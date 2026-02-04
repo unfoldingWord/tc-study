@@ -33,11 +33,18 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
-      - name: Build TC-Study (includes dependencies)
+      - name: Build all workspace packages
+        run: cd packages && for dir in */; do (cd "$dir" && [ -f package.json ] && bun run build 2>/dev/null || true); done
+
+      - name: Build TC-Study
         working-directory: apps/tc-study
         run: bun run build:skip-check
+        
+      - name: Remove large preloaded files
+        working-directory: apps/tc-study
+        run: rm -f dist/preloaded/*.json || true
 
       - name: Publish to Cloudflare Pages
         uses: cloudflare/pages-action@v1
