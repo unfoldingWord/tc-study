@@ -1,0 +1,33 @@
+{
+  "name": "@bt-synergy/translation-words-loader",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Translation Words resource loader for catalog-manager - handles TW entries",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Tests coming soon\""
+  },
+  "keywords": [
+    "translation",
+    "words",
+    "dictionary",
+    "loader"
+  ],
+  "author": "BT-Synergy",
+  "license": "MIT",
+  "dependencies": {
+    "@bt-synergy/resource-catalog": "workspace:*",
+    "jszip": "^3.10.1"
+  },
+  "peerDependencies": {
+    "@bt-synergy/catalog-manager": "workspace:*",
+    "@bt-synergy/door43-api": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
+

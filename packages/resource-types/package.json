@@ -1,0 +1,23 @@
+{
+  "name": "@bt-synergy/resource-types",
+  "version": "0.2.0",
+  "description": "Resource type definitions for BT-Synergy",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@bt-synergy/resource-panels": "workspace:*",
+    "@bt-synergy/resource-signals": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/react": "^18.0.0"
+  }
+}

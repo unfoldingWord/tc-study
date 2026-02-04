@@ -1,0 +1,38 @@
+{
+  "name": "@bt-synergy/unified-catalog-store",
+  "version": "0.1.0",
+  "description": "Unified catalog store with React hooks",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "catalog",
+    "store",
+    "unified",
+    "hooks"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "zustand": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.0.0",
+    "typescript": "^5.3.3"
+  }
+}
+
+

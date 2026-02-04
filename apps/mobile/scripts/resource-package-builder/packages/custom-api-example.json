@@ -1,0 +1,33 @@
+{
+  "name": "custom-api-example",
+  "version": "1.0.0",
+  "description": "Example package using a custom API server",
+  "outputDir": "outputs/custom-api-example",
+  "server": "custom_api",
+  "config": {
+    "baseUrl": "https://api.example.com",
+    "endpoint": "/resources",
+    "apiKey": "your-api-key-here",
+    "timeout": 30000,
+    "retries": 3
+  },
+  "resources": [
+    {
+      "id": "uw_lt",
+      "description": "Inherits custom API server config"
+    },
+    {
+      "id": "uw_tn",
+      "config": {
+        "endpoint": "/translation-notes",
+        "timeout": 60000
+      },
+      "description": "Overrides endpoint and timeout for this resource"
+    }
+  ],
+  "metadata": {
+    "author": "Resource Package Builder",
+    "license": "MIT",
+    "description": "This package demonstrates custom API server configuration. Shows how different servers can have completely different configuration requirements."
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "resources": [
+    {
+      "owner": "unfoldingWord",
+      "language": "el-x-koine",
+      "resourceId": "ugnt",
+      "stage": "prod",
+      "version": "0.30"
+    },
+    {
+      "owner": "unfoldingWord",
+      "language": "hbo",
+      "resourceId": "uhb",
+      "stage": "prod",
+      "version": "2.1.30"
+    },
+    {
+      "owner": "unfoldingWord",
+      "language": "en",
+      "resourceId": "ult",
+      "stage": "prod"
+    },
+    {
+      "owner": "unfoldingWord",
+      "language": "en",
+      "resourceId": "ust",
+      "stage": "prod"
+    }
+  ],
+  "output": "./bundled-resources",
+  "format": "json",
+  "compress": true,
+  "manifest": true,
+  "parallel": true
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@bt-synergy/linked-panels",
+  "version": "1.0.0",
+  "description": "Cross-panel communication system for coordinated resource interactions",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "echo 'Skipping build - external package'",
+    "dev": "echo 'No dev mode - external package'",
+    "clean": "echo 'No clean needed - external package'"
+  },
+  "keywords": ["panels", "communication", "messages", "pub-sub", "scripture", "highlighting"],
+  "author": "BT Synergy Team",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+

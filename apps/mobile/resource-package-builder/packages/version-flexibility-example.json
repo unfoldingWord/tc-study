@@ -1,0 +1,60 @@
+{
+  "name": "version-flexibility-example",
+  "version": "1.0.0",
+  "description": "Example showing different version specifications",
+  "outputDir": "outputs/version-flexibility-example",
+  "server": "door43",
+  "config": {
+    "owner": "unfoldingWord",
+    "language": "en",
+    "stage": "prod"
+  },
+  "resources": [
+    {
+      "id": "uw_lt",
+      "description": "Inherits package config (version will default to 'latest')"
+    },
+    {
+      "id": "uw_tn",
+      "config": {
+        "version": "v86"
+      },
+      "description": "Explicitly specifies version v86"
+    },
+    {
+      "id": "uw_tw",
+      "config": {
+        "version": "latest"
+      },
+      "description": "Explicitly specifies 'latest' version"
+    },
+    {
+      "id": "uw_ta",
+      "config": {
+        "version": "v85"
+      },
+      "description": "Uses older version v85"
+    }
+  ],
+  "metadata": {
+    "author": "Resource Package Builder",
+    "license": "MIT",
+    "description": "This package demonstrates version flexibility. Resources can inherit the default 'latest' version, explicitly specify 'latest', or use specific version numbers like 'v86' or 'v85'."
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

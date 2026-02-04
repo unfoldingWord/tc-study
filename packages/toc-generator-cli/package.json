@@ -1,0 +1,46 @@
+{
+  "name": "@bt-synergy/toc-generator-cli",
+  "version": "1.0.0",
+  "description": "CLI tool for generating Table of Contents (ingredients) files for Door43 resources",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./toc-generator": "./dist/toc-generator.js",
+    "./generators": "./dist/generators/index.js"
+  },
+  "bin": {
+    "toc-generator": "./bin/toc-generator",
+    "toc-generator.cmd": "./bin/toc-generator.cmd"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "bun dist/cli.js",
+    "cli": "bun dist/cli.js",
+    "debug": "bun --inspect dist/cli.js"
+  },
+  "keywords": [
+    "toc",
+    "ingredients",
+    "cli",
+    "door43",
+    "resources"
+  ],
+  "author": "BT Synergy Team",
+  "license": "MIT",
+  "dependencies": {
+    "@bt-synergy/door43-api": "workspace:*",
+    "commander": "^11.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.0.1",
+    "inquirer": "^9.2.12",
+    "dotenv": "^16.4.5",
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/inquirer": "^9.0.7",
+    "typescript": "^5.3.3"
+  }
+}

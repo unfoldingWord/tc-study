@@ -1,0 +1,24 @@
+{
+  "description": "Static bundle config - Resources imported as JS modules (no fetch)",
+  "resources": [
+    {
+      "owner": "unfoldingWord",
+      "language": "el-x-koine",
+      "resourceId": "ugnt",
+      "stage": "prod",
+      "version": "0.34"
+    },
+    {
+      "owner": "unfoldingWord",
+      "language": "hbo",
+      "resourceId": "uhb",
+      "stage": "prod",
+      "version": "2.1.30"
+    }
+  ],
+  "output": "./src/preloaded",
+  "format": "json",
+  "compress": false,
+  "manifest": true,
+  "parallel": true
+}

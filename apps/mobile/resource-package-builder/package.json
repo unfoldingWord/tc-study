@@ -1,0 +1,66 @@
+{
+  "name": "@bt-synergy/resource-package-builder",
+  "version": "2.0.0",
+  "description": "Localized resource package builder with namespace-prefixed resources",
+  "main": "core/PackageBuilder.ts",
+  "type": "module",
+  "bin": {
+    "rpb": "./cli/build.ts",
+    "rpb-tarball": "./cli/build-tarball.ts"
+  },
+  "scripts": {
+    "build": "tsx cli/build.ts",
+    "build:package": "tsx cli/build.ts build",
+    "build:tarball": "tsx cli/build-tarball.ts",
+    "build:tarball-package": "tsx cli/build-tarball.ts build",
+    "list-packages": "tsx cli/build.ts list-packages",
+    "list-resources": "tsx cli/build.ts list-resources",
+    "list-servers": "tsx cli/build.ts list-servers",
+    "server-config": "tsx cli/build.ts server-config",
+    "create-package": "tsx cli/build.ts create-package",
+    "cache": "tsx cli/build.ts cache",
+    "help": "tsx cli/build.ts help",
+    "test-download": "tsx cli/build-tarball.ts test-download",
+    "dev": "tsx --watch cli/build.ts"
+  },
+  "keywords": [
+    "resource",
+    "package",
+    "builder",
+    "localized",
+    "namespace",
+    "unfoldingword",
+    "door43",
+    "bible",
+    "translation",
+    "notes",
+    "scripture"
+  ],
+  "author": "BT-Synergy Team",
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^20.0.0",
+    "better-sqlite3": "^9.6.0",
+    "commander": "^12.0.0",
+    "tar": "^6.2.0",
+    "tsx": "^4.20.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/commander": "^2.12.2",
+    "@types/tar": "^6.1.9",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "core/",
+    "resources/",
+    "servers/",
+    "packages/",
+    "cli/",
+    "*.ts",
+    "*.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

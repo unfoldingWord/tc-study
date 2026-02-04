@@ -1,0 +1,64 @@
+{
+  "name": "translation-notes-with-dependencies",
+  "version": "1.0.0",
+  "description": "English Translation Notes with all required dependencies for enhanced processing",
+  "outputDir": "outputs/translation-notes-with-dependencies",
+  "server": "door43",
+  "config": {
+    "owner": "unfoldingWord",
+    "language": "en",
+    "version": "v86",
+    "stage": "prod"
+  },
+  "resources": [
+    {
+      "id": "uw_lt"
+    },
+    {
+      "id": "uw_tw",
+      "dependencies": [
+        {
+          "resourceId": "uw_ta",
+          "purpose": "cross_references",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "uw_ta",
+      "dependencies": [
+        {
+          "resourceId": "uw_tw",
+          "purpose": "cross_references",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "uw_tn",
+      "dependencies": [
+        {
+          "resourceId": "uw_lt",
+          "purpose": "original_quotes",
+          "required": true
+        },
+        {
+          "resourceId": "uw_tw",
+          "purpose": "link_titles",
+          "required": true
+        },
+        {
+          "resourceId": "uw_ta",
+          "purpose": "link_titles",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "author": "Resource Package Builder",
+    "license": "MIT",
+    "homepage": "https://github.com/bt-synergy/resource-package-builder",
+    "description": "This package demonstrates resource dependencies and inheritance. All resources inherit the Door43 server configuration, and TN requires ULT for original quotes, and both TW and TA for link titles."
+  }
+}

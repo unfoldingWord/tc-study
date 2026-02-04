@@ -1,0 +1,23 @@
+{
+  "name": "@bt-synergy/catalog-manager",
+  "version": "0.1.0",
+  "description": "Resource catalog manager for BT-Synergy",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@bt-synergy/resource-catalog": "workspace:*",
+    "@bt-synergy/resource-types": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/react": "^18.0.0"
+  }
+}

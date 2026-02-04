@@ -1,0 +1,86 @@
+{
+  "name": "english-bible-tarball",
+  "version": "1.0.0",
+  "description": "English Bible resources using tarball downloads for efficiency",
+  "outputDir": "outputs/english-bible-tarball",
+  "server": "door43",
+  "config": {
+    "owner": "unfoldingWord",
+    "language": "en",
+    "version": "v86",
+    "stage": "prod"
+  },
+  "resources": [
+    {
+      "id": "uw_ult",
+      "description": "UnfoldingWord Literal Text - word-for-word translation",
+      "config": {
+        "maxBooks": 5
+      }
+    },
+    {
+      "id": "uw_ust",
+      "description": "UnfoldingWord Simplified Translation - meaning-based translation",
+      "config": {
+        "maxBooks": 5
+      }
+    },
+    {
+      "id": "uw_tn",
+      "description": "Translation Notes with dependencies on ULT",
+      "dependencies": [
+        {
+          "resourceId": "uw_ult",
+          "purpose": "original_quotes",
+          "required": true
+        }
+      ],
+      "config": {
+        "maxBooks": 3
+      }
+    },
+    {
+      "id": "uw_tw",
+      "description": "Translation Words - biblical term definitions",
+      "config": {
+        "maxEntries": 20
+      }
+    },
+    {
+      "id": "uw_ta",
+      "description": "Translation Academy - translation training articles",
+      "dependencies": [
+        {
+          "resourceId": "uw_tw",
+          "purpose": "cross_references",
+          "required": false
+        }
+      ],
+      "config": {
+        "maxEntries": 10
+      }
+    }
+  ],
+  "exporters": [
+    {
+      "type": "sqlite",
+      "options": {
+        "databaseName": "english-bible.db",
+        "compress": false
+      }
+    },
+    {
+      "type": "json",
+      "options": {
+        "fileName": "english-bible.json",
+        "compress": true,
+        "compressionLevel": 9
+      }
+    }
+  ],
+  "metadata": {
+    "author": "Resource Package Builder",
+    "license": "MIT",
+    "description": "This package demonstrates efficient tarball-based resource downloading for English Bible resources. Each resource is downloaded as a single tarball archive and extracted locally, significantly reducing the number of HTTP requests compared to individual file downloads."
+  }
+}

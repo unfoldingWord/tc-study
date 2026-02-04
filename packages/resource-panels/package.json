@@ -1,0 +1,45 @@
+{
+  "name": "@bt-synergy/resource-panels",
+  "version": "0.1.0",
+  "description": "High-level wrapper around linked-panels for interactive resource management",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/types.d.ts",
+      "import": "./dist/core/types.js",
+      "require": "./dist/core/types.js"
+    },
+    "./examples": {
+      "types": "./dist/examples/commonSignals.d.ts",
+      "import": "./dist/examples/commonSignals.js",
+      "require": "./dist/examples/commonSignals.js"
+    },
+    "./signals": {
+      "types": "./dist/signals/types.d.ts",
+      "import": "./dist/signals/types.js",
+      "require": "./dist/signals/types.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "linked-panels": "^1.0.0-beta.2"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+

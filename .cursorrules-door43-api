@@ -1,0 +1,270 @@
+# Door43 API Guidelines
+
+## Overview
+All interactions with Door43.org APIs must go through the centralized `Door43ApiClient`.
+Never make direct fetch/HTTP calls to Door43 endpoints.
+
+## Rules
+
+### 1. Always Use Door43ApiClient
+```typescript
+// ✅ CORRECT
+import { getDoor43ApiClient } from '@/lib/services/api/Door43ApiClient';
+
+const client = getDoor43ApiClient();
+const languages = await client.getLanguages();
+const resources = await client.getResourcesByLanguage('en');
+
+// ❌ WRONG - Direct fetch
+const response = await fetch('https://git.door43.org/api/v3/catalog.json');
+```
+
+### 2. Parameter Validation
+Always validate parameters before making API calls:
+
+```typescript
+// ✅ CORRECT
+if (!languageCode || typeof languageCode !== 'string') {
+  throw new Error('Invalid language code');
+}
+const resources = await client.getResourcesByLanguage(languageCode);
+
+// ❌ WRONG - No validation
+const resources = await client.getResourcesByLanguage(userInput);
+```
+
+### 3. Error Handling
+Always handle Door43 API errors gracefully:
+
+```typescript
+// ✅ CORRECT
+try {
+  const resources = await client.getResourcesByLanguage('en');
+  // ... use resources
+} catch (error) {
+  if (error.code === 'TIMEOUT') {
+    console.error('Door43 API timeout - using cached data');
+    // Fallback to cached/bundled resources
+  } else if (error.code === 'NETWORK_ERROR') {
+    console.error('No network connection');
+    // Show offline mode
+  }
+}
+
+// ❌ WRONG - No error handling
+const resources = await client.getResourcesByLanguage('en');
+```
+
+### 4. Type Safety
+Use the provided TypeScript types:
+
+```typescript
+// ✅ CORRECT
+import { Door43Resource, Door43Language } from '@/lib/services/api/Door43ApiClient';
+
+function processResource(resource: Door43Resource) {
+  console.log(resource.id, resource.language, resource.owner);
+}
+
+// ❌ WRONG - Using 'any'
+function processResource(resource: any) {
+  console.log(resource.id);
+}
+```
+
+### 5. Testing
+Write tests for any code using Door43 API:
+
+```typescript
+// ✅ CORRECT
+import { createDoor43ApiClient } from '@/lib/services/api/Door43ApiClient';
+
+describe('MyComponent', () => {
+  it('should handle Door43 API errors', async () => {
+    const mockClient = createDoor43ApiClient({
+      baseUrl: 'https://mock.door43.org'
+    });
+    // Test with mock client
+  });
+});
+
+// ❌ WRONG - No tests
+```
+
+### 6. Caching & Offline Support
+Always provide fallback for offline scenarios:
+
+```typescript
+// ✅ CORRECT
+async function loadResources(languageCode: string) {
+  try {
+    const resources = await client.getResourcesByLanguage(languageCode);
+    await cacheResources(resources);
+    return resources;
+  } catch (error) {
+    console.warn('Failed to fetch from Door43, using cached data');
+    return await getCachedResources(languageCode);
+  }
+}
+
+// ❌ WRONG - No offline fallback
+async function loadResources(languageCode: string) {
+  return await client.getResourcesByLanguage(languageCode);
+}
+```
+
+### 7. Rate Limiting
+Be mindful of API rate limits:
+
+```typescript
+// ✅ CORRECT - Batch requests
+const languages = ['en', 'es', 'fr'];
+const allResources = await Promise.all(
+  languages.map(lang => 
+    client.getResourcesByLanguage(lang)
+      .catch(err => {
+        console.warn(`Failed for ${lang}:`, err);
+        return [];
+      })
+  )
+);
+
+// ❌ WRONG - Rapid sequential calls without error handling
+for (const lang of languages) {
+  await client.getResourcesByLanguage(lang);
+}
+```
+
+### 8. Timeout Configuration
+Set appropriate timeouts based on context:
+
+```typescript
+// ✅ CORRECT - Different timeouts for different scenarios
+const quickClient = createDoor43ApiClient({ timeout: 5000 }); // Fast check
+const normalClient = createDoor43ApiClient({ timeout: 30000 }); // Standard
+const downloadClient = createDoor43ApiClient({ timeout: 120000 }); // Large downloads
+
+// ❌ WRONG - Same timeout for everything
+```
+
+### 9. Response Validation
+Validate API responses before using them:
+
+```typescript
+// ✅ CORRECT
+const catalog = await client.getCatalog();
+if (!client.validateCatalog(catalog)) {
+  throw new Error('Invalid catalog structure');
+}
+
+// ❌ WRONG - Assume response is valid
+const catalog = await client.getCatalog();
+catalog.languages.forEach(...); // Could crash if invalid
+```
+
+### 10. Documentation
+Document Door43-specific logic:
+
+```typescript
+// ✅ CORRECT
+/**
+ * Fetches unfoldingWord resources for translation work.
+ * 
+ * Door43 API: Gets resources filtered by owner='unfoldingWord'
+ * Fallback: Uses bundled resources if offline
+ * 
+ * @param languageCode - ISO 639 code (e.g., 'en', 'es-419')
+ * @returns Array of resources or empty array on error
+ */
+async function getUnfoldingWordResources(languageCode: string) {
+  // ...
+}
+
+// ❌ WRONG - No documentation
+async function getUnfoldingWordResources(languageCode: string) {
+  // ...
+}
+```
+
+## Common Patterns
+
+### Pattern: Load with Fallback
+```typescript
+async function loadLanguages(): Promise<Door43Language[]> {
+  try {
+    const client = getDoor43ApiClient();
+    const languages = await client.getLanguages();
+    return languages;
+  } catch (error) {
+    console.warn('Failed to fetch languages, using defaults');
+    return DEFAULT_LANGUAGES;
+  }
+}
+```
+
+### Pattern: Find Resource with Alternatives
+```typescript
+async function findBibleResource(
+  language: string,
+  preferredIds: string[]
+): Promise<Door43Resource | null> {
+  const client = getDoor43ApiClient();
+  
+  // Try each resource ID in priority order
+  for (const resourceId of preferredIds) {
+    try {
+      const resource = await client.findResource('unfoldingWord', language, resourceId);
+      if (resource) return resource;
+    } catch (error) {
+      console.warn(`Resource ${resourceId} not found`);
+    }
+  }
+  
+  return null;
+}
+```
+
+### Pattern: Batch with Error Recovery
+```typescript
+async function loadMultipleLanguages(
+  languageCodes: string[]
+): Promise<Map<string, Door43Resource[]>> {
+  const client = getDoor43ApiClient();
+  const results = new Map();
+  
+  const promises = languageCodes.map(async (code) => {
+    try {
+      const resources = await client.getResourcesByLanguage(code);
+      results.set(code, resources);
+    } catch (error) {
+      console.warn(`Failed to load ${code}:`, error);
+      results.set(code, []);
+    }
+  });
+  
+  await Promise.allSettled(promises);
+  return results;
+}
+```
+
+## Checklist
+
+Before committing code that uses Door43 API:
+
+- [ ] Uses `Door43ApiClient`, not direct fetch
+- [ ] Validates all parameters
+- [ ] Handles errors with try/catch
+- [ ] Has offline/fallback strategy
+- [ ] Uses TypeScript types
+- [ ] Has tests (unit or integration)
+- [ ] Sets appropriate timeout
+- [ ] Validates responses
+- [ ] Documents Door43-specific behavior
+- [ ] Respects rate limits
+
+## Reference
+
+- API Client: `lib/services/api/Door43ApiClient.ts`
+- Tests: `lib/services/api/Door43ApiClient.test.ts`
+- Door43 API Docs: https://git.door43.org/api/swagger
+

@@ -1,0 +1,124 @@
+---
+description: Semiotic UI - Use icons/symbols only, avoid text labels for internationalization
+globs: **/*.tsx
+alwaysApply: false
+---
+
+# Semiotic UI Pattern
+
+Use visual symbols (icons, colors, animations) instead of text labels to reduce localization overhead and create universally understandable interfaces.
+
+## Core Principle
+
+**Icons communicate state, not text.**
+
+## Loading States
+
+```tsx
+// ❌ BAD - Text requires translation
+<div>
+  <Loader className="w-5 h-5 animate-spin" />
+  <span>Loading entries...</span>
+</div>
+
+// ✅ GOOD - Icon only
+<div className="flex items-center justify-center h-32">
+  <Loader className="w-5 h-5 text-purple-500 animate-spin" />
+</div>
+
+// ✅ ACCEPTABLE - For accessibility (use aria-label/title)
+<div 
+  className="flex items-center justify-center h-32"
+  aria-label="Loading content"
+  role="status"
+>
+  <Loader className="w-5 h-5 text-purple-500 animate-spin" />
+</div>
+```
+
+## Error States
+
+```tsx
+// ❌ BAD
+<div>
+  <AlertCircle className="w-5 h-5 text-red-500" />
+  <span>Failed to load</span>
+</div>
+
+// ✅ GOOD - Icon color communicates error
+<div className="flex items-center justify-center" title="Error">
+  <AlertCircle className="w-6 h-6 text-red-500" />
+</div>
+```
+
+## Empty States
+
+```tsx
+// ❌ BAD
+<div>
+  <FileText className="w-12 h-12 text-gray-300" />
+  <p>No entries available</p>
+</div>
+
+// ✅ GOOD - Icon with subtle styling indicates empty state
+<div className="flex items-center justify-center h-full">
+  <FileText className="w-16 h-16 text-gray-300 opacity-60" />
+</div>
+```
+
+## Success States
+
+```tsx
+// ❌ BAD
+<div>
+  <CheckCircle2 className="w-5 h-5 text-green-600" />
+  <span>Download complete!</span>
+</div>
+
+// ✅ GOOD - Animated icon communicates success
+<div>
+  <CheckCircle2 className="w-5 h-5 text-green-600 animate-pulse" />
+</div>
+```
+
+## Progress Indicators
+
+```tsx
+// ❌ BAD
+<div>
+  <span>Downloading 5 of 10 items...</span>
+  <ProgressBar value={50} />
+</div>
+
+// ✅ GOOD - Visual progress with percentage badge
+<div>
+  <div className="relative">
+    <Download className="w-5 h-5" />
+    <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs px-1 rounded-full">
+      50%
+    </span>
+  </div>
+</div>
+```
+
+## When Text is Necessary
+
+Use `title`, `aria-label`, or `aria-describedby` attributes for accessibility:
+
+```tsx
+<button
+  onClick={handleSave}
+  title="Save changes"
+  aria-label="Save changes"
+>
+  <Save className="w-5 h-5" />
+</button>
+```
+
+## Visual Communication Hierarchy
+
+1. **Icon shape** - Conveys action/state type
+2. **Color** - Indicates status (red=error, green=success, blue=info)
+3. **Animation** - Shows activity (spin, pulse, bounce)
+4. **Size** - Emphasizes importance
+5. **Opacity** - Communicates availability/relevance

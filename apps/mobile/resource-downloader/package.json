@@ -1,0 +1,54 @@
+{
+  "name": "@bt-toolkit/resource-downloader",
+  "version": "1.0.0",
+  "description": "Door43 Resource Downloader - Downloads and processes Door43 resources using existing adapters",
+  "main": "complete-downloader.ts",
+  "type": "module",
+  "scripts": {
+    "download": "tsx complete-downloader.ts",
+    "build-db": "tsx sqlite-builder.ts",
+    "export-json": "tsx json-exporter.ts",
+    "export-json-split": "tsx json-exporter-split.ts",
+    "export-archive": "tsx archive-exporter.ts",
+    "export-zip": "tsx zip-exporter.ts",
+    "bundle-resources": "tsx resource-zip-bundler.ts",
+    "copy-to-assets": "node copy-resources-to-assets.js",
+    "convert-app-db": "tsx app-db-converter.ts",
+    "create-db-asset": "node create-db-asset.js",
+    "start": "npm run download && npm run build-db",
+    "start:app": "npm run download && npm run convert-app-db && npm run create-db-asset",
+    "start:app-split": "npm run download && npm run export-json-split",
+    "start:app-archive": "npm run download && npm run export-archive && npm run copy-to-assets",
+    "start:app-bundled": "npm run download && npm run bundle-resources"
+  },
+  "keywords": [
+    "door43",
+    "bible",
+    "translation",
+    "resources",
+    "downloader",
+    "usfm",
+    "scripture",
+    "sqlite",
+    "indexeddb"
+  ],
+  "author": "BT-Toolkit Team",
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^20.0.0",
+    "archiver": "^7.0.1",
+    "better-sqlite3": "^12.2.0",
+    "glob": "^10.3.0",
+    "tsx": "^4.20.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "*.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "@bt-synergy/translation-notes-loader",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Translation Notes resource loader for catalog-manager - handles TN TSV files",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "echo \"Tests coming soon\""
+  },
+  "keywords": [
+    "translation",
+    "notes",
+    "tn",
+    "loader"
+  ],
+  "author": "BT-Synergy",
+  "license": "MIT",
+  "dependencies": {
+    "@bt-synergy/resource-catalog": "workspace:*",
+    "@bt-synergy/resource-parsers": "workspace:*"
+  },
+  "peerDependencies": {
+    "@bt-synergy/catalog-manager": "workspace:*",
+    "@bt-synergy/door43-api": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
+
+

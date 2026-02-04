@@ -1,0 +1,40 @@
+{
+  "name": "@bt-synergy/resource-adapters",
+  "version": "0.1.0",
+  "description": "Platform-agnostic resource adapters for fetching and processing Door43 content",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "door43",
+    "bible",
+    "translation",
+    "adapter",
+    "resource"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@bt-synergy/door43-api": "workspace:*",
+    "@bt-synergy/resource-parsers": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.0.4"
+  }
+}
+

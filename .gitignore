@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Turbo
+.turbo
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment
+.env
+.env*.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+.cache/
+
+# Large data files - should not be committed
+apps/tc-study/public/preloaded/*.json
+apps/tc-study/.bt-cache/
+apps/mobile/resource-downloader/app.db
+exports/uw-translation-resources/
+packages/catalog-cli/test-*.zip
+packages/resource-bundler/test-output/

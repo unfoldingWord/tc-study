@@ -1,0 +1,1 @@
+{"root":["./src/index.ts","./src/core/types.ts","./src/examples/commonsignals.ts","./src/hooks/index.ts","./src/hooks/useresourcepanel.ts","./src/hooks/usesignal.ts","./src/hooks/usesignalhandler.ts","./src/hooks/usesignalstore.ts","./src/signals/index.ts","./src/signals/registry.ts","./src/signals/types.ts","./src/utils/filtermatching.ts"],"version":"5.9.3"}

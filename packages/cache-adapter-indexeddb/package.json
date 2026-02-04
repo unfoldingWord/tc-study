@@ -1,0 +1,35 @@
+{
+  "name": "@bt-synergy/cache-adapter-indexeddb",
+  "version": "0.1.0",
+  "description": "IndexedDB storage adapter for resource-cache (web browsers)",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "cache",
+    "adapter",
+    "indexeddb",
+    "web",
+    "browser"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@bt-synergy/resource-cache": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

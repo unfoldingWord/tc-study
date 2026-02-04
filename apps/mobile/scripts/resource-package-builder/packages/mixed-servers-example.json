@@ -1,0 +1,56 @@
+{
+  "name": "mixed-servers-example",
+  "version": "1.0.0",
+  "description": "Example package showing inheritance with mixed server usage",
+  "outputDir": "outputs/mixed-servers-example",
+  "server": "door43",
+  "config": {
+    "owner": "unfoldingWord",
+    "language": "en",
+    "version": "v86",
+    "stage": "prod"
+  },
+  "resources": [
+    {
+      "id": "uw_lt",
+      "description": "Inherits package server and config"
+    },
+    {
+      "id": "uw_tn",
+      "description": "Inherits package server and config",
+      "dependencies": [
+        {
+          "resourceId": "uw_lt",
+          "purpose": "original_quotes",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "uw_tw",
+      "server": "door43",
+      "config": {
+        "owner": "unfoldingWord",
+        "language": "es",
+        "version": "v85",
+        "stage": "prod"
+      },
+      "description": "Overrides package config for Spanish language"
+    },
+    {
+      "id": "uw_ta",
+      "server": "other_server",
+      "config": {
+        "baseUrl": "https://api.other-server.com",
+        "language": "en",
+        "version": "latest"
+      },
+      "description": "Uses different server entirely"
+    }
+  ],
+  "metadata": {
+    "author": "Resource Package Builder",
+    "license": "MIT",
+    "description": "This package demonstrates how resources can inherit package-level server configuration or override it with their own server and config."
+  }
+}

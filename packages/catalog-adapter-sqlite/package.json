@@ -1,0 +1,23 @@
+{
+  "name": "@bt-synergy/catalog-adapter-sqlite",
+  "version": "1.0.0",
+  "description": "SQLite adapter for catalog storage",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bt-synergy/catalog-manager": "workspace:*",
+    "better-sqlite3": "^9.2.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}
+

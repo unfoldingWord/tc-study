@@ -1,0 +1,379 @@
+# BT Synergy - Development Principles
+
+## Core Principle 1: Minimal Localization Requirements
+
+All UI components should be designed to minimize or eliminate the need for text localization. The goal is to create interfaces that are self-explanatory through visual design, icons, and context.
+
+## Core Principle 2: DRY (Don't Repeat Yourself)
+
+**Never duplicate code.** Always extract reusable logic into shared utilities, hooks, or components.
+
+### Rules for Code Reuse:
+
+1. **Extract Common Patterns**: If you see similar code in 2+ places, extract it
+2. **Create Shared Hooks**: For repeated React logic (data fetching, state management)
+3. **Create Utility Functions**: For repeated transformations, validations, or calculations
+4. **Create Base Components**: For repeated UI patterns with variations
+5. **Use Composition**: Build complex components from simpler, reusable ones
+
+### Good Examples:
+
+**❌ BAD - Duplicated fetch logic:**
+```tsx
+// LanguageSelector.tsx
+const loadLanguages = async () => {
+  const door43Client = getDoor43ApiClient()
+  const langs = await door43Client.getLanguages({...})
+  setLanguages(langs)
+}
+
+// OrganizationSelector.tsx  
+const loadOrganizations = async () => {
+  const door43Client = getDoor43ApiClient()
+  const orgs = await door43Client.getOrganizations({...})
+  setOrganizations(orgs)
+}
+```
+
+**✅ GOOD - Shared hook:**
+```tsx
+// hooks/useDoor43Data.ts
+export function useDoor43Data<T>(
+  fetchFn: (filters: any) => Promise<T[]>,
+  dependencies: any[]
+) {
+  const [data, setData] = useState<T[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const result = await fetchFn(filters)
+        setData(result)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, dependencies)
+  
+  return { data, loading }
+}
+
+// Usage:
+const { data: languages, loading } = useDoor43Data(
+  (filters) => client.getLanguages(filters),
+  [selectedSubjects]
+)
+```
+
+**❌ BAD - Duplicated grid UI:**
+```tsx
+// Multiple places with identical grid structure
+<div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+  {items.map(item => (
+    <button className="p-4 border-2 rounded-lg...">
+      {/* Complex button content */}
+    </button>
+  ))}
+</div>
+```
+
+**✅ GOOD - Reusable grid component:**
+```tsx
+// components/SelectableGrid.tsx
+interface SelectableGridProps<T> {
+  items: T[]
+  selected: Set<string>
+  onToggle: (id: string) => void
+  renderItem: (item: T, isSelected: boolean) => ReactNode
+  getKey: (item: T) => string
+}
+
+export function SelectableGrid<T>({ items, selected, onToggle, renderItem, getKey }: SelectableGridProps<T>) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {items.map(item => {
+        const key = getKey(item)
+        const isSelected = selected.has(key)
+        return (
+          <button
+            key={key}
+            onClick={() => onToggle(key)}
+            className={`p-4 border-2 rounded-lg ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
+          >
+            {renderItem(item, isSelected)}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+```
+
+### When to Extract:
+
+- **Immediately**: If copying code from one file to another
+- **After 2nd use**: If same logic appears twice, extract on 3rd use
+- **When refactoring**: Always look for duplication opportunities
+- **In code review**: Suggest extractions for any duplicated code
+
+### Where to Place Shared Code:
+
+- **Hooks**: `src/hooks/` - Reusable React logic
+- **Utils**: `src/utils/` - Pure functions, transformations
+- **Components**: `src/components/shared/` - Reusable UI components
+- **Types**: `src/types/` - Shared TypeScript interfaces/types
+- **Constants**: `src/constants/` - Shared configuration, enums
+
+## Rules
+
+### 1. Icon-First Design
+- **Use icons instead of text labels** wherever possible
+- Every action button should have an icon as the primary visual element
+- Text labels should only be used in tooltips or aria-labels for accessibility
+- Icons should be universally recognizable (use Lucide React or similar standard icon sets)
+
+**Good Example:**
+```tsx
+<button
+  onClick={handleDelete}
+  className="p-2 hover:bg-red-100 rounded-md"
+  title="Delete resource"
+  aria-label="Delete resource"
+>
+  <Trash2 className="w-4 h-4 text-red-600" />
+</button>
+```
+
+**Bad Example:**
+```tsx
+<button onClick={handleDelete}>
+  <Trash2 className="w-4 h-4" />
+  Delete Resource
+</button>
+```
+
+### 2. Remove Instructional Text
+- **No "how to use" instructions** in the UI
+- **No explanatory paragraphs** or helper text
+- The UI should be intuitive enough that users understand it visually
+- Use placeholder text in inputs instead of labels above them
+
+**Good Example:**
+```tsx
+<input
+  type="text"
+  placeholder="Search..."
+  className="w-full px-3 py-2 border rounded-lg"
+  aria-label="Search resources"
+/>
+```
+
+**Bad Example:**
+```tsx
+<div>
+  <label>Search Resources</label>
+  <p>Enter a keyword to search for resources in the catalog</p>
+  <input type="text" />
+</div>
+```
+
+### 3. Visual Indicators Over Text
+- Use **badges with numbers** instead of text counts
+- Use **color coding** to indicate status (green = available, blue = online, gray = unavailable)
+- Use **icons as status indicators** (Database icon = cached, Wifi icon = online)
+- Use **progress indicators** instead of text status messages
+
+**Good Example:**
+```tsx
+<div className="flex items-center gap-2">
+  <Database className="w-4 h-4 text-green-600" />
+  <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+    {cachedCount}
+  </span>
+</div>
+```
+
+**Bad Example:**
+```tsx
+<p>You have {cachedCount} cached resources available offline</p>
+```
+
+### 4. Compact Headers and Titles
+- Avoid verbose titles like "Welcome to the Resource Manager"
+- Use **single words or short phrases** (2-3 words max) for section headers
+- Use **numbered badges** instead of "Panel 1", "Panel 2" text
+- Consider removing titles entirely if context is clear
+
+**Good Example:**
+```tsx
+<div className="flex items-center gap-2">
+  <div className="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center text-sm font-bold">
+    1
+  </div>
+  <BookOpen className="w-5 h-5 text-blue-600" />
+</div>
+```
+
+**Bad Example:**
+```tsx
+<h2>Panel 1 - Scripture Resources</h2>
+<p>This panel shows your selected scripture resources</p>
+```
+
+### 5. Empty States
+- Empty states should use **icons and minimal text**
+- Avoid long explanations of what's missing
+- Use a large icon, a single short phrase, and action buttons
+
+**Good Example:**
+```tsx
+<div className="text-center py-12">
+  <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+  <div className="flex gap-2 justify-center">
+    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg">
+      <Plus className="w-4 h-4" />
+    </button>
+    <button className="px-4 py-2 border border-gray-300 rounded-lg">
+      <Download className="w-4 h-4" />
+    </button>
+  </div>
+</div>
+```
+
+**Bad Example:**
+```tsx
+<div>
+  <h3>No Collections Yet</h3>
+  <p>You haven't created any collections yet. Collections help you organize your resources for specific projects or studies.</p>
+  <button>Create Your First Collection</button>
+</div>
+```
+
+### 6. Modal and Wizard Headers
+- Remove verbose modal titles
+- Use **icon + number badge** to indicate what's being added and where
+- Remove subtitle/description text
+- Use visual progress indicators (stepper with icons)
+
+**Good Example:**
+```tsx
+<div className="flex items-center gap-3">
+  <div className="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">
+    1
+  </div>
+  <BookOpen className="w-6 h-6 text-blue-600" />
+</div>
+```
+
+**Bad Example:**
+```tsx
+<div>
+  <h2>Add Resources to Panel 1</h2>
+  <p>Click any resource below to add it to your panel instantly</p>
+</div>
+```
+
+### 7. Tab Navigation
+- Use **icons only** or **icon + count badge** for tabs
+- Remove text labels from tabs when icon is self-explanatory
+- Use color/underline to indicate active tab
+
+**Good Example:**
+```tsx
+<div className="flex border-b">
+  <button className={`px-4 py-3 ${isActive ? 'border-b-2 border-blue-600' : ''}`}>
+    <div className="flex items-center gap-2">
+      <Package className="w-5 h-5" />
+      <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs">
+        {count}
+      </span>
+    </div>
+  </button>
+</div>
+```
+
+**Bad Example:**
+```tsx
+<Tab label="My Collections (5)" />
+<Tab label="Browse Catalog (120)" />
+```
+
+### 8. Tooltips and Accessibility
+- **Always include `title` and `aria-label`** attributes for icon-only buttons
+- Tooltips should contain the text that would have been the label
+- This maintains accessibility while keeping the UI clean
+
+**Good Example:**
+```tsx
+<button
+  onClick={handleSave}
+  title="Save changes"
+  aria-label="Save changes"
+  className="p-2 hover:bg-green-100 rounded-md"
+>
+  <Save className="w-5 h-5 text-green-600" />
+</button>
+```
+
+### 9. Forms and Inputs
+- Use **placeholder text** instead of labels
+- Use **icons inside inputs** to indicate purpose
+- Avoid helper text below inputs unless critical
+
+**Good Example:**
+```tsx
+<div className="relative">
+  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+  <input
+    type="text"
+    placeholder="Search..."
+    className="w-full pl-10 pr-4 py-2 border rounded-lg"
+  />
+</div>
+```
+
+### 10. Grid Layouts for Lists
+- Use **grid layouts** instead of verbose list items
+- Show key info through **icons, badges, and minimal text**
+- Use **visual grouping** (cards) instead of section headers
+
+**Good Example:**
+```tsx
+<div className="grid grid-cols-3 gap-3">
+  {items.map(item => (
+    <button className="p-4 border-2 rounded-lg hover:border-blue-500">
+      <div className="font-semibold">{item.name}</div>
+      <div className="text-sm text-gray-500">{item.code}</div>
+      <div className="flex gap-1 mt-2">
+        <Database className="w-3 h-3 text-green-600" />
+      </div>
+    </button>
+  ))}
+</div>
+```
+
+## Summary Checklist
+
+Before committing any UI component, verify:
+
+- [ ] No instructional text or "how to" explanations
+- [ ] All buttons use icons with tooltips (not text labels)
+- [ ] Empty states use icons and minimal text
+- [ ] Headers and titles are minimal (or removed if context is clear)
+- [ ] Status indicators use icons/colors instead of text
+- [ ] Tabs use icons + badges instead of text labels
+- [ ] All interactive elements have `title` and `aria-label` for accessibility
+- [ ] Lists use grid layouts with visual indicators
+- [ ] No verbose descriptions or helper text
+- [ ] The UI is self-explanatory through visual design
+
+## Examples to Study
+
+- `LanguageSelectorStep.tsx` - Icon-based language grid
+- `ResourceSelectorStep.tsx` - Icon-based resource grid  
+- `AddToCatalogWizard.tsx` - Icon-based wizard progress
+- `LinkedPanelsStudio.tsx` - Icon-based panel headers and navigation
+

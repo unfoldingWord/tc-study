@@ -1,0 +1,21 @@
+{
+  "name": "@bt-synergy/passage-sets-cli",
+  "version": "1.0.0",
+  "description": "CLI tool for managing passage sets",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "echo 'Skipping build - no source files'",
+    "dev": "echo 'No dev mode - no source files'",
+    "lint": "echo 'No lint - no source files'",
+    "typecheck": "echo 'No typecheck - no source files'"
+  },
+  "dependencies": {
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}
+

@@ -1,0 +1,34 @@
+{
+  "name": "@bt-synergy/resource-cli",
+  "version": "0.1.0",
+  "description": "CLI tool for generating BT-Synergy resource packages",
+  "bin": {
+    "resource": "./dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node dist/index.js create test-resource --platforms web"
+  },
+  "keywords": [
+    "bt-synergy",
+    "resource",
+    "cli",
+    "generator",
+    "scaffold"
+  ],
+  "dependencies": {
+    "commander": "^11.0.0",
+    "chalk": "^4.1.2",
+    "prompts": "^2.4.2",
+    "fs-extra": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/prompts": "^2.4.4",
+    "@types/fs-extra": "^11.0.0",
+    "typescript": "^5.3.3"
+  }
+}

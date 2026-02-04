@@ -1,0 +1,1873 @@
+{
+  "id": "new-generations-story-sets",
+  "name": "New Generations Story Sets",
+  "description": "A comprehensive collection of scripture sets for evangelism, discipleship, and leadership development",
+  "version": "1.0.0",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "metadata": {
+    "category": "curriculum",
+    "audience": [
+      "beginner",
+      "intermediate",
+      "advanced"
+    ],
+    "passageCount": 1141,
+    "source": "ESP300 Kingdom Scripture Sets - v. 2"
+  },
+  "root": [
+    {
+      "id": "creation-to-christ",
+      "type": "group",
+      "label": "Scripture Set #1 - Creation to Christ: Helping People Discover God",
+      "description": "A foundational set introducing God's plan from creation through Christ",
+      "metadata": {
+        "totalVerses": 383,
+        "theme": "evangelism"
+      },
+      "groupType": "sequential",
+      "requiresSequentialCompletion": true,
+      "children": [
+        {
+          "id": "creation-to-christ-1",
+          "type": "passage",
+          "label": "1. Genesis 1:1-25",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "1:1-25",
+              "label": "Discover our Creator",
+              "metadata": {
+                "title": "Discover our Creator",
+                "theme": "creation"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-2",
+          "type": "passage",
+          "label": "2. Genesis 1:26-31",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "1:26-31",
+              "label": "The Image of God",
+              "metadata": {
+                "title": "The Image of God",
+                "theme": "creation"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-3",
+          "type": "passage",
+          "label": "3. Genesis 2:7-17",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "2:7-17",
+              "label": "God's Provides & Instructs",
+              "metadata": {
+                "title": "God's Provides & Instructs",
+                "theme": "provision"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-4",
+          "type": "passage",
+          "label": "4. Genesis 3:1-6",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "3:1-6",
+              "label": "Man Disobeys God",
+              "metadata": {
+                "title": "Man Disobeys God",
+                "theme": "sin"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-5",
+          "type": "passage",
+          "label": "5. Genesis 3:7-13",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "3:7-13",
+              "label": "Results of Disobedience",
+              "metadata": {
+                "title": "Results of Disobedience",
+                "theme": "sin"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-6",
+          "type": "passage",
+          "label": "6. Genesis 3:14-24",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "3:14-24",
+              "label": "Creation Cursed & Promise",
+              "metadata": {
+                "title": "Creation Cursed & Promise",
+                "theme": "promise"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-7",
+          "type": "passage",
+          "label": "7. Genesis 6:5-17",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "6:5-17",
+              "label": "Compounded Consequences",
+              "metadata": {
+                "title": "Compounded Consequences",
+                "theme": "judgment"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-8",
+          "type": "passage",
+          "label": "8. Genesis 11:1-9",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "11:1-9",
+              "label": "United in Rebellion",
+              "metadata": {
+                "title": "United in Rebellion",
+                "theme": "rebellion"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-9",
+          "type": "passage",
+          "label": "9. Genesis 12:1-3",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "12:1-3",
+              "label": "God's Promised Restoration",
+              "metadata": {
+                "title": "God's Promised Restoration",
+                "theme": "promise"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-10",
+          "type": "passage",
+          "label": "10. Genesis 22:1-19",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "22:1-19",
+              "label": "God Provides a Ram",
+              "metadata": {
+                "title": "God Provides a Ram",
+                "theme": "sacrifice"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-11",
+          "type": "passage",
+          "label": "11. Exodus 12:1-28",
+          "passages": [
+            {
+              "bookCode": "EXO",
+              "ref": "12:1-28",
+              "label": "A Passover Lamb",
+              "metadata": {
+                "title": "A Passover Lamb",
+                "theme": "sacrifice"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-12",
+          "type": "passage",
+          "label": "12. Isaiah 53",
+          "passages": [
+            {
+              "bookCode": "ISA",
+              "ref": "53:1-12",
+              "label": "Messiah will Suffer",
+              "metadata": {
+                "title": "Messiah will Suffer",
+                "theme": "prophecy"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-13",
+          "type": "passage",
+          "label": "13. Luke 1:26-38, 2:1-20",
+          "passages": [
+            {
+              "bookCode": "LUK",
+              "ref": "1:26-38",
+              "label": "God's Promised Savior (Annunciation)",
+              "metadata": {
+                "title": "The Annunciation",
+                "theme": "incarnation"
+              }
+            },
+            {
+              "bookCode": "LUK",
+              "ref": "2:1-20",
+              "label": "God's Promised Savior (Birth)",
+              "metadata": {
+                "title": "The Birth of Jesus",
+                "theme": "incarnation"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-14",
+          "type": "passage",
+          "label": "14. Matthew 3:13-17",
+          "passages": [
+            {
+              "bookCode": "MAT",
+              "ref": "3:13-17",
+              "label": "Jesus Baptized",
+              "metadata": {
+                "title": "Jesus Baptized",
+                "theme": "baptism"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-15",
+          "type": "passage",
+          "label": "15. John 1:29-34",
+          "passages": [
+            {
+              "bookCode": "JOH",
+              "ref": "1:29-34",
+              "label": "The Lamb of God",
+              "metadata": {
+                "title": "The Lamb of God",
+                "theme": "sacrifice"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-16",
+          "type": "passage",
+          "label": "16. Matthew 4:1-11",
+          "passages": [
+            {
+              "bookCode": "MAT",
+              "ref": "4:1-11",
+              "label": "Jesus Tested",
+              "metadata": {
+                "title": "Jesus Tested",
+                "theme": "temptation"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-17",
+          "type": "passage",
+          "label": "17. Luke 5:17-26",
+          "passages": [
+            {
+              "bookCode": "LUK",
+              "ref": "5:17-26",
+              "label": "Forgiving & Healing",
+              "metadata": {
+                "title": "Forgiving & Healing",
+                "theme": "healing"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-18",
+          "type": "passage",
+          "label": "18. Mark 4:35-41",
+          "passages": [
+            {
+              "bookCode": "MAR",
+              "ref": "4:35-41",
+              "label": "Power Over Nature",
+              "metadata": {
+                "title": "Power Over Nature",
+                "theme": "miracle"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-19",
+          "type": "passage",
+          "label": "19. Mark 5:1-20",
+          "passages": [
+            {
+              "bookCode": "MAR",
+              "ref": "5:1-20",
+              "label": "Power Over Demons",
+              "metadata": {
+                "title": "Power Over Demons",
+                "theme": "deliverance"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-20",
+          "type": "passage",
+          "label": "20. John 11:1-44",
+          "passages": [
+            {
+              "bookCode": "JOH",
+              "ref": "11:1-44",
+              "label": "Power Over Death",
+              "metadata": {
+                "title": "Power Over Death",
+                "theme": "resurrection"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-21",
+          "type": "passage",
+          "label": "21. John 18:1-11",
+          "passages": [
+            {
+              "bookCode": "JOH",
+              "ref": "18:1-11",
+              "label": "Jesus Betrayed & Arrested",
+              "metadata": {
+                "title": "Jesus Betrayed & Arrested",
+                "theme": "betrayal"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-22",
+          "type": "passage",
+          "label": "22. Luke 23:32-56",
+          "passages": [
+            {
+              "bookCode": "LUK",
+              "ref": "23:32-56",
+              "label": "Crucified yet Forgiving",
+              "metadata": {
+                "title": "Crucified yet Forgiving",
+                "theme": "crucifixion"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-23",
+          "type": "passage",
+          "label": "23. Luke 24:1-35",
+          "passages": [
+            {
+              "bookCode": "LUK",
+              "ref": "24:1-35",
+              "label": "Jesus' Resurrection",
+              "metadata": {
+                "title": "Jesus' Resurrection",
+                "theme": "resurrection"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-24",
+          "type": "passage",
+          "label": "24. Matthew 11:28-30",
+          "passages": [
+            {
+              "bookCode": "MAT",
+              "ref": "11:28-30",
+              "label": "Come to Jesus",
+              "metadata": {
+                "title": "Come to Jesus",
+                "theme": "invitation"
+              }
+            }
+          ]
+        },
+        {
+          "id": "creation-to-christ-25",
+          "type": "passage",
+          "label": "25. John 3:1-7, 14-19",
+          "passages": [
+            {
+              "bookCode": "JOH",
+              "ref": "3:1-7",
+              "label": "Born Again (Part 1)",
+              "metadata": {
+                "title": "Born Again - Nicodemus",
+                "theme": "salvation"
+              }
+            },
+            {
+              "bookCode": "JOH",
+              "ref": "3:14-19",
+              "label": "Born Again (Part 2)",
+              "metadata": {
+                "title": "Born Again - God's Love",
+                "theme": "salvation"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "the-church",
+      "type": "group",
+      "label": "Scripture Set #2 – The Church: Becoming a Community of Christ Followers",
+      "description": "Building understanding of church life and community",
+      "metadata": {
+        "totalVerses": 269,
+        "theme": "discipleship"
+      },
+      "groupType": "sequential",
+      "requiresSequentialCompletion": true,
+      "children": [
+        {
+          "id": "church-1",
+          "type": "passage",
+          "label": "1. Luke 19:1-10",
+          "passages": [
+            {
+              "bookCode": "LUK",
+              "ref": "19:1-10",
+              "label": "Repenting & Believing",
+              "metadata": {
+                "title": "Repenting & Believing",
+                "theme": "repentance"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-2",
+          "type": "passage",
+          "label": "2. Acts 1:4-5, 8, 2:1-17",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "1:4-5",
+              "label": "Holy Spirit Empowered (Promise)",
+              "metadata": {
+                "title": "The Promise of the Spirit",
+                "theme": "holy-spirit"
+              }
+            },
+            {
+              "bookCode": "ACT",
+              "ref": "1:8",
+              "label": "Holy Spirit Empowered (Commission)",
+              "metadata": {
+                "title": "The Great Commission",
+                "theme": "mission"
+              }
+            },
+            {
+              "bookCode": "ACT",
+              "ref": "2:1-17",
+              "label": "Holy Spirit Empowered (Pentecost)",
+              "metadata": {
+                "title": "Pentecost",
+                "theme": "holy-spirit"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-3",
+          "type": "passage",
+          "label": "3. Acts 2:14, 22-24, 36-41",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "2:14",
+              "label": "Baptizing Followers (Peter Stands)",
+              "metadata": {
+                "title": "Peter Stands Up",
+                "theme": "preaching"
+              }
+            },
+            {
+              "bookCode": "ACT",
+              "ref": "2:22-24",
+              "label": "Baptizing Followers (The Message)",
+              "metadata": {
+                "title": "Peter's Message",
+                "theme": "preaching"
+              }
+            },
+            {
+              "bookCode": "ACT",
+              "ref": "2:36-41",
+              "label": "Baptizing Followers (Response)",
+              "metadata": {
+                "title": "The Response",
+                "theme": "baptism"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-4",
+          "type": "passage",
+          "label": "4. Acts 2:41-47",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "2:41-47",
+              "label": "Functions of Churches",
+              "metadata": {
+                "title": "Functions of Churches",
+                "theme": "church-life"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-5",
+          "type": "passage",
+          "label": "5. Acts 3:1-19",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "3:1-19",
+              "label": "Praying for Healing",
+              "metadata": {
+                "title": "Praying for Healing",
+                "theme": "healing"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-6",
+          "type": "passage",
+          "label": "6. Acts 4:1-22",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "4:1-22",
+              "label": "Making Disciples",
+              "metadata": {
+                "title": "Making Disciples",
+                "theme": "discipleship"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-7",
+          "type": "passage",
+          "label": "7. Acts 4:23-31",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "4:23-31",
+              "label": "Spirit's Empowerment",
+              "metadata": {
+                "title": "Spirit's Empowerment",
+                "theme": "prayer"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-8",
+          "type": "passage",
+          "label": "8. Acts 4:32-35",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "4:32-35",
+              "label": "Lifestyle of Generosity",
+              "metadata": {
+                "title": "Lifestyle of Generosity",
+                "theme": "generosity"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-9",
+          "type": "passage",
+          "label": "9. Acts 5:12, 17-35, 40-41",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "5:12",
+              "label": "Courage in Suffering (Signs)",
+              "metadata": {
+                "title": "Signs and Wonders",
+                "theme": "miracles"
+              }
+            },
+            {
+              "bookCode": "ACT",
+              "ref": "5:17-35",
+              "label": "Courage in Suffering (Persecution)",
+              "metadata": {
+                "title": "Persecution and Deliverance",
+                "theme": "persecution"
+              }
+            },
+            {
+              "bookCode": "ACT",
+              "ref": "5:40-41",
+              "label": "Courage in Suffering (Joy)",
+              "metadata": {
+                "title": "Joy in Suffering",
+                "theme": "suffering"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-10",
+          "type": "passage",
+          "label": "10. Acts 6:1-7",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "6:1-7",
+              "label": "Developing Leaders",
+              "metadata": {
+                "title": "Developing Leaders",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-11",
+          "type": "passage",
+          "label": "11. Acts 6:8-15, 7:56-60 & 8:1-4",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "6:8-15",
+              "label": "Enduring (Stephen's Arrest)",
+              "metadata": {
+                "title": "Stephen's Arrest",
+                "theme": "persecution"
+              }
+            },
+            {
+              "bookCode": "ACT",
+              "ref": "7:56-60",
+              "label": "Enduring (Stephen's Death)",
+              "metadata": {
+                "title": "Stephen's Martyrdom",
+                "theme": "martyrdom"
+              }
+            },
+            {
+              "bookCode": "ACT",
+              "ref": "8:1-4",
+              "label": "Enduring (Scattering)",
+              "metadata": {
+                "title": "The Church Scattered",
+                "theme": "persecution"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-12",
+          "type": "passage",
+          "label": "12. Acts 8:26-39",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "8:26-39",
+              "label": "Baptizing New Followers",
+              "metadata": {
+                "title": "Baptizing New Followers",
+                "theme": "evangelism"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-13",
+          "type": "passage",
+          "label": "13. Acts 9:1-22",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "9:1-22",
+              "label": "Sharing Good News",
+              "metadata": {
+                "title": "Sharing Good News",
+                "theme": "conversion"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-14",
+          "type": "passage",
+          "label": "14. Acts 9:32-42",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "9:32-42",
+              "label": "Praying for Oppressed",
+              "metadata": {
+                "title": "Praying for Oppressed",
+                "theme": "healing"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-15",
+          "type": "passage",
+          "label": "15. Acts 11:19-26",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "11:19-26",
+              "label": "Studying God's Word",
+              "metadata": {
+                "title": "Studying God's Word",
+                "theme": "teaching"
+              }
+            }
+          ]
+        },
+        {
+          "id": "church-16",
+          "type": "passage",
+          "label": "16. Acts 11:25-30",
+          "passages": [
+            {
+              "bookCode": "ACT",
+              "ref": "11:25-30",
+              "label": "Mission of Generosity",
+              "metadata": {
+                "title": "Mission of Generosity",
+                "theme": "generosity"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kingdom-of-god-subset",
+      "type": "group",
+      "label": "The Kingdom of God (10 passages)",
+      "description": "A focused study on the Kingdom of God theme",
+      "metadata": {
+        "totalVerses": 60,
+        "theme": "kingdom"
+      },
+      "groupType": "sequential",
+      "children": [
+        {
+          "id": "kingdom-1",
+          "type": "passage",
+          "label": "1. Genesis 3:14-24",
+          "passages": [
+            {
+              "bookCode": "GEN",
+              "ref": "3:14-24",
+              "label": "Promise of the Seed",
+              "metadata": {
+                "title": "Promise of the Seed",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-2",
+          "type": "passage",
+          "label": "2. 2 Samuel 7:4-5, 12-16",
+          "passages": [
+            {
+              "bookCode": "2SA",
+              "ref": "7:4-5",
+              "label": "Eternal Kingdom (Promise to David)",
+              "metadata": {
+                "title": "God's Promise to David",
+                "theme": "kingdom"
+              }
+            },
+            {
+              "bookCode": "2SA",
+              "ref": "7:12-16",
+              "label": "Eternal Kingdom (Covenant)",
+              "metadata": {
+                "title": "The Davidic Covenant",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-3",
+          "type": "passage",
+          "label": "3. Isaiah 9:6-7",
+          "passages": [
+            {
+              "bookCode": "ISA",
+              "ref": "9:6-7",
+              "label": "Messiah born of a virgin",
+              "metadata": {
+                "title": "Messiah born of a virgin",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-4",
+          "type": "passage",
+          "label": "4. Isaiah 40:3-5, 42:1-4",
+          "passages": [
+            {
+              "bookCode": "ISA",
+              "ref": "40:3-5",
+              "label": "New Kingdom (Preparation)",
+              "metadata": {
+                "title": "Preparing the Way",
+                "theme": "kingdom"
+              }
+            },
+            {
+              "bookCode": "ISA",
+              "ref": "42:1-4",
+              "label": "New Kingdom (Servant)",
+              "metadata": {
+                "title": "The Servant King",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-5",
+          "type": "passage",
+          "label": "5. Isaiah 53",
+          "passages": [
+            {
+              "bookCode": "ISA",
+              "ref": "53:1-12",
+              "label": "Messiah will Suffer",
+              "metadata": {
+                "title": "Messiah will Suffer",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-6",
+          "type": "passage",
+          "label": "6. Daniel 2:44, 7:14",
+          "passages": [
+            {
+              "bookCode": "DAN",
+              "ref": "2:44",
+              "label": "Eternal kingdom for all (Vision)",
+              "metadata": {
+                "title": "The Eternal Kingdom",
+                "theme": "kingdom"
+              }
+            },
+            {
+              "bookCode": "DAN",
+              "ref": "7:14",
+              "label": "Eternal kingdom for all (Authority)",
+              "metadata": {
+                "title": "Dominion and Glory",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-7",
+          "type": "passage",
+          "label": "7. Matthew 6:25-33",
+          "passages": [
+            {
+              "bookCode": "MAT",
+              "ref": "6:25-33",
+              "label": "Kingdom Focus",
+              "metadata": {
+                "title": "Kingdom Focus",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-8",
+          "type": "passage",
+          "label": "8. Matthew 24:3-14",
+          "passages": [
+            {
+              "bookCode": "MAT",
+              "ref": "24:3-14",
+              "label": "The Culmination",
+              "metadata": {
+                "title": "The Culmination",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-9",
+          "type": "passage",
+          "label": "9. Hebrews 10:12-14",
+          "passages": [
+            {
+              "bookCode": "HEB",
+              "ref": "10:12-14",
+              "label": "Kingdom Sacrifice",
+              "metadata": {
+                "title": "Kingdom Sacrifice",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        },
+        {
+          "id": "kingdom-10",
+          "type": "passage",
+          "label": "10. 1 Timothy 6:11-16",
+          "passages": [
+            {
+              "bookCode": "1TI",
+              "ref": "6:11-16",
+              "label": "King of Kings",
+              "metadata": {
+                "title": "King of Kings",
+                "theme": "kingdom"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "developing-leaders",
+      "type": "group",
+      "label": "Scripture Set #3 – A Sample Set For Developing Leaders",
+      "description": "Leadership development through the book of Titus",
+      "metadata": {
+        "totalVerses": 66,
+        "theme": "leadership"
+      },
+      "groupType": "sequential",
+      "requiresSequentialCompletion": true,
+      "children": [
+        {
+          "id": "leaders-1",
+          "type": "passage",
+          "label": "1. Titus 1:1-4",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "1:1-4",
+              "label": "Promises of God",
+              "metadata": {
+                "title": "Promises of God",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-2",
+          "type": "passage",
+          "label": "2. Titus 1:5-9",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "1:5-9",
+              "label": "Qualifications of Elders",
+              "metadata": {
+                "title": "Qualifications of Elders",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-3",
+          "type": "passage",
+          "label": "3. Titus 1:10-16",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "1:10-16",
+              "label": "Behavior of the lost",
+              "metadata": {
+                "title": "Behavior of the lost",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-4",
+          "type": "passage",
+          "label": "4. Titus 2:1-5",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "2:1-5",
+              "label": "Leading those older",
+              "metadata": {
+                "title": "Leading those older",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-5",
+          "type": "passage",
+          "label": "5. Titus 2:6-10",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "2:6-10",
+              "label": "Leading those younger",
+              "metadata": {
+                "title": "Leading those younger",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-6",
+          "type": "passage",
+          "label": "6. Titus 2:11-14",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "2:11-14",
+              "label": "Grace & Renouncing",
+              "metadata": {
+                "title": "Grace & Renouncing",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-7",
+          "type": "passage",
+          "label": "7. Titus 2:15-3:2",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "2:15",
+              "label": "Vision Reminders (Authority)",
+              "metadata": {
+                "title": "Speak with Authority",
+                "theme": "leadership"
+              }
+            },
+            {
+              "bookCode": "TIT",
+              "ref": "3:1-2",
+              "label": "Vision Reminders (Submission)",
+              "metadata": {
+                "title": "Remind Them to Submit",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-8",
+          "type": "passage",
+          "label": "8. Titus 3:3-8",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "3:3-8",
+              "label": "Grace motivates compassion",
+              "metadata": {
+                "title": "Grace motivates compassion",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-9",
+          "type": "passage",
+          "label": "9. Titus 3:9-11",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "3:9-11",
+              "label": "Handling distractions",
+              "metadata": {
+                "title": "Handling distractions",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-10",
+          "type": "passage",
+          "label": "10. Titus 3:12-15",
+          "passages": [
+            {
+              "bookCode": "TIT",
+              "ref": "3:12-15",
+              "label": "Focused on Mission",
+              "metadata": {
+                "title": "Focused on Mission",
+                "theme": "leadership"
+              }
+            }
+          ]
+        },
+        {
+          "id": "leaders-shepherding",
+          "type": "passage",
+          "label": "Ezekiel 34:11-24; 36:22-27",
+          "passages": [
+            {
+              "bookCode": "EZK",
+              "ref": "34:11-24",
+              "label": "Shepherding Introduction (The Good Shepherd)",
+              "metadata": {
+                "title": "The Good Shepherd",
+                "theme": "leadership"
+              }
+            },
+            {
+              "bookCode": "EZK",
+              "ref": "36:22-27",
+              "label": "Shepherding Introduction (New Heart)",
+              "metadata": {
+                "title": "A New Heart",
+                "theme": "leadership"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mission-contextualization",
+      "type": "group",
+      "label": "Scripture Set #4 – Various issues of Mission & Contextualization",
+      "description": "Advanced topics for mission and cultural adaptation",
+      "metadata": {
+        "totalVerses": 423,
+        "theme": "mission"
+      },
+      "groupType": "parallel",
+      "children": [
+        {
+          "id": "dmm-training",
+          "type": "group",
+          "label": "Disciple Making Movement Training",
+          "description": "Training for disciple making movements",
+          "metadata": {
+            "totalVerses": 43,
+            "theme": "dmm"
+          },
+          "children": [
+            {
+              "id": "dmm-1",
+              "type": "passage",
+              "label": "1. Luke 15:11-32",
+              "passages": [
+                {
+                  "bookCode": "LUK",
+                  "ref": "15:11-32",
+                  "label": "God's loving heart",
+                  "metadata": {
+                    "title": "God's loving heart",
+                    "theme": "dmm"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "dmm-2",
+              "type": "passage",
+              "label": "2. John 6:43-45",
+              "passages": [
+                {
+                  "bookCode": "JOH",
+                  "ref": "6:43-45",
+                  "label": "God draws, so ask him to",
+                  "metadata": {
+                    "title": "God draws, so ask him to",
+                    "theme": "dmm"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "dmm-3",
+              "type": "passage",
+              "label": "3. Deuteronomy 6:4-9",
+              "passages": [
+                {
+                  "bookCode": "DEU",
+                  "ref": "6:4-9",
+                  "label": "Show your Christian life",
+                  "metadata": {
+                    "title": "Show your Christian life",
+                    "theme": "dmm"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "dmm-4",
+              "type": "passage",
+              "label": "4. Luke 10:1-12",
+              "passages": [
+                {
+                  "bookCode": "LUK",
+                  "ref": "10:1-12",
+                  "label": "A Jesus strategy to reach the lost",
+                  "metadata": {
+                    "title": "A Jesus strategy to reach the lost",
+                    "theme": "dmm"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "commitment-to-jesus",
+          "type": "group",
+          "label": "Commitment to Jesus",
+          "description": "Understanding commitment and discipleship",
+          "metadata": {
+            "totalVerses": 22,
+            "theme": "commitment"
+          },
+          "children": [
+            {
+              "id": "commitment-1",
+              "type": "passage",
+              "label": "1. Mark 12:28-31",
+              "passages": [
+                {
+                  "bookCode": "MAR",
+                  "ref": "12:28-31",
+                  "label": "Love God and neighbor",
+                  "metadata": {
+                    "title": "Love God and neighbor",
+                    "theme": "commitment"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "commitment-2",
+              "type": "passage",
+              "label": "2. Luke 14:25-27, 33",
+              "passages": [
+                {
+                  "bookCode": "LUK",
+                  "ref": "14:25-27",
+                  "label": "Die daily and follow Christ (Cost)",
+                  "metadata": {
+                    "title": "Count the Cost",
+                    "theme": "commitment"
+                  }
+                },
+                {
+                  "bookCode": "LUK",
+                  "ref": "14:33",
+                  "label": "Die daily and follow Christ (Everything)",
+                  "metadata": {
+                    "title": "Give Up Everything",
+                    "theme": "commitment"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "commitment-3",
+              "type": "passage",
+              "label": "3. John 12:24-26",
+              "passages": [
+                {
+                  "bookCode": "JOH",
+                  "ref": "12:24-26",
+                  "label": "Die to bear much fruit",
+                  "metadata": {
+                    "title": "Die to bear much fruit",
+                    "theme": "commitment"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "commitment-4",
+              "type": "passage",
+              "label": "4. John 13:34-35",
+              "passages": [
+                {
+                  "bookCode": "JOH",
+                  "ref": "13:34-35",
+                  "label": "Love as Christ loves us",
+                  "metadata": {
+                    "title": "Love as Christ loves us",
+                    "theme": "commitment"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "commitment-5",
+              "type": "passage",
+              "label": "5. John 14:15-16",
+              "passages": [
+                {
+                  "bookCode": "JOH",
+                  "ref": "14:15-16",
+                  "label": "Love and obey Jesus, receive the Holy Spirit",
+                  "metadata": {
+                    "title": "Love and obey Jesus, receive the Holy Spirit",
+                    "theme": "commitment"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "commitment-6",
+              "type": "passage",
+              "label": "6. John 15:7-8",
+              "passages": [
+                {
+                  "bookCode": "JOH",
+                  "ref": "15:7-8",
+                  "label": "Remain in Christ to bear fruit",
+                  "metadata": {
+                    "title": "Remain in Christ to bear fruit",
+                    "theme": "commitment"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "commitment-7",
+              "type": "passage",
+              "label": "7. John 20:28-29",
+              "passages": [
+                {
+                  "bookCode": "JOH",
+                  "ref": "20:28-29",
+                  "label": "Trust Jesus as Lord and God",
+                  "metadata": {
+                    "title": "Trust Jesus as Lord and God",
+                    "theme": "commitment"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "commitment-8",
+              "type": "passage",
+              "label": "8. Matthew 28:18-20",
+              "passages": [
+                {
+                  "bookCode": "MAT",
+                  "ref": "28:18-20",
+                  "label": "Make disciples of all nations",
+                  "metadata": {
+                    "title": "Make disciples of all nations",
+                    "theme": "commitment"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "marriage",
+          "type": "group",
+          "label": "Marriage",
+          "description": "Biblical perspectives on marriage and relationships",
+          "metadata": {
+            "totalVerses": 157,
+            "theme": "marriage"
+          },
+          "children": [
+            {
+              "id": "marriage-1",
+              "type": "passage",
+              "label": "1. Genesis 24:1-29, 50-67",
+              "passages": [
+                {
+                  "bookCode": "GEN",
+                  "ref": "24:1-29",
+                  "label": "In good times and bad: Isaac & Rebekah (Meeting)",
+                  "metadata": {
+                    "title": "Isaac and Rebekah Meet",
+                    "theme": "marriage"
+                  }
+                },
+                {
+                  "bookCode": "GEN",
+                  "ref": "24:50-67",
+                  "label": "In good times and bad: Isaac & Rebekah (Marriage)",
+                  "metadata": {
+                    "title": "Isaac and Rebekah Marry",
+                    "theme": "marriage"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "marriage-2",
+              "type": "passage",
+              "label": "2. Ruth 2:1-23",
+              "passages": [
+                {
+                  "bookCode": "RUT",
+                  "ref": "2:1-23",
+                  "label": "Love, honor and cherish: Ruth and Boaz",
+                  "metadata": {
+                    "title": "Love, honor and cherish: Ruth and Boaz",
+                    "theme": "marriage"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "marriage-3",
+              "type": "passage",
+              "label": "3. Genesis 29:1-30",
+              "passages": [
+                {
+                  "bookCode": "GEN",
+                  "ref": "29:1-30",
+                  "label": "'Till death do us part: Jacob and Rachel",
+                  "metadata": {
+                    "title": "'Till death do us part: Jacob and Rachel",
+                    "theme": "marriage"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "marriage-4",
+              "type": "passage",
+              "label": "4. John 13:1-17",
+              "passages": [
+                {
+                  "bookCode": "JOH",
+                  "ref": "13:1-17",
+                  "label": "Serving one another: Who's job is foot washing?",
+                  "metadata": {
+                    "title": "Serving one another: Who's job is foot washing?",
+                    "theme": "marriage"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "marriage-5",
+              "type": "passage",
+              "label": "5. Genesis 2:4-25",
+              "passages": [
+                {
+                  "bookCode": "GEN",
+                  "ref": "2:4-25",
+                  "label": "One-flesh friends: Adam and Eve",
+                  "metadata": {
+                    "title": "One-flesh friends: Adam and Eve",
+                    "theme": "marriage"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "marriage-6",
+              "type": "passage",
+              "label": "6. Song of Songs 6:13-8:4",
+              "passages": [
+                {
+                  "bookCode": "SNG",
+                  "ref": "6:13",
+                  "label": "Lovers: celebrate the difference (Beginning)",
+                  "metadata": {
+                    "title": "Celebrate the Difference",
+                    "theme": "marriage"
+                  }
+                },
+                {
+                  "bookCode": "SNG",
+                  "ref": "7:1",
+                  "label": "Lovers: celebrate the difference (Continuation)",
+                  "metadata": {
+                    "title": "Love's Expression",
+                    "theme": "marriage"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "grief-and-loss",
+          "type": "group",
+          "label": "Grief and loss",
+          "description": "Biblical perspectives on grief, loss, and healing",
+          "metadata": {
+            "totalVerses": 142,
+            "theme": "grief"
+          },
+          "children": [
+            {
+              "id": "grief-1",
+              "type": "passage",
+              "label": "1. 2 Kings 4:8-37",
+              "passages": [
+                {
+                  "bookCode": "2KI",
+                  "ref": "4:8-37",
+                  "label": "Denial: Elisha and a woman in denial",
+                  "metadata": {
+                    "title": "Denial: Elisha and a woman in denial",
+                    "theme": "grief"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "grief-2",
+              "type": "passage",
+              "label": "2. Ruth 1:1-22",
+              "passages": [
+                {
+                  "bookCode": "RUT",
+                  "ref": "1:1-22",
+                  "label": "Anger: Naomi empty and bitter",
+                  "metadata": {
+                    "title": "Anger: Naomi empty and bitter",
+                    "theme": "grief"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "grief-3",
+              "type": "passage",
+              "label": "3. 2 Samuel 12:15-25",
+              "passages": [
+                {
+                  "bookCode": "2SA",
+                  "ref": "12:15-25",
+                  "label": "Bargaining: David bargains with God",
+                  "metadata": {
+                    "title": "Bargaining: David bargains with God",
+                    "theme": "grief"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "grief-4",
+              "type": "passage",
+              "label": "4. Genesis 37:12-36",
+              "passages": [
+                {
+                  "bookCode": "GEN",
+                  "ref": "37:12-36",
+                  "label": "Depression: Jacob mourns for Joseph",
+                  "metadata": {
+                    "title": "Depression: Jacob mourns for Joseph",
+                    "theme": "grief"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "grief-5",
+              "type": "passage",
+              "label": "5. Job 2:1-10",
+              "passages": [
+                {
+                  "bookCode": "JOB",
+                  "ref": "2:1-10",
+                  "label": "Acceptance: Job suffers",
+                  "metadata": {
+                    "title": "Acceptance: Job suffers",
+                    "theme": "grief"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "grief-6",
+              "type": "passage",
+              "label": "6. John 11:1-44",
+              "passages": [
+                {
+                  "bookCode": "JOH",
+                  "ref": "11:1-44",
+                  "label": "Hope: Jesus raises Lazarus",
+                  "metadata": {
+                    "title": "Hope: Jesus raises Lazarus",
+                    "theme": "grief"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "kingdom-of-god-extended",
+          "type": "group",
+          "label": "The Kingdom of God",
+          "description": "Extended study on the Kingdom of God (duplicate for reference)",
+          "metadata": {
+            "totalVerses": 59,
+            "theme": "kingdom"
+          },
+          "children": [
+            {
+              "id": "kingdom-ext-1",
+              "type": "passage",
+              "label": "1. Genesis 3:14-24",
+              "passages": [
+                {
+                  "bookCode": "GEN",
+                  "ref": "3:14-24",
+                  "label": "Promise of the Seed",
+                  "metadata": {
+                    "title": "Promise of the Seed",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-2",
+              "type": "passage",
+              "label": "2. 2 Samuel 7:4-5, 12-16",
+              "passages": [
+                {
+                  "bookCode": "2SA",
+                  "ref": "7:4-5",
+                  "label": "Eternal Kingdom (Promise)",
+                  "metadata": {
+                    "title": "Promise to David",
+                    "theme": "kingdom"
+                  }
+                },
+                {
+                  "bookCode": "2SA",
+                  "ref": "7:12-16",
+                  "label": "Eternal Kingdom (Covenant)",
+                  "metadata": {
+                    "title": "Davidic Covenant",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-3",
+              "type": "passage",
+              "label": "3. Isaiah 9:6-7",
+              "passages": [
+                {
+                  "bookCode": "ISA",
+                  "ref": "9:6-7",
+                  "label": "Messiah born of a virgin",
+                  "metadata": {
+                    "title": "Messiah born of a virgin",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-4",
+              "type": "passage",
+              "label": "4. Isaiah 40:3-5, 42:1-4",
+              "passages": [
+                {
+                  "bookCode": "ISA",
+                  "ref": "40:3-5",
+                  "label": "New Kingdom (Preparation)",
+                  "metadata": {
+                    "title": "Preparing the Way",
+                    "theme": "kingdom"
+                  }
+                },
+                {
+                  "bookCode": "ISA",
+                  "ref": "42:1-4",
+                  "label": "New Kingdom (Servant)",
+                  "metadata": {
+                    "title": "The Servant King",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-5",
+              "type": "passage",
+              "label": "5. Isaiah 53",
+              "passages": [
+                {
+                  "bookCode": "ISA",
+                  "ref": "53:1-12",
+                  "label": "Messiah will Suffer",
+                  "metadata": {
+                    "title": "Messiah will Suffer",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-6",
+              "type": "passage",
+              "label": "6. Daniel 2:44, 7:14",
+              "passages": [
+                {
+                  "bookCode": "DAN",
+                  "ref": "2:44",
+                  "label": "Eternal kingdom for all (Vision)",
+                  "metadata": {
+                    "title": "The Eternal Kingdom",
+                    "theme": "kingdom"
+                  }
+                },
+                {
+                  "bookCode": "DAN",
+                  "ref": "7:14",
+                  "label": "Eternal kingdom for all (Authority)",
+                  "metadata": {
+                    "title": "Dominion and Glory",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-7",
+              "type": "passage",
+              "label": "7. Matthew 6:25-33",
+              "passages": [
+                {
+                  "bookCode": "MAT",
+                  "ref": "6:25-33",
+                  "label": "Kingdom Focus",
+                  "metadata": {
+                    "title": "Kingdom Focus",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-8",
+              "type": "passage",
+              "label": "8. Matthew 24:3-14",
+              "passages": [
+                {
+                  "bookCode": "MAT",
+                  "ref": "24:3-14",
+                  "label": "The Culmination",
+                  "metadata": {
+                    "title": "The Culmination",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-9",
+              "type": "passage",
+              "label": "9. Hebrews 10:12-14",
+              "passages": [
+                {
+                  "bookCode": "HEB",
+                  "ref": "10:12-14",
+                  "label": "Kingdom Sacrifice",
+                  "metadata": {
+                    "title": "Kingdom Sacrifice",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "kingdom-ext-10",
+              "type": "passage",
+              "label": "10. 1 Timothy 6:11-16",
+              "passages": [
+                {
+                  "bookCode": "1TI",
+                  "ref": "6:11-16",
+                  "label": "King of Kings",
+                  "metadata": {
+                    "title": "King of Kings",
+                    "theme": "kingdom"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

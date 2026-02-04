@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Development bundle config - Original languages + English resources for UI testing",
+  "comment": "Includes Greek NT, English ULT/UST, Translation Words (twl removed - too large for Vite dev server)",
+  "resources": [
+    {
+      "owner": "unfoldingWord",
+      "language": "el-x-koine",
+      "resourceId": "ugnt",
+      "stage": "prod"
+    },
+    {
+      "owner": "unfoldingWord",
+      "language": "en",
+      "resourceId": "ult",
+      "stage": "prod"
+    },
+    {
+      "owner": "unfoldingWord",
+      "language": "en",
+      "resourceId": "ust",
+      "stage": "prod"
+    },
+    {
+      "owner": "unfoldingWord",
+      "language": "en",
+      "resourceId": "tw",
+      "stage": "prod"
+    }
+  ],
+  "output": "./public/preloaded",
+  "format": "json",
+  "compress": false,
+  "manifest": true,
+  "parallel": true
+}

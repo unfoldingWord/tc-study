@@ -1,0 +1,46 @@
+{
+  "name": "github-example",
+  "version": "1.0.0",
+  "description": "Example package using GitHub as the server",
+  "outputDir": "outputs/github-example",
+  "server": "github",
+  "config": {
+    "owner": "myorg",
+    "repo": "my-resource",
+    "branch": "main"
+  },
+  "resources": [
+    {
+      "id": "uw_lt",
+      "description": "Inherits GitHub server config"
+    },
+    {
+      "id": "uw_tn",
+      "config": {
+        "tag": "v1.2.0"
+      },
+      "description": "Uses specific tag instead of branch"
+    }
+  ],
+  "metadata": {
+    "author": "Resource Package Builder",
+    "license": "MIT",
+    "description": "This package demonstrates GitHub server configuration. Resources inherit the owner and repo, but can override branch/tag settings."
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

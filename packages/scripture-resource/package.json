@@ -1,0 +1,60 @@
+{
+  "name": "@bt-synergy/scripture-resource",
+  "version": "1.0.0",
+  "description": "Complete Scripture resource type for tc-study - loader, viewer, and signals",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./viewer": {
+      "types": "./dist/viewer/index.d.ts",
+      "import": "./dist/viewer/index.js",
+      "require": "./dist/viewer/index.js"
+    },
+    "./loader": {
+      "types": "./dist/loader/index.d.ts",
+      "import": "./dist/loader/index.js",
+      "require": "./dist/loader/index.js"
+    },
+    "./signals": {
+      "types": "./dist/signals/index.d.ts",
+      "import": "./dist/signals/index.js",
+      "require": "./dist/signals/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@bt-synergy/resource-types": "workspace:*",
+    "@bt-synergy/resource-panels": "workspace:*",
+    "@bt-synergy/usfm-processor": "workspace:*",
+    "@bt-synergy/resource-cache": "workspace:*",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.5",
+    "typescript": "~5.9.3"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "keywords": [
+    "bible",
+    "scripture",
+    "usfm",
+    "translation",
+    "tc-study",
+    "resource-type"
+  ],
+  "author": "BT Synergy Team",
+  "license": "MIT"
+}

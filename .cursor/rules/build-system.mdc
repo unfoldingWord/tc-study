@@ -1,0 +1,81 @@
+---
+description: Build system and package manager configuration
+alwaysApply: true
+---
+
+# Build System
+
+This repository uses **Bun** as the package manager and **Turborepo** for monorepo management.
+
+## Package Manager
+
+**Always use Bun, never npm, yarn, or pnpm.**
+
+```bash
+# ✅ CORRECT
+bun install
+bun add package-name
+bun remove package-name
+bun run dev
+bun run build
+
+# ❌ WRONG
+npm install
+pnpm install
+yarn add package-name
+```
+
+## Turborepo Build
+
+The project uses Turborepo for efficient builds across packages.
+
+```bash
+# Build all packages and apps
+bun run build
+
+# Build specific package
+bun run build --filter=@bt-synergy/package-name
+
+# Development mode (watch)
+bun run dev
+```
+
+## Important Notes
+
+- **Do NOT** suggest npm/pnpm/yarn commands
+- **Do NOT** use npx - use bunx instead
+- Turborepo caches builds for faster rebuilds
+- After adding/modifying packages, always run `bun run build`
+
+## Common Commands
+
+```bash
+# Install dependencies
+bun install
+
+# Build all packages
+bun run build
+
+# Development mode
+bun run dev
+
+# Run specific app
+bun run dev --filter=tc-study
+
+# Clean build cache
+bun run clean
+
+# Type checking
+bun run type-check
+
+# Linting
+bun run lint
+```
+
+## Package Structure
+
+This is a monorepo with:
+- `/apps/` - Applications (tc-study, mobile, etc.)
+- `/packages/` - Shared packages and libraries
+
+When suggesting commands, always use `bun` as the package manager.

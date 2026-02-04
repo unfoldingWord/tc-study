@@ -1,0 +1,58 @@
+{
+  "name": "@bt-synergy/resource-signals",
+  "version": "1.0.0",
+  "description": "Platform-agnostic signal definitions for resource inter-communication (Web + React Native)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./navigation": {
+      "types": "./dist/navigation.d.ts",
+      "import": "./dist/navigation.js"
+    },
+    "./content": {
+      "types": "./dist/content.d.ts",
+      "import": "./dist/content.js"
+    },
+    "./links": {
+      "types": "./dist/links.d.ts",
+      "import": "./dist/links.js"
+    },
+    "./lifecycle": {
+      "types": "./dist/lifecycle.d.ts",
+      "import": "./dist/lifecycle.js"
+    },
+    "./registry": {
+      "types": "./dist/registry.d.ts",
+      "import": "./dist/registry.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc -b --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "^2.0.0"
+  },
+  "keywords": [
+    "resource",
+    "signals",
+    "communication",
+    "cross-platform",
+    "react-native",
+    "web"
+  ],
+  "author": "BT Synergy Team",
+  "license": "MIT"
+}
+

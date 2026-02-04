@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/components/debuglogviewer.tsx","./src/components/loginscreen.tsx","./src/components/tocgeneratorform.tsx","./src/hooks/useauth.ts"],"version":"5.9.3"}

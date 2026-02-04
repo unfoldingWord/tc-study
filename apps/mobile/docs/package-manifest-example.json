@@ -1,0 +1,293 @@
+{
+  "formatVersion": "2.0.0",
+  
+  "id": "my-multilingual-study-pack-001",
+  "name": "My Multilingual Bible Study Pack",
+  "description": "English ULT + Spanish UST + Translation helps from multiple organizations",
+  "version": "1.0.0",
+  
+  "primaryOrganization": "unfoldingWord",
+  "primaryLanguage": "en",
+  
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z",
+  "createdBy": "user123",
+  
+  "resources": [
+    {
+      "id": "ult",
+      "type": "scripture",
+      "metadata": {
+        "id": "ult",
+        "type": "scripture",
+        "subjects": ["Aligned Bible"],
+        "books": [
+          { "code": "gen", "name": "Genesis" },
+          { "code": "exo", "name": "Exodus" },
+          { "code": "mat", "name": "Matthew" },
+          { "code": "mrk", "name": "Mark" }
+        ],
+        "version": "v1.0.0",
+        "size": 5242880,
+        "lastUpdated": "2023-12-01T00:00:00Z",
+        "owner": "unfoldingWord",
+        "language": "en",
+        "languageName": "English",
+        "format": "usfm",
+        "description": "Literal translation of the Bible",
+        "sourceUrl": "https://git.door43.org/unfoldingWord/en_ult",
+        "releaseUrl": "https://git.door43.org/unfoldingWord/en_ult/archive/v1.0.0.zip",
+        "commitSha": "a1b2c3d4e5f6"
+      },
+      "contentLocation": {
+        "type": "bundled",
+        "path": "/resources/unfoldingWord/en/ult/content",
+        "format": "compressed"
+      },
+      "status": "cached",
+      "role": "anchor",
+      "panelId": "panel-1",
+      "order": 1
+    },
+    {
+      "id": "ust",
+      "type": "scripture",
+      "metadata": {
+        "id": "ust",
+        "type": "scripture",
+        "subjects": ["Aligned Bible"],
+        "books": [
+          { "code": "gen", "name": "Génesis" },
+          { "code": "exo", "name": "Éxodo" },
+          { "code": "mat", "name": "Mateo" }
+        ],
+        "version": "v2.1.0",
+        "size": 4718592,
+        "lastUpdated": "2023-11-15T00:00:00Z",
+        "owner": "unfoldingWord",
+        "language": "es",
+        "languageName": "Spanish",
+        "format": "usfm",
+        "description": "Traducción simplificada de la Biblia",
+        "sourceUrl": "https://git.door43.org/unfoldingWord/es_ust",
+        "releaseUrl": "https://git.door43.org/unfoldingWord/es_ust/archive/v2.1.0.zip",
+        "commitSha": "b2c3d4e5f6a7"
+      },
+      "contentLocation": {
+        "type": "phone",
+        "path": "/storage/emulated/0/BibleResources/es_ust.zip",
+        "format": "compressed"
+      },
+      "status": "cached",
+      "role": "primary",
+      "panelId": "panel-1",
+      "order": 2
+    },
+    {
+      "id": "tn",
+      "type": "notes",
+      "metadata": {
+        "id": "tn",
+        "type": "notes",
+        "subjects": ["TSV Translation Notes"],
+        "books": [
+          { "code": "gen", "name": "Genesis" },
+          { "code": "mat", "name": "Matthew" }
+        ],
+        "version": "v3.2.1",
+        "size": 2097152,
+        "lastUpdated": "2023-10-20T00:00:00Z",
+        "owner": "unfoldingWord",
+        "language": "en",
+        "languageName": "English",
+        "format": "tsv",
+        "description": "Translation notes for biblical texts",
+        "sourceUrl": "https://git.door43.org/unfoldingWord/en_tn",
+        "releaseUrl": "https://git.door43.org/unfoldingWord/en_tn/archive/v3.2.1.zip",
+        "commitSha": "c3d4e5f6a7b8"
+      },
+      "contentLocation": {
+        "type": "bundled",
+        "path": "/resources/unfoldingWord/en/tn/content",
+        "format": "compressed"
+      },
+      "status": "available",
+      "role": "supplementary",
+      "panelId": "panel-2",
+      "order": 1
+    },
+    {
+      "id": "tw",
+      "type": "words",
+      "metadata": {
+        "id": "tw",
+        "type": "words",
+        "subjects": ["Translation Words"],
+        "articles": [
+          { "id": "angel", "title": "Angel, Archangel" },
+          { "id": "god", "title": "God" },
+          { "id": "holy", "title": "Holy, Holiness" },
+          { "id": "covenant", "title": "Covenant" }
+        ],
+        "version": "v2.0.0",
+        "size": 1048576,
+        "lastUpdated": "2023-09-10T00:00:00Z",
+        "owner": "Door43-Catalog",
+        "language": "en",
+        "languageName": "English",
+        "format": "markdown",
+        "description": "Key biblical terms and definitions",
+        "sourceUrl": "https://git.door43.org/Door43-Catalog/en_tw",
+        "releaseUrl": "https://git.door43.org/Door43-Catalog/en_tw/archive/v2.0.0.zip",
+        "commitSha": "d4e5f6a7b8c9"
+      },
+      "contentLocation": {
+        "type": "url",
+        "path": "https://cdn.door43.org/en/tw/v2.0.0/tw.zip",
+        "format": "compressed"
+      },
+      "status": "pending",
+      "role": "supplementary",
+      "panelId": "panel-2",
+      "order": 2
+    },
+    {
+      "id": "ugnt",
+      "type": "scripture",
+      "metadata": {
+        "id": "ugnt",
+        "type": "scripture",
+        "subjects": ["Aligned Bible"],
+        "books": [
+          { "code": "mat", "name": "ΚΑΤΑ ΜΑΤΘΑΙΟΝ" },
+          { "code": "mrk", "name": "ΚΑΤΑ ΜΑΡΚΟΝ" },
+          { "code": "luk", "name": "ΚΑΤΑ ΛΟΥΚΑΝ" }
+        ],
+        "version": "v0.30",
+        "size": 3145728,
+        "lastUpdated": "2023-12-15T00:00:00Z",
+        "owner": "unfoldingWord",
+        "language": "el-x-koine",
+        "languageName": "Koine Greek",
+        "format": "usfm",
+        "description": "Greek New Testament",
+        "sourceUrl": "https://git.door43.org/unfoldingWord/el-x-koine_ugnt",
+        "releaseUrl": "https://git.door43.org/unfoldingWord/el-x-koine_ugnt/archive/v0.30.zip",
+        "commitSha": "e5f6a7b8c9d0"
+      },
+      "contentLocation": {
+        "type": "bundled",
+        "path": "/resources/unfoldingWord/el-x-koine/ugnt/content",
+        "format": "compressed"
+      },
+      "status": "cached",
+      "role": "reference",
+      "panelId": "panel-3",
+      "order": 1
+    },
+    {
+      "id": "uhb",
+      "type": "scripture",
+      "metadata": {
+        "id": "uhb",
+        "type": "scripture",
+        "subjects": ["Aligned Bible"],
+        "books": [
+          { "code": "gen", "name": "בְּרֵאשִׁית" },
+          { "code": "exo", "name": "שְׁמוֹת" }
+        ],
+        "version": "v2.1.30",
+        "size": 4194304,
+        "lastUpdated": "2023-11-30T00:00:00Z",
+        "owner": "unfoldingWord",
+        "language": "hbo",
+        "languageName": "Biblical Hebrew",
+        "format": "usfm",
+        "description": "Hebrew Bible",
+        "sourceUrl": "https://git.door43.org/unfoldingWord/hbo_uhb",
+        "releaseUrl": "https://git.door43.org/unfoldingWord/hbo_uhb/archive/v2.1.30.zip",
+        "commitSha": "f6a7b8c9d0e1"
+      },
+      "contentLocation": {
+        "type": "bundled",
+        "path": "/resources/unfoldingWord/hbo/uhb/content",
+        "format": "compressed"
+      },
+      "status": "cached",
+      "role": "reference",
+      "panelId": "panel-3",
+      "order": 2
+    }
+  ],
+  
+  "panelLayout": {
+    "panels": [
+      {
+        "id": "panel-1",
+        "title": "Scripture",
+        "description": "Primary scripture reading",
+        "resourceIds": ["ult", "ust"],
+        "defaultResourceId": "ult",
+        "visible": true,
+        "closable": false,
+        "resizable": true,
+        "width": 600,
+        "minWidth": 300
+      },
+      {
+        "id": "panel-2",
+        "title": "Translation Helps",
+        "description": "Notes and reference materials",
+        "resourceIds": ["tn", "tw"],
+        "defaultResourceId": "tn",
+        "visible": true,
+        "closable": true,
+        "resizable": true,
+        "width": 400,
+        "minWidth": 200
+      },
+      {
+        "id": "panel-3",
+        "title": "Original Languages",
+        "description": "Greek and Hebrew texts",
+        "resourceIds": ["ugnt", "uhb"],
+        "defaultResourceId": "ugnt",
+        "visible": false,
+        "closable": true,
+        "resizable": true,
+        "minWidth": 300
+      }
+    ],
+    "layoutVersion": "1.0"
+  },
+  
+  "passageSetIds": [
+    "nt-narrative-passages",
+    "pentateuch-key-events"
+  ],
+  
+  "config": {
+    "defaultServer": "https://git.door43.org",
+    "offlineEnabled": true,
+    "autoUpdate": true,
+    "updateFrequency": "weekly"
+  },
+  
+  "metadata": {
+    "author": "John Translator",
+    "license": "CC BY-SA 4.0",
+    "category": "bible-study",
+    "tags": ["multilingual", "study", "translation", "original-languages"]
+  },
+  
+  "stats": {
+    "totalSize": 20971520,
+    "downloadedSize": 16777216,
+    "resourceCount": 6,
+    "organizations": ["unfoldingWord", "Door43-Catalog"],
+    "languages": ["en", "es", "el-x-koine", "hbo"],
+    "subjects": ["Aligned Bible", "TSV Translation Notes", "Translation Words"]
+  },
+  
+  "status": "ready"
+}

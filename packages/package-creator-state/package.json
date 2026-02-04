@@ -1,0 +1,15 @@
+{
+  "name": "@bt-synergy/package-creator-state",
+  "version": "0.1.0",
+  "description": "Package creator state management",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

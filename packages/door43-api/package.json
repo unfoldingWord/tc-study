@@ -1,0 +1,29 @@
+{
+  "name": "@bt-synergy/door43-api",
+  "version": "1.0.0",
+  "description": "Centralized Door43 API client for BT Synergy",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "bun test Door43ApiClient.test.ts",
+    "test:integration": "bun test Door43ApiClient.integration.test.ts",
+    "test:all": "bun test",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": ["door43", "api", "bible", "translation"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "~5.9.2"
+  },
+  "peerDependencies": {},
+  "dependencies": {}
+}
+

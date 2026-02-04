@@ -1,0 +1,529 @@
+/**
+ * ScriptureViewer - Displays scripture with proper USFM parsing
+ * Adapted from mobile app pattern for web
+ * 
+ * Features:
+ * - Loads content based on current reference
+ * - Tokenizes for inter-panel communication
+ * - Exposes TOC for navigation
+ * - Handles verse ranges
+ * - Highlights based on messages
+ * - Uses ProcessedScripture format from @bt-synergy/usfm-processor
+ */
+
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useResourceAPI, useCurrentState, useEvents } from 'linked-panels'
+import { useCurrentReference, useApp, useCatalogManager, type BookInfo, type ResourceTOC } from '../../contexts'
+import type { TokenClickEvent, HighlightedTokensState, VerseReferenceFilterEvent } from '../../plugins/types'
+import type { ProcessedScripture, ProcessedChapter, ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
+
+interface ScriptureViewerProps {
+  resourceId: string
+  resourceKey: string
+  server?: string
+  owner?: string
+  language?: string
+  resourceType?: string
+  isAnchor?: boolean
+}
+
+// No more sample data needed - using real ProcessedScripture from catalog!
+
+export function ScriptureViewer({
+  resourceId,
+  resourceKey,
+  server = 'git.door43.org',
+  owner = 'unfoldingWord',
+  language = 'es',
+  resourceType = 'bible',
+  isAnchor,
+}: ScriptureViewerProps) {
+  console.log('📖 ScriptureViewer mounted:', { resourceId, resourceKey, isAnchor })
+  
+  const catalogManager = useCatalogManager()
+  const api = useResourceAPI<TokenClickEvent>(resourceId)
+  const app = useApp()
+  const currentRef = useCurrentReference()
+  
+  console.log('📖 Current reference:', currentRef)
+  
+  // Local state for highlighting (from spike pattern)
+  const [localHighlightedTokens, setLocalHighlightedTokens] = useState<string[]>([])
+  const [localSelectedToken, setLocalSelectedToken] = useState<string | null>(null)
+  const [loadedContent, setLoadedContent] = useState<ProcessedScripture | null>(null)
+  const [availableBooks, setAvailableBooks] = useState<BookInfo[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const tocSetRef = useRef(false) // Track if TOC has been set to prevent infinite loops
+  
+  // Listen for highlighted-tokens state
+  const highlightState = useCurrentState<HighlightedTokensState>(
+    resourceId,
+    'current-highlighted-tokens'
+  )
+
+  // Listen for verse-filter events
+  useEvents<VerseReferenceFilterEvent>(
+    resourceId,
+    ['verse-filter'],
+    (event) => {
+      console.log('📨 ScriptureViewer received verse-filter:', event.verseRef)
+    }
+  )
+
+  // Load TOC and available books from resource metadata (only once when resource changes)
+  useEffect(() => {
+    let cancelled = false
+    
+    const loadTOC = async () => {
+      console.log('📚 Loading TOC from catalog for resource:', resourceKey)
+      
+      try {
+        // Get resource metadata to find available books
+        const metadata = await catalogManager.getResourceMetadata(resourceKey)
+        
+        if (cancelled) return
+        
+        if (metadata && metadata.contentMetadata?.ingredients) {
+          // Extract book codes from ingredients
+          const ingredients = metadata.contentMetadata.ingredients
+          const bookCodes = new Set<string>()
+          
+          // Scripture resources have ingredients with identifiers like 'gen', 'exo', etc.
+          ingredients.forEach((ing: any) => {
+            const identifier = ing.identifier?.toLowerCase()
+            if (identifier && identifier.length <= 4) {
+              // Likely a book code (gen, exo, mat, etc.)
+              bookCodes.add(identifier)
+            }
+          })
+          
+          // Convert to BookInfo array
+          const books: BookInfo[] = Array.from(bookCodes).map((code) => {
+            // Get chapter count from ingredients if available
+            const bookIngredients = ingredients.filter((ing: any) => 
+              ing.identifier?.toLowerCase() === code
+            )
+            const chapters = bookIngredients.length || 1
+            
+            return {
+              code,
+              name: code.toUpperCase(), // Will be improved with proper book names
+              chapters,
+            }
+          }).sort((a, b) => a.code.localeCompare(b.code))
+          
+          console.log(`✅ Found ${books.length} books in resource:`, books.map(b => b.code).join(', '))
+          setAvailableBooks(books)
+          
+          // If anchor resource, expose TOC (only once to prevent infinite loops)
+          if (isAnchor && !tocSetRef.current) {
+            const toc: ResourceTOC = {
+              resourceId,
+              resourceType: 'scripture',
+              books,
+            }
+            app.setAnchorResource(resourceId, toc)
+            tocSetRef.current = true
+            console.log('⚓ ScriptureViewer exposed TOC with', books.length, 'books')
+          }
+          
+          // Note: Auto-navigation to first book should be handled by parent component
+          // if current book isn't available
+        } else {
+          console.warn('⚠️ No ingredients found in metadata for resource:', resourceKey)
+          setAvailableBooks([])
+        }
+      } catch (err) {
+        console.error('❌ Error loading TOC:', err)
+        setAvailableBooks([])
+      }
+    }
+    
+    loadTOC()
+    
+    return () => {
+      cancelled = true
+    }
+  }, [resourceKey, catalogManager, isAnchor, resourceId, app]) // Removed currentRef.book to prevent infinite loop
+  
+  // Reset TOC set flag when resource changes
+  useEffect(() => {
+    tocSetRef.current = false
+  }, [resourceId])
+
+  // Create a stable string representation of available book codes to prevent infinite loops
+  // Strings are compared by value, so this will only change when the actual book codes change
+  const availableBookCodesStr = availableBooks.map(b => b.code.toLowerCase()).sort().join(',')
+
+  // Load content for current book from catalog
+  useEffect(() => {
+    let cancelled = false
+    const bookCode = currentRef.book
+    
+    // Parse available book codes from string
+    const availableBookCodes = new Set(availableBookCodesStr.split(',').filter(Boolean))
+    
+    // Don't try to load if we don't have available books yet or if book isn't available
+    if (availableBookCodes.size === 0 || !availableBookCodes.has(bookCode.toLowerCase())) {
+      console.log(`⏸️ Skipping load - book '${bookCode}' not available or TOC not loaded yet`)
+      return
+    }
+    
+    const loadBookContent = async () => {
+      console.log('📖 Loading ProcessedScripture from catalog for book:', bookCode, 'resourceKey:', resourceKey)
+      setIsLoading(true)
+      setError(null)
+      
+      try {
+        // Load scripture content from catalog (three-tier lookup)
+        // ScriptureLoader now returns ProcessedScripture format
+        const content = await catalogManager.loadContent(resourceKey, bookCode) as ProcessedScripture
+        
+        if (cancelled) return
+        
+        console.log('🔍 Raw content received:', {
+          hasContent: !!content,
+          type: typeof content,
+          isArray: Array.isArray(content),
+          keys: content ? Object.keys(content) : [],
+          hasMetadata: content && 'metadata' in content,
+          hasChapters: content && 'chapters' in content,
+          chaptersLength: content?.chapters?.length,
+        })
+        
+        if (content && content.metadata && content.chapters) {
+          console.log('✅ Loaded ProcessedScripture from catalog:')
+          console.log('   Book:', content.metadata.bookName, `(${content.metadata.bookCode})`)
+          console.log('   Chapters:', content.metadata.totalChapters, 'actual chapters in array:', content.chapters.length)
+          console.log('   Verses:', content.metadata.totalVerses)
+          console.log('   Paragraphs:', content.metadata.totalParagraphs)
+          console.log('   Chapter-Verse Map:', Object.keys(content.metadata.chapterVerseMap).length, 'chapters')
+          console.log('   Alignments:', content.alignments?.length || 0, 'global alignments')
+          console.log('   Translator Sections:', content.translatorSections?.length || 0, 'sections')
+          console.log('   First chapter:', content.chapters[0]?.number, 'has', content.chapters[0]?.verses?.length || 0, 'verses')
+          
+          setLoadedContent(content)
+        } else {
+          console.warn('⚠️ No ProcessedScripture returned from catalog for:', bookCode)
+          console.warn('   Content type:', typeof content)
+          console.warn('   Has metadata?', content && 'metadata' in content)
+          console.warn('   Has chapters?', content && 'chapters' in content)
+          setLoadedContent(null)
+        }
+      } catch (err) {
+        if (cancelled) return
+        console.error('❌ Error loading ProcessedScripture from catalog:', err)
+        setError(err instanceof Error ? err.message : 'Unknown error')
+        setLoadedContent(null)
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false)
+        }
+      }
+    }
+    
+    loadBookContent()
+    
+    return () => {
+      cancelled = true
+    }
+  }, [currentRef.book, resourceKey, catalogManager, availableBookCodesStr]) // Use string representation to prevent infinite loop
+
+  // Get current chapter data from ProcessedScripture
+  const currentChapter = useMemo(() => {
+    if (!loadedContent) {
+      console.log('🔍 No loadedContent, currentChapter is null')
+      return null
+    }
+    console.log('🔍 Looking for chapter', currentRef.chapter, 'in', loadedContent.chapters.length, 'chapters')
+    console.log('🔍 Available chapters:', loadedContent.chapters.map(ch => ch.number).join(', '))
+    const chapter = loadedContent.chapters.find((ch) => ch.number === currentRef.chapter)
+    if (chapter) {
+      console.log('✅ Found chapter', currentRef.chapter, 'with', chapter.verses.length, 'verses')
+    } else {
+      console.warn('⚠️ Chapter', currentRef.chapter, 'not found in loadedContent')
+    }
+    return chapter
+  }, [loadedContent, currentRef.chapter])
+
+  // Get verses in range
+  const displayVerses = useMemo(() => {
+    if (!currentChapter) {
+      console.log('🔍 No currentChapter, displayVerses is empty')
+      return []
+    }
+    
+    const startVerse = currentRef.verse
+    const endVerse = currentRef.endVerse || currentRef.endChapter ? 999 : startVerse
+    
+    console.log('🔍 Filtering verses:', { startVerse, endVerse, totalVerses: currentChapter.verses.length })
+    const verses = currentChapter.verses.filter(
+      (v) => v.number >= startVerse && v.number <= endVerse
+    )
+    console.log('🔍 Found', verses.length, 'verses in range')
+    if (verses.length > 0) {
+      console.log('🔍 First verse:', verses[0].number, 'has', verses[0].wordTokens?.length || 0, 'wordTokens')
+    }
+    return verses
+  }, [currentChapter, currentRef])
+
+  // Combine local + broadcast highlighting
+  const highlightedTokens = localHighlightedTokens.length > 0
+    ? localHighlightedTokens
+    : (highlightState?.tokenIds || [])
+  const selectedTokenId = localSelectedToken || highlightState?.selectedTokenId
+
+  // Handle token click (using WordToken from ProcessedScripture)
+  const handleTokenClick = (token: WordToken) => {
+    const tokenContent = (token as any).content || token.text || ''
+    console.log('🖱️ Token clicked:', tokenContent)
+    
+    // Update local state immediately
+    setLocalHighlightedTokens([token.id])
+    setLocalSelectedToken(token.id)
+    
+    // Broadcast token-click event
+    const message: TokenClickEvent = {
+      type: 'token-click',
+      lifecycle: 'event',
+      token: {
+        id: token.id,
+        content: tokenContent,
+        semanticId: token.id, // WordToken already has proper structure
+        verseRef: `${currentRef.book.toUpperCase()} ${currentRef.chapter}:${token.verseNumber}`,
+        position: token.position,
+      },
+      sourceResourceId: resourceId,
+      timestamp: Date.now(),
+    }
+    
+    api.messaging.sendToAll(message)
+  }
+
+  // Format reference
+  const refString = `${currentRef.book.toUpperCase()} ${currentRef.chapter}:${currentRef.verse}${
+    currentRef.endVerse ? `-${currentRef.endVerse}` : ''
+  }`
+
+  return (
+    <div className="h-full flex flex-col p-6">
+      {/* Header */}
+      <div className="mb-4">
+        <h3 className="text-lg font-semibold text-gray-900">{resourceKey}</h3>
+        <p className="text-sm text-gray-500">{refString}</p>
+        {isAnchor && (
+          <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
+            ⚓ Anchor Resource
+          </span>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto">
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+            <p className="text-sm text-gray-600">Loading from catalog...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12 text-red-600">
+            <p className="font-semibold">Error loading content</p>
+            <p className="text-sm mt-2">{error}</p>
+          </div>
+        ) : !loadedContent ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>No content available for {currentRef.book.toUpperCase()}</p>
+            <p className="text-sm mt-2">
+              Available books: {availableBooks.map((b) => b.code).join(', ').toUpperCase()}
+            </p>
+          </div>
+        ) : displayVerses.length === 0 ? (
+          <div className="text-center py-12 text-gray-500">
+            <p>No verses found for {refString}</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {displayVerses.map((verse) => {
+              // Debug: Log verse structure
+              console.log('🔍 Rendering verse:', {
+                number: verse.number,
+                hasWordTokens: !!verse.wordTokens,
+                wordTokensLength: verse.wordTokens?.length || 0,
+                hasText: !!verse.text,
+                text: verse.text,
+                verseKeys: Object.keys(verse),
+              })
+              
+              return (
+                <div key={verse.number} className="flex gap-3">
+                  {/* Verse Number */}
+                  <span className="text-sm font-bold text-gray-500 select-none min-w-[2rem]">
+                    {verse.number}
+                  </span>
+
+                  {/* Verse Tokens (using wordTokens from ProcessedScripture) */}
+                  <div className="flex-1 text-lg leading-relaxed text-gray-900">
+                    {verse.wordTokens && verse.wordTokens.length > 0 ? (
+                      (() => {
+                        // Debug: Log first token structure
+                        if (verse.wordTokens.length > 0) {
+                          console.log('🔍 First token structure:', {
+                            id: verse.wordTokens[0].id,
+                            text: verse.wordTokens[0].text,
+                            content: verse.wordTokens[0].content,
+                            word: verse.wordTokens[0].word,
+                            value: verse.wordTokens[0].value,
+                            keys: Object.keys(verse.wordTokens[0]),
+                            fullToken: verse.wordTokens[0],
+                          })
+                        }
+                        
+                        // First, check if tokens have real content (non-whitespace)
+                        const hasRealTokenContent = verse.wordTokens.some((token) => {
+                          const tokenText = token.text || token.content || token.word || token.value || (token as any).wordText || (token as any).surface
+                          return tokenText && tokenText.trim().length > 0
+                        })
+                        
+                        // If no real token content but we have verse.text, use that
+                        if (!hasRealTokenContent && verse.text) {
+                          console.log('⚠️ Tokens have no text content, falling back to verse.text')
+                          return <span className="text-gray-700">{verse.text}</span>
+                        }
+                        
+                        const renderedTokens = verse.wordTokens.map((token, idx) => {
+                          const isHighlighted = highlightedTokens.includes(token.id)
+                          const isSelected = selectedTokenId === token.id
+                          
+                          // Get token text - use content directly (don't trim, as spaces are valid)
+                          // Tokens from ProcessedScripture use 'content' property
+                          const tokenText = token.content || 
+                                          token.text || 
+                                          token.word || 
+                                          token.value || 
+                                          (token as any).wordText ||
+                                          (token as any).surface ||
+                                          ''
+                          
+                          console.log(`🔍 Rendering token ${idx}:`, {
+                            id: token.id,
+                            tokenText,
+                            rawText: token.text,
+                            rawContent: token.content,
+                            rawWord: token.word,
+                            rawValue: token.value,
+                            allKeys: Object.keys(token),
+                          })
+
+                          // Use tokenText directly - spaces are valid content
+                          // Only use placeholder if completely empty
+                          const displayText = tokenText || `[${idx}]`
+
+                          return (
+                            <span key={token.id || `token-${idx}`} className="inline">
+                              <span
+                                onClick={() => handleTokenClick(token)}
+                                className={`
+                                  cursor-pointer px-1 py-0.5 rounded transition-all text-gray-900 inline-block
+                                  ${isSelected ? 'bg-yellow-400 font-bold' : ''}
+                                  ${isHighlighted && !isSelected ? 'bg-yellow-100' : ''}
+                                  ${!isHighlighted && !isSelected ? 'hover:bg-gray-100' : ''}
+                                `}
+                                title={`Position: ${token.position}, Verse: ${token.verseNumber}`}
+                                style={{ minWidth: '1px', whiteSpace: 'pre' }} // Preserve whitespace
+                              >
+                                {displayText}
+                              </span>
+                            </span>
+                          )
+                        })
+                        
+                        console.log(`✅ Rendered ${renderedTokens.length} token elements`)
+                        return renderedTokens
+                      })()
+                    ) : verse.text ? (
+                      <span className="text-gray-500 italic">
+                        {verse.text}
+                      </span>
+                    ) : (
+                      <span className="text-red-500 italic">
+                        [No content available for verse {verse.number}]
+                        <br />
+                        <span className="text-xs text-gray-400">
+                          Verse keys: {Object.keys(verse).join(', ')}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Debug Info */}
+      <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-xs border border-yellow-200">
+        <strong className="text-yellow-900">🐛 Debug State:</strong>
+        <ul className="mt-2 space-y-1 text-yellow-800 font-mono">
+          <li>• isLoading: {String(isLoading)}</li>
+          <li>• error: {error || 'null'}</li>
+          <li>• loadedContent: {loadedContent ? '✅' : '❌'}</li>
+          <li>• availableBooks: {availableBooks.length}</li>
+          <li>• currentChapter: {currentChapter ? `✅ (${currentChapter.verses.length} verses)` : '❌'}</li>
+          <li>• displayVerses: {displayVerses.length}</li>
+          <li>• currentRef: {JSON.stringify(currentRef)}</li>
+          {displayVerses.length > 0 && (
+            <>
+              <li>• First verse number: {displayVerses[0].number}</li>
+              <li>• First verse has wordTokens: {String(!!displayVerses[0].wordTokens)}</li>
+              <li>• First verse wordTokens length: {displayVerses[0].wordTokens?.length || 0}</li>
+              <li>• First verse has text: {String(!!displayVerses[0].text)}</li>
+              <li>• First verse text preview: {displayVerses[0].text ? displayVerses[0].text.substring(0, 50) + '...' : 'null'}</li>
+              <li>• First verse keys: {Object.keys(displayVerses[0]).join(', ')}</li>
+            </>
+          )}
+        </ul>
+      </div>
+
+      {/* Info & Metadata */}
+      <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
+        <strong className="text-blue-900">📊 Current View:</strong>
+        <ul className="mt-2 space-y-1 text-gray-700">
+          <li>• Book: {currentRef.book.toUpperCase()}</li>
+          <li>• Chapter: {currentRef.chapter}</li>
+          <li>• Verses displayed: {displayVerses.length}</li>
+          <li>• Tokens highlighted: {highlightedTokens.length}</li>
+        </ul>
+        
+        {loadedContent?.metadata && (
+          <>
+            <strong className="text-blue-900 mt-3 block">📖 Book Metadata:</strong>
+            <ul className="mt-2 space-y-1 text-gray-700">
+              <li>• Book: {loadedContent.metadata.bookName} ({loadedContent.metadata.bookCode})</li>
+              <li>• Total Chapters: {loadedContent.metadata.totalChapters}</li>
+              <li>• Total Verses: {loadedContent.metadata.totalVerses}</li>
+              <li>• Total Paragraphs: {loadedContent.metadata.totalParagraphs}</li>
+              <li>• Alignments: {loadedContent.alignments?.length || 0}</li>
+              <li>• Translator Sections: {loadedContent.translatorSections?.length || 0}</li>
+            </ul>
+            
+            <strong className="text-blue-900 mt-3 block">🗺️ Chapter-Verse Map:</strong>
+            <div className="mt-2 text-xs text-gray-600 max-h-20 overflow-auto">
+              {Object.entries(loadedContent.metadata.chapterVerseMap).slice(0, 10).map(([ch, count]) => (
+                <span key={ch} className="inline-block mr-2">
+                  {ch}:{count}
+                </span>
+              ))}
+              {Object.keys(loadedContent.metadata.chapterVerseMap).length > 10 && (
+                <span className="text-gray-400">
+                  ... +{Object.keys(loadedContent.metadata.chapterVerseMap).length - 10} more
+                </span>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
