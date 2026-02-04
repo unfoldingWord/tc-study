@@ -6,7 +6,7 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { ScriptureLoader } from '@bt-synergy/scripture-loader'
-import { ScriptureViewer } from '../components/resources/ScriptureViewer'
+import { ScriptureViewer } from '../components/resources/ScriptureViewer/index'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const scriptureResourceType: ResourceTypeDefinition = defineResourceType({

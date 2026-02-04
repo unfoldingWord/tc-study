@@ -3,7 +3,7 @@
  */
 
 import type { ProcessedScripture, ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
-import type { BookInfo } from '../../../contexts'
+import type { BookInfo } from '../../../contexts/types-only'
 
 export interface ScriptureViewerProps {
   resourceId: string

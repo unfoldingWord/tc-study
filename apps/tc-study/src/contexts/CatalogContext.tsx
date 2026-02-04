@@ -11,15 +11,15 @@
 
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { CatalogManager, ViewerRegistry } from '@bt-synergy/catalog-manager'
-import { IndexedDBCatalogAdapter } from '../lib/adapters/IndexedDBCatalogAdapter'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
 import { ResourceTypeRegistry } from '@bt-synergy/resource-types'
 import { createContext, ReactNode, useContext, useEffect, useMemo } from 'react'
+import { IndexedDBCatalogAdapter } from '../lib/adapters/IndexedDBCatalogAdapter'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
-import { ResourceLoadingService } from '../lib/services/ResourceLoadingService'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
 import { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
-import { scriptureResourceType, translationAcademyResourceType, translationNotesResourceType, translationWordsLinksResourceType, translationWordsResourceType } from '../resourceTypes'
+import { ResourceLoadingService } from '../lib/services/ResourceLoadingService'
+// NOTE: Resource types are registered asynchronously in useEffect to avoid circular dependencies
 
 // ============================================================================
 // CONTEXT
@@ -89,14 +89,7 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     // - Registers loaders with LoaderRegistry (via ResourceTypeRegistry)
     // - Registers viewers with ViewerRegistry (via ResourceTypeRegistry)
     // - Creates subject mappings
-    console.log('📦 Registering resource types...')
-    
-    // 7a. Register external package-based resource types
-    resourceTypeRegistry.register(scriptureResourceType)
-    resourceTypeRegistry.register(translationWordsResourceType)
-    resourceTypeRegistry.register(translationWordsLinksResourceType)
-    resourceTypeRegistry.register(translationAcademyResourceType)
-    resourceTypeRegistry.register(translationNotesResourceType)
+    console.log('📦 ResourceTypeRegistry created (resource types will be registered asynchronously)')
     
     // 7b. Auto-register internal app resource types
     // Note: Auto-registration will happen asynchronously in a useEffect
@@ -149,10 +142,8 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     
     const initializeAsync = async () => {
       try {
-        // Auto-register internal resource types
-        const { autoRegisterResourceTypes } = await import('../resourceTypes/autoRegister')
-        await autoRegisterResourceTypes(contextValue.resourceTypeRegistry)
-        console.log('  ✓ Auto-registered internal resource types')
+        // NOTE: Resource types are now registered by ResourceTypeInitializer component
+        // to avoid circular dependencies. This just marks the catalog as ready.
 
         // Load preloaded resources metadata (if available)
         // NOTE: DISABLED for web - we always fetch fresh from Door43 to avoid mismatches

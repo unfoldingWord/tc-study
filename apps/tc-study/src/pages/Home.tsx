@@ -2,10 +2,10 @@
  * Home page - Quick access and overview
  */
 
-import { useNavigate } from 'react-router-dom'
+import { Clapperboard, FileText, FolderOpen, Library } from 'lucide-react'
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { usePackageStore } from '../lib/stores'
-import { Library, FolderOpen, Clapperboard, FileText } from 'lucide-react'
 
 export default function Home() {
   const navigate = useNavigate()

@@ -6,7 +6,7 @@
  * - [See verse 5](../01/05.md) -> Falls back to parsing the file path
  */
 
-import type { BCVReference } from '../../../../contexts/types'
+import type { BCVReference } from '../../../../contexts/types-only'
 
 /**
  * Parse a scripture reference from link text or file path

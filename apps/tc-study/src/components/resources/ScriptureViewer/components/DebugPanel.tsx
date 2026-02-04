@@ -5,7 +5,7 @@
 
 import type { ProcessedChapter, ProcessedScripture } from '@bt-synergy/usfm-processor'
 import { X } from 'lucide-react'
-import type { ReferenceState } from '../../../../contexts/ReferenceContext'
+import type { ReferenceState } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken } from '../types'
 
 interface DebugPanelProps {

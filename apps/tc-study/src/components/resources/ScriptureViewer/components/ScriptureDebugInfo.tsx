@@ -3,7 +3,7 @@
  */
 
 import type { ProcessedVerse } from '@bt-synergy/usfm-processor'
-import type { BookInfo } from '../../../../contexts'
+import type { BookInfo } from '../../../../contexts/types-only'
 
 interface ScriptureDebugInfoProps {
   isLoading: boolean

@@ -3,7 +3,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { useApp, useCatalogManager, useNavigation, type BookInfo, type ResourceTOC } from '../../../../contexts'
+import { useApp, useCatalogManager, useNavigation } from '../../../../contexts'
+import type { BookInfo, ResourceTOC } from '../../../../contexts/types-only'
 import { defaultSectionsService } from '../../../../lib/services/default-sections'
 import { getStandardVerseCount } from '../../../../lib/versification'
 

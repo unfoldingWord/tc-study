@@ -5,7 +5,7 @@
 import type { ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
 import { BookX } from 'lucide-react'
 import { useEffect, useRef } from 'react'
-import type { BookInfo } from '../../../../contexts'
+import type { BookInfo } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken } from '../types'
 import { VerseRenderer } from './VerseRenderer'
 

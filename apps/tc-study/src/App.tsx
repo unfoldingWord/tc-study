@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import { AdminPanel } from './components/dev/AdminPanel'
 import Layout from './components/Layout'
+import { ResourceTypeInitializer } from './components/ResourceTypeInitializer'
 import { PanelSystemTest } from './components/test'
 import { NavigationProvider } from './contexts/NavigationContext'
 import { useWorkspaceStore } from './lib/stores/workspaceStore'
@@ -12,8 +14,6 @@ import PassageSets from './pages/PassageSets'
 import Read from './pages/Read'
 import Settings from './pages/Settings'
 import Studio from './pages/Studio'
-import { NavigationBridgeProvider } from './providers/NavigationBridgeProvider'
-import { AdminPanel } from './components/dev/AdminPanel'
 
 function App() {
   // Load saved workspace on mount
@@ -91,6 +91,7 @@ function App() {
   
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <ResourceTypeInitializer />
       <NavigationProvider>
         <NavigationBridgeProvider>
           <Routes>

@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+.turbo
+
+# Environment
+.env
+.env.local
+.env*.local
+.cloudflare-token
+wrangler.toml.backup
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Testing
+coverage
+
+# Misc
+.cache
