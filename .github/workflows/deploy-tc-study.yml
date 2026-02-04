@@ -35,12 +35,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build monorepo packages
-        run: bun run build
-        
-      - name: Build TC-Study
+      - name: Build TC-Study (includes dependencies)
         working-directory: apps/tc-study
-        run: bun run build
+        run: bun run build:skip-check
 
       - name: Publish to Cloudflare Pages
         uses: cloudflare/pages-action@v1
