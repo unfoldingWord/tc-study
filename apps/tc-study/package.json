@@ -14,8 +14,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "deploy": "node scripts/deploy-cloudflare.js",
-    "deploy:cf": "node scripts/deploy-cloudflare.js",
+    "deploy": "bash scripts/deploy.sh",
+    "deploy:quick": "bun run build:skip-check && bunx wrangler pages deploy dist --project-name=tc-study",
+    "deploy:cf": "bash scripts/deploy.sh",
     "build:skip-check": "vite build"
   },
   "dependencies": {
@@ -85,6 +86,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "wrangler": "^4.62.0"
   }
 }
