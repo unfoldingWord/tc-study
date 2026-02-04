@@ -86,7 +86,7 @@ export default function Home() {
             Studio
           </h3>
           <p className="text-sm text-gray-500">
-            {activeCollection ? activeCollection.title : 'Open your workspace'}
+            {activeCollection ? activeCollection.name : 'Open your workspace'}
           </p>
         </div>
       </div>
