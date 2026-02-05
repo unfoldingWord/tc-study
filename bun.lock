@@ -185,7 +185,7 @@
     },
     "apps/tc-study": {
       "name": "tc-study",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "dependencies": {
         "-": "^0.0.1",
         "@bt-synergy/cache-adapter-indexeddb": "workspace:*",
@@ -208,6 +208,7 @@
         "@bt-synergy/study-store": "workspace:*",
         "@bt-synergy/translation-academy-loader": "workspace:*",
         "@bt-synergy/translation-notes-loader": "workspace:*",
+        "@bt-synergy/translation-questions-loader": "workspace:*",
         "@bt-synergy/translation-words-links-loader": "workspace:*",
         "@bt-synergy/translation-words-loader": "workspace:*",
         "@bt-synergy/ui-controls": "workspace:*",
@@ -744,6 +745,18 @@
         "@bt-synergy/door43-api": "workspace:*",
       },
     },
+    "packages/translation-questions-loader": {
+      "name": "@bt-synergy/translation-questions-loader",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/catalog-manager": "workspace:*",
+        "@bt-synergy/resource-catalog": "workspace:*",
+        "@bt-synergy/resource-parsers": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/translation-words-links-loader": {
       "name": "@bt-synergy/translation-words-links-loader",
       "version": "1.0.0",
@@ -1142,6 +1155,8 @@
     "@bt-synergy/translation-academy-loader": ["@bt-synergy/translation-academy-loader@workspace:packages/translation-academy-loader"],
 
     "@bt-synergy/translation-notes-loader": ["@bt-synergy/translation-notes-loader@workspace:packages/translation-notes-loader"],
+
+    "@bt-synergy/translation-questions-loader": ["@bt-synergy/translation-questions-loader@workspace:packages/translation-questions-loader"],
 
     "@bt-synergy/translation-words-links-loader": ["@bt-synergy/translation-words-links-loader@workspace:packages/translation-words-links-loader"],
 
