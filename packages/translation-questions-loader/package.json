@@ -1,0 +1,20 @@
+{
+  "name": "@bt-synergy/translation-questions-loader",
+  "version": "0.1.0",
+  "description": "Translation Questions resource loader for BT-Synergy",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@bt-synergy/catalog-manager": "workspace:*",
+    "@bt-synergy/resource-catalog": "workspace:*",
+    "@bt-synergy/resource-parsers": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

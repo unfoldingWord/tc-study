@@ -16,12 +16,12 @@ export { translationWordsResourceType } from './translationWords'
 export { translationWordsLinksResourceType } from './translationWordsLinks'
 export { translationAcademyResourceType } from './translationAcademy'
 export { translationNotesResourceType } from './translationNotes'
+export { translationQuestionsResourceType } from './translationQuestions'
 
 // ===== RESOURCE PANELS INTEGRATION =====
 // HOC for adding inter-panel communication to any viewer
 export { withPanelCommunication, type InjectedPanelProps, type WithPanelCommunicationProps } from './withPanelCommunication'
 
 // Future resource types (loaders created, need integration):
-// export { questionsResourceType } from './questions'
 // export { alignedBibleResourceType } from './aligned-bible'
 

@@ -22,12 +22,14 @@ export function ResourceTypeInitializer() {
           translationWordsResourceType,
           translationWordsLinksResourceType,
           translationAcademyResourceType,
-          translationNotesResourceType
+          translationNotesResourceType,
+          translationQuestionsResourceType
         } = await import('../resourceTypes')
         
         registry.register(scriptureResourceType)
         registry.register(translationWordsLinksResourceType)
         registry.register(translationNotesResourceType)
+        registry.register(translationQuestionsResourceType)
         
         // TESTING: Register TW and TA without viewers (modal-only resources)
         // We create modified versions that only have the loader, no viewer
