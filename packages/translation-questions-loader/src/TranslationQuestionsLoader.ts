@@ -11,8 +11,7 @@ import type {
     ResourceLoader,
     ResourceMetadata
 } from '@bt-synergy/catalog-manager'
-import { ResourceType } from '@bt-synergy/resource-catalog'
-import { Door43ServerAdapter } from '@bt-synergy/resource-catalog'
+import { Door43ServerAdapter, ResourceType } from '@bt-synergy/resource-catalog'
 import type { ProcessedQuestions } from '@bt-synergy/resource-parsers'
 import { QuestionsProcessor } from '@bt-synergy/resource-parsers'
 import type {

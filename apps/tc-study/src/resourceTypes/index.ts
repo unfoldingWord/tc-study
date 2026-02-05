@@ -12,11 +12,11 @@ export { RESOURCE_TYPE_IDS, getResourceTypeDisplayName, isValidResourceTypeId, t
 
 // ===== REGISTERED RESOURCE TYPES =====
 export { scriptureResourceType } from './scripture'
-export { translationWordsResourceType } from './translationWords'
-export { translationWordsLinksResourceType } from './translationWordsLinks'
 export { translationAcademyResourceType } from './translationAcademy'
 export { translationNotesResourceType } from './translationNotes'
 export { translationQuestionsResourceType } from './translationQuestions'
+export { translationWordsResourceType } from './translationWords'
+export { translationWordsLinksResourceType } from './translationWordsLinks'
 
 // ===== RESOURCE PANELS INTEGRATION =====
 // HOC for adding inter-panel communication to any viewer

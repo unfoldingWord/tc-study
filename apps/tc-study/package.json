@@ -41,6 +41,7 @@
     "@bt-synergy/study-store": "workspace:*",
     "@bt-synergy/translation-academy-loader": "workspace:*",
     "@bt-synergy/translation-notes-loader": "workspace:*",
+    "@bt-synergy/translation-questions-loader": "workspace:*",
     "@bt-synergy/translation-words-links-loader": "workspace:*",
     "@bt-synergy/translation-words-loader": "workspace:*",
     "@bt-synergy/ui-controls": "workspace:*",

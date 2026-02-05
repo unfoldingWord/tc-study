@@ -20,15 +20,17 @@
 
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { CatalogManager } from '@bt-synergy/catalog-manager'
-import { IndexedDBCatalogAdapter } from '../lib/adapters/IndexedDBCatalogAdapter'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
 import { ScriptureLoader } from '@bt-synergy/scripture-loader'
-import { TranslationWordsLoader } from '@bt-synergy/translation-words-loader'
-import { TranslationWordsLinksLoader } from '@bt-synergy/translation-words-links-loader'
 import { TranslationAcademyLoader } from '@bt-synergy/translation-academy-loader'
 import { TranslationNotesLoader } from '@bt-synergy/translation-notes-loader'
-import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
+import { TranslationQuestionsLoader } from '@bt-synergy/translation-questions-loader'
+import { TranslationWordsLinksLoader } from '@bt-synergy/translation-words-links-loader'
+import { TranslationWordsLoader } from '@bt-synergy/translation-words-loader'
+import { getDownloadPriority } from '../config/loaderConfig'
+import { IndexedDBCatalogAdapter } from '../lib/adapters/IndexedDBCatalogAdapter'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
+import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
 import { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
 
 // NOTE: We don't import ResourceTypeRegistry or resource type definitions here
@@ -107,6 +109,12 @@ async function initialize() {
 
     // 5. Manually register loaders (avoid importing resource types with React components)
     // Register loaders with BOTH CatalogManager (for discovery) and LoaderRegistry (for downloads)
+    // 
+    // ⚠️ IMPORTANT: When adding a new loader, also update:
+    //   - src/config/loaderConfig.ts (source of truth for loader IDs and priorities)
+    //   - src/components/ResourceTypeInitializer.tsx (main thread registration)
+    // 
+    // TODO: Consider dynamic loader registration to eliminate this duplication
     const scriptureLoader = new ScriptureLoader({
       cacheAdapter,
       catalogAdapter,
@@ -151,20 +159,23 @@ async function initialize() {
     })
     catalogManager.registerResourceType(translationNotesLoader)
     loaderRegistry.registerLoader('tn', translationNotesLoader)
+    
+    const translationQuestionsLoader = new TranslationQuestionsLoader({
+      cacheAdapter,
+      catalogAdapter,
+      door43Client,
+      debug: false
+    })
+    catalogManager.registerResourceType(translationQuestionsLoader)
+    loaderRegistry.registerLoader('questions', translationQuestionsLoader)
 
     // 6. Create a minimal resource type registry for priority lookups
     // (BackgroundDownloadManager needs this for priority ordering)
+    // Uses shared LOADER_CONFIGS to ensure consistency with main thread
     const resourceTypeRegistry = {
       get: (type: string) => {
-        const priorities: Record<string, number> = {
-          'tn': 1,              // Highest priority - translators need notes first
-          'scripture': 2,       // Second priority
-          'words-links': 10,
-          'words': 20,
-          'ta': 30
-        }
         return {
-          downloadPriority: priorities[type] || 50
+          downloadPriority: getDownloadPriority(type)
         }
       }
     }

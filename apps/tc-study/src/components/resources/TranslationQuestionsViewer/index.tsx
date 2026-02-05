@@ -2,14 +2,15 @@
  * Translation Questions Viewer
  * 
  * Displays comprehension questions and answers for Bible passages.
- * Questions are organized by chapter and verse.
+ * Questions are filtered by the current verse range.
  */
 
-import { useState, useEffect } from 'react'
-import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react'
+import type { ProcessedQuestions } from '@bt-synergy/resource-parsers'
 import type { ResourceViewerProps } from '@bt-synergy/resource-types'
-import type { ProcessedQuestions, TranslationQuestion } from '@bt-synergy/resource-parsers'
-import { useCatalogManager, useCurrentReference } from '../../../contexts'
+import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useCurrentReference } from '../../../contexts'
+import { useLoaderRegistry } from '../../../contexts/CatalogContext'
 
 export function TranslationQuestionsViewer({ resourceKey, metadata }: ResourceViewerProps) {
   const [questions, setQuestions] = useState<ProcessedQuestions | null>(null)
@@ -17,38 +18,97 @@ export function TranslationQuestionsViewer({ resourceKey, metadata }: ResourceVi
   const [error, setError] = useState<string | null>(null)
   const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
   
-  const catalogManager = useCatalogManager()
+  const loaderRegistry = useLoaderRegistry()
   const currentRef = useCurrentReference()
   
   const bookCode = currentRef.book || 'gen'
-  const chapter = currentRef.chapter || 1
 
   // Load questions for current book
   useEffect(() => {
-    if (!catalogManager || !resourceKey) return
+    if (!loaderRegistry || !resourceKey) return
+
+    let cancelled = false
 
     const loadQuestions = async () => {
       setLoading(true)
       setError(null)
       
       try {
-        const loader = catalogManager.getLoader(metadata?.type || 'questions')
+        const loader = loaderRegistry.getLoader('questions')
         if (!loader) {
           throw new Error('Translation Questions loader not found')
         }
 
+        console.log(`📖 Loading translation questions for: ${resourceKey}/${bookCode}`)
         const content = await loader.loadContent(resourceKey, bookCode)
+        
+        if (cancelled) return
+
         setQuestions(content)
       } catch (err) {
+        if (cancelled) return
+
         console.error(`Failed to load questions for ${bookCode}:`, err)
         setError(err instanceof Error ? err.message : 'Failed to load questions')
       } finally {
-        setLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
     loadQuestions()
-  }, [resourceKey, bookCode, catalogManager, metadata])
+
+    return () => {
+      cancelled = true
+    }
+  }, [resourceKey, bookCode, loaderRegistry])
+
+  // Filter questions for current chapter/verse range
+  const relevantQuestions = useMemo(() => {
+    if (!questions || !questions.questions || questions.questions.length === 0) return []
+
+    const startChapter = currentRef.chapter
+    const startVerse = currentRef.verse
+    const endChapter = currentRef.endChapter || startChapter
+    const endVerse = currentRef.endVerse || startVerse
+
+    return questions.questions.filter(question => {
+      // Parse reference (format: "1:1" or "1:2-3")
+      const [questionChapterStr, questionVerseRange] = question.reference.split(':')
+      const questionChapter = parseInt(questionChapterStr)
+
+      // Check if question's chapter is within range
+      if (questionChapter < startChapter || questionChapter > endChapter) {
+        return false
+      }
+
+      // Parse verse range (could be single verse or range like "1-3")
+      let questionStartVerse: number
+      let questionEndVerse: number
+
+      if (questionVerseRange.includes('-')) {
+        const [start, end] = questionVerseRange.split('-').map(v => parseInt(v))
+        questionStartVerse = start
+        questionEndVerse = end
+      } else {
+        questionStartVerse = parseInt(questionVerseRange)
+        questionEndVerse = questionStartVerse
+      }
+
+      // If this is the start chapter, check if question's end verse is >= start verse
+      if (questionChapter === startChapter && questionEndVerse < startVerse) {
+        return false
+      }
+
+      // If this is the end chapter, check if question's start verse is <= end verse
+      if (questionChapter === endChapter && questionStartVerse > endVerse) {
+        return false
+      }
+
+      return true
+    })
+  }, [questions, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
 
   // Toggle answer visibility
   const toggleQuestion = (questionId: string) => {
@@ -62,20 +122,6 @@ export function TranslationQuestionsViewer({ resourceKey, metadata }: ResourceVi
       return next
     })
   }
-
-  // Expand/collapse all
-  const expandAll = () => {
-    if (!questions) return
-    const chapterQuestions = questions.questionsByChapter[chapter.toString()] || []
-    setExpandedQuestions(new Set(chapterQuestions.map(q => q.id)))
-  }
-
-  const collapseAll = () => {
-    setExpandedQuestions(new Set())
-  }
-
-  // Filter questions for current chapter
-  const chapterQuestions = questions?.questionsByChapter[chapter.toString()] || []
 
   if (loading) {
     return (
@@ -100,14 +146,14 @@ export function TranslationQuestionsViewer({ resourceKey, metadata }: ResourceVi
     )
   }
 
-  if (!questions || chapterQuestions.length === 0) {
+  if (!questions || relevantQuestions.length === 0) {
     return (
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center max-w-md">
           <HelpCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Questions Available</h3>
           <p className="text-gray-600">
-            No questions are available for this chapter.
+            No questions are available for this verse range.
           </p>
         </div>
       </div>
@@ -115,91 +161,57 @@ export function TranslationQuestionsViewer({ resourceKey, metadata }: ResourceVi
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              {questions.bookName} {chapter} - Questions
-            </h2>
-            <p className="text-sm text-gray-600">
-              {chapterQuestions.length} question{chapterQuestions.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <div className="flex gap-2">
+    <div className="h-full overflow-y-auto bg-gray-50 p-4 space-y-3">
+      {relevantQuestions.map((question, index) => {
+        const isExpanded = expandedQuestions.has(question.id)
+        
+        return (
+          <div
+            key={question.id}
+            className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+          >
+            {/* Question Header */}
             <button
-              onClick={expandAll}
-              className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+              onClick={() => toggleQuestion(question.id)}
+              className="w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-gray-50 transition-colors"
             >
-              Expand All
-            </button>
-            <button
-              onClick={collapseAll}
-              className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-            >
-              Collapse All
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Questions List */}
-      <div className="p-4 space-y-3">
-        {chapterQuestions.map((question, index) => {
-          const isExpanded = expandedQuestions.has(question.id)
-          
-          return (
-            <div
-              key={question.id}
-              className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
-            >
-              {/* Question Header */}
-              <button
-                onClick={() => toggleQuestion(question.id)}
-                className="w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-semibold mt-0.5">
-                  {index + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-gray-900 font-medium leading-relaxed">
-                      {question.question}
-                    </p>
-                    {isExpanded ? (
-                      <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                    )}
-                  </div>
-                  {question.reference && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      {question.reference}
-                      {question.quote && ` - "${question.quote}"`}
-                    </p>
+              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-semibold mt-0.5">
+                {index + 1}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-gray-900 font-medium leading-relaxed">
+                    {question.question}
+                  </p>
+                  {isExpanded ? (
+                    <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
                   )}
                 </div>
-              </button>
+                {question.reference && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {question.reference}
+                    {question.quote && ` - "${question.quote}"`}
+                  </p>
+                )}
+              </div>
+            </button>
 
-              {/* Answer (Expanded) */}
-              {isExpanded && (
-                <div className="px-4 pb-4 border-t border-gray-100">
-                  <div className="pt-3 pl-9">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-700 mb-1">Answer:</p>
-                        <p className="text-gray-900 leading-relaxed">{question.response}</p>
-                      </div>
-                    </div>
+            {/* Answer (Expanded) */}
+            {isExpanded && (
+              <div className="px-4 pb-4 border-t border-gray-100">
+                <div className="pt-3 pl-9">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-gray-900 leading-relaxed flex-1">{question.response}</p>
                   </div>
                 </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
