@@ -8,43 +8,43 @@
  */
 
 import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  TouchSensor,
-  pointerWithin,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
+    DndContext,
+    DragOverlay,
+    PointerSensor,
+    TouchSensor,
+    pointerWithin,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+    type DragOverEvent,
+    type DragStartEvent,
 } from '@dnd-kit/core'
 import {
-  LinkedPanel,
-  LinkedPanelsContainer,
-  createDefaultPluginRegistry,
-  type LinkedPanelsConfig,
+    LinkedPanel,
+    LinkedPanelsContainer,
+    createDefaultPluginRegistry,
+    type LinkedPanelsConfig,
 } from 'linked-panels'
-import { Loader2, Package, CheckCircle2, XCircle } from 'lucide-react'
+import { CheckCircle2, Loader2, Package, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCatalogManager, useCacheAdapter, useCompletenessChecker, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
+import { useCacheAdapter, useCatalogManager, useCompletenessChecker, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useBackgroundDownload, useCatalogBackgroundDownload, useResourceManagement, useStudioResources, useSwipeGesture } from '../../hooks'
 import { createResourceMetadata } from '../../lib/services/ResourceMetadataFactory'
-import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { usePackageStore } from '../../lib/stores/packageStore'
-import type { ExportWorkerMessage, ExportWorkerResponse } from '../../workers/collectionExport.worker'
+import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
-  entryLinkClickPlugin,
-  linkClickPlugin,
-  scriptureContentRequestPlugin,
-  scriptureContentResponsePlugin,
-  scriptureTokensBroadcastPlugin,
-  tokenClickPlugin
+    entryLinkClickPlugin,
+    linkClickPlugin,
+    scriptureContentRequestPlugin,
+    scriptureContentResponsePlugin,
+    scriptureTokensBroadcastPlugin,
+    tokenClickPlugin
 } from '../../plugins/messageTypePlugins'
 import { useStudyStore } from '../../store/studyStore'
+import type { ExportWorkerMessage, ExportWorkerResponse } from '../../workers/collectionExport.worker'
 import { CollectionImportDialog } from '../collections/CollectionImportDialog'
 import { EntryResourceModal } from '../common/EntryResourceModal'
 import { FallbackViewer } from '../resources'
@@ -533,17 +533,21 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         addResource(basicResourceInfo)
         loadedResourceKeys.push(resourceKey)
         
-        // Assign to panels immediately
-        const isScripture = type === 'scripture'
-        const panelId = isScripture ? 'panel-1' : 'panel-2'
-        const currentPanel = getPanel(panelId)
-        const currentIndex = currentPanel?.resourceKeys.length || 0
-        assignResourceToPanel(resourceKey, panelId, currentIndex)
-        if (currentIndex === 0) {
-          setActiveResourceInPanel(panelId, 0)
+        // Only assign to panels if resource has a viewer (modal-only resources won't appear as tabs)
+        const hasViewer = viewerRegistry.hasViewer(type)
+        if (hasViewer) {
+          const isScripture = type === 'scripture'
+          const panelId = isScripture ? 'panel-1' : 'panel-2'
+          const currentPanel = getPanel(panelId)
+          const currentIndex = currentPanel?.resourceKeys.length || 0
+          assignResourceToPanel(resourceKey, panelId, currentIndex)
+          if (currentIndex === 0) {
+            setActiveResourceInPanel(panelId, 0)
+          }
+          console.log(`✅ Immediately added to panel: ${resourceKey} (metadata will load in background)`)
+        } else {
+          console.log(`✅ Loaded resource (modal-only): ${resourceKey} (no panel viewer)`)
         }
-        
-        console.log(`✅ Immediately added: ${resourceKey} (metadata will load in background)`)
       }
       
       console.log(`⚡ Phase 1 complete: ${loadedResourceKeys.length} resources in UI`)

@@ -54,9 +54,8 @@ export class ResourceTypeRegistry {
       throw new Error(`Resource type '${id}' must have a loader`)
     }
     
-    if (!viewer) {
-      throw new Error(`Resource type '${id}' must have a viewer`)
-    }
+    // Viewer is optional - resources without viewers are modal-only
+    // (accessible via Entry Viewer Registry, not as panel tabs)
     
     // 2. Store definition
     this.types.set(id, definition)
@@ -96,44 +95,50 @@ export class ResourceTypeRegistry {
       throw error
     }
     
-    // 5. Register viewer (UI layer)
-    try {
-      this.viewerRegistry.registerViewer({
-        resourceType: id,
-        displayName: displayName,
-        component: viewer,
-        canHandle: (metadata: any) => {
-          // Check type
-          if (metadata.type === id) return true
-          
-          // Check subjects
-          if (metadata.subject && subjects.includes(metadata.subject)) {
-            return true
-          }
-          
-          // Check aliases
-          if (aliases) {
-            for (const alias of aliases) {
-              if (
-                metadata.type === alias ||
-                metadata.resourceId === alias ||
-                metadata.subject === alias
-              ) {
-                return true
+    // 5. Register viewer (UI layer) - only if viewer is provided
+    if (viewer) {
+      try {
+        this.viewerRegistry.registerViewer({
+          resourceType: id,
+          displayName: displayName,
+          component: viewer,
+          canHandle: (metadata: any) => {
+            // Check type
+            if (metadata.type === id) return true
+            
+            // Check subjects
+            if (metadata.subject && subjects.includes(metadata.subject)) {
+              return true
+            }
+            
+            // Check aliases
+            if (aliases) {
+              for (const alias of aliases) {
+                if (
+                  metadata.type === alias ||
+                  metadata.resourceId === alias ||
+                  metadata.subject === alias
+                ) {
+                  return true
+                }
               }
             }
+            
+            return false
           }
-          
-          return false
-        }
-      })
-    } catch (error) {
-      console.error(`Failed to register viewer for '${id}':`, error)
-      throw error
+        })
+      } catch (error) {
+        console.error(`Failed to register viewer for '${id}':`, error)
+        throw error
+      }
+    } else {
+      if (this.debug) {
+        console.log(`ℹ️ No viewer registered for '${id}' (modal-only resource)`)
+      }
     }
     
     // 6. Log success (simplified)
-    console.log(`✅ Registered: ${id} (${subjects.length} subjects)`)
+    console.log(`✅ Registered: ${id} (${subjects.length} subjects)${viewer ? '' : ' [modal-only]'}`)
   }
   
   /**

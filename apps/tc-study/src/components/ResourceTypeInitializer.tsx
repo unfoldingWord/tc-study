@@ -26,10 +26,26 @@ export function ResourceTypeInitializer() {
         } = await import('../resourceTypes')
         
         registry.register(scriptureResourceType)
-        registry.register(translationWordsResourceType)
         registry.register(translationWordsLinksResourceType)
-        registry.register(translationAcademyResourceType)
         registry.register(translationNotesResourceType)
+        
+        // TESTING: Register TW and TA without viewers (modal-only resources)
+        // We create modified versions that only have the loader, no viewer
+        console.log('📦 [Initializer] Registering modal-only resources (TW, TA)...')
+        
+        // Translation Words (modal-only)
+        const twModalOnly = {
+          ...translationWordsResourceType,
+          viewer: undefined // Remove viewer so it won't appear as a tab
+        }
+        registry.register(twModalOnly)
+        
+        // Translation Academy (modal-only)
+        const taModalOnly = {
+          ...translationAcademyResourceType,
+          viewer: undefined // Remove viewer so it won't appear as a tab
+        }
+        registry.register(taModalOnly)
         
         console.log('📦 [Initializer] ✅ Resource types registered')
         setInitialized(true)

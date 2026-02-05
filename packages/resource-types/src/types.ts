@@ -4,9 +4,9 @@
  * Defines the structure for resource type plugins
  */
 
-import type { ResourceLoader, ResourceViewerProps } from './base-types'
 import type { BaseSignal, ResourceMetadata } from '@bt-synergy/resource-panels'
 import type { ComponentType } from 'react'
+import type { ResourceLoader, ResourceViewerProps } from './base-types'
 
 /**
  * API filters for Door43 catalog requests
@@ -261,6 +261,8 @@ export interface ResourceTypeDefinition {
   /** 
    * Viewer component - either a single component or platform-specific components
    * 
+   * Optional: If omitted, resource will be modal-only (accessible via Entry Viewer Registry)
+   * 
    * Single viewer (works on both platforms):
    * ```typescript
    * viewer: MyViewer
@@ -274,7 +276,7 @@ export interface ResourceTypeDefinition {
    * }
    * ```
    */
-  viewer: ComponentType<ResourceViewerProps> | PlatformViewers
+  viewer?: ComponentType<ResourceViewerProps> | PlatformViewers
   
   // ===== COMMUNICATION =====
   /** 

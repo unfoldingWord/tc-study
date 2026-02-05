@@ -19,28 +19,28 @@ import { usePackageStore } from '../../lib/stores'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { entryLinkClickPlugin, linkClickPlugin, scriptureContentRequestPlugin, scriptureContentResponsePlugin, scriptureTokensBroadcastPlugin, tokenClickPlugin } from '../../plugins/messageTypePlugins'
 import { useStudyStore } from '../../store/studyStore'
-import { FallbackViewer } from '../resources'
 import { EntryResourceModal } from '../common/EntryResourceModal'
+import { FallbackViewer } from '../resources'
 // import { AddResourceWizard } from '../wizard' // Temporarily inlined
 // import { AnchorSelector } from './AnchorSelector'
+import {
+    DndContext,
+    DragOverlay,
+    PointerSensor,
+    TouchSensor,
+    pointerWithin,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+    type DragOverEvent,
+    type DragStartEvent,
+} from '@dnd-kit/core'
 import { getBaseResourceKey, useResourceManagement, useStudioResources, useSwipeGesture } from '../../hooks'
+import { DroppablePanel } from './DroppablePanel'
 import { EmptyPanelState } from './EmptyPanelState'
 import { NavigationBar } from './NavigationBar'
 import { PanelHeader } from './PanelHeader'
-import { DroppablePanel } from './DroppablePanel'
 import { ResourceLibrarySidebar, ResourceWizardPanel } from './ResourceLibrarySidebar'
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  pointerWithin,
-  type DragEndEvent,
-  type DragStartEvent,
-  type DragOverEvent,
-} from '@dnd-kit/core'
 
 export function LinkedPanelsStudio() {
   // Wizard state
