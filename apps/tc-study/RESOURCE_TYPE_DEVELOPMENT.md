@@ -7,19 +7,29 @@ This guide explains how to add new resource types to tc-study. There are **two t
 1. **Panel Tab Viewer** - Full-featured viewer for resource panels (main reading interface)
 2. **Modal Entry Viewer** - Lightweight viewer for popup modals (quick reference, definitions)
 
-Both are required for a complete resource type implementation.
+### Registration Flexibility
+
+**You can register either viewer independently:**
+
+- ✅ **Both viewers** (recommended for primary resources) - Resource appears in panels AND modals
+- ✅ **Panel Tab Viewer only** - Resource appears in panels, but links won't open modals
+- ✅ **Modal Entry Viewer only** - Resource ONLY accessible via modals (links, cross-references), never as a panel tab
+
+This flexibility allows you to create "modal-only" resources for auxiliary content like glossaries, dictionaries, or reference materials that don't need full panel views.
 
 ## Quick Start
 
 ### Overview: Two Types of Viewers
 
 **Panel Tab Viewer** (`ScriptureViewer`, `TranslationWordsViewer`)
+
 - Used in: Main reading panels (left/right split view)
 - Purpose: Full-featured resource viewing with TOC, navigation, search
 - Registration: `ResourceTypeInitializer.tsx` → `ResourceTypeRegistry`
 - Location: `src/components/resources/MyResourceViewer/`
 
 **Modal Entry Viewer** (`TranslationWordsEntryViewer`, `TranslationAcademyEntryViewer`)
+
 - Used in: Popup modals (floating entry display)
 - Purpose: Lightweight single-entry display (definitions, articles)
 - Registration: `main.tsx` → `EntryViewerRegistry`
@@ -241,17 +251,64 @@ export function registerDefaultEntryViewers(registry: EntryViewerRegistry): void
 
 ### Summary: Registration Checklist
 
-When adding a new resource type, register in **2 places**:
+When adding a new resource type, you can register in **1 or 2 places** (depending on your needs):
+
+#### Option A: Full Resource (Both Viewers)
 
 ✅ **Panel Tab Viewer** → `ResourceTypeInitializer.tsx`
+
 - Purpose: Main reading interface
 - Wrapped with `withPanelCommunication`
 - Full-featured with TOC, navigation
 
 ✅ **Modal Entry Viewer** → `registerEntryViewers.ts`
+
 - Purpose: Popup modal for quick reference
 - Lightweight, minimal UI
 - Single entry display only
+
+**Use case:** Primary resources like Translation Words, Translation Academy, Translation Notes
+
+---
+
+#### Option B: Modal-Only Resource (Entry Viewer Only)
+
+✅ **Modal Entry Viewer** → `registerEntryViewers.ts`
+
+- Purpose: Popup modal for quick reference
+- Lightweight, minimal UI
+- Single entry display only
+
+❌ **No Panel Tab Viewer needed**
+
+**Use case:** Auxiliary resources like glossaries, dictionaries, or cross-reference materials that don't need full panel views
+
+---
+
+#### Option C: Panel-Only Resource (Tab Viewer Only)
+
+✅ **Panel Tab Viewer** → `ResourceTypeInitializer.tsx`
+
+- Purpose: Main reading interface
+- Wrapped with `withPanelCommunication`
+- Full-featured with TOC, navigation
+
+❌ **No Modal Entry Viewer**
+
+**Use case:** Resources that are only viewed in full panel mode (e.g., Scripture translations)
+
+---
+
+### How Modal-Only Resources Work
+
+When you register only a Modal Entry Viewer:
+
+1. **Resource won't appear as a tab option** in panels
+2. **Links will open the modal** when clicked (via `openModal(resourceKey)`)
+3. **Modal loads metadata independently** from `CatalogManager`
+4. **Entry Viewer renders based on metadata** (type, subject, etc.)
+
+This is useful for supporting resources that provide context but don't need a full reading interface.
 
 ---
 
@@ -348,12 +405,14 @@ Test your viewer with the Panel System Test page:
 ## Examples
 
 **Panel Tab Viewers** (Full-featured):
+
 - `src/components/resources/ScriptureViewer/` - Complete scripture viewer with TOC
 - `src/components/resources/TranslationWordsViewer/` - Words browser with categories
 - `src/components/resources/TranslationNotesViewer/` - Notes with verse alignment
 - `src/resourceTypes/scripture.ts` - Complete resource type registration
 
 **Modal Entry Viewers** (Lightweight):
+
 - `src/components/entryViewers/TranslationWordsEntryViewer.tsx` - Single word definition
 - `src/components/entryViewers/TranslationAcademyEntryViewer.tsx` - Single article
 - `src/lib/viewers/registerEntryViewers.ts` - Entry viewer registration
@@ -362,13 +421,15 @@ Test your viewer with the Panel System Test page:
 
 ## Registration Locations Summary
 
-### For Panel Tab Viewers:
+### For Panel Tab Viewers
+
 1. **Create viewer**: `src/components/resources/MyResourceViewer/index.tsx`
 2. **Define type**: `src/resourceTypes/myResource.ts`
 3. **Export**: `src/resourceTypes/index.ts`
 4. **Register**: `src/components/ResourceTypeInitializer.tsx` (ONE place)
 
-### For Modal Entry Viewers:
+### For Modal Entry Viewers
+
 1. **Create viewer**: `src/components/entryViewers/MyResourceEntryViewer.tsx`
 2. **Register**: `src/lib/viewers/registerEntryViewers.ts` (ONE place)
 
@@ -377,12 +438,14 @@ Test your viewer with the Panel System Test page:
 ## When to Use Which Viewer?
 
 **Use Panel Tab Viewer when:**
+
 - User needs to browse/navigate entire resource
 - TOC/navigation is required
 - Full-screen reading experience
 - Inter-panel communication needed
 
 **Use Modal Entry Viewer when:**
+
 - User clicks a link to view single entry
 - Quick reference popup (like dictionary lookup)
 - No navigation needed
@@ -395,17 +458,20 @@ Test your viewer with the Panel System Test page:
 ## Troubleshooting
 
 **Signals not being received?**
+
 - Check resourceId is correct and matches between sender/receiver
 - Verify signal type string matches exactly
 - Check Signal Monitor in test page
 - Enable debug mode to see logs
 
 **TypeScript errors?**
+
 - Ensure you're importing signal types from `../signals`
 - Use the generic type parameter: `sendSignal<SignalType>(...)`
 - Check `WithPanelCommunicationProps` is extended correctly
 
 **Component not rendering?**
+
 - Check ViewerRegistry has the viewer registered
 - Verify resource type ID matches across registration
 - Check CatalogContext initialization logs
@@ -487,7 +553,8 @@ Test your viewer with the Panel System Test page:
 
 ## Complete Example: Adding Translation Questions
 
-### Panel Viewer:
+### Panel Viewer
+
 ```tsx
 // 1. src/components/resources/TranslationQuestionsViewer/index.tsx
 export const TranslationQuestionsViewer = withPanelCommunication(
@@ -512,7 +579,8 @@ const { ..., translationQuestionsResourceType } = await import('../resourceTypes
 registry.register(translationQuestionsResourceType)
 ```
 
-### Entry Viewer:
+### Entry Viewer
+
 ```tsx
 // 5. src/components/entryViewers/TranslationQuestionsEntryViewer.tsx
 export function TranslationQuestionsEntryViewer({ 
