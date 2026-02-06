@@ -10,6 +10,7 @@ interface SortableTabProps {
   id: string
   isActive: boolean
   label: string
+  tooltip?: string // Full resource name for tooltip
   colorScheme: 'blue' | 'purple'
   onClick: () => void
 }
@@ -27,7 +28,7 @@ const tabColors = {
   },
 }
 
-export function SortableTab({ id, isActive, label, colorScheme, onClick }: SortableTabProps) {
+export function SortableTab({ id, isActive, label, tooltip, colorScheme, onClick }: SortableTabProps) {
   const {
     attributes,
     listeners,
@@ -68,7 +69,7 @@ export function SortableTab({ id, isActive, label, colorScheme, onClick }: Sorta
       role="tab"
       aria-selected={isActive}
       aria-label={label}
-      title={label}
+      title={tooltip || label}
       onClick={onClick}
       className={`
         flex-shrink-0 px-2 py-1.5 text-xs font-medium whitespace-nowrap

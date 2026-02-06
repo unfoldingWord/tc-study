@@ -143,6 +143,7 @@ export function ResourceTabs({
                   id={key}
                   isActive={idx === currentIndex}
                   label={getResourceId(resource)}
+                  tooltip={resource.title} // Show full resource title on hover
                   colorScheme={colorScheme}
                   onClick={() => onIndexChange(idx)}
                 />

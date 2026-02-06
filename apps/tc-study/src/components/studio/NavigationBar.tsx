@@ -400,6 +400,18 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
       <div className="flex items-center gap-2 w-full">
         {/* Left side controls */}
         <div className="flex items-center gap-1">
+          {/* Back button for navigation history - moved to left side */}
+          {navigation.canGoBack() && (
+            <button
+              onClick={() => navigation.goBack()}
+              className="p-1 rounded hover:bg-gray-100 text-gray-700"
+              title="Go back in navigation history"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          
           {/* Navigation type selector */}
           <div className="relative" ref={typeSelectorRef}>
             <button
@@ -452,20 +464,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
           </button>
         </div>
         
-        {/* Right side controls - Back Button, Download Indicator & Hamburger Menu */}
+        {/* Right side controls - Download Indicator & Hamburger Menu */}
         <div className="flex items-center gap-1">
-          {/* Back button for navigation history - only show when history available */}
-          {navigation.canGoBack() && (
-            <button
-              onClick={() => navigation.goBack()}
-              className="p-1 rounded hover:bg-gray-100 text-gray-700"
-              title="Go back in navigation history"
-              aria-label="Go back"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-          
           {/* Download Indicator */}
           {downloadIndicator}
           
