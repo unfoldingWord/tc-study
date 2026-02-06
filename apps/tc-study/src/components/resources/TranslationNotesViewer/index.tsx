@@ -6,11 +6,13 @@
  */
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
-import { BookOpen, ExternalLink, Loader } from 'lucide-react'
+import { BookOpen, ExternalLink, Loader, FileText } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
+import { getBookTitleStatic } from '../../../utils/bookNames'
+import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TranslationNoteCard } from './components/TranslationNoteCard'
 import { useTranslationNotesContent } from './hooks/useTranslationNotesContent'
 import { useTATitles } from './hooks/useTATitles'
@@ -19,17 +21,19 @@ import { useAlignedTokens, useQuoteTokens, useScriptureTokens } from '../WordsLi
 import { generateSemanticIdsForQuoteTokens } from '../WordsLinksViewer/utils'
 import { TokenFilterBanner } from '../WordsLinksViewer/components/TokenFilterBanner'
 
+import type { ResourceInfo } from '../../../contexts/types'
+
 interface TranslationNotesViewerProps {
   resourceKey: string
   resourceId: string
-  metadata?: any
+  resource: ResourceInfo
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
 }
 
 export function TranslationNotesViewer({
   resourceKey,
   resourceId,
-  metadata,
+  resource,
   onEntryLinkClick,
 }: TranslationNotesViewerProps) {
   const currentRef = useCurrentReference()
@@ -404,6 +408,12 @@ export function TranslationNotesViewer({
 
   return (
     <div className="h-full flex flex-col">
+      <ResourceViewerHeader 
+        title={resource.title}
+        icon={FileText}
+        subtitle={resource.languageTitle}
+      />
+      
       {tokenFilter && (
         <TokenFilterBanner
           tokenFilter={tokenFilter}
@@ -442,7 +452,7 @@ export function TranslationNotesViewer({
               <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
                 <BookOpen className="w-4 h-4 text-amber-600" />
                 <h3 className="text-sm font-semibold text-gray-700">
-                  {currentRef.book.toUpperCase()} {verse}
+                  {getBookTitleStatic(currentRef.book)} {verse}
                 </h3>
                 <span className="ml-auto px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
                   {verseNotes.length}

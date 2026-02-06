@@ -41,7 +41,13 @@ export interface ResourceInfo {
   category: string
   toc?: ResourceTOC
   
+  // Full ResourceMetadata object - ALWAYS populated via normalization
+  // This is the single source of truth for resource metadata
+  metadata: any // ResourceMetadata from @bt-synergy/resource-catalog (any for now to avoid circular deps)
+  
   // Additional metadata for resource management
+  // These fields are kept for backward compatibility and convenience,
+  // but metadata object should be the primary source
   language?: string
   languageCode?: string
   languageName?: string // Human-readable language name (e.g., "English", "español, Latinoamérica")
@@ -54,7 +60,6 @@ export interface ResourceInfo {
   ingredients?: any[] // Full ingredient objects from Door43
   version?: string
   contentStructure?: 'book' | 'entry' // How content is organized
-  metadata?: any // Full ResourceMetadata object for viewers that need it (e.g., TranslationWordsViewer)
   release?: any // Release object from Door43 API (contains tag_name, published_at, etc.)
   
   // Extended metadata for resource information display

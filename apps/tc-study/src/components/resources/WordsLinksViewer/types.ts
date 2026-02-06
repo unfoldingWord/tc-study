@@ -8,10 +8,12 @@ import type { ProcessedWordsLinks, TranslationWordsLink } from '@bt-synergy/reso
 
 export type { ProcessedWordsLinks, TranslationWordsLink }
 
+import type { ResourceInfo } from '../../../contexts/types'
+
 export interface WordsLinksViewerProps {
   resourceId: string
   resourceKey: string
-  metadata?: any
+  resource: ResourceInfo
   wordsLinksContent?: ProcessedWordsLinks
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
 }

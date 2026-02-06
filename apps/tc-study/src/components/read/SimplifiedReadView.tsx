@@ -1000,16 +1000,8 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
       const viewerProps: any = {
         resourceId: resource.id,
         resourceKey: resourceKey,
-      }
-      
-      // Add metadata - use stored metadata or resource object as fallback
-      if (resource.metadata != null) {
-        viewerProps.metadata = resource.metadata
-      } else if (resource.ingredients != null && resource.type === 'words') {
-        viewerProps.metadata = { ingredients: resource.ingredients, contentMetadata: { ingredients: resource.ingredients } }
-      } else {
-        // Use resource object itself as metadata fallback for other resource types
-        viewerProps.metadata = resource
+        // Metadata is now guaranteed to be populated via normalization
+        metadata: resource.metadata,
       }
       
       // Add onEntryLinkClick for entry-organized resources

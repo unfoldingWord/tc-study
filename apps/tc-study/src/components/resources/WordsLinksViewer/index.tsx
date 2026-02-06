@@ -32,7 +32,7 @@ import { generateSemanticIdsForQuoteTokens, parseTWLink } from './utils'
 export function WordsLinksViewer({
   resourceId,
   resourceKey,
-  metadata,
+  resource,
   wordsLinksContent,
   onEntryLinkClick,
 }: WordsLinksViewerProps) {
@@ -413,9 +413,9 @@ export function WordsLinksViewer({
   return (
     <div className="h-full flex flex-col">
       <ResourceViewerHeader 
-        title={metadata?.title || 'Translation Words Links'}
+        title={resource.title}
         icon={Link}
-        subtitle={metadata?.language_title}
+        subtitle={resource.languageTitle}
       />
       
       {tokenFilter && (

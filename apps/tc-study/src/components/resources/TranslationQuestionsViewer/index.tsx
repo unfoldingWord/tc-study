@@ -7,12 +7,13 @@
 
 import type { ProcessedQuestions } from '@bt-synergy/resource-parsers'
 import type { ResourceViewerProps } from '@bt-synergy/resource-types'
-import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react'
+import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, HelpCircle, MessageCircleQuestion } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useCurrentReference } from '../../../contexts'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
+import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 
-export function TranslationQuestionsViewer({ resourceKey, metadata }: ResourceViewerProps) {
+export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceViewerProps & { resource: any }) {
   const [questions, setQuestions] = useState<ProcessedQuestions | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -161,8 +162,15 @@ export function TranslationQuestionsViewer({ resourceKey, metadata }: ResourceVi
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-4 space-y-3">
-      {relevantQuestions.map((question, index) => {
+    <div className="h-full flex flex-col">
+      <ResourceViewerHeader 
+        title={resource.title}
+        icon={MessageCircleQuestion}
+        subtitle={resource.languageTitle}
+      />
+      
+      <div className="flex-1 overflow-y-auto bg-gray-50 p-4 space-y-3">
+        {relevantQuestions.map((question, index) => {
         const isExpanded = expandedQuestions.has(question.id)
         
         return (
@@ -212,6 +220,7 @@ export function TranslationQuestionsViewer({ resourceKey, metadata }: ResourceVi
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

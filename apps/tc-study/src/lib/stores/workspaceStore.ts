@@ -11,6 +11,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { ResourceInfo } from '../../contexts/types'
+import { normalizeResourceInfo } from '../../utils/normalizeResourceInfo'
 
 export interface PanelConfig {
   id: string // Unique panel ID (e.g., 'panel-1', 'panel-2', 'panel-3')
@@ -370,18 +371,21 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         version: collection.version,
         description: collection.description,
         resources: new Map(
-          (collection.resources || []).map((res: any) => [
-            `${res.owner}/${res.language}/${res.resourceId}`,
-            {
-              key: `${res.owner}/${res.language}/${res.resourceId}`,
+          (collection.resources || []).map((res: any) => {
+            const resourceKey = `${res.owner}/${res.language}/${res.resourceId}`
+            const resourceInfo: ResourceInfo = {
+              key: resourceKey,
               id: res.resourceId,
               title: res.displayName || res.resourceId,
               type: 'unknown',
+              category: 'unknown',
               owner: res.owner,
               language: res.language,
               server: res.server,
-            } as ResourceInfo
-          ])
+            }
+            // Normalize to ensure metadata is populated
+            return [resourceKey, normalizeResourceInfo(resourceInfo)]
+          })
         ),
         panels: collection.panelLayout?.panels?.map((panel: any, idx: number) => ({
           id: panel.id,
@@ -422,9 +426,13 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         if (!saved) return false
         
         const data = JSON.parse(saved)
+        
+        // Import normalization utility
+        const { normalizeResourceInfoMap } = require('../../utils/normalizeResourceInfo')
+        
         const workspace: WorkspacePackage = {
           ...data,
-          resources: new Map(data.resources || []),
+          resources: normalizeResourceInfoMap(new Map(data.resources || [])),
         }
         
         get().loadPackage(workspace)
@@ -531,6 +539,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               description: metadata.description || door43Data?.description,
               readme: metadata.longDescription || door43Data?.readme,
               license: typeof metadata.license === 'string' ? metadata.license : metadata.license?.id || door43Data?.license,
+              metadata: metadata, // ⭐ Include full metadata
             })
             
             added++
@@ -550,9 +559,12 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     
     // Resource management
     addResourceToPackage: (resource) => {
+      // Normalize resource to ensure metadata is always populated
+      const normalizedResource = normalizeResourceInfo(resource)
+      
       set((state) => {
         if (state.currentPackage) {
-          state.currentPackage.resources.set(resource.key, resource)
+          state.currentPackage.resources.set(normalizedResource.key, normalizedResource)
           state.isPackageModified = true
         }
       })

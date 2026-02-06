@@ -760,23 +760,21 @@ export function LinkedPanelsStudio() {
         viewerProps.isAnchor = isAnchor
       } else if (resource.type === 'words' || resource.category === 'words') {
         // TranslationWordsViewer needs metadata and onEntryLinkClick
-        viewerProps.metadata = resource.metadata || resource // Use stored metadata or resource as fallback
+        viewerProps.metadata = resource.metadata
         viewerProps.onEntryLinkClick = handleOpenEntry
       } else if (resource.type === 'words-links' || resource.category === 'words-links' || resource.type === 'twl') {
         // WordsLinksViewer needs metadata and onEntryLinkClick
-        viewerProps.metadata = resource.metadata || resource // Use stored metadata or resource as fallback
+        viewerProps.metadata = resource.metadata
         viewerProps.onEntryLinkClick = handleOpenEntry
       } else if (resource.type === 'notes' || resource.type === 'tn' || resource.type === 'questions' || resource.type === 'tq') {
         // Translation Notes/Questions viewers need metadata and onEntryLinkClick
-        viewerProps.metadata = resource.metadata || resource // Use stored metadata or resource as fallback
+        viewerProps.metadata = resource.metadata
         if (resource.type === 'notes' || resource.type === 'tn') {
           viewerProps.onEntryLinkClick = handleOpenEntry
         }
       } else {
-        // For any other viewer that might need metadata, provide it if available
-        if (resource.metadata) {
-          viewerProps.metadata = resource.metadata
-        }
+        // For any other viewer that might need metadata, provide it
+        viewerProps.metadata = resource.metadata
       }
       
       return <ViewerComponent {...viewerProps} />
