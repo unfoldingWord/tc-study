@@ -11,6 +11,7 @@ export type { ProcessedWordsLinks, TranslationWordsLink }
 export interface WordsLinksViewerProps {
   resourceId: string
   resourceKey: string
+  metadata?: any
   wordsLinksContent?: ProcessedWordsLinks
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
 }

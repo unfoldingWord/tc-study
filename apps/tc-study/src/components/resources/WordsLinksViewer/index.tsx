@@ -11,11 +11,13 @@
  */
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
-import { BookOpen, BookX, Loader } from 'lucide-react'
+import { BookOpen, BookX, Link, Loader } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useCatalogManager, useResourceTypeRegistry, useCurrentReference } from '../../../contexts'
+import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
+import { getBookTitleStatic } from '../../../utils/bookNames'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
+import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TokenFilterBanner, WordLinkCard } from './components'
 import {
     useAlignedTokens,
@@ -30,6 +32,7 @@ import { generateSemanticIdsForQuoteTokens, parseTWLink } from './utils'
 export function WordsLinksViewer({
   resourceId,
   resourceKey,
+  metadata,
   wordsLinksContent,
   onEntryLinkClick,
 }: WordsLinksViewerProps) {
@@ -409,6 +412,12 @@ export function WordsLinksViewer({
   
   return (
     <div className="h-full flex flex-col">
+      <ResourceViewerHeader 
+        title={metadata?.title || 'Translation Words Links'}
+        icon={Link}
+        subtitle={metadata?.language_title}
+      />
+      
       {tokenFilter && (
         <TokenFilterBanner
           tokenFilter={tokenFilter}
@@ -481,7 +490,7 @@ export function WordsLinksViewer({
                     {/* Verse Header */}
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm font-semibold text-gray-700">
-                        {currentRef.book?.toUpperCase() || ''} {chapter}:{verse}
+                        {getBookTitleStatic(currentRef.book || 'gen')} {chapter}:{verse}
                       </span>
                     </div>
                     
