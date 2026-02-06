@@ -204,6 +204,16 @@ export interface ResourceMetadata {
     release?: string          // Release page URL
     homepage?: string         // Project homepage
   }
+  
+  // Language metadata (extended)
+  languageTitle?: string      // Human-readable language name (e.g., "English", "español")
+  languageName?: string       // Alternative language display name
+  languageDirection?: 'ltr' | 'rtl'  // Text direction
+  
+  // Documentation & licensing (full content)
+  readme?: string             // Full README.md content
+  licenseText?: string        // Full license text content
+  licenseFile?: string        // License filename (e.g., "LICENSE.md")
 }
 
 /**

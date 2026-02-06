@@ -2,8 +2,13 @@
  * Type definitions for tc-study contexts
  */
 
+import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+
 // Re-export passage set types from the package
 export type { BCVReference, PassageSet } from '@bt-synergy/passage-sets'
+
+// Re-export ResourceMetadata as the single source of truth
+export type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 
 /**
  * Book information from scripture resource TOC
@@ -31,39 +36,18 @@ export interface ResourceTOC {
 }
 
 /**
- * Resource metadata that components need
+ * App-specific resource wrapper
+ * 
+ * Extends ResourceMetadata (the single source of truth) with ONLY app-specific state.
+ * All metadata fields come from ResourceMetadata - NO DUPLICATION!
  */
-export interface ResourceInfo {
-  id: string
-  key: string
-  title: string
-  type: string
-  category: string
-  toc?: ResourceTOC
+export interface ResourceInfo extends ResourceMetadata {
+  // App/UI-specific state ONLY (not in catalog)
+  toc?: ResourceTOC           // Runtime TOC from loaders
   
-  // Full ResourceMetadata object - ALWAYS populated via normalization
-  // This is the single source of truth for resource metadata
-  metadata: any // ResourceMetadata from @bt-synergy/resource-catalog (any for now to avoid circular deps)
-  
-  // Additional metadata for resource management
-  // These fields are kept for backward compatibility and convenience,
-  // but metadata object should be the primary source
-  language?: string
-  languageCode?: string
-  languageName?: string // Human-readable language name (e.g., "English", "español, Latinoamérica")
-  owner?: string
-  server?: string
-  subject?: string
-  format?: string
-  location?: string
-  resourceId?: string
-  ingredients?: any[] // Full ingredient objects from Door43
-  version?: string
-  contentStructure?: 'book' | 'entry' // How content is organized
-  release?: any // Release object from Door43 API (contains tag_name, published_at, etc.)
-  
-  // Extended metadata for resource information display
-  description?: string
-  readme?: string
-  license?: string
+  // Convenience aliases for common access patterns
+  // These are NOT stored separately - they reference the base ResourceMetadata fields
+  id: string                  // Alias for resourceKey
+  key: string                 // Alias for resourceKey  
+  category: string            // Computed from type
 }

@@ -749,32 +749,20 @@ export function LinkedPanelsStudio() {
       const viewerProps: any = {
         resourceId: resource.id,
         resourceKey: resourceKey,
+        // Pass full resource - top-level fields are source of truth
+        resource: resource,
       }
       
       // Add type-specific props
       if (resource.type === 'scripture' || resource.category === 'scripture') {
-        // ScriptureViewer needs additional props
+        // ScriptureViewer needs additional props and anchor flag
         viewerProps.server = resource.server
         viewerProps.owner = resource.owner
         viewerProps.language = resource.language
         viewerProps.isAnchor = isAnchor
-      } else if (resource.type === 'words' || resource.category === 'words') {
-        // TranslationWordsViewer needs metadata and onEntryLinkClick
-        viewerProps.metadata = resource.metadata
+      } else if (resource.type === 'words' || resource.category === 'words' || resource.type === 'words-links' || resource.category === 'words-links' || resource.type === 'twl' || resource.type === 'academy' || resource.type === 'ta' || resource.type === 'notes' || resource.type === 'tn') {
+        // Entry-organized resources need onEntryLinkClick
         viewerProps.onEntryLinkClick = handleOpenEntry
-      } else if (resource.type === 'words-links' || resource.category === 'words-links' || resource.type === 'twl') {
-        // WordsLinksViewer needs metadata and onEntryLinkClick
-        viewerProps.metadata = resource.metadata
-        viewerProps.onEntryLinkClick = handleOpenEntry
-      } else if (resource.type === 'notes' || resource.type === 'tn' || resource.type === 'questions' || resource.type === 'tq') {
-        // Translation Notes/Questions viewers need metadata and onEntryLinkClick
-        viewerProps.metadata = resource.metadata
-        if (resource.type === 'notes' || resource.type === 'tn') {
-          viewerProps.onEntryLinkClick = handleOpenEntry
-        }
-      } else {
-        // For any other viewer that might need metadata, provide it
-        viewerProps.metadata = resource.metadata
       }
       
       return <ViewerComponent {...viewerProps} />

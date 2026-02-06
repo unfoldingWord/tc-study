@@ -12,8 +12,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useCurrentReference } from '../../../contexts'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
+import type { ResourceInfo } from '../../../contexts/types'
 
-export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceViewerProps & { resource: any }) {
+export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceViewerProps & { resource: ResourceInfo }) {
   const [questions, setQuestions] = useState<ProcessedQuestions | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -512,6 +512,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         const basicResourceInfo: ResourceInfo = {
           id: resourceKey,
           key: resourceKey,
+          resourceKey: resourceKey, // Required for createResourceInfo
           title: item.title ?? entry.title ?? resourceKey,
           type,
           category: subject || 'Unknown',
@@ -633,6 +634,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         const basicResourceInfo: ResourceInfo = {
           id: resourceKey,
           key: resourceKey,
+          resourceKey: resourceKey, // Required for createResourceInfo
           title: orig.label,
           type: 'scripture',
           category: 'Bible',
@@ -1000,8 +1002,8 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
       const viewerProps: any = {
         resourceId: resource.id,
         resourceKey: resourceKey,
-        // Metadata is now guaranteed to be populated via normalization
-        metadata: resource.metadata,
+        // Pass full resource object - top-level fields are source of truth
+        resource: resource,
       }
       
       // Add onEntryLinkClick for entry-organized resources

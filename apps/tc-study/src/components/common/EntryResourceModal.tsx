@@ -299,13 +299,14 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
               }
               
               // Use Entry Viewer Registry to get the appropriate viewer
-              const metadata = resourceInfo?.metadata || resourceMetadata || resourceInfo
+              // ResourceInfo now extends ResourceMetadata, so we use resourceInfo directly
+              const metadata = resourceInfo || resourceMetadata
               const EntryViewer = entryViewerRegistry.getEntryViewer({
                 type: metadata?.type,
                 subject: metadata?.subject,
                 resourceId: resourceId,
                 owner: metadata?.owner,
-                languageCode: metadata?.languageCode,
+                languageCode: metadata?.language, // Use language, not languageCode
               })
               
               if (!EntryViewer) {

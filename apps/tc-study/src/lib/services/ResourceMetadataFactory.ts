@@ -354,8 +354,9 @@ export async function createResourceMetadata(
       repository: door43Resource.html_url,
     },
     
-    // Language metadata
-    languageName: door43Resource.language_title,
+    // Language metadata (extended)
+    languageTitle: door43Resource.language_title,
+    languageName: door43Resource.language_title, // Alias for compatibility
     languageDirection: door43Resource.language_direction,
     
     // Timestamps

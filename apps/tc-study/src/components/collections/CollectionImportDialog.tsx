@@ -10,10 +10,12 @@ import type { ResourcePackage } from '@bt-synergy/package-storage'
 import { Check, Database, FileArchive, Package, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../contexts/AppContext'
-import { useCatalogManager } from '../../contexts/CatalogContext'
+import { useCatalogManager, useResourceTypeRegistry } from '../../contexts/CatalogContext'
 import { collectionExportService } from '../../lib/services/CollectionExportService'
+import { createResourceMetadata } from '../../lib/services/ResourceMetadataFactory'
 import { usePackageStore } from '../../lib/stores/packageStore'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
+import { createResourceInfo } from '../../utils/resourceInfo'
 
 interface CollectionImportDialogProps {
   isOpen: boolean
@@ -28,6 +30,7 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
   const loadPackages = usePackageStore(state => state.loadPackages)
   const addResourceToApp = useAppStore(state => state.addResource)
   const catalogManager = useCatalogManager()
+  const resourceTypeRegistry = useResourceTypeRegistry()
   
   // Filter to only show installed collections (same as Collections page)
   const packages = allPackages.filter((pkg: any) => pkg.status === 'installed')
@@ -144,56 +147,14 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
             // Deep clone the entire metadata object to break any Immer freeze
             const unfrozenMetadata = JSON.parse(JSON.stringify(metadata))
             
-            // Create fresh, independent resource info object for workspacePackage
-            const resourceInfoForWorkspace = {
-              id: _resourceKey,
-              key: _resourceKey,
-              title: unfrozenMetadata.title || '',
-              owner: unfrozenMetadata.owner || '',
-              language: unfrozenMetadata.language || '',
-              languageCode: unfrozenMetadata.language || '',
-              languageName: unfrozenMetadata.languageName || '',
-              subject: unfrozenMetadata.subject || '',
-              type: unfrozenMetadata.type || 'unknown',
-              category: unfrozenMetadata.category || 'unknown',
-              format: unfrozenMetadata.format || 'unknown',
-              contentStructure: unfrozenMetadata.contentStructure || undefined,
-              server: unfrozenMetadata.server || 'git.door43.org',
-              resourceId: unfrozenMetadata.resourceId || '',
-              version: unfrozenMetadata.version || '',
-              description: unfrozenMetadata.description || '',
-              readme: unfrozenMetadata.readme || '',  // ✅ Standardized field
-              license: unfrozenMetadata.license || '', // ✅ Standardized field
-              metadata_url: unfrozenMetadata.urls?.metadata || '',
-              ingredients: unfrozenMetadata.contentMetadata?.ingredients ? JSON.parse(JSON.stringify(unfrozenMetadata.contentMetadata.ingredients)) : undefined
-            }
+            // Create ResourceInfo from complete catalog metadata
+            const resourceInfoForWorkspace = createResourceInfo(unfrozenMetadata)
             
             // Add to workspacePackage.resources FIRST
             workspacePackage.resources.set(_resourceKey, resourceInfoForWorkspace)
             
             // Create a completely separate copy for AppStore (deep clone again to ensure no shared references)
-            const resourceInfoForApp = {
-              id: _resourceKey,
-              key: _resourceKey,
-              title: unfrozenMetadata.title || '',
-              owner: unfrozenMetadata.owner || '',
-              language: unfrozenMetadata.language || '',
-              languageCode: unfrozenMetadata.language || '',
-              languageName: unfrozenMetadata.languageName || '',
-              subject: unfrozenMetadata.subject || '',
-              type: unfrozenMetadata.type || 'unknown',
-              category: unfrozenMetadata.category || 'unknown',
-              format: unfrozenMetadata.format || 'unknown',
-              contentStructure: unfrozenMetadata.contentStructure || undefined,
-              server: unfrozenMetadata.server || 'git.door43.org',
-              resourceId: unfrozenMetadata.resourceId || '',
-              version: unfrozenMetadata.version || '',
-              description: unfrozenMetadata.description || '',
-              readme: unfrozenMetadata.readme || '',  // ✅ Standardized field
-              license: unfrozenMetadata.license || '', // ✅ Standardized field
-              metadata_url: unfrozenMetadata.urls?.metadata || '',
-              ingredients: unfrozenMetadata.contentMetadata?.ingredients ? JSON.parse(JSON.stringify(unfrozenMetadata.contentMetadata.ingredients)) : undefined
-            }
+            const resourceInfoForApp = createResourceInfo(unfrozenMetadata)
             
             // Store for AppStore (to be added later)
             resourceInfosForApp.set(_resourceKey, resourceInfoForApp)
@@ -234,99 +195,31 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
               
               const door43Resource = searchResults[0]
               
-              // Enrich metadata (fetch README, license, ingredients)
-              console.log(`   🔄 Enriching metadata for: ${_resourceKey}`)
-              const enrichedMetadata = await door43Client.enrichResourceMetadata(door43Resource)
-              
-              // Create full metadata object
-              const fetchedMetadata = {
-                key: _resourceKey,
-                id: resourceId,
-                resourceId: resourceId,
-                title: door43Resource.title,
-                name: door43Resource.title,
-                owner: owner,
-                languageCode: language,
-                languageName: language,
-                language: language,
-                category: door43Resource.category,
-                subject: door43Resource.subject,
-                description: door43Resource.description,
-                version: door43Resource.version,
-                metadata_url: door43Resource.metadata_url,
-                repo_url: door43Resource.repo_url,
-                license: enrichedMetadata.license,
-                readme: enrichedMetadata.readme,
-                type: door43Resource.metadataType,
-                format: door43Resource.format,
-                server: 'git.door43.org',
-                contentMetadata: {
-                  ingredients: enrichedMetadata.ingredients,
-                }
-              }
+              // Use the ResourceMetadataFactory to create complete metadata with ingredients
+              console.log(`   🔄 Creating metadata with ingredients for: ${_resourceKey}`)
+              const resourceMetadata = await createResourceMetadata(door43Resource, {
+                includeEnrichment: true,
+                resourceTypeRegistry: resourceTypeRegistry,
+                debug: true,
+              })
               
               // Add to catalog
-              await catalogManager.addResourceToCatalog(fetchedMetadata as any)
+              await catalogManager.addResourceToCatalog(resourceMetadata)
               console.log(`   ✅ Added resource to catalog: ${_resourceKey}`)
               
-              // Now process this fetched metadata the same way as cached metadata
-              const unfrozenMetadata = JSON.parse(JSON.stringify(fetchedMetadata))
-              
-              // Create fresh, independent resource info object for workspacePackage
-              const resourceInfoForWorkspace = {
-                id: _resourceKey,
-                key: _resourceKey,
-                title: unfrozenMetadata.title || '',
-                owner: unfrozenMetadata.owner || '',
-                language: unfrozenMetadata.language || '',
-                languageCode: unfrozenMetadata.language || '',
-                languageName: unfrozenMetadata.languageName || '',
-                subject: unfrozenMetadata.subject || '',
-                type: unfrozenMetadata.type || 'unknown',
-                category: unfrozenMetadata.category || 'unknown',
-                format: unfrozenMetadata.format || 'unknown',
-                contentStructure: unfrozenMetadata.contentStructure || undefined,
-                server: unfrozenMetadata.server || 'git.door43.org',
-                resourceId: unfrozenMetadata.resourceId || '',
-                version: unfrozenMetadata.version || '',
-                description: unfrozenMetadata.description || '',
-                readme: unfrozenMetadata.readme || '',
-                license: unfrozenMetadata.license || '',
-                metadata_url: unfrozenMetadata.metadata_url || '',
-                ingredients: unfrozenMetadata.contentMetadata?.ingredients ? JSON.parse(JSON.stringify(unfrozenMetadata.contentMetadata.ingredients)) : undefined
-              }
+              // Create ResourceInfo from the complete metadata
+              const resourceInfoForWorkspace = createResourceInfo(resourceMetadata)
               
               // Add to workspacePackage.resources FIRST
               workspacePackage.resources.set(_resourceKey, resourceInfoForWorkspace)
               
               // Create a completely separate copy for AppStore
-              const resourceInfoForApp = {
-                id: _resourceKey,
-                key: _resourceKey,
-                title: unfrozenMetadata.title || '',
-                owner: unfrozenMetadata.owner || '',
-                language: unfrozenMetadata.language || '',
-                languageCode: unfrozenMetadata.language || '',
-                languageName: unfrozenMetadata.languageName || '',
-                subject: unfrozenMetadata.subject || '',
-                type: unfrozenMetadata.type || 'unknown',
-                category: unfrozenMetadata.category || 'unknown',
-                format: unfrozenMetadata.format || 'unknown',
-                contentStructure: unfrozenMetadata.contentStructure || undefined,
-                server: unfrozenMetadata.server || 'git.door43.org',
-                resourceId: unfrozenMetadata.resourceId || '',
-                version: unfrozenMetadata.version || '',
-                description: unfrozenMetadata.description || '',
-                readme: unfrozenMetadata.readme || '',
-                license: unfrozenMetadata.license || '',
-                metadata_url: unfrozenMetadata.metadata_url || '',
-                ingredients: unfrozenMetadata.contentMetadata?.ingredients ? JSON.parse(JSON.stringify(unfrozenMetadata.contentMetadata.ingredients)) : undefined
-              }
+              const resourceInfoForApp = createResourceInfo(resourceMetadata)
               
               // Store for AppStore (to be added later)
               resourceInfosForApp.set(_resourceKey, resourceInfoForApp)
               
-              console.log(`   ✅ Downloaded & loaded: ${unfrozenMetadata.title}`)
+              console.log(`   ✅ Downloaded & loaded: ${resourceMetadata.title}`)
               
             } catch (fetchError) {
               console.error(`   ❌ Failed to fetch resource from Door43: ${_resourceKey}`, fetchError)
@@ -422,54 +315,14 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
             // Deep clone the entire metadata object to break any Immer freeze
             const unfrozenMetadata = JSON.parse(JSON.stringify(metadata))
             
-            // Create fresh, independent resource info object for workspace
-            const resourceInfoForWorkspace = {
-              id: _resourceKey,
-              key: _resourceKey,
-              title: unfrozenMetadata.title || '',
-              owner: unfrozenMetadata.owner || '',
-              language: unfrozenMetadata.language || '',
-              languageName: unfrozenMetadata.languageName || '',
-              type: unfrozenMetadata.type || 'unknown',
-              category: unfrozenMetadata.category || 'unknown',
-              format: unfrozenMetadata.format || 'unknown',
-              contentStructure: unfrozenMetadata.contentStructure || undefined,
-              server: unfrozenMetadata.server || 'git.door43.org',
-              resourceId: unfrozenMetadata.resourceId || '',
-              version: unfrozenMetadata.version || '',
-              description: unfrozenMetadata.description || '',
-              readme: unfrozenMetadata.readme || '',  // ✅ Standardized field
-              license: unfrozenMetadata.license || '', // ✅ Standardized field
-              metadata_url: unfrozenMetadata.urls?.metadata || '',
-              ingredients: unfrozenMetadata.contentMetadata?.ingredients ? JSON.parse(JSON.stringify(unfrozenMetadata.contentMetadata.ingredients)) : undefined
-            }
+            // Create ResourceInfo from metadata
+            const resourceInfoForWorkspace = createResourceInfo(unfrozenMetadata)
             
             // Add to workspace.resources FIRST
             workspace.resources.set(_resourceKey, resourceInfoForWorkspace)
             
             // Create a completely separate copy for AppStore (deep clone again to ensure no shared references)
-            const resourceInfoForApp = {
-              id: _resourceKey,
-              key: _resourceKey,
-              title: unfrozenMetadata.title || '',
-              owner: unfrozenMetadata.owner || '',
-              language: unfrozenMetadata.language || '',
-              languageCode: unfrozenMetadata.language || '',
-              languageName: unfrozenMetadata.languageName || '',
-              subject: unfrozenMetadata.subject || '',
-              type: unfrozenMetadata.type || 'unknown',
-              category: unfrozenMetadata.category || 'unknown',
-              format: unfrozenMetadata.format || 'unknown',
-              contentStructure: unfrozenMetadata.contentStructure || undefined,
-              server: unfrozenMetadata.server || 'git.door43.org',
-              resourceId: unfrozenMetadata.resourceId || '',
-              version: unfrozenMetadata.version || '',
-              description: unfrozenMetadata.description || '',
-              readme: unfrozenMetadata.readme || '',  // ✅ Standardized field
-              license: unfrozenMetadata.license || '', // ✅ Standardized field
-              metadata_url: unfrozenMetadata.urls?.metadata || '',
-              ingredients: unfrozenMetadata.contentMetadata?.ingredients ? JSON.parse(JSON.stringify(unfrozenMetadata.contentMetadata.ingredients)) : undefined
-            }
+            const resourceInfoForApp = createResourceInfo(unfrozenMetadata)
             
             // Store for AppStore (to be added later)
             resourceInfosForApp.set(_resourceKey, resourceInfoForApp)
@@ -510,99 +363,31 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
               
               const door43Resource = searchResults[0]
               
-              // Enrich metadata (fetch README, license, ingredients)
-              console.log(`   🔄 Enriching metadata for: ${_resourceKey}`)
-              const enrichedMetadata = await door43Client.enrichResourceMetadata(door43Resource)
-              
-              // Create full metadata object
-              const fetchedMetadata = {
-                key: _resourceKey,
-                id: resourceId,
-                resourceId: resourceId,
-                title: door43Resource.title,
-                name: door43Resource.title,
-                owner: owner,
-                languageCode: language,
-                languageName: language,
-                language: language,
-                category: door43Resource.category,
-                subject: door43Resource.subject,
-                description: door43Resource.description,
-                version: door43Resource.version,
-                metadata_url: door43Resource.metadata_url,
-                repo_url: door43Resource.repo_url,
-                license: enrichedMetadata.license,
-                readme: enrichedMetadata.readme,
-                type: door43Resource.metadataType,
-                format: door43Resource.format,
-                server: 'git.door43.org',
-                contentMetadata: {
-                  ingredients: enrichedMetadata.ingredients,
-                }
-              }
+              // Use the ResourceMetadataFactory to create complete metadata with ingredients
+              console.log(`   🔄 Creating metadata with ingredients for: ${_resourceKey}`)
+              const resourceMetadata = await createResourceMetadata(door43Resource, {
+                includeEnrichment: true,
+                resourceTypeRegistry: resourceTypeRegistry,
+                debug: true,
+              })
               
               // Add to catalog
-              await catalogManager.addResourceToCatalog(fetchedMetadata as any)
+              await catalogManager.addResourceToCatalog(resourceMetadata)
               console.log(`   ✅ Added resource to catalog: ${_resourceKey}`)
               
-              // Now process this fetched metadata the same way as cached metadata
-              const unfrozenMetadata = JSON.parse(JSON.stringify(fetchedMetadata))
-              
-              // Create fresh, independent resource info object for workspace
-              const resourceInfoForWorkspace = {
-                id: _resourceKey,
-                key: _resourceKey,
-                title: unfrozenMetadata.title || '',
-                owner: unfrozenMetadata.owner || '',
-                language: unfrozenMetadata.language || '',
-                languageCode: unfrozenMetadata.language || '',
-                languageName: unfrozenMetadata.languageName || '',
-                subject: unfrozenMetadata.subject || '',
-                type: unfrozenMetadata.type || 'unknown',
-                category: unfrozenMetadata.category || 'unknown',
-                format: unfrozenMetadata.format || 'unknown',
-                contentStructure: unfrozenMetadata.contentStructure || undefined,
-                server: unfrozenMetadata.server || 'git.door43.org',
-                resourceId: unfrozenMetadata.resourceId || '',
-                version: unfrozenMetadata.version || '',
-                description: unfrozenMetadata.description || '',
-                readme: unfrozenMetadata.readme || '',
-                license: unfrozenMetadata.license || '',
-                metadata_url: unfrozenMetadata.metadata_url || '',
-                ingredients: unfrozenMetadata.contentMetadata?.ingredients ? JSON.parse(JSON.stringify(unfrozenMetadata.contentMetadata.ingredients)) : undefined
-              }
+              // Create ResourceInfo from the complete metadata
+              const resourceInfoForWorkspace = createResourceInfo(resourceMetadata)
               
               // Add to workspace.resources FIRST
               workspace.resources.set(_resourceKey, resourceInfoForWorkspace)
               
               // Create a completely separate copy for AppStore
-              const resourceInfoForApp = {
-                id: _resourceKey,
-                key: _resourceKey,
-                title: unfrozenMetadata.title || '',
-                owner: unfrozenMetadata.owner || '',
-                language: unfrozenMetadata.language || '',
-                languageCode: unfrozenMetadata.language || '',
-                languageName: unfrozenMetadata.languageName || '',
-                subject: unfrozenMetadata.subject || '',
-                type: unfrozenMetadata.type || 'unknown',
-                category: unfrozenMetadata.category || 'unknown',
-                format: unfrozenMetadata.format || 'unknown',
-                contentStructure: unfrozenMetadata.contentStructure || undefined,
-                server: unfrozenMetadata.server || 'git.door43.org',
-                resourceId: unfrozenMetadata.resourceId || '',
-                version: unfrozenMetadata.version || '',
-                description: unfrozenMetadata.description || '',
-                readme: unfrozenMetadata.readme || '',
-                license: unfrozenMetadata.license || '',
-                metadata_url: unfrozenMetadata.metadata_url || '',
-                ingredients: unfrozenMetadata.contentMetadata?.ingredients ? JSON.parse(JSON.stringify(unfrozenMetadata.contentMetadata.ingredients)) : undefined
-              }
+              const resourceInfoForApp = createResourceInfo(resourceMetadata)
               
               // Store for AppStore (to be added later)
               resourceInfosForApp.set(_resourceKey, resourceInfoForApp)
               
-              console.log(`   ✅ Downloaded & loaded: ${unfrozenMetadata.title}`)
+              console.log(`   ✅ Downloaded & loaded: ${resourceMetadata.title}`)
               
             } catch (fetchError) {
               console.error(`   ❌ Failed to fetch resource from Door43: ${_resourceKey}`, fetchError)

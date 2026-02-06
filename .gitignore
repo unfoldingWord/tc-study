@@ -44,3 +44,4 @@ apps/mobile/resource-downloader/app.db
 exports/uw-translation-resources/
 packages/catalog-cli/test-*.zip
 packages/resource-bundler/test-output/
+resource-downloader/

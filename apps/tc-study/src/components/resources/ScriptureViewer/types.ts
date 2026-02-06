@@ -4,10 +4,12 @@
 
 import type { ProcessedScripture, ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
 import type { BookInfo } from '../../../contexts/types-only'
+import type { ResourceInfo } from '../../../contexts/types'
 
 export interface ScriptureViewerProps {
   resourceId: string
   resourceKey: string
+  resource: ResourceInfo
   server?: string
   owner?: string
   language?: string

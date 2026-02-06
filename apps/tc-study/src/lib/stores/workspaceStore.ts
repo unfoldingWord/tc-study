@@ -11,7 +11,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { ResourceInfo } from '../../contexts/types'
-import { normalizeResourceInfo } from '../../utils/normalizeResourceInfo'
+import { createResourceInfo } from '../../utils/resourceInfo'
 
 export interface PanelConfig {
   id: string // Unique panel ID (e.g., 'panel-1', 'panel-2', 'panel-3')
@@ -283,18 +283,23 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       
       // Helper to extract base resource key (removes instance identifiers like #2)
       const extractBaseKey = (key: string): string => {
+        if (!key) return ''
         return key.split('#')[0]
       }
       
       // Helper to extract resourceId from key (format: owner/language/resourceId or owner/language/resourceId#N)
       const extractResourceId = (key: string): string => {
+        if (!key) return 'unknown'
         const baseKey = extractBaseKey(key)
         const parts = baseKey.split('/')
-        return parts[parts.length - 1] // Return last part
+        return parts[parts.length - 1] || 'unknown'
       }
       
       // Helper to parse full resource key into components
       const parseResourceKey = (key: string): { owner: string; language: string; resourceId: string } => {
+        if (!key) {
+          return { owner: 'unknown', language: 'en', resourceId: 'unknown' }
+        }
         const baseKey = extractBaseKey(key)
         const parts = baseKey.split('/')
         return {
@@ -372,19 +377,32 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         description: collection.description,
         resources: new Map(
           (collection.resources || []).map((res: any) => {
-            const resourceKey = `${res.owner}/${res.language}/${res.resourceId}`
-            const resourceInfo: ResourceInfo = {
-              key: resourceKey,
-              id: res.resourceId,
-              title: res.displayName || res.resourceId,
-              type: 'unknown',
-              category: 'unknown',
-              owner: res.owner,
-              language: res.language,
-              server: res.server,
-            }
-            // Normalize to ensure metadata is populated
-            return [resourceKey, normalizeResourceInfo(resourceInfo)]
+          const resourceKey = `${res.owner}/${res.language}/${res.resourceId}`
+          // Create minimal ResourceMetadata from collection resource
+          const metadata: any = {
+            resourceKey,
+            resourceId: res.resourceId,
+            server: res.server,
+            owner: res.owner,
+            language: res.language,
+            title: res.displayName || res.resourceId,
+            subject: 'unknown',
+            version: '1.0.0',
+            type: 'unknown',
+            format: 'unknown' as any,
+            contentType: 'unknown',
+            contentStructure: 'book' as const,
+            availability: {
+              online: false,
+              offline: false,
+              bundled: false,
+              partial: false,
+            },
+            locations: [],
+            catalogedAt: new Date().toISOString(),
+          }
+          // Create ResourceInfo from metadata
+          return [resourceKey, createResourceInfo(metadata)]
           })
         ),
         panels: collection.panelLayout?.panels?.map((panel: any, idx: number) => ({
@@ -427,12 +445,83 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         
         const data = JSON.parse(saved)
         
-        // Import normalization utility
-        const { normalizeResourceInfoMap } = require('../../utils/normalizeResourceInfo')
+        // Convert saved resources to ResourceInfo
+        const resourcesMap = new Map<string, ResourceInfo>(
+          (data.resources || []).map(([key, res]: [string, any]) => {
+            try {
+              // Build complete ResourceMetadata from saved resource (handle both old and new formats)
+              const metadata: any = {
+                // Required core fields
+                resourceKey: res.resourceKey || key,
+                resourceId: res.resourceId || res.id || key.split('/')[2] || 'unknown',
+                server: res.server || 'git.door43.org',
+                owner: res.owner || key.split('/')[0] || 'unknown',
+                language: res.language || res.languageCode || key.split('/')[1] || 'en',
+                title: res.title || 'Unknown Resource',
+                subject: res.subject || res.resourceId || 'unknown',
+                version: res.version || '1.0.0',
+                
+                // Resource type info
+                type: res.type || 'unknown',
+                format: res.format || 'unknown',
+                contentType: res.contentType || res.type || 'unknown',
+                contentStructure: res.contentStructure || 'book',
+                
+                // Availability and locations
+                availability: res.availability || {
+                  online: false,
+                  offline: true,  // Assume offline if saved in workspace
+                  bundled: false,
+                  partial: false,
+                },
+                locations: res.locations || [],
+                
+                // Optional metadata
+                description: res.description,
+                languageTitle: res.languageTitle || res.languageName,
+                languageName: res.languageName,
+                languageDirection: res.languageDirection,
+                readme: res.readme,
+                licenseText: res.license,
+                
+                // Content metadata
+                contentMetadata: res.contentMetadata || (res.ingredients ? { ingredients: res.ingredients } : undefined),
+                
+                // URLs
+                urls: res.urls || (res.metadata_url ? { metadata: res.metadata_url } : undefined),
+                
+                // Timestamps
+                catalogedAt: res.catalogedAt || new Date().toISOString(),
+              }
+              
+              return [key, createResourceInfo(metadata, { toc: res.toc })]
+            } catch (error) {
+              console.error(`❌ Failed to load resource ${key}:`, error)
+              // Return a minimal valid resource as fallback
+              return [key, createResourceInfo({
+                resourceKey: key,
+                resourceId: key.split('/')[2] || 'unknown',
+                server: 'git.door43.org',
+                owner: key.split('/')[0] || 'unknown',
+                language: key.split('/')[1] || 'en',
+                title: `Failed to load: ${key}`,
+                subject: 'unknown',
+                version: '1.0.0',
+                type: 'unknown',
+                format: 'unknown',
+                contentType: 'unknown',
+                contentStructure: 'book',
+                availability: { online: false, offline: false, bundled: false, partial: false },
+                locations: [],
+                catalogedAt: new Date().toISOString(),
+              })]
+            }
+          })
+        )
         
         const workspace: WorkspacePackage = {
           ...data,
-          resources: normalizeResourceInfoMap(new Map(data.resources || [])),
+          resources: resourcesMap,
         }
         
         get().loadPackage(workspace)
@@ -559,12 +648,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     
     // Resource management
     addResourceToPackage: (resource) => {
-      // Normalize resource to ensure metadata is always populated
-      const normalizedResource = normalizeResourceInfo(resource)
+      // Ensure resource has proper structure
+      // If it already has all required fields, it's a proper ResourceInfo
+      const resourceInfo = resource.resourceKey && resource.catalogedAt 
+        ? resource as ResourceInfo
+        : createResourceInfo(resource as any)
       
       set((state) => {
         if (state.currentPackage) {
-          state.currentPackage.resources.set(normalizedResource.key, normalizedResource)
+          state.currentPackage.resources.set(resourceInfo.key, resourceInfo)
           state.isPackageModified = true
         }
       })

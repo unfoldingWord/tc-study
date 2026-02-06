@@ -10,11 +10,12 @@
  * - Uses ProcessedScripture format from @bt-synergy/usfm-processor
  */
 
-import { Bug } from 'lucide-react'
+import { Book, Bug } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEvents } from 'linked-panels'
 import { useCatalogManager, useCurrentReference } from '../../../contexts'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
+import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import {
     DebugPanel,
     ScriptureContent,
@@ -25,6 +26,7 @@ import type { ScriptureViewerProps } from './types'
 export function ScriptureViewer({
   resourceId,
   resourceKey,
+  resource,
   server = 'git.door43.org',
   owner = 'unfoldingWord',
   language = 'es',
@@ -158,21 +160,28 @@ export function ScriptureViewer({
   }
 
   return (
-    <div 
-      className="h-full flex flex-col p-6 relative cursor-pointer" 
-      onClick={handleViewerClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          handleViewerClick()
-        }
-      }}
-    >
-      {/* Content - scrolling handled by parent container */}
-      <div className="flex-1">
-        <ScriptureContent
+    <div className="h-full flex flex-col">
+      <ResourceViewerHeader 
+        title={resource.title}
+        icon={Book}
+        subtitle={resource.languageTitle}
+      />
+      
+      <div 
+        className="flex-1 p-6 relative cursor-pointer" 
+        onClick={handleViewerClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleViewerClick()
+          }
+        }}
+      >
+        {/* Content - scrolling handled by parent container */}
+        <div className="flex-1">
+          <ScriptureContent
           isLoading={isLoading}
           error={error}
           loadedContent={loadedContent}
@@ -203,25 +212,26 @@ export function ScriptureViewer({
       />
       )}
 
-      {/* Floating Debug Button (smaller, positioned within panel) */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation() // Prevent triggering parent onClick
-          setShowDebug(!showDebug)
-        }}
-        className={`
-          absolute bottom-2 right-2 p-1.5 rounded-full shadow-md
-          transition-all duration-200 hover:scale-110
-          ${showDebug 
-            ? 'bg-blue-600 text-white hover:bg-blue-700' 
-            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }
-        `}
-        title={showDebug ? 'Hide debug panel' : 'Show debug panel'}
-        aria-label={showDebug ? 'Hide debug panel' : 'Show debug panel'}
-      >
-        <Bug className="w-3 h-3" />
-      </button>
+        {/* Floating Debug Button (smaller, positioned within panel) */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation() // Prevent triggering parent onClick
+            setShowDebug(!showDebug)
+          }}
+          className={`
+            absolute bottom-2 right-2 p-1.5 rounded-full shadow-md
+            transition-all duration-200 hover:scale-110
+            ${showDebug 
+              ? 'bg-blue-600 text-white hover:bg-blue-700' 
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }
+          `}
+          title={showDebug ? 'Hide debug panel' : 'Show debug panel'}
+          aria-label={showDebug ? 'Hide debug panel' : 'Show debug panel'}
+        >
+          <Bug className="w-3 h-3" />
+        </button>
+      </div>
     </div>
   )
 }

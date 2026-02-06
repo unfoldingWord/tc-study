@@ -13,6 +13,7 @@ import { useCatalogManager, useResourceTypeRegistry } from '../../contexts/Catal
 import { createResourceMetadata } from '../../lib/services/ResourceMetadataFactory'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { checkResourceDependencies, getRequiredDependencyResources } from '../../utils/resourceDependencies'
+import { createResourceInfo } from '../../utils/resourceInfo'
 
 // Import wizard steps (reuse existing ones)
 import { LanguageSelectorStep } from '../wizard/LanguageSelectorStep'
@@ -380,58 +381,18 @@ export function AddToCatalogWizard({ onClose, onComplete, isEmbedded = false, ta
             // Save to catalog
             await catalogManager.addResourceToCatalog(resourceMetadata)
             
-            // Also add to workspace collection
-            addResourceToPackage({
-              id: resourceKey,
-              key: resourceKey,
-              title: resourceMetadata.title,
-              type: resourceMetadata.type,
-              category: String(resourceMetadata.type).toLowerCase(),
-              subject: resourceMetadata.subject,
-              language: resourceMetadata.language,
-              languageCode: resourceMetadata.language,
-              languageName: resourceMetadata.languageName || resourceData.language_title,
-              owner: resourceMetadata.owner,
-              server: resourceMetadata.server,
-              format: resourceData.format || resourceData.content_format,
-              location: 'network',
-              resourceId: resourceMetadata.resourceId,
-              ingredients: resourceMetadata.contentMetadata?.ingredients,
-              version: resourceMetadata.version,
-              description: resourceMetadata.description,
-              readme: resourceMetadata.readme,  // ✅ Always present now!
-              license: resourceMetadata.license, // ✅ Always present now!
-            })
+            // Also add to workspace collection            
+            // Convert ResourceMetadata to ResourceInfo
+            addResourceToPackage(createResourceInfo(resourceMetadata))
             
-            console.log(`   ✅ Added: ${resource.title}`)
+            console.log(`   ✅ Added: ${resourceMetadata.title}`)
           } else {
             console.log(`   ⊙ Already in catalog: ${resource.title}`)
             
             // Still need to add to workspace package even if already in catalog
             const existingMetadata = await catalogManager.getResourceMetadata(resourceKey)
             if (existingMetadata) {
-              addResourceToPackage({
-                id: resourceKey,
-                key: resourceKey,
-                title: resource.title || existingMetadata.title,
-                type: existingMetadata.type,
-                category: String(existingMetadata.type).toLowerCase(),
-                subject: existingMetadata.subject,
-                language: existingMetadata.language,
-                languageCode: existingMetadata.language,
-                languageName: existingMetadata.languageName || (resource as any).language_title,
-                owner: existingMetadata.owner,
-                server: existingMetadata.server,
-                format: existingMetadata.format,
-                location: 'network',
-                resourceId: existingMetadata.resourceId,
-                ingredients: existingMetadata.contentMetadata?.ingredients,
-                version: existingMetadata.version,
-                description: existingMetadata.description,
-                readme: existingMetadata.readme || '', // ✅ Standardized field name
-                license: existingMetadata.license || '', // ✅ Standardized field name
-                metadata_url: existingMetadata.urls?.metadata,
-              })
+              addResourceToPackage(createResourceInfo(existingMetadata))
               console.log(`   ✅ Added to workspace: ${resource.title}`)
             }
           }
@@ -592,28 +553,7 @@ export function AddToCatalogWizard({ onClose, onComplete, isEmbedded = false, ta
           
           // Add to workspace package (metadata is now guaranteed to exist)
           if (metadata) {
-            const resourceType = getResourceTypeFromSubjectUsingRegistry(metadata.subject, metadata.type, resourceTypeRegistry)
-            addResourceToPackage({
-              id: resourceKey,
-              key: resourceKey,
-              title: resource.title || metadata.title,
-              type: resourceType,
-              category: String(resourceType).toLowerCase(),
-              subject: metadata.subject,
-              language: metadata.language,
-              languageCode: metadata.language,
-              languageName: (resource as any).language_title,
-              owner: metadata.owner,
-              server: metadata.server,
-              format: metadata.format,
-              location: 'network',
-              resourceId: metadata.resourceId,
-              ingredients: metadata.contentMetadata?.ingredients,
-              version: metadata.version,
-              description: metadata.description,
-              readme: metadata.description,
-              license: metadata.license?.id,
-            })
+            addResourceToPackage(createResourceInfo(metadata))
           }
           
           // Add to download list
