@@ -1088,38 +1088,6 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
       onDragEnd={handleDragEnd}
     >
       <div className="h-full flex flex-col overflow-hidden">
-        {/* Navigation Bar with Language Picker */}
-      {navState === 'compact' && (
-        <div className="flex-shrink-0 flex flex-col">
-          <div className="flex items-center bg-white border-b border-gray-200 px-2 py-1.5">
-            <NavigationBar 
-              isCompact={true}
-              onToggleCompact={undefined}
-              showLanguagePicker={true}
-              onLanguageSelected={handleLanguageSelected}
-              autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
-              downloadIndicator={
-                <DownloadIndicator 
-                  isDownloading={isBackgroundDownloading}
-                  progress={downloadStats.progress}
-                />
-              }
-              onDownloadCollection={isCollectionFullyCached ? handleDirectDownloadCollection : undefined}
-              onLoadCollection={() => setShowLoadDialog(true)}
-            />
-          </div>
-          {isLoadingResources && (
-            <div 
-              className="flex items-center justify-center px-4 py-1.5 bg-blue-50 border-b border-blue-100"
-              role="status"
-              aria-label="Loading resources"
-            >
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-            </div>
-          )}
-        </div>
-      )}
-      
       {/* Main Content Area - Two Panels (matches Studio exactly) */}
       <div className="flex-1 overflow-hidden">
         <LinkedPanelsContainer config={panelConfig} plugins={plugins}>
@@ -1312,9 +1280,44 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
                 }}
               </LinkedPanel>
             </DroppablePanel>
+            
+            {/* Entry Resource Modal with History - positioned relative to panels container */}
+            <EntryResourceModal onEntryLinkClick={handleOpenEntry} />
           </div>
         </LinkedPanelsContainer>
       </div>
+      
+      {/* Navigation Bar with Language Picker - MOVED TO BOTTOM */}
+      {navState === 'compact' && (
+        <div className="flex-shrink-0 flex flex-col">
+          {isLoadingResources && (
+            <div 
+              className="flex items-center justify-center px-4 py-1.5 bg-blue-50 border-t border-blue-100/50"
+              role="status"
+              aria-label="Loading resources"
+            >
+              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+            </div>
+          )}
+          <div className="flex items-center bg-white border-t border-gray-100/50 px-2 py-1.5">
+            <NavigationBar 
+              isCompact={true}
+              onToggleCompact={undefined}
+              showLanguagePicker={true}
+              onLanguageSelected={handleLanguageSelected}
+              autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
+              downloadIndicator={
+                <DownloadIndicator 
+                  isDownloading={isBackgroundDownloading}
+                  progress={downloadStats.progress}
+                />
+              }
+              onDownloadCollection={isCollectionFullyCached ? handleDirectDownloadCollection : undefined}
+              onLoadCollection={() => setShowLoadDialog(true)}
+            />
+          </div>
+        </div>
+      )}
       
       {/* DragOverlay for ghost preview */}
       <DragOverlay>
@@ -1324,9 +1327,6 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           </div>
         ) : null}
       </DragOverlay>
-      
-      {/* Entry Resource Modal with History */}
-      <EntryResourceModal onEntryLinkClick={handleOpenEntry} />
       
       {/* Collection Import Dialog */}
       <CollectionImportDialog

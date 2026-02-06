@@ -130,7 +130,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
     const displayTitle = entryTitle || entryName || resourceInfo?.title || 'Entry'
     
     return (
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="absolute bottom-2 right-6 z-50">
         <div className="relative">
           {/* Restore button */}
           <button

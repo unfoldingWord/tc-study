@@ -9,9 +9,10 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { BookOpen, ExternalLink, Loader, FileText } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
+import { useAnchorResource } from '../../../contexts/AppContext'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
-import { getBookTitleStatic } from '../../../utils/bookNames'
+import { getBookTitle } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TranslationNoteCard } from './components/TranslationNoteCard'
 import { useTranslationNotesContent } from './hooks/useTranslationNotesContent'
@@ -39,6 +40,7 @@ export function TranslationNotesViewer({
   const currentRef = useCurrentReference()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
+  const anchorResource = useAnchorResource()
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [tokenFilter, setTokenFilter] = useState<{ semanticId: string; content: string; alignedSemanticIds: string[]; timestamp: number } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
@@ -408,12 +410,6 @@ export function TranslationNotesViewer({
 
   return (
     <div className="h-full flex flex-col">
-      <ResourceViewerHeader 
-        title={resource.title}
-        icon={FileText}
-        subtitle={resource.languageTitle}
-      />
-      
       {tokenFilter && (
         <TokenFilterBanner
           tokenFilter={tokenFilter}
@@ -423,7 +419,13 @@ export function TranslationNotesViewer({
         />
       )}
       
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <ResourceViewerHeader 
+          title={resource.title}
+          icon={FileText}
+          subtitle={resource.languageTitle}
+        />
+        <div className="p-4">
         {loading ? (
           <div 
             className="flex items-center justify-center py-12"
@@ -445,16 +447,16 @@ export function TranslationNotesViewer({
           <BookOpen className="w-16 h-16 text-gray-300 opacity-60" />
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {Object.entries(notesByVerse).map(([verse, verseNotes]) => (
             <div key={verse} className="space-y-3">
               {/* Verse Header */}
-              <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
-                <BookOpen className="w-4 h-4 text-amber-600" />
-                <h3 className="text-sm font-semibold text-gray-700">
-                  {getBookTitleStatic(currentRef.book)} {verse}
+              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg">
+                <BookOpen className="w-3.5 h-3.5 text-amber-500" />
+                <h3 className="text-xs font-semibold text-gray-700">
+                  {getBookTitle(anchorResource, currentRef.book)} {verse}
                 </h3>
-                <span className="ml-auto px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                <span className="ml-auto px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-full text-[10px] font-medium">
                   {verseNotes.length}
                 </span>
               </div>
@@ -486,6 +488,7 @@ export function TranslationNotesViewer({
           ))}
         </div>
       )}
+        </div>
       </div>
     </div>
   )

@@ -25,16 +25,16 @@ export function ResourceViewerHeader({
   actions 
 }: ResourceViewerHeaderProps) {
   return (
-    <div className="flex-shrink-0 bg-white border-b border-gray-200 px-4 py-2">
+    <div className="flex-shrink-0 px-4 py-3 mt-2">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
-          {Icon && <Icon className="w-4 h-4 text-gray-600 flex-shrink-0" />}
+          {Icon && <Icon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-gray-900 truncate">
+            <h2 className="text-[10px] font-semibold text-gray-500 truncate tracking-widest uppercase">
               {title}
             </h2>
             {subtitle && (
-              <p className="text-xs text-gray-500 truncate">
+              <p className="text-xs text-gray-400 truncate">
                 {subtitle}
               </p>
             )}

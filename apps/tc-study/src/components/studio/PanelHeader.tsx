@@ -93,7 +93,7 @@ export function PanelHeader({
   const c = colors[colorScheme]
 
   return (
-    <div className={`px-2 pt-1.5 pb-0 md:px-3 md:pt-2 md:pb-0 border-b border-gray-200 bg-gradient-to-r ${c.gradient}`}>
+    <div className={`px-2 pt-1.5 pb-0 md:px-3 md:pt-2 md:pb-0 bg-gradient-to-r ${c.gradient}`}>
       <div className="flex items-center gap-2 min-w-0">
         <div
           className={`w-5 h-5 rounded ${c.badge} flex items-center justify-center font-semibold text-xs flex-shrink-0`}

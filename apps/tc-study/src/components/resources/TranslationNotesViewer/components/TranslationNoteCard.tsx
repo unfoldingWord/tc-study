@@ -117,10 +117,10 @@ export function TranslationNoteCard({
   return (
     <div
       className={`
-        rounded-lg border p-4 cursor-pointer transition-all
+        group rounded-lg p-3 cursor-pointer transition-all duration-150 border
         ${isSelected 
-          ? 'border-amber-500 bg-amber-50 shadow-md' 
-          : 'border-gray-200 bg-white hover:border-amber-300 hover:shadow-sm'
+          ? 'bg-gradient-to-br from-amber-50 via-amber-50 to-orange-50 shadow-sm border-amber-200' 
+          : 'bg-white hover:shadow-sm hover:border-gray-200 border-gray-100'
         }
       `}
       onClick={onClick}
@@ -136,11 +136,11 @@ export function TranslationNoteCard({
               onQuoteClick()
             }
           }}
-          className="w-full text-left mb-3 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 rounded border border-blue-100 transition-colors"
+          className="w-full text-left mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
           title="Click to highlight these words in scripture"
         >
-          <div className="text-sm leading-relaxed" dir={languageDirection}>
-            <span className="italic text-gray-900">
+          <div className="text-base leading-relaxed" dir={languageDirection}>
+            <span className="italic text-gray-700">
               {note.alignedTokens!.map((token, index) => {
                 // For whitespace and text tokens, render them as-is (they already contain their spacing)
                 if (token.type === 'whitespace' || token.type === 'text') {
@@ -172,7 +172,7 @@ export function TranslationNoteCard({
               })}
             </span>
             {resourceAbbreviation && (
-              <span className="ml-2 px-2 py-0.5 bg-white rounded text-xs text-blue-700 font-medium border border-blue-200">
+              <span className="ml-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
                 {resourceAbbreviation}
               </span>
             )}
@@ -184,13 +184,13 @@ export function TranslationNoteCard({
       {note.note && (
         <div className="relative">
           {showRawMarkdown ? (
-            <pre className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 p-3 rounded border border-gray-200 overflow-x-auto">
+            <pre className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 p-2.5 rounded-lg overflow-x-auto">
               {note.note}
             </pre>
           ) : (
             <MarkdownRenderer
               content={note.note}
-              className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none"
+              className="text-base text-gray-700 leading-relaxed prose prose-base max-w-none"
               onInternalLinkClick={handleInternalLinkClick}
               getEntryTitle={getEntryTitle}
             />
@@ -201,7 +201,7 @@ export function TranslationNoteCard({
               e.stopPropagation()
               setShowRawMarkdown(!showRawMarkdown)
             }}
-            className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors opacity-0 group-hover:opacity-100"
             title={showRawMarkdown ? "Show rendered markdown" : "Show raw markdown"}
           >
             <Code className="w-3.5 h-3.5" />
@@ -211,7 +211,7 @@ export function TranslationNoteCard({
 
       {/* Support Reference - Link to Translation Academy */}
       {note.supportReference && note.supportReference.startsWith('rc://') && (
-        <div className="mt-3 pt-3 border-t border-gray-200">
+        <div className="mt-2.5 pt-2.5 border-t border-gray-100/50">
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -219,12 +219,12 @@ export function TranslationNoteCard({
                 onSupportReferenceClick(note.supportReference)
               }
             }}
-            className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 hover:underline transition-colors"
+            className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 transition-colors"
             title={`Learn more: ${taTitle}`}
           >
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ExternalLink className="w-3 h-3" />
             {isLoadingTATitle ? (
-              <span className="italic text-gray-500">Loading...</span>
+              <span className="italic text-gray-400">Loading...</span>
             ) : (
               <span>{taTitle}</span>
             )}
@@ -238,7 +238,7 @@ export function TranslationNoteCard({
           {note.tags.split(',').filter(Boolean).map((tag, idx) => (
             <span
               key={idx}
-              className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs"
+              className="px-1.5 py-0.5 bg-gray-100/50 text-gray-600 rounded text-[10px]"
             >
               {tag.trim()}
             </span>

@@ -129,7 +129,7 @@ export function ResourceTabs({
     <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden">
       <SortableContext items={sortableIds} strategy={horizontalListSortingStrategy}>
         <div
-          className="flex border-b-2 border-gray-200 gap-px -mb-px"
+          className="flex gap-1"
           role="tablist"
           aria-label="Resources"
         >

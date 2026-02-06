@@ -5,7 +5,8 @@
 import { ArrowLeft, Book, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, List, ListOrdered, Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCurrentPassageSet, useCurrentReference, useNavigation, useNavigationHistory, useNavigationMode } from '../../contexts'
-import { useAppStore } from '../../contexts/AppContext'
+import { useAnchorResource, useAppStore } from '../../contexts/AppContext'
+import { getBookTitle } from '../../utils/bookNames'
 import { LanguagePicker } from '../LanguagePicker'
 import { BCVNavigator } from './BCVNavigator'
 import { NavigationHistoryModal } from './NavigationHistoryModal'
@@ -29,6 +30,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   const passageSet = useCurrentPassageSet()
   const history = useNavigationHistory()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
+  const anchorResource = useAnchorResource()
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false)
@@ -79,7 +81,9 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   const hasNavigationSource = hasAnchor || hasPassageSet
 
   const formatReference = (ref: typeof currentRef) => {
-    let result = `${ref.book.toUpperCase()} ${ref.chapter}:${ref.verse}`
+    // Get localized book name from anchor resource's ingredients (e.g., "Tito" for Spanish)
+    const bookName = getBookTitle(anchorResource, ref.book)
+    let result = `${bookName} ${ref.chapter}:${ref.verse}`
     if (ref.endChapter || ref.endVerse) {
       if (ref.endChapter && ref.endChapter !== ref.chapter) {
         result += `-${ref.endChapter}:${ref.endVerse || 1}`
@@ -404,64 +408,71 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
           {navigation.canGoBack() && (
             <button
               onClick={() => navigation.goBack()}
-              className="p-1 rounded hover:bg-gray-100 text-gray-700"
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
               title="Go back in navigation history"
               aria-label="Go back"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
           )}
-          
-          {/* Navigation type selector */}
-          <div className="relative" ref={typeSelectorRef}>
-            <button
-              onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
-              className="p-1 rounded hover:bg-gray-100 text-gray-700"
-              title={`Navigation type: ${getModeLabel()}`}
-            >
-              {navigationMode === 'verse' && <BookOpen className="w-4 h-4" />}
-              {navigationMode === 'section' && <List className="w-4 h-4" />}
-              {navigationMode === 'passage-set' && <ListOrdered className="w-4 h-4" />}
-            </button>
-            
-            {/* Navigation Type Selector Dropdown */}
-            {isTypeSelectorOpen && (
-              <NavigationTypeSelector 
-                onClose={() => setIsTypeSelectorOpen(false)}
-              />
-          )}
-          </div>
         </div>
         
-        {/* Center navigation group */}
-        <div className="flex-1 flex items-center justify-center gap-2">
-          <button
-            onClick={handlePrevious}
-            disabled={!canGoPrevious()}
-            className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-            title={`Previous ${getModeLabel()}`}
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-          
-          {/* Reference display - medium size and centered */}
-          <button
-            onClick={() => setIsNavigatorOpen(true)}
-            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-md text-sm font-medium text-blue-900 flex items-center gap-1.5 transition-colors"
-            title="Click to navigate or adjust range"
-          >
-            <Book className="w-4 h-4 text-blue-600" />
-            {formatReference(currentRef)}
-          </button>
-          
-          <button
-            onClick={handleNext}
-            disabled={!canGoNext()}
-            className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-            title={`Next ${getModeLabel()}`}
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+        {/* Center navigation group - unified component with circular arrows inside blue container */}
+        <div className="flex-1 flex items-center justify-center">
+          {/* Blue container holds everything */}
+          <div className="flex items-center gap-2 bg-blue-50 px-2 py-2 rounded-full">
+            {/* Previous button - circular, inside container */}
+            <button
+              onClick={handlePrevious}
+              disabled={!canGoPrevious()}
+              className="w-7 h-7 rounded-full bg-blue-200 hover:bg-blue-300 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 transition-colors flex items-center justify-center flex-shrink-0"
+              title={`Previous ${getModeLabel()}`}
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            
+            {/* Navigation type selector */}
+            <div className="relative" ref={typeSelectorRef}>
+              <button
+                onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
+                className="p-1.5 hover:bg-blue-100 text-blue-700 transition-colors rounded-full flex items-center justify-center"
+                title={`Navigation type: ${getModeLabel()}`}
+              >
+                {navigationMode === 'verse' && <BookOpen className="w-4 h-4" />}
+                {navigationMode === 'section' && <List className="w-4 h-4" />}
+                {navigationMode === 'passage-set' && <ListOrdered className="w-4 h-4" />}
+              </button>
+              
+              {/* Navigation Type Selector Dropdown */}
+              {isTypeSelectorOpen && (
+                <NavigationTypeSelector 
+                  onClose={() => setIsTypeSelectorOpen(false)}
+                />
+            )}
+            </div>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-blue-200"></div>
+
+            {/* Reference display */}
+            <button
+              onClick={() => setIsNavigatorOpen(true)}
+              className="px-3 py-1 hover:bg-blue-100 text-sm font-medium text-blue-900 transition-colors rounded-md"
+              title="Click to navigate or adjust range"
+            >
+              {formatReference(currentRef)}
+            </button>
+            
+            {/* Next button - circular, inside container */}
+            <button
+              onClick={handleNext}
+              disabled={!canGoNext()}
+              className="w-7 h-7 rounded-full bg-blue-200 hover:bg-blue-300 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 transition-colors flex items-center justify-center flex-shrink-0"
+              title={`Next ${getModeLabel()}`}
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
         
         {/* Right side controls - Download Indicator & Hamburger Menu */}
@@ -472,7 +483,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-1 rounded hover:bg-gray-100 text-gray-700"
+              className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
               title={isMenuOpen ? 'Close menu' : 'Open menu'}
               aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
             >

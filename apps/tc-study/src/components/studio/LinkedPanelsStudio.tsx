@@ -840,23 +840,6 @@ export function LinkedPanelsStudio() {
       onDragEnd={handleDndDragEnd}
     >
       <div className="h-full flex flex-col overflow-hidden">
-        {/* Studio Navigation Bar - Show only in compact mode */}
-      {navState === 'compact' && (
-        <div className="flex-shrink-0 flex items-center bg-white border-b border-gray-200 px-2 py-1.5">
-          <NavigationBar 
-            isCompact={true}
-            onToggleCompact={undefined}
-          />
-        </div>
-      )}
-
-      {/* Anchor Resource Selector - Only show if there are scripture resources */}
-      {/* {scriptureResources.length > 0 && (
-        <AnchorSelector scriptureResources={scriptureResources} />
-      )} */}
-
-      {/* Old toolbar removed - resource management is now inline on panel headers */}
-
       {/* Main Content Area with Sidebar */}
       <div className="flex-1 overflow-hidden flex">
         {/* Resource Library Sidebar */}
@@ -1142,6 +1125,16 @@ export function LinkedPanelsStudio() {
           )}
         </div>
       </div>
+      
+      {/* Studio Navigation Bar - Show only in compact mode - MOVED TO BOTTOM */}
+      {navState === 'compact' && (
+        <div className="flex-shrink-0 flex items-center bg-white px-2 py-1.5 border-t border-gray-100/50">
+          <NavigationBar 
+            isCompact={true}
+            onToggleCompact={undefined}
+          />
+        </div>
+      )}
 
       {/* Entry Resource Modal with History */}
       <EntryResourceModal onEntryLinkClick={handleOpenEntry} />

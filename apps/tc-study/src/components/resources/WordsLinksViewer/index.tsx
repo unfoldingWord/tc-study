@@ -14,8 +14,9 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { BookOpen, BookX, Link, Loader } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
+import { useAnchorResource } from '../../../contexts/AppContext'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
-import { getBookTitleStatic } from '../../../utils/bookNames'
+import { getBookTitle } from '../../../utils/bookNames'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TokenFilterBanner, WordLinkCard } from './components'
@@ -39,6 +40,7 @@ export function WordsLinksViewer({
   const currentRef = useCurrentReference()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
+  const anchorResource = useAnchorResource()
   
   const [selectedLink, setSelectedLink] = useState<string | null>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
@@ -412,12 +414,6 @@ export function WordsLinksViewer({
   
   return (
     <div className="h-full flex flex-col">
-      <ResourceViewerHeader 
-        title={resource.title}
-        icon={Link}
-        subtitle={resource.languageTitle}
-      />
-      
       {tokenFilter && (
         <TokenFilterBanner
           tokenFilter={tokenFilter}
@@ -427,7 +423,13 @@ export function WordsLinksViewer({
         />
       )}
       
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <ResourceViewerHeader 
+          title={resource.title}
+          icon={Link}
+          subtitle={resource.languageTitle}
+        />
+        <div className="p-4">
         {!dependenciesReady ? (
           <div 
             className="flex items-center justify-center py-12"
@@ -488,14 +490,17 @@ export function WordsLinksViewer({
                 return (
                   <div key={chapterVerse} className="space-y-2">
                     {/* Verse Header */}
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-semibold text-gray-700">
-                        {getBookTitleStatic(currentRef.book || 'gen')} {chapter}:{verse}
-                      </span>
+                    <div className="px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <BookOpen className="w-3.5 h-3.5 text-purple-600" />
+                        <h3 className="text-xs font-semibold text-gray-700">
+                          {getBookTitle(anchorResource, currentRef.book || 'gen')} {chapter}:{verse}
+                        </h3>
+                      </div>
                     </div>
                     
                     {/* Word Links */}
-                    <div className="grid grid-cols-1 gap-2">
+                    <div className="grid grid-cols-1 gap-3">
                       {verseLinks.map((link) => {
                         const isSelected = selectedLink === link.id
                         const twInfo = parseTWLink(link.twLink)
@@ -522,6 +527,7 @@ export function WordsLinksViewer({
               })}
           </div>
         )}
+        </div>
       </div>
     </div>
   )

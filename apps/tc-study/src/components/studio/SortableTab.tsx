@@ -17,13 +17,13 @@ interface SortableTabProps {
 
 const tabColors = {
   blue: {
-    active: 'bg-blue-100 text-blue-800 border-blue-300',
-    inactive: 'text-gray-600 hover:bg-gray-100 border-transparent hover:border-gray-300',
+    active: 'bg-gradient-to-b from-blue-100 to-blue-50 text-blue-700 font-semibold',
+    inactive: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50',
     dragging: 'bg-blue-50 text-blue-400 border-blue-200',
   },
   purple: {
-    active: 'bg-purple-100 text-purple-800 border-purple-300',
-    inactive: 'text-gray-600 hover:bg-gray-100 border-transparent hover:border-gray-300',
+    active: 'bg-gradient-to-b from-purple-100 to-purple-50 text-purple-700 font-semibold',
+    inactive: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50',
     dragging: 'bg-purple-50 text-purple-400 border-purple-200',
   },
 }
@@ -56,7 +56,7 @@ export function SortableTab({ id, isActive, label, tooltip, colorScheme, onClick
   } else {
     // Normal state
     colorClasses = isActive ? colors.active : colors.inactive
-    borderStyle = 'border-b-2'
+    borderStyle = isActive ? '' : ''
   }
 
   return (
@@ -72,10 +72,11 @@ export function SortableTab({ id, isActive, label, tooltip, colorScheme, onClick
       title={tooltip || label}
       onClick={onClick}
       className={`
-        flex-shrink-0 px-2 py-1.5 text-xs font-medium whitespace-nowrap
-        ${borderStyle} transition-colors rounded-t cursor-grab active:cursor-grabbing
+        flex-shrink-0 px-3 py-1.5 text-xs font-medium whitespace-nowrap
+        ${borderStyle} transition-all duration-150 cursor-grab active:cursor-grabbing
         ${colorClasses}
         ${isDragging ? 'animate-pulse' : ''}
+        ${isActive ? 'rounded-t-lg' : 'rounded-t-lg'}
       `}
     >
       {label}

@@ -13,8 +13,9 @@ import type { TranslatorSection } from '@bt-synergy/usfm-processor'
 import { AlertCircle, ArrowLeft, BookOpen, Check, Hash, List, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAvailableBooks, useCurrentSectionIndex, useNavigation, useNavigationMode, type BCVReference } from '../../contexts'
-import { useAppStore } from '../../contexts/AppContext'
+import { useAnchorResource, useAppStore } from '../../contexts/AppContext'
 import { getDefaultSections } from '../../lib/default-sections'
+import { getBookTitle } from '../../utils/bookNames'
 
 interface BCVNavigatorProps {
   onClose: () => void
@@ -27,6 +28,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   const navigationMode = useNavigationMode()
   const currentSectionIndex = useCurrentSectionIndex()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
+  const anchorResource = useAnchorResource()
   const currentRef = navigation.currentReference
   
   // Use provided mode or fall back to current navigation mode
@@ -332,10 +334,11 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
         <div className="flex-1 flex flex-col min-h-0">
           {step === 1 ? (
             // Step 1: Book Selection
-            <div className="flex-1 overflow-auto p-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            <div className="flex-1 overflow-auto p-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                 {availableBooks.map((book) => {
                   const isSelected = selectedBook === book.code
+                  const fullBookName = getBookTitle(anchorResource, book.code)
                   return (
                     <button
                       key={book.code}
@@ -345,17 +348,17 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                         setStep(2)
                       }}
                       className={`
-                        p-4 rounded-lg border-2 transition-all text-left
+                        p-3 rounded-lg border transition-all text-left hover:shadow-sm
                         ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            ? 'border-blue-500 bg-blue-50 shadow-sm'
+                            : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                         }
                       `}
                     >
-                      <div className="font-semibold text-gray-900">{book.name}</div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {book.code.toUpperCase()} • {book.testament || ''}
+                      <div className="font-semibold text-gray-900">{fullBookName}</div>
+                      <div className="text-[10px] text-gray-400 uppercase tracking-wide mt-1">
+                        {book.code}
                       </div>
                     </button>
                   )
@@ -379,7 +382,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                   <BookOpen className="w-4 h-4 text-gray-500" />
                 </div>
                 <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <strong>{bookInfo?.name || selectedBook.toUpperCase()}</strong>
+                  <strong>{getBookTitle(anchorResource, selectedBook)}</strong>
                   {currentSectionIndex >= 0 && (
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                       {currentSectionIndex + 1} / {sections.length}
@@ -463,7 +466,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                   <BookOpen className="w-4 h-4 text-gray-500" />
                 </div>
                 <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <strong>{bookInfo?.name || selectedBook.toUpperCase()}</strong>
+                  <strong>{getBookTitle(anchorResource, selectedBook)}</strong>
                   <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                     {getSelectionCount()}
                   </span>

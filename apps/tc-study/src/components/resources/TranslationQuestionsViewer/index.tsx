@@ -7,10 +7,12 @@
 
 import type { ProcessedQuestions } from '@bt-synergy/resource-parsers'
 import type { ResourceViewerProps } from '@bt-synergy/resource-types'
-import { AlertCircle, CheckCircle, ChevronDown, ChevronUp, HelpCircle, MessageCircleQuestion } from 'lucide-react'
+import { AlertCircle, BookOpen, CheckCircle, ChevronDown, ChevronUp, HelpCircle, MessageCircleQuestion } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useCurrentReference } from '../../../contexts'
+import { useAnchorResource } from '../../../contexts/AppContext'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
+import { getBookTitle } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import type { ResourceInfo } from '../../../contexts/types'
 
@@ -22,6 +24,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
   
   const loaderRegistry = useLoaderRegistry()
   const currentRef = useCurrentReference()
+  const anchorResource = useAnchorResource()
   
   const bookCode = currentRef.book || 'gen'
 
@@ -112,6 +115,19 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
     })
   }, [questions, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
 
+  // Group questions by verse for display
+  const questionsByVerse = useMemo(() => {
+    const grouped: Record<string, typeof relevantQuestions> = {}
+    for (const question of relevantQuestions) {
+      const ref = question.reference
+      if (!grouped[ref]) {
+        grouped[ref] = []
+      }
+      grouped[ref].push(question)
+    }
+    return grouped
+  }, [relevantQuestions])
+
   // Toggle answer visibility
   const toggleQuestion = (questionId: string) => {
     setExpandedQuestions(prev => {
@@ -164,63 +180,87 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
 
   return (
     <div className="h-full flex flex-col">
-      <ResourceViewerHeader 
-        title={resource.title}
-        icon={MessageCircleQuestion}
-        subtitle={resource.languageTitle}
-      />
-      
-      <div className="flex-1 overflow-y-auto bg-gray-50 p-4 space-y-3">
-        {relevantQuestions.map((question, index) => {
-        const isExpanded = expandedQuestions.has(question.id)
-        
-        return (
-          <div
-            key={question.id}
-            className="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
-          >
-            {/* Question Header */}
-            <button
-              onClick={() => toggleQuestion(question.id)}
-              className="w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-sm font-semibold mt-0.5">
-                {index + 1}
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <ResourceViewerHeader 
+          title={resource.title}
+          icon={MessageCircleQuestion}
+          subtitle={resource.languageTitle}
+        />
+        <div className="p-4 space-y-4">
+        {Object.entries(questionsByVerse).map(([verse, verseQuestions]) => (
+          <div key={verse} className="space-y-3">
+            {/* Verse Header */}
+            <div className="px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                <h3 className="text-xs font-semibold text-gray-700">
+                  {getBookTitle(anchorResource, currentRef.book)} {verse}
+                </h3>
+                <span className="ml-auto px-2 py-0.5 bg-blue-100/50 text-blue-700 rounded-full text-[10px] font-medium">
+                  {verseQuestions.length}
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="text-gray-900 font-medium leading-relaxed">
-                    {question.question}
-                  </p>
-                  {isExpanded ? (
-                    <ChevronUp className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-400 flex-shrink-0" />
+            </div>
+
+            {/* Questions for this verse */}
+            {verseQuestions.map((question, index) => {
+              const isExpanded = expandedQuestions.has(question.id)
+              
+              return (
+                <div
+                  key={question.id}
+                  className={`
+                    group rounded-lg p-3 transition-all duration-150 border
+                    ${isExpanded
+                      ? 'bg-gradient-to-br from-green-50 via-green-50 to-emerald-50 shadow-sm border-green-200' 
+                      : 'bg-white hover:shadow-sm hover:border-gray-200 border-gray-100'
+                    }
+                  `}
+                >
+                  {/* Question Header */}
+                  <button
+                    onClick={() => toggleQuestion(question.id)}
+                    className="w-full text-left flex items-start gap-3"
+                  >
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold mt-0.5">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-base text-gray-900 font-medium leading-relaxed">
+                          {question.question}
+                        </p>
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0 mt-1" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0 mt-1" />
+                        )}
+                      </div>
+                      {question.quote && (
+                        <p className="text-sm text-gray-600 italic mt-1.5">
+                          "{question.quote}"
+                        </p>
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Answer (Expanded) */}
+                  {isExpanded && (
+                    <div className="mt-2.5 pt-2.5 border-t border-gray-100/50">
+                      <div className="pl-9">
+                        <div className="flex items-start gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-1" />
+                          <p className="text-base text-gray-700 leading-relaxed flex-1">{question.response}</p>
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-                {question.reference && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {question.reference}
-                    {question.quote && ` - "${question.quote}"`}
-                  </p>
-                )}
-              </div>
-            </button>
-
-            {/* Answer (Expanded) */}
-            {isExpanded && (
-              <div className="px-4 pb-4 border-t border-gray-100">
-                <div className="pt-3 pl-9">
-                  <div className="flex items-start gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-gray-900 leading-relaxed flex-1">{question.response}</p>
-                  </div>
-                </div>
-              </div>
-            )}
+              )
+            })}
           </div>
-        )
-      })}
+        ))}
+        </div>
       </div>
     </div>
   )
