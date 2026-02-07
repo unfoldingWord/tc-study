@@ -16,7 +16,7 @@
       "version": "2.1.30"
     }
   ],
-  "output": "./src/preloaded",
+  "output": "./.bundle-cache",
   "format": "json",
   "compress": false,
   "manifest": true,

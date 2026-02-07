@@ -27,7 +27,7 @@
       "stage": "prod"
     }
   ],
-  "output": "./public/preloaded",
+  "output": "./.bundle-cache",
   "format": "json",
   "compress": true,
   "manifest": true,

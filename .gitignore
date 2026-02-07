@@ -39,7 +39,8 @@ Thumbs.db
 .cache/
 
 # Large data files - should not be committed
-apps/tc-study/public/preloaded/*.json
+apps/tc-study/public/preloaded/
+apps/tc-study/.bundle-cache/
 apps/tc-study/.bt-cache/
 apps/mobile/resource-downloader/app.db
 exports/uw-translation-resources/

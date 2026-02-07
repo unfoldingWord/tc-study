@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node -e \"require('fs').rmSync('public/preloaded',{recursive:true,force:true})\" && vite build",
     "prebundle": "bt-bundle bundle --config bundle-config.json",
     "bundle:minimal": "bt-bundle bundle --config bundle-config.json",
     "bundle:full": "bt-bundle bundle --config bundle-config-full.json",

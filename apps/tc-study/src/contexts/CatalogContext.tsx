@@ -135,35 +135,11 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     }
   }, []) // Only initialize once
 
-  // Auto-register internal app resource types and load preloaded resources asynchronously
+  // Expose catalog manager globally for non-React code and mark catalog ready
   useEffect(() => {
-    // Make catalog manager globally accessible for non-React code
     ;(window as any).__catalogManager__ = contextValue.catalogManager
-    
-    const initializeAsync = async () => {
-      try {
-        // NOTE: Resource types are now registered by ResourceTypeInitializer component
-        // to avoid circular dependencies. This just marks the catalog as ready.
-
-        // Load preloaded resources metadata (if available)
-        // NOTE: DISABLED for web - we always fetch fresh from Door43 to avoid mismatches
-        // Web requires internet anyway, so preloaded metadata can cause issues when
-        // the API format changes (e.g., Spanish resources use different structure)
-        // 
-        // const { initializePreloadedResources } = await import('../lib/preloadedResources')
-        // await initializePreloadedResources(contextValue.catalogManager)
-        console.log('  ✓ Skipping preloaded resources (web always fetches fresh from Door43)')
-        
-        // Signal that catalog initialization is complete
-        ;(window as any).__catalogInitialized__ = true
-
-      } catch (error) {
-        console.error('Failed to initialize async resources:', error)
-      }
-    }
-    
-    initializeAsync()
-  }, [contextValue.resourceTypeRegistry, contextValue.catalogManager])
+    ;(window as any).__catalogInitialized__ = true
+  }, [contextValue.catalogManager])
 
   return (
     <CatalogContext.Provider value={contextValue}>

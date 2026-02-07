@@ -23,7 +23,7 @@ function App() {
   
   useEffect(() => {
     const initWorkspace = async () => {
-      // Wait for catalog to finish initialization (including preloaded resources)
+      // Wait for catalog to finish initialization
       const waitForCatalog = async () => {
         let attempts = 0
         const maxAttempts = 20 // 2 seconds max wait

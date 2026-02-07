@@ -59,7 +59,6 @@ interface WorkspaceActions {
   loadFromCollection: (packageId: string) => Promise<void>
   autoSaveWorkspace: () => void
   loadSavedWorkspace: () => Promise<boolean>
-  loadPreloadedResources: () => Promise<void>
   
   // Panel management
   addPanel: (name?: string) => string // Returns new panel ID
@@ -568,82 +567,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       } catch (error) {
         console.error('❌ Failed to load saved workspace:', error)
         return false
-      }
-    },
-    
-    // Load preloaded resources into workspace (from catalog)
-    loadPreloadedResources: async () => {
-      try {
-        console.log('🔍 Loading preloaded resources into workspace...')
-        
-        // Get catalog manager from global context
-        const catalogManager = (window as any).__catalogManager__
-        
-        if (!catalogManager) {
-          console.warn('⚠️ CatalogManager not available yet, will retry later')
-          return
-        }
-        
-        const { getPreloadedResourceKeys, getPreloadedResourceData } = await import('../preloadedResources')
-        const preloadedKeys = await getPreloadedResourceKeys()
-        
-        if (preloadedKeys.length === 0) {
-          console.log('ℹ️ No preloaded resources available')
-          return
-        }
-        
-        console.log(`📦 Found ${preloadedKeys.length} preloaded resources, adding to workspace...`)
-        
-        // Add each preloaded resource to workspace (get metadata from catalog + Door43 data)
-        let added = 0
-        for (const resourceKey of preloadedKeys) {
-          try {
-            const metadata = await catalogManager.getResourceMetadata(resourceKey)
-            
-            if (!metadata) {
-              console.warn(`⚠️ Preloaded resource not in catalog: ${resourceKey}`)
-              continue
-            }
-            
-            // Get original Door43 data to access language_title
-            const door43Data = await getPreloadedResourceData(resourceKey)
-            
-            // Add to workspace collection
-            get().addResourceToPackage({
-              id: resourceKey,
-              key: resourceKey,
-              title: metadata.title,
-              type: metadata.type,
-              category: String(metadata.type).toLowerCase(),
-              subject: metadata.subject,
-              language: metadata.language,
-              languageCode: metadata.language,
-              languageName: door43Data?.language_title, // ⭐ Get from original Door43 data
-              owner: metadata.owner,
-              server: metadata.server || 'git.door43.org',
-              format: metadata.format || 'usfm',
-              location: 'network',
-              resourceId: metadata.resourceId,
-              ingredients: metadata.contentMetadata?.ingredients, // ⭐ For on-demand downloading
-              version: metadata.version,
-              description: metadata.description || door43Data?.description,
-              readme: metadata.longDescription || door43Data?.readme,
-              license: typeof metadata.license === 'string' ? metadata.license : metadata.license?.id || door43Data?.license,
-              metadata: metadata, // ⭐ Include full metadata
-            })
-            
-            added++
-          } catch (error) {
-            console.error(`❌ Failed to add ${resourceKey} to workspace:`, error)
-          }
-        }
-        
-        console.log(`✅ Added ${added}/${preloadedKeys.length} preloaded resources to workspace`)
-        
-        // Note: Resources are now visible in sidebar with ingredients for on-demand downloading
-        // Content will be downloaded book-by-book as the user accesses them
-      } catch (error) {
-        console.error('❌ Failed to load preloaded resources:', error)
       }
     },
     
