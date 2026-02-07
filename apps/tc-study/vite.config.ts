@@ -15,6 +15,7 @@ export default defineConfig({
       '@bt-synergy/navigation': path.resolve(__dirname, '../../packages/navigation/src/index.ts'),
       '@bt-synergy/study-store': path.resolve(__dirname, '../../packages/study-store/src/index.ts'),
     },
+    dedupe: ['react', 'react-dom'],
   },
   optimizeDeps: {
     include: ['linked-panels'],
