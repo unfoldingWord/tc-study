@@ -28,11 +28,12 @@ import {
 import { CheckCircle2, Loader2, Package, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ResourceType, ResourceFormat } from '@bt-synergy/resource-catalog'
 import { useCacheAdapter, useCatalogManager, useCompletenessChecker, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useBackgroundDownload, useCatalogBackgroundDownload, useResourceManagement, useStudioResources, useSwipeGesture } from '../../hooks'
-import { createResourceMetadata } from '../../lib/services/ResourceMetadataFactory'
+import { createResourceMetadata, mapSubjectToResourceType, mapContentFormat } from '../../lib/services/ResourceMetadataFactory'
 import { usePackageStore } from '../../lib/stores/packageStore'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
@@ -501,12 +502,16 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         
         const subjectRaw = item.subject ?? ''
         const subject = String((Array.isArray(subjectRaw) ? subjectRaw[0] : subjectRaw) ?? '').trim()
-        const type = resourceTypeRegistry.getTypeForSubject(subject)
+        const typeId = resourceTypeRegistry.getTypeForSubject(subject)
         
-        if (!type) {
+        if (!typeId) {
           console.log('⏭️ Skip: subject not in resource registry', { resourceKey, subject })
           continue
         }
+        
+        // Map type string ID and format string to enums
+        const type = mapSubjectToResourceType(subject)
+        const format = mapContentFormat(item.content_format ?? item.format ?? 'usfm')
         
         // Create basic ResourceInfo immediately (no metadata fetch yet)
         const basicResourceInfo: ResourceInfo = {
@@ -523,7 +528,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           languageName: item.language_title ?? langStr,
           resourceId: resourceId,
           server: 'git.door43.org',
-          format: (item.content_format ?? item.format ?? 'usfm') as string,
+          format,
           contentStructure: (subject.toLowerCase().includes('bible') ? 'book' : 'entry') as 'book' | 'entry',
           version: item.release?.tag_name ?? '1.0',
           description: item.description ?? item.repo?.description,
@@ -608,6 +613,20 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           await catalogManager.addResourceToCatalog(metadata)
           console.log(`📊 Metadata loaded and saved: ${resourceKey}`)
           
+          // ⭐ Update the ResourceInfo in loadedResources with full metadata (including ingredients)
+          const existingResource = useAppStore.getState().loadedResources[resourceKey]
+          if (existingResource) {
+            const updatedResource = {
+              ...existingResource,
+              ...metadata, // Spread full metadata (includes contentMetadata.ingredients)
+              // Preserve app-specific fields that might have been set
+              id: existingResource.id,
+              key: existingResource.key,
+              toc: existingResource.toc,
+            }
+            useAppStore.getState().addResource(updatedResource)
+          }
+          
           // ✅ Notify background download monitor that metadata changed
           setMetadataUpdateCounter(prev => prev + 1)
         } catch (error) {
@@ -636,7 +655,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           key: resourceKey,
           resourceKey: resourceKey, // Required for createResourceInfo
           title: orig.label,
-          type: 'scripture',
+          type: ResourceType.SCRIPTURE,
           category: 'Bible',
           subject: orig.subject,
           owner: 'unfoldingWord',
@@ -645,7 +664,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           languageName: orig.label,
           resourceId: orig.id,
           server: 'git.door43.org',
-          format: 'usfm',
+          format: ResourceFormat.USFM,
           contentStructure: 'book',
           version: '1.0',
         }
@@ -698,6 +717,20 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
               
               await catalogManager.addResourceToCatalog(metadata)
               console.log(`📊 Metadata loaded for original: ${resourceKey}`)
+              
+              // ⭐ Update the ResourceInfo in loadedResources with full metadata (including ingredients)
+              const existingResource = useAppStore.getState().loadedResources[resourceKey]
+              if (existingResource) {
+                const updatedResource = {
+                  ...existingResource,
+                  ...metadata, // Spread full metadata (includes contentMetadata.ingredients)
+                  // Preserve app-specific fields that might have been set
+                  id: existingResource.id,
+                  key: existingResource.key,
+                  toc: existingResource.toc,
+                }
+                useAppStore.getState().addResource(updatedResource)
+              }
               
               // ✅ Notify background download monitor that metadata changed
               setMetadataUpdateCounter(prev => prev + 1)

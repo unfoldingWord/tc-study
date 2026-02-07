@@ -12,6 +12,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { ResourceInfo } from '../../contexts/types'
 import { createResourceInfo } from '../../utils/resourceInfo'
+import { ResourceType, ResourceFormat } from '@bt-synergy/resource-catalog'
 
 export interface PanelConfig {
   id: string // Unique panel ID (e.g., 'panel-1', 'panel-2', 'panel-3')
@@ -507,8 +508,8 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
                 title: `Failed to load: ${key}`,
                 subject: 'unknown',
                 version: '1.0.0',
-                type: 'unknown',
-                format: 'unknown',
+                type: ResourceType.UNKNOWN,
+                format: ResourceFormat.UNKNOWN,
                 contentType: 'unknown',
                 contentStructure: 'book',
                 availability: { online: false, offline: false, bundled: false, partial: false },
@@ -920,3 +921,70 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     },
   }))
 )
+
+// Expose migration function globally for console access
+if (typeof window !== 'undefined') {
+  (window as any).__migrateResourceIngredients__ = async () => {
+    console.log('[BOOK-TITLE] 🔄 Starting migration to add ingredients to existing resources...')
+    
+    const catalogManager = (window as any).__catalogManager__
+    if (!catalogManager) {
+      console.error('[BOOK-TITLE] ❌ CatalogManager not available')
+      return
+    }
+    
+    const pkg = useWorkspaceStore.getState().currentPackage
+    if (!pkg) {
+      console.log('[BOOK-TITLE] No package to migrate')
+      return
+    }
+    
+    let updated = 0
+    let skipped = 0
+    
+    for (const [key, resource] of pkg.resources.entries()) {
+      try {
+        // Skip if already has ingredients
+        if (resource.ingredients && resource.ingredients.length > 0) {
+          console.log(`[BOOK-TITLE] ✓ ${key} already has ${resource.ingredients.length} ingredients, skipping`)
+          skipped++
+          continue
+        }
+        
+        console.log(`[BOOK-TITLE] 🔄 Updating ${key} with fresh metadata...`)
+        
+        // Fetch fresh metadata from catalog
+        const metadata = await catalogManager.getResourceMetadata(key)
+        if (!metadata?.contentMetadata?.ingredients) {
+          console.warn(`[BOOK-TITLE] ⚠️ ${key} - no ingredients in catalog metadata`)
+          skipped++
+          continue
+        }
+        
+        // Update resource with ingredients
+        const updatedResource = {
+          ...resource,
+          ingredients: metadata.contentMetadata.ingredients,
+          contentMetadata: metadata.contentMetadata,
+          metadata: metadata,
+        }
+        
+        pkg.resources.set(key, updatedResource)
+        console.log(`[BOOK-TITLE] ✅ ${key} updated with ${metadata.contentMetadata.ingredients.length} ingredients`)
+        updated++
+        
+      } catch (error) {
+        console.error(`[BOOK-TITLE] ❌ Failed to update ${key}:`, error)
+      }
+    }
+    
+    if (updated > 0) {
+      // Trigger save
+      useWorkspaceStore.getState().autoSaveWorkspace()
+      console.log(`[BOOK-TITLE] 🎉 Migration complete: ${updated} resources updated, ${skipped} skipped`)
+      console.log(`[BOOK-TITLE] ℹ️ Reload the page to see the changes`)
+    } else {
+      console.log(`[BOOK-TITLE] ℹ️ No resources needed updating (${skipped} already had ingredients)`)
+    }
+  }
+}

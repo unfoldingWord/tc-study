@@ -5,22 +5,33 @@
  * Falls back to uppercase book code if title is not available.
  */
 
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
-
 /**
  * Get the user-friendly book title from scripture resource ingredients
  * 
- * @param metadata - Scripture resource metadata
+ * @param metadata - Scripture resource metadata (or any object with ingredients)
  * @param bookCode - Book code (e.g., "gen", "mat")
  * @returns Book title (e.g., "Genesis", "Matthew") or uppercase book code as fallback
  */
-export function getBookTitle(metadata: ResourceMetadata | null | undefined, bookCode: string): string {
-  if (!metadata?.contentMetadata?.ingredients) {
+export function getBookTitle(metadata: any | null | undefined, bookCode: string): string {
+  console.log(`[BOOK-TITLE] getBookTitle called for bookCode: "${bookCode}"`)
+  console.log(`[BOOK-TITLE] metadata object:`, metadata)
+  console.log(`[BOOK-TITLE] metadata keys:`, metadata ? Object.keys(metadata) : 'null/undefined')
+  
+  // Try multiple possible locations for ingredients
+  // ResourceInfo has it at top level: resource.ingredients
+  // ResourceMetadata has it nested: resource.contentMetadata.ingredients
+  // Some resources store full metadata: resource.metadata.contentMetadata.ingredients
+  const ingredients = 
+    metadata?.ingredients || 
+    metadata?.contentMetadata?.ingredients ||
+    metadata?.metadata?.contentMetadata?.ingredients
+  
+  if (!ingredients) {
     return bookCode.toUpperCase()
   }
 
-  const ingredient = metadata.contentMetadata.ingredients.find(
-    (ing) => ing.identifier?.toLowerCase() === bookCode.toLowerCase()
+  const ingredient = ingredients.find(
+    (ing: any) => ing.identifier?.toLowerCase() === bookCode.toLowerCase()
   )
 
   return ingredient?.title || bookCode.toUpperCase()

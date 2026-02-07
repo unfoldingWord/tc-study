@@ -58,8 +58,11 @@ export const useAppStore = create<AppStore>()(
           }
         }
         
-        // Ensure the resource exists, if not create it
+        // ⚠️ IMPORTANT: DO NOT create a stub resource here!
+        // The resource should already exist with full metadata from addResource()
+        // If it doesn't exist, something is wrong with the initialization order
         if (!state.loadedResources[resourceId]) {
+          console.warn(`⚠️ setAnchorResource called for ${resourceId} but resource doesn't exist in loadedResources!`)
           state.loadedResources[resourceId] = {
             id: resourceId,
             key: resourceId,
@@ -68,12 +71,11 @@ export const useAppStore = create<AppStore>()(
             category: 'scripture',
           }
         }
-        // Update with TOC
+        // Update with TOC (preserve all existing metadata)
         state.loadedResources[resourceId].toc = toc
         state.anchorResourceId = resourceId
         state.isInitialized = true
       })
-      console.log('⚓ Anchor resource set:', resourceId)
     },
 
     addResource: (resource: ResourceInfo) => {
@@ -125,5 +127,6 @@ export function useApp() {
 
 // Selector hooks
 export function useAnchorResource() {
-  return useAppStore((s) => s.getAnchorResource())
+  const resource = useAppStore((s) => s.getAnchorResource())
+  return resource
 }

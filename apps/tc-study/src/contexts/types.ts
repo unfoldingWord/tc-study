@@ -38,7 +38,7 @@ export interface ResourceTOC {
 /**
  * App-specific resource wrapper
  * 
- * Extends ResourceMetadata (the single source of truth) with ONLY app-specific state.
+ * Extends ResourceMetadata (the single source of truth) with app-specific state and convenience fields.
  * All metadata fields come from ResourceMetadata - NO DUPLICATION!
  */
 export interface ResourceInfo extends ResourceMetadata {
@@ -50,4 +50,23 @@ export interface ResourceInfo extends ResourceMetadata {
   id: string                  // Alias for resourceKey
   key: string                 // Alias for resourceKey  
   category: string            // Computed from type
+  
+  // Additional app-specific fields (flattened from nested metadata for easier access)
+  languageCode?: string       // Alias for language (for backward compatibility)
+  languageName?: string       // Human-readable language name
+  ingredients?: Array<{       // Flattened from contentMetadata.ingredients for easier access
+    identifier: string
+    title: string
+    path?: string
+    size?: number
+    categories?: string[]
+    sort?: number
+    alignmentCount?: number
+    versification?: string
+    exists?: boolean
+    isDir?: boolean
+  }>
+  metadata?: ResourceMetadata // Full metadata reference (for nested access)
+  location?: string           // Simplified location info
+  readme?: string             // README content
 }

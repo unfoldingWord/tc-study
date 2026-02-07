@@ -5,6 +5,7 @@
  */
 
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import { ResourceType, ResourceFormat } from '@bt-synergy/resource-catalog'
 import type { ResourceInfo } from '../contexts/types'
 
 /**
@@ -63,8 +64,8 @@ export function createResourceInfoFromPartial(partial: Partial<ResourceInfo> & {
     title: partial.title || 'Unknown',
     subject: partial.subject || 'unknown',
     version: partial.version || '1.0.0',
-    type: partial.type || 'unknown',
-    format: (partial.format || 'unknown') as any,
+    type: partial.type || ResourceType.UNKNOWN,
+    format: partial.format || ResourceFormat.UNKNOWN,
     contentType: partial.contentType || 'unknown',
     contentStructure: partial.contentStructure || 'book',
     availability: partial.availability || {

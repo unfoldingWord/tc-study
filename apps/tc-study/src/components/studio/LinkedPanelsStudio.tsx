@@ -503,14 +503,14 @@ export function LinkedPanelsStudio() {
             contentStructure: metadata.contentStructure || 'book',
             resourceId: metadata.resourceId,
             location: metadata.locations?.[0]?.type || 'network', // First location type or default to network
-            ingredients: metadata.contentMetadata?.ingredients, // ⭐ Include ingredients for on-demand downloading
-            version: metadata.version,
-            metadata: metadata, // ⭐ Store full metadata for viewers that need it (e.g., TranslationWordsViewer)
-            // TOC will be populated by loader when content is fetched
-          }
-          
-          console.log(`📦 Created ResourceInfo from catalog metadata:`, resourceInfo)
-        } else {
+          ingredients: metadata.contentMetadata?.ingredients, // ⭐ Include ingredients for on-demand downloading
+          version: metadata.version,
+          metadata: metadata, // ⭐ Store full metadata for viewers that need it (e.g., TranslationWordsViewer)
+          // TOC will be populated by loader when content is fetched
+        }
+        
+        console.log(`📦 Created ResourceInfo from catalog metadata:`, resourceInfo)
+      } else {
           // Fallback: metadata not found, use basic info
           console.warn(`⚠️ Metadata not found for ${resourceKey}, using fallback`)
           resourceInfo = {
@@ -624,6 +624,12 @@ export function LinkedPanelsStudio() {
           server: metadata.server || 'git.door43.org',
           subject: metadata.subject,
           contentStructure: metadata.contentStructure || 'book',
+          resourceId: metadata.resourceId,
+          location: metadata.locations?.[0]?.type || 'network', // First location type or default to network
+          ingredients: metadata.contentMetadata?.ingredients, // ⭐ Include ingredients for on-demand downloading
+          version: metadata.version,
+          metadata: metadata, // ⭐ Store full metadata for viewers that need it (e.g., TranslationWordsViewer)
+          // TOC will be populated by loader when content is fetched
         }
         
         console.log(`📦 Created ResourceInfo from catalog metadata:`, resourceInfo)

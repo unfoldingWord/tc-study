@@ -186,7 +186,7 @@ export async function createResourceMetadata(
   if (options.resourceTypeRegistry) {
     try {
       // Find resource type definition by subject or type ID
-      const typeId = options.resourceTypeRegistry.getTypeForSubject(door43Resource.subject) || resourceType
+      const typeId = options.resourceTypeRegistry.getTypeForSubject(door43Resource.subject) || resourceTypeId
       const resourceTypeDef = options.resourceTypeRegistry.get(typeId)
       
       if (resourceTypeDef?.ingredientsGenerator) {
@@ -291,11 +291,11 @@ export async function createResourceMetadata(
     
     // 🌟 STANDARDIZED ENRICHMENT FIELDS (always present, may be empty)
     readme: enrichmentData.readme || '',
-    license: enrichmentData.license || '',
+    license: enrichmentData.license ? { id: enrichmentData.license } : undefined,
     licenseFile: enrichmentData.licenseFile || '',
     
     // Resource type & format
-    type: resourceTypeId, // Use string ID for viewer registry lookup
+    type: resourceTypeEnum, // Use ResourceType enum
     format: mapContentFormat(door43Resource.content_format || door43Resource.format),
     contentType: getContentType(door43Resource.content_format || door43Resource.format),
     contentStructure: mapContentStructure(resourceTypeEnum),
@@ -369,7 +369,7 @@ export async function createResourceMetadata(
 /**
  * Map Door43 subject to ResourceType
  */
-function mapSubjectToResourceType(subject: string): ResourceType {
+export function mapSubjectToResourceType(subject: string): ResourceType {
   const subjectLower = subject.toLowerCase()
   
   if (subjectLower.includes('bible') || subjectLower.includes('scripture')) {
@@ -396,13 +396,13 @@ function mapSubjectToResourceType(subject: string): ResourceType {
     return ResourceType.ACADEMY
   }
   
-  return ResourceType.OTHER
+  return ResourceType.UNKNOWN
 }
 
 /**
  * Map content format to ResourceFormat
  */
-function mapContentFormat(format?: string): ResourceFormat {
+export function mapContentFormat(format?: string): ResourceFormat {
   if (!format) return ResourceFormat.USFM
   
   const formatLower = format.toLowerCase()
@@ -411,7 +411,7 @@ function mapContentFormat(format?: string): ResourceFormat {
   if (formatLower.includes('markdown') || formatLower.includes('md')) return ResourceFormat.MARKDOWN
   if (formatLower.includes('tsv')) return ResourceFormat.TSV
   if (formatLower.includes('json')) return ResourceFormat.JSON
-  if (formatLower.includes('text') || formatLower.includes('txt')) return ResourceFormat.TEXT
+  if (formatLower.includes('text') || formatLower.includes('txt')) return ResourceFormat.MARKDOWN
   
   return ResourceFormat.USFM
 }
@@ -446,7 +446,7 @@ function mapContentStructure(type: ResourceType): 'book' | 'entry' {
     
     case ResourceType.WORDS:
     case ResourceType.ACADEMY:
-    case ResourceType.OTHER:
+    case ResourceType.UNKNOWN:
       return 'entry' // Organized by articles/entries
     
     default:

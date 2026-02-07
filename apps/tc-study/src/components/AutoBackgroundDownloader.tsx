@@ -70,8 +70,8 @@ export function AutoBackgroundDownloader({
     // Poll for catalog changes every 5 seconds
     const intervalId = setInterval(async () => {
       try {
-        const resources = await catalogManager.getAllResources()
-        const currentCount = resources.length
+        const resourceKeys = await catalogManager.getAllResourceKeys()
+        const currentCount = resourceKeys.length
 
         // If resources were added and we're not already downloading
         if (currentCount > lastResourceCount && !isDownloading) {
@@ -90,7 +90,6 @@ export function AutoBackgroundDownloader({
 
           // Schedule download after delay
           timeoutRef.current = setTimeout(() => {
-            const resourceKeys = resources.map(r => r.resourceKey)
             
             if (debug) {
               console.log('[AutoBackgroundDownloader] Starting background downloads for:', resourceKeys)
