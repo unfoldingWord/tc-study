@@ -98,15 +98,16 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   // Load sections when in section mode
   useEffect(() => {
     if (effectiveMode === 'section' && selectedBook) {
-      // TODO: Try to get sections from the anchor resource first
-      // For now, always use default sections
-      const defaultSections = getDefaultSections(selectedBook)
-      setSections(defaultSections)
-      
-      // Set sections in navigation context to update current section index
-      if (defaultSections.length > 0) {
-        navigation.setBookSections(selectedBook, defaultSections)
-      }
+      let cancelled = false
+      getDefaultSections(selectedBook).then((defaultSections) => {
+        if (!cancelled && defaultSections.length > 0) {
+          setSections(defaultSections)
+          navigation.setBookSections(selectedBook, defaultSections)
+        } else if (!cancelled) {
+          setSections([])
+        }
+      })
+      return () => { cancelled = true }
     }
   }, [effectiveMode, selectedBook, navigation])
   

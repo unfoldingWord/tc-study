@@ -8,11 +8,39 @@
  * - Broadcast reference changes to all resources
  */
 
+import type { PassageLeaf, PassageSetNode, RefRange } from '@bt-synergy/passage-sets'
 import type { TranslatorSection } from '@bt-synergy/usfm-processor'
 import { createContext, ReactNode, useContext, useEffect } from 'react'
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { BCVReference, BookInfo, NavigationMode, PassageSet } from './types'
+
+/** Flatten passage set root to a list of BCV references for navigation */
+function flattenPassageSetToBCV(root: PassageSetNode[]): BCVReference[] {
+  const out: BCVReference[] = []
+  function walk(nodes: PassageSetNode[]) {
+    for (const node of nodes) {
+      if (node.type === 'passage') {
+        const leaf = node as PassageLeaf
+        for (const p of leaf.passages ?? []) {
+          const ref = typeof p.ref === 'string' ? undefined : (p.ref as RefRange)
+          out.push({
+            book: p.bookCode,
+            chapter: ref?.startChapter ?? 1,
+            verse: ref?.startVerse ?? 1,
+            endChapter: ref?.endChapter,
+            endVerse: ref?.endVerse,
+          })
+        }
+      }
+      if (node.type === 'group' && 'children' in node) {
+        walk((node as { children: PassageSetNode[] }).children)
+      }
+    }
+  }
+  walk(root)
+  return out
+}
 
 // ============================================================================
 // ZUSTAND STORE
@@ -31,6 +59,8 @@ interface NavigationState {
   
   // Passage Set Navigation
   currentPassageSet: PassageSet | null
+  /** Flat list of BCV refs derived from currentPassageSet.root */
+  currentPassageList: BCVReference[]
   currentPassageIndex: number
   navigationMode: NavigationMode
 }
@@ -77,7 +107,7 @@ interface NavigationActions {
   hasNavigationSource: () => boolean
 }
 
-type NavigationStore = NavigationState & NavigationActions
+export type NavigationStore = NavigationState & NavigationActions
 
 // Storage key for persisting navigation state
 const NAVIGATION_STORAGE_KEY = 'bt-synergy:navigation-state'
@@ -135,6 +165,7 @@ const useNavigationStore = create<NavigationStore>()(
   
   // Passage Set state
   currentPassageSet: null,
+  currentPassageList: [] as BCVReference[],
   currentPassageIndex: -1,
   navigationMode: persistedState.navigationMode || 'verse',
 
@@ -284,7 +315,7 @@ const useNavigationStore = create<NavigationStore>()(
       })
     } 
     // Try to go to first verse of next chapter
-    else if (currentChapter < bookInfo.chapters) {
+    else if (currentChapter < (bookInfo.chapters ?? 0)) {
       get().navigateToReference({
         book: currentReference.book,
         chapter: currentChapter + 1,
@@ -341,8 +372,8 @@ const useNavigationStore = create<NavigationStore>()(
         const previousBook = availableBooks[currentBookIndex - 1]
         const previousBookInfo = get().getBookInfo(previousBook.code)
         if (previousBookInfo && previousBookInfo.verses) {
-          const lastChapter = previousBookInfo.chapters
-          const lastVerse = previousBookInfo.verses[lastChapter - 1] || 1
+          const lastChapter = previousBookInfo.chapters ?? 1
+          const lastVerse = previousBookInfo.verses[lastChapter - 1] ?? 1
           get().navigateToReference({
             book: previousBook.code,
             chapter: lastChapter,
@@ -365,7 +396,8 @@ const useNavigationStore = create<NavigationStore>()(
     const currentChapter = currentReference.chapter
     
     // If there's a next chapter in this book
-    if (currentChapter < bookInfo.chapters) {
+    const chapters = bookInfo.chapters ?? 0
+    if (currentChapter < chapters) {
       get().navigateToReference({
         book: currentReference.book,
         chapter: currentChapter + 1,
@@ -414,7 +446,7 @@ const useNavigationStore = create<NavigationStore>()(
         if (previousBookInfo) {
           get().navigateToReference({
             book: previousBook.code,
-            chapter: previousBookInfo.chapters,
+            chapter: previousBookInfo.chapters ?? 1,
             verse: 1,
           })
         }
@@ -436,7 +468,7 @@ const useNavigationStore = create<NavigationStore>()(
     if (currentVerse < versesInChapter) return true
     
     // Can go to next chapter
-    if (currentChapter < bookInfo.chapters) return true
+    if (currentChapter < (bookInfo.chapters ?? 0)) return true
     
     // Can go to next book
     const currentBookIndex = availableBooks.findIndex(b => b.code === currentReference.book)
@@ -466,15 +498,9 @@ const useNavigationStore = create<NavigationStore>()(
   canGoToNextChapter: () => {
     const { currentReference, availableBooks } = get()
     const bookInfo = get().getBookInfo(currentReference.book)
-    
     if (!bookInfo) return false
-    
     const currentChapter = currentReference.chapter
-    
-    // Can go to next chapter in current book
-    if (currentChapter < bookInfo.chapters) return true
-    
-    // Can go to next book
+    if (currentChapter < (bookInfo.chapters ?? 0)) return true
     const currentBookIndex = availableBooks.findIndex(b => b.code === currentReference.book)
     return currentBookIndex >= 0 && currentBookIndex < availableBooks.length - 1
   },
@@ -601,24 +627,24 @@ const useNavigationStore = create<NavigationStore>()(
 
   // Passage Set Actions
   loadPassageSet: (passageSet: PassageSet) => {
+    const flat = flattenPassageSetToBCV(passageSet.root ?? [])
     set((state) => {
       state.currentPassageSet = passageSet
+      state.currentPassageList = flat
       state.currentPassageIndex = 0
       state.navigationMode = 'passage-set'
-      
-      // Navigate to first passage
-      if (passageSet.passages.length > 0) {
-        state.currentReference = passageSet.passages[0]
+      if (flat.length > 0) {
+        state.currentReference = flat[0]
       }
     })
-    console.log('📋 Passage set loaded:', passageSet.name, `(${passageSet.passages.length} passages)`)
+    console.log('📋 Passage set loaded:', passageSet.name, `(${flat.length} passages)`)
   },
 
   clearPassageSet: () => {
     set((state) => {
       state.currentPassageSet = null
+      state.currentPassageList = []
       state.currentPassageIndex = -1
-      // Reset to verse mode if no books available
       if (state.availableBooks.length === 0) {
         state.navigationMode = 'verse'
       }
@@ -627,43 +653,41 @@ const useNavigationStore = create<NavigationStore>()(
   },
 
   nextPassage: () => {
-    const { currentPassageSet, currentPassageIndex } = get()
-    if (!currentPassageSet || currentPassageIndex >= currentPassageSet.passages.length - 1) {
+    const { currentPassageList, currentPassageIndex } = get()
+    if (currentPassageList.length === 0 || currentPassageIndex >= currentPassageList.length - 1) {
       return
     }
-    
     const newIndex = currentPassageIndex + 1
     set((state) => {
       state.currentPassageIndex = newIndex
-      state.currentReference = currentPassageSet.passages[newIndex]
+      state.currentReference = currentPassageList[newIndex]
       persistState(state)
     })
-    console.log('➡️ Next passage:', newIndex + 1, 'of', currentPassageSet.passages.length)
+    console.log('➡️ Next passage:', newIndex + 1, 'of', currentPassageList.length)
   },
 
   previousPassage: () => {
-    const { currentPassageSet, currentPassageIndex } = get()
-    if (!currentPassageSet || currentPassageIndex <= 0) {
+    const { currentPassageList, currentPassageIndex } = get()
+    if (currentPassageList.length === 0 || currentPassageIndex <= 0) {
       return
     }
-    
     const newIndex = currentPassageIndex - 1
     set((state) => {
       state.currentPassageIndex = newIndex
-      state.currentReference = currentPassageSet.passages[newIndex]
+      state.currentReference = currentPassageList[newIndex]
       persistState(state)
     })
-    console.log('⬅️ Previous passage:', newIndex + 1, 'of', currentPassageSet.passages.length)
+    console.log('⬅️ Previous passage:', newIndex + 1, 'of', currentPassageList.length)
   },
 
   canGoToNextPassage: () => {
-    const { currentPassageSet, currentPassageIndex } = get()
-    return !!currentPassageSet && currentPassageIndex < currentPassageSet.passages.length - 1
+    const { currentPassageList, currentPassageIndex } = get()
+    return currentPassageList.length > 0 && currentPassageIndex < currentPassageList.length - 1
   },
 
   canGoToPreviousPassage: () => {
-    const { currentPassageSet, currentPassageIndex } = get()
-    return !!currentPassageSet && currentPassageIndex > 0
+    const { currentPassageList, currentPassageIndex } = get()
+    return currentPassageList.length > 0 && currentPassageIndex > 0
   },
 
   setNavigationMode: (mode: NavigationMode) => {
@@ -684,7 +708,7 @@ const useNavigationStore = create<NavigationStore>()(
 // CONTEXT
 // ============================================================================
 
-const NavigationContext = createContext<ReturnType<typeof useNavigationStore> | null>(null)
+const NavigationContext = createContext<NavigationStore | null>(null)
 
 export function NavigationProvider({ children }: { children: ReactNode }) {
   const store = useNavigationStore()
@@ -699,7 +723,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   return <NavigationContext.Provider value={store}>{children}</NavigationContext.Provider>
 }
 
-export function useNavigation() {
+export function useNavigation(): NavigationStore {
   const context = useContext(NavigationContext)
   if (!context) {
     throw new Error('useNavigation must be used within NavigationProvider')

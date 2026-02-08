@@ -4,14 +4,81 @@
 
 import { useState, useEffect } from 'react'
 import { X, Plus, Trash2, BookOpen, Check } from 'lucide-react'
-import type { ResourcePackage } from '../../lib/storage/types'
+import type { ResourcePackage as WorkspacePackage } from '../../lib/storage/types'
+import type { ResourceInfo } from '../../contexts/types'
+import type { ResourcePackage as StorageResourcePackage, PackageResource } from '@bt-synergy/package-storage'
 import { usePackageStore } from '../../lib/stores'
 
 interface ManageCollectionDialogProps {
-  collection: ResourcePackage
+  collection: WorkspacePackage | StorageResourcePackage
   isOpen: boolean
   onClose: () => void
   onOpenWizard?: () => void
+}
+
+function getResourcesArray(collection: WorkspacePackage | StorageResourcePackage): ResourceInfo[] | PackageResource[] {
+  const r = (collection as { resources?: Map<string, ResourceInfo> | PackageResource[] }).resources
+  if (r instanceof Map) return Array.from(r.values())
+  return r ?? []
+}
+
+function resourcesMapToArray(resources: Map<string, ResourceInfo>): ResourceInfo[] {
+  return Array.from(resources.values())
+}
+
+function arrayToResourcesMap(resources: ResourceInfo[]): Map<string, ResourceInfo> {
+  const map = new Map<string, ResourceInfo>()
+  resources.forEach(r => map.set(r.key, r))
+  return map
+}
+
+/** Convert dialog state + collection to package-storage ResourcePackage for save */
+function toStoragePackage(
+  collection: WorkspacePackage | StorageResourcePackage,
+  name: string,
+  description: string | undefined,
+  resources: ResourceInfo[] | PackageResource[]
+): StorageResourcePackage {
+  const base = collection as unknown as Record<string, unknown>
+  const now = new Date().toISOString()
+  const parseKey = (key: string) => {
+    const parts = key.split('/')
+    return {
+      server: 'https://git.door43.org',
+      owner: parts[0] || 'unfoldingword',
+      language: parts[1] || 'en',
+      resourceId: parts[parts.length - 1] || '',
+    }
+  }
+  const packageResources: PackageResource[] = resources.map((r: ResourceInfo | PackageResource) => {
+    if ('key' in r && r.key) {
+      const { owner, language, resourceId } = parseKey(r.key)
+      return { server: (r as ResourceInfo).server || 'https://git.door43.org', owner, language, resourceId, displayName: (r as ResourceInfo).title }
+    }
+    return r as PackageResource
+  })
+  const panels = (base.panels as { id: string; name?: string; resourceKeys: string[]; activeIndex?: number }[] | undefined) ?? (base.panelLayout as { panels?: { id: string; title?: string; resourceIds: string[]; defaultResourceId?: string }[] })?.panels ?? []
+  const panelLayout = Array.isArray(panels) && panels.length > 0
+    ? {
+        panels: panels.map((p: { id: string; name?: string; title?: string; resourceKeys?: string[]; resourceIds?: string[]; activeIndex?: number; defaultResourceId?: string }) => ({
+          id: p.id,
+          title: p.name ?? p.title,
+          resourceIds: p.resourceKeys ?? p.resourceIds ?? [],
+          defaultResourceId: p.resourceKeys?.[p.activeIndex ?? 0] ?? p.defaultResourceId,
+        })),
+        orientation: 'horizontal' as const,
+      }
+    : undefined
+  return {
+    id: (base.id as string) || `collection_${Date.now()}`,
+    name: name.trim(),
+    description: description?.trim() || undefined,
+    version: (base.version as string) || '1.0.0',
+    createdAt: (base.createdAt as string) || now,
+    updatedAt: now,
+    resources: packageResources,
+    panelLayout,
+  }
 }
 
 export function ManageCollectionDialog({
@@ -21,15 +88,15 @@ export function ManageCollectionDialog({
   onOpenWizard,
 }: ManageCollectionDialogProps) {
   const savePackage = usePackageStore(state => state.savePackage)
-  const [resources, setResources] = useState(collection.resources || [])
-  const [name, setName] = useState(collection.title || collection.name || '')
+  const [resources, setResources] = useState<ResourceInfo[] | PackageResource[]>(() => getResourcesArray(collection) as ResourceInfo[] | PackageResource[])
+  const [name, setName] = useState(collection.name || (collection as { title?: string }).title || '')
   const [description, setDescription] = useState(collection.description || '')
 
   // Reset state when dialog opens or collection changes
   useEffect(() => {
     if (isOpen) {
-      setResources(collection.resources || [])
-      setName(collection.title || collection.name || '')
+      setResources(getResourcesArray(collection) as ResourceInfo[] | PackageResource[])
+      setName(collection.name || (collection as { title?: string }).title || '')
       setDescription(collection.description || '')
     }
   }, [isOpen, collection])
@@ -37,19 +104,13 @@ export function ManageCollectionDialog({
   if (!isOpen) return null
 
   const handleRemoveResource = (index: number) => {
-    const updatedResources = resources.filter((_, i) => i !== index)
+    const updatedResources = resources.filter((_, i: number) => i !== index)
     setResources(updatedResources)
   }
 
   const handleSave = async () => {
-    const updatedCollection = {
-      ...collection,
-      name: name.trim(),
-      title: name.trim(),
-      description: description.trim() || undefined,
-      resources: resources,
-    }
-    await savePackage(updatedCollection)
+    const toSave = toStoragePackage(collection, name, description, resources)
+    await savePackage(toSave)
     onClose()
   }
 

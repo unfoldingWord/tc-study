@@ -242,7 +242,7 @@ export function SimpleCollectionCreator({ onClose, onComplete, onAddResources, i
                       <div className="flex items-center gap-2">
                         <h3 className="font-medium text-gray-900 truncate">{resource.title}</h3>
                         {isDownloaded && (
-                          <Download className="w-4 h-4 text-green-600 flex-shrink-0" title="Downloaded" aria-label="Downloaded" />
+                          <span title="Downloaded"><Download className="w-4 h-4 text-green-600 flex-shrink-0" aria-label="Downloaded" /></span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">

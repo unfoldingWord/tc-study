@@ -73,7 +73,7 @@ export default function Collections() {
   }
 
   const handleDeleteCollection = async (pkg: ResourcePackage) => {
-    if (confirm(`Are you sure you want to delete "${pkg.title}"?\n\nThis will remove the collection.`)) {
+    if (confirm(`Are you sure you want to delete "${pkg.name ?? (pkg as { title?: string }).title}"?\n\nThis will remove the collection.`)) {
       await uninstallPackage(pkg.id)
     }
   }

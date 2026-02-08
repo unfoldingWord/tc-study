@@ -4,7 +4,41 @@
 
 import { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Save } from 'lucide-react'
-import type { PassageSet, BCVReference } from '@bt-synergy/passage-sets'
+import type { PassageSet, BCVReference, Passage, PassageLeaf, PassageSetNode, RefRange } from '@bt-synergy/passage-sets'
+
+function flattenPassageSetToBCV(root: PassageSetNode[]): BCVReference[] {
+  const out: BCVReference[] = []
+  for (const node of root) {
+    if (node.type === 'passage' && 'passages' in node) {
+      const leaf = node as PassageLeaf
+      for (const p of leaf.passages) {
+        const ref = p.ref as RefRange
+        out.push({
+          book: p.bookCode,
+          chapter: ref.startChapter,
+          verse: ref.startVerse ?? 1,
+        })
+      }
+    }
+    if (node.type === 'group' && 'children' in node) {
+      out.push(...flattenPassageSetToBCV((node as { children: PassageSetNode[] }).children))
+    }
+  }
+  return out
+}
+
+function bcvListToPassageLeaf(bcvList: BCVReference[]): PassageLeaf {
+  const passages: Passage[] = bcvList.map(bcv => ({
+    bookCode: bcv.book,
+    ref: { startChapter: bcv.chapter, startVerse: bcv.verse } as RefRange,
+  }))
+  return {
+    id: 'default',
+    type: 'passage',
+    label: 'Passages',
+    passages,
+  }
+}
 
 interface PassageSetFormProps {
   passageSet?: PassageSet | null
@@ -92,7 +126,7 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
     if (passageSet) {
       setName(passageSet.name)
       setDescription(passageSet.description || '')
-      setPassages(passageSet.passages)
+      setPassages(flattenPassageSetToBCV(passageSet.root))
     }
   }, [passageSet])
 
@@ -120,11 +154,15 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
       return
     }
 
+    const now = new Date().toISOString()
     const saved: PassageSet = {
       id: passageSet?.id || `ps-${Date.now()}`,
       name: name.trim(),
-      description: description.trim(),
-      passages,
+      description: description.trim() || undefined,
+      version: passageSet?.version ?? '1.0',
+      createdAt: passageSet?.createdAt ?? now,
+      updatedAt: now,
+      root: [bcvListToPassageLeaf(passages)],
     }
 
     onSave(saved)

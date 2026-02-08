@@ -79,7 +79,7 @@ export function useContent(
           // Use sections from content if available, otherwise fall back to default sections
           const sections = content.translatorSections && content.translatorSections.length > 0
             ? content.translatorSections
-            : defaultSectionsService.getDefaultSections(bookCode)
+            : await defaultSectionsService.getDefaultSections(bookCode)
           
           if (sections.length > 0) {
             navigation.setBookSections(bookCode, sections)

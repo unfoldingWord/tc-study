@@ -12,6 +12,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { DownloadProgress } from '../lib/services/BackgroundDownloadManager'
 
+export type { DownloadProgress }
+
 export interface BackgroundDownloadStats {
   isDownloading: boolean
   progress: DownloadProgress | null

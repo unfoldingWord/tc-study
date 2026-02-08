@@ -1,183 +1,123 @@
 /**
  * Default Sections Index
- * Exports all default sections for Bible books
+ * Lazy-loads sections per book to reduce initial bundle size
  */
 
-// Import all sections and metadata
-import { book1chMetadata, book1chSections } from './1ch';
-import { book2chMetadata, book2chSections } from './2ch';
-import { actMetadata, actSections } from './act';
-import { amoMetadata, amoSections } from './amo';
-import { colMetadata, colSections } from './col';
-import { danMetadata, danSections } from './dan';
-import { deuMetadata, deuSections } from './deu';
-import { eccMetadata, eccSections } from './ecc';
-import { ephMetadata, ephSections } from './eph';
-import { estMetadata, estSections } from './est';
-import { exoMetadata, exoSections } from './exo';
-import { ezkMetadata, ezkSections } from './ezk';
-import { ezrMetadata, ezrSections } from './ezr';
-import { galMetadata, galSections } from './gal';
-import { genMetadata, genSections } from './gen';
-import { habMetadata, habSections } from './hab';
-import { hagMetadata, hagSections } from './hag';
-import { hebMetadata, hebSections } from './heb';
-import { hosMetadata, hosSections } from './hos';
-import { isaMetadata, isaSections } from './isa';
-import { jasMetadata, jasSections } from './jas';
-import { jdgMetadata, jdgSections } from './jdg';
-import { jerMetadata, jerSections } from './jer';
-import { jhnMetadata, jhnSections } from './jhn';
-import { jobMetadata, jobSections } from './job';
-import { jolMetadata, jolSections } from './jol';
-import { jonMetadata, jonSections } from './jon';
-import { josMetadata, josSections } from './jos';
-import { judMetadata, judSections } from './jud';
-import { lamMetadata, lamSections } from './lam';
-import { levMetadata, levSections } from './lev';
-import { lukMetadata, lukSections } from './luk';
-import { malMetadata, malSections } from './mal';
-import { matMetadata, matSections } from './mat';
-import { micMetadata, micSections } from './mic';
-import { mrkMetadata, mrkSections } from './mrk';
-import { namMetadata, namSections } from './nam';
-import { nehMetadata, nehSections } from './neh';
-import { numMetadata, numSections } from './num';
-import { obaMetadata, obaSections } from './oba';
-import { phmMetadata, phmSections } from './phm';
-import { phpMetadata, phpSections } from './php';
-import { proMetadata, proSections } from './pro';
-import { psaMetadata, psaSections } from './psa';
-import { revMetadata, revSections } from './rev';
-import { romMetadata, romSections } from './rom';
-import { rutMetadata, rutSections } from './rut';
-import { sngMetadata, sngSections } from './sng';
-import { titMetadata, titSections } from './tit';
-import { zecMetadata, zecSections } from './zec';
-import { zepMetadata, zepSections } from './zep';
+import type { TranslatorSection } from '@bt-synergy/usfm-processor'
 
-// New Testament (numbered books)
-import { book1coMetadata, book1coSections } from './1co';
-import { book1jnMetadata, book1jnSections } from './1jn';
-import { book1kiMetadata, book1kiSections } from './1ki';
-import { book1peMetadata, book1peSections } from './1pe';
-import { book1saMetadata, book1saSections } from './1sa';
-import { book1thMetadata, book1thSections } from './1th';
-import { book1tiMetadata, book1tiSections } from './1ti';
-import { book2coMetadata, book2coSections } from './2co';
-import { book2jnMetadata, book2jnSections } from './2jn';
-import { book2kiMetadata, book2kiSections } from './2ki';
-import { book2peMetadata, book2peSections } from './2pe';
-import { book2saMetadata, book2saSections } from './2sa';
-import { book2thMetadata, book2thSections } from './2th';
-import { book2tiMetadata, book2tiSections } from './2ti';
-import { book3jnMetadata, book3jnSections } from './3jn';
-
-// Types
-export type { TranslatorSection } from '@bt-synergy/usfm-processor';
+export type { TranslatorSection }
 
 export interface BookMetadata {
-  bookCode: string;
-  bookName: string;
-  sectionsCount: number;
-  extractedAt: string;
+  bookCode: string
+  bookName: string
+  sectionsCount: number
+  extractedAt: string
 }
 
-// Book mapping
-export const DEFAULT_SECTIONS_MAP: Record<string, { sections: TranslatorSection[]; metadata: BookMetadata }> = {
-  // Old Testament
-  'gen': { sections: genSections, metadata: genMetadata },
-  'exo': { sections: exoSections, metadata: exoMetadata },
-  'lev': { sections: levSections, metadata: levMetadata },
-  'num': { sections: numSections, metadata: numMetadata },
-  'deu': { sections: deuSections, metadata: deuMetadata },
-  'jos': { sections: josSections, metadata: josMetadata },
-  'jdg': { sections: jdgSections, metadata: jdgMetadata },
-  'rut': { sections: rutSections, metadata: rutMetadata },
-  '1sa': { sections: book1saSections, metadata: book1saMetadata },
-  '2sa': { sections: book2saSections, metadata: book2saMetadata },
-  '1ki': { sections: book1kiSections, metadata: book1kiMetadata },
-  '2ki': { sections: book2kiSections, metadata: book2kiMetadata },
-  '1ch': { sections: book1chSections, metadata: book1chMetadata },
-  '2ch': { sections: book2chSections, metadata: book2chMetadata },
-  'ezr': { sections: ezrSections, metadata: ezrMetadata },
-  'neh': { sections: nehSections, metadata: nehMetadata },
-  'est': { sections: estSections, metadata: estMetadata },
-  'job': { sections: jobSections, metadata: jobMetadata },
-  'psa': { sections: psaSections, metadata: psaMetadata },
-  'pro': { sections: proSections, metadata: proMetadata },
-  'ecc': { sections: eccSections, metadata: eccMetadata },
-  'sng': { sections: sngSections, metadata: sngMetadata },
-  'isa': { sections: isaSections, metadata: isaMetadata },
-  'jer': { sections: jerSections, metadata: jerMetadata },
-  'lam': { sections: lamSections, metadata: lamMetadata },
-  'ezk': { sections: ezkSections, metadata: ezkMetadata },
-  'dan': { sections: danSections, metadata: danMetadata },
-  'hos': { sections: hosSections, metadata: hosMetadata },
-  'jol': { sections: jolSections, metadata: jolMetadata },
-  'amo': { sections: amoSections, metadata: amoMetadata },
-  'oba': { sections: obaSections, metadata: obaMetadata },
-  'jon': { sections: jonSections, metadata: jonMetadata },
-  'mic': { sections: micSections, metadata: micMetadata },
-  'nam': { sections: namSections, metadata: namMetadata },
-  'hab': { sections: habSections, metadata: habMetadata },
-  'zep': { sections: zepSections, metadata: zepMetadata },
-  'hag': { sections: hagSections, metadata: hagMetadata },
-  'zec': { sections: zecSections, metadata: zecMetadata },
-  'mal': { sections: malSections, metadata: malMetadata },
+type BookLoader = () => Promise<{ sections: TranslatorSection[]; metadata: BookMetadata }>
 
-  // New Testament
-  'mat': { sections: matSections, metadata: matMetadata },
-  'mrk': { sections: mrkSections, metadata: mrkMetadata },
-  'luk': { sections: lukSections, metadata: lukMetadata },
-  'jhn': { sections: jhnSections, metadata: jhnMetadata },
-  'act': { sections: actSections, metadata: actMetadata },
-  'rom': { sections: romSections, metadata: romMetadata },
-  '1co': { sections: book1coSections, metadata: book1coMetadata },
-  '2co': { sections: book2coSections, metadata: book2coMetadata },
-  'gal': { sections: galSections, metadata: galMetadata },
-  'eph': { sections: ephSections, metadata: ephMetadata },
-  'php': { sections: phpSections, metadata: phpMetadata },
-  'col': { sections: colSections, metadata: colMetadata },
-  '1th': { sections: book1thSections, metadata: book1thMetadata },
-  '2th': { sections: book2thSections, metadata: book2thMetadata },
-  '1ti': { sections: book1tiSections, metadata: book1tiMetadata },
-  '2ti': { sections: book2tiSections, metadata: book2tiMetadata },
-  'tit': { sections: titSections, metadata: titMetadata },
-  'phm': { sections: phmSections, metadata: phmMetadata },
-  'heb': { sections: hebSections, metadata: hebMetadata },
-  'jas': { sections: jasSections, metadata: jasMetadata },
-  '1pe': { sections: book1peSections, metadata: book1peMetadata },
-  '2pe': { sections: book2peSections, metadata: book2peMetadata },
-  '1jn': { sections: book1jnSections, metadata: book1jnMetadata },
-  '2jn': { sections: book2jnSections, metadata: book2jnMetadata },
-  '3jn': { sections: book3jnSections, metadata: book3jnMetadata },
-  'jud': { sections: judSections, metadata: judMetadata },
-  'rev': { sections: revSections, metadata: revMetadata },
-};
+const loaders: Record<string, BookLoader> = {
+  gen: () => import('./gen').then(m => ({ sections: m.genSections, metadata: m.genMetadata })),
+  exo: () => import('./exo').then(m => ({ sections: m.exoSections, metadata: m.exoMetadata })),
+  lev: () => import('./lev').then(m => ({ sections: m.levSections, metadata: m.levMetadata })),
+  num: () => import('./num').then(m => ({ sections: m.numSections, metadata: m.numMetadata })),
+  deu: () => import('./deu').then(m => ({ sections: m.deuSections, metadata: m.deuMetadata })),
+  jos: () => import('./jos').then(m => ({ sections: m.josSections, metadata: m.josMetadata })),
+  jdg: () => import('./jdg').then(m => ({ sections: m.jdgSections, metadata: m.jdgMetadata })),
+  rut: () => import('./rut').then(m => ({ sections: m.rutSections, metadata: m.rutMetadata })),
+  '1sa': () => import('./1sa').then(m => ({ sections: m.book1saSections, metadata: m.book1saMetadata })),
+  '2sa': () => import('./2sa').then(m => ({ sections: m.book2saSections, metadata: m.book2saMetadata })),
+  '1ki': () => import('./1ki').then(m => ({ sections: m.book1kiSections, metadata: m.book1kiMetadata })),
+  '2ki': () => import('./2ki').then(m => ({ sections: m.book2kiSections, metadata: m.book2kiMetadata })),
+  '1ch': () => import('./1ch').then(m => ({ sections: m.book1chSections, metadata: m.book1chMetadata })),
+  '2ch': () => import('./2ch').then(m => ({ sections: m.book2chSections, metadata: m.book2chMetadata })),
+  ezr: () => import('./ezr').then(m => ({ sections: m.ezrSections, metadata: m.ezrMetadata })),
+  neh: () => import('./neh').then(m => ({ sections: m.nehSections, metadata: m.nehMetadata })),
+  est: () => import('./est').then(m => ({ sections: m.estSections, metadata: m.estMetadata })),
+  job: () => import('./job').then(m => ({ sections: m.jobSections, metadata: m.jobMetadata })),
+  psa: () => import('./psa').then(m => ({ sections: m.psaSections, metadata: m.psaMetadata })),
+  pro: () => import('./pro').then(m => ({ sections: m.proSections, metadata: m.proMetadata })),
+  ecc: () => import('./ecc').then(m => ({ sections: m.eccSections, metadata: m.eccMetadata })),
+  sng: () => import('./sng').then(m => ({ sections: m.sngSections, metadata: m.sngMetadata })),
+  isa: () => import('./isa').then(m => ({ sections: m.isaSections, metadata: m.isaMetadata })),
+  jer: () => import('./jer').then(m => ({ sections: m.jerSections, metadata: m.jerMetadata })),
+  lam: () => import('./lam').then(m => ({ sections: m.lamSections, metadata: m.lamMetadata })),
+  ezk: () => import('./ezk').then(m => ({ sections: m.ezkSections, metadata: m.ezkMetadata })),
+  dan: () => import('./dan').then(m => ({ sections: m.danSections, metadata: m.danMetadata })),
+  hos: () => import('./hos').then(m => ({ sections: m.hosSections, metadata: m.hosMetadata })),
+  jol: () => import('./jol').then(m => ({ sections: m.jolSections, metadata: m.jolMetadata })),
+  amo: () => import('./amo').then(m => ({ sections: m.amoSections, metadata: m.amoMetadata })),
+  oba: () => import('./oba').then(m => ({ sections: m.obaSections, metadata: m.obaMetadata })),
+  jon: () => import('./jon').then(m => ({ sections: m.jonSections, metadata: m.jonMetadata })),
+  mic: () => import('./mic').then(m => ({ sections: m.micSections, metadata: m.micMetadata })),
+  nam: () => import('./nam').then(m => ({ sections: m.namSections, metadata: m.namMetadata })),
+  hab: () => import('./hab').then(m => ({ sections: m.habSections, metadata: m.habMetadata })),
+  zep: () => import('./zep').then(m => ({ sections: m.zepSections, metadata: m.zepMetadata })),
+  hag: () => import('./hag').then(m => ({ sections: m.hagSections, metadata: m.hagMetadata })),
+  zec: () => import('./zec').then(m => ({ sections: m.zecSections, metadata: m.zecMetadata })),
+  mal: () => import('./mal').then(m => ({ sections: m.malSections, metadata: m.malMetadata })),
+  mat: () => import('./mat').then(m => ({ sections: m.matSections, metadata: m.matMetadata })),
+  mrk: () => import('./mrk').then(m => ({ sections: m.mrkSections, metadata: m.mrkMetadata })),
+  luk: () => import('./luk').then(m => ({ sections: m.lukSections, metadata: m.lukMetadata })),
+  jhn: () => import('./jhn').then(m => ({ sections: m.jhnSections, metadata: m.jhnMetadata })),
+  act: () => import('./act').then(m => ({ sections: m.actSections, metadata: m.actMetadata })),
+  rom: () => import('./rom').then(m => ({ sections: m.romSections, metadata: m.romMetadata })),
+  '1co': () => import('./1co').then(m => ({ sections: m.book1coSections, metadata: m.book1coMetadata })),
+  '2co': () => import('./2co').then(m => ({ sections: m.book2coSections, metadata: m.book2coMetadata })),
+  gal: () => import('./gal').then(m => ({ sections: m.galSections, metadata: m.galMetadata })),
+  eph: () => import('./eph').then(m => ({ sections: m.ephSections, metadata: m.ephMetadata })),
+  php: () => import('./php').then(m => ({ sections: m.phpSections, metadata: m.phpMetadata })),
+  col: () => import('./col').then(m => ({ sections: m.colSections, metadata: m.colMetadata })),
+  '1th': () => import('./1th').then(m => ({ sections: m.book1thSections, metadata: m.book1thMetadata })),
+  '2th': () => import('./2th').then(m => ({ sections: m.book2thSections, metadata: m.book2thMetadata })),
+  '1ti': () => import('./1ti').then(m => ({ sections: m.book1tiSections, metadata: m.book1tiMetadata })),
+  '2ti': () => import('./2ti').then(m => ({ sections: m.book2tiSections, metadata: m.book2tiMetadata })),
+  tit: () => import('./tit').then(m => ({ sections: m.titSections, metadata: m.titMetadata })),
+  phm: () => import('./phm').then(m => ({ sections: m.phmSections, metadata: m.phmMetadata })),
+  heb: () => import('./heb').then(m => ({ sections: m.hebSections, metadata: m.hebMetadata })),
+  jas: () => import('./jas').then(m => ({ sections: m.jasSections, metadata: m.jasMetadata })),
+  '1pe': () => import('./1pe').then(m => ({ sections: m.book1peSections, metadata: m.book1peMetadata })),
+  '2pe': () => import('./2pe').then(m => ({ sections: m.book2peSections, metadata: m.book2peMetadata })),
+  '1jn': () => import('./1jn').then(m => ({ sections: m.book1jnSections, metadata: m.book1jnMetadata })),
+  '2jn': () => import('./2jn').then(m => ({ sections: m.book2jnSections, metadata: m.book2jnMetadata })),
+  '3jn': () => import('./3jn').then(m => ({ sections: m.book3jnSections, metadata: m.book3jnMetadata })),
+  jud: () => import('./jud').then(m => ({ sections: m.judSections, metadata: m.judMetadata })),
+  rev: () => import('./rev').then(m => ({ sections: m.revSections, metadata: m.revMetadata })),
+}
 
 /**
- * Get default sections for a book
+ * Get default sections for a book (async)
  */
-export function getDefaultSections(bookCode: string): TranslatorSection[] {
-  const normalizedCode = bookCode.toLowerCase();
-  const bookData = DEFAULT_SECTIONS_MAP[normalizedCode];
-  return bookData?.sections || [];
+export async function getDefaultSections(bookCode: string): Promise<TranslatorSection[]> {
+  const loader = loaders[bookCode.toLowerCase()]
+  if (!loader) return []
+  try {
+    const { sections } = await loader()
+    return sections
+  } catch (err) {
+    console.warn(`Failed to load default sections for ${bookCode}:`, err)
+    return []
+  }
 }
 
 /**
- * Get default sections metadata for a book
+ * Get default sections metadata for a book (async)
  */
-export function getDefaultSectionsMetadata(bookCode: string): BookMetadata | null {
-  const normalizedCode = bookCode.toLowerCase();
-  const bookData = DEFAULT_SECTIONS_MAP[normalizedCode];
-  return bookData?.metadata || null;
+export async function getDefaultSectionsMetadata(bookCode: string): Promise<BookMetadata | null> {
+  const loader = loaders[bookCode.toLowerCase()]
+  if (!loader) return null
+  try {
+    const { metadata } = await loader()
+    return metadata
+  } catch (err) {
+    console.warn(`Failed to load default sections metadata for ${bookCode}:`, err)
+    return null
+  }
 }
 
 /**
- * Check if default sections are available for a book
+ * Check if default sections are available for a book (sync)
  */
 export function hasDefaultSections(bookCode: string): boolean {
-  const normalizedCode = bookCode.toLowerCase();
-  return normalizedCode in DEFAULT_SECTIONS_MAP;
+  return bookCode.toLowerCase() in loaders
 }

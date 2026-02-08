@@ -53,7 +53,7 @@ export function PackageCard({ package: pkg, onOpen, onDelete, onManage, isActive
       {/* Header */}
       <div className="mb-4">
         <h3 className="text-base font-semibold text-gray-900 mb-1">
-          {pkg.title || pkg.id}
+          {pkg.name || pkg.id}
         </h3>
         {pkg.description && (
           <p className="text-xs text-gray-500 line-clamp-2">
@@ -64,36 +64,36 @@ export function PackageCard({ package: pkg, onOpen, onDelete, onManage, isActive
 
       {/* Metadata */}
       <div className="mb-4 flex flex-wrap gap-2 text-xs">
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 rounded-lg" title={`${pkg.resources?.length || 0} resources`}>
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 rounded-lg" title={`${Array.isArray(pkg.resources) ? pkg.resources.length : (pkg.resources as Map<string, unknown>)?.size ?? 0} resources`}>
           <BookOpen className="w-3 h-3 text-blue-600" />
           <span className="text-blue-600 font-semibold">
-            {pkg.resources?.length || 0}
+            {Array.isArray(pkg.resources) ? pkg.resources.length : (pkg.resources as Map<string, unknown>)?.size ?? 0}
           </span>
         </div>
-        {pkg.stats?.estimatedSize && (
-          <span className="px-2 py-1 bg-gray-50 text-gray-600 rounded-lg" title={formatSize(pkg.stats.estimatedSize)}>
-            {formatSize(pkg.stats.estimatedSize)}
+        {(pkg as { stats?: { estimatedSize?: number } }).stats?.estimatedSize != null && (
+          <span className="px-2 py-1 bg-gray-50 text-gray-600 rounded-lg" title={formatSize((pkg as { stats?: { estimatedSize?: number } }).stats!.estimatedSize)}>
+            {formatSize((pkg as { stats?: { estimatedSize?: number } }).stats!.estimatedSize)}
           </span>
         )}
       </div>
 
-      {/* Status & Progress */}
-      {pkg.status === 'installing' && (
+      {/* Status & Progress - optional fields for package store compatibility */}
+      {(pkg as { status?: string }).status === 'installing' && (
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-2">
             <Loader className="w-4 h-4 text-blue-600 animate-spin" />
             <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-gray-100">
               <div 
                 className="h-full bg-blue-600 transition-all"
-                style={{ width: `${pkg.downloadProgress}%` }}
+                style={{ width: `${(pkg as { downloadProgress?: number }).downloadProgress ?? 0}%` }}
               />
             </div>
-            <span className="text-xs font-medium text-blue-600">{pkg.downloadProgress}%</span>
+            <span className="text-xs font-medium text-blue-600">{(pkg as { downloadProgress?: number }).downloadProgress ?? 0}%</span>
           </div>
         </div>
       )}
 
-      {pkg.status === 'error' && (
+      {(pkg as { status?: string }).status === 'error' && (
         <div className="mb-4 flex items-center gap-2 p-2 bg-red-50 rounded-lg">
           <AlertCircle className="w-4 h-4 text-red-600" />
           <span className="text-xs text-red-600 font-medium">Error</span>
@@ -104,9 +104,9 @@ export function PackageCard({ package: pkg, onOpen, onDelete, onManage, isActive
       <div className="flex items-center gap-2">
         <button
           onClick={() => onOpen(pkg)}
-          disabled={pkg.status !== 'installed'}
+          disabled={(pkg as { status?: string }).status !== 'installed'}
           className={`flex-1 rounded-lg p-2.5 transition-colors flex items-center justify-center ${
-            pkg.status === 'installed'
+            (pkg as { status?: string }).status === 'installed'
               ? 'bg-blue-600 text-white hover:bg-blue-700'
               : 'cursor-not-allowed bg-gray-100 text-gray-400'
           }`}

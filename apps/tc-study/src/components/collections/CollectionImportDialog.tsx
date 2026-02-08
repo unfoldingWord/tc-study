@@ -454,7 +454,7 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-3">
-            <Upload className="w-6 h-6 text-blue-600" title="Load collection" aria-label="Load collection" />
+            <span title="Load collection"><Upload className="w-6 h-6 text-blue-600" aria-label="Load collection" /></span>
           </div>
           <button
             onClick={onClose}
@@ -462,7 +462,7 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
             aria-label="Close dialog"
             title="Close dialog"
           >
-            <X className="w-4 h-4" title="Close" />
+            <span title="Close"><X className="w-4 h-4" /></span>
           </button>
         </div>
         
@@ -539,7 +539,7 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
               title="Drop .btc.zip file here or click to browse"
               aria-label="Drop collection file here or click to select file"
             >
-              <FileArchive className={`w-16 h-16 mx-auto mb-3 ${file ? 'text-blue-600' : 'text-gray-400'}`} title="Collection file" />
+              <span title="Collection file"><FileArchive className={`w-16 h-16 mx-auto mb-3 ${file ? 'text-blue-600' : 'text-gray-400'}`} /></span>
               {file ? (
                 <>
                   <p className="text-sm font-medium text-gray-700 mb-1 truncate px-2">{file.name}</p>
@@ -548,7 +548,7 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
               ) : (
                 <div className="flex flex-col items-center gap-2">
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-gray-400" title="Upload" />
+                    <span title="Upload"><Upload className="w-5 h-5 text-gray-400" /></span>
                   </div>
                 </div>
               )}
@@ -587,7 +587,7 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
           {/* Success Message */}
           {success && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center justify-center gap-2 text-green-800">
-              <Check className="w-5 h-5" title="Success" />
+              <span title="Success"><Check className="w-5 h-5" /></span>
             </div>
           )}
           
@@ -608,7 +608,7 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
             aria-label="Cancel"
             title="Cancel"
           >
-            <X className="w-4 h-4 mx-auto" title="Cancel" />
+            <span title="Cancel"><X className="w-4 h-4 mx-auto" /></span>
           </button>
           <button
             onClick={handleImport}
@@ -620,9 +620,9 @@ export function CollectionImportDialog({ isOpen, onClose }: CollectionImportDial
             {importing ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" title="Loading..." />
             ) : success ? (
-              <Check className="w-5 h-5" title="Success" />
+              <span title="Success"><Check className="w-5 h-5" /></span>
             ) : (
-              <Upload className="w-5 h-5" title="Load" />
+              <span title="Load"><Upload className="w-5 h-5" /></span>
             )}
           </button>
         </div>

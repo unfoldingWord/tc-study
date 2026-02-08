@@ -5,5 +5,4 @@
  * Used by components to avoid circular dependencies.
  */
 
-export type { BCVReference, BookInfo, NavigationMode, PassageSet, ResourceInfo, ResourceTOC } from './types'
-export type { ReferenceState } from './ReferenceContext'
+export type { BCVReference, BookInfo, NavigationMode, PassageSet, ReferenceState, ResourceInfo, ResourceTOC } from './types'

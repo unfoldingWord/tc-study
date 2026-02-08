@@ -27,6 +27,17 @@ export interface BookInfo {
 export type NavigationMode = 'verse' | 'section' | 'passage-set'
 
 /**
+ * Reference state (book/chapter/verse) for display
+ */
+export interface ReferenceState {
+  book: string
+  chapter: number
+  verse: number
+  endChapter?: number
+  endVerse?: number
+}
+
+/**
  * Resource TOC (Table of Contents) that resources can expose
  */
 export interface ResourceTOC {

@@ -133,8 +133,8 @@ export function useTOC(
             
             // Load default sections for the current book (will be replaced by content sections when content loads)
             const currentBook = navigation.currentReference.book
-            const sections = defaultSectionsService.getDefaultSections(currentBook)
-            if (sections.length > 0) {
+            const sections = await defaultSectionsService.getDefaultSections(currentBook)
+            if (!cancelled && sections.length > 0) {
               navigation.setBookSections(currentBook, sections)
             }
             
@@ -168,20 +168,20 @@ export function useTOC(
   }, [resourceId])
 
   // Function to manually set this resource as anchor
-  const setAsAnchor = () => {
+  const setAsAnchor = async () => {
     if (loadedTOC) {
       // Update AppContext
       app.setAnchorResource(resourceId, loadedTOC)
       // Update NavigationContext with the available books
       navigation.setAvailableBooks(loadedTOC.books)
-      
+
       // Load default sections for the current book (will be replaced by content sections when content loads)
       const currentBook = navigation.currentReference.book
-      const sections = defaultSectionsService.getDefaultSections(currentBook)
+      const sections = await defaultSectionsService.getDefaultSections(currentBook)
       if (sections.length > 0) {
         navigation.setBookSections(currentBook, sections)
       }
-      
+
       tocSetRef.current = true
     }
   }

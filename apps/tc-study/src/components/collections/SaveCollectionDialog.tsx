@@ -165,7 +165,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-3">
-            <Save className="w-6 h-6 text-blue-600" title="Save or download collection" aria-label="Save or download collection" />
+            <span title="Save or download collection"><Save className="w-6 h-6 text-blue-600" aria-label="Save or download collection" /></span>
           </div>
           <button
             onClick={onClose}
@@ -173,7 +173,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
             aria-label="Close dialog"
             title="Close dialog"
           >
-            <X className="w-4 h-4" title="Close" />
+            <span title="Close"><X className="w-4 h-4" /></span>
           </button>
         </div>
         
@@ -208,7 +208,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
               aria-label="Save to collections database"
               title="Save to collections database"
             >
-              <Save className={`w-6 h-6 ${actionMode === 'save' ? 'text-blue-600' : 'text-gray-400'}`} title="Save to DB" />
+              <span title="Save to DB"><Save className={`w-6 h-6 ${actionMode === 'save' ? 'text-blue-600' : 'text-gray-400'}`} /></span>
               <span className={`text-sm font-medium ${actionMode === 'save' ? 'text-blue-900' : 'text-gray-600'}`}>
                 Save
               </span>
@@ -228,7 +228,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
               aria-label="Download as .btc.zip file"
               title="Download as .btc.zip file"
             >
-              <Download className={`w-6 h-6 ${actionMode === 'download' ? 'text-green-600' : 'text-gray-400'}`} title="Download" />
+              <span title="Download"><Download className={`w-6 h-6 ${actionMode === 'download' ? 'text-green-600' : 'text-gray-400'}`} /></span>
               <span className={`text-sm font-medium ${actionMode === 'download' ? 'text-green-900' : 'text-gray-600'}`}>
                 Download
               </span>
@@ -274,7 +274,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
                 aria-label="Download metadata only (requires internet to load content)"
                 title="Metadata only - Content downloads on-demand (requires internet)"
               >
-                <Wifi className={`w-6 h-6 ${!includeContent ? 'text-blue-600' : 'text-gray-400'}`} title="Online mode" />
+                <span title="Online mode"><Wifi className={`w-6 h-6 ${!includeContent ? 'text-blue-600' : 'text-gray-400'}`} /></span>
                 <span className={`text-sm font-medium ${!includeContent ? 'text-blue-900' : 'text-gray-600'}`}>
                   Online
                 </span>
@@ -291,7 +291,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
                 aria-label="Include downloaded content for offline use"
                 title="Include content - Works offline but larger file size"
               >
-                <Database className={`w-6 h-6 ${includeContent ? 'text-green-600' : 'text-gray-400'}`} title="Offline mode" />
+                <span title="Offline mode"><Database className={`w-6 h-6 ${includeContent ? 'text-green-600' : 'text-gray-400'}`} /></span>
                 <span className={`text-sm font-medium ${includeContent ? 'text-green-900' : 'text-gray-600'}`}>
                   Offline
                 </span>
@@ -324,7 +324,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
             aria-label="Cancel"
             title="Cancel"
           >
-            <X className="w-4 h-4 mx-auto" title="Cancel" />
+            <span title="Cancel"><X className="w-4 h-4 mx-auto" /></span>
           </button>
           <button
             onClick={handleAction}
@@ -336,9 +336,9 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
             {processing ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" title="Processing..." />
             ) : actionMode === 'save' ? (
-              <Save className="w-5 h-5" title="Save" />
+              <span title="Save"><Save className="w-5 h-5" /></span>
             ) : (
-              <Download className="w-5 h-5" title="Download" />
+              <span title="Download"><Download className="w-5 h-5" /></span>
             )}
           </button>
         </div>
