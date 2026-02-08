@@ -5,6 +5,7 @@
 
 import { createPlugin, type MessageTypePlugin } from 'linked-panels'
 import type { EntryLinkClickSignal, ScriptureContentRequestSignal, ScriptureContentResponseSignal, ScriptureTokensBroadcastSignal, TokenClickSignal } from '../signals/studioSignals'
+import { useStudyStore } from '../store/studyStore'
 import type { LinkClickEvent } from './types'
 
 /**
@@ -437,10 +438,13 @@ function isEntryLinkClickSignal(content: unknown): content is EntryLinkClickSign
 
 /**
  * Handler for entry-link-click signals
+ * Opens the entry modal when a TW/TA link is clicked (e.g. from TWL or Notes viewer)
  */
 function handleEntryLinkClick(message: any) {
   const signal = message.content as EntryLinkClickSignal
   console.log(`🔗 Entry Link Click: ${signal.link.text} (${signal.link.resourceId}#${signal.link.entryId}) from ${signal.sourceResourceId}`)
+  const resourceKey = `${signal.link.resourceId}#${signal.link.entryId}`
+  useStudyStore.getState().openModal(resourceKey)
 }
 
 /**

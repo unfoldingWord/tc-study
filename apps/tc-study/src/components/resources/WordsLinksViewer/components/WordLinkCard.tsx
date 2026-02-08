@@ -1,10 +1,12 @@
 /**
  * WordLinkCard Component
- * 
- * Individual card for a Translation Words Link
+ *
+ * Individual card for a Translation Words Link.
+ * Design matches Notes entries: quote on top, entry link on bottom with modal icon.
+ * Entry title stays more prominent than the quote.
  */
 
-import { Hash, Loader } from 'lucide-react'
+import { ExternalLink, Loader } from 'lucide-react'
 import type { TokenFilter, TranslationWordsLink } from '../types'
 import { parseTWLink } from '../utils'
 
@@ -39,63 +41,46 @@ export function WordLinkCard({
   const twInfo = parseTWLink(link.twLink)
   const isKeyTerm = twInfo.category === 'kt'
   const hasAlignedTokens = (link as any).alignedTokens && (link as any).alignedTokens.length > 0
-  
+
   // Extract resource abbreviation (e.g., "ult" from "unfoldingWord/en/ult")
-  const resourceAbbreviation = targetResourceId 
+  const resourceAbbreviation = targetResourceId
     ? targetResourceId.split('/').pop()?.toUpperCase() || ''
     : ''
-  
+
   return (
     <div
       className={`
-        group rounded-lg p-3 transition-all duration-150 border
+        group rounded-lg p-3 cursor-pointer transition-all duration-150 border
         ${isSelected
           ? 'bg-gradient-to-br from-purple-50 via-purple-50 to-indigo-50 shadow-sm border-purple-200'
           : 'bg-white hover:shadow-sm hover:border-gray-200 border-gray-100'
         }
       `}
+      onClick={hasAlignedTokens ? () => onQuoteClick(link) : undefined}
+      role="article"
+      aria-label="Translation words link"
+      title={hasAlignedTokens ? 'Click to highlight these words in scripture' : undefined}
     >
-      {/* TW Article Title - Prominent, clickable to open modal */}
-      <button
-        onClick={() => onTitleClick(link)}
-        className="w-full text-left transition-colors group/title"
-        title={`View Translation Words article: ${twTitle}`}
-      >
-        <div className="flex items-start gap-2">
-          <Hash className={`w-4 h-4 mt-1 flex-shrink-0 ${isKeyTerm ? 'text-indigo-600' : 'text-teal-600'}`} />
-          <div className="flex-1">
-            {isLoadingTitle ? (
-              <div className="flex items-center gap-2">
-                <Loader className="w-4 h-4 animate-spin text-gray-400" />
-                <span className="text-sm text-gray-500">Loading...</span>
-              </div>
-            ) : (
-              <div className={`font-semibold text-base group-hover/title:text-blue-600 transition-colors ${isKeyTerm ? 'text-indigo-900' : 'text-teal-900'}`}>
-                {twTitle}
-              </div>
-            )}
-          </div>
-        </div>
-      </button>
-      
-      {/* Target Language Quote - Clickable to broadcast/highlight tokens */}
+      {/* Quote - On top, clickable to broadcast/highlight tokens (matches Notes layout) */}
       {hasAlignedTokens && (
         <button
           onClick={(e) => {
             e.stopPropagation()
             onQuoteClick(link)
           }}
-          className="w-full text-left mt-2 px-3 py-2 bg-gradient-to-r from-purple-50/80 to-indigo-50/80 hover:from-purple-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
+          className="w-full text-left mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
           title="Click to highlight these words in scripture"
         >
-          <div className="text-base text-gray-700 leading-relaxed">
-            <span className="italic">
+          <div className="text-base leading-relaxed">
+            <span className="italic text-gray-700">
+              &ldquo;
               {(link as any).alignedTokens.map((token: AlignedToken, index: number) => (
                 <span key={token.semanticId || index}>
                   {index > 0 && ' '}
                   {token.content}
                 </span>
               ))}
+              &rdquo;
             </span>
             {resourceAbbreviation && (
               <span className="ml-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-purple-600 font-medium">
@@ -105,6 +90,30 @@ export function WordLinkCard({
           </div>
         </button>
       )}
+
+      {/* Entry Link - On bottom, with modal icon (matches Notes support reference style) */}
+      <div className="mt-2.5 pt-2.5 border-t border-gray-100/50">
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onTitleClick(link)
+          }}
+          className="flex items-center gap-1.5 w-full text-left transition-colors group/title"
+          title={`View Translation Words article: ${twTitle}`}
+        >
+          <ExternalLink className={`w-3.5 h-3.5 flex-shrink-0 ${isKeyTerm ? 'text-indigo-600' : 'text-teal-600'}`} />
+          {isLoadingTitle ? (
+            <span className="flex items-center gap-2 italic text-gray-400 text-sm">
+              <Loader className="w-3.5 h-3.5 animate-spin" />
+              Loading...
+            </span>
+          ) : (
+            <span className={`font-semibold text-base group-hover/title:text-blue-600 transition-colors ${isKeyTerm ? 'text-indigo-900' : 'text-teal-900'}`}>
+              {twTitle}
+            </span>
+          )}
+        </button>
+      </div>
     </div>
   )
 }

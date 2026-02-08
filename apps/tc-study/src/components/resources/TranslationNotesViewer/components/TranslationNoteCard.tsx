@@ -123,7 +123,12 @@ export function TranslationNoteCard({
           : 'bg-white hover:shadow-sm hover:border-gray-200 border-gray-100'
         }
       `}
-      onClick={onClick}
+      onClick={() => {
+        onClick()
+        if (hasAlignedTokens && onQuoteClick) {
+          onQuoteClick()
+        }
+      }}
       role="article"
       aria-label="Translation note"
     >
@@ -141,6 +146,7 @@ export function TranslationNoteCard({
         >
           <div className="text-base leading-relaxed" dir={languageDirection}>
             <span className="italic text-gray-700">
+              &ldquo;
               {note.alignedTokens!.map((token, index) => {
                 // For whitespace and text tokens, render them as-is (they already contain their spacing)
                 if (token.type === 'whitespace' || token.type === 'text') {
@@ -170,6 +176,7 @@ export function TranslationNoteCard({
                   </span>
                 )
               })}
+              &rdquo;
             </span>
             {resourceAbbreviation && (
               <span className="ml-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
@@ -211,7 +218,7 @@ export function TranslationNoteCard({
 
       {/* Support Reference - Link to Translation Academy */}
       {note.supportReference && note.supportReference.startsWith('rc://') && (
-        <div className="mt-2.5 pt-2.5 border-t border-gray-100/50">
+        <div className="mt-2.5 pt-2.5 border-t border-gray-100/50" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={(e) => {
               e.stopPropagation()
