@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { AdminPanel } from './components/dev/AdminPanel'
 import Layout from './components/Layout'
+import { ReadPageSkeleton } from './components/read/ReadPageSkeleton'
 import { ResourceTypeInitializer } from './components/ResourceTypeInitializer'
 import { NavigationProvider } from './contexts/NavigationContext'
 // import { NavigationBridgeProvider } from './providers/NavigationBridgeProvider'
@@ -113,8 +114,8 @@ function App() {
               <Route path="collections" element={<Suspense fallback={<PageLoader />}><Collections /></Suspense>} />
               <Route path="passage-sets" element={<Suspense fallback={<PageLoader />}><PassageSets /></Suspense>} />
               <Route path="studio" element={<Suspense fallback={<PageLoader />}><Studio /></Suspense>} />
-              <Route path="read" element={<Suspense fallback={<PageLoader />}><Read /></Suspense>} />
-              <Route path="read/:languageCode" element={<Suspense fallback={<PageLoader />}><Read /></Suspense>} />
+              <Route path="read" element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>} />
+              <Route path="read/:languageCode" element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>} />
               <Route path="test/panels" element={<Suspense fallback={<PageLoader />}><PanelSystemTest /></Suspense>} />
               <Route path="data" element={<Suspense fallback={<PageLoader />}><DataManagement /></Suspense>} />
               <Route path="settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />

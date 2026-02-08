@@ -1204,10 +1204,16 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
                         onMouseLeave={swipeHandlers.onMouseLeave}
                       >
                         {current.resource?.component || (
-                          <EmptyPanelState
-                            panelId="panel-1"
-                            message="Select a language to load resources"
-                          />
+                          isLoadingResources ? (
+                            <div className="h-full flex items-center justify-center" role="status" aria-label="Loading resources">
+                              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                            </div>
+                          ) : (
+                            <EmptyPanelState
+                              panelId="panel-1"
+                              message="Select a language to load resources"
+                            />
+                          )
                         )}
                       </div>
                     </div>
@@ -1309,10 +1315,16 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
                         onMouseLeave={swipeHandlers.onMouseLeave}
                       >
                         {current.resource?.component || (
-                          <EmptyPanelState
-                            panelId="panel-2"
-                            message="Select a language to load resources"
-                          />
+                          isLoadingResources ? (
+                            <div className="h-full flex items-center justify-center" role="status" aria-label="Loading resources">
+                              <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+                            </div>
+                          ) : (
+                            <EmptyPanelState
+                              panelId="panel-2"
+                              message="Select a language to load resources"
+                            />
+                          )
                         )}
                       </div>
                     </div>
@@ -1330,15 +1342,6 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
       {/* Navigation Bar with Language Picker - MOVED TO BOTTOM */}
       {navState === 'compact' && (
         <div className="flex-shrink-0 flex flex-col">
-          {isLoadingResources && (
-            <div 
-              className="flex items-center justify-center px-4 py-1.5 bg-blue-50 border-t border-blue-100/50"
-              role="status"
-              aria-label="Loading resources"
-            >
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-            </div>
-          )}
           <div className="flex items-center bg-white border-t border-gray-100/50 px-2 py-1.5">
             <NavigationBar 
               isCompact={true}

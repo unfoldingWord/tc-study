@@ -26,10 +26,13 @@ export function ResourceTypeInitializer() {
           translationQuestionsResourceType
         } = await import('../resourceTypes')
         
-        registry.register(scriptureResourceType)
-        registry.register(translationWordsLinksResourceType)
-        registry.register(translationNotesResourceType)
-        registry.register(translationQuestionsResourceType)
+        const registerIfNew = (def: { id: string }) => {
+          if (!registry.has(def.id)) registry.register(def as any)
+        }
+        registerIfNew(scriptureResourceType)
+        registerIfNew(translationWordsLinksResourceType)
+        registerIfNew(translationNotesResourceType)
+        registerIfNew(translationQuestionsResourceType)
         
         // TESTING: Register TW and TA without viewers (modal-only resources)
         // We create modified versions that only have the loader, no viewer
@@ -40,14 +43,14 @@ export function ResourceTypeInitializer() {
           ...translationWordsResourceType,
           viewer: undefined // Remove viewer so it won't appear as a tab
         }
-        registry.register(twModalOnly)
+        registerIfNew(twModalOnly)
         
         // Translation Academy (modal-only)
         const taModalOnly = {
           ...translationAcademyResourceType,
           viewer: undefined // Remove viewer so it won't appear as a tab
         }
-        registry.register(taModalOnly)
+        registerIfNew(taModalOnly)
         
         console.log('📦 [Initializer] ✅ Resource types registered')
         setInitialized(true)
