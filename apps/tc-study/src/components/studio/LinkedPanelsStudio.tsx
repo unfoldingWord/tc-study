@@ -1009,7 +1009,7 @@ export function LinkedPanelsStudio() {
                 onMouseDown={handlePanelDividerMouseDown}
                 onTouchStart={handlePanelDividerTouchStart}
                 className={`flex-shrink-0 transition-colors relative flex items-center justify-center ${
-                  isResizingPanels ? 'bg-blue-500' : 'bg-gray-300 hover:bg-blue-400'
+                  isResizingPanels ? 'bg-blue-500' : 'bg-gray-200 hover:bg-blue-400'
                 } md:w-1.5 md:h-full md:cursor-ew-resize w-full h-1.5 cursor-ns-resize`}
                 title="Drag to resize panels"
                 aria-label="Resize panels"
@@ -1020,13 +1020,13 @@ export function LinkedPanelsStudio() {
                 {/* Visual grip indicator - dots adapt to orientation */}
                 <div className="absolute flex gap-1 pointer-events-none md:flex-col md:left-1/2 md:-translate-x-1/2 md:top-1/2 md:-translate-y-1/2 flex-row top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2">
                   <div className={`w-1 h-1 rounded-full transition-colors ${
-                    isResizingPanels ? 'bg-white' : 'bg-gray-500'
+                    isResizingPanels ? 'bg-white' : 'bg-gray-400'
                   }`} />
                   <div className={`w-1 h-1 rounded-full transition-colors ${
-                    isResizingPanels ? 'bg-white' : 'bg-gray-500'
+                    isResizingPanels ? 'bg-white' : 'bg-gray-400'
                   }`} />
                   <div className={`w-1 h-1 rounded-full transition-colors ${
-                    isResizingPanels ? 'bg-white' : 'bg-gray-500'
+                    isResizingPanels ? 'bg-white' : 'bg-gray-400'
                   }`} />
                 </div>
               </div>

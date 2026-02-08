@@ -32,7 +32,7 @@ export function ReadPageSkeleton() {
         </div>
 
         {/* Resize Divider */}
-        <div className="flex-shrink-0 w-full md:w-1.5 h-1.5 md:h-full bg-gray-300 flex items-center justify-center" />
+        <div className="flex-shrink-0 w-full md:w-1.5 h-1.5 md:h-full bg-gray-200 flex items-center justify-center" />
 
         {/* Panel 2 */}
         <div
