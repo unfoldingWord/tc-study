@@ -46,13 +46,13 @@ export function NavigationTypeSelector({ onClose }: NavigationTypeSelectorProps)
     <>
       {/* Backdrop - transparent click-outside handler */}
       <div
-        className="fixed inset-0 top-[88px] z-40 bg-transparent"
+        className="fixed inset-0 z-40 bg-transparent"
         onClick={onClose}
       />
       
-      {/* Compact dropdown - icon only */}
+      {/* Compact dropdown - opens upward (nav bar is at bottom) */}
       <div
-        className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50"
+        className="absolute bottom-full left-0 mb-1 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50"
         onClick={(e) => e.stopPropagation()}
       >
         {navigationTypes.map(({ mode, icon: Icon, label }) => {

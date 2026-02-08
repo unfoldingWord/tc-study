@@ -423,7 +423,6 @@ export function TranslationNotesViewer({
         <ResourceViewerHeader 
           title={resource.title}
           icon={FileText}
-          subtitle={resource.languageTitle}
         />
         <div className="p-4">
         {loading ? (

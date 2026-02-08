@@ -427,7 +427,6 @@ export function WordsLinksViewer({
         <ResourceViewerHeader 
           title={resource.title}
           icon={Link}
-          subtitle={resource.languageTitle}
         />
         <div className="p-4">
         {!dependenciesReady ? (

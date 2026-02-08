@@ -490,9 +490,9 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
               {isMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
             
-            {/* Dropdown Menu */}
+            {/* Dropdown Menu - opens upward (nav bar is at bottom) */}
             {isMenuOpen && (
-              <div className="absolute top-full right-0 mt-1 w-auto bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+              <div className="absolute bottom-full right-0 mb-1 w-auto bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
                 {/* History Button - Icon Only */}
                 <button
                   onClick={() => {

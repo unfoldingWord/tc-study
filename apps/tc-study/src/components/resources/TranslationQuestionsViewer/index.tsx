@@ -184,7 +184,6 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
         <ResourceViewerHeader 
           title={resource.title}
           icon={MessageCircleQuestion}
-          subtitle={resource.languageTitle}
         />
         <div className="p-4 space-y-4">
         {Object.entries(questionsByVerse).map(([verse, verseQuestions]) => (
