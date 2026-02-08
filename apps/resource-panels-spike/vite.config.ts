@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { getSharedBuildConfig } from '../../config/vite-build'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  ...getSharedBuildConfig(),
   server: {
     port: 5174
   },

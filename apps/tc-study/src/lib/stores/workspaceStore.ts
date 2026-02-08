@@ -11,8 +11,10 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { ResourceInfo } from '../../contexts/types'
+import { useAppStore } from '../../contexts/AppContext'
 import { createResourceInfo } from '../../utils/resourceInfo'
 import { ResourceType, ResourceFormat } from '@bt-synergy/resource-catalog'
+import { usePackageStore } from './packageStore'
 
 export interface PanelConfig {
   id: string // Unique panel ID (e.g., 'panel-1', 'panel-2', 'panel-3')
@@ -266,7 +268,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       
       const allResourceKeys = Array.from(pkg.resources.keys())
       
-      const { usePackageStore } = await import('./packageStore')
       const packageStore = usePackageStore.getState()
       
       // Check if a collection with this name already exists
@@ -363,7 +364,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     
     // Load a collection into workspace
     loadFromCollection: async (packageId: string) => {
-      const { usePackageStore } = await import('./packageStore')
       const packageStore = usePackageStore.getState()
       
       const collection = packageStore.getPackage(packageId)
@@ -529,7 +529,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         
         // Load all panel resources into AppStore.loadedResources so they can be rendered
         // This is critical: workspace restoration loads the package metadata, but doesn't load resources for rendering
-        const { useAppStore } = await import('../../contexts/AppContext')
         const addResourceToApp = useAppStore.getState().addResource
         
         // Collect all unique resource IDs from all panels

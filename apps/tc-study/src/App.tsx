@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { AdminPanel } from './components/dev/AdminPanel'
 import Layout from './components/Layout'
 import { ResourceTypeInitializer } from './components/ResourceTypeInitializer'
@@ -43,7 +44,6 @@ function App() {
       // Load Door43 languages for language name lookups throughout the app
       const loadLanguages = async () => {
         try {
-          const { getDoor43ApiClient } = await import('@bt-synergy/door43-api')
           const client = getDoor43ApiClient()
           const languages = await client.getLanguages({ stage: 'prod' })
           

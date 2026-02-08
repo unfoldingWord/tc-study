@@ -14,7 +14,7 @@ import { AlertCircle, ArrowLeft, BookOpen, Check, Hash, List, X } from 'lucide-r
 import { useEffect, useRef, useState } from 'react'
 import { useAvailableBooks, useCurrentSectionIndex, useNavigation, useNavigationMode, type BCVReference } from '../../contexts'
 import { useAnchorResource, useAppStore } from '../../contexts/AppContext'
-import { getDefaultSections } from '../../lib/default-sections'
+import { getDefaultSections } from '../../lib/data/default-sections'
 import { getBookTitle } from '../../utils/bookNames'
 
 interface BCVNavigatorProps {

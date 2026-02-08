@@ -17,7 +17,8 @@
     "deploy": "bash scripts/deploy.sh",
     "deploy:quick": "bun run build:skip-check && bunx wrangler pages deploy dist --project-name=tc-study",
     "deploy:cf": "bash scripts/deploy.sh",
-    "build:skip-check": "vite build"
+    "build:skip-check": "vite build",
+    "build:analyze": "bunx vite-bundle-visualizer -t treemap -o dist/stats.html --open true"
   },
   "dependencies": {
     "-": "^0.0.1",

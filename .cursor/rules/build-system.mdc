@@ -30,8 +30,11 @@ yarn add package-name
 The project uses Turborepo for efficient builds across packages.
 
 ```bash
-# Build all packages and apps
+# Build all packages and apps (minified, production)
 bun run build
+
+# Build with minification disabled (easier debugging of bundled code)
+bun run build:debug
 
 # Build specific package
 bun run build --filter=@bt-synergy/package-name
@@ -39,6 +42,13 @@ bun run build --filter=@bt-synergy/package-name
 # Development mode (watch)
 bun run dev
 ```
+
+## Shared Build Config
+
+Minification and build options are controlled from `config/vite-build.ts`. All Vite apps use `getSharedBuildConfig()`.
+
+- **Normal build**: `minify: true` (smaller bundles)
+- **Debug build**: `bun run build:debug` sets `DEBUG_BUILD=1`, disabling minification for easier debugging
 
 ## Important Notes
 

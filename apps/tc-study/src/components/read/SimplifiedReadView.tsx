@@ -29,6 +29,7 @@ import { CheckCircle2, Loader2, Package, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ResourceType, ResourceFormat } from '@bt-synergy/resource-catalog'
+import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useCacheAdapter, useCatalogManager, useCompletenessChecker, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
@@ -406,7 +407,6 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         }
       }
 
-      const { getDoor43ApiClient } = await import('@bt-synergy/door43-api')
       const door43Client = getDoor43ApiClient()
       
       // Search for all tc-ready resources for this language (any owner).
@@ -517,7 +517,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         const basicResourceInfo: ResourceInfo = {
           id: resourceKey,
           key: resourceKey,
-          resourceKey: resourceKey, // Required for createResourceInfo
+          resourceKey: resourceKey,
           title: item.title ?? entry.title ?? resourceKey,
           type,
           category: subject || 'Unknown',
@@ -529,10 +529,14 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           resourceId: resourceId,
           server: 'git.door43.org',
           format,
+          contentType: format === ResourceFormat.USFM ? 'text/usfm' : 'text/markdown',
           contentStructure: (subject.toLowerCase().includes('bible') ? 'book' : 'entry') as 'book' | 'entry',
           version: item.release?.tag_name ?? '1.0',
           description: item.description ?? item.repo?.description,
           release: item.release ?? item.catalog?.prod,
+          availability: { online: true, offline: false, bundled: false, partial: false },
+          locations: [],
+          catalogedAt: new Date().toISOString(),
         }
         
         // Add to workspace immediately
@@ -653,7 +657,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         const basicResourceInfo: ResourceInfo = {
           id: resourceKey,
           key: resourceKey,
-          resourceKey: resourceKey, // Required for createResourceInfo
+          resourceKey: resourceKey,
           title: orig.label,
           type: ResourceType.SCRIPTURE,
           category: 'Bible',
@@ -665,8 +669,12 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           resourceId: orig.id,
           server: 'git.door43.org',
           format: ResourceFormat.USFM,
+          contentType: 'text/usfm',
           contentStructure: 'book',
           version: '1.0',
+          availability: { online: true, offline: false, bundled: false, partial: false },
+          locations: [],
+          catalogedAt: new Date().toISOString(),
         }
         
         // Add to workspace immediately
@@ -750,7 +758,6 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           const collectionName = `${languageCode}_tc-helps`
           console.log(`📦 Creating collection: ${collectionName}`)
           
-          const { useWorkspaceStore } = await import('../../lib/stores/workspaceStore')
           const workspaceStore = useWorkspaceStore.getState()
           
           await workspaceStore.saveAsCollection(
@@ -1342,7 +1349,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
               downloadIndicator={
                 <DownloadIndicator 
                   isDownloading={isBackgroundDownloading}
-                  progress={downloadStats.progress}
+                  progress={downloadStats.progress ?? undefined}
                 />
               }
               onDownloadCollection={isCollectionFullyCached ? handleDirectDownloadCollection : undefined}

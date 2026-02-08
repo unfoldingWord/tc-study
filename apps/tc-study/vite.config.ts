@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { defineConfig } from 'vite'
 import checker from 'vite-plugin-checker'
+import { getSharedBuildConfig } from '../../config/vite-build'
 
 export default defineConfig({
   plugins: [
@@ -27,19 +28,7 @@ export default defineConfig({
   optimizeDeps: {
     include: ['linked-panels'],
   },
-  esbuild: {
-    minify: false,
-    drop: [],
-  },
-  build: {
-    sourcemap: true,
-    minify: false,
-    rollupOptions: {
-      output: {
-        compact: false,
-      },
-    },
-  },
+  ...getSharedBuildConfig(),
   server: {
     port: 3000,
     open: true,

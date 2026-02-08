@@ -9,12 +9,14 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "build:debug": "cross-env DEBUG_BUILD=1 turbo run build",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "mobile": "bun --cwd apps/mobile dev",
     "web": "bun --cwd apps/web dev"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "turbo": "latest"
   },
   "packageManager": "bun@1.0.0",
