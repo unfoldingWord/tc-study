@@ -39,6 +39,21 @@
 }
 
 @layer utilities {
+  /*
+   * Dynamic viewport height: accounts for mobile browser UI (address bar, nav bar).
+   * 100dvh = visible viewport; avoids needing to scroll to see bottom nav on phones.
+   * Fallback to 100vh for older browsers.
+   */
+  .h-dynamic-screen {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .min-h-dynamic-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
   /* Line clamp utilities */
   .line-clamp-1 {
     display: -webkit-box;

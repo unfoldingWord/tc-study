@@ -27,7 +27,7 @@ export default function Layout() {
   const isReadPage = location.pathname.startsWith('/read')
 
   return (
-    <div className="flex h-screen flex-col bg-gray-50 overflow-hidden">
+    <div className="flex h-dynamic-screen flex-col bg-gray-50 overflow-hidden">
       {!isReadPage && (
       <header className="flex-shrink-0 border-b border-gray-100 bg-white/80 backdrop-blur-sm relative z-[110]">
         <nav className="flex items-center justify-between px-3 py-1.5">
