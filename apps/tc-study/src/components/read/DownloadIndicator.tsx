@@ -72,9 +72,9 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
         )}
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown - opens upward (nav bar is at bottom) */}
       {isOpen && (
-        <div className="absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 p-3 min-w-[280px] z-50">
+        <div className="absolute bottom-full right-0 mb-1 bg-white rounded-lg shadow-lg border border-gray-200 p-3 min-w-[280px] z-50">
           {/* Header */}
           <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
             <Download className="w-4 h-4 text-gray-600" />

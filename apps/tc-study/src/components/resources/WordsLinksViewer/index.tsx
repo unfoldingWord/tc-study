@@ -112,8 +112,8 @@ export function WordsLinksViewer({
     }
     checkCatalog()
     
-    // Recheck periodically
-    const interval = setInterval(checkCatalog, 1000)
+    // Recheck periodically (slower to avoid re-render thrashing)
+    const interval = setInterval(checkCatalog, 5000)
     return () => clearInterval(interval)
   }, [catalogManager])
   

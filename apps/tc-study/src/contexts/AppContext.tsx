@@ -26,6 +26,8 @@ interface AppState {
 interface AppActions {
   setAnchorResource: (resourceId: string, toc: ResourceInfo['toc']) => void
   addResource: (resource: ResourceInfo) => void
+  /** Batch update: one store write so one re-render when e.g. Phase 2 metadata is cached. */
+  addResources: (resources: ResourceInfo[]) => void
   removeResource: (resourceId: string) => void
   getResource: (resourceId: string) => ResourceInfo | undefined
   getAnchorResource: () => ResourceInfo | undefined
@@ -85,6 +87,15 @@ export const useAppStore = create<AppStore>()(
         state.loadedResources[resource.id] = resource
       })
       // Resource added (removed verbose logging)
+    },
+
+    addResources: (resources: ResourceInfo[]) => {
+      if (resources.length === 0) return
+      set((state) => {
+        for (const resource of resources) {
+          state.loadedResources[resource.id] = resource
+        }
+      })
     },
 
     removeResource: (resourceId: string) => {

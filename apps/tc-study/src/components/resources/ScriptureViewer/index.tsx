@@ -72,7 +72,7 @@ export function ScriptureViewer({
   }, [resourceKey, catalogManager])
 
   // Load TOC and available books
-  const { availableBooks, setAsAnchor } = useTOC(resourceKey, resourceId, isAnchor)
+  const { availableBooks, isLoadingTOC, setAsAnchor } = useTOC(resourceKey, resourceId, isAnchor)
 
   // Auto-set as anchor whenever this scripture resource becomes active (when user switches tabs)
   // This ensures the navigation updates to show the current scripture resource's books
@@ -191,6 +191,7 @@ export function ScriptureViewer({
         <div className="flex-1">
           <ScriptureContent
           isLoading={isLoading}
+          isLoadingTOC={isLoadingTOC}
           error={error}
           loadedContent={loadedContent}
           availableBooks={availableBooks}

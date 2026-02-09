@@ -13,10 +13,6 @@
  * @returns Book title (e.g., "Genesis", "Matthew") or uppercase book code as fallback
  */
 export function getBookTitle(metadata: any | null | undefined, bookCode: string): string {
-  console.log(`[BOOK-TITLE] getBookTitle called for bookCode: "${bookCode}"`)
-  console.log(`[BOOK-TITLE] metadata object:`, metadata)
-  console.log(`[BOOK-TITLE] metadata keys:`, metadata ? Object.keys(metadata) : 'null/undefined')
-  
   // Try multiple possible locations for ingredients
   // ResourceInfo has it at top level: resource.ingredients
   // ResourceMetadata has it nested: resource.contentMetadata.ingredients

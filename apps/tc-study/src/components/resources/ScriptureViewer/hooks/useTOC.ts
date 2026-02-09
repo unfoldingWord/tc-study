@@ -18,11 +18,13 @@ export function useTOC(
   const navigation = useNavigation()
   const [availableBooks, setAvailableBooks] = useState<BookInfo[]>([])
   const [loadedTOC, setLoadedTOC] = useState<ResourceTOC | null>(null)
+  const [isLoadingTOC, setIsLoadingTOC] = useState(true) // true until first metadata load completes
   const tocSetRef = useRef(false) // Track if TOC has been set to prevent infinite loops
   const [catalogCheckTrigger, setCatalogCheckTrigger] = useState(0)
   const metadataCheckIntervalRef = useRef<number>()
 
-  // Poll catalog until metadata is available (for Phase 2 background loading)
+  // Poll catalog until metadata is available (for Phase 2 background loading).
+  // Only start polling after initial TOC load has completed with no books, to avoid overlapping work and re-render thrashing.
   useEffect(() => {
     const checkForMetadata = async () => {
       try {
@@ -30,8 +32,6 @@ export function useTOC(
         if (metadata?.contentMetadata?.ingredients && metadata.contentMetadata.ingredients.length > 0) {
           // Metadata is available! Trigger TOC reload
           setCatalogCheckTrigger(prev => prev + 1)
-          
-          // Stop polling
           if (metadataCheckIntervalRef.current) {
             clearInterval(metadataCheckIntervalRef.current)
             metadataCheckIntervalRef.current = undefined
@@ -41,36 +41,29 @@ export function useTOC(
         // Ignore errors during polling
       }
     }
-    
-    // Start polling if we don't have books yet
-    if (availableBooks.length === 0) {
-      checkForMetadata() // Check immediately
-      metadataCheckIntervalRef.current = window.setInterval(checkForMetadata, 1000)
+
+    // Only poll when initial load is done and we still have no books (5s interval to reduce thrashing)
+    if (!isLoadingTOC && availableBooks.length === 0) {
+      checkForMetadata()
+      metadataCheckIntervalRef.current = window.setInterval(checkForMetadata, 5000)
     }
-    
+
     return () => {
       if (metadataCheckIntervalRef.current) {
         clearInterval(metadataCheckIntervalRef.current)
       }
     }
-  }, [resourceKey, catalogManager, availableBooks.length])
+  }, [resourceKey, catalogManager, availableBooks.length, isLoadingTOC])
 
   useEffect(() => {
     let cancelled = false
 
     const loadTOC = async () => {
+      setIsLoadingTOC(true)
       try {
         // Get resource metadata to find available books
         const metadata = await catalogManager.getResourceMetadata(resourceKey)
         
-        console.log('[useTOC] Retrieved metadata for', resourceKey, {
-          hasMetadata: !!metadata,
-          hasContentMetadata: !!metadata?.contentMetadata,
-          hasIngredients: !!metadata?.contentMetadata?.ingredients,
-          ingredientsCount: metadata?.contentMetadata?.ingredients?.length || 0,
-          sample: metadata?.contentMetadata?.ingredients?.slice(0, 3)
-        })
-
         if (cancelled) return
 
         if (metadata && metadata.contentMetadata?.ingredients) {
@@ -152,6 +145,10 @@ export function useTOC(
         console.error('❌ Error loading TOC:', err)
         setAvailableBooks([])
         setLoadedTOC(null)
+      } finally {
+        if (!cancelled) {
+          setIsLoadingTOC(false)
+        }
       }
     }
 
@@ -186,7 +183,7 @@ export function useTOC(
     }
   }
 
-  return { availableBooks, setAsAnchor }
+  return { availableBooks, isLoadingTOC, setAsAnchor }
 }
 
 

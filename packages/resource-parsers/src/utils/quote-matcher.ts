@@ -270,17 +270,8 @@ export class QuoteMatcher {
         .map(token => this.normalizeText(token.text))
         .join(' ');
       
-      console.log('🔍 [QuoteMatcher] Searching in verse:', {
-        verseNumber: verse.number,
-        verseText,
-        lookingFor: normalizedQuote,
-        occurrence
-      })
-      
       // Find all occurrences of the quote in this verse
       const matches = this.findQuoteOccurrencesInText(verseText, normalizedQuote);
-      
-      console.log('🔍 [QuoteMatcher] Found matches:', matches.length)
       
       for (const match of matches) {
         // Skip matches that are before our start position (for sequential quote matching)
@@ -293,13 +284,6 @@ export class QuoteMatcher {
         if (foundOccurrences === occurrence) {
           // Found the target occurrence, extract tokens
           const tokens = this.extractTokensForMatch(verse, match.start, match.end);
-          
-          console.log('🔍 [QuoteMatcher] Found target occurrence:', {
-            occurrence: foundOccurrences,
-            matchStart: match.start,
-            matchEnd: match.end,
-            extractedTokens: tokens.map(t => t.text).join(' ')
-          })
           
           return {
             quote,
@@ -328,13 +312,6 @@ export class QuoteMatcher {
       return matches;
     }
     
-    console.log('🔍 [findQuoteOccurrencesInText]', {
-      text,
-      quote,
-      textLength: text.length,
-      quoteLength: quote.length
-    })
-    
     // Try exact substring matching first
     let startIndex = 0;
     while (true) {
@@ -345,12 +322,6 @@ export class QuoteMatcher {
         start: index,
         end: index + quote.length
       });
-      
-      console.log('🔍 [findQuoteOccurrencesInText] Found exact match at:', {
-        start: index,
-        end: index + quote.length,
-        matchedText: text.substring(index, index + quote.length)
-      })
       
       startIndex = index + 1;
     }
@@ -437,13 +408,6 @@ export class QuoteMatcher {
     // Track occurrence counts for each word in the verse (up to current position)
     const occurrenceCounts = new Map<string, number>();
     
-    console.log('🔍 [extractTokensForMatch] Extracting:', {
-      startPos,
-      endPos,
-      wordTokensCount: wordTokens.length,
-      firstFewTokens: wordTokens.slice(0, 10).map(t => this.normalizeText(t.text)).join(' ')
-    })
-    
     for (let i = 0; i < wordTokens.length; i++) {
       const token = wordTokens[i];
       const tokenText = this.normalizeText(token.text);
@@ -463,23 +427,12 @@ export class QuoteMatcher {
           ...token,
           occurrence, // Add the verse-wide occurrence number
         });
-        console.log('🔍 [extractTokensForMatch] Token matched:', {
-          index: i,
-          text: token.text,
-          normalized: tokenText,
-          occurrence, // Log the occurrence
-          tokenStart,
-          tokenEnd,
-          matchRange: `${startPos}-${endPos}`
-        })
       }
       
       // Move to next token position
       // Add token length + 1 for space (except after last token)
       currentPos = tokenEnd + (i < wordTokens.length - 1 ? 1 : 0);
     }
-    
-    console.log('🔍 [extractTokensForMatch] Final tokens:', tokens.map(t => `${t.text}:${t.occurrence}`).join(' '))
     
     return tokens;
   }

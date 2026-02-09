@@ -42,25 +42,10 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
   // Build quoteTokens for each link
   // Only process links in the current chapter range to optimize performance
   const linksWithQuotes = useMemo(() => {
-    console.log('🔍 [useQuoteTokens] Memo running:', {
-      hasOriginalContent: !!originalContent,
-      originalContentLength: originalContent?.length || 0,
-      linksCount: links.length,
-      loadingOriginal,
-      hasError: !!originalError
-    })
-    
     // Don't build quotes if content isn't loaded yet or if we have no links
     if (!originalContent || originalContent.length === 0 || links.length === 0) {
-      console.log('🔍 [useQuoteTokens] Early exit:', {
-        hasOriginalContent: !!originalContent && originalContent.length > 0,
-        originalContentLength: originalContent?.length || 0,
-        linksCount: links.length
-      })
       return links
     }
-    
-    console.log('🔍 [useQuoteTokens] Building quotes for', links.length, 'links')
     
     // Use uppercase for QuoteMatcher (bt-studio format), but lowercase for semantic IDs
     const bookCode = currentRef.book?.toUpperCase() || ''

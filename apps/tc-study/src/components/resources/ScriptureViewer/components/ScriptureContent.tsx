@@ -11,6 +11,7 @@ import { VerseRenderer } from './VerseRenderer'
 
 interface ScriptureContentProps {
   isLoading: boolean
+  isLoadingTOC?: boolean
   error: string | null
   loadedContent: any
   availableBooks: BookInfo[]
@@ -25,6 +26,7 @@ interface ScriptureContentProps {
 
 export function ScriptureContent({
   isLoading,
+  isLoadingTOC = false,
   error,
   loadedContent,
   availableBooks,
@@ -77,7 +79,11 @@ export function ScriptureContent({
   useEffect(() => {
     lastScrolledTokenRef.current = null
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
-  if (isLoading) {
+  // Show full-screen loading only when we have no content yet (initial load).
+  // When we already have content and isLoading flips (e.g. token click triggers a refetch),
+  // keep showing the current content to avoid the spinner replacing the text.
+  const showFullScreenLoading = (isLoadingTOC || isLoading) && !loadedContent
+  if (showFullScreenLoading) {
     return (
       <div 
         className="flex items-center justify-center py-12"

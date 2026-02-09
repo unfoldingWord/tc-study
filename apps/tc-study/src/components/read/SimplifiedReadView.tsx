@@ -57,6 +57,65 @@ import { NavigationBar } from '../studio/NavigationBar'
 import { PanelHeader } from '../studio/PanelHeader'
 import { DownloadIndicator } from './DownloadIndicator'
 
+/** Set to false to re-enable automatic background downloads (disabled for debugging). */
+const DISABLE_BACKGROUND_DOWNLOAD = true
+
+/**
+ * Renders a panel resource by id. Subscribes only to loadedResources[resourceId],
+ * so metadata updates for other resources do not cause this panel to re-render.
+ * Used to keep panelConfig stable when loadedResources changes.
+ */
+function ResourcePanelByKey({
+  resourceId,
+  viewerRegistry,
+  onEntryLinkClick,
+}: {
+  resourceId: string
+  viewerRegistry: ReturnType<typeof useViewerRegistry>
+  onEntryLinkClick: (resourceId: string, entryId?: string) => void
+}) {
+  const resource = useAppStore((s) => s.loadedResources[resourceId])
+  if (!resource) {
+    return (
+      <div className="h-full flex items-center justify-center" role="status" aria-label="Loading resource">
+        <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+      </div>
+    )
+  }
+  const resourceKey = resource.key || resource.id
+  const resourceMetadata = {
+    type: resource.type,
+    subject: resource.subject,
+    resourceId: resource.id,
+    key: resourceKey,
+    title: resource.title,
+    language: resource.language,
+    owner: resource.owner,
+  } as any
+  let ViewerComponent = viewerRegistry.getViewer(resourceMetadata)
+  if (!ViewerComponent && resource.type) {
+    ViewerComponent = viewerRegistry.getViewerByType(resource.type)
+  }
+  if (ViewerComponent) {
+    const viewerProps: any = {
+      resourceId: resource.id,
+      resourceKey,
+      resource,
+    }
+    if (resource.type === 'words' || resource.type === 'words-links' || resource.category === 'words-links' || resource.type === 'twl' || resource.type === 'academy' || resource.type === 'ta' || resource.type === 'tn' || resource.type === 'notes') {
+      viewerProps.onEntryLinkClick = onEntryLinkClick
+    }
+    return <ViewerComponent {...viewerProps} />
+  }
+  return (
+    <FallbackViewer
+      resourceId={resource.id}
+      resourceKey={resourceKey}
+      resourceType={resource.type}
+    />
+  )
+}
+
 interface SimplifiedReadViewProps {
   initialLanguage?: string
 }
@@ -374,7 +433,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     onStartDownload: startDownload,
     catalogTrigger: `${Object.keys(loadedResources).length}-${metadataUpdateCounter}`, // Reacts to resource count AND metadata changes
     expectedResources, // ✅ List of resources expected from catalog search
-    enabled: !isLoadingResources && Object.keys(loadedResources).length > 0, // Wait for UI to be ready
+    enabled: !DISABLE_BACKGROUND_DOWNLOAD && !isLoadingResources && Object.keys(loadedResources).length > 0, // Wait for UI to be ready
     debug: true,
   })
   
@@ -562,13 +621,14 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
       
       console.log(`⚡ Phase 1 complete: ${loadedResourceKeys.length} resources in UI`)
       
-      // ✅ PHASE 2: Fetch metadata in background (simpler - just fetch and save to catalog)
+      // ✅ PHASE 2: Fetch metadata in background. When cached, catalog reads are fast;
+      // we batch store updates so one addResources() = one re-render instead of N.
       console.log(`🔄 Phase 2: Fetching metadata for ${catalogResults.length} resources in background...`)
-      const metadataPromises = catalogResults.map(async (entry) => {
+      const metadataPromises = catalogResults.map(async (entry): Promise<ResourceInfo | null> => {
         const item = entry.repo ? { ...entry, ...entry.repo } : entry
         const repoName = item.name ?? item.repo_name
         if (!repoName || typeof repoName !== 'string') {
-          return
+          return null
         }
         
         const owner = typeof item.owner === 'string' ? item.owner : (item.owner?.login ?? item.owner?.username ?? entry.owner)
@@ -582,10 +642,10 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         const subject = String((Array.isArray(subjectRaw) ? subjectRaw[0] : subjectRaw) ?? '').trim()
         const type = resourceTypeRegistry.getTypeForSubject(subject)
         
-        if (!type) return
+        if (!type) return null
         
         const release = item.release ?? item.catalog?.prod
-        if (!release?.tag_name) return
+        if (!release?.tag_name) return null
         
         try {
           const door43Resource = {
@@ -617,30 +677,21 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           await catalogManager.addResourceToCatalog(metadata)
           console.log(`📊 Metadata loaded and saved: ${resourceKey}`)
           
-          // ⭐ Update the ResourceInfo in loadedResources with full metadata (including ingredients)
           const existingResource = useAppStore.getState().loadedResources[resourceKey]
           if (existingResource) {
-            const updatedResource = {
+            return {
               ...existingResource,
-              ...metadata, // Spread full metadata (includes contentMetadata.ingredients)
-              // Preserve app-specific fields that might have been set
+              ...metadata,
               id: existingResource.id,
               key: existingResource.key,
               toc: existingResource.toc,
             }
-            useAppStore.getState().addResource(updatedResource)
           }
-          
-          // ✅ Notify background download monitor that metadata changed
-          setMetadataUpdateCounter(prev => prev + 1)
+          return null
         } catch (error) {
           console.warn(`⚠️ Failed to load metadata for ${resourceKey}:`, error)
+          return null
         }
-      })
-      
-      // Wait for all metadata to complete
-      Promise.allSettled(metadataPromises).then(() => {
-        console.log(`✅ Phase 2 complete: Catalog metadata loaded for target language resources`)
       })
       
       // ✅ Add original language resources immediately
@@ -691,7 +742,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
       
       // Fetch metadata for original resources in background
       console.log('🔄 Fetching metadata for original language resources in background...')
-      const originalMetadataPromises = originalResources.map(async (orig) => {
+      const originalMetadataPromises = originalResources.map(async (orig): Promise<ResourceInfo | null> => {
         const resourceKey = `unfoldingWord/${orig.lang}/${orig.id}`
         try {
           let catalogEntry = await catalogManager.catalogAdapter.get(resourceKey)
@@ -726,31 +777,36 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
               await catalogManager.addResourceToCatalog(metadata)
               console.log(`📊 Metadata loaded for original: ${resourceKey}`)
               
-              // ⭐ Update the ResourceInfo in loadedResources with full metadata (including ingredients)
               const existingResource = useAppStore.getState().loadedResources[resourceKey]
               if (existingResource) {
-                const updatedResource = {
+                return {
                   ...existingResource,
-                  ...metadata, // Spread full metadata (includes contentMetadata.ingredients)
-                  // Preserve app-specific fields that might have been set
+                  ...metadata,
                   id: existingResource.id,
                   key: existingResource.key,
                   toc: existingResource.toc,
                 }
-                useAppStore.getState().addResource(updatedResource)
               }
-              
-              // ✅ Notify background download monitor that metadata changed
-              setMetadataUpdateCounter(prev => prev + 1)
             }
           }
         } catch (error) {
           console.warn(`⚠️ Failed to load metadata for ${resourceKey}:`, error)
         }
+        return null
       })
       
-      // Log completion and create collection
-      Promise.allSettled([...metadataPromises, ...originalMetadataPromises]).then(async () => {
+      // One batched store update when all metadata is ready (cached = fast, one re-render)
+      Promise.allSettled([...metadataPromises, ...originalMetadataPromises]).then(async (results) => {
+        const toAdd: ResourceInfo[] = []
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value) {
+            toAdd.push(result.value)
+          }
+        }
+        if (toAdd.length > 0) {
+          useAppStore.getState().addResources(toAdd)
+          setMetadataUpdateCounter((prev) => prev + toAdd.length)
+        }
         console.log(`✅ All metadata loading complete for ${languageCode}`)
         
         // Create a collection with all loaded resources for this language
@@ -1018,69 +1074,39 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     openModal(resourceKey)
   }, [openModal])
   
-  // Generate resource component dynamically using ViewerRegistry
-  const generateResourceComponent = useCallback((resource: any) => {
-    const resourceKey = resource.key || resource.id
-    
-    const resourceMetadata = {
-      type: resource.type,
-      subject: resource.subject,
-      resourceId: resource.id,
-      key: resourceKey,
-      title: resource.title,
-      language: resource.language,
-      owner: resource.owner,
-    } as any
-    
-    let ViewerComponent = viewerRegistry.getViewer(resourceMetadata)
-    
-    if (!ViewerComponent && resource.type) {
-      ViewerComponent = viewerRegistry.getViewerByType(resource.type)
-    }
-    
-    if (ViewerComponent) {
-      const viewerProps: any = {
-        resourceId: resource.id,
-        resourceKey: resourceKey,
-        // Pass full resource object - top-level fields are source of truth
-        resource: resource,
-      }
-      
-      // Add onEntryLinkClick for entry-organized resources
-      if (resource.type === 'words' || resource.type === 'words-links' || resource.category === 'words-links' || resource.type === 'twl' || resource.type === 'academy' || resource.type === 'ta' || resource.type === 'tn' || resource.type === 'notes') {
-        viewerProps.onEntryLinkClick = handleOpenEntry
-      }
-      
-      return <ViewerComponent {...viewerProps} />
-    } else {
-      return (
-        <FallbackViewer
-          resourceId={resource.id}
-          resourceKey={resourceKey}
-          resourceType={resource.type}
-        />
-      )
-    }
-  }, [viewerRegistry, handleOpenEntry])
-  
-  // Build panel config (matches Studio exactly)
+  // Build panel config (matches Studio exactly).
+  //
+  // Re-render cascade (why notes viewer re-renders a lot and Scripture "waits" for TN):
+  // - This view subscribes to loadedResources. Every addResource/setAnchorResource (Phase 2
+  //   metadata, TOC load) updates the store → SimplifiedReadView re-renders.
+  // - panelConfig used to depend on loadedResources and generateResourceComponent, so every
+  //   re-render produced a new config object and new component elements.
+  // - LinkedPanelsContainer then updates the linked-panels store → both panels (Scripture
+  //   and TN) re-render. So both keep re-rendering until the stream of store updates stops.
+  // - TN also re-renders from its own async state (notes, TA titles, dependencies).
+  //
+  // Stabilization: we use ResourcePanelByKey so config does NOT depend on loadedResources.
+  // Each panel resource is rendered by a wrapper that subscribes to only its own
+  // loadedResources[id]; when metadata loads, only that wrapper re-renders, not the whole
+  // container. So panelConfig deps are only panel keys and active indices.
+  const allResourceIds = useMemo(
+    () => [...new Set([...panel1ResourceKeys, ...panel2ResourceKeys])],
+    [panel1ResourceKeys, panel2ResourceKeys]
+  )
   const panelConfig: LinkedPanelsConfig = useMemo(() => {
-    const allResourceIds = [...new Set([...panel1ResourceKeys, ...panel2ResourceKeys])]
-    
-    const resources = allResourceIds
-      .map((id) => {
-        const resource = loadedResources[id]
-        if (!resource) return null
-        
-        return {
-          id: resource.id,
-          title: resource.title,
-          description: `${resource.type} resource`,
-          category: resource.category || resource.type,
-          component: generateResourceComponent(resource),
-        }
-      })
-      .filter(Boolean) as any[]
+    const resources = allResourceIds.map((id) => ({
+      id,
+      title: '', // Titles come from store inside ResourcePanelByKey / panel header
+      description: 'resource',
+      category: 'resource',
+      component: (
+        <ResourcePanelByKey
+          resourceId={id}
+          viewerRegistry={viewerRegistry}
+          onEntryLinkClick={handleOpenEntry}
+        />
+      ),
+    }))
 
     return {
       resources,
@@ -1095,7 +1121,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         },
       },
     }
-  }, [panel1ResourceKeys, panel2ResourceKeys, panel1Resources.activeIndex, panel2Resources.activeIndex, loadedResources, generateResourceComponent])
+  }, [allResourceIds, panel1ResourceKeys, panel2ResourceKeys, panel1Resources.activeIndex, panel2Resources.activeIndex, viewerRegistry, handleOpenEntry])
   
   // Helper to get resource label for DragOverlay
   const getResourceLabel = useCallback((resourceKey: string) => {
