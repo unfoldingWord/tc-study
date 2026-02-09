@@ -20,17 +20,22 @@ import type { ResourceInfo } from './types'
 interface AppState {
   loadedResources: Record<string, ResourceInfo>
   anchorResourceId: string | null
+  /** Resource id of the last active scripture viewer (for book title resolution when anchor has no ingredients yet). */
+  lastActiveScriptureResourceId: string | null
   isInitialized: boolean
 }
 
 interface AppActions {
   setAnchorResource: (resourceId: string, toc: ResourceInfo['toc']) => void
+  setLastActiveScriptureResource: (resourceId: string | null) => void
   addResource: (resource: ResourceInfo) => void
   /** Batch update: one store write so one re-render when e.g. Phase 2 metadata is cached. */
   addResources: (resources: ResourceInfo[]) => void
   removeResource: (resourceId: string) => void
   getResource: (resourceId: string) => ResourceInfo | undefined
   getAnchorResource: () => ResourceInfo | undefined
+  /** Resource to use for getBookTitle: last active scripture (has ingredients) else anchor. */
+  getBookTitleSource: () => ResourceInfo | undefined
 }
 
 type AppStore = AppState & AppActions
@@ -40,7 +45,14 @@ export const useAppStore = create<AppStore>()(
     // Initial state
     loadedResources: {},
     anchorResourceId: null,
+    lastActiveScriptureResourceId: null,
     isInitialized: false,
+
+    setLastActiveScriptureResource: (resourceId) => {
+      set((state) => {
+        state.lastActiveScriptureResourceId = resourceId
+      })
+    },
 
     // Actions
     setAnchorResource: (resourceId: string, toc) => {
@@ -113,6 +125,15 @@ export const useAppStore = create<AppStore>()(
       const anchorId = get().anchorResourceId
       return anchorId ? get().loadedResources[anchorId] : undefined
     },
+
+    getBookTitleSource: () => {
+      const state = get()
+      const lastId = state.lastActiveScriptureResourceId
+      const last = lastId ? state.loadedResources[lastId] : undefined
+      if (last) return last
+      const anchorId = state.anchorResourceId
+      return anchorId ? state.loadedResources[anchorId] : undefined
+    },
   }))
 )
 
@@ -140,4 +161,18 @@ export function useApp() {
 export function useAnchorResource() {
   const resource = useAppStore((s) => s.getAnchorResource())
   return resource
+}
+
+/** Resource to use for getBookTitle (last active scripture else anchor). Use in nav bar and help viewers. */
+export function useBookTitleSource() {
+  // Subscribe to the actual state so we re-render when loadedResources[id] is updated (e.g. ingredients added in Phase 2)
+  const lastResource = useAppStore((s) => {
+    const id = s.lastActiveScriptureResourceId
+    return id ? s.loadedResources[id] : undefined
+  })
+  const anchorResource = useAppStore((s) => {
+    const id = s.anchorResourceId
+    return id ? s.loadedResources[id] : undefined
+  })
+  return lastResource ?? anchorResource
 }

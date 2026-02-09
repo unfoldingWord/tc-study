@@ -2,7 +2,7 @@
  * Context exports for tc-study
  */
 
-export { AppProvider, useApp } from './AppContext'
+export { AppProvider, useApp, useAnchorResource, useBookTitleSource } from './AppContext'
 export {
     CatalogProvider,
     useCatalog,

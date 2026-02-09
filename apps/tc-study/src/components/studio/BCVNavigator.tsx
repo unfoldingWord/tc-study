@@ -13,7 +13,7 @@ import type { TranslatorSection } from '@bt-synergy/usfm-processor'
 import { AlertCircle, ArrowLeft, BookOpen, Check, Hash, List, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useAvailableBooks, useCurrentSectionIndex, useNavigation, useNavigationMode, type BCVReference } from '../../contexts'
-import { useAnchorResource, useAppStore } from '../../contexts/AppContext'
+import { useAppStore, useBookTitleSource } from '../../contexts/AppContext'
 import { getDefaultSections } from '../../lib/data/default-sections'
 import { getBookTitle } from '../../utils/bookNames'
 
@@ -28,7 +28,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   const navigationMode = useNavigationMode()
   const currentSectionIndex = useCurrentSectionIndex()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
-  const anchorResource = useAnchorResource()
+  const bookTitleSource = useBookTitleSource()
   const currentRef = navigation.currentReference
   
   // Use provided mode or fall back to current navigation mode
@@ -339,7 +339,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                 {availableBooks.map((book) => {
                   const isSelected = selectedBook === book.code
-                  const fullBookName = getBookTitle(anchorResource, book.code)
+                  const fullBookName = getBookTitle(bookTitleSource, book.code)
                   return (
                     <button
                       key={book.code}
@@ -383,7 +383,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                   <BookOpen className="w-4 h-4 text-gray-500" />
                 </div>
                 <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <strong>{getBookTitle(anchorResource, selectedBook)}</strong>
+                  <strong>{getBookTitle(bookTitleSource, selectedBook)}</strong>
                   {currentSectionIndex >= 0 && (
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                       {currentSectionIndex + 1} / {sections.length}
@@ -467,7 +467,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                   <BookOpen className="w-4 h-4 text-gray-500" />
                 </div>
                 <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <strong>{getBookTitle(anchorResource, selectedBook)}</strong>
+                  <strong>{getBookTitle(bookTitleSource, selectedBook)}</strong>
                   <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                     {getSelectionCount()}
                   </span>

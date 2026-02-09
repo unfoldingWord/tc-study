@@ -9,10 +9,10 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { BookOpen, ExternalLink, Loader, FileText } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
-import { useAnchorResource } from '../../../contexts/AppContext'
+import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
-import { getBookTitle } from '../../../utils/bookNames'
+import { getBookTitleWithFallback } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TranslationNoteCard } from './components/TranslationNoteCard'
 import { useTranslationNotesContent } from './hooks/useTranslationNotesContent'
@@ -40,7 +40,10 @@ export function TranslationNotesViewer({
   const currentRef = useCurrentReference()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
-  const anchorResource = useAnchorResource()
+  const bookTitleSource = useBookTitleSource()
+  // Use latest resource from store so we pick up ingredients when metadata loads (Phase 2)
+  const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
+  const effectiveResource = resourceFromStore ?? resource
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [tokenFilter, setTokenFilter] = useState<{ semanticId: string; content: string; alignedSemanticIds: string[]; timestamp: number } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
@@ -453,7 +456,7 @@ export function TranslationNotesViewer({
               <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg">
                 <BookOpen className="w-3.5 h-3.5 text-amber-500" />
                 <h3 className="text-xs font-semibold text-gray-700">
-                  {getBookTitle(anchorResource, currentRef.book)} {verse}
+                  {getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book)} {verse}
                 </h3>
                 <span className="ml-auto px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-full text-[10px] font-medium">
                   {verseNotes.length}

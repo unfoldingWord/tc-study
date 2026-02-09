@@ -5,7 +5,7 @@
 import { ArrowLeft, Book, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, List, ListOrdered, Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCurrentPassageSet, useCurrentReference, useNavigation, useNavigationHistory, useNavigationMode } from '../../contexts'
-import { useAnchorResource, useAppStore } from '../../contexts/AppContext'
+import { useAppStore, useBookTitleSource } from '../../contexts/AppContext'
 import { getBookTitle } from '../../utils/bookNames'
 import { LanguagePicker } from '../LanguagePicker'
 import { BCVNavigator } from './BCVNavigator'
@@ -30,7 +30,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   const passageSet = useCurrentPassageSet()
   const history = useNavigationHistory()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
-  const anchorResource = useAnchorResource()
+  const bookTitleSource = useBookTitleSource()
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false)
@@ -81,8 +81,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   const hasNavigationSource = hasAnchor || hasPassageSet
 
   const formatReference = (ref: typeof currentRef) => {
-    // Get localized book name from anchor resource's ingredients (e.g., "Tito" for Spanish)
-    const bookName = getBookTitle(anchorResource, ref.book)
+    // Get localized book name from last active scripture (or anchor) ingredients (e.g., "Jonás" for Spanish)
+    const bookName = getBookTitle(bookTitleSource, ref.book)
     let result = `${bookName} ${ref.chapter}:${ref.verse}`
     if (ref.endChapter || ref.endVerse) {
       if (ref.endChapter && ref.endChapter !== ref.chapter) {

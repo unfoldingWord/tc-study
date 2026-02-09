@@ -14,9 +14,9 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { BookOpen, BookX, Link, Loader } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
-import { useAnchorResource } from '../../../contexts/AppContext'
+import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
-import { getBookTitle } from '../../../utils/bookNames'
+import { getBookTitleWithFallback } from '../../../utils/bookNames'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TokenFilterBanner, WordLinkCard } from './components'
@@ -40,8 +40,10 @@ export function WordsLinksViewer({
   const currentRef = useCurrentReference()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
-  const anchorResource = useAnchorResource()
-  
+  const bookTitleSource = useBookTitleSource()
+  const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
+  const effectiveResource = resourceFromStore ?? resource
+
   const [selectedLink, setSelectedLink] = useState<string | null>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
@@ -493,7 +495,7 @@ export function WordsLinksViewer({
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-3.5 h-3.5 text-purple-600" />
                         <h3 className="text-xs font-semibold text-gray-700">
-                          {getBookTitle(anchorResource, currentRef.book || 'gen')} {chapter}:{verse}
+                          {getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book || 'gen')} {chapter}:{verse}
                         </h3>
                       </div>
                     </div>

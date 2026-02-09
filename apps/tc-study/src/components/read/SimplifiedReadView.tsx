@@ -440,10 +440,8 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
   // Handle language selection - automatically load all tc-ready resources
   const handleLanguageSelected = useCallback(async (languageCode: string) => {
     console.log('📚 Auto-loading all tc-ready resources for language:', languageCode)
-    
     // Track current language for collection management
     setCurrentLanguageCode(languageCode)
-    
     // 🛑 IMPORTANT: Cancel any ongoing downloads from previous language
     if (isBackgroundDownloading) {
       console.log('🛑 Canceling ongoing downloads (language changed)')

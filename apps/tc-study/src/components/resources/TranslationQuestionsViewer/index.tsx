@@ -11,9 +11,9 @@ import type { ResourceViewerProps } from '@bt-synergy/resource-types'
 import { AlertCircle, BookOpen, CheckCircle, ChevronDown, ChevronUp, HelpCircle, MessageCircleQuestion } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useCurrentReference } from '../../../contexts'
-import { useAnchorResource } from '../../../contexts/AppContext'
+import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
-import { getBookTitle } from '../../../utils/bookNames'
+import { getBookTitleWithFallback } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import type { ResourceInfo } from '../../../contexts/types'
 
@@ -27,8 +27,10 @@ function tqCacheKey(resourceKey: string, bookCode: string) {
 export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceViewerProps & { resource: ResourceInfo }) {
   const loaderRegistry = useLoaderRegistry()
   const currentRef = useCurrentReference()
-  const anchorResource = useAnchorResource()
+  const bookTitleSource = useBookTitleSource()
   const bookCode = currentRef.book || 'gen'
+  const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
+  const effectiveResource = resourceFromStore ?? resource
 
   const cached = resourceKey && bookCode ? questionsCache.get(tqCacheKey(resourceKey, bookCode)) : undefined
   const [questions, setQuestions] = useState<ProcessedQuestions | null>(cached ?? null)
@@ -203,7 +205,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
               <div className="flex items-center gap-2">
                 <BookOpen className="w-3.5 h-3.5 text-blue-600" />
                 <h3 className="text-xs font-semibold text-gray-700">
-                  {getBookTitle(anchorResource, currentRef.book)} {verse}
+                  {getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book)} {verse}
                 </h3>
                 <span className="ml-auto px-2 py-0.5 bg-blue-100/50 text-blue-700 rounded-full text-[10px] font-medium">
                   {verseQuestions.length}

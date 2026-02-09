@@ -86,22 +86,20 @@ export function useTOC(
             }
           })
 
-          // Convert to BookInfo array
+          // Convert to BookInfo array (use ingredient.title when catalog provides it)
           const books: BookInfo[] = Array.from(bookCodes).map((code) => {
-            // Get chapter count from ingredients if available
             const bookIngredients = ingredients.filter((ing: any) =>
               ing.identifier?.toLowerCase() === code
             )
             const chapters = bookIngredients.length || 1
-
-            // Get verse counts from standard versification
             const verses = getStandardVerseCount(code)
+            const name = bookIngredients[0]?.title || code.toUpperCase()
 
             return {
               code,
-              name: code.toUpperCase(), // Will be improved with proper book names
-              chapters: verses?.length || chapters, // Use verse array length as source of truth for chapter count
-              verses, // Array of verse counts per chapter
+              name, // From catalog ingredient.title when available
+              chapters: verses?.length || chapters,
+              verses,
             }
           }).sort((a, b) => a.code.localeCompare(b.code))
 

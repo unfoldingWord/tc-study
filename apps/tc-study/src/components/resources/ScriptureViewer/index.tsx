@@ -13,8 +13,10 @@
 import { Book, Bug } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEvents } from 'linked-panels'
+import { useAppStore } from '../../../contexts/AppContext'
 import { useCatalogManager, useCurrentReference } from '../../../contexts'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
+import { getBookTitle } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import {
     DebugPanel,
@@ -71,8 +73,15 @@ export function ScriptureViewer({
   // Load TOC and available books
   const { availableBooks, isLoadingTOC, setAsAnchor } = useTOC(resourceKey, resourceId, isAnchor)
 
+  // Register as last active scripture when this viewer is mounted (so book titles use our ingredients)
+  useEffect(() => {
+    useAppStore.getState().setLastActiveScriptureResource(resourceId)
+    return () => {
+      useAppStore.getState().setLastActiveScriptureResource(null)
+    }
+  }, [resourceId])
+
   // Auto-set as anchor whenever this scripture resource becomes active (when user switches tabs)
-  // This ensures the navigation updates to show the current scripture resource's books
   useEffect(() => {
     if (availableBooks.length > 0 && anchorSetRef.current !== resourceId) {
       setAsAnchor()
@@ -91,6 +100,14 @@ export function ScriptureViewer({
   
   // Get language direction from catalog metadata
   const languageDirection = catalogMetadata?.languageDirection || 'ltr'
+
+  // Use latest resource from store so we get ingredients when Phase 2 metadata loads (localized book title)
+  const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
+  const effectiveResource = resourceFromStore ?? resource
+
+  // Language and book title from current scripture metadata (for header)
+  const languageDisplay = effectiveResource.languageName ?? catalogMetadata?.language_title ?? effectiveResource.language ?? language
+  const currentBookTitle = getBookTitle(effectiveResource, currentRef.book)
 
   // Handle highlighting and token clicks (using resource-panels signal API)
   const {
@@ -163,6 +180,7 @@ export function ScriptureViewer({
     <div className="h-full flex flex-col">
       <ResourceViewerHeader 
         title={resource.title}
+        subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}
         icon={Book}
       />
       
