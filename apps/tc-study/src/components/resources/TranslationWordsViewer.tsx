@@ -17,6 +17,9 @@ interface TranslationWord {
   seeAlso?: string[]
 }
 
+const TW_WORD_CACHE_MAX = 80
+const twWordCache = new Map<string, TranslationWord>()
+
 interface TranslationWordsViewerExtendedProps {
   resourceKey: string
   metadata?: any
@@ -159,25 +162,27 @@ export function TranslationWordsViewer({
     }
   }, [metadata, selectedWordId, initialEntryId])
 
-  // Load word content when selection changes
+  // Load word content when selection changes (cached by resourceKey+entryId so switching tabs doesn't re-fetch)
   useEffect(() => {
-    if (!selectedWordId || !resourceKey) {
-      console.log('[TranslationWordsViewer] Skipping load - selectedWordId:', selectedWordId, 'resourceKey:', resourceKey)
-      return
-    }
+    if (!selectedWordId || !resourceKey) return
 
-    // Skip loading if selectedWordId is a directory (e.g., "bible")
     if (selectedWordId === 'bible' || !selectedWordId.includes('/')) {
-      console.warn('⚠️ Skipping load for directory entry:', selectedWordId)
       setError('Please select a word entry, not a category')
       setLoading(false)
       return
     }
 
-    // Don't load if loaderRegistry is not available
     if (!loaderRegistry) {
-      console.error('⚠️ LoaderRegistry not available, cannot load word')
       setError('Resource loader not available. Please refresh the page.')
+      setLoading(false)
+      return
+    }
+
+    const key = `tw:${resourceKey}:${selectedWordId}`
+    const hit = twWordCache.get(key)
+    if (hit !== undefined) {
+      setWord(hit)
+      setError(null)
       setLoading(false)
       return
     }
@@ -185,26 +190,19 @@ export function TranslationWordsViewer({
     const loadWord = async () => {
       setLoading(true)
       setError(null)
-      
+
       try {
         const loader = loaderRegistry.getLoader('words')
         if (!loader) {
           throw new Error('Translation Words loader not found')
         }
-        
-        console.log('📖 Loading word:', { resourceKey, entryId: selectedWordId })
-        if (!selectedWordId || !selectedWordId.includes('/')) {
-          throw new Error(`Invalid entry ID format: "${selectedWordId}". Expected format: "bible/category/term"`)
-        }
         const wordData = await loader.loadContent(resourceKey, selectedWordId)
-        setWord(wordData as TranslationWord)
+        const w = wordData as TranslationWord
+        if (twWordCache.size >= TW_WORD_CACHE_MAX) twWordCache.delete(twWordCache.keys().next().value!)
+        twWordCache.set(key, w)
+        setWord(w)
       } catch (err) {
-        console.error('❌ Failed to load word:', {
-          resourceKey,
-          entryId: selectedWordId,
-          error: err instanceof Error ? err.message : String(err),
-          stack: err instanceof Error ? err.stack : undefined
-        })
+        console.error('❌ Failed to load word:', { resourceKey, entryId: selectedWordId, error: err })
         setError(err instanceof Error ? err.message : 'Failed to load word')
       } finally {
         setLoading(false)

@@ -1,8 +1,9 @@
 /**
  * Translation Questions Viewer
- * 
+ *
  * Displays comprehension questions and answers for Bible passages.
  * Questions are filtered by the current verse range.
+ * Results are cached by resourceKey+book so switching tabs doesn't re-fetch.
  */
 
 import type { ProcessedQuestions } from '@bt-synergy/resource-parsers'
@@ -16,57 +17,66 @@ import { getBookTitle } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import type { ResourceInfo } from '../../../contexts/types'
 
+const TQ_CACHE_MAX = 50
+const questionsCache = new Map<string, ProcessedQuestions>()
+
+function tqCacheKey(resourceKey: string, bookCode: string) {
+  return `tq:${resourceKey}:${bookCode}`
+}
+
 export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceViewerProps & { resource: ResourceInfo }) {
-  const [questions, setQuestions] = useState<ProcessedQuestions | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
-  
   const loaderRegistry = useLoaderRegistry()
   const currentRef = useCurrentReference()
   const anchorResource = useAnchorResource()
-  
   const bookCode = currentRef.book || 'gen'
+
+  const cached = resourceKey && bookCode ? questionsCache.get(tqCacheKey(resourceKey, bookCode)) : undefined
+  const [questions, setQuestions] = useState<ProcessedQuestions | null>(cached ?? null)
+  const [loading, setLoading] = useState(!cached)
+  const [error, setError] = useState<string | null>(null)
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<string>>(new Set())
 
   // Load questions for current book
   useEffect(() => {
     if (!loaderRegistry || !resourceKey) return
+
+    const key = tqCacheKey(resourceKey, bookCode)
+    const hit = questionsCache.get(key)
+    if (hit !== undefined) {
+      setQuestions(hit)
+      setLoading(false)
+      return
+    }
 
     let cancelled = false
 
     const loadQuestions = async () => {
       setLoading(true)
       setError(null)
-      
+
       try {
         const loader = loaderRegistry.getLoader('questions')
         if (!loader) {
           throw new Error('Translation Questions loader not found')
         }
 
-        console.log(`📖 Loading translation questions for: ${resourceKey}/${bookCode}`)
         const content = await loader.loadContent(resourceKey, bookCode)
-        
-        if (cancelled) return
 
+        if (cancelled) return
+        if (questionsCache.size >= TQ_CACHE_MAX) questionsCache.delete(questionsCache.keys().next().value!)
+        questionsCache.set(key, content)
         setQuestions(content)
       } catch (err) {
         if (cancelled) return
-
         console.error(`Failed to load questions for ${bookCode}:`, err)
         setError(err instanceof Error ? err.message : 'Failed to load questions')
       } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+        if (!cancelled) setLoading(false)
       }
     }
 
     loadQuestions()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [resourceKey, bookCode, loaderRegistry])
 
   // Filter questions for current chapter/verse range

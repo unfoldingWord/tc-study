@@ -13,10 +13,8 @@
 import { Book, Bug } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEvents } from 'linked-panels'
-import { useAnchorResource } from '../../../contexts/AppContext'
 import { useCatalogManager, useCurrentReference } from '../../../contexts'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
-import { getBookTitle } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import {
     DebugPanel,
@@ -37,7 +35,6 @@ export function ScriptureViewer({
 }: ScriptureViewerProps) {
   const currentRef = useCurrentReference()
   const catalogManager = useCatalogManager()
-  const anchorResource = useAnchorResource()
   const { setBook, setChapter, setVerse, setEndChapter, setEndVerse } = currentRef
 
   // Debug panel visibility state
@@ -181,12 +178,6 @@ export function ScriptureViewer({
           }
         }}
       >
-        {/* Book title - centered, bold, serif, italic, larger than chapter number */}
-        {currentRef.book && (
-          <h2 className="text-center font-bold font-serif italic text-3xl text-gray-900 py-4">
-            {getBookTitle(anchorResource, currentRef.book)}
-          </h2>
-        )}
         {/* Content - scrolling handled by parent container */}
         <div className="flex-1">
           <ScriptureContent

@@ -4,7 +4,7 @@
  * Displays Translation Academy content (training articles for translators)
  */
 
-import { AlertCircle, ArrowLeft, BookOpen, ChevronDown, ChevronUp, FileText, GraduationCap, Loader, Search } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ChevronDown, ChevronUp, FileText, GraduationCap, Loader, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useLoaderRegistry } from '../../contexts/CatalogContext'
 
@@ -15,6 +15,9 @@ interface TranslationAcademyArticle {
   question?: string
   relatedArticles?: string[]
 }
+
+const TA_ARTICLE_CACHE_MAX = 80
+const taArticleCache = new Map<string, TranslationAcademyArticle>()
 
 interface TranslationAcademyViewerExtendedProps {
   resourceKey: string
@@ -143,9 +146,17 @@ export function TranslationAcademyViewer({
     }
   }, [metadata, selectedArticleId, initialEntryId])
 
-  // Load article content when selection changes
+  // Load article content when selection changes (cached by resourceKey+articleId so switching tabs doesn't re-fetch)
   useEffect(() => {
-    if (!selectedArticleId || !resourceKey) {
+    if (!selectedArticleId || !resourceKey) return
+
+    const key = `ta:${resourceKey}:${selectedArticleId}`
+    const hit = taArticleCache.get(key)
+    if (hit !== undefined) {
+      setArticle(hit)
+      setError(null)
+      setLoading(false)
+      setViewMode('article')
       return
     }
 
@@ -160,6 +171,8 @@ export function TranslationAcademyViewer({
         }
 
         const loadedArticle = await loader.loadContent(resourceKey, selectedArticleId)
+        if (taArticleCache.size >= TA_ARTICLE_CACHE_MAX) taArticleCache.delete(taArticleCache.keys().next().value!)
+        taArticleCache.set(key, loadedArticle)
         setArticle(loadedArticle)
         setViewMode('article')
       } catch (err: any) {

@@ -1,20 +1,40 @@
 /**
- * Hook for loading Translation Notes content
+ * Hook for loading Translation Notes content.
+ * Results are cached by resourceKey+book so switching tabs doesn't re-fetch.
  */
 
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
 import { useEffect, useState } from 'react'
 import { useLoaderRegistry } from '../../../../contexts/CatalogContext'
 
+const CACHE_MAX = 50
+const notesCache = new Map<string, { notes: TranslationNote[]; error: string | null }>()
+
+function cacheKey(resourceKey: string, bookCode: string) {
+  return `notes:${resourceKey}:${bookCode}`
+}
+
 export function useTranslationNotesContent(resourceKey: string, bookCode: string) {
   const loaderRegistry = useLoaderRegistry()
-  const [notes, setNotes] = useState<TranslationNote[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const cached = resourceKey && bookCode ? notesCache.get(cacheKey(resourceKey, bookCode)) : undefined
+  const [notes, setNotes] = useState<TranslationNote[]>(cached?.notes ?? [])
+  const [loading, setLoading] = useState(!cached)
+  const [error, setError] = useState<string | null>(cached?.error ?? null)
 
   useEffect(() => {
     if (!resourceKey || !bookCode) {
       setNotes([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+
+    const key = cacheKey(resourceKey, bookCode)
+    const hit = notesCache.get(key)
+    if (hit !== undefined) {
+      setNotes(hit.notes)
+      setError(hit.error)
+      setLoading(false)
       return
     }
 
@@ -30,15 +50,16 @@ export function useTranslationNotesContent(resourceKey: string, bookCode: string
           throw new Error('Translation Notes loader not found')
         }
 
-        console.log(`📖 Loading translation notes for: ${resourceKey}/${bookCode}`)
         const processedNotes = await loader.loadContent(resourceKey, bookCode)
 
         if (cancelled) return
 
         if (processedNotes && processedNotes.notes) {
-          setNotes(processedNotes.notes)
+          const data = { notes: processedNotes.notes, error: null }
+          if (notesCache.size >= CACHE_MAX) notesCache.delete(notesCache.keys().next().value!)
+          notesCache.set(key, data)
+          setNotes(data.notes)
         } else {
-          console.warn('⚠️ No notes returned from loader')
           setNotes([])
         }
       } catch (err) {
@@ -50,25 +71,21 @@ export function useTranslationNotesContent(resourceKey: string, bookCode: string
           error: err instanceof Error ? err.message : String(err),
         })
 
-        // Check if it's a 404 (book not available)
-        if (err instanceof Error && err.message.includes('404')) {
-          setError(`Notes not available for ${bookCode.toUpperCase()}`)
-        } else {
-          setError(err instanceof Error ? err.message : 'Failed to load notes')
-        }
+        const errMsg = err instanceof Error && err.message.includes('404')
+          ? `Notes not available for ${bookCode.toUpperCase()}`
+          : (err instanceof Error ? err.message : 'Failed to load notes')
+        const data = { notes: [] as TranslationNote[], error: errMsg }
+        if (notesCache.size >= CACHE_MAX) notesCache.delete(notesCache.keys().next().value!)
+        notesCache.set(key, data)
+        setError(errMsg)
         setNotes([])
       } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
+        if (!cancelled) setLoading(false)
       }
     }
 
     loadNotes()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [resourceKey, bookCode, loaderRegistry])
 
   return { notes, loading, error }

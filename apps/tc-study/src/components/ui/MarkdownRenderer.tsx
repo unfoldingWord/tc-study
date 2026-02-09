@@ -3,11 +3,36 @@
  * 
  * React component for rendering markdown content with support for internal links.
  * Uses the remark/unified ecosystem for robust markdown processing.
+ * Rendered output is cached by content so switching tabs doesn't re-render.
  */
 
 import { useEffect, useState } from 'react'
-import { Loader } from 'lucide-react'
 import { RemarkMarkdownRenderer } from '../../lib/markdown/remarkRenderer'
+
+const RENDER_CACHE_MAX = 80
+const renderCache = new Map<string, React.ReactNode>()
+
+function getCached(content: string): React.ReactNode | undefined {
+  return renderCache.get(content)
+}
+
+function setCached(content: string, node: React.ReactNode): void {
+  if (renderCache.size >= RENDER_CACHE_MAX) {
+    const firstKey = renderCache.keys().next().value
+    if (firstKey !== undefined) renderCache.delete(firstKey)
+  }
+  renderCache.set(content, node)
+}
+
+function MarkdownSkeleton({ className = '' }: { className?: string }) {
+  return (
+    <div className={`space-y-2 ${className}`} aria-hidden="true">
+      <div className="h-3 w-full max-w-[100%] rounded bg-gray-200 animate-pulse" />
+      <div className="h-3 w-full max-w-[95%] rounded bg-gray-200 animate-pulse" />
+      <div className="h-3 w-full max-w-[88%] rounded bg-gray-200 animate-pulse" />
+    </div>
+  )
+}
 
 interface MarkdownRendererProps {
   content: string
@@ -22,8 +47,9 @@ export function MarkdownRenderer({
   onInternalLinkClick,
   getEntryTitle
 }: MarkdownRendererProps) {
-  const [renderedContent, setRenderedContent] = useState<React.ReactNode>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const cached = content ? getCached(content) : undefined
+  const [renderedContent, setRenderedContent] = useState<React.ReactNode>(cached ?? null)
+  const [isLoading, setIsLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -33,12 +59,20 @@ export function MarkdownRenderer({
       return
     }
 
+    const cachedResult = getCached(content)
+    if (cachedResult !== undefined) {
+      setRenderedContent(cachedResult)
+      setIsLoading(false)
+      return
+    }
+
+    let cancelled = false
+
     const renderContent = async () => {
       try {
         setIsLoading(true)
         setError(null)
 
-        // Create renderer with current options
         const renderer = new RemarkMarkdownRenderer({
           linkTarget: '_blank',
           headerBaseLevel: 3,
@@ -47,19 +81,22 @@ export function MarkdownRenderer({
           getEntryTitle
         })
 
-        // Render markdown to React
         const result = await renderer.renderToReact(content)
+        if (cancelled) return
+        setCached(content, result)
         setRenderedContent(result)
       } catch (err) {
+        if (cancelled) return
         console.error('Markdown rendering error:', err)
         setError(err instanceof Error ? err.message : 'Unknown error')
         setRenderedContent(<span className="text-red-500">Error rendering markdown</span>)
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
 
     renderContent()
+    return () => { cancelled = true }
   }, [content, onInternalLinkClick, getEntryTitle])
 
   if (!content) {
@@ -68,9 +105,8 @@ export function MarkdownRenderer({
 
   if (isLoading) {
     return (
-      <div className={`flex items-center gap-2 text-gray-500 ${className}`}>
-        <Loader className="w-4 h-4 animate-spin" />
-        <span className="text-sm">Rendering...</span>
+      <div className={className}>
+        <MarkdownSkeleton className="text-base leading-relaxed" />
       </div>
     )
   }

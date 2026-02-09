@@ -4,8 +4,8 @@
 
 import type { ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
 import { useEffect, useMemo, useState } from 'react'
-import type { BookInfo } from '../../../../contexts/types-only'
 import { useCatalogManager, useCurrentReference, useNavigation } from '../../../../contexts'
+import type { BookInfo } from '../../../../contexts/types-only'
 import { defaultSectionsService } from '../../../../lib/services/default-sections'
 import { extractVerseCountsFromContent } from '../../../../lib/versification'
 import { attachAlignmentSemanticIds } from '../utils/attachAlignmentSemanticIds'
