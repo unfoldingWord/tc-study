@@ -2,7 +2,9 @@
 /**
  * IndexedDB Storage Adapter
  *
- * Browser-based persistent storage using IndexedDB
+ * Browser-based persistent storage using IndexedDB.
+ * Book-organized resources (scripture, TN, TQ) are stored as one manifest + one record per chapter
+ * to avoid large single-entry size limits on mobile. TA, TW, and other keys are stored as single records.
  */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -42,9 +44,10 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.IndexedDBCacheAdapter = void 0;
+var bookChunkedStorage_1 = require("./bookChunkedStorage");
 /**
- * IndexedDB adapter for web browsers
- * Provides persistent cache storage
+ * IndexedDB adapter for web browsers. Book-organized resources (scripture, TN, TQ) are stored as manifest + chapter entries.
+ * API-compatible with CacheStorageAdapter (get/set/has/delete/keys/size/count etc.).
  */
 var IndexedDBCacheAdapter = /** @class */ (function () {
     function IndexedDBCacheAdapter(options) {
@@ -94,12 +97,33 @@ var IndexedDBCacheAdapter = /** @class */ (function () {
     };
     IndexedDBCacheAdapter.prototype.set = function (key, entry) {
         return __awaiter(this, void 0, void 0, function () {
-            var store;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getStore('readwrite')];
+            var _a, manifestEntry_1, chapterEntries_1, db_1, store;
+            var _this = this;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0:
+                        if (!(0, bookChunkedStorage_1.canSplitBookEntry)(key, entry)) return [3 /*break*/, 2];
+                        _a = (0, bookChunkedStorage_1.splitBookEntry)(key, entry), manifestEntry_1 = _a.manifestEntry, chapterEntries_1 = _a.chapterEntries;
+                        if (typeof console !== 'undefined' && console.log) {
+                            console.log('[cache-adapter-indexeddb] Storing book as chapter entries:', key, "(".concat(chapterEntries_1.length, " chapters)"));
+                        }
+                        return [4 /*yield*/, this.initDB()];
                     case 1:
-                        store = _a.sent();
+                        db_1 = _b.sent();
+                        return [2 /*return*/, new Promise(function (resolve, reject) {
+                                var tx = db_1.transaction(_this.storeName, 'readwrite');
+                                var store = tx.objectStore(_this.storeName);
+                                store.put({ key: key, entry: manifestEntry_1 });
+                                for (var _i = 0, chapterEntries_2 = chapterEntries_1; _i < chapterEntries_2.length; _i++) {
+                                    var _a = chapterEntries_2[_i], chKey = _a.key, chEntry = _a.entry;
+                                    store.put({ key: chKey, entry: chEntry });
+                                }
+                                tx.oncomplete = function () { return resolve(); };
+                                tx.onerror = function () { return reject(tx.error); };
+                            })];
+                    case 2: return [4 /*yield*/, this.getStore('readwrite')];
+                    case 3:
+                        store = _b.sent();
                         return [2 /*return*/, new Promise(function (resolve, reject) {
                                 var request = store.put({ key: key, entry: entry });
                                 request.onerror = function () { return reject(request.error); };
@@ -111,31 +135,47 @@ var IndexedDBCacheAdapter = /** @class */ (function () {
     };
     IndexedDBCacheAdapter.prototype.get = function (key) {
         return __awaiter(this, void 0, void 0, function () {
-            var store;
+            var store, result, db, chapterRecords;
             var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0: return [4 /*yield*/, this.getStore('readonly')];
                     case 1:
                         store = _a.sent();
-                        return [2 /*return*/, new Promise(function (resolve, reject) {
+                        return [4 /*yield*/, new Promise(function (resolve, reject) {
                                 var request = store.get(key);
                                 request.onerror = function () { return reject(request.error); };
+                                request.onsuccess = function () { var _a; return resolve((_a = request.result) !== null && _a !== void 0 ? _a : null); };
+                            })];
+                    case 2:
+                        result = _a.sent();
+                        if (!result)
+                            return [2 /*return*/, null];
+                        if (!(result.entry.expiresAt && new Date(result.entry.expiresAt) < new Date())) return [3 /*break*/, 4];
+                        return [4 /*yield*/, this.delete(key)];
+                    case 3:
+                        _a.sent();
+                        return [2 /*return*/, null];
+                    case 4:
+                        if (!(0, bookChunkedStorage_1.isChunkedManifest)(result.entry))
+                            return [2 /*return*/, result.entry];
+                        return [4 /*yield*/, this.initDB()];
+                    case 5:
+                        db = _a.sent();
+                        return [4 /*yield*/, new Promise(function (resolve, reject) {
+                                var tx = db.transaction(_this.storeName, 'readonly');
+                                var st = tx.objectStore(_this.storeName);
+                                var range = IDBKeyRange.bound(key + ':', key + ':\uffff');
+                                var request = st.getAll(range);
+                                request.onerror = function () { return reject(request.error); };
                                 request.onsuccess = function () {
-                                    var result = request.result;
-                                    if (!result) {
-                                        resolve(null);
-                                        return;
-                                    }
-                                    // Check if expired
-                                    if (result.entry.expiresAt && new Date(result.entry.expiresAt) < new Date()) {
-                                        // Delete expired entry
-                                        _this.delete(key).then(function () { return resolve(null); });
-                                        return;
-                                    }
-                                    resolve(result.entry);
+                                    var rows = request.result;
+                                    resolve(rows !== null && rows !== void 0 ? rows : []);
                                 };
                             })];
+                    case 6:
+                        chapterRecords = _a.sent();
+                        return [2 /*return*/, (0, bookChunkedStorage_1.reassembleBookEntry)(key, result.entry, chapterRecords.map(function (r) { return ({ key: r.key, entry: r.entry }); }))];
                 }
             });
         });
@@ -155,16 +195,31 @@ var IndexedDBCacheAdapter = /** @class */ (function () {
     };
     IndexedDBCacheAdapter.prototype.delete = function (key) {
         return __awaiter(this, void 0, void 0, function () {
-            var store;
+            var db;
+            var _this = this;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getStore('readwrite')];
+                    case 0: return [4 /*yield*/, this.initDB()];
                     case 1:
-                        store = _a.sent();
+                        db = _a.sent();
                         return [2 /*return*/, new Promise(function (resolve, reject) {
-                                var request = store.delete(key);
-                                request.onerror = function () { return reject(request.error); };
-                                request.onsuccess = function () { return resolve(); };
+                                var tx = db.transaction(_this.storeName, 'readwrite');
+                                var store = tx.objectStore(_this.storeName);
+                                store.delete(key);
+                                if ((0, bookChunkedStorage_1.isBookOrganizedKey)(key)) {
+                                    var range = IDBKeyRange.bound(key + ':', key + ':\uffff');
+                                    var cursorRequest_1 = store.openCursor(range);
+                                    cursorRequest_1.onerror = function () { return reject(cursorRequest_1.error); };
+                                    cursorRequest_1.onsuccess = function () {
+                                        var cursor = cursorRequest_1.result;
+                                        if (cursor) {
+                                            cursor.delete();
+                                            cursor.continue();
+                                        }
+                                    };
+                                }
+                                tx.oncomplete = function () { return resolve(); };
+                                tx.onerror = function () { return reject(tx.error); };
                             })];
                 }
             });
@@ -172,43 +227,23 @@ var IndexedDBCacheAdapter = /** @class */ (function () {
     };
     IndexedDBCacheAdapter.prototype.setMany = function (items) {
         return __awaiter(this, void 0, void 0, function () {
-            var store;
+            var _i, items_1, item;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getStore('readwrite')];
+                    case 0:
+                        _i = 0, items_1 = items;
+                        _a.label = 1;
                     case 1:
-                        store = _a.sent();
-                        return [2 /*return*/, new Promise(function (resolve, reject) {
-                                var completed = 0;
-                                var hasError = false;
-                                if (items.length === 0) {
-                                    resolve();
-                                    return;
-                                }
-                                var _loop_1 = function (item) {
-                                    if (hasError)
-                                        return "break";
-                                    var request = store.put({ key: item.key, entry: item.entry });
-                                    request.onerror = function () {
-                                        if (!hasError) {
-                                            hasError = true;
-                                            reject(request.error);
-                                        }
-                                    };
-                                    request.onsuccess = function () {
-                                        completed++;
-                                        if (completed === items.length) {
-                                            resolve();
-                                        }
-                                    };
-                                };
-                                for (var _i = 0, items_1 = items; _i < items_1.length; _i++) {
-                                    var item = items_1[_i];
-                                    var state_1 = _loop_1(item);
-                                    if (state_1 === "break")
-                                        break;
-                                }
-                            })];
+                        if (!(_i < items_1.length)) return [3 /*break*/, 4];
+                        item = items_1[_i];
+                        return [4 /*yield*/, this.set(item.key, item.entry)];
+                    case 2:
+                        _a.sent();
+                        _a.label = 3;
+                    case 3:
+                        _i++;
+                        return [3 /*break*/, 1];
+                    case 4: return [2 /*return*/];
                 }
             });
         });
@@ -243,43 +278,23 @@ var IndexedDBCacheAdapter = /** @class */ (function () {
     };
     IndexedDBCacheAdapter.prototype.deleteMany = function (keys) {
         return __awaiter(this, void 0, void 0, function () {
-            var store;
+            var _i, keys_2, key;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getStore('readwrite')];
+                    case 0:
+                        _i = 0, keys_2 = keys;
+                        _a.label = 1;
                     case 1:
-                        store = _a.sent();
-                        return [2 /*return*/, new Promise(function (resolve, reject) {
-                                var completed = 0;
-                                var hasError = false;
-                                if (keys.length === 0) {
-                                    resolve();
-                                    return;
-                                }
-                                var _loop_2 = function (key) {
-                                    if (hasError)
-                                        return "break";
-                                    var request = store.delete(key);
-                                    request.onerror = function () {
-                                        if (!hasError) {
-                                            hasError = true;
-                                            reject(request.error);
-                                        }
-                                    };
-                                    request.onsuccess = function () {
-                                        completed++;
-                                        if (completed === keys.length) {
-                                            resolve();
-                                        }
-                                    };
-                                };
-                                for (var _i = 0, keys_2 = keys; _i < keys_2.length; _i++) {
-                                    var key = keys_2[_i];
-                                    var state_2 = _loop_2(key);
-                                    if (state_2 === "break")
-                                        break;
-                                }
-                            })];
+                        if (!(_i < keys_2.length)) return [3 /*break*/, 4];
+                        key = keys_2[_i];
+                        return [4 /*yield*/, this.delete(key)];
+                    case 2:
+                        _a.sent();
+                        _a.label = 3;
+                    case 3:
+                        _i++;
+                        return [3 /*break*/, 1];
+                    case 4: return [2 /*return*/];
                 }
             });
         });
@@ -303,17 +318,21 @@ var IndexedDBCacheAdapter = /** @class */ (function () {
     };
     IndexedDBCacheAdapter.prototype.keys = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var store;
+            var store, allKeys, logicalKeys;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0: return [4 /*yield*/, this.getStore('readonly')];
                     case 1:
                         store = _a.sent();
-                        return [2 /*return*/, new Promise(function (resolve, reject) {
+                        return [4 /*yield*/, new Promise(function (resolve, reject) {
                                 var request = store.getAllKeys();
                                 request.onerror = function () { return reject(request.error); };
                                 request.onsuccess = function () { return resolve(request.result); };
                             })];
+                    case 2:
+                        allKeys = _a.sent();
+                        logicalKeys = allKeys.map(function (k) { return ((0, bookChunkedStorage_1.isChapterSubKey)(k) ? (0, bookChunkedStorage_1.toLogicalKey)(k) : k); });
+                        return [2 /*return*/, Array.from(new Set(logicalKeys))];
                 }
             });
         });
@@ -348,46 +367,45 @@ var IndexedDBCacheAdapter = /** @class */ (function () {
     };
     IndexedDBCacheAdapter.prototype.count = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var store;
+            var logicalKeys;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getStore('readonly')];
+                    case 0: return [4 /*yield*/, this.keys()];
                     case 1:
-                        store = _a.sent();
-                        return [2 /*return*/, new Promise(function (resolve, reject) {
-                                var request = store.count();
-                                request.onerror = function () { return reject(request.error); };
-                                request.onsuccess = function () { return resolve(request.result); };
-                            })];
+                        logicalKeys = _a.sent();
+                        return [2 /*return*/, logicalKeys.length];
                 }
             });
         });
     };
     IndexedDBCacheAdapter.prototype.prune = function () {
         return __awaiter(this, void 0, void 0, function () {
-            var store, now;
+            var logicalKeys, now, pruned, _i, logicalKeys_1, key, entry;
             return __generator(this, function (_a) {
                 switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getStore('readwrite')];
+                    case 0: return [4 /*yield*/, this.keys()];
                     case 1:
-                        store = _a.sent();
+                        logicalKeys = _a.sent();
                         now = new Date();
-                        return [2 /*return*/, new Promise(function (resolve, reject) {
-                                var request = store.getAll();
-                                request.onerror = function () { return reject(request.error); };
-                                request.onsuccess = function () {
-                                    var items = request.result;
-                                    var pruned = 0;
-                                    for (var _i = 0, items_2 = items; _i < items_2.length; _i++) {
-                                        var item = items_2[_i];
-                                        if (item.entry.expiresAt && new Date(item.entry.expiresAt) < now) {
-                                            store.delete(item.key);
-                                            pruned++;
-                                        }
-                                    }
-                                    resolve(pruned);
-                                };
-                            })];
+                        pruned = 0;
+                        _i = 0, logicalKeys_1 = logicalKeys;
+                        _a.label = 2;
+                    case 2:
+                        if (!(_i < logicalKeys_1.length)) return [3 /*break*/, 6];
+                        key = logicalKeys_1[_i];
+                        return [4 /*yield*/, this.get(key)];
+                    case 3:
+                        entry = _a.sent();
+                        if (!((entry === null || entry === void 0 ? void 0 : entry.expiresAt) && new Date(entry.expiresAt) < now)) return [3 /*break*/, 5];
+                        return [4 /*yield*/, this.delete(key)];
+                    case 4:
+                        _a.sent();
+                        pruned++;
+                        _a.label = 5;
+                    case 5:
+                        _i++;
+                        return [3 /*break*/, 2];
+                    case 6: return [2 /*return*/, pruned];
                 }
             });
         });

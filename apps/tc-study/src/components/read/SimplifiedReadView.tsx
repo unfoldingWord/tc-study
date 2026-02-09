@@ -57,8 +57,8 @@ import { NavigationBar } from '../studio/NavigationBar'
 import { PanelHeader } from '../studio/PanelHeader'
 import { DownloadIndicator } from './DownloadIndicator'
 
-/** Set to false to re-enable automatic background downloads (disabled for debugging). */
-const DISABLE_BACKGROUND_DOWNLOAD = true
+/** Set to true to disable automatic background downloads (e.g. for debugging). */
+const DISABLE_BACKGROUND_DOWNLOAD = false
 
 /**
  * Renders a panel resource by id. Subscribes only to loadedResources[resourceId],

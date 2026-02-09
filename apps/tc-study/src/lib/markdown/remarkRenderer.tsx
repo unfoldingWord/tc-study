@@ -5,16 +5,16 @@
  * Similar to bt-studio's approach but adapted for tc-study architecture.
  */
 
+import { BookOpen, GraduationCap, Hash } from 'lucide-react'
 import React, { Fragment } from 'react'
-import { unified } from 'unified'
-import remarkParse from 'remark-parse'
-import remarkGfm from 'remark-gfm'
-import remarkRehype from 'remark-rehype'
-import rehypeReact from 'rehype-react'
 import * as prod from 'react/jsx-runtime'
+import rehypeReact from 'rehype-react'
+import remarkGfm from 'remark-gfm'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
 import type { Processor } from 'unified'
-import { parseRcLink, isRelativeLink, getRcLinkDisplayName } from './rc-link-parser'
-import { GraduationCap, Hash, BookOpen } from 'lucide-react'
+import { unified } from 'unified'
+import { getRcLinkDisplayName, isRelativeLink, parseRcLink } from './rc-link-parser'
 
 export interface MarkdownRendererOptions {
   allowDangerousHtml?: boolean

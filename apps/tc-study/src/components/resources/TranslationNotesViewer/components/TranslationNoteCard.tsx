@@ -4,13 +4,13 @@
  * Displays a single translation note with quote, note content, and support reference link
  */
 
-import { useState, startTransition } from 'react'
-import { ExternalLink, Code } from 'lucide-react'
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
-import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
+import { Code, ExternalLink } from 'lucide-react'
+import { startTransition, useState } from 'react'
 import { useCurrentReference, useNavigation } from '../../../../contexts'
-import { parseScriptureLink } from '../utils/parseScriptureLink'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
+import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
+import { parseScriptureLink } from '../utils/parseScriptureLink'
 
 interface AlignedToken {
   content: string
