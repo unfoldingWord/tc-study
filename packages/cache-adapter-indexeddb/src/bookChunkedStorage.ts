@@ -135,17 +135,6 @@ export function splitScriptureEntry(
     } as CacheEntry,
   }))
 
-  if (typeof console !== 'undefined' && console.log && alignmentEntries.length > 0) {
-    const totalStored = alignmentEntries.reduce((sum, e) => sum + (Array.isArray(e.entry.content) ? e.entry.content.length : 0), 0)
-    console.log('[Cache Adapter] splitScriptureEntry', {
-      key,
-      chapterEntries: chapterEntries.length,
-      alignmentEntries: alignmentEntries.length,
-      totalAlignmentsStored: totalStored,
-      inputAlignmentsCount: alignments.length,
-    })
-  }
-
   return { manifestEntry, chapterEntries, alignmentEntries }
 }
 
@@ -159,16 +148,6 @@ export function reassembleScripture(manifestEntry: CacheEntry, chapterRecords: A
 
   const contentEntries = chapterRecords.filter((r) => !r.key.endsWith(':alignments'))
   const alignmentEntries = chapterRecords.filter((r) => r.key.endsWith(':alignments'))
-
-  if (typeof console !== 'undefined' && console.log) {
-    const alignmentsFromEntries = alignmentEntries.flatMap((r) => (Array.isArray(r.entry.content) ? r.entry.content : []))
-    console.log('[Cache Adapter] reassembleScripture', {
-      contentEntries: contentEntries.length,
-      alignmentEntries: alignmentEntries.length,
-      totalAlignmentsFromEntries: alignmentsFromEntries.length,
-      manifestHadAlignments: Array.isArray(content?.alignments) ? (content.alignments as unknown[]).length : 0,
-    })
-  }
 
   const chapters = contentEntries
     .sort((a, b) => {

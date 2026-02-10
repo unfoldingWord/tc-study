@@ -67,15 +67,6 @@ export class ScriptureLoader implements ResourceLoader {
           if (this.debug) {
             console.log('✅ Cached content is ProcessedScripture format')
           }
-          if (typeof console !== 'undefined' && console.log) {
-            const alignmentsCount = (content as any).alignments?.length ?? 0
-            console.log('[TN Quote] ScriptureLoader returning from cache', {
-              resourceKey,
-              bookId,
-              alignmentsCount,
-              fromCache: true,
-            })
-          }
           return content
         } else if (content && content.usfm) {
           // Old format - needs reprocessing
@@ -212,16 +203,6 @@ export class ScriptureLoader implements ResourceLoader {
           hasChapters: !!processedScripture.chapters,
           chaptersCount: processedScripture.chapters?.length,
           versesCount: processedScripture.metadata?.totalVerses
-        })
-      }
-
-      if (typeof console !== 'undefined' && console.log) {
-        const alignmentsCount = (processedScripture as any).alignments?.length ?? 0
-        console.log('[TN Quote] ScriptureLoader returning from network', {
-          resourceKey,
-          bookId,
-          alignmentsCount,
-          fromCache: false,
         })
       }
 

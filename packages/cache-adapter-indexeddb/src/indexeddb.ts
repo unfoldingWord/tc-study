@@ -71,14 +71,6 @@ export class IndexedDBCacheAdapter {
   async set(key: string, entry: CacheEntry): Promise<void> {
     if (canSplitBookEntry(key, entry)) {
       const { manifestEntry, chapterEntries, alignmentEntries } = splitBookEntry(key, entry)
-      if (typeof console !== 'undefined' && console.log) {
-        const alignCount = alignmentEntries?.length ?? 0
-        console.log(
-          '[cache-adapter-indexeddb] Storing book as chapter entries:',
-          key,
-          `(${chapterEntries.length} chapters${alignCount > 0 ? `, ${alignCount} alignment entries` : ''})`
-        )
-      }
       const db = await this.initDB()
       return new Promise((resolve, reject) => {
         const tx = db.transaction(this.storeName, 'readwrite')
@@ -136,33 +128,7 @@ export class IndexedDBCacheAdapter {
       }
     })
 
-    const contentRecords = chapterRecords.filter((r) => !r.key.endsWith(':alignments'))
-    const alignmentRecords = chapterRecords.filter((r) => r.key.endsWith(':alignments'))
-    if (key.startsWith('scripture:') && typeof console !== 'undefined' && console.log) {
-      console.log('[Cache Adapter] get() chunked scripture', {
-        key,
-        totalSubRecords: chapterRecords.length,
-        contentRecords: contentRecords.length,
-        alignmentRecords: alignmentRecords.length,
-        alignmentRecordKeys: alignmentRecords.slice(0, 5).map((r) => r.key),
-      })
-      if (chapterRecords.length > 0 && alignmentRecords.length === 0) {
-        console.warn('[Cache Adapter] No alignment entries in cache for this book — likely written by older code or before alignment split was added. Clear cache for this resource and re-download to get alignments.', key)
-      }
-    }
-
-    const reassembled = reassembleBookEntry(key, result.entry, chapterRecords.map((r) => ({ key: r.key, entry: r.entry })))
-    if (key.startsWith('scripture:') && typeof console !== 'undefined' && console.log) {
-      const c = reassembled.content as Record<string, unknown> | undefined
-      const alignments = c?.alignments as unknown[] | undefined
-      const chapters = c?.chapters as unknown[] | undefined
-      console.log('[Cache Adapter] get() reassembled scripture', {
-        key,
-        alignmentsCount: alignments?.length ?? 0,
-        chaptersCount: chapters?.length ?? 0,
-      })
-    }
-    return reassembled
+    return reassembleBookEntry(key, result.entry, chapterRecords.map((r) => ({ key: r.key, entry: r.entry })))
   }
   
   async has(key: string): Promise<boolean> {

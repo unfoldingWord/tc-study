@@ -60,17 +60,6 @@ export function useContent(
         if (content && content.metadata && content.chapters) {
           // For target language resources (not original language), attach alignment semantic IDs
           const isOriginalLanguage = language === 'el-x-koine' || language === 'hbo'
-          const alignmentsCount = content.alignments?.length ?? 0
-          if (typeof console !== 'undefined' && console.log) {
-            console.log('[TN Quote] useContent after load', {
-              resourceKey,
-              bookCode,
-              language,
-              isOriginalLanguage,
-              alignmentsCount,
-              willAttach: !isOriginalLanguage && alignmentsCount > 0,
-            })
-          }
           if (!isOriginalLanguage && content.alignments && content.alignments.length > 0) {
             // Attach to all verses in all chapters
             const allVerses: ProcessedVerse[] = []
@@ -78,18 +67,6 @@ export function useContent(
               allVerses.push(...chapter.verses)
             }
             attachAlignmentSemanticIds(content, allVerses)
-            // [TN Quote] confirm tokens have alignedOriginalWordIds after attach
-            const firstVerseWithTokens = allVerses.find((v) => v.wordTokens?.length)
-            const firstWordToken = firstVerseWithTokens?.wordTokens?.find((t: any) => t.type === 'word')
-            if (typeof console !== 'undefined' && console.log) {
-              console.log('[TN Quote] useContent after attachAlignmentSemanticIds', {
-                versesCount: allVerses.length,
-                firstVerseRef: firstVerseWithTokens?.reference,
-                firstWordTokenAlign: firstWordToken
-                  ? (firstWordToken as any).alignedOriginalWordIds
-                  : 'no word token',
-              })
-            }
           }
 
           // Update verse counts in NavigationContext from actual content

@@ -54,17 +54,6 @@ export function TranslationNoteCard({
   const { navigateToReference } = useNavigation()
   const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
 
-  // Debug: why target quote may not render
-  if (typeof console !== 'undefined' && console.log) {
-    console.log('[TN Quote]', {
-      noteId: note.id,
-      quote: note.quote ?? '(none)',
-      hasAlignedTokensProp: !!note.alignedTokens,
-      alignedTokensLength: note.alignedTokens?.length ?? 0,
-      willRenderQuote: hasAlignedTokens,
-    })
-  }
-  
   // Extract resource abbreviation (e.g., "ULT" from "unfoldingWord/en/ult")
   const resourceAbbreviation = targetResourceId 
     ? targetResourceId.split('/').pop()?.toUpperCase() || ''
@@ -144,11 +133,7 @@ export function TranslationNoteCard({
       aria-label="Translation note"
     >
       {/* Target Language Quote - Clickable aligned tokens when available */}
-      {hasAlignedTokens && (() => {
-        if (typeof console !== 'undefined' && console.log) {
-          console.log('[TN Quote] Rendering quote block', { noteId: note.id, tokenCount: note.alignedTokens!.length })
-        }
-        return (
+      {hasAlignedTokens && (
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -200,8 +185,7 @@ export function TranslationNoteCard({
             )}
           </div>
         </button>
-        )
-      })()}
+      )}
 
       {/* Fallback: Original language quote when target alignment is missing (e.g. scripture has no \zaln) */}
       {!hasAlignedTokens && note.quote && note.quote.trim().length > 0 && (

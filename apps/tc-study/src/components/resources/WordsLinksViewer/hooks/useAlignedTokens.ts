@@ -80,19 +80,6 @@ function findAlignedTokens(
   })
   
   if (matchedPositions.length === 0) {
-    // [TN Quote] diagnostic: why no matches
-    const wordTokensWithAlign = targetTokens
-      .filter((t) => t.type === 'word' && ((t as any).alignedOriginalWordIds?.length ?? 0) > 0)
-      .slice(0, 5)
-      .map((t) => ({ text: t.text, alignedOriginalWordIds: (t as any).alignedOriginalWordIds }))
-    if (typeof console !== 'undefined' && console.log) {
-      console.log('[TN Quote] findAlignedTokens no matches', {
-        originalSemanticIds,
-        targetTokenCount: targetTokens.length,
-        wordTokensWithAlignCount: targetTokens.filter(t => t.type === 'word').length,
-        sampleWordTokensWithAlign: wordTokensWithAlign,
-      })
-    }
     return []
   }
 
@@ -117,9 +104,7 @@ function findAlignedTokens(
     if (matchIndex < matchedPositions.length - 1) {
       const nextPosition = matchedPositions[matchIndex + 1]
       const gap = nextPosition - position
-      
-      console.log(`🔍 [findAlignedTokens] Gap check: position ${position} to ${nextPosition}, gap=${gap}`)
-      
+
       if (gap > 1) {
         // There are tokens between (gap >= 2)
         const betweenTokens = []
@@ -179,30 +164,9 @@ export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedT
     const currentChapter = currentRef.chapter || 1
     const refBookLower = tokenReference?.book?.toLowerCase() ?? ''
 
-    if (typeof console !== 'undefined' && console.log) {
-      console.log('[TN Quote] useAlignedTokens input', {
-        bookCode,
-        currentChapter,
-        refBookLower,
-        tokenReference: tokenReference
-          ? {
-              book: tokenReference.book,
-              chapter: tokenReference.chapter,
-              verse: tokenReference.verse,
-              endVerse: tokenReference.endVerse,
-            }
-          : null,
-        linksCount: links.length,
-        targetTokenCount: targetTokens.length,
-      })
-    }
-
     const linksWithAlignedTokens = links.map(link => {
       // Only process links with quote tokens (original language tokens)
       if (!link.quoteTokens || link.quoteTokens.length === 0) {
-        if (typeof console !== 'undefined' && console.log) {
-          console.log('[TN Quote] useAlignedTokens skip (no quoteTokens)', { linkId: link.id, reference: link.reference })
-        }
         return { ...link, alignedTokens: undefined }
       }
 
@@ -213,13 +177,6 @@ export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedT
 
       // Only process links in current chapter
       if (linkChapter !== currentChapter) {
-        if (typeof console !== 'undefined' && console.log) {
-          console.log('[TN Quote] useAlignedTokens skip (chapter mismatch)', {
-            linkId: link.id,
-            linkChapter,
-            currentChapter,
-          })
-        }
         return { ...link, alignedTokens: undefined }
       }
 
@@ -231,15 +188,6 @@ export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedT
         refBookLower !== bookCode ||
         tokenReference.chapter !== linkChapter
       ) {
-        if (typeof console !== 'undefined' && console.log) {
-          console.log('[TN Quote] useAlignedTokens skip (ref mismatch)', {
-            linkId: link.id,
-            refBookLower,
-            bookCode,
-            tokenChapter: tokenReference?.chapter,
-            linkChapter,
-          })
-        }
         return { ...link, alignedTokens: undefined }
       }
 
@@ -248,14 +196,6 @@ export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedT
       const broadcastEndVerse = tokenReference.endVerse || broadcastStartVerse
 
       if (linkVerse < broadcastStartVerse || linkVerse > broadcastEndVerse) {
-        if (typeof console !== 'undefined' && console.log) {
-          console.log('[TN Quote] useAlignedTokens skip (verse out of range)', {
-            linkId: link.id,
-            linkVerse,
-            broadcastStartVerse,
-            broadcastEndVerse,
-          })
-        }
         return { ...link, alignedTokens: undefined }
       }
 
@@ -278,25 +218,6 @@ export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedT
         linkChapter,
         linkVerse
       )
-
-      if (typeof console !== 'undefined' && console.log) {
-        console.log('[TN Quote] useAlignedTokens result', {
-          linkId: link.id,
-          reference: link.reference,
-          originalSemanticIds,
-          alignedCount: alignedTokens.length,
-        })
-        if (alignedTokens.length === 0) {
-          const sample = targetTokens
-            .filter((t) => t.type === 'word' && ((t as any).alignedOriginalWordIds?.length ?? 0) > 0)
-            .slice(0, 3)
-            .map((t) => ({ text: t.text, alignedOriginalWordIds: (t as any).alignedOriginalWordIds }))
-          console.log('[TN Quote] useAlignedTokens no match (sample target alignments)', {
-            linkId: link.id,
-            sampleTargetTokensWithAlign: sample,
-          })
-        }
-      }
 
       return {
         ...link,
