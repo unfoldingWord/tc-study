@@ -84,7 +84,7 @@ export function WordLinkCard({
             e.stopPropagation()
             onQuoteClick(link)
           }}
-          className="w-full text-left mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
+          className="w-full text-left mb-1.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
           title="Click to highlight these words in scripture"
         >
           <div className="text-base leading-relaxed">
@@ -109,7 +109,7 @@ export function WordLinkCard({
       })()}
 
       {/* Entry Link - On bottom, with modal icon (matches Notes support reference style) */}
-      <div className="mt-2.5 pt-2.5 border-t border-gray-100/50">
+      <div className="mt-1.5 pt-1.5 border-t border-gray-100/50">
         <button
           onClick={(e) => {
             e.stopPropagation()

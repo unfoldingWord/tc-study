@@ -272,8 +272,8 @@ export class TranslationWordsLoader implements ResourceLoader {
       throw new Error(`Invalid parameters for fetchWordFromDoor43: owner=${owner}, language=${language}, resourceId=${resourceId} (type: ${typeof resourceId})`)
     }
     
-    // Entry format: "bible/kt/god" -> fetch from "bible/kt/god.md"
-    const filePath = `${entryId}.md`
+    // Entry format: "bible/kt/god" -> fetch from "bible/kt/god.md" (don't append .md if already present, e.g. from [text](../kt/bless.md))
+    const filePath = entryId.endsWith('.md') ? entryId : `${entryId}.md`
     
     // Final check - if resourceId is still undefined or invalid, try to extract it from language
     if (!resourceId || resourceId === 'undefined' || resourceId === undefined) {

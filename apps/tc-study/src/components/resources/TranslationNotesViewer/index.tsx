@@ -17,6 +17,7 @@ import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TranslationNoteCard } from './components/TranslationNoteCard'
 import { useTranslationNotesContent } from './hooks/useTranslationNotesContent'
 import { useTATitles } from './hooks/useTATitles'
+import { useTAMetadataForTitles } from './hooks/useTAMetadataForTitles'
 import { useEntryTitles } from './hooks/useEntryTitles'
 import { useAlignedTokens, useQuoteTokens, useScriptureTokens } from '../WordsLinksViewer/hooks'
 import { generateSemanticIdsForQuoteTokens } from '../WordsLinksViewer/utils'
@@ -58,8 +59,10 @@ export function TranslationNotesViewer({
   // Fetch TA titles
   const { taTitles, loadingTitles, fetchTATitle, getTATitle } = useTATitles(resourceKey)
   
-  // Fetch entry titles (TW/TA) for rc:// links in markdown content
-  const { fetchEntryTitle, getEntryTitle } = useEntryTitles(resourceKey)
+  // Stateful TA metadata: useEffect + async request; when ingredients load, state updates and we re-render (no retries)
+  const taMetadata = useTAMetadataForTitles(resourceKey)
+  const { fetchEntryTitle, getEntryTitle, invalidateTitles } = useEntryTitles(resourceKey, taMetadata)
+  const [entryTitleRefreshTrigger, setEntryTitleRefreshTrigger] = useState(0)
   
   // Determine resource metadata for signal system
   const resourceMetadata = useMemo(() => {
@@ -297,6 +300,18 @@ export function TranslationNotesViewer({
     })
   }, [displayNotes, fetchTATitle])
 
+  // When tab becomes visible, re-fetch entry titles so we show TOC titles once TA is ready (e.g. after language switch)
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        invalidateTitles()
+        setEntryTitleRefreshTrigger(t => t + 1)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+  }, [invalidateTitles])
+
   // Preload entry titles (TW/TA) from rc:// links in note markdown content
   useEffect(() => {
     if (!displayNotes.length) return
@@ -315,7 +330,7 @@ export function TranslationNotesViewer({
         })
       }
     })
-  }, [displayNotes, fetchEntryTitle])
+  }, [displayNotes, fetchEntryTitle, entryTitleRefreshTrigger])
 
   // Group notes by verse for display
   const notesByVerse = useMemo(() => {
@@ -465,7 +480,9 @@ export function TranslationNotesViewer({
 
               {/* Notes for this verse */}
               {verseNotes.map((note, idx) => {
-                const taTitle = getTATitle(note)
+                // Prefer getEntryTitle (stateful taMetadata) for bottom orange link so it matches markdown and re-renders when TA TOC loads
+                const entryTitle = note.supportReference?.startsWith('rc://') ? getEntryTitle(note.supportReference) : null
+                const taTitle = entryTitle ?? getTATitle(note)
                 const isLoadingTitle = note.supportReference ? loadingTitles.has(note.supportReference.match(/rc:\/\/\*\/ta\/man\/(.+)/)?.[1] || '') : false
                 
                 return (
