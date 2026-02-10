@@ -42,10 +42,6 @@ export function useEntryTitles(resourceKey: string) {
       return null
     }
 
-    if (typeof console !== 'undefined' && console.log) {
-      console.log('[Entry Titles] Fetching title for', { rcLink, cacheKey, resourceType: parsed.resourceType })
-    }
-
     try {
       setLoadingTitles(prev => new Set(prev).add(cacheKey))
 
@@ -82,16 +78,6 @@ export function useEntryTitles(resourceKey: string) {
       if (!metadata?.contentMetadata?.ingredients?.length) {
         // Metadata not ready yet - use fallback title
         const fallback = parsed.entryId.split('/').pop() || 'Unknown'
-        if (typeof console !== 'undefined' && console.log) {
-          console.log('[Entry Titles] No ingredients in metadata – using fallback', {
-            rcLink,
-            parsedEntryId: parsed.entryId,
-            targetResourceKey,
-            hasMetadata: !!metadata,
-            ingredientsLength: metadata?.contentMetadata?.ingredients?.length ?? 0,
-            fallback,
-          })
-        }
         entryTitlesRef.current.set(cacheKey, fallback)
         setEntryTitles(prev => new Map(prev).set(cacheKey, fallback))
         return fallback
@@ -133,26 +119,12 @@ export function useEntryTitles(resourceKey: string) {
       if (!ingredient?.title) {
         // Ingredient not found in TOC - use fallback
         const fallback = parsed.entryId.split('/').pop() || 'Unknown'
-        if (typeof console !== 'undefined' && console.log) {
-          const sampleIds = (ingredients as any[]).slice(0, 5).map((ing: any) => ing.identifier)
-          console.log('[Entry Titles] No matching ingredient – using fallback', {
-            rcLink,
-            parsedEntryId: parsed.entryId,
-            targetResourceKey,
-            ingredientsCount: ingredients.length,
-            sampleIdentifiers: sampleIds,
-            fallback,
-          })
-        }
         entryTitlesRef.current.set(cacheKey, fallback)
         setEntryTitles(prev => new Map(prev).set(cacheKey, fallback))
         return fallback
       }
 
       const title = ingredient.title
-      if (typeof console !== 'undefined' && console.log) {
-        console.log('[Entry Titles] Resolved from TOC', { parsedEntryId: parsed.entryId, title, ingredientId: ingredient.identifier })
-      }
       entryTitlesRef.current.set(cacheKey, title)
       setEntryTitles(prev => new Map(prev).set(cacheKey, title))
       return title
