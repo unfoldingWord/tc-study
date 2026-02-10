@@ -42,6 +42,10 @@ export function useEntryTitles(resourceKey: string) {
       return null
     }
 
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('[Entry Titles] Fetching title for', { rcLink, cacheKey, resourceType: parsed.resourceType })
+    }
+
     try {
       setLoadingTitles(prev => new Set(prev).add(cacheKey))
 
@@ -58,11 +62,36 @@ export function useEntryTitles(resourceKey: string) {
       const targetResourceKey = `${owner}/${language}/${parsed.resourceAbbrev}`
 
       // Get resource metadata from catalog (contains TOC in ingredients)
-      const metadata = await catalogManager.getResourceMetadata(targetResourceKey)
+      let metadata = await catalogManager.getResourceMetadata(targetResourceKey)
 
-      if (!metadata?.contentMetadata?.ingredients) {
+      // For TA: if catalog has no ingredients yet, trigger a load of this article so the loader
+      // runs getMetadata and saves ingredients to the catalog (then we can resolve titles).
+      if (
+        metadata &&
+        (!metadata.contentMetadata?.ingredients?.length || metadata.contentMetadata.ingredients.length < 10) &&
+        parsed.resourceType === 'academy'
+      ) {
+        try {
+          await catalogManager.loadContent(targetResourceKey, parsed.entryId)
+          metadata = await catalogManager.getResourceMetadata(targetResourceKey)
+        } catch {
+          // Ignore load errors; we'll use fallback below if still no ingredients
+        }
+      }
+
+      if (!metadata?.contentMetadata?.ingredients?.length) {
         // Metadata not ready yet - use fallback title
         const fallback = parsed.entryId.split('/').pop() || 'Unknown'
+        if (typeof console !== 'undefined' && console.log) {
+          console.log('[Entry Titles] No ingredients in metadata – using fallback', {
+            rcLink,
+            parsedEntryId: parsed.entryId,
+            targetResourceKey,
+            hasMetadata: !!metadata,
+            ingredientsLength: metadata?.contentMetadata?.ingredients?.length ?? 0,
+            fallback,
+          })
+        }
         entryTitlesRef.current.set(cacheKey, fallback)
         setEntryTitles(prev => new Map(prev).set(cacheKey, fallback))
         return fallback
@@ -75,6 +104,13 @@ export function useEntryTitles(resourceKey: string) {
         // Match by identifier or path
         if (ing.identifier === parsed.entryId) return true
         if (ing.path && ing.path.replace(/\.md$/, '') === parsed.entryId) return true
+        
+        // For TA: also try matching by last segment (e.g. identifier "figs-nominaladj" vs entryId "translate/figs-nominaladj")
+        if (parsed.resourceType === 'academy') {
+          const entryLast = parsed.entryId.split('/').pop()
+          const ingId = ing.identifier?.split('/').pop()
+          if (entryLast && ingId && entryLast === ingId) return true
+        }
         
         // For TW: also try matching just category/term (last two parts)
         if (parsed.resourceType === 'words') {
@@ -97,12 +133,26 @@ export function useEntryTitles(resourceKey: string) {
       if (!ingredient?.title) {
         // Ingredient not found in TOC - use fallback
         const fallback = parsed.entryId.split('/').pop() || 'Unknown'
+        if (typeof console !== 'undefined' && console.log) {
+          const sampleIds = (ingredients as any[]).slice(0, 5).map((ing: any) => ing.identifier)
+          console.log('[Entry Titles] No matching ingredient – using fallback', {
+            rcLink,
+            parsedEntryId: parsed.entryId,
+            targetResourceKey,
+            ingredientsCount: ingredients.length,
+            sampleIdentifiers: sampleIds,
+            fallback,
+          })
+        }
         entryTitlesRef.current.set(cacheKey, fallback)
         setEntryTitles(prev => new Map(prev).set(cacheKey, fallback))
         return fallback
       }
 
       const title = ingredient.title
+      if (typeof console !== 'undefined' && console.log) {
+        console.log('[Entry Titles] Resolved from TOC', { parsedEntryId: parsed.entryId, title, ingredientId: ingredient.identifier })
+      }
       entryTitlesRef.current.set(cacheKey, title)
       setEntryTitles(prev => new Map(prev).set(cacheKey, title))
       return title

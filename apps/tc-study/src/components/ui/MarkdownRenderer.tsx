@@ -47,7 +47,10 @@ export function MarkdownRenderer({
   onInternalLinkClick,
   getEntryTitle
 }: MarkdownRendererProps) {
-  const cached = content ? getCached(content) : undefined
+  // When getEntryTitle is used, rendered link text depends on async titles - don't use cache
+  // so we re-render when titles resolve (otherwise cache keyed only by content would show entry IDs).
+  const useCache = !getEntryTitle
+  const cached = useCache && content ? getCached(content) : undefined
   const [renderedContent, setRenderedContent] = useState<React.ReactNode>(cached ?? null)
   const [isLoading, setIsLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
@@ -59,11 +62,13 @@ export function MarkdownRenderer({
       return
     }
 
-    const cachedResult = getCached(content)
-    if (cachedResult !== undefined) {
-      setRenderedContent(cachedResult)
-      setIsLoading(false)
-      return
+    if (useCache) {
+      const cachedResult = getCached(content)
+      if (cachedResult !== undefined) {
+        setRenderedContent(cachedResult)
+        setIsLoading(false)
+        return
+      }
     }
 
     let cancelled = false
@@ -83,7 +88,7 @@ export function MarkdownRenderer({
 
         const result = await renderer.renderToReact(content)
         if (cancelled) return
-        setCached(content, result)
+        if (useCache) setCached(content, result)
         setRenderedContent(result)
       } catch (err) {
         if (cancelled) return
