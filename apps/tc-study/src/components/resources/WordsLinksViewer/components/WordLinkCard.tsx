@@ -40,7 +40,19 @@ export function WordLinkCard({
 }: WordLinkCardProps) {
   const twInfo = parseTWLink(link.twLink)
   const isKeyTerm = twInfo.category === 'kt'
-  const hasAlignedTokens = (link as any).alignedTokens && (link as any).alignedTokens.length > 0
+  const alignedTokens = (link as any).alignedTokens
+  const hasAlignedTokens = alignedTokens && alignedTokens.length > 0
+
+  // Debug: why target quote may not render
+  if (typeof console !== 'undefined' && console.log) {
+    console.log('[TWL Quote]', {
+      twLink: link.twLink,
+      origWords: (link as any).origWords ?? '(none)',
+      hasAlignedTokensProp: !!alignedTokens,
+      alignedTokensLength: alignedTokens?.length ?? 0,
+      willRenderQuote: hasAlignedTokens,
+    })
+  }
 
   // Extract resource abbreviation (e.g., "ult" from "unfoldingWord/en/ult")
   const resourceAbbreviation = targetResourceId
@@ -62,7 +74,11 @@ export function WordLinkCard({
       title={hasAlignedTokens ? 'Click to highlight these words in scripture' : undefined}
     >
       {/* Quote - On top, clickable to broadcast/highlight tokens (matches Notes layout) */}
-      {hasAlignedTokens && (
+      {hasAlignedTokens && (() => {
+        if (typeof console !== 'undefined' && console.log) {
+          console.log('[TWL Quote] Rendering quote block', { twLink: link.twLink, tokenCount: alignedTokens.length })
+        }
+        return (
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -74,7 +90,7 @@ export function WordLinkCard({
           <div className="text-base leading-relaxed">
             <span className="italic text-gray-700">
               &ldquo;
-              {(link as any).alignedTokens.map((token: AlignedToken, index: number) => (
+              {alignedTokens.map((token: AlignedToken, index: number) => (
                 <span key={token.semanticId || index}>
                   {index > 0 && ' '}
                   {token.content}
@@ -89,7 +105,8 @@ export function WordLinkCard({
             )}
           </div>
         </button>
-      )}
+        )
+      })()}
 
       {/* Entry Link - On bottom, with modal icon (matches Notes support reference style) */}
       <div className="mt-2.5 pt-2.5 border-t border-gray-100/50">

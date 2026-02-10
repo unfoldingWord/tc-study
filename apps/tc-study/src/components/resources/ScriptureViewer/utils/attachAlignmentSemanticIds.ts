@@ -28,6 +28,11 @@ export function attachAlignmentSemanticIds(
   verses: ProcessedVerse[]
 ): void {
   if (!scripture.alignments || scripture.alignments.length === 0) {
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('[TN Quote] attachAlignmentSemanticIds early return (no alignments)', {
+        alignmentsLength: scripture.alignments?.length ?? 0,
+      })
+    }
     return
   }
 
@@ -42,6 +47,16 @@ export function attachAlignmentSemanticIds(
       alignmentsByVerse.set(verseRef, [])
     }
     alignmentsByVerse.get(verseRef)!.push(alignment)
+  }
+
+  const sampleAlignmentKeys = Array.from(alignmentsByVerse.keys()).slice(0, 3)
+  const sampleVerseRefs = verses.slice(0, 3).map((v) => v.reference)
+  if (typeof console !== 'undefined' && console.log) {
+    console.log('[TN Quote] attachAlignmentSemanticIds keys', {
+      alignmentVerseRefsSample: sampleAlignmentKeys,
+      verseReferencesSample: sampleVerseRefs,
+      versesCount: verses.length,
+    })
   }
 
   // Now attach semantic IDs to tokens in verses
@@ -107,5 +122,8 @@ export function attachAlignmentSemanticIds(
         attachedCount++
       }
     }
+  }
+  if (typeof console !== 'undefined' && console.log) {
+    console.log('[TN Quote] attachAlignmentSemanticIds done', { attachedCount })
   }
 }

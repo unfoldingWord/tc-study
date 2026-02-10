@@ -17,22 +17,32 @@ export function isBookOrganizedKey(key: string): boolean {
 }
 
 /**
- * Returns true if this key is a chapter sub-key (e.g. scripture:owner/lang/id:gen:1).
+ * Returns true if this key is a chapter sub-key (e.g. scripture:owner/lang/id:gen:1 or scripture:...:1:alignments).
  * Used to filter keys() to logical keys only.
  */
 export function isChapterSubKey(key: string): boolean {
   if (!isBookOrganizedKey(key)) return false
   const parts = key.split(':')
   const last = parts[parts.length - 1]
-  return /^\d+$/.test(last) && parts.length > 1
+  const secondLast = parts.length > 2 ? parts[parts.length - 2] : ''
+  return (
+    (parts.length > 1 && /^\d+$/.test(last)) ||
+    (parts.length > 2 && last === 'alignments' && /^\d+$/.test(secondLast))
+  )
 }
 
 /**
  * Map a raw key to its logical key (base key for book-organized entries).
  * e.g. scripture:owner/lang/id:gen:1 -> scripture:owner/lang/id:gen
+ *      scripture:owner/lang/id:gen:1:alignments -> scripture:owner/lang/id:gen
  */
 export function toLogicalKey(key: string): string {
   if (!isChapterSubKey(key)) return key
+  if (key.endsWith(':alignments')) {
+    const withoutAlignments = key.slice(0, -':alignments'.length)
+    const lastColon = withoutAlignments.lastIndexOf(':')
+    return lastColon > 0 ? withoutAlignments.slice(0, lastColon) : withoutAlignments
+  }
   const lastColon = key.lastIndexOf(':')
   return lastColon > 0 ? key.slice(0, lastColon) : key
 }
@@ -58,9 +68,10 @@ function isScriptureEntry(entry: CacheEntry | Record<string, unknown>): boolean 
   return Array.isArray((c as { chapters?: unknown })?.chapters)
 }
 
-function scriptureChapters(entry: CacheEntry): { metadata: unknown; chapters: unknown[] } {
-  const content = entry.content as { metadata?: unknown; chapters: unknown[] }
-  return { metadata: content.metadata, chapters: content.chapters ?? [] }
+function scriptureChapters(entry: CacheEntry): { metadata: unknown; chapters: unknown[]; content: Record<string, unknown> } {
+  const content = entry.content as Record<string, unknown> & { metadata?: unknown; chapters: unknown[] }
+  const chapters = content.chapters ?? []
+  return { metadata: content.metadata, chapters, content }
 }
 
 export function canSplitScripture(key: string, entry: CacheEntry): boolean {
@@ -68,13 +79,46 @@ export function canSplitScripture(key: string, entry: CacheEntry): boolean {
   return key.startsWith('scripture:') && isScriptureEntry(entry) && (chapters?.length ?? 0) > 0
 }
 
-export function splitScriptureEntry(key: string, entry: CacheEntry): { manifestEntry: CacheEntry; chapterEntries: Array<{ key: string; entry: CacheEntry }> } {
-  const { metadata, chapters } = scriptureChapters(entry)
+/** WordAlignment has verseRef e.g. "TIT 1:1"; we split by chapter using bookCode + " " + ch + ":". */
+function alignmentsForChapter(
+  alignments: Array<{ verseRef?: string }>,
+  bookCode: string,
+  chapterNum: number
+): Array<{ verseRef?: string }> {
+  if (!alignments?.length) return []
+  const prefix = `${bookCode} ${chapterNum}:`.toLowerCase()
+  return alignments.filter((a) => (a.verseRef ?? '').toLowerCase().startsWith(prefix))
+}
+
+/**
+ * Split scripture for chapter-level storage. Manifest has no chapters and no alignments (they are large).
+ * Chapter content → key:chNum. Chapter alignments → key:chNum:alignments (separate entries).
+ */
+export function splitScriptureEntry(
+  key: string,
+  entry: CacheEntry
+): { manifestEntry: CacheEntry; chapterEntries: Array<{ key: string; entry: CacheEntry }>; alignmentEntries: Array<{ key: string; entry: CacheEntry }> } {
+  const { metadata, chapters, content } = scriptureChapters(entry)
+  const alignments = (content.alignments as Array<{ verseRef?: string }> | undefined) ?? []
+  const bookCodeFromKey = key.split(':').pop() ?? ''
+  const bookCode = String((content.bookCode ?? (content.metadata as Record<string, unknown>)?.bookCode) ?? bookCodeFromKey).toLowerCase() || ''
+
+  const bookLevelContent: Record<string, unknown> = {
+    ...content,
+    metadata,
+    chapters: undefined,
+    alignments: undefined,
+    [CHUNKED_MARKER]: true,
+  }
+  delete bookLevelContent.chapters
+  delete bookLevelContent.alignments
   const manifestEntry: CacheEntry = {
     ...entry,
-    content: { metadata, [CHUNKED_MARKER]: true },
-    metadata: { ...entry.metadata, [CHUNKED_MARKER]: true },
+    content: bookLevelContent,
+    metadata: { ...(entry.metadata as Record<string, unknown>), [CHUNKED_MARKER]: true },
   }
+
+  const chapterNums = (chapters as Array<{ number?: number }>).map((ch, i) => ch?.number ?? i + 1)
   const chapterEntries = (chapters as Array<{ number?: number }>).map((ch, i) => {
     const chapterNum = ch?.number ?? i + 1
     return {
@@ -82,23 +126,81 @@ export function splitScriptureEntry(key: string, entry: CacheEntry): { manifestE
       entry: { ...entry, content: ch } as CacheEntry,
     }
   })
-  return { manifestEntry, chapterEntries }
+
+  const alignmentEntries = chapterNums.map((chapterNum) => ({
+    key: `${key}:${chapterNum}:alignments`,
+    entry: {
+      ...entry,
+      content: alignmentsForChapter(alignments, bookCode || 'unknown', chapterNum),
+    } as CacheEntry,
+  }))
+
+  if (typeof console !== 'undefined' && console.log && alignmentEntries.length > 0) {
+    const totalStored = alignmentEntries.reduce((sum, e) => sum + (Array.isArray(e.entry.content) ? e.entry.content.length : 0), 0)
+    console.log('[Cache Adapter] splitScriptureEntry', {
+      key,
+      chapterEntries: chapterEntries.length,
+      alignmentEntries: alignmentEntries.length,
+      totalAlignmentsStored: totalStored,
+      inputAlignmentsCount: alignments.length,
+    })
+  }
+
+  return { manifestEntry, chapterEntries, alignmentEntries }
 }
 
-export function reassembleScripture(manifestEntry: CacheEntry, chapterEntries: Array<{ key: string; entry: CacheEntry }>): CacheEntry {
-  const content = manifestEntry.content as { metadata?: unknown; [k: string]: unknown }
+/**
+ * All records under this book key (content key:chNum and alignment key:chNum:alignments).
+ * We separate into content entries and alignment entries, then reassemble.
+ */
+export function reassembleScripture(manifestEntry: CacheEntry, chapterRecords: Array<{ key: string; entry: CacheEntry }>): CacheEntry {
+  const content = manifestEntry.content as Record<string, unknown>
   const metadata = content?.metadata
-  const chapters = chapterEntries
+
+  const contentEntries = chapterRecords.filter((r) => !r.key.endsWith(':alignments'))
+  const alignmentEntries = chapterRecords.filter((r) => r.key.endsWith(':alignments'))
+
+  if (typeof console !== 'undefined' && console.log) {
+    const alignmentsFromEntries = alignmentEntries.flatMap((r) => (Array.isArray(r.entry.content) ? r.entry.content : []))
+    console.log('[Cache Adapter] reassembleScripture', {
+      contentEntries: contentEntries.length,
+      alignmentEntries: alignmentEntries.length,
+      totalAlignmentsFromEntries: alignmentsFromEntries.length,
+      manifestHadAlignments: Array.isArray(content?.alignments) ? (content.alignments as unknown[]).length : 0,
+    })
+  }
+
+  const chapters = contentEntries
     .sort((a, b) => {
       const na = parseInt(a.key.split(':').pop() ?? '0', 10)
       const nb = parseInt(b.key.split(':').pop() ?? '0', 10)
       return na - nb
     })
     .map((c) => c.entry.content)
+
+  const alignments = alignmentEntries
+    .sort((a, b) => {
+      const aParts = a.key.split(':')
+      const bParts = b.key.split(':')
+      const na = parseInt(aParts[aParts.length - 2] ?? '0', 10)
+      const nb = parseInt(bParts[bParts.length - 2] ?? '0', 10)
+      return na - nb
+    })
+    .flatMap((r) => (Array.isArray(r.entry.content) ? r.entry.content : []))
+
+  const reassembledContent = { ...content, metadata, chapters, alignments: alignments.length > 0 ? alignments : undefined }
+  delete (reassembledContent as Record<string, unknown>)[CHUNKED_MARKER]
+  const outMetadata = manifestEntry.metadata
+    ? (() => {
+        const m = { ...(manifestEntry.metadata as Record<string, unknown>) }
+        delete m[CHUNKED_MARKER]
+        return m
+      })()
+    : undefined
   return {
     ...manifestEntry,
-    content: { ...content, metadata, chapters },
-    metadata: manifestEntry.metadata ? { ...manifestEntry.metadata } : undefined,
+    content: reassembledContent,
+    metadata: outMetadata,
   }
 }
 
@@ -218,20 +320,28 @@ export function canSplitBookEntry(key: string, entry: CacheEntry): boolean {
   return canSplitScripture(key, entry) || canSplitNotes(key, entry) || canSplitQuestions(key, entry)
 }
 
-export function splitBookEntry(key: string, entry: CacheEntry): { manifestEntry: CacheEntry; chapterEntries: Array<{ key: string; entry: CacheEntry }> } {
+export type ChapterEntry = { key: string; entry: CacheEntry }
+
+export function splitBookEntry(
+  key: string,
+  entry: CacheEntry
+): { manifestEntry: CacheEntry; chapterEntries: ChapterEntry[]; alignmentEntries?: ChapterEntry[] } {
   if (canSplitScripture(key, entry)) return splitScriptureEntry(key, entry)
   if (canSplitNotes(key, entry)) return splitNotesEntry(key, entry)
   if (canSplitQuestions(key, entry)) return splitQuestionsEntry(key, entry)
   return { manifestEntry: entry, chapterEntries: [] }
 }
 
+/**
+ * Reassemble from manifest + all chapter-related records (content key:ch and, for scripture, alignment key:ch:alignments).
+ */
 export function reassembleBookEntry(
   key: string,
   manifestEntry: CacheEntry,
-  chapterEntries: Array<{ key: string; entry: CacheEntry }>
+  chapterRecords: Array<{ key: string; entry: CacheEntry }>
 ): CacheEntry {
-  if (key.startsWith('scripture:')) return reassembleScripture(manifestEntry, chapterEntries)
-  if (key.startsWith('tn:')) return reassembleNotes(manifestEntry, chapterEntries)
-  if (key.startsWith('tq:')) return reassembleQuestions(manifestEntry, chapterEntries)
+  if (key.startsWith('scripture:')) return reassembleScripture(manifestEntry, chapterRecords)
+  if (key.startsWith('tn:')) return reassembleNotes(manifestEntry, chapterRecords)
+  if (key.startsWith('tq:')) return reassembleQuestions(manifestEntry, chapterRecords)
   return manifestEntry
 }

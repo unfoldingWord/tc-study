@@ -52,7 +52,18 @@ export function TranslationNoteCard({
   const [showRawMarkdown, setShowRawMarkdown] = useState(false)
   const currentRef = useCurrentReference()
   const { navigateToReference } = useNavigation()
-  const hasAlignedTokens = note.alignedTokens && note.alignedTokens.length > 0
+  const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
+
+  // Debug: why target quote may not render
+  if (typeof console !== 'undefined' && console.log) {
+    console.log('[TN Quote]', {
+      noteId: note.id,
+      quote: note.quote ?? '(none)',
+      hasAlignedTokensProp: !!note.alignedTokens,
+      alignedTokensLength: note.alignedTokens?.length ?? 0,
+      willRenderQuote: hasAlignedTokens,
+    })
+  }
   
   // Extract resource abbreviation (e.g., "ULT" from "unfoldingWord/en/ult")
   const resourceAbbreviation = targetResourceId 
@@ -132,8 +143,12 @@ export function TranslationNoteCard({
       role="article"
       aria-label="Translation note"
     >
-      {/* Target Language Quote - Clickable aligned tokens */}
-      {hasAlignedTokens && (
+      {/* Target Language Quote - Clickable aligned tokens when available */}
+      {hasAlignedTokens && (() => {
+        if (typeof console !== 'undefined' && console.log) {
+          console.log('[TN Quote] Rendering quote block', { noteId: note.id, tokenCount: note.alignedTokens!.length })
+        }
+        return (
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -185,6 +200,26 @@ export function TranslationNoteCard({
             )}
           </div>
         </button>
+        )
+      })()}
+
+      {/* Fallback: Original language quote when target alignment is missing (e.g. scripture has no \zaln) */}
+      {!hasAlignedTokens && note.quote && note.quote.trim().length > 0 && (
+        <div
+          className="w-full text-left mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 rounded-lg border border-blue-100/50"
+          title="Original language phrase (target language alignment not available)"
+        >
+          <div className="text-base leading-relaxed" dir={languageDirection}>
+            <span className="italic text-gray-700">
+              &ldquo;{note.quote}&rdquo;
+            </span>
+            {resourceAbbreviation && (
+              <span className="ml-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
+                {resourceAbbreviation}
+              </span>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Note Content - Translation guidance (markdown) */}

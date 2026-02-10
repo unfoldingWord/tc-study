@@ -198,18 +198,36 @@ export function TranslationNotesViewer({
   }, [relevantNotes])
   
   // Parse original language tokens from quote fields
-  const { linksWithQuotes } = useQuoteTokens({
+  const { linksWithQuotes, hasOriginalContent } = useQuoteTokens({
     resourceKey,
     resourceId,
     links: notesWithQuotes,
   })
   
   // Get aligned tokens in target language
-  const { linksWithAlignedTokens } = useAlignedTokens({
+  const { linksWithAlignedTokens, hasTargetContent } = useAlignedTokens({
     resourceKey,
     resourceId,
     links: linksWithQuotes,
   })
+
+  // Debug: trace why alignedTokens might be missing (quote not rendering)
+  const quotePipelineDebug = useMemo(() => {
+    const withQuote = linksWithQuotes.filter(l => l.quoteTokens && l.quoteTokens.length > 0)
+    const withAligned = linksWithAlignedTokens.filter(l => l.alignedTokens && l.alignedTokens.length > 0)
+    return {
+      notesWithQuotesCount: notesWithQuotes.length,
+      linksWithQuoteTokensCount: withQuote.length,
+      linksWithAlignedTokensCount: withAligned.length,
+      hasOriginalContent,
+      hasTargetContent,
+    }
+  }, [notesWithQuotes.length, linksWithQuotes, linksWithAlignedTokens, hasOriginalContent, hasTargetContent])
+  useEffect(() => {
+    if (notesWithQuotes.length > 0 && typeof console !== 'undefined' && console.log) {
+      console.log('[TN Quote Pipeline]', quotePipelineDebug)
+    }
+  }, [notesWithQuotes.length, quotePipelineDebug])
   
   // Merge quote tokens (original language) and aligned tokens back into notes
   const notesWithAlignedTokens = useMemo(() => {

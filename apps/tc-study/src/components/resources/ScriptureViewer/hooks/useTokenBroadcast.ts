@@ -75,10 +75,20 @@ function extractOptimizedTokens(
       
       // Convert WordToken[] to OptimizedToken[]
       // Include ALL tokens (word, punctuation, whitespace) for accurate quote building
+      let firstWordLogged = false
       verseData.wordTokens.forEach((token: WordToken) => {
         const verseRef = `${bookCode} ${chapterNum}:${verseNum}`
         const occurrence = token.occurrence || 1
-        
+        const wordToken = token as WordToken & { alignedOriginalWordIds?: string[] }
+        if (token.type === 'word' && !firstWordLogged && typeof console !== 'undefined' && console.log) {
+          console.log('[TN Quote] extractOptimizedTokens first word in range', {
+            verseRef,
+            content: token.content,
+            alignedOriginalWordIds: wordToken.alignedOriginalWordIds ?? 'none',
+          })
+          firstWordLogged = true
+        }
+
         // Create OptimizedToken with extended properties via type assertion
         const optimizedToken: OptimizedToken = {
           id: tokens.length, // Use cumulative index across all verses
@@ -91,7 +101,7 @@ function extractOptimizedTokens(
             semanticId: token.type === 'word' 
               ? `${verseRef}:${token.content}:${occurrence}`
               : `${verseRef}:${token.type}:${tokens.length}`, // Use index for non-word tokens
-            alignedOriginalWordIds: token.alignedOriginalWordIds || [],
+            alignedOriginalWordIds: wordToken.alignedOriginalWordIds || [],
           } as any),
         }
         
@@ -126,6 +136,14 @@ export function useTokenBroadcast({
     const bookCode = loadedContent?.metadata?.bookCode || ''
     
     if (!loadedContent || !bookCode || !currentChapter || !currentVerse) {
+      if (typeof console !== 'undefined' && console.log) {
+        console.log('[TN Quote] useTokenBroadcast early return', {
+          hasLoadedContent: !!loadedContent,
+          bookCode,
+          currentChapter,
+          currentVerse,
+        })
+      }
       // Send empty state to clear
       api.messaging.sendToAll({
         type: 'scripture-tokens-broadcast',
@@ -149,9 +167,30 @@ export function useTokenBroadcast({
       return
     }
     
+    // [TN Quote] inspect loadedContent before extract
+    const firstChapter = loadedContent.chapters?.[0]
+    const firstVerse = firstChapter?.verses?.[0]
+    const firstWordInContent = firstVerse?.wordTokens?.find((t: WordToken) => t.type === 'word') as WordToken & { alignedOriginalWordIds?: string[] } | undefined
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('[TN Quote] useTokenBroadcast before extract', {
+        resourceKey,
+        alignmentsCount: loadedContent.alignments?.length ?? 0,
+        firstVerseRef: firstVerse?.reference,
+        firstWordAlign: firstWordInContent?.alignedOriginalWordIds ?? 'no word token',
+      })
+    }
+
     // Extract tokens for current verse or verse range
     const tokens = extractOptimizedTokens(loadedContent, currentChapter, currentVerse, endChapter, endVerse)
-    
+    const tokensWithAlign = tokens.filter((t: any) => (t.alignedOriginalWordIds?.length ?? 0) > 0)
+    if (typeof console !== 'undefined' && console.log) {
+      console.log('[TN Quote] useTokenBroadcast after extract', {
+        tokensCount: tokens.length,
+        tokensWithAlignedIds: tokensWithAlign.length,
+        sample: tokensWithAlign[0]?.alignedOriginalWordIds ?? 'none',
+      })
+    }
+
     // Broadcast tokens
     const broadcast: ScriptureTokensBroadcastSignal = {
       type: 'scripture-tokens-broadcast',
