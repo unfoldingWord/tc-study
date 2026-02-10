@@ -117,10 +117,12 @@ export function isRelativeLink(href: string): boolean {
 }
 
 /**
- * Parse a relative link to extract the entry ID
+ * Parse a relative link to extract the entry ID.
+ * Resolution is relative to the current entry's directory (parent of the term), not the full path.
  * Examples:
- * - dot-dot-slash translate/figs-metaphor becomes translate/figs-metaphor
- * - dot-dot-slash dot-dot-slash bible/kt/grace becomes bible/kt/grace
+ * - from bible/kt/wordofgod, ../kt/bless.md -> bible/kt/bless (same category)
+ * - from bible/kt/wordofgod, ../other/praise.md -> bible/other/praise (sibling category)
+ * - ./other/term or no currentEntryId: path only, normalized.
  */
 export function parseRelativeLink(href: string, currentEntryId: string): string {
   if (!href || !isRelativeLink(href)) {
@@ -132,16 +134,18 @@ export function parseRelativeLink(href: string, currentEntryId: string): string 
   const upLevels = (href.match(/\.\.\//g) || []).length
   path = path.replace(/^(\.\.\/)*(\.\/)?/, '')
 
-  // If we have the current entry ID, resolve relative to it
   if (currentEntryId && upLevels > 0) {
     const currentParts = currentEntryId.split('/')
-    // Go up the specified number of levels
-    const baseParts = currentParts.slice(0, -upLevels)
-    // Append the relative path
-    return [...baseParts, path].join('/')
+    // Current "directory" is all segments except the last (the term/file)
+    const currentDirParts = currentParts.length > 1 ? currentParts.slice(0, -1) : currentParts
+    // Go up from that directory (e.g. bible/kt + ../ -> bible)
+    const baseParts = currentDirParts.slice(0, Math.max(0, currentDirParts.length - upLevels))
+    const resolved = [...baseParts, path].join('/')
+    return resolved.endsWith('.md') ? resolved.slice(0, -3) : resolved
   }
 
-  return path
+  const pathResolved = path.endsWith('.md') ? path.slice(0, -3) : path
+  return pathResolved
 }
 
 /**
