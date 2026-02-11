@@ -1,0 +1,6 @@
+node_modules/
+dist/
+# Avoid committing compiled output if tsc ever runs without outDir
+src/**/*.js
+src/**/*.d.ts
+*.tsbuildinfo

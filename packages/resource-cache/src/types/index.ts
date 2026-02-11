@@ -39,11 +39,12 @@ export interface NetworkSecurityOptions {
   allowHttp?: boolean
   allowedOrigins?: string[]
   requireSecureConnection?: boolean
+  requireSecureWifi?: boolean
+  allowedDomains?: string[]
 }
 
-export interface NetworkFetcher {
-  fetch(url: string): Promise<any>
-}
+/** Callable: (key: string) => Promise<CacheEntry | null> */
+export type NetworkFetcher = (key: string) => Promise<CacheEntry | null>
 
 export interface NetworkStatus {
   online: boolean
@@ -64,8 +65,10 @@ export interface CacheStorageAdapter {
   getMany?(keys: string[]): Promise<Map<string, CacheEntry>>
   setMany?(entries: Array<{ key: string; entry: CacheEntry }>): Promise<void>
   deleteMany?(keys: string[]): Promise<void>
-  readonly size?: number
-  readonly count?: number
+  /** Size in bytes (sync getter or async method) */
+  size?(): number | Promise<number>
+  /** Entry count (sync getter or async method) */
+  count?(): number | Promise<number>
   optimize?(): Promise<void>
 }
 
@@ -86,6 +89,9 @@ export interface CacheExport {
 export interface ImportOptions {
   overwrite?: boolean
   validateEntries?: boolean
+  merge?: boolean
+  skipExpired?: boolean
+  updateTimestamps?: boolean
 }
 
 export { }

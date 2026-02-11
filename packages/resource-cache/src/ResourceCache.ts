@@ -189,7 +189,7 @@ export class ResourceCache {
     
     // Store in memory cache
     if (!options.skipMemory) {
-      this.memoryCache.set(key, entry, options.priority)
+      this.memoryCache.set(key, entry)
     }
     
     // Store in storage cache
@@ -333,7 +333,7 @@ export class ResourceCache {
       
       // Add to memory cache
       if (!options?.skipMemory) {
-        this.memoryCache.set(key, entry, options?.priority)
+        this.memoryCache.set(key, entry)
       }
       
       return { key, entry }
@@ -449,6 +449,7 @@ export class ResourceCache {
       totalEntries: memoryStats.entries + storageCount,
       totalSize: memoryStats.size + storageSize,
       hitRate,
+      missRate: 1 - hitRate,
       memory: memoryStats,
       storage: {
         entries: storageCount,
@@ -472,7 +473,7 @@ export class ResourceCache {
    * Get total cache size
    */
   async getSize(): Promise<number> {
-    const memorySize = this.memoryCache.size()
+    const memorySize = this.memoryCache.size
     const storageSize = await this.storage.size()
     return memorySize + storageSize
   }
@@ -508,12 +509,8 @@ export class ResourceCache {
     const entries = await this.storage.getMany(keys)
     
     return {
-      version: '1.0.0',
       exportedAt: new Date().toISOString(),
-      entries: Array.from(entries.entries()).map(([key, entry]) => ({
-        key,
-        entry,
-      })),
+      entries: Array.from(entries.entries()),
     }
   }
   
@@ -531,7 +528,7 @@ export class ResourceCache {
     
     const items: Array<{ key: string; entry: CacheEntry }> = []
     
-    for (const { key, entry } of data.entries) {
+    for (const [key, entry] of data.entries) {
       // Skip expired if requested
       if (options.skipExpired && entry.expiresAt && new Date(entry.expiresAt) < now) {
         continue
