@@ -47,6 +47,7 @@
     "@bt-synergy/translation-words-loader": "workspace:*",
     "@bt-synergy/ui-controls": "workspace:*",
     "@bt-synergy/usfm-processor": "workspace:*",
+    "usfm-js": "^3.4.3",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

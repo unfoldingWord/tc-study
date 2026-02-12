@@ -29,6 +29,7 @@ export default defineConfig({
     include: [
       'linked-panels',
       '@bt-synergy/cache-adapter-indexeddb',
+      'usfm-js',
     ],
   },
   ...getSharedBuildConfig(),
