@@ -28,15 +28,16 @@
     }
   },
   "scripts": {
-    "build": "tsc -b",
-    "dev": "tsc -b --watch",
+    "build": "tsc",
+    "dev": "tsc --watch",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@bt-synergy/resource-types": "workspace:*",
-    "@bt-synergy/resource-panels": "workspace:*",
-    "@bt-synergy/usfm-processor": "workspace:*",
     "@bt-synergy/resource-cache": "workspace:*",
+    "@bt-synergy/resource-panels": "workspace:*",
+    "@bt-synergy/resource-signals": "workspace:*",
+    "@bt-synergy/resource-types": "workspace:*",
+    "@bt-synergy/usfm-processor": "workspace:*",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

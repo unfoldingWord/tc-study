@@ -18,17 +18,21 @@ export function ManifestPreview({ onAddMoreResources, onBackToManage }: Manifest
   
   const manifest = generateManifest()
   const manifestJson = JSON.stringify(manifest, null, 2)
+  const statsWithEstimated = manifest.stats as { estimatedSize?: number; totalSize?: number }
+  const sizeMb = ((statsWithEstimated.estimatedSize ?? statsWithEstimated.totalSize ?? 0) / (1024 * 1024)).toFixed(1)
   
-  // Derive stats from resources (since we removed redundant stats fields)
-  const organizations = Array.from(new Set(manifest.resources.map(r => r.owner)))
+  // Derive from resources (support both package-builder shape and web manifest shape)
+  const resources = manifest.resources as Array<{ owner?: string; metadata?: { owner?: string; language?: string; subjects?: string[] }; language?: { code: string; name: string; direction: string }; content?: { subject?: string } }>
+  const organizations = Array.from(new Set(resources.map(r => r.owner ?? r.metadata?.owner ?? '').filter(Boolean)))
   const languagesMap = new Map<string, { code: string; name: string; direction: string }>()
-  manifest.resources.forEach(r => {
-    if (!languagesMap.has(r.language.code)) {
-      languagesMap.set(r.language.code, r.language)
+  resources.forEach(r => {
+    const code = r.language?.code ?? r.metadata?.language ?? ''
+    if (code && !languagesMap.has(code)) {
+      languagesMap.set(code, r.language ?? { code, name: code, direction: 'ltr' })
     }
   })
   const languages = Array.from(languagesMap.values())
-  const subjects = Array.from(new Set(manifest.resources.map(r => r.content.subject)))
+  const subjects = Array.from(new Set(resources.map(r => r.content?.subject ?? (r.metadata?.subjects?.[0] ?? '')).filter(Boolean)))
 
   const handleDownload = () => {
     const blob = new Blob([manifestJson], { type: 'application/json' })
@@ -93,7 +97,7 @@ export function ManifestPreview({ onAddMoreResources, onBackToManage }: Manifest
           <div>
             <div className="text-gray-500">Estimated Size</div>
             <div className="font-semibold text-gray-900">
-              {(manifest.stats.estimatedSize / (1024 * 1024)).toFixed(1)} MB
+              {sizeMb} MB
             </div>
           </div>
           <div>

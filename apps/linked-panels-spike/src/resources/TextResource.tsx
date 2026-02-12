@@ -8,13 +8,15 @@ import { useState, useEffect } from 'react'
 import { useResourceAPI, useCurrentState, useEvents } from 'linked-panels'
 import type { WordClickMessage, HighlightedWordsBroadcast } from '../types'
 
+type PanelMessage = WordClickMessage | HighlightedWordsBroadcast
+
 interface TextResourceProps {
   text: string
   resourceId: string
 }
 
 export function TextResource({ text, resourceId }: TextResourceProps) {
-  const api = useResourceAPI<WordClickMessage>(resourceId)
+  const api = useResourceAPI<PanelMessage>(resourceId)
   // Local state for highlighting (fallback when useCurrentState doesn't update)
   const [localHighlightedWords, setLocalHighlightedWords] = useState<string[]>([])
   const [localSelectedWord, setLocalSelectedWord] = useState<string | null>(null)

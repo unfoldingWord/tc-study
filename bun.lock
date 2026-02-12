@@ -659,6 +659,7 @@
       "dependencies": {
         "@bt-synergy/resource-cache": "workspace:*",
         "@bt-synergy/resource-panels": "workspace:*",
+        "@bt-synergy/resource-signals": "workspace:*",
         "@bt-synergy/resource-types": "workspace:*",
         "@bt-synergy/usfm-processor": "workspace:*",
         "react": "^19.2.0",
@@ -818,6 +819,9 @@
     "packages/usfm-processor": {
       "name": "@bt-synergy/usfm-processor",
       "version": "0.1.0",
+      "dependencies": {
+        "usfm-js": "^3.4.3",
+      },
       "devDependencies": {
         "typescript": "^5.3.3",
       },

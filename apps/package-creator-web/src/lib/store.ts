@@ -5,20 +5,11 @@
 import { create } from 'zustand'
 import type {
   PackageManifest,
-  ResourceManifestEntry,
   Door43Language,
   Door43Organization,
   Door43Resource,
 } from '@/types/manifest'
-import {
-  generateManifest as generateManifestFromBuilder,
-  inferResourceType,
-  inferResourceRole,
-  assignPanelId,
-  getResourceKey,
-  generatePanelLayout,
-  calculatePackageStats,
-} from '@bt-synergy/package-builder'
+import { generateManifest as generateManifestFromBuilder } from '@bt-synergy/package-builder'
 
 interface PackageStore {
   // Current package being created
@@ -68,6 +59,8 @@ const DEFAULT_MANIFEST: Partial<PackageManifest> = {
   version: '1.0.0',
   config: {
     defaultServer: 'https://git.door43.org',
+    offlineEnabled: true,
+    autoUpdate: false,
   },
   status: 'draft',
 }
@@ -201,11 +194,15 @@ export const usePackageStore = create<PackageStore>((set, get) => ({
     
     console.log('✅ Generated manifest with', manifest.resources.length, 'resources')
     
-    // Merge with any additional manifest fields from state
-    return {
-      ...manifest,
-      id: state.manifest.id || manifest.id,
-    } as PackageManifest
+    // Merge with any additional manifest fields from state; add web-only fields if missing
+    const base = { ...manifest, id: state.manifest.id || manifest.id }
+    const withLayout = 'panelLayout' in base && base.panelLayout
+      ? base
+      : { ...base, panelLayout: { panels: [], layoutVersion: '1.0' } }
+    const withStatus = 'status' in withLayout && withLayout.status
+      ? withLayout
+      : { ...withLayout, status: 'draft' as const }
+    return withStatus as unknown as PackageManifest
   },
 }))
 

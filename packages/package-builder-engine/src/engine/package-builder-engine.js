@@ -129,7 +129,7 @@ var PackageBuilderEngine = /** @class */ (function () {
                         _a.label = 6;
                     case 6:
                         totalSize = Array.from(files.values()).reduce(function (sum, file) {
-                            return sum + (typeof file === 'string' ? file.length : file.length);
+                            return sum + (typeof file === 'string' ? file.length : file.byteLength);
                         }, 0);
                         buildTime = Date.now() - startTime;
                         return [2 /*return*/, {

@@ -1,3 +1,4 @@
+import type { UserConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { defineConfig } from 'vite'
@@ -22,4 +23,4 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['@bt-synergy/toc-generator-cli'],
   },
-})
+} as unknown as UserConfig)

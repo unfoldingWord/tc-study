@@ -10,6 +10,8 @@ export {
   type ResourceSubject,
 } from '@bt-synergy/package-builder'
 
+import { DEFAULT_SUBJECTS } from '@bt-synergy/package-builder'
+
 /**
  * Get the current active subjects list
  * Can be extended to read from settings/config

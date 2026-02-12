@@ -15,7 +15,6 @@ import remarkRehype from 'remark-rehype'
 import type { Processor } from 'unified'
 import { unified } from 'unified'
 import { getRcLinkDisplayName, isRelativeLink, parseRcLink } from './rc-link-parser'
-import { remarkRcLinks } from './remarkRcLinks'
 
 export interface MarkdownRendererOptions {
   allowDangerousHtml?: boolean
@@ -55,7 +54,6 @@ export class RemarkMarkdownRenderer {
     this.processor = unified()
       .use(remarkParse) // Parse markdown to AST
       .use(remarkGfm) // Add GitHub Flavored Markdown support (tables, strikethrough, etc.)
-      .use(remarkRcLinks) // Turn plain-text rc:// URLs into link nodes (no special markup needed)
       .use(remarkRehype, { 
         allowDangerousHtml: this.options.allowDangerousHtml || false 
       }) // Convert markdown AST to HTML AST
@@ -181,7 +179,7 @@ export class RemarkMarkdownRenderer {
             <pre {...props} className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4 text-sm" />
           ),
           blockquote: (props: any) => (
-            <blockquote {...props} className="border-s-4 border-blue-300 ps-4 italic mb-4 text-gray-800 dark:text-gray-300" />
+            <blockquote {...props} className="border-l-4 border-blue-300 pl-4 italic mb-4 text-gray-700 dark:text-gray-300" />
           ),
           strong: (props: any) => <strong {...props} className="font-semibold" />,
           em: (props: any) => <em {...props} className="italic" />,

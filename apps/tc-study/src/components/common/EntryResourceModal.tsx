@@ -6,11 +6,10 @@
  */
 
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader, Minimize2, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '../../contexts/AppContext'
 import { useCatalogManager } from '../../contexts/CatalogContext'
 import { useEntryViewerRegistry } from '../../contexts/EntryViewerContext'
-import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { useStudyStore } from '../../store/studyStore'
 import { ErrorBoundary } from './ErrorBoundary'
 
@@ -32,8 +31,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
   const catalogManager = useCatalogManager()
   const entryViewerRegistry = useEntryViewerRegistry()
   const navigationStatus = useStudyStore((s: any) => s.modal.navigationStatus)
-  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
-
+  
   const [resourceMetadata, setResourceMetadata] = useState<any>(null)
   const [loadingMetadata, setLoadingMetadata] = useState(false)
   const [entryContent, setEntryContent] = useState<any>(null)
@@ -42,18 +40,6 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
   const resourceId = modalState.resourceKey ? modalState.resourceKey.split('#')[0] : null
   const entryId = modalState.resourceKey?.includes('#') ? modalState.resourceKey.split('#')[1] : null
   const resource = resourceId ? loadedResources[resourceId] : null
-
-  // RTL: must run before any early return (hooks order)
-  const modalDirection = useMemo(() => {
-    if (!resourceId) return 'ltr'
-    const meta = resource || resourceMetadata
-    if (meta?.languageDirection === 'rtl') return 'rtl'
-    if (meta?.languageDirection === 'ltr') return 'ltr'
-    const lang = meta?.language ?? meta?.languageCode ?? resourceId.split('/')[1]?.split('_')[0] ?? ''
-    if (!lang) return 'ltr'
-    const entry = availableLanguages.find((l) => l.code === lang)
-    return entry?.direction === 'rtl' ? 'rtl' : 'ltr'
-  }, [resource, resourceMetadata, resourceId, availableLanguages])
   
   // Reset entry content when entry changes
   useEffect(() => {
@@ -217,26 +203,26 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
         closeModal()
       }
     }}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()} dir={modalDirection}>
-        {/* Icon-based Modal Header - controls in LTR so arrows/icons don't mirror in RTL */}
+      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Icon-based Modal Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-          {/* History Navigation - RTL: left arrow=forward, right arrow=back (same as nav bar) */}
-          <div className="flex items-center gap-1" dir="ltr">
+          {/* History Navigation - Compact */}
+          <div className="flex items-center gap-1">
             <button
-              onClick={modalDirection === 'rtl' ? modalGoForward : modalGoBack}
-              disabled={modalDirection === 'rtl' ? !canModalGoForward() : !canModalGoBack()}
+              onClick={modalGoBack}
+              disabled={!canModalGoBack()}
               className="p-1.5 hover:bg-white rounded-md transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-              aria-label={modalDirection === 'rtl' ? 'Forward' : 'Back'}
-              title={modalDirection === 'rtl' ? 'Forward' : 'Back'}
+              aria-label="Back"
+              title="Back"
             >
               <ArrowLeft className="w-4 h-4 text-gray-700" />
             </button>
             <button
-              onClick={modalDirection === 'rtl' ? modalGoBack : modalGoForward}
-              disabled={modalDirection === 'rtl' ? !canModalGoBack() : !canModalGoForward()}
+              onClick={modalGoForward}
+              disabled={!canModalGoForward()}
               className="p-1.5 hover:bg-white rounded-md transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-              aria-label={modalDirection === 'rtl' ? 'Back' : 'Forward'}
-              title={modalDirection === 'rtl' ? 'Back' : 'Forward'}
+              aria-label="Forward"
+              title="Forward"
             >
               <ArrowRight className="w-4 h-4 text-gray-700" />
             </button>
@@ -247,7 +233,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
             </span>
           </div>
 
-          {/* Resource title - minimal (inherits modal dir for RTL titles) */}
+          {/* Resource title - minimal */}
           <div className="flex-1 mx-4 truncate text-center">
             <h2 className="text-sm font-medium text-gray-900 truncate">
               {entryTerm || resourceInfo?.title || resourceId}
@@ -260,14 +246,13 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
             className="p-1.5 hover:bg-white rounded-md transition-colors"
             aria-label="Minimize"
             title="Minimize"
-            dir="ltr"
           >
             <Minimize2 className="w-4 h-4 text-gray-600" />
           </button>
         </div>
 
-        {/* Modal Content - dir for RTL so entry content flows correctly */}
-        <div className="flex-1 overflow-auto bg-white min-h-0" dir={modalDirection}>
+        {/* Modal Content */}
+        <div className="flex-1 overflow-auto bg-white min-h-0">
           <ErrorBoundary fallback={
             <div className="p-6 text-red-600 bg-white">
               <p className="font-semibold mb-2">Something went wrong</p>
@@ -346,7 +331,6 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
                     resourceKey={resourceId}
                     entryId={entryId}
                     metadata={metadata}
-                    direction={modalDirection}
                     onEntryLinkClick={handleOpenEntry}
                     onContentLoaded={setEntryContent}
                   />

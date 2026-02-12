@@ -117,45 +117,17 @@ export interface PackageManifest {
     tags?: string[];
   };
   stats: {
-    totalSize: number;
-    downloadedSize: number;
-    resourceCount: number;
-    organizations: string[];
-    languages: string[];
-    subjects: string[];
+    totalSize?: number;
+    downloadedSize?: number;
+    resourceCount?: number;
+    organizations?: string[];
+    languages?: string[];
+    subjects?: string[];
+    estimatedSize?: number;
   };
   status: PackageStatus;
 }
 
-// Door43 specific types
-export interface Door43Resource {
-  id: string;
-  name: string;
-  owner: string;
-  language: string;
-  subject: string;
-  version: string;
-  release?: {
-    tag_name: string;
-    zipball_url: string;
-    tarball_url: string;
-    published_at: string;
-  };
-  metadata?: Record<string, any>;
-}
-
-export interface Door43Language {
-  code: string;
-  name: string;
-  direction: 'ltr' | 'rtl';
-  anglicized_name?: string;
-}
-
-export interface Door43Organization {
-  id: string;
-  username: string;
-  full_name?: string;
-  description?: string;
-  avatar_url?: string;
-  website?: string;
-}
+// Door43 types - re-export from door43-api for compatibility
+export type { Door43Resource, Door43Language } from '@bt-synergy/door43-api'
+export type { Door43Owner as Door43Organization } from '@bt-synergy/door43-api'

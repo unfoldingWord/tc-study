@@ -15,7 +15,7 @@ import {
 } from '@bt-synergy/resource-signals'
 import { ScriptureLoader } from './loader'
 import type { ComponentType } from 'react'
-import type { ResourceViewerProps } from '@bt-synergy/catalog-manager'
+import type { ResourceViewerProps } from '@bt-synergy/resource-types'
 
 /**
  * Create scripture resource type with a provided viewer
@@ -63,7 +63,7 @@ export function createScriptureResourceType(
     },
     
     // ===== UI LAYER =====
-    viewer,
+    viewer: viewer as ResourceTypeDefinition['viewer'],
     
     // ===== COMMUNICATION (v2.0 API) =====
     communication: {
@@ -75,9 +75,9 @@ export function createScriptureResourceType(
       handlers: [
         {
           signalType: 'verse-navigation',
-          handler: (signal: VerseNavigationSignal, context) => {
-            // Handle incoming verse navigation requests
-            console.log('📖 Scripture received verse-navigation:', signal.verse)
+          handler: (signal, context) => {
+            const s = signal as VerseNavigationSignal
+            console.log('📖 Scripture received verse-navigation:', s.verse)
           },
         },
       ],

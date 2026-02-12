@@ -1,3 +1,4 @@
+import type { UserConfig } from 'vite'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { getSharedBuildConfig } from '../../config/vite-build'
@@ -6,4 +7,4 @@ import { getSharedBuildConfig } from '../../config/vite-build'
 export default defineConfig({
   plugins: [react()],
   ...getSharedBuildConfig(),
-})
+} as unknown as UserConfig)

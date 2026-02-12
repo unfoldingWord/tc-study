@@ -57,10 +57,9 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
     handlers: [
       {
         signalType: 'verse-navigation',
-        handler: (signal: VerseNavigationSignal, context) => {
-          // Handle incoming verse navigation requests
-          // The viewer will receive this through its props
-          console.log('📖 Scripture received verse-navigation:', signal.verse)
+        handler: (signal, context) => {
+          const s = signal as VerseNavigationSignal
+          console.log('📖 Scripture received verse-navigation:', s.verse)
         },
       },
     ],

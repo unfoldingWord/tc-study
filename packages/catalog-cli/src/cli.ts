@@ -510,7 +510,8 @@ program
   .option('-o, --output <path>', 'Output file path (default: <resourceKey>.zip)')
   .action(async (resourceKey: string, options) => {
     const { catalogManager } = initCatalogManager()
-    const JSZip = (await import('jszip')).default
+    const jszipMod = await import('jszip')
+    const JSZip = ((jszipMod as { default?: unknown }).default ?? jszipMod) as any
     const fs = await import('fs/promises')
     const path = await import('path')
     
@@ -605,7 +606,8 @@ program
   .description('Import a resource package from ZIP file')
   .action(async (zipFile: string) => {
     const { catalogManager } = initCatalogManager()
-    const JSZip = (await import('jszip')).default
+    const jszipMod = await import('jszip')
+    const JSZip = ((jszipMod as { default?: unknown }).default ?? jszipMod) as any
     const fs = await import('fs/promises')
     const path = await import('path')
     

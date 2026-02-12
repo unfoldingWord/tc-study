@@ -360,7 +360,8 @@ export class ScriptureLoader implements ResourceLoader {
     console.log(`✅ Downloaded zipball: ${(zipballBuffer.byteLength / (1024 * 1024)).toFixed(2)} MB`)
 
     // Load zip using JSZip
-    const JSZip = (await import('jszip')).default
+    const jszipMod = await import('jszip')
+    const JSZip = (jszipMod as unknown as { default?: typeof jszipMod }).default ?? jszipMod
     const zip = await JSZip.loadAsync(zipballBuffer)
 
     // Process each book from ingredients
@@ -407,11 +408,12 @@ export class ScriptureLoader implements ResourceLoader {
         // bookPath might be like "./08-RUT.usfm" so we normalize it
         const normalizedPath = bookPath.replace(/^\.\//, '') // Remove leading ./
         
-        let zipFile: any = null
+        let zipFile: { dir?: boolean; async?(type: string): Promise<unknown> } | null = null
         for (const [fileName, file] of Object.entries(zip.files)) {
+          const entry = file as { dir?: boolean }
           // Match if filename ends with the normalized path (handles root folder prefix)
-          if (fileName.endsWith(normalizedPath) && !file.dir) {
-            zipFile = file
+          if (fileName.endsWith(normalizedPath) && !entry.dir) {
+            zipFile = file as { dir?: boolean; async?(type: string): Promise<unknown> }
             break
           }
         }
@@ -434,7 +436,8 @@ export class ScriptureLoader implements ResourceLoader {
         }
 
         // Extract USFM content
-        const usfmContent = await zipFile.async('string')
+        const raw = await (zipFile as { async(type: string): Promise<unknown> }).async('string')
+        const usfmContent = raw as string
         
         if (this.debug) {
           console.log(`📖 Processing ${bookId} from ZIP (${usfmContent.length} bytes)`)

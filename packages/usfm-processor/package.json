@@ -11,5 +11,8 @@
   },
   "devDependencies": {
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "usfm-js": "^3.4.3"
   }
 }

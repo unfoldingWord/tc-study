@@ -9,6 +9,15 @@ export {
 } from './Door43ApiClient';
 
 export type {
-    Door43ApiConfig, Door43ApiError, Door43Catalog, Door43Language, Door43Owner, Door43Resource
+    Door43ApiConfig, Door43ApiError, Door43Catalog, Door43Language, Door43Organization, Door43Owner, Door43Resource
 } from './Door43ApiClient';
 
+export {
+    getContentUrl,
+    getUSFMUrl,
+    getNotesUrl,
+    getQuestionsUrl,
+    getWordsLinksUrl,
+} from './content-helpers';
+
+export type { ContentUrlOptions } from './content-helpers';

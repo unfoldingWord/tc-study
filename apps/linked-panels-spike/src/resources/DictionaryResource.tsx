@@ -8,6 +8,8 @@ import { useState } from 'react'
 import { useResourceAPI, useEvents } from 'linked-panels'
 import type { WordClickMessage, HighlightedWordsBroadcast } from '../types'
 
+type PanelMessage = WordClickMessage | HighlightedWordsBroadcast
+
 // Sample dictionary
 const DICTIONARY: Record<string, { definition: string; example: string }> = {
   hello: {
@@ -41,7 +43,7 @@ interface DictionaryResourceProps {
 }
 
 export function DictionaryResource({ resourceId }: DictionaryResourceProps) {
-  const api = useResourceAPI<HighlightedWordsBroadcast>(resourceId)
+  const api = useResourceAPI<PanelMessage>(resourceId)
   const [selectedWord, setSelectedWord] = useState<string | null>(null)
   const [selectedWordId, setSelectedWordId] = useState<string | null>(null)
   const [definition, setDefinition] = useState<typeof DICTIONARY[string] | null>(null)

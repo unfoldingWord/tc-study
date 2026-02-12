@@ -1,3 +1,7 @@
+# Windows reserved names (avoid accidental capture)
+/nul
+nul
+
 # Dependencies
 node_modules/
 .pnp

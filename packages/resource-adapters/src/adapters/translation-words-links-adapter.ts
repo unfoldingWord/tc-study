@@ -23,7 +23,7 @@ export class TranslationWordsLinksAdapter extends BaseResourceAdapter<ProcessedW
     resource: Door43Resource,
     options: DownloadOptions = {}
   ): Promise<ResourceContent<ProcessedWordsLinks>> {
-    console.log('[TWL Adapter] 🔄 fetchAndParse() called', { bookCode: options.bookCode, bookName: options.bookName, resourceId: resource?.resourceId })
+    console.log('[TWL Adapter] 🔄 fetchAndParse() called', { bookCode: options.bookCode, bookName: options.bookName, resourceId: resource?.id })
     
     const { bookCode, bookName } = options
     
@@ -135,7 +135,6 @@ export class TranslationWordsLinksAdapter extends BaseResourceAdapter<ProcessedW
         statistics: {
           totalLinks: links.length,
           linksPerChapter: {},
-          linksByCategory: {},
         },
       },
     }

@@ -122,7 +122,7 @@ export class PackageBuilderEngine {
       
       // 5. Calculate stats
       const totalSize = Array.from(files.values()).reduce((sum, file) => {
-        return sum + (typeof file === 'string' ? file.length : file.length)
+        return sum + (typeof file === 'string' ? file.length : (file as ArrayBufferView).byteLength)
       }, 0)
       
       const buildTime = Date.now() - startTime

@@ -78,8 +78,7 @@ function extractOptimizedTokens(
       verseData.wordTokens.forEach((token: WordToken) => {
         const verseRef = `${bookCode} ${chapterNum}:${verseNum}`
         const occurrence = token.occurrence || 1
-        const wordToken = token as WordToken & { alignedOriginalWordIds?: string[] }
-
+        
         // Create OptimizedToken with extended properties via type assertion
         const optimizedToken: OptimizedToken = {
           id: tokens.length, // Use cumulative index across all verses
@@ -92,7 +91,7 @@ function extractOptimizedTokens(
             semanticId: token.type === 'word' 
               ? `${verseRef}:${token.content}:${occurrence}`
               : `${verseRef}:${token.type}:${tokens.length}`, // Use index for non-word tokens
-            alignedOriginalWordIds: wordToken.alignedOriginalWordIds || [],
+            alignedOriginalWordIds: token.alignedOriginalWordIds || [],
           } as any),
         }
         
@@ -149,10 +148,10 @@ export function useTokenBroadcast({
       })
       return
     }
-
+    
     // Extract tokens for current verse or verse range
     const tokens = extractOptimizedTokens(loadedContent, currentChapter, currentVerse, endChapter, endVerse)
-
+    
     // Broadcast tokens
     const broadcast: ScriptureTokensBroadcastSignal = {
       type: 'scripture-tokens-broadcast',

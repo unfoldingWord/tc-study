@@ -48,14 +48,14 @@ export function OriginalLanguageSelector() {
             console.log(`   Relations for ${resource.id}:`, resource.relations)
             
             // Check each relation
-            resource.relations.forEach(rel => {
+            resource.relations.forEach((rel: { lang?: string; identifier?: string }) => {
               const lang = rel.lang
               const identifier = rel.identifier
               
               if (lang === 'el-x-koine' || identifier === 'ugnt') {
-                recommendedGreek.add(identifier)
+                if (identifier) recommendedGreek.add(identifier)
               } else if (lang === 'hbo' || identifier === 'uhb') {
-                recommendedHebrew.add(identifier)
+                if (identifier) recommendedHebrew.add(identifier)
               }
             })
           } else {

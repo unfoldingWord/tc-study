@@ -29,7 +29,6 @@ export function TranslationAcademyEntryViewer({
   resourceKey: rawResourceKey,
   entryId,
   metadata: propMetadata,
-  direction = 'ltr',
   onEntryLinkClick,
   onContentLoaded,
 }: BaseEntryViewerProps) {
@@ -171,16 +170,14 @@ export function TranslationAcademyEntryViewer({
   }
 
   // Render article content
-  const isRtl = direction === 'rtl'
   return (
-    <div className="h-full relative" dir={direction}>
+    <div className="h-full relative">
       {/* Debug toggle button for raw markdown (dev tool - only in development) */}
       {import.meta.env.DEV && (
         <button
           onClick={() => setShowRawMarkdown(!showRawMarkdown)}
-          className={`absolute top-4 z-10 flex items-center justify-center p-1.5 bg-gray-500/30 hover:bg-gray-600/50 text-gray-600 hover:text-gray-800 rounded transition-all opacity-50 hover:opacity-100 ${isRtl ? 'left-4' : 'right-4'}`}
+          className="absolute top-4 right-4 z-10 flex items-center justify-center p-1.5 bg-gray-500/30 hover:bg-gray-600/50 text-gray-600 hover:text-gray-800 rounded transition-all opacity-50 hover:opacity-100"
           title={showRawMarkdown ? "Show rendered view" : "Show raw markdown"}
-          dir="ltr"
         >
           {showRawMarkdown ? (
             <Eye className="w-3.5 h-3.5" />
@@ -190,7 +187,7 @@ export function TranslationAcademyEntryViewer({
         </button>
       )}
 
-      <article className={`max-w-4xl mx-auto p-6 ${isRtl ? 'text-right' : 'text-left'}`}>
+      <article className="max-w-4xl mx-auto p-6">
         {/* Custom styled header */}
         <header className="mb-6 pb-4 border-b border-gray-200">
           <div className="flex items-start gap-3">
@@ -257,9 +254,9 @@ export function TranslationAcademyEntryViewer({
 
         {/* Related Articles */}
         {article.relatedArticles && article.relatedArticles.length > 0 && (
-          <div className={`mt-8 pt-6 border-t border-gray-200 ${isRtl ? 'text-right' : ''}`}>
+          <div className="mt-8 pt-6 border-t border-gray-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Related Articles</h3>
-            <div className={`flex flex-wrap gap-2 ${isRtl ? 'flex-row-reverse justify-end' : ''}`}>
+            <div className="flex flex-wrap gap-2">
               {article.relatedArticles.map((relatedLink, idx) => {
                 // Extract article ID from link if it's a full rc link
                 const articleId = relatedLink.includes('/')
