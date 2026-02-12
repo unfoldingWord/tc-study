@@ -10,9 +10,10 @@ import { BookOpen, ExternalLink, Loader, FileText } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
+import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
-import { getBookTitleWithFallback } from '../../../utils/bookNames'
+import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TranslationNoteCard } from './components/TranslationNoteCard'
 import { useTranslationNotesContent } from './hooks/useTranslationNotesContent'
@@ -42,10 +43,12 @@ export function TranslationNotesViewer({
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
   const bookTitleSource = useBookTitleSource()
+  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
   // Use latest resource from store so we pick up ingredients when metadata loads (Phase 2)
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
   const effectiveResource = resourceFromStore ?? resource
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+  const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
   const [tokenFilter, setTokenFilter] = useState<{ semanticId: string; content: string; alignedSemanticIds: string[]; timestamp: number } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
   const [catalogTrigger, setCatalogTrigger] = useState(0)
@@ -132,6 +135,15 @@ export function TranslationNotesViewer({
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
   
   // Listen for scripture token broadcasts (for target language alignment)
+  // Load catalog metadata for this resource (for RTL fallback when no scripture is broadcasting)
+  useEffect(() => {
+    let cancelled = false
+    catalogManager.getResourceMetadata(resourceKey).then((meta) => {
+      if (!cancelled && meta) setCatalogMetadata(meta)
+    })
+    return () => { cancelled = true }
+  }, [resourceKey, catalogManager])
+
   // The useAlignedTokens hook will use these internally
   // Also get the source resource ID and language direction for quote attribution
   const { 
@@ -141,9 +153,12 @@ export function TranslationNotesViewer({
   } = useScriptureTokens({ 
     resourceId 
   })
-  
-  // Get language direction from target scripture
-  const targetLanguageDirection = targetScriptureMetadata?.languageDirection || 'ltr'
+
+  // Language direction: target scripture broadcast first, then this resource's catalog/language list (so TN is RTL even without scripture panel)
+  const languageCode = resource?.language ?? resourceKey.split('/')[1]?.split('_')[0] ?? ''
+  const languageFromList = availableLanguages.find((l) => l.code === languageCode)
+  const resourceDirection = catalogMetadata?.languageDirection ?? languageFromList?.direction ?? 'ltr'
+  const targetLanguageDirection = targetScriptureMetadata?.languageDirection ?? resourceDirection
 
   // Filter notes for current chapter/verse range
   const relevantNotes = useMemo(() => {
@@ -437,10 +452,11 @@ export function TranslationNotesViewer({
         />
       )}
       
-      <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="flex-1 overflow-y-auto bg-gray-50" dir={targetLanguageDirection}>
         <ResourceViewerHeader 
           title={resource.title}
           icon={FileText}
+          direction={targetLanguageDirection}
         />
         <div className="p-4">
         {loading ? (
@@ -465,13 +481,29 @@ export function TranslationNotesViewer({
         </div>
       ) : (
         <div className="space-y-4">
-          {Object.entries(notesByVerse).map(([verse, verseNotes]) => (
+          {Object.entries(notesByVerse).map(([verse, verseNotes]) => {
+            const bookCode = currentRef.book
+            const resolved = getBookTitleWithFallback(effectiveResource, bookTitleSource, bookCode)
+            return (
             <div key={verse} className="space-y-3">
-              {/* Verse Header */}
-              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg">
+              {/* Verse Header - LTR: book 1:4; RTL: 4:1 book (flex enforces order when book is RTL script) */}
+              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg" dir={targetLanguageDirection}>
                 <BookOpen className="w-3.5 h-3.5 text-amber-500" />
                 <h3 className="text-xs font-semibold text-gray-700">
-                  {getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book)} {verse}
+                  {(() => {
+                    const { bookPart, numberPart } = formatVerseRefParts(resolved, verse, targetLanguageDirection === 'rtl')
+                    return targetLanguageDirection === 'rtl' ? (
+                      <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
+                        <span>{numberPart}</span>
+                        <span>{bookPart}</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex gap-1" dir="ltr">
+                        <span>{bookPart}</span>
+                        <span>{numberPart}</span>
+                      </span>
+                    )
+                  })()}
                 </h3>
                 <span className="ml-auto px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-full text-[10px] font-medium">
                   {verseNotes.length}
@@ -504,7 +536,8 @@ export function TranslationNotesViewer({
                 )
               })}
             </div>
-          ))}
+          )
+          })}
         </div>
       )}
         </div>

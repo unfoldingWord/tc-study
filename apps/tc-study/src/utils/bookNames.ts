@@ -62,6 +62,26 @@ export function getBookTitleWithFallback(
 }
 
 /**
+ * Parts for rendering a verse reference in section headers (TN, TQ, TWL).
+ * Render as two spans so RTL order is preserved (avoids bidi reordering).
+ *
+ * LTR: { book_title } { startChapter }: { startVerse }
+ * RTL: { startVerse }: { startChapter } { book_title }  (number part first in DOM for RTL layout)
+ */
+export function formatVerseRefParts(
+  bookName: string,
+  chapterVerse: string,
+  isRtl: boolean
+): { bookPart: string; numberPart: string } {
+  if (!isRtl) {
+    return { bookPart: bookName, numberPart: chapterVerse }
+  }
+  const [chapter, verse] = chapterVerse.split(':')
+  const numberPart = verse !== undefined ? `${verse}:${chapter}` : chapterVerse
+  return { bookPart: bookName, numberPart }
+}
+
+/**
  * Map of common book codes to their English titles
  * Used as fallback when resource metadata is not available
  */

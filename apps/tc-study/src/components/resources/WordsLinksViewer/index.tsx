@@ -15,8 +15,9 @@ import { BookOpen, BookX, Link, Loader } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
+import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
-import { getBookTitleWithFallback } from '../../../utils/bookNames'
+import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TokenFilterBanner, WordLinkCard } from './components'
@@ -44,11 +45,27 @@ export function WordsLinksViewer({
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
   const effectiveResource = resourceFromStore ?? resource
 
+  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
   const [selectedLink, setSelectedLink] = useState<string | null>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
   const [catalogTrigger, setCatalogTrigger] = useState(0)
-  
+  const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
+
+  // Resolve RTL: prefer language list (list/languages API has correct ld per language) over resource catalog metadata (can be wrong e.g. TWL returning ltr)
+  const languageCode = resource?.language ?? resourceKey.split('/')[1]?.split('_')[0] ?? ''
+  const languageFromList = availableLanguages.find((l) => l.code === languageCode)
+  const languageDirection = languageFromList?.direction ?? catalogMetadata?.languageDirection ?? 'ltr'
+
+  // Load catalog metadata for direction
+  useEffect(() => {
+    let cancelled = false
+    catalogManager.getResourceMetadata(resourceKey).then((meta) => {
+      if (!cancelled && meta) setCatalogMetadata(meta)
+    })
+    return () => { cancelled = true }
+  }, [resourceKey, catalogManager])
+
   // Load TWL content
   const { content, loading, error } = useWordsLinksContent({
     resourceKey,
@@ -176,10 +193,10 @@ export function WordsLinksViewer({
     links: links, // Use processed links instead of raw content?.links
   })
   
-  // Get source resource ID from scripture broadcasts (for quote attribution)
-  const { 
-    sourceResourceId: targetSourceId,
-  } = useScriptureTokens({ resourceId })
+  // Get source resource ID from scripture broadcasts (for quote attribution only)
+  const { sourceResourceId: targetSourceId } = useScriptureTokens({ resourceId })
+  // Use same book title source as TN: getBookTitleWithFallback(ownResource, bookTitleSource, bookCode)
+  // bookTitleSource = last active scripture or anchor (set by ScriptureViewer), so we get localized name when that scripture is in the same language.
   
   // Get aligned tokens from target language scripture (e.g., ULT)
   const { linksWithAlignedTokens, loadingAligned, alignedError, hasTargetContent } = useAlignedTokens({
@@ -425,10 +442,11 @@ export function WordsLinksViewer({
         />
       )}
       
-      <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="flex-1 overflow-y-auto bg-gray-50" dir={languageDirection}>
         <ResourceViewerHeader 
           title={resource.title}
           icon={Link}
+          direction={languageDirection}
         />
         <div className="p-4">
         {!dependenciesReady ? (
@@ -487,15 +505,29 @@ export function WordsLinksViewer({
               })
               .map(([chapterVerse, verseLinks]) => {
                 const [chapter, verse] = chapterVerse.split(':')
-                
+                const bookCode = currentRef.book || 'gen'
+                const resolved = getBookTitleWithFallback(effectiveResource, bookTitleSource, bookCode)
                 return (
                   <div key={chapterVerse} className="space-y-2">
-                    {/* Verse Header */}
-                    <div className="px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg">
+                    {/* Verse Header - LTR: book 1:4; RTL: 4:1 book (flex enforces order when book is RTL script) */}
+                    <div className="px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg" dir={languageDirection}>
                       <div className="flex items-center gap-2">
                         <BookOpen className="w-3.5 h-3.5 text-purple-600" />
                         <h3 className="text-xs font-semibold text-gray-700">
-                          {getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book || 'gen')} {chapter}:{verse}
+                          {(() => {
+                            const { bookPart, numberPart } = formatVerseRefParts(resolved, `${chapter}:${verse}`, languageDirection === 'rtl')
+                            return languageDirection === 'rtl' ? (
+                              <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
+                                <span>{numberPart}</span>
+                                <span>{bookPart}</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex gap-1" dir="ltr">
+                                <span>{bookPart}</span>
+                                <span>{numberPart}</span>
+                              </span>
+                            )
+                          })()}
                         </h3>
                       </div>
                     </div>
@@ -519,6 +551,7 @@ export function WordsLinksViewer({
                             onQuoteClick={handleQuoteClick}
                             tokenFilter={tokenFilter}
                             targetResourceId={targetSourceId}
+                            languageDirection={languageDirection}
                           />
                         )
                       })}

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEvents } from 'linked-panels'
 import { useAppStore } from '../../../contexts/AppContext'
 import { useCatalogManager, useCurrentReference } from '../../../contexts'
+import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getBookTitle } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
@@ -37,6 +38,7 @@ export function ScriptureViewer({
 }: ScriptureViewerProps) {
   const currentRef = useCurrentReference()
   const catalogManager = useCatalogManager()
+  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
   const { setBook, setChapter, setVerse, setEndChapter, setEndVerse } = currentRef
 
   // Debug panel visibility state
@@ -98,8 +100,10 @@ export function ScriptureViewer({
     displayVerses,
   } = useContent(resourceKey, availableBooks, language)
   
-  // Get language direction from catalog metadata
-  const languageDirection = catalogMetadata?.languageDirection || 'ltr'
+  // Language direction: resource metadata first, then list-languages (catalog) fallback; no hardcoding
+  const languageCode = resource?.language ?? language
+  const languageFromList = availableLanguages.find((l) => l.code === languageCode)
+  const languageDirection = catalogMetadata?.languageDirection ?? languageFromList?.direction ?? 'ltr'
 
   // Use latest resource from store so we get ingredients when Phase 2 metadata loads (localized book title)
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
@@ -182,6 +186,7 @@ export function ScriptureViewer({
         title={resource.title}
         subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}
         icon={Book}
+        direction={languageDirection}
       />
       
       <div 

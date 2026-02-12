@@ -18,6 +18,8 @@ export interface BaseEntryViewerProps {
   entryId: string
   /** Resource metadata (optional, may be loaded by viewer) */
   metadata?: any
+  /** Text direction for RTL languages (e.g. Arabic) */
+  direction?: 'ltr' | 'rtl'
   /** Handler for navigating to other entries */
   onEntryLinkClick?: (resourceId: string, entryId?: string) => void
   /** Callback when entry content is loaded (for floating button title display) */

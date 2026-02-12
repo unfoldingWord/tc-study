@@ -62,11 +62,11 @@ function App() {
           const languageData = languages.map(lang => ({
             code: lang.code,
             name: lang.name || lang.code.toUpperCase(),
-            source: 'door43' as const
+            source: 'door43' as const,
+            direction: lang.direction,
           }))
           
           setAvailableLanguages(languageData)
-          console.log(`🌐 Loaded ${languageData.length} languages from Door43`)
         } catch (error) {
           console.warn('⚠️ Failed to load languages from Door43:', error)
         }

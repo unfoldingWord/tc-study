@@ -5,7 +5,8 @@
 import { ArrowLeft, Book, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, List, ListOrdered, Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCurrentPassageSet, useCurrentReference, useNavigation, useNavigationHistory, useNavigationMode } from '../../contexts'
-import { useAppStore, useBookTitleSource } from '../../contexts/AppContext'
+import { useAppStore, useAnchorResource, useBookTitleSource } from '../../contexts/AppContext'
+import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { getBookTitle } from '../../utils/bookNames'
 import { LanguagePicker } from '../LanguagePicker'
 import { BCVNavigator } from './BCVNavigator'
@@ -30,7 +31,29 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   const passageSet = useCurrentPassageSet()
   const history = useNavigationHistory()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
+  const anchorResource = useAnchorResource()
   const bookTitleSource = useBookTitleSource()
+  const loadedResources = useAppStore((s) => s.loadedResources)
+  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
+  // RTL if anchor is RTL, or if ANY loaded resource is RTL (e.g. Arabic TN in other panel) so ref order matches
+  const isRtl = (() => {
+    const dirFrom = (res: { languageDirection?: 'ltr' | 'rtl'; language?: string; languageCode?: string } | undefined) => {
+      if (!res) return null
+      if (res.languageDirection === 'rtl') return true
+      if (res.languageDirection === 'ltr') return false
+      const lang = res.language ?? res.languageCode
+      if (!lang) return null
+      return availableLanguages.find((l) => l.code === lang)?.direction === 'rtl' ?? null
+    }
+    if (dirFrom(anchorResource) === true) return true
+    if (anchorResource && dirFrom(anchorResource) === false) return false
+    if (dirFrom(bookTitleSource) === true) return true
+    const anyRtl = Object.values(loadedResources).some((r) => dirFrom(r) === true)
+    if (anyRtl) return true
+    const lang = anchorResource?.language ?? anchorResource?.languageCode ?? bookTitleSource?.language
+    if (!lang) return false
+    return availableLanguages.find((l) => l.code === lang)?.direction === 'rtl' ?? false
+  })()
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false)
@@ -80,18 +103,26 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   const hasPassageSet = !!passageSet
   const hasNavigationSource = hasAnchor || hasPassageSet
 
-  const formatReference = (ref: typeof currentRef) => {
-    // Get localized book name from last active scripture (or anchor) ingredients (e.g., "Jonás" for Spanish)
+  // LTR: { book } { startChapter }: { startVerse }-?{ EndChapter }?:?{ EndVerse }?
+  // RTL: { EndVerse }?:?{ EndChapter }?-?{ startVerse }: { startChapter } { book } (two parts for bidi-safe render)
+  const formatReferenceParts = (ref: typeof currentRef) => {
     const bookName = getBookTitle(bookTitleSource, ref.book)
-    let result = `${bookName} ${ref.chapter}:${ref.verse}`
-    if (ref.endChapter || ref.endVerse) {
+    if (!isRtl) {
+      let numberPart = `${ref.chapter}:${ref.verse}`
       if (ref.endChapter && ref.endChapter !== ref.chapter) {
-        result += `-${ref.endChapter}:${ref.endVerse || 1}`
+        numberPart += `-${ref.endChapter}:${ref.endVerse || 1}`
       } else if (ref.endVerse && ref.endVerse !== ref.verse) {
-        result += `-${ref.endVerse}`
+        numberPart += `-${ref.endVerse}`
       }
+      return { bookPart: bookName, numberPart }
     }
-    return result
+    let numberPart = `${ref.verse}:${ref.chapter}`
+    if (ref.endChapter && ref.endChapter !== ref.chapter) {
+      numberPart = `${ref.endVerse ?? 1}:${ref.endChapter}-${numberPart}`
+    } else if (ref.endVerse && ref.endVerse !== ref.verse) {
+      numberPart = `${ref.endVerse}-${ref.verse}:${ref.chapter}`
+    }
+    return { bookPart: bookName, numberPart }
   }
 
   const getModeLabel = () => {
@@ -419,14 +450,15 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
         
         {/* Center navigation group - unified component with circular arrows inside blue container */}
         <div className="flex-1 flex items-center justify-center">
-          {/* Blue container holds everything */}
+          {/* Blue container - same layout; for RTL invert only functionality: left arrow = next, right arrow = previous */}
           <div className="flex items-center gap-2 bg-blue-50 px-2 py-2 rounded-full">
-            {/* Previous button - circular, inside container */}
+            {/* Left arrow - in RTL: next (forward); in LTR: previous */}
             <button
-              onClick={handlePrevious}
-              disabled={!canGoPrevious()}
+              onClick={isRtl ? handleNext : handlePrevious}
+              disabled={isRtl ? !canGoNext() : !canGoPrevious()}
               className="w-7 h-7 rounded-full bg-blue-200 hover:bg-blue-300 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 transition-colors flex items-center justify-center flex-shrink-0"
-              title={`Previous ${getModeLabel()}`}
+              title={isRtl ? `Next ${getModeLabel()}` : `Previous ${getModeLabel()}`}
+              aria-label={isRtl ? 'Next' : 'Previous'}
             >
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
@@ -454,21 +486,36 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
             {/* Divider */}
             <div className="w-px h-6 bg-blue-200"></div>
 
-            {/* Reference display */}
+            {/* Reference display - RTL: range then book (4:1 Titus); flex enforces order regardless of script */}
             <button
               onClick={() => setIsNavigatorOpen(true)}
-              className="px-3 py-1 hover:bg-blue-100 text-sm font-medium text-blue-900 transition-colors rounded-md"
+              className="px-3 py-1 hover:bg-blue-100 text-sm font-medium text-blue-900 transition-colors rounded-md inline-flex items-center gap-1"
               title="Click to navigate or adjust range"
+              dir={isRtl ? 'rtl' : 'ltr'}
             >
-              {formatReference(currentRef)}
+              {(() => {
+                const { bookPart, numberPart } = formatReferenceParts(currentRef)
+                return isRtl ? (
+                  <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
+                    <span>{numberPart}</span>
+                    <span>{bookPart}</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex gap-1" dir="ltr">
+                    <span>{bookPart}</span>
+                    <span>{numberPart}</span>
+                  </span>
+                )
+              })()}
             </button>
             
-            {/* Next button - circular, inside container */}
+            {/* Right arrow - in RTL: previous (backward); in LTR: next */}
             <button
-              onClick={handleNext}
-              disabled={!canGoNext()}
+              onClick={isRtl ? handlePrevious : handleNext}
+              disabled={isRtl ? !canGoPrevious() : !canGoNext()}
               className="w-7 h-7 rounded-full bg-blue-200 hover:bg-blue-300 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 transition-colors flex items-center justify-center flex-shrink-0"
-              title={`Next ${getModeLabel()}`}
+              title={isRtl ? `Previous ${getModeLabel()}` : `Next ${getModeLabel()}`}
+              aria-label={isRtl ? 'Previous' : 'Next'}
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>

@@ -16,16 +16,19 @@ interface ResourceViewerHeaderProps {
   subtitle?: string
   /** Optional extra content on the right side */
   actions?: React.ReactNode
+  /** Text/layout direction so header aligns with resource content (e.g. RTL for Persian/Arabic) */
+  direction?: 'ltr' | 'rtl'
 }
 
 export function ResourceViewerHeader({ 
   title, 
   icon: Icon, 
   subtitle,
-  actions 
+  actions,
+  direction = 'ltr',
 }: ResourceViewerHeaderProps) {
   return (
-    <div className="flex-shrink-0 px-4 py-3 mt-2">
+    <div className="flex-shrink-0 px-4 py-3 mt-2" dir={direction}>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           {Icon && <Icon className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}

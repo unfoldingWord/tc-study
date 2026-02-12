@@ -26,6 +26,8 @@ interface WordLinkCardProps {
   onQuoteClick: (link: TranslationWordsLink) => void  // Broadcasts tokens for highlighting
   tokenFilter: TokenFilter | null
   targetResourceId?: string | null  // Source scripture resource (e.g., "unfoldingWord/en/ult")
+  /** Quote block direction (e.g. rtl for Persian) so quote marks and text align correctly */
+  languageDirection?: 'ltr' | 'rtl'
 }
 
 export function WordLinkCard({
@@ -37,6 +39,7 @@ export function WordLinkCard({
   onQuoteClick,
   tokenFilter,
   targetResourceId,
+  languageDirection = 'ltr',
 }: WordLinkCardProps) {
   const twInfo = parseTWLink(link.twLink)
   const isKeyTerm = twInfo.category === 'kt'
@@ -84,8 +87,9 @@ export function WordLinkCard({
             e.stopPropagation()
             onQuoteClick(link)
           }}
-          className="w-full text-left mb-1.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
+          className="w-full text-start mb-1.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
           title="Click to highlight these words in scripture"
+          dir={languageDirection}
         >
           <div className="text-base leading-relaxed">
             <span className="italic text-gray-700">

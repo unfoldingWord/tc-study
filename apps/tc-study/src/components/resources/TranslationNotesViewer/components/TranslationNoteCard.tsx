@@ -141,7 +141,7 @@ export function TranslationNoteCard({
               onQuoteClick()
             }
           }}
-          className="w-full text-left mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
+          className={`w-full mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150 ${languageDirection === 'rtl' ? 'text-right' : 'text-left'}`}
           title="Click to highlight these words in scripture"
         >
           <div className="text-base leading-relaxed" dir={languageDirection}>
@@ -179,7 +179,7 @@ export function TranslationNoteCard({
               &rdquo;
             </span>
             {resourceAbbreviation && (
-              <span className="ml-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
+              <span className={`${languageDirection === 'rtl' ? 'mr-2' : 'ml-2'} px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium`}>
                 {resourceAbbreviation}
               </span>
             )}
@@ -190,7 +190,7 @@ export function TranslationNoteCard({
       {/* Fallback: Original language quote when target alignment is missing (e.g. scripture has no \zaln) */}
       {!hasAlignedTokens && note.quote && note.quote.trim().length > 0 && (
         <div
-          className="w-full text-left mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 rounded-lg border border-blue-100/50"
+          className={`w-full mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 rounded-lg border border-blue-100/50 ${languageDirection === 'rtl' ? 'text-right' : 'text-left'}`}
           title="Original language phrase (target language alignment not available)"
         >
           <div className="text-base leading-relaxed" dir={languageDirection}>
@@ -198,7 +198,7 @@ export function TranslationNoteCard({
               &ldquo;{note.quote}&rdquo;
             </span>
             {resourceAbbreviation && (
-              <span className="ml-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
+              <span className={`${languageDirection === 'rtl' ? 'mr-2' : 'ml-2'} px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium`}>
                 {resourceAbbreviation}
               </span>
             )}

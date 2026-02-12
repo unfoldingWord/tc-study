@@ -10,10 +10,11 @@ import type { ProcessedQuestions } from '@bt-synergy/resource-parsers'
 import type { ResourceViewerProps } from '@bt-synergy/resource-types'
 import { AlertCircle, BookOpen, CheckCircle, ChevronDown, ChevronUp, HelpCircle, MessageCircleQuestion } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useCurrentReference } from '../../../contexts'
+import { useCatalogManager, useCurrentReference } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
+import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
-import { getBookTitleWithFallback } from '../../../utils/bookNames'
+import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import type { ResourceInfo } from '../../../contexts/types'
 
@@ -26,11 +27,26 @@ function tqCacheKey(resourceKey: string, bookCode: string) {
 
 export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceViewerProps & { resource: ResourceInfo }) {
   const loaderRegistry = useLoaderRegistry()
+  const catalogManager = useCatalogManager()
   const currentRef = useCurrentReference()
   const bookTitleSource = useBookTitleSource()
+  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
   const bookCode = currentRef.book || 'gen'
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
   const effectiveResource = resourceFromStore ?? resource
+
+  const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
+  const languageCode = resource?.language ?? resourceKey.split('/')[1]?.split('_')[0] ?? ''
+  const languageFromList = availableLanguages.find((l) => l.code === languageCode)
+  const languageDirection = catalogMetadata?.languageDirection ?? languageFromList?.direction ?? 'ltr'
+
+  useEffect(() => {
+    let cancelled = false
+    catalogManager.getResourceMetadata(resourceKey).then((meta) => {
+      if (!cancelled && meta) setCatalogMetadata(meta)
+    })
+    return () => { cancelled = true }
+  }, [resourceKey, catalogManager])
 
   const cached = resourceKey && bookCode ? questionsCache.get(tqCacheKey(resourceKey, bookCode)) : undefined
   const [questions, setQuestions] = useState<ProcessedQuestions | null>(cached ?? null)
@@ -192,20 +208,35 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="flex-1 overflow-y-auto bg-gray-50" dir={languageDirection}>
         <ResourceViewerHeader 
           title={resource.title}
           icon={MessageCircleQuestion}
+          direction={languageDirection}
         />
         <div className="p-4 space-y-4">
         {Object.entries(questionsByVerse).map(([verse, verseQuestions]) => (
           <div key={verse} className="space-y-3">
-            {/* Verse Header */}
-            <div className="px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg">
+            {/* Verse Header - LTR: book 1:4; RTL: 4:1 book (flex enforces order when book is RTL script) */}
+            <div className="px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg" dir={languageDirection}>
               <div className="flex items-center gap-2">
                 <BookOpen className="w-3.5 h-3.5 text-blue-600" />
                 <h3 className="text-xs font-semibold text-gray-700">
-                  {getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book)} {verse}
+                  {(() => {
+                    const bookName = getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book)
+                    const { bookPart, numberPart } = formatVerseRefParts(bookName, verse, languageDirection === 'rtl')
+                    return languageDirection === 'rtl' ? (
+                      <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
+                        <span>{numberPart}</span>
+                        <span>{bookPart}</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex gap-1" dir="ltr">
+                        <span>{bookPart}</span>
+                        <span>{numberPart}</span>
+                      </span>
+                    )
+                  })()}
                 </h3>
                 <span className="ml-auto px-2 py-0.5 bg-blue-100/50 text-blue-700 rounded-full text-[10px] font-medium">
                   {verseQuestions.length}

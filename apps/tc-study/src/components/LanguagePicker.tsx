@@ -17,21 +17,21 @@ import {
     Wifi,
     X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useCatalogManager, useResourceTypeRegistry } from '../contexts'
-import { useDoor43Data } from '../hooks'
 import { useWorkspaceStore } from '../lib/stores/workspaceStore'
 import { SelectableGridWithStatus } from './shared/SelectableGrid'
 
 // Cache key for localStorage
 const LANGUAGES_CACHE_KEY = 'tc-study:languages-cache'
-const CACHE_VERSION = 1 // Increment to invalidate cache
+const CACHE_VERSION = 2 // Increment to invalidate cache (v2: include direction from list/languages)
 
 interface CachedLanguages {
   version: number
   timestamp: number
   subjects: string[]
-  languages: Array<{ code: string; name: string; source: 'catalog' | 'door43' }>
+  languages: Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>
 }
 
 interface LanguagePickerProps {
@@ -56,11 +56,12 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
   const resourceTypeRegistry = useResourceTypeRegistry()
   const setAvailableLanguages = useWorkspaceStore((s) => s.setAvailableLanguages)
 
-  // Get supported subjects for filtering
+  // Get supported subjects for filtering (stable string for effect/callback deps)
   const supportedSubjects = resourceTypeRegistry.getSupportedSubjects()
+  const supportedSubjectsKey = supportedSubjects.join(',')
   
   // Try to load from cache first
-  const loadFromCache = (): Array<{ code: string; name: string; source: 'catalog' | 'door43' }> | null => {
+  const loadFromCache = (): Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }> | null => {
     try {
       const cached = localStorage.getItem(LANGUAGES_CACHE_KEY)
       if (!cached) return null
@@ -91,7 +92,7 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
   }
   
   // Save to cache after successful fetch
-  const saveToCache = (languages: Array<{ code: string; name: string; source: 'catalog' | 'door43' }>) => {
+  const saveToCache = (languages: Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>) => {
     try {
       const cacheData: CachedLanguages = {
         version: CACHE_VERSION,
@@ -106,37 +107,40 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
     }
   }
 
-  const { data: languages, loading: isLoading, error, retry } = useDoor43Data({
-    fetchFn: async (client, _filters) => {
-      // Try cache first
-      const cached = loadFromCache()
-      if (cached) {
-        setAvailableLanguages(cached)
-        return cached
-      }
-      
-      // Fetch from API with subject filters
-      console.log('🌐 Fetching languages with subjects:', supportedSubjects)
+  // Displayed list: show cache immediately, then update when revalidation completes
+  const [displayedLanguages, setDisplayedLanguages] = useState<Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>>([])
+  const [isRevalidating, setIsRevalidating] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+
+  const revalidate = useCallback(async () => {
+    setIsRevalidating(true)
+    setError(null)
+    try {
+      const client = getDoor43ApiClient()
+      console.log('🌐 Revalidating languages with subjects:', supportedSubjects)
       const door43Langs = await client.getLanguages({
         subjects: supportedSubjects,
         stage: 'prod',
+        topic: 'tc-ready',
       })
-      
       const door43NameMap = new Map<string, string>()
+      const door43DirectionMap = new Map<string, 'ltr' | 'rtl'>()
       for (const lang of door43Langs) {
         door43NameMap.set(lang.code, lang.name || lang.code.toUpperCase())
+        door43DirectionMap.set(lang.code, lang.direction)
       }
       const catalogStats = await catalogManager.getCatalogStats()
       const catalogLanguageCodes = Object.keys(catalogStats.byLanguage)
       const languageMap = new Map<
         string,
-        { code: string; name: string; source: 'catalog' | 'door43' }
+        { code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }
       >()
       for (const code of catalogLanguageCodes) {
         languageMap.set(code, {
           code,
           name: door43NameMap.get(code) || code.toUpperCase(),
           source: 'catalog',
+          direction: door43DirectionMap.get(code),
         })
       }
       for (const lang of door43Langs) {
@@ -145,21 +149,45 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
             code: lang.code,
             name: lang.name || lang.code.toUpperCase(),
             source: 'door43',
+            direction: lang.direction,
           })
         }
       }
       const merged = Array.from(languageMap.values()).sort((a, b) =>
         a.name.localeCompare(b.name)
       )
-      
-      // Save to cache
       saveToCache(merged)
-      
+      setDisplayedLanguages(merged)
       setAvailableLanguages(merged)
-      return merged
-    },
-    dependencies: [supportedSubjects.join(',')], // Re-fetch if subjects change
-  })
+    } catch (err) {
+      console.error('❌ Failed to revalidate languages:', err)
+      setError(err as Error)
+    } finally {
+      setIsRevalidating(false)
+    }
+  }, [supportedSubjectsKey, catalogManager])
+
+  const revalidateRef = useRef(revalidate)
+  revalidateRef.current = revalidate
+
+  // When picker opens: show cache immediately (optimistic), then revalidate in background
+  useEffect(() => {
+    if (!isOpen) return
+
+    const cached = loadFromCache()
+    if (cached?.length) {
+      setDisplayedLanguages(cached)
+      setAvailableLanguages(cached)
+    } else {
+      setDisplayedLanguages([])
+    }
+    setError(null)
+    revalidateRef.current()
+  }, [isOpen])
+
+  const languages = displayedLanguages
+  const isLoading = isRevalidating && displayedLanguages.length === 0
+  const retry = revalidate
 
   const filteredLanguages = searchQuery
     ? languages.filter(
@@ -236,8 +264,11 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
                     <Languages className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                {!isLoading && !error && (
-                  <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
+                {(!isLoading || displayedLanguages.length > 0) && !error && (
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 rounded-full">
+                    {isRevalidating && displayedLanguages.length > 0 && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" aria-hidden />
+                    )}
                     <Globe className="w-3.5 h-3.5 text-gray-600" />
                     <span className="text-xs font-medium text-gray-900">
                       {filteredLanguages.length}

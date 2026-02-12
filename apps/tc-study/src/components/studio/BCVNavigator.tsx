@@ -177,7 +177,14 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
 
   const chapters = Object.keys(versesByChapter).map(Number).sort((a, b) => a - b)
 
-  // Handle verse click/selection - click once for start, twice for end
+  // Compare two verse keys (chapter:verse); true if a is before b in biblical order
+  const isBefore = (a: string, b: string): boolean => {
+    const [ac, av] = a.split(':').map(Number)
+    const [bc, bv] = b.split(':').map(Number)
+    return ac < bc || (ac === bc && av < bv)
+  }
+
+  // Handle verse click/selection - click once for start, twice for end. Always store so start is before end (by chapter then verse).
   const handleVerseClick = (verseKey: string) => {
     if (!startVerse) {
       // First click: set start verse
@@ -192,8 +199,13 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
       setStartVerse(verseKey)
       setEndVerse(null)
     } else {
-      // Clicking outside the range: set end verse to create/extend range
-      setEndVerse(verseKey)
+      // Clicking outside the range: set end verse. Normalize so start is always before end (endVerse < startVerse only when endChapter > startChapter).
+      if (isBefore(verseKey, startVerse)) {
+        setStartVerse(verseKey)
+        setEndVerse(startVerse)
+      } else {
+        setEndVerse(verseKey)
+      }
     }
   }
 

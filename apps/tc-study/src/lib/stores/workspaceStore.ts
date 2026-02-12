@@ -46,7 +46,7 @@ interface WorkspaceState {
   selectedResourceKeys: Set<string>
   
   // Available data
-  availableLanguages: Array<{ code: string; name: string; source: 'catalog' | 'door43' }>
+  availableLanguages: Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>
   availableOrganizations: Array<{ id: string; username: string; name: string; description?: string; avatarUrl?: string }>
   availableResources: Map<string, ResourceInfo>
 }

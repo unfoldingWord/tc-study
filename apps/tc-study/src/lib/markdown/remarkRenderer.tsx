@@ -181,7 +181,7 @@ export class RemarkMarkdownRenderer {
             <pre {...props} className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4 text-sm" />
           ),
           blockquote: (props: any) => (
-            <blockquote {...props} className="border-l-4 border-blue-300 pl-4 italic mb-4 text-gray-700 dark:text-gray-300" />
+            <blockquote {...props} className="border-s-4 border-blue-300 ps-4 italic mb-4 text-gray-800 dark:text-gray-300" />
           ),
           strong: (props: any) => <strong {...props} className="font-semibold" />,
           em: (props: any) => <em {...props} className="italic" />,
