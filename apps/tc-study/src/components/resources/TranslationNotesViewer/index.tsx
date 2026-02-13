@@ -14,6 +14,7 @@ import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
+import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TranslationNoteCard } from './components/TranslationNoteCard'
 import { useTranslationNotesContent } from './hooks/useTranslationNotesContent'
@@ -154,10 +155,14 @@ export function TranslationNotesViewer({
     resourceId 
   })
 
-  // Language direction: target scripture broadcast first, then this resource's catalog/language list (so TN is RTL even without scripture panel)
+  // Language direction: target scripture broadcast first, then this resource's catalog/list, then known RTL codes
   const languageCode = resource?.language ?? resourceKey.split('/')[1]?.split('_')[0] ?? ''
   const languageFromList = availableLanguages.find((l) => l.code === languageCode)
-  const resourceDirection = catalogMetadata?.languageDirection ?? languageFromList?.direction ?? 'ltr'
+  const resourceDirection = getLanguageDirection(
+    catalogMetadata?.languageDirection ?? undefined,
+    languageFromList?.direction ?? undefined,
+    languageCode
+  )
   const targetLanguageDirection = targetScriptureMetadata?.languageDirection ?? resourceDirection
 
   // Filter notes for current chapter/verse range

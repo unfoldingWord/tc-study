@@ -15,6 +15,7 @@ import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
+import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import type { ResourceInfo } from '../../../contexts/types'
 
@@ -38,7 +39,11 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
   const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
   const languageCode = resource?.language ?? resourceKey.split('/')[1]?.split('_')[0] ?? ''
   const languageFromList = availableLanguages.find((l) => l.code === languageCode)
-  const languageDirection = catalogMetadata?.languageDirection ?? languageFromList?.direction ?? 'ltr'
+  const languageDirection = getLanguageDirection(
+    catalogMetadata?.languageDirection ?? undefined,
+    languageFromList?.direction ?? undefined,
+    languageCode
+  )
 
   useEffect(() => {
     let cancelled = false

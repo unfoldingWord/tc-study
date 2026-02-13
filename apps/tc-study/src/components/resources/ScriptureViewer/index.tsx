@@ -18,6 +18,7 @@ import { useCatalogManager, useCurrentReference } from '../../../contexts'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getBookTitle } from '../../../utils/bookNames'
+import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import {
     DebugPanel,
@@ -100,10 +101,14 @@ export function ScriptureViewer({
     displayVerses,
   } = useContent(resourceKey, availableBooks, language)
   
-  // Language direction: resource metadata first, then list-languages (catalog) fallback; no hardcoding
+  // Language direction: catalog first, then list-languages, then known RTL codes (so /read/ar works before APIs load)
   const languageCode = resource?.language ?? language
   const languageFromList = availableLanguages.find((l) => l.code === languageCode)
-  const languageDirection = catalogMetadata?.languageDirection ?? languageFromList?.direction ?? 'ltr'
+  const languageDirection = getLanguageDirection(
+    catalogMetadata?.languageDirection ?? undefined,
+    languageFromList?.direction ?? undefined,
+    languageCode
+  )
 
   // Use latest resource from store so we get ingredients when Phase 2 metadata loads (localized book title)
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
@@ -181,7 +186,7 @@ export function ScriptureViewer({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" dir={languageDirection}>
       <ResourceViewerHeader 
         title={resource.title}
         subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}

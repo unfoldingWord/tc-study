@@ -8,6 +8,7 @@ import { useCurrentPassageSet, useCurrentReference, useNavigation, useNavigation
 import { useAppStore, useAnchorResource, useBookTitleSource } from '../../contexts/AppContext'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { getBookTitle } from '../../utils/bookNames'
+import { isRtlLanguageCode } from '../../utils/languageDirection'
 import { LanguagePicker } from '../LanguagePicker'
 import { BCVNavigator } from './BCVNavigator'
 import { NavigationHistoryModal } from './NavigationHistoryModal'
@@ -43,7 +44,9 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
       if (res.languageDirection === 'ltr') return false
       const lang = res.language ?? res.languageCode
       if (!lang) return null
-      return availableLanguages.find((l) => l.code === lang)?.direction === 'rtl' ?? null
+      const listDir = availableLanguages.find((l) => l.code === lang)?.direction
+      if (listDir === 'rtl' || listDir === 'ltr') return listDir === 'rtl'
+      return isRtlLanguageCode(lang) ? true : null
     }
     if (dirFrom(anchorResource) === true) return true
     if (anchorResource && dirFrom(anchorResource) === false) return false
@@ -52,7 +55,9 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
     if (anyRtl) return true
     const lang = anchorResource?.language ?? anchorResource?.languageCode ?? bookTitleSource?.language
     if (!lang) return false
-    return availableLanguages.find((l) => l.code === lang)?.direction === 'rtl' ?? false
+    const listDir = availableLanguages.find((l) => l.code === lang)?.direction
+    if (listDir === 'rtl' || listDir === 'ltr') return listDir === 'rtl'
+    return isRtlLanguageCode(lang)
   })()
   const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)

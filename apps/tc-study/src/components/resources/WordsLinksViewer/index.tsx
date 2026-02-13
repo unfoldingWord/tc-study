@@ -18,6 +18,7 @@ import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
+import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TokenFilterBanner, WordLinkCard } from './components'
@@ -52,10 +53,14 @@ export function WordsLinksViewer({
   const [catalogTrigger, setCatalogTrigger] = useState(0)
   const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
 
-  // Resolve RTL: prefer language list (list/languages API has correct ld per language) over resource catalog metadata (can be wrong e.g. TWL returning ltr)
+  // Resolve RTL: list first, then catalog, then known RTL codes (so /read/ar works before APIs load)
   const languageCode = resource?.language ?? resourceKey.split('/')[1]?.split('_')[0] ?? ''
   const languageFromList = availableLanguages.find((l) => l.code === languageCode)
-  const languageDirection = languageFromList?.direction ?? catalogMetadata?.languageDirection ?? 'ltr'
+  const languageDirection = getLanguageDirection(
+    catalogMetadata?.languageDirection ?? undefined,
+    languageFromList?.direction ?? undefined,
+    languageCode
+  )
 
   // Load catalog metadata for direction
   useEffect(() => {
