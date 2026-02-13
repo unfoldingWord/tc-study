@@ -2,12 +2,13 @@
  * NavigationBar - Context-aware navigation controls
  */
 
-import { ArrowLeft, Book, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, List, ListOrdered, Menu, X } from 'lucide-react'
+import { ArrowLeft, Book, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, Info, List, ListOrdered, Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCurrentPassageSet, useCurrentReference, useNavigation, useNavigationHistory, useNavigationMode } from '../../contexts'
 import { useAppStore, useAnchorResource, useBookTitleSource } from '../../contexts/AppContext'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { getBookTitle } from '../../utils/bookNames'
+import { APP_VERSION, DEPLOY_VERSION } from '../../utils/deployVersion'
 import { isRtlLanguageCode } from '../../utils/languageDirection'
 import { LanguagePicker } from '../LanguagePicker'
 import { BCVNavigator } from './BCVNavigator'
@@ -63,6 +64,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isVersionOpen, setIsVersionOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const typeSelectorRef = useRef<HTMLDivElement>(null)
   
@@ -612,10 +614,57 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
                     />
                   </div>
                 )}
+                
+                {/* Version info - icon opens modal with app version and build */}
+                {showLanguagePicker && (
+                  <div className="border-t border-gray-100 px-2 py-1.5 flex justify-center">
+                    <button
+                      onClick={() => {
+                        setIsVersionOpen(true)
+                        setIsMenuOpen(false)
+                      }}
+                      className="p-1 rounded hover:bg-gray-50 text-gray-400 hover:text-gray-600"
+                      title="Version"
+                      aria-label="Version"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
+        
+        {/* Version & build modal */}
+        {isVersionOpen && (
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40"
+            onClick={() => setIsVersionOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Version and build"
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">Version</h3>
+              <p className="font-mono text-sm text-gray-800" data-app-version={APP_VERSION}>
+                {APP_VERSION}
+              </p>
+              <p className="font-mono text-xs text-gray-600 mt-2 break-all" data-deploy-version={DEPLOY_VERSION}>
+                Build: {DEPLOY_VERSION}
+              </p>
+              <button
+                onClick={() => setIsVersionOpen(false)}
+                className="mt-4 w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
         
         {/* BCV Navigator Modal */}
         {isNavigatorOpen && hasAnchor && (

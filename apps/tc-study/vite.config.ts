@@ -5,7 +5,15 @@ import { defineConfig } from 'vite'
 import checker from 'vite-plugin-checker'
 import { getSharedBuildConfig } from '../../config/vite-build'
 
+// Build id: set VITE_DEPLOY_VERSION before build for reproducible deploys; otherwise build timestamp
+const deployVersion =
+  process.env.VITE_DEPLOY_VERSION ||
+  new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
+
 export default defineConfig({
+  define: {
+    __DEPLOY_VERSION__: JSON.stringify(deployVersion),
+  },
   plugins: [
     react(),
     tailwindcss(),

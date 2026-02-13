@@ -1,6 +1,9 @@
 # Dependencies
 node_modules
 
+# Generated at dev/build (scripts/write-app-version.cjs)
+src/generated/
+
 # Build output
 dist
 .turbo

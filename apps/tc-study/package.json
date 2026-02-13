@@ -1,11 +1,13 @@
 {
   "name": "tc-study",
   "private": true,
-  "version": "0.1.1",
+  "version": "1.1.1-beta.1",
   "description": "Translation Companion Study - Web app for Bible translation resources with offline capability",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/write-app-version.cjs",
     "dev": "vite",
+    "prebuild": "node scripts/write-app-version.cjs",
     "build": "node -e \"require('fs').rmSync('public/preloaded',{recursive:true,force:true})\" && vite build",
     "prebundle": "bt-bundle bundle --config bundle-config.json",
     "bundle:minimal": "bt-bundle bundle --config bundle-config.json",
@@ -15,7 +17,7 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "deploy": "bash scripts/deploy.sh",
-    "deploy:quick": "bun run build:skip-check && bunx wrangler pages deploy dist --project-name=tc-study --branch=main",
+    "deploy:quick": "node scripts/write-app-version.cjs && node scripts/set-deploy-version.js \"bun run build:skip-check\" && bunx wrangler pages deploy dist --project-name=tc-study --branch=main",
     "deploy:cf": "bash scripts/deploy.sh",
     "build:skip-check": "vite build",
     "build:analyze": "bunx vite-bundle-visualizer -t treemap -o dist/stats.html --open true"
