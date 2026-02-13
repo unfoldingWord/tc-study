@@ -17,7 +17,7 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "deploy": "bash scripts/deploy.sh",
-    "deploy:quick": "node scripts/write-app-version.cjs && node scripts/set-deploy-version.js \"bun run build:skip-check\" && bunx wrangler pages deploy dist --project-name=tc-study --branch=main",
+    "deploy:quick": "node scripts/write-app-version.cjs && node scripts/set-deploy-version.cjs \"bun run build:skip-check\" && bunx wrangler pages deploy dist --project-name=tc-study --branch=main",
     "deploy:cf": "bash scripts/deploy.sh",
     "build:skip-check": "vite build",
     "build:analyze": "bunx vite-bundle-visualizer -t treemap -o dist/stats.html --open true"
