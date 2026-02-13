@@ -48,7 +48,7 @@ if (!existsSync(distDir) || readdirSync(distDir).length === 0) {
 // Deploy to Cloudflare Pages
 console.log('🌐 Deploying to Cloudflare Pages...');
 try {
-  execSync(`wrangler pages deploy dist --project-name="${projectName}"`, {
+  execSync(`wrangler pages deploy dist --project-name="${projectName}" --branch=main`, {
     cwd: appDir,
     stdio: 'inherit'
   });

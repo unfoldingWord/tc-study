@@ -169,6 +169,7 @@ export function useTokenBroadcast({
       resourceMetadata: {
         id: resourceKey,
         language,
+        languageDirection,
         type: 'scripture',
       },
       timestamp: Date.now(),
