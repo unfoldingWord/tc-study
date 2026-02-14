@@ -3,8 +3,8 @@
  * Provides sortable tabs with drag-and-drop support for reordering and cross-panel moves.
  */
 
-import React from 'react'
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable'
+import React from 'react'
 import { SortableTab } from './SortableTab'
 
 interface Resource {

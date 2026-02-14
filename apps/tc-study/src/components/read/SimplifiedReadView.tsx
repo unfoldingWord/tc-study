@@ -7,6 +7,8 @@
  * - Two-panel layout with navigation (same as Studio)
  */
 
+import { getDoor43ApiClient } from '@bt-synergy/door43-api'
+import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 import {
     DndContext,
     DragOverlay,
@@ -28,13 +30,11 @@ import {
 import { CheckCircle2, Loader2, Package, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ResourceType, ResourceFormat } from '@bt-synergy/resource-catalog'
-import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useCacheAdapter, useCatalogManager, useCompletenessChecker, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useBackgroundDownload, useCatalogBackgroundDownload, useResourceManagement, useStudioResources, useSwipeGesture } from '../../hooks'
-import { createResourceMetadata, mapSubjectToResourceType, mapContentFormat } from '../../lib/services/ResourceMetadataFactory'
+import { createResourceMetadata, mapContentFormat, mapSubjectToResourceType } from '../../lib/services/ResourceMetadataFactory'
 import { usePackageStore } from '../../lib/stores/packageStore'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
