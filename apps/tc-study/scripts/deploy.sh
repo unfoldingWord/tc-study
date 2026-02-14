@@ -58,7 +58,7 @@ echo -e "${BLUE}🌐 Step 3: Deploying to Cloudflare Pages...${NC}"
 # Use project name from wrangler.toml or default to "tc-study"
 PROJECT_NAME="${1:-tc-study}"
 
-bunx wrangler pages deploy dist --project-name="$PROJECT_NAME" --branch=main
+bunx wrangler pages deploy dist --project-name="$PROJECT_NAME" --branch=master
 
 if [ $? -eq 0 ]; then
     echo ""
