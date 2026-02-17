@@ -10,7 +10,7 @@
  * - Uses ProcessedScripture format from @bt-synergy/usfm-processor
  */
 
-import { Book, Bug } from 'lucide-react'
+import { Book } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useEvents } from 'linked-panels'
 import { useAppStore } from '../../../contexts/AppContext'
@@ -20,10 +20,7 @@ import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getBookTitle } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
-import {
-    DebugPanel,
-    ScriptureContent,
-} from './components'
+import { ScriptureContent } from './components'
 import { useContent, useContentRequests, useHighlighting, useScriptureEvents, useTOC, useTokenBroadcast } from './hooks'
 import type { ScriptureViewerProps } from './types'
 
@@ -42,9 +39,6 @@ export function ScriptureViewer({
   const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
   const { setBook, setChapter, setVerse, setEndChapter, setEndVerse } = currentRef
 
-  // Debug panel visibility state
-  const [showDebug, setShowDebug] = useState(false)
-  
   // Catalog metadata (Door43 manifest data)
   const [catalogMetadata, setCatalogMetadata] = useState<any>(null)
   
@@ -222,43 +216,7 @@ export function ScriptureViewer({
           language={language}
           languageDirection={languageDirection}
         />
-      </div>
-
-      {/* Debug Panel (conditionally shown) */}
-      {showDebug && (
-        <DebugPanel
-        isLoading={isLoading}
-        error={error}
-        loadedContent={loadedContent}
-          catalogMetadata={catalogMetadata}
-        availableBooks={availableBooks}
-        currentChapter={currentChapter}
-        displayVerses={displayVerses}
-        currentRef={currentRef}
-          highlightTarget={highlightTarget}
-          onClose={() => setShowDebug(false)}
-      />
-      )}
-
-        {/* Floating Debug Button (smaller, positioned within panel) */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation() // Prevent triggering parent onClick
-            setShowDebug(!showDebug)
-          }}
-          className={`
-            absolute bottom-2 right-2 p-1.5 rounded-full shadow-md
-            transition-all duration-200 hover:scale-110
-            ${showDebug 
-              ? 'bg-blue-600 text-white hover:bg-blue-700' 
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }
-          `}
-          title={showDebug ? 'Hide debug panel' : 'Show debug panel'}
-          aria-label={showDebug ? 'Hide debug panel' : 'Show debug panel'}
-        >
-          <Bug className="w-3 h-3" />
-        </button>
+        </div>
       </div>
     </div>
   )
