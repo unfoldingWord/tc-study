@@ -2,12 +2,13 @@
  * NavigationTypeSelector - Dropdown for quick navigation type switching
  * 
  * Allows switching between:
- * - Verse (verse-by-verse)
+ * - Custom Range (verse-by-verse or range)
+ * - Chapter (whole chapter, arrows move by chapter)
  * - Sections (translator sections)
  * - Passage Sets (predefined passage lists)
  */
 
-import { BookOpen, List, ListOrdered } from 'lucide-react'
+import { BookOpen, Library, List, ListOrdered } from 'lucide-react'
 import { useNavigation, useNavigationMode } from '../../contexts'
 import type { NavigationMode } from '../../contexts/types'
 
@@ -24,6 +25,11 @@ export function NavigationTypeSelector({ onClose }: NavigationTypeSelectorProps)
       mode: 'verse' as NavigationMode,
       icon: BookOpen,
       label: 'Custom Range',
+    },
+    {
+      mode: 'chapter' as NavigationMode,
+      icon: Library,
+      label: 'Chapter',
     },
     {
       mode: 'section' as NavigationMode,
@@ -50,9 +56,9 @@ export function NavigationTypeSelector({ onClose }: NavigationTypeSelectorProps)
         onClick={onClose}
       />
       
-      {/* Compact dropdown - opens upward (nav bar is at bottom) */}
+      {/* Dropdown: opens upward on mobile (bar at bottom), downward on md+ (bar at top) */}
       <div
-        className="absolute bottom-full left-0 mb-1 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50"
+        className="absolute bottom-full left-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50"
         onClick={(e) => e.stopPropagation()}
       >
         {navigationTypes.map(({ mode, icon: Icon, label }) => {

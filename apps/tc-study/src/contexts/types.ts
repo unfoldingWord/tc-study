@@ -24,7 +24,7 @@ export interface BookInfo {
 /**
  * Navigation Mode
  */
-export type NavigationMode = 'verse' | 'section' | 'passage-set'
+export type NavigationMode = 'verse' | 'chapter' | 'section' | 'passage-set'
 
 /**
  * Reference state (book/chapter/verse) for display

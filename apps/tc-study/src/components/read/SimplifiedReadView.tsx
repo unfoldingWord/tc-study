@@ -1152,8 +1152,30 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
       onDragEnd={handleDragEnd}
     >
       <div className="h-full flex flex-col overflow-hidden">
+      {/* Navigation Bar - top on md+, bottom on mobile */}
+      {navState === 'compact' && (
+        <div className="flex-shrink-0 flex flex-col order-2 md:order-1">
+          <div className="flex items-center bg-white border-gray-100/50 border-t md:border-t-0 md:border-b px-2 py-1.5">
+            <NavigationBar 
+              isCompact={true}
+              onToggleCompact={undefined}
+              showLanguagePicker={true}
+              onLanguageSelected={handleLanguageSelected}
+              autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
+              downloadIndicator={
+                <DownloadIndicator 
+                  isDownloading={isBackgroundDownloading}
+                  progress={downloadStats.progress ?? undefined}
+                />
+              }
+              onDownloadCollection={isCollectionFullyCached ? handleDirectDownloadCollection : undefined}
+              onLoadCollection={() => setShowLoadDialog(true)}
+            />
+          </div>
+        </div>
+      )}
       {/* Main Content Area - Two Panels (matches Studio exactly) */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden order-1 md:order-2 min-h-0">
         <LinkedPanelsContainer config={panelConfig} plugins={plugins}>
           {/* Bridge global events to panel system */}
           <GlobalSignalBridge />
@@ -1362,29 +1384,6 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           </div>
         </LinkedPanelsContainer>
       </div>
-      
-      {/* Navigation Bar with Language Picker - MOVED TO BOTTOM */}
-      {navState === 'compact' && (
-        <div className="flex-shrink-0 flex flex-col">
-          <div className="flex items-center bg-white border-t border-gray-100/50 px-2 py-1.5">
-            <NavigationBar 
-              isCompact={true}
-              onToggleCompact={undefined}
-              showLanguagePicker={true}
-              onLanguageSelected={handleLanguageSelected}
-              autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
-              downloadIndicator={
-                <DownloadIndicator 
-                  isDownloading={isBackgroundDownloading}
-                  progress={downloadStats.progress ?? undefined}
-                />
-              }
-              onDownloadCollection={isCollectionFullyCached ? handleDirectDownloadCollection : undefined}
-              onLoadCollection={() => setShowLoadDialog(true)}
-            />
-          </div>
-        </div>
-      )}
       
       {/* DragOverlay for ghost preview */}
       <DragOverlay>

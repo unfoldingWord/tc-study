@@ -2,7 +2,7 @@
  * NavigationBar - Context-aware navigation controls
  */
 
-import { ArrowLeft, Book, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, Info, List, ListOrdered, Menu, X } from 'lucide-react'
+import { ArrowLeft, Book, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, Info, Library, List, ListOrdered, Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCurrentPassageSet, useCurrentReference, useNavigation, useNavigationHistory, useNavigationMode } from '../../contexts'
 import { useAppStore, useAnchorResource, useBookTitleSource } from '../../contexts/AppContext'
@@ -136,6 +136,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
     switch (navigationMode) {
       case 'verse':
         return 'Range'
+      case 'chapter':
+        return 'Chapter'
       case 'section':
         return 'Section'
       case 'passage-set':
@@ -150,6 +152,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
       navigation.previousPassage()
     } else if (navigationMode === 'verse') {
       navigation.previousVerse()
+    } else if (navigationMode === 'chapter') {
+      navigation.previousChapter()
     } else if (navigationMode === 'section') {
       navigation.previousSection()
     }
@@ -160,6 +164,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
       navigation.nextPassage()
     } else if (navigationMode === 'verse') {
       navigation.nextVerse()
+    } else if (navigationMode === 'chapter') {
+      navigation.nextChapter()
     } else if (navigationMode === 'section') {
       navigation.nextSection()
     }
@@ -170,6 +176,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
       return navigation.canGoToPreviousPassage()
     } else if (navigationMode === 'verse') {
       return navigation.canGoToPreviousVerse()
+    } else if (navigationMode === 'chapter') {
+      return navigation.canGoToPreviousChapter()
     } else if (navigationMode === 'section') {
       return navigation.canGoToPreviousSection()
     }
@@ -181,6 +189,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
       return navigation.canGoToNextPassage()
     } else if (navigationMode === 'verse') {
       return navigation.canGoToNextVerse()
+    } else if (navigationMode === 'chapter') {
+      return navigation.canGoToNextChapter()
     } else if (navigationMode === 'section') {
       return navigation.canGoToNextSection()
     }
@@ -478,6 +488,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
                 title={`Navigation type: ${getModeLabel()}`}
               >
                 {navigationMode === 'verse' && <BookOpen className="w-4 h-4" />}
+                {navigationMode === 'chapter' && <Library className="w-4 h-4" />}
                 {navigationMode === 'section' && <List className="w-4 h-4" />}
                 {navigationMode === 'passage-set' && <ListOrdered className="w-4 h-4" />}
               </button>
@@ -544,9 +555,9 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
               {isMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
             
-            {/* Dropdown Menu - opens upward (nav bar is at bottom) */}
+            {/* Dropdown Menu - opens upward on mobile (bar at bottom), downward on md+ (bar at top) */}
             {isMenuOpen && (
-              <div className="absolute bottom-full right-0 mb-1 w-auto bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
+              <div className="absolute bottom-full right-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 w-auto bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
                 {/* History Button - Icon Only */}
                 <button
                   onClick={() => {

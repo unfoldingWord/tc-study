@@ -173,26 +173,41 @@ const useNavigationStore = create<NavigationStore>()(
   navigateToReference: (ref: BCVReference) => {
     const current = get().currentReference
     const historyLength = get().navigationHistory.length
+    const navigationMode = get().navigationMode
+
+    // In chapter mode, normalize to full chapter (verse 1 to last verse)
+    let refToUse = ref
+    if (navigationMode === 'chapter') {
+      const bookInfo = get().getBookInfo(ref.book)
+      if (bookInfo?.verses && ref.chapter) {
+        const lastVerse = bookInfo.verses[ref.chapter - 1] ?? 1
+        refToUse = {
+          ...ref,
+          verse: 1,
+          endVerse: lastVerse,
+        }
+      }
+    }
 
     // Check if same reference (but allow if history is empty - for initial navigation)
     const isSame =
-      current.book === ref.book &&
-      current.chapter === ref.chapter &&
-      current.verse === ref.verse &&
-      current.endChapter === ref.endChapter &&
-      current.endVerse === ref.endVerse
+      current.book === refToUse.book &&
+      current.chapter === refToUse.chapter &&
+      current.verse === refToUse.verse &&
+      current.endChapter === refToUse.endChapter &&
+      current.endVerse === refToUse.endVerse
 
     if (isSame && historyLength > 0) return
 
     set((state) => {
       // Add to history
       if (state.navigationHistory.length === 0) {
-        state.navigationHistory = [{ ...ref }]
+        state.navigationHistory = [{ ...refToUse }]
         state.historyIndex = 0
       } else {
         // Remove forward history
         state.navigationHistory = state.navigationHistory.slice(0, state.historyIndex + 1)
-        state.navigationHistory.push({ ...ref })
+        state.navigationHistory.push({ ...refToUse })
 
         // Maintain max size
         if (state.navigationHistory.length > state.maxHistorySize) {
@@ -202,13 +217,13 @@ const useNavigationStore = create<NavigationStore>()(
         state.historyIndex = state.navigationHistory.length - 1
       }
 
-      state.currentReference = ref
+      state.currentReference = refToUse
       
       // Persist to localStorage
       persistState(state)
     })
 
-    console.log('📍 Navigated to:', ref)
+    console.log('📍 Navigated to:', refToUse)
   },
 
   navigateToBook: (bookCode: string) => {
@@ -385,7 +400,7 @@ const useNavigationStore = create<NavigationStore>()(
   },
 
   nextChapter: () => {
-    const { currentReference, availableBooks } = get()
+    const { currentReference, availableBooks, navigationMode } = get()
     const bookInfo = get().getBookInfo(currentReference.book)
     
     if (!bookInfo) {
@@ -398,10 +413,15 @@ const useNavigationStore = create<NavigationStore>()(
     // If there's a next chapter in this book
     const chapters = bookInfo.chapters ?? 0
     if (currentChapter < chapters) {
+      const newChapter = currentChapter + 1
+      const lastVerse = (navigationMode === 'chapter' && bookInfo.verses)
+        ? (bookInfo.verses[newChapter - 1] ?? 1)
+        : undefined
       get().navigateToReference({
         book: currentReference.book,
-        chapter: currentChapter + 1,
+        chapter: newChapter,
         verse: 1,
+        ...(lastVerse !== undefined && { endVerse: lastVerse }),
       })
     }
     // Try to go to the first chapter of the next book
@@ -409,17 +429,22 @@ const useNavigationStore = create<NavigationStore>()(
       const currentBookIndex = availableBooks.findIndex(b => b.code === currentReference.book)
       if (currentBookIndex >= 0 && currentBookIndex < availableBooks.length - 1) {
         const nextBook = availableBooks[currentBookIndex + 1]
+        const nextBookInfo = get().getBookInfo(nextBook.code)
+        const lastVerse = (navigationMode === 'chapter' && nextBookInfo?.verses)
+          ? (nextBookInfo.verses[0] ?? 1)
+          : undefined
         get().navigateToReference({
           book: nextBook.code,
           chapter: 1,
           verse: 1,
+          ...(lastVerse !== undefined && { endVerse: lastVerse }),
         })
       }
     }
   },
 
   previousChapter: () => {
-    const { currentReference, availableBooks } = get()
+    const { currentReference, availableBooks, navigationMode } = get()
     const bookInfo = get().getBookInfo(currentReference.book)
     
     if (!bookInfo) {
@@ -431,10 +456,15 @@ const useNavigationStore = create<NavigationStore>()(
     
     // If there's a previous chapter in this book
     if (currentChapter > 1) {
+      const newChapter = currentChapter - 1
+      const lastVerse = (navigationMode === 'chapter' && bookInfo.verses)
+        ? (bookInfo.verses[newChapter - 1] ?? 1)
+        : undefined
       get().navigateToReference({
         book: currentReference.book,
-        chapter: currentChapter - 1,
+        chapter: newChapter,
         verse: 1,
+        ...(lastVerse !== undefined && { endVerse: lastVerse }),
       })
     }
     // Try to go to the last chapter of the previous book
@@ -444,10 +474,15 @@ const useNavigationStore = create<NavigationStore>()(
         const previousBook = availableBooks[currentBookIndex - 1]
         const previousBookInfo = get().getBookInfo(previousBook.code)
         if (previousBookInfo) {
+          const prevChapter = previousBookInfo.chapters ?? 1
+          const lastVerse = (navigationMode === 'chapter' && previousBookInfo.verses)
+            ? (previousBookInfo.verses[prevChapter - 1] ?? 1)
+            : undefined
           get().navigateToReference({
             book: previousBook.code,
-            chapter: previousBookInfo.chapters ?? 1,
+            chapter: prevChapter,
             verse: 1,
+            ...(lastVerse !== undefined && { endVerse: lastVerse }),
           })
         }
       }
@@ -693,6 +728,18 @@ const useNavigationStore = create<NavigationStore>()(
   setNavigationMode: (mode: NavigationMode) => {
     set((state) => {
       state.navigationMode = mode
+      // When switching to chapter mode, expand current reference to full chapter (verse 1 to last verse)
+      if (mode === 'chapter') {
+        const bookInfo = get().getBookInfo(state.currentReference.book)
+        if (bookInfo?.verses && state.currentReference.chapter) {
+          const lastVerse = bookInfo.verses[state.currentReference.chapter - 1] ?? 1
+          state.currentReference = {
+            ...state.currentReference,
+            verse: 1,
+            endVerse: lastVerse,
+          }
+        }
+      }
       persistState(state)
     })
     console.log('🔀 Navigation mode changed to:', mode)
