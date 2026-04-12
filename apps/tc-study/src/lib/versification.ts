@@ -91,6 +91,43 @@ export function getStandardBooks(): string[] {
   return Object.keys(STANDARD_VERSIFICATION)
 }
 
+/** Canonical order index (0-based) for Protestant Bible book codes; unknown codes return a large value. */
+const STANDARD_BOOK_ORDER_MAP: Map<string, number> = new Map(
+  Object.keys(STANDARD_VERSIFICATION).map((code, i) => [code, i])
+)
+
+export function getStandardBookOrderIndex(bookCode: string): number {
+  const normalized = bookCode.toLowerCase().trim()
+  return STANDARD_BOOK_ORDER_MAP.get(normalized) ?? 1000
+}
+
+/**
+ * Leading digits on ingredient filenames (e.g. `./01-GEN.usfm` → 1) match Bible order in many catalogs.
+ */
+export function parseIngredientPathBookOrder(path: string | undefined): number | undefined {
+  if (!path) return undefined
+  const base = path.replace(/^\.\//, '').split(/[/\\]/).pop() ?? path
+  const m = base.match(/^(\d+)/)
+  return m ? parseInt(m[1], 10) : undefined
+}
+
+/**
+ * Prefer explicit catalog `sort`, else numeric path prefix; caller may fall back to {@link getStandardBookOrderIndex}.
+ */
+export function getIngredientBookSortKey(
+  ingredients: Array<{ path?: string; sort?: number }>
+): number | undefined {
+  const sorts = ingredients
+    .map((i) => i.sort)
+    .filter((n): n is number => typeof n === 'number' && !Number.isNaN(n))
+  if (sorts.length) return Math.min(...sorts)
+  const pathNums = ingredients
+    .map((i) => parseIngredientPathBookOrder(i.path))
+    .filter((n): n is number => n !== undefined)
+  if (pathNums.length) return Math.min(...pathNums)
+  return undefined
+}
+
 /**
  * Extract verse counts from parsed USFM content metadata
  */

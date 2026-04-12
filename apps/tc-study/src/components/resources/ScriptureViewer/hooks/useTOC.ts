@@ -6,7 +6,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useApp, useCatalogManager, useNavigation } from '../../../../contexts'
 import type { BookInfo, ResourceTOC } from '../../../../contexts/types-only'
 import { defaultSectionsService } from '../../../../lib/services/default-sections'
-import { getStandardVerseCount } from '../../../../lib/versification'
+import {
+  getIngredientBookSortKey,
+  getStandardBookOrderIndex,
+  getStandardVerseCount,
+} from '../../../../lib/versification'
 
 export function useTOC(
   resourceKey: string,
@@ -87,21 +91,30 @@ export function useTOC(
           })
 
           // Convert to BookInfo array (use ingredient.title when catalog provides it)
-          const books: BookInfo[] = Array.from(bookCodes).map((code) => {
-            const bookIngredients = ingredients.filter((ing: any) =>
-              ing.identifier?.toLowerCase() === code
-            )
-            const chapters = bookIngredients.length || 1
-            const verses = getStandardVerseCount(code)
-            const name = bookIngredients[0]?.title || code.toUpperCase()
+          const books: BookInfo[] = Array.from(bookCodes)
+            .map((code) => {
+              const bookIngredients = ingredients.filter((ing: any) =>
+                ing.identifier?.toLowerCase() === code
+              )
+              const chapters = bookIngredients.length || 1
+              const verses = getStandardVerseCount(code)
+              const name = bookIngredients[0]?.title || code.toUpperCase()
+              const primaryOrder =
+                getIngredientBookSortKey(bookIngredients) ?? getStandardBookOrderIndex(code)
 
-            return {
-              code,
-              name, // From catalog ingredient.title when available
-              chapters: verses?.length || chapters,
-              verses,
-            }
-          }).sort((a, b) => a.code.localeCompare(b.code))
+              return {
+                code,
+                name, // From catalog ingredient.title when available
+                chapters: verses?.length || chapters,
+                verses,
+                primaryOrder,
+              }
+            })
+            .sort((a, b) => {
+              if (a.primaryOrder !== b.primaryOrder) return a.primaryOrder - b.primaryOrder
+              return a.code.localeCompare(b.code)
+            })
+            .map(({ primaryOrder: _p, ...book }) => book)
 
           setAvailableBooks(books)
 
