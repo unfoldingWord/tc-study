@@ -43,7 +43,8 @@ import {
     scriptureContentRequestPlugin,
     scriptureContentResponsePlugin,
     scriptureTokensBroadcastPlugin,
-    tokenClickPlugin
+    tokenClickPlugin,
+    verseFilterPlugin
 } from '../../plugins/messageTypePlugins'
 import { useStudyStore } from '../../store/studyStore'
 import type { ExportWorkerMessage, ExportWorkerResponse } from '../../workers/collectionExport.worker'
@@ -1050,6 +1051,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     
     // Register signal plugins for resource-panels communication
     pluginRegistry.register(tokenClickPlugin)
+    pluginRegistry.register(verseFilterPlugin)
     pluginRegistry.register(linkClickPlugin)
     pluginRegistry.register(entryLinkClickPlugin)
     pluginRegistry.register(scriptureTokensBroadcastPlugin)

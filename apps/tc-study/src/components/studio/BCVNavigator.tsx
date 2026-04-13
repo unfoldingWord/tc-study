@@ -76,8 +76,8 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
     )
   }
 
-  // Start at step 2 if we already have a book selected
-  const [step, setStep] = useState<1 | 2>(currentRef.book ? 2 : 1)
+  // Always open at book selection (step 1); current book is highlighted and scrolled into view
+  const [step, setStep] = useState<1 | 2>(1)
   const [selectedBook, setSelectedBook] = useState(currentRef.book)
   
   // Initialize with current reference range

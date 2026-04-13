@@ -7,7 +7,6 @@ import { useApp, useCatalogManager, useNavigation } from '../../../../contexts'
 import type { BookInfo, ResourceTOC } from '../../../../contexts/types-only'
 import { defaultSectionsService } from '../../../../lib/services/default-sections'
 import {
-  getIngredientBookSortKey,
   getStandardBookOrderIndex,
   getStandardVerseCount,
 } from '../../../../lib/versification'
@@ -99,8 +98,7 @@ export function useTOC(
               const chapters = bookIngredients.length || 1
               const verses = getStandardVerseCount(code)
               const name = bookIngredients[0]?.title || code.toUpperCase()
-              const primaryOrder =
-                getIngredientBookSortKey(bookIngredients) ?? getStandardBookOrderIndex(code)
+              const primaryOrder = getStandardBookOrderIndex(code)
 
               return {
                 code,

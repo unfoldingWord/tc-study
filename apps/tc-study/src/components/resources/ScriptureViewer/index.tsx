@@ -11,7 +11,7 @@
  */
 
 import { Book } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useEvents } from 'linked-panels'
 import { useAppStore } from '../../../contexts/AppContext'
 import { useCatalogManager, useCurrentReference } from '../../../contexts'
@@ -117,6 +117,7 @@ export function ScriptureViewer({
     highlightTarget,
     selectedTokenId,
     handleTokenClick,
+    handleVerseFilter,
   } = useHighlighting(resourceId, language)
 
   // Handle inter-panel events
@@ -174,6 +175,14 @@ export function ScriptureViewer({
     endVerse: 999, // All verses in chapter (will be clamped to actual verse count)
   })
 
+  const handleVerseClick = useCallback((chapter: number, verse: number) => {
+    handleVerseFilter(chapter, verse)
+  }, [handleVerseFilter])
+
+  const handleChapterClick = useCallback((chapter: number) => {
+    handleVerseFilter(chapter)
+  }, [handleVerseFilter])
+
   // Handle click to set as anchor resource for navigation
   const handleViewerClick = () => {
     setAsAnchor()
@@ -213,6 +222,8 @@ export function ScriptureViewer({
           highlightTarget={highlightTarget}
           selectedTokenId={selectedTokenId}
           onTokenClick={handleTokenClick}
+          onVerseClick={handleVerseClick}
+          onChapterClick={handleChapterClick}
           language={language}
           languageDirection={languageDirection}
         />

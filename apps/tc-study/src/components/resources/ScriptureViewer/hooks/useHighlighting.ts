@@ -9,7 +9,7 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import type { WordToken } from '@bt-synergy/usfm-processor'
 import { useCallback, useState } from 'react'
 import { useCurrentReference } from '../../../../contexts'
-import type { TokenClickSignal } from '../../../../signals/studioSignals'
+import type { TokenClickSignal, VerseFilterSignal } from '../../../../signals/studioSignals'
 import type { OriginalLanguageToken } from '../types'
 
 export function useHighlighting(resourceId: string, language?: string) {
@@ -22,9 +22,15 @@ export function useHighlighting(resourceId: string, language?: string) {
     tags: ['bible'],
   }
   
-  // Set up signal sender
+  // Set up signal senders
   const { sendToAll } = useSignal<TokenClickSignal>(
     'token-click',
+    resourceId,
+    resourceMetadata
+  )
+  
+  const { sendToAll: sendVerseFilter } = useSignal<VerseFilterSignal>(
+    'verse-filter',
     resourceId,
     resourceMetadata
   )
@@ -86,6 +92,19 @@ export function useHighlighting(resourceId: string, language?: string) {
       // Get position - WordToken position is always an object with start/end
       const position = token.position?.start ?? 0
 
+      // If unaligned, fall back to verse-based filtering so TN/TWL still narrow down
+      if (!alignedSemanticIds || alignedSemanticIds.length === 0) {
+        const refMatch = verseRef.match(/\w+\s+(\d+):(\d+)/)
+        const chapter = refMatch ? parseInt(refMatch[1], 10) : currentRef.chapter
+        const verse = refMatch ? parseInt(refMatch[2], 10) : undefined
+        setHighlightTarget(null)
+        sendVerseFilter({
+          lifecycle: 'event',
+          filter: { chapter, verse },
+        })
+        return
+      }
+
       // Update local state IMMEDIATELY for instant feedback (matches mobile app pattern)
       setHighlightTarget({
         semanticId: semanticId,
@@ -116,12 +135,21 @@ export function useHighlighting(resourceId: string, language?: string) {
     } catch (error) {
       console.error('❌ Error in handleTokenClick:', error)
     }
-  }, [sendToAll, currentRef, resourceId])
+  }, [sendToAll, sendVerseFilter, currentRef, resourceId])
+
+  const handleVerseFilter = useCallback((chapter: number, verse?: number) => {
+    setHighlightTarget(null)
+    sendVerseFilter({
+      lifecycle: 'event',
+      filter: { chapter, verse },
+    })
+  }, [sendVerseFilter])
 
   return {
     highlightTarget,
     selectedTokenId: highlightTarget?.semanticId || null,
     handleTokenClick,
+    handleVerseFilter,
   }
 }
 

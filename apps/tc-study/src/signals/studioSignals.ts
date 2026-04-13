@@ -69,6 +69,21 @@ export interface TokenClickSignal extends BaseSignal {
 }
 
 /**
+ * Verse Filter Signal - Filter entries by verse or chapter click in scripture
+ * 
+ * Typical Flow:
+ * - Sender: Scripture Viewers (verse number or chapter header click)
+ * - Receiver: Notes Viewers, Words Links Viewers
+ */
+export interface VerseFilterSignal extends BaseSignal {
+  type: 'verse-filter'
+  filter: {
+    chapter: number
+    verse?: number   // undefined = filter by whole chapter
+  }
+}
+
+/**
  * Text Selection Signal - When text is selected/highlighted
  * 
  * Typical Flow:
@@ -304,6 +319,7 @@ export type StudioSignal =
   | VerseNavigationSignal
   | BookNavigationSignal
   | TokenClickSignal
+  | VerseFilterSignal
   | TextSelectionSignal
   | EntryLinkClickSignal
   | CrossReferenceSignal
@@ -353,6 +369,15 @@ export const STUDIO_SIGNAL_REGISTRY = {
         verseRef: 'JHN 1:1',
         position: 1
       }
+    }
+  },
+  'verse-filter': {
+    description: 'Filter entries by verse or chapter click in scripture',
+    typicalSenders: ['scripture'],
+    typicalReceivers: ['notes', 'words-links'],
+    example: {
+      type: 'verse-filter',
+      filter: { chapter: 3, verse: 5 }
     }
   },
   'entry-link-click': {

@@ -4,7 +4,7 @@
  */
 
 import { createPlugin, type MessageTypePlugin } from 'linked-panels'
-import type { EntryLinkClickSignal, ScriptureContentRequestSignal, ScriptureContentResponseSignal, ScriptureTokensBroadcastSignal, TokenClickSignal } from '../signals/studioSignals'
+import type { EntryLinkClickSignal, ScriptureContentRequestSignal, ScriptureContentResponseSignal, ScriptureTokensBroadcastSignal, TokenClickSignal, VerseFilterSignal } from '../signals/studioSignals'
 import { useStudyStore } from '../store/studyStore'
 import type { LinkClickEvent } from './types'
 
@@ -116,6 +116,35 @@ export const tokenClickPlugin: MessageTypePlugin<TokenClickSignal> = createPlugi
   handlers: {
     'token-click': handleTokenClickSignal
   }
+})
+
+// ===== VERSE FILTER PLUGIN =====
+
+function isVerseFilterSignal(content: unknown): content is VerseFilterSignal {
+  if (!content || typeof content !== 'object') return false
+  const msg = content as any
+  if (msg.type !== 'verse-filter') return false
+  if (msg.lifecycle !== 'event') return false
+  if (!msg.filter || typeof msg.filter !== 'object') return false
+  if (typeof msg.filter.chapter !== 'number') return false
+  if (msg.filter.verse !== undefined && typeof msg.filter.verse !== 'number') return false
+  if (typeof msg.sourceResourceId !== 'string') return false
+  if (typeof msg.timestamp !== 'number') return false
+  return true
+}
+
+function handleVerseFilterSignal(message: any) {
+  const signal = message.content as VerseFilterSignal
+  console.log(`📍 Verse Filter: ch ${signal.filter.chapter}${signal.filter.verse !== undefined ? `:${signal.filter.verse}` : ''} from ${signal.sourceResourceId}`)
+}
+
+export const verseFilterPlugin: MessageTypePlugin<VerseFilterSignal> = createPlugin({
+  name: 'verse-filter-plugin',
+  version: '1.0.0',
+  description: 'Plugin for verse/chapter filter signals from scripture viewers',
+  messageTypes: { 'verse-filter': {} as VerseFilterSignal },
+  validators: { 'verse-filter': isVerseFilterSignal },
+  handlers: { 'verse-filter': handleVerseFilterSignal },
 })
 
 /**

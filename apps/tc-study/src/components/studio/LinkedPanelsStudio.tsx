@@ -17,7 +17,7 @@ import { useAppStore } from '../../contexts/AppContext'
 // import type { PassageSet } from '../../contexts/types'
 import { usePackageStore } from '../../lib/stores'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
-import { entryLinkClickPlugin, linkClickPlugin, scriptureContentRequestPlugin, scriptureContentResponsePlugin, scriptureTokensBroadcastPlugin, tokenClickPlugin } from '../../plugins/messageTypePlugins'
+import { entryLinkClickPlugin, linkClickPlugin, scriptureContentRequestPlugin, scriptureContentResponsePlugin, scriptureTokensBroadcastPlugin, tokenClickPlugin, verseFilterPlugin } from '../../plugins/messageTypePlugins'
 import { useStudyStore } from '../../store/studyStore'
 import { EntryResourceModal } from '../common/EntryResourceModal'
 import { FallbackViewer } from '../resources'
@@ -259,6 +259,7 @@ export function LinkedPanelsStudio() {
     
     // Register signal plugins for resource-panels communication
     pluginRegistry.register(tokenClickPlugin)
+    pluginRegistry.register(verseFilterPlugin)
     pluginRegistry.register(linkClickPlugin)
     pluginRegistry.register(entryLinkClickPlugin)
     pluginRegistry.register(scriptureTokensBroadcastPlugin)

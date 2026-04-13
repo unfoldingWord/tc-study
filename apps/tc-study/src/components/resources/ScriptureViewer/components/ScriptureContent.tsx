@@ -20,6 +20,8 @@ interface ScriptureContentProps {
   highlightTarget: OriginalLanguageToken | null
   selectedTokenId: string | null
   onTokenClick: (token: WordToken) => void
+  onVerseClick?: (chapter: number, verse: number) => void
+  onChapterClick?: (chapter: number) => void
   language?: string
   languageDirection?: 'ltr' | 'rtl'
 }
@@ -35,6 +37,8 @@ export function ScriptureContent({
   highlightTarget,
   selectedTokenId,
   onTokenClick,
+  onVerseClick,
+  onChapterClick,
   language,
   languageDirection = 'ltr',
 }: ScriptureContentProps) {
@@ -164,7 +168,13 @@ export function ScriptureContent({
       {chapters.map((chapterNum) => (
         <div key={chapterNum} className="space-y-1">
           {/* Chapter Header - shown for each chapter in cross-chapter ranges */}
-          <h2 className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200">
+          <h2
+            className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200 cursor-pointer hover:text-blue-600 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              onChapterClick?.(chapterNum)
+            }}
+          >
             {chapterNum}
           </h2>
           
@@ -173,10 +183,10 @@ export function ScriptureContent({
         <VerseRenderer
               key={`${chapterNum}:${verse.number}`}
           verse={verse}
-              highlightedTokens={[]} // Keep for backward compatibility but not used
-          selectedTokenId={selectedTokenId}
+              chapterNumber={chapterNum}
               highlightTarget={highlightTarget}
           onTokenClick={onTokenClick}
+              onVerseClick={onVerseClick}
               isOriginalLanguage={isOriginalLanguage}
         />
           ))}

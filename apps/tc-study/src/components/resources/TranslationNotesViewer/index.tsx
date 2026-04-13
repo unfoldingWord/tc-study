@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
-import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
+import type { EntryLinkClickSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
@@ -51,6 +51,7 @@ export function TranslationNotesViewer({
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
   const [tokenFilter, setTokenFilter] = useState<{ semanticId: string; content: string; alignedSemanticIds: string[]; timestamp: number } | null>(null)
+  const [verseFilter, setVerseFilter] = useState<{ chapter: number; verse?: number; timestamp: number } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
   const [catalogTrigger, setCatalogTrigger] = useState(0)
 
@@ -105,12 +106,30 @@ export function TranslationNotesViewer({
         alignedSemanticIds: signal.token.alignedSemanticIds || [],
         timestamp: signal.timestamp,
       })
+      setVerseFilter(null)
       setSelectedNoteId(null)
     }, [resourceId]),
     {
       debug: false,
       resourceMetadata,
     }
+  )
+
+  // Listen for verse-filter signals from scripture (for filtering notes by verse/chapter)
+  useSignalHandler<VerseFilterSignal>(
+    'verse-filter',
+    resourceId,
+    useCallback((signal) => {
+      if (signal.sourceResourceId === resourceId) return
+      setVerseFilter({
+        chapter: signal.filter.chapter,
+        verse: signal.filter.verse,
+        timestamp: signal.timestamp,
+      })
+      setTokenFilter(null)
+      setSelectedNoteId(null)
+    }, [resourceId]),
+    { debug: false, resourceMetadata }
   )
 
   // Check dependencies (original language scriptures) on resource change
@@ -129,9 +148,10 @@ export function TranslationNotesViewer({
       })
   }, [resourceKey, catalogManager, resourceTypeRegistry, catalogTrigger])
   
-  // Clear token filter when reference changes
+  // Clear filters when reference changes
   useEffect(() => {
     setTokenFilter(null)
+    setVerseFilter(null)
     setSelectedNoteId(null)
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
   
@@ -251,8 +271,26 @@ export function TranslationNotesViewer({
     }))
   }, [relevantNotes, linksWithQuotes, linksWithAlignedTokens])
   
-  // Apply token filter if active (similar to TWL)
+  // Apply verse filter or token filter if active
   const { displayNotes, hasMatches } = useMemo(() => {
+    // Verse filter: narrow by reference (chapter/verse click)
+    if (verseFilter) {
+      const filtered = notesWithAlignedTokens.filter((note) => {
+        const [chapterStr, verseRange] = note.reference.split(':')
+        const noteChapter = parseInt(chapterStr)
+        if (isNaN(noteChapter) || noteChapter !== verseFilter.chapter) return false
+        if (verseFilter.verse === undefined) return true
+        if (!verseRange || verseRange === 'intro') return false
+        if (verseRange.includes('-')) {
+          const [start, end] = verseRange.split('-').map(Number)
+          return verseFilter.verse >= start && verseFilter.verse <= end
+        }
+        return parseInt(verseRange) === verseFilter.verse
+      })
+      return { displayNotes: filtered, hasMatches: filtered.length > 0 }
+    }
+
+    // Token filter: alignment-based matching
     if (!tokenFilter) {
       return { displayNotes: notesWithAlignedTokens, hasMatches: true }
     }
@@ -262,14 +300,12 @@ export function TranslationNotesViewer({
     
     const filtered = notesWithAlignedTokens.filter((note) => {
       // STRATEGY 1: Alignment-based matching (PRIMARY)
-      // Generate semantic IDs for this note's quote tokens and compare with clicked token's aligned IDs
       if (note.quoteTokens && note.quoteTokens.length > 0) {
         const refParts = note.reference.split(':')
         const noteChapter = parseInt(refParts[0] || '1', 10)
         const noteVerse = parseInt(refParts[1] || '1', 10)
         const noteOccurrence = parseInt(note.occurrence || '1', 10)
         
-        // Generate semantic IDs for this note's quote tokens
         const noteSemanticIds = generateSemanticIdsForQuoteTokens(
           note.quoteTokens,
           bookCode,
@@ -278,7 +314,6 @@ export function TranslationNotesViewer({
           noteOccurrence
         )
         
-        // Check if any of the clicked token's aligned IDs match this note's semantic IDs
         const hasAlignedMatch = tokenFilter.alignedSemanticIds?.some(alignedId => {
           const alignedIdLower = alignedId.toLowerCase()
           return noteSemanticIds.some(noteSemanticId => 
@@ -301,13 +336,12 @@ export function TranslationNotesViewer({
       return hasTextMatch || hasQuoteTokenMatch
     })
     
-    // If no matches found, show all notes for the current range instead of empty list
     const hasMatches = filtered.length > 0
     return {
       displayNotes: hasMatches ? filtered : notesWithAlignedTokens,
       hasMatches,
     }
-  }, [notesWithAlignedTokens, tokenFilter, currentRef.book])
+  }, [notesWithAlignedTokens, tokenFilter, verseFilter, currentRef.book])
   
   // Load TA titles for visible notes
   useEffect(() => {
@@ -454,6 +488,21 @@ export function TranslationNotesViewer({
           displayLinksCount={displayNotes.length}
           hasMatches={hasMatches}
           onClearFilter={() => setTokenFilter(null)}
+        />
+      )}
+      {verseFilter && (
+        <TokenFilterBanner
+          tokenFilter={{
+            semanticId: '',
+            content: verseFilter.verse !== undefined
+              ? `${verseFilter.chapter}:${verseFilter.verse}`
+              : `Ch ${verseFilter.chapter}`,
+            alignedSemanticIds: [],
+            timestamp: verseFilter.timestamp,
+          }}
+          displayLinksCount={displayNotes.length}
+          hasMatches={hasMatches}
+          onClearFilter={() => setVerseFilter(null)}
         />
       )}
       

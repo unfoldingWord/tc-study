@@ -40,8 +40,10 @@ export interface OriginalLanguageToken {
 
 export interface VerseDisplayProps {
   verse: ProcessedVerse
+  chapterNumber: number
   highlightTarget: OriginalLanguageToken | null // Mobile app pattern
   onTokenClick: (token: WordToken) => void
+  onVerseClick?: (chapter: number, verse: number) => void
   isOriginalLanguage: boolean
 }
 

@@ -92,8 +92,10 @@ function shouldAddSpaceAfterToken(
 
 export function VerseRenderer({
   verse,
+  chapterNumber,
   highlightTarget,
   onTokenClick,
+  onVerseClick,
   isOriginalLanguage,
 }: VerseDisplayProps) {
   const renderVerseContent = () => {
@@ -195,7 +197,13 @@ export function VerseRenderer({
 
   return (
     <div className="mb-2 leading-relaxed">
-      <span className="text-sm font-bold text-blue-600 mr-2 select-none cursor-pointer hover:text-blue-700">
+      <span
+        className="text-sm font-bold text-blue-600 mr-2 select-none cursor-pointer hover:text-blue-700"
+        onClick={(e) => {
+          e.stopPropagation()
+          onVerseClick?.(chapterNumber, verse.number)
+        }}
+      >
         {verse.number}
       </span>
       <span className="text-lg text-gray-900">

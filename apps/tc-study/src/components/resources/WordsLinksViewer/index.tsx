@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
-import type { EntryLinkClickSignal, TokenClickSignal } from '../../../signals/studioSignals'
+import type { EntryLinkClickSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
@@ -49,6 +49,7 @@ export function WordsLinksViewer({
   const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
   const [selectedLink, setSelectedLink] = useState<string | null>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
+  const [verseFilter, setVerseFilter] = useState<{ chapter: number; verse?: number; timestamp: number } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
   const [catalogTrigger, setCatalogTrigger] = useState(0)
   const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
@@ -120,12 +121,30 @@ export function WordsLinksViewer({
         alignedSemanticIds: signal.token.alignedSemanticIds || [],
         timestamp: signal.timestamp,
       })
+      setVerseFilter(null)
       setSelectedLink(null)
     }, [resourceId]),
     {
       debug: false,  // Reduced logging
       resourceMetadata,
     }
+  )
+
+  // Listen for verse-filter signals from scripture (for filtering links by verse/chapter)
+  useSignalHandler<VerseFilterSignal>(
+    'verse-filter',
+    resourceId,
+    useCallback((signal) => {
+      if (signal.sourceResourceId === resourceId) return
+      setVerseFilter({
+        chapter: signal.filter.chapter,
+        verse: signal.filter.verse,
+        timestamp: signal.timestamp,
+      })
+      setTokenFilter(null)
+      setSelectedLink(null)
+    }, [resourceId]),
+    { debug: false, resourceMetadata }
   )
   
   // Monitor catalog for changes (to react when dependencies are added)
@@ -168,9 +187,10 @@ export function WordsLinksViewer({
     checkDeps()
   }, [resourceKey, resourceTypeRegistry, catalogManager, catalogTrigger])
   
-  // Clear token filter when reference changes
+  // Clear filters when reference changes
   useEffect(() => {
     setTokenFilter(null)
+    setVerseFilter(null)
     setSelectedLink(null)
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
   
@@ -269,8 +289,26 @@ export function WordsLinksViewer({
     })
   }, [processedLinks, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
   
-  // Apply token filter if active
+  // Apply verse filter or token filter if active
   const { displayLinks, hasMatches } = useMemo(() => {
+    // Verse filter: narrow by reference (chapter/verse click)
+    if (verseFilter) {
+      const filtered = filteredByReference.filter((link) => {
+        const [chapterStr, verseRange] = link.reference.split(':')
+        const linkChapter = parseInt(chapterStr)
+        if (isNaN(linkChapter) || linkChapter !== verseFilter.chapter) return false
+        if (verseFilter.verse === undefined) return true
+        if (!verseRange || verseRange === 'intro') return false
+        if (verseRange.includes('-')) {
+          const [start, end] = verseRange.split('-').map(Number)
+          return verseFilter.verse >= start && verseFilter.verse <= end
+        }
+        return parseInt(verseRange) === verseFilter.verse
+      })
+      return { displayLinks: filtered, hasMatches: filtered.length > 0 }
+    }
+
+    // Token filter: alignment-based matching
     if (!tokenFilter) {
       return { displayLinks: filteredByReference, hasMatches: true }
     }
@@ -280,14 +318,12 @@ export function WordsLinksViewer({
     
     const filtered = filteredByReference.filter((link) => {
       // STRATEGY 1: Alignment-based matching (PRIMARY)
-      // Generate semantic IDs for this link's quote tokens and compare with clicked token's aligned IDs
       if (link.quoteTokens && link.quoteTokens.length > 0) {
         const refParts = link.reference.split(':')
         const linkChapter = parseInt(refParts[0] || '1', 10)
         const linkVerse = parseInt(refParts[1] || '1', 10)
         const linkOccurrence = parseInt(link.occurrence || '1', 10)
         
-        // Generate semantic IDs for this link's quote tokens
         const linkSemanticIds = generateSemanticIdsForQuoteTokens(
           link.quoteTokens,
           bookCode,
@@ -296,7 +332,6 @@ export function WordsLinksViewer({
           linkOccurrence
         )
         
-        // Check if any of the clicked token's aligned IDs match this link's semantic IDs
         const hasAlignedMatch = tokenFilter.alignedSemanticIds?.some(alignedId => {
           const alignedIdLower = alignedId.toLowerCase()
           return linkSemanticIds.some(linkSemanticId => 
@@ -319,13 +354,12 @@ export function WordsLinksViewer({
       return hasTextMatch || hasQuoteTokenMatch
     })
     
-    // If no matches found, show all TWLs for the current range instead of empty list
     const hasMatches = filtered.length > 0
     return {
       displayLinks: hasMatches ? filtered : filteredByReference,
       hasMatches,
     }
-  }, [filteredByReference, tokenFilter, currentRef.book])
+  }, [filteredByReference, tokenFilter, verseFilter, currentRef.book])
   
   // Load TW titles for visible links
   useEffect(() => {
@@ -444,6 +478,21 @@ export function WordsLinksViewer({
           displayLinksCount={displayLinks.length}
           hasMatches={hasMatches}
           onClearFilter={() => setTokenFilter(null)}
+        />
+      )}
+      {verseFilter && (
+        <TokenFilterBanner
+          tokenFilter={{
+            semanticId: '',
+            content: verseFilter.verse !== undefined
+              ? `${verseFilter.chapter}:${verseFilter.verse}`
+              : `Ch ${verseFilter.chapter}`,
+            alignedSemanticIds: [],
+            timestamp: verseFilter.timestamp,
+          }}
+          displayLinksCount={displayLinks.length}
+          hasMatches={hasMatches}
+          onClearFilter={() => setVerseFilter(null)}
         />
       )}
       
