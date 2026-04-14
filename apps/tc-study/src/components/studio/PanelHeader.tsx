@@ -1,5 +1,6 @@
 import { ArrowLeftRight, Info, MoreVertical, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { COMBINED_HELPS_RESOURCE_ID } from '../resources/CombinedHelpsViewer/constants'
 import { ResourceInfoModal } from './ResourceInfoModal'
 import { ResourceTabs } from './ResourceTabs'
 
@@ -24,6 +25,10 @@ interface PanelHeaderProps {
 }
 
 const getResourceId = (resource: any): string => {
+  const key = resource?.key || resource?.id || ''
+  if (key === COMBINED_HELPS_RESOURCE_ID || resource?.type === 'combined-helps') {
+    return 'Helps'
+  }
   if (resource?.key) {
     const parts = resource.key.split('/')
     const lastPart = parts[parts.length - 1] || ''

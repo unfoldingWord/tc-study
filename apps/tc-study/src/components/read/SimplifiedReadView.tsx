@@ -51,7 +51,7 @@ import { useStudyStore } from '../../store/studyStore'
 import type { ExportWorkerMessage, ExportWorkerResponse } from '../../workers/collectionExport.worker'
 import { CollectionImportDialog } from '../collections/CollectionImportDialog'
 import { EntryResourceModal } from '../common/EntryResourceModal'
-import { FallbackViewer } from '../resources'
+import { CombinedHelpsViewer, COMBINED_HELPS_RESOURCE_ID, FallbackViewer } from '../resources'
 import { DroppablePanel } from '../studio/DroppablePanel'
 import { EmptyPanelState } from '../studio/EmptyPanelState'
 import { GlobalSignalBridge } from '../studio/GlobalSignalBridge'
@@ -61,6 +61,50 @@ import { DownloadIndicator } from './DownloadIndicator'
 
 /** Set to true to disable automatic background downloads (e.g. for debugging). */
 const DISABLE_BACKGROUND_DOWNLOAD = false
+
+function primaryLangSegment(code: string): string {
+  return String(code || '')
+    .trim()
+    .split(/[-_/]/)[0]!
+    .toLowerCase()
+}
+
+/** Resolve TN/TWL catalog keys from the app store right after Phase 1 load (for combined Helps viewer). */
+function findTnTwlKeysForLanguage(langCode: string): { tnKey?: string; twlKey?: string } {
+  const loaded = useAppStore.getState().loadedResources
+  const want = primaryLangSegment(langCode)
+  let tnKey: string | undefined
+  let twlKey: string | undefined
+  const list = Object.values(loaded).filter(Boolean) as ResourceInfo[]
+
+  const keyMatchesLang = (key: string) => {
+    if (!want) return true
+    const seg = primaryLangSegment(key.split('/')[1] || '')
+    return seg === want
+  }
+
+  for (const r of list) {
+    const key = r.key || r.id
+    if (!key || key === COMBINED_HELPS_RESOURCE_ID) continue
+    const t = String(r.type).toLowerCase()
+    if (!keyMatchesLang(key)) continue
+    if ((t === 'notes' || t === 'tn') && !tnKey) tnKey = key
+    if ((t === 'words-links' || t === 'words_links' || t === 'twl') && !twlKey) twlKey = key
+  }
+
+  // Fallback when metadata language is missing/wrong: still constrain by resource key path
+  // so we never pair "Helps" with TN/TWL from another language left in loadedResources.
+  for (const r of list) {
+    const key = r.key || r.id
+    if (!key || key === COMBINED_HELPS_RESOURCE_ID) continue
+    if (want && !keyMatchesLang(key)) continue
+    const t = String(r.type).toLowerCase()
+    if (!tnKey && (t === 'notes' || t === 'tn')) tnKey = key
+    if (!twlKey && (t === 'words-links' || t === 'words_links' || t === 'twl')) twlKey = key
+  }
+
+  return { tnKey, twlKey }
+}
 
 /**
  * Renders a panel resource by id. Subscribes only to loadedResources[resourceId],
@@ -104,7 +148,17 @@ function ResourcePanelByKey({
       resourceKey,
       resource,
     }
-    if (resource.type === 'words' || resource.type === 'words-links' || resource.category === 'words-links' || resource.type === 'twl' || resource.type === 'academy' || resource.type === 'ta' || resource.type === 'tn' || resource.type === 'notes') {
+    if (
+      resource.type === 'words' ||
+      resource.type === 'words-links' ||
+      resource.category === 'words-links' ||
+      resource.type === 'twl' ||
+      resource.type === 'academy' ||
+      resource.type === 'ta' ||
+      resource.type === 'tn' ||
+      resource.type === 'notes' ||
+      resource.type === 'combined-helps'
+    ) {
       viewerProps.onEntryLinkClick = onEntryLinkClick
     }
     return <ViewerComponent {...viewerProps} />
@@ -128,6 +182,18 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
   const cacheAdapter = useCacheAdapter()
   const viewerRegistry = useViewerRegistry()
   const resourceTypeRegistry = useResourceTypeRegistry()
+
+  // Experimental Read-only: combined TN + TWL viewer (synthetic resource type)
+  useEffect(() => {
+    if (!viewerRegistry.hasViewer('combined-helps')) {
+      viewerRegistry.registerViewer({
+        resourceType: 'combined-helps',
+        displayName: 'Helps',
+        component: CombinedHelpsViewer as any,
+        canHandle: (metadata: { type?: string }) => metadata?.type === 'combined-helps',
+      })
+    }
+  }, [viewerRegistry])
   const loadedResources = useAppStore((s) => s.loadedResources)
   const completenessChecker = useCompletenessChecker()
   const packageStore = usePackageStore()
@@ -618,6 +684,39 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           console.log(`✅ Loaded resource (modal-only): ${resourceKey} (no panel viewer)`)
         }
       }
+
+      // Synthetic "Helps" tab: TN + TWL in one panel (experimental)
+      const { tnKey: resolvedHelpsTn, twlKey: resolvedHelpsTwl } = findTnTwlKeysForLanguage(languageCode)
+      const combinedHelpsResource = {
+        id: COMBINED_HELPS_RESOURCE_ID,
+        key: COMBINED_HELPS_RESOURCE_ID,
+        resourceKey: COMBINED_HELPS_RESOURCE_ID,
+        title: 'Helps',
+        type: 'combined-helps',
+        category: 'Combined helps',
+        subject: 'Combined TN+TWL',
+        owner: 'local',
+        language: languageCode,
+        languageCode,
+        languageName: languageCode,
+        resourceId: 'combined-helps',
+        server: 'git.door43.org',
+        format: ResourceFormat.TSV,
+        contentType: 'text/tab-separated-values',
+        contentStructure: 'book' as const,
+        version: '1.0',
+        description: 'Experimental combined Translation Notes and Translation Words Links',
+        availability: { online: true, offline: false, bundled: false, partial: false },
+        locations: [],
+        catalogedAt: new Date().toISOString(),
+      } as ResourceInfo
+      const ch = combinedHelpsResource as ResourceInfo & { helpsTnResourceKey?: string; helpsTwlResourceKey?: string }
+      ch.helpsTnResourceKey = resolvedHelpsTn
+      ch.helpsTwlResourceKey = resolvedHelpsTwl
+      addResource(combinedHelpsResource)
+      loadedResourceKeys.push(COMBINED_HELPS_RESOURCE_ID)
+      assignResourceToPanel(COMBINED_HELPS_RESOURCE_ID, 'panel-2', 0)
+      setActiveResourceInPanel('panel-2', 0)
       
       console.log(`⚡ Phase 1 complete: ${loadedResourceKeys.length} resources in UI`)
       
@@ -1130,6 +1229,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     const resource = loadedResources[resourceKey]
     if (!resource) return resourceKey.split('/').pop()?.toUpperCase() || 'N/A'
     
+    if (resourceKey === COMBINED_HELPS_RESOURCE_ID) return 'Helps'
     const parts = resourceKey.split('/')
     const lastPart = parts[parts.length - 1] || ''
     if (lastPart) return lastPart.toUpperCase()

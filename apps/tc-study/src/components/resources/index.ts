@@ -9,4 +9,5 @@ export { ScriptureViewer } from './ScriptureViewer'
 export { TranslationWordsViewer } from './TranslationWordsViewer'
 export { WordsLinksViewer } from './WordsLinksViewer/index'
 export { TranslationNotesViewer } from './TranslationNotesViewer'
+export { CombinedHelpsViewer, COMBINED_HELPS_RESOURCE_ID } from './CombinedHelpsViewer'
 

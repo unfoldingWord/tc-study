@@ -31,6 +31,13 @@ export function useWordsLinksContent({
       setContent(wordsLinksContent)
       return
     }
+
+    if (!resourceKey) {
+      setContent(null)
+      setLoading(false)
+      setError(null)
+      return
+    }
     
     if (!currentRef.book || !loaderRegistry) return
     
