@@ -21,7 +21,7 @@ import { getBookTitle } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { ScriptureContent } from './components'
-import { useContent, useContentRequests, useHighlighting, useScriptureEvents, useTOC, useTokenBroadcast } from './hooks'
+import { useContent, useContentRequests, useHighlighting, useScriptureEvents, useTOC, useTokenBroadcast, useUnderlinedTokens } from './hooks'
 import type { ScriptureViewerProps } from './types'
 
 export function ScriptureViewer({
@@ -112,13 +112,16 @@ export function ScriptureViewer({
   const languageDisplay = effectiveResource.languageName ?? catalogMetadata?.language_title ?? effectiveResource.language ?? language
   const currentBookTitle = getBookTitle(effectiveResource, currentRef.book)
 
+  // Must come before useHighlighting so the coverage set is available for click decisions
+  const underlinedSemanticIds = useUnderlinedTokens(resourceId)
+
   // Handle highlighting and token clicks (using resource-panels signal API)
   const {
     highlightTarget,
     selectedTokenId,
     handleTokenClick,
     handleVerseFilter,
-  } = useHighlighting(resourceId, language)
+  } = useHighlighting(resourceId, language, underlinedSemanticIds)
 
   // Handle inter-panel events
   useScriptureEvents(resourceId)
@@ -220,6 +223,7 @@ export function ScriptureViewer({
           displayVerses={displayVerses}
           currentRef={currentRef}
           highlightTarget={highlightTarget}
+          underlinedSemanticIds={underlinedSemanticIds}
           selectedTokenId={selectedTokenId}
           onTokenClick={handleTokenClick}
           onVerseClick={handleVerseClick}

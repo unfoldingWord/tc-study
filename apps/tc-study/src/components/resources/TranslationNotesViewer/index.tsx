@@ -6,12 +6,13 @@
  */
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
+import { useResourceAPI } from 'linked-panels'
 import { BookOpen, ExternalLink, Loader, FileText } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
-import type { EntryLinkClickSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
+import type { EntryLinkClickSignal, NotesTokenGroupsSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
@@ -22,7 +23,7 @@ import { useTATitles } from './hooks/useTATitles'
 import { useTAMetadataForTitles } from './hooks/useTAMetadataForTitles'
 import { useEntryTitles } from './hooks/useEntryTitles'
 import { useAlignedTokens, useQuoteTokens, useScriptureTokens } from '../WordsLinksViewer/hooks'
-import { generateSemanticIdsForQuoteTokens } from '../WordsLinksViewer/utils'
+import { generateSemanticIdsForQuoteTokens, parseLinkChapterVerse } from '../WordsLinksViewer/utils'
 import { TokenFilterBanner } from '../WordsLinksViewer/components/TokenFilterBanner'
 
 import type { ResourceInfo } from '../../../contexts/types'
@@ -270,6 +271,72 @@ export function TranslationNotesViewer({
       alignedTokens: alignedTokensMap.get(note.id), // Target language tokens (for display)
     }))
   }, [relevantNotes, linksWithQuotes, linksWithAlignedTokens])
+
+  /** Semantic ID groups for passive scripture underlining (all notes with quotes in current range). */
+  const underlineTokenGroups = useMemo(() => {
+    const bookCode = currentRef.book?.toLowerCase() || ''
+    const groups: { sourceId: string; semanticIds: string[] }[] = []
+    for (const note of notesWithAlignedTokens) {
+      if (!note.quoteTokens?.length) continue
+      const { chapter, verse } = parseLinkChapterVerse(note.reference)
+      const baseOccurrence = parseInt(note.occurrence || '1', 10)
+      const semanticIds = generateSemanticIdsForQuoteTokens(
+        note.quoteTokens,
+        bookCode,
+        chapter,
+        verse,
+        baseOccurrence
+      )
+      if (semanticIds.length > 0) {
+        groups.push({ sourceId: note.id, semanticIds })
+      }
+    }
+    return groups
+  }, [notesWithAlignedTokens, currentRef.book])
+
+  const notesTokenGroupsApi = useResourceAPI<NotesTokenGroupsSignal>(resourceId)
+
+  // Track the last-broadcast content key to avoid infinite re-send loops.
+  // Calling sendToAll updates the linked-panels store which causes all useSignal/useSignalHandler
+  // subscribers to re-render (TN is one of them), producing new useMemo references. We gate here
+  // by comparing a content-derived string so we only send when the data actually changed.
+  const lastBroadcastKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const key = underlineTokenGroups.map(g => `${g.sourceId}:${g.semanticIds.length}`).join('|')
+    if (key === lastBroadcastKeyRef.current) return
+    lastBroadcastKeyRef.current = key
+
+    const parts = resourceKey.split('/')
+    const language = parts[1]?.split('_')[0] || ''
+    notesTokenGroupsApi.messaging.sendToAll({
+      type: 'notes-token-groups',
+      lifecycle: 'state',
+      stateKey: 'current-notes-token-groups-tn',
+      sourceResourceId: resourceId,
+      tokenGroups: underlineTokenGroups,
+      resourceMetadata: { id: resourceKey, language, type: 'tn' },
+      timestamp: Date.now(),
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- messaging ref is stable; key guards content changes
+  }, [resourceId, resourceKey, underlineTokenGroups])
+
+  // Separate cleanup effect: clears underlines only when this resource is unmounted or replaced.
+  useEffect(() => {
+    return () => {
+      lastBroadcastKeyRef.current = null
+      notesTokenGroupsApi.messaging.sendToAll({
+        type: 'notes-token-groups',
+        lifecycle: 'state',
+        stateKey: 'current-notes-token-groups-tn',
+        sourceResourceId: resourceId,
+        tokenGroups: [],
+        resourceMetadata: { id: resourceKey, language: '', type: 'tn' },
+        timestamp: Date.now(),
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- messaging ref is stable
+  }, [resourceId])
   
   // Apply verse filter or token filter if active
   const { displayNotes, hasMatches } = useMemo(() => {

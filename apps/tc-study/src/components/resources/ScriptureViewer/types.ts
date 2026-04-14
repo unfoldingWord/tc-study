@@ -42,6 +42,8 @@ export interface VerseDisplayProps {
   verse: ProcessedVerse
   chapterNumber: number
   highlightTarget: OriginalLanguageToken | null // Mobile app pattern
+  /** Original-language semantic IDs from TN/TWL for passive underlining */
+  underlinedSemanticIds?: Set<string>
   onTokenClick: (token: WordToken) => void
   onVerseClick?: (chapter: number, verse: number) => void
   isOriginalLanguage: boolean
@@ -52,6 +54,8 @@ export interface TokenDisplayProps {
   index: number
   isHighlighted: boolean
   isSelected: boolean
+  /** Passive underline from loaded TN/TWL quote coverage */
+  isUnderlined?: boolean
   onTokenClick: (token: WordToken) => void
   isOriginalLanguage: boolean
 }

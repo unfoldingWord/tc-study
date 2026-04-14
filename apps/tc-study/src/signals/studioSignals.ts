@@ -183,6 +183,45 @@ export interface ScriptureTokensBroadcastSignal {
   timestamp: number
 }
 
+/**
+ * One entry (note or TWL link) mapped to original-language semantic IDs for scripture underlining.
+ */
+export interface NotesTokenGroupEntry {
+  /** Note id or link id */
+  sourceId: string
+  /** Semantic IDs for each quote token (verseRef:content:occurrence, lowercase book) */
+  semanticIds: string[]
+}
+
+/**
+ * Notes Token Groups Signal - STATE broadcast of all quote token groups from TN/TWL
+ *
+ * Scripture viewers consume via useCurrentState(resourceId, 'current-notes-token-groups')
+ * to underline every word aligned to these original-language semantic IDs.
+ */
+/** TN vs TWL use separate keys so both can broadcast without overwriting each other. */
+export type NotesTokenGroupsStateKey =
+  | 'current-notes-token-groups-tn'
+  | 'current-notes-token-groups-twl'
+
+export interface NotesTokenGroupsSignal {
+  type: 'notes-token-groups'
+  lifecycle: 'state'
+  stateKey: NotesTokenGroupsStateKey
+
+  sourceResourceId: string
+
+  tokenGroups: NotesTokenGroupEntry[]
+
+  resourceMetadata: {
+    id: string
+    language: string
+    type: string
+  }
+
+  timestamp: number
+}
+
 // ===== CONTENT REQUEST SIGNALS (DEPRECATED - Use broadcast instead) =====
 
 /**
@@ -324,6 +363,7 @@ export type StudioSignal =
   | EntryLinkClickSignal
   | CrossReferenceSignal
   | ScriptureTokensBroadcastSignal
+  | NotesTokenGroupsSignal
   | ScriptureContentRequestSignal
   | ScriptureContentResponseSignal
   | ResourceLoadedSignal
@@ -438,6 +478,20 @@ export const STUDIO_SIGNAL_REGISTRY = {
       reference: { book: 'JHN', chapter: 3, verse: 16 },
       tokens: [],
       resourceMetadata: { id: 'ult', language: 'en', type: 'scripture' },
+      timestamp: Date.now()
+    }
+  },
+  'notes-token-groups': {
+    description: 'Broadcast all TN/TWL quote token semantic IDs for passive scripture underlining',
+    typicalSenders: ['notes', 'words-links'],
+    typicalReceivers: ['scripture'],
+    example: {
+      type: 'notes-token-groups',
+      lifecycle: 'state',
+      stateKey: 'current-notes-token-groups-tn',
+      sourceResourceId: 'panel-tn-1',
+      tokenGroups: [{ sourceId: 'note-1', semanticIds: ['tit 1:1:Θεός:1'] }],
+      resourceMetadata: { id: 'en_tn', language: 'en', type: 'tn' },
       timestamp: Date.now()
     }
   },

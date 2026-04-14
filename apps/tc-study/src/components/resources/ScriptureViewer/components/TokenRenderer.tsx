@@ -10,6 +10,7 @@ export function TokenRenderer({
   index,
   isHighlighted,
   isSelected,
+  isUnderlined = false,
   onTokenClick,
   isOriginalLanguage,
 }: TokenDisplayProps) {
@@ -21,11 +22,10 @@ export function TokenRenderer({
     ? rawText.trim() 
     : rawText
 
-  // Determine if token is clickable (matches mobile app logic)
-  // Original language tokens are always clickable (if they're words)
-  // Target language tokens are clickable if they have alignment data
-  const tokenAlign = token.alignedOriginalWordIds || (token as any).align || []
-  const isClickable = token.type === 'word' && (isOriginalLanguage || tokenAlign.length > 0)
+  // All word tokens are clickable:
+  // - Aligned tokens → token-click (alignment-based filtering)
+  // - Non-aligned / non-covered tokens → verse-filter (handled in useHighlighting)
+  const isClickable = token.type === 'word'
 
   const handleClick = () => {
     if (isClickable) {
@@ -44,8 +44,8 @@ export function TokenRenderer({
       className={`
         rounded ${paddingClass} transition-all inline-block
         ${isClickable ? 'cursor-pointer hover:bg-gray-100' : ''}
-        ${isSelected ? 'bg-yellow-200 highlighted-token' : ''}
-        ${isHighlighted && !isSelected ? 'bg-yellow-100 highlighted-token' : ''}
+        ${isHighlighted || isSelected ? 'bg-yellow-100 highlighted-token' : ''}
+        ${isUnderlined ? 'underline decoration-dotted decoration-gray-400 decoration-1 underline-offset-3' : ''}
         ${token.type === 'punctuation' ? 'text-gray-600' : 'text-gray-900'}
       `}
       style={{ minHeight: '1.5rem' }}

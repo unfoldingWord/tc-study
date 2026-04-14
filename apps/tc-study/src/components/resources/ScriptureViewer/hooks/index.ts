@@ -8,4 +8,5 @@ export { useScriptureEvents } from './useEvents'
 export { useHighlighting } from './useHighlighting'
 export { useTOC } from './useTOC'
 export { useTokenBroadcast } from './useTokenBroadcast'
+export { useUnderlinedTokens } from './useUnderlinedTokens'
 

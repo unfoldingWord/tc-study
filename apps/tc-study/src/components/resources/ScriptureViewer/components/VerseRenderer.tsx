@@ -94,6 +94,7 @@ export function VerseRenderer({
   verse,
   chapterNumber,
   highlightTarget,
+  underlinedSemanticIds,
   onTokenClick,
   onVerseClick,
   isOriginalLanguage,
@@ -179,6 +180,18 @@ export function VerseRenderer({
         
       }
 
+      let isUnderlined = false
+      if (underlinedSemanticIds && underlinedSemanticIds.size > 0 && token.type === 'word') {
+        const key = tokenSemanticId.toLowerCase()
+        if (isOriginalLanguage) {
+          isUnderlined = underlinedSemanticIds.has(key)
+        } else {
+          const rawAlign = token.alignedOriginalWordIds || (token as any).align || []
+          const alignedIds = Array.isArray(rawAlign) ? rawAlign.map((id: unknown) => String(id)) : []
+          isUnderlined = alignedIds.some((id) => underlinedSemanticIds.has(id.toLowerCase()))
+        }
+      }
+
         return (
         <Fragment key={`token-${tokenId}-${index}`}>
           <TokenRenderer
@@ -186,6 +199,7 @@ export function VerseRenderer({
             index={index}
             isHighlighted={isHighlighted}
             isSelected={isSelected}
+            isUnderlined={isUnderlined}
             onTokenClick={onTokenClick}
             isOriginalLanguage={isOriginalLanguage}
           />

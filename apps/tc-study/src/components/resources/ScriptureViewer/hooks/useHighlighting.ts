@@ -12,7 +12,11 @@ import { useCurrentReference } from '../../../../contexts'
 import type { TokenClickSignal, VerseFilterSignal } from '../../../../signals/studioSignals'
 import type { OriginalLanguageToken } from '../types'
 
-export function useHighlighting(resourceId: string, language?: string) {
+export function useHighlighting(
+  resourceId: string,
+  language?: string,
+  underlinedSemanticIds?: Set<string>,
+) {
   const currentRef = useCurrentReference()
   
   // Determine resource metadata for signal system
@@ -81,34 +85,45 @@ export function useHighlighting(resourceId: string, language?: string) {
       const tokenOccurrence = token.occurrence || 1
       const semanticId = `${verseRef}:${tokenContent}:${tokenOccurrence}`
       
-      // For target language tokens, get aligned semantic IDs (uniqueId strings of original language tokens)
-      let alignedSemanticIds: string[] | undefined = undefined
+      // For target language tokens, get aligned semantic IDs (original language token IDs)
       const rawAlign = token.alignedOriginalWordIds || (token as any).align
-      if (Array.isArray(rawAlign) && rawAlign.length > 0) {
-        // Ensure they're strings
-        alignedSemanticIds = rawAlign.map(id => String(id)).filter(Boolean)
-      }
-      
+      const alignedSemanticIds: string[] | undefined =
+        Array.isArray(rawAlign) && rawAlign.length > 0
+          ? rawAlign.map((id: unknown) => String(id)).filter(Boolean)
+          : undefined
+
       // Get position - WordToken position is always an object with start/end
       const position = token.position?.start ?? 0
 
-      // If unaligned, fall back to verse-based filtering so TN/TWL still narrow down
-      if (!alignedSemanticIds || alignedSemanticIds.length === 0) {
+      // Determine if this token is covered by at least one TN/TWL entry (underlined).
+      // - OL tokens: match by their own semantic ID
+      // - Target language tokens: match by any of their aligned OL IDs
+      // If not covered by anything, fall back to verse-filter so resources still narrow down.
+      const tokenKey = semanticId.toLowerCase()
+      const alignedKeys = alignedSemanticIds?.map((id) => id.toLowerCase()) ?? []
+      const hasCoverage =
+        underlinedSemanticIds && underlinedSemanticIds.size > 0
+          ? underlinedSemanticIds.has(tokenKey) ||
+            alignedKeys.some((k) => underlinedSemanticIds.has(k))
+          : false
+
+      if (!hasCoverage) {
         const refMatch = verseRef.match(/\w+\s+(\d+):(\d+)/)
         const chapter = refMatch ? parseInt(refMatch[1], 10) : currentRef.chapter
         const verse = refMatch ? parseInt(refMatch[2], 10) : undefined
         setHighlightTarget(null)
-        sendVerseFilter({
-          lifecycle: 'event',
-          filter: { chapter, verse },
-        })
+        sendVerseFilter({ lifecycle: 'event', filter: { chapter, verse } })
         return
       }
+
+      // Token IS covered → token-click for alignment-based filtering.
+      // For OL tokens (no alignedSemanticIds), broadcast their own ID so TN/TWL can match.
+      const effectiveAlignedIds = alignedSemanticIds ?? [semanticId]
 
       // Update local state IMMEDIATELY for instant feedback (matches mobile app pattern)
       setHighlightTarget({
         semanticId: semanticId,
-        alignedSemanticIds: alignedSemanticIds,
+        alignedSemanticIds: effectiveAlignedIds,
         content: tokenContent,
         verseRef: verseRef,
         strong: token.alignment?.strong,
@@ -117,25 +132,24 @@ export function useHighlighting(resourceId: string, language?: string) {
       })
 
       // Then send token-click signal to OTHER resources using resource-panels API
-      // The signal system automatically adds sourceResourceId, sourceMetadata, and timestamp
       sendToAll({
         lifecycle: 'event',
         token: {
           id: String(tokenId),
           content: String(tokenContent),
-          semanticId: semanticId, // Format: verseRef:content:occurrence (preserves Unicode)
+          semanticId: semanticId,
           verseRef: String(verseRef),
           position: position,
           strong: token.alignment?.strong,
           lemma: token.alignment?.lemma,
           morph: token.alignment?.morph,
-          alignedSemanticIds: alignedSemanticIds, // Semantic IDs this token aligns to
+          alignedSemanticIds: effectiveAlignedIds,
         },
       })
     } catch (error) {
       console.error('❌ Error in handleTokenClick:', error)
     }
-  }, [sendToAll, sendVerseFilter, currentRef, resourceId])
+  }, [sendToAll, sendVerseFilter, currentRef, underlinedSemanticIds])
 
   const handleVerseFilter = useCallback((chapter: number, verse?: number) => {
     setHighlightTarget(null)

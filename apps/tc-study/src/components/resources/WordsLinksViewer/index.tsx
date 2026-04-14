@@ -11,12 +11,13 @@
  */
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
+import { useResourceAPI } from 'linked-panels'
 import { BookOpen, BookX, Link, Loader } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
-import type { EntryLinkClickSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
+import type { EntryLinkClickSignal, NotesTokenGroupsSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
@@ -30,7 +31,7 @@ import {
     useWordsLinksContent,
 } from './hooks'
 import type { TokenFilter, WordsLinksViewerProps } from './types'
-import { generateSemanticIdsForQuoteTokens, parseTWLink } from './utils'
+import { generateSemanticIdsForQuoteTokens, parseLinkChapterVerse, parseTWLink } from './utils'
 
 export function WordsLinksViewer({
   resourceId,
@@ -288,6 +289,67 @@ export function WordsLinksViewer({
       return true
     })
   }, [processedLinks, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
+
+  /** Semantic ID groups for passive scripture underlining (all TWL links in current passage range). */
+  const underlineTokenGroups = useMemo(() => {
+    const bookCode = currentRef.book?.toLowerCase() || ''
+    const groups: { sourceId: string; semanticIds: string[] }[] = []
+    for (const link of filteredByReference) {
+      if (!link.quoteTokens?.length) continue
+      const { chapter, verse } = parseLinkChapterVerse(link.reference)
+      const baseOccurrence = parseInt(link.occurrence || '1', 10)
+      const semanticIds = generateSemanticIdsForQuoteTokens(
+        link.quoteTokens,
+        bookCode,
+        chapter,
+        verse,
+        baseOccurrence
+      )
+      if (semanticIds.length > 0) {
+        groups.push({ sourceId: link.id, semanticIds })
+      }
+    }
+    return groups
+  }, [filteredByReference, currentRef.book])
+
+  const twlTokenGroupsApi = useResourceAPI<NotesTokenGroupsSignal>(resourceId)
+
+  const lastTwlBroadcastKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const key = underlineTokenGroups.map(g => `${g.sourceId}:${g.semanticIds.length}`).join('|')
+    if (key === lastTwlBroadcastKeyRef.current) return
+    lastTwlBroadcastKeyRef.current = key
+
+    const parts = resourceKey.split('/')
+    const language = parts[1]?.split('_')[0] || ''
+    twlTokenGroupsApi.messaging.sendToAll({
+      type: 'notes-token-groups',
+      lifecycle: 'state',
+      stateKey: 'current-notes-token-groups-twl',
+      sourceResourceId: resourceId,
+      tokenGroups: underlineTokenGroups,
+      resourceMetadata: { id: resourceKey, language, type: 'words-links' },
+      timestamp: Date.now(),
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- messaging ref is stable; key guards content changes
+  }, [resourceId, resourceKey, underlineTokenGroups])
+
+  useEffect(() => {
+    return () => {
+      lastTwlBroadcastKeyRef.current = null
+      twlTokenGroupsApi.messaging.sendToAll({
+        type: 'notes-token-groups',
+        lifecycle: 'state',
+        stateKey: 'current-notes-token-groups-twl',
+        sourceResourceId: resourceId,
+        tokenGroups: [],
+        resourceMetadata: { id: resourceKey, language: '', type: 'words-links' },
+        timestamp: Date.now(),
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- messaging ref is stable
+  }, [resourceId])
   
   // Apply verse filter or token filter if active
   const { displayLinks, hasMatches } = useMemo(() => {

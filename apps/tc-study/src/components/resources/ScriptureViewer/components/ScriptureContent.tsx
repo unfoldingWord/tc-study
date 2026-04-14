@@ -18,6 +18,7 @@ interface ScriptureContentProps {
   displayVerses: ProcessedVerse[]
   currentRef: any
   highlightTarget: OriginalLanguageToken | null
+  underlinedSemanticIds?: Set<string>
   selectedTokenId: string | null
   onTokenClick: (token: WordToken) => void
   onVerseClick?: (chapter: number, verse: number) => void
@@ -35,6 +36,7 @@ export function ScriptureContent({
   displayVerses,
   currentRef,
   highlightTarget,
+  underlinedSemanticIds,
   selectedTokenId,
   onTokenClick,
   onVerseClick,
@@ -185,6 +187,7 @@ export function ScriptureContent({
           verse={verse}
               chapterNumber={chapterNum}
               highlightTarget={highlightTarget}
+              underlinedSemanticIds={underlinedSemanticIds}
           onTokenClick={onTokenClick}
               onVerseClick={onVerseClick}
               isOriginalLanguage={isOriginalLanguage}

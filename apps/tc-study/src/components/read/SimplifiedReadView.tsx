@@ -40,6 +40,7 @@ import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
     entryLinkClickPlugin,
     linkClickPlugin,
+    notesTokenGroupsPlugin,
     scriptureContentRequestPlugin,
     scriptureContentResponsePlugin,
     scriptureTokensBroadcastPlugin,
@@ -1055,6 +1056,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     pluginRegistry.register(linkClickPlugin)
     pluginRegistry.register(entryLinkClickPlugin)
     pluginRegistry.register(scriptureTokensBroadcastPlugin)
+    pluginRegistry.register(notesTokenGroupsPlugin)
     pluginRegistry.register(scriptureContentRequestPlugin)
     pluginRegistry.register(scriptureContentResponsePlugin)
     

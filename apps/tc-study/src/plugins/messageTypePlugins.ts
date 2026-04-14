@@ -4,7 +4,7 @@
  */
 
 import { createPlugin, type MessageTypePlugin } from 'linked-panels'
-import type { EntryLinkClickSignal, ScriptureContentRequestSignal, ScriptureContentResponseSignal, ScriptureTokensBroadcastSignal, TokenClickSignal, VerseFilterSignal } from '../signals/studioSignals'
+import type { EntryLinkClickSignal, NotesTokenGroupsSignal, ScriptureContentRequestSignal, ScriptureContentResponseSignal, ScriptureTokensBroadcastSignal, TokenClickSignal, VerseFilterSignal } from '../signals/studioSignals'
 import { useStudyStore } from '../store/studyStore'
 import type { LinkClickEvent } from './types'
 
@@ -412,6 +412,60 @@ export const scriptureTokensBroadcastPlugin: MessageTypePlugin<ScriptureTokensBr
   handlers: {
     'scripture-tokens-broadcast': handleScriptureTokensBroadcast
   }
+})
+
+// ===== NOTES TOKEN GROUPS PLUGIN =====
+
+function isNotesTokenGroupsSignal(content: unknown): content is NotesTokenGroupsSignal {
+  if (!content || typeof content !== 'object') return false
+  const message = content as any
+  if (message.type !== 'notes-token-groups') return false
+  if (message.lifecycle !== 'state') return false
+  if (
+    message.stateKey !== 'current-notes-token-groups-tn' &&
+    message.stateKey !== 'current-notes-token-groups-twl'
+  ) {
+    return false
+  }
+  if (typeof message.sourceResourceId !== 'string') return false
+  if (!Array.isArray(message.tokenGroups)) return false
+  for (const g of message.tokenGroups) {
+    if (!g || typeof g !== 'object') return false
+    if (typeof g.sourceId !== 'string') return false
+    if (!Array.isArray(g.semanticIds)) return false
+    for (const id of g.semanticIds) {
+      if (typeof id !== 'string') return false
+    }
+  }
+  if (!message.resourceMetadata || typeof message.resourceMetadata !== 'object') return false
+  if (typeof message.resourceMetadata.id !== 'string') return false
+  if (typeof message.resourceMetadata.language !== 'string') return false
+  if (typeof message.resourceMetadata.type !== 'string') return false
+  if (typeof message.timestamp !== 'number') return false
+  return true
+}
+
+function handleNotesTokenGroupsSignal(message: any) {
+  const signal = message.content as NotesTokenGroupsSignal
+  const count = signal.tokenGroups.reduce((n, g) => n + g.semanticIds.length, 0)
+  if (count > 0) {
+    console.log(`📎 Notes token groups from ${signal.sourceResourceId}: ${signal.tokenGroups.length} groups, ${count} semantic ids`)
+  }
+}
+
+export const notesTokenGroupsPlugin: MessageTypePlugin<NotesTokenGroupsSignal> = createPlugin({
+  name: 'notes-token-groups-plugin',
+  version: '1.0.0',
+  description: 'TN/TWL broadcast of quote semantic IDs for scripture underlining',
+  messageTypes: {
+    'notes-token-groups': {} as NotesTokenGroupsSignal,
+  },
+  validators: {
+    'notes-token-groups': isNotesTokenGroupsSignal,
+  },
+  handlers: {
+    'notes-token-groups': handleNotesTokenGroupsSignal,
+  },
 })
 
 // ===== ENTRY LINK CLICK PLUGIN =====
