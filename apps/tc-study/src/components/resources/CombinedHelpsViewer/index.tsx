@@ -336,7 +336,7 @@ export function CombinedHelpsViewer({
       if (noteChapter === endChapter && noteStartVerse > endVerse) return false
       return true
     })
-  }, [tnNotes, currentRef])
+  }, [tnNotes, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
 
   const notesWithQuotes = useMemo(() => {
     return relevantNotes
@@ -368,10 +368,12 @@ export function CombinedHelpsViewer({
   const notesWithAlignedTokens = useMemo(() => {
     const quoteMap = new Map(tnLinksWithQuotes.map((l) => [l.id, l.quoteTokens]))
     const alignedMap = new Map(tnLinksAligned.map((l) => [l.id, l.alignedTokens]))
+    const semanticIdsMap = new Map(tnLinksAligned.map((l) => [l.id, (l as any).semanticIds as string[] | undefined]))
     return relevantNotes.map((note) => ({
       ...note,
       quoteTokens: quoteMap.get(note.id),
       alignedTokens: alignedMap.get(note.id),
+      semanticIds: semanticIdsMap.get(note.id),
     }))
   }, [relevantNotes, tnLinksWithQuotes, tnLinksAligned])
 
@@ -439,15 +441,11 @@ export function CombinedHelpsViewer({
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const note of notesWithAlignedTokens) {
       if (!note.quoteTokens?.length) continue
-      const { chapter, verse } = parseLinkChapterVerse(note.reference)
-      const baseOccurrence = parseInt(note.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        note.quoteTokens,
-        bookCodeLower,
-        chapter,
-        verse,
-        baseOccurrence
-      )
+      const cached = (note as any).semanticIds as string[] | undefined
+      const semanticIds = cached ?? (() => {
+        const { chapter, verse } = parseLinkChapterVerse(note.reference)
+        return generateSemanticIdsForQuoteTokens(note.quoteTokens!, bookCodeLower, chapter, verse, parseInt(note.occurrence || '1', 10))
+      })()
       if (semanticIds.length > 0) groups.push({ sourceId: note.id, semanticIds })
     }
     return groups
@@ -457,15 +455,11 @@ export function CombinedHelpsViewer({
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const link of filteredByReference) {
       if (!link.quoteTokens?.length) continue
-      const { chapter, verse } = parseLinkChapterVerse(link.reference)
-      const baseOccurrence = parseInt(link.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        link.quoteTokens,
-        bookCodeLower,
-        chapter,
-        verse,
-        baseOccurrence
-      )
+      const cached = (link as any).semanticIds as string[] | undefined
+      const semanticIds = cached ?? (() => {
+        const { chapter, verse } = parseLinkChapterVerse(link.reference)
+        return generateSemanticIdsForQuoteTokens(link.quoteTokens!, bookCodeLower, chapter, verse, parseInt(link.occurrence || '1', 10))
+      })()
       if (semanticIds.length > 0) groups.push({ sourceId: link.id, semanticIds })
     }
     return groups
@@ -561,17 +555,13 @@ export function CombinedHelpsViewer({
     const cleanToken = tokenFilter.content.toLowerCase().trim()
     const filtered = notesWithAlignedTokens.filter((note) => {
       if (note.quoteTokens && note.quoteTokens.length > 0) {
-        const refParts = note.reference.split(':')
-        const noteChapter = parseInt(refParts[0] || '1', 10)
-        const noteVerse = parseInt(refParts[1] || '1', 10)
-        const noteOccurrence = parseInt(note.occurrence || '1', 10)
-        const noteSemanticIds = generateSemanticIdsForQuoteTokens(
-          note.quoteTokens,
-          bookCodeLower,
-          noteChapter,
-          noteVerse,
-          noteOccurrence
-        )
+        const cached = (note as any).semanticIds as string[] | undefined
+        const noteSemanticIds = cached ?? (() => {
+          const refParts = note.reference.split(':')
+          const ch = parseInt(refParts[0] || '1', 10)
+          const vs = parseInt(refParts[1] || '1', 10)
+          return generateSemanticIdsForQuoteTokens(note.quoteTokens!, bookCodeLower, ch, vs, parseInt(note.occurrence || '1', 10))
+        })()
         const hasAligned = tokenFilter.alignedSemanticIds?.some((alignedId) => {
           const al = alignedId.toLowerCase()
           return noteSemanticIds.some((id) => id.toLowerCase() === al)
@@ -611,17 +601,13 @@ export function CombinedHelpsViewer({
     const cleanToken = tokenFilter.content.toLowerCase().trim()
     const filtered = filteredByReference.filter((link) => {
       if (link.quoteTokens && link.quoteTokens.length > 0) {
-        const refParts = link.reference.split(':')
-        const linkChapter = parseInt(refParts[0] || '1', 10)
-        const linkVerse = parseInt(refParts[1] || '1', 10)
-        const linkOccurrence = parseInt(link.occurrence || '1', 10)
-        const linkSemanticIds = generateSemanticIdsForQuoteTokens(
-          link.quoteTokens,
-          bookCodeLower,
-          linkChapter,
-          linkVerse,
-          linkOccurrence
-        )
+        const cached = (link as any).semanticIds as string[] | undefined
+        const linkSemanticIds = cached ?? (() => {
+          const refParts = link.reference.split(':')
+          const ch = parseInt(refParts[0] || '1', 10)
+          const vs = parseInt(refParts[1] || '1', 10)
+          return generateSemanticIdsForQuoteTokens(link.quoteTokens!, bookCodeLower, ch, vs, parseInt(link.occurrence || '1', 10))
+        })()
         const hasAligned = tokenFilter.alignedSemanticIds?.some((alignedId) => {
           const al = alignedId.toLowerCase()
           return linkSemanticIds.some((id) => id.toLowerCase() === al)
@@ -767,6 +753,10 @@ export function CombinedHelpsViewer({
     }
     return groups
   }, [mergedRows])
+
+  const handleNoteSelect = useCallback((note: { id: string }) => {
+    setSelectedNoteId(note.id)
+  }, [])
 
   const handleNoteQuoteClick = useCallback(
     (note: (typeof notesWithAlignedTokens)[0]) => {
@@ -1016,8 +1006,8 @@ export function CombinedHelpsViewer({
                                   isSelected={selectedNoteId === note.id}
                                   onSupportReferenceClick={handleSupportReferenceClick}
                                   onEntryLinkClick={onEntryLinkClick}
-                                  onQuoteClick={() => handleNoteQuoteClick(note)}
-                                  onClick={() => setSelectedNoteId(note.id)}
+                                  onQuoteClick={handleNoteQuoteClick}
+                                  onClick={handleNoteSelect}
                                   targetResourceId={targetSourceId || undefined}
                                   resourceKey={tnKey || resourceKey}
                                   languageDirection={targetLanguageDirection}

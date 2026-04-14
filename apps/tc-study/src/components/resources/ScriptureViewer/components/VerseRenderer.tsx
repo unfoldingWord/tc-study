@@ -4,9 +4,26 @@
  */
 
 import type { WordToken } from '@bt-synergy/usfm-processor'
-import { Fragment } from 'react'
-import type { VerseDisplayProps } from '../types'
+import { Fragment, memo } from 'react'
+import type { OriginalLanguageToken, VerseDisplayProps } from '../types'
 import { TokenRenderer } from './TokenRenderer'
+
+/** Extract verse number from a token verseRef like "TIT 2:3" → 3 */
+function verseNumFromRef(ref: string | undefined): number | null {
+  if (!ref) return null
+  const m = ref.match(/:(\d+)$/)
+  return m ? parseInt(m[1], 10) : null
+}
+
+function highlightAffectsVerse(
+  prev: OriginalLanguageToken | null,
+  next: OriginalLanguageToken | null,
+  verseNumber: number
+): boolean {
+  const oldNum = verseNumFromRef(prev?.verseRef)
+  const newNum = verseNumFromRef(next?.verseRef)
+  return verseNumber === oldNum || verseNumber === newNum
+}
 
 // Helper to get token ID (WordToken uses 'uniqueId' property)
 function getTokenId(token: WordToken): string {
@@ -90,7 +107,7 @@ function shouldAddSpaceAfterToken(
   return false
 }
 
-export function VerseRenderer({
+export const VerseRenderer = memo(function VerseRenderer({
   verse,
   chapterNumber,
   highlightTarget,
@@ -225,6 +242,23 @@ export function VerseRenderer({
       </span>
     </div>
   )
-}
+}, (prev, next) => {
+  // Skip re-render when only non-impacting props are the same.
+  if (
+    prev.verse !== next.verse ||
+    prev.underlinedSemanticIds !== next.underlinedSemanticIds ||
+    prev.onTokenClick !== next.onTokenClick ||
+    prev.onVerseClick !== next.onVerseClick ||
+    prev.isOriginalLanguage !== next.isOriginalLanguage ||
+    prev.chapterNumber !== next.chapterNumber
+  ) {
+    return false // must re-render
+  }
+  if (prev.highlightTarget === next.highlightTarget) {
+    return true // nothing changed — skip
+  }
+  // highlightTarget changed: only re-render if this verse is involved
+  return !highlightAffectsVerse(prev.highlightTarget, next.highlightTarget, next.verse.number)
+})
 
 

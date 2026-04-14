@@ -6,7 +6,7 @@
 
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
 import { Code, ExternalLink } from 'lucide-react'
-import { startTransition, useState } from 'react'
+import { memo, startTransition, useState } from 'react'
 import { useCurrentReference, useNavigation } from '../../../../contexts'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
@@ -20,11 +20,15 @@ interface AlignedToken {
   type?: 'word' | 'punctuation' | 'whitespace' | 'text' | 'gap'
 }
 
+type NoteWithTokens = TranslationNote & { alignedTokens?: AlignedToken[] }
+
 interface TranslationNoteCardProps {
-  note: TranslationNote & { alignedTokens?: AlignedToken[] }
+  note: NoteWithTokens
   isSelected: boolean
-  onClick: () => void
-  onQuoteClick?: () => void
+  /** Called with the note object so callers can use a single stable handler */
+  onClick: (note: NoteWithTokens) => void
+  /** Called with the note object so callers can use a single stable handler */
+  onQuoteClick?: (note: NoteWithTokens) => void
   onSupportReferenceClick?: (supportRef: string) => void
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   targetResourceId?: string
@@ -35,7 +39,7 @@ interface TranslationNoteCardProps {
   getEntryTitle?: (rcLink: string) => string | null
 }
 
-export function TranslationNoteCard({
+export const TranslationNoteCard = memo(function TranslationNoteCard({
   note,
   isSelected,
   onClick,
@@ -124,9 +128,9 @@ export function TranslationNoteCard({
         }
       `}
       onClick={() => {
-        onClick()
+        onClick(note)
         if (hasAlignedTokens && onQuoteClick) {
-          onQuoteClick()
+          onQuoteClick(note)
         }
       }}
       role="article"
@@ -138,7 +142,7 @@ export function TranslationNoteCard({
           onClick={(e) => {
             e.stopPropagation()
             if (onQuoteClick) {
-              onQuoteClick()
+              onQuoteClick(note)
             }
           }}
           className="w-full text-start mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
@@ -275,4 +279,4 @@ export function TranslationNoteCard({
       )}
     </div>
   )
-}
+})

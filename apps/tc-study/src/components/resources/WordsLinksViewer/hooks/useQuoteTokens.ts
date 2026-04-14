@@ -79,15 +79,8 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
     })
     
     return linksWithQuotes
-  }, [
-    links, 
-    originalContent, 
-    currentRef.book, 
-    currentRef.chapter,
-    currentRef.verse,
-    currentRef.endChapter,
-    currentRef.endVerse
-  ])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- only book/chapter are read; verse/endChapter/endVerse are not used in the body
+  }, [links, originalContent, currentRef.book, currentRef.chapter])
   
   return {
     linksWithQuotes,

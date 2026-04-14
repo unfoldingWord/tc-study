@@ -296,15 +296,11 @@ export function WordsLinksViewer({
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const link of filteredByReference) {
       if (!link.quoteTokens?.length) continue
-      const { chapter, verse } = parseLinkChapterVerse(link.reference)
-      const baseOccurrence = parseInt(link.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        link.quoteTokens,
-        bookCode,
-        chapter,
-        verse,
-        baseOccurrence
-      )
+      const cached = (link as any).semanticIds as string[] | undefined
+      const semanticIds = cached ?? (() => {
+        const { chapter, verse } = parseLinkChapterVerse(link.reference)
+        return generateSemanticIdsForQuoteTokens(link.quoteTokens!, bookCode, chapter, verse, parseInt(link.occurrence || '1', 10))
+      })()
       if (semanticIds.length > 0) {
         groups.push({ sourceId: link.id, semanticIds })
       }
@@ -381,18 +377,13 @@ export function WordsLinksViewer({
     const filtered = filteredByReference.filter((link) => {
       // STRATEGY 1: Alignment-based matching (PRIMARY)
       if (link.quoteTokens && link.quoteTokens.length > 0) {
-        const refParts = link.reference.split(':')
-        const linkChapter = parseInt(refParts[0] || '1', 10)
-        const linkVerse = parseInt(refParts[1] || '1', 10)
-        const linkOccurrence = parseInt(link.occurrence || '1', 10)
-        
-        const linkSemanticIds = generateSemanticIdsForQuoteTokens(
-          link.quoteTokens,
-          bookCode,
-          linkChapter,
-          linkVerse,
-          linkOccurrence
-        )
+        const cached = (link as any).semanticIds as string[] | undefined
+        const linkSemanticIds = cached ?? (() => {
+          const refParts = link.reference.split(':')
+          const ch = parseInt(refParts[0] || '1', 10)
+          const vs = parseInt(refParts[1] || '1', 10)
+          return generateSemanticIdsForQuoteTokens(link.quoteTokens!, bookCode, ch, vs, parseInt(link.occurrence || '1', 10))
+        })()
         
         const hasAlignedMatch = tokenFilter.alignedSemanticIds?.some(alignedId => {
           const alignedIdLower = alignedId.toLowerCase()

@@ -222,21 +222,15 @@ export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedT
       return {
         ...link,
         alignedTokens: alignedTokens.length > 0 ? alignedTokens : undefined,
+        // Cache semantic IDs so downstream memos (underline groups, token filter) can
+        // reuse them without calling generateSemanticIdsForQuoteTokens again.
+        semanticIds: originalSemanticIds,
       }
     })
 
     return linksWithAlignedTokens
-  }, [
-    links, 
-    targetTokens, 
-    tokenReference, 
-    hasTokens, 
-    currentRef.book, 
-    currentRef.chapter,
-    currentRef.verse,
-    currentRef.endChapter,
-    currentRef.endVerse
-  ])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- verse/endChapter/endVerse not read; tokenReference already encodes broadcast range
+  }, [links, targetTokens, tokenReference, hasTokens, currentRef.book, currentRef.chapter])
   
   return {
     linksWithAlignedTokens,

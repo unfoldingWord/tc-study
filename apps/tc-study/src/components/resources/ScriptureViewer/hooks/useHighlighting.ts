@@ -7,7 +7,7 @@
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import type { WordToken } from '@bt-synergy/usfm-processor'
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useCurrentReference } from '../../../../contexts'
 import type { TokenClickSignal, VerseFilterSignal } from '../../../../signals/studioSignals'
 import type { OriginalLanguageToken } from '../types'
@@ -41,6 +41,13 @@ export function useHighlighting(
   
   // Store the highlight target (matches mobile app pattern)
   const [highlightTarget, setHighlightTarget] = useState<OriginalLanguageToken | null>(null)
+
+  // Refs so handleTokenClick can read the latest values without them being deps,
+  // keeping the callback identity stable across verse changes and underline updates.
+  const currentRefRef = useRef(currentRef)
+  currentRefRef.current = currentRef
+  const underlinedRef = useRef(underlinedSemanticIds)
+  underlinedRef.current = underlinedSemanticIds
 
   // Listen for token-click signals from OTHER resources
   useSignalHandler<TokenClickSignal>(
@@ -76,9 +83,13 @@ export function useHighlighting(
       // WordToken uses 'uniqueId' property (not 'id')
       const tokenId = token.uniqueId || (token as any).id || ''
       const tokenContent = token.content || (token as any).text || ''
+
+      // Read latest values from refs (avoids stale-closure without adding them as deps)
+      const currentRefSnapshot = currentRefRef.current
+      const underlinedSnapshot = underlinedRef.current
       
       // Get verse reference - WordToken has verseRef property
-      const verseRef = token.verseRef || `${currentRef.book.toUpperCase()} ${currentRef.chapter}:1`
+      const verseRef = token.verseRef || `${currentRefSnapshot.book.toUpperCase()} ${currentRefSnapshot.chapter}:1`
       
       // Generate semantic ID in format: verseRef:content:occurrence
       // This preserves Unicode characters and matches across languages
@@ -102,14 +113,14 @@ export function useHighlighting(
       const tokenKey = semanticId.toLowerCase()
       const alignedKeys = alignedSemanticIds?.map((id) => id.toLowerCase()) ?? []
       const hasCoverage =
-        underlinedSemanticIds && underlinedSemanticIds.size > 0
-          ? underlinedSemanticIds.has(tokenKey) ||
-            alignedKeys.some((k) => underlinedSemanticIds.has(k))
+        underlinedSnapshot && underlinedSnapshot.size > 0
+          ? underlinedSnapshot.has(tokenKey) ||
+            alignedKeys.some((k) => underlinedSnapshot.has(k))
           : false
 
       if (!hasCoverage) {
         const refMatch = verseRef.match(/\w+\s+(\d+):(\d+)/)
-        const chapter = refMatch ? parseInt(refMatch[1], 10) : currentRef.chapter
+        const chapter = refMatch ? parseInt(refMatch[1], 10) : currentRefSnapshot.chapter
         const verse = refMatch ? parseInt(refMatch[2], 10) : undefined
         setHighlightTarget(null)
         sendVerseFilter({ lifecycle: 'event', filter: { chapter, verse } })
@@ -149,7 +160,8 @@ export function useHighlighting(
     } catch (error) {
       console.error('❌ Error in handleTokenClick:', error)
     }
-  }, [sendToAll, sendVerseFilter, currentRef, underlinedSemanticIds])
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentRef and underlinedSemanticIds accessed via refs; callback identity is stable
+  }, [sendToAll, sendVerseFilter])
 
   const handleVerseFilter = useCallback((chapter: number, verse?: number) => {
     setHighlightTarget(null)

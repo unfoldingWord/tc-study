@@ -4,7 +4,7 @@
 
 import type { ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
 import { BookX } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { BookInfo } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken } from '../types'
 import { VerseRenderer } from './VerseRenderer'
@@ -151,18 +151,22 @@ export function ScriptureContent({
   const isOriginalLanguage = language === 'el-x-koine' || language === 'hbo'
 
   // Group verses by chapter for cross-chapter range support
-  const versesByChapter = displayVerses.reduce((acc, verse) => {
-    // Use verse.chapterNumber if available (cross-chapter), otherwise use currentRef.chapter
-    const verseWithChapter = verse as ProcessedVerse & { chapterNumber?: number }
-    const chapterNum = verseWithChapter.chapterNumber || currentRef.chapter
-    if (!acc[chapterNum]) {
-      acc[chapterNum] = []
+  const { versesByChapter, chapters } = useMemo(() => {
+    const grouped = displayVerses.reduce((acc, verse) => {
+      // Use verse.chapterNumber if available (cross-chapter), otherwise use currentRef.chapter
+      const verseWithChapter = verse as ProcessedVerse & { chapterNumber?: number }
+      const chapterNum = verseWithChapter.chapterNumber || currentRef.chapter
+      if (!acc[chapterNum]) {
+        acc[chapterNum] = []
+      }
+      acc[chapterNum].push(verse)
+      return acc
+    }, {} as Record<number, ProcessedVerse[]>)
+    return {
+      versesByChapter: grouped,
+      chapters: Object.keys(grouped).map(Number).sort((a, b) => a - b),
     }
-    acc[chapterNum].push(verse)
-    return acc
-  }, {} as Record<number, ProcessedVerse[]>)
-
-  const chapters = Object.keys(versesByChapter).map(Number).sort((a, b) => a - b)
+  }, [displayVerses, currentRef.chapter])
   const isCrossChapter = chapters.length > 1
 
   return (

@@ -7,6 +7,7 @@
  */
 
 import { ExternalLink, Loader } from 'lucide-react'
+import { memo } from 'react'
 import type { TokenFilter, TranslationWordsLink } from '../types'
 import { parseTWLink } from '../utils'
 
@@ -30,7 +31,7 @@ interface WordLinkCardProps {
   languageDirection?: 'ltr' | 'rtl'
 }
 
-export function WordLinkCard({
+export const WordLinkCard = memo(function WordLinkCard({
   link,
   isSelected,
   twTitle,
@@ -45,17 +46,6 @@ export function WordLinkCard({
   const isKeyTerm = twInfo.category === 'kt'
   const alignedTokens = (link as any).alignedTokens
   const hasAlignedTokens = alignedTokens && alignedTokens.length > 0
-
-  // Debug: why target quote may not render
-  if (typeof console !== 'undefined' && console.log) {
-    console.log('[TWL Quote]', {
-      twLink: link.twLink,
-      origWords: (link as any).origWords ?? '(none)',
-      hasAlignedTokensProp: !!alignedTokens,
-      alignedTokensLength: alignedTokens?.length ?? 0,
-      willRenderQuote: hasAlignedTokens,
-    })
-  }
 
   // Extract resource abbreviation (e.g., "ult" from "unfoldingWord/en/ult")
   const resourceAbbreviation = targetResourceId
@@ -77,11 +67,7 @@ export function WordLinkCard({
       title={hasAlignedTokens ? 'Click to highlight these words in scripture' : undefined}
     >
       {/* Quote - On top, clickable to broadcast/highlight tokens (matches Notes layout) */}
-      {hasAlignedTokens && (() => {
-        if (typeof console !== 'undefined' && console.log) {
-          console.log('[TWL Quote] Rendering quote block', { twLink: link.twLink, tokenCount: alignedTokens.length })
-        }
-        return (
+      {hasAlignedTokens && (
         <button
           onClick={(e) => {
             e.stopPropagation()
@@ -109,8 +95,7 @@ export function WordLinkCard({
             )}
           </div>
         </button>
-        )
-      })()}
+      )}
 
       {/* Entry Link - On bottom, with modal icon (matches Notes support reference style) */}
       <div className="mt-1.5 pt-1.5 border-t border-gray-100/50">
@@ -137,4 +122,4 @@ export function WordLinkCard({
       </div>
     </div>
   )
-}
+})

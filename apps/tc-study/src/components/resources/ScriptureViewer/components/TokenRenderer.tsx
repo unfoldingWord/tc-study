@@ -3,9 +3,10 @@
  * Matches the pattern from mobile app's USFMRenderer/WordTokenRenderer
  */
 
+import { memo } from 'react'
 import type { TokenDisplayProps } from '../types'
 
-export function TokenRenderer({
+export const TokenRenderer = memo(function TokenRenderer({
   token,
   index,
   isHighlighted,
@@ -16,7 +17,7 @@ export function TokenRenderer({
 }: TokenDisplayProps) {
   // Get token text (WordToken uses 'content' property)
   // Trim text/punctuation tokens to remove extra spaces
-  const rawText = token.content || token.text || ''
+  const rawText = token.content || (token as any).text || ''
   const tokenType = token.type as string
   const tokenText = (tokenType === 'text' || tokenType === 'punctuation') 
     ? rawText.trim() 
@@ -53,6 +54,6 @@ export function TokenRenderer({
       {tokenText}
     </span>
   )
-}
+})
 
 

@@ -222,7 +222,7 @@ export function TranslationNotesViewer({
 
       return true
     })
-  }, [notes, currentRef])
+  }, [notes, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
   
   // Transform notes to include quote field for alignment
   // Only include notes that have a non-empty quote field
@@ -264,11 +264,15 @@ export function TranslationNotesViewer({
     const alignedTokensMap = new Map(
       linksWithAlignedTokens.map(link => [link.id, link.alignedTokens])
     )
+    const semanticIdsMap = new Map(
+      linksWithAlignedTokens.map(link => [link.id, (link as any).semanticIds as string[] | undefined])
+    )
     
     return relevantNotes.map(note => ({
       ...note,
       quoteTokens: quoteTokensMap.get(note.id), // Original language tokens
       alignedTokens: alignedTokensMap.get(note.id), // Target language tokens (for display)
+      semanticIds: semanticIdsMap.get(note.id), // Cached semantic IDs from alignment step
     }))
   }, [relevantNotes, linksWithQuotes, linksWithAlignedTokens])
 
@@ -278,15 +282,11 @@ export function TranslationNotesViewer({
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const note of notesWithAlignedTokens) {
       if (!note.quoteTokens?.length) continue
-      const { chapter, verse } = parseLinkChapterVerse(note.reference)
-      const baseOccurrence = parseInt(note.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        note.quoteTokens,
-        bookCode,
-        chapter,
-        verse,
-        baseOccurrence
-      )
+      const cached = (note as any).semanticIds as string[] | undefined
+      const semanticIds = cached ?? (() => {
+        const { chapter, verse } = parseLinkChapterVerse(note.reference)
+        return generateSemanticIdsForQuoteTokens(note.quoteTokens!, bookCode, chapter, verse, parseInt(note.occurrence || '1', 10))
+      })()
       if (semanticIds.length > 0) {
         groups.push({ sourceId: note.id, semanticIds })
       }
@@ -368,18 +368,13 @@ export function TranslationNotesViewer({
     const filtered = notesWithAlignedTokens.filter((note) => {
       // STRATEGY 1: Alignment-based matching (PRIMARY)
       if (note.quoteTokens && note.quoteTokens.length > 0) {
-        const refParts = note.reference.split(':')
-        const noteChapter = parseInt(refParts[0] || '1', 10)
-        const noteVerse = parseInt(refParts[1] || '1', 10)
-        const noteOccurrence = parseInt(note.occurrence || '1', 10)
-        
-        const noteSemanticIds = generateSemanticIdsForQuoteTokens(
-          note.quoteTokens,
-          bookCode,
-          noteChapter,
-          noteVerse,
-          noteOccurrence
-        )
+        const cached = (note as any).semanticIds as string[] | undefined
+        const noteSemanticIds = cached ?? (() => {
+          const refParts = note.reference.split(':')
+          const ch = parseInt(refParts[0] || '1', 10)
+          const vs = parseInt(refParts[1] || '1', 10)
+          return generateSemanticIdsForQuoteTokens(note.quoteTokens!, bookCode, ch, vs, parseInt(note.occurrence || '1', 10))
+        })()
         
         const hasAlignedMatch = tokenFilter.alignedSemanticIds?.some(alignedId => {
           const alignedIdLower = alignedId.toLowerCase()
@@ -466,6 +461,10 @@ export function TranslationNotesViewer({
     return grouped
   }, [displayNotes])
   
+  const handleNoteSelect = useCallback((note: { id: string }) => {
+    setSelectedNoteId(note.id)
+  }, [])
+
   // Handle clicking on aligned quote tokens (broadcast ORIGINAL LANGUAGE tokens, same as TWL)
   const handleQuoteClick = useCallback((note: typeof notesWithAlignedTokens[0]) => {
     // CRITICAL: Send original language tokens (quoteTokens), not aligned tokens
@@ -645,8 +644,8 @@ export function TranslationNotesViewer({
                     isSelected={selectedNoteId === note.id}
                     onSupportReferenceClick={handleSupportReferenceClick}
                     onEntryLinkClick={onEntryLinkClick}
-                    onQuoteClick={() => handleQuoteClick(note)}
-                    onClick={() => setSelectedNoteId(note.id)}
+                    onQuoteClick={handleQuoteClick}
+                    onClick={handleNoteSelect}
                     targetResourceId={targetSourceId || undefined}
                     resourceKey={resourceKey}
                     languageDirection={targetLanguageDirection}
