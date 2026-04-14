@@ -85,6 +85,25 @@ export function ScriptureContent({
   useEffect(() => {
     lastScrolledTokenRef.current = null
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
+
+  // Group verses by chapter for cross-chapter range support.
+  // Must be called before any early returns to satisfy Rules of Hooks.
+  const { versesByChapter, chapters } = useMemo(() => {
+    const grouped = displayVerses.reduce((acc, verse) => {
+      const verseWithChapter = verse as ProcessedVerse & { chapterNumber?: number }
+      const chapterNum = verseWithChapter.chapterNumber || currentRef.chapter
+      if (!acc[chapterNum]) {
+        acc[chapterNum] = []
+      }
+      acc[chapterNum].push(verse)
+      return acc
+    }, {} as Record<number, ProcessedVerse[]>)
+    return {
+      versesByChapter: grouped,
+      chapters: Object.keys(grouped).map(Number).sort((a, b) => a - b),
+    }
+  }, [displayVerses, currentRef.chapter])
+
   // Show full-screen loading only when we have no content yet (initial load).
   // When we already have content and isLoading flips (e.g. token click triggers a refetch),
   // keep showing the current content to avoid the spinner replacing the text.
@@ -149,24 +168,6 @@ export function ScriptureContent({
 
   // Determine if this is an original language resource
   const isOriginalLanguage = language === 'el-x-koine' || language === 'hbo'
-
-  // Group verses by chapter for cross-chapter range support
-  const { versesByChapter, chapters } = useMemo(() => {
-    const grouped = displayVerses.reduce((acc, verse) => {
-      // Use verse.chapterNumber if available (cross-chapter), otherwise use currentRef.chapter
-      const verseWithChapter = verse as ProcessedVerse & { chapterNumber?: number }
-      const chapterNum = verseWithChapter.chapterNumber || currentRef.chapter
-      if (!acc[chapterNum]) {
-        acc[chapterNum] = []
-      }
-      acc[chapterNum].push(verse)
-      return acc
-    }, {} as Record<number, ProcessedVerse[]>)
-    return {
-      versesByChapter: grouped,
-      chapters: Object.keys(grouped).map(Number).sort((a, b) => a - b),
-    }
-  }, [displayVerses, currentRef.chapter])
   const isCrossChapter = chapters.length > 1
 
   return (
