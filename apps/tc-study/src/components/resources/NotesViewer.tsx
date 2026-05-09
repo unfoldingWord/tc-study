@@ -88,7 +88,7 @@ export function NotesViewer({ resourceId, resourceKey, notesContent }: NotesView
       timestamp: Date.now(),
     }
     
-    api.messaging.sendToAll(selectionMessage)
+    api.messaging.sendToAll(selectionMessage as any)
     
     // TODO: Send highlighted-tokens to highlight the note's quote in scripture
     // This would require matching tokens in scripture

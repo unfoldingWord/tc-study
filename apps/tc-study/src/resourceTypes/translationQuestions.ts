@@ -17,6 +17,10 @@ export const translationQuestionsResourceType: ResourceTypeDefinition = defineRe
   description: 'Comprehension questions and answers for Bible passages to help verify understanding',
   icon: 'MessageCircleQuestion',
   
+  // ===== SCOPE / ROLE =====
+  contentRole: 'companion',
+  companionFor: ['scripture'],
+
   // ===== DOOR43 MAPPING =====
   subjects: ['TSV Translation Questions'],
   aliases: ['tq', 'questions'],
@@ -33,7 +37,7 @@ export const translationQuestionsResourceType: ResourceTypeDefinition = defineRe
   downloadPriority: 25, // Similar to Translation Notes
   
   // ===== UI LAYER =====
-  viewer: TranslationQuestionsViewer,
+  viewer: TranslationQuestionsViewer as any,
   
   // ===== FEATURES =====
   features: {

@@ -21,6 +21,7 @@ import { Activity, Send, Eye, Zap, CheckCircle, Radio, ArrowRight, Shuffle } fro
 import { ScriptureViewer } from '../resources/ScriptureViewer'
 import { WordsLinksViewer } from '../resources'
 import { useCatalog } from '../../contexts/CatalogContext'
+import type { ResourceInfo, ResourceMetadata } from '../../contexts/types'
 import type { TokenClickEvent, LinkClickEvent } from '../../plugins/types'
 import { tokenClickPlugin, linkClickPlugin } from '../../plugins/messageTypePlugins'
 import { TestResourceWithPanels } from './TestResourceWithPanels'
@@ -313,7 +314,7 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
         {targetMode === 'panel' && (
           <select
             value={targetPanel}
-            onChange={(e) => setTargetPanel(e.target.value)}
+            onChange={(e) => setTargetPanel(e.target.value as 'panel-1' | 'panel-2')}
             className="w-full px-2 py-1 text-xs border rounded"
           >
             <option value="panel-1">Panel 1</option>
@@ -474,11 +475,11 @@ export function PanelSystemTest() {
   ], [])
 
   const realResources = useMemo(() => 
-    availableResources.slice(0, 4).map((resource, idx) => ({
-      id: `real-${resource.key.replace(/\//g, '-')}`,
-      title: resource.title || resource.key,
+    availableResources.slice(0, 4).map((resource) => ({
+      id: `real-${resource.resourceKey.replace(/\//g, '-')}`,
+      title: resource.title || resource.resourceKey,
       category: resource.subject,
-      resourceKey: resource.key,
+      resourceKey: resource.resourceKey,
       subject: resource.subject,
     }))
   , [availableResources])
@@ -532,16 +533,23 @@ export function PanelSystemTest() {
             onMessageLog={logMessage}
           />
         )
-      ) : resource.subject === 'Bible' || resource.subject === 'Aligned Bible' ? (
+      ) : 'subject' in resource && (resource.subject === 'Bible' || resource.subject === 'Aligned Bible') ? (
         <ScriptureViewer
           resourceId={resource.id}
           resourceKey={resource.resourceKey}
+          resource={{
+            id: resource.id,
+            key: resource.resourceKey,
+            resourceKey: resource.resourceKey,
+            title: resource.title,
+            type: resource.subject as any,
+          } as ResourceInfo}
           isAnchor={false}
         />
       ) : (
         <div className="p-4">
           <p className="text-sm font-semibold">{resource.title}</p>
-          <p className="text-xs text-gray-500">{resource.subject}</p>
+          <p className="text-xs text-gray-500">{'subject' in resource ? resource.subject : resource.category}</p>
         </div>
       )
       

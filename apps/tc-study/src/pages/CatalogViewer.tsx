@@ -96,7 +96,7 @@ export default function CatalogViewer() {
         await catalogManager.removeResource(resourceKey)
         
         // Also clear cached content
-        const loader = catalogManager['registry']?.getLoader(resource.type)
+        const loader = catalogManager.resolveLoaderForMetadata(resource)
         if (loader && typeof loader.clearCache === 'function') {
           await loader.clearCache(resourceKey)
         }
@@ -339,11 +339,21 @@ export default function CatalogViewer() {
                         
                         {/* Compact download status */}
                         {resource.availability.offline && !resource.availability.partial ? (
-                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" title="Downloaded" />
+                          <span title="Downloaded" aria-label="Downloaded" className="inline-flex flex-shrink-0">
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                          </span>
                         ) : resource.availability.partial ? (
-                          <Circle className="w-4 h-4 text-blue-500 flex-shrink-0" title={`Partial: ${resource.contentMetadata?.downloadedIngredients?.length}/${resource.contentMetadata?.ingredients?.length}`} />
+                          <span
+                            title={`Partial: ${resource.contentMetadata?.downloadedIngredients?.length}/${resource.contentMetadata?.ingredients?.length}`}
+                            aria-label="Partially downloaded"
+                            className="inline-flex flex-shrink-0"
+                          >
+                            <Circle className="w-4 h-4 text-blue-500" />
+                          </span>
                         ) : (
-                          <Circle className="w-4 h-4 text-gray-300 flex-shrink-0" title="Not downloaded" />
+                          <span title="Not downloaded" aria-label="Not downloaded" className="inline-flex flex-shrink-0">
+                            <Circle className="w-4 h-4 text-gray-300" />
+                          </span>
                         )}
                         
                         {/* Download progress */}

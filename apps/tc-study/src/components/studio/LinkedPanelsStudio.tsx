@@ -18,6 +18,11 @@ import { useAppStore } from '../../contexts/AppContext'
 import { usePackageStore } from '../../lib/stores'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { entryLinkClickPlugin, linkClickPlugin, notesTokenGroupsPlugin, scriptureContentRequestPlugin, scriptureContentResponsePlugin, scriptureTokensBroadcastPlugin, tokenClickPlugin, verseFilterPlugin } from '../../plugins/messageTypePlugins'
+import {
+  ResourceFormat,
+  ResourceType,
+  type ResourceMetadata as CatalogResourceMetadata,
+} from '@bt-synergy/resource-catalog'
 import { useStudyStore } from '../../store/studyStore'
 import { EntryResourceModal } from '../common/EntryResourceModal'
 import { FallbackViewer } from '../resources'
@@ -41,6 +46,46 @@ import { EmptyPanelState } from './EmptyPanelState'
 import { NavigationBar } from './NavigationBar'
 import { PanelHeader } from './PanelHeader'
 import { ResourceLibrarySidebar, ResourceWizardPanel } from './ResourceLibrarySidebar'
+
+function resourceInfoFromCatalogMetadata(resourceKey: string, metadata: CatalogResourceMetadata): ResourceInfo {
+  const subject = metadata.subject?.toLowerCase() ?? ''
+  const category =
+    subject.includes('bible')
+      ? 'scripture'
+      : subject.includes('words')
+        ? 'words'
+        : subject.includes('notes')
+          ? 'notes'
+          : subject.includes('questions')
+            ? 'questions'
+            : String(metadata.type)
+
+  return {
+    ...metadata,
+    id: resourceKey,
+    key: resourceKey,
+    category,
+    ingredients: metadata.contentMetadata?.ingredients as ResourceInfo['ingredients'],
+    metadata,
+    location: metadata.locations?.[0]?.type ?? 'network',
+  } as ResourceInfo
+}
+
+function minimalResourceInfoFallback(resourceKey: string): ResourceInfo {
+  const owner = resourceKey.split('/')[0] ?? 'unknown'
+  return {
+    id: resourceKey,
+    key: resourceKey,
+    resourceKey,
+    title: resourceKey.split('/').pop() || resourceKey,
+    type: ResourceType.UNKNOWN,
+    category: 'unknown',
+    format: ResourceFormat.MARKDOWN,
+    language: 'en',
+    owner,
+    server: 'git.door43.org',
+  } as ResourceInfo
+}
 
 export function LinkedPanelsStudio() {
   // Wizard state
@@ -470,91 +515,33 @@ export function LinkedPanelsStudio() {
       
       try {
         const metadata = await catalogManager.getResourceMetadata(resourceKey)
-      
+
         if (metadata) {
-          // Convert ResourceType enum to string
-          let typeString = 'unknown'
-          if (typeof metadata.type === 'string') {
-            typeString = metadata.type
-          } else if (metadata.type) {
-            typeString = String(metadata.type)
-          }
-          
-          // Map subject to category
-          const category = metadata.subject?.toLowerCase().includes('bible') 
-            ? 'scripture' 
-            : metadata.subject?.toLowerCase().includes('words')
-            ? 'words'
-            : metadata.subject?.toLowerCase().includes('notes')
-            ? 'notes'
-            : metadata.subject?.toLowerCase().includes('questions')
-            ? 'questions'
-            : typeString
-          
-          resourceInfo = {
-            id: resourceKey,
-            key: resourceKey,
-            title: metadata.title || resourceKey,
-            type: typeString,
-            category: category,
-            format: metadata.format || 'markdown',
-            language: metadata.language || 'en',
-            owner: metadata.owner || 'unknown',
-            server: metadata.server || 'git.door43.org',
-            subject: metadata.subject,
-            contentStructure: metadata.contentStructure || 'book',
-            resourceId: metadata.resourceId,
-            location: metadata.locations?.[0]?.type || 'network', // First location type or default to network
-          ingredients: metadata.contentMetadata?.ingredients, // ⭐ Include ingredients for on-demand downloading
-          version: metadata.version,
-          metadata: metadata, // ⭐ Store full metadata for viewers that need it (e.g., TranslationWordsViewer)
-          // TOC will be populated by loader when content is fetched
-        }
-        
-        console.log(`📦 Created ResourceInfo from catalog metadata:`, resourceInfo)
-      } else {
-          // Fallback: metadata not found, use basic info
+          resourceInfo = resourceInfoFromCatalogMetadata(resourceKey, metadata)
+          console.log(`📦 Created ResourceInfo from catalog metadata:`, resourceInfo)
+        } else {
           console.warn(`⚠️ Metadata not found for ${resourceKey}, using fallback`)
-          resourceInfo = {
-            id: resourceKey,
-            key: resourceKey,
-            title: resourceKey.split('/').pop() || resourceKey,
-            type: 'unknown',
-            category: 'unknown',
-            format: 'markdown',
-            language: 'en',
-            owner: resourceKey.split('/')[0] || 'unknown',
-          }
+          resourceInfo = minimalResourceInfoFallback(resourceKey)
         }
       } catch (error) {
         console.error(`❌ Failed to fetch metadata for ${resourceKey}:`, error)
-        // Fallback on error
-        resourceInfo = {
-          id: resourceKey,
-          key: resourceKey,
-          title: resourceKey.split('/').pop() || resourceKey,
-          type: 'unknown',
-          category: 'unknown',
-          format: 'markdown',
-          language: 'en',
-          owner: resourceKey.split('/')[0] || 'unknown',
-        }
+        resourceInfo = minimalResourceInfoFallback(resourceKey)
       }
-      
+
       // Add to workspace and app (DRY: single function handles both)
       // Allow multiple instances so the same resource can be added to multiple panels
       const instanceId = addResource(resourceInfo, true)
-      
+
       // Assign instance to panel (use the generated instance ID, not the base key)
       assignResourceToPanel(instanceId, targetPanelId)
-      
+
       // Navigate to the last added resource
       const newIndex = targetResourceKeys.length
       if (resourceKeys.indexOf(resourceKey) === resourceKeys.length - 1) {
         // Only set active for the last resource
         setActiveResourceInPanel(targetPanelId, newIndex)
       }
-      
+
       console.log(`✅ Resource instance ${instanceId} added to ${targetPanelId} via drag-drop at index ${newIndex}`)
     }
     
@@ -593,77 +580,19 @@ export function LinkedPanelsStudio() {
       
       try {
         const metadata = await catalogManager.getResourceMetadata(resourceKey)
-      
-      if (metadata) {
-        // Convert ResourceType enum to string
-        let typeString = 'unknown'
-        if (typeof metadata.type === 'string') {
-          typeString = metadata.type
-        } else if (metadata.type) {
-          typeString = String(metadata.type)
+
+        if (metadata) {
+          resourceInfo = resourceInfoFromCatalogMetadata(resourceKey, metadata)
+          console.log(`📦 Created ResourceInfo from catalog metadata:`, resourceInfo)
+        } else {
+          console.warn(`⚠️ Metadata not found for ${resourceKey}, using fallback`)
+          resourceInfo = minimalResourceInfoFallback(resourceKey)
         }
-        
-        // Map subject to category
-        const category = metadata.subject?.toLowerCase().includes('bible') 
-          ? 'scripture' 
-          : metadata.subject?.toLowerCase().includes('words')
-          ? 'words'
-          : metadata.subject?.toLowerCase().includes('notes')
-          ? 'notes'
-          : metadata.subject?.toLowerCase().includes('questions')
-          ? 'questions'
-          : typeString
-        
-        resourceInfo = {
-          id: resourceKey,
-          key: resourceKey,
-          title: metadata.title || resourceKey,
-          type: typeString,
-          category: category,
-          format: metadata.format || 'markdown',
-          language: metadata.language || 'en',
-          owner: metadata.owner || 'unknown',
-          server: metadata.server || 'git.door43.org',
-          subject: metadata.subject,
-          contentStructure: metadata.contentStructure || 'book',
-          resourceId: metadata.resourceId,
-          location: metadata.locations?.[0]?.type || 'network', // First location type or default to network
-          ingredients: metadata.contentMetadata?.ingredients, // ⭐ Include ingredients for on-demand downloading
-          version: metadata.version,
-          metadata: metadata, // ⭐ Store full metadata for viewers that need it (e.g., TranslationWordsViewer)
-          // TOC will be populated by loader when content is fetched
-        }
-        
-        console.log(`📦 Created ResourceInfo from catalog metadata:`, resourceInfo)
-      } else {
-        // Fallback: metadata not found, use basic info
-        console.warn(`⚠️ Metadata not found for ${resourceKey}, using fallback`)
-        resourceInfo = {
-          id: resourceKey,
-          key: resourceKey,
-          title: resourceKey.split('/').pop() || resourceKey,
-          type: 'unknown',
-          category: 'unknown',
-          format: 'markdown',
-          language: 'en',
-          owner: resourceKey.split('/')[0] || 'unknown',
-        }
+      } catch (error) {
+        console.error(`❌ Failed to fetch metadata for ${resourceKey}:`, error)
+        resourceInfo = minimalResourceInfoFallback(resourceKey)
       }
-    } catch (error) {
-      console.error(`❌ Failed to fetch metadata for ${resourceKey}:`, error)
-      // Fallback on error
-      resourceInfo = {
-        id: resourceKey,
-        key: resourceKey,
-        title: resourceKey.split('/').pop() || resourceKey,
-        type: 'unknown',
-        category: 'unknown',
-        format: 'markdown',
-        language: 'en',
-        owner: resourceKey.split('/')[0] || 'unknown',
-      }
-    }
-      
+
       // Add to workspace and app (DRY: single function handles both)
       // Allow multiple instances so the same resource can be added to multiple panels
       const instanceId = addResource(resourceInfo, true)
@@ -768,6 +697,8 @@ export function LinkedPanelsStudio() {
         viewerProps.owner = resource.owner
         viewerProps.language = resource.language
         viewerProps.isAnchor = isAnchor
+      } else if (resource.type === 'obs') {
+        // ObsViewer reads language/title from the resource prop directly; no extra props needed.
       } else if (resource.type === 'words' || resource.category === 'words' || resource.type === 'words-links' || resource.category === 'words-links' || resource.type === 'twl' || resource.type === 'academy' || resource.type === 'ta' || resource.type === 'notes' || resource.type === 'tn') {
         // Entry-organized resources need onEntryLinkClick
         viewerProps.onEntryLinkClick = handleOpenEntry

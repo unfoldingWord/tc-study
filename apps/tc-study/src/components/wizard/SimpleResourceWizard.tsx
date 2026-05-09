@@ -51,15 +51,8 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
           try {
             console.log(`🔍 Processing resource:`, metadata.resourceKey)
             
-            // Convert ResourceType enum to string if needed
-            let typeString = 'unknown'
-            if (typeof metadata.type === 'string') {
-              typeString = metadata.type
-            } else if (metadata.type && typeof metadata.type === 'object' && 'value' in metadata.type) {
-              typeString = String(metadata.type.value)
-            } else if (metadata.type) {
-              typeString = String(metadata.type)
-            }
+            // ResourceType is a string enum in our catalog — stringify for display rows
+            let typeString = String(metadata.type ?? 'unknown')
             
             const resource = {
               id: metadata.resourceKey,

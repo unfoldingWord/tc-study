@@ -17,6 +17,10 @@ export const translationNotesResourceType: ResourceTypeDefinition = defineResour
   description: 'Translation guidance for specific phrases with links to Translation Academy (TSV format)',
   icon: 'BookOpen',
   
+  // ===== SCOPE / ROLE =====
+  contentRole: 'companion',
+  companionFor: ['scripture'],
+
   // ===== DEPENDENCIES =====
   // TN requires:
   // 1. UGNT (Greek NT) - unfoldingWord's Greek New Testament
@@ -52,7 +56,7 @@ export const translationNotesResourceType: ResourceTypeDefinition = defineResour
 
   
   // ===== UI LAYER =====
-  viewer: TranslationNotesViewer,
+  viewer: TranslationNotesViewer as any,
   
   // ===== FEATURES =====
   features: {

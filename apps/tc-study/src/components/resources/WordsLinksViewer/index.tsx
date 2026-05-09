@@ -14,10 +14,19 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { useResourceAPI } from 'linked-panels'
 import { BookOpen, BookX, Link, Loader } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
+import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
-import type { EntryLinkClickSignal, NotesTokenGroupsSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
+import { RESOURCE_TYPE_IDS } from '../../../resourceTypes/resourceTypeIds'
+import type {
+  EntryLinkClickSignal,
+  NotesTokenGroupsSignal,
+  ObsFrameHighlightSignal,
+  ObsFrameQuoteEntry,
+  ObsFrameQuotesSignal,
+  TokenClickSignal,
+  VerseFilterSignal,
+} from '../../../signals/studioSignals'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
@@ -41,14 +50,39 @@ export function WordsLinksViewer({
   onEntryLinkClick,
 }: WordsLinksViewerProps) {
   const currentRef = useCurrentReference()
+  const navigationMode = useNavigationMode()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
   const bookTitleSource = useBookTitleSource()
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
   const effectiveResource = resourceFromStore ?? resource
 
+  // Resolve the TW resource key from the workspace — OBS-TWL may be owned by a GL org
+  // (e.g. es-419_gl/en/obs-twl) while the TW dictionary is always unfoldingWord/en/tw.
+  const twResourceKeyFromStore = useAppStore((s) => {
+    const lang = resourceKey.split('/')[1]?.split('_')[0] ?? ''
+    const entry = Object.values(s.loadedResources).find(
+      (r: any) => (r.type === 'words' || r.type === RESOURCE_TYPE_IDS.TRANSLATION_WORDS) &&
+        r.language === lang
+    )
+    return entry ? (entry.key ?? entry.id ?? entry.resourceKey) : null
+  })
+
+  // Determine whether this viewer is rendering OBS TWL or scripture TWL.
+  // Check both the resource key (reliable, always correct) and the stored type.
+  // The stored type can be stale (e.g. degraded from 'obs-words-links' to 'words-links'
+  // if the ResourceType enum didn't include the app-level ID at load time).
+  const resourceIdFromKey = resourceKey.split('/')[2] ?? ''
+  const loaderTypeId: string =
+    resourceIdFromKey.startsWith('obs-') ||
+    String(effectiveResource?.type ?? resource?.type ?? '').includes('obs')
+      ? RESOURCE_TYPE_IDS.OBS_WORDS_LINKS
+      : RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS
+
   const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
   const [selectedLink, setSelectedLink] = useState<string | null>(null)
+  // OBS-only: filter to the single entry whose quote was clicked in the OBS frame text
+  const [obsQuoteFilter, setObsQuoteFilter] = useState<{ quote: string; occurrence: number; rowId?: string } | null>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
   const [verseFilter, setVerseFilter] = useState<{ chapter: number; verse?: number; timestamp: number } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
@@ -73,10 +107,11 @@ export function WordsLinksViewer({
     return () => { cancelled = true }
   }, [resourceKey, catalogManager])
 
-  // Load TWL content
+  // Load TWL content — pass the derived loaderTypeId so OBS TWL uses 'obs-words-links'
   const { content, loading, error } = useWordsLinksContent({
     resourceKey,
     wordsLinksContent,
+    loaderTypeId,
   })
   
   // Determine resource metadata for signal system
@@ -85,12 +120,12 @@ export function WordsLinksViewer({
     const owner = parts[0] || ''
     const language = parts[1]?.split('_')[0] || ''
     return {
-      type: 'words-links' as const,
+      type: loaderTypeId as 'words-links' | 'obs-words-links',
       language,
       owner,
-      tags: ['words-links'],
+      tags: [loaderTypeId],
     }
-  }, [resourceKey])
+  }, [resourceKey, loaderTypeId])
   
   // Get signal sender for entry-link-click
   const { sendToAll: sendEntryLinkClick } = useSignal<EntryLinkClickSignal>(
@@ -102,6 +137,13 @@ export function WordsLinksViewer({
   // Get signal sender for token-click (to highlight aligned tokens in target language panels)
   const { sendToAll: sendTokenClick } = useSignal<TokenClickSignal>(
     'token-click',
+    resourceId,
+    resourceMetadata
+  )
+
+  // OBS: broadcast obs-frame-highlight (bidirectional: quote click → OBS viewer)
+  const { sendToAll: broadcastObsHighlight } = useSignal<ObsFrameHighlightSignal>(
+    'obs-frame-highlight',
     resourceId,
     resourceMetadata
   )
@@ -174,24 +216,25 @@ export function WordsLinksViewer({
       const language = parts.length === 3 ? parts[1] : parts[1].split('_')[0]
       
       const ready = await checkDependenciesReady(
-        'words-links',
+        loaderTypeId,
         language,
         owner,
         resourceTypeRegistry,
         catalogManager,
-        false // quiet mode (no debug logs for UI)
+        false
       )
       
       setDependenciesReady(ready)
     }
     
     checkDeps()
-  }, [resourceKey, resourceTypeRegistry, catalogManager, catalogTrigger])
+  }, [resourceKey, loaderTypeId, resourceTypeRegistry, catalogManager, catalogTrigger])
   
   // Clear filters when reference changes
   useEffect(() => {
     setTokenFilter(null)
     setVerseFilter(null)
+    setObsQuoteFilter(null)
     setSelectedLink(null)
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
   
@@ -252,11 +295,13 @@ export function WordsLinksViewer({
   // Filter links by current reference (supports cross-chapter ranges)
   const filteredByReference = useMemo(() => {
     if (!processedLinks.length) return []
-    
+
     const startChapter = currentRef.chapter || 1
     const endChapter = currentRef.endChapter || startChapter
     const startVerse = currentRef.verse || 1
-    const endVerse = currentRef.endVerse || startVerse
+    // In OBS story mode show all frames of the story; otherwise restrict to the current range.
+    const isObsStoryMode = navigationMode === 'chapter' && currentRef.book === 'obs'
+    const endVerse = isObsStoryMode ? Number.POSITIVE_INFINITY : (currentRef.endVerse || startVerse)
     
     return processedLinks.filter((link) => {
       const refParts = link.reference.split(':')
@@ -288,7 +333,7 @@ export function WordsLinksViewer({
       // Link is in intermediate chapter - include all verses
       return true
     })
-  }, [processedLinks, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
+  }, [processedLinks, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse, currentRef.book, navigationMode])
 
   /** Semantic ID groups for passive scripture underlining (all TWL links in current passage range). */
   const underlineTokenGroups = useMemo(() => {
@@ -347,8 +392,19 @@ export function WordsLinksViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- messaging ref is stable
   }, [resourceId])
   
-  // Apply verse filter or token filter if active
+  // Apply verse filter, token filter, or OBS quote filter if active
   const { displayLinks, hasMatches } = useMemo(() => {
+    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching entry
+    if (loaderTypeId === RESOURCE_TYPE_IDS.OBS_WORDS_LINKS && obsQuoteFilter) {
+      const match = filteredByReference.find(
+        (l) =>
+          (obsQuoteFilter.rowId && l.id === obsQuoteFilter.rowId) ||
+          (l.origWords?.trim().toLowerCase() === obsQuoteFilter.quote.trim().toLowerCase() &&
+            Number.parseInt(String(l.occurrence ?? '1'), 10) === obsQuoteFilter.occurrence)
+      )
+      return { displayLinks: match ? [match] : filteredByReference, hasMatches: !!match }
+    }
+
     // Verse filter: narrow by reference (chapter/verse click)
     if (verseFilter) {
       const filtered = filteredByReference.filter((link) => {
@@ -412,7 +468,7 @@ export function WordsLinksViewer({
       displayLinks: hasMatches ? filtered : filteredByReference,
       hasMatches,
     }
-  }, [filteredByReference, tokenFilter, verseFilter, currentRef.book])
+  }, [filteredByReference, tokenFilter, verseFilter, obsQuoteFilter, loaderTypeId, currentRef.book])
   
   // Load TW titles for visible links
   useEffect(() => {
@@ -457,9 +513,10 @@ export function WordsLinksViewer({
     const parts = resourceKey.split('/')
     if (parts.length < 2) return
     
-    const [owner, langResource] = parts
-    const language = langResource.split('_')[0]
-    const twResourceKey = `${owner}/${language}/tw`
+    const language = (parts[1] ?? '').split('_')[0]
+    // Prefer the workspace-resolved TW key so OBS-TWL (owned by a GL org like es-419_gl)
+    // opens the correct unfoldingWord/en/tw resource instead of es-419_gl/en/tw.
+    const twResourceKey = twResourceKeyFromStore ?? `${parts[0]}/${language}/tw`
     const entryId = `bible/${twInfo.category}/${twInfo.term}`
     
     // Open TW article in modal
@@ -476,41 +533,50 @@ export function WordsLinksViewer({
         text: twInfo.term,
       },
     })
-  }, [resourceKey, onEntryLinkClick, sendEntryLinkClick])
+  }, [resourceKey, twResourceKeyFromStore, onEntryLinkClick, sendEntryLinkClick])
   
-  // Handle clicking on quote text (broadcasts tokens for highlighting only)
+  // Handle clicking on quote text
   const handleQuoteClick = useCallback((link: typeof displayLinks[0]) => {
     setSelectedLink(link.id)
-    
-    // Send token-click signals for original language quote tokens
-    // This will highlight aligned tokens in target language scripture panels
+
+    // OBS mode: highlight frame text in the OBS viewer
+    if (loaderTypeId === RESOURCE_TYPE_IDS.OBS_WORDS_LINKS) {
+      const quote = link.origWords?.trim()
+      if (!quote) return
+      const refParts = link.reference.split(':')
+      const chapter = parseInt(refParts[0] || '1', 10)
+      const verse = parseInt(refParts[1] || '1', 10)
+      const occRaw = Number.parseInt(String(link.occurrence ?? '1'), 10)
+      broadcastObsHighlight({
+        lifecycle: 'event',
+        highlight: {
+          storyNumber: chapter,
+          frameNumber: verse,
+          quote,
+          occurrence: Number.isFinite(occRaw) ? occRaw : 1,
+          rowId: link.id,
+        },
+      })
+      return
+    }
+
+    // Scripture mode: send token-click signals for each original language quote token
     if (link.quoteTokens && link.quoteTokens.length > 0) {
       const refParts = link.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
       const verse = parseInt(refParts[1] || '1', 10)
       const bookCode = currentRef.book?.toLowerCase() || ''
       const baseOccurrence = parseInt(link.occurrence || '1', 10)
-      
-      // Generate semantic IDs with correct occurrence number
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        link.quoteTokens,
-        bookCode,
-        chapter,
-        verse,
-        baseOccurrence
-      )
-      
-      // Send a token-click signal for each quote token
+      const semanticIds = generateSemanticIdsForQuoteTokens(link.quoteTokens, bookCode, chapter, verse, baseOccurrence)
       link.quoteTokens.forEach((token, index) => {
         const semanticId = semanticIds[index]
         if (!semanticId) return
-        
         sendTokenClick({
           lifecycle: 'event',
           token: {
             id: String(token.id),
             content: token.text,
-            semanticId: semanticId,
+            semanticId,
             verseRef: `${bookCode} ${chapter}:${verse}`,
             position: index,
             strong: token.strong,
@@ -521,11 +587,120 @@ export function WordsLinksViewer({
         })
       })
     }
-  }, [currentRef.book, sendTokenClick])
+  }, [loaderTypeId, currentRef.book, broadcastObsHighlight, sendTokenClick])
   
+  // OBS: handle incoming obs-frame-highlight (OBS viewer clicked a quoted span → filter + select row)
+  useSignalHandler<ObsFrameHighlightSignal>(
+    'obs-frame-highlight',
+    resourceId,
+    useCallback(
+      (signal) => {
+        if (signal.sourceResourceId === resourceId) return
+        if (loaderTypeId !== RESOURCE_TYPE_IDS.OBS_WORDS_LINKS) return
+        if (signal.highlight === null) {
+          setObsQuoteFilter(null)
+          setSelectedLink(null)
+          return
+        }
+        const h = signal.highlight
+        if (currentRef.book !== 'obs' || h.storyNumber !== currentRef.chapter) return
+        const isObsStoryMode = navigationMode === 'chapter'
+        if (!isObsStoryMode && h.frameNumber !== currentRef.verse) return
+        // TN click → this viewer has no relevant entry; clear any existing filter
+        if (h.kind === 'tn') {
+          setObsQuoteFilter(null)
+          setSelectedLink(null)
+          return
+        }
+        // Set the filter — displayLinks will narrow to just this entry
+        setObsQuoteFilter({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId })
+        // Also mark the entry as selected so the card renders in its selected style
+        if (h.rowId && filteredByReference.some((l) => l.id === h.rowId)) {
+          setSelectedLink(h.rowId)
+          return
+        }
+        const nq = h.quote.trim().toLowerCase()
+        for (const link of filteredByReference) {
+          if ((link.origWords || '').trim().toLowerCase() !== nq) continue
+          const occ = Number.parseInt(String(link.occurrence ?? '1'), 10)
+          if (occ === h.occurrence) { setSelectedLink(link.id); return }
+        }
+      },
+      [resourceId, loaderTypeId, currentRef.book, currentRef.chapter, currentRef.verse, navigationMode, filteredByReference]
+    ),
+    { debug: false, resourceMetadata }
+  )
+
+  // OBS: broadcast obs-frame-quotes so the OBS viewer can underline matching frame text
+  const obsFrameQuotesApi = useResourceAPI<ObsFrameQuotesSignal>(resourceId)
+  const lastObsQuotesKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    lastObsQuotesKeyRef.current = null
+  }, [currentRef.book, currentRef.chapter, currentRef.verse])
+
+  useEffect(() => {
+    if (loaderTypeId !== RESOURCE_TYPE_IDS.OBS_WORDS_LINKS) return
+    const storyNumber = currentRef.book === 'obs' ? currentRef.chapter : 0
+    const frameNumber = currentRef.book === 'obs' ? currentRef.verse : 0
+    const refStr = `${storyNumber}:${frameNumber}`
+
+    const frameQuoteMap: Record<number, ObsFrameQuoteEntry[]> = {}
+    const quotes: ObsFrameQuoteEntry[] = []
+    if (currentRef.book === 'obs') {
+      // Use unfiltered links so underlines persist even when obsQuoteFilter is active.
+      for (const l of filteredByReference) {
+        if (!l.origWords?.trim()) continue
+        const [chStr, frStr] = l.reference.split(':')
+        if (parseInt(chStr) !== storyNumber) continue
+        const fr = parseInt(frStr)
+        const entry: ObsFrameQuoteEntry = {
+          sourceId: l.id,
+          kind: 'twl',
+          quote: l.origWords!.trim(),
+          occurrence: Number.isFinite(Number.parseInt(String(l.occurrence ?? '1'), 10))
+            ? Number.parseInt(String(l.occurrence ?? '1'), 10)
+            : 1,
+        }
+        if (!frameQuoteMap[fr]) frameQuoteMap[fr] = []
+        frameQuoteMap[fr].push(entry)
+        if (fr === frameNumber) quotes.push(entry)
+      }
+    }
+
+    const key = `${refStr}:${quotes.map((q) => `${q.sourceId}:${q.quote}:${q.occurrence}`).join('|')}`
+    if (key === lastObsQuotesKeyRef.current) return
+    lastObsQuotesKeyRef.current = key
+    obsFrameQuotesApi.messaging.sendToAll({
+      type: 'obs-frame-quotes',
+      lifecycle: 'state',
+      stateKey: 'current-obs-frame-quotes',
+      sourceResourceId: resourceId,
+      storyNumber,
+      frameNumber,
+      quotes,
+      frameQuoteMap,
+      timestamp: Date.now(),
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaderTypeId, resourceId, currentRef.book, currentRef.chapter, currentRef.verse, filteredByReference])
+
   return (
     <div className="h-full flex flex-col">
-      {tokenFilter && (
+      {obsQuoteFilter && (
+        <TokenFilterBanner
+          tokenFilter={{
+            semanticId: '',
+            content: obsQuoteFilter.quote,
+            alignedSemanticIds: [],
+            timestamp: 0,
+          }}
+          displayLinksCount={displayLinks.length}
+          hasMatches={hasMatches}
+          onClearFilter={() => { setObsQuoteFilter(null); setSelectedLink(null) }}
+        />
+      )}
+      {!obsQuoteFilter && tokenFilter && (
         <TokenFilterBanner
           tokenFilter={tokenFilter}
           displayLinksCount={displayLinks.length}
@@ -533,7 +708,7 @@ export function WordsLinksViewer({
           onClearFilter={() => setTokenFilter(null)}
         />
       )}
-      {verseFilter && (
+      {!obsQuoteFilter && verseFilter && (
         <TokenFilterBanner
           tokenFilter={{
             semanticId: '',
@@ -659,6 +834,7 @@ export function WordsLinksViewer({
                             tokenFilter={tokenFilter}
                             targetResourceId={targetSourceId}
                             languageDirection={languageDirection}
+                            obsMode={loaderTypeId === RESOURCE_TYPE_IDS.OBS_WORDS_LINKS}
                           />
                         )
                       })}

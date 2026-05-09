@@ -3,20 +3,27 @@
  * Results are cached by resourceKey+book so switching tabs doesn't re-fetch.
  */
 
-import type { TranslationNote } from '@bt-synergy/resource-parsers'
+import type { ProcessedNotes, TranslationNote } from '@bt-synergy/resource-parsers'
 import { useEffect, useState } from 'react'
 import { useLoaderRegistry } from '../../../../contexts/CatalogContext'
 
 const CACHE_MAX = 50
 const notesCache = new Map<string, { notes: TranslationNote[]; error: string | null }>()
 
-function cacheKey(resourceKey: string, bookCode: string) {
-  return `notes:${resourceKey}:${bookCode}`
+function cacheKey(resourceKey: string, bookCode: string, loaderTypeId: string) {
+  return `notes:${loaderTypeId}:${resourceKey}:${bookCode}`
 }
 
-export function useTranslationNotesContent(resourceKey: string, bookCode: string) {
+export function useTranslationNotesContent(
+  resourceKey: string,
+  bookCode: string,
+  loaderTypeId: string = 'notes'
+) {
   const loaderRegistry = useLoaderRegistry()
-  const cached = resourceKey && bookCode ? notesCache.get(cacheKey(resourceKey, bookCode)) : undefined
+  const cached =
+    resourceKey && bookCode
+      ? notesCache.get(cacheKey(resourceKey, bookCode, loaderTypeId))
+      : undefined
   const [notes, setNotes] = useState<TranslationNote[]>(cached?.notes ?? [])
   const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(cached?.error ?? null)
@@ -29,7 +36,7 @@ export function useTranslationNotesContent(resourceKey: string, bookCode: string
       return
     }
 
-    const key = cacheKey(resourceKey, bookCode)
+    const key = cacheKey(resourceKey, bookCode, loaderTypeId)
     const hit = notesCache.get(key)
     if (hit !== undefined) {
       setNotes(hit.notes)
@@ -45,12 +52,12 @@ export function useTranslationNotesContent(resourceKey: string, bookCode: string
       setError(null)
 
       try {
-        const loader = loaderRegistry.getLoader('notes')
+        const loader = loaderRegistry.getLoader(loaderTypeId)
         if (!loader) {
           throw new Error('Translation Notes loader not found')
         }
 
-        const processedNotes = await loader.loadContent(resourceKey, bookCode)
+        const processedNotes = (await loader.loadContent(resourceKey, bookCode)) as ProcessedNotes | null
 
         if (cancelled) return
 
@@ -86,7 +93,7 @@ export function useTranslationNotesContent(resourceKey: string, bookCode: string
 
     loadNotes()
     return () => { cancelled = true }
-  }, [resourceKey, bookCode, loaderRegistry])
+  }, [resourceKey, bookCode, loaderTypeId, loaderRegistry])
 
   return { notes, loading, error }
 }

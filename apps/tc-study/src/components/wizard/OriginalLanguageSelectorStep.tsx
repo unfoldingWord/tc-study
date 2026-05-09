@@ -6,12 +6,67 @@
  */
 
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import {
+  LocationType,
+  ResourceFormat,
+  ResourceType,
+  type ResourceMetadata,
+} from '@bt-synergy/resource-catalog'
 import { Book, Check, Database, Info, Loader2, Package, Wifi } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCatalog } from '../../contexts/CatalogContext'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { ResourceInfoModal } from '../studio/ResourceInfoModal'
+import type { ResourceInfo } from '../../contexts/types'
+
+function door43LanguageResourceToMetadata(
+  resource: {
+    owner: string
+    language: string
+    id: string
+    title?: string
+    name?: string
+    subject?: string
+    ingredients?: unknown
+    metadata_version?: string
+    version?: string
+  },
+  subjectFallback: string
+): ResourceMetadata {
+  const resourceKey = `${resource.owner}/${resource.language}/${resource.id}`
+  const ingredientsArr = Array.isArray(resource.ingredients) ? resource.ingredients : undefined
+  return {
+    resourceKey,
+    resourceId: resource.id,
+    server: 'git.door43.org',
+    owner: resource.owner,
+    language: resource.language,
+    title: resource.title || resource.name || resource.id,
+    subject: resource.subject || subjectFallback,
+    version: resource.metadata_version || resource.version || '1.0.0',
+    type: ResourceType.SCRIPTURE,
+    format: ResourceFormat.USFM,
+    contentType: 'text/usfm',
+    contentStructure: 'book',
+    availability: {
+      online: true,
+      offline: false,
+      bundled: false,
+      partial: false,
+    },
+    locations: [
+      {
+        type: LocationType.NETWORK,
+        path: `https://git.door43.org/${resource.owner}/${resource.language}_${resource.id}`,
+        priority: 1,
+      },
+    ],
+    catalogedAt: new Date().toISOString(),
+    contentMetadata: ingredientsArr
+      ? { ingredients: ingredientsArr as NonNullable<ResourceMetadata['contentMetadata']>['ingredients'] }
+      : undefined,
+  }
+}
 
 interface OriginalLanguageResource extends ResourceMetadata {
   isCached: boolean
@@ -79,20 +134,7 @@ export function OriginalLanguageSelectorStep() {
           .filter(resource => resource.language === 'el-x-koine') // Only keep Greek language resources
           .map(async (resource) => {
             const resourceKey = `${resource.owner}/${resource.language}/${resource.id}`
-            const metadata: ResourceMetadata = {
-              resourceKey,
-              resourceId: resource.id,
-              server: 'git.door43.org',
-              owner: resource.owner,
-              language: resource.language,
-              title: resource.title || resource.name,
-              subject: resource.subject || 'Greek New Testament',
-              type: 'scripture',
-              format: 'usfm',
-              location: 'network',
-              ingredients: resource.ingredients, // ⭐ Preserve ingredients!
-              version: resource.metadata_version || resource.version || '1.0.0',
-            }
+            const metadata = door43LanguageResourceToMetadata(resource, 'Greek New Testament')
             
             const viewer = viewerRegistry.getViewer(metadata)
             const isCached = await catalogManager.isResourceCached(resourceKey)
@@ -134,20 +176,7 @@ export function OriginalLanguageSelectorStep() {
           .filter(resource => resource.language === 'hbo') // Only keep Hebrew language resources
           .map(async (resource) => {
             const resourceKey = `${resource.owner}/${resource.language}/${resource.id}`
-            const metadata: ResourceMetadata = {
-              resourceKey,
-              resourceId: resource.id,
-              server: 'git.door43.org',
-              owner: resource.owner,
-              language: resource.language,
-              title: resource.title || resource.name,
-              subject: resource.subject || 'Hebrew Old Testament',
-              type: 'scripture',
-              format: 'usfm',
-              location: 'network',
-              ingredients: resource.ingredients, // ⭐ Preserve ingredients!
-              version: resource.metadata_version || resource.version || '1.0.0',
-            }
+            const metadata = door43LanguageResourceToMetadata(resource, 'Hebrew Old Testament')
             
             const viewer = viewerRegistry.getViewer(metadata)
             const isCached = await catalogManager.isResourceCached(resourceKey)
@@ -197,26 +226,15 @@ export function OriginalLanguageSelectorStep() {
             const reason = resource.isInWorkspace ? 'in collection' : resource.isCached ? 'cached' : 'recommended'
             console.log(`   ✅ Auto-selecting (${reason}): ${resource.title} (${resource.resourceId})`)
             toggleResource(resource.resourceKey, {
+              ...resource,
               id: resource.resourceId,
               key: resource.resourceKey,
-              title: resource.title,
-              type: 'scripture',
-              category: resource.subject,
-              language: resource.language,
-              languageCode: resource.language,
-              languageName: (resource as any).language_title,
-              owner: resource.owner,
-              server: resource.server,
-              subject: resource.subject,
-              format: resource.format,
-              location: resource.location,
-              resourceId: resource.resourceId,
-              ingredients: (resource as any).ingredients,
-              version: (resource as any).version || '1.0.0',
-              description: (resource as any).description,
-              readme: (resource as any).readme,
-              license: (resource as any).license,
-            })
+              category: resource.subject ?? 'scripture',
+              location:
+                typeof resource.locations?.[0]?.type === 'string'
+                  ? resource.locations![0].type
+                  : String(resource.locations?.[0]?.type ?? LocationType.NETWORK),
+            } as ResourceInfo)
             autoSelectedCount++
           }
         })
@@ -247,7 +265,7 @@ export function OriginalLanguageSelectorStep() {
         metadataUrl = `https://git.door43.org/${resource.owner}/${repoName}/raw/branch/master/manifest.yaml`
       }
       
-      let enrichedData = { readme: undefined, license: undefined }
+      let enrichedData: { readme?: string; license?: string; licenseFile?: string } = {}
       if (metadataUrl) {
         const tempResource = { ...resource, metadata_url: metadataUrl }
         enrichedData = await door43Client.enrichResourceMetadata(tempResource)
@@ -307,26 +325,15 @@ export function OriginalLanguageSelectorStep() {
                   onClick={() => {
                     if (isLocked) return // Don't allow deselecting workspace resources
                     toggleResource(resource.resourceKey, {
+                      ...resource,
                       id: resource.resourceId,
                       key: resource.resourceKey,
-                      title: resource.title,
-                      type: 'scripture',
-                      category: resource.subject,
-                      language: resource.language,
-                      languageCode: resource.language,
-                      languageName: (resource as any).language_title,
-                      owner: resource.owner,
-                      server: resource.server,
-                      subject: resource.subject,
-                      format: resource.format,
-                      location: resource.location,
-                      resourceId: resource.resourceId,
-                      ingredients: (resource as any).ingredients,
-                      version: (resource as any).version || '1.0.0',
-                      description: (resource as any).description,
-                      readme: (resource as any).readme,
-                      license: (resource as any).license,
-                    })
+                      category: resource.subject ?? 'scripture',
+                      location:
+                        typeof resource.locations?.[0]?.type === 'string'
+                          ? resource.locations![0].type
+                          : String(resource.locations?.[0]?.type ?? LocationType.NETWORK),
+                    } as ResourceInfo)
                   }}
                   disabled={isLocked}
                   className={`
@@ -364,11 +371,17 @@ export function OriginalLanguageSelectorStep() {
                   
                   {/* Status icon - bottom left (priority: In Collection > Cached > Online) */}
                   {isInWorkspace ? (
-                    <Package className="absolute bottom-1.5 left-1.5 w-3.5 h-3.5 text-purple-600" title="Already in collection" />
+                    <span title="Already in collection" aria-label="Already in collection" className="absolute bottom-1.5 left-1.5 inline-flex">
+                      <Package className="w-3.5 h-3.5 text-purple-600" />
+                    </span>
                   ) : isCached ? (
-                    <Database className="absolute bottom-1.5 left-1.5 w-3.5 h-3.5 text-green-600" title="Cached offline" />
+                    <span title="Cached offline" aria-label="Cached offline" className="absolute bottom-1.5 left-1.5 inline-flex">
+                      <Database className="w-3.5 h-3.5 text-green-600" />
+                    </span>
                   ) : (
-                    <Wifi className="absolute bottom-1.5 left-1.5 w-3.5 h-3.5 text-blue-500" title="Available online" />
+                    <span title="Available online" aria-label="Available online" className="absolute bottom-1.5 left-1.5 inline-flex">
+                      <Wifi className="w-3.5 h-3.5 text-blue-500" />
+                    </span>
                   )}
                   
                   {/* Subject icon - bottom right */}
@@ -403,21 +416,15 @@ export function OriginalLanguageSelectorStep() {
                     onClick={() => {
                       if (isLocked) return // Don't allow deselecting workspace resources
                       toggleResource(resource.resourceKey, {
+                        ...resource,
                         id: resource.resourceId,
                         key: resource.resourceKey,
-                        title: resource.title,
-                        type: 'scripture',
-                        category: resource.subject,
-                        language: resource.language,
-                        owner: resource.owner,
-                        server: resource.server,
-                        subject: resource.subject,
-                        format: resource.format,
-                        location: resource.location,
-                        resourceId: resource.resourceId,
-                        ingredients: (resource as any).ingredients,
-                        version: (resource as any).version || '1.0.0',
-                      })
+                        category: resource.subject ?? 'scripture',
+                        location:
+                          typeof resource.locations?.[0]?.type === 'string'
+                            ? resource.locations![0].type
+                            : String(resource.locations?.[0]?.type ?? LocationType.NETWORK),
+                      } as ResourceInfo)
                     }}
                     disabled={isLocked}
                     className={`
@@ -455,11 +462,17 @@ export function OriginalLanguageSelectorStep() {
                     
                     {/* Status icon - bottom left (priority: In Collection > Cached > Online) */}
                     {isInWorkspace ? (
-                      <Package className="absolute bottom-1.5 left-1.5 w-3.5 h-3.5 text-purple-600" title="Already in collection" />
+                      <span title="Already in collection" aria-label="Already in collection" className="absolute bottom-1.5 left-1.5 inline-flex">
+                        <Package className="w-3.5 h-3.5 text-purple-600" />
+                      </span>
                     ) : isCached ? (
-                      <Database className="absolute bottom-1.5 left-1.5 w-3.5 h-3.5 text-green-600" title="Cached offline" />
+                      <span title="Cached offline" aria-label="Cached offline" className="absolute bottom-1.5 left-1.5 inline-flex">
+                        <Database className="w-3.5 h-3.5 text-green-600" />
+                      </span>
                     ) : (
-                      <Wifi className="absolute bottom-1.5 left-1.5 w-3.5 h-3.5 text-blue-500" title="Available online" />
+                      <span title="Available online" aria-label="Available online" className="absolute bottom-1.5 left-1.5 inline-flex">
+                        <Wifi className="w-3.5 h-3.5 text-blue-500" />
+                      </span>
                     )}
                     
                     {/* Subject icon - bottom right */}

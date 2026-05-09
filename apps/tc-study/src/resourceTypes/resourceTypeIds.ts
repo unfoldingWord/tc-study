@@ -35,6 +35,15 @@ export const RESOURCE_TYPE_IDS = {
   
   /** Open Bible Stories */
   OBS: 'obs',
+
+  /** OBS Translation Notes */
+  OBS_NOTES: 'obs-notes',
+
+  /** OBS Translation Words Links */
+  OBS_WORDS_LINKS: 'obs-words-links',
+
+  /** OBS Translation Questions */
+  OBS_QUESTIONS: 'obs-questions',
 } as const
 
 // Type-safe union of all valid resource type IDs
@@ -60,6 +69,9 @@ export function getResourceTypeDisplayName(id: ResourceTypeId): string {
     [RESOURCE_TYPE_IDS.TRANSLATION_QUESTIONS]: 'Translation Questions',
     [RESOURCE_TYPE_IDS.TRANSLATION_ACADEMY]: 'Translation Academy',
     [RESOURCE_TYPE_IDS.OBS]: 'Open Bible Stories',
+    [RESOURCE_TYPE_IDS.OBS_NOTES]: 'OBS Translation Notes',
+    [RESOURCE_TYPE_IDS.OBS_WORDS_LINKS]: 'OBS Translation Words Links',
+    [RESOURCE_TYPE_IDS.OBS_QUESTIONS]: 'OBS Translation Questions',
   }
   
   return displayNames[id] || id

@@ -10,5 +10,9 @@
 // Studio signals for production use
 export * from './studioSignals'
 
-// Test signals for development/testing
-export * from './testSignals'
+// Test-only signals (imports should use `./testSignals` for `TokenClickSignal` — name overlaps studio)
+export type {
+  LinkClickSignal,
+  NavigationRequestSignal,
+  TestSignal,
+} from './testSignals'

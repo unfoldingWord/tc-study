@@ -9,8 +9,16 @@
  */
 
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import type { ResourceMetadata, ResourceIngredient } from '@bt-synergy/resource-catalog'
 import { LocationType, ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
+
+/**
+ * Produce catalog ingredients during metadata creation when Door43 lacks full ingredient list.
+ */
+export type IngredientsGenerator = (
+  door43Resource: Door43Resource,
+  door43Client: any
+) => Promise<ResourceIngredient[]>
 
 /**
  * Door43 resource from catalog search

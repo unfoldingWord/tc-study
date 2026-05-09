@@ -16,9 +16,6 @@ import {
   Save,
   X,
 } from 'lucide-react'
-// import { createPassageSetBuilder } from '@bt-synergy/passage-sets'
-// TODO: Re-enable when passage-sets package is properly set up
-const createPassageSetBuilder = () => ({ build: () => ({}) })
 import type {
   PassageSet,
   PassageSetNode,
@@ -94,7 +91,7 @@ export function HierarchicalPassageSetCreator({
       return nodes.map(node => {
         if (node.id === parentId && node.type === 'group') {
           const group = node as PassageGroup
-          const newChild: PassageSetNode = type === 'group'
+          const newChild: PassageGroup | PassageLeaf = type === 'group'
             ? {
                 id: `group-${Date.now()}`,
                 type: 'group',
@@ -354,20 +351,6 @@ export function HierarchicalPassageSetCreator({
       return
     }
 
-    const builder = createPassageSetBuilder()
-    builder.setName(name.trim())
-    
-    if (description.trim()) {
-      builder.setDescription(description.trim())
-    }
-
-    builder.setMetadata({
-      category,
-      tags,
-    })
-
-    // For now, we'll use the direct PassageSet structure
-    // TODO: Properly use the builder pattern
     const passageSet: PassageSet = {
       id: initialSet?.id || `ps-${Date.now()}`,
       name: name.trim(),

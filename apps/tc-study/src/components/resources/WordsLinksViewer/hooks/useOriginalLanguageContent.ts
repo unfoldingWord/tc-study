@@ -49,6 +49,13 @@ export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageC
       console.log('❌ [useOriginalLanguageContent] Early return - missing dependencies')
       return
     }
+
+    // OBS is not a biblical book — it has no Hebrew/Greek original language
+    if (currentRef.book.toLowerCase() === 'obs') {
+      setLoading(false)
+      setOriginalContent(null)
+      return
+    }
     
     let cancelled = false
     

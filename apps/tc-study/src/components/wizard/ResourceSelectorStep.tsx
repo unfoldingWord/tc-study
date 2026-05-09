@@ -18,6 +18,7 @@ import { checkAllDependencies, type DependencySearchResult } from '../../utils/c
 import { excludeOriginalLanguageSubjects, getSubjectIcon, isOriginalLanguageResource } from '../../utils/resourceHelpers'
 import { SelectableGrid } from '../shared/SelectableGrid'
 import { ResourceInfoModal } from '../studio/ResourceInfoModal'
+import type { ResourceInfo } from '../../contexts/types'
 
 interface ResourceWithStatus extends ResourceMetadata {
   isCached: boolean
@@ -550,7 +551,7 @@ export function ResourceSelectorStep() {
       console.log(`   Auto-included count: ${Array.from(resourceInfoMap.values()).filter((r: any) => r.isAutoIncluded).length}`)
       console.log(`   Auto-included resources:`, Array.from(resourceInfoMap.entries()).filter(([_, r]: any) => r.isAutoIncluded).map(([k]) => k))
       
-      setAvailableResources(resourceInfoMap)
+      setAvailableResources(resourceInfoMap as unknown as Map<string, ResourceInfo>)
       
       // Auto-select resources that are already in the workspace
       const resourcesInWorkspace = Array.from(supportedResources.entries())

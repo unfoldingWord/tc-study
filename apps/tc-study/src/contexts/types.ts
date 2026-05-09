@@ -27,6 +27,11 @@ export interface BookInfo {
 export type NavigationMode = 'verse' | 'chapter' | 'section' | 'passage-set'
 
 /**
+ * Bible vs Open Bible Stories navigation (book navigator tab)
+ */
+export type NavigationCatalogScope = 'scripture' | 'obs'
+
+/**
  * Reference state (book/chapter/verse) for display
  */
 export interface ReferenceState {
@@ -80,4 +85,11 @@ export interface ResourceInfo extends ResourceMetadata {
   metadata?: ResourceMetadata // Full metadata reference (for nested access)
   location?: string           // Simplified location info
   readme?: string             // README content
+
+  /** Reading scope this resource belongs to; `shared` shows in Bible and OBS scopes. */
+  appliesToScope?: NavigationCatalogScope | 'shared'
+
+  /** Synthetic combined TN+TWL row only — which TN/TWL resource keys backs this viewer. */
+  helpsTnResourceKey?: string
+  helpsTwlResourceKey?: string
 }

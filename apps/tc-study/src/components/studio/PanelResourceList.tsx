@@ -101,11 +101,11 @@ export function PanelResourceList({
               className="w-full"
             >
               <DraggableResourceItem
-                resourceId={resource.id}
+                id={resource.id}
                 title={resource.title}
                 isActive={index === activeIndex}
                 onRemove={() => onRemove(resource.id)}
-                onDragStart={setDraggingResourceId}
+                onDragStart={() => setDraggingResourceId(resource.id)}
                 onDragEnd={() => setDraggingResourceId(null)}
               />
             </button>

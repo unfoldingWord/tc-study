@@ -42,7 +42,6 @@
 
 import { useResourcePanel, useSignal, useSignalHandler, type BaseSignal, type ResourceMetadata } from '@bt-synergy/resource-panels'
 import React, { ComponentType, useCallback } from 'react'
-import type { StudioSignal } from '../signals/studioSignals'
 
 export interface PanelCommunicationConfig<TProps = any> {
   /**
@@ -220,7 +219,7 @@ export function withPanelCommunication<TProps extends Record<string, any>>(
     if (config.receives) {
       Object.entries(config.receives).forEach(([signalType, handler]) => {
         // eslint-disable-next-line react-hooks/rules-of-hooks
-        useSignalHandler<StudioSignal>(
+        useSignalHandler(
           signalType as any,
           resourceId,
           useCallback((signal: any) => {

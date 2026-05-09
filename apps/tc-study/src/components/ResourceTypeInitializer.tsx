@@ -19,20 +19,28 @@ export function ResourceTypeInitializer() {
         // Dynamic import to avoid circular dependencies
         const {
           scriptureResourceType,
+          obsResourceType,
           translationWordsResourceType,
           translationWordsLinksResourceType,
           translationAcademyResourceType,
           translationNotesResourceType,
-          translationQuestionsResourceType
+          translationQuestionsResourceType,
+          obsTranslationNotesResourceType,
+          obsTranslationWordsLinksResourceType,
+          obsTranslationQuestionsResourceType,
         } = await import('../resourceTypes')
         
         const registerIfNew = (def: { id: string }) => {
           if (!registry.has(def.id)) registry.register(def as any)
         }
         registerIfNew(scriptureResourceType)
+        registerIfNew(obsResourceType)
         registerIfNew(translationWordsLinksResourceType)
         registerIfNew(translationNotesResourceType)
         registerIfNew(translationQuestionsResourceType)
+        registerIfNew(obsTranslationNotesResourceType)
+        registerIfNew(obsTranslationWordsLinksResourceType)
+        registerIfNew(obsTranslationQuestionsResourceType)
         
         // TESTING: Register TW and TA without viewers (modal-only resources)
         // We create modified versions that only have the loader, no viewer

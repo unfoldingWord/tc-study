@@ -299,7 +299,14 @@ export function getRequiredDependencyResources(
     
     // Check if a matching dependency is already in workspace
     const hasInWorkspace = Array.from(workspaceResources.values()).some(
-      resource => resourceMatchesDependency(resource, normalizedDep, resourceLanguage, resourceOwner)
+      (resource) =>
+        resourceMatchesDependency(
+          resource,
+          normalizedDep,
+          resourceLanguage,
+          resourceOwner,
+          resourceTypeRegistry
+        )
     )
     
     if (hasInWorkspace) {

@@ -30,7 +30,7 @@ import {
 import { CheckCircle2, Loader2, Package, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useCacheAdapter, useCatalogManager, useCompletenessChecker, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
+import { useCacheAdapter, useCatalogManager, useCompletenessChecker, useNavigationScope, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useBackgroundDownload, useCatalogBackgroundDownload, useResourceManagement, useStudioResources, useSwipeGesture } from '../../hooks'
@@ -41,17 +41,19 @@ import {
     entryLinkClickPlugin,
     linkClickPlugin,
     notesTokenGroupsPlugin,
+    obsFrameHighlightPlugin,
+    obsFrameQuotesPlugin,
     scriptureContentRequestPlugin,
     scriptureContentResponsePlugin,
     scriptureTokensBroadcastPlugin,
     tokenClickPlugin,
-    verseFilterPlugin
+    verseFilterPlugin,
 } from '../../plugins/messageTypePlugins'
 import { useStudyStore } from '../../store/studyStore'
 import type { ExportWorkerMessage, ExportWorkerResponse } from '../../workers/collectionExport.worker'
 import { CollectionImportDialog } from '../collections/CollectionImportDialog'
 import { EntryResourceModal } from '../common/EntryResourceModal'
-import { CombinedHelpsViewer, COMBINED_HELPS_RESOURCE_ID, FallbackViewer } from '../resources'
+import { COMBINED_HELPS_IDS, CombinedHelpsViewer, COMBINED_HELPS_RESOURCE_ID, FallbackViewer, OBS_COMBINED_HELPS_RESOURCE_ID } from '../resources'
 import { DroppablePanel } from '../studio/DroppablePanel'
 import { EmptyPanelState } from '../studio/EmptyPanelState'
 import { GlobalSignalBridge } from '../studio/GlobalSignalBridge'
@@ -69,13 +71,24 @@ function primaryLangSegment(code: string): string {
     .toLowerCase()
 }
 
-/** Resolve TN/TWL catalog keys from the app store right after Phase 1 load (for combined Helps viewer). */
-function findTnTwlKeysForLanguage(langCode: string): { tnKey?: string; twlKey?: string } {
+/**
+ * Resolve TN/TWL catalog keys from the app store right after Phase 1 load.
+ * scope='scripture' returns scripture-TN + scripture-TWL keys.
+ * scope='obs' returns OBS-TN + OBS-TWL keys.
+ */
+function findHelpsKeysForScope(
+  langCode: string,
+  scope: 'scripture' | 'obs'
+): { tnKey?: string; twlKey?: string } {
   const loaded = useAppStore.getState().loadedResources
   const want = primaryLangSegment(langCode)
   let tnKey: string | undefined
   let twlKey: string | undefined
   const list = Object.values(loaded).filter(Boolean) as ResourceInfo[]
+
+  // Type IDs expected for each scope
+  const tnTypes = scope === 'obs' ? ['obs-notes'] : ['notes', 'tn']
+  const twlTypes = scope === 'obs' ? ['obs-words-links'] : ['words-links', 'words_links', 'twl']
 
   const keyMatchesLang = (key: string) => {
     if (!want) return true
@@ -85,25 +98,60 @@ function findTnTwlKeysForLanguage(langCode: string): { tnKey?: string; twlKey?: 
 
   for (const r of list) {
     const key = r.key || r.id
-    if (!key || key === COMBINED_HELPS_RESOURCE_ID) continue
+    if (!key || COMBINED_HELPS_IDS.has(key)) continue
     const t = String(r.type).toLowerCase()
     if (!keyMatchesLang(key)) continue
-    if ((t === 'notes' || t === 'tn') && !tnKey) tnKey = key
-    if ((t === 'words-links' || t === 'words_links' || t === 'twl') && !twlKey) twlKey = key
+    if (tnTypes.includes(t) && !tnKey) tnKey = key
+    if (twlTypes.includes(t) && !twlKey) twlKey = key
   }
 
-  // Fallback when metadata language is missing/wrong: still constrain by resource key path
-  // so we never pair "Helps" with TN/TWL from another language left in loadedResources.
+  // Fallback: constrain by resource key path to avoid cross-language matches
   for (const r of list) {
     const key = r.key || r.id
-    if (!key || key === COMBINED_HELPS_RESOURCE_ID) continue
+    if (!key || COMBINED_HELPS_IDS.has(key)) continue
     if (want && !keyMatchesLang(key)) continue
     const t = String(r.type).toLowerCase()
-    if (!tnKey && (t === 'notes' || t === 'tn')) tnKey = key
-    if (!twlKey && (t === 'words-links' || t === 'words_links' || t === 'twl')) twlKey = key
+    if (!tnKey && tnTypes.includes(t)) tnKey = key
+    if (!twlKey && twlTypes.includes(t)) twlKey = key
   }
 
   return { tnKey, twlKey }
+}
+
+/** @deprecated Use findHelpsKeysForScope instead. */
+function findTnTwlKeysForLanguage(langCode: string): { tnKey?: string; twlKey?: string } {
+  return findHelpsKeysForScope(langCode, 'scripture')
+}
+
+/**
+ * Derive the reading scope for a resource key:
+ * - 'scripture': scripture resources + scripture-companion helps
+ * - 'obs': OBS resources + OBS-companion helps
+ * - null: shared resources (TW, TA) or unknown types (show in both scopes)
+ *
+ * The combined-helps IDs have fixed scopes encoded in their ID.
+ */
+function getResourceAppliesToScope(
+  resourceKey: string,
+  loadedResources: Record<string, ResourceInfo | undefined>,
+  resourceTypeRegistry: { getTypeForSubject: (s: string) => string | undefined; getScopeForType: (id: string) => string | null }
+): string | null {
+  if (resourceKey === COMBINED_HELPS_RESOURCE_ID) return 'scripture'
+  if (resourceKey === OBS_COMBINED_HELPS_RESOURCE_ID) return 'obs'
+
+  const resource = loadedResources[resourceKey]
+  if (!resource) return null
+
+  if (resource.appliesToScope === 'shared') return null
+  if (resource.appliesToScope === 'scripture' || resource.appliesToScope === 'obs') {
+    return resource.appliesToScope
+  }
+
+  const subject = resource.subject || resource.category || ''
+  const typeId = resourceTypeRegistry.getTypeForSubject(subject)
+  if (!typeId) return null
+
+  return resourceTypeRegistry.getScopeForType(typeId)
 }
 
 /**
@@ -148,16 +196,19 @@ function ResourcePanelByKey({
       resourceKey,
       resource,
     }
+    const typeStr = String(resource.type || '').toLowerCase()
     if (
-      resource.type === 'words' ||
-      resource.type === 'words-links' ||
+      typeStr === 'words' ||
+      typeStr === 'words-links' ||
       resource.category === 'words-links' ||
-      resource.type === 'twl' ||
-      resource.type === 'academy' ||
-      resource.type === 'ta' ||
-      resource.type === 'tn' ||
-      resource.type === 'notes' ||
-      resource.type === 'combined-helps'
+      typeStr === 'twl' ||
+      typeStr === 'academy' ||
+      typeStr === 'ta' ||
+      typeStr === 'tn' ||
+      typeStr === 'notes' ||
+      typeStr === 'obs-notes' ||
+      typeStr === 'obs-words-links' ||
+      typeStr === 'combined-helps'
     ) {
       viewerProps.onEntryLinkClick = onEntryLinkClick
     }
@@ -174,14 +225,20 @@ function ResourcePanelByKey({
 
 interface SimplifiedReadViewProps {
   initialLanguage?: string
+  /** True when the URL is `/read` without `:languageCode` — language modal opens and cannot be skipped. */
+  requireLanguageInUrl?: boolean
 }
 
-export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps = {}) {
+export function SimplifiedReadView({
+  initialLanguage,
+  requireLanguageInUrl = false,
+}: SimplifiedReadViewProps = {}) {
   const navigate = useNavigate()
   const catalogManager = useCatalogManager()
   const cacheAdapter = useCacheAdapter()
   const viewerRegistry = useViewerRegistry()
   const resourceTypeRegistry = useResourceTypeRegistry()
+  const navigationScope = useNavigationScope()
 
   // Experimental Read-only: combined TN + TWL viewer (synthetic resource type)
   useEffect(() => {
@@ -237,27 +294,12 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     }
   }, [metadataUpdateCounter])
   
-  // Language picker state - auto-open if no resources loaded
-  const [shouldAutoOpenLanguagePicker, setShouldAutoOpenLanguagePicker] = useState(false)
-  const [hasCheckedInitialState, setHasCheckedInitialState] = useState(false)
-  
-  // Check if we need to auto-open language picker (after initial render)
+  // Language picker: always open on `/read` until the user picks a language (navigates to `/read/:code`)
+  const [shouldAutoOpenLanguagePicker, setShouldAutoOpenLanguagePicker] = useState(requireLanguageInUrl)
+
   useEffect(() => {
-    // Don't auto-open if we have a language from URL
-    if (hasCheckedInitialState || initialLanguage) return
-    
-    const hasResources = Object.keys(loadedResources).length > 0
-    console.log('[SimplifiedReadView] Auto-open language picker check:', {
-      hasResources,
-      loadedResourcesCount: Object.keys(loadedResources).length,
-      shouldAutoOpen: !hasResources
-    })
-    
-    if (!hasResources) {
-      setShouldAutoOpenLanguagePicker(true)
-    }
-    setHasCheckedInitialState(true)
-  }, [loadedResources, hasCheckedInitialState, initialLanguage])
+    setShouldAutoOpenLanguagePicker(requireLanguageInUrl)
+  }, [requireLanguageInUrl])
   
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -489,6 +531,11 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     skipExisting: true,
     debug: true
   })
+  /** Keeps cancel-on-language-change logic without listing isDownloading in handleLanguageSelected deps (avoids reload loops). */
+  const isBackgroundDownloadingRef = useRef(isBackgroundDownloading)
+  useEffect(() => {
+    isBackgroundDownloadingRef.current = isBackgroundDownloading
+  }, [isBackgroundDownloading])
   
   // 🔄 AUTOMATIC BACKGROUND DOWNLOADS
   // Reactively checks catalog when resources load and downloads incomplete ones
@@ -511,7 +558,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     // Track current language for collection management
     setCurrentLanguageCode(languageCode)
     // 🛑 IMPORTANT: Cancel any ongoing downloads from previous language
-    if (isBackgroundDownloading) {
+    if (isBackgroundDownloadingRef.current) {
       console.log('🛑 Canceling ongoing downloads (language changed)')
       stopDownload()
     }
@@ -634,10 +681,17 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           continue
         }
         
-        // Map type string ID and format string to enums
-        const type = mapSubjectToResourceType(subject)
+        // Use registry typeId directly as the authoritative subject → type mapping.
+        // The ResourceType enum only covers base types; app-level types like
+        // 'obs-words-links' live only in the registry. Falling back to
+        // mapSubjectToResourceType would silently downgrade 'obs-words-links' → 'words-links',
+        // breaking the dependency check in WordsLinksViewer.
+        const type = typeId as ResourceType
         const format = mapContentFormat(item.content_format ?? item.format ?? 'usfm')
-        
+        const scopeForType = resourceTypeRegistry.getScopeForType(typeId)
+        const appliesToScope =
+          scopeForType === 'scripture' || scopeForType === 'obs' ? scopeForType : ('shared' as const)
+
         // Create basic ResourceInfo immediately (no metadata fetch yet)
         const basicResourceInfo: ResourceInfo = {
           id: resourceKey,
@@ -662,32 +716,39 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
           availability: { online: true, offline: false, bundled: false, partial: false },
           locations: [],
           catalogedAt: new Date().toISOString(),
+          appliesToScope,
         }
         
         // Add to workspace immediately
         addResource(basicResourceInfo)
         loadedResourceKeys.push(resourceKey)
         
-        // Only assign to panels if resource has a viewer (modal-only resources won't appear as tabs)
-        const hasViewer = viewerRegistry.hasViewer(type)
+        // Only assign to panels if resource has a viewer (modal-only resources won't appear as tabs).
+        // Use the string type ID from the registry (e.g. 'obs', 'notes') for viewer lookup —
+        // not the ResourceType enum value which returns 'unknown' for OBS.
+        const hasViewer = viewerRegistry.hasViewer(typeId)
         if (hasViewer) {
-          const isScripture = type === 'scripture'
-          const panelId = isScripture ? 'panel-1' : 'panel-2'
+          // Use contentRole to determine which panel: primaries (scripture, obs) → panel-1,
+          // companions (notes, words-links, questions, obs-notes, ...) → panel-2.
+          const typeDef = resourceTypeRegistry.get(typeId)
+          const isPrimary = typeDef?.contentRole === 'primary'
+          const panelId = isPrimary ? 'panel-1' : 'panel-2'
           const currentPanel = getPanel(panelId)
           const currentIndex = currentPanel?.resourceKeys.length || 0
           assignResourceToPanel(resourceKey, panelId, currentIndex)
           if (currentIndex === 0) {
             setActiveResourceInPanel(panelId, 0)
           }
-          console.log(`✅ Immediately added to panel: ${resourceKey} (metadata will load in background)`)
+          console.log(`✅ Immediately added to panel: ${resourceKey} → panel ${panelId} (metadata will load in background)`)
         } else {
           console.log(`✅ Loaded resource (modal-only): ${resourceKey} (no panel viewer)`)
         }
       }
 
-      // Synthetic "Helps" tab: TN + TWL in one panel (experimental)
-      const { tnKey: resolvedHelpsTn, twlKey: resolvedHelpsTwl } = findTnTwlKeysForLanguage(languageCode)
-      const combinedHelpsResource = {
+      // --- Synthetic combined-helps resources (one per scope) ---
+      // Scripture Helps: TN + TWL for Bible passages
+      const { tnKey: scriptureHelpsTn, twlKey: scriptureHelpsTwl } = findHelpsKeysForScope(languageCode, 'scripture')
+      const scriptureHelpsResource = {
         id: COMBINED_HELPS_RESOURCE_ID,
         key: COMBINED_HELPS_RESOURCE_ID,
         resourceKey: COMBINED_HELPS_RESOURCE_ID,
@@ -705,18 +766,52 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
         contentType: 'text/tab-separated-values',
         contentStructure: 'book' as const,
         version: '1.0',
-        description: 'Experimental combined Translation Notes and Translation Words Links',
+        description: 'Combined Translation Notes and Translation Words Links for Scripture',
         availability: { online: true, offline: false, bundled: false, partial: false },
         locations: [],
         catalogedAt: new Date().toISOString(),
-      } as ResourceInfo
-      const ch = combinedHelpsResource as ResourceInfo & { helpsTnResourceKey?: string; helpsTwlResourceKey?: string }
-      ch.helpsTnResourceKey = resolvedHelpsTn
-      ch.helpsTwlResourceKey = resolvedHelpsTwl
-      addResource(combinedHelpsResource)
+        helpsTnResourceKey: scriptureHelpsTn,
+        helpsTwlResourceKey: scriptureHelpsTwl,
+        appliesToScope: 'scripture',
+      } as unknown as ResourceInfo
+      addResource(scriptureHelpsResource)
       loadedResourceKeys.push(COMBINED_HELPS_RESOURCE_ID)
       assignResourceToPanel(COMBINED_HELPS_RESOURCE_ID, 'panel-2', 0)
       setActiveResourceInPanel('panel-2', 0)
+
+      // OBS Helps: OBS-TN + OBS-TWL for OBS story frames
+      const { tnKey: obsHelpsTn, twlKey: obsHelpsTwl } = findHelpsKeysForScope(languageCode, 'obs')
+      const obsHelpsResource = {
+        id: OBS_COMBINED_HELPS_RESOURCE_ID,
+        key: OBS_COMBINED_HELPS_RESOURCE_ID,
+        resourceKey: OBS_COMBINED_HELPS_RESOURCE_ID,
+        title: 'OBS Helps',
+        type: 'combined-helps',
+        category: 'Combined helps',
+        subject: 'Combined OBS TN+TWL',
+        owner: 'local',
+        language: languageCode,
+        languageCode,
+        languageName: languageCode,
+        resourceId: 'combined-helps-obs',
+        server: 'git.door43.org',
+        format: ResourceFormat.TSV,
+        contentType: 'text/tab-separated-values',
+        contentStructure: 'book' as const,
+        version: '1.0',
+        description: 'Combined OBS Translation Notes and Translation Words Links',
+        availability: { online: true, offline: false, bundled: false, partial: false },
+        locations: [],
+        catalogedAt: new Date().toISOString(),
+        helpsTnResourceKey: obsHelpsTn,
+        helpsTwlResourceKey: obsHelpsTwl,
+        appliesToScope: 'obs',
+      } as unknown as ResourceInfo
+      addResource(obsHelpsResource)
+      loadedResourceKeys.push(OBS_COMBINED_HELPS_RESOURCE_ID)
+      // OBS helps go into panel-2 (same as scripture helps, scope filter will show/hide)
+      const panel2AfterScripture = getPanel('panel-2')
+      assignResourceToPanel(OBS_COMBINED_HELPS_RESOURCE_ID, 'panel-2', panel2AfterScripture?.resourceKeys.length || 1)
       
       console.log(`⚡ Phase 1 complete: ${loadedResourceKeys.length} resources in UI`)
       
@@ -931,16 +1026,18 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     } finally {
       setIsLoadingResources(false)
     }
-  }, [catalogManager, resourceTypeRegistry, assignResourceToPanel, setActiveResourceInPanel, addResource, getPanel, removeResourceFromPanel, navigate, stopDownload, isBackgroundDownloading])
+  }, [catalogManager, resourceTypeRegistry, assignResourceToPanel, setActiveResourceInPanel, addResource, getPanel, removeResourceFromPanel, navigate, stopDownload, viewerRegistry])
   
-  // Auto-load resources if language is provided via URL
+  // Auto-load resources when the URL includes a language segment (once per URL language).
+  // handleLanguageSelected must NOT depend on volatile flags like isBackgroundDownloading — otherwise its
+  // identity churn retriggers this effect and repeatedly reloads panels (infinite loop on Read).
+  const autoLoadedLanguageForUrlRef = useRef<string | null>(null)
   useEffect(() => {
-    if (initialLanguage && !hasCheckedInitialState) {
-      console.log('[SimplifiedReadView] Auto-loading resources for URL language:', initialLanguage)
-      handleLanguageSelected(initialLanguage)
-      setHasCheckedInitialState(true)
-    }
-  }, [initialLanguage, hasCheckedInitialState, handleLanguageSelected])
+    if (!initialLanguage) return
+    if (autoLoadedLanguageForUrlRef.current === initialLanguage) return
+    autoLoadedLanguageForUrlRef.current = initialLanguage
+    void handleLanguageSelected(initialLanguage)
+  }, [initialLanguage, handleLanguageSelected])
   
   // Check if current collection is fully cached
   useEffect(() => {
@@ -1156,6 +1253,8 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
     pluginRegistry.register(entryLinkClickPlugin)
     pluginRegistry.register(scriptureTokensBroadcastPlugin)
     pluginRegistry.register(notesTokenGroupsPlugin)
+    pluginRegistry.register(obsFrameHighlightPlugin)
+    pluginRegistry.register(obsFrameQuotesPlugin)
     pluginRegistry.register(scriptureContentRequestPlugin)
     pluginRegistry.register(scriptureContentResponsePlugin)
     
@@ -1165,7 +1264,40 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
   // Resource keys for each panel (ensure arrays)
   const panel1ResourceKeys = panel1Resources.resourceKeys ?? []
   const panel2ResourceKeys = panel2Resources.resourceKeys ?? []
+
+  // Filter panel keys by the active navigation scope so the panels "fully swap"
+  // when switching between Bible and OBS. shared-scope resources (null) are visible in both scopes.
+  const filteredPanel1Keys = useMemo(
+    () =>
+      panel1ResourceKeys.filter((key) => {
+        const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
+        return scope === navigationScope || scope === null
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [panel1ResourceKeys, navigationScope, loadedResources, resourceTypeRegistry]
+  )
+  const filteredPanel2Keys = useMemo(
+    () =>
+      panel2ResourceKeys.filter((key) => {
+        const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
+        return scope === navigationScope || scope === null
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [panel2ResourceKeys, navigationScope, loadedResources, resourceTypeRegistry]
+  )
   
+  // Filtered resource objects (for PanelHeader — tabs must match the filtered key list).
+  // loadedResources is used only to map keys → ResourceInfo; we keep this memoized so tab
+  // re-renders happen only when the filtered key list or loadedResources changes.
+  const filteredPanel1Resources = useMemo(
+    () => filteredPanel1Keys.map((key) => loadedResources[key]).filter(Boolean) as ResourceInfo[],
+    [filteredPanel1Keys, loadedResources]
+  )
+  const filteredPanel2Resources = useMemo(
+    () => filteredPanel2Keys.map((key) => loadedResources[key]).filter(Boolean) as ResourceInfo[],
+    [filteredPanel2Keys, loadedResources]
+  )
+
   // Modal management
   const openModal = useStudyStore((s: any) => s.openModal)
   
@@ -1191,8 +1323,8 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
   // loadedResources[id]; when metadata loads, only that wrapper re-renders, not the whole
   // container. So panelConfig deps are only panel keys and active indices.
   const allResourceIds = useMemo(
-    () => [...new Set([...panel1ResourceKeys, ...panel2ResourceKeys])],
-    [panel1ResourceKeys, panel2ResourceKeys]
+    () => [...new Set([...filteredPanel1Keys, ...filteredPanel2Keys])],
+    [filteredPanel1Keys, filteredPanel2Keys]
   )
   const panelConfig: LinkedPanelsConfig = useMemo(() => {
     const resources = allResourceIds.map((id) => ({
@@ -1209,26 +1341,37 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
       ),
     }))
 
+    // When scope changes the filtered list may not contain the previously-active resource.
+    // Try to keep the same resource selected if it exists in the filtered list; otherwise show index 0.
+    const p1ActiveKey = panel1Resources.resourceKeys[panel1Resources.activeIndex]
+    const p1FilteredIdx = p1ActiveKey ? filteredPanel1Keys.indexOf(p1ActiveKey) : -1
+    const p1InitialIndex = p1FilteredIdx >= 0 ? p1FilteredIdx : 0
+
+    const p2ActiveKey = panel2Resources.resourceKeys[panel2Resources.activeIndex]
+    const p2FilteredIdx = p2ActiveKey ? filteredPanel2Keys.indexOf(p2ActiveKey) : -1
+    const p2InitialIndex = p2FilteredIdx >= 0 ? p2FilteredIdx : 0
+
     return {
       resources,
       panels: {
         'panel-1': {
-          resourceIds: panel1ResourceKeys,
-          initialIndex: panel1Resources.activeIndex,
+          resourceIds: filteredPanel1Keys,
+          initialIndex: p1InitialIndex,
         },
         'panel-2': {
-          resourceIds: panel2ResourceKeys,
-          initialIndex: panel2Resources.activeIndex,
+          resourceIds: filteredPanel2Keys,
+          initialIndex: p2InitialIndex,
         },
       },
     }
-  }, [allResourceIds, panel1ResourceKeys, panel2ResourceKeys, panel1Resources.activeIndex, panel2Resources.activeIndex, viewerRegistry, handleOpenEntry])
+  }, [allResourceIds, filteredPanel1Keys, filteredPanel2Keys, panel1Resources.activeIndex, panel2Resources.activeIndex, viewerRegistry, handleOpenEntry])
   
   // Helper to get resource label for DragOverlay
   const getResourceLabel = useCallback((resourceKey: string) => {
     const resource = loadedResources[resourceKey]
     if (!resource) return resourceKey.split('/').pop()?.toUpperCase() || 'N/A'
     
+    if (resourceKey === OBS_COMBINED_HELPS_RESOURCE_ID) return 'OBS Helps'
     if (resourceKey === COMBINED_HELPS_RESOURCE_ID) return 'Helps'
     const parts = resourceKey.split('/')
     const lastPart = parts[parts.length - 1] || ''
@@ -1266,6 +1409,7 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
               showLanguagePicker={true}
               onLanguageSelected={handleLanguageSelected}
               autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
+              languagePickerRequired={requireLanguageInUrl}
               downloadIndicator={
                 <DownloadIndicator 
                   isDownloading={isBackgroundDownloading}
@@ -1319,18 +1463,23 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
                       <PanelHeader
                         panelNumber={1}
                         panelId="panel-1"
-                        resources={panel1Resources.resources}
+                        resources={filteredPanel1Resources}
                         currentIndex={current.index}
-                        currentResource={panel1Resources.activeResource}
+                        currentResource={filteredPanel1Resources[current.index] ?? null}
                         onIndexChange={(newIndex) => {
                           navigate.toIndex(newIndex)
-                          panel1Resources.goToIndex(newIndex)
+                          // Map filtered index back to the unfiltered workspace index
+                          const filteredKey = filteredPanel1Keys[newIndex]
+                          const unfilteredIdx = filteredKey
+                            ? panel1Resources.resourceKeys.indexOf(filteredKey)
+                            : -1
+                          if (unfilteredIdx >= 0) panel1Resources.goToIndex(unfilteredIdx)
                         }}
                         onRemove={() => panel1Resources.removeResource()}
                         onMoveToOtherPanel={
-                          panel1Resources.activeResource && panel1Resources.resourceKeys.length > 0
+                          filteredPanel1Resources[current.index] && filteredPanel1Keys.length > 0
                             ? () => {
-                                const key = panel1Resources.resourceKeys[panel1Resources.activeIndex]
+                                const key = filteredPanel1Keys[current.index]
                                 if (key) panel1Resources.moveResource(key, 'panel-2')
                               }
                             : undefined
@@ -1430,18 +1579,22 @@ export function SimplifiedReadView({ initialLanguage }: SimplifiedReadViewProps 
                       <PanelHeader
                         panelNumber={2}
                         panelId="panel-2"
-                        resources={panel2Resources.resources}
+                        resources={filteredPanel2Resources}
                         currentIndex={current.index}
-                        currentResource={panel2Resources.activeResource}
+                        currentResource={filteredPanel2Resources[current.index] ?? null}
                         onIndexChange={(newIndex) => {
                           navigate.toIndex(newIndex)
-                          panel2Resources.goToIndex(newIndex)
+                          const filteredKey = filteredPanel2Keys[newIndex]
+                          const unfilteredIdx = filteredKey
+                            ? panel2Resources.resourceKeys.indexOf(filteredKey)
+                            : -1
+                          if (unfilteredIdx >= 0) panel2Resources.goToIndex(unfilteredIdx)
                         }}
                         onRemove={() => panel2Resources.removeResource()}
                         onMoveToOtherPanel={
-                          panel2Resources.activeResource && panel2Resources.resourceKeys.length > 0
+                          filteredPanel2Resources[current.index] && filteredPanel2Keys.length > 0
                             ? () => {
-                                const key = panel2Resources.resourceKeys[panel2Resources.activeIndex]
+                                const key = filteredPanel2Keys[current.index]
                                 if (key) panel2Resources.moveResource(key, 'panel-1')
                               }
                             : undefined

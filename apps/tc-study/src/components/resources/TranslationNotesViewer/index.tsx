@@ -9,15 +9,23 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { useResourceAPI } from 'linked-panels'
 import { BookOpen, ExternalLink, Loader, FileText } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
+import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
-import type { EntryLinkClickSignal, NotesTokenGroupsSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
+import type {
+  EntryLinkClickSignal,
+  NotesTokenGroupsSignal,
+  ObsFrameHighlightSignal,
+  ObsFrameQuoteEntry,
+  ObsFrameQuotesSignal,
+  TokenClickSignal,
+  VerseFilterSignal,
+} from '../../../signals/studioSignals'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
-import { TranslationNoteCard } from './components/TranslationNoteCard'
+import { TranslationNoteCard, type NoteWithTokens } from './components/TranslationNoteCard'
 import { useTranslationNotesContent } from './hooks/useTranslationNotesContent'
 import { useTATitles } from './hooks/useTATitles'
 import { useTAMetadataForTitles } from './hooks/useTAMetadataForTitles'
@@ -42,6 +50,7 @@ export function TranslationNotesViewer({
   onEntryLinkClick,
 }: TranslationNotesViewerProps) {
   const currentRef = useCurrentReference()
+  const navigationMode = useNavigationMode()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
   const bookTitleSource = useBookTitleSource()
@@ -49,17 +58,27 @@ export function TranslationNotesViewer({
   // Use latest resource from store so we pick up ingredients when metadata loads (Phase 2)
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
   const effectiveResource = resourceFromStore ?? resource
+
+  // OBS mode: detect from resource key (reliable) or stored type
+  const resourceIdFromKey = resourceKey.split('/')[2] ?? ''
+  const isObs =
+    resourceIdFromKey.startsWith('obs-') ||
+    String(effectiveResource?.type ?? resource?.type ?? '').includes('obs')
+
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
   const [tokenFilter, setTokenFilter] = useState<{ semanticId: string; content: string; alignedSemanticIds: string[]; timestamp: number } | null>(null)
   const [verseFilter, setVerseFilter] = useState<{ chapter: number; verse?: number; timestamp: number } | null>(null)
+  // OBS-only: filter to the single entry whose quote was clicked in the OBS frame text
+  const [obsQuoteFilter, setObsQuoteFilter] = useState<{ quote: string; occurrence: number; rowId?: string } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
   const [catalogTrigger, setCatalogTrigger] = useState(0)
 
   // Load translation notes for current book
   const { notes, loading, error } = useTranslationNotesContent(
     resourceKey,
-    currentRef.book
+    currentRef.book,
+    isObs ? 'obs-notes' : 'notes'
   )
   
   // Fetch TA titles
@@ -86,6 +105,13 @@ export function TranslationNotesViewer({
   // Get signal sender for token-click (to highlight aligned tokens in scripture)
   const { sendToAll: sendTokenClick } = useSignal<TokenClickSignal>(
     'token-click',
+    resourceId,
+    resourceMetadata
+  )
+
+  // OBS: broadcast obs-frame-highlight (bidirectional: quote click → OBS viewer)
+  const { sendToAll: broadcastObsHighlight } = useSignal<ObsFrameHighlightSignal>(
+    'obs-frame-highlight',
     resourceId,
     resourceMetadata
   )
@@ -153,6 +179,7 @@ export function TranslationNotesViewer({
   useEffect(() => {
     setTokenFilter(null)
     setVerseFilter(null)
+    setObsQuoteFilter(null)
     setSelectedNoteId(null)
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
   
@@ -193,7 +220,9 @@ export function TranslationNotesViewer({
     const startChapter = currentRef.chapter
     const startVerse = currentRef.verse
     const endChapter = currentRef.endChapter || startChapter
-    const endVerse = currentRef.endVerse || startVerse
+    // In OBS story mode show all frames of the story; otherwise restrict to the current range.
+    const isObsStoryMode = navigationMode === 'chapter' && currentRef.book === 'obs'
+    const endVerse = isObsStoryMode ? Number.POSITIVE_INFINITY : (currentRef.endVerse || startVerse)
 
     return notes.filter(note => {
       const [noteChapterStr, noteVerseRange] = note.reference.split(':')
@@ -222,7 +251,7 @@ export function TranslationNotesViewer({
 
       return true
     })
-  }, [notes, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
+  }, [notes, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse, currentRef.book, navigationMode])
   
   // Transform notes to include quote field for alignment
   // Only include notes that have a non-empty quote field
@@ -338,8 +367,19 @@ export function TranslationNotesViewer({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- messaging ref is stable
   }, [resourceId])
   
-  // Apply verse filter or token filter if active
+  // Apply verse filter, token filter, or OBS quote filter if active
   const { displayNotes, hasMatches } = useMemo(() => {
+    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching entry
+    if (isObs && obsQuoteFilter) {
+      const match = notesWithAlignedTokens.find(
+        (n) =>
+          (obsQuoteFilter.rowId && n.id === obsQuoteFilter.rowId) ||
+          (n.quote?.trim().toLowerCase() === obsQuoteFilter.quote.trim().toLowerCase() &&
+            Number.parseInt(String(n.occurrence ?? '1'), 10) === obsQuoteFilter.occurrence)
+      )
+      return { displayNotes: match ? [match] : notesWithAlignedTokens, hasMatches: !!match }
+    }
+
     // Verse filter: narrow by reference (chapter/verse click)
     if (verseFilter) {
       const filtered = notesWithAlignedTokens.filter((note) => {
@@ -403,7 +443,7 @@ export function TranslationNotesViewer({
       displayNotes: hasMatches ? filtered : notesWithAlignedTokens,
       hasMatches,
     }
-  }, [notesWithAlignedTokens, tokenFilter, verseFilter, currentRef.book])
+  }, [notesWithAlignedTokens, tokenFilter, verseFilter, obsQuoteFilter, isObs, currentRef.book])
   
   // Load TA titles for visible notes
   useEffect(() => {
@@ -465,44 +505,41 @@ export function TranslationNotesViewer({
     setSelectedNoteId(note.id)
   }, [])
 
-  // Handle clicking on aligned quote tokens (broadcast ORIGINAL LANGUAGE tokens, same as TWL)
-  const handleQuoteClick = useCallback((note: typeof notesWithAlignedTokens[0]) => {
-    // CRITICAL: Send original language tokens (quoteTokens), not aligned tokens
-    // The scripture viewer will find and highlight the aligned target tokens
+  // Handle clicking on aligned quote tokens
+  const handleQuoteClick = useCallback((note: NoteWithTokens) => {
+    setSelectedNoteId(note.id)
+
+    // OBS mode: highlight frame text in the OBS viewer
+    if (isObs) {
+      const quote = note.quote?.trim()
+      if (!quote) return
+      const refParts = note.reference.split(':')
+      const chapter = parseInt(refParts[0] || '1', 10)
+      const verse = parseInt(refParts[1] || '1', 10)
+      const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
+      broadcastObsHighlight({
+        lifecycle: 'event',
+        highlight: {
+          storyNumber: chapter,
+          frameNumber: verse,
+          quote,
+          occurrence: Number.isFinite(occRaw) ? occRaw : 1,
+          rowId: note.id,
+        },
+      })
+      return
+    }
+
+    // Scripture mode: send original language tokens so the scripture viewer highlights aligned words
     if (!note.quoteTokens || note.quoteTokens.length === 0) return
-    
     const refParts = note.reference.split(':')
     const chapter = parseInt(refParts[0] || '1', 10)
     const verse = parseInt(refParts[1] || '1', 10)
     const bookCode = currentRef.book?.toLowerCase() || ''
     const baseOccurrence = parseInt(note.occurrence || '1', 10)
-    
-    // Generate semantic IDs with correct occurrence number (same as TWL)
-    const semanticIds = generateSemanticIdsForQuoteTokens(
-      note.quoteTokens,
-      bookCode,
-      chapter,
-      verse,
-      baseOccurrence
-    )
-    
-    // CRITICAL: Send a SINGLE signal with ALL semantic IDs in alignedSemanticIds
-    // This ensures the scripture viewer highlights all tokens at once
-    // instead of each signal replacing the previous highlighting
+    const semanticIds = generateSemanticIdsForQuoteTokens(note.quoteTokens, bookCode, chapter, verse, baseOccurrence)
     const firstToken = note.quoteTokens[0]
     if (!firstToken) return
-    
-    console.log('🔍 [TN-CLICK] Broadcasting single signal with all semantic IDs:', {
-      noteId: note.id,
-      quoteTokensCount: note.quoteTokens.length,
-      allSemanticIds: semanticIds,
-      originalTokens: note.quoteTokens.map((t: any, i: number) => ({ 
-        text: t.text, 
-        semanticId: semanticIds[i]
-      })),
-    })
-    
-    // Send a SINGLE token-click signal with all semantic IDs in alignedSemanticIds
     sendTokenClick({
       lifecycle: 'event',
       token: {
@@ -514,10 +551,10 @@ export function TranslationNotesViewer({
         strong: firstToken.strong,
         lemma: firstToken.lemma,
         morph: firstToken.morph,
-        alignedSemanticIds: semanticIds, // ALL semantic IDs here!
+        alignedSemanticIds: semanticIds,
       },
     })
-  }, [currentRef.book, sendTokenClick])
+  }, [isObs, currentRef.book, broadcastObsHighlight, sendTokenClick])
 
   // Handle clicking on a Support Reference (link to TA)
   const handleSupportReferenceClick = useCallback((supportRef: string) => {
@@ -546,9 +583,120 @@ export function TranslationNotesViewer({
     }
   )
 
+  // OBS: handle incoming obs-frame-highlight (OBS viewer clicked a quoted span → filter + select row)
+  useSignalHandler<ObsFrameHighlightSignal>(
+    'obs-frame-highlight',
+    resourceId,
+    useCallback(
+      (signal) => {
+        if (signal.sourceResourceId === resourceId) return
+        if (!isObs) return
+        if (signal.highlight === null) {
+          setObsQuoteFilter(null)
+          setSelectedNoteId(null)
+          return
+        }
+        const h = signal.highlight
+        if (currentRef.book !== 'obs' || h.storyNumber !== currentRef.chapter) return
+        const isObsStoryMode = navigationMode === 'chapter'
+        if (!isObsStoryMode && h.frameNumber !== currentRef.verse) return
+        // TWL click → this viewer has no relevant entry; clear any existing filter
+        if (h.kind === 'twl') {
+          setObsQuoteFilter(null)
+          setSelectedNoteId(null)
+          return
+        }
+        // Set the filter — displayNotes will narrow to just this entry
+        setObsQuoteFilter({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId })
+        // Also mark the entry as selected so the card renders in its selected style
+        if (h.rowId && notesWithAlignedTokens.some((n) => n.id === h.rowId)) {
+          setSelectedNoteId(h.rowId)
+          return
+        }
+        const nq = h.quote.trim().toLowerCase()
+        for (const note of notesWithAlignedTokens) {
+          if ((note.quote || '').trim().toLowerCase() !== nq) continue
+          const occ = Number.parseInt(String(note.occurrence ?? '1'), 10)
+          if (occ === h.occurrence) { setSelectedNoteId(note.id); return }
+        }
+      },
+      [resourceId, isObs, currentRef.book, currentRef.chapter, currentRef.verse, navigationMode, notesWithAlignedTokens]
+    ),
+    { debug: false, resourceMetadata }
+  )
+
+  // OBS: build the quote entries for the current frame
+  const obsFrameQuotesApi = useResourceAPI<ObsFrameQuotesSignal>(resourceId)
+  const lastObsQuotesKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    lastObsQuotesKeyRef.current = null
+  }, [currentRef.book, currentRef.chapter, currentRef.verse])
+
+  useEffect(() => {
+    if (!isObs) return
+    const storyNumber = currentRef.book === 'obs' ? currentRef.chapter : 0
+    const frameNumber = currentRef.book === 'obs' ? currentRef.verse : 0
+    const refStr = `${storyNumber}:${frameNumber}`
+
+    // Build per-frame quote map for the whole story so the OBS viewer can underline
+    // each frame independently in story/range mode.
+    const frameQuoteMap: Record<number, ObsFrameQuoteEntry[]> = {}
+    const quotes: ObsFrameQuoteEntry[] = []
+    if (currentRef.book === 'obs') {
+      // Use unfiltered notes so underlines persist even when obsQuoteFilter is active.
+      for (const n of notesWithAlignedTokens) {
+        if (!n.quote?.trim()) continue
+        const [chStr, frStr] = n.reference.split(':')
+        if (parseInt(chStr) !== storyNumber) continue
+        const fr = parseInt(frStr)
+        const entry: ObsFrameQuoteEntry = {
+          sourceId: n.id,
+          kind: 'tn',
+          quote: n.quote!.trim(),
+          occurrence: Number.isFinite(Number.parseInt(String(n.occurrence ?? '1'), 10))
+            ? Number.parseInt(String(n.occurrence ?? '1'), 10)
+            : 1,
+        }
+        if (!frameQuoteMap[fr]) frameQuoteMap[fr] = []
+        frameQuoteMap[fr].push(entry)
+        if (fr === frameNumber) quotes.push(entry)
+      }
+    }
+
+    const key = `${refStr}:${quotes.map((q) => `${q.sourceId}:${q.quote}:${q.occurrence}`).join('|')}`
+    if (key === lastObsQuotesKeyRef.current) return
+    lastObsQuotesKeyRef.current = key
+    obsFrameQuotesApi.messaging.sendToAll({
+      type: 'obs-frame-quotes',
+      lifecycle: 'state',
+      stateKey: 'current-obs-frame-quotes',
+      sourceResourceId: resourceId,
+      storyNumber,
+      frameNumber,
+      quotes,
+      frameQuoteMap,
+      timestamp: Date.now(),
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isObs, resourceId, currentRef.book, currentRef.chapter, currentRef.verse, notesWithAlignedTokens])
+
   return (
     <div className="h-full flex flex-col">
-      {tokenFilter && (
+      {obsQuoteFilter && (
+        <TokenFilterBanner
+          tokenFilter={{
+            semanticId: '',
+            content: obsQuoteFilter.quote,
+            alignedSemanticIds: [],
+            timestamp: 0,
+          }}
+          displayLinksCount={displayNotes.length}
+          hasMatches={hasMatches}
+          onClearFilter={() => { setObsQuoteFilter(null); setSelectedNoteId(null) }}
+        />
+      )}
+      {!obsQuoteFilter && tokenFilter && (
         <TokenFilterBanner
           tokenFilter={tokenFilter}
           displayLinksCount={displayNotes.length}
@@ -556,7 +704,7 @@ export function TranslationNotesViewer({
           onClearFilter={() => setTokenFilter(null)}
         />
       )}
-      {verseFilter && (
+      {!obsQuoteFilter && verseFilter && (
         <TokenFilterBanner
           tokenFilter={{
             semanticId: '',
@@ -652,6 +800,7 @@ export function TranslationNotesViewer({
                     taTitle={taTitle}
                     isLoadingTATitle={isLoadingTitle}
                     getEntryTitle={getEntryTitle}
+                    obsMode={isObs}
                   />
                 )
               })}

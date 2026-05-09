@@ -186,7 +186,7 @@
     },
     "apps/tc-study": {
       "name": "tc-study",
-      "version": "0.1.1",
+      "version": "1.1.1-beta.1",
       "dependencies": {
         "-": "^0.0.1",
         "@bt-synergy/cache-adapter-indexeddb": "workspace:*",
@@ -242,6 +242,7 @@
       "devDependencies": {
         "@eslint/js": "^9.39.1",
         "@types/file-saver": "^2.0.7",
+        "@types/mdast": "^4.0.4",
         "@types/node": "^24.10.1",
         "@types/react": "^19.2.5",
         "@types/react-dom": "^19.2.3",
@@ -740,6 +741,7 @@
       "dependencies": {
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
+        "jszip": "^3.10.1",
       },
       "devDependencies": {
         "typescript": "^5.0.0",
@@ -756,6 +758,7 @@
         "@bt-synergy/catalog-manager": "workspace:*",
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
+        "jszip": "^3.10.1",
       },
       "devDependencies": {
         "typescript": "^5.9.3",
@@ -767,6 +770,7 @@
       "dependencies": {
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
+        "jszip": "^3.10.1",
       },
       "devDependencies": {
         "typescript": "^5.0.0",

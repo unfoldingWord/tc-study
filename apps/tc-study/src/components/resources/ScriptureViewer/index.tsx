@@ -14,7 +14,8 @@ import { Book } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useEvents } from 'linked-panels'
 import { useAppStore } from '../../../contexts/AppContext'
-import { useCatalogManager, useCurrentReference } from '../../../contexts'
+import { useCatalogManager, useCurrentReference, useNavigation } from '../../../contexts'
+import type { ResourceMetadata } from '../../../contexts/types'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getBookTitle } from '../../../utils/bookNames'
@@ -35,13 +36,11 @@ export function ScriptureViewer({
   isAnchor,
 }: ScriptureViewerProps) {
   const currentRef = useCurrentReference()
+  const { navigateToReference } = useNavigation()
   const catalogManager = useCatalogManager()
   const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
-  const { setBook, setChapter, setVerse, setEndChapter, setEndVerse } = currentRef
+  const [catalogMetadata, setCatalogMetadata] = useState<ResourceMetadata | null>(null)
 
-  // Catalog metadata (Door43 manifest data)
-  const [catalogMetadata, setCatalogMetadata] = useState<any>(null)
-  
   // Track if we've set this resource as anchor to prevent repeated calls
   const anchorSetRef = useRef<string | null>(null)
 
@@ -109,7 +108,11 @@ export function ScriptureViewer({
   const effectiveResource = resourceFromStore ?? resource
 
   // Language and book title from current scripture metadata (for header)
-  const languageDisplay = effectiveResource.languageName ?? catalogMetadata?.language_title ?? effectiveResource.language ?? language
+  const languageDisplay =
+    effectiveResource.languageName ??
+    (catalogMetadata as ResourceMetadata & { language_title?: string })?.language_title ??
+    effectiveResource.language ??
+    language
   const currentBookTitle = getBookTitle(effectiveResource, currentRef.book)
 
   // Must come before useHighlighting so the coverage set is available for click decisions
@@ -129,29 +132,30 @@ export function ScriptureViewer({
   // Listen for verse-navigation signals (from modals, other panels, etc.)
   const handleVerseNavigation = useCallback((signal: VerseNavigationSignal) => {
     console.log('[ScriptureViewer] Received verse-navigation signal:', signal.verse)
-    
+
     const { book, chapter, verse, endChapter, endVerse } = signal.verse
-    
-    // Navigate to the specified reference
-    if (book) setBook(book)
-    if (chapter) setChapter(chapter)
-    if (verse) setVerse(verse)
-    if (endChapter) setEndChapter(endChapter)
-    if (endVerse) setEndVerse(endVerse)
-    
+
+    navigateToReference({
+      book: book || currentRef.book,
+      chapter: chapter ?? currentRef.chapter,
+      verse: verse ?? currentRef.verse,
+      endChapter: endChapter ?? currentRef.endChapter,
+      endVerse: endVerse ?? currentRef.endVerse,
+    })
+
     console.log('[ScriptureViewer] Navigated to:', {
       book,
       chapter,
       verse,
       endChapter,
-      endVerse
+      endVerse,
     })
-  }, [setBook, setChapter, setVerse, setEndChapter, setEndVerse])
-  
-  useEvents<VerseNavigationSignal>(
+  }, [navigateToReference, currentRef.book, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
+
+  useEvents(
     resourceId,
     ['verse-navigation'],
-    handleVerseNavigation
+    handleVerseNavigation as (payload: any) => void
   )
 
   // Handle content requests from other panels (e.g., TWL viewer)

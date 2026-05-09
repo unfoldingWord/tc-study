@@ -22,9 +22,9 @@ export {
 export {
     NavigationProvider, useAvailableBooks,
     useCurrentPassageSet, useCurrentReference, useCurrentSectionIndex, useCurrentSections, useHasNavigationSource, useNavigation, useNavigationHistory,
-    useNavigationHistoryIndex, useNavigationMode
+    useNavigationHistoryIndex, useNavigationMode, useNavigationScope, useNavigationStore
 } from './NavigationContext'
 export type {
-    BCVReference, BookInfo, NavigationMode, PassageSet, ResourceInfo, ResourceTOC
+    BCVReference, BookInfo, NavigationCatalogScope, NavigationMode, PassageSet, ResourceInfo, ResourceTOC
 } from './types'
 

@@ -13,7 +13,7 @@ import type { TranslatorSection } from '@bt-synergy/usfm-processor'
 import { createContext, ReactNode, useContext, useEffect } from 'react'
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import type { BCVReference, BookInfo, NavigationMode, PassageSet } from './types'
+import type { BCVReference, BookInfo, NavigationCatalogScope, NavigationMode, PassageSet } from './types'
 
 /** Flatten passage set root to a list of BCV references for navigation */
 function flattenPassageSetToBCV(root: PassageSetNode[]): BCVReference[] {
@@ -63,6 +63,11 @@ interface NavigationState {
   currentPassageList: BCVReference[]
   currentPassageIndex: number
   navigationMode: NavigationMode
+
+  /** Bible vs OBS catalog (navigator tab + arrow semantics) */
+  navigationScope: NavigationCatalogScope
+  /** Per-story frame counts for OBS (story number → frames), filled by ObsViewer */
+  obsFrameCountByStory: Record<string, number>
 }
 
 interface NavigationActions {
@@ -102,6 +107,17 @@ interface NavigationActions {
   canGoToNextPassage: () => boolean
   canGoToPreviousPassage: () => boolean
   setNavigationMode: (mode: NavigationMode) => void
+
+  setNavigationScope: (scope: NavigationCatalogScope) => void
+  setObsStoryFrameCount: (storyNumber: number, frameCount: number) => void
+  nextObsFrame: () => void
+  previousObsFrame: () => void
+  canGoToNextObsFrame: () => boolean
+  canGoToPreviousObsFrame: () => boolean
+  nextObsStory: () => void
+  previousObsStory: () => void
+  canGoToNextObsStory: () => boolean
+  canGoToPreviousObsStory: () => boolean
   
   // Navigation availability
   hasNavigationSource: () => boolean
@@ -135,6 +151,8 @@ const persistState = (state: NavigationState) => {
       navigationHistory: state.navigationHistory,
       historyIndex: state.historyIndex,
       navigationMode: state.navigationMode,
+      navigationScope: state.navigationScope,
+      obsFrameCountByStory: state.obsFrameCountByStory,
     }
     localStorage.setItem(NAVIGATION_STORAGE_KEY, JSON.stringify(toPersist))
   } catch (err) {
@@ -144,7 +162,7 @@ const persistState = (state: NavigationState) => {
 
 const persistedState = loadPersistedState()
 
-const useNavigationStore = create<NavigationStore>()(
+export const useNavigationStore = create<NavigationStore>()(
   immer((set, get) => ({
   // Initial state - restore from localStorage or use defaults
   currentReference: persistedState.currentReference || {
@@ -168,6 +186,8 @@ const useNavigationStore = create<NavigationStore>()(
   currentPassageList: [] as BCVReference[],
   currentPassageIndex: -1,
   navigationMode: persistedState.navigationMode || 'verse',
+  navigationScope: persistedState.navigationScope || 'scripture',
+  obsFrameCountByStory: persistedState.obsFrameCountByStory || {},
 
   // Actions
   navigateToReference: (ref: BCVReference) => {
@@ -175,9 +195,9 @@ const useNavigationStore = create<NavigationStore>()(
     const historyLength = get().navigationHistory.length
     const navigationMode = get().navigationMode
 
-    // In chapter mode, normalize to full chapter (verse 1 to last verse)
+    // In chapter mode, normalize to full chapter (verse 1 to last verse) — not for OBS
     let refToUse = ref
-    if (navigationMode === 'chapter') {
+    if (navigationMode === 'chapter' && ref.book !== 'obs') {
       const bookInfo = get().getBookInfo(ref.book)
       if (bookInfo?.verses && ref.chapter) {
         const lastVerse = bookInfo.verses[ref.chapter - 1] ?? 1
@@ -186,6 +206,23 @@ const useNavigationStore = create<NavigationStore>()(
           verse: 1,
           endVerse: lastVerse,
         }
+      }
+    }
+
+    if (refToUse.book === 'obs') {
+      // Preserve range fields so cross-story selections survive navigation.
+      // Fall back to 1 for chapter/verse to guard against undefined/NaN values
+      // that would permanently disable the navigation arrows.
+      refToUse = {
+        book: 'obs',
+        chapter: refToUse.chapter || 1,
+        verse: refToUse.verse || 1,
+        ...(refToUse.endChapter != null && refToUse.endChapter >= 1
+          ? { endChapter: refToUse.endChapter }
+          : {}),
+        ...(refToUse.endVerse != null && refToUse.endVerse >= 1
+          ? { endVerse: refToUse.endVerse }
+          : {}),
       }
     }
 
@@ -728,15 +765,26 @@ const useNavigationStore = create<NavigationStore>()(
   setNavigationMode: (mode: NavigationMode) => {
     set((state) => {
       state.navigationMode = mode
-      // When switching to chapter mode, expand current reference to full chapter (verse 1 to last verse)
       if (mode === 'chapter') {
-        const bookInfo = get().getBookInfo(state.currentReference.book)
-        if (bookInfo?.verses && state.currentReference.chapter) {
-          const lastVerse = bookInfo.verses[state.currentReference.chapter - 1] ?? 1
+        if (state.currentReference.book === 'obs') {
+          // Story mode: collapse any range — always show exactly one story at a time.
+          // Leaving endChapter in place would make ObsViewer load multiple stories on
+          // every arrow click, causing cascading setObsStoryFrameCount store updates.
           state.currentReference = {
-            ...state.currentReference,
+            book: 'obs',
+            chapter: state.currentReference.chapter || 1,
             verse: 1,
-            endVerse: lastVerse,
+          }
+        } else {
+          // Scripture chapter mode: expand to full chapter
+          const bookInfo = get().getBookInfo(state.currentReference.book)
+          if (bookInfo?.verses && state.currentReference.chapter) {
+            const lastVerse = bookInfo.verses[state.currentReference.chapter - 1] ?? 1
+            state.currentReference = {
+              ...state.currentReference,
+              verse: 1,
+              endVerse: lastVerse,
+            }
           }
         }
       }
@@ -745,9 +793,120 @@ const useNavigationStore = create<NavigationStore>()(
     console.log('🔀 Navigation mode changed to:', mode)
   },
 
+  setNavigationScope: (scope: NavigationCatalogScope) => {
+    set((state) => {
+      state.navigationScope = scope
+      if (scope === 'obs') {
+        const cur = state.currentReference
+        // Only preserve the existing OBS ref when chapter/verse are valid numbers;
+        // otherwise default to 1·1 (guards against stale/corrupted localStorage state).
+        state.currentReference =
+          cur.book === 'obs' && cur.chapter >= 1 && cur.verse >= 1
+            ? { book: 'obs', chapter: cur.chapter, verse: cur.verse }
+            : { book: 'obs', chapter: 1, verse: 1 }
+      } else {
+        const cur = state.currentReference
+        if (cur.book === 'obs') {
+          const first = state.availableBooks[0]
+          if (first) {
+            state.currentReference = { book: first.code, chapter: 1, verse: 1 }
+          }
+        }
+      }
+      persistState(state)
+    })
+    console.log('🔀 Navigation catalog scope:', scope)
+  },
+
+  setObsStoryFrameCount: (storyNumber: number, frameCount: number) => {
+    set((state) => {
+      state.obsFrameCountByStory[String(storyNumber)] = frameCount
+      persistState(state)
+    })
+  },
+
+  nextObsFrame: () => {
+    const { currentReference, obsFrameCountByStory } = get()
+    if (currentReference.book !== 'obs') return
+    // Advance from the END of the range (or single frame) so the arrow lands
+    // on the first frame that was NOT part of the previous selection.
+    const story = (currentReference.endChapter ?? currentReference.chapter) || 1
+    const frame = (currentReference.endVerse ?? currentReference.verse) || 1
+    const max = obsFrameCountByStory[String(story)] ?? 1
+    if (frame < max) {
+      get().navigateToReference({ book: 'obs', chapter: story, verse: frame + 1 })
+    } else if (story < 50) {
+      get().navigateToReference({ book: 'obs', chapter: story + 1, verse: 1 })
+    }
+  },
+
+  previousObsFrame: () => {
+    const { currentReference, obsFrameCountByStory } = get()
+    if (currentReference.book !== 'obs') return
+    const story = currentReference.chapter || 1
+    const frame = currentReference.verse || 1
+    if (frame > 1) {
+      get().navigateToReference({ book: 'obs', chapter: story, verse: frame - 1 })
+    } else if (story > 1) {
+      const prevStory = story - 1
+      const prevMax = obsFrameCountByStory[String(prevStory)] ?? 1
+      get().navigateToReference({ book: 'obs', chapter: prevStory, verse: prevMax })
+    }
+  },
+
+  canGoToNextObsFrame: () => {
+    const { currentReference, obsFrameCountByStory } = get()
+    if (currentReference.book !== 'obs') return false
+    const story = (currentReference.endChapter ?? currentReference.chapter) || 1
+    const frame = (currentReference.endVerse ?? currentReference.verse) || 1
+    const max = obsFrameCountByStory[String(story)] ?? 0
+    if (max > 0 && frame < max) return true
+    return story < 50
+  },
+
+  canGoToPreviousObsFrame: () => {
+    const { currentReference } = get()
+    if (currentReference.book !== 'obs') return false
+    return (currentReference.verse || 0) > 1 || (currentReference.chapter || 0) > 1
+  },
+
+  nextObsStory: () => {
+    const { currentReference } = get()
+    if (currentReference.book !== 'obs') return
+    const story = currentReference.chapter || 1
+    if (story < 50) {
+      get().navigateToReference({ book: 'obs', chapter: story + 1, verse: 1 })
+    }
+  },
+
+  previousObsStory: () => {
+    const { currentReference } = get()
+    if (currentReference.book !== 'obs') return
+    const story = currentReference.chapter || 1
+    if (story > 1) {
+      get().navigateToReference({ book: 'obs', chapter: story - 1, verse: 1 })
+    }
+  },
+
+  canGoToNextObsStory: () => {
+    const { currentReference } = get()
+    if (currentReference.book !== 'obs') return false
+    return (currentReference.chapter || 0) < 50
+  },
+
+  canGoToPreviousObsStory: () => {
+    const { currentReference } = get()
+    if (currentReference.book !== 'obs') return false
+    return (currentReference.chapter || 0) > 1
+  },
+
   hasNavigationSource: () => {
-    const { availableBooks, currentPassageSet } = get()
-    return availableBooks.length > 0 || !!currentPassageSet
+    const { availableBooks, currentPassageSet, navigationScope } = get()
+    return (
+      availableBooks.length > 0 ||
+      !!currentPassageSet ||
+      navigationScope === 'obs'
+    )
   },
 })))
 
@@ -793,6 +952,10 @@ export function useCurrentPassageSet() {
 
 export function useNavigationMode() {
   return useNavigationStore((state) => state.navigationMode)
+}
+
+export function useNavigationScope() {
+  return useNavigationStore((state) => state.navigationScope)
 }
 
 export function useHasNavigationSource() {

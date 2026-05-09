@@ -12,7 +12,6 @@ import rehypeReact from 'rehype-react'
 import remarkGfm from 'remark-gfm'
 import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
-import type { Processor } from 'unified'
 import { unified } from 'unified'
 import { getRcLinkDisplayName, isRelativeLink, parseRcLink } from './rc-link-parser'
 
@@ -32,7 +31,8 @@ export interface MarkdownRendererOptions {
 }
 
 export class RemarkMarkdownRenderer {
-  private processor: Processor | null = null
+  /** Plugin chain narrows `Processor<>` generics inconsistently across versions */
+  private processor: any = null
   private options: MarkdownRendererOptions
 
   constructor(options: MarkdownRendererOptions = {}) {

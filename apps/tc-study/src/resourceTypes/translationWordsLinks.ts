@@ -17,6 +17,10 @@ export const translationWordsLinksResourceType: ResourceTypeDefinition = defineR
   description: 'Links between words in scripture and Translation Words articles (TSV format)',
   icon: 'Link',
   
+  // ===== SCOPE / ROLE =====
+  contentRole: 'companion',
+  companionFor: ['scripture'],
+
   // ===== DEPENDENCIES =====
   // TWL requires:
   // 1. TW (Translation Words dictionary) from the same language and organization
@@ -58,7 +62,7 @@ export const translationWordsLinksResourceType: ResourceTypeDefinition = defineR
 
   
   // ===== UI LAYER =====
-  viewer: WordsLinksViewer,
+  viewer: WordsLinksViewer as any,
   
   // ===== FEATURES =====
   features: {

@@ -2,9 +2,9 @@
  * NavigationBar - Context-aware navigation controls
  */
 
-import { ArrowLeft, Book, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, Info, Library, List, ListOrdered, Menu, X } from 'lucide-react'
+import { ArrowLeft, Book, BookMarked, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, Info, Library, List, ListOrdered, Menu, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { useCurrentPassageSet, useCurrentReference, useNavigation, useNavigationHistory, useNavigationMode } from '../../contexts'
+import { useAvailableBooks, useCurrentPassageSet, useCurrentReference, useHasNavigationSource, useNavigation, useNavigationHistory, useNavigationMode } from '../../contexts'
 import { useAppStore, useAnchorResource, useBookTitleSource } from '../../contexts/AppContext'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { getBookTitle } from '../../utils/bookNames'
@@ -15,23 +15,75 @@ import { BCVNavigator } from './BCVNavigator'
 import { NavigationHistoryModal } from './NavigationHistoryModal'
 import { NavigationTypeSelector } from './NavigationTypeSelector'
 
+/** Inline type selector for OBS — only Frame and Story modes are relevant. */
+function ObsNavigationTypeSelector({ onClose }: { onClose: () => void }) {
+  const navigation = useNavigation()
+  const currentMode = useNavigationMode()
+
+  const modes = [
+    { mode: 'verse' as const, icon: BookMarked, label: 'Frame' },
+    { mode: 'chapter' as const, icon: Library, label: 'Story' },
+  ]
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-transparent" onClick={onClose} />
+      <div
+        className="absolute bottom-full left-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {modes.map(({ mode, icon: Icon, label }) => (
+          <button
+            key={mode}
+            onClick={() => { navigation.setNavigationMode(mode); onClose() }}
+            className={`w-full flex items-center justify-center px-3 py-2 transition-colors relative ${
+              mode === currentMode ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
+            }`}
+            title={label}
+            aria-label={label}
+          >
+            <Icon className="w-4 h-4" />
+            {mode === currentMode && (
+              <div className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full bg-blue-600" />
+            )}
+          </button>
+        ))}
+      </div>
+    </>
+  )
+}
+
 interface NavigationBarProps {
   isCompact?: boolean
   onToggleCompact?: () => void
   onLanguageSelected?: (languageCode: string) => void // For Read page language selection
   showLanguagePicker?: boolean // Show language picker in navigation bar
   autoOpenLanguagePicker?: boolean // Auto-open language picker on mount (for Read page)
+  /** When true, language modal cannot be closed until a language is chosen (/read without :languageCode). */
+  languagePickerRequired?: boolean
   downloadIndicator?: React.ReactNode // Download indicator component
   onDownloadCollection?: () => void // Download current collection (Read page)
   onLoadCollection?: () => void // Load a collection (Read page)
 }
 
-export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSelected, showLanguagePicker = false, autoOpenLanguagePicker = false, downloadIndicator, onDownloadCollection, onLoadCollection }: NavigationBarProps = {}) {
+export function NavigationBar({
+  isCompact = false,
+  onToggleCompact,
+  onLanguageSelected,
+  showLanguagePicker = false,
+  autoOpenLanguagePicker = false,
+  languagePickerRequired = false,
+  downloadIndicator,
+  onDownloadCollection,
+  onLoadCollection,
+}: NavigationBarProps = {}) {
   const navigation = useNavigation()
   const currentRef = useCurrentReference()
   const navigationMode = useNavigationMode()
   const passageSet = useCurrentPassageSet()
   const history = useNavigationHistory()
+  const availableBooks = useAvailableBooks()
+  const storeHasNavigationSource = useHasNavigationSource()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
   const anchorResource = useAnchorResource()
   const bookTitleSource = useBookTitleSource()
@@ -103,16 +155,33 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isTypeSelectorOpen])
 
-  // Navigation is available when:
-  // 1. Anchor resource is set (BCV, sections, etc.)
-  // 2. OR passage set is loaded (passage set navigation only)
   const hasAnchor = !!anchorResourceId
   const hasPassageSet = !!passageSet
-  const hasNavigationSource = hasAnchor || hasPassageSet
+  const hasObsResource = Object.values(loadedResources).some(
+    (r) =>
+      r.resourceId?.toLowerCase() === 'obs' ||
+      (r.subject?.toLowerCase().includes('open bible stories') ?? false)
+  )
+  const hasNavigationSource =
+    storeHasNavigationSource || (!!anchorResourceId && hasObsResource && availableBooks.length === 0)
 
   // LTR: { book } { startChapter }: { startVerse }-?{ EndChapter }?:?{ EndVerse }?
   // RTL: { EndVerse }?:?{ EndChapter }?-?{ startVerse }: { startChapter } { book } (two parts for bidi-safe render)
   const formatReferenceParts = (ref: typeof currentRef) => {
+    if (ref.book === 'obs') {
+      if (navigationMode === 'chapter') {
+        // Story mode — show only the story number (arrows move story-by-story)
+        return { bookPart: 'OBS', numberPart: `${ref.chapter}` }
+      }
+      // Frame / custom-range mode — show story · frame, plus range suffix if present
+      let numberPart = `${ref.chapter} · ${ref.verse}`
+      if (ref.endChapter && ref.endChapter !== ref.chapter) {
+        numberPart += ` – ${ref.endChapter} · ${ref.endVerse ?? 1}`
+      } else if (ref.endVerse && ref.endVerse !== ref.verse) {
+        numberPart += ` – ${ref.chapter} · ${ref.endVerse}`
+      }
+      return { bookPart: 'OBS', numberPart }
+    }
     const bookName = getBookTitle(bookTitleSource, ref.book)
     if (!isRtl) {
       let numberPart = `${ref.chapter}:${ref.verse}`
@@ -133,6 +202,9 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   }
 
   const getModeLabel = () => {
+    if (currentRef.book === 'obs') {
+      return navigationMode === 'chapter' ? 'Story' : 'Frame'
+    }
     switch (navigationMode) {
       case 'verse':
         return 'Range'
@@ -148,6 +220,14 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   }
 
   const handlePrevious = () => {
+    if (currentRef.book === 'obs') {
+      if (navigationMode === 'chapter') {
+        navigation.previousObsStory()
+      } else {
+        navigation.previousObsFrame()
+      }
+      return
+    }
     if (navigationMode === 'passage-set' && hasPassageSet) {
       navigation.previousPassage()
     } else if (navigationMode === 'verse') {
@@ -160,6 +240,14 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   }
 
   const handleNext = () => {
+    if (currentRef.book === 'obs') {
+      if (navigationMode === 'chapter') {
+        navigation.nextObsStory()
+      } else {
+        navigation.nextObsFrame()
+      }
+      return
+    }
     if (navigationMode === 'passage-set' && hasPassageSet) {
       navigation.nextPassage()
     } else if (navigationMode === 'verse') {
@@ -172,6 +260,11 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   }
 
   const canGoPrevious = () => {
+    if (currentRef.book === 'obs') {
+      return navigationMode === 'chapter'
+        ? navigation.canGoToPreviousObsStory()
+        : navigation.canGoToPreviousObsFrame()
+    }
     if (navigationMode === 'passage-set') {
       return navigation.canGoToPreviousPassage()
     } else if (navigationMode === 'verse') {
@@ -185,6 +278,11 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   }
 
   const canGoNext = () => {
+    if (currentRef.book === 'obs') {
+      return navigationMode === 'chapter'
+        ? navigation.canGoToNextObsStory()
+        : navigation.canGoToNextObsFrame()
+    }
     if (navigationMode === 'passage-set') {
       return navigation.canGoToNextPassage()
     } else if (navigationMode === 'verse') {
@@ -200,7 +298,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
   // Range expansion helpers for custom range mode
   const expandRangeBackward = () => {
     if (navigationMode !== 'verse') return
-    
+    if (currentRef.book === 'obs') return
+
     const bookInfo = navigation.getBookInfo(currentRef.book)
     if (!bookInfo) return
 
@@ -216,7 +315,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
       // Move to previous chapter
       newStartChapter = startChapter - 1
       if (newStartChapter >= 1) {
-        newStartVerse = bookInfo.verses[newStartChapter - 1] || 1
+        newStartVerse = bookInfo.verses?.[newStartChapter - 1] || 1
       } else {
         return // Can't go before chapter 1
       }
@@ -233,7 +332,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
 
   const expandRangeForward = () => {
     if (navigationMode !== 'verse') return
-    
+    if (currentRef.book === 'obs') return
+
     const bookInfo = navigation.getBookInfo(currentRef.book)
     if (!bookInfo) return
 
@@ -244,12 +344,12 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
 
     let newEndChapter = endChapter
     let newEndVerse = endVerse + 1
-    const maxVerseInChapter = bookInfo.verses[newEndChapter - 1] || 0
+    const maxVerseInChapter = bookInfo.verses?.[newEndChapter - 1] || 0
 
     if (newEndVerse > maxVerseInChapter) {
       // Move to next chapter
       newEndChapter = endChapter + 1
-      if (newEndChapter <= bookInfo.verses.length) {
+      if (newEndChapter <= (bookInfo.verses ?? []).length) {
         newEndVerse = 1
       } else {
         return // Can't go beyond last chapter
@@ -267,6 +367,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
 
   const canExpandBackward = () => {
     if (navigationMode !== 'verse') return false
+    if (currentRef.book === 'obs') return false
     const bookInfo = navigation.getBookInfo(currentRef.book)
     if (!bookInfo) return false
     return currentRef.verse > 1 || currentRef.chapter > 1
@@ -274,17 +375,19 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
 
   const canExpandForward = () => {
     if (navigationMode !== 'verse') return false
+    if (currentRef.book === 'obs') return false
     const bookInfo = navigation.getBookInfo(currentRef.book)
     if (!bookInfo) return false
     const endChapter = currentRef.endChapter || currentRef.chapter
     const endVerse = currentRef.endVerse || currentRef.verse
-    const maxVerse = bookInfo.verses[endChapter - 1] || 0
-    return endVerse < maxVerse || endChapter < bookInfo.verses.length
+    const maxVerse = bookInfo.verses?.[endChapter - 1] || 0
+    return endVerse < maxVerse || endChapter < (bookInfo.verses ?? []).length
   }
 
   const shrinkRangeFromStart = () => {
     if (navigationMode !== 'verse') return
-    
+    if (currentRef.book === 'obs') return
+
     const bookInfo = navigation.getBookInfo(currentRef.book)
     if (!bookInfo) return
 
@@ -298,7 +401,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
 
     let newStartChapter = startChapter
     let newStartVerse = startVerse + 1
-    const maxVerseInChapter = bookInfo.verses[startChapter - 1] || 0
+    const maxVerseInChapter = bookInfo.verses?.[startChapter - 1] || 0
 
     if (newStartVerse > maxVerseInChapter) {
       // Move to next chapter
@@ -329,7 +432,8 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
 
   const shrinkRangeFromEnd = () => {
     if (navigationMode !== 'verse') return
-    
+    if (currentRef.book === 'obs') return
+
     const bookInfo = navigation.getBookInfo(currentRef.book)
     if (!bookInfo) return
 
@@ -348,7 +452,7 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
       // Move to previous chapter
       newEndChapter = endChapter - 1
       if (newEndChapter >= 1) {
-        newEndVerse = bookInfo.verses[newEndChapter - 1] || 1
+        newEndVerse = bookInfo.verses?.[newEndChapter - 1] || 1
       } else {
         return
       }
@@ -410,7 +514,12 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
           {showLanguagePicker && (
             <div className="flex items-center gap-1 shrink-0">
               <div className="w-px h-4 bg-gray-300" />
-              <LanguagePicker onLanguageSelected={onLanguageSelected} compact autoOpen={autoOpenLanguagePicker} />
+              <LanguagePicker
+                onLanguageSelected={onLanguageSelected}
+                compact
+                autoOpen={autoOpenLanguagePicker}
+                required={languagePickerRequired}
+              />
             </div>
           )}
         </div>
@@ -440,7 +549,12 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
           </button>
         </div>
         {showLanguagePicker && (
-          <LanguagePicker onLanguageSelected={onLanguageSelected} compact={false} autoOpen={autoOpenLanguagePicker} />
+          <LanguagePicker
+            onLanguageSelected={onLanguageSelected}
+            compact={false}
+            autoOpen={autoOpenLanguagePicker}
+            required={languagePickerRequired}
+          />
         )}
       </div>
     )
@@ -480,40 +594,62 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
             
-            {/* Navigation type selector */}
+            {/* Navigation type selector — OBS: Frame vs Story; Scripture: verse/chapter/section/passage */}
             <div className="relative" ref={typeSelectorRef}>
-              <button
-                onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
-                className="p-1.5 hover:bg-blue-100 text-blue-700 transition-colors rounded-full flex items-center justify-center"
-                title={`Navigation type: ${getModeLabel()}`}
-              >
-                {navigationMode === 'verse' && <BookOpen className="w-4 h-4" />}
-                {navigationMode === 'chapter' && <Library className="w-4 h-4" />}
-                {navigationMode === 'section' && <List className="w-4 h-4" />}
-                {navigationMode === 'passage-set' && <ListOrdered className="w-4 h-4" />}
-              </button>
-              
-              {/* Navigation Type Selector Dropdown */}
-              {isTypeSelectorOpen && (
-                <NavigationTypeSelector 
-                  onClose={() => setIsTypeSelectorOpen(false)}
-                />
-            )}
+              {currentRef.book === 'obs' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
+                    className="p-1.5 hover:bg-blue-100 text-blue-700 transition-colors rounded-full flex items-center justify-center"
+                    title={`Navigation type: ${getModeLabel()}`}
+                  >
+                    {navigationMode === 'chapter' ? (
+                      <Library className="w-4 h-4" />
+                    ) : (
+                      <BookMarked className="w-4 h-4" />
+                    )}
+                  </button>
+
+                  {isTypeSelectorOpen && (
+                    <ObsNavigationTypeSelector onClose={() => setIsTypeSelectorOpen(false)} />
+                  )}
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
+                    className="p-1.5 hover:bg-blue-100 text-blue-700 transition-colors rounded-full flex items-center justify-center"
+                    title={`Navigation type: ${getModeLabel()}`}
+                  >
+                    {navigationMode === 'verse' && <BookOpen className="w-4 h-4" />}
+                    {navigationMode === 'chapter' && <Library className="w-4 h-4" />}
+                    {navigationMode === 'section' && <List className="w-4 h-4" />}
+                    {navigationMode === 'passage-set' && <ListOrdered className="w-4 h-4" />}
+                  </button>
+
+                  {isTypeSelectorOpen && (
+                    <NavigationTypeSelector onClose={() => setIsTypeSelectorOpen(false)} />
+                  )}
+                </>
+              )}
             </div>
 
             {/* Divider */}
             <div className="w-px h-6 bg-blue-200"></div>
 
-            {/* Reference display - RTL: range then book (4:1 Titus); flex enforces order regardless of script */}
+            {/* Reference display - RTL: range then book (4:1 Titus); flex enforces order regardless of script.
+                OBS references are always LTR regardless of language direction (numeric story · frame). */}
             <button
               onClick={() => setIsNavigatorOpen(true)}
               className="px-3 py-1 hover:bg-blue-100 text-sm font-medium text-blue-900 transition-colors rounded-md inline-flex items-center gap-1"
               title="Click to navigate or adjust range"
-              dir={isRtl ? 'rtl' : 'ltr'}
+              dir={isRtl && currentRef.book !== 'obs' ? 'rtl' : 'ltr'}
             >
               {(() => {
                 const { bookPart, numberPart } = formatReferenceParts(currentRef)
-                return isRtl ? (
+                return isRtl && currentRef.book !== 'obs' ? (
                   <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
                     <span>{numberPart}</span>
                     <span>{bookPart}</span>
@@ -540,10 +676,20 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
           </div>
         </div>
         
-        {/* Right side controls - Download Indicator & Hamburger Menu */}
+        {/* Right side controls - Download Indicator, Language Picker & Hamburger Menu */}
         <div className="flex items-center gap-1">
           {/* Download Indicator */}
           {downloadIndicator}
+
+          {/* Language Picker - always mounted so autoOpen/required work regardless of hamburger state */}
+          {showLanguagePicker && (
+            <LanguagePicker
+              onLanguageSelected={onLanguageSelected}
+              compact={true}
+              autoOpen={autoOpenLanguagePicker}
+              required={languagePickerRequired}
+            />
+          )}
           
           <div className="relative" ref={menuRef}>
             <button
@@ -612,20 +758,6 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
                   </>
                 )}
                 
-                {/* Language Picker */}
-                {showLanguagePicker && (
-                  <div className="border-t border-gray-100 p-2">
-                    <LanguagePicker 
-                      onLanguageSelected={(lang) => {
-                        onLanguageSelected?.(lang)
-                        setIsMenuOpen(false)
-                      }}
-                      compact={true}
-                      autoOpen={autoOpenLanguagePicker}
-                    />
-                  </div>
-                )}
-                
                 {/* Version info - icon opens modal with app version and build */}
                 {showLanguagePicker && (
                   <div className="border-t border-gray-100 px-2 py-1.5 flex justify-center">
@@ -678,10 +810,12 @@ export function NavigationBar({ isCompact = false, onToggleCompact, onLanguageSe
         )}
         
         {/* BCV Navigator Modal */}
-        {isNavigatorOpen && hasAnchor && (
-          <BCVNavigator 
-            onClose={() => setIsNavigatorOpen(false)} 
-            mode={navigationMode === 'section' ? 'section' : 'verse'}
+        {/* hasAnchor gates scripture-mode navigation; hasObsResource allows OBS-only mode
+            (when scope is obs after a fresh load no scripture viewer has called setAnchorResource) */}
+        {isNavigatorOpen && (hasAnchor || hasObsResource) && (availableBooks.length > 0 || hasObsResource) && (
+          <BCVNavigator
+            onClose={() => setIsNavigatorOpen(false)}
+            mode={navigationMode === 'section' && currentRef.book !== 'obs' ? 'section' : 'verse'}
           />
         )}
         

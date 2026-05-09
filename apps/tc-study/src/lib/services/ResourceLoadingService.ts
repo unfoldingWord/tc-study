@@ -6,14 +6,14 @@
 import type { ResourceMetadata } from '@bt-synergy/catalog-manager'
 import type { LoaderRegistry } from '../loaders/LoaderRegistry'
 import { ProcessedScripture } from '@bt-synergy/usfm-processor'
-import { TranslationWord } from '@bt-synergy/translation-words-loader/types'
+import type { TranslationWord } from '@bt-synergy/translation-words-loader'
 
 export interface LoadedResourceContent {
   resourceKey: string
   metadata: ResourceMetadata
   content: any // Scripture: ProcessedScripture, Words: TranslationWord, etc.
   loadedAt: Date
-  type: 'scripture' | 'words' | 'notes' | 'questions' | 'academy' | 'unknown'
+  type: 'scripture' | 'obs' | 'words' | 'notes' | 'questions' | 'academy' | 'unknown'
 }
 
 export class ResourceLoadingService {
@@ -34,9 +34,8 @@ export class ResourceLoadingService {
     metadata: ResourceMetadata,
     ingredientId?: string
   ): Promise<LoadedResourceContent> {
-    const cacheKey = ingredientId 
-      ? `${metadata.id}/${ingredientId}` 
-      : metadata.id
+    const baseKey = metadata.resourceKey
+    const cacheKey = ingredientId ? `${baseKey}/${ingredientId}` : baseKey
 
     // Check if already loaded
     if (this.loadedContent.has(cacheKey)) {
@@ -63,18 +62,18 @@ export class ResourceLoadingService {
       if (!ingredientId) {
         throw new Error('ingredientId (book code) required for book-organized resources')
       }
-      content = await loader.loadContent(metadata.id, ingredientId)
+      content = await loader.loadContent(metadata.resourceKey, ingredientId)
     } else if (metadata.contentStructure === 'entry') {
       // Entry-organized resources (e.g., Translation Words) - load specific entry or index
       if (ingredientId) {
-        content = await loader.loadContent(metadata.id, ingredientId)
+        content = await loader.loadContent(metadata.resourceKey, ingredientId)
       } else {
         // Load entry list/index
-        content = await loader.getMetadata(metadata.id)
+        content = await loader.getMetadata(metadata.resourceKey)
       }
     } else {
       // Unknown structure - try generic load
-      content = await loader.loadContent(metadata.id, ingredientId || '')
+      content = await loader.loadContent(metadata.resourceKey, ingredientId || '')
     }
 
     const loaded: LoadedResourceContent = {
@@ -139,6 +138,9 @@ export class ResourceLoadingService {
    * Determine resource type from metadata
    */
   private determineType(metadata: ResourceMetadata): LoadedResourceContent['type'] {
+    if (metadata.type === 'obs' || metadata.subject === 'Open Bible Stories') {
+      return 'obs'
+    }
     if (metadata.type === 'scripture' || metadata.subject === 'Bible' || metadata.subject === 'Aligned Bible') {
       return 'scripture'
     }

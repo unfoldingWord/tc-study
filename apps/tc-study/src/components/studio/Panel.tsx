@@ -3,11 +3,15 @@
  */
 
 import { BookOpen } from 'lucide-react'
-import type { PanelState } from '@bt-synergy/study-store'
-import { ReferenceParser } from '@bt-synergy/navigation'
+
+/** Legacy placeholder panel state (not the workspace `PanelConfig` model). */
+export interface LegacyPanelPlaceholderState {
+  resourceKey: string | null
+  currentReference: string
+}
 
 interface PanelProps {
-  panel: PanelState
+  panel: LegacyPanelPlaceholderState
   onSelectResource: () => void
 }
 
@@ -53,7 +57,7 @@ export function Panel({ panel, onSelectResource }: PanelProps) {
           </button>
         </div>
         <p className="text-sm text-gray-500 mt-1">
-          {ReferenceParser.formatDisplay(panel.currentReference)}
+          {panel.currentReference}
         </p>
       </div>
 
@@ -62,7 +66,7 @@ export function Panel({ panel, onSelectResource }: PanelProps) {
         {/* Placeholder for resource content */}
         <div className="prose max-w-none">
           <h4 className="text-xl font-bold mb-4">
-            {ReferenceParser.formatDisplay(panel.currentReference)}
+            {panel.currentReference}
           </h4>
           <p className="text-gray-600 mb-4">
             Resource content will be displayed here.
@@ -76,4 +80,3 @@ export function Panel({ panel, onSelectResource }: PanelProps) {
     </div>
   )
 }
-

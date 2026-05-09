@@ -16,6 +16,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
+    "test": "bun test src/lib/obs/highlightFrameText.test.ts",
     "deploy": "bash scripts/deploy.sh",
     "deploy:quick": "node scripts/write-app-version.cjs && node scripts/set-deploy-version.cjs \"bun run build:skip-check\" && bunx wrangler pages deploy dist --project-name=tc-study --branch=master",
     "deploy:cf": "bash scripts/deploy.sh",
@@ -77,6 +78,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@types/file-saver": "^2.0.7",
+    "@types/mdast": "^4.0.4",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",

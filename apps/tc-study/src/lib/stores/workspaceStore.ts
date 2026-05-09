@@ -273,7 +273,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
       // Check if a collection with this name already exists
       const collectionName = name || pkg.name
       const existingCollection = packageStore.packages.find(
-        p => (p.name === collectionName || p.title === collectionName)
+        p => p.name === collectionName || (p as { title?: string }).title === collectionName
       )
       
       // Get all resources assigned to panels

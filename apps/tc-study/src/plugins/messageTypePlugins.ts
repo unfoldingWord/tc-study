@@ -3,8 +3,18 @@
  * Registers signal types for resource-panels communication
  */
 
-import { createPlugin, type MessageTypePlugin } from 'linked-panels'
-import type { EntryLinkClickSignal, NotesTokenGroupsSignal, ScriptureContentRequestSignal, ScriptureContentResponseSignal, ScriptureTokensBroadcastSignal, TokenClickSignal, VerseFilterSignal } from '../signals/studioSignals'
+import { createPlugin } from 'linked-panels'
+import type {
+  EntryLinkClickSignal,
+  NotesTokenGroupsSignal,
+  ObsFrameHighlightSignal,
+  ObsFrameQuotesSignal,
+  ScriptureContentRequestSignal,
+  ScriptureContentResponseSignal,
+  ScriptureTokensBroadcastSignal,
+  TokenClickSignal,
+  VerseFilterSignal,
+} from '../signals/studioSignals'
 import { useStudyStore } from '../store/studyStore'
 import type { LinkClickEvent } from './types'
 
@@ -100,7 +110,7 @@ function handleTokenClickSignal(message: any) {
  * Plugin for token-click signals (resource-panels)
  * Handles word/token selection across scripture panels
  */
-export const tokenClickPlugin: MessageTypePlugin<TokenClickSignal> = createPlugin({
+export const tokenClickPlugin = createPlugin({
   name: 'token-click-signal-plugin',
   version: '2.0.0',
   description: 'Plugin for token-click signals from @bt-synergy/resource-panels',
@@ -138,7 +148,7 @@ function handleVerseFilterSignal(message: any) {
   console.log(`📍 Verse Filter: ch ${signal.filter.chapter}${signal.filter.verse !== undefined ? `:${signal.filter.verse}` : ''} from ${signal.sourceResourceId}`)
 }
 
-export const verseFilterPlugin: MessageTypePlugin<VerseFilterSignal> = createPlugin({
+export const verseFilterPlugin = createPlugin({
   name: 'verse-filter-plugin',
   version: '1.0.0',
   description: 'Plugin for verse/chapter filter signals from scripture viewers',
@@ -220,7 +230,7 @@ function handleLinkClick(message: any) {
  * Plugin for link-click messages
  * Handles navigation between related resources (e.g., TW links)
  */
-export const linkClickPlugin: MessageTypePlugin<LinkClickEvent> = createPlugin({
+export const linkClickPlugin = createPlugin({
   name: 'link-click-plugin',
   version: '1.0.0',
   description: 'Plugin for link click events in resource viewers',
@@ -265,7 +275,7 @@ function handleScriptureContentRequest(message: any) {
 /**
  * Plugin for scripture-content-request signals
  */
-export const scriptureContentRequestPlugin: MessageTypePlugin<ScriptureContentRequestSignal> = createPlugin({
+export const scriptureContentRequestPlugin = createPlugin({
   name: 'scripture-content-request-plugin',
   version: '1.0.0',
   description: 'Plugin for scripture content request signals',
@@ -314,7 +324,7 @@ function handleScriptureContentResponse(message: any) {
 /**
  * Plugin for scripture-content-response signals
  */
-export const scriptureContentResponsePlugin: MessageTypePlugin<ScriptureContentResponseSignal> = createPlugin({
+export const scriptureContentResponsePlugin = createPlugin({
   name: 'scripture-content-response-plugin',
   version: '1.0.0',
   description: 'Plugin for scripture content response signals',
@@ -397,7 +407,7 @@ function handleScriptureTokensBroadcast(message: any) {
  * Plugin for scripture-tokens-broadcast signals
  * Handles broadcasting of scripture tokens from active panels
  */
-export const scriptureTokensBroadcastPlugin: MessageTypePlugin<ScriptureTokensBroadcastSignal> = createPlugin({
+export const scriptureTokensBroadcastPlugin = createPlugin({
   name: 'scripture-tokens-broadcast-plugin',
   version: '1.0.0',
   
@@ -453,7 +463,7 @@ function handleNotesTokenGroupsSignal(message: any) {
   }
 }
 
-export const notesTokenGroupsPlugin: MessageTypePlugin<NotesTokenGroupsSignal> = createPlugin({
+export const notesTokenGroupsPlugin = createPlugin({
   name: 'notes-token-groups-plugin',
   version: '1.0.0',
   description: 'TN/TWL broadcast of quote semantic IDs for scripture underlining',
@@ -534,7 +544,7 @@ function handleEntryLinkClick(message: any) {
  * Plugin for entry-link-click signals
  * Handles navigation to entry-organized resources (Translation Words, Translation Academy, etc.)
  */
-export const entryLinkClickPlugin: MessageTypePlugin<EntryLinkClickSignal> = createPlugin({
+export const entryLinkClickPlugin = createPlugin({
   name: 'entry-link-click-plugin',
   version: '1.0.0',
   description: 'Plugin for entry link click signals (Translation Words, Translation Academy, etc.)',
@@ -552,4 +562,83 @@ export const entryLinkClickPlugin: MessageTypePlugin<EntryLinkClickSignal> = cre
   }
 })
 
+// ===== OBS FRAME HIGHLIGHT PLUGIN =====
+
+function isObsFrameHighlightSignal(content: unknown): content is ObsFrameHighlightSignal {
+  if (!content || typeof content !== 'object') return false
+  const message = content as ObsFrameHighlightSignal
+  if (message.type !== 'obs-frame-highlight') return false
+  if (message.lifecycle !== 'event') return false
+  if (typeof message.sourceResourceId !== 'string') return false
+  if (typeof message.timestamp !== 'number') return false
+  if (message.highlight === null) return true
+  const h = message.highlight
+  if (typeof h.storyNumber !== 'number') return false
+  if (typeof h.frameNumber !== 'number') return false
+  if (typeof h.quote !== 'string') return false
+  if (typeof h.occurrence !== 'number') return false
+  if (h.rowId !== undefined && typeof h.rowId !== 'string') return false
+  return true
+}
+
+function handleObsFrameHighlightSignal(message: { content: ObsFrameHighlightSignal }) {
+  const signal = message.content as ObsFrameHighlightSignal
+  if (signal.highlight) {
+    console.log(
+      `[OBS Frame Highlight] ${signal.sourceResourceId} → story ${signal.highlight.storyNumber} frame ${signal.highlight.frameNumber}: "${signal.highlight.quote}" (occ ${signal.highlight.occurrence})`
+    )
+  } else {
+    console.log(`[OBS Frame Highlight] ${signal.sourceResourceId} cleared`)
+  }
+}
+
+export const obsFrameHighlightPlugin = createPlugin({
+  name: 'obs-frame-highlight-plugin',
+  version: '1.0.0',
+  description: 'OBS frame substring highlight (TN/TWL ↔ ObsViewer)',
+  messageTypes: { 'obs-frame-highlight': {} as ObsFrameHighlightSignal },
+  validators: { 'obs-frame-highlight': isObsFrameHighlightSignal },
+  handlers: { 'obs-frame-highlight': handleObsFrameHighlightSignal },
+})
+
+// ===== OBS FRAME QUOTES STATE PLUGIN =====
+
+function isObsFrameQuotesSignal(content: unknown): content is ObsFrameQuotesSignal {
+  if (!content || typeof content !== 'object') return false
+  const message = content as ObsFrameQuotesSignal
+  if (message.type !== 'obs-frame-quotes') return false
+  if (message.lifecycle !== 'state') return false
+  if (message.stateKey !== 'current-obs-frame-quotes') return false
+  if (typeof message.sourceResourceId !== 'string') return false
+  if (typeof message.storyNumber !== 'number') return false
+  if (typeof message.frameNumber !== 'number') return false
+  if (!Array.isArray(message.quotes)) return false
+  for (const q of message.quotes) {
+    if (!q || typeof q !== 'object') return false
+    if (typeof q.sourceId !== 'string') return false
+    if (q.kind !== 'tn' && q.kind !== 'twl') return false
+    if (typeof q.quote !== 'string') return false
+    if (typeof q.occurrence !== 'number') return false
+  }
+  if (typeof message.timestamp !== 'number') return false
+  return true
+}
+
+function handleObsFrameQuotesSignal(message: { content: ObsFrameQuotesSignal }) {
+  const signal = message.content as ObsFrameQuotesSignal
+  if (signal.quotes.length > 0) {
+    console.log(
+      `[OBS Frame Quotes] from ${signal.sourceResourceId}: story ${signal.storyNumber} frame ${signal.frameNumber}, ${signal.quotes.length} quotes`
+    )
+  }
+}
+
+export const obsFrameQuotesPlugin = createPlugin({
+  name: 'obs-frame-quotes-plugin',
+  version: '1.0.0',
+  description: 'OBS TN/TWL quote broadcast for clickable frame text',
+  messageTypes: { 'obs-frame-quotes': {} as ObsFrameQuotesSignal },
+  validators: { 'obs-frame-quotes': isObsFrameQuotesSignal },
+  handlers: { 'obs-frame-quotes': handleObsFrameQuotesSignal },
+})
 

@@ -11,12 +11,17 @@ import { NavigationProvider, AppProvider } from '../contexts'
 import { SimplifiedReadView } from '../components/read/SimplifiedReadView'
 
 export default function Read() {
-  const { languageCode } = useParams<{ languageCode?: string }>()
+  const { languageCode: languageCodeParam } = useParams<{ languageCode?: string }>()
+  const languageCode = languageCodeParam?.trim() || undefined
+  const requireLanguageInUrl = !languageCode
 
   return (
     <NavigationProvider>
       <AppProvider>
-        <SimplifiedReadView initialLanguage={languageCode} />
+        <SimplifiedReadView
+          initialLanguage={languageCode}
+          requireLanguageInUrl={requireLanguageInUrl}
+        />
       </AppProvider>
     </NavigationProvider>
   )

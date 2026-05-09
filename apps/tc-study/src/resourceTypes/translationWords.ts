@@ -16,6 +16,9 @@ export const translationWordsResourceType: ResourceTypeDefinition = defineResour
   description: 'Biblical term definitions organized by category (Key Terms, Names, Other)',
   icon: 'BookText',
   
+  // ===== SCOPE / ROLE =====
+  contentRole: 'shared',
+
   // ===== DOOR43 MAPPING =====
   subjects: ['Translation Words'],
   aliases: ['tw', 'words'],

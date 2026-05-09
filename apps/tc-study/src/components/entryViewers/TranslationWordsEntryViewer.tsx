@@ -306,7 +306,7 @@ export function TranslationWordsEntryViewer({
                         validationPassed = false
                       } else {
                         // Validate chapter is within book bounds
-                        if (chapter > bookInfo.chapters) {
+                        if (chapter > (bookInfo.chapters ?? Infinity)) {
                           console.warn('[TranslationWordsEntryViewer] Chapter out of bounds in current context:', { 
                             chapter, 
                             maxChapters: bookInfo.chapters 

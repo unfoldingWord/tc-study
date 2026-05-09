@@ -6,8 +6,8 @@
 
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
 import { Code, ExternalLink } from 'lucide-react'
-import { memo, startTransition, useState } from 'react'
-import { useCurrentReference, useNavigation } from '../../../../contexts'
+import { memo, startTransition, useCallback, useState } from 'react'
+import { useNavigationStore } from '../../../../contexts'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
 import { parseScriptureLink } from '../utils/parseScriptureLink'
@@ -20,7 +20,10 @@ interface AlignedToken {
   type?: 'word' | 'punctuation' | 'whitespace' | 'text' | 'gap'
 }
 
-type NoteWithTokens = TranslationNote & { alignedTokens?: AlignedToken[] }
+export type NoteWithTokens = TranslationNote & {
+  alignedTokens?: AlignedToken[]
+  semanticIds?: string[]
+}
 
 interface TranslationNoteCardProps {
   note: NoteWithTokens
@@ -37,6 +40,8 @@ interface TranslationNoteCardProps {
   taTitle?: string
   isLoadingTATitle?: boolean
   getEntryTitle?: (rcLink: string) => string | null
+  /** When true, clicking the literal quote broadcasts OBS frame highlight even without aligned tokens. */
+  obsMode?: boolean
 }
 
 export const TranslationNoteCard = memo(function TranslationNoteCard({
@@ -52,10 +57,12 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   taTitle = 'Learn more',
   isLoadingTATitle = false,
   getEntryTitle,
+  obsMode = false,
 }: TranslationNoteCardProps) {
   const [showRawMarkdown, setShowRawMarkdown] = useState(false)
-  const currentRef = useCurrentReference()
-  const { navigateToReference } = useNavigation()
+  // Narrow selector: only re-render when the book changes (OBS↔scripture switch),
+  // not on every chapter/verse navigation or obsFrameCountByStory update.
+  const currentBook = useNavigationStore((s) => s.currentReference.book)
   const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
 
   // Extract resource abbreviation (e.g., "ULT" from "unfoldingWord/en/ult")
@@ -63,8 +70,10 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
     ? targetResourceId.split('/').pop()?.toUpperCase() || ''
     : ''
   
-  // Handle internal link clicks (scripture navigation, TA/TW entry links)
-  const handleInternalLinkClick = (href: string, linkType: 'rc' | 'relative' | 'unknown', linkText?: string) => {
+  // Stable callback: useNavigationStore.getState() avoids subscribing to the store,
+  // preventing re-renders (and cascading MarkdownRenderer effect re-fires) on every
+  // navigation store update (e.g. setObsStoryFrameCount changing obsFrameCountByStory).
+  const handleInternalLinkClick = useCallback((href: string, linkType: 'rc' | 'relative' | 'unknown', linkText?: string) => {
     // Handle rc:// links (TA/TW entries)
     if (linkType === 'rc' && href.startsWith('rc://')) {
       const parsed = parseRcLink(href)
@@ -102,14 +111,13 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
     }
     
     // Handle scripture navigation (relative links)
-    if (linkType === 'relative' && linkText && currentRef.book) {
-      const scriptureRef = parseScriptureLink(linkText, href, currentRef.book)
+    if (linkType === 'relative' && linkText && currentBook) {
+      const scriptureRef = parseScriptureLink(linkText, href, currentBook)
       if (scriptureRef) {
         console.log('📖 [TN] Navigating to scripture reference:', scriptureRef)
         // Use startTransition to make navigation non-blocking
-        // This prevents the heavy quote matching/alignment computation from freezing the UI
         startTransition(() => {
-          navigateToReference(scriptureRef)
+          useNavigationStore.getState().navigateToReference(scriptureRef)
         })
         return
       }
@@ -117,7 +125,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
     
     // Unknown link type - log for debugging
     console.warn('🔗 [TN] Unhandled link:', { href, linkType, linkText })
-  }
+  }, [currentBook, onEntryLinkClick, onSupportReferenceClick, resourceKey])
   return (
     <div
       className={`
@@ -129,7 +137,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       `}
       onClick={() => {
         onClick(note)
-        if (hasAlignedTokens && onQuoteClick) {
+        if ((hasAlignedTokens || obsMode) && onQuoteClick) {
           onQuoteClick(note)
         }
       }}
@@ -193,7 +201,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       )}
 
       {/* Fallback: Original language quote when target alignment is missing (e.g. scripture has no \zaln) */}
-      {!hasAlignedTokens && note.quote && note.quote.trim().length > 0 && (
+      {!hasAlignedTokens && note.quote && note.quote.trim().length > 0 && !obsMode && (
         <div
           className="w-full text-start mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 rounded-lg border border-blue-100/50"
           title="Original language phrase (target language alignment not available)"
@@ -210,6 +218,30 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
             )}
           </div>
         </div>
+      )}
+
+      {!hasAlignedTokens && obsMode && note.quote && note.quote.trim().length > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onQuoteClick?.(note)
+          }}
+          className="w-full text-start mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
+          title="Click to highlight this phrase in the story frame"
+          dir={languageDirection}
+        >
+          <div className="text-base leading-relaxed" dir={languageDirection}>
+            <span className="italic text-gray-700">
+              &ldquo;{note.quote}&rdquo;
+            </span>
+            {resourceAbbreviation && (
+              <span className="ms-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
+                {resourceAbbreviation}
+              </span>
+            )}
+          </div>
+        </button>
       )}
 
       {/* Note Content - Translation guidance (markdown) */}

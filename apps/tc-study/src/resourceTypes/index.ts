@@ -12,11 +12,17 @@ export { RESOURCE_TYPE_IDS, getResourceTypeDisplayName, isValidResourceTypeId, t
 
 // ===== REGISTERED RESOURCE TYPES =====
 export { scriptureResourceType } from './scripture'
+export { obsResourceType } from './obs'
 export { translationAcademyResourceType } from './translationAcademy'
 export { translationNotesResourceType } from './translationNotes'
 export { translationQuestionsResourceType } from './translationQuestions'
 export { translationWordsResourceType } from './translationWords'
 export { translationWordsLinksResourceType } from './translationWordsLinks'
+
+// ===== OBS COMPANION TYPES =====
+export { obsTranslationNotesResourceType } from './obsTranslationNotes'
+export { obsTranslationWordsLinksResourceType } from './obsTranslationWordsLinks'
+export { obsTranslationQuestionsResourceType } from './obsTranslationQuestions'
 
 // ===== RESOURCE PANELS INTEGRATION =====
 // HOC for adding inter-panel communication to any viewer

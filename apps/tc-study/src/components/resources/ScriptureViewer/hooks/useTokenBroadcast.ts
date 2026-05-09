@@ -178,29 +178,10 @@ export function useTokenBroadcast({
     api.messaging.sendToAll(broadcast)
   }, [resourceId, resourceKey, loadedContent, language, languageDirection, currentChapter, currentVerse, endChapter, endVerse])
   
-  // Cleanup: Send empty state on unmount
-  // Note: api.messaging.sendToAll is stable, so we don't include it in dependencies
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    return () => {
-      api.messaging.sendToAll({
-        type: 'scripture-tokens-broadcast',
-        lifecycle: 'state',
-        stateKey: 'current-scripture-tokens',
-        sourceResourceId: resourceId,
-        reference: {
-          book: '',
-          chapter: 0,
-          verse: 0,
-        },
-        tokens: [],
-        resourceMetadata: {
-          id: '',
-          language: '',
-          type: 'scripture',
-        },
-        timestamp: Date.now(),
-      })
-    }
-  }, [resourceId])
+  // Note: we intentionally do NOT send an empty-state broadcast on unmount.
+  // linked-panels validates that the sourceResourceId still exists in the store,
+  // so broadcasting after the resource has been removed from the panel store
+  // produces noisy "Sender resource does not exist" console errors (especially
+  // under React Strict Mode which double-invokes effects). Other panels will
+  // receive fresh token broadcasts from the newly mounted viewer.
 }

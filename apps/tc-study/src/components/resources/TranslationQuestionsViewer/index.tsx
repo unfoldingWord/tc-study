@@ -83,7 +83,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
           throw new Error('Translation Questions loader not found')
         }
 
-        const content = await loader.loadContent(resourceKey, bookCode)
+        const content = (await loader.loadContent(resourceKey, bookCode)) as ProcessedQuestions
 
         if (cancelled) return
         if (questionsCache.size >= TQ_CACHE_MAX) questionsCache.delete(questionsCache.keys().next().value!)

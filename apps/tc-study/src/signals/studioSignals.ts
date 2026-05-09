@@ -222,6 +222,57 @@ export interface NotesTokenGroupsSignal {
   timestamp: number
 }
 
+// ===== OBS FRAME HIGHLIGHTING (Open Bible Stories) =====
+
+/**
+ * OBS frame quote entry — substring + occurrence for matcher in frame text.
+ */
+export interface ObsFrameQuoteEntry {
+  sourceId: string
+  kind: 'tn' | 'twl'
+  quote: string
+  occurrence: number
+}
+
+/**
+ * OBS frame quotes broadcast — TN/TWL rows for current story/frame so ObsViewer can build clickable spans.
+ * `quotes` carries entries for the single current frame (backward compat).
+ * `frameQuoteMap` carries entries for every frame in the story so multi-frame (story/range) views can
+ * underline each frame independently.
+ */
+export interface ObsFrameQuotesSignal {
+  type: 'obs-frame-quotes'
+  lifecycle: 'state'
+  stateKey: 'current-obs-frame-quotes'
+  sourceResourceId: string
+  storyNumber: number
+  frameNumber: number
+  quotes: ObsFrameQuoteEntry[]
+  /** All frames in the current story, keyed by frame number. Used by range/story-mode rendering. */
+  frameQuoteMap?: Record<number, ObsFrameQuoteEntry[]>
+  timestamp: number
+}
+
+/**
+ * OBS frame highlight — bidirectional selection (helps card ↔ OBS frame substring).
+ */
+export interface ObsFrameHighlightSignal {
+  type: 'obs-frame-highlight'
+  lifecycle: 'event'
+  sourceResourceId: string
+  highlight: {
+    storyNumber: number
+    frameNumber: number
+    quote: string
+    occurrence: number
+    /** Optional row id for selection (TN id / TWL id) */
+    rowId?: string
+    /** Source kind — tells receivers which entry type was clicked so they can filter correctly */
+    kind?: 'tn' | 'twl'
+  } | null
+  timestamp: number
+}
+
 // ===== CONTENT REQUEST SIGNALS (DEPRECATED - Use broadcast instead) =====
 
 /**
@@ -370,6 +421,8 @@ export type StudioSignal =
   | ResourceErrorSignal
   | ContentChangeSignal
   | ScrollSyncSignal
+  | ObsFrameQuotesSignal
+  | ObsFrameHighlightSignal
 
 // ===== SIGNAL METADATA REGISTRY =====
 
@@ -527,5 +580,32 @@ export const STUDIO_SIGNAL_REGISTRY = {
         content: {}
       }
     }
-  }
+  },
+  'obs-frame-quotes': {
+    description: 'Broadcast OBS TN/TWL quote slices for current story/frame',
+    typicalSenders: ['combined-helps'],
+    typicalReceivers: ['obs'],
+    example: {
+      type: 'obs-frame-quotes',
+      lifecycle: 'state',
+      stateKey: 'current-obs-frame-quotes',
+      sourceResourceId: 'panel-2',
+      storyNumber: 1,
+      frameNumber: 1,
+      quotes: [{ sourceId: 'r1', kind: 'tn', quote: 'the beginning', occurrence: 1 }],
+      timestamp: Date.now(),
+    },
+  },
+  'obs-frame-highlight': {
+    description: 'Select or clear OBS frame substring highlight (bidirectional)',
+    typicalSenders: ['combined-helps', 'obs'],
+    typicalReceivers: ['combined-helps', 'obs'],
+    example: {
+      type: 'obs-frame-highlight',
+      lifecycle: 'event',
+      sourceResourceId: 'panel-1',
+      highlight: { storyNumber: 1, frameNumber: 1, quote: 'the beginning', occurrence: 1 },
+      timestamp: Date.now(),
+    },
+  },
 } as const

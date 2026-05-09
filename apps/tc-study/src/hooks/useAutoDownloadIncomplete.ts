@@ -58,7 +58,7 @@ export function useAutoDownloadIncomplete(
   const [isChecking, setIsChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const hasCheckedRef = useRef(false)
-  const timeoutRef = useRef<NodeJS.Timeout>()
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   
   const checkAndStart = async () => {
     if (!completenessChecker) {

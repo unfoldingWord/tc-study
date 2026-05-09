@@ -11,6 +11,10 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  // Elapsed-time tracking
+  const [startedAt, setStartedAt] = useState<number | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -25,6 +29,19 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
     }
   }, [isOpen])
 
+  // Track download start/stop to record startedAt
+  useEffect(() => {
+    if (isDownloading && startedAt == null) setStartedAt(Date.now())
+    if (!isDownloading) setStartedAt(null)
+  }, [isDownloading, startedAt])
+
+  // Tick every second only while the dropdown is open AND downloading
+  useEffect(() => {
+    if (!isDownloading || !isOpen) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [isDownloading, isOpen])
+
   // Calculate progress values BEFORE conditional return (for useEffect dependencies)
   const useIngredients = progress?.totalIngredients !== undefined && progress.totalIngredients > 0
   const completed = useIngredients 
@@ -37,6 +54,13 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
     ? (progress?.failedIngredients || 0)
     : (progress?.failedResources || 0)
   const overallProgress = progress?.overallProgress || 0
+
+  const elapsedMs = startedAt != null ? now - startedAt : 0
+  const elapsedLabel = (() => {
+    const s = Math.floor(elapsedMs / 1000)
+    const m = Math.floor(s / 60)
+    return m > 0 ? `${m}m ${s % 60}s` : `${s}s`
+  })()
   
   // Debug log for key state changes (MUST be before conditional return)
   useEffect(() => {
@@ -102,6 +126,14 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
               />
             </div>
           </div>
+
+          {/* Elapsed time — visible only while downloading */}
+          {isDownloading && startedAt != null && (
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+              <span>Elapsed</span>
+              <span className="font-mono">{elapsedLabel}</span>
+            </div>
+          )}
 
           {/* Current Resource & Ingredient */}
           {isDownloading && (progress?.currentResource || progress?.currentIngredient) && (

@@ -29,7 +29,8 @@
   "license": "MIT",
   "dependencies": {
     "@bt-synergy/resource-catalog": "workspace:*",
-    "@bt-synergy/resource-parsers": "workspace:*"
+    "@bt-synergy/resource-parsers": "workspace:*",
+    "jszip": "^3.10.1"
   },
   "peerDependencies": {
     "@bt-synergy/catalog-manager": "workspace:*",

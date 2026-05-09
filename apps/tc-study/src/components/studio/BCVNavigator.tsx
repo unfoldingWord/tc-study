@@ -1,56 +1,506 @@
 /**
- * BCVNavigator - Book-Chapter-Verse or Section selection modal
- * 
- * Two-step process:
- * 1. Select book from available books
- * 2a. Select custom range in a grid (can span chapters) - verse mode
- * 2b. Select from preset sections - section mode
- * 
- * Only works when anchor resource is set.
+ * BCVNavigator - Book-Chapter-Verse, Section, or Open Bible Stories selection modal
+ *
+ * Scripture: (1) pick book → (2) verses or preset sections
+ * OBS: (1) pick story → (2) pick frame
  */
 
 import type { TranslatorSection } from '@bt-synergy/usfm-processor'
-import { AlertCircle, ArrowLeft, BookOpen, Check, Hash, List, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { useAvailableBooks, useCurrentSectionIndex, useNavigation, useNavigationMode, type BCVReference } from '../../contexts'
+import { AlertCircle, ArrowLeft, BookMarked, BookOpen, Check, Hash, List, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useAvailableBooks,
+  useCatalogManager,
+  useCurrentSectionIndex,
+  useNavigation,
+  useNavigationMode,
+  useNavigationScope,
+  type BCVReference,
+} from '../../contexts'
 import { useAppStore, useBookTitleSource } from '../../contexts/AppContext'
+import { COMBINED_HELPS_IDS } from '../resources/CombinedHelpsViewer/constants'
+import type { ParsedObsStory } from '../../lib/obs/parseObsMarkdown'
 import { getDefaultSections } from '../../lib/data/default-sections'
 import { getBookTitle } from '../../utils/bookNames'
 
 interface BCVNavigatorProps {
   onClose: () => void
-  mode?: 'verse' | 'section' // Default is 'verse'
+  mode?: 'verse' | 'section'
+}
+
+function findObsCatalogKey(
+  loadedResources: Record<
+    string,
+    { resourceKey?: string; key?: string; subject?: string; type?: unknown }
+  >
+): string | null {
+  for (const r of Object.values(loadedResources)) {
+    if (!r) continue
+    const rk = r.resourceKey ?? r.key
+    if (!rk || COMBINED_HELPS_IDS.has(rk)) continue
+
+    const typeStr = String(r.type ?? '').toLowerCase().trim()
+    if (typeStr === 'obs' || /open bible stories/i.test(r.subject ?? '')) {
+      return rk
+    }
+  }
+  return null
 }
 
 export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   const navigation = useNavigation()
+  const navigationScope = useNavigationScope()
   const availableBooks = useAvailableBooks()
   const navigationMode = useNavigationMode()
   const currentSectionIndex = useCurrentSectionIndex()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
+  const loadedResources = useAppStore((s) => s.loadedResources)
   const bookTitleSource = useBookTitleSource()
+  const catalogManager = useCatalogManager()
   const currentRef = navigation.currentReference
-  
-  // Use provided mode or fall back to current navigation mode
-  const effectiveMode = mode || navigationMode
-  
-  // Refs for scrolling to current section/verse/book
+
+  const obsCatalogKey = useMemo(() => findObsCatalogKey(loadedResources), [loadedResources])
+  const hasObsLoaded = !!obsCatalogKey
+
+  const scripturePickerMode = mode || navigationMode
+
+  const obsStoryIds = useMemo(() => {
+    if (!obsCatalogKey) {
+      return Array.from({ length: 50 }, (_, i) => i + 1)
+    }
+    const res = Object.values(loadedResources).find(
+      (r) => (r.resourceKey ?? r.key) === obsCatalogKey
+    )
+    const ing = res?.ingredients
+    if (!ing?.length) {
+      return Array.from({ length: 50 }, (_, i) => i + 1)
+    }
+    const nums = ing
+      .map((i) => parseInt(i.identifier, 10))
+      .filter((n) => !Number.isNaN(n) && n > 0)
+    if (nums.length === 0) {
+      return Array.from({ length: 50 }, (_, i) => i + 1)
+    }
+    return [...new Set(nums)].sort((a, b) => a - b)
+  }, [loadedResources, obsCatalogKey])
+
+  const [step, setStep] = useState<1 | 2>(1)
+  const [selectedBook, setSelectedBook] = useState<string>(() =>
+    currentRef.book !== 'obs' ? currentRef.book : availableBooks[0]?.code ?? 'gen'
+  )
+  const [selectedObsStory, setSelectedObsStory] = useState<number | null>(() =>
+    currentRef.book === 'obs' ? currentRef.chapter : null
+  )
+
+  const initStartVerse =
+    currentRef.book !== 'obs' && currentRef.chapter && currentRef.verse
+      ? `${currentRef.chapter}:${currentRef.verse}`
+      : null
+  const initEndVerse =
+    currentRef.book !== 'obs' && currentRef.endChapter && currentRef.endVerse
+      ? `${currentRef.endChapter}:${currentRef.endVerse}`
+      : currentRef.book !== 'obs' && currentRef.endVerse && !currentRef.endChapter
+        ? `${currentRef.chapter}:${currentRef.endVerse}`
+        : null
+
+  const [startVerse, setStartVerse] = useState<string | null>(initStartVerse)
+  const [endVerse, setEndVerse] = useState<string | null>(initEndVerse)
+  const [sections, setSections] = useState<TranslatorSection[]>([])
+
+  const [obsFrameCountLocal, setObsFrameCountLocal] = useState(0)
+  const [obsFramesLoading, setObsFramesLoading] = useState(false)
+  const [obsLoadError, setObsLoadError] = useState<string | null>(null)
+
+  // OBS range selection — start fresh (no pre-init from currentRef to avoid confusion)
+  const [obsRangeStart, setObsRangeStart] = useState<{ story: number; frame: number } | null>(null)
+  const [obsRangeEnd, setObsRangeEnd] = useState<{ story: number; frame: number } | null>(null)
+  // Stories being lazy-loaded for the combined range view
+  const [obsLoadingStories, setObsLoadingStories] = useState<Set<number>>(new Set())
+  // Guard: auto-load neighbors once per open
+  const obsNeighborLoadDone = useRef(false)
+
   const currentSectionRef = useRef<HTMLButtonElement>(null)
   const startVerseRef = useRef<HTMLButtonElement>(null)
   const selectedBookRef = useRef<HTMLButtonElement>(null)
+  const selectedObsStoryRef = useRef<HTMLButtonElement>(null)
 
-  // Guard: Navigator requires anchor resource
-  if (!anchorResourceId || availableBooks.length === 0) {
+  useEffect(() => {
+    if (navigationScope !== 'scripture') return
+    const b =
+      currentRef.book !== 'obs' ? currentRef.book : availableBooks[0]?.code
+    if (b) setSelectedBook(b)
+  }, [navigationScope, currentRef.book, availableBooks])
+
+  useEffect(() => {
+    if (scripturePickerMode === 'section' && navigationScope === 'scripture' && selectedBook) {
+      let cancelled = false
+      getDefaultSections(selectedBook).then((defaultSections) => {
+        if (!cancelled && defaultSections.length > 0) {
+          setSections(defaultSections)
+          navigation.setBookSections(selectedBook, defaultSections)
+        } else if (!cancelled) {
+          setSections([])
+        }
+      })
+      return () => {
+        cancelled = true
+      }
+    }
+  }, [scripturePickerMode, selectedBook, navigation, navigationScope])
+
+  useEffect(() => {
+    if (scripturePickerMode === 'section' && currentSectionRef.current && step === 2 && navigationScope === 'scripture') {
+      setTimeout(() => {
+        currentSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+      }, 100)
+    }
+  }, [scripturePickerMode, step, sections, navigationScope])
+
+  useEffect(() => {
+    if (
+      scripturePickerMode !== 'section' &&
+      navigationScope === 'scripture' &&
+      startVerseRef.current &&
+      step === 2 &&
+      startVerse
+    ) {
+      setTimeout(() => {
+        startVerseRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+      }, 100)
+    }
+  }, [scripturePickerMode, step, startVerse, navigationScope])
+
+  useEffect(() => {
+    if (step === 1 && selectedBookRef.current && selectedBook && navigationScope === 'scripture') {
+      setTimeout(() => {
+        selectedBookRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+      }, 100)
+    }
+  }, [step, selectedBook, navigationScope])
+
+  useEffect(() => {
+    if (step === 1 && selectedObsStoryRef.current && navigationScope === 'obs' && currentRef.book === 'obs') {
+      setTimeout(() => {
+        selectedObsStoryRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        })
+      }, 100)
+    }
+  }, [step, navigationScope, currentRef.book, currentRef.chapter])
+
+  // Stable ref to navigation actions — keeps this effect out of the
+  // setObsStoryFrameCount → store update → navigation ref change → re-run loop.
+  const navigationActionsRef = useRef(navigation)
+  useEffect(() => {
+    navigationActionsRef.current = navigation
+  })
+
+  useEffect(() => {
+    if (step !== 2 || navigationScope !== 'obs' || !selectedObsStory || !obsCatalogKey) {
+      return
+    }
+    let cancelled = false
+    setObsFramesLoading(true)
+    setObsLoadError(null)
+    void catalogManager
+      .loadContent(obsCatalogKey, String(selectedObsStory))
+      .then((content) => {
+        if (cancelled) return
+        const parsed = content as ParsedObsStory
+        navigationActionsRef.current.setObsStoryFrameCount(selectedObsStory, parsed.frames.length)
+        setObsFrameCountLocal(parsed.frames.length)
+      })
+      .catch((e) => {
+        if (cancelled) return
+        setObsLoadError(e instanceof Error ? e.message : String(e))
+        const cached = navigationActionsRef.current.obsFrameCountByStory[String(selectedObsStory)]
+        setObsFrameCountLocal(cached ?? 0)
+      })
+      .finally(() => {
+        if (!cancelled) setObsFramesLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  // `navigation` excluded: calling setObsStoryFrameCount mutates the store, which
+  // changes the navigation object reference (Immer), which would re-trigger this effect
+  // in an infinite loop. Actions are accessed via stable navigationActionsRef instead.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, navigationScope, selectedObsStory, obsCatalogKey, catalogManager])
+
+  // When the combined OBS range view opens, eagerly load the ±5 stories around the current one.
+  // Loading all 50 at once causes 50 Zustand updates which cascade into the ObsViewer useEffect
+  // (navigation in its deps) and make the viewer restart its own load 50 times → freeze.
+  useEffect(() => {
+    if (navigationScope !== 'obs' || navigationMode !== 'verse' || !obsCatalogKey) return
+    if (obsNeighborLoadDone.current) return
+    obsNeighborLoadDone.current = true
+
+    const currentStory = currentRef.book === 'obs' ? currentRef.chapter : 1
+    const neighbors = obsStoryIds.filter(
+      (s) =>
+        Math.abs(s - currentStory) <= 5 &&
+        !(navigationActionsRef.current.obsFrameCountByStory[String(s)] > 0),
+    )
+    neighbors.forEach((storyNum) => {
+      setObsLoadingStories((prev) => new Set([...prev, storyNum]))
+      void catalogManager
+        .loadContent(obsCatalogKey, String(storyNum))
+        .then((content) => {
+          const parsed = content as ParsedObsStory
+          navigationActionsRef.current.setObsStoryFrameCount(storyNum, parsed.frames.length)
+        })
+        .catch(() => {})
+        .finally(() => {
+          setObsLoadingStories((prev) => {
+            const next = new Set(prev)
+            next.delete(storyNum)
+            return next
+          })
+        })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigationScope, navigationMode, obsCatalogKey])
+
+  const bookInfo = navigation.getBookInfo(selectedBook)
+
+  const verses: Array<{ chapter: number; verse: number; key: string }> = []
+  if (bookInfo?.verses) {
+    bookInfo.verses.forEach((verseCount, chapterIndex) => {
+      const chapter = chapterIndex + 1
+      for (let verse = 1; verse <= verseCount; verse++) {
+        verses.push({
+          chapter,
+          verse,
+          key: `${chapter}:${verse}`,
+        })
+      }
+    })
+  }
+
+  const versesByChapter = verses.reduce(
+    (acc, v) => {
+      if (!acc[v.chapter]) acc[v.chapter] = []
+      acc[v.chapter].push(v)
+      return acc
+    },
+    {} as Record<number, typeof verses>
+  )
+
+  const chapters = Object.keys(versesByChapter)
+    .map(Number)
+    .sort((a, b) => a - b)
+
+  const isVerseSelected = (verseKey: string): boolean => {
+    if (!startVerse) return false
+    if (!endVerse) return verseKey === startVerse
+
+    const [startC, startV] = startVerse.split(':').map(Number)
+    const [endC, endV] = endVerse.split(':').map(Number)
+    const [currentC, currentV] = verseKey.split(':').map(Number)
+
+    const actualStart =
+      startC < endC || (startC === endC && startV <= endV) ? { c: startC, v: startV } : { c: endC, v: endV }
+    const actualEnd =
+      startC < endC || (startC === endC && startV <= endV) ? { c: endC, v: endV } : { c: startC, v: startV }
+
+    if (currentC < actualStart.c || currentC > actualEnd.c) return false
+    if (currentC === actualStart.c && currentV < actualStart.v) return false
+    if (currentC === actualEnd.c && currentV > actualEnd.v) return false
+    return true
+  }
+
+  const isStartVerse = (verseKey: string): boolean => verseKey === startVerse
+  const isEndVerse = (verseKey: string): boolean => verseKey === endVerse
+
+  const getSelectionCount = (): number => {
+    if (!startVerse) return 0
+    if (!endVerse) return 1
+
+    let count = 0
+    verses.forEach((v) => {
+      if (isVerseSelected(v.key)) count++
+    })
+    return count
+  }
+
+  const getObsSelectionCount = (): number => {
+    if (!obsRangeStart) return 0
+    if (!obsRangeEnd) return 1
+    const [s, e] = sortObsRange(obsRangeStart, obsRangeEnd)
+    let count = 0
+    for (let story = s.story; story <= e.story; story++) {
+      const frameCount = navigation.obsFrameCountByStory[String(story)] ?? 0
+      const startFrame = story === s.story ? s.frame : 1
+      const endFrame = story === e.story ? e.frame : frameCount
+      if (endFrame >= startFrame) count += endFrame - startFrame + 1
+    }
+    return count
+  }
+
+  const handleVerseClick = (verseKey: string) => {
+    if (!startVerse) {
+      setStartVerse(verseKey)
+      setEndVerse(null)
+    } else if (verseKey === startVerse && !endVerse) {
+      setStartVerse(null)
+      setEndVerse(null)
+    } else if (isVerseSelected(verseKey)) {
+      setStartVerse(verseKey)
+      setEndVerse(null)
+    } else {
+      setEndVerse(verseKey)
+    }
+  }
+
+  const handleChapterClick = (chapter: number) => {
+    const chapterVerses = versesByChapter[chapter] || []
+    if (chapterVerses.length === 0) return
+
+    const firstVerse = chapterVerses[0].key
+    const lastVerse = chapterVerses[chapterVerses.length - 1].key
+
+    setStartVerse(firstVerse)
+    setEndVerse(lastVerse)
+  }
+
+  const handleSectionSelect = (section: TranslatorSection) => {
+    const newRef: BCVReference = {
+      book: selectedBook,
+      chapter: section.start.chapter,
+      verse: section.start.verse,
+      endChapter: section.end.chapter !== section.start.chapter ? section.end.chapter : undefined,
+      endVerse: section.end.verse,
+    }
+
+    navigation.navigateToReference(newRef)
+    navigation.setBookSections(selectedBook, sections)
+    onClose()
+  }
+
+  const handleApply = () => {
+    if (!startVerse) return
+
+    const [startC, startV] = startVerse.split(':').map(Number)
+
+    const newRef: BCVReference = {
+      book: selectedBook,
+      chapter: startC,
+      verse: startV,
+    }
+
+    if (endVerse) {
+      const [endC, endV] = endVerse.split(':').map(Number)
+      newRef.endChapter = endC
+      newRef.endVerse = endV
+    }
+
+    navigation.navigateToReference(newRef)
+    onClose()
+  }
+
+  // Two-step single-frame picker (story mode, non-range)
+  const handleObsFramePick = (frame: number) => {
+    if (!selectedObsStory) return
+    navigation.navigateToReference({ book: 'obs', chapter: selectedObsStory, verse: frame })
+    onClose()
+  }
+
+  // ── OBS Range (verse mode) helpers — mirrors scripture startVerse/endVerse logic ──
+
+  const obsPos = (story: number, frame: number) => story * 10000 + frame
+
+  const sortObsRange = (
+    a: { story: number; frame: number },
+    b: { story: number; frame: number },
+  ): [{ story: number; frame: number }, { story: number; frame: number }] =>
+    obsPos(a.story, a.frame) <= obsPos(b.story, b.frame) ? [a, b] : [b, a]
+
+  const isObsFrameSelected = (story: number, frame: number): boolean => {
+    if (!obsRangeStart) return false
+    if (!obsRangeEnd) return obsRangeStart.story === story && obsRangeStart.frame === frame
+    const [s, e] = sortObsRange(obsRangeStart, obsRangeEnd)
+    const pos = obsPos(story, frame)
+    return pos >= obsPos(s.story, s.frame) && pos <= obsPos(e.story, e.frame)
+  }
+
+  // Mirrors handleVerseClick: set start or end, never navigates directly
+  const handleObsRangeClick = (story: number, frame: number) => {
+    if (!obsRangeStart) {
+      setObsRangeStart({ story, frame })
+      setObsRangeEnd(null)
+    } else if (obsRangeStart.story === story && obsRangeStart.frame === frame && !obsRangeEnd) {
+      // Clicking start again deselects (like scripture)
+      setObsRangeStart(null)
+    } else if (isObsFrameSelected(story, frame)) {
+      // Clicking within range → reset to this as new start
+      setObsRangeStart({ story, frame })
+      setObsRangeEnd(null)
+    } else {
+      setObsRangeEnd({ story, frame })
+    }
+  }
+
+  // Mirrors handleApply for scripture
+  const handleObsRangeApply = () => {
+    if (!obsRangeStart) return
+    const end = obsRangeEnd ?? obsRangeStart
+    const [s, e] = sortObsRange(obsRangeStart, end)
+    navigation.navigateToReference({
+      book: 'obs',
+      chapter: s.story,
+      verse: s.frame,
+      endChapter: e.story !== s.story ? e.story : undefined,
+      endVerse: e.frame !== s.frame || e.story !== s.story ? e.frame : undefined,
+    })
+    onClose()
+  }
+
+  // Load story frame count on demand for the combined range view
+  const loadStoryFrames = useCallback(
+    (storyNum: number) => {
+      if (!obsCatalogKey) return
+      setObsLoadingStories((prev) => new Set([...prev, storyNum]))
+      void catalogManager
+        .loadContent(obsCatalogKey, String(storyNum))
+        .then((content) => {
+          const parsed = content as ParsedObsStory
+          navigation.setObsStoryFrameCount(storyNum, parsed.frames.length)
+        })
+        .catch(console.error)
+        .finally(() => {
+          setObsLoadingStories((prev) => {
+            const next = new Set(prev)
+            next.delete(storyNum)
+            return next
+          })
+        })
+    },
+    [obsCatalogKey, catalogManager, navigation],
+  )
+
+  // Show error only when there is truly nothing to navigate (no scripture books AND no OBS)
+  const missingNavigator = !hasObsLoaded && availableBooks.length === 0
+
+  if (missingNavigator) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
-        {/* Backdrop */}
         <div
           className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           onClick={onClose}
           aria-hidden="true"
         />
-        
-        {/* Modal */}
+
         <div
           className="relative flex flex-col bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden m-4"
           onClick={(e) => e.stopPropagation()}
@@ -68,259 +518,46 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
               <X className="w-4 h-4" />
             </button>
           </div>
-          <div className="flex-1 flex items-center justify-center min-h-0">
-            <AlertCircle className="w-24 h-24 text-gray-300" />
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0 gap-3 p-6 text-center text-gray-600 text-sm">
+            <AlertCircle className="w-16 h-16 text-gray-300" />
+            <p>Add a Bible translation (for book navigation) or load Open Bible Stories to use story navigation.</p>
           </div>
         </div>
       </div>
     )
   }
 
-  // Always open at book selection (step 1); current book is highlighted and scrolled into view
-  const [step, setStep] = useState<1 | 2>(1)
-  const [selectedBook, setSelectedBook] = useState(currentRef.book)
-  
-  // Initialize with current reference range
-  const initStartVerse = currentRef.chapter && currentRef.verse 
-    ? `${currentRef.chapter}:${currentRef.verse}` 
-    : null
-  const initEndVerse = currentRef.endChapter && currentRef.endVerse
-    ? `${currentRef.endChapter}:${currentRef.endVerse}`
-    : currentRef.endVerse && !currentRef.endChapter
-    ? `${currentRef.chapter}:${currentRef.endVerse}`
-    : null
-    
-  const [startVerse, setStartVerse] = useState<string | null>(initStartVerse)
-  const [endVerse, setEndVerse] = useState<string | null>(initEndVerse)
-  const [sections, setSections] = useState<TranslatorSection[]>([])
-  const [selectedSection, setSelectedSection] = useState<TranslatorSection | null>(null)
-  
-  // Load sections when in section mode
-  useEffect(() => {
-    if (effectiveMode === 'section' && selectedBook) {
-      let cancelled = false
-      getDefaultSections(selectedBook).then((defaultSections) => {
-        if (!cancelled && defaultSections.length > 0) {
-          setSections(defaultSections)
-          navigation.setBookSections(selectedBook, defaultSections)
-        } else if (!cancelled) {
-          setSections([])
-        }
-      })
-      return () => { cancelled = true }
-    }
-  }, [effectiveMode, selectedBook, navigation])
-  
-  // Scroll to current section when modal opens and sections are loaded
-  useEffect(() => {
-    if (effectiveMode === 'section' && currentSectionRef.current && step === 2) {
-      // Small delay to ensure rendering is complete
-      setTimeout(() => {
-        currentSectionRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        })
-      }, 100)
-    }
-  }, [effectiveMode, step, sections])
-  
-  // Scroll to current verse range when modal opens in verse mode
-  useEffect(() => {
-    if (effectiveMode !== 'section' && startVerseRef.current && step === 2 && startVerse) {
-      // Small delay to ensure rendering is complete
-      setTimeout(() => {
-        startVerseRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        })
-      }, 100)
-    }
-  }, [effectiveMode, step, startVerse])
-  
-  // Scroll to selected book when modal opens on step 1
-  useEffect(() => {
-    if (step === 1 && selectedBookRef.current && selectedBook) {
-      // Small delay to ensure rendering is complete
-      setTimeout(() => {
-        selectedBookRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        })
-      }, 100)
-    }
-  }, [step, selectedBook])
-
-  // Get current book info
-  const bookInfo = navigation.getBookInfo(selectedBook)
-  
-  // Generate verse grid data
-  const verses: Array<{ chapter: number; verse: number; key: string }> = []
-  if (bookInfo && bookInfo.verses) {
-    bookInfo.verses.forEach((verseCount, chapterIndex) => {
-      const chapter = chapterIndex + 1
-      for (let verse = 1; verse <= verseCount; verse++) {
-        verses.push({
-          chapter,
-          verse,
-          key: `${chapter}:${verse}`,
-        })
-      }
-    })
-  }
-
-  // Group verses by chapter for rendering
-  const versesByChapter = verses.reduce((acc, v) => {
-    if (!acc[v.chapter]) acc[v.chapter] = []
-    acc[v.chapter].push(v)
-    return acc
-  }, {} as Record<number, typeof verses>)
-
-  const chapters = Object.keys(versesByChapter).map(Number).sort((a, b) => a - b)
-
-  // Handle verse click/selection - click once for start, twice for end
-  const handleVerseClick = (verseKey: string) => {
-    if (!startVerse) {
-      // First click: set start verse
-      setStartVerse(verseKey)
-      setEndVerse(null)
-    } else if (verseKey === startVerse && !endVerse) {
-      // Clicking the only selected verse: deselect
-      setStartVerse(null)
-      setEndVerse(null)
-    } else if (isVerseSelected(verseKey)) {
-      // Clicking any verse in the current range: clear range and select only this verse
-      setStartVerse(verseKey)
-      setEndVerse(null)
-    } else {
-      // Clicking outside the range: set end verse to create/extend range
-      setEndVerse(verseKey)
-    }
-  }
-
-  // Handle chapter click (select whole chapter)
-  const handleChapterClick = (chapter: number) => {
-    const chapterVerses = versesByChapter[chapter] || []
-    if (chapterVerses.length === 0) return
-
-    const firstVerse = chapterVerses[0].key
-    const lastVerse = chapterVerses[chapterVerses.length - 1].key
-
-    setStartVerse(firstVerse)
-    setEndVerse(lastVerse)
-  }
-
-  // Helper to check if a verse is in the selected range
-  const isVerseSelected = (verseKey: string): boolean => {
-    if (!startVerse) return false
-    if (!endVerse) return verseKey === startVerse
-
-    // Parse verses to determine range
-    const [startC, startV] = startVerse.split(':').map(Number)
-    const [endC, endV] = endVerse.split(':').map(Number)
-    const [currentC, currentV] = verseKey.split(':').map(Number)
-
-    // Ensure start is before end
-    const actualStart = (startC < endC || (startC === endC && startV <= endV)) 
-      ? { c: startC, v: startV } 
-      : { c: endC, v: endV }
-    const actualEnd = (startC < endC || (startC === endC && startV <= endV)) 
-      ? { c: endC, v: endV } 
-      : { c: startC, v: startV }
-
-    // Check if current verse is within range
-    if (currentC < actualStart.c || currentC > actualEnd.c) return false
-    if (currentC === actualStart.c && currentV < actualStart.v) return false
-    if (currentC === actualEnd.c && currentV > actualEnd.v) return false
-    return true
-  }
-
-  // Helper to check if verse is start or end point
-  const isStartVerse = (verseKey: string): boolean => verseKey === startVerse
-  const isEndVerse = (verseKey: string): boolean => verseKey === endVerse
-
-  // Get selection count
-  const getSelectionCount = (): number => {
-    if (!startVerse) return 0
-    if (!endVerse) return 1
-
-    const [startC, startV] = startVerse.split(':').map(Number)
-    const [endC, endV] = endVerse.split(':').map(Number)
-
-    let count = 0
-    verses.forEach(v => {
-      if (isVerseSelected(v.key)) count++
-    })
-    return count
-  }
-
-  // Handle section selection
-  const handleSectionSelect = (section: TranslatorSection) => {
-    setSelectedSection(section)
-    
-    const newRef: BCVReference = {
-      book: selectedBook,
-      chapter: section.start.chapter,
-      verse: section.start.verse,
-      endChapter: section.end.chapter !== section.start.chapter ? section.end.chapter : undefined,
-      endVerse: section.end.verse,
-    }
-    
-    // Navigate first, then set sections (so section index is calculated based on new reference)
-    navigation.navigateToReference(newRef)
-    navigation.setBookSections(selectedBook, sections)
-    onClose()
-  }
-
-  // Handle apply (verse mode)
-  const handleApply = () => {
-    if (!startVerse) return
-
-    const [startC, startV] = startVerse.split(':').map(Number)
-
-    const newRef: BCVReference = {
-      book: selectedBook,
-      chapter: startC,
-      verse: startV,
-    }
-
-    // Add end if range
-    if (endVerse) {
-      const [endC, endV] = endVerse.split(':').map(Number)
-      newRef.endChapter = endC
-      newRef.endVerse = endV
-    }
-
-    navigation.navigateToReference(newRef)
-    onClose()
-  }
+  const headerIcon =
+    step === 1 ? (
+      navigationScope === 'obs' ? (
+        <BookMarked className="w-5 h-5 text-blue-600" />
+      ) : (
+        <BookOpen className="w-5 h-5 text-blue-600" />
+      )
+    ) : navigationScope === 'obs' ? (
+      <BookMarked className="w-5 h-5 text-blue-600" />
+    ) : scripturePickerMode === 'section' ? (
+      <List className="w-5 h-5 text-blue-600" />
+    ) : (
+      <Hash className="w-5 h-5 text-blue-600" />
+    )
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
-      
-      {/* Modal */}
+
       <div
         className="relative flex flex-col bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden m-4"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
       >
-        {/* Header */}
         <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between bg-gray-50 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            {step === 1 ? (
-              <BookOpen className="w-5 h-5 text-blue-600" />
-            ) : effectiveMode === 'section' ? (
-              <List className="w-5 h-5 text-blue-600" />
-            ) : (
-              <Hash className="w-5 h-5 text-blue-600" />
-            )}
-          </div>
+          <div className="flex items-center gap-2">{headerIcon}</div>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded transition-colors"
@@ -331,24 +568,63 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
           </button>
         </div>
 
-        {/* Content */}
+        {step === 1 && (
+          <div className="flex border-b border-gray-200 bg-gray-50 px-3 py-2 gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                navigation.setNavigationScope('scripture')
+                setStep(1)
+              }}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+                navigationScope === 'scripture'
+                  ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Bible
+            </button>
+            <button
+              type="button"
+              disabled={!hasObsLoaded}
+              onClick={() => {
+                navigation.setNavigationScope('obs')
+                setStep(1)
+                setSelectedObsStory(currentRef.book === 'obs' ? currentRef.chapter : null)
+              }}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                navigationScope === 'obs'
+                  ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
+                  : 'text-gray-600 hover:bg-gray-100'
+              } disabled:opacity-40 disabled:cursor-not-allowed`}
+            >
+              <BookMarked className="w-4 h-4 shrink-0" />
+              Open Bible Stories
+            </button>
+          </div>
+        )}
+
         <div className="flex-1 flex flex-col min-h-0">
-          {step === 1 ? (
-            // Step 1: Book Selection
+          {step === 1 && navigationScope === 'scripture' && (
             <div className="flex-1 overflow-auto p-4">
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                {availableBooks.map((book) => {
-                  const isSelected = selectedBook === book.code
-                  const fullBookName = getBookTitle(bookTitleSource, book.code)
-                  return (
-                    <button
-                      key={book.code}
-                      ref={isSelected ? selectedBookRef : null}
-                      onClick={() => {
-                        setSelectedBook(book.code)
-                        setStep(2)
-                      }}
-                      className={`
+              {availableBooks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500 text-sm">
+                  No Bible books in the current anchor resource.
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                  {availableBooks.map((book) => {
+                    const isSelected = selectedBook === book.code
+                    const fullBookName = getBookTitle(bookTitleSource, book.code)
+                    return (
+                      <button
+                        key={book.code}
+                        ref={isSelected ? selectedBookRef : null}
+                        onClick={() => {
+                          setSelectedBook(book.code)
+                          setStep(2)
+                        }}
+                        className={`
                         p-3 rounded-lg border transition-all text-left hover:shadow-sm
                         ${
                           isSelected
@@ -356,23 +632,160 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                             : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
                         }
                       `}
+                      >
+                        <div className="font-semibold text-gray-900">{fullBookName}</div>
+                        <div className="text-[10px] text-gray-400 uppercase tracking-wide mt-1">
+                          {book.code}
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* OBS — Story mode: compact story grid, click navigates directly (mirrors scripture chapter mode) */}
+          {step === 1 && navigationScope === 'obs' && navigationMode === 'chapter' && (
+            <div className="flex-1 overflow-auto p-4">
+              <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2">
+                {obsStoryIds.map((storyNum) => {
+                  const isCurrent = currentRef.book === 'obs' && currentRef.chapter === storyNum
+                  return (
+                    <button
+                      key={storyNum}
+                      ref={isCurrent ? selectedObsStoryRef : null}
+                      type="button"
+                      onClick={() => {
+                        navigation.navigateToReference({ book: 'obs', chapter: storyNum, verse: 1 })
+                        onClose()
+                      }}
+                      className={`
+                        p-2 rounded-lg border text-sm font-medium transition-all
+                        ${
+                          isCurrent
+                            ? 'border-blue-500 bg-blue-50 text-blue-900'
+                            : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50 text-gray-800'
+                        }
+                      `}
                     >
-                      <div className="font-semibold text-gray-900">{fullBookName}</div>
-                      <div className="text-[10px] text-gray-400 uppercase tracking-wide mt-1">
-                        {book.code}
-                      </div>
+                      {storyNum}
                     </button>
                   )
                 })}
               </div>
             </div>
-          ) : effectiveMode === 'section' ? (
-            // Step 2: Section Selection
+          )}
+
+          {/* OBS — Frame/Range mode: combined stories+frames view (mirrors scripture chapter+verse picker) */}
+          {navigationScope === 'obs' && navigationMode === 'verse' && (
             <div className="flex-1 flex flex-col min-h-0">
-              {/* Header bar - stays visible */}
+              <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200 bg-gray-50 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <BookMarked className="w-4 h-4 text-gray-500" />
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                    {getObsSelectionCount()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto p-6">
+                <div className="space-y-6">
+                  {obsStoryIds.map((storyNum) => {
+                    const frameCount = navigation.obsFrameCountByStory[String(storyNum)] ?? 0
+                    const isLoading = obsLoadingStories.has(storyNum)
+                    const isCurrentStory = currentRef.book === 'obs' && currentRef.chapter === storyNum
+
+                    return (
+                      <div key={storyNum}>
+                        {/* Story header — mirrors chapter button in scripture picker */}
+                        <button
+                          type="button"
+                          ref={isCurrentStory ? selectedObsStoryRef : null}
+                          onClick={() => {
+                            if (frameCount === 0) {
+                              loadStoryFrames(storyNum)
+                              return
+                            }
+                            // Select entire story (mirrors handleChapterClick)
+                            const start = { story: storyNum, frame: 1 }
+                            const end = { story: storyNum, frame: frameCount }
+                            if (!obsRangeStart) {
+                              setObsRangeStart(start)
+                              setObsRangeEnd(end)
+                            } else if (isObsFrameSelected(storyNum, 1) && isObsFrameSelected(storyNum, frameCount)) {
+                              setObsRangeStart(start)
+                              setObsRangeEnd(null)
+                            } else {
+                              setObsRangeEnd(end)
+                            }
+                          }}
+                          className="mb-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold text-gray-700 text-sm transition-colors"
+                          title={`Story ${storyNum}`}
+                          aria-label={`Story ${storyNum}`}
+                        >
+                          {storyNum}
+                        </button>
+
+                        {isLoading && (
+                          <span className="text-xs text-gray-400 ml-2">Loading…</span>
+                        )}
+
+                        {!isLoading && frameCount === 0 && (
+                          <span className="text-xs text-gray-400 italic ml-1">
+                            tap story number to load
+                          </span>
+                        )}
+
+                        {frameCount > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from({ length: frameCount }, (_, i) => i + 1).map((frameNum) => {
+                              const isSelected = isObsFrameSelected(storyNum, frameNum)
+                              const isStartFrame = obsRangeStart?.story === storyNum && obsRangeStart.frame === frameNum
+                              const isEndFrame = obsRangeEnd?.story === storyNum && obsRangeEnd.frame === frameNum
+                              const isCurFrame = isCurrentStory && currentRef.verse === frameNum
+
+                              return (
+                                <button
+                                  key={frameNum}
+                                  ref={isStartFrame ? startVerseRef : null}
+                                  type="button"
+                                  onClick={() => handleObsRangeClick(storyNum, frameNum)}
+                                  className={`
+                                    w-8 h-8 text-xs font-medium rounded transition-all
+                                    ${
+                                      isStartFrame || isEndFrame
+                                        ? 'bg-blue-600 text-white ring-2 ring-blue-400 font-bold'
+                                        : isSelected
+                                        ? 'bg-blue-400 text-white'
+                                        : isCurFrame
+                                        ? 'bg-white text-blue-700 ring-2 ring-blue-400 font-bold'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }
+                                  `}
+                                >
+                                  {frameNum}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && navigationScope === 'scripture' && scripturePickerMode === 'section' && (
+            <div className="flex-1 flex flex-col min-h-0">
               <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200 bg-gray-50 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setStep(1)}
                     className="flex items-center gap-1 text-blue-600 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded transition-colors"
                     title="Change book"
@@ -392,7 +805,6 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                 </div>
               </div>
 
-              {/* Section List - scrollable */}
               {sections.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center">
                   <AlertCircle className="w-12 h-12 text-gray-300" />
@@ -400,63 +812,61 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
               ) : (
                 <div className="flex-1 overflow-auto p-6">
                   <div className="space-y-1.5">
-                  {sections.map((section, idx) => {
-                    const startRef = `${section.start.chapter}:${section.start.verse}`
-                    const endRef = section.end.chapter !== section.start.chapter 
-                      ? `${section.end.chapter}:${section.end.verse}`
-                      : section.end.verse.toString()
-                    const isCurrent = idx === currentSectionIndex
-                    
-                    return (
-                      <button
-                        key={idx}
-                        ref={isCurrent ? currentSectionRef : null}
-                        onClick={() => handleSectionSelect(section)}
-                        className={`
+                    {sections.map((section, idx) => {
+                      const startRef = `${section.start.chapter}:${section.start.verse}`
+                      const endRef =
+                        section.end.chapter !== section.start.chapter
+                          ? `${section.end.chapter}:${section.end.verse}`
+                          : section.end.verse.toString()
+                      const isCurrent = idx === currentSectionIndex
+
+                      return (
+                        <button
+                          key={idx}
+                          ref={isCurrent ? currentSectionRef : null}
+                          type="button"
+                          onClick={() => handleSectionSelect(section)}
+                          className={`
                           w-full text-left p-2.5 border rounded-lg transition-colors flex items-center gap-3
-                          ${isCurrent 
-                            ? 'border-blue-500 bg-blue-50' 
-                            : 'border-gray-200 hover:border-blue-400 hover:bg-blue-50'
+                          ${
+                            isCurrent
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-blue-400 hover:bg-blue-50'
                           }
                         `}
-                      >
-                        {/* Section Number */}
-                        <div className={`
+                        >
+                          <div
+                            className={`
                           flex-shrink-0 w-6 h-6 rounded flex items-center justify-center font-bold text-xs
-                          ${isCurrent 
-                            ? 'bg-blue-600 text-white' 
-                            : 'bg-gray-100 text-gray-700'
-                          }
-                        `}>
-                          {idx + 1}
-                        </div>
-                        
-                        {/* Section Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-gray-900 truncate">{section.heading}</div>
-                          <div className="text-sm text-gray-600 mt-0.5 font-medium">
-                            {startRef} - {endRef}
+                          ${isCurrent ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}
+                        `}
+                          >
+                            {idx + 1}
                           </div>
-                        </div>
-                        
-                        {/* Current Indicator */}
-                        {isCurrent && (
-                          <Check className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                        )}
-                      </button>
-                    )
-                  })}
+
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-gray-900 truncate">{`Section ${idx + 1}`}</div>
+                            <div className="text-sm text-gray-600 mt-0.5 font-medium">
+                              {startRef} - {endRef}
+                            </div>
+                          </div>
+
+                          {isCurrent && <Check className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
               )}
             </div>
-          ) : (
-            // Step 2: Custom Range Grid
+          )}
+
+          {step === 2 && navigationScope === 'scripture' && scripturePickerMode !== 'section' && (
             <div className="flex-1 flex flex-col min-h-0">
-              {/* Header bar - stays visible */}
               <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200 bg-gray-50 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setStep(1)}
                     className="flex items-center gap-1 text-blue-600 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded transition-colors"
                     title="Change book"
@@ -474,61 +884,76 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                 </div>
               </div>
 
-              {/* Verse Grid by Chapter - scrollable */}
               <div className="flex-1 overflow-auto p-6">
                 <div className="space-y-6">
-                {chapters.map((chapter) => (
-                  <div key={chapter}>
-                    {/* Chapter Header */}
-                    <button
-                      onClick={() => handleChapterClick(chapter)}
-                      className="mb-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold text-gray-700 text-sm transition-colors"
-                      title={`${chapter}`}
-                      aria-label={`Chapter ${chapter}`}
-                    >
-                      {chapter}
-                    </button>
+                  {chapters.map((chapter) => (
+                    <div key={chapter}>
+                      <button
+                        type="button"
+                        onClick={() => handleChapterClick(chapter)}
+                        className="mb-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold text-gray-700 text-sm transition-colors"
+                        title={`${chapter}`}
+                        aria-label={`Chapter ${chapter}`}
+                      >
+                        {chapter}
+                      </button>
 
-                    {/* Verse Grid */}
-                    <div className="flex flex-wrap gap-1">
-                      {versesByChapter[chapter]?.map((v) => {
-                        const selected = isVerseSelected(v.key)
-                        const isStart = isStartVerse(v.key)
-                        const isEnd = isEndVerse(v.key)
-                        
-                        return (
-                          <button
-                            key={v.key}
-                            ref={isStart ? startVerseRef : null}
-                            onClick={() => handleVerseClick(v.key)}
-                            className={`
+                      <div className="flex flex-wrap gap-1">
+                        {versesByChapter[chapter]?.map((v) => {
+                          const selected = isVerseSelected(v.key)
+                          const isStart = isStartVerse(v.key)
+                          const isEnd = isEndVerse(v.key)
+
+                          return (
+                            <button
+                              key={v.key}
+                              ref={isStart ? startVerseRef : null}
+                              type="button"
+                              onClick={() => handleVerseClick(v.key)}
+                              className={`
                               w-8 h-8 text-xs font-medium rounded transition-all
                               ${
                                 isStart || isEnd
                                   ? 'bg-blue-600 text-white ring-2 ring-blue-400 font-bold'
                                   : selected
-                                  ? 'bg-blue-400 text-white'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    ? 'bg-blue-400 text-white'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                               }
                             `}
-                          >
-                            {v.verse}
-                          </button>
-                        )
-                      })}
+                            >
+                              {v.verse}
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        {step === 2 && effectiveMode !== 'section' && (
+        {/* OBS range Apply — mirrors scripture Apply button */}
+        {navigationScope === 'obs' && navigationMode === 'verse' && (
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end flex-shrink-0">
             <button
+              type="button"
+              onClick={handleObsRangeApply}
+              disabled={!obsRangeStart}
+              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Apply selection"
+              aria-label="Apply selection"
+            >
+              <Check className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {step === 2 && navigationScope === 'scripture' && scripturePickerMode !== 'section' && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end flex-shrink-0">
+            <button
+              type="button"
               onClick={handleApply}
               disabled={!startVerse}
               className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

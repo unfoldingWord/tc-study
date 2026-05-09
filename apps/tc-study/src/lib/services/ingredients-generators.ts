@@ -149,7 +149,7 @@ export const generateTranslationWordsIngredients: IngredientsGenerator = async (
       repoName,
       'bible',
       ref,
-      (file) => file.type === 'file' && file.name.endsWith('.md')
+      (file: { type: string; name: string }) => file.type === 'file' && file.name.endsWith('.md')
     )
     
     // Create file content getter using API

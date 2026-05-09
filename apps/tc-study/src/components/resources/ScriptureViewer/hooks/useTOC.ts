@@ -24,7 +24,7 @@ export function useTOC(
   const [isLoadingTOC, setIsLoadingTOC] = useState(true) // true until first metadata load completes
   const tocSetRef = useRef(false) // Track if TOC has been set to prevent infinite loops
   const [catalogCheckTrigger, setCatalogCheckTrigger] = useState(0)
-  const metadataCheckIntervalRef = useRef<number>()
+  const metadataCheckIntervalRef = useRef<number | undefined>(undefined)
 
   // Poll catalog until metadata is available (for Phase 2 background loading).
   // Only start polling after initial TOC load has completed with no books, to avoid overlapping work and re-render thrashing.

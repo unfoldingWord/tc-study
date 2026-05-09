@@ -170,6 +170,29 @@ export interface ResourceTypeDefinition {
   /** Icon name (for UI display) */
   icon?: string
   
+  // ===== SCOPE / ROLE =====
+  /**
+   * The role this resource type plays in a reading session.
+   * - 'primary': The main text being read (e.g. scripture, obs). Shows in panel-1.
+   * - 'companion': A help resource for one specific primary scope (uses companionFor).
+   * - 'shared': Works alongside any primary (e.g. translation-words, translation-academy).
+   * @default 'companion'
+   */
+  contentRole?: 'primary' | 'companion' | 'shared'
+
+  /**
+   * For primary types: the scope key identifying this type's reading context.
+   * Used by companion types to declare which primary they serve.
+   * E.g. 'scripture' for Bible, 'obs' for Open Bible Stories.
+   */
+  scope?: string
+
+  /**
+   * For companion types: which primary scope(s) this type serves.
+   * E.g. ['scripture'] for Translation Notes, ['obs'] for OBS Translation Notes.
+   */
+  companionFor?: string[]
+
   // ===== DOOR43 MAPPING =====
   /** Door43 subjects this resource type handles (e.g., ['Bible', 'Aligned Bible']) */
   subjects: string[]

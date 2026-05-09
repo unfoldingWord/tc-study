@@ -17,6 +17,8 @@ import type { PassageSet } from '../contexts/types'
 import { useCatalogManager } from '../contexts/CatalogContext'
 import { PassageSetForm } from '../components/data/PassageSetForm'
 import { usePackageStore } from '../lib/stores'
+import { countPassages } from '@bt-synergy/passage-sets'
+import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 
 type Tab = 'passage-sets' | 'collections' | 'resources'
 
@@ -108,20 +110,27 @@ export default function DataManagement() {
     URL.revokeObjectURL(url)
   }
 
-  // Import resource package from ZIP
+  // Import resource package from ZIP (Door43 export: catalog.json + optional books/)
   const handleImportResourcePackage = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
     try {
-      const buffer = await file.arrayBuffer()
-      const resourceKey = await catalogManager.importResourcePackage(Buffer.from(buffer))
-      alert(`Successfully imported resource: ${resourceKey}`)
+      const JSZip = (await import('jszip')).default
+      const zip = await JSZip.loadAsync(await file.arrayBuffer())
+      const catalogFile = zip.file('catalog.json')
+      if (!catalogFile) {
+        throw new Error('Invalid package: missing catalog.json')
+      }
+      const catalogJson = await catalogFile.async('string')
+      const metadata = JSON.parse(catalogJson) as ResourceMetadata
+      await catalogManager.addResourceToCatalog(metadata)
+      alert(`Successfully imported resource: ${metadata.resourceKey}`)
     } catch (err) {
       alert(`Failed to import resource: ${err}`)
       console.error(err)
     }
-    event.target.value = '' // Reset input
+    event.target.value = ''
   }
 
   // Export collection as JSON
@@ -291,7 +300,7 @@ export default function DataManagement() {
                       <p className="text-sm text-gray-500 mt-1">{ps.description}</p>
                     )}
                     <p className="text-xs text-gray-400 mt-1">
-                      {ps.passages.length} passage{ps.passages.length !== 1 ? 's' : ''}
+                      {countPassages(ps)} passage{countPassages(ps) !== 1 ? 's' : ''}
                     </p>
                   </div>
                   

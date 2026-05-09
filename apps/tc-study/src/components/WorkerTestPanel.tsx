@@ -96,13 +96,13 @@ export function WorkerTestPanel() {
 
     // Check 3: Catalog Manager
     try {
-      const resources = await catalogManager.getAllResources()
-      setResourceCount(resources.length)
-      updateTest('Catalog Manager Ready', 'passed', `Found ${resources.length} resources`)
-      
+      const keys = await catalogManager.getAllResourceKeys()
+      setResourceCount(keys.length)
+      updateTest('Catalog Manager Ready', 'passed', `Found ${keys.length} resources`)
+
       // Check 4: Resources available
-      if (resources.length > 0) {
-        updateTest('Resources Available', 'passed', `${resources.length} resources ready to download`)
+      if (keys.length > 0) {
+        updateTest('Resources Available', 'passed', `${keys.length} resources ready to download`)
       } else {
         updateTest('Resources Available', 'failed', 'No resources in catalog. Add some first.')
       }
@@ -124,13 +124,18 @@ export function WorkerTestPanel() {
     updateTest('Cache Verified', 'running')
 
     // Get first resource
-    const resources = await catalogManager.getAllResources()
-    const testResource = resources[0]
+    const keys = await catalogManager.getAllResourceKeys()
+    const testResourceKey = keys[0]
 
-    console.log('🧪 Starting worker test with:', testResource.resourceKey)
-    
+    if (!testResourceKey) {
+      updateTest('Download Triggered', 'failed', 'No resource key in catalog')
+      return
+    }
+
+    console.log('🧪 Starting worker test with:', testResourceKey)
+
     setTestStartTime(Date.now())
-    startDownload([testResource.resourceKey])
+    startDownload([testResourceKey])
   }
 
   const checkCache = async () => {

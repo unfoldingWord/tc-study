@@ -38,18 +38,23 @@ interface LanguagePickerProps {
   onLanguageSelected?: (languageCode: string) => void
   compact?: boolean
   autoOpen?: boolean
+  /** When true, the dialog cannot be dismissed without choosing a language (Read page on /read). */
+  required?: boolean
 }
 
-export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen = false }: LanguagePickerProps) {
-  const [isOpen, setIsOpen] = useState(autoOpen)
-  
-  // React to autoOpen prop changes
+export function LanguagePicker({
+  onLanguageSelected,
+  compact = false,
+  autoOpen = false,
+  required = false,
+}: LanguagePickerProps) {
+  const [isOpen, setIsOpen] = useState(() => autoOpen || required)
+
   useEffect(() => {
-    console.log('[LanguagePicker] autoOpen changed to:', autoOpen)
-    if (autoOpen) {
+    if (autoOpen || required) {
       setIsOpen(true)
     }
-  }, [autoOpen])
+  }, [autoOpen, required])
   const [searchQuery, setSearchQuery] = useState('')
 
   const catalogManager = useCatalogManager()
@@ -201,13 +206,15 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
   const onlineLanguages = filteredLanguages.filter((l) => l.source === 'door43')
 
   const closeModal = () => {
+    if (required) return
     setIsOpen(false)
     setSearchQuery('')
   }
 
   const handleSelect = (code: string) => {
     onLanguageSelected?.(code)
-    closeModal()
+    setIsOpen(false)
+    setSearchQuery('')
   }
 
   return (
@@ -227,7 +234,7 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={closeModal}
+            onClick={required ? undefined : closeModal}
             aria-hidden="true"
           />
           <div
@@ -242,14 +249,16 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
               <div className="flex items-center gap-2">
                 <Languages className="w-5 h-5 text-blue-600" />
               </div>
-              <button
-                onClick={closeModal}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
-                title="Close"
-                aria-label="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              {!required && (
+                <button
+                  onClick={closeModal}
+                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                  title="Close"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             {/* Progress strip - single step (wizard-style) */}
@@ -364,18 +373,20 @@ export function LanguagePicker({ onLanguageSelected, compact = false, autoOpen =
             </div>
 
             {/* Footer - matches wizard (Cancel only) */}
-            <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-              <div className="flex items-center justify-end gap-1.5">
-                <button
-                  onClick={closeModal}
-                  className="p-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors"
-                  title="Cancel"
-                  aria-label="Cancel"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+            {!required && (
+              <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+                <div className="flex items-center justify-end gap-1.5">
+                  <button
+                    onClick={closeModal}
+                    className="p-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                    title="Cancel"
+                    aria-label="Cancel"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

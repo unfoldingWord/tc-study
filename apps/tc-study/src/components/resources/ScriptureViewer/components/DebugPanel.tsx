@@ -231,21 +231,15 @@ export function DebugPanel({
           </section>
         )}
 
-        {/* Manifest/Book Structure */}
-        {loadedContent?.books && (
+        {/* Book / chapter structure */}
+        {loadedContent?.chapters && loadedContent.chapters.length > 0 && (
           <section>
-            <h3 className="text-xs font-bold text-gray-600 mb-2">📋 Manifest (Books)</h3>
+            <h3 className="text-xs font-bold text-gray-600 mb-2">📋 Book structure</h3>
             <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
-              {Object.keys(loadedContent.books).map(bookId => {
-                const book = loadedContent.books[bookId]
-                const chapterCount = book?.chapters ? Object.keys(book.chapters).length : 0
-                return (
-                  <div key={bookId} className="flex justify-between">
-                    <span>{bookId.toUpperCase()}</span>
-                    <span className="text-gray-500">{chapterCount} ch</span>
-                  </div>
-                )
-              })}
+              <div className="flex justify-between">
+                <span>{(loadedContent.book || loadedContent.bookCode || '').toUpperCase()}</span>
+                <span className="text-gray-500">{loadedContent.chapters.length} ch</span>
+              </div>
             </div>
           </section>
         )}
@@ -313,8 +307,8 @@ export function DebugPanel({
                 <pre className="text-xs bg-gray-50 p-2 rounded overflow-x-auto max-h-60 overflow-y-auto">
                   {JSON.stringify({
                     metadata: loadedContent.metadata,
-                    bookCount: loadedContent.books ? Object.keys(loadedContent.books).length : 0,
-                    bookIds: loadedContent.books ? Object.keys(loadedContent.books) : [],
+                    book: loadedContent.book,
+                    chapterCount: loadedContent.chapters?.length ?? 0,
                     hasAlignments: loadedContent.alignments && loadedContent.alignments.length > 0,
                     alignmentCount: loadedContent.alignments?.length || 0,
                   }, null, 2)}

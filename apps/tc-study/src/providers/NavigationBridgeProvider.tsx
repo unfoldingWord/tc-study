@@ -144,7 +144,7 @@ export function NavigationBridgeProvider({ children }: { children: ReactNode }) 
   
   return (
     <NavigationContext.Provider value={navigationProvider}>
-      {children}
+      {children as any}
     </NavigationContext.Provider>
   );
 }

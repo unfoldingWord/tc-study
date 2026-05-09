@@ -21,7 +21,8 @@
   "dependencies": {
     "@bt-synergy/catalog-manager": "workspace:*",
     "@bt-synergy/resource-catalog": "workspace:*",
-    "@bt-synergy/resource-parsers": "workspace:*"
+    "@bt-synergy/resource-parsers": "workspace:*",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

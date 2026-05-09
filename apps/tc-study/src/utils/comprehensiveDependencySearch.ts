@@ -168,7 +168,7 @@ async function searchInDoor43(
       })
       
       if (matchingResource) {
-        const resourceKey = `${matchingResource.owner}/${matchingResource.language}/${matchingResource.id || matchingResource.abbreviation}`
+        const resourceKey = `${matchingResource.owner}/${matchingResource.language}/${matchingResource.id || (matchingResource as { abbreviation?: string }).abbreviation || 'unknown'}`
         
         console.log(`      ✓ Found on Door43: ${resourceKey}`)
         

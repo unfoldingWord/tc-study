@@ -130,7 +130,7 @@ export default function Library() {
         await catalogManager.removeResource(resourceKey)
         
         // Also clear cached content
-        const loader = catalogManager['registry']?.getLoader(resource.type)
+        const loader = catalogManager.resolveLoaderForMetadata(resource)
         if (loader && typeof loader.clearCache === 'function') {
           await loader.clearCache(resourceKey)
         }

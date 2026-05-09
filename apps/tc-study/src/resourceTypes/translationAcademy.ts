@@ -16,6 +16,9 @@ export const translationAcademyResourceType: ResourceTypeDefinition = defineReso
   description: 'Training articles for translators organized by manual (Translate, Checking, Process, Intro)',
   icon: 'GraduationCap',
   
+  // ===== SCOPE / ROLE =====
+  contentRole: 'shared',
+
   // ===== DOOR43 MAPPING =====
   subjects: ['Translation Academy'],
   aliases: ['ta', 'academy'],

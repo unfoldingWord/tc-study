@@ -95,7 +95,7 @@ export function attachAlignmentSemanticIds(
         // Example: TWL has "Θεοῦ" (genitive), zaln.content has "Θεοῦ", zaln.lemma has "θεός"
         const sourceSemanticIds = sourceWords.map((word, idx) => {
           // Use content field (the actual inflected text) not lemma
-          const actualText = alignment.alignmentData[idx]?.content || word
+          const actualText = (alignment.alignmentData[idx] as { content?: string } | undefined)?.content || word
           const occurrence = alignment.alignmentData[idx]?.occurrence 
             ? parseInt(alignment.alignmentData[idx].occurrence) 
             : idx + 1

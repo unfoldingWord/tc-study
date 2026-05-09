@@ -133,9 +133,9 @@ export class LocalStorageCatalogAdapter implements CatalogAdapter {
     return result
   }
 
-  async getAll(): Promise<ResourceMetadata[]> {
+  async getAll(): Promise<string[]> {
     await this.initialize()
-    return Array.from(this.memoryCache.values())
+    return Array.from(this.memoryCache.keys())
   }
 
   async getAllKeys(): Promise<string[]> {

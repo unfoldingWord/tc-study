@@ -43,8 +43,12 @@ export class TranslationQuestionsLoader implements ResourceLoader {
   canHandle(metadata: ResourceMetadata): boolean {
     return (
       metadata.type === 'questions' ||
+      metadata.type === 'obs-questions' ||
       metadata.subject === 'TSV Translation Questions' ||
-      metadata.resourceId === 'tq'
+      metadata.subject === 'TSV OBS Translation Questions' ||
+      metadata.subject === 'OBS Translation Questions' ||
+      metadata.resourceId === 'tq' ||
+      metadata.resourceId === 'obs-tq'
     )
   }
 
@@ -126,72 +130,62 @@ export class TranslationQuestionsLoader implements ResourceLoader {
         return cached
       }
 
-      // Get metadata to retrieve the release tag/version
+      // Get metadata to retrieve the release info and ingredient paths
       const metadata = await this.getMetadata(resourceKey)
-      
-      // Parse resourceKey to get identifiers
-      const parts = resourceKey.split('/')
-      const [owner, language, resourceId] = parts
-      
-      // Get release tag
-      const ref = metadata.release?.tag_name
+
+      const ref = (metadata as any).release?.tag_name
       if (!ref) {
-        throw new Error(
-          `Resource ${resourceKey} has no release tag. ` +
-          `Only released resources are currently supported.`
-        )
+        throw new Error(`Resource ${resourceKey} has no release tag.`)
       }
 
-      // Construct TSV URL directly
-      // Format: https://git.door43.org/{owner}/{language}_{resourceId}/raw/tag/{ref}/tq_{BOOK}.tsv
-      const repoName = `${language}_${resourceId}`
-      const tsvUrl = `https://git.door43.org/${owner}/${repoName}/raw/tag/${ref}/tq_${bookCode.toUpperCase()}.tsv`
-      
+      // If the resource has ingredients but none match this book, it simply
+      // doesn't cover that book (e.g. scripture TQ asked for 'obs').
+      // Return empty immediately rather than making a request that would 404.
+      const ingredients: any[] = (metadata as any).contentMetadata?.ingredients || []
+      if (ingredients.length > 0) {
+        const hasIngredient = ingredients.some(
+          (ing: any) => (ing.identifier || '').toLowerCase() === bookCode.toLowerCase()
+        )
+        if (!hasIngredient) {
+          return {
+            bookCode, bookName: bookCode, questions: [], questionsByChapter: {},
+            metadata: {
+              bookCode, bookName: bookCode,
+              processingDate: new Date().toISOString(),
+              totalQuestions: 0, chaptersWithQuestions: [],
+              statistics: { totalQuestions: 0, questionsPerChapter: {} }
+            }
+          }
+        }
+      }
+
+      const tsvUrl = this.buildRawTsvUrl(metadata, bookCode, ref, 'tq')
+
       if (this.debug) {
         console.log(`📥 Fetching TQ TSV from: ${tsvUrl}`)
       }
 
       const response = await fetch(tsvUrl)
       if (!response.ok) {
-        // 404 means book doesn't exist in this repo (common for incomplete translations)
         if (response.status === 404) {
-          if (this.debug) {
-            console.log(`⚠️ TQ file not found (book not in repo): ${bookCode}`)
-          }
-          // Return empty processed result so it gets cached and we don't retry
+          if (this.debug) console.log(`⚠️ TQ file not found (book not in repo): ${bookCode}`)
+          // Do NOT cache 404s — the background download may still be in progress.
           return {
-            bookCode,
-            bookName: bookCode,
-            questions: [],
-            questionsByChapter: {},
+            bookCode, bookName: bookCode, questions: [], questionsByChapter: {},
             metadata: {
-              bookCode,
-              bookName: bookCode,
+              bookCode, bookName: bookCode,
               processingDate: new Date().toISOString(),
-              totalQuestions: 0,
-              chaptersWithQuestions: [],
-              statistics: {
-                totalQuestions: 0,
-                questionsPerChapter: {}
-              }
+              totalQuestions: 0, chaptersWithQuestions: [],
+              statistics: { totalQuestions: 0, questionsPerChapter: {} }
             }
           }
         }
-        throw new Error(`Failed to fetch TSV: ${response.statusText}`)
+        throw new Error(`Failed to fetch TQ TSV: ${response.statusText}`)
       }
 
       const tsvContent = await response.text()
-      
-      // Process TSV using QuestionsProcessor
-      const processed = await this.processor.processQuestions(
-        tsvContent,
-        bookCode,
-        bookCode // Use bookCode as bookName for now
-      )
-
-      // Cache it
+      const processed = await this.processor.processQuestions(tsvContent, bookCode, bookCode)
       await this.cacheAdapter.set(cacheKey, processed)
-
       return processed
     } catch (error) {
       if (this.debug) {
@@ -201,23 +195,53 @@ export class TranslationQuestionsLoader implements ResourceLoader {
     }
   }
 
+  private buildRawTsvUrl(metadata: ResourceMetadata, bookCode: string, ref: string, prefix: string): string {
+    const zipballUrl: string | undefined = (metadata as any).release?.zipball_url
+    let owner: string
+    let repoName: string
+
+    if (zipballUrl) {
+      const match = zipballUrl.match(/git\.door43\.org\/([^/]+)\/([^/]+)\/archive\//)
+      if (match) {
+        owner = match[1]; repoName = match[2]
+      } else {
+        const parts = (metadata as any).resourceKey?.split('/') || []
+        owner = parts[0] || ''; repoName = `${parts[1]}_${parts[2]}`
+      }
+    } else {
+      const parts = (metadata as any).resourceKey?.split('/') || []
+      owner = parts[0] || ''; repoName = `${parts[1]}_${parts[2]}`
+    }
+
+    const ingredients: any[] = (metadata as any).contentMetadata?.ingredients || []
+    const ingredient = ingredients.find(
+      (ing: any) => (ing.identifier || '').toLowerCase() === bookCode.toLowerCase()
+    )
+    const filePath = ingredient?.path
+      ? ingredient.path.replace(/^\.\//, '')
+      : `${prefix}_${bookCode.toUpperCase()}.tsv`
+
+    return `https://git.door43.org/${owner}/${repoName}/raw/tag/${ref}/${filePath}`
+  }
+
   /**
-   * Download entire Translation Questions resource (all books)
+   * Download entire Translation Questions resource (all books).
+   * Uses zipball by default (one HTTP fetch for all books); falls back to per-book fetches
+   * when no zipball URL is available or the zip download fails.
    */
   async downloadResource(
     resourceKey: string,
     options?: { 
       method?: 'individual' | 'zip'
       skipExisting?: boolean
-      onProgress?: ProgressCallback
-    }
+    },
+    onProgress?: ProgressCallback
   ): Promise<void> {
     const skipExisting = options?.skipExisting ?? true
-    const onProgress = options?.onProgress
+    const method = options?.method ?? 'zip'
 
-    console.log(`📦 [TranslationQuestionsLoader] Starting download for ${resourceKey}`)
+    console.log(`📦 [TranslationQuestionsLoader] Starting download for ${resourceKey} (method: ${method})`)
 
-    // Get resource metadata to access ingredients (book list)
     const metadata = await this.getMetadata(resourceKey)
     if (!metadata) {
       throw new Error(`Resource metadata not found for ${resourceKey}`)
@@ -231,6 +255,18 @@ export class TranslationQuestionsLoader implements ResourceLoader {
 
     console.log(`📦 Found ${ingredients.length} books to download`)
 
+    const zipUrl = (metadata as any).release?.zipball_url
+    if (method === 'zip' && zipUrl) {
+      try {
+        await this.downloadViaZip(resourceKey, metadata, ingredients, skipExisting, onProgress)
+        await this.markComplete(resourceKey, ingredients.length, 'zip')
+        return
+      } catch (zipError) {
+        console.warn(`⚠️ [TQ] ZIP download failed, falling back to per-book fetch:`, zipError)
+      }
+    }
+
+    // Per-book fallback
     const total = ingredients.length
     let loaded = 0
 
@@ -242,72 +278,130 @@ export class TranslationQuestionsLoader implements ResourceLoader {
       }
 
       try {
-        // Check if already cached
         if (skipExisting) {
           const cacheKey = `tq:${resourceKey}:${bookId}`
           const cached = await this.cacheAdapter.get(cacheKey)
           if (cached && cached.questions) {
-            console.log(`⏭️ Skipping ${bookId} (already cached)`)
             loaded++
             if (onProgress) {
-              onProgress({
-                loaded,
-                total,
-                percentage: Math.round((loaded / total) * 100),
-                message: `Skipped ${bookId} (already cached)`
-              })
+              onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (already cached)` })
             }
             continue
           }
         }
 
-        // Download and process this book
-        if (this.debug) {
-          console.log(`📥 Downloading TQ for ${bookId}...`)
-        }
+        if (this.debug) console.log(`📥 Downloading TQ for ${bookId}...`)
         await this.loadContent(resourceKey, bookId)
 
         loaded++
         if (onProgress) {
-          onProgress({
-            loaded,
-            total,
-            percentage: Math.round((loaded / total) * 100),
-            message: `Downloaded ${bookId}`
-          })
+          onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Downloaded ${bookId}` })
         }
       } catch (error) {
-        if (this.debug) {
-          console.warn(`⚠️ Failed to download TQ for ${bookId}:`, error)
-        }
-        // Continue with next book even if one fails
+        if (this.debug) console.warn(`⚠️ Failed to download TQ for ${bookId}:`, error)
         loaded++
         if (onProgress) {
-          onProgress({
-            loaded,
-            total,
-            percentage: Math.round((loaded / total) * 100),
-            message: `Skipped ${bookId} (not in repo)`
-          })
+          onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (not in repo)` })
         }
       }
     }
 
-    // Mark resource as fully downloaded
+    await this.markComplete(resourceKey, ingredients.length, 'individual')
+    if (this.debug) console.log(`✅ [TranslationQuestionsLoader] Download complete for ${resourceKey}`)
+  }
+
+  /**
+   * Download all books via a single zipball fetch, then extract and cache each TSV.
+   */
+  private async downloadViaZip(
+    resourceKey: string,
+    metadata: ResourceMetadata,
+    ingredients: any[],
+    skipExisting: boolean,
+    onProgress?: ProgressCallback
+  ): Promise<void> {
+    const [owner, language, resourceId] = resourceKey.split('/')
+    const repoName = `${language}_${resourceId}`
+    const ref = (metadata as any).release?.tag_name || 'master'
+
+    console.log(`📦 [TQ] Downloading zipball for ${resourceKey} (ref: ${ref})`)
+    const zipBuffer = await this.door43Client.downloadZipball(owner, repoName, ref)
+    console.log(`✅ [TQ] Zipball downloaded: ${(zipBuffer.byteLength / 1024).toFixed(0)} KB`)
+
+    const jszipMod = await import('jszip')
+    const JSZip = (jszipMod as unknown as { default?: typeof jszipMod }).default ?? jszipMod
+    const zip = await (JSZip as any).loadAsync(zipBuffer)
+
+    const total = ingredients.length
+    let loaded = 0
+
+    for (const ingredient of ingredients) {
+      const bookId = ingredient.identifier
+      if (!bookId) { loaded++; continue }
+
+      try {
+        const cacheKey = `tq:${resourceKey}:${bookId}`
+
+        if (skipExisting) {
+          const cached = await this.cacheAdapter.get(cacheKey)
+          if (cached && cached.questions) {
+            loaded++
+            if (onProgress) {
+              onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (already cached)` })
+            }
+            continue
+          }
+        }
+
+        const normalizedPath = (ingredient.path || '').replace(/^\.\//, '')
+        let zipFile: any = null
+        for (const [fileName, file] of Object.entries(zip.files) as [string, any][]) {
+          if (fileName.endsWith(normalizedPath) && !file.dir) {
+            zipFile = file
+            break
+          }
+        }
+
+        if (!zipFile) {
+          if (this.debug) console.warn(`⚠️ [TQ] ${bookId} not found in ZIP`)
+          loaded++
+          if (onProgress) {
+            onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (not in repo)` })
+          }
+          continue
+        }
+
+        const tsv = await zipFile.async('string')
+        const processed = await this.processor.processQuestions(tsv, bookId, bookId)
+        await this.cacheAdapter.set(cacheKey, processed)
+
+        loaded++
+        if (onProgress) {
+          onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Processed ${bookId}` })
+        }
+      } catch (error) {
+        if (this.debug) console.warn(`⚠️ [TQ] Failed to process ${bookId} from ZIP:`, error)
+        loaded++
+        if (onProgress) {
+          onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Failed: ${bookId}` })
+        }
+      }
+    }
+
+    console.log(`✅ [TQ] ZIP extraction complete for ${resourceKey}`)
+  }
+
+  private async markComplete(resourceKey: string, entryCount: number, method: string): Promise<void> {
     const resourceCacheKey = `resource:${resourceKey}`
     await this.cacheAdapter.set(resourceCacheKey, {
       content: { downloaded: true },
       metadata: {
         downloadComplete: true,
         downloadCompletedAt: new Date().toISOString(),
-        downloadMethod: 'individual',
-        entryCount: ingredients.length,
-        expectedEntryCount: ingredients.length
+        downloadMethod: method,
+        entryCount,
+        expectedEntryCount: entryCount
       }
     })
-
-    if (this.debug) {
-      console.log(`✅ [TranslationQuestionsLoader] Download complete for ${resourceKey}`)
-    }
   }
 }

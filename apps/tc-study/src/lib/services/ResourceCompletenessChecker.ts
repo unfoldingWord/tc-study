@@ -117,7 +117,7 @@ export class ResourceCompletenessChecker {
     
     try {
       // Get all resources from catalog
-      const resourceKeys = await this.catalogManager.getAllResources()
+      const resourceKeys = await this.catalogManager.getAllResourceKeys()
       
       if (this.debug) {
         console.log(`[BG-DL] 📦 Cache Found ${resourceKeys.length} resources in catalog`)
@@ -304,7 +304,7 @@ export class ResourceCompletenessChecker {
     }
     
     // Get all resources
-    const allResources = await this.catalogManager.getAllResources()
+    const allResources = await this.catalogManager.getAllResourceKeys()
     
     // Filter by language (resourceKey format: owner/language/...)
     const languageResources = allResources.filter(key => {

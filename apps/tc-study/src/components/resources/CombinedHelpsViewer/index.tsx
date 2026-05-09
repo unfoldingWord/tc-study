@@ -10,16 +10,24 @@ import { ResourceType } from '@bt-synergy/resource-catalog'
 import { useResourceAPI } from 'linked-panels'
 import { BookMarked, BookOpen, FileText, LayoutList, Layers, Loader, NotebookPen } from 'lucide-react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useResourceTypeRegistry } from '../../../contexts'
+import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
-import type { EntryLinkClickSignal, NotesTokenGroupsSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
+import type {
+  EntryLinkClickSignal,
+  NotesTokenGroupsSignal,
+  ObsFrameHighlightSignal,
+  ObsFrameQuoteEntry,
+  ObsFrameQuotesSignal,
+  TokenClickSignal,
+  VerseFilterSignal,
+} from '../../../signals/studioSignals'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
-import { TranslationNoteCard } from '../TranslationNotesViewer/components/TranslationNoteCard'
+import { TranslationNoteCard, type NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
 import { useTranslationNotesContent } from '../TranslationNotesViewer/hooks/useTranslationNotesContent'
 import { useTATitles } from '../TranslationNotesViewer/hooks/useTATitles'
 import { useTAMetadataForTitles } from '../TranslationNotesViewer/hooks/useTAMetadataForTitles'
@@ -34,9 +42,9 @@ import {
 } from '../WordsLinksViewer/hooks'
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { generateSemanticIdsForQuoteTokens, parseLinkChapterVerse, parseTWLink } from '../WordsLinksViewer/utils'
-import { COMBINED_HELPS_RESOURCE_ID } from './constants'
+import { COMBINED_HELPS_IDS, COMBINED_HELPS_RESOURCE_ID } from './constants'
 
-export { COMBINED_HELPS_RESOURCE_ID } from './constants'
+export { COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID, COMBINED_HELPS_IDS } from './constants'
 
 type HelpsKindFilter = 'all' | 'notes' | 'twl'
 
@@ -63,13 +71,15 @@ function langFromResourceKey(key: string | undefined): string {
   return primaryLangCode(parts[1])
 }
 
-function isNotesType(t: string | undefined): boolean {
+function isNotesType(t: string | undefined, scope: 'scripture' | 'obs' = 'scripture'): boolean {
   const s = String(t || '').toLowerCase()
+  if (scope === 'obs') return s === 'obs-notes'
   return s === 'notes' || s === 'tn' || t === ResourceType.NOTES
 }
 
-function isWordsLinksType(t: string | undefined): boolean {
+function isWordsLinksType(t: string | undefined, scope: 'scripture' | 'obs' = 'scripture'): boolean {
   const s = String(t || '').toLowerCase()
+  if (scope === 'obs') return s === 'obs-words-links'
   return s === 'words-links' || s === 'words_links' || s === 'twl' || t === ResourceType.WORDS_LINKS
 }
 
@@ -85,6 +95,7 @@ export function CombinedHelpsViewer({
   onEntryLinkClick,
 }: CombinedHelpsViewerProps) {
   const currentRef = useCurrentReference()
+  const navigationMode = useNavigationMode()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
   const bookTitleSource = useBookTitleSource()
@@ -96,6 +107,8 @@ export function CombinedHelpsViewer({
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
   const [verseFilter, setVerseFilter] = useState<{ chapter: number; verse?: number; timestamp: number } | null>(null)
+  // OBS-only: filter to the single entry whose quote was clicked in the OBS frame text
+  const [obsQuoteFilter, setObsQuoteFilter] = useState<{ quote: string; occurrence: number; rowId?: string; kind?: 'tn' | 'twl' } | null>(null)
   const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
   const [tnDepsReady, setTnDepsReady] = useState(false)
   const [twlDepsReady, setTwlDepsReady] = useState(false)
@@ -106,8 +119,9 @@ export function CombinedHelpsViewer({
 
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
   const effectiveResource = resourceFromStore ?? resource
-  const injectedTnKey = (effectiveResource as ResourceInfo & { helpsTnResourceKey?: string }).helpsTnResourceKey
-  const injectedTwlKey = (effectiveResource as ResourceInfo & { helpsTwlResourceKey?: string }).helpsTwlResourceKey
+  const injectedTnKey = effectiveResource.helpsTnResourceKey
+  const injectedTwlKey = effectiveResource.helpsTwlResourceKey
+  const helpsScope: 'scripture' | 'obs' = effectiveResource.appliesToScope === 'obs' ? 'obs' : 'scripture'
 
   const { tnKey, twlKey } = useMemo(() => {
     let tn: string | null = injectedTnKey || null
@@ -127,10 +141,10 @@ export function CombinedHelpsViewer({
     for (const r of list) {
       const t = r.type as string | undefined
       const key = r.key || r.id || ''
-      if (key === COMBINED_HELPS_RESOURCE_ID) continue
+      if (COMBINED_HELPS_IDS.has(key)) continue
       if (!matchesLang(r)) continue
-      if (isNotesType(t) && !tn) tn = key
-      if (isWordsLinksType(t) && !twl) twl = key
+      if (isNotesType(t, helpsScope) && !tn) tn = key
+      if (isWordsLinksType(t, helpsScope) && !twl) twl = key
     }
 
     // Fallback when metadata language is wrong: use `owner/lang/...` from the key only.
@@ -138,22 +152,27 @@ export function CombinedHelpsViewer({
     for (const r of list) {
       const t = r.type as string | undefined
       const key = r.key || r.id || ''
-      if (key === COMBINED_HELPS_RESOURCE_ID) continue
+      if (COMBINED_HELPS_IDS.has(key)) continue
       if (wantLang && langFromResourceKey(key) !== wantLang) continue
-      if (!tn && isNotesType(t)) tn = key
-      if (!twl && isWordsLinksType(t)) twl = key
+      if (!tn && isNotesType(t, helpsScope)) tn = key
+      if (!twl && isWordsLinksType(t, helpsScope)) twl = key
     }
 
     return { tnKey: tn || '', twlKey: twl || '' }
-  }, [loadedResources, wantLang, injectedTnKey, injectedTwlKey])
+  }, [loadedResources, wantLang, injectedTnKey, injectedTwlKey, helpsScope])
+
+  const tnLoaderId = helpsScope === 'obs' ? 'obs-notes' : 'notes'
+  const twlLoaderId = helpsScope === 'obs' ? 'obs-words-links' : 'words-links'
 
   const { notes: tnNotes, loading: tnLoading, error: tnError } = useTranslationNotesContent(
     tnKey,
-    currentRef.book || ''
+    currentRef.book || '',
+    tnLoaderId
   )
 
   const { content: twlContent, loading: twlLoading, error: twlError } = useWordsLinksContent({
     resourceKey: twlKey,
+    loaderTypeId: twlLoaderId,
   })
 
   /** Same resource id the standalone TN/TWL viewers use — required for scripture token broadcast subscription. */
@@ -174,6 +193,11 @@ export function CombinedHelpsViewer({
   const { sendToAll: sendTokenClick } = useSignal<TokenClickSignal>('token-click', resourceId, resourceMetadata)
   const { sendToAll: sendEntryLinkClick } = useSignal<EntryLinkClickSignal>(
     'entry-link-click',
+    resourceId,
+    resourceMetadata
+  )
+  const { sendToAll: broadcastObsHighlight } = useSignal<ObsFrameHighlightSignal>(
+    'obs-frame-highlight',
     resourceId,
     resourceMetadata
   )
@@ -232,6 +256,7 @@ export function CombinedHelpsViewer({
   useEffect(() => {
     setTokenFilter(null)
     setVerseFilter(null)
+    setObsQuoteFilter(null)
     setSelectedNoteId(null)
     setSelectedLinkId(null)
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
@@ -264,10 +289,11 @@ export function CombinedHelpsViewer({
     const parts = tnKey.split('/')
     const language = parts.length >= 2 ? parts[1] : ''
     const owner = parts[0] || ''
-    checkDependenciesReady('tn', language, owner, resourceTypeRegistry, catalogManager, false)
+    const tnTypeId = helpsScope === 'obs' ? 'obs-notes' : 'notes'
+    checkDependenciesReady(tnTypeId, language, owner, resourceTypeRegistry, catalogManager, false)
       .then(setTnDepsReady)
       .catch(() => setTnDepsReady(false))
-  }, [tnKey, catalogManager, resourceTypeRegistry, catalogTrigger])
+  }, [tnKey, helpsScope, catalogManager, resourceTypeRegistry, catalogTrigger])
 
   useEffect(() => {
     if (!twlKey) {
@@ -277,10 +303,11 @@ export function CombinedHelpsViewer({
     const parts = twlKey.split('/')
     const owner = parts[0]
     const language = parts.length === 3 ? parts[1] : parts[1].split('_')[0]
-    checkDependenciesReady('words-links', language, owner, resourceTypeRegistry, catalogManager, false)
+    const twlTypeId = helpsScope === 'obs' ? 'obs-words-links' : 'words-links'
+    checkDependenciesReady(twlTypeId, language, owner, resourceTypeRegistry, catalogManager, false)
       .then(setTwlDepsReady)
       .catch(() => setTwlDepsReady(false))
-  }, [twlKey, catalogManager, resourceTypeRegistry, catalogTrigger])
+  }, [twlKey, helpsScope, catalogManager, resourceTypeRegistry, catalogTrigger])
 
   const {
     sourceResourceId: targetSourceId,
@@ -317,7 +344,9 @@ export function CombinedHelpsViewer({
     const startChapter = currentRef.chapter
     const startVerse = currentRef.verse
     const endChapter = currentRef.endChapter || startChapter
-    const endVerse = currentRef.endVerse || startVerse
+    // In OBS story mode show all frames of the story; otherwise restrict to the current range.
+    const isObsStoryMode = navigationMode === 'chapter' && currentRef.book === 'obs'
+    const endVerse = isObsStoryMode ? Number.POSITIVE_INFINITY : (currentRef.endVerse || startVerse)
 
     return tnNotes.filter((note) => {
       const [noteChapterStr, noteVerseRange] = note.reference.split(':')
@@ -336,7 +365,7 @@ export function CombinedHelpsViewer({
       if (noteChapter === endChapter && noteStartVerse > endVerse) return false
       return true
     })
-  }, [tnNotes, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
+  }, [tnNotes, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse, currentRef.book, navigationMode])
 
   const notesWithQuotes = useMemo(() => {
     return relevantNotes
@@ -417,7 +446,9 @@ export function CombinedHelpsViewer({
     const startChapter = currentRef.chapter || 1
     const endChapter = currentRef.endChapter || startChapter
     const startVerse = currentRef.verse || 1
-    const endVerse = currentRef.endVerse || startVerse
+    // In OBS story mode show all frames of the story; otherwise restrict to the current range.
+    const isObsStoryMode = navigationMode === 'chapter' && currentRef.book === 'obs'
+    const endVerse = isObsStoryMode ? Number.POSITIVE_INFINITY : (currentRef.endVerse || startVerse)
 
     return processedLinks.filter((link) => {
       const refParts = link.reference.split(':')
@@ -433,7 +464,7 @@ export function CombinedHelpsViewer({
       if (linkChapter === endChapter) return linkVerse <= endVerse
       return true
     })
-  }, [processedLinks, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
+  }, [processedLinks, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse, currentRef.book, navigationMode])
 
   const bookCodeLower = currentRef.book?.toLowerCase() || ''
 
@@ -466,10 +497,13 @@ export function CombinedHelpsViewer({
   }, [filteredByReference, bookCodeLower])
 
   const tokenGroupsApi = useResourceAPI<NotesTokenGroupsSignal>(resourceId)
+  const obsQuotesApi = useResourceAPI<ObsFrameQuotesSignal>(resourceId)
   const lastTnKeyRef = useRef<string | null>(null)
   const lastTwlKeyRef = useRef<string | null>(null)
+  const lastObsQuotesKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
+    if (helpsScope === 'obs') return
     const activeGroups = kindFilter === 'twl' ? [] : underlineTnGroups
     const key = `${kindFilter}:${activeGroups.map((g) => `${g.sourceId}:${g.semanticIds.length}`).join('|')}`
     if (key === lastTnKeyRef.current) return
@@ -486,9 +520,10 @@ export function CombinedHelpsViewer({
       timestamp: Date.now(),
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps -- stable messaging ref; key dedupes
-  }, [resourceId, tnKey, resourceKey, underlineTnGroups, kindFilter])
+  }, [resourceId, tnKey, resourceKey, underlineTnGroups, kindFilter, helpsScope])
 
   useEffect(() => {
+    if (helpsScope === 'obs') return
     const activeGroups = kindFilter === 'notes' ? [] : underlineTwlGroups
     const key = `${kindFilter}:${activeGroups.map((g) => `${g.sourceId}:${g.semanticIds.length}`).join('|')}`
     if (key === lastTwlKeyRef.current) return
@@ -505,35 +540,34 @@ export function CombinedHelpsViewer({
       timestamp: Date.now(),
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resourceId, twlKey, resourceKey, underlineTwlGroups, kindFilter])
+  }, [resourceId, twlKey, resourceKey, underlineTwlGroups, kindFilter, helpsScope])
 
   useEffect(() => {
     return () => {
       lastTnKeyRef.current = null
       lastTwlKeyRef.current = null
-      tokenGroupsApi.messaging.sendToAll({
-        type: 'notes-token-groups',
-        lifecycle: 'state',
-        stateKey: 'current-notes-token-groups-tn',
-        sourceResourceId: resourceId,
-        tokenGroups: [],
-        resourceMetadata: { id: tnKey || resourceKey, language: '', type: 'tn' },
-        timestamp: Date.now(),
-      })
-      tokenGroupsApi.messaging.sendToAll({
-        type: 'notes-token-groups',
-        lifecycle: 'state',
-        stateKey: 'current-notes-token-groups-twl',
-        sourceResourceId: resourceId,
-        tokenGroups: [],
-        resourceMetadata: { id: twlKey || resourceKey, language: '', type: 'words-links' },
-        timestamp: Date.now(),
-      })
+      // Note: we intentionally do NOT call sendToAll on unmount.
+      // linked-panels validates the sourceResourceId still exists in the store,
+      // so broadcasting after removal produces "Sender resource does not exist"
+      // console errors. Fresh broadcasts from newly mounted viewers replace stale state.
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resourceId])
 
   const { displayNotes, hasNoteMatches } = useMemo(() => {
+    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching note
+    if (helpsScope === 'obs' && obsQuoteFilter) {
+      // TWL click → hide all notes
+      if (obsQuoteFilter.kind === 'twl') return { displayNotes: [], hasNoteMatches: false }
+      const match = notesWithAlignedTokens.find(
+        (n) =>
+          (obsQuoteFilter.rowId && n.id === obsQuoteFilter.rowId) ||
+          (n.quote?.trim().toLowerCase() === obsQuoteFilter.quote.trim().toLowerCase() &&
+            Number.parseInt(String(n.occurrence ?? '1'), 10) === obsQuoteFilter.occurrence)
+      )
+      return { displayNotes: match ? [match] : notesWithAlignedTokens, hasNoteMatches: !!match }
+    }
+
     if (verseFilter) {
       const filtered = notesWithAlignedTokens.filter((note) => {
         const [chapterStr, verseRange] = note.reference.split(':')
@@ -577,9 +611,22 @@ export function CombinedHelpsViewer({
       displayNotes: filtered,
       hasNoteMatches: filtered.length > 0,
     }
-  }, [notesWithAlignedTokens, tokenFilter, verseFilter, bookCodeLower])
+  }, [notesWithAlignedTokens, tokenFilter, verseFilter, obsQuoteFilter, helpsScope, bookCodeLower])
 
   const { displayLinks, hasLinkMatches } = useMemo(() => {
+    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching link
+    if (helpsScope === 'obs' && obsQuoteFilter) {
+      // TN click → hide all links
+      if (obsQuoteFilter.kind === 'tn') return { displayLinks: [], hasLinkMatches: false }
+      const match = filteredByReference.find(
+        (l) =>
+          (obsQuoteFilter.rowId && l.id === obsQuoteFilter.rowId) ||
+          (l.origWords?.trim().toLowerCase() === obsQuoteFilter.quote.trim().toLowerCase() &&
+            Number.parseInt(String(l.occurrence ?? '1'), 10) === obsQuoteFilter.occurrence)
+      )
+      return { displayLinks: match ? [match] : filteredByReference, hasLinkMatches: !!match }
+    }
+
     if (verseFilter) {
       const filtered = filteredByReference.filter((link) => {
         const [chapterStr, verseRange] = link.reference.split(':')
@@ -623,21 +670,188 @@ export function CombinedHelpsViewer({
       displayLinks: filtered,
       hasLinkMatches: filtered.length > 0,
     }
-  }, [filteredByReference, tokenFilter, verseFilter, bookCodeLower])
+  }, [filteredByReference, tokenFilter, verseFilter, obsQuoteFilter, helpsScope, bookCodeLower])
 
-  const hasMatches = tokenFilter
-    ? kindFilter === 'notes'
-      ? hasNoteMatches
-      : kindFilter === 'twl'
-        ? hasLinkMatches
-        : hasNoteMatches || hasLinkMatches
-    : verseFilter
+  const obsFrameQuotesForBroadcast: ObsFrameQuoteEntry[] = useMemo(() => {
+    if (helpsScope !== 'obs' || currentRef.book !== 'obs') return []
+    const story = currentRef.chapter
+    const frame = currentRef.verse
+    const refStr = `${story}:${frame}`
+    const out: ObsFrameQuoteEntry[] = []
+    // Use unfiltered data so underlines persist even when obsQuoteFilter is active.
+    for (const note of notesWithAlignedTokens) {
+      if (note.reference !== refStr) continue
+      const q = note.quote?.trim()
+      if (!q) continue
+      const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
+      out.push({
+        sourceId: note.id,
+        kind: 'tn',
+        quote: q,
+        occurrence: Number.isFinite(occRaw) ? occRaw : 1,
+      })
+    }
+    for (const link of filteredByReference) {
+      if (link.reference !== refStr) continue
+      const q = link.origWords?.trim()
+      if (!q) continue
+      const occRaw = Number.parseInt(String(link.occurrence ?? '1'), 10)
+      out.push({
+        sourceId: link.id,
+        kind: 'twl',
+        quote: q,
+        occurrence: Number.isFinite(occRaw) ? occRaw : 1,
+      })
+    }
+    return out
+  }, [helpsScope, currentRef.book, currentRef.chapter, currentRef.verse, notesWithAlignedTokens, filteredByReference])
+
+  // Full-story frame quote map: frame number → entries (for range/story-mode OBS underlines)
+  const obsFrameQuoteMap = useMemo<Record<number, ObsFrameQuoteEntry[]>>(() => {
+    if (helpsScope !== 'obs' || currentRef.book !== 'obs') return {}
+    const story = currentRef.chapter
+    const map: Record<number, ObsFrameQuoteEntry[]> = {}
+    const addEntry = (ref: string, entry: ObsFrameQuoteEntry) => {
+      const [chStr, frStr] = ref.split(':')
+      if (parseInt(chStr) !== story) return
+      const fr = parseInt(frStr)
+      if (!map[fr]) map[fr] = []
+      map[fr].push(entry)
+    }
+    // Use unfiltered data so underlines persist even when obsQuoteFilter is active.
+    for (const note of notesWithAlignedTokens) {
+      const q = note.quote?.trim()
+      if (!q) continue
+      const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
+      addEntry(note.reference, { sourceId: note.id, kind: 'tn', quote: q, occurrence: Number.isFinite(occRaw) ? occRaw : 1 })
+    }
+    for (const link of filteredByReference) {
+      const q = link.origWords?.trim()
+      if (!q) continue
+      const occRaw = Number.parseInt(String(link.occurrence ?? '1'), 10)
+      addEntry(link.reference, { sourceId: link.id, kind: 'twl', quote: q, occurrence: Number.isFinite(occRaw) ? occRaw : 1 })
+    }
+    return map
+  }, [helpsScope, currentRef.book, currentRef.chapter, notesWithAlignedTokens, filteredByReference])
+
+  useEffect(() => {
+    lastObsQuotesKeyRef.current = null
+  }, [currentRef.book, currentRef.chapter, currentRef.verse, helpsScope])
+
+  useEffect(() => {
+    if (helpsScope !== 'obs') return
+    const key = `${currentRef.book}:${currentRef.chapter}:${currentRef.verse}:${kindFilter}:${obsFrameQuotesForBroadcast
+      .map((q) => `${q.sourceId}:${q.quote}:${q.occurrence}`)
+      .join('|')}`
+    if (key === lastObsQuotesKeyRef.current) return
+    lastObsQuotesKeyRef.current = key
+    const storyNumber = currentRef.book === 'obs' ? currentRef.chapter : 0
+    const frameNumber = currentRef.book === 'obs' ? currentRef.verse : 0
+    obsQuotesApi.messaging.sendToAll({
+      type: 'obs-frame-quotes',
+      lifecycle: 'state',
+      stateKey: 'current-obs-frame-quotes',
+      sourceResourceId: resourceId,
+      storyNumber,
+      frameNumber,
+      quotes: currentRef.book === 'obs' ? obsFrameQuotesForBroadcast : [],
+      frameQuoteMap: currentRef.book === 'obs' ? obsFrameQuoteMap : undefined,
+      timestamp: Date.now(),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    helpsScope,
+    resourceId,
+    currentRef.book,
+    currentRef.chapter,
+    currentRef.verse,
+    kindFilter,
+    obsFrameQuotesForBroadcast,
+    obsFrameQuoteMap,
+  ])
+
+  useSignalHandler<ObsFrameHighlightSignal>(
+    'obs-frame-highlight',
+    resourceId,
+    useCallback(
+      (signal) => {
+        if (signal.sourceResourceId === resourceId) return
+        if (helpsScope !== 'obs') return
+        if (signal.highlight === null) {
+          setObsQuoteFilter(null)
+          setSelectedNoteId(null)
+          setSelectedLinkId(null)
+          return
+        }
+        const h = signal.highlight
+        if (currentRef.book !== 'obs' || h.storyNumber !== currentRef.chapter) return
+        const isObsStoryMode = navigationMode === 'chapter'
+        if (!isObsStoryMode && h.frameNumber !== currentRef.verse) return
+        // Set the filter — displayNotes/displayLinks will narrow to just this entry.
+        // Include kind so each list knows whether to show or hide itself entirely.
+        setObsQuoteFilter({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId, kind: h.kind })
+        // Also mark the entry as selected for visual feedback (search unfiltered lists)
+        if (h.rowId) {
+          if (notesWithAlignedTokens.some((n) => n.id === h.rowId)) {
+            setSelectedNoteId(h.rowId)
+            setSelectedLinkId(null)
+            return
+          }
+          if (filteredByReference.some((l) => l.id === h.rowId)) {
+            setSelectedLinkId(h.rowId)
+            setSelectedNoteId(null)
+            return
+          }
+        }
+        const nq = h.quote.trim().toLowerCase()
+        for (const note of notesWithAlignedTokens) {
+          if ((note.quote || '').trim().toLowerCase() !== nq) continue
+          const occ = Number.parseInt(String(note.occurrence ?? '1'), 10)
+          if (occ === h.occurrence) {
+            setSelectedNoteId(note.id)
+            setSelectedLinkId(null)
+            return
+          }
+        }
+        for (const link of filteredByReference) {
+          if ((link.origWords || '').trim().toLowerCase() !== nq) continue
+          const occ = Number.parseInt(String(link.occurrence ?? '1'), 10)
+          if (occ === h.occurrence) {
+            setSelectedLinkId(link.id)
+            setSelectedNoteId(null)
+            return
+          }
+        }
+      },
+      [
+        resourceId,
+        helpsScope,
+        currentRef.book,
+        currentRef.chapter,
+        currentRef.verse,
+        navigationMode,
+        notesWithAlignedTokens,
+        filteredByReference,
+      ]
+    ),
+    { debug: false, resourceMetadata }
+  )
+
+  const hasMatches = obsQuoteFilter
+    ? hasNoteMatches || hasLinkMatches
+    : tokenFilter
       ? kindFilter === 'notes'
         ? hasNoteMatches
         : kindFilter === 'twl'
           ? hasLinkMatches
           : hasNoteMatches || hasLinkMatches
-      : true
+      : verseFilter
+        ? kindFilter === 'notes'
+          ? hasNoteMatches
+          : kindFilter === 'twl'
+            ? hasLinkMatches
+            : hasNoteMatches || hasLinkMatches
+        : true
 
   const displayCount =
     kindFilter === 'all'
@@ -759,7 +973,28 @@ export function CombinedHelpsViewer({
   }, [])
 
   const handleNoteQuoteClick = useCallback(
-    (note: (typeof notesWithAlignedTokens)[0]) => {
+    (note: NoteWithTokens) => {
+      if (helpsScope === 'obs') {
+        const quote = note.quote?.trim()
+        if (!quote) return
+        const refParts = note.reference.split(':')
+        const chapter = parseInt(refParts[0] || '1', 10)
+        const verse = parseInt(refParts[1] || '1', 10)
+        const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
+        const occurrence = Number.isFinite(occRaw) ? occRaw : 1
+        setSelectedNoteId(note.id)
+        broadcastObsHighlight({
+          lifecycle: 'event',
+          highlight: {
+            storyNumber: chapter,
+            frameNumber: verse,
+            quote,
+            occurrence,
+            rowId: note.id,
+          },
+        })
+        return
+      }
       if (!note.quoteTokens?.length) return
       const refParts = note.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
@@ -784,7 +1019,7 @@ export function CombinedHelpsViewer({
         },
       })
     },
-    [currentRef.book, sendTokenClick]
+    [currentRef.book, helpsScope, broadcastObsHighlight, sendTokenClick]
   )
 
   const handleSupportReferenceClick = useCallback(
@@ -828,6 +1063,26 @@ export function CombinedHelpsViewer({
   const handleLinkQuoteClick = useCallback(
     (link: TranslationWordsLink) => {
       setSelectedLinkId(link.id)
+      if (helpsScope === 'obs') {
+        const quote = link.origWords?.trim()
+        if (!quote) return
+        const refParts = link.reference.split(':')
+        const chapter = parseInt(refParts[0] || '1', 10)
+        const verse = parseInt(refParts[1] || '1', 10)
+        const occRaw = Number.parseInt(String(link.occurrence ?? '1'), 10)
+        const occurrence = Number.isFinite(occRaw) ? occRaw : 1
+        broadcastObsHighlight({
+          lifecycle: 'event',
+          highlight: {
+            storyNumber: chapter,
+            frameNumber: verse,
+            quote,
+            occurrence,
+            rowId: link.id,
+          },
+        })
+        return
+      }
       if (!link.quoteTokens?.length) return
       const refParts = link.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
@@ -854,7 +1109,7 @@ export function CombinedHelpsViewer({
         })
       })
     },
-    [currentRef.book, sendTokenClick]
+    [currentRef.book, helpsScope, broadcastObsHighlight, sendTokenClick]
   )
 
   const depsOk = (!tnKey || tnDepsReady) && (!twlKey || twlDepsReady)
@@ -889,7 +1144,20 @@ export function CombinedHelpsViewer({
 
   return (
     <div className="h-full flex flex-col">
-      {tokenFilter && (
+      {obsQuoteFilter && (
+        <TokenFilterBanner
+          tokenFilter={{
+            semanticId: '',
+            content: obsQuoteFilter.quote,
+            alignedSemanticIds: [],
+            timestamp: 0,
+          }}
+          displayLinksCount={displayCount}
+          hasMatches={hasMatches}
+          onClearFilter={() => { setObsQuoteFilter(null); setSelectedNoteId(null); setSelectedLinkId(null) }}
+        />
+      )}
+      {!obsQuoteFilter && tokenFilter && (
         <TokenFilterBanner
           tokenFilter={tokenFilter}
           displayLinksCount={displayCount}
@@ -897,7 +1165,7 @@ export function CombinedHelpsViewer({
           onClearFilter={() => setTokenFilter(null)}
         />
       )}
-      {verseFilter && (
+      {!obsQuoteFilter && verseFilter && (
         <TokenFilterBanner
           tokenFilter={{
             semanticId: '',
@@ -1014,6 +1282,7 @@ export function CombinedHelpsViewer({
                                   taTitle={taTitle}
                                   isLoadingTATitle={isLoadingTitle}
                                   getEntryTitle={getEntryTitle}
+                                  obsMode={helpsScope === 'obs'}
                                 />
                               </div>
                             )
@@ -1034,6 +1303,7 @@ export function CombinedHelpsViewer({
                                 tokenFilter={tokenFilter}
                                 targetResourceId={targetSourceId}
                                 languageDirection={targetLanguageDirection}
+                                obsMode={helpsScope === 'obs'}
                               />
                             </div>
                           )

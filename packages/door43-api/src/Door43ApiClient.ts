@@ -217,46 +217,73 @@ export class Door43ApiClient {
   }): Promise<Door43Language[]> {
     const params = new URLSearchParams()
     
-    // Add multiple subjects (each as a separate parameter)
     if (filters?.subjects && filters.subjects.length > 0) {
-      filters.subjects.forEach(subject => {
-        params.append('subject', subject)
-      })
+      filters.subjects.forEach(subject => params.append('subject', subject))
     }
-    if (filters?.stage) {
-      params.append('stage', filters.stage)
-    }
-    if (filters?.topic) {
-      params.append('topic', filters.topic)
-    }
+    if (filters?.stage) params.append('stage', filters.stage)
+    if (filters?.topic) params.append('topic', filters.topic)
     
     const queryString = params.toString()
-    const endpoint = queryString 
+    const listEndpoint = queryString 
       ? `/api/v1/catalog/list/languages?${queryString}`
       : '/api/v1/catalog/list/languages'
     
-    // Simplified log: just show the request type and key filters
-    const filterSummary = filters?.subjects 
-      ? `${filters.subjects.length} subjects` 
-      : 'all subjects'
+    const filterSummary = filters?.subjects ? `${filters.subjects.length} subjects` : 'all subjects'
     const stageSummary = filters?.stage || 'all stages'
     const topicSummary = filters?.topic ? `, ${filters.topic}` : ''
     console.log(`📡 Fetching languages (${filterSummary}, ${stageSummary}${topicSummary})`)
     
-    const response = await this.request<{ ok: boolean; data: any[] }>(endpoint);
-    
-    if (!response.ok || !Array.isArray(response.data)) {
-      return [];
+    // Primary: catalog/list/languages
+    try {
+      const response = await this.request<{ ok: boolean; data: any[] | null }>(listEndpoint)
+      if (response.ok && Array.isArray(response.data) && response.data.length > 0) {
+        // API returns: lc (language code), ln (native name), ang (anglicized name), ld (direction)
+        return response.data.map((lang: any) => ({
+          code: lang.lc || lang.identifier || lang.code,
+          name: lang.ln || lang.name || lang.ang || lang.title,
+          direction: (lang.ld || lang.direction || 'ltr') as 'ltr' | 'rtl',
+          anglicized_name: lang.ang || lang.anglicized_name,
+        }))
+      }
+    } catch (e) {
+      console.warn('⚠️ catalog/list/languages failed, falling back to catalog/search', e)
     }
-    
-    // Transform API response to Door43Language[]
-    // API returns: lc (language code), ln (native name), ang (anglicized name), ld (direction)
-    return response.data.map((lang: any) => ({
-      code: lang.lc || lang.identifier || lang.code,
-      name: lang.ln || lang.name || lang.ang || lang.title, // Prioritize native name (ln)
-      direction: (lang.ld || lang.direction || 'ltr') as 'ltr' | 'rtl',
-      anglicized_name: lang.ang || lang.anglicized_name, // Keep English name separate
-    }));
+
+    // Fallback: derive unique languages from catalog/search (handles broken list/languages endpoint)
+    console.log('📡 Falling back to catalog/search to derive languages...')
+    const searchParams = new URLSearchParams()
+    if (filters?.subjects && filters.subjects.length > 0) {
+      filters.subjects.forEach(subject => searchParams.append('subject', subject))
+    }
+    if (filters?.stage) searchParams.append('stage', filters.stage)
+    if (filters?.topic) searchParams.append('topic', filters.topic)
+    searchParams.set('limit', '500')
+
+    const searchResponse = await this.request<{ ok: boolean; data: any[] | null }>(
+      `/api/v1/catalog/search?${searchParams.toString()}`
+    )
+    if (!searchResponse.ok || !Array.isArray(searchResponse.data)) {
+      console.warn('🌐 Found 0 languages from Door43')
+      return []
+    }
+
+    // Deduplicate by language code, preferring GL entries
+    const langMap = new Map<string, Door43Language>()
+    for (const entry of searchResponse.data) {
+      const code: string = entry.language || entry.language_code || ''
+      if (!code) continue
+      if (!langMap.has(code)) {
+        langMap.set(code, {
+          code,
+          name: entry.language_title || entry.language_name || code.toUpperCase(),
+          direction: (entry.language_direction || 'ltr') as 'ltr' | 'rtl',
+          anglicized_name: entry.language_anglicized_name,
+        })
+      }
+    }
+    const langs = Array.from(langMap.values())
+    console.log(`🌐 Found ${langs.length} languages from Door43 (via catalog/search fallback)`)
+    return langs
   }
 
   /**
@@ -562,12 +589,10 @@ export class Door43ApiClient {
   async enrichResourceMetadata(resource: Door43Resource): Promise<{
     license?: string;
     readme?: string;
-    licenseFile?: string;
   }> {
     const enriched: { 
       license?: string; 
       readme?: string; 
-      licenseFile?: string;
     } = {};
     
     if (!resource.metadata_url) {
@@ -625,38 +650,6 @@ export class Door43ApiClient {
       if (this.config.debug) {
         console.warn(`⚠️  Failed to fetch README:`, error);
       }
-    }
-    
-    // Fetch LICENSE file (try multiple common names)
-    const licenseFileNames = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'LICENCE', 'LICENCE.md'];
-    for (const fileName of licenseFileNames) {
-      try {
-        const licenseUrl = resource.metadata_url.replace('manifest.yaml', fileName);
-        
-        if (this.config.debug) {
-          console.log(`📜 Trying LICENSE file: ${licenseUrl}`);
-        }
-        
-        const licenseResponse = await fetch(licenseUrl);
-        if (licenseResponse.ok) {
-          const licenseText = await licenseResponse.text();
-          if (licenseText && licenseText.length > 0) {
-            enriched.licenseFile = licenseText;
-            
-            if (this.config.debug) {
-              console.log(`✅ Got LICENSE file (${licenseText.length} chars) from ${fileName}`);
-            }
-            break; // Found license file, stop trying
-          }
-        }
-      } catch (error) {
-        // Continue to next filename
-        continue;
-      }
-    }
-    
-    if (this.config.debug && !enriched.licenseFile) {
-      console.warn(`⚠️  No LICENSE file found`);
     }
     
     return enriched;
@@ -751,23 +744,66 @@ export class Door43ApiClient {
     }
     
     try {
-      // Use repos endpoint - this is the correct endpoint that returns repository info
-      // The catalog entry endpoint doesn't exist, use the standard Gitea API instead
-      const endpoint = `/api/v1/repos/${owner}/${repoName}`;
-      const repo = await this.request<any>(endpoint);
+      // Step 1: fetch repo info — gives us the catalog stage map (tag names, zip URLs)
+      // and structural fields (owner object, description, stars, etc.)
+      const repo = await this.request<any>(`/api/v1/repos/${owner}/${repoName}`);
       
-      // The repo object includes a 'catalog' field with prod/preprod/latest info
-      // Extract the appropriate release based on stage
       if (repo && repo.catalog && repo.catalog[stage]) {
-        // Merge catalog info into the release field for consistency
         const catalogStage = repo.catalog[stage];
+        const tag = catalogStage.branch_or_tag_name;
+
+        // Build the release object from catalog stage info (always correct)
         repo.release = {
-          tag_name: catalogStage.branch_or_tag_name,
+          tag_name: tag,
           zipball_url: catalogStage.zipball_url,
           tarball_url: catalogStage.tarball_url,
           published_at: catalogStage.released,
-          html_url: catalogStage.release_url
+          html_url: catalogStage.release_url,
         };
+
+        // Step 2: fetch the catalog entry pinned to the release tag so that
+        // content-metadata fields (title, language, subject, metadata_url,
+        // ingredients, content_format) reflect the tagged commit, not master.
+        if (tag) {
+          try {
+            const catalogEntry = await this.request<any>(
+              `/api/v1/catalog/entry/${owner}/${repoName}/${encodeURIComponent(tag)}`
+            );
+            if (catalogEntry) {
+              // Overlay only the fields whose authoritative source is the manifest
+              // at the release tag. Structural/social fields (owner object, forks,
+              // stars, permissions, etc.) are left untouched from the repos response.
+              repo.title          = catalogEntry.title          ?? repo.title;
+              repo.language       = catalogEntry.language       ?? repo.language;
+              repo.language_title = catalogEntry.language_title ?? repo.language_title;
+              repo.language_direction = catalogEntry.language_direction ?? repo.language_direction;
+              repo.subject        = catalogEntry.subject        ?? repo.subject;
+              repo.metadata_url   = catalogEntry.metadata_url   ?? repo.metadata_url;
+              repo.ingredients    = catalogEntry.ingredients    ?? repo.ingredients;
+              repo.content_format = catalogEntry.content_format ?? repo.content_format;
+              repo.relations      = catalogEntry.relations      ?? repo.relations;
+
+              if (this.config.debug) {
+                console.log(`📌 findRepository: overlaid catalog entry fields for ${owner}/${repoName}@${tag}`, {
+                  title: repo.title,
+                  language: repo.language,
+                  subject: repo.subject,
+                  metadata_url: repo.metadata_url,
+                });
+              }
+            }
+          } catch (catalogError) {
+            // Catalog entry unavailable (e.g. not yet indexed) — proceed with
+            // repos-endpoint data.  This is a degraded but functional fallback.
+            if (this.config.debug) {
+              console.warn(
+                `⚠️ findRepository: catalog entry not found for ${owner}/${repoName}@${tag}, ` +
+                `falling back to repos endpoint data:`,
+                catalogError
+              );
+            }
+          }
+        }
       }
       
       return repo;

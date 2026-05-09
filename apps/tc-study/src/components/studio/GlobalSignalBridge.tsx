@@ -31,8 +31,11 @@ export function GlobalSignalBridge() {
       if (signal.type === 'verse-navigation') {
         api.messaging.sendToAll({
           type: 'verse-navigation',
-          verse: signal.verse
-        })
+          lifecycle: 'event',
+          sourceResourceId: '__global__',
+          timestamp: Date.now(),
+          verse: signal.verse,
+        } satisfies VerseNavigationSignal)
         console.log('[GlobalSignalBridge] Forwarded verse-navigation to all panels')
       }
       

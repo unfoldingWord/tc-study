@@ -29,6 +29,7 @@ import { TranslationWordsLinksLoader } from '@bt-synergy/translation-words-links
 import { TranslationWordsLoader } from '@bt-synergy/translation-words-loader'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { IndexedDBCatalogAdapter } from '../lib/adapters/IndexedDBCatalogAdapter'
+import { ObsLoader } from '../lib/loaders/ObsLoader'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
 import { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
@@ -141,6 +142,8 @@ async function initialize() {
     })
     catalogManager.registerResourceType(translationWordsLinksLoader)
     loaderRegistry.registerLoader('words-links', translationWordsLinksLoader)
+    // OBS TWL uses the same loader — register under the OBS type ID for explicit lookup
+    loaderRegistry.registerLoader('obs-words-links', translationWordsLinksLoader)
     
     const translationAcademyLoader = new TranslationAcademyLoader({
       cacheAdapter,
@@ -159,6 +162,8 @@ async function initialize() {
     })
     catalogManager.registerResourceType(translationNotesLoader)
     loaderRegistry.registerLoader('tn', translationNotesLoader)
+    // OBS TN uses the same loader — register under the OBS type ID for explicit lookup
+    loaderRegistry.registerLoader('obs-notes', translationNotesLoader)
     
     const translationQuestionsLoader = new TranslationQuestionsLoader({
       cacheAdapter,
@@ -168,6 +173,18 @@ async function initialize() {
     })
     catalogManager.registerResourceType(translationQuestionsLoader)
     loaderRegistry.registerLoader('questions', translationQuestionsLoader)
+    // OBS TQ uses the same loader — register under the OBS type ID for explicit lookup
+    loaderRegistry.registerLoader('obs-questions', translationQuestionsLoader)
+
+    // OBS loader — no React deps so safe to instantiate in worker
+    const obsLoader = new ObsLoader({
+      cacheAdapter,
+      catalogAdapter,
+      door43Client,
+      debug: false
+    })
+    catalogManager.registerResourceType(obsLoader)
+    loaderRegistry.registerLoader('obs', obsLoader)
 
     // 6. Create a minimal resource type registry for priority lookups
     // (BackgroundDownloadManager needs this for priority ordering)

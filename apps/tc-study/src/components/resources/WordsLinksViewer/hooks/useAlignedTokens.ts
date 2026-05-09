@@ -26,15 +26,19 @@ import { useCurrentReference } from '../../../../contexts'
 import { generateSemanticIdsForQuoteTokens } from '../utils/generateSemanticIds'
 import { useScriptureTokens } from './useScriptureTokens'
 
-interface UseAlignedTokensOptions {
+/** Minimal link shape needed to attach aligned tokens (TN pseudo-links + full TWL rows). */
+type LinkQuotesInput = {
+  id: string
+  reference: string
+  origWords?: string
+  quoteTokens?: OptimizedToken[]
+  occurrence?: string
+}
+
+interface UseAlignedTokensOptions<TLink extends LinkQuotesInput> {
   resourceKey: string // TWL resource key (e.g., "unfoldingWord/en/twl")
   resourceId: string // TWL viewer resource ID
-  links: Array<{
-    id: string
-    reference: string
-    origWords?: string
-    quoteTokens?: OptimizedToken[] // Original language tokens
-  }>
+  links: TLink[]
 }
 
 interface AlignedToken {
@@ -62,8 +66,10 @@ function findAlignedTokens(
   // First, find all matched word token positions
   const matchedPositions: number[] = []
   targetTokens.forEach((token, index) => {
-    // Get aligned semantic IDs from this token
-    const alignedIds = token.alignedOriginalWordIds || []
+    const tk = token as OptimizedToken & { alignedOriginalWordIds?: unknown[] }
+    const alignedIds: unknown[] = Array.isArray(tk.alignedOriginalWordIds)
+      ? tk.alignedOriginalWordIds
+      : []
     
     // Check if any of the original semantic IDs match
     // Compare case-insensitively (broadcast/USFM may use "TIT 1:1:...", we generate "tit 1:1:...")
@@ -115,16 +121,24 @@ function findAlignedTokens(
           if (token.type === 'word') {
             hasWordsBetween = true
             // Don't break - we still need to collect punctuation
-          } else if (token.type === 'punctuation' || token.type === 'whitespace' || token.type === 'text') {
-            // Collect all non-word tokens (punctuation, whitespace, and text tokens)
-            // Text tokens can contain hyphens, commas, and other inline punctuation
-            betweenTokens.push({
+          } else if (
+            token.type === 'punctuation' ||
+            token.type === 'whitespace' ||
+            token.type === 'number' ||
+            token.type === 'paragraph-marker' ||
+            (token as { type?: string }).type === 'text'
+          ) {
+            const marked: AlignedToken = {
               content: token.text,
               semanticId: `${verseRef}:${token.type}:${i}`,
               verseRef,
               position: i,
-              type: token.type as 'punctuation' | 'whitespace',
-            })
+              type:
+                token.type === 'whitespace'
+                  ? 'whitespace'
+                  : 'punctuation',
+            }
+            betweenTokens.push(marked)
           }
         }
         
@@ -148,16 +162,24 @@ function findAlignedTokens(
   return result
 }
 
-export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedTokensOptions) {
+export function useAlignedTokens<TLink extends LinkQuotesInput>({
+  resourceKey,
+  resourceId,
+  links,
+}: UseAlignedTokensOptions<TLink>) {
   const currentRef = useCurrentReference()
   
   // Listen for scripture token broadcasts (simple state listener!)
   const { tokens: targetTokens, reference: tokenReference, hasTokens } = useScriptureTokens({ resourceId })
   
   // Build aligned tokens for each link
-  const linksWithAlignedTokens = useMemo(() => {
+  const linksWithAlignedTokens = useMemo((): Array<
+    TLink & { alignedTokens: AlignedToken[] | undefined; semanticIds?: string[] }
+  > => {
     if (!hasTokens || !links || links.length === 0) {
-      return links ? links.map(link => ({ ...link, alignedTokens: undefined })) : []
+      return links.map((link) => ({ ...link, alignedTokens: undefined })) as Array<
+        TLink & { alignedTokens: AlignedToken[] | undefined }
+      >
     }
 
     const bookCode = currentRef.book?.toLowerCase() || ''
@@ -201,7 +223,7 @@ export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedT
 
       // Generate semantic IDs for original language tokens
       // Pass baseOccurrence for single-token quotes (TN/TWL occurrence from link)
-      const linkOccurrence = parseInt(String((link as { occurrence?: string }).occurrence ?? '1'), 10)
+      const linkOccurrence = parseInt(String(link.occurrence ?? '1'), 10)
       const originalSemanticIds = generateSemanticIdsForQuoteTokens(
         link.quoteTokens,
         bookCode,
@@ -235,6 +257,8 @@ export function useAlignedTokens({ resourceKey, resourceId, links }: UseAlignedT
   return {
     linksWithAlignedTokens,
     loading: false, // No loading state needed with broadcast!
+    loadingAligned: false,
+    alignedError: null as string | null,
     error: null,
     hasTargetContent: hasTokens,
   }

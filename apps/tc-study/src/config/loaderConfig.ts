@@ -50,6 +50,12 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     downloadPriority: 10,
   },
   {
+    id: 'obs-words-links',
+    name: 'OBS Translation Words Links',
+    loaderImport: '@bt-synergy/translation-words-links-loader',
+    downloadPriority: 12,
+  },
+  {
     id: 'words',
     name: 'Translation Words',
     loaderImport: '@bt-synergy/translation-words-loader',
@@ -60,6 +66,24 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     name: 'Translation Academy',
     loaderImport: '@bt-synergy/translation-academy-loader',
     downloadPriority: 30,
+  },
+  {
+    id: 'obs',
+    name: 'Open Bible Stories',
+    loaderImport: 'src/lib/loaders/ObsLoader',
+    downloadPriority: 5,
+  },
+  {
+    id: 'obs-notes',
+    name: 'OBS Translation Notes',
+    loaderImport: '@bt-synergy/translation-notes-loader',
+    downloadPriority: 11,
+  },
+  {
+    id: 'obs-questions',
+    name: 'OBS Translation Questions',
+    loaderImport: '@bt-synergy/translation-questions-loader',
+    downloadPriority: 26,
   },
 ]
 

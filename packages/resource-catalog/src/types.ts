@@ -18,10 +18,14 @@ export enum ResourceType {
   WORDS_LINKS = 'words-links',
   QUESTIONS = 'questions',
   ACADEMY = 'academy',
+  OBS = 'obs',
+  OBS_NOTES = 'obs-notes',
+  OBS_WORDS_LINKS = 'obs-words-links',
+  OBS_QUESTIONS = 'obs-questions',
   AUDIO = 'audio',
   VIDEO = 'video',
   ALIGNMENT = 'alignment',
-  UNKNOWN = 'unknown'
+  UNKNOWN = 'unknown',
 }
 
 /**

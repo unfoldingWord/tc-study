@@ -236,6 +236,43 @@ export class ResourceTypeRegistry {
   }
   
   /**
+   * Get scope keys for all registered primary types (e.g. ['scripture', 'obs'])
+   */
+  getPrimaryScopes(): string[] {
+    const scopes: string[] = []
+    for (const def of this.types.values()) {
+      if (def.contentRole === 'primary' && def.scope && !scopes.includes(def.scope)) {
+        scopes.push(def.scope)
+      }
+    }
+    return scopes
+  }
+
+  /**
+   * Get all companion types registered for a given primary scope.
+   * E.g. getCompanionTypesForScope('obs') returns [obs-notes, obs-words-links, obs-questions]
+   */
+  getCompanionTypesForScope(scope: string): ResourceTypeDefinition[] {
+    return Array.from(this.types.values()).filter(
+      (def) => def.contentRole === 'companion' && def.companionFor?.includes(scope)
+    )
+  }
+
+  /**
+   * Return the primary scope a type belongs to, or null if shared / unknown.
+   * - Primary types return their own scope.
+   * - Companion types return the first scope in companionFor.
+   * - Shared types return null.
+   */
+  getScopeForType(typeId: string): string | null {
+    const def = this.types.get(typeId)
+    if (!def) return null
+    if (def.contentRole === 'primary') return def.scope ?? null
+    if (def.contentRole === 'companion') return def.companionFor?.[0] ?? null
+    return null
+  }
+
+  /**
    * Get statistics about registered types
    */
   getStats() {

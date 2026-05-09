@@ -170,7 +170,7 @@ export function TranslationAcademyViewer({
           throw new Error('No loader available for Translation Academy')
         }
 
-        const loadedArticle = await loader.loadContent(resourceKey, selectedArticleId)
+        const loadedArticle = (await loader.loadContent(resourceKey, selectedArticleId)) as TranslationAcademyArticle
         if (taArticleCache.size >= TA_ARTICLE_CACHE_MAX) taArticleCache.delete(taArticleCache.keys().next().value!)
         taArticleCache.set(key, loadedArticle)
         setArticle(loadedArticle)

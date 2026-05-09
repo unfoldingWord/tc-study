@@ -94,6 +94,13 @@ export class CatalogManager {
   }
 
   /**
+   * Resolve the loader for catalog metadata (e.g. clearing per-resource cache in the UI).
+   */
+  resolveLoaderForMetadata(metadata: ResourceMetadata): ResourceLoader | null {
+    return this.getLoaderForResource(metadata)
+  }
+
+  /**
    * Load resource content
    * Automatically finds the appropriate loader and delegates
    * 

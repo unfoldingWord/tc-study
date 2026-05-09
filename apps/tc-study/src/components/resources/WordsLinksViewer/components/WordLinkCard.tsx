@@ -29,6 +29,8 @@ interface WordLinkCardProps {
   targetResourceId?: string | null  // Source scripture resource (e.g., "unfoldingWord/en/ult")
   /** Quote block direction (e.g. rtl for Persian) so quote marks and text align correctly */
   languageDirection?: 'ltr' | 'rtl'
+  /** When true, quote is clickable for OBS frame highlight using origWords (no aligned tokens). */
+  obsMode?: boolean
 }
 
 export const WordLinkCard = memo(function WordLinkCard({
@@ -41,6 +43,7 @@ export const WordLinkCard = memo(function WordLinkCard({
   tokenFilter,
   targetResourceId,
   languageDirection = 'ltr',
+  obsMode = false,
 }: WordLinkCardProps) {
   const twInfo = parseTWLink(link.twLink)
   const isKeyTerm = twInfo.category === 'kt'
@@ -61,10 +64,16 @@ export const WordLinkCard = memo(function WordLinkCard({
           : 'bg-white hover:shadow-sm hover:border-gray-200 border-gray-100'
         }
       `}
-      onClick={hasAlignedTokens ? () => onQuoteClick(link) : undefined}
+      onClick={(hasAlignedTokens || obsMode) ? () => onQuoteClick(link) : undefined}
       role="article"
       aria-label="Translation words link"
-      title={hasAlignedTokens ? 'Click to highlight these words in scripture' : undefined}
+      title={
+        hasAlignedTokens || obsMode
+          ? obsMode
+            ? 'Click to highlight in the story frame'
+            : 'Click to highlight these words in scripture'
+          : undefined
+      }
     >
       {/* Quote - On top, clickable to broadcast/highlight tokens (matches Notes layout) */}
       {hasAlignedTokens && (
@@ -87,6 +96,30 @@ export const WordLinkCard = memo(function WordLinkCard({
                 </span>
               ))}
               &rdquo;
+            </span>
+            {resourceAbbreviation && (
+              <span className="ml-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-purple-600 font-medium">
+                {resourceAbbreviation}
+              </span>
+            )}
+          </div>
+        </button>
+      )}
+
+      {!hasAlignedTokens && obsMode && link.origWords && link.origWords.trim().length > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onQuoteClick(link)
+          }}
+          className="w-full text-start mb-1.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
+          title="Click to highlight this phrase in the story frame"
+          dir={languageDirection}
+        >
+          <div className="text-base leading-relaxed">
+            <span className="italic text-gray-700">
+              &ldquo;{link.origWords}&rdquo;
             </span>
             {resourceAbbreviation && (
               <span className="ml-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-purple-600 font-medium">

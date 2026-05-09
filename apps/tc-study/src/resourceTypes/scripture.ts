@@ -15,6 +15,10 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
   displayName: 'Scripture',
   description: 'Bible texts in USFM format with verse-level precision',
   icon: 'Book',
+
+  // ===== SCOPE / ROLE =====
+  contentRole: 'primary',
+  scope: 'scripture',
   
   // ===== DOOR43 MAPPING =====
   subjects: [
@@ -40,7 +44,7 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
   // If ingredients are missing, that indicates a problem with Door43 data
   
   // ===== UI LAYER =====
-  viewer: ScriptureViewer,
+  viewer: ScriptureViewer as any,
   
   // ===== FEATURES =====
   features: {

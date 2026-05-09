@@ -317,11 +317,11 @@ export class TranslationAcademyLoader implements ResourceLoader {
     try {
       // Fetch all three files in parallel
       const [titleContent, subtitleContent, mainContent] = await Promise.all([
-        this.door43Client.fetchTextContent(owner, repoName, titlePath, ref).catch(err => {
+        this.door43Client.fetchTextContent(owner, repoName, titlePath, ref).catch((err: unknown) => {
           console.warn(`⚠️  Failed to fetch ${titlePath}:`, err)
           return '' // Optional file
         }),
-        this.door43Client.fetchTextContent(owner, repoName, subtitlePath, ref).catch(err => {
+        this.door43Client.fetchTextContent(owner, repoName, subtitlePath, ref).catch((err: unknown) => {
           console.warn(`⚠️  Failed to fetch ${subtitlePath}:`, err)
           return '' // Optional file
         }),

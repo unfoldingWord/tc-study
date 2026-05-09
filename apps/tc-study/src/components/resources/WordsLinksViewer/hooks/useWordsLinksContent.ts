@@ -11,11 +11,14 @@ import type { ProcessedWordsLinks } from '../types'
 interface UseWordsLinksContentOptions {
   resourceKey: string
   wordsLinksContent?: ProcessedWordsLinks
+  /** Loader registry id (e.g. `words-links` or `obs-words-links`). */
+  loaderTypeId?: string
 }
 
 export function useWordsLinksContent({
   resourceKey,
   wordsLinksContent,
+  loaderTypeId = 'words-links',
 }: UseWordsLinksContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
@@ -47,7 +50,7 @@ export function useWordsLinksContent({
         setError(null)
         
         // Get loader for words-links
-        const loader = loaderRegistry.getLoader('words-links')
+        const loader = loaderRegistry.getLoader(loaderTypeId)
         if (!loader) {
           throw new Error('Words Links loader not found')
         }
@@ -70,7 +73,7 @@ export function useWordsLinksContent({
     }
     
     loadContent()
-  }, [currentRef.book, currentRef.chapter, resourceKey, loaderRegistry, wordsLinksContent])
+  }, [currentRef.book, currentRef.chapter, resourceKey, loaderRegistry, wordsLinksContent, loaderTypeId])
   
   return { content, loading, error }
 }

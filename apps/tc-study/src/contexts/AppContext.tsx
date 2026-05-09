@@ -11,6 +11,7 @@
 import { createContext, useContext, ReactNode } from 'react'
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { ResourceType } from '@bt-synergy/resource-catalog'
 import type { ResourceInfo } from './types'
 
 // ============================================================================
@@ -39,6 +40,8 @@ interface AppActions {
 }
 
 type AppStore = AppState & AppActions
+
+export type { AppStore }
 
 export const useAppStore = create<AppStore>()(
   immer((set, get) => ({
@@ -81,9 +84,9 @@ export const useAppStore = create<AppStore>()(
             id: resourceId,
             key: resourceId,
             title: resourceId,
-            type: 'scripture',
+            type: ResourceType.SCRIPTURE,
             category: 'scripture',
-          }
+          } as ResourceInfo
         }
         // Update with TOC (preserve all existing metadata)
         state.loadedResources[resourceId].toc = toc
@@ -141,7 +144,7 @@ export const useAppStore = create<AppStore>()(
 // CONTEXT (Simplified - just pass through the store)
 // ============================================================================
 
-const AppContext = createContext<ReturnType<typeof useAppStore> | null>(null)
+const AppContext = createContext<AppStore | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const store = useAppStore()

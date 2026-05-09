@@ -1,10 +1,11 @@
 /**
  * USFM Processor
- * 
+ *
  * Parses USFM text into structured, queryable format
  * Compatible with @bt-toolkit and @bt-synergy ecosystems
  */
 
+/// <reference path="./usfm-js.d.ts" />
 import * as usfm from 'usfm-js'
 import type {
   ProcessedChapter,
