@@ -6,18 +6,19 @@
  */
 
 import type { TranslatorSection } from '@bt-synergy/usfm-processor'
-import { AlertCircle, ArrowLeft, BookMarked, BookOpen, Check, Hash, List, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, BookMarked, BookOpen, Check, Hash, Library, List, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useAvailableBooks,
   useCatalogManager,
-  useCurrentSectionIndex,
   useNavigation,
   useNavigationMode,
   useNavigationScope,
   type BCVReference,
+  type BookInfo,
 } from '../../contexts'
 import { useAppStore, useBookTitleSource } from '../../contexts/AppContext'
+import { getStandardBookOrderIndex, getStandardVerseCount } from '../../lib/versification'
 import { COMBINED_HELPS_IDS } from '../resources/CombinedHelpsViewer/constants'
 import type { ParsedObsStory } from '../../lib/obs/parseObsMarkdown'
 import { getDefaultSections } from '../../lib/data/default-sections'
@@ -26,6 +27,31 @@ import { getBookTitle } from '../../utils/bookNames'
 interface BCVNavigatorProps {
   onClose: () => void
   mode?: 'verse' | 'section'
+}
+
+/** Section index for `ref` within `sections` (same rules as NavigationContext.setBookSections). */
+function findSectionIndexForRef(
+  bookCode: string,
+  ref: BCVReference,
+  sections: TranslatorSection[]
+): number {
+  if (ref.book !== bookCode || ref.book === 'obs' || sections.length === 0) return -1
+  return sections.findIndex((section) => {
+    const refChapter = ref.chapter
+    const refVerse = ref.verse
+    if (refChapter < section.start.chapter) return false
+    if (refChapter > section.end.chapter) return false
+    if (refChapter === section.start.chapter && refChapter === section.end.chapter) {
+      return refVerse >= section.start.verse && refVerse <= section.end.verse
+    }
+    if (refChapter === section.start.chapter) {
+      return refVerse >= section.start.verse
+    }
+    if (refChapter === section.end.chapter) {
+      return refVerse <= section.end.verse
+    }
+    return true
+  })
 }
 
 function findObsCatalogKey(
@@ -47,13 +73,44 @@ function findObsCatalogKey(
   return null
 }
 
+/** Build navigation book list from scripture resource ingredients (same rules as ScriptureViewer useTOC). */
+function buildBookInfosFromIngredients(ingredients: Array<{ identifier?: string; title?: string }>): BookInfo[] {
+  const bookCodes = new Set<string>()
+  for (const ing of ingredients) {
+    const identifier = ing.identifier
+    if (!identifier) continue
+    const normalizedId = identifier.toLowerCase()
+    if (normalizedId.length >= 2 && normalizedId.length <= 4) {
+      bookCodes.add(normalizedId)
+    }
+  }
+  return Array.from(bookCodes)
+    .map((code) => {
+      const bookIngredients = ingredients.filter((ing) => ing.identifier?.toLowerCase() === code)
+      const chapters = bookIngredients.length || 1
+      const verses = getStandardVerseCount(code)
+      const name = bookIngredients[0]?.title || code.toUpperCase()
+      const primaryOrder = getStandardBookOrderIndex(code)
+      return {
+        code,
+        name,
+        chapters: verses?.length || chapters,
+        verses,
+        primaryOrder,
+      }
+    })
+    .sort((a, b) => {
+      if (a.primaryOrder !== b.primaryOrder) return a.primaryOrder - b.primaryOrder
+      return a.code.localeCompare(b.code)
+    })
+    .map(({ primaryOrder: _p, ...book }) => book)
+}
+
 export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   const navigation = useNavigation()
   const navigationScope = useNavigationScope()
   const availableBooks = useAvailableBooks()
   const navigationMode = useNavigationMode()
-  const currentSectionIndex = useCurrentSectionIndex()
-  const anchorResourceId = useAppStore((s) => s.anchorResourceId)
   const loadedResources = useAppStore((s) => s.loadedResources)
   const bookTitleSource = useBookTitleSource()
   const catalogManager = useCatalogManager()
@@ -61,6 +118,22 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
 
   const obsCatalogKey = useMemo(() => findObsCatalogKey(loadedResources), [loadedResources])
   const hasObsLoaded = !!obsCatalogKey
+
+  /** Local modal scope — do not call setNavigationScope until Apply (avoids mutating global ref / URL while browsing). */
+  const [pickerScope, setPickerScope] = useState<typeof navigationScope>(() => navigationScope)
+  /** OBS-only: story grid (chapter) vs frame/range picker (verse). Independent of global mode while modal is open. */
+  const [pickerObsMode, setPickerObsMode] = useState<'chapter' | 'verse'>(() =>
+    navigationScope === 'obs' ? (navigationMode === 'chapter' ? 'chapter' : 'verse') : 'chapter'
+  )
+
+  const commitPickerToNavigation = useCallback(() => {
+    if (pickerScope === 'obs') {
+      navigation.setNavigationScope('obs')
+      navigation.setNavigationMode(pickerObsMode)
+    } else {
+      navigation.setNavigationScope('scripture')
+    }
+  }, [navigation, pickerScope, pickerObsMode])
 
   const scripturePickerMode = mode || navigationMode
 
@@ -106,6 +179,8 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   const [startVerse, setStartVerse] = useState<string | null>(initStartVerse)
   const [endVerse, setEndVerse] = useState<string | null>(initEndVerse)
   const [sections, setSections] = useState<TranslatorSection[]>([])
+  /** Section picker: index in `sections` to apply (no global nav until Apply). */
+  const [pickedSectionIdx, setPickedSectionIdx] = useState<number | null>(null)
 
   const [obsFrameCountLocal, setObsFrameCountLocal] = useState(0)
   const [obsFramesLoading, setObsFramesLoading] = useState(false)
@@ -116,8 +191,8 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   const [obsRangeEnd, setObsRangeEnd] = useState<{ story: number; frame: number } | null>(null)
   // Stories being lazy-loaded for the combined range view
   const [obsLoadingStories, setObsLoadingStories] = useState<Set<number>>(new Set())
-  // Guard: auto-load neighbors once per open
-  const obsNeighborLoadDone = useRef(false)
+  /** Bumps when modal scope/mode changes so grids re-request catalog + frame data. */
+  const [navigatorRefreshTick, setNavigatorRefreshTick] = useState(0)
 
   const currentSectionRef = useRef<HTMLButtonElement>(null)
   const startVerseRef = useRef<HTMLButtonElement>(null)
@@ -125,19 +200,18 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   const selectedObsStoryRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (navigationScope !== 'scripture') return
+    if (pickerScope !== 'scripture') return
     const b =
       currentRef.book !== 'obs' ? currentRef.book : availableBooks[0]?.code
     if (b) setSelectedBook(b)
-  }, [navigationScope, currentRef.book, availableBooks])
+  }, [pickerScope, currentRef.book, availableBooks])
 
   useEffect(() => {
-    if (scripturePickerMode === 'section' && navigationScope === 'scripture' && selectedBook) {
+    if (scripturePickerMode === 'section' && pickerScope === 'scripture' && selectedBook) {
       let cancelled = false
       getDefaultSections(selectedBook).then((defaultSections) => {
         if (!cancelled && defaultSections.length > 0) {
           setSections(defaultSections)
-          navigation.setBookSections(selectedBook, defaultSections)
         } else if (!cancelled) {
           setSections([])
         }
@@ -146,10 +220,16 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
         cancelled = true
       }
     }
-  }, [scripturePickerMode, selectedBook, navigation, navigationScope])
+  }, [scripturePickerMode, selectedBook, pickerScope, navigatorRefreshTick])
 
   useEffect(() => {
-    if (scripturePickerMode === 'section' && currentSectionRef.current && step === 2 && navigationScope === 'scripture') {
+    if (scripturePickerMode !== 'section' || step !== 2 || pickerScope !== 'scripture') return
+    const hi = findSectionIndexForRef(selectedBook, currentRef, sections)
+    setPickedSectionIdx(hi >= 0 ? hi : sections.length > 0 ? 0 : null)
+  }, [scripturePickerMode, step, pickerScope, selectedBook, currentRef, sections])
+
+  useEffect(() => {
+    if (scripturePickerMode === 'section' && currentSectionRef.current && step === 2 && pickerScope === 'scripture') {
       setTimeout(() => {
         currentSectionRef.current?.scrollIntoView({
           behavior: 'smooth',
@@ -157,12 +237,12 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
         })
       }, 100)
     }
-  }, [scripturePickerMode, step, sections, navigationScope])
+  }, [scripturePickerMode, step, sections, pickerScope])
 
   useEffect(() => {
     if (
       scripturePickerMode !== 'section' &&
-      navigationScope === 'scripture' &&
+      pickerScope === 'scripture' &&
       startVerseRef.current &&
       step === 2 &&
       startVerse
@@ -174,10 +254,10 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
         })
       }, 100)
     }
-  }, [scripturePickerMode, step, startVerse, navigationScope])
+  }, [scripturePickerMode, step, startVerse, pickerScope])
 
   useEffect(() => {
-    if (step === 1 && selectedBookRef.current && selectedBook && navigationScope === 'scripture') {
+    if (step === 1 && selectedBookRef.current && selectedBook && pickerScope === 'scripture') {
       setTimeout(() => {
         selectedBookRef.current?.scrollIntoView({
           behavior: 'smooth',
@@ -185,10 +265,10 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
         })
       }, 100)
     }
-  }, [step, selectedBook, navigationScope])
+  }, [step, selectedBook, pickerScope])
 
   useEffect(() => {
-    if (step === 1 && selectedObsStoryRef.current && navigationScope === 'obs' && currentRef.book === 'obs') {
+    if (step === 1 && selectedObsStoryRef.current && pickerScope === 'obs' && currentRef.book === 'obs') {
       setTimeout(() => {
         selectedObsStoryRef.current?.scrollIntoView({
           behavior: 'smooth',
@@ -196,7 +276,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
         })
       }, 100)
     }
-  }, [step, navigationScope, currentRef.book, currentRef.chapter])
+  }, [step, pickerScope, currentRef.book, currentRef.chapter])
 
   // Stable ref to navigation actions — keeps this effect out of the
   // setObsStoryFrameCount → store update → navigation ref change → re-run loop.
@@ -206,7 +286,62 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   })
 
   useEffect(() => {
-    if (step !== 2 || navigationScope !== 'obs' || !selectedObsStory || !obsCatalogKey) {
+    setNavigatorRefreshTick((t) => t + 1)
+  }, [pickerScope, pickerObsMode, scripturePickerMode])
+
+  // Scripture: refresh book/chapter grid from catalog when switching to Bible or changing verse/section mode.
+  useEffect(() => {
+    if (pickerScope !== 'scripture') return
+    const resourceKey = bookTitleSource?.key ?? bookTitleSource?.id
+    if (!resourceKey) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const metadata = await catalogManager.getResourceMetadata(resourceKey)
+        if (cancelled || !metadata?.contentMetadata?.ingredients?.length) return
+        const books = buildBookInfosFromIngredients(metadata.contentMetadata.ingredients)
+        if (books.length > 0) {
+          navigation.setAvailableBooks(books)
+        }
+      } catch (e) {
+        console.warn('[BCVNavigator] Scripture catalog refresh failed:', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pickerScope, scripturePickerMode, navigatorRefreshTick, bookTitleSource, catalogManager, navigation])
+
+  // OBS: refresh story list (ingredients) from catalog when switching to OBS or Story/Frame.
+  useEffect(() => {
+    if (pickerScope !== 'obs' || !obsCatalogKey) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const metadata = await catalogManager.getResourceMetadata(obsCatalogKey)
+        if (cancelled || !metadata?.contentMetadata?.ingredients?.length) return
+        const ing = metadata.contentMetadata.ingredients
+        useAppStore.setState((state) => {
+          for (const id of Object.keys(state.loadedResources)) {
+            const r = state.loadedResources[id]
+            if (!r) continue
+            const k = r.key ?? id
+            if (k !== obsCatalogKey) continue
+            r.ingredients = ing as typeof r.ingredients
+            break
+          }
+        })
+      } catch (e) {
+        console.warn('[BCVNavigator] OBS catalog refresh failed:', e)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pickerScope, pickerObsMode, navigatorRefreshTick, obsCatalogKey, catalogManager])
+
+  useEffect(() => {
+    if (step !== 2 || pickerScope !== 'obs' || !selectedObsStory || !obsCatalogKey) {
       return
     }
     let cancelled = false
@@ -236,22 +371,15 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   // changes the navigation object reference (Immer), which would re-trigger this effect
   // in an infinite loop. Actions are accessed via stable navigationActionsRef instead.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, navigationScope, selectedObsStory, obsCatalogKey, catalogManager])
+  }, [step, pickerScope, selectedObsStory, obsCatalogKey, catalogManager, navigatorRefreshTick])
 
-  // When the combined OBS range view opens, eagerly load the ±5 stories around the current one.
-  // Loading all 50 at once causes 50 Zustand updates which cascade into the ObsViewer useEffect
-  // (navigation in its deps) and make the viewer restart its own load 50 times → freeze.
+  // OBS frame mode: load ±5 stories around the current ref whenever scope/mode/refresh changes.
+  // Re-requests on each switch (navigatorRefreshTick) so frame grids repopulate after toggling Bible/OBS or Story/Frame.
   useEffect(() => {
-    if (navigationScope !== 'obs' || navigationMode !== 'verse' || !obsCatalogKey) return
-    if (obsNeighborLoadDone.current) return
-    obsNeighborLoadDone.current = true
+    if (pickerScope !== 'obs' || pickerObsMode !== 'verse' || !obsCatalogKey) return
 
     const currentStory = currentRef.book === 'obs' ? currentRef.chapter : 1
-    const neighbors = obsStoryIds.filter(
-      (s) =>
-        Math.abs(s - currentStory) <= 5 &&
-        !(navigationActionsRef.current.obsFrameCountByStory[String(s)] > 0),
-    )
+    const neighbors = obsStoryIds.filter((s) => Math.abs(s - currentStory) <= 5)
     neighbors.forEach((storyNum) => {
       setObsLoadingStories((prev) => new Set([...prev, storyNum]))
       void catalogManager
@@ -270,7 +398,16 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
         })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigationScope, navigationMode, obsCatalogKey])
+  }, [
+    pickerScope,
+    pickerObsMode,
+    obsCatalogKey,
+    obsStoryIds,
+    currentRef.book,
+    currentRef.chapter,
+    navigatorRefreshTick,
+    catalogManager,
+  ])
 
   const bookInfo = navigation.getBookInfo(selectedBook)
 
@@ -374,7 +511,10 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
     setEndVerse(lastVerse)
   }
 
-  const handleSectionSelect = (section: TranslatorSection) => {
+  const applySectionSelection = () => {
+    if (pickedSectionIdx == null) return
+    const section = sections[pickedSectionIdx]
+    if (!section) return
     const newRef: BCVReference = {
       book: selectedBook,
       chapter: section.start.chapter,
@@ -383,8 +523,10 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
       endVerse: section.end.verse,
     }
 
-    navigation.navigateToReference(newRef)
+    commitPickerToNavigation()
+    navigation.setNavigationMode('section')
     navigation.setBookSections(selectedBook, sections)
+    navigation.navigateToReference(newRef)
     onClose()
   }
 
@@ -405,14 +547,16 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
       newRef.endVerse = endV
     }
 
+    commitPickerToNavigation()
+    navigation.setNavigationMode('verse')
     navigation.navigateToReference(newRef)
     onClose()
   }
 
-  // Two-step single-frame picker (story mode, non-range)
-  const handleObsFramePick = (frame: number) => {
-    if (!selectedObsStory) return
-    navigation.navigateToReference({ book: 'obs', chapter: selectedObsStory, verse: frame })
+  const handleObsStoryApply = () => {
+    if (selectedObsStory == null) return
+    commitPickerToNavigation()
+    navigation.navigateToReference({ book: 'obs', chapter: selectedObsStory, verse: 1 })
     onClose()
   }
 
@@ -456,6 +600,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
     if (!obsRangeStart) return
     const end = obsRangeEnd ?? obsRangeStart
     const [s, e] = sortObsRange(obsRangeStart, end)
+    commitPickerToNavigation()
     navigation.navigateToReference({
       book: 'obs',
       chapter: s.story,
@@ -529,12 +674,12 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
 
   const headerIcon =
     step === 1 ? (
-      navigationScope === 'obs' ? (
+      pickerScope === 'obs' ? (
         <BookMarked className="w-5 h-5 text-blue-600" />
       ) : (
         <BookOpen className="w-5 h-5 text-blue-600" />
       )
-    ) : navigationScope === 'obs' ? (
+    ) : pickerScope === 'obs' ? (
       <BookMarked className="w-5 h-5 text-blue-600" />
     ) : scripturePickerMode === 'section' ? (
       <List className="w-5 h-5 text-blue-600" />
@@ -573,11 +718,11 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
             <button
               type="button"
               onClick={() => {
-                navigation.setNavigationScope('scripture')
+                setPickerScope('scripture')
                 setStep(1)
               }}
               className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
-                navigationScope === 'scripture'
+                pickerScope === 'scripture'
                   ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
@@ -588,12 +733,16 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
               type="button"
               disabled={!hasObsLoaded}
               onClick={() => {
-                navigation.setNavigationScope('obs')
+                const fromScripture = pickerScope === 'scripture'
+                setPickerScope('obs')
+                if (fromScripture) {
+                  setPickerObsMode('chapter')
+                }
                 setStep(1)
                 setSelectedObsStory(currentRef.book === 'obs' ? currentRef.chapter : null)
               }}
               className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                navigationScope === 'obs'
+                pickerScope === 'obs'
                   ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
                   : 'text-gray-600 hover:bg-gray-100'
               } disabled:opacity-40 disabled:cursor-not-allowed`}
@@ -604,8 +753,39 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
           </div>
         )}
 
+        {step === 1 && pickerScope === 'obs' && (
+          <div className="flex border-b border-gray-200 bg-gray-50 px-3 py-2 gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setPickerObsMode('chapter')}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center ${
+                pickerObsMode === 'chapter'
+                  ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+              title="Story"
+              aria-label="Story"
+            >
+              <Library className="w-4 h-4 shrink-0" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setPickerObsMode('verse')}
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center ${
+                pickerObsMode === 'verse'
+                  ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+              title="Frame"
+              aria-label="Frame"
+            >
+              <BookMarked className="w-4 h-4 shrink-0" />
+            </button>
+          </div>
+        )}
+
         <div className="flex-1 flex flex-col min-h-0">
-          {step === 1 && navigationScope === 'scripture' && (
+          {step === 1 && pickerScope === 'scripture' && (
             <div className="flex-1 overflow-auto p-4">
               {availableBooks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-gray-500 text-sm">
@@ -645,25 +825,24 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
             </div>
           )}
 
-          {/* OBS — Story mode: compact story grid, click navigates directly (mirrors scripture chapter mode) */}
-          {step === 1 && navigationScope === 'obs' && navigationMode === 'chapter' && (
+          {/* OBS — Story mode: pick a story, then confirm (does not change global nav until Apply) */}
+          {step === 1 && pickerScope === 'obs' && pickerObsMode === 'chapter' && (
             <div className="flex-1 overflow-auto p-4">
               <div className="grid grid-cols-5 sm:grid-cols-6 md:grid-cols-8 gap-2">
                 {obsStoryIds.map((storyNum) => {
-                  const isCurrent = currentRef.book === 'obs' && currentRef.chapter === storyNum
+                  const isViewerRef = currentRef.book === 'obs' && currentRef.chapter === storyNum
+                  const isChosen = selectedObsStory === storyNum
+                  const isHighlighted = isChosen || (selectedObsStory == null && isViewerRef)
                   return (
                     <button
                       key={storyNum}
-                      ref={isCurrent ? selectedObsStoryRef : null}
+                      ref={isHighlighted ? selectedObsStoryRef : null}
                       type="button"
-                      onClick={() => {
-                        navigation.navigateToReference({ book: 'obs', chapter: storyNum, verse: 1 })
-                        onClose()
-                      }}
+                      onClick={() => setSelectedObsStory(storyNum)}
                       className={`
                         p-2 rounded-lg border text-sm font-medium transition-all
                         ${
-                          isCurrent
+                          isHighlighted
                             ? 'border-blue-500 bg-blue-50 text-blue-900'
                             : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50 text-gray-800'
                         }
@@ -678,7 +857,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
           )}
 
           {/* OBS — Frame/Range mode: combined stories+frames view (mirrors scripture chapter+verse picker) */}
-          {navigationScope === 'obs' && navigationMode === 'verse' && (
+          {pickerScope === 'obs' && pickerObsMode === 'verse' && (
             <div className="flex-1 flex flex-col min-h-0">
               <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200 bg-gray-50 flex-shrink-0">
                 <div className="flex items-center gap-2">
@@ -780,7 +959,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
             </div>
           )}
 
-          {step === 2 && navigationScope === 'scripture' && scripturePickerMode === 'section' && (
+          {step === 2 && pickerScope === 'scripture' && scripturePickerMode === 'section' && (
             <div className="flex-1 flex flex-col min-h-0">
               <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200 bg-gray-50 flex-shrink-0">
                 <div className="flex items-center gap-2">
@@ -797,9 +976,9 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                 </div>
                 <div className="text-sm text-gray-600 flex items-center gap-2">
                   <strong>{getBookTitle(bookTitleSource, selectedBook)}</strong>
-                  {currentSectionIndex >= 0 && (
+                  {pickedSectionIdx != null && pickedSectionIdx >= 0 && (
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
-                      {currentSectionIndex + 1} / {sections.length}
+                      {pickedSectionIdx + 1} / {sections.length}
                     </span>
                   )}
                 </div>
@@ -818,18 +997,18 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                         section.end.chapter !== section.start.chapter
                           ? `${section.end.chapter}:${section.end.verse}`
                           : section.end.verse.toString()
-                      const isCurrent = idx === currentSectionIndex
+                      const isPicked = idx === pickedSectionIdx
 
                       return (
                         <button
                           key={idx}
-                          ref={isCurrent ? currentSectionRef : null}
+                          ref={isPicked ? currentSectionRef : null}
                           type="button"
-                          onClick={() => handleSectionSelect(section)}
+                          onClick={() => setPickedSectionIdx(idx)}
                           className={`
                           w-full text-left p-2.5 border rounded-lg transition-colors flex items-center gap-3
                           ${
-                            isCurrent
+                            isPicked
                               ? 'border-blue-500 bg-blue-50'
                               : 'border-gray-200 hover:border-blue-400 hover:bg-blue-50'
                           }
@@ -838,7 +1017,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                           <div
                             className={`
                           flex-shrink-0 w-6 h-6 rounded flex items-center justify-center font-bold text-xs
-                          ${isCurrent ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}
+                          ${isPicked ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'}
                         `}
                           >
                             {idx + 1}
@@ -851,7 +1030,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                             </div>
                           </div>
 
-                          {isCurrent && <Check className="w-5 h-5 text-blue-600 flex-shrink-0" />}
+                          {isPicked && <Check className="w-5 h-5 text-blue-600 flex-shrink-0" />}
                         </button>
                       )
                     })}
@@ -861,7 +1040,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
             </div>
           )}
 
-          {step === 2 && navigationScope === 'scripture' && scripturePickerMode !== 'section' && (
+          {step === 2 && pickerScope === 'scripture' && scripturePickerMode !== 'section' && (
             <div className="flex-1 flex flex-col min-h-0">
               <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200 bg-gray-50 flex-shrink-0">
                 <div className="flex items-center gap-2">
@@ -934,8 +1113,40 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
           )}
         </div>
 
+        {/* Scripture section Apply */}
+        {step === 2 && pickerScope === 'scripture' && scripturePickerMode === 'section' && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end flex-shrink-0">
+            <button
+              type="button"
+              onClick={applySectionSelection}
+              disabled={pickedSectionIdx == null || sections.length === 0}
+              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Apply selection"
+              aria-label="Apply selection"
+            >
+              <Check className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
+        {/* OBS story Apply */}
+        {step === 1 && pickerScope === 'obs' && pickerObsMode === 'chapter' && (
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end flex-shrink-0">
+            <button
+              type="button"
+              onClick={handleObsStoryApply}
+              disabled={selectedObsStory == null}
+              className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Apply selection"
+              aria-label="Apply selection"
+            >
+              <Check className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+
         {/* OBS range Apply — mirrors scripture Apply button */}
-        {navigationScope === 'obs' && navigationMode === 'verse' && (
+        {pickerScope === 'obs' && pickerObsMode === 'verse' && (
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end flex-shrink-0">
             <button
               type="button"
@@ -950,7 +1161,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
           </div>
         )}
 
-        {step === 2 && navigationScope === 'scripture' && scripturePickerMode !== 'section' && (
+        {step === 2 && pickerScope === 'scripture' && scripturePickerMode !== 'section' && (
           <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-end flex-shrink-0">
             <button
               type="button"

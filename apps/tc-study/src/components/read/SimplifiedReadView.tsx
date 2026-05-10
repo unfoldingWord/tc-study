@@ -29,8 +29,22 @@ import {
 } from 'linked-panels'
 import { CheckCircle2, Loader2, Package, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useCacheAdapter, useCatalogManager, useCompletenessChecker, useNavigationScope, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  useCacheAdapter,
+  useCatalogManager,
+  useCompletenessChecker,
+  useCurrentPassageSet,
+  useCurrentReference,
+  useCurrentSections,
+  useCurrentSectionIndex,
+  useNavigation,
+  useNavigationMode,
+  useNavigationScope,
+  useNavigationStore,
+  useResourceTypeRegistry,
+  useViewerRegistry,
+} from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useBackgroundDownload, useCatalogBackgroundDownload, useResourceManagement, useStudioResources, useSwipeGesture } from '../../hooks'
@@ -60,6 +74,18 @@ import { GlobalSignalBridge } from '../studio/GlobalSignalBridge'
 import { NavigationBar } from '../studio/NavigationBar'
 import { PanelHeader } from '../studio/PanelHeader'
 import { DownloadIndicator } from './DownloadIndicator'
+import {
+  buildReadPath,
+  buildReadRouteTailFromNavigation,
+  findPassageSetByNavSlug,
+  navigationModeFromReadNav,
+  navigationScopeFromResourceType,
+  parseBibleNavRef,
+  parseBibleSectionNavRef,
+  parseObsFrameNavRef,
+  parseObsStoryNavRef,
+  type ReadRouteTail,
+} from '../../utils/readRoutes'
 
 /** Set to true to disable automatic background downloads (e.g. for debugging). */
 const DISABLE_BACKGROUND_DOWNLOAD = false
@@ -227,18 +253,28 @@ interface SimplifiedReadViewProps {
   initialLanguage?: string
   /** True when the URL is `/read` without `:languageCode` — language modal opens and cannot be skipped. */
   requireLanguageInUrl?: boolean
+  /** Deep link: `/read/{lang}/bible|obs/{navType}/{navRef}` */
+  readRouteTail?: ReadRouteTail | null
 }
 
 export function SimplifiedReadView({
   initialLanguage,
   requireLanguageInUrl = false,
+  readRouteTail = null,
 }: SimplifiedReadViewProps = {}) {
   const navigate = useNavigate()
+  const location = useLocation()
   const catalogManager = useCatalogManager()
   const cacheAdapter = useCacheAdapter()
   const viewerRegistry = useViewerRegistry()
   const resourceTypeRegistry = useResourceTypeRegistry()
+  const navigation = useNavigation()
   const navigationScope = useNavigationScope()
+  const navigationMode = useNavigationMode()
+  const currentNavRef = useCurrentReference()
+  const currentPassageSet = useCurrentPassageSet()
+  const currentSectionIndex = useCurrentSectionIndex()
+  const currentSections = useCurrentSections()
 
   // Experimental Read-only: combined TN + TWL viewer (synthetic resource type)
   useEffect(() => {
@@ -300,6 +336,14 @@ export function SimplifiedReadView({
   useEffect(() => {
     setShouldAutoOpenLanguagePicker(requireLanguageInUrl)
   }, [requireLanguageInUrl])
+
+  const suppressUrlSyncRef = useRef(false)
+  const readRouteAppliedSigRef = useRef<string | null>(null)
+  const pendingSectionRef = useRef<{ book: string; section1Based: number } | null>(null)
+
+  useEffect(() => {
+    if (!readRouteTail) readRouteAppliedSigRef.current = null
+  }, [readRouteTail])
   
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -314,6 +358,131 @@ export function SimplifiedReadView({
   // Track current language and collection cache status
   const [currentLanguageCode, setCurrentLanguageCode] = useState<string | null>(initialLanguage || null)
   const [isCollectionFullyCached, setIsCollectionFullyCached] = useState(false)
+
+  // Apply `/read/:lang/bible|obs/:navType/:navRef` once resources are ready
+  useEffect(() => {
+    if (!readRouteTail) {
+      pendingSectionRef.current = null
+      return
+    }
+    const sig = `${readRouteTail.resourceType}|${readRouteTail.navType}|${readRouteTail.navRef}`
+    if (readRouteAppliedSigRef.current === sig) return
+    if (!currentLanguageCode || isLoadingResources) return
+
+    suppressUrlSyncRef.current = true
+    let cancelled = false
+
+    const run = async () => {
+      try {
+        const rt = readRouteTail.resourceType
+        const mode = navigationModeFromReadNav(rt, readRouteTail.navType)
+        if (!mode) {
+          console.warn('[read route] Unknown nav type for resource', readRouteTail)
+          readRouteAppliedSigRef.current = sig
+          return
+        }
+
+        navigation.setNavigationScope(navigationScopeFromResourceType(rt))
+        navigation.setNavigationMode(mode)
+
+        if (rt === 'obs') {
+          const nt = readRouteTail.navType.toLowerCase()
+          if (nt === 'story') {
+            const ref = parseObsStoryNavRef(readRouteTail.navRef)
+            if (ref) navigation.navigateToReference(ref)
+          } else if (nt === 'ref') {
+            const ref = parseObsFrameNavRef(readRouteTail.navRef)
+            if (ref) navigation.navigateToReference(ref)
+          }
+        } else {
+          const nt = readRouteTail.navType.toLowerCase()
+          if (nt === 'passage') {
+            const set = await findPassageSetByNavSlug(readRouteTail.navRef)
+            if (cancelled) return
+            if (set) navigation.loadPassageSet(set)
+            else console.warn('[read route] Passage set not found:', readRouteTail.navRef)
+          } else if (nt === 'section') {
+            const parsed = parseBibleSectionNavRef(readRouteTail.navRef)
+            if (parsed) {
+              pendingSectionRef.current = { book: parsed.book, section1Based: parsed.section1Based }
+              navigation.navigateToReference({ book: parsed.book, chapter: 1, verse: 1 })
+            } else {
+              console.warn('[read route] Invalid section nav ref', readRouteTail.navRef)
+            }
+          } else {
+            const parsed = parseBibleNavRef(readRouteTail.navRef)
+            if (parsed) navigation.navigateToReference(parsed.ref)
+            else console.warn('[read route] Invalid bible nav ref', readRouteTail.navRef)
+          }
+        }
+
+        readRouteAppliedSigRef.current = sig
+      } finally {
+        if (!cancelled) {
+          requestAnimationFrame(() => {
+            suppressUrlSyncRef.current = false
+          })
+        }
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [readRouteTail, currentLanguageCode, isLoadingResources, navigation])
+
+  // After sections load, jump to 1-based section from URL
+  useEffect(() => {
+    const pending = pendingSectionRef.current
+    if (!pending) return
+    if (currentNavRef.book !== pending.book) return
+    if (!currentSections.length) return
+    const idx = pending.section1Based - 1
+    if (idx < 0 || idx >= currentSections.length) {
+      pendingSectionRef.current = null
+      return
+    }
+    const sec = currentSections[idx]
+    pendingSectionRef.current = null
+    navigation.navigateToReference({
+      book: pending.book,
+      chapter: sec.start.chapter,
+      verse: sec.start.verse,
+      endChapter: sec.end.chapter !== sec.start.chapter ? sec.end.chapter : undefined,
+      endVerse: sec.end.verse,
+    })
+  }, [navigation, currentNavRef.book, currentSections])
+
+  // Keep URL in sync with navigation (canonical `/read/...` template)
+  useEffect(() => {
+    if (requireLanguageInUrl || !currentLanguageCode) return
+    if (suppressUrlSyncRef.current) return
+
+    const tail = buildReadRouteTailFromNavigation({
+      scope: navigationScope,
+      mode: navigationMode,
+      ref: currentNavRef,
+      passageSet: currentPassageSet,
+      section1Based: navigationMode === 'section' && currentSectionIndex >= 0 ? currentSectionIndex + 1 : null,
+    })
+    if (!tail) return
+
+    const path = buildReadPath(currentLanguageCode, tail)
+    if (location.pathname !== path) {
+      navigate(path, { replace: true })
+    }
+  }, [
+    requireLanguageInUrl,
+    currentLanguageCode,
+    navigationScope,
+    navigationMode,
+    currentNavRef,
+    currentPassageSet,
+    currentSectionIndex,
+    location.pathname,
+    navigate,
+  ])
   
   // Export progress state
   const [exportProgress, setExportProgress] = useState<{
@@ -563,8 +732,21 @@ export function SimplifiedReadView({
       stopDownload()
     }
     
-    // Update URL to reflect selected language
-    navigate(`/read/${languageCode}`, { replace: true })
+    // Update URL: preserve read-route tail when navigation already resolves to a template
+    const nav = useNavigationStore.getState()
+    const tail = buildReadRouteTailFromNavigation({
+      scope: nav.navigationScope,
+      mode: nav.navigationMode,
+      ref: nav.currentReference,
+      passageSet: nav.currentPassageSet,
+      section1Based:
+        nav.navigationMode === 'section' && nav.currentSectionIndex >= 0 ? nav.currentSectionIndex + 1 : null,
+    })
+    if (tail) {
+      navigate(buildReadPath(languageCode, tail), { replace: true })
+    } else {
+      navigate(`/read/${languageCode}`, { replace: true })
+    }
     
     setIsLoadingResources(true)
     

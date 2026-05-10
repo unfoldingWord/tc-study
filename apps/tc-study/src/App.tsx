@@ -75,9 +75,9 @@ function App() {
       // Load languages in background (don't block workspace loading)
       loadLanguages()
       
-      // Skip workspace restoration if we're on a /read/:languageCode route
+      // Skip workspace restoration if we're on a /read/:language route (with optional tail segments)
       // because that route explicitly loads resources for a specific language
-      const isReadWithLanguage = window.location.pathname.match(/^\/read\/[^/]+$/)
+      const isReadWithLanguage = window.location.pathname.match(/^\/read\/[^/]+(\/|$)/)
       
       if (isReadWithLanguage) {
         console.log('📦 Skipping workspace restoration (language specified in URL)')
@@ -115,6 +115,10 @@ function App() {
               <Route path="passage-sets" element={<Suspense fallback={<PageLoader />}><PassageSets /></Suspense>} />
               <Route path="studio" element={<Suspense fallback={<PageLoader />}><Studio /></Suspense>} />
               <Route path="read" element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>} />
+              <Route
+                path="read/:languageCode/:resourceType/:navType/:navRef"
+                element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>}
+              />
               <Route path="read/:languageCode" element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>} />
               <Route path="test/panels" element={<Suspense fallback={<PageLoader />}><PanelSystemTest /></Suspense>} />
               <Route path="data" element={<Suspense fallback={<PageLoader />}><DataManagement /></Suspense>} />
