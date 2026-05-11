@@ -9,9 +9,21 @@ import { FileText, GraduationCap, Loader, Code2, Eye } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useCatalogManager, useLoaderRegistry } from '../../contexts/CatalogContext'
 import { removeFirstHeading } from '../../lib/markdown/markdownProcessor'
-import { parseRcLink, parseRelativeLink } from '../../lib/markdown/rc-link-parser'
+import { parseRcLink, parseRelativeLink, parseVerseRangeFromText } from '../../lib/markdown/rc-link-parser'
 import { MarkdownRenderer } from '../ui/MarkdownRenderer'
 import type { BaseEntryViewerProps } from '../../lib/viewers/EntryViewerRegistry'
+import { useNavigation } from '../../contexts/NavigationContext'
+import { useStudyStore } from '../../store/studyStore'
+
+// Valid 3-letter Bible book codes (uppercase) — OBS handled separately
+const VALID_BIBLE_BOOK_CODES = new Set([
+  'GEN', 'EXO', 'LEV', 'NUM', 'DEU', 'JOS', 'JDG', 'RUT', '1SA', '2SA', '1KI', '2KI',
+  '1CH', '2CH', 'EZR', 'NEH', 'EST', 'JOB', 'PSA', 'PRO', 'ECC', 'SNG', 'ISA', 'JER',
+  'LAM', 'EZK', 'DAN', 'HOS', 'JOL', 'AMO', 'OBA', 'JON', 'MIC', 'NAM', 'HAB', 'ZEP',
+  'HAG', 'ZEC', 'MAL', 'MAT', 'MRK', 'LUK', 'JHN', 'ACT', 'ROM', '1CO', '2CO', 'GAL',
+  'EPH', 'PHP', 'COL', '1TH', '2TH', '1TI', '2TI', 'TIT', 'PHM', 'HEB', 'JAS', '1PE',
+  '2PE', '1JN', '2JN', '3JN', 'JUD', 'REV',
+])
 
 interface TranslationAcademyArticle {
   id: string
@@ -39,6 +51,8 @@ export function TranslationAcademyEntryViewer({
 
   const loaderRegistry = useLoaderRegistry()
   const catalogManager = useCatalogManager()
+  const { navigateToReference, setNavigationMode } = useNavigation()
+  const minimizeModal = useStudyStore((s: any) => s.minimizeModal)
   const [article, setArticle] = useState<TranslationAcademyArticle | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -220,22 +234,81 @@ export function TranslationAcademyEntryViewer({
             <MarkdownRenderer 
               content={article.content}
               className="prose prose-slate max-w-none mb-8"
-              onInternalLinkClick={(href, linkType) => {
-                console.log('[TranslationAcademyEntryViewer] Internal link clicked:', href, linkType)
+              onInternalLinkClick={(href, linkType, linkText) => {
+                console.log('[TranslationAcademyEntryViewer] Internal link clicked:', href, linkType, linkText)
                 
-                // Handle rc links (Door43 TA article links)
+                // Handle rc links (Door43 resource links)
                 if (linkType === 'rc' && href.startsWith('rc://')) {
                   const parsed = parseRcLink(href)
                   
-                  if (parsed.isValid && onEntryLinkClick) {
-                    // If it's linking to TA, navigate within current resource
-                    if (parsed.resourceType === 'academy') {
-                      onEntryLinkClick(resourceKey, parsed.entryId)
+                  if (parsed.isValid) {
+                    // TN-style links carry scripture/OBS references
+                    if (parsed.resourceType === 'notes' && parsed.scriptureRef) {
+                      const bookCode = parsed.scriptureRef.bookCode.toUpperCase()
+
+                      // OBS story navigation — rc://*\/tn/help/obs/[story]/[frame]
+                      if (bookCode === 'OBS') {
+                        const story = parseInt(parsed.scriptureRef.chapter, 10) || 1
+                        const frame = parseInt(parsed.scriptureRef.verse, 10) || 1
+                        console.log('[TranslationAcademyEntryViewer] OBS navigation → story', story, 'frame', frame)
+                        minimizeModal()
+                        // Switch to frame mode so the specific frame is shown (not the whole story)
+                        setNavigationMode('verse')
+                        navigateToReference({ book: 'obs', chapter: story, verse: frame })
+                        return
+                      }
+
+                      // Scripture navigation
+                      if (VALID_BIBLE_BOOK_CODES.has(bookCode)) {
+                        let chapter = parseInt(parsed.scriptureRef.chapter, 10)
+                        let verse = parseInt(parsed.scriptureRef.verse, 10)
+                        let endChapter: number | undefined
+                        let endVerse: number | undefined
+                        if (linkText) {
+                          const range = parseVerseRangeFromText(linkText)
+                          if (range?.chapter) {
+                            chapter = parseInt(range.chapter, 10)
+                            verse = parseInt(range.verseStart || '1', 10)
+                            if (range.endChapter) {
+                              endChapter = parseInt(range.endChapter, 10)
+                              endVerse = parseInt(range.verseEnd || '1', 10)
+                            } else if (range.verseEnd) {
+                              endVerse = parseInt(range.verseEnd, 10)
+                            }
+                          }
+                        }
+                        if (!isNaN(chapter) && chapter >= 1 && !isNaN(verse) && verse >= 1) {
+                          console.log('[TranslationAcademyEntryViewer] Scripture navigation:', bookCode, chapter, verse)
+                          minimizeModal()
+                          navigateToReference({
+                            book: bookCode.toLowerCase(),
+                            chapter,
+                            verse,
+                            ...(endChapter ? { endChapter } : {}),
+                            ...(endVerse ? { endVerse } : {}),
+                          })
+                          return
+                        }
+                      }
                     }
-                    // If it's linking to TW or other resources, would need cross-resource navigation
-                    else {
-                      console.log('[TranslationAcademyEntryViewer] Cross-resource link not yet supported:', parsed)
-                      // TODO: Implement cross-resource navigation
+
+                    if (onEntryLinkClick) {
+                      // TA → TA: navigate within current resource
+                      if (parsed.resourceType === 'academy') {
+                        onEntryLinkClick(resourceKey, parsed.entryId)
+                      } else {
+                        // Cross-resource (TW, etc.): resolve language and navigate
+                        const parts = resourceKey.split('/')
+                        let targetLanguage = parsed.language
+                        let owner = 'unfoldingWord'
+                        if (parts.length >= 3) {
+                          owner = parts[0]
+                          if (targetLanguage === '*') targetLanguage = parts[1]
+                        }
+                        const targetResourceKey = `${owner}/${targetLanguage}/${parsed.resourceAbbrev}`
+                        console.log('[TranslationAcademyEntryViewer] Cross-resource link:', targetResourceKey, parsed.entryId)
+                        onEntryLinkClick(targetResourceKey, parsed.entryId)
+                      }
                     }
                   }
                 }
@@ -243,7 +316,6 @@ export function TranslationAcademyEntryViewer({
                 else if (linkType === 'relative') {
                   const resolvedPath = parseRelativeLink(href, entryId)
                   console.log('[TranslationAcademyEntryViewer] Relative link resolved:', href, '->', resolvedPath)
-                  
                   if (onEntryLinkClick) {
                     onEntryLinkClick(resourceKey, resolvedPath)
                   }

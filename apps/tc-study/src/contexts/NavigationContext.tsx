@@ -255,6 +255,15 @@ export const useNavigationStore = create<NavigationStore>()(
       }
 
       state.currentReference = refToUse
+
+      // Auto-switch navigation scope to match the reference book so that
+      // links in TW/TA articles (and history navigation) always land in the
+      // correct mode without callers needing to call setNavigationScope manually.
+      if (refToUse.book === 'obs' && state.navigationScope !== 'obs') {
+        state.navigationScope = 'obs'
+      } else if (refToUse.book !== 'obs' && state.navigationScope !== 'scripture') {
+        state.navigationScope = 'scripture'
+      }
       
       // Persist to localStorage
       persistState(state)

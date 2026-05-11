@@ -50,7 +50,7 @@ export function TranslationWordsEntryViewer({
 
   const loaderRegistry = useLoaderRegistry()
   const catalogManager = useCatalogManager()
-  const { navigateToReference, getBookInfo } = useNavigation()
+  const { navigateToReference, getBookInfo, setNavigationMode } = useNavigation()
   const minimizeModal = useStudyStore((s: any) => s.minimizeModal)
   const setNavStatus = useStudyStore((s: any) => s.setNavigationStatus)
   const navStatus = useStudyStore((s: any) => s.modal.navigationStatus)
@@ -240,8 +240,25 @@ export function TranslationWordsEntryViewer({
                       
                       // Book code comes from the URL (reliable)
                       const bookCode = parsed.scriptureRef.bookCode.toUpperCase()
+
+                      // OBS story navigation — rc://*\/tn/help/obs/[story]/[frame]
+                      if (bookCode === 'OBS') {
+                        const story = parseInt(parsed.scriptureRef.chapter, 10) || 1
+                        const frame = parseInt(parsed.scriptureRef.verse, 10) || 1
+                        console.log('[TranslationWordsEntryViewer] OBS navigation link → story', story, 'frame', frame)
+                        minimizeModal()
+                        // Switch to frame mode so the specific frame is shown (not the whole story)
+                        setNavigationMode('verse')
+                        navigateToReference({ book: 'obs', chapter: story, verse: frame })
+                        setNavStatus('navigating')
+                        setTimeout(() => {
+                          setNavStatus('success')
+                          setTimeout(() => setNavStatus('idle'), 1500)
+                        }, 100)
+                        return
+                      }
                       
-                      // Validate book code
+                      // Validate book code (Bible books only past this point)
                       if (!VALID_BOOK_CODES.has(bookCode)) {
                         console.warn('[TranslationWordsEntryViewer] Invalid book code:', bookCode)
                         setNavStatus('error')
