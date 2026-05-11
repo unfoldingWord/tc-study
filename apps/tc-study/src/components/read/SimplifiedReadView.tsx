@@ -8,6 +8,7 @@
  */
 
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
+import { verifyResourceContents } from '../../lib/services/ResourceContentVerifier'
 import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 import {
     DndContext,
@@ -179,6 +180,69 @@ function getResourceAppliesToScope(
   if (!typeId) return null
 
   return resourceTypeRegistry.getScopeForType(typeId)
+}
+
+/**
+ * Returns false only when we can positively determine that a book-structured resource
+ * does NOT contain the given book. Returns true (show) when:
+ *   - the resource is entry-structured (TW, TA, etc.)
+ *   - the resource is a combined-helps virtual resource (no ingredients of its own)
+ *   - ingredients / toc are not yet loaded (fail-open while async load is in progress)
+ *   - the book IS present in the resource's ingredients or toc
+ */
+function resourceSupportsBook(
+  resourceKey: string,
+  loadedResources: Record<string, ResourceInfo | undefined>,
+  bookCode: string
+): boolean {
+  // Combined-helps are virtual — no book-level ingredients, always show
+  if (resourceKey === COMBINED_HELPS_RESOURCE_ID || resourceKey === OBS_COMBINED_HELPS_RESOURCE_ID) {
+    return true
+  }
+  // OBS is not book-structured in the scripture sense
+  if (bookCode === 'obs') return true
+
+  const resource = loadedResources[resourceKey]
+  if (!resource) return true // not yet in store — fail open
+
+  const code = bookCode.toLowerCase()
+
+  // verifiedIngredients is the authoritative source when present.
+  // Check it BEFORE the entry-structured guard so that book-companion resources
+  // (TN, TWL, TQ) that were verified can be correctly hidden when their book is
+  // absent from the published ref, even though their contentStructure is 'entry'.
+  //
+  // Sentinel semantics:
+  //   undefined  → never processed; fall through to other checks (fail-open)
+  //   []         → processed, book absent from ref → hide
+  //   [...]      → processed, check if this book is in the confirmed list
+  if (resource.verifiedIngredients !== undefined) {
+    return resource.verifiedIngredients.some(
+      (ing) => ing.identifier?.toLowerCase() === code
+    )
+  }
+
+  // Entry-structured resources (TW, TA) without verification data — always show
+  const structure = resource.contentStructure ?? (resource as any).contentMetadata?.contentStructure
+  if (structure && structure !== 'book') return true
+
+  // Fall back to flattened ingredients (populated by catalog fetch)
+  const ingredients = resource.ingredients ?? (resource as any).contentMetadata?.ingredients
+  if (ingredients && ingredients.length > 0) {
+    return ingredients.some(
+      (ing: { identifier?: string }) =>
+        ing.identifier?.toLowerCase() === code
+    )
+  }
+
+  // Check runtime toc.books (set by ScriptureViewer/useTOC)
+  const tocBooks = resource.toc?.books
+  if (tocBooks && tocBooks.length > 0) {
+    return tocBooks.some((b) => b.code?.toLowerCase() === code)
+  }
+
+  // No book info loaded yet — fail open (don't hide while still loading)
+  return true
 }
 
 /**
@@ -451,6 +515,107 @@ export function SimplifiedReadView({
       cancelled = true
     }
   }, [readRouteTail, currentLanguageCode, isLoadingResources, navigation])
+
+  // Pre-fetch catalog ingredients for book-structured resources that are missing them,
+  // then verify which ingredients actually exist at the published ref (git/trees check).
+  // This hydrates `ResourceInfo.ingredients` and `ResourceInfo.verifiedIngredients` so
+  // the per-book tab filter in `resourceSupportsBook` / `filteredPanel*Keys` can hide tabs.
+  //
+  // Performance notes:
+  // - `toProcess` only includes resources not yet verified, so the effect is a no-op
+  //   after the first pass once all resources are verified.
+  // - We pass `knownRef` (from ResourceMetadata.release.tag_name) directly to the
+  //   verifier, avoiding a redundant findRepository network call per resource.
+  // - The verifyCache in ResourceContentVerifier deduplicates concurrent calls for
+  //   the same resource.
+  useEffect(() => {
+    // Include only book-structured scripture resources that have NEVER been through the
+    // verification pipeline. `verifiedIngredients === undefined` (not just falsy) is the
+    // sentinel: once written (even as []) the resource is permanently excluded from future
+    // runs, preventing the Immer-write → loadedResources-change → effect-re-run loop.
+    //
+    // Exclude OBS resources explicitly: "Open Bible Stories" contains the word "bible" and
+    // would otherwise match the subject substring check, causing unnecessary write cycles.
+    const toProcess = Object.values(loadedResources).filter((r): r is ResourceInfo => {
+      if (!r) return false
+      const subjectLower = String(r.subject ?? '').toLowerCase()
+      const typeLower = String(r.type ?? '').toLowerCase()
+      // Bible-scope book-companion types (notes=TN, words-links=TWL, questions=TQ)
+      // have per-book files and need verification, but their contentStructure is 'entry'.
+      // Only skip OBS variants of these types.
+      const isBibleBookCompanion =
+        (typeLower === 'notes' || typeLower === 'words-links' || typeLower === 'questions') &&
+        !subjectLower.includes('obs') &&
+        !subjectLower.includes('open bible stories')
+      const isBookStructured =
+        isBibleBookCompanion ||
+        r.contentStructure === 'book' ||
+        String(r.category).toLowerCase() === 'scripture' ||
+        typeLower === 'scripture' ||
+        // Match scripture/bible subjects but not "Open Bible Stories"
+        (subjectLower.includes('bible') && !subjectLower.includes('open bible stories'))
+      if (!isBookStructured) return false
+      // Sentinel: undefined = never processed; [] or non-empty = already attempted
+      return r.verifiedIngredients === undefined
+    })
+    if (!toProcess.length) return
+
+    const door43Client = getDoor43ApiClient()
+    let cancelled = false
+
+    void Promise.all(
+      toProcess.map(async (r) => {
+        const k = r.key ?? r.id
+        // Step 1: read from local catalog (no network). Populates ingredients and prod ref.
+        let ings = r.ingredients
+        let knownRef: string | undefined
+        try {
+          const md = await catalogManager.getResourceMetadata(k)
+          if (!ings || !ings.length) {
+            ings = (md?.contentMetadata?.ingredients ?? []) as ResourceInfo['ingredients']
+          }
+          // Pass the prod ref so the verifier skips an extra findRepository call
+          knownRef = md?.release?.tag_name ?? undefined
+        } catch {
+          if (!ings) ings = []
+        }
+        // Step 2: verify ingredients against the published ref (one network call: git/trees)
+        // `verifiedIngredients` is initialised to `ings` as the fail-open value.
+        let verifiedIngredients: ResourceInfo['ingredients'] = ings ?? []
+        let verifiedRef: string | undefined
+        if (ings && ings.length) {
+          try {
+            const resourceForVerify = { ...r, ingredients: ings } as ResourceInfo
+            const result = await verifyResourceContents(resourceForVerify, door43Client, knownRef)
+            if (result.treeFetched) {
+              verifiedIngredients = result.verifiedIngredients
+              verifiedRef = result.verifiedRef
+            }
+          } catch {
+            // fail-open — verifiedIngredients stays as full ingredient list
+          }
+        }
+        return { k, ings, verifiedIngredients, verifiedRef }
+      })
+    ).then((results) => {
+      if (cancelled) return
+      useAppStore.setState((state) => {
+        for (const { k, ings, verifiedIngredients, verifiedRef } of results) {
+          const r = state.loadedResources[k]
+          if (!r) continue
+          if (ings && ings.length) r.ingredients = ings as typeof r.ingredients
+          // Always write verifiedIngredients (even as []) as a "processed" sentinel so
+          // `r.verifiedIngredients === undefined` is false on the next effect run.
+          // This breaks the Immer write-cycle loop for resources with no ingredients.
+          r.verifiedIngredients = (verifiedIngredients ?? []) as typeof r.verifiedIngredients
+          if (verifiedRef) r.verifiedRef = verifiedRef
+        }
+      })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [loadedResources, catalogManager])
 
   // After sections load, jump to 1-based section from URL
   useEffect(() => {
@@ -1467,26 +1632,42 @@ export function SimplifiedReadView({
   const panel1ResourceKeys = panel1Resources.resourceKeys ?? []
   const panel2ResourceKeys = panel2Resources.resourceKeys ?? []
 
-  // Filter panel keys by the active navigation scope so the panels "fully swap"
-  // when switching between Bible and OBS. shared-scope resources (null) are visible in both scopes.
-  const filteredPanel1Keys = useMemo(
-    () =>
-      panel1ResourceKeys.filter((key) => {
-        const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
-        return scope === navigationScope || scope === null
-      }),
+  // Filter panel keys by (1) active navigation scope and (2) current book availability.
+  // Resources whose ingredients are not yet loaded are kept visible (fail-open) so they
+  // don't flicker away while async catalog fetches are in progress.
+  //
+  // Stable-reference guard: return the same array reference when the key list content is
+  // unchanged, even if `loadedResources` was replaced by a new Immer-produced reference.
+  // This prevents `allResourceIds` and `panelConfig` from recomputing (and
+  // linked-panels from "Setting store config") on every loadedResources write.
+  const currentBook = currentNavRef.book
+  const prev1KeysRef = useRef<string[]>([])
+  const filteredPanel1Keys = useMemo(() => {
+    const next = panel1ResourceKeys.filter((key) => {
+      const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
+      if (scope !== navigationScope && scope !== null) return false
+      return resourceSupportsBook(key, loadedResources, currentBook)
+    })
+    const prev = prev1KeysRef.current
+    if (next.length === prev.length && next.every((k, i) => k === prev[i])) return prev
+    prev1KeysRef.current = next
+    return next
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panel1ResourceKeys, navigationScope, loadedResources, resourceTypeRegistry]
-  )
-  const filteredPanel2Keys = useMemo(
-    () =>
-      panel2ResourceKeys.filter((key) => {
-        const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
-        return scope === navigationScope || scope === null
-      }),
+  }, [panel1ResourceKeys, navigationScope, loadedResources, resourceTypeRegistry, currentBook])
+
+  const prev2KeysRef = useRef<string[]>([])
+  const filteredPanel2Keys = useMemo(() => {
+    const next = panel2ResourceKeys.filter((key) => {
+      const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
+      if (scope !== navigationScope && scope !== null) return false
+      return resourceSupportsBook(key, loadedResources, currentBook)
+    })
+    const prev = prev2KeysRef.current
+    if (next.length === prev.length && next.every((k, i) => k === prev[i])) return prev
+    prev2KeysRef.current = next
+    return next
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [panel2ResourceKeys, navigationScope, loadedResources, resourceTypeRegistry]
-  )
+  }, [panel2ResourceKeys, navigationScope, loadedResources, resourceTypeRegistry, currentBook])
   
   // Filtered resource objects (for PanelHeader — tabs must match the filtered key list).
   // loadedResources is used only to map keys → ResourceInfo; we keep this memoized so tab
@@ -1528,6 +1709,7 @@ export function SimplifiedReadView({
     () => [...new Set([...filteredPanel1Keys, ...filteredPanel2Keys])],
     [filteredPanel1Keys, filteredPanel2Keys]
   )
+
   const panelConfig: LinkedPanelsConfig = useMemo(() => {
     const resources = allResourceIds.map((id) => ({
       id,

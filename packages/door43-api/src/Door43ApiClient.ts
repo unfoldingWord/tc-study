@@ -121,11 +121,27 @@ export interface Door43Catalog {
   resources: Door43Resource[];
 }
 
-export interface Door43ApiError {
-  message: string;
-  code: string;
-  status?: number;
-  details?: any;
+export class Door43ApiError extends Error {
+  readonly code: string;
+  readonly status?: number;
+  readonly details?: unknown;
+
+  constructor(
+    message: string,
+    opts: { code: string; status?: number; details?: unknown }
+  ) {
+    super(message);
+    this.name = 'Door43ApiError';
+    this.code = opts.code;
+    this.status = opts.status;
+    this.details = opts.details;
+    // Restore prototype chain in transpiled environments
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+export function isDoor43ApiError(e: unknown): e is Door43ApiError {
+  return e instanceof Door43ApiError;
 }
 
 export interface Door43Organization {
@@ -880,11 +896,7 @@ export class Door43ApiClient {
     code: string,
     status?: number
   ): Door43ApiError {
-    return {
-      message,
-      code,
-      status,
-    };
+    return new Door43ApiError(message, { code, status });
   }
 
   /**
@@ -1221,6 +1233,69 @@ export class Door43ApiClient {
       }
       
       throw this.createError('Failed to list repository contents', 'NETWORK_ERROR');
+    }
+  }
+
+  /**
+   * Fetch the full recursive tree of blob paths for a given ref.
+   * Returns a Set of normalized paths (no leading "./").
+   * Used to verify which files actually exist at a published tag/branch,
+   * since catalog ingredients can list files that are absent from the release.
+   *
+   * @param owner - Repository owner
+   * @param repo - Repository name
+   * @param ref  - Branch name or tag name
+   * @returns Set of blob paths in the tree
+   */
+  async fetchRepoTreePaths(
+    owner: string,
+    repo: string,
+    ref: string
+  ): Promise<Set<string>> {
+    if (!owner || !repo || !ref) {
+      throw this.createError('Missing required parameters for fetchRepoTreePaths', 'INVALID_PARAM');
+    }
+
+    const url = `${this.config.baseUrl}/api/v1/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1&per_page=99999`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+
+    try {
+      const response = await fetch(url, {
+        headers: this.config.headers,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw this.createError(
+          `Failed to fetch repo tree: ${response.status} ${response.statusText}`,
+          'HTTP_ERROR',
+          response.status
+        );
+      }
+
+      const data = await response.json() as { tree?: Array<{ path: string; type: string }> };
+      const set = new Set<string>();
+      for (const entry of (data.tree ?? [])) {
+        if (entry.type === 'blob') {
+          // Normalize: strip leading "./"
+          set.add(entry.path.replace(/^\.\//, ''));
+        }
+      }
+      return set;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Door43ApiError) throw error;
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw this.createError(
+          `fetchRepoTreePaths timeout after ${this.config.timeout}ms`,
+          'TIMEOUT'
+        );
+      }
+      throw this.createError('Failed to fetch repo tree', 'NETWORK_ERROR');
     }
   }
 

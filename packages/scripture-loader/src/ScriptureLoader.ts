@@ -10,6 +10,26 @@ import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import type { ResourceLoader, ProgressCallback } from '@bt-synergy/resource-types'
 
 /**
+ * Produce a human-readable description from any thrown value, including
+ * Door43ApiError plain-objects and class instances that don't extend Error.
+ */
+function describeError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.message;
+  }
+  if (err !== null && typeof err === 'object') {
+    const e = err as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof e['message'] === 'string') parts.push(e['message']);
+    if (typeof e['code'] === 'string') parts.push(`code=${e['code']}`);
+    if (typeof e['status'] === 'number') parts.push(`status=${e['status']}`);
+    if (parts.length > 0) return parts.join(' ');
+    try { return JSON.stringify(err); } catch { /* ignore */ }
+  }
+  return String(err);
+}
+
+/**
  * Find the file path for a book from resource ingredients
  */
 function getBookPath(metadata: ResourceMetadata, bookId: string): string | null {
@@ -223,22 +243,18 @@ export class ScriptureLoader implements ResourceLoader {
 
       return processedScripture
     } catch (err) {
-      if (this.debug) {
-        console.error(`Failed to load ${resourceKey}/${bookId}`)
-        console.error('Error details:', err)
-        if (err instanceof Error) {
-          console.error('Error message:', err.message)
-          console.error('Error stack:', err.stack)
-        }
-        try {
-          console.error('Error JSON:', JSON.stringify(err, null, 2))
-        } catch (jsonErr) {
-          console.error('Could not stringify error')
-        }
+      console.error(`[ScriptureLoader] Failed to load ${resourceKey}/${bookId}:`, describeError(err))
+      if (err instanceof Error) {
+        console.error('[ScriptureLoader] Stack:', err.stack)
+      } else {
+        try { console.error('[ScriptureLoader] Error value:', JSON.stringify(err, null, 2)) } catch { /* ignore */ }
       }
 
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      throw new Error(`Scripture content not available for ${resourceKey}/${bookId}: ${errorMsg}`)
+      const wrapped = new Error(
+        `Scripture content not available for ${resourceKey}/${bookId}: ${describeError(err)}`
+      );
+      (wrapped as any).cause = err
+      throw wrapped
     }
   }
 

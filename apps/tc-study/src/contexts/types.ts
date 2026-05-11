@@ -82,6 +82,25 @@ export interface ResourceInfo extends ResourceMetadata {
     exists?: boolean
     isDir?: boolean
   }>
+  /**
+   * Subset of `ingredients` verified to exist at the published ref (via git/trees).
+   * Present only after ResourceContentVerifier has run for this resource.
+   * When present, it is authoritative: missing book = not supported at this ref.
+   */
+  verifiedIngredients?: Array<{
+    identifier: string
+    title: string
+    path?: string
+    size?: number
+    categories?: string[]
+    sort?: number
+    alignmentCount?: number
+    versification?: string
+    exists?: boolean
+    isDir?: boolean
+  }>
+  /** The ref (tag or branch) that verifiedIngredients was validated against. */
+  verifiedRef?: string
   metadata?: ResourceMetadata // Full metadata reference (for nested access)
   location?: string           // Simplified location info
   readme?: string             // README content

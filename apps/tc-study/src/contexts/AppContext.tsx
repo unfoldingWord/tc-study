@@ -108,7 +108,19 @@ export const useAppStore = create<AppStore>()(
       if (resources.length === 0) return
       set((state) => {
         for (const resource of resources) {
-          state.loadedResources[resource.id] = resource
+          const existing = state.loadedResources[resource.id]
+          state.loadedResources[resource.id] = {
+            ...resource,
+            // Preserve runtime-computed verification fields: metadata batch writes may use
+            // stale snapshots captured before verification ran, so we must not let them
+            // overwrite verifiedIngredients / verifiedRef that were set in the interim.
+            ...(existing?.verifiedIngredients !== undefined
+              ? { verifiedIngredients: existing.verifiedIngredients }
+              : {}),
+            ...(existing?.verifiedRef !== undefined
+              ? { verifiedRef: existing.verifiedRef }
+              : {}),
+          }
         }
       })
     },

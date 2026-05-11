@@ -5,11 +5,12 @@
  */
 
 export {
-    Door43ApiClient, createDoor43ApiClient, getDoor43ApiClient, resetDoor43ApiClient
+    Door43ApiClient, createDoor43ApiClient, getDoor43ApiClient, resetDoor43ApiClient,
+    Door43ApiError, isDoor43ApiError,
 } from './Door43ApiClient';
 
 export type {
-    Door43ApiConfig, Door43ApiError, Door43Catalog, Door43Language, Door43Organization, Door43Owner, Door43Resource
+    Door43ApiConfig, Door43Catalog, Door43Language, Door43Organization, Door43Owner, Door43Resource
 } from './Door43ApiClient';
 
 export {

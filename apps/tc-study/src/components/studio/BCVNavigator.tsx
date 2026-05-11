@@ -300,12 +300,17 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
     }
   }, [step, pickerScope, currentRef.book, currentRef.chapter])
 
-  // Stable ref to navigation actions — keeps this effect out of the
-  // setObsStoryFrameCount → store update → navigation ref change → re-run loop.
+  // Stable ref to navigation actions — keeps effects out of the
+  // store-update → navigation ref change → re-run loop.
   const navigationActionsRef = useRef(navigation)
   useEffect(() => {
     navigationActionsRef.current = navigation
   })
+
+  // Track the last book-code signature we sent to setAvailableBooks.
+  // Prevents redundant calls when loadedResources changes for other reasons
+  // (e.g. verifiedIngredients/TOC writes) but the derived books list is the same.
+  const lastBookKeysSig = useRef<string>('')
 
   useEffect(() => {
     setNavigatorRefreshTick((t) => t + 1)
@@ -314,6 +319,8 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   // Scripture: refresh book/chapter grid from the union of ALL loaded scripture resources.
   // This ensures the Bible tab is populated even when no scripture viewer has been opened
   // (e.g. the app booted directly into OBS mode).
+  // Prefers `verifiedIngredients` (confirmed present at the published ref) when available,
+  // so books absent from the release tag are not shown to the user.
   useEffect(() => {
     if (pickerScope !== 'scripture') return
     const scriptureResources = getScriptureResources(loadedResources)
@@ -333,6 +340,11 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
       try {
         const lists = await Promise.all(
           ordered.map(async (r) => {
+            // Use verifiedIngredients if already populated (authoritative)
+            if (r.verifiedIngredients && r.verifiedIngredients.length > 0) {
+              return r.verifiedIngredients
+            }
+            // Fall back to catalog metadata fetch
             const k = r.key ?? r.id
             try {
               const metadata = await catalogManager.getResourceMetadata(k)
@@ -347,7 +359,14 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
         const allIngredients = lists.flat()
         if (!allIngredients.length) return
         const books = buildBookInfosFromIngredients(allIngredients)
-        if (books.length > 0) navigation.setAvailableBooks(books)
+        if (!books.length) return
+        // Skip if the derived list is identical to what we already sent.
+        const sig = books.map((b) => b.code).join(',')
+        if (sig === lastBookKeysSig.current) return
+        lastBookKeysSig.current = sig
+        // Use the stable ref so calling setAvailableBooks does NOT re-trigger this
+        // effect (the navigation context object changes on every store write).
+        navigationActionsRef.current.setAvailableBooks(books)
       } catch (e) {
         console.warn('[BCVNavigator] Scripture catalog refresh failed:', e)
       }
@@ -355,7 +374,8 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
     return () => {
       cancelled = true
     }
-  }, [pickerScope, scripturePickerMode, navigatorRefreshTick, bookTitleSource, loadedResources, catalogManager, navigation])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickerScope, scripturePickerMode, navigatorRefreshTick, bookTitleSource, loadedResources, catalogManager])
 
   // OBS: refresh story list (ingredients) from catalog when switching to OBS or Story/Frame.
   useEffect(() => {
