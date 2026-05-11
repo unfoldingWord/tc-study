@@ -5,9 +5,9 @@
  * Processes USFM into structured scripture data using usfm-processor.
  */
 
-import { USFMProcessor } from '@bt-synergy/usfm-processor'
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
-import type { ResourceLoader, ProgressCallback } from '@bt-synergy/resource-types'
+import type { ResourceMetadata } from '@bt-synergy/resource-catalog';
+import type { ProgressCallback, ResourceLoader } from '@bt-synergy/resource-types';
+import { USFMProcessor } from '@bt-synergy/usfm-processor';
 
 /**
  * Produce a human-readable description from any thrown value, including

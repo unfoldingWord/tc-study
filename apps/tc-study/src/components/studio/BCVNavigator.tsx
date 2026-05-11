@@ -8,6 +8,7 @@
 import type { TranslatorSection } from '@bt-synergy/usfm-processor'
 import { AlertCircle, ArrowLeft, BookMarked, BookOpen, Check, Hash, Library, List, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import {
   useAvailableBooks,
   useCatalogManager,
@@ -59,9 +60,12 @@ function findSectionIndexForRef(
 function findObsCatalogKey(
   loadedResources: Record<
     string,
-    { resourceKey?: string; key?: string; subject?: string; type?: unknown }
-  >
+    { resourceKey?: string; key?: string; subject?: string; type?: unknown; language?: string; languageCode?: string }
+  >,
+  preferLanguage?: string
 ): string | null {
+  let fallback: string | null = null
+  const preferLang = preferLanguage?.toLowerCase()
   for (const r of Object.values(loadedResources)) {
     if (!r) continue
     const rk = r.resourceKey ?? r.key
@@ -69,10 +73,14 @@ function findObsCatalogKey(
 
     const typeStr = String(r.type ?? '').toLowerCase().trim()
     if (typeStr === 'obs' || /open bible stories/i.test(r.subject ?? '')) {
-      return rk
+      if (preferLang) {
+        const rLang = (r.language ?? r.languageCode ?? '').toLowerCase()
+        if (rLang === preferLang) return rk
+      }
+      if (!fallback) fallback = rk
     }
   }
-  return null
+  return fallback
 }
 
 /** Return all target-language scripture resources from the loaded-resources map.
@@ -136,8 +144,23 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
   const catalogManager = useCatalogManager()
   const currentRef = navigation.currentReference
 
-  const obsCatalogKey = useMemo(() => findObsCatalogKey(loadedResources), [loadedResources])
+  const { languageCode: urlLanguageCode } = useParams<{ languageCode?: string }>()
+  const currentLanguage = (urlLanguageCode ?? '').toLowerCase()
+
+  const obsCatalogKey = useMemo(
+    () => findObsCatalogKey(loadedResources, currentLanguage || undefined),
+    [loadedResources, currentLanguage]
+  )
   const hasObsLoaded = !!obsCatalogKey
+
+  const obsResourceTitle = useMemo(() => {
+    if (!obsCatalogKey) return null
+    const res = Object.values(loadedResources).find(
+      (r) => (r as ResourceInfo | undefined)?.resourceKey === obsCatalogKey ||
+              (r as ResourceInfo | undefined)?.key === obsCatalogKey
+    ) as ResourceInfo | undefined
+    return res?.title ?? null
+  }, [loadedResources, obsCatalogKey])
 
   /** Local modal scope — do not call setNavigationScope until Apply (avoids mutating global ref / URL while browsing). */
   const [pickerScope, setPickerScope] = useState<typeof navigationScope>(() => navigationScope)
@@ -786,13 +809,13 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                 setPickerScope('scripture')
                 setStep(1)
               }}
-              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
                 pickerScope === 'scripture'
                   ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
             >
-              Bible
+              <BookOpen className="w-4 h-4 shrink-0" />
             </button>
             <button
               type="button"
@@ -813,7 +836,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
               } disabled:opacity-40 disabled:cursor-not-allowed`}
             >
               <BookMarked className="w-4 h-4 shrink-0" />
-              Open Bible Stories
+              {obsResourceTitle ?? 'Open Bible Stories'}
             </button>
           </div>
         )}
