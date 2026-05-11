@@ -13,6 +13,9 @@ export type FrameSpan = {
    *  so clicking a TN card highlights the full phrase even when a shorter TWL
    *  quote bisects it. */
   parentQuoteIndices?: number[]
+  /** Inclusive word-token indices when this span was built from {@link computeFrameWordSpans}. */
+  startWord?: number
+  endWord?: number
 }
 
 export type FrameQuoteSpec = {
@@ -20,7 +23,7 @@ export type FrameQuoteSpec = {
   occurrence: number
 }
 
-function stripForSearch(s: string): string {
+export function stripForSearch(s: string): string {
   return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 }
 
@@ -33,7 +36,7 @@ function codePointWidthAt(text: string, i: number): number {
 /**
  * Map each UTF-16 index in `text` to a normalized search string and position map.
  */
-function buildNormWithMap(text: string): { norm: string; map: number[] } {
+export function buildNormWithMap(text: string): { norm: string; map: number[] } {
   let norm = ''
   const map: number[] = []
   for (let i = 0; i < text.length; ) {
@@ -49,7 +52,7 @@ function buildNormWithMap(text: string): { norm: string; map: number[] } {
   return { norm, map }
 }
 
-function origEndForMatch(text: string, map: number[], normStart: number, normLen: number): number {
+export function origEndForMatch(text: string, map: number[], normStart: number, normLen: number): number {
   const lastNormIdx = normStart + normLen - 1
   const lastOrigStart = map[lastNormIdx]!
   const w = codePointWidthAt(text, lastOrigStart)
@@ -59,7 +62,7 @@ function origEndForMatch(text: string, map: number[], normStart: number, normLen
 /**
  * Non-overlapping occurrences of `quote` in `text` (search plane is normalized).
  */
-function findNonOverlappingMatches(
+export function findNonOverlappingMatches(
   text: string,
   norm: string,
   map: number[],
@@ -80,6 +83,23 @@ function findNonOverlappingMatches(
   return matches
 }
 
+/**
+ * First UTF-16 range for `quote` in `text` using the same normalized matching as {@link computeFrameSpans}.
+ * `occurrence` is 1-based; `-1` selects the first match. Returns null if none.
+ */
+export function findQuoteCharRange(
+  text: string,
+  quote: string,
+  occurrence: number
+): { start: number; end: number } | null {
+  if (!text || !quote?.trim()) return null
+  const { norm, map } = buildNormWithMap(text)
+  const matches = findNonOverlappingMatches(text, norm, map, quote)
+  if (!matches.length) return null
+  if (occurrence === -1) return matches[0] ?? null
+  if (occurrence < 1 || occurrence > matches.length) return null
+  return matches[occurrence - 1] ?? null
+}
 
 /**
  * Compute render spans: plain text interleaved with highlighted quote slices.
@@ -169,7 +189,7 @@ export function computeFrameSpans(text: string, quotes: FrameQuoteSpec[]): Frame
   return mergeAdjacentPlain(spans)
 }
 
-function mergeAdjacentPlain(spans: FrameSpan[]): FrameSpan[] {
+export function mergeAdjacentPlain(spans: FrameSpan[]): FrameSpan[] {
   const out: FrameSpan[] = []
   for (const s of spans) {
     const last = out[out.length - 1]

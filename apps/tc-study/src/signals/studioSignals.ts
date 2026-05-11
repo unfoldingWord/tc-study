@@ -232,6 +232,13 @@ export interface ObsFrameQuoteEntry {
   kind: 'tn' | 'twl'
   quote: string
   occurrence: number
+  /** Inclusive word-token indices in frame text (see `tokenizeObsFrameWords`); set when enriched locally.
+   *  Mirrors `wordRanges[0]` for backward compatibility. */
+  startWord?: number
+  endWord?: number
+  /** Multi-part quotes (`&`/`…`-separated) produce one range per part.
+   *  `startWord`/`endWord` mirror `wordRanges[0]`. Set by `enrichObsFrameQuoteEntries`. */
+  wordRanges?: Array<{ startWord: number; endWord: number }>
 }
 
 /**
@@ -263,12 +270,16 @@ export interface ObsFrameHighlightSignal {
   highlight: {
     storyNumber: number
     frameNumber: number
-    quote: string
-    occurrence: number
+    /** Legacy substring selection (helps card → frame, or char fallback in the viewer). */
+    quote?: string
+    occurrence?: number
     /** Optional row id for selection (TN id / TWL id) */
     rowId?: string
     /** Source kind — tells receivers which entry type was clicked so they can filter correctly */
     kind?: 'tn' | 'twl'
+    /** Word-token click: all TN/TWL rows whose word range covers this index */
+    wordIndex?: number
+    overlappingSourceIds?: string[]
   } | null
   timestamp: number
 }

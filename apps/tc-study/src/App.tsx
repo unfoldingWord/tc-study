@@ -119,6 +119,14 @@ function App() {
                 path="read/:languageCode/:resourceType/:navType/:navRef"
                 element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>}
               />
+              <Route
+                path="read/:languageCode/:resourceType/:navType"
+                element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>}
+              />
+              <Route
+                path="read/:languageCode/:resourceType"
+                element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>}
+              />
               <Route path="read/:languageCode" element={<Suspense fallback={<ReadPageSkeleton />}><Read /></Suspense>} />
               <Route path="test/panels" element={<Suspense fallback={<PageLoader />}><PanelSystemTest /></Suspense>} />
               <Route path="data" element={<Suspense fallback={<PageLoader />}><DataManagement /></Suspense>} />

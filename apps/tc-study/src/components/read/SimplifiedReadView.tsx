@@ -84,6 +84,7 @@ import {
   parseBibleSectionNavRef,
   parseObsFrameNavRef,
   parseObsStoryNavRef,
+  type PartialRouteHint,
   type ReadRouteTail,
 } from '../../utils/readRoutes'
 
@@ -255,12 +256,15 @@ interface SimplifiedReadViewProps {
   requireLanguageInUrl?: boolean
   /** Deep link: `/read/{lang}/bible|obs/{navType}/{navRef}` */
   readRouteTail?: ReadRouteTail | null
+  /** Partial deep link: `/read/{lang}/bible|obs[/{navType}]` — sets scope (and mode when navType is present) without overriding the current reference. */
+  partialRouteHint?: PartialRouteHint
 }
 
 export function SimplifiedReadView({
   initialLanguage,
   requireLanguageInUrl = false,
   readRouteTail = null,
+  partialRouteHint,
 }: SimplifiedReadViewProps = {}) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -344,7 +348,7 @@ export function SimplifiedReadView({
   useEffect(() => {
     if (!readRouteTail) readRouteAppliedSigRef.current = null
   }, [readRouteTail])
-  
+
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null)
   /** Track which panel (if any) is being hovered over during cross-panel drag */
@@ -358,6 +362,22 @@ export function SimplifiedReadView({
   // Track current language and collection cache status
   const [currentLanguageCode, setCurrentLanguageCode] = useState<string | null>(initialLanguage || null)
   const [isCollectionFullyCached, setIsCollectionFullyCached] = useState(false)
+
+  // Apply `/read/{lang}/bible|obs[/{navType}]` (no navRef) — switch scope and optionally mode.
+  // The URL-sync effect will then rewrite the URL to the full canonical form.
+  const partialHintAppliedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!partialRouteHint) return
+    if (!currentLanguageCode || isLoadingResources) return
+    const sig = `${partialRouteHint.resourceType}|${partialRouteHint.navType ?? ''}`
+    if (partialHintAppliedRef.current === sig) return
+    partialHintAppliedRef.current = sig
+    navigation.setNavigationScope(navigationScopeFromResourceType(partialRouteHint.resourceType))
+    if (partialRouteHint.navType) {
+      const mode = navigationModeFromReadNav(partialRouteHint.resourceType, partialRouteHint.navType)
+      if (mode) navigation.setNavigationMode(mode)
+    }
+  }, [partialRouteHint, currentLanguageCode, isLoadingResources, navigation])
 
   // Apply `/read/:lang/bible|obs/:navType/:navRef` once resources are ready
   useEffect(() => {

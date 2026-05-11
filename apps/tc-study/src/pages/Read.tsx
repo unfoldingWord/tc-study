@@ -9,7 +9,7 @@
 import { useParams } from 'react-router-dom'
 import { NavigationProvider, AppProvider } from '../contexts'
 import { SimplifiedReadView } from '../components/read/SimplifiedReadView'
-import type { ReadResourceType, ReadRouteTail } from '../utils/readRoutes'
+import type { ReadResourceType, ReadRouteTail, PartialRouteHint } from '../utils/readRoutes'
 
 function isReadResourceType(s: string | undefined): s is ReadResourceType {
   return s === 'bible' || s === 'obs'
@@ -34,6 +34,13 @@ export default function Read() {
         }
       : null
 
+  // When the URL has resource type (and optional navType) but no navRef, carry a
+  // partial hint so the view switches scope/mode without overriding the current reference.
+  const partialRouteHint: PartialRouteHint | undefined =
+    !readRouteTail && isReadResourceType(resourceType)
+      ? { resourceType, navType: navType || undefined }
+      : undefined
+
   return (
     <NavigationProvider>
       <AppProvider>
@@ -41,6 +48,7 @@ export default function Read() {
           initialLanguage={languageCode}
           requireLanguageInUrl={requireLanguageInUrl}
           readRouteTail={readRouteTail}
+          partialRouteHint={partialRouteHint}
         />
       </AppProvider>
     </NavigationProvider>

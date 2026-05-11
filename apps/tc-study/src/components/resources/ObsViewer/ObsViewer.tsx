@@ -12,7 +12,10 @@ import { useCurrentState } from 'linked-panels'
 import { useCatalogManager, useCurrentReference, useNavigation, useNavigationMode } from '../../../contexts'
 import { useAppStore } from '../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
+import { enrichObsFrameQuoteEntries } from '../../../lib/obs/enrichObsFrameQuotes'
+import type { FrameSpan } from '../../../lib/obs/highlightFrameText'
 import { computeFrameSpans } from '../../../lib/obs/highlightFrameText'
+import { computeFrameWordSpans, overlappingEntriesForWordRange } from '../../../lib/obs/highlightFrameWords'
 import type { ObsFrame, ParsedObsStory } from '../../../lib/obs/parseObsMarkdown'
 import type { ObsFrameHighlightSignal, ObsFrameQuoteEntry, ObsFrameQuotesSignal } from '../../../signals/studioSignals'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
@@ -26,17 +29,25 @@ export interface ObsViewerProps {
 }
 
 type ActiveHl = {
-  quote: string
-  occurrence: number
+  quote?: string
+  occurrence?: number
   rowId?: string
-  /** Frame number for highlights triggered in range/story mode */
   frameNumber?: number
+  wordIndex?: number
+  overlappingSourceIds?: string[]
 }
 
-function sameObsHighlight(a: ActiveHl, e: ObsFrameQuoteEntry, frameNumber?: number): boolean {
+function sortedSourceIdsKey(ids: string[]): string {
+  return [...ids].sort().join('\0')
+}
+
+function isObsEntryActive(a: ActiveHl | null, e: ObsFrameQuoteEntry, currentFrameNum: number): boolean {
+  if (!a) return false
+  if (a.frameNumber !== undefined && a.frameNumber !== currentFrameNum) return false
+  if (a.overlappingSourceIds?.length) return a.overlappingSourceIds.includes(e.sourceId)
+  if (a.quote === undefined || a.occurrence === undefined) return false
   if (a.quote !== e.quote || a.occurrence !== e.occurrence) return false
   if (a.rowId !== undefined && a.rowId !== e.sourceId) return false
-  if (a.frameNumber !== undefined && frameNumber !== undefined && a.frameNumber !== frameNumber) return false
   return true
 }
 
@@ -150,7 +161,20 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
         if (h.storyNumber !== storyNum) return
         // In range/story mode accept any frame in the current story; in single-frame mode require exact match
         if (!isRange && h.frameNumber !== frameNum) return
-        setActiveHighlight({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId, frameNumber: h.frameNumber })
+        if (h.overlappingSourceIds?.length) {
+          setActiveHighlight({
+            overlappingSourceIds: h.overlappingSourceIds,
+            wordIndex: h.wordIndex,
+            frameNumber: h.frameNumber,
+            quote: h.quote,
+            occurrence: h.occurrence,
+            rowId: h.rowId,
+          })
+          return
+        }
+        if (h.quote !== undefined && h.occurrence !== undefined) {
+          setActiveHighlight({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId, frameNumber: h.frameNumber })
+        }
       },
       [resourceId, currentRef.book, storyNum, frameNum, isRange]
     ),
@@ -236,15 +260,79 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
     [quotesForFrame, isRange]
   )
 
-  const spans = useMemo(
-    () => (currentFrame?.text ? computeFrameSpans(currentFrame.text, specs) : []),
-    [currentFrame?.text, specs]
+  const enrichedQuotes = useMemo(
+    () =>
+      currentFrame?.text && quotesForFrame.length
+        ? enrichObsFrameQuoteEntries(currentFrame.text, quotesForFrame)
+        : quotesForFrame,
+    [currentFrame?.text, quotesForFrame]
   )
 
-  // Single-frame toggle (used when !isRange)
+  const useWordUnderline =
+    !isRange &&
+    enrichedQuotes.length > 0 &&
+    enrichedQuotes.every(
+      (e) =>
+        (e.startWord != null && e.endWord != null) ||
+        (e.wordRanges != null && e.wordRanges.length > 0)
+    )
+
+  const spans = useMemo(() => {
+    if (!currentFrame?.text) return []
+    if (!quotesForFrame.length) return [{ text: currentFrame.text }]
+    if (useWordUnderline) return computeFrameWordSpans(currentFrame.text, enrichedQuotes)
+    return computeFrameSpans(currentFrame.text, specs)
+  }, [currentFrame?.text, quotesForFrame.length, specs, useWordUnderline, enrichedQuotes])
+
+  const activateWordSpan = useCallback(
+    (span: FrameSpan, sNum: number, fNum: number, enriched: ObsFrameQuoteEntry[]) => {
+      if (span.startWord == null || span.endWord == null || span.quoteIndex == null) return
+      const entry = enriched[span.quoteIndex]
+      if (!entry) return
+      const overlap = overlappingEntriesForWordRange(enriched, span.startWord, span.endWord)
+      const ids = [...new Set(overlap.map((e) => e.sourceId))]
+      const samePick =
+        activeHighlight &&
+        (activeHighlight.frameNumber ?? fNum) === fNum &&
+        activeHighlight.wordIndex === span.startWord &&
+        sortedSourceIdsKey(activeHighlight.overlappingSourceIds ?? []) === sortedSourceIdsKey(ids)
+      if (samePick) {
+        sendObsHighlight({ lifecycle: 'event', highlight: null })
+        setActiveHighlight(null)
+        return
+      }
+      sendObsHighlight({
+        lifecycle: 'event',
+        highlight: {
+          storyNumber: sNum,
+          frameNumber: fNum,
+          wordIndex: span.startWord,
+          overlappingSourceIds: ids,
+          quote: entry.quote,
+          occurrence: entry.occurrence,
+          rowId: entry.sourceId,
+          kind: entry.kind,
+        },
+      })
+      setActiveHighlight({
+        wordIndex: span.startWord,
+        overlappingSourceIds: ids,
+        frameNumber: fNum,
+        quote: entry.quote,
+        occurrence: entry.occurrence,
+        rowId: entry.sourceId,
+      })
+    },
+    [activeHighlight, sendObsHighlight]
+  )
+
+  // Single-frame toggle (substring mode when word enrichment is incomplete)
   const toggleHighlightEntry = useCallback(
     (entry: ObsFrameQuoteEntry) => {
-      const matchesActive = activeHighlight && sameObsHighlight(activeHighlight, entry)
+      const matchesActive =
+        !!activeHighlight &&
+        !activeHighlight.overlappingSourceIds?.length &&
+        isObsEntryActive(activeHighlight, entry, frameNum)
       if (matchesActive) {
         sendObsHighlight({ lifecycle: 'event', highlight: null })
         setActiveHighlight(null)
@@ -261,15 +349,18 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
           kind: entry.kind,
         },
       })
-      setActiveHighlight({ quote: entry.quote, occurrence: entry.occurrence, rowId: entry.sourceId })
+      setActiveHighlight({ quote: entry.quote, occurrence: entry.occurrence, rowId: entry.sourceId, frameNumber: frameNum })
     },
     [activeHighlight, frameNum, sendObsHighlight, storyNum]
   )
 
-  // Range/story-mode toggle (per-frame, passes explicit frameNumber)
+  // Range/story-mode toggle (substring mode)
   const toggleRangeHighlight = useCallback(
     (sNum: number, frameNumber: number, entry: ObsFrameQuoteEntry) => {
-      const matchesActive = activeHighlight && sameObsHighlight(activeHighlight, entry, frameNumber)
+      const matchesActive =
+        !!activeHighlight &&
+        !activeHighlight.overlappingSourceIds?.length &&
+        isObsEntryActive(activeHighlight, entry, frameNumber)
       if (matchesActive) {
         sendObsHighlight({ lifecycle: 'event', highlight: null })
         setActiveHighlight(null)
@@ -286,7 +377,12 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
           kind: entry.kind,
         },
       })
-      setActiveHighlight({ quote: entry.quote, occurrence: entry.occurrence, rowId: entry.sourceId, frameNumber })
+      setActiveHighlight({
+        quote: entry.quote,
+        occurrence: entry.occurrence,
+        rowId: entry.sourceId,
+        frameNumber,
+      })
     },
     [activeHighlight, sendObsHighlight]
   )
@@ -305,7 +401,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
   }, [activeHighlight])
 
   function isEntryActive(entry: ObsFrameQuoteEntry): boolean {
-    return !!activeHighlight && sameObsHighlight(activeHighlight, entry)
+    return isObsEntryActive(activeHighlight, entry, frameNum)
   }
 
   return (
@@ -366,7 +462,17 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
                         ? (obsQuotesState?.frameQuoteMap?.[frame.frameNumber] ?? [])
                         : []
                       const frameSpecs = frameEntries.map((q) => ({ quote: q.quote, occurrence: q.occurrence }))
-                      const frameSpans = frameSpecs.length > 0 ? computeFrameSpans(frame.text, frameSpecs) : null
+                      const frameEnriched =
+                        frameEntries.length > 0 ? enrichObsFrameQuoteEntries(frame.text, frameEntries) : frameEntries
+                      const frameWordMode =
+                        frameEntries.length > 0 &&
+                        frameEnriched.every((e) => e.startWord != null && e.endWord != null)
+                      const frameSpans =
+                        frameSpecs.length > 0
+                          ? frameWordMode
+                            ? computeFrameWordSpans(frame.text, frameEnriched)
+                            : computeFrameSpans(frame.text, frameSpecs)
+                          : null
                       return (
                         <div key={frame.frameNumber} className="space-y-3">
                           <p className="text-xs text-gray-400 font-medium">
@@ -378,13 +484,13 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
                                 if (span.quoteIndex === undefined) {
                                   return <span key={`t-${idx}`}>{span.text}</span>
                                 }
-                                const entry = frameEntries[span.quoteIndex]
+                                const entry = frameEnriched[span.quoteIndex]
                                 if (!entry) return <span key={`t-${idx}`}>{span.text}</span>
                                 const active =
-                                  (!!activeHighlight && sameObsHighlight(activeHighlight, entry, frame.frameNumber)) ||
+                                  isObsEntryActive(activeHighlight, entry, frame.frameNumber) ||
                                   !!(span.parentQuoteIndices?.some((pqi) => {
-                                    const pe = frameEntries[pqi]
-                                    return pe ? !!activeHighlight && sameObsHighlight(activeHighlight, pe, frame.frameNumber) : false
+                                    const pe = frameEnriched[pqi]
+                                    return pe ? isObsEntryActive(activeHighlight, pe, frame.frameNumber) : false
                                   }))
                                 return (
                                   <button
@@ -395,7 +501,14 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
                                       'inline align-baseline cursor-pointer px-px font-inherit text-inherit whitespace-pre-wrap transition-colors',
                                       active ? quoteButtonActiveClass : quoteButtonIdleClass
                                     )}
-                                    onClick={() => toggleRangeHighlight(sNum, frame.frameNumber, entry)}
+                                    onClick={() =>
+                                      frameWordMode &&
+                                      span.startWord != null &&
+                                      span.endWord != null &&
+                                      span.quoteIndex != null
+                                        ? activateWordSpan(span, sNum, frame.frameNumber, frameEnriched)
+                                        : toggleRangeHighlight(sNum, frame.frameNumber, entry)
+                                    }
                                   >
                                     {span.text}
                                   </button>
@@ -436,13 +549,13 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
                 if (span.quoteIndex === undefined) {
                   return <span key={`t-${idx}`}>{span.text}</span>
                 }
-                const entry = quotesForFrame[span.quoteIndex]
+                const entry = enrichedQuotes[span.quoteIndex]
                 if (!entry) return <span key={`t-${idx}`}>{span.text}</span>
                 const active =
                   isEntryActive(entry) ||
                   (span.parentQuoteIndices?.some((pqi) => {
-                    const parentEntry = quotesForFrame[pqi]
-                    return parentEntry ? isEntryActive(parentEntry) : false
+                    const parentEntry = enrichedQuotes[pqi]
+                    return parentEntry ? isObsEntryActive(activeHighlight, parentEntry, frameNum) : false
                   }) ?? false)
                 return (
                   <button
@@ -453,7 +566,14 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
                       'inline align-baseline cursor-pointer px-px font-inherit text-inherit whitespace-pre-wrap transition-colors',
                       active ? quoteButtonActiveClass : quoteButtonIdleClass
                     )}
-                    onClick={() => toggleHighlightEntry(entry)}
+                    onClick={() =>
+                      useWordUnderline &&
+                      span.startWord != null &&
+                      span.endWord != null &&
+                      span.quoteIndex != null
+                        ? activateWordSpan(span, storyNum, frameNum, enrichedQuotes)
+                        : toggleHighlightEntry(entry)
+                    }
                   >
                     {span.text}
                   </button>

@@ -18,11 +18,13 @@ import {
   type BookInfo,
 } from '../../contexts'
 import { useAppStore, useBookTitleSource } from '../../contexts/AppContext'
+import type { ResourceInfo } from '../../contexts/types'
 import { getStandardBookOrderIndex, getStandardVerseCount } from '../../lib/versification'
 import { COMBINED_HELPS_IDS } from '../resources/CombinedHelpsViewer/constants'
 import type { ParsedObsStory } from '../../lib/obs/parseObsMarkdown'
 import { getDefaultSections } from '../../lib/data/default-sections'
-import { getBookTitle } from '../../utils/bookNames'
+import { getBookTitle, getBookTitleStatic } from '../../utils/bookNames'
+import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
 
 interface BCVNavigatorProps {
   onClose: () => void
@@ -71,6 +73,24 @@ function findObsCatalogKey(
     }
   }
   return null
+}
+
+/** Return all target-language scripture resources from the loaded-resources map.
+ *  Original language resources (Greek/Hebrew) are excluded so their untranslated
+ *  ingredient titles don't pollute the book name lookup. */
+function getScriptureResources(loaded: Record<string, ResourceInfo | undefined>): ResourceInfo[] {
+  return Object.values(loaded).filter(
+    (r): r is ResourceInfo => {
+      if (!r) return false
+      const isScripture =
+        String(r.category).toLowerCase() === 'scripture' ||
+        String(r.type).toLowerCase() === 'scripture'
+      if (!isScripture) return false
+      const lang = (r.language ?? r.languageCode ?? '').toLowerCase()
+      const subject = r.subject ?? ''
+      return !isOriginalLanguageResource(lang, subject)
+    }
+  )
 }
 
 /** Build navigation book list from scripture resource ingredients (same rules as ScriptureViewer useTOC). */
@@ -201,10 +221,12 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
 
   useEffect(() => {
     if (pickerScope !== 'scripture') return
+    // Don't reset once the user has already picked a book and moved to step 2
+    if (step === 2) return
     const b =
       currentRef.book !== 'obs' ? currentRef.book : availableBooks[0]?.code
     if (b) setSelectedBook(b)
-  }, [pickerScope, currentRef.book, availableBooks])
+  }, [pickerScope, currentRef.book, availableBooks, step])
 
   useEffect(() => {
     if (scripturePickerMode === 'section' && pickerScope === 'scripture' && selectedBook) {
@@ -289,20 +311,43 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
     setNavigatorRefreshTick((t) => t + 1)
   }, [pickerScope, pickerObsMode, scripturePickerMode])
 
-  // Scripture: refresh book/chapter grid from catalog when switching to Bible or changing verse/section mode.
+  // Scripture: refresh book/chapter grid from the union of ALL loaded scripture resources.
+  // This ensures the Bible tab is populated even when no scripture viewer has been opened
+  // (e.g. the app booted directly into OBS mode).
   useEffect(() => {
     if (pickerScope !== 'scripture') return
-    const resourceKey = bookTitleSource?.key ?? bookTitleSource?.id
-    if (!resourceKey) return
+    const scriptureResources = getScriptureResources(loadedResources)
+    if (!scriptureResources.length) return
+
+    // Put bookTitleSource first so its ingredient titles win when deduping by book code.
+    const preferredKey = bookTitleSource?.key ?? bookTitleSource?.id
+    const ordered = preferredKey
+      ? [
+          ...scriptureResources.filter((r) => (r.key ?? r.id) === preferredKey),
+          ...scriptureResources.filter((r) => (r.key ?? r.id) !== preferredKey),
+        ]
+      : scriptureResources
+
     let cancelled = false
     void (async () => {
       try {
-        const metadata = await catalogManager.getResourceMetadata(resourceKey)
-        if (cancelled || !metadata?.contentMetadata?.ingredients?.length) return
-        const books = buildBookInfosFromIngredients(metadata.contentMetadata.ingredients)
-        if (books.length > 0) {
-          navigation.setAvailableBooks(books)
-        }
+        const lists = await Promise.all(
+          ordered.map(async (r) => {
+            const k = r.key ?? r.id
+            try {
+              const metadata = await catalogManager.getResourceMetadata(k)
+              return metadata?.contentMetadata?.ingredients ?? []
+            } catch (e) {
+              console.warn('[BCVNavigator] metadata fetch failed for', k, e)
+              return []
+            }
+          })
+        )
+        if (cancelled) return
+        const allIngredients = lists.flat()
+        if (!allIngredients.length) return
+        const books = buildBookInfosFromIngredients(allIngredients)
+        if (books.length > 0) navigation.setAvailableBooks(books)
       } catch (e) {
         console.warn('[BCVNavigator] Scripture catalog refresh failed:', e)
       }
@@ -310,7 +355,7 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
     return () => {
       cancelled = true
     }
-  }, [pickerScope, scripturePickerMode, navigatorRefreshTick, bookTitleSource, catalogManager, navigation])
+  }, [pickerScope, scripturePickerMode, navigatorRefreshTick, bookTitleSource, loadedResources, catalogManager, navigation])
 
   // OBS: refresh story list (ingredients) from catalog when switching to OBS or Story/Frame.
   useEffect(() => {
@@ -789,13 +834,18 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
             <div className="flex-1 overflow-auto p-4">
               {availableBooks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-gray-500 text-sm">
-                  No Bible books in the current anchor resource.
+                  No Bible books found in any loaded scripture resource.
                 </div>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                   {availableBooks.map((book) => {
                     const isSelected = selectedBook === book.code
-                    const fullBookName = getBookTitle(bookTitleSource, book.code)
+                    const resolvedName = getBookTitle(bookTitleSource, book.code)
+                    // Fall back to static English name when the resource has no localized title
+                    const fullBookName =
+                      resolvedName !== book.code.toUpperCase()
+                        ? resolvedName
+                        : (getBookTitleStatic(book.code) || book.name || book.code.toUpperCase())
                     return (
                       <button
                         key={book.code}
@@ -1056,7 +1106,10 @@ export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
                   <BookOpen className="w-4 h-4 text-gray-500" />
                 </div>
                 <div className="text-sm text-gray-600 flex items-center gap-2">
-                  <strong>{getBookTitle(bookTitleSource, selectedBook)}</strong>
+                  <strong>{(() => {
+                    const n = getBookTitle(bookTitleSource, selectedBook)
+                    return n !== selectedBook.toUpperCase() ? n : (getBookTitleStatic(selectedBook) || n)
+                  })()}</strong>
                   <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
                     {getSelectionCount()}
                   </span>

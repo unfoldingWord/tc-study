@@ -69,8 +69,14 @@ export function TranslationNotesViewer({
   const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
   const [tokenFilter, setTokenFilter] = useState<{ semanticId: string; content: string; alignedSemanticIds: string[]; timestamp: number } | null>(null)
   const [verseFilter, setVerseFilter] = useState<{ chapter: number; verse?: number; timestamp: number } | null>(null)
-  // OBS-only: filter to the single entry whose quote was clicked in the OBS frame text
-  const [obsQuoteFilter, setObsQuoteFilter] = useState<{ quote: string; occurrence: number; rowId?: string } | null>(null)
+  // OBS-only: filter by frame quote click (substring or overlapping entry ids)
+  const [obsQuoteFilter, setObsQuoteFilter] = useState<{
+    quote?: string
+    occurrence?: number
+    rowId?: string
+    sourceIds?: string[]
+    wordIndex?: number
+  } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
   const [catalogTrigger, setCatalogTrigger] = useState(0)
 
@@ -369,13 +375,19 @@ export function TranslationNotesViewer({
   
   // Apply verse filter, token filter, or OBS quote filter if active
   const { displayNotes, hasMatches } = useMemo(() => {
-    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching entry
+    // OBS quote filter: user clicked a quoted span in the OBS frame → show matching note(s)
     if (isObs && obsQuoteFilter) {
+      if (obsQuoteFilter.sourceIds?.length) {
+        const idSet = new Set(obsQuoteFilter.sourceIds)
+        const notes = notesWithAlignedTokens.filter((n) => idSet.has(n.id))
+        return { displayNotes: notes, hasMatches: notes.length > 0 }
+      }
+      const q = obsQuoteFilter.quote?.trim().toLowerCase() ?? ''
+      const occ = obsQuoteFilter.occurrence ?? 1
       const match = notesWithAlignedTokens.find(
         (n) =>
           (obsQuoteFilter.rowId && n.id === obsQuoteFilter.rowId) ||
-          (n.quote?.trim().toLowerCase() === obsQuoteFilter.quote.trim().toLowerCase() &&
-            Number.parseInt(String(n.occurrence ?? '1'), 10) === obsQuoteFilter.occurrence)
+          (n.quote?.trim().toLowerCase() === q && Number.parseInt(String(n.occurrence ?? '1'), 10) === occ)
       )
       return { displayNotes: match ? [match] : notesWithAlignedTokens, hasMatches: !!match }
     }
@@ -525,6 +537,7 @@ export function TranslationNotesViewer({
           quote,
           occurrence: Number.isFinite(occRaw) ? occRaw : 1,
           rowId: note.id,
+          kind: 'tn',
         },
       })
       return
@@ -600,15 +613,26 @@ export function TranslationNotesViewer({
         if (currentRef.book !== 'obs' || h.storyNumber !== currentRef.chapter) return
         const isObsStoryMode = navigationMode === 'chapter'
         if (!isObsStoryMode && h.frameNumber !== currentRef.verse) return
-        // TWL click → this viewer has no relevant entry; clear any existing filter
+        if (h.overlappingSourceIds?.length) {
+          setObsQuoteFilter({
+            sourceIds: h.overlappingSourceIds,
+            wordIndex: h.wordIndex,
+            quote: h.quote,
+            occurrence: h.occurrence,
+            rowId: h.rowId,
+          })
+          const first = notesWithAlignedTokens.find((n) => h.overlappingSourceIds!.includes(n.id))
+          setSelectedNoteId(first?.id ?? null)
+          return
+        }
+        // TWL-only legacy click → this viewer has no relevant entry
         if (h.kind === 'twl') {
           setObsQuoteFilter(null)
           setSelectedNoteId(null)
           return
         }
-        // Set the filter — displayNotes will narrow to just this entry
+        if (h.quote === undefined || h.occurrence === undefined) return
         setObsQuoteFilter({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId })
-        // Also mark the entry as selected so the card renders in its selected style
         if (h.rowId && notesWithAlignedTokens.some((n) => n.id === h.rowId)) {
           setSelectedNoteId(h.rowId)
           return
@@ -687,7 +711,9 @@ export function TranslationNotesViewer({
         <TokenFilterBanner
           tokenFilter={{
             semanticId: '',
-            content: obsQuoteFilter.quote,
+            content:
+              obsQuoteFilter.quote?.trim() ||
+              (obsQuoteFilter.wordIndex != null ? `Word ${obsQuoteFilter.wordIndex + 1}` : 'Frame selection'),
             alignedSemanticIds: [],
             timestamp: 0,
           }}

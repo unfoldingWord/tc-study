@@ -81,8 +81,14 @@ export function WordsLinksViewer({
 
   const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
   const [selectedLink, setSelectedLink] = useState<string | null>(null)
-  // OBS-only: filter to the single entry whose quote was clicked in the OBS frame text
-  const [obsQuoteFilter, setObsQuoteFilter] = useState<{ quote: string; occurrence: number; rowId?: string } | null>(null)
+  // OBS-only: filter by frame quote click (substring or overlapping entry ids)
+  const [obsQuoteFilter, setObsQuoteFilter] = useState<{
+    quote?: string
+    occurrence?: number
+    rowId?: string
+    sourceIds?: string[]
+    wordIndex?: number
+  } | null>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
   const [verseFilter, setVerseFilter] = useState<{ chapter: number; verse?: number; timestamp: number } | null>(null)
   const [dependenciesReady, setDependenciesReady] = useState(false)
@@ -394,13 +400,19 @@ export function WordsLinksViewer({
   
   // Apply verse filter, token filter, or OBS quote filter if active
   const { displayLinks, hasMatches } = useMemo(() => {
-    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching entry
+    // OBS quote filter: user clicked a quoted span in the OBS frame → show matching link(s)
     if (loaderTypeId === RESOURCE_TYPE_IDS.OBS_WORDS_LINKS && obsQuoteFilter) {
+      if (obsQuoteFilter.sourceIds?.length) {
+        const idSet = new Set(obsQuoteFilter.sourceIds)
+        const links = filteredByReference.filter((l) => idSet.has(l.id))
+        return { displayLinks: links, hasMatches: links.length > 0 }
+      }
+      const q = obsQuoteFilter.quote?.trim().toLowerCase() ?? ''
+      const occ = obsQuoteFilter.occurrence ?? 1
       const match = filteredByReference.find(
         (l) =>
           (obsQuoteFilter.rowId && l.id === obsQuoteFilter.rowId) ||
-          (l.origWords?.trim().toLowerCase() === obsQuoteFilter.quote.trim().toLowerCase() &&
-            Number.parseInt(String(l.occurrence ?? '1'), 10) === obsQuoteFilter.occurrence)
+          (l.origWords?.trim().toLowerCase() === q && Number.parseInt(String(l.occurrence ?? '1'), 10) === occ)
       )
       return { displayLinks: match ? [match] : filteredByReference, hasMatches: !!match }
     }
@@ -555,6 +567,7 @@ export function WordsLinksViewer({
           quote,
           occurrence: Number.isFinite(occRaw) ? occRaw : 1,
           rowId: link.id,
+          kind: 'twl',
         },
       })
       return
@@ -606,15 +619,26 @@ export function WordsLinksViewer({
         if (currentRef.book !== 'obs' || h.storyNumber !== currentRef.chapter) return
         const isObsStoryMode = navigationMode === 'chapter'
         if (!isObsStoryMode && h.frameNumber !== currentRef.verse) return
-        // TN click → this viewer has no relevant entry; clear any existing filter
+        if (h.overlappingSourceIds?.length) {
+          setObsQuoteFilter({
+            sourceIds: h.overlappingSourceIds,
+            wordIndex: h.wordIndex,
+            quote: h.quote,
+            occurrence: h.occurrence,
+            rowId: h.rowId,
+          })
+          const first = filteredByReference.find((l) => h.overlappingSourceIds!.includes(l.id))
+          setSelectedLink(first?.id ?? null)
+          return
+        }
+        // TN-only legacy click → this viewer has no relevant entry
         if (h.kind === 'tn') {
           setObsQuoteFilter(null)
           setSelectedLink(null)
           return
         }
-        // Set the filter — displayLinks will narrow to just this entry
+        if (h.quote === undefined || h.occurrence === undefined) return
         setObsQuoteFilter({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId })
-        // Also mark the entry as selected so the card renders in its selected style
         if (h.rowId && filteredByReference.some((l) => l.id === h.rowId)) {
           setSelectedLink(h.rowId)
           return
@@ -691,7 +715,9 @@ export function WordsLinksViewer({
         <TokenFilterBanner
           tokenFilter={{
             semanticId: '',
-            content: obsQuoteFilter.quote,
+            content:
+              obsQuoteFilter.quote?.trim() ||
+              (obsQuoteFilter.wordIndex != null ? `Word ${obsQuoteFilter.wordIndex + 1}` : 'Frame selection'),
             alignedSemanticIds: [],
             timestamp: 0,
           }}

@@ -575,17 +575,31 @@ function isObsFrameHighlightSignal(content: unknown): content is ObsFrameHighlig
   const h = message.highlight
   if (typeof h.storyNumber !== 'number') return false
   if (typeof h.frameNumber !== 'number') return false
-  if (typeof h.quote !== 'string') return false
-  if (typeof h.occurrence !== 'number') return false
+  const hasWordPick = Array.isArray(h.overlappingSourceIds) && h.overlappingSourceIds.length > 0
+  const hasLegacy =
+    typeof h.quote === 'string' && typeof h.occurrence === 'number'
+  if (!hasWordPick && !hasLegacy) return false
+  if (hasWordPick) {
+    for (const id of h.overlappingSourceIds!) {
+      if (typeof id !== 'string') return false
+    }
+    if (h.wordIndex !== undefined && typeof h.wordIndex !== 'number') return false
+  }
   if (h.rowId !== undefined && typeof h.rowId !== 'string') return false
+  if (h.kind !== undefined && h.kind !== 'tn' && h.kind !== 'twl') return false
   return true
 }
 
 function handleObsFrameHighlightSignal(message: { content: ObsFrameHighlightSignal }) {
   const signal = message.content as ObsFrameHighlightSignal
   if (signal.highlight) {
+    const h = signal.highlight
+    const detail =
+      h.overlappingSourceIds && h.overlappingSourceIds.length > 0
+        ? `ids [${h.overlappingSourceIds.join(', ')}]`
+        : `"${h.quote ?? ''}" (occ ${h.occurrence ?? '?'})`
     console.log(
-      `[OBS Frame Highlight] ${signal.sourceResourceId} → story ${signal.highlight.storyNumber} frame ${signal.highlight.frameNumber}: "${signal.highlight.quote}" (occ ${signal.highlight.occurrence})`
+      `[OBS Frame Highlight] ${signal.sourceResourceId} → story ${h.storyNumber} frame ${h.frameNumber}: ${detail}`
     )
   } else {
     console.log(`[OBS Frame Highlight] ${signal.sourceResourceId} cleared`)
@@ -619,6 +633,8 @@ function isObsFrameQuotesSignal(content: unknown): content is ObsFrameQuotesSign
     if (q.kind !== 'tn' && q.kind !== 'twl') return false
     if (typeof q.quote !== 'string') return false
     if (typeof q.occurrence !== 'number') return false
+    if (q.startWord !== undefined && typeof q.startWord !== 'number') return false
+    if (q.endWord !== undefined && typeof q.endWord !== 'number') return false
   }
   if (typeof message.timestamp !== 'number') return false
   return true

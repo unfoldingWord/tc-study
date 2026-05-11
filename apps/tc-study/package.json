@@ -16,7 +16,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "test": "bun test src/lib/obs/highlightFrameText.test.ts src/utils/readRoutes.test.ts",
+    "test": "bun test src/lib/obs/highlightFrameText.test.ts src/lib/obs/obsWordTokens.test.ts src/lib/obs/enrichObsFrameQuotes.test.ts src/lib/obs/highlightFrameWords.test.ts src/utils/readRoutes.test.ts",
     "deploy": "bash scripts/deploy.sh",
     "deploy:quick": "node scripts/write-app-version.cjs && node scripts/set-deploy-version.cjs \"bun run build:skip-check\" && bunx wrangler pages deploy dist --project-name=tc-study --branch=master",
     "deploy:cf": "bash scripts/deploy.sh",

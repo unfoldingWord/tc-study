@@ -107,8 +107,15 @@ export function CombinedHelpsViewer({
   const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
   const [verseFilter, setVerseFilter] = useState<{ chapter: number; verse?: number; timestamp: number } | null>(null)
-  // OBS-only: filter to the single entry whose quote was clicked in the OBS frame text
-  const [obsQuoteFilter, setObsQuoteFilter] = useState<{ quote: string; occurrence: number; rowId?: string; kind?: 'tn' | 'twl' } | null>(null)
+  // OBS-only: filter by frame quote click (legacy substring or word overlap via source ids)
+  const [obsQuoteFilter, setObsQuoteFilter] = useState<{
+    quote?: string
+    occurrence?: number
+    rowId?: string
+    kind?: 'tn' | 'twl'
+    sourceIds?: string[]
+    wordIndex?: number
+  } | null>(null)
   const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(null)
   const [tnDepsReady, setTnDepsReady] = useState(false)
   const [twlDepsReady, setTwlDepsReady] = useState(false)
@@ -555,15 +562,21 @@ export function CombinedHelpsViewer({
   }, [resourceId])
 
   const { displayNotes, hasNoteMatches } = useMemo(() => {
-    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching note
+    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching note(s)
     if (helpsScope === 'obs' && obsQuoteFilter) {
-      // TWL click → hide all notes
+      if (obsQuoteFilter.sourceIds?.length) {
+        const idSet = new Set(obsQuoteFilter.sourceIds)
+        const notes = notesWithAlignedTokens.filter((n) => idSet.has(n.id))
+        return { displayNotes: notes, hasNoteMatches: notes.length > 0 }
+      }
+      // TWL-only legacy click → hide all notes
       if (obsQuoteFilter.kind === 'twl') return { displayNotes: [], hasNoteMatches: false }
+      const q = obsQuoteFilter.quote?.trim().toLowerCase() ?? ''
+      const occ = obsQuoteFilter.occurrence ?? 1
       const match = notesWithAlignedTokens.find(
         (n) =>
           (obsQuoteFilter.rowId && n.id === obsQuoteFilter.rowId) ||
-          (n.quote?.trim().toLowerCase() === obsQuoteFilter.quote.trim().toLowerCase() &&
-            Number.parseInt(String(n.occurrence ?? '1'), 10) === obsQuoteFilter.occurrence)
+          (n.quote?.trim().toLowerCase() === q && Number.parseInt(String(n.occurrence ?? '1'), 10) === occ)
       )
       return { displayNotes: match ? [match] : notesWithAlignedTokens, hasNoteMatches: !!match }
     }
@@ -614,15 +627,21 @@ export function CombinedHelpsViewer({
   }, [notesWithAlignedTokens, tokenFilter, verseFilter, obsQuoteFilter, helpsScope, bookCodeLower])
 
   const { displayLinks, hasLinkMatches } = useMemo(() => {
-    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching link
+    // OBS quote filter: user clicked a quoted span in the OBS frame → show only the matching link(s)
     if (helpsScope === 'obs' && obsQuoteFilter) {
-      // TN click → hide all links
+      if (obsQuoteFilter.sourceIds?.length) {
+        const idSet = new Set(obsQuoteFilter.sourceIds)
+        const links = filteredByReference.filter((l) => idSet.has(l.id))
+        return { displayLinks: links, hasLinkMatches: links.length > 0 }
+      }
+      // TN-only legacy click → hide all links
       if (obsQuoteFilter.kind === 'tn') return { displayLinks: [], hasLinkMatches: false }
+      const q = obsQuoteFilter.quote?.trim().toLowerCase() ?? ''
+      const occ = obsQuoteFilter.occurrence ?? 1
       const match = filteredByReference.find(
         (l) =>
           (obsQuoteFilter.rowId && l.id === obsQuoteFilter.rowId) ||
-          (l.origWords?.trim().toLowerCase() === obsQuoteFilter.quote.trim().toLowerCase() &&
-            Number.parseInt(String(l.occurrence ?? '1'), 10) === obsQuoteFilter.occurrence)
+          (l.origWords?.trim().toLowerCase() === q && Number.parseInt(String(l.occurrence ?? '1'), 10) === occ)
       )
       return { displayLinks: match ? [match] : filteredByReference, hasLinkMatches: !!match }
     }
@@ -787,10 +806,24 @@ export function CombinedHelpsViewer({
         if (currentRef.book !== 'obs' || h.storyNumber !== currentRef.chapter) return
         const isObsStoryMode = navigationMode === 'chapter'
         if (!isObsStoryMode && h.frameNumber !== currentRef.verse) return
-        // Set the filter — displayNotes/displayLinks will narrow to just this entry.
-        // Include kind so each list knows whether to show or hide itself entirely.
+        if (h.overlappingSourceIds?.length) {
+          setObsQuoteFilter({
+            sourceIds: h.overlappingSourceIds,
+            wordIndex: h.wordIndex,
+            quote: h.quote,
+            occurrence: h.occurrence,
+            rowId: h.rowId,
+            kind: h.kind,
+          })
+          const firstTn = notesWithAlignedTokens.find((n) => h.overlappingSourceIds!.includes(n.id))
+          const firstTwl = filteredByReference.find((l) => h.overlappingSourceIds!.includes(l.id))
+          setSelectedNoteId(firstTn?.id ?? null)
+          setSelectedLinkId(firstTwl?.id ?? null)
+          return
+        }
+        if (h.quote === undefined || h.occurrence === undefined) return
+        // Legacy substring pick — include kind so each list knows whether to show or hide itself entirely.
         setObsQuoteFilter({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId, kind: h.kind })
-        // Also mark the entry as selected for visual feedback (search unfiltered lists)
         if (h.rowId) {
           if (notesWithAlignedTokens.some((n) => n.id === h.rowId)) {
             setSelectedNoteId(h.rowId)
@@ -991,6 +1024,7 @@ export function CombinedHelpsViewer({
             quote,
             occurrence,
             rowId: note.id,
+            kind: 'tn',
           },
         })
         return
@@ -1079,6 +1113,7 @@ export function CombinedHelpsViewer({
             quote,
             occurrence,
             rowId: link.id,
+            kind: 'twl',
           },
         })
         return
@@ -1148,7 +1183,9 @@ export function CombinedHelpsViewer({
         <TokenFilterBanner
           tokenFilter={{
             semanticId: '',
-            content: obsQuoteFilter.quote,
+            content:
+              obsQuoteFilter.quote?.trim() ||
+              (obsQuoteFilter.wordIndex != null ? `Word ${obsQuoteFilter.wordIndex + 1}` : 'Frame selection'),
             alignedSemanticIds: [],
             timestamp: 0,
           }}

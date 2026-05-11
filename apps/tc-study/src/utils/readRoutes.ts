@@ -24,6 +24,17 @@ export type ReadRouteTail = {
   navRef: string
 }
 
+/**
+ * Partial deep-link hint: URL has resource type and optional nav type but no nav ref.
+ * Used to set navigation scope (and optionally mode) without overriding the current reference.
+ * e.g. `/read/en/obs` → `{ resourceType: 'obs' }`
+ * e.g. `/read/en/obs/story` → `{ resourceType: 'obs', navType: 'story' }`
+ */
+export type PartialRouteHint = {
+  resourceType: ReadResourceType
+  navType?: string
+}
+
 /** URL-safe slug for passage set matching (id or name). */
 export function slugifyReadNavSegment(s: string): string {
   return String(s || '')
