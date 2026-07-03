@@ -109,7 +109,8 @@ function App() {
         {/* <NavigationBridgeProvider> */}
           <Routes>
             <Route path="/" element={<Layout />}>
-              <Route index element={<Suspense fallback={<PageLoader />}><Home /></Suspense>} />
+              <Route index element={<Navigate to="/read" replace />} />
+              <Route path="home" element={<Suspense fallback={<PageLoader />}><Home /></Suspense>} />
               <Route path="library" element={<Suspense fallback={<PageLoader />}><Library /></Suspense>} />
               <Route path="collections" element={<Suspense fallback={<PageLoader />}><Collections /></Suspense>} />
               <Route path="passage-sets" element={<Suspense fallback={<PageLoader />}><PassageSets /></Suspense>} />

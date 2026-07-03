@@ -3,12 +3,12 @@ import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 const navItems = [
-  { name: 'Home', path: '/', icon: Home },
+  { name: 'Read', path: '/read', icon: BookOpenCheck },
+  { name: 'Home', path: '/home', icon: Home },
   { name: 'Library', path: '/library', icon: Library },
   { name: 'Collections', path: '/collections', icon: FolderOpen },
   { name: 'Passage Sets', path: '/passage-sets', icon: FileText },
   { name: 'Studio', path: '/studio', icon: Clapperboard },
-  { name: 'Read', path: '/read', icon: BookOpenCheck },
   { name: 'Settings', path: '/settings', icon: Settings },
 ]
 
@@ -17,11 +17,7 @@ export default function Layout() {
   const location = useLocation()
   
   // Find current active nav item
-  const activeNavItem = navItems.find(item => 
-    item.path === '/' 
-      ? location.pathname === '/'
-      : location.pathname.startsWith(item.path)
-  ) || navItems[0]
+  const activeNavItem = navItems.find(item => location.pathname.startsWith(item.path)) || navItems[0]
 
   // Hide app bar on read page for immersive reading experience
   const isReadPage = location.pathname.startsWith('/read')
@@ -75,7 +71,6 @@ export default function Layout() {
                     <NavLink
                       key={item.name}
                       to={item.path}
-                      end={item.path === '/'}
                       onClick={() => setIsMenuOpen(false)}
                       className={({ isActive }) =>
                         `flex items-center justify-center py-2 transition-colors ${
