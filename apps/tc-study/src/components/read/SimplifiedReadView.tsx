@@ -400,9 +400,13 @@ export function SimplifiedReadView({
   
   // Language picker: always open on `/read` until the user picks a language (navigates to `/read/:code`)
   const [shouldAutoOpenLanguagePicker, setShouldAutoOpenLanguagePicker] = useState(requireLanguageInUrl)
+  // Track required separately so we can clear it immediately on language selection, preventing
+  // a newly-mounted LanguagePicker (after hasNavigationSource flips) from re-opening due to required=true.
+  const [isLanguagePickerRequired, setIsLanguagePickerRequired] = useState(requireLanguageInUrl)
 
   useEffect(() => {
     setShouldAutoOpenLanguagePicker(requireLanguageInUrl)
+    setIsLanguagePickerRequired(requireLanguageInUrl)
   }, [requireLanguageInUrl])
 
   const suppressUrlSyncRef = useRef(false)
@@ -493,6 +497,13 @@ export function SimplifiedReadView({
             } else {
               console.warn('[read route] Invalid section nav ref', readRouteTail.navRef)
             }
+          } else if (nt === 'chapter') {
+            // Parse "jos 1" → navigate to whole chapter.
+            // navigateToReference will expand to the full chapter range (verse 1 → lastVerse)
+            // once book info is available; NavigationContext re-normalises when books load.
+            const parsed = parseBibleNavRef(readRouteTail.navRef)
+            if (parsed) navigation.navigateToReference({ book: parsed.ref.book, chapter: parsed.ref.chapter, verse: 1 })
+            else console.warn('[read route] Invalid chapter nav ref', readRouteTail.navRef)
           } else {
             const parsed = parseBibleNavRef(readRouteTail.navRef)
             if (parsed) navigation.navigateToReference(parsed.ref)
@@ -909,6 +920,13 @@ export function SimplifiedReadView({
   // Handle language selection - automatically load all tc-ready resources
   const handleLanguageSelected = useCallback(async (languageCode: string) => {
     console.log('📚 Auto-loading all tc-ready resources for language:', languageCode)
+    // Immediately suppress auto-open AND required so that when the LanguagePicker
+    // instance switches (because hasNavigationSource flips to true once resources
+    // start loading), the newly-mounted picker does NOT open a second time.
+    // Both autoOpen and required are checked by useState() on mount, so both
+    // must be false before any new LanguagePicker instance can be created.
+    setShouldAutoOpenLanguagePicker(false)
+    setIsLanguagePickerRequired(false)
     // Track current language for collection management
     setCurrentLanguageCode(languageCode)
     // 🛑 IMPORTANT: Cancel any ongoing downloads from previous language
@@ -1793,7 +1811,7 @@ export function SimplifiedReadView({
               showLanguagePicker={true}
               onLanguageSelected={handleLanguageSelected}
               autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
-              languagePickerRequired={requireLanguageInUrl}
+              languagePickerRequired={isLanguagePickerRequired}
               downloadIndicator={
                 <DownloadIndicator 
                   isDownloading={isBackgroundDownloading}

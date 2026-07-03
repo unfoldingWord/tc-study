@@ -109,14 +109,31 @@ export const useAppStore = create<AppStore>()(
       set((state) => {
         for (const resource of resources) {
           const existing = state.loadedResources[resource.id]
+          const existingVerified = existing?.verifiedIngredients
+
+          // If Phase 1 verification ran before catalog metadata was saved it may have
+          // produced an empty verifiedIngredients list (race condition).  When Phase 2
+          // now supplies real ingredients, reset to undefined so the verification effect
+          // re-runs with the actual ingredient list rather than keeping the stale [].
+          const incomingIngredients: unknown[] | undefined =
+            (resource as any).ingredients ?? (resource as any).contentMetadata?.ingredients
+          const prematureEmptyVerification =
+            existingVerified !== undefined &&
+            existingVerified.length === 0 &&
+            Array.isArray(incomingIngredients) &&
+            incomingIngredients.length > 0
+
           state.loadedResources[resource.id] = {
             ...resource,
             // Preserve runtime-computed verification fields: metadata batch writes may use
             // stale snapshots captured before verification ran, so we must not let them
             // overwrite verifiedIngredients / verifiedRef that were set in the interim.
-            ...(existing?.verifiedIngredients !== undefined
-              ? { verifiedIngredients: existing.verifiedIngredients }
-              : {}),
+            // Exception: prematureEmptyVerification — reset to undefined to trigger re-verify.
+            verifiedIngredients: prematureEmptyVerification
+              ? undefined
+              : existingVerified !== undefined
+                ? existingVerified
+                : resource.verifiedIngredients,
             ...(existing?.verifiedRef !== undefined
               ? { verifiedRef: existing.verifiedRef }
               : {}),

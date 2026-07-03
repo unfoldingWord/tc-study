@@ -287,7 +287,17 @@ export const useNavigationStore = create<NavigationStore>()(
   },
 
   setAvailableBooks: (books: BookInfo[]) => {
-    set({ availableBooks: books })
+    set((state) => {
+      state.availableBooks = books
+      // Re-expand current chapter reference if book info just became available
+      if (state.navigationMode === 'chapter' && state.currentReference.book !== 'obs' && !state.currentReference.endVerse) {
+        const bookInfo = books.find((b) => b.code === state.currentReference.book)
+        if (bookInfo?.verses && state.currentReference.chapter) {
+          const lastVerse = bookInfo.verses[state.currentReference.chapter - 1] ?? 1
+          state.currentReference = { ...state.currentReference, verse: 1, endVerse: lastVerse }
+        }
+      }
+    })
     console.log('📚 Available books updated:', books.length, 'books')
   },
 
@@ -298,6 +308,17 @@ export const useNavigationStore = create<NavigationStore>()(
         state.availableBooks[bookIndex].verses = verses
         state.availableBooks[bookIndex].chapters = verses.length
         console.log('📊 Updated verse counts for', bookCode, ':', verses.length, 'chapters')
+        // Re-expand current chapter reference if this book just got verse counts
+        if (
+          state.navigationMode === 'chapter' &&
+          state.currentReference.book === bookCode &&
+          state.currentReference.book !== 'obs' &&
+          !state.currentReference.endVerse &&
+          state.currentReference.chapter
+        ) {
+          const lastVerse = verses[state.currentReference.chapter - 1] ?? 1
+          state.currentReference = { ...state.currentReference, verse: 1, endVerse: lastVerse }
+        }
       }
     })
   },

@@ -50,6 +50,10 @@ export function LanguagePicker({
 }: LanguagePickerProps) {
   const [isOpen, setIsOpen] = useState(() => autoOpen || required)
 
+  // Re-open when autoOpen or required transitions false → true after mount.
+  // The parent (SimplifiedReadView) is responsible for setting both to false
+  // before any LanguagePicker instance remounts, so this effect only fires
+  // for intentional re-opens (e.g. user navigates back to /read).
   useEffect(() => {
     if (autoOpen || required) {
       setIsOpen(true)
