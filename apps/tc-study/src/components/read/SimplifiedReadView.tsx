@@ -412,6 +412,13 @@ export function SimplifiedReadView({
   const suppressUrlSyncRef = useRef(false)
   const readRouteAppliedSigRef = useRef<string | null>(null)
   const pendingSectionRef = useRef<{ book: string; section1Based: number } | null>(null)
+  // Keys we already attempted to verify when ingredients were unavailable.
+  // Prevents the verification effect from re-running forever without writing
+  // a hiding `verifiedIngredients = []` sentinel (fresh-session fail-open).
+  const verificationAttemptedKeysRef = useRef<Set<string>>(new Set())
+  // Tracks which URL language the auto-load effect (or an in-place picker load)
+  // has already handled, so we do not start duplicate catalog loads.
+  const autoLoadedLanguageForUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!readRouteTail) readRouteAppliedSigRef.current = null
@@ -541,12 +548,31 @@ export function SimplifiedReadView({
   //   the same resource.
   useEffect(() => {
     // Include only book-structured scripture resources that have NEVER been through the
-    // verification pipeline. `verifiedIngredients === undefined` (not just falsy) is the
-    // sentinel: once written (even as []) the resource is permanently excluded from future
-    // runs, preventing the Immer-write → loadedResources-change → effect-re-run loop.
+    // verification pipeline. `verifiedIngredients === undefined` (not just falsy) means
+    // not yet verified. Resources we already attempted with no ingredients available are
+    // tracked in verificationAttemptedKeysRef so we don't loop, but we do NOT write
+    // `verifiedIngredients = []` in that case — an empty sentinel would hide every book
+    // tab via resourceSupportsBook (fresh-session bug).
     //
     // Exclude OBS resources explicitly: "Open Bible Stories" contains the word "bible" and
     // would otherwise match the subject substring check, causing unnecessary write cycles.
+    const attempted = verificationAttemptedKeysRef.current
+
+    // If a previously-skipped resource later gains ingredients (Phase 2), allow retry.
+    for (const r of Object.values(loadedResources)) {
+      if (!r) continue
+      const k = r.key ?? r.id
+      if (!attempted.has(k)) continue
+      if (r.verifiedIngredients !== undefined) {
+        attempted.delete(k)
+        continue
+      }
+      const ings = r.ingredients ?? (r as any).contentMetadata?.ingredients
+      if (Array.isArray(ings) && ings.length > 0) {
+        attempted.delete(k)
+      }
+    }
+
     const toProcess = Object.values(loadedResources).filter((r): r is ResourceInfo => {
       if (!r) return false
       const subjectLower = String(r.subject ?? '').toLowerCase()
@@ -567,7 +593,11 @@ export function SimplifiedReadView({
         (subjectLower.includes('bible') && !subjectLower.includes('open bible stories'))
       if (!isBookStructured) return false
       // Sentinel: undefined = never processed; [] or non-empty = already attempted
-      return r.verifiedIngredients === undefined
+      if (r.verifiedIngredients !== undefined) return false
+      const k = r.key ?? r.id
+      // Already tried with no ingredients available — wait for Phase 2 to clear the key
+      if (attempted.has(k)) return false
+      return true
     })
     if (!toProcess.length) return
 
@@ -588,38 +618,48 @@ export function SimplifiedReadView({
           // Pass the prod ref so the verifier skips an extra findRepository call
           knownRef = md?.release?.tag_name ?? undefined
         } catch {
-          if (!ings) ings = []
+          // Keep whatever ingredients we already had from Phase 1 / resource
+        }
+        // No ingredients available yet (fresh IndexedDB, Phase 2 still pending).
+        // Skip writing a hiding empty sentinel; mark attempted so we don't loop.
+        if (!ings || !ings.length) {
+          return { k, skipped: true as const }
         }
         // Step 2: verify ingredients against the published ref (one network call: git/trees)
         // `verifiedIngredients` is initialised to `ings` as the fail-open value.
-        let verifiedIngredients: ResourceInfo['ingredients'] = ings ?? []
+        let verifiedIngredients: ResourceInfo['ingredients'] = ings
         let verifiedRef: string | undefined
-        if (ings && ings.length) {
-          try {
-            const resourceForVerify = { ...r, ingredients: ings } as ResourceInfo
-            const result = await verifyResourceContents(resourceForVerify, door43Client, knownRef)
-            if (result.treeFetched) {
-              verifiedIngredients = result.verifiedIngredients
-              verifiedRef = result.verifiedRef
-            }
-          } catch {
-            // fail-open — verifiedIngredients stays as full ingredient list
+        try {
+          const resourceForVerify = { ...r, ingredients: ings } as ResourceInfo
+          const result = await verifyResourceContents(resourceForVerify, door43Client, knownRef)
+          if (result.treeFetched) {
+            verifiedIngredients = result.verifiedIngredients
+            verifiedRef = result.verifiedRef
           }
+        } catch {
+          // fail-open — verifiedIngredients stays as full ingredient list
         }
-        return { k, ings, verifiedIngredients, verifiedRef }
+        return { k, ings, verifiedIngredients, verifiedRef, skipped: false as const }
       })
     ).then((results) => {
       if (cancelled) return
       useAppStore.setState((state) => {
-        for (const { k, ings, verifiedIngredients, verifiedRef } of results) {
+        for (const result of results) {
+          const { k } = result
           const r = state.loadedResources[k]
           if (!r) continue
+          if (result.skipped) {
+            // Do not write verifiedIngredients=[] — keep fail-open until ingredients arrive
+            verificationAttemptedKeysRef.current.add(k)
+            continue
+          }
+          const { ings, verifiedIngredients, verifiedRef } = result
           if (ings && ings.length) r.ingredients = ings as typeof r.ingredients
-          // Always write verifiedIngredients (even as []) as a "processed" sentinel so
-          // `r.verifiedIngredients === undefined` is false on the next effect run.
-          // This breaks the Immer write-cycle loop for resources with no ingredients.
-          r.verifiedIngredients = (verifiedIngredients ?? []) as typeof r.verifiedIngredients
+          // Write verifiedIngredients (may be [] only when the published ref truly
+          // has none of the listed books after a successful tree fetch).
+          r.verifiedIngredients = (verifiedIngredients ?? ings) as typeof r.verifiedIngredients
           if (verifiedRef) r.verifiedRef = verifiedRef
+          verificationAttemptedKeysRef.current.delete(k)
         }
       })
     })
@@ -950,6 +990,18 @@ export function SimplifiedReadView({
     } else {
       navigate(`/read/${languageCode}`, { replace: true })
     }
+
+    // Bare `/read` → `/read/:lang/...` crosses distinct route elements in App.tsx and
+    // remounts Read. Do not start the catalog load on this about-to-unmount instance —
+    // the remounted instance's auto-load effect will call handleLanguageSelected once.
+    if (!initialLanguage) {
+      console.log('📚 Navigate-only language pick (await remount auto-load):', languageCode)
+      return
+    }
+
+    // Mark this language as handled so the auto-load effect does not start a second
+    // identical load after the URL param updates (in-place language switch).
+    autoLoadedLanguageForUrlRef.current = languageCode
     
     setIsLoadingResources(true)
     
@@ -1077,7 +1129,10 @@ export function SimplifiedReadView({
         const appliesToScope =
           scopeForType === 'scripture' || scopeForType === 'obs' ? scopeForType : ('shared' as const)
 
-        // Create basic ResourceInfo immediately (no metadata fetch yet)
+        // Create basic ResourceInfo immediately (no metadata fetch yet).
+        // Carry catalog ingredients so book filtering / verification can fail-open
+        // correctly on a fresh session before Phase 2 writes IndexedDB metadata.
+        const catalogIngredients = item.ingredients ?? item.repo?.ingredients
         const basicResourceInfo: ResourceInfo = {
           id: resourceKey,
           key: resourceKey,
@@ -1098,6 +1153,7 @@ export function SimplifiedReadView({
           version: item.release?.tag_name ?? '1.0',
           description: item.description ?? item.repo?.description,
           release: item.release ?? item.catalog?.prod,
+          ingredients: catalogIngredients as ResourceInfo['ingredients'],
           availability: { online: true, offline: false, bundled: false, partial: false },
           locations: [],
           catalogedAt: new Date().toISOString(),
@@ -1411,12 +1467,11 @@ export function SimplifiedReadView({
     } finally {
       setIsLoadingResources(false)
     }
-  }, [catalogManager, resourceTypeRegistry, assignResourceToPanel, setActiveResourceInPanel, addResource, getPanel, removeResourceFromPanel, navigate, stopDownload, viewerRegistry])
+  }, [catalogManager, resourceTypeRegistry, assignResourceToPanel, setActiveResourceInPanel, addResource, getPanel, removeResourceFromPanel, navigate, stopDownload, viewerRegistry, initialLanguage])
   
   // Auto-load resources when the URL includes a language segment (once per URL language).
   // handleLanguageSelected must NOT depend on volatile flags like isBackgroundDownloading — otherwise its
   // identity churn retriggers this effect and repeatedly reloads panels (infinite loop on Read).
-  const autoLoadedLanguageForUrlRef = useRef<string | null>(null)
   useEffect(() => {
     if (!initialLanguage) return
     if (autoLoadedLanguageForUrlRef.current === initialLanguage) return
