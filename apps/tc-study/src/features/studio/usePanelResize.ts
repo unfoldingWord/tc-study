@@ -45,26 +45,34 @@ export function usePanelResize(initialWidth = 50) {
     if (!isResizingPanels) return
 
     const isVertical = resizeStartLayout === 'vertical'
-    const container = document.querySelector(RESIZE_CONTAINER_SELECTOR)
+    const container =
+      resizeContainerRef.current ?? document.querySelector(RESIZE_CONTAINER_SELECTOR)
     if (!container) return
 
-    const containerRect = container.getBoundingClientRect()
+    const containerEl = container as HTMLElement
+    const prevContainerOverscroll = containerEl.style.overscrollBehavior
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior
 
     const handleMove = (clientX: number, clientY: number) => {
+      const rect = container.getBoundingClientRect()
       const percentage = isVertical
-        ? ((clientY - containerRect.top) / containerRect.height) * 100
-        : ((clientX - containerRect.left) / containerRect.width) * 100
+        ? ((clientY - rect.top) / rect.height) * 100
+        : ((clientX - rect.left) / rect.width) * 100
       setPanel1Width(Math.max(10, Math.min(90, percentage)))
     }
 
     const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY)
     const handleTouchMove = (e: TouchEvent) => {
+      // Non-passive + preventDefault blocks mobile pull-to-refresh during drag
+      e.preventDefault()
       if (e.touches.length > 0) {
         handleMove(e.touches[0].clientX, e.touches[0].clientY)
       }
     }
     const handleEnd = () => setIsResizingPanels(false)
 
+    containerEl.style.overscrollBehavior = 'none'
+    document.documentElement.style.overscrollBehavior = 'none'
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleEnd)
     document.addEventListener('touchmove', handleTouchMove, { passive: false })
@@ -74,6 +82,8 @@ export function usePanelResize(initialWidth = 50) {
     document.body.style.touchAction = 'none'
 
     return () => {
+      containerEl.style.overscrollBehavior = prevContainerOverscroll
+      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleEnd)
       document.removeEventListener('touchmove', handleTouchMove)

@@ -4,6 +4,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+const RESIZE_CONTAINER_SELECTOR = '.panels-resize-container'
+
+function detectLayoutOrientation(): 'vertical' | 'horizontal' {
+  const container = document.querySelector(RESIZE_CONTAINER_SELECTOR)
+  if (!container) return 'horizontal'
+  const style = window.getComputedStyle(container)
+  return style.flexDirection === 'column' ? 'vertical' : 'horizontal'
+}
+
 export function useReadPanelResize(initialPercent = 50) {
   const [panel1Width, setPanel1Width] = useState(initialPercent)
   const [isResizingPanels, setIsResizingPanels] = useState(false)
@@ -11,12 +20,7 @@ export function useReadPanelResize(initialPercent = 50) {
   const resizeContainerRef = useRef<HTMLDivElement>(null)
 
   const beginResize = useCallback(() => {
-    const container = document.querySelector('.panels-resize-container')
-    if (container) {
-      const style = window.getComputedStyle(container)
-      const isVertical = style.flexDirection === 'column'
-      setResizeStartLayout(isVertical ? 'vertical' : 'horizontal')
-    }
+    setResizeStartLayout(detectLayoutOrientation())
     setIsResizingPanels(true)
   }, [])
 
@@ -39,51 +43,53 @@ export function useReadPanelResize(initialPercent = 50) {
   useEffect(() => {
     if (!isResizingPanels) return
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const container = document.querySelector('.panels-resize-container')
-      if (!container) return
+    const container =
+      resizeContainerRef.current ?? document.querySelector(RESIZE_CONTAINER_SELECTOR)
+    if (!container) return
 
+    const isVertical = resizeStartLayout === 'vertical'
+    const containerEl = container as HTMLElement
+    const prevContainerOverscroll = containerEl.style.overscrollBehavior
+    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior
+
+    const handleMove = (clientX: number, clientY: number) => {
       const rect = container.getBoundingClientRect()
-
-      if (resizeStartLayout === 'horizontal') {
-        const newPercent = ((e.clientX - rect.left) / rect.width) * 100
-        setPanel1Width(Math.max(20, Math.min(80, newPercent)))
-      } else {
-        const newPercent = ((e.clientY - rect.top) / rect.height) * 100
-        setPanel1Width(Math.max(20, Math.min(80, newPercent)))
-      }
+      const newPercent = isVertical
+        ? ((clientY - rect.top) / rect.height) * 100
+        : ((clientX - rect.left) / rect.width) * 100
+      setPanel1Width(Math.max(20, Math.min(80, newPercent)))
     }
 
+    const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY)
     const handleTouchMove = (e: TouchEvent) => {
-      const container = document.querySelector('.panels-resize-container')
-      if (!container) return
-
-      const rect = container.getBoundingClientRect()
-      const touch = e.touches[0]
-
-      if (resizeStartLayout === 'horizontal') {
-        const newPercent = ((touch.clientX - rect.left) / rect.width) * 100
-        setPanel1Width(Math.max(20, Math.min(80, newPercent)))
-      } else {
-        const newPercent = ((touch.clientY - rect.top) / rect.height) * 100
-        setPanel1Width(Math.max(20, Math.min(80, newPercent)))
+      // Non-passive + preventDefault blocks mobile pull-to-refresh during drag
+      e.preventDefault()
+      if (e.touches.length > 0) {
+        handleMove(e.touches[0].clientX, e.touches[0].clientY)
       }
     }
+    const handleEnd = () => setIsResizingPanels(false)
 
-    const handleMouseUp = () => {
-      setIsResizingPanels(false)
-    }
-
+    containerEl.style.overscrollBehavior = 'none'
+    document.documentElement.style.overscrollBehavior = 'none'
     document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('touchmove', handleTouchMove)
-    document.addEventListener('mouseup', handleMouseUp)
-    document.addEventListener('touchend', handleMouseUp)
+    document.addEventListener('mouseup', handleEnd)
+    document.addEventListener('touchmove', handleTouchMove, { passive: false })
+    document.addEventListener('touchend', handleEnd)
+    document.body.style.cursor = isVertical ? 'ns-resize' : 'ew-resize'
+    document.body.style.userSelect = 'none'
+    document.body.style.touchAction = 'none'
 
     return () => {
+      containerEl.style.overscrollBehavior = prevContainerOverscroll
+      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll
       document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleEnd)
       document.removeEventListener('touchmove', handleTouchMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-      document.removeEventListener('touchend', handleMouseUp)
+      document.removeEventListener('touchend', handleEnd)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.body.style.touchAction = ''
     }
   }, [isResizingPanels, resizeStartLayout])
 
