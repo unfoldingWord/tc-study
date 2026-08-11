@@ -63,7 +63,7 @@ function ReadPanelsArea(props: {
   isResizingPanels: boolean
   resizeContainerRef: RefObject<HTMLDivElement | null>
   handlePanelDividerMouseDown: (e: MouseEvent) => void
-  handlePanelDividerTouchStart: (e: TouchEvent) => void
+  handlePanelDividerTouchStart: () => void
   filteredPanel1Keys: string[]
   filteredPanel2Keys: string[]
   filteredPanel1Resources: ReturnType<typeof useFilteredReadPanelKeys>['filteredPanel1Resources']

@@ -24,7 +24,7 @@ function StudioPanelsArea(props: {
   isResizingPanels: boolean
   resizeContainerRef: RefObject<HTMLDivElement | null>
   handlePanelDividerMouseDown: (e: MouseEvent) => void
-  handlePanelDividerTouchStart: (e: TouchEvent) => void
+  handlePanelDividerTouchStart: () => void
   panel1: { name?: string } | undefined
   panel2: { name?: string } | undefined
   panel1Resources: ReturnType<typeof useStudioResources>
