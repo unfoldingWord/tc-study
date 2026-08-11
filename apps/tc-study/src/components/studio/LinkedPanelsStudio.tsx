@@ -4,7 +4,7 @@
  */
 
 import { LinkedPanelsContainer } from '@bt-synergy/resource-panels'
-import { useCallback, useState, type DragEvent, type MouseEvent, type RefObject, type TouchEvent } from 'react'
+import { useCallback, useState, type DragEvent, type MouseEvent, type RefObject } from 'react'
 import { EntryResourceModal } from '../common/EntryResourceModal'
 import { TabDnDProvider, useTabDnD } from '../../features/dnd/TabDnDContext'
 import { useStudioDnD } from '../../features/studio/useStudioDnD'

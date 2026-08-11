@@ -14,7 +14,6 @@ import {
   useState,
   type MouseEvent,
   type RefObject,
-  type TouchEvent,
 } from 'react'
 import {
   useCurrentReference,
