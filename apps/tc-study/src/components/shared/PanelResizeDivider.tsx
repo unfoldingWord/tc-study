@@ -1,9 +1,9 @@
-import { useEffect, useRef, type MouseEvent, type TouchEvent as ReactTouchEvent } from 'react'
+import { useEffect, useRef, type MouseEvent } from 'react'
 
 interface PanelResizeDividerProps {
   isResizing: boolean
   onMouseDown: (e: MouseEvent) => void
-  onTouchStart: (e: ReactTouchEvent) => void
+  onTouchStart: () => void
 }
 
 export function PanelResizeDivider({
@@ -23,7 +23,7 @@ export function PanelResizeDivider({
 
     const handleTouchStart = (e: TouchEvent) => {
       e.preventDefault()
-      onTouchStartRef.current(e as unknown as ReactTouchEvent)
+      onTouchStartRef.current()
     }
 
     node.addEventListener('touchstart', handleTouchStart, { passive: false })

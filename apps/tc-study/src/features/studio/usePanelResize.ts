@@ -33,13 +33,9 @@ export function usePanelResize(initialWidth = 50) {
     [beginResize]
   )
 
-  const handlePanelDividerTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      e.preventDefault()
-      beginResize()
-    },
-    [beginResize]
-  )
+  const handlePanelDividerTouchStart = useCallback(() => {
+    beginResize()
+  }, [beginResize])
 
   useEffect(() => {
     if (!isResizingPanels) return
