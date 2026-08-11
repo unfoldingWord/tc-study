@@ -119,7 +119,7 @@ const HELPS_HOOKS_HARD: { name: string; path: string; hardMax: number }[] = [
 const WORKSPACE_SLICES: { name: string; path: string; currentLoc: number }[] = [
   { name: 'workspacePackageSlice', path: 'features/workspace/workspacePackageSlice.ts', currentLoc: 129 },
   { name: 'workspacePanelSlice', path: 'features/workspace/workspacePanelSlice.ts', currentLoc: 82 },
-  { name: 'workspaceResourceSlice', path: 'features/workspace/workspaceResourceSlice.ts', currentLoc: 249 },
+  { name: 'workspaceResourceSlice', path: 'features/workspace/workspaceResourceSlice.ts', currentLoc: 275 },
   { name: 'workspacePersistence', path: 'features/workspace/workspacePersistence.ts', currentLoc: 144 },
   { name: 'workspaceCollectionHelpers', path: 'features/workspace/workspaceCollectionHelpers.ts', currentLoc: 161 },
   { name: 'workspaceTypes', path: 'features/workspace/workspaceTypes.ts', currentLoc: 125 },

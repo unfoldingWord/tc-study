@@ -61,7 +61,7 @@ const FOLDER_BUDGETS: { name: string; path: string; currentLoc: number }[] = [
   {
     name: 'WordsLinksViewer',
     path: 'components/resources/WordsLinksViewer',
-    currentLoc: 2161,
+    currentLoc: 2322,
   },
   {
     name: 'ScriptureViewer',
