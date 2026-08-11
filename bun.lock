@@ -312,6 +312,9 @@
     "packages/catalog-adapter-indexeddb": {
       "name": "@bt-synergy/catalog-adapter-indexeddb",
       "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/catalog-manager": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^20.10.0",
         "typescript": "^5.3.3",
