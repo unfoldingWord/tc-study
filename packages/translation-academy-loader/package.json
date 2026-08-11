@@ -19,6 +19,8 @@
   "author": "BT-Synergy",
   "license": "MIT",
   "dependencies": {
+    "@bt-synergy/catalog-manager": "workspace:*",
+    "@bt-synergy/door43-api": "workspace:*",
     "@bt-synergy/resource-catalog": "workspace:*",
     "jszip": "^3.10.1"
   },

@@ -20,9 +20,12 @@
   "author": "BT-Synergy",
   "license": "MIT",
   "dependencies": {
+    "@bt-synergy/catalog-manager": "workspace:*",
+    "@bt-synergy/door43-api": "workspace:*",
+    "@bt-synergy/resource-catalog": "workspace:*",
+    "@bt-synergy/resource-parsers": "workspace:*",
     "@bt-synergy/resource-types": "workspace:*",
     "@bt-synergy/usfm-processor": "workspace:*",
-    "@bt-synergy/resource-catalog": "workspace:*",
     "jszip": "^3.10.1"
   },
   "peerDependencies": {
@@ -34,4 +37,3 @@
     "typescript": "^5.0.0"
   }
 }
-

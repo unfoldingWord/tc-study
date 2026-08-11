@@ -279,6 +279,9 @@
     "packages/cache-adapter-indexeddb": {
       "name": "@bt-synergy/cache-adapter-indexeddb",
       "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/resource-cache": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^20.10.0",
         "typescript": "^5.3.3",
@@ -290,6 +293,9 @@
     "packages/cache-adapter-memory": {
       "name": "@bt-synergy/cache-adapter-memory",
       "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/resource-cache": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^20.10.0",
         "typescript": "^5.3.3",
@@ -301,6 +307,9 @@
     "packages/cache-adapter-sqlite": {
       "name": "@bt-synergy/cache-adapter-sqlite",
       "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/resource-cache": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^20.10.0",
         "typescript": "^5.3.3",
@@ -326,6 +335,9 @@
     "packages/catalog-adapter-memory": {
       "name": "@bt-synergy/catalog-adapter-memory",
       "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/resource-catalog": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^20.10.0",
         "typescript": "^5.3.3",
@@ -478,6 +490,9 @@
     "packages/package-storage": {
       "name": "@bt-synergy/package-storage",
       "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/resource-catalog": "workspace:*",
+      },
       "devDependencies": {
         "@types/node": "^20.10.0",
         "typescript": "^5.3.3",
@@ -635,7 +650,10 @@
       "name": "@bt-synergy/scripture-loader",
       "version": "1.0.0",
       "dependencies": {
+        "@bt-synergy/catalog-manager": "workspace:*",
+        "@bt-synergy/door43-api": "workspace:*",
         "@bt-synergy/resource-catalog": "workspace:*",
+        "@bt-synergy/resource-parsers": "workspace:*",
         "@bt-synergy/resource-types": "workspace:*",
         "@bt-synergy/usfm-processor": "workspace:*",
         "jszip": "^3.10.1",
@@ -718,6 +736,8 @@
       "name": "@bt-synergy/translation-academy-loader",
       "version": "1.0.0",
       "dependencies": {
+        "@bt-synergy/catalog-manager": "workspace:*",
+        "@bt-synergy/door43-api": "workspace:*",
         "@bt-synergy/resource-catalog": "workspace:*",
         "jszip": "^3.10.1",
       },
@@ -733,6 +753,8 @@
       "name": "@bt-synergy/translation-notes-loader",
       "version": "0.1.0",
       "dependencies": {
+        "@bt-synergy/catalog-manager": "workspace:*",
+        "@bt-synergy/door43-api": "workspace:*",
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
         "jszip": "^3.10.1",
@@ -762,6 +784,8 @@
       "name": "@bt-synergy/translation-words-links-loader",
       "version": "1.0.0",
       "dependencies": {
+        "@bt-synergy/catalog-manager": "workspace:*",
+        "@bt-synergy/door43-api": "workspace:*",
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
         "jszip": "^3.10.1",
@@ -778,6 +802,8 @@
       "name": "@bt-synergy/translation-words-loader",
       "version": "1.0.0",
       "dependencies": {
+        "@bt-synergy/catalog-manager": "workspace:*",
+        "@bt-synergy/door43-api": "workspace:*",
         "@bt-synergy/resource-catalog": "workspace:*",
         "jszip": "^3.10.1",
       },
