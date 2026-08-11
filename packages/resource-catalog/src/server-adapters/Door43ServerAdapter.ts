@@ -4,6 +4,7 @@
  * Transforms Door43 API metadata into our unified ResourceMetadata format
  */
 
+import { inferDoor43ResourceTypeId } from '../resourceTypeIds'
 import type { ResourceMetadata } from '../types'
 import { LocationType, ResourceFormat, ResourceType } from '../types'
 import { BaseServerAdapter } from './types'
@@ -12,6 +13,7 @@ import { BaseServerAdapter } from './types'
 interface Door43Resource {
   id: string
   name: string
+  abbreviation?: string
   owner: string
   language: string
   language_title?: string
@@ -69,6 +71,11 @@ export class Door43ServerAdapter extends BaseServerAdapter {
       categories: ing.categories,
     }))
     
+    const abbreviation =
+      typeof door43Resource.abbreviation === 'string' && door43Resource.abbreviation.trim()
+        ? door43Resource.abbreviation.trim()
+        : undefined
+
     return {
       // Resource identity
       resourceKey,
@@ -76,6 +83,7 @@ export class Door43ServerAdapter extends BaseServerAdapter {
       owner: door43Resource.owner,
       language: door43Resource.language,
       resourceId: door43Resource.id,
+      ...(abbreviation ? { abbreviation } : {}),
       
       // Basic info
       subject: door43Resource.subject,
@@ -174,27 +182,10 @@ export class Door43ServerAdapter extends BaseServerAdapter {
   }
   
   /**
-   * Infer resource type from Door43 metadata
+   * Infer resource type from Door43 metadata (canonical RESOURCE_TYPE_IDS).
    */
-  private inferResourceType(id: string, subject: string): string {
-    const typeMap: Record<string, string> = {
-      'ult': 'scripture',
-      'glt': 'scripture',
-      'ust': 'scripture',
-      'gst': 'scripture',
-      'ulb': 'scripture',
-      'udb': 'scripture',
-      'ugnt': 'scripture',
-      'uhb': 'scripture',
-      'tn': 'notes',
-      'tq': 'questions',
-      'tw': 'words',
-      'twl': 'words_links',
-      'ta': 'academy',
-      'obs': 'stories',
-    }
-    
-    return typeMap[id.toLowerCase()] || 'unknown'
+  private inferResourceType(id: string, _subject: string): string {
+    return inferDoor43ResourceTypeId(id)
   }
   
   /**

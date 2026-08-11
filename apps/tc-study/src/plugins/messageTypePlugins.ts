@@ -3,7 +3,7 @@
  * Registers signal types for resource-panels communication
  */
 
-import { createPlugin } from 'linked-panels'
+import { createPlugin } from '@bt-synergy/resource-panels'
 import type {
   EntryLinkClickSignal,
   NotesTokenGroupsSignal,
@@ -15,95 +15,40 @@ import type {
   TokenClickSignal,
   VerseFilterSignal,
 } from '../signals/studioSignals'
-import { useStudyStore } from '../store/studyStore'
+import { useEntryModalStore } from '../features/entries'
 import type { LinkClickEvent } from './types'
 
 /**
  * Validator for token-click signals (from @bt-synergy/resource-panels)
  */
 function isTokenClickSignal(content: unknown): content is TokenClickSignal {
-  if (!content || typeof content !== 'object') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Message is not an object')
-    return false
-  }
+  if (!content || typeof content !== 'object') return false
 
-  const message = content as any
+  const message = content as TokenClickSignal
 
-  if (message.type !== 'token-click') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Wrong type:', message.type)
-    return false
-  }
-
+  if (message.type !== 'token-click') return false
   if (message.lifecycle !== 'event' && message.lifecycle !== 'request' && message.lifecycle !== 'response') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid lifecycle:', message.lifecycle)
     return false
   }
-
-  if (!message.token || typeof message.token !== 'object') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid token object')
-    return false
-  }
-
-  if (typeof message.token.id !== 'string') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid token.id:', message.token.id)
-    return false
-  }
-
-  if (typeof message.token.content !== 'string') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid token.content:', message.token.content)
-    return false
-  }
-
-  if (typeof message.token.semanticId !== 'string') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid token.semanticId (must be string):', message.token.semanticId, typeof message.token.semanticId)
-    return false
-  }
-
-  if (typeof message.token.verseRef !== 'string') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid token.verseRef:', message.token.verseRef)
-    return false
-  }
-
-  if (typeof message.token.position !== 'number') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid token.position:', message.token.position)
-    return false
-  }
+  if (!message.token || typeof message.token !== 'object') return false
+  if (typeof message.token.id !== 'string') return false
+  if (typeof message.token.content !== 'string') return false
+  if (typeof message.token.semanticId !== 'string') return false
+  if (typeof message.token.verseRef !== 'string') return false
+  if (typeof message.token.position !== 'number') return false
 
   // Optional: alignedSemanticIds for cross-panel highlighting
   if (message.token.alignedSemanticIds !== undefined) {
-    if (!Array.isArray(message.token.alignedSemanticIds)) {
-      console.log('[TOKEN-CLICK VALIDATION] ❌ alignedSemanticIds must be an array:', message.token.alignedSemanticIds)
-      return false
-    }
-    // Validate each ID is a string
+    if (!Array.isArray(message.token.alignedSemanticIds)) return false
     for (const id of message.token.alignedSemanticIds) {
-      if (typeof id !== 'string') {
-        console.log('[TOKEN-CLICK VALIDATION] ❌ alignedSemanticIds must contain only strings:', id, typeof id)
-        return false
-      }
+      if (typeof id !== 'string') return false
     }
   }
 
-  if (typeof message.sourceResourceId !== 'string') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid sourceResourceId:', message.sourceResourceId)
-    return false
-  }
+  if (typeof message.sourceResourceId !== 'string') return false
+  if (typeof message.timestamp !== 'number') return false
 
-  if (typeof message.timestamp !== 'number') {
-    console.log('[TOKEN-CLICK VALIDATION] ❌ Invalid timestamp:', message.timestamp)
-    return false
-  }
-
-  console.log('[TOKEN-CLICK VALIDATION] ✅ All checks passed!')
   return true
-}
-
-/**
- * Handler for token-click signals
- */
-function handleTokenClickSignal(message: any) {
-  const signal = message.content as TokenClickSignal
-  console.log(`🎯 Token Click Signal: ${signal.token.content} from ${signal.sourceResourceId}`)
 }
 
 /**
@@ -114,25 +59,19 @@ export const tokenClickPlugin = createPlugin({
   name: 'token-click-signal-plugin',
   version: '2.0.0',
   description: 'Plugin for token-click signals from @bt-synergy/resource-panels',
-  
   messageTypes: {
-    'token-click': {} as TokenClickSignal
+    'token-click': {} as TokenClickSignal,
   },
-  
   validators: {
-    'token-click': isTokenClickSignal
+    'token-click': isTokenClickSignal,
   },
-  
-  handlers: {
-    'token-click': handleTokenClickSignal
-  }
 })
 
 // ===== VERSE FILTER PLUGIN =====
 
 function isVerseFilterSignal(content: unknown): content is VerseFilterSignal {
   if (!content || typeof content !== 'object') return false
-  const msg = content as any
+  const msg = content as VerseFilterSignal
   if (msg.type !== 'verse-filter') return false
   if (msg.lifecycle !== 'event') return false
   if (!msg.filter || typeof msg.filter !== 'object') return false
@@ -143,87 +82,37 @@ function isVerseFilterSignal(content: unknown): content is VerseFilterSignal {
   return true
 }
 
-function handleVerseFilterSignal(message: any) {
-  const signal = message.content as VerseFilterSignal
-  console.log(`📍 Verse Filter: ch ${signal.filter.chapter}${signal.filter.verse !== undefined ? `:${signal.filter.verse}` : ''} from ${signal.sourceResourceId}`)
-}
-
 export const verseFilterPlugin = createPlugin({
   name: 'verse-filter-plugin',
   version: '1.0.0',
   description: 'Plugin for verse/chapter filter signals from scripture viewers',
   messageTypes: { 'verse-filter': {} as VerseFilterSignal },
   validators: { 'verse-filter': isVerseFilterSignal },
-  handlers: { 'verse-filter': handleVerseFilterSignal },
 })
 
 /**
  * Validator for link-click messages
  */
 function isLinkClickEvent(content: unknown): content is LinkClickEvent {
-  if (!content || typeof content !== 'object') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Message is not an object')
-    return false
-  }
+  if (!content || typeof content !== 'object') return false
 
-  const message = content as any
+  const message = content as LinkClickEvent
 
-  if (message.type !== 'link-click') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Wrong type:', message.type)
-    return false
-  }
-
-  if (message.lifecycle !== 'event') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Wrong lifecycle:', message.lifecycle)
-    return false
-  }
-
-  if (!message.link || typeof message.link !== 'object') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Invalid link object')
-    return false
-  }
-
-  if (typeof message.link.url !== 'string') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Invalid link.url:', message.link.url)
-    return false
-  }
-
-  if (typeof message.link.text !== 'string') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Invalid link.text:', message.link.text)
-    return false
-  }
-
-  // Check optional fields if present
+  if (message.type !== 'link-click') return false
+  if (message.lifecycle !== 'event') return false
+  if (!message.link || typeof message.link !== 'object') return false
+  if (typeof message.link.url !== 'string') return false
+  if (typeof message.link.text !== 'string') return false
   if (message.link.resourceType !== undefined && typeof message.link.resourceType !== 'string') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Invalid link.resourceType:', message.link.resourceType)
     return false
   }
-
   if (message.link.resourceId !== undefined && typeof message.link.resourceId !== 'string') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Invalid link.resourceId:', message.link.resourceId)
     return false
   }
+  if (typeof message.sourceResourceId !== 'string') return false
+  if (typeof message.timestamp !== 'number') return false
 
-  if (typeof message.sourceResourceId !== 'string') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Invalid sourceResourceId:', message.sourceResourceId)
-    return false
-  }
-
-  if (typeof message.timestamp !== 'number') {
-    console.log('[LINK-CLICK VALIDATION] ❌ Invalid timestamp:', message.timestamp)
-    return false
-  }
-
-  console.log('[LINK-CLICK VALIDATION] ✅ All checks passed!')
   return true
-}
-
-/**
- * Handler for link-click messages
- */
-function handleLinkClick(message: any) {
-  const event = message.content as LinkClickEvent
-  console.log(`🔗 Link Click: ${event.link.text} (${event.link.url}) from ${event.sourceResourceId}`)
 }
 
 /**
@@ -234,18 +123,12 @@ export const linkClickPlugin = createPlugin({
   name: 'link-click-plugin',
   version: '1.0.0',
   description: 'Plugin for link click events in resource viewers',
-  
   messageTypes: {
-    'link-click': {} as LinkClickEvent
+    'link-click': {} as LinkClickEvent,
   },
-  
   validators: {
-    'link-click': isLinkClickEvent
+    'link-click': isLinkClickEvent,
   },
-  
-  handlers: {
-    'link-click': handleLinkClick
-  }
 })
 
 /**
@@ -253,7 +136,7 @@ export const linkClickPlugin = createPlugin({
  */
 function isScriptureContentRequestSignal(content: unknown): content is ScriptureContentRequestSignal {
   if (!content || typeof content !== 'object') return false
-  const message = content as any
+  const message = content as ScriptureContentRequestSignal
   if (message.type !== 'scripture-content-request') return false
   if (message.lifecycle !== 'event' && message.lifecycle !== 'request') return false
   if (!message.request || typeof message.request !== 'object') return false
@@ -265,32 +148,18 @@ function isScriptureContentRequestSignal(content: unknown): content is Scripture
 }
 
 /**
- * Handler for scripture-content-request signals
- */
-function handleScriptureContentRequest(message: any) {
-  const signal = message.content as ScriptureContentRequestSignal
-  console.log(`📤 Scripture Content Request: ${signal.request.book} ${signal.request.chapter} from ${signal.sourceResourceId}`)
-}
-
-/**
  * Plugin for scripture-content-request signals
  */
 export const scriptureContentRequestPlugin = createPlugin({
   name: 'scripture-content-request-plugin',
   version: '1.0.0',
   description: 'Plugin for scripture content request signals',
-  
   messageTypes: {
-    'scripture-content-request': {} as ScriptureContentRequestSignal
+    'scripture-content-request': {} as ScriptureContentRequestSignal,
   },
-  
   validators: {
-    'scripture-content-request': isScriptureContentRequestSignal
+    'scripture-content-request': isScriptureContentRequestSignal,
   },
-  
-  handlers: {
-    'scripture-content-request': handleScriptureContentRequest
-  }
 })
 
 /**
@@ -298,7 +167,7 @@ export const scriptureContentRequestPlugin = createPlugin({
  */
 function isScriptureContentResponseSignal(content: unknown): content is ScriptureContentResponseSignal {
   if (!content || typeof content !== 'object') return false
-  const message = content as any
+  const message = content as ScriptureContentResponseSignal
   if (message.type !== 'scripture-content-response') return false
   if (message.lifecycle !== 'event' && message.lifecycle !== 'response') return false
   if (!message.response || typeof message.response !== 'object') return false
@@ -314,32 +183,18 @@ function isScriptureContentResponseSignal(content: unknown): content is Scriptur
 }
 
 /**
- * Handler for scripture-content-response signals
- */
-function handleScriptureContentResponse(message: any) {
-  const signal = message.content as ScriptureContentResponseSignal
-  console.log(`📥 Scripture Content Response: ${signal.response.book} ${signal.response.chapter} from ${signal.sourceResourceId} (hasContent: ${signal.response.hasContent})`)
-}
-
-/**
  * Plugin for scripture-content-response signals
  */
 export const scriptureContentResponsePlugin = createPlugin({
   name: 'scripture-content-response-plugin',
   version: '1.0.0',
   description: 'Plugin for scripture content response signals',
-  
   messageTypes: {
-    'scripture-content-response': {} as ScriptureContentResponseSignal
+    'scripture-content-response': {} as ScriptureContentResponseSignal,
   },
-  
   validators: {
-    'scripture-content-response': isScriptureContentResponseSignal
+    'scripture-content-response': isScriptureContentResponseSignal,
   },
-  
-  handlers: {
-    'scripture-content-response': handleScriptureContentResponse
-  }
 })
 
 // ===== SCRIPTURE TOKENS BROADCAST PLUGIN =====
@@ -348,59 +203,20 @@ export const scriptureContentResponsePlugin = createPlugin({
  * Validator for scripture-tokens-broadcast signals
  */
 function isScriptureTokensBroadcastSignal(content: unknown): content is ScriptureTokensBroadcastSignal {
-  if (!content || typeof content !== 'object') {
-    return false
-  }
+  if (!content || typeof content !== 'object') return false
 
-  const message = content as any
+  const message = content as ScriptureTokensBroadcastSignal
 
-  if (message.type !== 'scripture-tokens-broadcast') {
-    return false
-  }
-
-  if (message.lifecycle !== 'state') {
-    return false
-  }
-
-  if (message.stateKey !== 'current-scripture-tokens') {
-    return false
-  }
-
-  if (typeof message.sourceResourceId !== 'string') {
-    return false
-  }
-
-  if (!message.reference || typeof message.reference !== 'object') {
-    return false
-  }
-
-  if (!Array.isArray(message.tokens)) {
-    return false
-  }
-
-  if (!message.resourceMetadata || typeof message.resourceMetadata !== 'object') {
-    return false
-  }
-
-  if (typeof message.timestamp !== 'number') {
-    return false
-  }
+  if (message.type !== 'scripture-tokens-broadcast') return false
+  if (message.lifecycle !== 'state') return false
+  if (message.stateKey !== 'current-scripture-tokens') return false
+  if (typeof message.sourceResourceId !== 'string') return false
+  if (!message.reference || typeof message.reference !== 'object') return false
+  if (!Array.isArray(message.tokens)) return false
+  if (!message.resourceMetadata || typeof message.resourceMetadata !== 'object') return false
+  if (typeof message.timestamp !== 'number') return false
 
   return true
-}
-
-/**
- * Handler for scripture-tokens-broadcast signals
- */
-function handleScriptureTokensBroadcast(message: any) {
-  const signal = message.content as ScriptureTokensBroadcastSignal
-  // Only log when there are actual tokens to broadcast
-  if (signal.tokens.length > 0) {
-    console.log(`📡 Scripture Tokens Broadcast from ${signal.sourceResourceId}:`, {
-      reference: signal.reference,
-      tokenCount: signal.tokens.length,
-    })
-  }
 }
 
 /**
@@ -410,25 +226,19 @@ function handleScriptureTokensBroadcast(message: any) {
 export const scriptureTokensBroadcastPlugin = createPlugin({
   name: 'scripture-tokens-broadcast-plugin',
   version: '1.0.0',
-  
   messageTypes: {
-    'scripture-tokens-broadcast': {} as ScriptureTokensBroadcastSignal
+    'scripture-tokens-broadcast': {} as ScriptureTokensBroadcastSignal,
   },
-  
   validators: {
-    'scripture-tokens-broadcast': isScriptureTokensBroadcastSignal
+    'scripture-tokens-broadcast': isScriptureTokensBroadcastSignal,
   },
-  
-  handlers: {
-    'scripture-tokens-broadcast': handleScriptureTokensBroadcast
-  }
 })
 
 // ===== NOTES TOKEN GROUPS PLUGIN =====
 
 function isNotesTokenGroupsSignal(content: unknown): content is NotesTokenGroupsSignal {
   if (!content || typeof content !== 'object') return false
-  const message = content as any
+  const message = content as NotesTokenGroupsSignal
   if (message.type !== 'notes-token-groups') return false
   if (message.lifecycle !== 'state') return false
   if (
@@ -455,14 +265,6 @@ function isNotesTokenGroupsSignal(content: unknown): content is NotesTokenGroups
   return true
 }
 
-function handleNotesTokenGroupsSignal(message: any) {
-  const signal = message.content as NotesTokenGroupsSignal
-  const count = signal.tokenGroups.reduce((n, g) => n + g.semanticIds.length, 0)
-  if (count > 0) {
-    console.log(`📎 Notes token groups from ${signal.sourceResourceId}: ${signal.tokenGroups.length} groups, ${count} semantic ids`)
-  }
-}
-
 export const notesTokenGroupsPlugin = createPlugin({
   name: 'notes-token-groups-plugin',
   version: '1.0.0',
@@ -473,9 +275,6 @@ export const notesTokenGroupsPlugin = createPlugin({
   validators: {
     'notes-token-groups': isNotesTokenGroupsSignal,
   },
-  handlers: {
-    'notes-token-groups': handleNotesTokenGroupsSignal,
-  },
 })
 
 // ===== ENTRY LINK CLICK PLUGIN =====
@@ -484,47 +283,21 @@ export const notesTokenGroupsPlugin = createPlugin({
  * Validator for entry-link-click signals
  */
 function isEntryLinkClickSignal(content: unknown): content is EntryLinkClickSignal {
-  if (!content || typeof content !== 'object') {
-    return false
-  }
+  if (!content || typeof content !== 'object') return false
 
-  const message = content as any
+  const message = content as EntryLinkClickSignal
 
-  if (message.type !== 'entry-link-click') {
-    return false
-  }
-
+  if (message.type !== 'entry-link-click') return false
   if (message.lifecycle !== 'event' && message.lifecycle !== 'request' && message.lifecycle !== 'response') {
     return false
   }
-
-  if (!message.link || typeof message.link !== 'object') {
-    return false
-  }
-
-  if (typeof message.link.resourceType !== 'string') {
-    return false
-  }
-
-  if (typeof message.link.resourceId !== 'string') {
-    return false
-  }
-
-  if (typeof message.link.entryId !== 'string') {
-    return false
-  }
-
-  if (typeof message.link.text !== 'string') {
-    return false
-  }
-
-  if (typeof message.sourceResourceId !== 'string') {
-    return false
-  }
-
-  if (typeof message.timestamp !== 'number') {
-    return false
-  }
+  if (!message.link || typeof message.link !== 'object') return false
+  if (typeof message.link.resourceType !== 'string') return false
+  if (typeof message.link.resourceId !== 'string') return false
+  if (typeof message.link.entryId !== 'string') return false
+  if (typeof message.link.text !== 'string') return false
+  if (typeof message.sourceResourceId !== 'string') return false
+  if (typeof message.timestamp !== 'number') return false
 
   return true
 }
@@ -533,11 +306,10 @@ function isEntryLinkClickSignal(content: unknown): content is EntryLinkClickSign
  * Handler for entry-link-click signals
  * Opens the entry modal when a TW/TA link is clicked (e.g. from TWL or Notes viewer)
  */
-function handleEntryLinkClick(message: any) {
-  const signal = message.content as EntryLinkClickSignal
-  console.log(`🔗 Entry Link Click: ${signal.link.text} (${signal.link.resourceId}#${signal.link.entryId}) from ${signal.sourceResourceId}`)
+function handleEntryLinkClick(message: { content: EntryLinkClickSignal }) {
+  const signal = message.content
   const resourceKey = `${signal.link.resourceId}#${signal.link.entryId}`
-  useStudyStore.getState().openModal(resourceKey)
+  useEntryModalStore.getState().openModal(resourceKey)
 }
 
 /**
@@ -548,18 +320,15 @@ export const entryLinkClickPlugin = createPlugin({
   name: 'entry-link-click-plugin',
   version: '1.0.0',
   description: 'Plugin for entry link click signals (Translation Words, Translation Academy, etc.)',
-  
   messageTypes: {
-    'entry-link-click': {} as EntryLinkClickSignal
+    'entry-link-click': {} as EntryLinkClickSignal,
   },
-  
   validators: {
-    'entry-link-click': isEntryLinkClickSignal
+    'entry-link-click': isEntryLinkClickSignal,
   },
-  
   handlers: {
-    'entry-link-click': handleEntryLinkClick
-  }
+    'entry-link-click': handleEntryLinkClick,
+  },
 })
 
 // ===== OBS FRAME HIGHLIGHT PLUGIN =====
@@ -576,8 +345,7 @@ function isObsFrameHighlightSignal(content: unknown): content is ObsFrameHighlig
   if (typeof h.storyNumber !== 'number') return false
   if (typeof h.frameNumber !== 'number') return false
   const hasWordPick = Array.isArray(h.overlappingSourceIds) && h.overlappingSourceIds.length > 0
-  const hasLegacy =
-    typeof h.quote === 'string' && typeof h.occurrence === 'number'
+  const hasLegacy = typeof h.quote === 'string' && typeof h.occurrence === 'number'
   if (!hasWordPick && !hasLegacy) return false
   if (hasWordPick) {
     for (const id of h.overlappingSourceIds!) {
@@ -590,29 +358,12 @@ function isObsFrameHighlightSignal(content: unknown): content is ObsFrameHighlig
   return true
 }
 
-function handleObsFrameHighlightSignal(message: { content: ObsFrameHighlightSignal }) {
-  const signal = message.content as ObsFrameHighlightSignal
-  if (signal.highlight) {
-    const h = signal.highlight
-    const detail =
-      h.overlappingSourceIds && h.overlappingSourceIds.length > 0
-        ? `ids [${h.overlappingSourceIds.join(', ')}]`
-        : `"${h.quote ?? ''}" (occ ${h.occurrence ?? '?'})`
-    console.log(
-      `[OBS Frame Highlight] ${signal.sourceResourceId} → story ${h.storyNumber} frame ${h.frameNumber}: ${detail}`
-    )
-  } else {
-    console.log(`[OBS Frame Highlight] ${signal.sourceResourceId} cleared`)
-  }
-}
-
 export const obsFrameHighlightPlugin = createPlugin({
   name: 'obs-frame-highlight-plugin',
   version: '1.0.0',
   description: 'OBS frame substring highlight (TN/TWL ↔ ObsViewer)',
   messageTypes: { 'obs-frame-highlight': {} as ObsFrameHighlightSignal },
   validators: { 'obs-frame-highlight': isObsFrameHighlightSignal },
-  handlers: { 'obs-frame-highlight': handleObsFrameHighlightSignal },
 })
 
 // ===== OBS FRAME QUOTES STATE PLUGIN =====
@@ -622,7 +373,12 @@ function isObsFrameQuotesSignal(content: unknown): content is ObsFrameQuotesSign
   const message = content as ObsFrameQuotesSignal
   if (message.type !== 'obs-frame-quotes') return false
   if (message.lifecycle !== 'state') return false
-  if (message.stateKey !== 'current-obs-frame-quotes') return false
+  if (
+    message.stateKey !== 'current-obs-frame-quotes-tn' &&
+    message.stateKey !== 'current-obs-frame-quotes-twl'
+  ) {
+    return false
+  }
   if (typeof message.sourceResourceId !== 'string') return false
   if (typeof message.storyNumber !== 'number') return false
   if (typeof message.frameNumber !== 'number') return false
@@ -640,21 +396,10 @@ function isObsFrameQuotesSignal(content: unknown): content is ObsFrameQuotesSign
   return true
 }
 
-function handleObsFrameQuotesSignal(message: { content: ObsFrameQuotesSignal }) {
-  const signal = message.content as ObsFrameQuotesSignal
-  if (signal.quotes.length > 0) {
-    console.log(
-      `[OBS Frame Quotes] from ${signal.sourceResourceId}: story ${signal.storyNumber} frame ${signal.frameNumber}, ${signal.quotes.length} quotes`
-    )
-  }
-}
-
 export const obsFrameQuotesPlugin = createPlugin({
   name: 'obs-frame-quotes-plugin',
   version: '1.0.0',
   description: 'OBS TN/TWL quote broadcast for clickable frame text',
   messageTypes: { 'obs-frame-quotes': {} as ObsFrameQuotesSignal },
   validators: { 'obs-frame-quotes': isObsFrameQuotesSignal },
-  handlers: { 'obs-frame-quotes': handleObsFrameQuotesSignal },
 })
-

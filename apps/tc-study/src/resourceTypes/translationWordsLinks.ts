@@ -7,7 +7,9 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { TranslationWordsLinksLoader } from '@bt-synergy/translation-words-links-loader'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { WordsLinksViewer } from '../components/resources'
+import { asResourceViewer } from './asResourceViewer'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const translationWordsLinksResourceType: ResourceTypeDefinition = defineResourceType({
@@ -57,12 +59,10 @@ export const translationWordsLinksResourceType: ResourceTypeDefinition = defineR
     debug: false,
   },
   
-  // Download priority for background downloading
-  downloadPriority: 10, // High priority (needed for scripture-words linking)
-
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS),
   
   // ===== UI LAYER =====
-  viewer: WordsLinksViewer as any,
+  viewer: asResourceViewer(WordsLinksViewer),
   
   // ===== FEATURES =====
   features: {
@@ -98,5 +98,4 @@ export const translationWordsLinksResourceType: ResourceTypeDefinition = defineR
 
 // Re-export for convenience
 export { WordsLinksViewer } from '../components/resources'
-
 

@@ -13,7 +13,9 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { TranslationWordsLinksLoader } from '@bt-synergy/translation-words-links-loader'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { WordsLinksViewer } from '../components/resources'
+import { asResourceViewer } from './asResourceViewer'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const obsTranslationWordsLinksResourceType: ResourceTypeDefinition = defineResourceType({
@@ -51,10 +53,10 @@ export const obsTranslationWordsLinksResourceType: ResourceTypeDefinition = defi
     debug: false,
   },
 
-  downloadPriority: 12,
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.OBS_WORDS_LINKS),
 
   // ===== UI LAYER =====
-  viewer: WordsLinksViewer as any,
+  viewer: asResourceViewer(WordsLinksViewer),
 
   // ===== FEATURES =====
   features: {

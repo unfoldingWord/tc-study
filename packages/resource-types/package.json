@@ -7,11 +7,12 @@
   "types": "src/index.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "bun test src",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@bt-synergy/resource-panels": "workspace:*",
-    "@bt-synergy/resource-signals": "workspace:*"
+    "@bt-synergy/resource-catalog": "workspace:*"
   },
   "peerDependencies": {
     "react": "^18.0.0"

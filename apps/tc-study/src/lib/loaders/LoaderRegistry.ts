@@ -1,7 +1,7 @@
 /**
  * LoaderRegistry - Manages resource loaders
  * Connects loaders to the app and provides unified loading interface
- * 
+ *
  * Loaders are now registered via ResourceTypeRegistry, not manually here.
  * This ensures a single source of truth for resource type registration.
  */
@@ -17,9 +17,7 @@ export class LoaderRegistry {
   }) {
     this.debug = config?.debug ?? false
 
-    if (this.debug) {
-      console.log('🔌 LoaderRegistry initialized (loaders will be registered via ResourceTypeRegistry)')
-    }
+
   }
 
   /**
@@ -27,16 +25,14 @@ export class LoaderRegistry {
    */
   registerLoader(type: string, loader: ResourceLoader): void {
     this.loaders.set(type, loader)
-    if (this.debug) {
-      console.log(`  ✅ Registered loader: ${type}`)
-    }
+
   }
 
   /**
    * Get loader for a resource
    */
   getLoaderForResource(metadata: ResourceMetadata): ResourceLoader | null {
-    for (const [type, loader] of this.loaders.entries()) {
+    for (const [_type, loader] of this.loaders.entries()) {
       if (loader.canHandle(metadata)) {
         return loader
       }

@@ -7,8 +7,13 @@ export interface BaseSignal {
   /** Signal type identifier (e.g., 'word-click', 'navigate', 'update') */
   type: string
   
-  /** Lifecycle phase of the signal */
-  lifecycle: 'event' | 'request' | 'response'
+  /**
+   * Lifecycle phase of the signal
+   *
+   * - `event` / `request` / `response`: ephemeral EVENT-style messaging (`useSignal` / `useSignalHandler`)
+   * - `state`: persistent STATE messaging keyed by `stateKey` (`useResourceState` / `useResourceStateSender`)
+   */
+  lifecycle: 'event' | 'request' | 'response' | 'state'
   
   /** Resource that sent the signal */
   sourceResourceId: string
@@ -18,7 +23,7 @@ export interface BaseSignal {
    * 
    * Enables multi-dimensional filtering (type, tags, categories, language, etc.)
    */
-  sourceMetadata?: ResourceMetadata
+  sourceMetadata?: PanelResourceMetadata
   
   /** Timestamp when the signal was sent */
   timestamp: number
@@ -46,9 +51,28 @@ export interface BaseSignal {
    * Used for clearing individual messages
    */
   id?: string
+
+  /**
+   * Required for `lifecycle: 'state'` messages.
+   * Latest message per key wins (supersedes prior state for that key).
+   */
+  stateKey?: string
   
   // Allow any additional properties
   [key: string]: any
+}
+
+/**
+ * Base interface for STATE lifecycle signals.
+ *
+ * STATE messages persist until superseded by a newer message with the same
+ * `stateKey` (or cleared). Prefer these hooks over raw linked-panels:
+ * - subscribe: `useResourceState`
+ * - send: `useResourceStateSender`
+ */
+export interface BaseStateSignal extends BaseSignal {
+  lifecycle: 'state'
+  stateKey: string
 }
 
 /**
@@ -58,16 +82,31 @@ export type SignalType<T extends BaseSignal> = T['type']
 
 /**
  * Resource type identifiers
- * 
- * Common types for Bible/translation resources.
- * Use `string` for custom types.
+ *
+ * Prefer canonical short IDs (`notes`, `words`, `academy`, `words-links`)
+ * used by tc-study loaders and `@bt-synergy/resource-catalog` RESOURCE_TYPE_IDS.
+ * Legacy long forms are still accepted for older examples/docs.
  */
 export type ResourceType =
+  // Canonical short IDs (preferred)
   | 'scripture'
+  | 'words'
+  | 'words-links'
+  | 'notes'
+  | 'questions'
+  | 'academy'
+  | 'obs'
+  | 'obs-notes'
+  | 'obs-words-links'
+  | 'obs-questions'
+  | 'combined-helps'
+  | 'obs-combined-helps'
+  // Legacy long forms (do not invent in new code)
   | 'translation-words'
   | 'translation-notes'
   | 'translation-questions'
   | 'translation-academy'
+  | 'translation-words-links'
   | 'lexicon'
   | 'original-language'
   | 'commentary'
@@ -75,14 +114,15 @@ export type ResourceType =
   | 'atlas'
   | 'media'
   | 'custom'
-  | string  // Allow any custom string
+  | string // Allow any custom string
 
 /**
- * Flexible metadata for multi-dimensional resource filtering
- * 
- * Define whatever fields make sense for your resources.
+ * Narrow panel/signal filter metadata.
+ *
+ * NOT the catalog SoT — that lives in `@bt-synergy/resource-catalog` as `ResourceMetadata`.
+ * Map catalog records via `toPanelResourceMetadata` before attaching to signals.
  */
-export interface ResourceMetadata {
+export interface PanelResourceMetadata {
   /** Primary resource type */
   type?: ResourceType
   
@@ -113,6 +153,11 @@ export interface ResourceMetadata {
   // Allow any additional properties
   [key: string]: any
 }
+
+/**
+ * @deprecated Use `PanelResourceMetadata`. Catalog SoT is `@bt-synergy/resource-catalog` `ResourceMetadata`.
+ */
+export type ResourceMetadata = PanelResourceMetadata
 
 /**
  * Filter criteria for targeting signals

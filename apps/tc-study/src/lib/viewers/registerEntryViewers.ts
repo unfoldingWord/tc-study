@@ -6,13 +6,18 @@
  */
 
 import { TranslationWordsEntryViewer, TranslationAcademyEntryViewer } from '../../components/entryViewers'
-import { createTypeMatcher, type EntryViewerRegistry } from './EntryViewerRegistry'
+import {
+  createTypeMatcher,
+  type EntryViewerComponent,
+  type EntryViewerMatcher,
+  type EntryViewerRegistry,
+} from './EntryViewerRegistry'
 
 /**
  * Register all default entry viewers
  */
 export function registerDefaultEntryViewers(registry: EntryViewerRegistry): void {
-  console.log('[EntryViewers] Registering default entry viewers...')
+
 
   // Translation Words Entry Viewer
   registry.register({
@@ -41,7 +46,7 @@ export function registerDefaultEntryViewers(registry: EntryViewerRegistry): void
   //   priority: 100,
   // })
 
-  console.log('[EntryViewers] ✅ Default entry viewers registered')
+
 }
 
 /**
@@ -67,8 +72,8 @@ export function registerCustomEntryViewer(
   registration: {
     id: string
     name: string
-    viewer: any
-    matcher: (metadata: any) => boolean
+    viewer: EntryViewerComponent
+    matcher: EntryViewerMatcher
     priority?: number
   }
 ): void {

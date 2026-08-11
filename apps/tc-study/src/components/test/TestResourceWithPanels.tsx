@@ -23,7 +23,7 @@ interface TestResourceWithPanelsProps {
   resourceId: string
   allResources: Array<{ id: string; title: string }>
   onNavigationRequest?: (targetPanelId: string, targetResourceId: string) => void
-  onMessageLog?: (type: string, from: string, to: string, data: any, received: boolean) => void
+  onMessageLog?: (type: string, from: string, to: string, data: unknown, received: boolean) => void
 }
 
 export function TestResourceWithPanels({
@@ -54,7 +54,7 @@ export function TestResourceWithPanels({
     'token-click',
     resourceId,
     useCallback((signal: TokenClickSignal) => {
-      console.log(`📨 [${resourceId}] Received token-click:`, signal.token)
+
       setLastReceivedToken(signal.token)
       setReceivedCount(prev => prev + 1)
       
@@ -68,7 +68,7 @@ export function TestResourceWithPanels({
     'link-click',
     resourceId,
     useCallback((signal: LinkClickSignal) => {
-      console.log(`📨 [${resourceId}] Received link-click:`, signal.link)
+
       setReceivedCount(prev => prev + 1)
       
       if (onMessageLog) {
@@ -82,7 +82,7 @@ export function TestResourceWithPanels({
     'navigation-request',
     resourceId,
     useCallback((signal: NavigationRequestSignal) => {
-      console.log(`📨 [${resourceId}] Received navigation-request:`, signal.navigation)
+
       
       if (onNavigationRequest) {
         onNavigationRequest(
@@ -264,7 +264,7 @@ export function TestResourceWithPanels({
         {targetMode === 'panel' && (
           <select
             value={targetPanel}
-            onChange={(e) => setTargetPanel(e.target.value as any)}
+            onChange={(e) => setTargetPanel(e.target.value as 'panel-1' | 'panel-2')}
             className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-purple-500"
           >
             <option value="panel-1">Panel 1</option>

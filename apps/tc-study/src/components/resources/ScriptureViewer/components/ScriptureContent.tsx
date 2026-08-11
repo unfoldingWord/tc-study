@@ -2,10 +2,11 @@
  * ScriptureContent - Main content area displaying verses
  */
 
-import type { ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
+import type { ProcessedScripture, ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
 import { BookX } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
-import type { BookInfo } from '../../../../contexts/types-only'
+import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
+import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import type { OriginalLanguageToken } from '../types'
 import { VerseRenderer } from './VerseRenderer'
 
@@ -13,10 +14,10 @@ interface ScriptureContentProps {
   isLoading: boolean
   isLoadingTOC?: boolean
   error: string | null
-  loadedContent: any
+  loadedContent: ProcessedScripture | null
   availableBooks: BookInfo[]
   displayVerses: ProcessedVerse[]
-  currentRef: any
+  currentRef: ReferenceState
   highlightTarget: OriginalLanguageToken | null
   underlinedSemanticIds?: Set<string>
   selectedTokenId: string | null
@@ -62,17 +63,17 @@ export function ScriptureContent({
     // Wait a tick for DOM to update
     const timer = setTimeout(() => {
       const highlightedElements = containerRef.current?.querySelectorAll('[data-highlighted="true"]')
-      
+
       if (highlightedElements && highlightedElements.length > 0) {
         const firstHighlighted = highlightedElements[0] as HTMLElement
-        
+
         // Scroll with smooth behavior and center alignment
         firstHighlighted.scrollIntoView({
           behavior: 'smooth',
           block: 'center',
           inline: 'nearest'
         })
-        
+
         // Remember this token to avoid redundant scrolls
         lastScrolledTokenRef.current = selectedTokenId
       }
@@ -110,13 +111,12 @@ export function ScriptureContent({
   const showFullScreenLoading = (isLoadingTOC || isLoading) && !loadedContent
   if (showFullScreenLoading) {
     return (
-      <div 
-        className="flex items-center justify-center py-12"
-        role="status"
-        aria-label="Loading scripture"
-      >
-        <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full" />
-      </div>
+      <LoadingSpinner
+        centered
+        label="Loading scripture"
+        className="text-blue-600"
+        containerClassName="py-12"
+      />
     )
   }
 
@@ -124,7 +124,7 @@ export function ScriptureContent({
     // Special handling for "book not available" case
     if (error === 'BOOK_NOT_AVAILABLE') {
       return (
-        <div 
+        <div
           className="flex items-center justify-center h-full"
           role="status"
           aria-label="Book not available in this resource"
@@ -134,7 +134,7 @@ export function ScriptureContent({
         </div>
       )
     }
-    
+
     // General error display for other errors
     return (
       <div className="text-center py-12 text-red-600">
@@ -168,7 +168,7 @@ export function ScriptureContent({
 
   // Determine if this is an original language resource
   const isOriginalLanguage = language === 'el-x-koine' || language === 'hbo'
-  const isCrossChapter = chapters.length > 1
+  const _isCrossChapter = chapters.length > 1
 
   return (
     <div ref={containerRef} className="space-y-6" dir={languageDirection}>
@@ -184,7 +184,7 @@ export function ScriptureContent({
           >
             {chapterNum}
           </h2>
-          
+
           {/* Verses in this chapter */}
           {versesByChapter[chapterNum].map((verse) => (
         <VerseRenderer
@@ -203,5 +203,4 @@ export function ScriptureContent({
     </div>
   )
 }
-
 

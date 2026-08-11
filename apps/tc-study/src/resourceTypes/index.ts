@@ -23,6 +23,10 @@ export { translationWordsLinksResourceType } from './translationWordsLinks'
 export { obsTranslationNotesResourceType } from './obsTranslationNotes'
 export { obsTranslationWordsLinksResourceType } from './obsTranslationWordsLinks'
 export { obsTranslationQuestionsResourceType } from './obsTranslationQuestions'
+export {
+  combinedHelpsResourceType,
+  obsCombinedHelpsResourceType,
+} from './combinedHelps'
 
 // ===== RESOURCE PANELS INTEGRATION =====
 // HOC for adding inter-panel communication to any viewer

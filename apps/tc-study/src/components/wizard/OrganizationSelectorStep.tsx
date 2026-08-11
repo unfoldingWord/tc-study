@@ -4,24 +4,24 @@
  */
 
 import { useState } from 'react'
-import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
+import { useWizardStore } from '../../lib/stores/wizardStore'
 import { useDoor43Data } from '../../hooks'
 import { Loader2, Building2, AlertCircle, RefreshCw } from 'lucide-react'
 import { SelectableGrid } from '../shared/SelectableGrid'
 
 export function OrganizationSelectorStep() {
   const [searchQuery, setSearchQuery] = useState('')
-  
-  const selectedLanguages = useWorkspaceStore((state) => state.selectedLanguages)
-  const selectedOrganizations = useWorkspaceStore((state) => state.selectedOrganizations)
-  const toggleOrganization = useWorkspaceStore((state) => state.toggleOrganization)
-  const setAvailableOrganizations = useWorkspaceStore((state) => state.setAvailableOrganizations)
+
+  const selectedLanguages = useWizardStore((state) => state.selectedLanguages)
+  const selectedOrganizations = useWizardStore((state) => state.selectedOrganizations)
+  const toggleOrganization = useWizardStore((state) => state.toggleOrganization)
+  const setAvailableOrganizations = useWizardStore((state) => state.setAvailableOrganizations)
 
   // Use shared hook for Door43 data fetching
   const { data: organizations, loading: isLoading, error, retry } = useDoor43Data({
     fetchFn: async (client, filters) => {
-      console.log('🔍 Loading organizations with filters:', filters)
-      console.log('   Selected languages:', Array.from(selectedLanguages))
+
+
 
       const orgs = await client.getOrganizations({
         languages: Array.from(selectedLanguages),
@@ -29,10 +29,10 @@ export function OrganizationSelectorStep() {
         stage: filters.stage,
         topic: filters.topic,
       })
-      
-      console.log('🏢 Found', orgs.length, 'organizations')
-      console.log('   (filtered by', selectedLanguages.size, 'languages and', filters.subjects?.length || 0, 'subjects)')
-      
+
+
+
+
       // Transform to consistent format
       const transformed = orgs.map(org => ({
         id: org.id,
@@ -41,10 +41,10 @@ export function OrganizationSelectorStep() {
         description: org.description,
         avatarUrl: org.avatar_url,
       }))
-      
+
       // Update workspace store
       setAvailableOrganizations(transformed)
-      
+
       return transformed
     },
     dependencies: [selectedLanguages.size], // Reload when languages change
@@ -66,7 +66,7 @@ export function OrganizationSelectorStep() {
       </div>
     )
   }
-  
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -82,7 +82,7 @@ export function OrganizationSelectorStep() {
       </div>
     )
   }
-  
+
   if (selectedLanguages.size === 0) {
     return (
       <div className="text-center py-20">
@@ -120,16 +120,16 @@ export function OrganizationSelectorStep() {
             selected={selectedOrganizations}
             onToggle={toggleOrganization}
             getKey={(org) => org.username}
-            renderItem={(org, isSelected) => (
+            renderItem={(org, _isSelected) => (
               <>
                 {org.avatarUrl && (
-                  <img 
-                    src={org.avatarUrl} 
+                  <img
+                    src={org.avatarUrl}
                     alt=""
                     className="w-10 h-10 rounded-full mb-2"
                   />
                 )}
-                
+
                 <div className="font-semibold text-gray-900 mb-0.5 pr-6 truncate">{org.name}</div>
                 <div className="text-sm text-gray-500 truncate">{org.username}</div>
               </>

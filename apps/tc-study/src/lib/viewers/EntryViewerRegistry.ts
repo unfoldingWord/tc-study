@@ -17,13 +17,13 @@ export interface BaseEntryViewerProps {
   /** Entry identifier within the resource (e.g., 'bible/kt/grace') */
   entryId: string
   /** Resource metadata (optional, may be loaded by viewer) */
-  metadata?: any
+  metadata?: Record<string, unknown>
   /** Text direction for RTL languages (e.g. Arabic) */
   direction?: 'ltr' | 'rtl'
   /** Handler for navigating to other entries */
   onEntryLinkClick?: (resourceId: string, entryId?: string) => void
   /** Callback when entry content is loaded (for floating button title display) */
-  onContentLoaded?: (content: any) => void
+  onContentLoaded?: (content: unknown) => void
 }
 
 /**
@@ -74,7 +74,7 @@ export class EntryViewerRegistry {
     }
     
     this.viewers.set(registration.id, registration)
-    console.log(`[EntryViewerRegistry] ✅ Registered entry viewer: ${registration.name} (${registration.id})`)
+
   }
 
   /**
@@ -83,7 +83,7 @@ export class EntryViewerRegistry {
   unregister(id: string): boolean {
     const removed = this.viewers.delete(id)
     if (removed) {
-      console.log(`[EntryViewerRegistry] ❌ Unregistered entry viewer: ${id}`)
+      // intentionally empty
     }
     return removed
   }
@@ -108,7 +108,7 @@ export class EntryViewerRegistry {
     for (const registration of sortedViewers) {
       try {
         if (registration.matcher(metadata)) {
-          console.log(`[EntryViewerRegistry] ✅ Found entry viewer: ${registration.name} for`, metadata)
+
           return registration.viewer
         }
       } catch (error) {
@@ -147,7 +147,7 @@ export class EntryViewerRegistry {
    */
   clear(): void {
     this.viewers.clear()
-    console.log('[EntryViewerRegistry] 🗑️ Cleared all entry viewers')
+
   }
 }
 
@@ -174,7 +174,7 @@ export function createSubjectMatcher(subject: string): EntryViewerMatcher {
  * Helper function to create a custom matcher
  */
 export function createCustomMatcher(
-  predicate: (metadata: any) => boolean
+  predicate: EntryViewerMatcher
 ): EntryViewerMatcher {
   return predicate
 }

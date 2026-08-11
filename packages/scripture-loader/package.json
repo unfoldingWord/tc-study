@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "echo \"Tests coming soon\""
+    "test": "node -e \"console.error('ERROR: scripture-loader has no real tests'); process.exit(1)\""
   },
   "keywords": [
     "bible",

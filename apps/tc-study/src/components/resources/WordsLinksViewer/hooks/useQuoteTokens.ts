@@ -20,7 +20,7 @@
 import { useMemo } from 'react'
 import { useCurrentReference } from '../../../../contexts'
 import type { TranslationWordsLink } from '../types'
-import { buildQuoteTokens } from '../utils'
+import { buildQuoteTokens } from '../../../../features/helps/quoteTokens'
 import { useOriginalLanguageContent } from './useOriginalLanguageContent'
 
 interface UseQuoteTokensOptions {
@@ -79,7 +79,7 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
     })
     
     return linksWithQuotes
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- only book/chapter are read; verse/endChapter/endVerse are not used in the body
+   
   }, [links, originalContent, currentRef.book, currentRef.chapter])
   
   return {

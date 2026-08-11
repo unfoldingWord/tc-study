@@ -21,9 +21,13 @@ if [ ! -f "package.json" ]; then
     exit 1
 fi
 
-# Step 1: Build the app
-echo -e "${BLUE}📦 Step 1: Building the application...${NC}"
-bun run build:skip-check
+# Step 1: Quality gates (must pass — local deploy is not a skip-check path)
+echo -e "${BLUE}🧪 Step 1: Running check (test + type-check + lint)...${NC}"
+bun run check
+
+# Step 2: Build the app
+echo -e "${BLUE}📦 Step 2: Building the application...${NC}"
+bun run build
 
 if [ ! -d "dist" ]; then
     echo -e "${RED}❌ Build failed - dist directory not found${NC}"
@@ -33,8 +37,12 @@ fi
 echo -e "${GREEN}✅ Build successful!${NC}"
 echo ""
 
-# Step 2: Check authentication
-echo -e "${BLUE}🔐 Step 2: Checking Cloudflare authentication...${NC}"
+# Match CI/Pages post-process (same strip as e2e + GitHub deploy)
+echo -e "${BLUE}🧹 Stripping dist/preloaded JSON (deploy parity)...${NC}"
+node scripts/strip-preloaded-from-dist.cjs
+
+# Step 3: Check authentication
+echo -e "${BLUE}🔐 Step 3: Checking Cloudflare authentication...${NC}"
 
 if bunx wrangler whoami > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Already logged in to Cloudflare${NC}"
@@ -52,8 +60,8 @@ fi
 
 echo ""
 
-# Step 3: Deploy
-echo -e "${BLUE}🌐 Step 3: Deploying to Cloudflare Pages...${NC}"
+# Step 4: Deploy
+echo -e "${BLUE}🌐 Step 4: Deploying to Cloudflare Pages...${NC}"
 
 # Use project name from wrangler.toml or default to "tc-study"
 PROJECT_NAME="${1:-tc-study}"

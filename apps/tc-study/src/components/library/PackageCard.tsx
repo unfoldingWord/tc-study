@@ -2,7 +2,7 @@
  * Package card for library view
  */
 
-import { BookOpen, Trash2, Download, Calendar, Settings, FolderOpen, Loader, AlertCircle, CheckCircle } from 'lucide-react'
+import { BookOpen, Trash2, Settings, FolderOpen, Loader, AlertCircle, CheckCircle } from 'lucide-react'
 import type { ResourcePackage } from '../../lib/storage/types'
 
 interface PackageCardProps {
@@ -14,7 +14,7 @@ interface PackageCardProps {
 }
 
 export function PackageCard({ package: pkg, onOpen, onDelete, onManage, isActive }: PackageCardProps) {
-  const formatDate = (dateStr: string) => {
+  const _formatDate = (dateStr: string) => {
     try {
       return new Date(dateStr).toLocaleDateString()
     } catch {
@@ -28,7 +28,7 @@ export function PackageCard({ package: pkg, onOpen, onDelete, onManage, isActive
     return `${mb.toFixed(1)} MB`
   }
 
-  const getStatusColor = (status: string) => {
+  const _getStatusColor = (status: string) => {
     switch (status) {
       case 'installed': return 'bg-green-100 text-green-800'
       case 'installing': return 'bg-blue-100 text-blue-800'
@@ -39,8 +39,8 @@ export function PackageCard({ package: pkg, onOpen, onDelete, onManage, isActive
 
   return (
     <div className={`group relative rounded-2xl border bg-white p-5 transition-all hover:shadow-md ${
-      isActive 
-        ? 'border-blue-200 ring-2 ring-blue-100' 
+      isActive
+        ? 'border-blue-200 ring-2 ring-blue-100'
         : 'border-gray-100'
     }`}>
       {/* Active Badge */}
@@ -83,7 +83,7 @@ export function PackageCard({ package: pkg, onOpen, onDelete, onManage, isActive
           <div className="flex items-center gap-2 mb-2">
             <Loader className="w-4 h-4 text-blue-600 animate-spin" />
             <div className="flex-1 h-1.5 overflow-hidden rounded-full bg-gray-100">
-              <div 
+              <div
                 className="h-full bg-blue-600 transition-all"
                 style={{ width: `${(pkg as { downloadProgress?: number }).downloadProgress ?? 0}%` }}
               />

@@ -1,80 +1,66 @@
 /**
  * Resource Type Initializer
- * 
- * Registers resource types AFTER contexts are mounted to avoid circular dependencies
+ *
+ * Registers resource types AFTER contexts are mounted to avoid circular dependencies.
+ * Modal-only types (words, academy) omit viewer in their plugin definitions.
+ *
+ * Reports completion/failure to CatalogContext so app ready (`useCatalogReady`)
+ * means services + types registered — not "catalog downloaded".
+ * Fail-closed: missing/invalid listed export OR incomplete registry
+ * calls markResourceTypesFailed; never marks ready on partial success.
  */
 
-import { useEffect, useState } from 'react'
-import { useResourceTypeRegistry } from '../contexts'
+import { useEffect } from 'react'
+import { useCatalog, useResourceTypeRegistry } from '../contexts'
+import {
+  assertAllPluginsRegistered,
+  collectRequiredPluginDefs,
+} from '../resourceTypes/assertAllPluginsRegistered'
+import { RESOURCE_TYPE_PLUGIN_EXPORTS } from '../resourceTypes/pluginRegistry'
+import type { ResourceTypeDefinition } from '@bt-synergy/resource-types'
 
 export function ResourceTypeInitializer() {
   const registry = useResourceTypeRegistry()
-  const [initialized, setInitialized] = useState(false)
+  const { resourceTypesReady, resourceTypesError, markResourceTypesReady, markResourceTypesFailed } =
+    useCatalog()
 
   useEffect(() => {
+    if (resourceTypesReady || resourceTypesError) return
+
     const registerResourceTypes = async () => {
       try {
-        console.log('📦 [Initializer] Registering resource types...')
-        
-        // Dynamic import to avoid circular dependencies
-        const {
-          scriptureResourceType,
-          obsResourceType,
-          translationWordsResourceType,
-          translationWordsLinksResourceType,
-          translationAcademyResourceType,
-          translationNotesResourceType,
-          translationQuestionsResourceType,
-          obsTranslationNotesResourceType,
-          obsTranslationWordsLinksResourceType,
-          obsTranslationQuestionsResourceType,
-        } = await import('../resourceTypes')
-        
-        const registerIfNew = (def: { id: string }) => {
-          if (!registry.has(def.id)) registry.register(def as any)
+
+        const plugins = await import('../resourceTypes')
+        const defs = collectRequiredPluginDefs(
+          RESOURCE_TYPE_PLUGIN_EXPORTS,
+          plugins as Record<string, unknown>
+        )
+        const expectedIds = defs.map((def) => def.id)
+
+        for (const def of defs) {
+          if (!registry.has(def.id)) registry.register(def as ResourceTypeDefinition)
         }
-        registerIfNew(scriptureResourceType)
-        registerIfNew(obsResourceType)
-        registerIfNew(translationWordsLinksResourceType)
-        registerIfNew(translationNotesResourceType)
-        registerIfNew(translationQuestionsResourceType)
-        registerIfNew(obsTranslationNotesResourceType)
-        registerIfNew(obsTranslationWordsLinksResourceType)
-        registerIfNew(obsTranslationQuestionsResourceType)
-        
-        // TESTING: Register TW and TA without viewers (modal-only resources)
-        // We create modified versions that only have the loader, no viewer
-        console.log('📦 [Initializer] Registering modal-only resources (TW, TA)...')
-        
-        // Translation Words (modal-only)
-        const twModalOnly = {
-          ...translationWordsResourceType,
-          viewer: undefined // Remove viewer so it won't appear as a tab
-        }
-        registerIfNew(twModalOnly)
-        
-        // Translation Academy (modal-only)
-        const taModalOnly = {
-          ...translationAcademyResourceType,
-          viewer: undefined // Remove viewer so it won't appear as a tab
-        }
-        registerIfNew(taModalOnly)
-        
-        console.log('📦 [Initializer] ✅ Resource types registered')
-        setInitialized(true)
-        
-        // Signal global readiness
-        ;(window as any).__resourceTypesInitialized__ = true
+
+        assertAllPluginsRegistered(
+          expectedIds,
+          registry.getAll().map((t) => t.id)
+        )
+
+        markResourceTypesReady()
       } catch (error) {
         console.error('📦 [Initializer] ❌ Failed to register resource types:', error)
-        // Still mark as initialized to prevent blocking the app
-        setInitialized(true)
+        markResourceTypesFailed(error)
       }
     }
 
-    registerResourceTypes()
-  }, [registry])
+    void registerResourceTypes()
+  }, [
+    registry,
+    resourceTypesReady,
+    resourceTypesError,
+    markResourceTypesReady,
+    markResourceTypesFailed,
+  ])
 
-  // Don't block rendering - just do initialization in background
   return null
 }

@@ -1,4 +1,4 @@
-import { Download, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Download, CheckCircle2, Loader2 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
 
@@ -44,7 +44,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
 
   // Calculate progress values BEFORE conditional return (for useEffect dependencies)
   const useIngredients = progress?.totalIngredients !== undefined && progress.totalIngredients > 0
-  const completed = useIngredients 
+  const completed = useIngredients
     ? (progress?.completedIngredients || 0)
     : (progress?.completedResources || 0)
   const total = useIngredients
@@ -53,7 +53,11 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
   const failed = useIngredients
     ? (progress?.failedIngredients || 0)
     : (progress?.failedResources || 0)
-  const overallProgress = progress?.overallProgress || 0
+  // Prefer completed/total so badge matches detail when overallProgress lags at 0
+  const overallProgress =
+    total > 0
+      ? Math.round((completed / total) * 100)
+      : (progress?.overallProgress || 0)
 
   const elapsedMs = startedAt != null ? now - startedAt : 0
   const elapsedLabel = (() => {
@@ -61,11 +65,11 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
     const m = Math.floor(s / 60)
     return m > 0 ? `${m}m ${s % 60}s` : `${s}s`
   })()
-  
+
   // Debug log for key state changes (MUST be before conditional return)
   useEffect(() => {
     if (progress && !isDownloading && completed === total && total > 0) {
-      console.log('[BG-DL] 🎨 UI ✅ All downloads complete!', { completed, total, failed })
+      // intentionally empty
     }
   }, [isDownloading, completed, total, failed, progress])
 
@@ -81,13 +85,14 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
         title="Download progress"
+        aria-label="Download progress"
       >
         {isDownloading ? (
           <Loader2 className="w-5 h-5 text-green-600 animate-spin" />
         ) : (
           <CheckCircle2 className="w-5 h-5 text-green-600" />
         )}
-        
+
         {/* Badge with percentage */}
         {isDownloading && (
           <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[10px] font-medium px-1 rounded-full min-w-[20px] text-center">
@@ -96,9 +101,9 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
         )}
       </button>
 
-      {/* Dropdown - opens upward (nav bar is at bottom) */}
+      {/* Mobile: bar at bottom → open up; md+: bar at top → open down */}
       {isOpen && (
-        <div className="absolute bottom-full right-0 mb-1 bg-white rounded-lg shadow-lg border border-gray-200 p-3 min-w-[280px] z-50">
+        <div className="absolute right-0 bottom-full mb-1 md:top-full md:bottom-auto md:mt-1 md:mb-0 bg-white rounded-lg shadow-lg border border-gray-200 p-3 min-w-[280px] z-50">
           {/* Header */}
           <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
             <Download className="w-4 h-4 text-gray-600" />

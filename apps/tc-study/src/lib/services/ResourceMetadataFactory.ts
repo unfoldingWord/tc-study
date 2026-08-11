@@ -9,6 +9,7 @@
  */
 
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
+import type { Door43Resource as ApiDoor43Resource } from '@bt-synergy/door43-api'
 import type { ResourceMetadata, ResourceIngredient } from '@bt-synergy/resource-catalog'
 import { LocationType, ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 
@@ -17,7 +18,7 @@ import { LocationType, ResourceFormat, ResourceType } from '@bt-synergy/resource
  */
 export type IngredientsGenerator = (
   door43Resource: Door43Resource,
-  door43Client: any
+  door43Client: ReturnType<typeof getDoor43ApiClient>
 ) => Promise<ResourceIngredient[]>
 
 /**
@@ -27,9 +28,12 @@ export interface Door43Resource {
   id: string
   name: string
   title?: string
+  /** DCS display abbreviation (may differ from `id`, e.g. glt → tpl). */
+  abbreviation?: string
   owner: string
   language: string
   language_title?: string
+  language_direction?: 'ltr' | 'rtl'
   subject: string
   version: string
   format?: string
@@ -41,7 +45,16 @@ export interface Door43Resource {
   tarball_url?: string
   html_url?: string
   server?: string
-  [key: string]: any
+  tag_name?: string
+  branch_or_tag_name?: string
+  release?: {
+    tag_name?: string
+    zipball_url?: string
+    tarball_url?: string
+    published_at?: string
+    html_url?: string
+  }
+  ingredients?: ResourceIngredient[]
 }
 
 /**
@@ -67,10 +80,17 @@ export interface MetadataCreationOptions {
   getResourceType?: (subject: string, format?: string) => ResourceType | string
   
   /** Resource type registry for extensible ingredients generation */
-  resourceTypeRegistry?: any
+  resourceTypeRegistry?: {
+    getTypeForSubject: (subject: string) => string | undefined
+    get: (typeId: string) =>
+      | { ingredientsGenerator?: IngredientsGenerator }
+      | undefined
+  }
   
   /** Catalog adapter to check for existing metadata and mutate it instead of creating new */
-  catalogAdapter?: any
+  catalogAdapter?: {
+    get: (resourceKey: string) => Promise<ResourceMetadata | null | undefined>
+  }
   
   /** Debug logging */
   debug?: boolean
@@ -96,9 +116,7 @@ export async function createResourceMetadata(
     debug = false
   } = options
   
-  if (debug) {
-    console.log(`📦 Creating metadata for ${door43Resource.owner}/${door43Resource.language}/${door43Resource.id}`)
-  }
+
   
   // Step 1: Extract base metadata from Door43 resource
   // Use standard app resource key format: owner/language/resourceId (forward slashes)
@@ -110,20 +128,15 @@ export async function createResourceMetadata(
   let existingMetadata: ResourceMetadata | null = null
   if (options.catalogAdapter) {
     try {
-      existingMetadata = await options.catalogAdapter.get(resourceKey)
+      existingMetadata = (await options.catalogAdapter.get(resourceKey)) ?? null
       if (existingMetadata) {
         const existingIngredientsCount = existingMetadata.contentMetadata?.ingredients?.length || 0
         if (existingIngredientsCount > 10) {
-          if (debug) {
-            console.log(`  ✨ Found existing metadata with ${existingIngredientsCount} complete ingredients - returning early to avoid regeneration`)
-          }
+
           // Return existing metadata if it has complete ingredients - no need to regenerate
           return existingMetadata
-        } else if (existingIngredientsCount > 0) {
-          if (debug) {
-            console.log(`  🔄 Found existing metadata with incomplete ingredients (${existingIngredientsCount}) - will update with generated ingredients`)
-          }
         }
+        // existingIngredientsCount > 0 but incomplete: fall through to regenerate
       }
     } catch (error) {
       if (debug) {
@@ -138,21 +151,14 @@ export async function createResourceMetadata(
   
   if (includeEnrichment && door43Resource.metadata_url) {
     try {
-      if (debug) {
-        console.log(`  📄 Enriching from ${door43Resource.metadata_url}`)
-      }
+
       
       const door43Client = getDoor43ApiClient({ debug })
-      enrichmentData = await door43Client.enrichResourceMetadata(door43Resource)
+      enrichmentData = await door43Client.enrichResourceMetadata(
+        door43Resource as ApiDoor43Resource
+      )
       
-      if (debug) {
-        console.log(`  ✅ Enrichment complete:`, {
-          hasReadme: !!enrichmentData.readme,
-          readmeLength: enrichmentData.readme?.length || 0,
-          hasLicense: !!enrichmentData.license,
-          ingredientsFromCatalog: door43Resource.ingredients?.length || 0
-        })
-      }
+
     } catch (error) {
       console.warn(`  ⚠️ Enrichment failed for ${resourceKey}:`, error)
       // Continue with base metadata
@@ -171,7 +177,12 @@ export async function createResourceMetadata(
   if (typeof resourceTypeOrId === 'string') {
     resourceTypeId = resourceTypeOrId // Already a string ID from registry
     // Convert string ID back to enum for mapContentStructure
-    resourceTypeEnum = (ResourceType as any)[resourceTypeOrId.toUpperCase()] || ResourceType.UNKNOWN
+    const enumKey = resourceTypeOrId.toUpperCase() as keyof typeof ResourceType
+    const mapped = ResourceType[enumKey]
+    resourceTypeEnum =
+      typeof mapped === 'number' || typeof mapped === 'string'
+        ? (mapped as ResourceType)
+        : ResourceType.UNKNOWN
   } else {
     resourceTypeEnum = resourceTypeOrId // Already an enum
     // Convert enum to string ID (e.g., ResourceType.WORDS -> "words")
@@ -183,13 +194,7 @@ export async function createResourceMetadata(
   let ingredients = door43Resource.ingredients || undefined
   
   // Debug: Log ingredients from Door43
-  if (debug && ingredients) {
-    console.log(`  📋 Ingredients from Door43 catalog:`, {
-      count: ingredients.length,
-      sample: ingredients.slice(0, 3),
-      hasPath: ingredients[0]?.path !== undefined
-    })
-  }
+
   
   if (options.resourceTypeRegistry) {
     try {
@@ -198,9 +203,7 @@ export async function createResourceMetadata(
       const resourceTypeDef = options.resourceTypeRegistry.get(typeId)
       
       if (resourceTypeDef?.ingredientsGenerator) {
-        if (debug) {
-          console.log(`  🔨 Generating ingredients using ${resourceTypeDef.id} generator...`)
-        }
+
         
         // Create Door43ApiClient configured with the resource's server
         const server = door43Resource.server || 'git.door43.org'
@@ -209,53 +212,29 @@ export async function createResourceMetadata(
           debug 
         })
         
-        if (debug) {
-          console.log(`  📋 Resource data passed to ingredientsGenerator:`, {
-            owner: door43Resource.owner,
-            language: door43Resource.language,
-            id: door43Resource.id,
-            release: door43Resource.release,
-            releaseTagName: door43Resource.release?.tag_name,
-            version: door43Resource.version,
-            allKeys: Object.keys(door43Resource)
-          })
-        }
+
         
         const generatedIngredients = await resourceTypeDef.ingredientsGenerator(door43Resource, door43Client)
         
-        if (debug) {
-          console.log(`  📊 Ingredients generator returned:`, {
-            count: generatedIngredients?.length || 0,
-            isArray: Array.isArray(generatedIngredients),
-            sample: generatedIngredients?.slice(0, 3)
-          })
-        }
+
         
         if (generatedIngredients && generatedIngredients.length > 0) {
           ingredients = generatedIngredients
-          if (debug) {
-            console.log(`  ✅ Generated ${ingredients.length} ingredients`)
-          }
+
           
           // If we have existing metadata, mutate it with generated ingredients instead of creating new
           if (existingMetadata) {
             if (!existingMetadata.contentMetadata) {
               existingMetadata.contentMetadata = {}
             }
-            existingMetadata.contentMetadata.ingredients = generatedIngredients.map((ing: any) => ({
-              identifier: ing.identifier || ing.id,
-              title: ing.title || ing.name,
+            existingMetadata.contentMetadata.ingredients = generatedIngredients.map((ing) => ({
+              identifier: ing.identifier,
+              title: ing.title,
               path: ing.path || '',
               categories: ing.categories || []
             }))
-            if (debug) {
-              console.log(`  🔄 Mutated existing metadata with ${generatedIngredients.length} generated ingredients`)
-            }
+
             return existingMetadata
-          }
-        } else {
-          if (debug) {
-            console.log(`  ⚠️ Generated ingredients is empty or invalid, using catalog API ingredients`)
           }
         }
       }
@@ -268,11 +247,17 @@ export async function createResourceMetadata(
     }
   }
   
+  const abbreviation =
+    typeof door43Resource.abbreviation === 'string' && door43Resource.abbreviation.trim()
+      ? door43Resource.abbreviation.trim()
+      : undefined
+
   // Step 4: Build complete metadata with standardized field names
   const metadata: ResourceMetadata = {
     // Identity
     resourceKey,
     resourceId: door43Resource.id,
+    ...(abbreviation ? { abbreviation } : {}),
     server: door43Resource.server || 'git.door43.org',
     owner: door43Resource.owner,
     language: door43Resource.language,
@@ -329,32 +314,30 @@ export async function createResourceMetadata(
     // 2. Door43 catalog API response (fallback)
     contentMetadata: {
       ingredients: ingredients,
-      books: ingredients?.map((i: any) => i.identifier),
+      books: ingredients?.map((i) => i.identifier),
     },
     
     // Release information (for ZIP downloads)
-    // Use the release object from Door43 API if available, otherwise construct from available fields
-    release: door43Resource.release ? {
-      tag_name: door43Resource.release.tag_name,
-      zipball_url: door43Resource.release.zipball_url || door43Resource.zipball_url,
-      tarball_url: door43Resource.release.tarball_url || door43Resource.tarball_url,
-      published_at: door43Resource.release.published_at || door43Resource.released,
-      html_url: door43Resource.release.html_url || door43Resource.html_url,
-    } : (door43Resource.zipball_url && door43Resource.release?.tag_name ? {
-      // Construct release object from individual fields if release object structure is incomplete
-      tag_name: door43Resource.release.tag_name,
-      zipball_url: door43Resource.zipball_url,
-      tarball_url: door43Resource.tarball_url,
-      published_at: door43Resource.released,
-      html_url: door43Resource.html_url,
-    } : (() => {
-      // Throw if no release tag - non-released resources will be supported in the future
-      throw new Error(
-        `Resource ${door43Resource.owner}/${door43Resource.id} has no release tag. ` +
-        `Only released resources are currently supported. ` +
-        `Future versions will support non-released resources using commit SHA and last updated timestamp.`
-      );
-    })()),
+    release: (() => {
+      const tag_name = door43Resource.release?.tag_name ?? door43Resource.tag_name
+      const zipball_url =
+        door43Resource.release?.zipball_url || door43Resource.zipball_url
+      if (!tag_name || !zipball_url) {
+        throw new Error(
+          `Resource ${door43Resource.owner}/${door43Resource.id} has no release tag. ` +
+            `Only released resources are currently supported. ` +
+            `Future versions will support non-released resources using commit SHA and last updated timestamp.`
+        )
+      }
+      return {
+        tag_name,
+        zipball_url,
+        tarball_url: door43Resource.release?.tarball_url || door43Resource.tarball_url,
+        published_at:
+          door43Resource.release?.published_at || door43Resource.released || '',
+        html_url: door43Resource.release?.html_url || door43Resource.html_url,
+      }
+    })(),
     
     // URLs
     urls: {

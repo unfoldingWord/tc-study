@@ -8,7 +8,10 @@ import type { TranslationNote } from '@bt-synergy/resource-parsers'
 import { Code, ExternalLink } from 'lucide-react'
 import { memo, startTransition, useCallback, useState } from 'react'
 import { useNavigationStore } from '../../../../contexts'
+import { useAppStore } from '../../../../contexts/AppContext'
+import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
+import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
 import { parseScriptureLink } from '../utils/parseScriptureLink'
 
@@ -21,6 +24,7 @@ interface AlignedToken {
 }
 
 export type NoteWithTokens = TranslationNote & {
+  quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
   alignedTokens?: AlignedToken[]
   semanticIds?: string[]
 }
@@ -65,10 +69,11 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   const currentBook = useNavigationStore((s) => s.currentReference.book)
   const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
 
-  // Extract resource abbreviation (e.g., "ULT" from "unfoldingWord/en/ult")
-  const resourceAbbreviation = targetResourceId 
-    ? targetResourceId.split('/').pop()?.toUpperCase() || ''
-    : ''
+  // DCS abbreviation from AppStore (e.g. glt key → TPL); fall back to key segment
+  const targetScripture = useAppStore((s) =>
+    targetResourceId ? s.loadedResources[targetResourceId] : undefined
+  )
+  const resourceAbbreviation = getResourceBadgeLabel(targetResourceId, targetScripture)
   
   // Stable callback: useNavigationStore.getState() avoids subscribing to the store,
   // preventing re-renders (and cascading MarkdownRenderer effect re-fires) on every
@@ -93,11 +98,6 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         // Construct target resource key
         const targetResourceKey = `${owner}/${language}/${parsed.resourceAbbrev}`
         
-        console.log('🔗 [TN] Opening entry:', {
-          resourceType: parsed.resourceType,
-          targetResourceKey,
-          entryId: parsed.entryId,
-        })
         
         onEntryLinkClick(targetResourceKey, parsed.entryId)
         return
@@ -114,7 +114,6 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
     if (linkType === 'relative' && linkText && currentBook) {
       const scriptureRef = parseScriptureLink(linkText, href, currentBook)
       if (scriptureRef) {
-        console.log('📖 [TN] Navigating to scripture reference:', scriptureRef)
         // Use startTransition to make navigation non-blocking
         startTransition(() => {
           useNavigationStore.getState().navigateToReference(scriptureRef)
@@ -288,7 +287,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
           >
             <ExternalLink className="w-3 h-3" />
             {isLoadingTATitle ? (
-              <span className="italic text-gray-400">Loading...</span>
+              <LoadingSpinner size="sm" label="Loading title" className="text-gray-400" />
             ) : (
               <span>{taTitle}</span>
             )}

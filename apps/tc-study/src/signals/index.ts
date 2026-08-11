@@ -1,13 +1,12 @@
 /**
  * Signal Definitions
- * 
- * All signal types for inter-resource communication.
- * Organized by context:
- * - studioSignals: General studio/production signals
- * - testSignals: Testing and development signals
+ *
+ * - studioSignals: facade (EVENT + STATE aliases + registry)
+ * - studioStateSignals: STATE → `@bt-synergy/resource-panels`
+ * - studioEventSignals: EVENT contracts
+ * - testSignals: testing/dev (import `./testSignals` for TokenClickSignal overlap)
  */
 
-// Studio signals for production use
 export * from './studioSignals'
 
 // Test-only signals (imports should use `./testSignals` for `TokenClickSignal` — name overlaps studio)

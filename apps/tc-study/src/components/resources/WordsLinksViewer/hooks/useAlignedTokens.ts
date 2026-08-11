@@ -1,29 +1,29 @@
 /**
  * useAlignedTokens Hook - STEP 3 of TSV Alignment Algorithm
- * 
+ *
  * Gets aligned tokens from target language scripture for displaying quotes.
  * This is the universal algorithm documented in apps/tc-study/TWL_ALIGNMENT_SYSTEM.md
- * 
+ *
  * Algorithm Flow (Complete):
  * STEP 1: TWL origWords → Original Language tokens (via QuoteMatcher in useQuoteTokens)
  * STEP 2: Extract semantic IDs from original tokens (e.g., "TIT 1:1:Παῦλος:1")
  * STEP 3: Find target tokens where alignedOriginalWordIds contains our semantic IDs
- * 
+ *
  * Semantic ID Matching:
  * - Original token has: id = "TIT 1:1:Παῦλος:1"
  * - Target token has: alignedOriginalWordIds = ["TIT 1:1:Παῦλος:1"]
  * - When they match → target token is part of the aligned quote
- * 
+ *
  * This same algorithm works for:
  * - Translation Words Links (TWL) - uses origWords field
- * - Translation Notes (TN) - uses quote field  
+ * - Translation Notes (TN) - uses quote field
  * - Any TSV resource with quote/origWords + occurrence + reference
  */
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import { useMemo } from 'react'
 import { useCurrentReference } from '../../../../contexts'
-import { generateSemanticIdsForQuoteTokens } from '../utils/generateSemanticIds'
+import { generateSemanticIdsForQuoteTokens } from '../../../../features/helps/quoteTokens'
 import { useScriptureTokens } from './useScriptureTokens'
 
 /** Minimal link shape needed to attach aligned tokens (TN pseudo-links + full TWL rows). */
@@ -62,7 +62,7 @@ function findAlignedTokens(
 ): AlignedToken[] {
   // CRITICAL: Use lowercase to match scripture viewer's semantic ID format!
   const verseRef = `${bookCode.toLowerCase()} ${chapter}:${verse}`
-  
+
   // First, find all matched word token positions
   const matchedPositions: number[] = []
   targetTokens.forEach((token, index) => {
@@ -70,7 +70,7 @@ function findAlignedTokens(
     const alignedIds: unknown[] = Array.isArray(tk.alignedOriginalWordIds)
       ? tk.alignedOriginalWordIds
       : []
-    
+
     // Check if any of the original semantic IDs match
     // Compare case-insensitively (broadcast/USFM may use "TIT 1:1:...", we generate "tit 1:1:...")
     const hasMatch = originalSemanticIds.some(originalId => {
@@ -79,24 +79,24 @@ function findAlignedTokens(
         return alignedIdStr.toLowerCase() === originalId.toLowerCase()
       })
     })
-    
+
     if (hasMatch && token.type === 'word') {
       matchedPositions.push(index)
     }
   })
-  
+
   if (matchedPositions.length === 0) {
     return []
   }
 
   // Now build the result array including words, punctuation, and gaps
   const result: AlignedToken[] = []
-  
+
   matchedPositions.forEach((position, matchIndex) => {
     const token = targetTokens[position]
     const tokenOccurrence = token.occurrence || 1
     const semanticId = `${verseRef}:${token.text}:${tokenOccurrence}`
-    
+
     // Add the matched word
     result.push({
       content: token.text,
@@ -105,7 +105,7 @@ function findAlignedTokens(
       position,
       type: 'word',
     })
-    
+
     // Check if there's a next matched word
     if (matchIndex < matchedPositions.length - 1) {
       const nextPosition = matchedPositions[matchIndex + 1]
@@ -115,7 +115,7 @@ function findAlignedTokens(
         // There are tokens between (gap >= 2)
         const betweenTokens = []
         let hasWordsBetween = false
-        
+
         for (let i = position + 1; i < nextPosition; i++) {
           const token = targetTokens[i]
           if (token.type === 'word') {
@@ -141,7 +141,7 @@ function findAlignedTokens(
             betweenTokens.push(marked)
           }
         }
-        
+
         if (hasWordsBetween) {
           // There are words between - add gap ellipsis
           result.push({
@@ -158,20 +158,20 @@ function findAlignedTokens(
       }
     }
   })
-  
+
   return result
 }
 
 export function useAlignedTokens<TLink extends LinkQuotesInput>({
-  resourceKey,
+  resourceKey: _resourceKey,
   resourceId,
   links,
 }: UseAlignedTokensOptions<TLink>) {
   const currentRef = useCurrentReference()
-  
+
   // Listen for scripture token broadcasts (simple state listener!)
   const { tokens: targetTokens, reference: tokenReference, hasTokens } = useScriptureTokens({ resourceId })
-  
+
   // Build aligned tokens for each link
   const linksWithAlignedTokens = useMemo((): Array<
     TLink & { alignedTokens: AlignedToken[] | undefined; semanticIds?: string[] }
@@ -251,9 +251,9 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     })
 
     return linksWithAlignedTokens
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- verse/endChapter/endVerse not read; tokenReference already encodes broadcast range
+
   }, [links, targetTokens, tokenReference, hasTokens, currentRef.book, currentRef.chapter])
-  
+
   return {
     linksWithAlignedTokens,
     loading: false, // No loading state needed with broadcast!

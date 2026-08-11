@@ -7,19 +7,23 @@
  */
 
 import { useState } from 'react'
+import type { ResourceInfo } from '../../contexts/types'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
+import { useWizardStore } from '../../lib/stores/wizardStore'
+import {
+  assignResourceToPanel,
+  removeResourceFromPanel,
+} from '../../features/workspace/resourceMutations'
 import { Layers, GripVertical, X, Plus, Monitor } from 'lucide-react'
 
 export function PanelAssignmentStep() {
   const [draggedResource, setDraggedResource] = useState<string | null>(null)
   const [dragOverPanel, setDragOverPanel] = useState<'panel-1' | 'panel-2' | null>(null)
   
-  const selectedResourceKeys = useWorkspaceStore((state) => state.selectedResourceKeys)
-  const availableResources = useWorkspaceStore((state) => state.availableResources)
+  const selectedResourceKeys = useWizardStore((state) => state.selectedResourceKeys)
+  const availableResources = useWizardStore((state) => state.availableResources)
   const currentPackage = useWorkspaceStore((state) => state.currentPackage)
   
-  const assignResourceToPanel = useWorkspaceStore((state) => state.assignResourceToPanel)
-  const removeResourceFromPanel = useWorkspaceStore((state) => state.removeResourceFromPanel)
   const setActiveResourceInPanel = useWorkspaceStore((state) => state.setActiveResourceInPanel)
   
   if (!currentPackage) {
@@ -33,7 +37,7 @@ export function PanelAssignmentStep() {
   // Get selected resources that aren't assigned yet, excluding workspace resources
   const unassignedResources = Array.from(selectedResourceKeys)
     .filter(key => {
-      const resource = availableResources.get(key) as any
+      const resource = availableResources.get(key)
       const isInWorkspace = resource?.isInWorkspace
       
       // Skip resources that are already in the workspace collection
@@ -56,10 +60,9 @@ export function PanelAssignmentStep() {
       key,
       info: availableResources.get(key)
     }))
-    .filter(r => {
+    .filter((r): r is { key: string; info: ResourceInfo } => {
       if (!r.info) return false
-      const resource = r.info as any
-      return !resource.isInWorkspace
+      return !r.info.isInWorkspace
     })
     
   const panel2Resources = (panel2?.resourceKeys || [])
@@ -67,10 +70,9 @@ export function PanelAssignmentStep() {
       key,
       info: availableResources.get(key)
     }))
-    .filter(r => {
+    .filter((r): r is { key: string; info: ResourceInfo } => {
       if (!r.info) return false
-      const resource = r.info as any
-      return !resource.isInWorkspace
+      return !r.info.isInWorkspace
     })
   
   // Drag handlers
@@ -118,7 +120,7 @@ export function PanelAssignmentStep() {
     isActive
   }: { 
     resourceKey: string
-    resource: any
+    resource: ResourceInfo
     isDragging?: boolean
     panelId?: 'panel-1' | 'panel-2'
     index?: number
@@ -172,7 +174,7 @@ export function PanelAssignmentStep() {
     activeIndex 
   }: { 
     panelId: 'panel-1' | 'panel-2'
-    resources: Array<{ key: string; info: any }>
+    resources: Array<{ key: string; info: ResourceInfo }>
     activeIndex: number
   }) => (
     <div className="flex flex-col h-full">
@@ -256,14 +258,16 @@ export function PanelAssignmentStep() {
             Unassigned Resources ({unassignedResources.length})
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {unassignedResources.map(({ key, info }) => (
-              <ResourceCard
-                key={key}
-                resourceKey={key}
-                resource={info}
-                isDragging={draggedResource === key}
-              />
-            ))}
+            {unassignedResources.map(({ key, info }) =>
+              info ? (
+                <ResourceCard
+                  key={key}
+                  resourceKey={key}
+                  resource={info}
+                  isDragging={draggedResource === key}
+                />
+              ) : null
+            )}
           </div>
         </div>
       )}
@@ -293,7 +297,7 @@ export function PanelAssignmentStep() {
               <span className="text-gray-600">New Resources:</span>
               <span className="px-2 py-1 bg-blue-100 text-blue-800 font-medium rounded">
                 {Array.from(selectedResourceKeys).filter(key => {
-                  const resource = availableResources.get(key) as any
+                  const resource = availableResources.get(key)
                   return !resource?.isInWorkspace
                 }).length}
               </span>

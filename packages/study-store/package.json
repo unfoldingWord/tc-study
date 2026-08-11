@@ -1,7 +1,8 @@
 {
   "name": "@bt-synergy/study-store",
+  "private": true,
   "version": "0.1.0",
-  "description": "Study store with persistence for managing study sessions",
+  "description": "[ARCHIVED stub] Do not use — tc-study owns its stores (see ARCHIVED.md)",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

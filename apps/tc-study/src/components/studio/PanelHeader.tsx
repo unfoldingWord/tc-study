@@ -1,21 +1,23 @@
 import { ArrowLeftRight, Info, MoreVertical, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { COMBINED_HELPS_IDS, OBS_COMBINED_HELPS_RESOURCE_ID } from '../resources/CombinedHelpsViewer/constants'
+import { useResourceTypeRegistry } from '../../contexts/CatalogContext'
+import type { ResourceInfo } from '../../contexts/types'
+import { useTabDnDOptional } from '../../features/dnd/TabDnDContext'
+import { resolveTabPresentationFromRegistry } from '../../features/tabs'
 import { ResourceInfoModal } from './ResourceInfoModal'
 import { ResourceTabs } from './ResourceTabs'
 
 interface PanelHeaderProps {
-  panelNumber: 1 | 2
-  resources: any[]
+  resources: ResourceInfo[]
   currentIndex: number
-  currentResource: any
+  currentResource: ResourceInfo | null | undefined
   onIndexChange: (index: number) => void
   onRemove: () => void
   /** Move current resource to the other panel. When provided, shows menu item. */
   onMoveToOtherPanel?: () => void
   colorScheme: 'blue' | 'purple'
-  /** Panel id (e.g. 'panel-1'). Required for dnd-kit sortable tabs. */
-  panelId?: string
+  /** Panel id (e.g. 'panel-1'). Required for tab pointer DnD. */
+  panelId: string
   /** Show a ghost placeholder tab when dragging from another panel */
   showDropPlaceholder?: boolean
   /** Label for the placeholder tab */
@@ -24,40 +26,7 @@ interface PanelHeaderProps {
   placeholderIndex?: number | null
 }
 
-const getResourceId = (resource: any): string => {
-  const key = resource?.key || resource?.id || ''
-  if (key === OBS_COMBINED_HELPS_RESOURCE_ID) {
-    return 'OBS Helps'
-  }
-  if (COMBINED_HELPS_IDS.has(key) || resource?.type === 'combined-helps') {
-    return 'Helps'
-  }
-  if (resource?.key) {
-    const parts = resource.key.split('/')
-    const lastPart = parts[parts.length - 1] || ''
-    if (lastPart) return lastPart.toUpperCase()
-  }
-  if (resource?.title) {
-    const t = resource.title
-    if (t.includes('Greek New Testament')) return 'UGNT'
-    if (t.includes('Hebrew Old Testament')) return 'UHB'
-    if (t.includes('Literal Text')) return 'ULT'
-    if (t.includes('Simplified Text')) return 'UST'
-    if (t.includes('Translation Notes')) return 'UTN'
-    if (t.includes('Translation Words')) return 'UTW'
-    if (t.includes('Translation Questions')) return 'UTQ'
-    if (t.includes('Translation Academy')) return 'UTA'
-    const words = t.split(/\s+/)
-    for (const w of words) {
-      if (['unfoldingWord', 'the', 'a', 'an', 'of'].includes(w)) continue
-      return w.substring(0, 4).toUpperCase()
-    }
-  }
-  return 'N/A'
-}
-
 export function PanelHeader({
-  panelNumber,
   resources,
   currentIndex,
   currentResource,
@@ -65,12 +34,13 @@ export function PanelHeader({
   onRemove,
   onMoveToOtherPanel,
   colorScheme,
-  panelId: panelIdProp,
+  panelId,
   showDropPlaceholder = false,
   placeholderLabel = '',
   placeholderIndex = null,
 }: PanelHeaderProps) {
-  const panelId = panelIdProp ?? `panel-${panelNumber}`
+  const registry = useResourceTypeRegistry()
+  const { activeIcon } = useTabDnDOptional()
   const [showInfoModal, setShowInfoModal] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -87,13 +57,11 @@ export function PanelHeader({
   const colors = {
     blue: {
       gradient: 'from-blue-50 to-gray-50',
-      badge: 'bg-blue-100 text-blue-600',
       button: 'hover:bg-blue-100 active:bg-blue-200',
       icon: 'text-blue-600',
     },
     purple: {
       gradient: 'from-purple-50 to-gray-50',
-      badge: 'bg-purple-100 text-purple-600',
       button: 'hover:bg-purple-100 active:bg-purple-200',
       icon: 'text-purple-600',
     },
@@ -103,22 +71,18 @@ export function PanelHeader({
   return (
     <div className={`px-2 pt-1.5 pb-0 md:px-3 md:pt-2 md:pb-0 bg-gradient-to-r ${c.gradient}`}>
       <div className="flex items-center gap-2 min-w-0">
-        <div
-          className={`w-5 h-5 rounded ${c.badge} flex items-center justify-center font-semibold text-xs flex-shrink-0`}
-          title={`Panel ${panelNumber}`}
-        >
-          {panelNumber}
-        </div>
-
         <ResourceTabs
           resources={resources}
           currentIndex={currentIndex}
           onIndexChange={onIndexChange}
-          getResourceId={getResourceId}
+          getTabPresentation={(r) =>
+            resolveTabPresentationFromRegistry(r as ResourceInfo, registry)
+          }
           colorScheme={colorScheme}
           panelId={panelId}
           showDropPlaceholder={showDropPlaceholder}
           placeholderLabel={placeholderLabel}
+          placeholderIcon={activeIcon}
           placeholderIndex={placeholderIndex}
         />
 
@@ -126,13 +90,13 @@ export function PanelHeader({
           <div className="relative flex-shrink-0" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
-              className={`p-1.5 rounded ${c.button} transition-colors`}
+              className={`p-2.5 min-w-10 min-h-10 flex items-center justify-center rounded ${c.button} transition-colors`}
               title="Actions"
               aria-label="Resource actions"
               aria-expanded={menuOpen}
               aria-haspopup="true"
             >
-              <MoreVertical className={`w-4 h-4 ${c.icon}`} />
+              <MoreVertical className={`w-5 h-5 ${c.icon}`} />
             </button>
             {menuOpen && (
               <div
@@ -187,7 +151,19 @@ export function PanelHeader({
         <ResourceInfoModal
           isOpen={showInfoModal}
           onClose={() => setShowInfoModal(false)}
-          resource={currentResource}
+          resource={{
+            title: currentResource.title,
+            key: currentResource.key,
+            owner: currentResource.owner,
+            languageCode: currentResource.languageCode ?? currentResource.language,
+            subject: currentResource.subject,
+            description: currentResource.description,
+            readme: currentResource.readme,
+            license:
+              typeof currentResource.license === 'string'
+                ? currentResource.license
+                : currentResource.license?.id,
+          }}
         />
       )}
     </div>

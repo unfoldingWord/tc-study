@@ -1,13 +1,13 @@
 /**
  * useTWTitles Hook
- * 
+ *
  * Fetches and caches Translation Words article titles
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useCatalogManager } from '../../../../contexts'
 import type { TranslationWordsLink } from '../types'
-import { parseTWLink } from '../utils'
+import { parseTWLink } from '../../../../features/helps/quoteTokens'
 
 export function useTWTitles(resourceKey: string) {
   const catalogManager = useCatalogManager()
@@ -15,17 +15,17 @@ export function useTWTitles(resourceKey: string) {
   const [loadingTitles, setLoadingTitles] = useState<Set<string>>(new Set())
   const twTitlesRef = useRef<Map<string, string>>(new Map())
   const fallbackTitlesRef = useRef<Set<string>>(new Set()) // Track which titles are fallbacks
-  
+
   // Fetch TW title for a link from TOC
   const fetchTWTitle = useCallback(async (link: TranslationWordsLink): Promise<string | null> => {
     // Try multiple sources for the TW link
     let linkSource = link.twLink || link.articlePath
-    
+
     // If id looks like an RC link, use it
     if (!linkSource && link.id && link.id.startsWith('rc://')) {
       linkSource = link.id
     }
-    
+
     // If still no link source, we can't fetch the title
     if (!linkSource) {
       console.error(`❌ [TWL Title Fetch] No valid link source found for link:`, {
@@ -35,40 +35,40 @@ export function useTWTitles(resourceKey: string) {
       })
       return null
     }
-    
+
     const twInfo = parseTWLink(linkSource)
-    
+
     // If parsing failed, we can't fetch the title
     if (twInfo.category === 'unknown' || !twInfo.term) {
       console.error(`❌ [TWL Title Fetch] Failed to parse link source: "${linkSource}"`)
       return null
     }
-    
+
     const cacheKey = `${twInfo.category}/${twInfo.term}`
-    
+
     // Check cache first
     if (twTitlesRef.current.has(cacheKey)) {
       return twTitlesRef.current.get(cacheKey) || null
     }
-    
+
     // Check if already loading
     if (loadingTitles.has(cacheKey)) {
       return null
     }
-    
+
     try {
       setLoadingTitles(prev => new Set(prev).add(cacheKey))
-      
+
       // Find TW resource (same language, same owner)
       const parts = resourceKey.split('/')
       if (parts.length < 2) {
         throw new Error(`Invalid resourceKey format: ${resourceKey}`)
       }
-      
+
       const [owner, ...rest] = parts
       let twResourceKey: string
       let language: string
-      
+
       if (rest.length === 1) {
         // Format: "owner/language_resourceId" (e.g., "unfoldingWord/en_twl")
         const langResource = rest[0]
@@ -81,13 +81,13 @@ export function useTWTitles(resourceKey: string) {
       } else {
         throw new Error(`Invalid resourceKey format: ${resourceKey}`)
       }
-      
+
       // Construct article ID to match against TOC
       const articleId = `bible/${twInfo.category}/${twInfo.term}`
-      
+
       // Get TW resource metadata from catalog (contains TOC in ingredients)
       const twMetadata = await catalogManager.getResourceMetadata(twResourceKey)
-      
+
       if (!twMetadata?.contentMetadata?.ingredients) {
         // TW metadata not ready yet - cache the term as fallback to prevent infinite retries
         const fallback = twInfo.term
@@ -96,11 +96,11 @@ export function useTWTitles(resourceKey: string) {
         setTwTitles(prev => new Map(prev).set(cacheKey, fallback))
         return fallback
       }
-      
+
       const ingredients = twMetadata.contentMetadata.ingredients
-      
+
       // Look up title from TOC ingredients
-      const ingredient = ingredients.find((ing: any) => {
+      const ingredient = ingredients.find((ing: { identifier?: string; path?: string; title?: string }) => {
         if (ing.identifier === articleId) return true
         if (ing.path && ing.path.replace(/\.md$/, '') === articleId) return true
         const ingParts = ing.identifier?.split('/') || []
@@ -111,7 +111,7 @@ export function useTWTitles(resourceKey: string) {
         }
         return false
       })
-      
+
       if (!ingredient?.title) {
         // Ingredient not found in TOC - cache the term as fallback
         const fallback = twInfo.term
@@ -120,13 +120,13 @@ export function useTWTitles(resourceKey: string) {
         setTwTitles(prev => new Map(prev).set(cacheKey, fallback))
         return fallback
       }
-      
+
       const title = ingredient.title
       fallbackTitlesRef.current.delete(cacheKey) // Remove from fallback set if it was there
       twTitlesRef.current.set(cacheKey, title)
       setTwTitles(prev => new Map(prev).set(cacheKey, title))
       return title
-    } catch (error) {
+    } catch (_error) {
       // Silently fail - cache term as fallback to prevent infinite retries
       const fallbackTitle = twInfo.term
       twTitlesRef.current.set(cacheKey, fallbackTitle)
@@ -140,14 +140,14 @@ export function useTWTitles(resourceKey: string) {
       })
     }
   }, [resourceKey, catalogManager])
-  
+
   // Get TW title for display
   const getTWTitle = useCallback((link: TranslationWordsLink): string => {
     const twInfo = parseTWLink(link.twLink)
     const cacheKey = `${twInfo.category}/${twInfo.term}`
     return twTitles.get(cacheKey) || twInfo.term
   }, [twTitles])
-  
+
   return {
     twTitles,
     loadingTitles,

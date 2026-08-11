@@ -1,17 +1,19 @@
 /**
- * AppContext - Manages app-level state (resources, packages, workspace)
- * 
+ * AppContext — AppStore read model for loaded resources (Unlock 3 seal).
+ *
  * Responsibilities:
- * - Loaded resources
- * - Active package
- * - Anchor resource (primary scripture that provides book list)
- * - Resource lifecycle
+ * - `loadedResources` projection (read model; not layout membership SoT)
+ * - Anchor / last-active scripture pointers
+ * - Enrichment via `patchLoadedResources` (never creates membership keys)
+ *
+ * Panel membership SoT is `workspaceStore`. Membership upsert/prune lives in
+ * `features/workspace/appStoreMembership.ts` (projector-only) — not on this
+ * store's public action surface.
  */
 
 import { createContext, useContext, ReactNode } from 'react'
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import { ResourceType } from '@bt-synergy/resource-catalog'
 import type { ResourceInfo } from './types'
 
 // ============================================================================
@@ -29,10 +31,12 @@ interface AppState {
 interface AppActions {
   setAnchorResource: (resourceId: string, toc: ResourceInfo['toc']) => void
   setLastActiveScriptureResource: (resourceId: string | null) => void
-  addResource: (resource: ResourceInfo) => void
-  /** Batch update: one store write so one re-render when e.g. Phase 2 metadata is cached. */
-  addResources: (resources: ResourceInfo[]) => void
-  removeResource: (resourceId: string) => void
+  /**
+   * Enrichment-only: patch existing `loadedResources` keys (Phase 2 metadata, etc.).
+   * Never creates membership — missing ids are skipped.
+   * Membership upsert/prune: projector via `appStoreMembership` only.
+   */
+  patchLoadedResources: (resources: ResourceInfo[]) => void
   getResource: (resourceId: string) => ResourceInfo | undefined
   getAnchorResource: () => ResourceInfo | undefined
   /** Resource to use for getBookTitle: last active scripture (has ingredients) else anchor. */
@@ -58,65 +62,47 @@ export const useAppStore = create<AppStore>()(
     },
 
     // Actions
-    setAnchorResource: (resourceId: string, toc) => {
+    setAnchorResource: (resourceId, toc) => {
       set((state) => {
-        // Check if TOC is already set and identical to prevent unnecessary updates
         const existingResource = state.loadedResources[resourceId]
-        if (existingResource?.toc) {
-          // Compare TOC books to see if it's the same
+        // Membership must come from the projector — never stub-create here.
+        if (!existingResource) {
+          console.warn(
+            `⚠️ setAnchorResource called for ${resourceId} but resource doesn't exist in loadedResources!`
+          )
+          return
+        }
+        if (existingResource.toc) {
           const existingBooks = existingResource.toc?.books || []
           const newBooks = toc?.books || []
           if (
             existingBooks.length === newBooks.length &&
             existingBooks.every((b, i) => b.code === newBooks[i]?.code)
           ) {
-            // TOC is already set and identical, skip update to prevent infinite loop
             return
           }
         }
-        
-        // ⚠️ IMPORTANT: DO NOT create a stub resource here!
-        // The resource should already exist with full metadata from addResource()
-        // If it doesn't exist, something is wrong with the initialization order
-        if (!state.loadedResources[resourceId]) {
-          console.warn(`⚠️ setAnchorResource called for ${resourceId} but resource doesn't exist in loadedResources!`)
-          state.loadedResources[resourceId] = {
-            id: resourceId,
-            key: resourceId,
-            title: resourceId,
-            type: ResourceType.SCRIPTURE,
-            category: 'scripture',
-          } as ResourceInfo
-        }
-        // Update with TOC (preserve all existing metadata)
-        state.loadedResources[resourceId].toc = toc
+        existingResource.toc = toc
         state.anchorResourceId = resourceId
         state.isInitialized = true
       })
     },
 
-    addResource: (resource: ResourceInfo) => {
-      set((state) => {
-        // Use resource.id as the storage key to support multiple instances (e.g., "resource#2")
-        // The id field contains the instance ID, while key contains the base resource key
-        state.loadedResources[resource.id] = resource
-      })
-      // Resource added (removed verbose logging)
-    },
-
-    addResources: (resources: ResourceInfo[]) => {
+    patchLoadedResources: (resources: ResourceInfo[]) => {
       if (resources.length === 0) return
       set((state) => {
         for (const resource of resources) {
           const existing = state.loadedResources[resource.id]
-          const existingVerified = existing?.verifiedIngredients
+          if (!existing) continue
+
+          const existingVerified = existing.verifiedIngredients
 
           // If Phase 1 verification ran before catalog metadata was saved it may have
           // produced an empty verifiedIngredients list (race condition).  When Phase 2
           // now supplies real ingredients, reset to undefined so the verification effect
           // re-runs with the actual ingredient list rather than keeping the stale [].
           const incomingIngredients: unknown[] | undefined =
-            (resource as any).ingredients ?? (resource as any).contentMetadata?.ingredients
+            resource.ingredients ?? resource.contentMetadata?.ingredients
           const prematureEmptyVerification =
             existingVerified !== undefined &&
             existingVerified.length === 0 &&
@@ -134,19 +120,12 @@ export const useAppStore = create<AppStore>()(
               : existingVerified !== undefined
                 ? existingVerified
                 : resource.verifiedIngredients,
-            ...(existing?.verifiedRef !== undefined
+            ...(existing.verifiedRef !== undefined
               ? { verifiedRef: existing.verifiedRef }
               : {}),
           }
         }
       })
-    },
-
-    removeResource: (resourceId: string) => {
-      set((state) => {
-        delete state.loadedResources[resourceId]
-      })
-      console.log('🗑️ Resource removed from app:', resourceId)
     },
 
     getResource: (resourceId: string) => {

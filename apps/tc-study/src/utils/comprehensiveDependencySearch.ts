@@ -1,6 +1,6 @@
 /**
  * Comprehensive Dependency Search
- * 
+ *
  * Searches for resource dependencies across all layers:
  * 1. Workspace (already loaded resources)
  * 2. Catalog (locally cached resources)
@@ -15,7 +15,7 @@ export interface DependencySearchResult {
   found: boolean
   location: 'workspace' | 'catalog' | 'door43' | 'not-found'
   resourceKey?: string
-  resource?: any
+  resource?: Record<string, unknown>
   message?: string
 }
 
@@ -39,7 +39,7 @@ function getTargetCriteria(
 ): { language: string; owner: string } {
   const targetLanguage = dependency.language || (dependency.sameLanguage ? resourceLanguage : undefined)
   const targetOwner = dependency.owner || (dependency.sameOwner ? resourceOwner : undefined)
-  
+
   return {
     language: targetLanguage || resourceLanguage,
     owner: targetOwner || resourceOwner
@@ -50,7 +50,14 @@ function getTargetCriteria(
  * Check if a resource matches the dependency criteria
  */
 function matchesDependency(
-  resource: any,
+  resource: {
+    type?: string
+    subject?: string
+    category?: string
+    language?: string
+    owner?: string
+    resourceKey?: string
+  },
   dependency: ResourceDependency,
   targetLanguage: string,
   targetOwner: string,
@@ -58,7 +65,7 @@ function matchesDependency(
 ): boolean {
   // Determine resource type from subject if not set
   let resourceType = resource.type
-  
+
   if (!resourceType || resourceType === 'undefined' || resourceType === undefined) {
     const subject = resource.subject || resource.category
     if (subject) {
@@ -71,12 +78,12 @@ function matchesDependency(
       }
     }
   }
-  
+
   // Check type match
   if (resourceType !== dependency.resourceType) {
     return false
   }
-  
+
   // Check language match
   if (dependency.sameLanguage && resource.language !== targetLanguage) {
     return false
@@ -84,7 +91,7 @@ function matchesDependency(
   if (dependency.language && resource.language !== dependency.language) {
     return false
   }
-  
+
   // Check owner match
   if (dependency.sameOwner && resource.owner !== targetOwner) {
     return false
@@ -92,7 +99,7 @@ function matchesDependency(
   if (dependency.owner && resource.owner !== dependency.owner) {
     return false
   }
-  
+
   return true
 }
 
@@ -117,7 +124,7 @@ function searchInWorkspace(
       }
     }
   }
-  
+
   return { found: false, location: 'not-found' }
 }
 
@@ -125,15 +132,14 @@ function searchInWorkspace(
  * Search for dependency in catalog (locally cached)
  */
 async function searchInCatalog(
-  catalogManager: CatalogManager,
-  dependency: ResourceDependency,
-  targetLanguage: string,
-  targetOwner: string,
-  resourceTypeRegistry: ResourceTypeRegistry
+  _catalogManager: CatalogManager,
+  _dependency: ResourceDependency,
+  _targetLanguage: string,
+  _targetOwner: string,
+  _resourceTypeRegistry: ResourceTypeRegistry
 ): Promise<DependencySearchResult> {
   // Catalog search not implemented - the catalog manager doesn't expose a getAllResources method
   // Dependencies are primarily found in workspace or fetched from Door43
-  console.log('   ⏭️  Skipping catalog search (not implemented)')
   return { found: false, location: 'not-found' }
 }
 
@@ -149,46 +155,40 @@ async function searchInDoor43(
   try {
     const door43Client = getDoor43ApiClient()
     const depType = resourceTypeRegistry.get(dependency.resourceType)
-    
+
     if (!depType) {
       return { found: false, location: 'not-found', message: 'Unknown resource type' }
     }
-    
-    console.log(`   🌐 Searching Door43 for ${dependency.resourceType} from ${targetOwner}/${targetLanguage}...`)
-    
+
+
     // Use getResourcesByOrgAndLanguage to fetch resources from the specific org/language
     const results = await door43Client.getResourcesByOrgAndLanguage(targetOwner, targetLanguage)
-    
+
     if (results && results.length > 0) {
       // Filter for resources matching the dependency type (by subject)
-      const matchingResource = results.find((resource: any) => {
-        return depType.subjects.some(subject => 
+      const matchingResource = results.find((resource) => {
+        return depType.subjects.some(subject =>
           subject.toLowerCase() === (resource.subject || '').toLowerCase()
         )
       })
-      
+
       if (matchingResource) {
         const resourceKey = `${matchingResource.owner}/${matchingResource.language}/${matchingResource.id || (matchingResource as { abbreviation?: string }).abbreviation || 'unknown'}`
-        
-        console.log(`      ✓ Found on Door43: ${resourceKey}`)
-        
+
+
         return {
           found: true,
           location: 'door43',
           resourceKey,
-          resource: matchingResource,
+          resource: matchingResource as unknown as Record<string, unknown>,
           message: 'Found on Door43 (will be fetched)'
         }
-      } else {
-        console.log(`      ✗ No matching ${dependency.resourceType} found`)
       }
-    } else {
-      console.log(`      ✗ No resources found for ${targetOwner}/${targetLanguage}`)
     }
   } catch (error) {
     console.error('Error searching Door43:', error)
   }
-  
+
   return { found: false, location: 'not-found' }
 }
 
@@ -210,10 +210,8 @@ export async function searchForDependency(
     resourceLanguage,
     resourceOwner
   )
-  
-  console.log(`🔍 Searching for dependency: ${dependency.resourceType}`)
-  console.log(`   Target: ${targetOwner}/${targetLanguage}`)
-  
+
+
   // Step 1: Check workspace (already loaded)
   const workspaceResult = searchInWorkspace(
     workspaceResources,
@@ -222,12 +220,11 @@ export async function searchForDependency(
     targetOwner,
     resourceTypeRegistry
   )
-  
+
   if (workspaceResult.found) {
-    console.log(`   ✓ Found in workspace: ${workspaceResult.resourceKey}`)
     return workspaceResult
   }
-  
+
   // Step 2: Check available resources (currently displayed in wizard)
   if (availableResources && availableResources.size > 0) {
     const availableResult = searchInWorkspace( // Reuse same logic
@@ -237,9 +234,8 @@ export async function searchForDependency(
       targetOwner,
       resourceTypeRegistry
     )
-    
+
     if (availableResult.found) {
-      console.log(`   ✓ Found in available resources list: ${availableResult.resourceKey}`)
       return {
         ...availableResult,
         location: 'catalog', // Mark as catalog since it's similar to a local cache
@@ -247,7 +243,7 @@ export async function searchForDependency(
       }
     }
   }
-  
+
   // Step 3: Check catalog (locally cached)
   const catalogResult = await searchInCatalog(
     catalogManager,
@@ -256,12 +252,11 @@ export async function searchForDependency(
     targetOwner,
     resourceTypeRegistry
   )
-  
+
   if (catalogResult.found) {
-    console.log(`   ✓ Found in catalog: ${catalogResult.resourceKey}`)
     return catalogResult
   }
-  
+
   // Step 4: Check Door43 (fetch from API)
   const door43Result = await searchInDoor43(
     dependency,
@@ -269,15 +264,14 @@ export async function searchForDependency(
     targetOwner,
     resourceTypeRegistry
   )
-  
+
   if (door43Result.found) {
-    console.log(`   ✓ Found on Door43: ${door43Result.resourceKey}`)
     return door43Result
   }
-  
+
   console.warn(`   ✗ Not found anywhere`)
-  return { 
-    found: false, 
+  return {
+    found: false,
     location: 'not-found',
     message: `${dependency.resourceType} not found for ${targetOwner}/${targetLanguage}`
   }
@@ -303,16 +297,16 @@ export async function checkAllDependencies(
   }>
 }> {
   const resourceType = resourceTypeRegistry.get(resourceTypeId)
-  
+
   if (!resourceType?.dependencies || resourceType.dependencies.length === 0) {
     return { allAvailable: true, results: [] }
   }
-  
+
   const results = await Promise.all(
     resourceType.dependencies.map(async (dep) => {
       const normalized = normalizeDependency(dep)
       const depType = resourceTypeRegistry.get(normalized.resourceType)
-      
+
       return {
         dependency: normalized,
         searchResult: await searchForDependency(
@@ -328,8 +322,8 @@ export async function checkAllDependencies(
       }
     })
   )
-  
+
   const allAvailable = results.every(r => r.searchResult.found)
-  
+
   return { allAvailable, results }
 }

@@ -1,5 +1,8 @@
 # Troubleshooting: Not Seeing Console Logs
 
+> **OBSOLETE snippets:** Examples that use `window.__catalogManager__` are historical and will not work.
+> Catalog access is via `CatalogContext` / `useCatalogManager()` (see `src/lib/stores/stateOwnership.ts`).
+
 ## 🔍 Quick Checklist
 
 ### 1. ✅ Is the App Running?

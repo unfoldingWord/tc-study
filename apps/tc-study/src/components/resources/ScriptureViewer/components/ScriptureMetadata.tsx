@@ -2,13 +2,13 @@
  * ScriptureMetadata - Metadata panel showing book and chapter information
  */
 
-import type { ProcessedScripture } from '@bt-synergy/usfm-processor'
+import type { ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
 import type { OriginalLanguageToken } from '../types'
 import { useCurrentReference } from '../../../../contexts'
 
 interface ScriptureMetadataProps {
   loadedContent: ProcessedScripture | null
-  displayVerses: any[]
+  displayVerses: ProcessedVerse[]
   highlightTarget: OriginalLanguageToken | null
 }
 

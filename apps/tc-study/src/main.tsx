@@ -13,9 +13,7 @@ const StrictModeWrapper = import.meta.env.DEV ? React.StrictMode : React.Fragmen
 
 // Initialize entry viewers (must be done before rendering)
 try {
-  console.log('[Main] Registering entry viewers...')
   registerDefaultEntryViewers(entryViewerRegistry)
-  console.log('[Main] ✅ Entry viewers registered successfully')
 } catch (error) {
   console.error('[Main] ❌ Failed to register entry viewers:', error)
 }

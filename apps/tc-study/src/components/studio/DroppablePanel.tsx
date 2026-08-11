@@ -1,10 +1,10 @@
 /**
- * DroppablePanel - A wrapper that makes a panel a drop target for dnd-kit
- * Used to enable dragging tabs from one panel to another
+ * DroppablePanel — panel drop target for tab pointer DnD (+ HTML5 sidebar on Studio).
  */
 
-import { useDroppable } from '@dnd-kit/core'
 import type { ReactNode } from 'react'
+import { TAB_DND_ATTR, useTabDnDOptional } from '../../features/dnd/TabDnDContext'
+import type { StudioPanelId } from '../../features/studio/studioDnDHelpers'
 
 interface DroppablePanelProps {
   id: string
@@ -15,6 +15,12 @@ interface DroppablePanelProps {
   colorScheme?: 'blue' | 'purple'
 }
 
+function panelIdFromDroppableId(id: string): StudioPanelId | null {
+  if (id === 'panel-1-droppable' || id.startsWith('panel-1')) return 'panel-1'
+  if (id === 'panel-2-droppable' || id.startsWith('panel-2')) return 'panel-2'
+  return null
+}
+
 export function DroppablePanel({
   id,
   children,
@@ -22,9 +28,9 @@ export function DroppablePanel({
   style,
   colorScheme = 'blue',
 }: DroppablePanelProps) {
-  const { isOver, setNodeRef } = useDroppable({
-    id,
-  })
+  const { hoverPanelId, isDragging } = useTabDnDOptional()
+  const panelId = panelIdFromDroppableId(id)
+  const isOver = isDragging && !!panelId && hoverPanelId === panelId
 
   const highlightColors = {
     blue: 'ring-2 ring-inset ring-blue-400 bg-blue-50',
@@ -33,7 +39,7 @@ export function DroppablePanel({
 
   return (
     <div
-      ref={setNodeRef}
+      {...(panelId ? { [TAB_DND_ATTR.droppable]: panelId } : {})}
       className={`${className} ${isOver ? highlightColors[colorScheme] : ''}`}
       style={style}
     >

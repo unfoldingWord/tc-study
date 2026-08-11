@@ -25,12 +25,5 @@
     "resolveJsonModule": true
   },
   "include": ["src"],
-  "exclude": [
-    "src/**/*.test.ts",
-    "src/components/resources/_ScriptureViewer.old.tsx",
-    "src/components/resources/_ScriptureViewer.old2.tsx",
-    "src/components/resources/_ScriptureViewer.v2.tsx",
-    "src/pages/Browse.tsx",
-    "src/workers/**/*.ts"
-  ]
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

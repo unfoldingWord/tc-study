@@ -1,17 +1,21 @@
 /**
  * Hook for broadcasting scripture tokens to other panels
- * 
+ *
  * Broadcasts current scripture tokens as a STATE message that persists
  * until unmounted or navigation changes. Other panels can access this
- * via useCurrentState('current-scripture-tokens').
- * 
- * This replaces the old request/response pattern with a simpler broadcast approach.
+ * via useResourceState(resourceId, RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS).
+ *
+ * Single-owner policy: only lastActive (else anchor) scripture may publish
+ * to the shared SCRIPTURE_TOKENS key — avoids multi-panel last-writer-wins.
+ * When neither is set, nobody publishes (bootstrap deny).
  */
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
+import { RESOURCE_STATE_KEYS, useResourceStateSender } from '@bt-synergy/resource-panels'
 import type { ProcessedScripture, WordToken } from '@bt-synergy/usfm-processor'
-import { useResourceAPI } from 'linked-panels'
 import { useEffect } from 'react'
+import { useAppStore } from '../../../../contexts/AppContext'
+import { isScriptureTokensOwner } from '../../../../features/messaging/scriptureTokensOwnership'
 import type { ScriptureTokensBroadcastSignal } from '../../../../signals/studioSignals'
 
 interface UseTokenBroadcastOptions {
@@ -39,67 +43,64 @@ function extractOptimizedTokens(
 ): OptimizedToken[] {
   const tokens: OptimizedToken[] = []
   const bookCode = loadedContent.metadata?.bookCode || ''
-  
-  // Determine the actual range
+
   const actualEndChapter = endChapter || startChapter
   const actualEndVerse = endVerse || startVerse
-  
-  // Iterate through all chapters in the range
+
   for (let chapterNum = startChapter; chapterNum <= actualEndChapter; chapterNum++) {
-    const chapterData = loadedContent.chapters.find(ch => ch.number === chapterNum)
+    const chapterData = loadedContent.chapters.find((ch) => ch.number === chapterNum)
     if (!chapterData) {
       continue
     }
-    
-    // Determine verse range for this chapter
+
     const verseStart = chapterNum === startChapter ? startVerse : 1
-    // Get the actual last verse number from the chapter data
-    const lastVerseInChapter = chapterData.verses.length > 0 
-      ? chapterData.verses[chapterData.verses.length - 1].number 
-      : verseStart
+    const lastVerseInChapter =
+      chapterData.verses.length > 0
+        ? chapterData.verses[chapterData.verses.length - 1].number
+        : verseStart
     const verseEnd = chapterNum === actualEndChapter ? actualEndVerse : lastVerseInChapter
-    
-    // Iterate through verses array directly (instead of by number range)
-    // This prevents issues with non-sequential or corrupted verse numbers
+
     for (const verseData of chapterData.verses) {
       const verseNum = verseData.number
-      
-      // Skip verses outside our range
+
       if (verseNum < verseStart || verseNum > verseEnd) {
         continue
       }
-      
+
       if (!verseData.wordTokens) {
         continue
       }
-      
-      // Convert WordToken[] to OptimizedToken[]
-      // Include ALL tokens (word, punctuation, whitespace) for accurate quote building
+
       verseData.wordTokens.forEach((token: WordToken) => {
         const verseRef = `${bookCode} ${chapterNum}:${verseNum}`
         const occurrence = token.occurrence || 1
-        
-        // Create OptimizedToken with extended properties via type assertion
-        const optimizedToken: OptimizedToken = {
-          id: tokens.length, // Use cumulative index across all verses
-          text: token.content,
-          type: token.type, // Preserve the actual token type (word, punctuation, or whitespace)
-          // Extended properties (not in base OptimizedToken type but used in practice)
-          ...({
-            verseRef,
-            occurrence,
-            semanticId: token.type === 'word' 
-              ? `${verseRef}:${token.content}:${occurrence}`
-              : `${verseRef}:${token.type}:${tokens.length}`, // Use index for non-word tokens
-            alignedOriginalWordIds: token.alignedOriginalWordIds || [],
-          } as any),
+
+        type BroadcastToken = OptimizedToken & {
+          verseRef: string
+          occurrence: number
+          semanticId: string
+          alignedOriginalWordIds: string[]
         }
-        
+        const tokenType: BroadcastToken['type'] =
+          token.type === 'text' ? 'whitespace' : token.type
+        const optimizedToken: BroadcastToken = {
+          id: tokens.length,
+          text: token.content,
+          type: tokenType,
+          verseRef,
+          occurrence,
+          semanticId:
+            token.type === 'word'
+              ? `${verseRef}:${token.content}:${occurrence}`
+              : `${verseRef}:${token.type}:${tokens.length}`,
+          alignedOriginalWordIds: token.alignedOriginalWordIds || [],
+        }
+
         tokens.push(optimizedToken)
       })
     }
   }
-  
+
   return tokens
 }
 
@@ -114,24 +115,32 @@ export function useTokenBroadcast({
   endChapter,
   endVerse,
 }: UseTokenBroadcastOptions) {
-  // Use the linked-panels API for messaging
-  const api = useResourceAPI<ScriptureTokensBroadcastSignal>(resourceId)
-  
-  // Broadcast tokens whenever content or navigation changes
-  // Note: We intentionally don't include 'api' in dependencies because:
-  // 1. api.messaging.sendToAll is a stable function that doesn't change
-  // 2. Including api would cause infinite loops as it's a new object reference on each render
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lastActiveScriptureResourceId = useAppStore((s) => s.lastActiveScriptureResourceId)
+  const anchorResourceId = useAppStore((s) => s.anchorResourceId)
+  const isOwner = isScriptureTokensOwner({
+    resourceId,
+    lastActiveScriptureResourceId,
+    anchorResourceId,
+  })
+
+  const { sendState, clearState } = useResourceStateSender<ScriptureTokensBroadcastSignal>(
+    'scripture-tokens-broadcast',
+    resourceId,
+    RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS,
+    'scripture',
+    // Owner clears via clearState on leave; non-owners must not tombstone the owner's key
+    { clearOnUnmount: isOwner }
+  )
+
+  // Broadcast tokens whenever content or navigation changes (owner only).
+   
   useEffect(() => {
+    if (!isOwner) return
+
     const bookCode = loadedContent?.metadata?.bookCode || ''
-    
+
     if (!loadedContent || !bookCode || !currentChapter || !currentVerse) {
-      // Send empty state to clear
-      api.messaging.sendToAll({
-        type: 'scripture-tokens-broadcast',
-        lifecycle: 'state',
-        stateKey: 'current-scripture-tokens',
-        sourceResourceId: resourceId,
+      sendState({
         reference: {
           book: '',
           chapter: 0,
@@ -144,20 +153,19 @@ export function useTokenBroadcast({
           languageDirection,
           type: 'scripture',
         },
-        timestamp: Date.now(),
       })
       return
     }
-    
-    // Extract tokens for current verse or verse range
-    const tokens = extractOptimizedTokens(loadedContent, currentChapter, currentVerse, endChapter, endVerse)
-    
-    // Broadcast tokens
-    const broadcast: ScriptureTokensBroadcastSignal = {
-      type: 'scripture-tokens-broadcast',
-      lifecycle: 'state',
-      stateKey: 'current-scripture-tokens',
-      sourceResourceId: resourceId,
+
+    const tokens = extractOptimizedTokens(
+      loadedContent,
+      currentChapter,
+      currentVerse,
+      endChapter,
+      endVerse
+    )
+
+    sendState({
       reference: {
         book: bookCode,
         chapter: currentChapter,
@@ -172,16 +180,24 @@ export function useTokenBroadcast({
         languageDirection,
         type: 'scripture',
       },
-      timestamp: Date.now(),
+    })
+  }, [
+    isOwner,
+    resourceId,
+    resourceKey,
+    loadedContent,
+    language,
+    languageDirection,
+    currentChapter,
+    currentVerse,
+    endChapter,
+    endVerse,
+  ])
+
+  // When ownership is lost (another scripture became lastActive), tombstone only if we own the key.
+  useEffect(() => {
+    if (!isOwner) {
+      clearState()
     }
-    
-    api.messaging.sendToAll(broadcast)
-  }, [resourceId, resourceKey, loadedContent, language, languageDirection, currentChapter, currentVerse, endChapter, endVerse])
-  
-  // Note: we intentionally do NOT send an empty-state broadcast on unmount.
-  // linked-panels validates that the sourceResourceId still exists in the store,
-  // so broadcasting after the resource has been removed from the panel store
-  // produces noisy "Sender resource does not exist" console errors (especially
-  // under React Strict Mode which double-invokes effects). Other panels will
-  // receive fresh token broadcasts from the newly mounted viewer.
+  }, [isOwner, clearState])
 }

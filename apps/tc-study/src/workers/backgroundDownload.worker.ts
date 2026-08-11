@@ -1,14 +1,14 @@
 /**
  * Background Download Worker
- * 
+ *
  * Runs resource downloads in a Web Worker to avoid blocking the main thread.
- * 
+ *
  * Architecture:
  * - Receives download commands from main thread
  * - Initializes all required services (catalog, loaders, etc.)
  * - Runs BackgroundDownloadManager in worker context
  * - Reports progress back to main thread
- * 
+ *
  * Messages:
  * - IN: { type: 'start', payload: { resourceKeys: string[], skipExisting: boolean } }
  * - IN: { type: 'stop' }
@@ -19,17 +19,11 @@
  */
 
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
+import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { CatalogManager } from '@bt-synergy/catalog-manager'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
-import { ScriptureLoader } from '@bt-synergy/scripture-loader'
-import { TranslationAcademyLoader } from '@bt-synergy/translation-academy-loader'
-import { TranslationNotesLoader } from '@bt-synergy/translation-notes-loader'
-import { TranslationQuestionsLoader } from '@bt-synergy/translation-questions-loader'
-import { TranslationWordsLinksLoader } from '@bt-synergy/translation-words-links-loader'
-import { TranslationWordsLoader } from '@bt-synergy/translation-words-loader'
 import { getDownloadPriority } from '../config/loaderConfig'
-import { IndexedDBCatalogAdapter } from '../lib/adapters/IndexedDBCatalogAdapter'
-import { ObsLoader } from '../lib/loaders/ObsLoader'
+import { registerWorkerLoaders } from '../features/download/workerLoaderRegistry'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
 import { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
@@ -42,8 +36,11 @@ import { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenes
 // WORKER CONTEXT CHECK
 // ============================================================================
 
-// Ensure we're running in a worker context
-if (typeof WorkerGlobalScope === 'undefined' || !(self instanceof WorkerGlobalScope)) {
+// Ensure we're running in a worker context (avoid WebWorker lib vs DOM conflict in app tsc)
+const WorkerScope = (globalThis as typeof globalThis & {
+  WorkerGlobalScope?: new () => object
+}).WorkerGlobalScope
+if (typeof WorkerScope === 'undefined' || !(self instanceof WorkerScope)) {
   console.error('[BG-DL] ⚙️ Worker ERROR: This file should only run in a Web Worker context!')
 }
 
@@ -55,6 +52,8 @@ let downloadManager: BackgroundDownloadManager | null = null
 let catalogManager: CatalogManager | null = null
 let completenessChecker: ResourceCompletenessChecker | null = null
 let isInitialized = false
+/** Active run id from the main thread; bumped/replaced on start/stop to drop stale work. */
+let activeRunId = 0
 
 /**
  * Initialize all services required for downloading
@@ -65,7 +64,6 @@ async function initialize() {
   }
 
   try {
-    console.log('[BG-DL] ⚙️ Worker Initializing services...')
 
     // 1. Create storage adapters (both use IndexedDB for worker compatibility)
     const cacheAdapter = new IndexedDBCacheAdapter({
@@ -103,92 +101,21 @@ async function initialize() {
       debug: false
     })
 
-    // 4. Create LoaderRegistry and register loaders directly
+    // 4. Create LoaderRegistry and register workerDownload loaders from SoT
     const loaderRegistry = new LoaderRegistry({
       debug: false // Disable verbose loader registration logs
     })
 
-    // 5. Manually register loaders (avoid importing resource types with React components)
-    // Register loaders with BOTH CatalogManager (for discovery) and LoaderRegistry (for downloads)
-    // 
-    // ⚠️ IMPORTANT: When adding a new loader, also update:
-    //   - src/config/loaderConfig.ts (source of truth for loader IDs and priorities)
-    //   - src/components/ResourceTypeInitializer.tsx (main thread registration)
-    // 
-    // TODO: Consider dynamic loader registration to eliminate this duplication
-    const scriptureLoader = new ScriptureLoader({
+    // 5. Register every surfaces.workerDownload id (no hardcoded id literals)
+    // When adding a loader: update loaderConfig.ts (+ plugin if mainPlugin)
+    registerWorkerLoaders(catalogManager, loaderRegistry, {
       cacheAdapter,
       catalogAdapter,
       door43Client,
-      debug: false
+      debug: false,
     })
-    catalogManager.registerResourceType(scriptureLoader)
-    loaderRegistry.registerLoader('scripture', scriptureLoader)
-    
-    const translationWordsLoader = new TranslationWordsLoader({
-      cacheAdapter,
-      catalogAdapter,
-      door43Client,
-      debug: false
-    })
-    catalogManager.registerResourceType(translationWordsLoader)
-    loaderRegistry.registerLoader('words', translationWordsLoader)
-    
-    const translationWordsLinksLoader = new TranslationWordsLinksLoader({
-      cacheAdapter,
-      catalogAdapter,
-      door43Client,
-      debug: false
-    })
-    catalogManager.registerResourceType(translationWordsLinksLoader)
-    loaderRegistry.registerLoader('words-links', translationWordsLinksLoader)
-    // OBS TWL uses the same loader — register under the OBS type ID for explicit lookup
-    loaderRegistry.registerLoader('obs-words-links', translationWordsLinksLoader)
-    
-    const translationAcademyLoader = new TranslationAcademyLoader({
-      cacheAdapter,
-      catalogAdapter,
-      door43Client,
-      debug: false
-    })
-    catalogManager.registerResourceType(translationAcademyLoader)
-    loaderRegistry.registerLoader('ta', translationAcademyLoader)
-    
-    const translationNotesLoader = new TranslationNotesLoader({
-      cacheAdapter,
-      catalogAdapter,
-      door43Client,
-      debug: false
-    })
-    catalogManager.registerResourceType(translationNotesLoader)
-    loaderRegistry.registerLoader('tn', translationNotesLoader)
-    // OBS TN uses the same loader — register under the OBS type ID for explicit lookup
-    loaderRegistry.registerLoader('obs-notes', translationNotesLoader)
-    
-    const translationQuestionsLoader = new TranslationQuestionsLoader({
-      cacheAdapter,
-      catalogAdapter,
-      door43Client,
-      debug: false
-    })
-    catalogManager.registerResourceType(translationQuestionsLoader)
-    loaderRegistry.registerLoader('questions', translationQuestionsLoader)
-    // OBS TQ uses the same loader — register under the OBS type ID for explicit lookup
-    loaderRegistry.registerLoader('obs-questions', translationQuestionsLoader)
 
-    // OBS loader — no React deps so safe to instantiate in worker
-    const obsLoader = new ObsLoader({
-      cacheAdapter,
-      catalogAdapter,
-      door43Client,
-      debug: false
-    })
-    catalogManager.registerResourceType(obsLoader)
-    loaderRegistry.registerLoader('obs', obsLoader)
-
-    // 6. Create a minimal resource type registry for priority lookups
-    // (BackgroundDownloadManager needs this for priority ordering)
-    // Uses shared LOADER_CONFIGS to ensure consistency with main thread
+    // 6. Minimal resource type registry for priority lookups — SoT via getDownloadPriority
     const resourceTypeRegistry = {
       get: (type: string) => {
         return {
@@ -201,7 +128,7 @@ async function initialize() {
     downloadManager = new BackgroundDownloadManager(
       loaderRegistry,
       catalogManager,
-      resourceTypeRegistry as any,
+      resourceTypeRegistry,
       {
         debug: false,
         downloadMethod: 'zip', // Default to zip, will be auto-selected per resource
@@ -209,17 +136,18 @@ async function initialize() {
       }
     )
 
-    // Set up progress callback
+    // Set up progress callback (download-all path); fence with activeRunId
     downloadManager.onProgress((progress) => {
-      // Send progress updates to main thread
+      const runId = activeRunId
+      if (runId <= 0) return
       postMessage({
         type: 'progress',
-        payload: progress
+        runId,
+        payload: progress,
       })
     })
 
     isInitialized = true
-    console.log('[BG-DL] ⚙️ Worker Initialization complete')
   } catch (error) {
     console.error('[BG-DL] ⚙️ Worker Initialization failed:', error)
     postMessage({
@@ -245,10 +173,16 @@ self.onmessage = async (event: MessageEvent) => {
   try {
     switch (type) {
       case 'start': {
+        const runId = typeof payload?.runId === 'number' ? payload.runId : 0
+        activeRunId = runId
+
         // Initialize if not already done
         if (!isInitialized) {
           await initialize()
         }
+
+        // Superseded during init (language switch stop)
+        if (runId !== activeRunId) return
 
         if (!downloadManager || !catalogManager) {
           throw new Error('Services not initialized')
@@ -256,44 +190,43 @@ self.onmessage = async (event: MessageEvent) => {
 
         const { resourceKeys, skipExisting, totalIngredients } = payload
 
-        console.log('[BG-DL] ⚙️ Worker Starting downloads:', {
-          resources: resourceKeys.length,
-          totalIngredients: totalIngredients || 'calculating...'
-        })
-
         // Update download manager config
         downloadManager['config'].skipExisting = skipExisting
 
         // If specific resource keys provided, download only those
         // Otherwise, download all resources in catalog
         if (resourceKeys && resourceKeys.length > 0) {
-          // Download specific resources with priority order (pass pre-calculated total)
-          await downloadSpecificResources(resourceKeys, skipExisting, totalIngredients)
+          await downloadSpecificResources(
+            resourceKeys,
+            skipExisting,
+            totalIngredients,
+            runId
+          )
         } else {
-          // Download all resources from catalog
           await downloadManager.downloadAllResources()
+          if (runId !== activeRunId) return
+          postMessage({
+            type: 'complete',
+            runId,
+            payload: downloadManager.getProgress(),
+          })
         }
-
-        // Send completion message
-        const finalProgress = downloadManager.getProgress()
-        postMessage({
-          type: 'complete',
-          payload: finalProgress
-        })
 
         break
       }
 
       case 'stop': {
-        console.log('[BG-DL] ⚙️ Worker Stopping downloads')
-        
+        const runId = typeof payload?.runId === 'number' ? payload.runId : activeRunId + 1
+        activeRunId = runId
+
         if (downloadManager) {
           await downloadManager.cancelDownloads()
         }
 
         postMessage({
           type: 'complete',
-          payload: downloadManager?.getProgress() || null
+          runId,
+          payload: null,
         })
 
         break
@@ -304,8 +237,10 @@ self.onmessage = async (event: MessageEvent) => {
     }
   } catch (error) {
     console.error('[BG-DL] ⚙️ Worker Error handling message:', error)
+    const runId = activeRunId
     postMessage({
       type: 'error',
+      runId,
       payload: {
         message: error instanceof Error ? error.message : String(error)
       }
@@ -318,27 +253,30 @@ self.onmessage = async (event: MessageEvent) => {
  * @param resourceKeys - List of resources to download
  * @param skipExisting - Skip already cached resources
  * @param providedTotalIngredients - Pre-calculated total ingredients (from main thread)
+ * @param runId - Main-thread run id; abort when activeRunId changes
  */
 async function downloadSpecificResources(
   resourceKeys: string[],
   skipExisting: boolean,
-  providedTotalIngredients?: number
+  providedTotalIngredients: number | undefined,
+  runId: number
 ) {
   if (!downloadManager || !catalogManager) {
     throw new Error('Services not initialized')
   }
+  if (runId !== activeRunId) return
 
   // Get metadata for all resources and count total ingredients
   const resourcesWithPriority: Array<{
     resourceKey: string
     priority: number
-    metadata: any
+    metadata: import('@bt-synergy/resource-catalog').ResourceMetadata
     ingredientsCount: number
   }> = []
 
   // Use provided total if available, otherwise calculate it
   let totalIngredients = providedTotalIngredients || 0
-  let needsCalculation = !providedTotalIngredients
+  const needsCalculation = !providedTotalIngredients
 
   for (const resourceKey of resourceKeys) {
     try {
@@ -375,8 +313,7 @@ async function downloadSpecificResources(
   // Sort by priority (lower = higher priority = downloads first)
   resourcesWithPriority.sort((a, b) => a.priority - b.priority)
 
-  const ingredientsSource = providedTotalIngredients ? 'pre-calculated' : 'calculated in worker'
-  console.log(`[BG-DL] ⚙️ Worker Starting ${resourcesWithPriority.length} resources (${totalIngredients} total ingredients, ${ingredientsSource})`)
+  const _ingredientsSource = providedTotalIngredients ? 'pre-calculated' : 'calculated in worker'
 
   // Track ingredient-level progress
   let completedIngredients = 0
@@ -392,9 +329,12 @@ async function downloadSpecificResources(
     })
   }
 
+  if (runId !== activeRunId) return
+
   // Notify main thread of queue order with ingredient count
   postMessage({
     type: 'queue-updated',
+    runId,
     payload: {
       queue: resourcesWithPriority.map(r => r.resourceKey),
       totalResources: resourcesWithPriority.length,
@@ -406,17 +346,25 @@ async function downloadSpecificResources(
   // Benefits: simpler progress tracking, better for slow connections, no race conditions
   let completedResourceCount = 0
   let failedResourceCount = 0
-  
+
   // Process resources sequentially in priority order
   for (const { resourceKey, metadata, ingredientsCount } of resourcesWithPriority) {
+    if (runId !== activeRunId) return
+
     try {
       // Determine download method: use zip if zipball_url is available
       const method = metadata.release?.zipball_url ? 'zip' : 'individual'
-      
-      console.log(`[BG-DL] ⚙️ Worker Downloading ${resourceKey} (${ingredientsCount} ingredients) using ${method} method`)
+
 
       // Create a custom progress callback for ingredient-level updates
-      const onProgress = (progress: any) => {
+      const onProgress = (progress: {
+        loaded?: number
+        total?: number
+        percentage?: number
+        message?: string
+      }) => {
+        if (runId !== activeRunId) return
+
         // Calculate how many ingredients completed for THIS resource so far
         let currentResourceIngredientsCompleted = 0
         if (progress.loaded !== undefined && progress.total !== undefined && progress.total > 0) {
@@ -426,9 +374,9 @@ async function downloadSpecificResources(
 
         // Overall progress = all previously completed + current resource's partial progress
         const currentTotalCompleted = completedIngredients + currentResourceIngredientsCompleted
-        
+
         // Calculate overall percentage based on TOTAL ingredients across ALL resources
-        const overallProgress = totalIngredients > 0 
+        const overallProgress = totalIngredients > 0
           ? Math.round((currentTotalCompleted / totalIngredients) * 100)
           : 0
 
@@ -461,16 +409,17 @@ async function downloadSpecificResources(
           currentIngredient: currentIngredient, // Current item being processed
           tasks: []
         }
-        
+
         postMessage({
           type: 'progress',
+          runId,
           payload: progressPayload
         })
       }
 
       // Get the loader for this resource
       const loader = downloadManager['loaderRegistry'].getLoaderForResource(metadata)
-      
+
       if (!loader || !loader.downloadResource) {
         throw new Error(`No loader available for ${resourceKey}`)
       }
@@ -485,7 +434,7 @@ async function downloadSpecificResources(
       await loader.downloadResource(
         resourceKey,
         {
-          method: method as any,
+          method,
           skipExisting
         },
         onProgress
@@ -494,52 +443,54 @@ async function downloadSpecificResources(
       // ✅ IMPORTANT: Update counts BEFORE marking as completed
       completedIngredients += ingredientsCount
       completedResourceCount++
-      
+
       // Mark as completed in task tracker (do this LAST)
       if (task) {
         task.status = 'completed'
         task.progress = 100
       }
 
-      
+
       // ✅ Mark as complete in cache (so it won't be re-downloaded)
       if (completenessChecker) {
         await completenessChecker.markComplete(resourceKey, {
-          downloadMethod: method as any
+          downloadMethod: method
         })
       }
-      
-      console.log(`[BG-DL] ⚙️ Worker ✅ Downloaded ${resourceKey} (${ingredientsCount} ingredients)`)
-      
+
+
     } catch (error) {
       console.error(`[BG-DL] ⚙️ Worker Failed to download ${resourceKey}:`, error)
-      
+
       // ❌ IMPORTANT: Update counts BEFORE marking as failed
       failedIngredients += ingredientsCount
       failedResourceCount++
-      
+
       // Mark as failed in task tracker
       const task = downloadManager['tasks'].get(resourceKey)
       if (task) {
         task.status = 'failed'
         task.error = error instanceof Error ? error.message : String(error)
       }
-      
+
       // ❌ Mark error in cache
       if (completenessChecker) {
         await completenessChecker.markError(
-          resourceKey, 
+          resourceKey,
           error instanceof Error ? error.message : String(error)
         )
       }
-      
+
       // Continue with next resource even if this one failed
     }
   }
-  
+
+  if (runId !== activeRunId) return
+
   // Send final completion message
   postMessage({
     type: 'complete',
+    runId,
     payload: {
       currentResource: null,
       currentResourceProgress: 0,
@@ -553,21 +504,24 @@ async function downloadSpecificResources(
       tasks: []
     }
   })
-  
-  console.log(`[BG-DL] ⚙️ Worker All downloads complete: ${completedResourceCount}/${resourcesWithPriority.length} resources, ${completedIngredients}/${totalIngredients} ingredients`)
+
 }
 
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================
 
-self.onerror = (error) => {
-  console.error('[BG-DL] ⚙️ Worker Unhandled error:', error)
+self.onerror = (event: string | Event) => {
+  console.error('[BG-DL] ⚙️ Worker Unhandled error:', event)
+  const message =
+    typeof event === 'string'
+      ? event
+      : event instanceof ErrorEvent
+        ? event.message
+        : String(event)
   postMessage({
     type: 'error',
-    payload: {
-      message: error.message || String(error)
-    }
+    payload: { message },
   })
 }
 
@@ -581,4 +535,3 @@ self.onunhandledrejection = (event) => {
   })
 }
 
-console.log('[BG-DL] ⚙️ Worker Background Download Worker loaded and ready')

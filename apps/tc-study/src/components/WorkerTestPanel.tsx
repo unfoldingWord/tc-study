@@ -1,13 +1,13 @@
 /**
  * Worker Test Panel
- * 
+ *
  * Component for testing and verifying the Web Worker implementation.
  * Drop this into any page temporarily to test background downloads.
- * 
+ *
  * Usage:
  * ```tsx
  * import { WorkerTestPanel } from './components/WorkerTestPanel'
- * 
+ *
  * function MyPage() {
  *   return (
  *     <div>
@@ -32,7 +32,7 @@ interface TestResult {
 
 export function WorkerTestPanel() {
   const catalogManager = useCatalogManager()
-  const { startDownload, stopDownload, stats, isDownloading } = useBackgroundDownload({
+  const { startDownload, stopDownload: _stopDownload, stats, isDownloading } = useBackgroundDownload({
     debug: true
   })
 
@@ -59,7 +59,7 @@ export function WorkerTestPanel() {
   useEffect(() => {
     if (isDownloading && testStartTime > 0) {
       updateTest('Download Triggered', 'passed', 'Worker is processing downloads')
-      
+
       if (stats.progress && stats.progress.currentResource) {
         updateTest('Progress Updates', 'passed', `Current: ${stats.progress.currentResource}`)
       }
@@ -75,7 +75,7 @@ export function WorkerTestPanel() {
   }, [isDownloading, stats, testStartTime])
 
   const updateTest = (name: string, status: TestResult['status'], message?: string, duration?: number) => {
-    setTests(prev => prev.map(test => 
+    setTests(prev => prev.map(test =>
       test.name === name ? { ...test, status, message, duration } : test
     ))
   }
@@ -132,8 +132,6 @@ export function WorkerTestPanel() {
       return
     }
 
-    console.log('🧪 Starting worker test with:', testResourceKey)
-
     setTestStartTime(Date.now())
     startDownload([testResourceKey])
   }
@@ -142,13 +140,13 @@ export function WorkerTestPanel() {
     try {
       // Try to open IndexedDB and check for cached content
       const dbRequest = indexedDB.open('tc-study-cache', 1)
-      
+
       dbRequest.onsuccess = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
         const transaction = db.transaction(['cache-entries'], 'readonly')
         const store = transaction.objectStore('cache-entries')
         const countRequest = store.count()
-        
+
         countRequest.onsuccess = () => {
           const count = countRequest.result
           if (count > 0) {
@@ -158,7 +156,7 @@ export function WorkerTestPanel() {
           }
         }
       }
-      
+
       dbRequest.onerror = () => {
         updateTest('Cache Verified', 'failed', 'Could not access IndexedDB')
       }
@@ -219,7 +217,7 @@ export function WorkerTestPanel() {
           </div>
           <div className="text-2xl font-bold text-blue-600">{passedTests}</div>
         </div>
-        
+
         <div className="p-4 bg-red-50 rounded-lg border border-red-200">
           <div className="flex items-center gap-2 mb-1">
             <XCircle className="w-4 h-4 text-red-600" />
@@ -227,7 +225,7 @@ export function WorkerTestPanel() {
           </div>
           <div className="text-2xl font-bold text-red-600">{failedTests}</div>
         </div>
-        
+
         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
           <div className="flex items-center gap-2 mb-1">
             <Database className="w-4 h-4 text-gray-600" />
@@ -320,7 +318,7 @@ export function WorkerTestPanel() {
               </div>
             )}
           </div>
-          
+
           {/* Progress bar */}
           <div className="mt-3 w-full bg-blue-200 rounded-full h-2">
             <div
@@ -355,7 +353,7 @@ export function WorkerTestPanel() {
           </div>
         </div>
       )}
-      
+
       {failedTests > 0 && (
         <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
           <div className="flex items-center gap-2 text-red-900 font-medium mb-2">

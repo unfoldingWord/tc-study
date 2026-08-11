@@ -7,21 +7,24 @@ import { useState, useEffect } from 'react'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useResourceTypeRegistry } from '../contexts'
 
-interface UseDoor43DataOptions<T> {
+interface UseDoor43DataOptions<T, F extends object = Record<string, never>> {
   /**
    * Function to fetch data from Door43 API
    */
-  fetchFn: (client: ReturnType<typeof getDoor43ApiClient>, filters: any) => Promise<T[]>
+  fetchFn: (
+    client: ReturnType<typeof getDoor43ApiClient>,
+    filters: F
+  ) => Promise<T[]>
   
   /**
    * Additional filters to pass to the API
    */
-  additionalFilters?: Record<string, any>
+  additionalFilters?: F
   
   /**
    * Dependencies to trigger refetch
    */
-  dependencies?: any[]
+  dependencies?: readonly unknown[]
   
   /**
    * Whether to automatically load on mount
@@ -34,13 +37,13 @@ interface UseDoor43DataOptions<T> {
   onSuccess?: (data: T[], count: number) => void
 }
 
-export function useDoor43Data<T>({
+export function useDoor43Data<T, F extends object = Record<string, never>>({
   fetchFn,
-  additionalFilters = {},
+  additionalFilters = {} as F,
   dependencies = [],
   autoLoad = true,
   onSuccess,
-}: UseDoor43DataOptions<T>) {
+}: UseDoor43DataOptions<T, F>) {
   const [data, setData] = useState<T[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)

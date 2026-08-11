@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import { X, Check, Search, Package, Plus, Download } from 'lucide-react'
 import { useCatalogManager } from '../../contexts/CatalogContext'
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import { usePackageStore } from '../../lib/stores/packageStore'
 
 interface SimpleCollectionCreatorProps {
   onClose: () => void
@@ -76,39 +77,52 @@ export function SimpleCollectionCreator({ onClose, onComplete, onAddResources, i
 
     setCreating(true)
     try {
-      // Create collection manifest
       const collectionId = `col-${Date.now()}`
-      const selectedResources = resources.filter(r => 
+      const selectedResources = resources.filter(r =>
         selectedResourceKeys.has(getResourceKey(r))
       )
+      const name = collectionName.trim()
+      const resourceIds = selectedResources.map((r) => getResourceKey(r))
 
-      const collection = {
-        id: collectionId,
-        title: collectionName.trim(),
-        description: `Collection with ${selectedResources.length} resource${selectedResources.length !== 1 ? 's' : ''}`,
-        resources: selectedResources.map(r => ({
-          key: getResourceKey(r),
-          title: r.title,
-          type: r.type,
-          language: r.language,
-          resourceId: r.resourceId,
-        })),
-        createdAt: new Date().toISOString(),
-        status: 'installed',
+      // Persist via packageStore (IndexedDB) so Collections list / reload see it
+      const packageStore = usePackageStore.getState()
+      if (!packageStore.packageManager) {
+        await packageStore.initialize()
       }
 
-      // Save to localStorage (package store)
-      const stored = localStorage.getItem('tc-study-packages')
-      const packages = stored ? JSON.parse(stored) : []
-      packages.push(collection)
-      localStorage.setItem('tc-study-packages', JSON.stringify(packages))
+      await packageStore.savePackage({
+        id: collectionId,
+        name,
+        title: name,
+        description: `Collection with ${selectedResources.length} resource${selectedResources.length !== 1 ? 's' : ''}`,
+        version: '1.0.0',
+        createdAt: new Date().toISOString(),
+        status: 'installed',
+        resources: selectedResources.map((r) => ({
+          server: r.server || 'https://git.door43.org',
+          owner: r.owner,
+          language: r.language,
+          resourceId: r.resourceId,
+          displayName: r.title,
+        })),
+        panelLayout: {
+          panels: [
+            {
+              id: 'panel-1',
+              title: 'Panel 1',
+              resourceIds,
+              defaultResourceId: resourceIds[0],
+            },
+          ],
+          orientation: 'horizontal',
+        },
+        // title/status used by Collections list filter + PackageCard
+      } as never)
 
-      console.log('✅ Collection created:', collection)
-      
       if (onComplete) {
         onComplete(collectionId)
       }
-      
+
       onClose()
     } catch (error) {
       console.error('Failed to create collection:', error)

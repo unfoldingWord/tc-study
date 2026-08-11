@@ -20,7 +20,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useCatalogManager, useResourceTypeRegistry } from '../contexts'
-import { useWorkspaceStore } from '../lib/stores/workspaceStore'
+import { useWizardStore } from '../lib/stores/wizardStore'
 import { SelectableGridWithStatus } from './shared/SelectableGrid'
 
 // Cache key for localStorage
@@ -63,7 +63,7 @@ export function LanguagePicker({
 
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
-  const setAvailableLanguages = useWorkspaceStore((s) => s.setAvailableLanguages)
+  const setAvailableLanguages = useWizardStore((s) => s.setAvailableLanguages)
 
   // Get supported subjects for filtering (stable string for effect/callback deps)
   const supportedSubjects = resourceTypeRegistry.getSupportedSubjects()
@@ -79,7 +79,6 @@ export function LanguagePicker({
       
       // Validate cache version and subjects match
       if (parsed.version !== CACHE_VERSION) {
-        console.log('📦 Cache version mismatch, will fetch fresh')
         return null
       }
       
@@ -88,11 +87,9 @@ export function LanguagePicker({
       const currentSubjects = new Set(supportedSubjects)
       if (cachedSubjects.size !== currentSubjects.size || 
           !supportedSubjects.every(s => cachedSubjects.has(s))) {
-        console.log('📦 Cache subjects mismatch, will fetch fresh')
         return null
       }
       
-      console.log(`📦 Using cached languages (${parsed.languages.length} languages)`)
       return parsed.languages
     } catch (error) {
       console.warn('⚠️ Failed to load languages from cache:', error)
@@ -110,7 +107,6 @@ export function LanguagePicker({
         languages,
       }
       localStorage.setItem(LANGUAGES_CACHE_KEY, JSON.stringify(cacheData))
-      console.log(`💾 Saved ${languages.length} languages to cache`)
     } catch (error) {
       console.warn('⚠️ Failed to save languages to cache:', error)
     }
@@ -126,7 +122,6 @@ export function LanguagePicker({
     setError(null)
     try {
       const client = getDoor43ApiClient()
-      console.log('🌐 Revalidating languages with subjects:', supportedSubjects)
       const door43Langs = await client.getLanguages({
         subjects: supportedSubjects,
         stage: 'prod',

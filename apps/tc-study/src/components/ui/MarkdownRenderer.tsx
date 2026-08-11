@@ -102,7 +102,7 @@ export function MarkdownRenderer({
 
     renderContent()
     return () => { cancelled = true }
-  }, [content, onInternalLinkClick, getEntryTitle])
+  }, [content, onInternalLinkClick, getEntryTitle, useCache])
 
   if (!content) {
     return null

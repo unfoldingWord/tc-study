@@ -5,6 +5,9 @@ export type {
   ProgressCallback,
 } from './base-types'
 
+/** Catalog SoT — re-exported for loader consumers */
+export type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+
 export { ResourceTypeRegistry } from './ResourceTypeRegistry'
 export type { ResourceTypeRegistryConfig } from './ResourceTypeRegistry'
 export { defineResourceType } from './types'
@@ -20,6 +23,8 @@ export type {
   SignalHandlerConfig,
   CommunicationConfig,
   ResourceDependency,
+  PanelResourceDescriptor,
+  ResourceSignal,
 } from './types'
-export { enhanceViewer, getPlatformViewer } from './enhanceViewer'
-export type { EnhancedViewerProps } from './enhanceViewer'
+export { getPlatformViewer } from './platformViewer'
+export type { EnhancedViewerProps } from './platformViewer'

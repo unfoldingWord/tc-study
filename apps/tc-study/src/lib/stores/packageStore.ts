@@ -1,5 +1,7 @@
 /**
- * Package Store - Manages saved collections (resource packages)
+ * Package Store — persisted named collections (`ResourcePackage`).
+ * Live panel layout SoT is `WorkspacePackage` in workspaceStore; convert via
+ * `features/workspace/workspaceCollectionHelpers.ts` (see stateOwnership vocab).
  * 
  * Uses @bt-synergy/package-storage for persistence via IndexedDB
  */
@@ -52,7 +54,7 @@ export const usePackageStore = create<PackageStore>()(
     // Initialize package manager with IndexedDB
     initialize: async () => {
       try {
-        console.log('📦 Initializing PackageManager...')
+
         
         // Create IndexedDB storage adapter
         const storage = new IndexedDBPackageStorage({
@@ -63,13 +65,16 @@ export const usePackageStore = create<PackageStore>()(
         
         // Create package manager (catalog will be null for now - packages are just metadata)
         // Note: IndexedDB storage auto-initializes on first access
-        const packageManager = new PackageManager(storage, null as any)
+        const packageManager = new PackageManager(
+          storage,
+          null as unknown as import('@bt-synergy/resource-catalog').ResourceCatalog
+        )
         
         set((state) => {
           state.packageManager = packageManager
         })
         
-        console.log('✅ PackageManager initialized')
+
         
         // Load packages
         await get().loadPackages()
@@ -96,7 +101,7 @@ export const usePackageStore = create<PackageStore>()(
         })
         
         const packages = await packageManager.listPackages()
-        console.log('📦 Loaded packages:', packages.length)
+
         
         set((state) => {
           state.packages = packages
@@ -125,11 +130,11 @@ export const usePackageStore = create<PackageStore>()(
         if (existing) {
           // Update existing
           await packageManager.updatePackage(pkg.id, pkg)
-          console.log('📦 Updated package:', pkg.id)
+
         } else {
           // Create new
           await packageManager.createPackage(pkg)
-          console.log('📦 Created package:', pkg.id)
+
         }
         
         // Reload packages
@@ -149,7 +154,7 @@ export const usePackageStore = create<PackageStore>()(
       
       try {
         await packageManager.deletePackage(packageId)
-        console.log('📦 Deleted package:', packageId)
+
         
         // Clear active if deleted
         if (get().activePackageId === packageId) {
@@ -185,5 +190,7 @@ export const usePackageStore = create<PackageStore>()(
   }))
 )
 
-// Auto-initialize on first use
-usePackageStore.getState().initialize()
+// Auto-initialize in browser only (Bun/node unit tests have no IndexedDB)
+if (typeof indexedDB !== 'undefined') {
+  void usePackageStore.getState().initialize()
+}

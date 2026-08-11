@@ -8,7 +8,7 @@ import type {
   ResourceLoader,
   ResourceMetadata
 } from '@bt-synergy/catalog-manager'
-import { Door43ServerAdapter } from '@bt-synergy/resource-catalog'
+import { Door43ServerAdapter, RESOURCE_TYPE_IDS } from '@bt-synergy/resource-catalog'
 import JSZip from 'jszip'
 import { generateTAIngredients } from './ingredients-generator'
 import type {
@@ -18,7 +18,8 @@ import type {
 } from './types'
 
 export class TranslationAcademyLoader implements ResourceLoader {
-  readonly resourceType = 'ta'
+  /** Canonical short ID — must match worker `registerLoader('academy', …)`. */
+  readonly resourceType = RESOURCE_TYPE_IDS.TRANSLATION_ACADEMY
   
   private cacheAdapter: any
   private catalogAdapter: any

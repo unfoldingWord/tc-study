@@ -1,6 +1,6 @@
 /**
  * Panel System Test Page
- * 
+ *
  * Tests comprehensive two-way communication:
  * - Multiple resources per panel
  * - Resource switching via navigation signals
@@ -17,21 +17,18 @@ import {
   useMessaging,
   type LinkedPanelsConfig,
 } from 'linked-panels'
-import { Activity, Send, Eye, Zap, CheckCircle, Radio, ArrowRight, Shuffle } from 'lucide-react'
+import { Activity, Send, Zap, CheckCircle, Radio, ArrowRight } from 'lucide-react'
 import { ScriptureViewer } from '../resources/ScriptureViewer'
-import { WordsLinksViewer } from '../resources'
 import { useCatalog } from '../../contexts/CatalogContext'
 import type { ResourceInfo, ResourceMetadata } from '../../contexts/types'
 import type { TokenClickEvent, LinkClickEvent } from '../../plugins/types'
 import { tokenClickPlugin, linkClickPlugin } from '../../plugins/messageTypePlugins'
 import { TestResourceWithPanels } from './TestResourceWithPanels'
-import type { NavigationRequestSignal } from '../../signals/testSignals'
 
 // Create plugin registry ONCE at module level, not on every render
 const pluginRegistry = createDefaultPluginRegistry()
 pluginRegistry.register(tokenClickPlugin)
 pluginRegistry.register(linkClickPlugin)
-console.log('📦 Plugin registry initialized with custom plugins')
 
 interface MessageLog {
   id: string
@@ -39,10 +36,15 @@ interface MessageLog {
   type: string
   from: string
   to: string
-  data: any
+  data: unknown
   received: boolean
 }
 
+/** Test harness messaging surface (linked-panels API is loosely typed here). */
+type TestMessaging = {
+  sendToAll: (event: unknown) => void
+  sendToPanel: (panelId: string, event: unknown) => void
+}
 
 // Note: Panel navigation is now inline in LinkedPanel render props, not a separate component
 
@@ -59,7 +61,7 @@ function SignalMonitor({ messages }: { messages: MessageLog[] }) {
       <p className="text-xs text-gray-600 mb-4">
         {messages.length} message{messages.length !== 1 ? 's' : ''} logged
       </p>
-      
+
       <div className="space-y-2">
         {messages.length === 0 ? (
           <div className="text-sm text-gray-500 text-center py-8">
@@ -117,20 +119,27 @@ interface TestResourceProps {
   resourceId: string
   allResources: Array<{ id: string; title: string }>
   onNavigateRequest?: (targetPanelId: string, targetResourceId: string) => void
-  onMessageLog?: (type: string, from: string, to: string, data: any, received: boolean) => void
+  onMessageLog?: (type: string, from: string, to: string, data: unknown, received: boolean) => void
 }
 
 function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLog }: TestResourceProps) {
-  console.log(`🎨 [TestResource] Component rendering with resourceId: ${resourceId}`)
-  
+
   // Use linked-panels API with ref pattern (mobile app pattern)
   const linkedPanelsAPI = useResourceAPI(resourceId)
   const linkedPanelsAPIRef = useRef(linkedPanelsAPI)
   linkedPanelsAPIRef.current = linkedPanelsAPI
-  
+
   const [sentCount, setSentCount] = useState(0)
-  const [receivedMessages, setReceivedMessages] = useState<any[]>([])
-  const [lastReceivedToken, setLastReceivedToken] = useState<any>(null)
+  const [receivedMessages, setReceivedMessages] = useState<
+    Array<{ type?: string; timestamp?: number; [key: string]: unknown }>
+  >([])
+  const [lastReceivedToken, setLastReceivedToken] = useState<{
+    content?: string
+    transliteration?: string
+    meaning?: string
+    semanticId?: string
+    verseRef?: string
+  } | null>(null)
   const [targetPanel, setTargetPanel] = useState<'panel-1' | 'panel-2'>('panel-2')
   const [targetMode, setTargetMode] = useState<'all' | 'panel' | 'resource'>('all')
   const [targetResourceId, setTargetResourceId] = useState(allResources[0]?.id || 'test-1')
@@ -141,29 +150,37 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
   useMessaging({
     resourceId,
     eventTypes: ['token-click', 'link-click'],
-    onEvent: (message: any) => {
-      console.log(`📨 [${resourceId}] ✨✨✨ useMessaging callback FIRED!`, message)
-      console.log(`📨 [${resourceId}] Message type:`, message.type)
-      console.log(`📨 [${resourceId}] Message token:`, message.token)
-      
-      setReceivedMessages(prev => [{ ...message, timestamp: Date.now() }, ...prev].slice(0, 10))
-      
-      // If it's a token-click event, extract and display the token
-      if (message.type === 'token-click' && message.token) {
-        console.log(`✅ [${resourceId}] Setting lastReceivedToken to:`, message.token)
-        setLastReceivedToken(message.token)
+    onEvent: (message) => {
+      const msg = message as {
+        type?: string
+        token?: unknown
+        sourceResourceId?: string
       }
-      
+
+      setReceivedMessages(prev => [{ ...msg, timestamp: Date.now() }, ...prev].slice(0, 10))
+
+      // If it's a token-click event, extract and display the token
+      if (msg.type === 'token-click' && msg.token) {
+        setLastReceivedToken(
+          msg.token as {
+            content?: string
+            transliteration?: string
+            meaning?: string
+            semanticId?: string
+            verseRef?: string
+          }
+        )
+      }
+
       // Log to signal monitor
       if (onMessageLog) {
-        onMessageLog(message.type, message.sourceResourceId || 'unknown', resourceId, message, true)
+        onMessageLog(msg.type || 'unknown', msg.sourceResourceId || 'unknown', resourceId, msg, true)
       }
     }
   })
-  
+
   // Debug logging in useEffect to avoid breaking hook rules
   useEffect(() => {
-    console.log(`👂 [${resourceId}] useMessaging listener registered`)
   }, [resourceId])
 
   const sendTokenClick = () => {
@@ -172,7 +189,7 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
       console.warn(`⚠️ [${resourceId}] Linked panels messaging API not available`)
       return
     }
-    
+
     const selectedWord = SAMPLE_WORDS[selectedWordIdx]
     const event: TokenClickEvent = {
       type: 'token-click',
@@ -189,29 +206,29 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
       sourceResourceId: resourceId,
       timestamp: Date.now(),
     }
-    
+
     let targetDesc = 'all resources'
-    
+
     // Send based on target mode using ref pattern
+    const messaging = linkedPanelsAPIRef.current.messaging as TestMessaging
     switch (targetMode) {
       case 'all':
-        (linkedPanelsAPIRef.current.messaging as any).sendToAll(event)
+        messaging.sendToAll(event)
         targetDesc = 'all resources'
         break
       case 'panel':
-        (linkedPanelsAPIRef.current.messaging as any).sendToPanel(targetPanel, event)
+        messaging.sendToPanel(targetPanel, event)
         targetDesc = `panel ${targetPanel}`
         break
       case 'resource':
         // Note: sendToResource doesn't exist in linked-panels API yet
-        (linkedPanelsAPIRef.current.messaging as any).sendToAll({ ...event, intendedTarget: targetResourceId })
+        messaging.sendToAll({ ...event, intendedTarget: targetResourceId })
         targetDesc = `resource ${targetResourceId} (via broadcast)`
         break
     }
-    
-    console.log(`📤 [${resourceId}] Sending "${selectedWord.word}" to ${targetDesc}`)
+
     setSentCount(prev => prev + 1)
-    
+
     // Log to signal monitor
     if (onMessageLog) {
       onMessageLog('token-click', resourceId, targetDesc, event, false)
@@ -224,7 +241,7 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
       console.warn(`⚠️ [${resourceId}] Linked panels messaging API not available`)
       return
     }
-    
+
     const event: LinkClickEvent = {
       type: 'link-click',
       lifecycle: 'event',
@@ -237,12 +254,10 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
       sourceResourceId: resourceId,
       timestamp: Date.now(),
     }
-    
-    console.log('🚀 [TestResource] Sending link-click event:', JSON.stringify(event, null, 2))
-    console.log('🚀 [TestResource] Event keys:', Object.keys(event))
-    ;(linkedPanelsAPIRef.current.messaging as any).sendToAll(event)
+
+    ;(linkedPanelsAPIRef.current.messaging as TestMessaging).sendToAll(event)
     setSentCount(prev => prev + 1)
-    
+
     // Log to signal monitor
     if (onMessageLog) {
       onMessageLog('link-click', resourceId, 'all', event, false)
@@ -253,8 +268,7 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
     if (onNavigateRequest) {
       onNavigateRequest(targetPanel, targetResourceId)
       setSentCount(prev => prev + 1)
-      console.log(`📤 [${resourceId}] Requesting navigation of ${targetPanel} to ${targetResourceId}`)
-      
+
       // Log to signal monitor
       if (onMessageLog) {
         onMessageLog('navigate', resourceId, targetPanel, { targetResourceId }, false)
@@ -309,7 +323,7 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
             Resource
           </button>
         </div>
-        
+
         {/* Conditional selectors based on mode */}
         {targetMode === 'panel' && (
           <select
@@ -321,7 +335,7 @@ function TestResource({ resourceId, allResources, onNavigateRequest, onMessageLo
             <option value="panel-2">Panel 2</option>
           </select>
         )}
-        
+
         {targetMode === 'resource' && (
           <select
             value={targetResourceId}
@@ -422,13 +436,13 @@ export function PanelSystemTest() {
   const [apiMode, setApiMode] = useState<'low-level' | 'high-level'>('high-level')
   const [availableResources, setAvailableResources] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  
+
   // Track current resource index for each panel
   const [panel1ResourceIdx, setPanel1ResourceIdx] = useState(0)
   const [panel2ResourceIdx, setPanel2ResourceIdx] = useState(1) // Start with a different resource
 
   // Message logger for signal monitor
-  const logMessage = useCallback((type: string, from: string, to: string, data: any, received: boolean) => {
+  const logMessage = useCallback((type: string, from: string, to: string, data: unknown, received: boolean) => {
     const log: MessageLog = {
       id: `${Date.now()}-${Math.random()}`,
       timestamp: Date.now(),
@@ -447,15 +461,14 @@ export function PanelSystemTest() {
         setLoading(true)
         const allResourceKeys = await catalogManager.catalogAdapter.getAll()
         const downloaded: ResourceMetadata[] = []
-        
+
         for (const key of allResourceKeys) {
           const metadata = await catalogManager.catalogAdapter.get(key)
           if (metadata?.availability?.offline === true) {
             downloaded.push(metadata)
           }
         }
-        
-        console.log('📦 Downloaded resources:', downloaded.length)
+
         setAvailableResources(downloaded)
       } catch (error) {
         console.error('❌ Failed to load:', error)
@@ -474,7 +487,7 @@ export function PanelSystemTest() {
     { id: 'test-4', title: 'Test Resource 4', category: 'test' },
   ], [])
 
-  const realResources = useMemo(() => 
+  const realResources = useMemo(() =>
     availableResources.slice(0, 4).map((resource) => ({
       id: `real-${resource.resourceKey.replace(/\//g, '-')}`,
       title: resource.title || resource.resourceKey,
@@ -484,10 +497,10 @@ export function PanelSystemTest() {
     }))
   , [availableResources])
 
-  const resources = useMemo(() => 
+  const resources = useMemo(() =>
     testMode === 'mock' ? mockResources : realResources
   , [testMode, mockResources, realResources])
-  
+
   // Handle navigation requests from test resources
   const handleNavigateRequest = useCallback((targetPanelId: string, targetResourceId: string) => {
     const targetIndex = resources.findIndex(r => r.id === targetResourceId)
@@ -495,9 +508,8 @@ export function PanelSystemTest() {
       console.warn(`Resource ${targetResourceId} not found`)
       return
     }
-    
-    console.log(`🔀 Switching ${targetPanelId} to resource ${targetResourceId} (index ${targetIndex})`)
-    
+
+
     if (targetPanelId === 'panel-1') {
       setPanel1ResourceIdx(targetIndex)
     } else if (targetPanelId === 'panel-2') {
@@ -509,13 +521,11 @@ export function PanelSystemTest() {
     // Get currently active resources for each panel
     const panel1Resource = resources[panel1ResourceIdx]
     const panel2Resource = resources[panel2ResourceIdx]
-    
-    console.log(`🔧 Creating config for panel-1: ${panel1Resource?.id}, panel-2: ${panel2Resource?.id}`)
-    
+
+
     // Only include the currently active resources (like the spike does)
     const activeResources = [panel1Resource, panel2Resource].filter(Boolean).map((resource) => {
-      console.log(`🔧 Creating component for resource: ${resource.id}`)
-      
+
       // Create component with explicit resourceId prop (like spike)
       const component = testMode === 'mock' ? (
         apiMode === 'high-level' ? (
@@ -542,7 +552,7 @@ export function PanelSystemTest() {
             key: resource.resourceKey,
             resourceKey: resource.resourceKey,
             title: resource.title,
-            type: resource.subject as any,
+            type: resource.subject as ResourceInfo['type'],
           } as ResourceInfo}
           isAnchor={false}
         />
@@ -552,13 +562,13 @@ export function PanelSystemTest() {
           <p className="text-xs text-gray-500">{'subject' in resource ? resource.subject : resource.category}</p>
         </div>
       )
-      
+
       return {
         ...resource,
         component,
       }
     })
-    
+
     return {
       resources: activeResources,
       panels: {
@@ -618,9 +628,9 @@ export function PanelSystemTest() {
               Real Resources ({realResources.length})
             </button>
           </div>
-          
+
           <div className="h-8 w-px bg-gray-300" />
-          
+
           <div className="flex gap-2">
             <button
               onClick={() => setApiMode('high-level')}
@@ -639,19 +649,19 @@ export function PanelSystemTest() {
               ⚙️ Low-Level API
             </button>
           </div>
-          
+
           <div className="ml-auto text-sm text-gray-600">
             <Activity className="w-4 h-4 inline mr-1" />
             {messages.length} messages
           </div>
         </div>
-        
+
         <div className="p-3 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
           <p className="text-sm font-semibold text-purple-900 mb-1">
             {apiMode === 'high-level' ? '✨ Using @bt-synergy/resource-panels' : '⚙️ Using linked-panels directly'}
           </p>
           <p className="text-xs text-gray-700">
-            {apiMode === 'high-level' 
+            {apiMode === 'high-level'
               ? 'Clean, typed hooks with automatic setup - useSignal() & useSignalHandler()'
               : 'Low-level useResourceAPI() & useMessaging() with manual refs'}
           </p>
@@ -680,7 +690,7 @@ export function PanelSystemTest() {
                       >
                         <ArrowRight className="w-4 h-4 rotate-180" />
                       </button>
-                      
+
                       <select
                         value={panel1ResourceIdx.toString()}
                         onChange={(e) => setPanel1ResourceIdx(parseInt(e.target.value, 10))}
@@ -692,7 +702,7 @@ export function PanelSystemTest() {
                           </option>
                         ))}
                       </select>
-                      
+
                       <button
                         onClick={() => setPanel1ResourceIdx(prev => Math.min(resources.length - 1, prev + 1))}
                         disabled={panel1ResourceIdx >= resources.length - 1}
@@ -701,12 +711,12 @@ export function PanelSystemTest() {
                       >
                         <ArrowRight className="w-4 h-4" />
                       </button>
-                      
+
                       <span className="text-xs text-gray-500 ml-2">
                         {panel1ResourceIdx + 1}/{resources.length}
                       </span>
                     </div>
-                    
+
                     {/* Content */}
                     <div className="flex-1 overflow-auto">
                       {current.resource?.component}
@@ -734,7 +744,7 @@ export function PanelSystemTest() {
                       >
                         <ArrowRight className="w-4 h-4 rotate-180" />
                       </button>
-                      
+
                       <select
                         value={panel2ResourceIdx.toString()}
                         onChange={(e) => setPanel2ResourceIdx(parseInt(e.target.value, 10))}
@@ -746,7 +756,7 @@ export function PanelSystemTest() {
                           </option>
                         ))}
                       </select>
-                      
+
                       <button
                         onClick={() => setPanel2ResourceIdx(prev => Math.min(resources.length - 1, prev + 1))}
                         disabled={panel2ResourceIdx >= resources.length - 1}
@@ -755,12 +765,12 @@ export function PanelSystemTest() {
                       >
                         <ArrowRight className="w-4 h-4" />
                       </button>
-                      
+
                       <span className="text-xs text-gray-500 ml-2">
                         {panel2ResourceIdx + 1}/{resources.length}
                       </span>
                     </div>
-                    
+
                     {/* Content */}
                     <div className="flex-1 overflow-auto">
                       {current.resource?.component}

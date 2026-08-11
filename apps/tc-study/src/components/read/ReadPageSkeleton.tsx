@@ -5,7 +5,7 @@
  * the structure immediately instead of a floating spinner.
  */
 
-import { Loader2 } from 'lucide-react'
+import { LoadingSpinner } from '../../shared/LoadingSpinner'
 
 export function ReadPageSkeleton() {
   return (
@@ -22,13 +22,12 @@ export function ReadPageSkeleton() {
               1
             </span>
           </div>
-          <div
-            className="flex-1 flex items-center justify-center min-h-0"
-            role="status"
-            aria-label="Loading"
-          >
-            <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-          </div>
+          <LoadingSpinner
+            centered
+            label="Loading"
+            className="text-blue-400"
+            containerClassName="flex-1 min-h-0"
+          />
         </div>
 
         {/* Resize Divider */}
@@ -44,13 +43,12 @@ export function ReadPageSkeleton() {
               2
             </span>
           </div>
-          <div
-            className="flex-1 flex items-center justify-center min-h-0"
-            role="status"
-            aria-label="Loading"
-          >
-            <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
-          </div>
+          <LoadingSpinner
+            centered
+            label="Loading"
+            className="text-purple-400"
+            containerClassName="flex-1 min-h-0"
+          />
         </div>
       </div>
 

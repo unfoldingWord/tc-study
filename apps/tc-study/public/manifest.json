@@ -1,0 +1,9 @@
+{
+  "name": "TC Study",
+  "short_name": "TC Study",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": []
+}

@@ -1,7 +1,7 @@
 {
   "name": "@bt-synergy/resource-signals",
   "version": "1.0.0",
-  "description": "Platform-agnostic signal definitions for resource inter-communication (Web + React Native)",
+  "description": "[ARCHIVED] Do not grow — tc-study uses resource-panels (see ARCHIVED.md)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -38,8 +38,7 @@
     "clean": "rm -rf dist",
     "test": "vitest"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "typescript": "~5.9.3",
     "vitest": "^2.0.0"
@@ -53,6 +52,6 @@
     "web"
   ],
   "author": "BT Synergy Team",
-  "license": "MIT"
+  "license": "MIT",
+  "private": true
 }
-

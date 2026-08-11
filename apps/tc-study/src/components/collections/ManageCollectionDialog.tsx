@@ -8,6 +8,7 @@ import type { ResourcePackage as WorkspacePackage } from '../../lib/storage/type
 import type { ResourceInfo } from '../../contexts/types'
 import type { ResourcePackage as StorageResourcePackage, PackageResource } from '@bt-synergy/package-storage'
 import { usePackageStore } from '../../lib/stores'
+import { getResourceBadgeLabel } from '../../features/tabs/tabShortLabel'
 
 interface ManageCollectionDialogProps {
   collection: WorkspacePackage | StorageResourcePackage
@@ -22,11 +23,11 @@ function getResourcesArray(collection: WorkspacePackage | StorageResourcePackage
   return r ?? []
 }
 
-function resourcesMapToArray(resources: Map<string, ResourceInfo>): ResourceInfo[] {
+function _resourcesMapToArray(resources: Map<string, ResourceInfo>): ResourceInfo[] {
   return Array.from(resources.values())
 }
 
-function arrayToResourcesMap(resources: ResourceInfo[]): Map<string, ResourceInfo> {
+function _arrayToResourcesMap(resources: ResourceInfo[]): Map<string, ResourceInfo> {
   const map = new Map<string, ResourceInfo>()
   resources.forEach(r => map.set(r.key, r))
   return map
@@ -175,11 +176,16 @@ export function ManageCollectionDialog({
             </div>
           ) : (
             <div className="space-y-2">
-              {resources.map((resource: any, index: number) => {
+              {resources.map((resource: ResourceInfo | PackageResource, index: number) => {
+                const full = resource as ResourceInfo
                 const fullResId = resource.resourceId || 'UNKNOWN'
-                const resId = fullResId.split('/').pop()?.toUpperCase() || fullResId.toUpperCase()
+                const resId = getResourceBadgeLabel(full.key || full.resourceKey || fullResId, {
+                  title: full.title,
+                  type: full.type,
+                  abbreviation: full.abbreviation,
+                })
                 const langCode = resource.language?.toUpperCase() || 'EN'
-                
+
                 return (
                   <div
                     key={index}
@@ -196,7 +202,13 @@ export function ManageCollectionDialog({
                             {langCode}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-500">{resource.displayName}</p>
+                        <p className="text-sm text-gray-500">
+                          {'displayName' in resource
+                            ? resource.displayName
+                            : 'title' in resource
+                              ? resource.title
+                              : ''}
+                        </p>
                       </div>
                     </div>
                     <button

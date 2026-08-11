@@ -10,5 +10,8 @@ interface ImportMetaEnv {
 
 interface ImportMeta {
   readonly env: ImportMetaEnv
-  readonly glob: (pattern: string, options?: any) => Record<string, () => Promise<any>>
+  readonly glob: (
+    pattern: string,
+    options?: Record<string, unknown>
+  ) => Record<string, () => Promise<unknown>>
 }

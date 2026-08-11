@@ -5,13 +5,11 @@
 
 import type { ResourceMetadata } from '@bt-synergy/catalog-manager'
 import type { LoaderRegistry } from '../loaders/LoaderRegistry'
-import { ProcessedScripture } from '@bt-synergy/usfm-processor'
-import type { TranslationWord } from '@bt-synergy/translation-words-loader'
 
 export interface LoadedResourceContent {
   resourceKey: string
   metadata: ResourceMetadata
-  content: any // Scripture: ProcessedScripture, Words: TranslationWord, etc.
+  content: unknown // Scripture: ProcessedScripture, Words: TranslationWord, etc.
   loadedAt: Date
   type: 'scripture' | 'obs' | 'words' | 'notes' | 'questions' | 'academy' | 'unknown'
 }
@@ -39,9 +37,7 @@ export class ResourceLoadingService {
 
     // Check if already loaded
     if (this.loadedContent.has(cacheKey)) {
-      if (this.debug) {
-        console.log(`✨ Resource already in memory: ${cacheKey}`)
-      }
+
       return this.loadedContent.get(cacheKey)!
     }
 
@@ -51,12 +47,8 @@ export class ResourceLoadingService {
       throw new Error(`No loader available for resource type: ${metadata.type}`)
     }
 
-    if (this.debug) {
-      console.log(`📥 Loading resource: ${cacheKey}`)
-    }
-
     // Load content based on content structure
-    let content: any
+    let content: unknown
     if (metadata.contentStructure === 'book') {
       // Book-organized resources (e.g., Scripture) - load specific book
       if (!ingredientId) {
@@ -86,10 +78,6 @@ export class ResourceLoadingService {
 
     this.loadedContent.set(cacheKey, loaded)
 
-    if (this.debug) {
-      console.log(`✅ Resource loaded: ${cacheKey}`)
-    }
-
     return loaded
   }
 
@@ -112,9 +100,7 @@ export class ResourceLoadingService {
    */
   unload(resourceKey: string): void {
     this.loadedContent.delete(resourceKey)
-    if (this.debug) {
-      console.log(`🗑️ Unloaded resource: ${resourceKey}`)
-    }
+
   }
 
   /**
@@ -129,9 +115,7 @@ export class ResourceLoadingService {
    */
   clearAll(): void {
     this.loadedContent.clear()
-    if (this.debug) {
-      console.log('🗑️ Cleared all loaded resources')
-    }
+
   }
 
   /**
@@ -173,6 +157,4 @@ export class ResourceLoadingService {
     }
   }
 }
-
-
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useMessaging } from 'linked-panels'
-import type { BaseSignal, SignalType, ResourceType, ResourceMetadata, ResourceFilter } from '../core/types'
+import type { BaseSignal, SignalType, ResourceType, PanelResourceMetadata, ResourceFilter } from '../core/types'
 import { _addSignalToStore } from './useSignalStore'
 import { matchesFilter, normalizeMetadata, normalizeFilter } from '../utils/filterMatching'
 
@@ -74,7 +74,7 @@ export function useSignalHandler<T extends BaseSignal>(
      * If specified, signals with targetFilter will only be handled
      * if this resource's metadata matches the filter.
      */
-    resourceMetadata?: ResourceType | ResourceMetadata
+    resourceMetadata?: ResourceType | PanelResourceMetadata
     
     /**
      * @deprecated Use resourceMetadata instead
@@ -92,7 +92,7 @@ export function useSignalHandler<T extends BaseSignal>(
   handlerRef.current = handler
 
   // Normalize metadata for backward compatibility
-  const myMetadata: ResourceMetadata = typeof options?.resourceMetadata === 'string'
+  const myMetadata: PanelResourceMetadata = typeof options?.resourceMetadata === 'string'
     ? { type: options.resourceMetadata }
     : options?.resourceMetadata || (options?.resourceType ? { type: options.resourceType } : {})
 

@@ -111,6 +111,13 @@ export interface CatalogConfig {
   
   /** Enable debug logging */
   debug?: boolean
+
+  /** Optional Door43 API client (used by loaders / worker bootstrap) */
+  door43Client?: unknown
+
+  /** Worker/main bootstrap flags (stored by callers; manager may ignore) */
+  enableNetworkFallback?: boolean
+  requireSecureConnection?: boolean
 }
 
 /**

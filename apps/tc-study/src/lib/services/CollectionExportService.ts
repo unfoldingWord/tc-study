@@ -1,6 +1,6 @@
 /**
  * Collection Export Service
- * 
+ *
  * Handles exporting workspace collections as downloadable packages that can be shared.
  * Collections include:
  * - Resource metadata (minimum requirement)
@@ -8,11 +8,14 @@
  * - Optional: Downloaded content for offline use
  */
 
-import type { ResourceMetadata } from '@bt-synergy/catalog-manager'
+import type { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
+import type { CatalogManager, ResourceMetadata } from '@bt-synergy/catalog-manager'
 import { saveAs } from 'file-saver'
 import JSZip from 'jszip'
 import type { ResourceInfo } from '../../contexts/types'
 import type { WorkspacePackage } from '../stores/workspaceStore'
+
+type ExportCacheAdapter = Pick<IndexedDBCacheAdapter, 'get' | 'set' | 'keys'>
 
 export interface CollectionManifest {
   format: 'bt-synergy-collection'
@@ -23,10 +26,10 @@ export interface CollectionManifest {
   description?: string
   createdAt: string
   createdBy?: string
-  
+
   // Resource pointers (same shape as local collection)
   resources: CollectionResource[]
-  
+
   // Panel configuration
   panelLayout: {
     panels: CollectionPanel[]
@@ -68,12 +71,12 @@ export class CollectionExportService {
    */
   async exportCollection(
     workspace: WorkspacePackage,
-    catalogManager: any,
-    cacheAdapter: any,
+    catalogManager: CatalogManager,
+    cacheAdapter: ExportCacheAdapter,
     options: ExportOptions = { includeContent: false }
   ): Promise<void> {
     const zip = new JSZip()
-    
+
     // 1. Create manifest
     const manifest = await this.createManifest(
       workspace,
@@ -81,13 +84,13 @@ export class CollectionExportService {
       cacheAdapter,
       options
     )
-    
+
     zip.file('manifest.json', JSON.stringify(manifest, null, 2))
-    
+
     // 2. Add resource metadata (standardized fields)
     const metadataFolder = zip.folder('metadata')
     if (metadataFolder) {
-      for (const [resourceKey, resourceInfo] of workspace.resources) {
+      for (const [resourceKey, _resourceInfo] of workspace.resources) {
         try {
           const metadata = await catalogManager.getResourceMetadata(resourceKey)
           if (metadata) {
@@ -100,7 +103,7 @@ export class CollectionExportService {
         }
       }
     }
-    
+
     // 3. Optionally include content
     if (options.includeContent) {
       const contentFolder = zip.folder('content')
@@ -113,39 +116,38 @@ export class CollectionExportService {
         )
       }
     }
-    
+
     // 4. Add README
     const readme = this.generateReadme(manifest, options.includeContent)
     zip.file('README.md', readme)
-    
+
     // 5. Generate and download ZIP
     const blob = await zip.generateAsync({ type: 'blob' })
     const filename = `${workspace.name.replace(/\s+/g, '-').toLowerCase()}-v${workspace.version}.btc.zip`
     saveAs(blob, filename)
-    
-    console.log(`📦 Exported collection: ${filename}`)
+
   }
-  
+
   /**
    * Create collection manifest
    * Manifest contains only:
    * - Collection metadata
    * - Resource pointers (lightweight)
    * - Panel configuration
-   * 
+   *
    * All resource metadata goes in metadata/*.json files
    */
   private async createManifest(
     workspace: WorkspacePackage,
-    catalogManager: any,
-    cacheAdapter: any,
-    options: ExportOptions
+    catalogManager: CatalogManager,
+    _cacheAdapter: ExportCacheAdapter,
+    _options: ExportOptions
   ): Promise<CollectionManifest> {
     const resources: CollectionResource[] = []
-    
+
     // Helper to extract base resource key (remove instance identifiers)
     const extractBaseKey = (key: string): string => key.split('#')[0]
-    
+
     // Helper to parse resource key into components
     const parseResourceKey = (key: string): CollectionResource => {
       const baseKey = extractBaseKey(key)
@@ -157,23 +159,23 @@ export class CollectionExportService {
         resourceId: parts[2] || '',
       }
     }
-    
-    for (const [resourceKey, resourceInfo] of workspace.resources) {
+
+    for (const [resourceKey, _resourceInfo] of workspace.resources) {
       try {
         const resource = parseResourceKey(resourceKey)
-        
+
         // Use actual server from metadata if available
         const metadata = await catalogManager.getResourceMetadata(extractBaseKey(resourceKey))
         if (metadata?.server) {
           resource.server = metadata.server
         }
-        
+
         resources.push(resource)
       } catch (error) {
         console.warn(`⚠️ Could not process resource ${resourceKey}:`, error)
       }
     }
-    
+
     return {
       format: 'bt-synergy-collection',
       formatVersion: '1.0.0',
@@ -188,7 +190,7 @@ export class CollectionExportService {
           id: panel.id,
           title: panel.name,
           resourceIds: panel.resourceKeys.map(extractBaseKey), // Strip instance identifiers
-          defaultResourceId: panel.resourceKeys[panel.activeIndex] 
+          defaultResourceId: panel.resourceKeys[panel.activeIndex]
             ? extractBaseKey(panel.resourceKeys[panel.activeIndex])
             : undefined,
         })),
@@ -196,88 +198,86 @@ export class CollectionExportService {
       },
     }
   }
-  
-  
+
+
   /**
    * Add cached content files to ZIP
-   * 
+   *
    * Discovers content by querying cache for keys that start with resource key
    * Example: "unfoldingWord/en/ult" finds all chapters cached for ULT
    */
   private async addContentToZip(
     contentFolder: JSZip,
     workspace: WorkspacePackage,
-    cacheAdapter: any,
+    cacheAdapter: ExportCacheAdapter,
     filter?: ExportOptions['contentFilter']
   ): Promise<void> {
     // Determine which resources to export
-    const resourcesToExport = filter?.resourceKeys 
+    const resourcesToExport = filter?.resourceKeys
       ? Array.from(workspace.resources.keys()).filter(k => filter.resourceKeys!.includes(k))
       : Array.from(workspace.resources.keys())
-    
-    console.log(`📦 [EXPORT] Starting content export for ${resourcesToExport.length} resources`)
-    
+
+
     // Get all cache keys once
     const allCacheKeys = await cacheAdapter.keys?.() || []
-    console.log(`📦 [EXPORT] Total cache keys available: ${allCacheKeys.length}`)
-    
-    let totalFilesAdded = 0
+
+    let _totalFilesAdded = 0
     const BATCH_SIZE = 10 // Process 10 files at a time
-    
+
     for (const resourceKey of resourcesToExport) {
       try {
         // Find all content for this resource
         const baseKey = resourceKey.split('#')[0] // Remove instance identifiers
-        
+
         // Cache keys include a type prefix (e.g., "scripture:owner/lang/id:book")
         // So we need to match keys that contain the resource key after the type prefix
         const contentKeys = allCacheKeys.filter((key: string) => {
           // Match keys like "scripture:owner/lang/id:..." or "notes:owner/lang/id:..."
           return key.includes(baseKey)
         })
-        
-        console.log(`📦 [EXPORT] ${baseKey}: Found ${contentKeys.length} cache entries`)
-        
+
+
         // Process in batches to avoid blocking the main thread
         for (let i = 0; i < contentKeys.length; i += BATCH_SIZE) {
           const batch = contentKeys.slice(i, i + BATCH_SIZE)
-          
+
           // Process batch
           for (const cacheKey of batch) {
-            const cacheEntry = await cacheAdapter.get(cacheKey)
-            
+            const cacheEntry = (await cacheAdapter.get(cacheKey)) as
+              | { content?: unknown }
+              | null
+              | undefined
+
             if (cacheEntry && cacheEntry.content) {
               // Convert cache key to filename: "owner/lang/id/book/chapter" -> "owner_lang_id_book_chapter.json"
               const filename = `${cacheKey.replace(/\//g, '_')}.json`
               // Store the complete cache entry (with content, metadata, timestamp, etc.)
               contentFolder.file(filename, JSON.stringify(cacheEntry, null, 2))
-              totalFilesAdded++
+              _totalFilesAdded++
             }
           }
-          
+
           // Yield to the browser after each batch to prevent blocking
           if (i + BATCH_SIZE < contentKeys.length) {
             await new Promise(resolve => setTimeout(resolve, 0))
           }
         }
-        
-        console.log(`📦 [EXPORT] ✅ ${baseKey}: Added ${contentKeys.length} files`)
+
       } catch (error) {
         console.warn(`⚠️ Could not export content for ${resourceKey}:`, error)
       }
     }
-    
-    console.log(`📦 [EXPORT] Finished! Total files added to content folder: ${totalFilesAdded}`)
+
   }
-  
+
   /**
    * Generate README file
    */
   private generateReadme(manifest: CollectionManifest, hasContent: boolean): string {
     return `# ${manifest.name}
 
-**Version:** ${manifest.version}  
-**Created:** ${new Date(manifest.createdAt).toLocaleString()}  
+**Version:** ${manifest.version}
+**Created:** ${new Date(manifest.createdAt).toLocaleString()}
 **Format:** BT Synergy Collection v${manifest.formatVersion}
 
 ${manifest.description ? `\n## Description\n\n${manifest.description}\n` : ''}
@@ -332,26 +332,26 @@ README.md            - This file
 Generated by BT Synergy
 `
   }
-  
+
   /**
    * Import a collection from ZIP file
    */
   async importCollection(
     file: File,
-    catalogManager: any,
-    cacheAdapter: any
+    catalogManager: CatalogManager,
+    cacheAdapter: ExportCacheAdapter
   ): Promise<WorkspacePackage> {
     const zip = await JSZip.loadAsync(file)
-    
+
     // 1. Read manifest
     const manifestFile = zip.file('manifest.json')
     if (!manifestFile) {
       throw new Error('Invalid collection: missing manifest.json')
     }
-    
+
     const manifestText = await manifestFile.async('text')
     const manifest: CollectionManifest = JSON.parse(manifestText)
-    
+
     // 2. Import resource metadata
     const metadataFolder = zip.folder('metadata')
     if (metadataFolder) {
@@ -361,14 +361,13 @@ Generated by BT Synergy
             const content = await file.async('text')
             const metadata: ResourceMetadata = JSON.parse(content)
             await catalogManager.addResourceToCatalog(metadata)
-            console.log(`✅ Imported metadata: ${metadata.title}`)
           } catch (error) {
             console.warn(`⚠️ Failed to import metadata from ${file.name}:`, error)
           }
         }
       }
     }
-    
+
     // 3. Import content (if included)
     const contentFolder = zip.folder('content')
     if (contentFolder) {
@@ -378,25 +377,24 @@ Generated by BT Synergy
             const content = await file.async('text')
             const cached = JSON.parse(content)
             const cacheKey = file.name.replace('content/', '').replace('.json', '').replace(/_/g, '/')
-            await cacheAdapter.set(cacheKey, cached)
-            console.log(`✅ Imported content: ${cacheKey}`)
+            await cacheAdapter.set?.(cacheKey, cached)
           } catch (error) {
             console.warn(`⚠️ Failed to import content from ${file.name}:`, error)
           }
         }
       }
     }
-    
+
     // 4. Convert to WorkspacePackage
     // Build resource map by loading metadata
     const resourcesMap = new Map()
-    
+
     for (const resourcePointer of manifest.resources) {
       const resourceKey = `${resourcePointer.owner}/${resourcePointer.language}/${resourcePointer.resourceId}`
-      
+
       // Try to get from catalog (already imported from metadata folder)
       const metadata = await catalogManager.getResourceMetadata(resourceKey)
-      
+
       if (metadata) {
         // Metadata now uses standardized field names
         resourcesMap.set(resourceKey, {
@@ -420,7 +418,7 @@ Generated by BT Synergy
         } as unknown as ResourceInfo)
       }
     }
-    
+
     const workspace: WorkspacePackage = {
       id: manifest.id,
       name: manifest.name,
@@ -431,15 +429,14 @@ Generated by BT Synergy
         id: p.id,
         name: p.title || `Panel ${index + 1}`,
         resourceKeys: p.resourceIds,
-        activeIndex: p.defaultResourceId 
+        activeIndex: p.defaultResourceId
           ? p.resourceIds.indexOf(p.defaultResourceId)
           : 0,
         position: index,
       })),
     }
-    
-    console.log(`📦 Imported collection: ${manifest.name} (${manifest.resources.length} resources)`)
-    
+
+
     return workspace
   }
 }

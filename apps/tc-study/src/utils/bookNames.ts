@@ -5,6 +5,25 @@
  * Falls back to uppercase book code if title is not available.
  */
 
+interface BookTitleIngredient {
+  identifier?: string
+  title?: string
+}
+
+interface BookTitleTocBook {
+  code?: string
+  identifier?: string
+  name?: string
+}
+
+/** Loose metadata shape accepted by book-title helpers (ResourceInfo or catalog-like). */
+export interface BookTitleMetadata {
+  ingredients?: BookTitleIngredient[]
+  contentMetadata?: { ingredients?: BookTitleIngredient[] }
+  metadata?: { contentMetadata?: { ingredients?: BookTitleIngredient[] } }
+  toc?: { books?: BookTitleTocBook[] }
+}
+
 /**
  * Get the user-friendly book title from scripture resource metadata.
  *
@@ -17,11 +36,11 @@
  * no ingredientsGenerator (unlike TN/TW) that fetches manifest/toc to fill titles. So we also
  * use toc.books (filled when the loader has ingredient titles or when we add a generator later).
  *
- * @param metadata - Scripture resource metadata (ResourceInfo or any object with ingredients / toc)
+ * @param metadata - Scripture resource metadata (ResourceInfo or object with ingredients / toc)
  * @param bookCode - Book code (e.g., "gen", "mat")
  * @returns Book title (e.g., "Genesis", "Matthew") or uppercase book code as fallback
  */
-export function getBookTitle(metadata: any | null | undefined, bookCode: string): string {
+export function getBookTitle(metadata: BookTitleMetadata | null | undefined, bookCode: string): string {
   const code = bookCode?.toLowerCase()
   if (!code) return bookCode.toUpperCase()
 
@@ -32,7 +51,7 @@ export function getBookTitle(metadata: any | null | undefined, bookCode: string)
     metadata?.metadata?.contentMetadata?.ingredients
   if (ingredients?.length) {
     const ingredient = ingredients.find(
-      (ing: any) => ing.identifier?.toLowerCase() === code
+      (ing) => ing.identifier?.toLowerCase() === code
     )
     if (ingredient?.title) return ingredient.title
   }
@@ -40,7 +59,7 @@ export function getBookTitle(metadata: any | null | undefined, bookCode: string)
   // 2) TOC books (from loader; may have name when catalog provided ingredient.title)
   const books = metadata?.toc?.books
   if (books?.length) {
-    const book = books.find((b: any) => (b.code || b.identifier)?.toLowerCase() === code)
+    const book = books.find((b) => (b.code || b.identifier)?.toLowerCase() === code)
     if (book?.name) return book.name
   }
 
@@ -52,8 +71,8 @@ export function getBookTitle(metadata: any | null | undefined, bookCode: string)
  * Use in TN/TQ/TWL so each resource can show its own language when it has ingredients.
  */
 export function getBookTitleWithFallback(
-  ownMetadata: any | null | undefined,
-  fallbackMetadata: any | null | undefined,
+  ownMetadata: BookTitleMetadata | null | undefined,
+  fallbackMetadata: BookTitleMetadata | null | undefined,
   bookCode: string
 ): string {
   const fromOwn = getBookTitle(ownMetadata, bookCode)

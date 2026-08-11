@@ -5,15 +5,17 @@
  * Unlike the full TranslationAcademyViewer, this only shows article content without TOC.
  */
 
-import { FileText, GraduationCap, Loader, Code2, Eye } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { useCatalogManager, useLoaderRegistry } from '../../contexts/CatalogContext'
+import { FileText, GraduationCap, Code2, Eye } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useLoaderRegistry } from '../../contexts/CatalogContext'
 import { removeFirstHeading } from '../../lib/markdown/markdownProcessor'
 import { parseRcLink, parseRelativeLink, parseVerseRangeFromText } from '../../lib/markdown/rc-link-parser'
 import { MarkdownRenderer } from '../ui/MarkdownRenderer'
 import type { BaseEntryViewerProps } from '../../lib/viewers/EntryViewerRegistry'
 import { useNavigation } from '../../contexts/NavigationContext'
-import { useStudyStore } from '../../store/studyStore'
+import { useEntryModalStore } from '../../features/entries'
+import { LoadingSpinner } from '../../shared/LoadingSpinner'
+import { entryContentLoadKey } from './entryContentLoadKey'
 
 // Valid 3-letter Bible book codes (uppercase) — OBS handled separately
 const VALID_BIBLE_BOOK_CODES = new Set([
@@ -40,7 +42,6 @@ interface TranslationAcademyArticle {
 export function TranslationAcademyEntryViewer({
   resourceKey: rawResourceKey,
   entryId,
-  metadata: propMetadata,
   direction = 'ltr',
   onEntryLinkClick,
   onContentLoaded,
@@ -48,41 +49,26 @@ export function TranslationAcademyEntryViewer({
   // Use resource key as-is (no normalization needed)
   // Background downloads and cache use 3-part format: owner/language/resourceId
   const resourceKey = rawResourceKey
+  const loadKey = entryContentLoadKey(resourceKey, entryId)
 
   const loaderRegistry = useLoaderRegistry()
-  const catalogManager = useCatalogManager()
   const { navigateToReference, setNavigationMode } = useNavigation()
-  const minimizeModal = useStudyStore((s: any) => s.minimizeModal)
+  const minimizeModal = useEntryModalStore((s) => s.minimizeModal)
+  const onContentLoadedRef = useRef(onContentLoaded)
+  onContentLoadedRef.current = onContentLoaded
   const [article, setArticle] = useState<TranslationAcademyArticle | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [metadata, setMetadata] = useState<any>(propMetadata)
   const [showRawMarkdown, setShowRawMarkdown] = useState(false)
 
-  // Fetch metadata from catalog if not provided
-  useEffect(() => {
-    if (!propMetadata && resourceKey && catalogManager) {
-      catalogManager.getResourceMetadata(resourceKey)
-        .then((catalogMetadata) => {
-          if (catalogMetadata) {
-            setMetadata(catalogMetadata)
-          }
-        })
-        .catch((err) => {
-          console.error('[TranslationAcademyEntryViewer] Failed to fetch metadata:', err)
-        })
-    } else if (propMetadata) {
-      setMetadata(propMetadata)
-    }
-  }, [resourceKey, propMetadata, catalogManager])
-
-  // Load article content when entryId changes
+  // Load article content when resourceKey/entryId change.
+  // Do not depend on metadata objects — parent often rebuilds them each render.
   useEffect(() => {
     if (!entryId || !resourceKey) {
       return
     }
 
-    console.log('[TranslationAcademyEntryViewer] Loading entry:', entryId)
+    let cancelled = false
     setLoading(true)
     setError(null)
 
@@ -105,44 +91,51 @@ export function TranslationAcademyEntryViewer({
 
     // Load the entry content
     loader.loadContent(resourceKey, entryId)
-      .then((content: any) => {
-        console.log('[TranslationAcademyEntryViewer] Loaded content:', content)
-        
+      .then((raw) => {
+        if (cancelled) return
+
+        const content = raw as {
+          content?: string
+          body?: string
+          title?: string
+          question?: string
+          relatedArticles?: unknown
+        }
+
         // Get the raw content (could be markdown or HTML)
         let rawContent = content.content || content.body || ''
-        
-        console.log('[TranslationAcademyEntryViewer] Raw content length:', rawContent.length)
-        console.log('[TranslationAcademyEntryViewer] First 200 chars:', rawContent.substring(0, 200))
-        
+
         // Remove the first heading to avoid duplication with custom header
         // Uses same approach as bt-studio for consistency
         rawContent = removeFirstHeading(rawContent).trim()
-        
-        console.log('[TranslationAcademyEntryViewer] Processed content length:', rawContent.length)
-        console.log('[TranslationAcademyEntryViewer] First 200 chars after processing:', rawContent.substring(0, 200))
-        
+
         const articleData: TranslationAcademyArticle = {
           id: entryId,
           title: content.title || entryId.split('/').pop() || entryId,
           content: rawContent,
           question: content.question || undefined,
-          relatedArticles: content.relatedArticles || [],
+          relatedArticles: Array.isArray(content.relatedArticles)
+            ? (content.relatedArticles as string[])
+            : [],
         }
-        
+
         setArticle(articleData)
         setLoading(false)
-        
+
         // Notify parent that content is loaded (for floating button title)
-        if (onContentLoaded) {
-          onContentLoaded(articleData)
-        }
+        onContentLoadedRef.current?.(articleData)
       })
       .catch((err) => {
+        if (cancelled) return
         console.error('[TranslationAcademyEntryViewer] Failed to load article:', err)
         setError(err instanceof Error ? err.message : 'Failed to load entry')
         setLoading(false)
       })
-  }, [resourceKey, entryId, metadata, loaderRegistry])
+
+    return () => {
+      cancelled = true
+    }
+  }, [loadKey, resourceKey, entryId, loaderRegistry])
 
   // Handle clicking on related article links
   const handleRelatedArticleClick = (relatedEntryId: string) => {
@@ -154,12 +147,12 @@ export function TranslationAcademyEntryViewer({
   // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full p-8">
-        <div className="text-center">
-          <Loader className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-2" />
-          <p className="text-sm text-gray-600">Loading article...</p>
-        </div>
-      </div>
+      <LoadingSpinner
+        centered
+        label="Loading article"
+        className="text-purple-600"
+        containerClassName="h-full p-8"
+      />
     )
   }
 
@@ -233,9 +226,9 @@ export function TranslationAcademyEntryViewer({
           ) : (
             <MarkdownRenderer 
               content={article.content}
-              className="prose prose-slate max-w-none mb-8"
+              className="prose prose-slate max-w-none mb-8 prose-blockquote:text-slate-900 prose-blockquote:opacity-100 [&_blockquote]:text-slate-900 [&_blockquote_p]:text-slate-900 [&_blockquote_em]:text-inherit"
               onInternalLinkClick={(href, linkType, linkText) => {
-                console.log('[TranslationAcademyEntryViewer] Internal link clicked:', href, linkType, linkText)
+
                 
                 // Handle rc links (Door43 resource links)
                 if (linkType === 'rc' && href.startsWith('rc://')) {
@@ -250,7 +243,7 @@ export function TranslationAcademyEntryViewer({
                       if (bookCode === 'OBS') {
                         const story = parseInt(parsed.scriptureRef.chapter, 10) || 1
                         const frame = parseInt(parsed.scriptureRef.verse, 10) || 1
-                        console.log('[TranslationAcademyEntryViewer] OBS navigation → story', story, 'frame', frame)
+
                         minimizeModal()
                         // Switch to frame mode so the specific frame is shown (not the whole story)
                         setNavigationMode('verse')
@@ -278,7 +271,7 @@ export function TranslationAcademyEntryViewer({
                           }
                         }
                         if (!isNaN(chapter) && chapter >= 1 && !isNaN(verse) && verse >= 1) {
-                          console.log('[TranslationAcademyEntryViewer] Scripture navigation:', bookCode, chapter, verse)
+
                           minimizeModal()
                           navigateToReference({
                             book: bookCode.toLowerCase(),
@@ -306,7 +299,7 @@ export function TranslationAcademyEntryViewer({
                           if (targetLanguage === '*') targetLanguage = parts[1]
                         }
                         const targetResourceKey = `${owner}/${targetLanguage}/${parsed.resourceAbbrev}`
-                        console.log('[TranslationAcademyEntryViewer] Cross-resource link:', targetResourceKey, parsed.entryId)
+
                         onEntryLinkClick(targetResourceKey, parsed.entryId)
                       }
                     }
@@ -315,7 +308,7 @@ export function TranslationAcademyEntryViewer({
                 // Handle relative links (e.g., ../translate/figs-metaphor)
                 else if (linkType === 'relative') {
                   const resolvedPath = parseRelativeLink(href, entryId)
-                  console.log('[TranslationAcademyEntryViewer] Relative link resolved:', href, '->', resolvedPath)
+
                   if (onEntryLinkClick) {
                     onEntryLinkClick(resourceKey, resolvedPath)
                   }

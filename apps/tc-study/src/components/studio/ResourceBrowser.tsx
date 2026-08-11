@@ -42,18 +42,18 @@ export function ResourceBrowser({ onClose, onSelectResource, targetPanel }: Reso
     
     try {
       // Build search filters
-      const filters: any = {}
+      const filters: Record<string, string> = {}
       if (selectedLanguage) filters.language = selectedLanguage
       if (selectedOwner) filters.owner = selectedOwner
       if (selectedSubject) filters.subject = selectedSubject
       if (searchQuery) filters.searchText = searchQuery
 
-      console.log('🔍 Searching with filters:', filters)
+
 
       // Search catalog (this searches both local cache AND online)
       const catalogResults = await catalogManager.searchCatalog(filters)
 
-      console.log(`📚 Found ${catalogResults.length} resources`)
+
 
       // Transform to UI format
       const uiResults: Resource[] = await Promise.all(

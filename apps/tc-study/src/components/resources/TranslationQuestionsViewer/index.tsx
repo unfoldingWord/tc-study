@@ -12,10 +12,11 @@ import { AlertCircle, BookOpen, CheckCircle, ChevronDown, ChevronUp, HelpCircle,
 import { useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
-import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
+import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
+import { LoadingSpinner } from '../../../shared/LoadingSpinner'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import type { ResourceInfo } from '../../../contexts/types'
 
@@ -31,7 +32,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
   const catalogManager = useCatalogManager()
   const currentRef = useCurrentReference()
   const bookTitleSource = useBookTitleSource()
-  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
+  const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const bookCode = currentRef.book || 'gen'
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
   const effectiveResource = resourceFromStore ?? resource
@@ -176,12 +177,12 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading questions...</p>
-        </div>
-      </div>
+      <LoadingSpinner
+        centered
+        label="Loading questions"
+        className="text-blue-600"
+        containerClassName="h-full"
+      />
     )
   }
 

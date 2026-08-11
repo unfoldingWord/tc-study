@@ -80,9 +80,8 @@ export function useHighlighting(
 
   const handleTokenClick = useCallback((token: WordToken) => {
     try {
-      // WordToken uses 'uniqueId' property (not 'id')
-      const tokenId = token.uniqueId || (token as any).id || ''
-      const tokenContent = token.content || (token as any).text || ''
+      const tokenId = token.uniqueId || ''
+      const tokenContent = token.content || ''
 
       // Read latest values from refs (avoids stale-closure without adding them as deps)
       const currentRefSnapshot = currentRefRef.current
@@ -97,7 +96,7 @@ export function useHighlighting(
       const semanticId = `${verseRef}:${tokenContent}:${tokenOccurrence}`
       
       // For target language tokens, get aligned semantic IDs (original language token IDs)
-      const rawAlign = token.alignedOriginalWordIds || (token as any).align
+      const rawAlign = token.alignedOriginalWordIds
       const alignedSemanticIds: string[] | undefined =
         Array.isArray(rawAlign) && rawAlign.length > 0
           ? rawAlign.map((id: unknown) => String(id)).filter(Boolean)
@@ -109,7 +108,8 @@ export function useHighlighting(
       // Determine if this token is covered by at least one TN/TWL entry (underlined).
       // - OL tokens: match by their own semantic ID
       // - Target language tokens: match by any of their aligned OL IDs
-      // If not covered by anything, fall back to verse-filter so resources still narrow down.
+      // Coverage is a hint for helps viewers (token filter vs verse filter) — it must NOT
+      // block scripture↔scripture highlighting (OL click → aligned Bible highlight).
       const tokenKey = semanticId.toLowerCase()
       const alignedKeys = alignedSemanticIds?.map((id) => id.toLowerCase()) ?? []
       const hasCoverage =
@@ -118,20 +118,12 @@ export function useHighlighting(
             alignedKeys.some((k) => underlinedSnapshot.has(k))
           : false
 
-      if (!hasCoverage) {
-        const refMatch = verseRef.match(/\w+\s+(\d+):(\d+)/)
-        const chapter = refMatch ? parseInt(refMatch[1], 10) : currentRefSnapshot.chapter
-        const verse = refMatch ? parseInt(refMatch[2], 10) : undefined
-        setHighlightTarget(null)
-        sendVerseFilter({ lifecycle: 'event', filter: { chapter, verse } })
-        return
-      }
-
-      // Token IS covered → token-click for alignment-based filtering.
-      // For OL tokens (no alignedSemanticIds), broadcast their own ID so TN/TWL can match.
+      // For OL tokens (no alignedSemanticIds), broadcast their own ID so aligned Bibles /
+      // TN/TWL can match via alignedOriginalWordIds / quote semantic IDs.
       const effectiveAlignedIds = alignedSemanticIds ?? [semanticId]
 
-      // Update local state IMMEDIATELY for instant feedback (matches mobile app pattern)
+      // Always update local highlight + broadcast token-click so other scripture panels
+      // can highlight aligned words regardless of TN/TWL coverage.
       setHighlightTarget({
         semanticId: semanticId,
         alignedSemanticIds: effectiveAlignedIds,
@@ -142,7 +134,6 @@ export function useHighlighting(
         morph: token.alignment?.morph,
       })
 
-      // Then send token-click signal to OTHER resources using resource-panels API
       sendToAll({
         lifecycle: 'event',
         token: {
@@ -155,12 +146,22 @@ export function useHighlighting(
           lemma: token.alignment?.lemma,
           morph: token.alignment?.morph,
           alignedSemanticIds: effectiveAlignedIds,
+          hasHelpsCoverage: hasCoverage,
         },
       })
+
+      // Uncovered clicks: also send verse-filter so helps viewers can narrow to the verse
+      // instead of applying an empty token filter.
+      if (!hasCoverage) {
+        const refMatch = verseRef.match(/\w+\s+(\d+):(\d+)/)
+        const chapter = refMatch ? parseInt(refMatch[1], 10) : currentRefSnapshot.chapter
+        const verse = refMatch ? parseInt(refMatch[2], 10) : undefined
+        sendVerseFilter({ lifecycle: 'event', filter: { chapter, verse } })
+      }
     } catch (error) {
       console.error('❌ Error in handleTokenClick:', error)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentRef and underlinedSemanticIds accessed via refs; callback identity is stable
+   
   }, [sendToAll, sendVerseFilter])
 
   const handleVerseFilter = useCallback((chapter: number, verse?: number) => {
@@ -179,8 +180,8 @@ export function useHighlighting(
   }
 }
 
-// Export a helper to get token ID (handles both uniqueId and id properties)
+// Export a helper to get token ID
 export function getTokenId(token: WordToken): string {
-  return token.uniqueId || (token as any).id || ''
+  return token.uniqueId || ''
 }
 

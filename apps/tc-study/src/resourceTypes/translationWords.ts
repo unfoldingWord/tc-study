@@ -6,7 +6,7 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { TranslationWordsLoader, generateTWIngredients } from '@bt-synergy/translation-words-loader'
-import { TranslationWordsViewer } from '../components/resources/TranslationWordsViewer'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const translationWordsResourceType: ResourceTypeDefinition = defineResourceType({
@@ -31,8 +31,7 @@ export const translationWordsResourceType: ResourceTypeDefinition = defineResour
     debug: false,
   },
   
-  // Download priority for background downloading
-  downloadPriority: 20, // Important but not as critical as scripture
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.TRANSLATION_WORDS),
   
   /**
    * Ingredients generator for Translation Words
@@ -44,7 +43,7 @@ export const translationWordsResourceType: ResourceTypeDefinition = defineResour
    * 
    * This ensures complete ingredients even when catalog API doesn't provide them.
    */
-  ingredientsGenerator: async (door43Resource: any, door43Client: any) => {
+  ingredientsGenerator: async (door43Resource, door43Client) => {
     const { owner, language, id: resourceId } = door43Resource
     
     // Get the release tag from the Door43 Catalog API response
@@ -52,16 +51,6 @@ export const translationWordsResourceType: ResourceTypeDefinition = defineResour
     // Priority: release.tag_name (from catalog API) > master
     const ref = door43Resource.release?.tag_name || 'master'
     
-    console.log(`🔍 TW Ingredients Generator - Resource info:`, {
-      owner,
-      language,
-      resourceId,
-      releaseTag: door43Resource.release?.tag_name,
-      releaseObject: door43Resource.release,
-      version: door43Resource.version,
-      selectedRef: ref,
-      hasRelease: !!door43Resource.release
-    })
     
     // Use the shared generateTWIngredients function
     // It returns { ingredients, fileCount, method }, we need just ingredients
@@ -74,18 +63,12 @@ export const translationWordsResourceType: ResourceTypeDefinition = defineResour
       debug: true, // Enable debug to see what's happening
     })
     
-    console.log(`🔨 TW Ingredients generation result:`, {
-      ingredientCount: result.ingredients?.length || 0,
-      fileCount: result.fileCount,
-      method: result.method,
-      sample: result.ingredients?.slice(0, 3)
-    })
     
     return result.ingredients
   },
   
   // ===== UI LAYER =====
-  viewer: TranslationWordsViewer,
+  // Modal-only: no panel viewer (articles open via EntryViewerRegistry)
   
   // ===== FEATURES =====
   features: {
@@ -112,8 +95,4 @@ export const translationWordsResourceType: ResourceTypeDefinition = defineResour
   author: 'BT Synergy Team',
   license: 'MIT',
 })
-
-// Re-export for convenience
-// export { TranslationWordsLoader } from '@bt-synergy/translation-words-loader'
-export { TranslationWordsViewer } from '../components/resources/TranslationWordsViewer'
 

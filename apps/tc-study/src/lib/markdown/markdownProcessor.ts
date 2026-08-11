@@ -65,3 +65,28 @@ export function extractCategoryFromEntryId(entryId: string): string {
   const parts = entryId.split('/')
   return parts.length > 1 ? parts[parts.length - 2] : ''
 }
+
+/**
+ * Extract the first content paragraph from a TW (or similar) markdown article.
+ *
+ * Mirrors TranslationWordsLoader.parseWord definition extraction:
+ * - Prefer first paragraph after the first `##` heading
+ * - Fall back to first paragraph after the `#` title
+ * Stops at blank line, next heading, or list markers.
+ */
+export function extractFirstContentParagraph(markdown: string): string {
+  if (!markdown?.trim()) return ''
+
+  // Use [^\n]+ for headings so the `s` flag cannot let `.` swallow later sections.
+  const firstSecondHeadingMatch = markdown.match(/##\s+[^\n]+\n+(.*?)(?=\n\n|\n##|\n[*\-+]\s|$)/s)
+  if (firstSecondHeadingMatch?.[1]) {
+    return firstSecondHeadingMatch[1].trim()
+  }
+
+  const afterTitleMatch = markdown.match(/^#\s+[^\n]+\n+(.*?)(?=\n\n|\n##|\n[*\-+]\s|$)/ms)
+  if (afterTitleMatch?.[1]) {
+    return afterTitleMatch[1].trim()
+  }
+
+  return ''
+}

@@ -9,16 +9,20 @@ import { usePackageStore } from '../lib/stores'
 
 export default function Home() {
   const navigate = useNavigate()
-  const packages = usePackageStore((state: any) => state.packages)
-  const activePackageId = usePackageStore((state: any) => state.activePackageId)
-  const loadPackages = usePackageStore((state: any) => state.loadPackages)
+  const packages = usePackageStore((state) => state.packages)
+  const activePackageId = usePackageStore((state) => state.activePackageId)
+  const loadPackages = usePackageStore((state) => state.loadPackages)
 
   useEffect(() => {
     loadPackages()
   }, [loadPackages])
 
-  const installedCollections = packages.filter((pkg: any) => pkg.status === 'installed')
-  const activeCollection = activePackageId ? packages.find((p: any) => p.id === activePackageId) : null
+  const installedCollections = packages.filter(
+    (pkg) => (pkg as { status?: string }).status === 'installed'
+  )
+  const activeCollection = activePackageId
+    ? packages.find((p) => p.id === activePackageId)
+    : null
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-16">
@@ -64,7 +68,7 @@ export default function Home() {
 
         {/* Passage Sets */}
         <div className="group rounded-2xl border border-gray-100 bg-white p-6 transition-all hover:shadow-md hover:scale-[1.02] cursor-pointer"
-             onClick={() => navigate('/passage-sets')}>
+             onClick={() => navigate('/data')}>
           <div className="mb-4 inline-flex p-3 bg-orange-50 rounded-xl">
             <FileText className="h-6 w-6 text-orange-600" />
           </div>

@@ -42,3 +42,12 @@ export {
   resourceKeyToString,
   parseResourceKey,
 } from './types'
+
+// Canonical short resource type IDs (SoT for loaders / catalog / apps)
+export {
+  RESOURCE_TYPE_IDS,
+  getResourceTypeDisplayName,
+  inferDoor43ResourceTypeId,
+  isValidResourceTypeId,
+  type ResourceTypeId,
+} from './resourceTypeIds'

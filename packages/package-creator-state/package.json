@@ -1,7 +1,8 @@
 {
   "name": "@bt-synergy/package-creator-state",
+  "private": true,
   "version": "0.1.0",
-  "description": "Package creator state management",
+  "description": "[ARCHIVED] Not on tc-study critical path (see ARCHIVED.md)",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",

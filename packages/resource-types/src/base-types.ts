@@ -3,7 +3,7 @@
  * Extracted here to prevent circular dependencies
  */
 
-import type { ResourceMetadata } from '@bt-synergy/resource-panels'
+import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 
 /**
  * Base props for all resource viewer components
@@ -40,7 +40,7 @@ export interface ResourceLoader {
   
   /**
    * Check if this loader can handle a specific resource
-   * @param metadata - Resource metadata to check
+   * @param metadata - Catalog ResourceMetadata (SoT in @bt-synergy/resource-catalog)
    * @returns true if this loader can handle the resource
    */
   canHandle(metadata: ResourceMetadata): boolean
@@ -56,7 +56,7 @@ export interface ResourceLoader {
   /**
    * Get resource metadata
    * @param resourceKey - Unique resource identifier
-   * @returns Resource metadata
+   * @returns Catalog ResourceMetadata
    */
   getMetadata(resourceKey: string): Promise<ResourceMetadata>
   

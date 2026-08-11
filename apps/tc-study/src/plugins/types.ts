@@ -3,7 +3,7 @@
  * Based on linked-panels spike learnings
  */
 
-import { BaseMessageContent } from 'linked-panels'
+import type { BaseMessageContent } from '@bt-synergy/resource-panels'
 
 /**
  * Token click event - sent when user clicks a token in scripture

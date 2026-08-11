@@ -6,7 +6,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import type { CompletenessReport } from '../lib/services/ResourceCompletenessChecker'
+import type {
+  CompletenessReport,
+  ResourceCompletenessChecker,
+} from '../lib/services/ResourceCompletenessChecker'
 
 export interface UseAutoDownloadIncompleteOptions {
   /** Language code to check (if null, checks all) */
@@ -16,7 +19,7 @@ export interface UseAutoDownloadIncompleteOptions {
   onStartDownload?: (resourceKeys: string[]) => void
   
   /** Completeness checker instance */
-  completenessChecker: any // ResourceCompletenessChecker
+  completenessChecker: ResourceCompletenessChecker
   
   /** Enable debug logging */
   debug?: boolean
@@ -70,9 +73,7 @@ export function useAutoDownloadIncomplete(
     setError(null)
     
     try {
-      if (debug) {
-        console.log('[BG-DL] 🔄 Auto Checking completeness...')
-      }
+
       
       // Check completeness
       const checkReport = languageCode
@@ -81,39 +82,15 @@ export function useAutoDownloadIncomplete(
       
       setReport(checkReport)
       
-      if (debug) {
-        console.log('[BG-DL] 🔄 Auto Completeness report:', {
-          total: checkReport.totalResources,
-          complete: checkReport.completeResources,
-          incomplete: checkReport.incompleteResources,
-          percentage: checkReport.completionPercentage,
-        })
-      }
+
       
       // If completion is below threshold, trigger downloads
-      if (checkReport.completionPercentage < minCompletionThreshold) {
-        if (checkReport.incompleteKeys.length > 0) {
-          if (debug) {
-            console.log(
-              `[BG-DL] 🔄 Auto ${checkReport.incompleteKeys.length} incomplete resources found, starting downloads...`
-            )
-          }
-          
-          // Trigger download callback
-          if (onStartDownload) {
-            onStartDownload(checkReport.incompleteKeys)
-          }
-        } else {
-          if (debug) {
-            console.log('[BG-DL] 🔄 Auto No incomplete resources to download')
-          }
-        }
-      } else {
-        if (debug) {
-          console.log(
-            `[BG-DL] 🔄 Auto Completion at ${checkReport.completionPercentage}%, no downloads needed`
-          )
-        }
+      if (
+        checkReport.completionPercentage < minCompletionThreshold &&
+        checkReport.incompleteKeys.length > 0 &&
+        onStartDownload
+      ) {
+        onStartDownload(checkReport.incompleteKeys)
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
@@ -136,11 +113,7 @@ export function useAutoDownloadIncomplete(
     
     // Only check if we have a language
     if (languageCode && !hasCheckedRef.current) {
-      if (debug) {
-        console.log(
-          `[BG-DL] 🔄 Auto Language changed to ${languageCode}, scheduling check in ${checkDelay}ms...`
-        )
-      }
+
       
       // Delay check to let catalog populate
       timeoutRef.current = setTimeout(() => {

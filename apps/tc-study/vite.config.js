@@ -2,7 +2,33 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
+import { getSharedBuildConfig } from '../../config/vite-build';
+
+// Build id: set VITE_DEPLOY_VERSION before build for reproducible deploys; otherwise build timestamp
+const deployVersion =
+    process.env.VITE_DEPLOY_VERSION ||
+    new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+
+/**
+ * NOTE: Vite resolves vite.config.js before vite.config.ts when both exist.
+ * Keep this file as the SoT for preview/e2e builds, and mirror critical
+ * resolve.dedupe / linked-panels alias from vite.config.ts.
+ *
+ * linked-panels uses a module-level store singleton — duplicate physical copies
+ * (app vs resource-panels nested installs) cause:
+ * `useLinkedPanelsStore must be used within a LinkedPanelsContainer`.
+ * Alias + dedupe force one instance for shells and @bt-synergy/resource-panels.
+ */
+const linkedPanelsEntry = path.resolve(
+    __dirname,
+    '../../node_modules/linked-panels/dist/index.js'
+)
+const sharedBuild = getSharedBuildConfig()
+
 export default defineConfig({
+    define: {
+        __DEPLOY_VERSION__: JSON.stringify(deployVersion),
+    },
     plugins: [
         react(),
         tailwindcss(),
@@ -10,11 +36,34 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
-            // Fix linked-panels to use dist files
-            'linked-panels': path.resolve(__dirname, './node_modules/linked-panels/dist/index.js'),
+            // Force single linked-panels copy (root install shared with resource-panels)
+            'linked-panels': linkedPanelsEntry,
             // Alias workspace packages to their source
             '@bt-synergy/navigation': path.resolve(__dirname, '../../packages/navigation/src/index.ts'),
-            '@bt-synergy/study-store': path.resolve(__dirname, '../../packages/study-store/src/index.ts'),
+        },
+        // Critical: prevent dual React / dual linked-panels singletons
+        dedupe: ['react', 'react-dom', 'linked-panels'],
+    },
+    optimizeDeps: {
+        include: [
+            'linked-panels',
+            '@bt-synergy/cache-adapter-indexeddb',
+        ],
+    },
+    ...sharedBuild,
+    build: {
+        ...sharedBuild.build,
+        rollupOptions: {
+            ...sharedBuild.build?.rollupOptions,
+            output: {
+                ...sharedBuild.build?.rollupOptions?.output,
+                // Keep store singleton out of arbitrary viewer chunks (e.g. WordLinkCard)
+                manualChunks(id) {
+                    if (id.includes('node_modules/linked-panels') || id.includes(`${path.sep}linked-panels${path.sep}`)) {
+                        return 'linked-panels'
+                    }
+                },
+            },
         },
     },
     server: {

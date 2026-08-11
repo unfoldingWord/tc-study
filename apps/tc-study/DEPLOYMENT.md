@@ -23,12 +23,17 @@ TC-Study is configured for deployment to Cloudflare Pages with automatic builds 
 ```bash
 cd apps/tc-study
 
-# Build the app
-bun run build
-
-# Deploy to Cloudflare Pages
+# Quality gate + build + strip preloaded JSON + Cloudflare Pages
 bun run deploy
 ```
+
+> **Do not use** a skip-check deploy to `master` as a green signal. The old
+> `deploy:preview-nocheck` script was removed. An emergency hatch exists only as
+> `deploy:UNSAFE_master-without-check` and requires
+> `ALLOW_UNSAFE_DEPLOY_WITHOUT_CHECK=YES`. Prefer CI (see below).
+
+Artifact parity (CI E2E uses the same `dist` that deploys): see
+[`docs/E2E_DEPLOY_ARTIFACT_PARITY.md`](./docs/E2E_DEPLOY_ARTIFACT_PARITY.md).
 
 #### From the root directory:
 

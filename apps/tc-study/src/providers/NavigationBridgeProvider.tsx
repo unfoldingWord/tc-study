@@ -142,9 +142,10 @@ export function NavigationBridgeProvider({ children }: { children: ReactNode }) 
     canGoForward: () => internalNav.canGoForward(),
   };
   
+  // Bridge package may resolve a different @types/react than the app (ReactNode variance).
   return (
     <NavigationContext.Provider value={navigationProvider}>
-      {children as any}
+      {children as never}
     </NavigationContext.Provider>
   );
 }

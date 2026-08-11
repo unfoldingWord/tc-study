@@ -22,6 +22,10 @@ export enum ResourceType {
   OBS_NOTES = 'obs-notes',
   OBS_WORDS_LINKS = 'obs-words-links',
   OBS_QUESTIONS = 'obs-questions',
+  /** Synthetic Combined Helps (TN + TWL composition) */
+  COMBINED_HELPS = 'combined-helps',
+  /** Synthetic OBS Combined Helps */
+  OBS_COMBINED_HELPS = 'obs-combined-helps',
   AUDIO = 'audio',
   VIDEO = 'video',
   ALIGNMENT = 'alignment',
@@ -117,6 +121,11 @@ export interface ResourceMetadata {
   owner: string               // e.g., 'unfoldingWord', 'Door43-Catalog'
   language: string            // e.g., 'en', 'es', 'el-x-koine'
   resourceId: string          // e.g., 'ult', 'tn', 'tw'
+  /**
+   * DCS catalog display abbreviation when it differs from `resourceId`
+   * (e.g. es-419 `glt` → `tpl`). Identity keys stay `…/resourceId`.
+   */
+  abbreviation?: string
   
   // Basic info
   subject: string             // e.g., 'Bible', 'Translation Notes'

@@ -1,7 +1,7 @@
 /**
  * @deprecated Import from core or examples instead
  * 
- * Core types: import { BaseSignal, ResourceType, ResourceMetadata, ResourceFilter } from '@bt-synergy/resource-panels'
+ * Core types: import { BaseSignal, ResourceType, PanelResourceMetadata, ResourceFilter } from '@bt-synergy/resource-panels'
  * Example signals: import { TokenClickSignal, ... } from '@bt-synergy/resource-panels/examples'
  * 
  * This file is kept for backward compatibility only.
@@ -12,6 +12,7 @@ export type {
   BaseSignal,
   SignalType,
   ResourceType,
+  PanelResourceMetadata,
   ResourceMetadata,
   ResourceFilter
 } from '../core/types'

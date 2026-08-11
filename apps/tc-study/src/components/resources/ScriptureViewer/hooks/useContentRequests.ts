@@ -1,18 +1,20 @@
 /**
- * Hook for handling scripture content requests from other panels
- * 
- * @deprecated This request/response pattern is being phased out in favor of
- * the broadcast approach (useTokenBroadcast). This hook is kept temporarily
- * for backward compatibility but will be removed in a future version.
- * 
- * Allows other panels (like TWL viewer) to request scripture content
- * from this panel via signals, similar to bt-studio behavior.
+ * QUARANTINED — not used by production ScriptureViewer.
+ *
+ * Request/response scripture content path superseded by SCRIPTURE_TOKENS STATE
+ * (`useTokenBroadcast` / `useScriptureTokens`). Kept for reference / emergency
+ * rollback only. Do not re-wire into `ScriptureViewer/index.tsx`.
+ *
+ * @deprecated Prefer token STATE only.
  */
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import type { ProcessedScripture } from '@bt-synergy/usfm-processor'
 import { useCallback, useEffect, useRef } from 'react'
-import type { ScriptureContentRequestSignal, ScriptureContentResponseSignal } from '../../../../signals/studioSignals'
+import type {
+  ScriptureContentRequestSignal,
+  ScriptureContentResponseSignal,
+} from '../../../../signals/studioSignals'
 
 interface UseContentRequestsOptions {
   resourceId: string
@@ -21,17 +23,16 @@ interface UseContentRequestsOptions {
   language?: string
 }
 
+/** @deprecated Quarantined — production uses useTokenBroadcast only. */
 export function useContentRequests({
   resourceId,
   resourceKey,
   loadedContent,
   language,
 }: UseContentRequestsOptions) {
-  // Use ref to avoid stale closures - always reference latest loadedContent
   const loadedContentRef = useRef<ProcessedScripture | null>(loadedContent)
   const previousContentRef = useRef<ProcessedScripture | null>(null)
-  
-  // Set up signal sender for responses - MUST be declared before useEffect
+
   const { sendToAll: sendContentResponse } = useSignal<ScriptureContentResponseSignal>(
     'scripture-content-response',
     resourceId,
@@ -41,20 +42,17 @@ export function useContentRequests({
       tags: ['bible'],
     }
   )
-  
+
   useEffect(() => {
     loadedContentRef.current = loadedContent
-    
-    // If content just became available (transition from null to loaded),
-    // proactively send it to any panels that might be waiting
+
     if (loadedContent && !previousContentRef.current) {
       const book = loadedContent.metadata?.bookCode || ''
       const chaptersCount = loadedContent.chapters.length
-      
-      // Proactively broadcast content availability to panels that might have requested it earlier
+
       if (chaptersCount > 0) {
         const firstChapter = loadedContent.chapters[0]
-        
+
         sendContentResponse({
           lifecycle: 'event',
           response: {
@@ -64,31 +62,94 @@ export function useContentRequests({
             book,
             chapter: firstChapter.number,
             hasContent: true,
-            content: loadedContent, // Send full ProcessedScripture (not OptimizedChapter[])
+            content: loadedContent,
           },
         })
       }
     }
-    
+
     previousContentRef.current = loadedContent
   }, [loadedContent, resourceId, resourceKey, sendContentResponse])
 
-  // Listen for content requests from other panels
   useSignalHandler<ScriptureContentRequestSignal>(
     'scripture-content-request',
     resourceId,
-    useCallback((signal) => {
-      // Don't respond to our own requests
-      if (signal.sourceResourceId === resourceId) {
-        return
-      }
+    useCallback(
+      (signal) => {
+        if (signal.sourceResourceId === resourceId) {
+          return
+        }
 
-      const { request } = signal
-      const { book, chapter, verse, endVerse, language: requestedLanguage } = request
+        const { request } = signal
+        const { book, chapter, language: requestedLanguage } = request
 
-      // Check if we have the requested content (use ref to get latest value)
-      const content = loadedContentRef.current
-      if (!content) {
+        const content = loadedContentRef.current
+        if (!content) {
+          sendContentResponse({
+            lifecycle: 'event',
+            response: {
+              requestId: String(signal.timestamp),
+              resourceId,
+              resourceKey,
+              book,
+              chapter,
+              hasContent: false,
+              error: 'No content loaded',
+            },
+          })
+          return
+        }
+
+        if (requestedLanguage && language !== requestedLanguage) {
+          sendContentResponse({
+            lifecycle: 'event',
+            response: {
+              requestId: String(signal.timestamp),
+              resourceId,
+              resourceKey,
+              book,
+              chapter,
+              hasContent: false,
+              error: `Language mismatch: requested ${requestedLanguage}, have ${language}`,
+            },
+          })
+          return
+        }
+
+        const currentBook = content.metadata?.bookCode?.toUpperCase()
+        if (currentBook !== book.toUpperCase()) {
+          sendContentResponse({
+            lifecycle: 'event',
+            response: {
+              requestId: String(signal.timestamp),
+              resourceId,
+              resourceKey,
+              book,
+              chapter,
+              hasContent: false,
+              error: `Book mismatch: requested ${book}, have ${currentBook}`,
+            },
+          })
+          return
+        }
+
+        const requestedChapter = content.chapters.find((ch) => ch.number === chapter)
+        if (!requestedChapter) {
+          sendContentResponse({
+            lifecycle: 'event',
+            response: {
+              requestId: String(signal.timestamp),
+              resourceId,
+              resourceKey,
+              book,
+              chapter,
+              hasContent: false,
+              error: `Chapter ${chapter} not found`,
+            },
+          })
+          return
+        }
+
         sendContentResponse({
           lifecycle: 'event',
           response: {
@@ -97,81 +158,13 @@ export function useContentRequests({
             resourceKey,
             book,
             chapter,
-            hasContent: false,
-            error: 'No content loaded',
+            hasContent: true,
+            content,
           },
         })
-        return
-      }
-
-      // Check if language matches (if specified)
-      if (requestedLanguage && language !== requestedLanguage) {
-        sendContentResponse({
-          lifecycle: 'event',
-          response: {
-            requestId: String(signal.timestamp),
-            resourceId,
-            resourceKey,
-            book,
-            chapter,
-            hasContent: false,
-            error: `Language mismatch: requested ${requestedLanguage}, have ${language}`,
-          },
-        })
-        return
-      }
-
-      // Check if book matches
-      const currentBook = content.metadata?.bookCode?.toUpperCase()
-      if (currentBook !== book.toUpperCase()) {
-        sendContentResponse({
-          lifecycle: 'event',
-          response: {
-            requestId: String(signal.timestamp),
-            resourceId,
-            resourceKey,
-            book,
-            chapter,
-            hasContent: false,
-            error: `Book mismatch: requested ${book}, have ${currentBook}`,
-          },
-        })
-        return
-      }
-
-      // Find the requested chapter
-      const requestedChapter = content.chapters.find(ch => ch.number === chapter)
-      if (!requestedChapter) {
-        sendContentResponse({
-          lifecycle: 'event',
-          response: {
-            requestId: String(signal.timestamp),
-            resourceId,
-            resourceKey,
-            book,
-            chapter,
-            hasContent: false,
-            error: `Chapter ${chapter} not found`,
-          },
-        })
-        return
-      }
-
-      // Send ProcessedScripture format directly (useAlignedTokens needs it to access alignedOriginalWordIds)
-      // The alignment semantic IDs are already attached by useContent hook
-      sendContentResponse({
-        lifecycle: 'event',
-        response: {
-          requestId: String(signal.timestamp),
-          resourceId,
-          resourceKey,
-          book,
-          chapter,
-          hasContent: true,
-          content, // Send full ProcessedScripture (not OptimizedChapter[])
-        },
-      })
-    }, [resourceId, resourceKey, language]), // Using ref for loadedContent to avoid stale closures
+      },
+      [resourceId, resourceKey, language]
+    ),
     {
       debug: true,
       resourceMetadata: {

@@ -2,73 +2,37 @@
  * NavigationBar - Context-aware navigation controls
  */
 
-import { ArrowLeft, Book, BookMarked, BookOpen, ChevronLeft, ChevronRight, Download, FolderOpen, History, Info, Library, List, ListOrdered, Menu, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { useAvailableBooks, useCurrentPassageSet, useCurrentReference, useHasNavigationSource, useNavigation, useNavigationHistory, useNavigationMode } from '../../contexts'
-import { useAppStore, useAnchorResource, useBookTitleSource } from '../../contexts/AppContext'
-import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
-import { getBookTitle } from '../../utils/bookNames'
-import { APP_VERSION, DEPLOY_VERSION } from '../../utils/deployVersion'
-import { isRtlLanguageCode } from '../../utils/languageDirection'
-import { LanguagePicker } from '../LanguagePicker'
-import { BCVNavigator } from './BCVNavigator'
-import { NavigationHistoryModal } from './NavigationHistoryModal'
-import { NavigationTypeSelector } from './NavigationTypeSelector'
+import { useEffect } from 'react'
+import {
+  useAvailableBooks,
+  useCurrentPassageSet,
+  useCurrentReference,
+  useHasNavigationSource,
+  useNavigation,
+  useNavigationMode,
+} from '../../contexts'
+import { useAppStore } from '../../contexts/AppContext'
+import { useNavigationBarMovement } from '../../features/nav/useNavigationBarMovement'
+import { useNavigationBarRtl } from '../../features/nav/useNavigationBarRtl'
+import { useNavigationBarUiState } from '../../features/nav/useNavigationBarUiState'
+import { NavigationBarCompact } from './NavigationBarCompact'
+import { NavigationBarDisabled } from './NavigationBarDisabled'
 
-/** Inline type selector for OBS — only Frame and Story modes are relevant. */
-function ObsNavigationTypeSelector({ onClose }: { onClose: () => void }) {
-  const navigation = useNavigation()
-  const currentMode = useNavigationMode()
-
-  const modes = [
-    { mode: 'verse' as const, icon: BookMarked, label: 'Frame' },
-    { mode: 'chapter' as const, icon: Library, label: 'Story' },
-  ]
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-transparent" onClick={onClose} />
-      <div
-        className="absolute bottom-full left-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {modes.map(({ mode, icon: Icon, label }) => (
-          <button
-            key={mode}
-            onClick={() => { navigation.setNavigationMode(mode); onClose() }}
-            className={`w-full flex items-center justify-center px-3 py-2 transition-colors relative ${
-              mode === currentMode ? 'bg-blue-50 text-blue-700' : 'text-gray-700 hover:bg-gray-50'
-            }`}
-            title={label}
-            aria-label={label}
-          >
-            <Icon className="w-4 h-4" />
-            {mode === currentMode && (
-              <div className="absolute right-1 top-1 w-1.5 h-1.5 rounded-full bg-blue-600" />
-            )}
-          </button>
-        ))}
-      </div>
-    </>
-  )
-}
-
-interface NavigationBarProps {
+export interface NavigationBarProps {
   isCompact?: boolean
   onToggleCompact?: () => void
-  onLanguageSelected?: (languageCode: string) => void // For Read page language selection
-  showLanguagePicker?: boolean // Show language picker in navigation bar
-  autoOpenLanguagePicker?: boolean // Auto-open language picker on mount (for Read page)
-  /** When true, language modal cannot be closed until a language is chosen (/read without :languageCode). */
+  onLanguageSelected?: (languageCode: string) => void
+  showLanguagePicker?: boolean
+  autoOpenLanguagePicker?: boolean
   languagePickerRequired?: boolean
-  downloadIndicator?: React.ReactNode // Download indicator component
-  onDownloadCollection?: () => void // Download current collection (Read page)
-  onLoadCollection?: () => void // Load a collection (Read page)
+  downloadIndicator?: React.ReactNode
+  onDownloadCollection?: () => void
+  onLoadCollection?: () => void
 }
 
 export function NavigationBar({
   isCompact = false,
-  onToggleCompact,
+  onToggleCompact: _onToggleCompact,
   onLanguageSelected,
   showLanguagePicker = false,
   autoOpenLanguagePicker = false,
@@ -81,82 +45,26 @@ export function NavigationBar({
   const currentRef = useCurrentReference()
   const navigationMode = useNavigationMode()
   const passageSet = useCurrentPassageSet()
-  const history = useNavigationHistory()
   const availableBooks = useAvailableBooks()
   const storeHasNavigationSource = useHasNavigationSource()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
-  const anchorResource = useAnchorResource()
-  const bookTitleSource = useBookTitleSource()
   const loadedResources = useAppStore((s) => s.loadedResources)
-  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
-  // RTL if anchor is RTL, or if ANY loaded resource is RTL (e.g. Arabic TN in other panel) so ref order matches
-  const isRtl = (() => {
-    const dirFrom = (res: { languageDirection?: 'ltr' | 'rtl'; language?: string; languageCode?: string } | undefined) => {
-      if (!res) return null
-      if (res.languageDirection === 'rtl') return true
-      if (res.languageDirection === 'ltr') return false
-      const lang = res.language ?? res.languageCode
-      if (!lang) return null
-      const listDir = availableLanguages.find((l) => l.code === lang)?.direction
-      if (listDir === 'rtl' || listDir === 'ltr') return listDir === 'rtl'
-      return isRtlLanguageCode(lang) ? true : null
-    }
-    if (dirFrom(anchorResource) === true) return true
-    if (anchorResource && dirFrom(anchorResource) === false) return false
-    if (dirFrom(bookTitleSource) === true) return true
-    const anyRtl = Object.values(loadedResources).some((r) => dirFrom(r) === true)
-    if (anyRtl) return true
-    const lang = anchorResource?.language ?? anchorResource?.languageCode ?? bookTitleSource?.language
-    if (!lang) return false
-    const listDir = availableLanguages.find((l) => l.code === lang)?.direction
-    if (listDir === 'rtl' || listDir === 'ltr') return listDir === 'rtl'
-    return isRtlLanguageCode(lang)
-  })()
-  const [isNavigatorOpen, setIsNavigatorOpen] = useState(false)
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const [isTypeSelectorOpen, setIsTypeSelectorOpen] = useState(false)
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isVersionOpen, setIsVersionOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const typeSelectorRef = useRef<HTMLDivElement>(null)
-  
-  // Debug auto-open language picker
+
+  const isRtl = useNavigationBarRtl()
+  const ui = useNavigationBarUiState()
+  const movement = useNavigationBarMovement(
+    navigation,
+    currentRef,
+    navigationMode,
+    !!passageSet
+  )
+
   useEffect(() => {
     if (autoOpenLanguagePicker) {
-      console.log('[NavigationBar] Received autoOpenLanguagePicker=true')
+      // intentionally empty
     }
   }, [autoOpenLanguagePicker])
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    if (!isMenuOpen) return
-    
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsMenuOpen(false)
-      }
-    }
-    
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isMenuOpen])
-  
-  // Close type selector when clicking outside
-  useEffect(() => {
-    if (!isTypeSelectorOpen) return
-    
-    const handleClickOutside = (e: MouseEvent) => {
-      if (typeSelectorRef.current && !typeSelectorRef.current.contains(e.target as Node)) {
-        setIsTypeSelectorOpen(false)
-      }
-    }
-    
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isTypeSelectorOpen])
-
-  const hasAnchor = !!anchorResourceId
-  const hasPassageSet = !!passageSet
   const hasObsResource = Object.values(loadedResources).some(
     (r) =>
       r.resourceId?.toLowerCase() === 'obs' ||
@@ -165,668 +73,50 @@ export function NavigationBar({
   const hasNavigationSource =
     storeHasNavigationSource || (!!anchorResourceId && hasObsResource && availableBooks.length === 0)
 
-  // LTR: { book } { startChapter }: { startVerse }-?{ EndChapter }?:?{ EndVerse }?
-  // RTL: { EndVerse }?:?{ EndChapter }?-?{ startVerse }: { startChapter } { book } (two parts for bidi-safe render)
-  const formatReferenceParts = (ref: typeof currentRef) => {
-    if (ref.book === 'obs') {
-      if (navigationMode === 'chapter') {
-        // Story mode — show only the story number (arrows move story-by-story)
-        return { bookPart: 'OBS', numberPart: `${ref.chapter}` }
-      }
-      // Frame / custom-range mode — show story · frame, plus range suffix if present
-      let numberPart = `${ref.chapter} · ${ref.verse}`
-      if (ref.endChapter && ref.endChapter !== ref.chapter) {
-        numberPart += ` – ${ref.endChapter} · ${ref.endVerse ?? 1}`
-      } else if (ref.endVerse && ref.endVerse !== ref.verse) {
-        numberPart += ` – ${ref.chapter} · ${ref.endVerse}`
-      }
-      return { bookPart: 'OBS', numberPart }
-    }
-    const bookName = getBookTitle(bookTitleSource, ref.book)
-    if (!isRtl) {
-      let numberPart = `${ref.chapter}:${ref.verse}`
-      if (ref.endChapter && ref.endChapter !== ref.chapter) {
-        numberPart += `-${ref.endChapter}:${ref.endVerse || 1}`
-      } else if (ref.endVerse && ref.endVerse !== ref.verse) {
-        numberPart += `-${ref.endVerse}`
-      }
-      return { bookPart: bookName, numberPart }
-    }
-    let numberPart = `${ref.verse}:${ref.chapter}`
-    if (ref.endChapter && ref.endChapter !== ref.chapter) {
-      numberPart = `${ref.endVerse ?? 1}:${ref.endChapter}-${numberPart}`
-    } else if (ref.endVerse && ref.endVerse !== ref.verse) {
-      numberPart = `${ref.endVerse}-${ref.verse}:${ref.chapter}`
-    }
-    return { bookPart: bookName, numberPart }
-  }
-
-  const getModeLabel = () => {
-    if (currentRef.book === 'obs') {
-      return navigationMode === 'chapter' ? 'Story' : 'Frame'
-    }
-    switch (navigationMode) {
-      case 'verse':
-        return 'Range'
-      case 'chapter':
-        return 'Chapter'
-      case 'section':
-        return 'Section'
-      case 'passage-set':
-        return 'Passage'
-      default:
-        return ''
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentRef.book === 'obs') {
-      if (navigationMode === 'chapter') {
-        navigation.previousObsStory()
-      } else {
-        navigation.previousObsFrame()
-      }
-      return
-    }
-    if (navigationMode === 'passage-set' && hasPassageSet) {
-      navigation.previousPassage()
-    } else if (navigationMode === 'verse') {
-      navigation.previousVerse()
-    } else if (navigationMode === 'chapter') {
-      navigation.previousChapter()
-    } else if (navigationMode === 'section') {
-      navigation.previousSection()
-    }
-  }
-
-  const handleNext = () => {
-    if (currentRef.book === 'obs') {
-      if (navigationMode === 'chapter') {
-        navigation.nextObsStory()
-      } else {
-        navigation.nextObsFrame()
-      }
-      return
-    }
-    if (navigationMode === 'passage-set' && hasPassageSet) {
-      navigation.nextPassage()
-    } else if (navigationMode === 'verse') {
-      navigation.nextVerse()
-    } else if (navigationMode === 'chapter') {
-      navigation.nextChapter()
-    } else if (navigationMode === 'section') {
-      navigation.nextSection()
-    }
-  }
-
-  const canGoPrevious = () => {
-    if (currentRef.book === 'obs') {
-      return navigationMode === 'chapter'
-        ? navigation.canGoToPreviousObsStory()
-        : navigation.canGoToPreviousObsFrame()
-    }
-    if (navigationMode === 'passage-set') {
-      return navigation.canGoToPreviousPassage()
-    } else if (navigationMode === 'verse') {
-      return navigation.canGoToPreviousVerse()
-    } else if (navigationMode === 'chapter') {
-      return navigation.canGoToPreviousChapter()
-    } else if (navigationMode === 'section') {
-      return navigation.canGoToPreviousSection()
-    }
-    return false
-  }
-
-  const canGoNext = () => {
-    if (currentRef.book === 'obs') {
-      return navigationMode === 'chapter'
-        ? navigation.canGoToNextObsStory()
-        : navigation.canGoToNextObsFrame()
-    }
-    if (navigationMode === 'passage-set') {
-      return navigation.canGoToNextPassage()
-    } else if (navigationMode === 'verse') {
-      return navigation.canGoToNextVerse()
-    } else if (navigationMode === 'chapter') {
-      return navigation.canGoToNextChapter()
-    } else if (navigationMode === 'section') {
-      return navigation.canGoToNextSection()
-    }
-    return false
-  }
-
-  // Range expansion helpers for custom range mode
-  const expandRangeBackward = () => {
-    if (navigationMode !== 'verse') return
-    if (currentRef.book === 'obs') return
-
-    const bookInfo = navigation.getBookInfo(currentRef.book)
-    if (!bookInfo) return
-
-    const startChapter = currentRef.chapter
-    const startVerse = currentRef.verse
-    const endChapter = currentRef.endChapter || currentRef.chapter
-    const endVerse = currentRef.endVerse || currentRef.verse
-
-    let newStartChapter = startChapter
-    let newStartVerse = startVerse - 1
-
-    if (newStartVerse < 1) {
-      // Move to previous chapter
-      newStartChapter = startChapter - 1
-      if (newStartChapter >= 1) {
-        newStartVerse = bookInfo.verses?.[newStartChapter - 1] || 1
-      } else {
-        return // Can't go before chapter 1
-      }
-    }
-
-    navigation.navigateToReference({
-      book: currentRef.book,
-      chapter: newStartChapter,
-      verse: newStartVerse,
-      endChapter: endChapter,
-      endVerse: endVerse,
-    })
-  }
-
-  const expandRangeForward = () => {
-    if (navigationMode !== 'verse') return
-    if (currentRef.book === 'obs') return
-
-    const bookInfo = navigation.getBookInfo(currentRef.book)
-    if (!bookInfo) return
-
-    const startChapter = currentRef.chapter
-    const startVerse = currentRef.verse
-    const endChapter = currentRef.endChapter || currentRef.chapter
-    const endVerse = currentRef.endVerse || currentRef.verse
-
-    let newEndChapter = endChapter
-    let newEndVerse = endVerse + 1
-    const maxVerseInChapter = bookInfo.verses?.[newEndChapter - 1] || 0
-
-    if (newEndVerse > maxVerseInChapter) {
-      // Move to next chapter
-      newEndChapter = endChapter + 1
-      if (newEndChapter <= (bookInfo.verses ?? []).length) {
-        newEndVerse = 1
-      } else {
-        return // Can't go beyond last chapter
-      }
-    }
-
-    navigation.navigateToReference({
-      book: currentRef.book,
-      chapter: startChapter,
-      verse: startVerse,
-      endChapter: newEndChapter,
-      endVerse: newEndVerse,
-    })
-  }
-
-  const canExpandBackward = () => {
-    if (navigationMode !== 'verse') return false
-    if (currentRef.book === 'obs') return false
-    const bookInfo = navigation.getBookInfo(currentRef.book)
-    if (!bookInfo) return false
-    return currentRef.verse > 1 || currentRef.chapter > 1
-  }
-
-  const canExpandForward = () => {
-    if (navigationMode !== 'verse') return false
-    if (currentRef.book === 'obs') return false
-    const bookInfo = navigation.getBookInfo(currentRef.book)
-    if (!bookInfo) return false
-    const endChapter = currentRef.endChapter || currentRef.chapter
-    const endVerse = currentRef.endVerse || currentRef.verse
-    const maxVerse = bookInfo.verses?.[endChapter - 1] || 0
-    return endVerse < maxVerse || endChapter < (bookInfo.verses ?? []).length
-  }
-
-  const shrinkRangeFromStart = () => {
-    if (navigationMode !== 'verse') return
-    if (currentRef.book === 'obs') return
-
-    const bookInfo = navigation.getBookInfo(currentRef.book)
-    if (!bookInfo) return
-
-    const startChapter = currentRef.chapter
-    const startVerse = currentRef.verse
-    const endChapter = currentRef.endChapter || currentRef.chapter
-    const endVerse = currentRef.endVerse || currentRef.verse
-
-    // Can't shrink a single verse
-    if (startChapter === endChapter && startVerse === endVerse) return
-
-    let newStartChapter = startChapter
-    let newStartVerse = startVerse + 1
-    const maxVerseInChapter = bookInfo.verses?.[startChapter - 1] || 0
-
-    if (newStartVerse > maxVerseInChapter) {
-      // Move to next chapter
-      newStartChapter = startChapter + 1
-      newStartVerse = 1
-    }
-
-    // Check if we've met or passed the end
-    const getVerseKey = (ch: number, v: number) => ch * 1000 + v
-    if (getVerseKey(newStartChapter, newStartVerse) >= getVerseKey(endChapter, endVerse)) {
-      // Collapse to single verse at end
-      navigation.navigateToReference({
-        book: currentRef.book,
-        chapter: endChapter,
-        verse: endVerse,
-      })
-      return
-    }
-
-    navigation.navigateToReference({
-      book: currentRef.book,
-      chapter: newStartChapter,
-      verse: newStartVerse,
-      endChapter: endChapter,
-      endVerse: endVerse,
-    })
-  }
-
-  const shrinkRangeFromEnd = () => {
-    if (navigationMode !== 'verse') return
-    if (currentRef.book === 'obs') return
-
-    const bookInfo = navigation.getBookInfo(currentRef.book)
-    if (!bookInfo) return
-
-    const startChapter = currentRef.chapter
-    const startVerse = currentRef.verse
-    const endChapter = currentRef.endChapter || currentRef.chapter
-    const endVerse = currentRef.endVerse || currentRef.verse
-
-    // Can't shrink a single verse
-    if (startChapter === endChapter && startVerse === endVerse) return
-
-    let newEndChapter = endChapter
-    let newEndVerse = endVerse - 1
-
-    if (newEndVerse < 1) {
-      // Move to previous chapter
-      newEndChapter = endChapter - 1
-      if (newEndChapter >= 1) {
-        newEndVerse = bookInfo.verses?.[newEndChapter - 1] || 1
-      } else {
-        return
-      }
-    }
-
-    // Check if we've met or gone before start
-    const getVerseKey = (ch: number, v: number) => ch * 1000 + v
-    if (getVerseKey(newEndChapter, newEndVerse) <= getVerseKey(startChapter, startVerse)) {
-      // Collapse to single verse at start
-      navigation.navigateToReference({
-        book: currentRef.book,
-        chapter: startChapter,
-        verse: startVerse,
-      })
-      return
-    }
-
-    navigation.navigateToReference({
-      book: currentRef.book,
-      chapter: startChapter,
-      verse: startVerse,
-      endChapter: newEndChapter,
-      endVerse: newEndVerse,
-    })
-  }
-
-  const canShrinkFromStart = () => {
-    if (navigationMode !== 'verse') return false
-    const endChapter = currentRef.endChapter || currentRef.chapter
-    const endVerse = currentRef.endVerse || currentRef.verse
-    return !(currentRef.chapter === endChapter && currentRef.verse === endVerse)
-  }
-
-  const canShrinkFromEnd = () => {
-    if (navigationMode !== 'verse') return false
-    const endChapter = currentRef.endChapter || currentRef.chapter
-    const endVerse = currentRef.endVerse || currentRef.verse
-    return !(currentRef.chapter === endChapter && currentRef.verse === endVerse)
-  }
-
-  // If no navigation source, show minimal disabled state with icon indicators only
-  // When showLanguagePicker is true (Read page), always show the language picker so user can select a language first
   if (!hasNavigationSource) {
-    if (isCompact) {
-      return (
-        <div className="flex items-center gap-2 w-full">
-          <div className="flex items-center gap-1 flex-1 justify-center opacity-40">
-            <button disabled className="p-1 rounded cursor-not-allowed" title="Navigation disabled">
-              <ChevronLeft className="w-4 h-4 text-gray-400" />
-            </button>
-            <div className="px-2 py-1 bg-gray-100 rounded flex items-center gap-1">
-              <Book className="w-3 h-3 text-gray-400" />
-              <div className="w-16 h-3 bg-gray-200 rounded" />
-            </div>
-            <button disabled className="p-1 rounded cursor-not-allowed" title="Navigation disabled">
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            </button>
-          </div>
-          {showLanguagePicker && (
-            <div className="flex items-center gap-1 shrink-0">
-              <div className="w-px h-4 bg-gray-300" />
-              <LanguagePicker
-                onLanguageSelected={onLanguageSelected}
-                compact
-                autoOpen={autoOpenLanguagePicker}
-                required={languagePickerRequired}
-              />
-            </div>
-          )}
-        </div>
-      )
-    }
-
     return (
-      <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-center gap-4">
-        <div className="flex items-center gap-2 opacity-40">
-          <button
-            disabled
-            className="p-2 rounded cursor-not-allowed"
-            title="Navigation disabled: Add scripture resource or load passage set"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-400" />
-          </button>
-          <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg">
-            <Book className="w-4 h-4 text-gray-400" />
-            <div className="w-24 h-4 bg-gray-200 rounded" title="No reference selected" />
-          </div>
-          <button
-            disabled
-            className="p-2 rounded cursor-not-allowed"
-            title="Navigation disabled: Add scripture resource or load passage set"
-          >
-            <ChevronRight className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
-        {showLanguagePicker && (
-          <LanguagePicker
-            onLanguageSelected={onLanguageSelected}
-            compact={false}
-            autoOpen={autoOpenLanguagePicker}
-            required={languagePickerRequired}
-          />
-        )}
-      </div>
+      <NavigationBarDisabled
+        isCompact={isCompact}
+        showLanguagePicker={showLanguagePicker}
+        onLanguageSelected={onLanguageSelected}
+        autoOpenLanguagePicker={autoOpenLanguagePicker}
+        languagePickerRequired={languagePickerRequired}
+      />
     )
   }
 
-  // Compact version - minimal, icon-only (always compact now)
   if (isCompact) {
     return (
-      <div className="flex items-center gap-2 w-full">
-        {/* Left side controls */}
-        <div className="flex items-center gap-1">
-          {/* Back button for navigation history - moved to left side */}
-          {navigation.canGoBack() && (
-            <button
-              onClick={() => navigation.goBack()}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
-              title="Go back in navigation history"
-              aria-label="Go back"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-        
-        {/* Center navigation group - unified component with circular arrows inside blue container */}
-        <div className="flex-1 flex items-center justify-center">
-          {/* Blue container - same layout; for RTL invert only functionality: left arrow = next, right arrow = previous */}
-          <div className="flex items-center gap-2 bg-blue-50 px-2 py-2 rounded-full">
-            {/* Left arrow - in RTL: next (forward); in LTR: previous */}
-            <button
-              onClick={isRtl ? handleNext : handlePrevious}
-              disabled={isRtl ? !canGoNext() : !canGoPrevious()}
-              className="w-7 h-7 rounded-full bg-blue-200 hover:bg-blue-300 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 transition-colors flex items-center justify-center flex-shrink-0"
-              title={isRtl ? `Next ${getModeLabel()}` : `Previous ${getModeLabel()}`}
-              aria-label={isRtl ? 'Next' : 'Previous'}
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            
-            {/* Navigation type selector — OBS: Frame vs Story; Scripture: verse/chapter/section/passage */}
-            <div className="relative" ref={typeSelectorRef}>
-              {currentRef.book === 'obs' ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
-                    className="p-1.5 hover:bg-blue-100 text-blue-700 transition-colors rounded-full flex items-center justify-center"
-                    title={`Navigation type: ${getModeLabel()}`}
-                  >
-                    {navigationMode === 'chapter' ? (
-                      <Library className="w-4 h-4" />
-                    ) : (
-                      <BookMarked className="w-4 h-4" />
-                    )}
-                  </button>
-
-                  {isTypeSelectorOpen && (
-                    <ObsNavigationTypeSelector onClose={() => setIsTypeSelectorOpen(false)} />
-                  )}
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
-                    className="p-1.5 hover:bg-blue-100 text-blue-700 transition-colors rounded-full flex items-center justify-center"
-                    title={`Navigation type: ${getModeLabel()}`}
-                  >
-                    {navigationMode === 'verse' && <BookOpen className="w-4 h-4" />}
-                    {navigationMode === 'chapter' && <Library className="w-4 h-4" />}
-                    {navigationMode === 'section' && <List className="w-4 h-4" />}
-                    {navigationMode === 'passage-set' && <ListOrdered className="w-4 h-4" />}
-                  </button>
-
-                  {isTypeSelectorOpen && (
-                    <NavigationTypeSelector onClose={() => setIsTypeSelectorOpen(false)} />
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-blue-200"></div>
-
-            {/* Reference display - RTL: range then book (4:1 Titus); flex enforces order regardless of script.
-                OBS references are always LTR regardless of language direction (numeric story · frame). */}
-            <button
-              onClick={() => setIsNavigatorOpen(true)}
-              className="px-3 py-1 hover:bg-blue-100 text-sm font-medium text-blue-900 transition-colors rounded-md inline-flex items-center gap-1"
-              title="Click to navigate or adjust range"
-              dir={isRtl && currentRef.book !== 'obs' ? 'rtl' : 'ltr'}
-            >
-              {(() => {
-                const { bookPart, numberPart } = formatReferenceParts(currentRef)
-                return isRtl && currentRef.book !== 'obs' ? (
-                  <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
-                    <span>{numberPart}</span>
-                    <span>{bookPart}</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex gap-1" dir="ltr">
-                    <span>{bookPart}</span>
-                    <span>{numberPart}</span>
-                  </span>
-                )
-              })()}
-            </button>
-            
-            {/* Right arrow - in RTL: previous (backward); in LTR: next */}
-            <button
-              onClick={isRtl ? handlePrevious : handleNext}
-              disabled={isRtl ? !canGoPrevious() : !canGoNext()}
-              className="w-7 h-7 rounded-full bg-blue-200 hover:bg-blue-300 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 transition-colors flex items-center justify-center flex-shrink-0"
-              title={isRtl ? `Previous ${getModeLabel()}` : `Next ${getModeLabel()}`}
-              aria-label={isRtl ? 'Previous' : 'Next'}
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-        
-        {/* Right side controls - Download Indicator, Language Picker & Hamburger Menu */}
-        <div className="flex items-center gap-1">
-          {/* Download Indicator */}
-          {downloadIndicator}
-
-          {/* Language Picker - always mounted so autoOpen/required work regardless of hamburger state */}
-          {showLanguagePicker && (
-            <LanguagePicker
-              onLanguageSelected={onLanguageSelected}
-              compact={true}
-              autoOpen={autoOpenLanguagePicker}
-              required={languagePickerRequired}
-            />
-          )}
-          
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
-              title={isMenuOpen ? 'Close menu' : 'Open menu'}
-              aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
-            >
-              {isMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-            </button>
-            
-            {/* Dropdown Menu - opens upward on mobile (bar at bottom), downward on md+ (bar at top) */}
-            {isMenuOpen && (
-              <div className="absolute bottom-full right-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 w-auto bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-50">
-                {/* History Button - Icon Only */}
-                <button
-                  onClick={() => {
-                    setIsHistoryOpen(true)
-                    setIsMenuOpen(false)
-                  }}
-                  disabled={history.length === 0}
-                  className="flex items-center justify-center p-2 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed relative"
-                  title={`Navigation history${history.length > 0 ? ` (${history.length})` : ''}`}
-                  aria-label={`Navigation history${history.length > 0 ? ` (${history.length} locations)` : ''}`}
-                >
-                  <History className="w-4 h-4 text-gray-500" />
-                  {history.length > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 bg-blue-500 text-white text-[9px] font-semibold rounded-full w-3.5 h-3.5 flex items-center justify-center">
-                      {history.length > 9 ? '9+' : history.length}
-                    </span>
-                  )}
-                </button>
-                
-                {/* Collection Management Buttons - Show in Read page */}
-                {(onDownloadCollection || onLoadCollection) && (
-                  <>
-                    {/* Download Collection Button - Icon Only */}
-                    {onDownloadCollection && (
-                      <button
-                        onClick={() => {
-                          onDownloadCollection()
-                          setIsMenuOpen(false)
-                        }}
-                        className="flex items-center justify-center p-2 hover:bg-gray-50"
-                        title="Download current collection"
-                        aria-label="Download current collection"
-                      >
-                        <Download className="w-4 h-4 text-gray-500" />
-                      </button>
-                    )}
-                    
-                    {/* Load Collection Button - Icon Only */}
-                    {onLoadCollection && (
-                      <button
-                        onClick={() => {
-                          onLoadCollection()
-                          setIsMenuOpen(false)
-                        }}
-                        className="flex items-center justify-center p-2 hover:bg-gray-50"
-                        title="Load a collection (from database or file)"
-                        aria-label="Load a collection (from database or file)"
-                      >
-                        <FolderOpen className="w-4 h-4 text-gray-500" />
-                      </button>
-                    )}
-                  </>
-                )}
-                
-                {/* Version info - icon opens modal with app version and build */}
-                {showLanguagePicker && (
-                  <div className="border-t border-gray-100 px-2 py-1.5 flex justify-center">
-                    <button
-                      onClick={() => {
-                        setIsVersionOpen(true)
-                        setIsMenuOpen(false)
-                      }}
-                      className="p-1 rounded hover:bg-gray-50 text-gray-400 hover:text-gray-600"
-                      title="Version"
-                      aria-label="Version"
-                    >
-                      <Info className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-        
-        {/* Version & build modal */}
-        {isVersionOpen && (
-          <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40"
-            onClick={() => setIsVersionOpen(false)}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Version and build"
-          >
-            <div
-              className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-semibold text-gray-900 mb-3">Version</h3>
-              <p className="font-mono text-sm text-gray-800" data-app-version={APP_VERSION}>
-                {APP_VERSION}
-              </p>
-              <p className="font-mono text-xs text-gray-600 mt-2 break-all" data-deploy-version={DEPLOY_VERSION}>
-                Build: {DEPLOY_VERSION}
-              </p>
-              <button
-                onClick={() => setIsVersionOpen(false)}
-                className="mt-4 w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
-        
-        {/* BCV Navigator Modal */}
-        {/* hasAnchor gates scripture-mode navigation; hasObsResource allows OBS-only mode
-            (when scope is obs after a fresh load no scripture viewer has called setAnchorResource) */}
-        {isNavigatorOpen && (hasAnchor || hasObsResource) && (availableBooks.length > 0 || hasObsResource) && (
-          <BCVNavigator
-            onClose={() => setIsNavigatorOpen(false)}
-            mode={navigationMode === 'section' && currentRef.book !== 'obs' ? 'section' : 'verse'}
-          />
-        )}
-        
-        {/* Navigation History Modal */}
-        {isHistoryOpen && (
-          <NavigationHistoryModal onClose={() => setIsHistoryOpen(false)} />
-        )}
-      </div>
+      <NavigationBarCompact
+        isRtl={isRtl}
+        hasObsResource={hasObsResource}
+        modeLabel={movement.modeLabel}
+        handlePrevious={movement.handlePrevious}
+        handleNext={movement.handleNext}
+        canGoPrevious={movement.canGoPrevious}
+        canGoNext={movement.canGoNext}
+        downloadIndicator={downloadIndicator}
+        showLanguagePicker={showLanguagePicker}
+        onLanguageSelected={onLanguageSelected}
+        autoOpenLanguagePicker={autoOpenLanguagePicker}
+        languagePickerRequired={languagePickerRequired}
+        onDownloadCollection={onDownloadCollection}
+        onLoadCollection={onLoadCollection}
+        isNavigatorOpen={ui.isNavigatorOpen}
+        setIsNavigatorOpen={ui.setIsNavigatorOpen}
+        isHistoryOpen={ui.isHistoryOpen}
+        setIsHistoryOpen={ui.setIsHistoryOpen}
+        isTypeSelectorOpen={ui.isTypeSelectorOpen}
+        setIsTypeSelectorOpen={ui.setIsTypeSelectorOpen}
+        isMenuOpen={ui.isMenuOpen}
+        setIsMenuOpen={ui.setIsMenuOpen}
+        isVersionOpen={ui.isVersionOpen}
+        setIsVersionOpen={ui.setIsVersionOpen}
+        menuRef={ui.menuRef}
+        typeSelectorRef={ui.typeSelectorRef}
+      />
     )
   }
 
-  // Not compact - this should never happen now, but keep as fallback
   return null
 }

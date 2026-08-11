@@ -61,9 +61,7 @@ export function AutoBackgroundDownloader({
 
   useEffect(() => {
     if (!enabled) {
-      if (debug) {
-        console.log('[AutoBackgroundDownloader] Disabled')
-      }
+
       return
     }
 
@@ -75,13 +73,6 @@ export function AutoBackgroundDownloader({
 
         // If resources were added and we're not already downloading
         if (currentCount > lastResourceCount && !isDownloading) {
-          if (debug) {
-            console.log('[AutoBackgroundDownloader] New resources detected:', {
-              previous: lastResourceCount,
-              current: currentCount,
-              new: currentCount - lastResourceCount
-            })
-          }
 
           // Clear any existing timeout
           if (timeoutRef.current) {
@@ -91,13 +82,9 @@ export function AutoBackgroundDownloader({
           // Schedule download after delay
           timeoutRef.current = setTimeout(() => {
             
-            if (debug) {
-              console.log('[AutoBackgroundDownloader] Starting background downloads for:', resourceKeys)
-            }
 
             if (showNotification) {
               // You can implement a toast notification here if you have a toast system
-              console.log('🔄 Starting background downloads for offline access...')
             }
 
             startDownload(resourceKeys)
@@ -105,9 +92,8 @@ export function AutoBackgroundDownloader({
           }, delayMs)
         } else if (currentCount === lastResourceCount && debug) {
           // No change, skip
-        } else if (isDownloading && debug) {
-          console.log('[AutoBackgroundDownloader] Downloads already in progress, skipping')
         }
+        // isDownloading: wait for current run; no-op
 
         // Update count if it decreased (resources were removed)
         if (currentCount < lastResourceCount) {

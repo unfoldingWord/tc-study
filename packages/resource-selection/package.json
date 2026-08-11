@@ -1,7 +1,8 @@
 {
   "name": "@bt-synergy/resource-selection",
+  "private": true,
   "version": "0.1.0",
-  "description": "Resource selection, filtering, and grouping utilities",
+  "description": "[ARCHIVED] Not on tc-study critical path (see ARCHIVED.md)",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -6,7 +6,7 @@
 
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { ResourceType, ResourceFormat } from '@bt-synergy/resource-catalog'
-import type { ResourceInfo } from '../contexts/types'
+import type { ResourceInfo, ResourceTOC } from '../contexts/types'
 
 /**
  * Create ResourceInfo from ResourceMetadata
@@ -21,7 +21,7 @@ import type { ResourceInfo } from '../contexts/types'
 export function createResourceInfo(
   metadata: ResourceMetadata,
   options: {
-    toc?: any
+    toc?: ResourceTOC
   } = {}
 ): ResourceInfo {
   return {

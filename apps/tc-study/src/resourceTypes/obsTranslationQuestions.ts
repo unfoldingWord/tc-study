@@ -8,7 +8,9 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { TranslationQuestionsLoader } from '@bt-synergy/translation-questions-loader'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { TranslationQuestionsViewer } from '../components/resources/TranslationQuestionsViewer'
+import { asResourceViewer } from './asResourceViewer'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const obsTranslationQuestionsResourceType: ResourceTypeDefinition = defineResourceType({
@@ -34,10 +36,10 @@ export const obsTranslationQuestionsResourceType: ResourceTypeDefinition = defin
     debug: false,
   },
 
-  downloadPriority: 27,
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.OBS_QUESTIONS),
 
   // ===== UI LAYER =====
-  viewer: TranslationQuestionsViewer as any,
+  viewer: asResourceViewer(TranslationQuestionsViewer),
 
   // ===== FEATURES =====
   features: {

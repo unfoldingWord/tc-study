@@ -1,6 +1,6 @@
 /**
  * Add Resource Wizard - Simplified Version
- * 
+ *
  * Basic working modal for adding resources.
  */
 
@@ -11,9 +11,9 @@ interface AddResourceWizardProps {
   onComplete?: () => void
 }
 
-export function AddResourceWizard({ onClose, onComplete }: AddResourceWizardProps) {
-  console.log('🧙 AddResourceWizard rendering!')
-  
+export function AddResourceWizard({ onClose, onComplete: _onComplete }: AddResourceWizardProps) {
+
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
@@ -35,7 +35,7 @@ export function AddResourceWizard({ onClose, onComplete }: AddResourceWizardProp
             <X className="w-5 h-5" />
           </button>
         </div>
-        
+
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
           <div className="text-center py-12">

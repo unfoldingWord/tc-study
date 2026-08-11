@@ -12,7 +12,7 @@ export interface EmptyPanelStateProps {
   onAddResource?: () => void
 }
 
-export function EmptyPanelState({ panelId, panelName, message, onAddResource }: EmptyPanelStateProps) {
+export function EmptyPanelState({ panelId: _panelId, panelName, message, onAddResource }: EmptyPanelStateProps) {
   return (
     <div className="h-full flex items-center justify-center">
       {(message || panelName) && (

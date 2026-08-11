@@ -7,7 +7,9 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { TranslationQuestionsLoader } from '@bt-synergy/translation-questions-loader'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { TranslationQuestionsViewer } from '../components/resources/TranslationQuestionsViewer'
+import { asResourceViewer } from './asResourceViewer'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const translationQuestionsResourceType: ResourceTypeDefinition = defineResourceType({
@@ -33,11 +35,10 @@ export const translationQuestionsResourceType: ResourceTypeDefinition = defineRe
     debug: false,
   },
   
-  // Download priority for background downloading
-  downloadPriority: 25, // Similar to Translation Notes
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.TRANSLATION_QUESTIONS),
   
   // ===== UI LAYER =====
-  viewer: TranslationQuestionsViewer as any,
+  viewer: asResourceViewer(TranslationQuestionsViewer),
   
   // ===== FEATURES =====
   features: {

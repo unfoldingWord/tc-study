@@ -1,6 +1,6 @@
 /**
  * Ingredients Generators for different resource types
- * 
+ *
  * These generators extract proper titles from content files during metadata creation.
  * They reuse the TOC builder logic to ensure consistency.
  */
@@ -18,14 +18,14 @@ function extractMarkdownTitle(content: string, fallback: string): string {
   if (titleMatch) {
     return titleMatch[1].trim()
   }
-  
+
   // Fallback to filename if no title found
   return fallback
 }
 
 /**
  * Generate ingredients for Translation Words resources
- * 
+ *
  * This generator:
  * 1. Checks for toc.json first (if available, uses it)
  * 2. Otherwise, uses zipball for release tags (fast) or recursive file listing
@@ -34,10 +34,11 @@ function extractMarkdownTitle(content: string, fallback: string): string {
  */
 export const generateTranslationWordsIngredients: IngredientsGenerator = async (
   door43Resource: Door43Resource,
-  door43Client: any
+  door43Client
 ) => {
-  let { owner, language, id: resourceId } = door43Resource
-  
+  const { owner } = door43Resource
+  let { language, id: resourceId } = door43Resource
+
   // Handle case where resourceId might be missing (shouldn't happen, but defensive)
   if (!resourceId && language && language.includes('_')) {
     const lastUnderscoreIndex = language.lastIndexOf('_')
@@ -47,26 +48,27 @@ export const generateTranslationWordsIngredients: IngredientsGenerator = async (
       console.warn(`[generateTranslationWordsIngredients] Extracted resourceId from language: ${resourceId}`)
     }
   }
-  
+
   if (!resourceId) {
     throw new Error(`Invalid door43Resource: missing resourceId. owner=${owner}, language=${language}`)
   }
-  
+
   const repoName = `${language}_${resourceId}`
-  
+
   // Validate repoName doesn't contain "undefined"
   if (repoName.includes('undefined')) {
     throw new Error(`Invalid repoName: ${repoName}. owner=${owner}, language=${language}, resourceId=${resourceId}`)
   }
-  
+
   // Determine ref (release tag, version, or master)
   // Check for release info in various possible locations
-  const releaseTag = (door43Resource as any).release?.tag_name || 
-                     (door43Resource as any).tag_name ||
-                     door43Resource.version || 
-                     'master'
+  const releaseTag =
+    door43Resource.release?.tag_name ||
+    door43Resource.tag_name ||
+    door43Resource.version ||
+    'master'
   const ref = releaseTag
-  
+
   // Step 1: Try to load TOC file first (if it exists, it has proper titles)
   try {
     const tocContent = await door43Client.fetchTextContent(
@@ -75,7 +77,7 @@ export const generateTranslationWordsIngredients: IngredientsGenerator = async (
       'toc.json',
       ref
     )
-    
+
     if (tocContent) {
       const tocData = JSON.parse(tocContent)
       if (tocData.ingredients && Array.isArray(tocData.ingredients)) {
@@ -86,18 +88,18 @@ export const generateTranslationWordsIngredients: IngredientsGenerator = async (
   } catch {
     // TOC file not found - continue to generate from files
   }
-  
+
   // Step 2: Generate ingredients from files
   // Use zipball for release tags (faster), recursive listing for branches
   const isReleaseTag = /^v\d/.test(ref)
   let files: Array<{ name: string; path: string; type: 'file' | 'dir' }> = []
   let getFileContent: (filePath: string) => Promise<string>
-  
+
   if (isReleaseTag) {
     // Use zipball method for release tags
     const zipballBuffer = await door43Client.downloadZipball(owner, repoName, ref)
     const zip = await JSZip.loadAsync(zipballBuffer)
-    
+
     // Find repo prefix
     let repoPrefix = ''
     const entryPaths = Object.keys(zip.files).filter(path => !zip.files[path].dir)
@@ -108,38 +110,38 @@ export const generateTranslationWordsIngredients: IngredientsGenerator = async (
         repoPrefix = firstPath.substring(0, firstSlashIndex + 1)
       }
     }
-    
+
     // Build file list
     for (const [entryPath, entry] of Object.entries(zip.files)) {
       if (entry.dir) continue
-      
+
       let filePath = entryPath
       if (repoPrefix && filePath.startsWith(repoPrefix)) {
         filePath = filePath.substring(repoPrefix.length)
       }
-      
+
       const fileName = filePath.split('/').pop() || filePath
-      
+
       files.push({
         name: fileName,
         path: filePath,
         type: 'file',
       })
     }
-    
+
     // Create file content getter from zip
     getFileContent = async (filePath: string): Promise<string> => {
       const fullPath = repoPrefix ? `${repoPrefix}${filePath}` : filePath
       let entry = zip.files[fullPath]
-      
+
       if (!entry && repoPrefix) {
         entry = zip.files[filePath]
       }
-      
+
       if (!entry || entry.dir) {
         throw new Error(`File not found in zip: ${filePath}`)
       }
-      
+
       return await entry.async('string')
     }
   } else {
@@ -151,27 +153,32 @@ export const generateTranslationWordsIngredients: IngredientsGenerator = async (
       ref,
       (file: { type: string; name: string }) => file.type === 'file' && file.name.endsWith('.md')
     )
-    
+
     // Create file content getter using API
     getFileContent = async (filePath: string): Promise<string> => {
       return await door43Client.fetchTextContent(owner, repoName, filePath, ref)
     }
   }
-  
+
   // Step 3: Filter to only .md files in bible/ directory and extract titles
   const markdownFiles = files.filter(
-    file => file.type === 'file' && 
-    file.path.startsWith('bible/') && 
+    file => file.type === 'file' &&
+    file.path.startsWith('bible/') &&
     file.name.endsWith('.md')
   )
-  
-  const ingredients: any[] = []
-  
+
+  const ingredients: Array<{
+    identifier: string
+    title: string
+    path: string
+    categories?: string[]
+  }> = []
+
   // Process files in batches
   const batchSize = 10
   for (let i = 0; i < markdownFiles.length; i += batchSize) {
     const batch = markdownFiles.slice(i, i + batchSize)
-    
+
     await Promise.all(
       batch.map(async (file) => {
         try {
@@ -179,18 +186,18 @@ export const generateTranslationWordsIngredients: IngredientsGenerator = async (
           const categoryMatch = entryId.match(/bible\/([^/]+)/)
           const category = categoryMatch ? categoryMatch[1] : 'other'
           const termId = entryId.split('/').pop() || entryId
-          
+
           // Fetch file content to extract title
           const content = await getFileContent(file.path)
           const title = extractMarkdownTitle(content, termId)
-          
+
           ingredients.push({
             identifier: entryId,
             title,
             path: file.path,
             categories: [category],
           })
-        } catch (error) {
+        } catch (_error) {
           // Use filename as fallback
           const entryId = file.path.replace(/\.md$/, '')
           const termId = entryId.split('/').pop() || entryId
@@ -203,10 +210,10 @@ export const generateTranslationWordsIngredients: IngredientsGenerator = async (
       })
     )
   }
-  
+
   // Sort by identifier for consistent ordering
   ingredients.sort((a, b) => a.identifier.localeCompare(b.identifier))
-  
+
   return ingredients
 }
 
@@ -219,7 +226,7 @@ export function getIngredientsGenerator(
 ): IngredientsGenerator | undefined {
   const subjectLower = subject.toLowerCase()
   const resourceIdLower = resourceId?.toLowerCase() || ''
-  
+
   // Translation Words
   if (
     (subjectLower.includes('words') && !subjectLower.includes('links')) ||
@@ -228,11 +235,11 @@ export function getIngredientsGenerator(
   ) {
     return generateTranslationWordsIngredients
   }
-  
+
   // Add more generators here for other resource types
   // if (subjectLower.includes('notes') || resourceIdLower === 'tn') {
   //   return generateTranslationNotesIngredients
   // }
-  
+
   return undefined
 }

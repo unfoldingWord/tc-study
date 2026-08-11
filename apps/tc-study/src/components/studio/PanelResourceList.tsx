@@ -33,10 +33,10 @@ export function PanelResourceList({
   onDrop,
 }: PanelResourceListProps) {
   // Extract display name (e.g., 'panel-1' -> 'Panel 1')
-  const displayName = panelName || 
+  const displayName = panelName ||
     panelId.replace(/^panel-(\d+)$/, 'Panel $1').replace(/-/g, ' ')
   const [isDragOver, setIsDragOver] = useState(false)
-  const [draggingResourceId, setDraggingResourceId] = useState<string | null>(null)
+  const [_draggingResourceId, setDraggingResourceId] = useState<string | null>(null)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -51,7 +51,7 @@ export function PanelResourceList({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOver(false)
-    
+
     const resourceId = e.dataTransfer.getData('text/plain')
     if (resourceId) {
       onDrop(resourceId)

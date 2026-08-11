@@ -1,6 +1,6 @@
 /**
  * TokenFilterBanner Component
- * 
+ *
  * Shows active token filter with clear button
  */
 
@@ -14,17 +14,17 @@ interface TokenFilterBannerProps {
   onClearFilter: () => void
 }
 
-export function TokenFilterBanner({ 
-  tokenFilter, 
-  displayLinksCount, 
+export function TokenFilterBanner({
+  tokenFilter,
+  displayLinksCount: _displayLinksCount,
   hasMatches,
-  onClearFilter 
+  onClearFilter
 }: TokenFilterBannerProps) {
   // Don't show banner if there are no matches
   if (!hasMatches) {
     return null
   }
-  
+
   return (
     <div className="px-4 py-1.5 border-b bg-blue-50 border-blue-200 flex items-center justify-center gap-2">
       <div className="inline-flex items-center gap-1.5 bg-white border border-blue-200 rounded-md px-2 py-0.5">

@@ -54,7 +54,7 @@ export function SimpleResourceExample({ resourceId, resourceTitle }: SimpleResou
     'token-click',
     resourceId,
     (signal) => {
-      console.log(`✅ [${resourceId}] Received token:`, signal.token.content)
+
       setReceivedToken(`${signal.token.content} (${signal.token.semanticId})`)
     },
     { debug: true } // Enable debug logging during development
@@ -65,7 +65,7 @@ export function SimpleResourceExample({ resourceId, resourceTitle }: SimpleResou
     'link-click',
     resourceId,
     (signal) => {
-      console.log(`✅ [${resourceId}] Received link:`, signal.link.url)
+
       setReceivedLink(signal.link.url)
     },
     { debug: true }
@@ -77,7 +77,7 @@ export function SimpleResourceExample({ resourceId, resourceTitle }: SimpleResou
     resourceId,
     (signal) => {
       const { book, chapter, verse } = signal.reference
-      console.log(`✅ [${resourceId}] Navigate to:`, `${book} ${chapter}:${verse}`)
+
       setReceivedVerse(`${book} ${chapter}:${verse}`)
     },
     { debug: true }

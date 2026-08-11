@@ -18,10 +18,7 @@ export interface WordsLinksViewerProps {
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
 }
 
-export interface TWLinkInfo {
-  category: string
-  term: string
-}
+export type { TWLinkInfo } from '../../../features/helps/quoteTokens/types'
 
 export interface TokenFilter {
   semanticId: string

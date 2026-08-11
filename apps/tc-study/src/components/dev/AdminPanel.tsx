@@ -1,16 +1,16 @@
 /**
  * Admin Panel - Development Tool
- * 
+ *
  * Shows resource metadata, dependencies, loading status, and cache status
  * Only visible in development mode
  */
 
 import { useState, useEffect } from 'react'
-import { 
-  Database, 
-  Download, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Database,
+  Download,
+  CheckCircle,
+  XCircle,
   Clock,
   ChevronDown,
   ChevronRight,
@@ -20,6 +20,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { useCatalogManager, useResourceTypeRegistry, useCacheAdapter, useCompletenessChecker } from '../../contexts'
+import { getDownloadPriority } from '../../config/loaderConfig'
 import { DependencyResolver } from '../../lib/services/DependencyResolver'
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import type { ResourceCompletenessStatus } from '../../lib/services/ResourceCompletenessChecker'
@@ -34,7 +35,7 @@ interface ResourceWithStatus {
 export function AdminPanel() {
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
-  const cacheAdapter = useCacheAdapter()
+  const _cacheAdapter = useCacheAdapter()
   const completenessChecker = useCompletenessChecker()
   const [isOpen, setIsOpen] = useState(false)
   const [resources, setResources] = useState<ResourceWithStatus[]>([])
@@ -49,9 +50,8 @@ export function AdminPanel() {
     try {
       // Get all resource keys from catalog
       const allResourceKeys = await catalogManager.getAllResourceKeys()
-      
-      console.log('[AdminPanel] Found resource keys:', allResourceKeys.length)
-      
+
+
       // Create dependency resolver
       const dependencyResolver = new DependencyResolver(
         catalogManager,
@@ -59,10 +59,10 @@ export function AdminPanel() {
         completenessChecker,
         false
       )
-      
+
       // Load data for each resource
       const resourcesData: ResourceWithStatus[] = []
-      
+
       for (const resourceKey of allResourceKeys) {
         // Get metadata for this resource
         const metadata = await catalogManager.getResourceMetadata(resourceKey)
@@ -70,13 +70,12 @@ export function AdminPanel() {
           console.warn('[AdminPanel] No metadata for:', resourceKey)
           continue
         }
-        
+
         const completeness = await completenessChecker.checkResource(resourceKey)
         const dependencies = await dependencyResolver.resolveDependencies(resourceKey)
-        
-        const resourceType = resourceTypeRegistry.get(metadata.type)
-        const priority = resourceType?.downloadPriority ?? 50
-        
+
+        const priority = getDownloadPriority(metadata.type)
+
         resourcesData.push({
           metadata,
           completeness,
@@ -84,7 +83,7 @@ export function AdminPanel() {
           priority
         })
       }
-      
+
       // Sort by priority then by name
       resourcesData.sort((a, b) => {
         if (a.priority !== b.priority) {
@@ -92,14 +91,8 @@ export function AdminPanel() {
         }
         return a.metadata.resourceKey.localeCompare(b.metadata.resourceKey)
       })
-      
+
       setResources(resourcesData)
-      console.log('[AdminPanel] Loaded resource data:', {
-        total: resourcesData.length,
-        complete: resourcesData.filter(r => r.completeness.isComplete).length,
-        incomplete: resourcesData.filter(r => !r.completeness.isComplete && r.completeness.status !== 'error').length,
-        errors: resourcesData.filter(r => r.completeness.status === 'error').length
-      })
     } catch (error) {
       console.error('[AdminPanel] Failed to load resources data:', error)
     } finally {
@@ -135,14 +128,14 @@ export function AdminPanel() {
         return false
       }
     }
-    
+
     // Status filter
     if (filterStatus !== 'all') {
       if (filterStatus === 'complete' && !r.completeness.isComplete) return false
       if (filterStatus === 'incomplete' && (r.completeness.isComplete || r.completeness.status === 'error')) return false
       if (filterStatus === 'error' && r.completeness.status !== 'error') return false
     }
-    
+
     return true
   })
 
@@ -230,10 +223,12 @@ export function AdminPanel() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
-          
+
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as any)}
+            onChange={(e) =>
+              setFilterStatus(e.target.value as 'all' | 'complete' | 'incomplete' | 'error')
+            }
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="all">All Status</option>
@@ -337,7 +332,7 @@ function ResourceCard({ resource, isExpanded, onToggle }: ResourceCardProps) {
         ) : (
           <ChevronRight className="w-5 h-5 text-gray-400 flex-shrink-0" />
         )}
-        
+
         <div className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-sm font-medium text-gray-900 truncate">

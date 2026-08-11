@@ -58,10 +58,7 @@ function shouldSkipVerification(resource: ResourceInfo): boolean {
   }
 
   // For all other resources, skip if entry-structured
-  const structure =
-    (resource as any).contentStructure ??
-    (resource as any).contentMetadata?.contentStructure
-  if (structure && structure !== 'book') return true
+  if (resource.contentStructure && resource.contentStructure !== 'book') return true
 
   if (subject.includes('open bible stories') || subject.includes('obs')) return true
   if (category === 'obs' || type === 'obs') return true
@@ -77,7 +74,7 @@ function shouldSkipVerification(resource: ResourceInfo): boolean {
 function parseResourceInfo(
   resource: ResourceInfo
 ): { owner: string; repoName: string; ingredients: IngredientItem[] } | null {
-  const key = resource.key ?? resource.id ?? (resource as any).resourceKey
+  const key = resource.key ?? resource.id ?? resource.resourceKey
   if (!key) return null
   const parts = String(key).split('/')
   if (parts.length !== 3) return null
@@ -127,7 +124,7 @@ export async function verifyResourceContents(
   let ref = knownRef ?? ''
   if (!ref) {
     try {
-      const repo = await (client as any).findRepository(owner, repoName, 'prod')
+      const repo = await client.findRepository(owner, repoName, 'prod')
       ref = repo?.release?.tag_name ?? repo?.default_branch ?? 'master'
     } catch {
       return { verifiedIngredients: ingredients, verifiedRef: '', treeFetched: false }

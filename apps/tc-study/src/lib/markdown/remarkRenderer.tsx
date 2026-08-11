@@ -15,11 +15,19 @@ import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 import { getRcLinkDisplayName, isRelativeLink, parseRcLink } from './rc-link-parser'
 
+/** Props shape for rehype-react element mappings (typed; no explicit any). */
+type MdElementProps = React.HTMLAttributes<HTMLElement> & {
+  href?: string
+  className?: string
+  children?: React.ReactNode
+}
+
 export interface MarkdownRendererOptions {
+
   allowDangerousHtml?: boolean
   linkTarget?: '_blank' | '_self'
   headerBaseLevel?: number
-  customComponents?: Record<string, React.ComponentType<any>>
+  customComponents?: Record<string, React.ComponentType<MdElementProps>>
   
   // Handler for internal links (rc links, relative paths, etc.)
   // linkText is the text content of the link (useful for parsing verse ranges)
@@ -32,7 +40,7 @@ export interface MarkdownRendererOptions {
 
 export class RemarkMarkdownRenderer {
   /** Plugin chain narrows `Processor<>` generics inconsistently across versions */
-  private processor: any = null
+  private processor: unknown = null
   private options: MarkdownRendererOptions
 
   constructor(options: MarkdownRendererOptions = {}) {
@@ -63,7 +71,7 @@ export class RemarkMarkdownRenderer {
         jsxs: prod.jsxs,
         components: {
           // Standard component mappings with Tailwind classes
-          a: (props: any) => {
+          a: (props: MdElementProps) => {
             const href = props.href || ''
             
             // Extract link text for passing to handler (useful for parsing verse ranges)
@@ -155,17 +163,17 @@ export class RemarkMarkdownRenderer {
               />
             )
           },
-          h1: (props: any) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 first:mt-0" />,
-          h2: (props: any) => <h2 {...props} className="text-xl font-semibold mb-3 mt-5" />,
-          h3: (props: any) => <h3 {...props} className="text-lg font-semibold mb-2 mt-4" />,
-          h4: (props: any) => <h4 {...props} className="text-base font-semibold mb-2 mt-3" />,
-          h5: (props: any) => <h5 {...props} className="text-sm font-semibold mb-1 mt-2" />,
-          h6: (props: any) => <h6 {...props} className="text-xs font-semibold mb-1 mt-2" />,
-          p: (props: any) => <p {...props} className="mb-4 last:mb-0 leading-relaxed" />,
-          ul: (props: any) => <ul {...props} className="mb-4 ml-6 list-disc space-y-1" />,
-          ol: (props: any) => <ol {...props} className="mb-4 ml-6 list-decimal space-y-1" />,
-          li: (props: any) => <li {...props} className="leading-relaxed" />,
-          code: (props: any) => {
+          h1: (props: MdElementProps) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 first:mt-0" />,
+          h2: (props: MdElementProps) => <h2 {...props} className="text-xl font-semibold mb-3 mt-5" />,
+          h3: (props: MdElementProps) => <h3 {...props} className="text-lg font-semibold mb-2 mt-4" />,
+          h4: (props: MdElementProps) => <h4 {...props} className="text-base font-semibold mb-2 mt-3" />,
+          h5: (props: MdElementProps) => <h5 {...props} className="text-sm font-semibold mb-1 mt-2" />,
+          h6: (props: MdElementProps) => <h6 {...props} className="text-xs font-semibold mb-1 mt-2" />,
+          p: (props: MdElementProps) => <p {...props} className="mb-4 last:mb-0 leading-relaxed" />,
+          ul: (props: MdElementProps) => <ul {...props} className="mb-4 ml-6 list-disc space-y-1" />,
+          ol: (props: MdElementProps) => <ol {...props} className="mb-4 ml-6 list-decimal space-y-1" />,
+          li: (props: MdElementProps) => <li {...props} className="leading-relaxed" />,
+          code: (props: MdElementProps) => {
             // Inline code (no className means inline)
             if (!props.className) {
               return (
@@ -175,29 +183,33 @@ export class RemarkMarkdownRenderer {
             // Code block (has className from language)
             return <code {...props} />
           },
-          pre: (props: any) => (
+          pre: (props: MdElementProps) => (
             <pre {...props} className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4 text-sm" />
           ),
-          blockquote: (props: any) => (
-            <blockquote {...props} className="border-l-4 border-blue-300 pl-4 italic mb-4 text-gray-700 dark:text-gray-300" />
+          blockquote: (props: MdElementProps) => (
+            <blockquote
+              {...props}
+              // Modal stays bg-white; avoid dark:text-* (OS dark → light text on white).
+              className="border-l-4 border-blue-300 pl-4 italic mb-4 text-slate-900 [&_p]:text-slate-900 [&_em]:text-inherit [&_strong]:text-inherit [&_blockquote]:text-slate-900 [&_blockquote_p]:text-slate-900"
+            />
           ),
-          strong: (props: any) => <strong {...props} className="font-semibold" />,
-          em: (props: any) => <em {...props} className="italic" />,
-          hr: (props: any) => <hr {...props} className="my-6 border-t border-gray-300" />,
+          strong: (props: MdElementProps) => <strong {...props} className="font-semibold" />,
+          em: (props: MdElementProps) => <em {...props} className="italic" />,
+          hr: (props: MdElementProps) => <hr {...props} className="my-6 border-t border-gray-300" />,
           
           // Table components (GitHub Flavored Markdown)
-          table: (props: any) => (
+          table: (props: MdElementProps) => (
             <div className="overflow-x-auto mb-4">
               <table {...props} className="min-w-full border-collapse border border-gray-300 dark:border-gray-700" />
             </div>
           ),
-          thead: (props: any) => <thead {...props} className="bg-gray-50 dark:bg-gray-800" />,
-          tbody: (props: any) => <tbody {...props} />,
-          tr: (props: any) => <tr {...props} className="border-b border-gray-200 dark:border-gray-700" />,
-          th: (props: any) => (
+          thead: (props: MdElementProps) => <thead {...props} className="bg-gray-50 dark:bg-gray-800" />,
+          tbody: (props: MdElementProps) => <tbody {...props} />,
+          tr: (props: MdElementProps) => <tr {...props} className="border-b border-gray-200 dark:border-gray-700" />,
+          th: (props: MdElementProps) => (
             <th {...props} className="border border-gray-300 dark:border-gray-700 px-4 py-2 text-left font-semibold" />
           ),
-          td: (props: any) => (
+          td: (props: MdElementProps) => (
             <td {...props} className="border border-gray-300 dark:border-gray-700 px-4 py-2" />
           ),
           
@@ -227,9 +239,11 @@ export class RemarkMarkdownRenderer {
     // Preprocess content
     const preprocessedContent = this.preprocessContent(content)
 
-    const processor = this.initializeProcessor()
-    const file = await processor!.process(preprocessedContent)
-    
+    const processor = this.initializeProcessor() as {
+      process: (content: string) => Promise<{ result: unknown }>
+    }
+    const file = await processor.process(preprocessedContent)
+
     return file.result as React.ReactNode
   }
 

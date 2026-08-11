@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
+import { useWizardStore } from '../../lib/stores/wizardStore'
 import { useCatalogManager } from '../../contexts'
 import { useDoor43Data } from '../../hooks'
 import { Loader2, Database, Wifi, Globe, AlertCircle, RefreshCw } from 'lucide-react'
@@ -12,36 +12,36 @@ import { SelectableGridWithStatus } from '../shared/SelectableGrid'
 
 export function LanguageSelectorStep() {
   const [searchQuery, setSearchQuery] = useState('')
-  
+
   const catalogManager = useCatalogManager()
-  const selectedLanguages = useWorkspaceStore((state) => state.selectedLanguages)
-  const toggleLanguage = useWorkspaceStore((state) => state.toggleLanguage)
-  const setAvailableLanguages = useWorkspaceStore((state) => state.setAvailableLanguages)
+  const selectedLanguages = useWizardStore((state) => state.selectedLanguages)
+  const toggleLanguage = useWizardStore((state) => state.toggleLanguage)
+  const setAvailableLanguages = useWizardStore((state) => state.setAvailableLanguages)
 
   // Use shared hook for Door43 data fetching
   const { data: languages, loading: isLoading, error, retry } = useDoor43Data({
     fetchFn: async (client, filters) => {
-      console.log('🔍 Loading languages with filters:', filters)
-      
+
+
       // Get Door43 languages first (to get proper names)
       const door43Langs = await client.getLanguages(filters)
-      console.log('🌐 Found', door43Langs.length, 'languages from Door43')
-      console.log('   (filtered by', filters.subjects?.length || 0, 'supported subjects)')
-      
+
+
+
       // Create a map of language codes to names from Door43
       const door43NameMap = new Map<string, string>()
       for (const lang of door43Langs) {
         door43NameMap.set(lang.code, lang.name || lang.code.toUpperCase())
       }
-      
+
       // Get catalog languages and use Door43 names if available
       const catalogStats = await catalogManager.getCatalogStats()
       const catalogLanguageCodes = Object.keys(catalogStats.byLanguage)
-      console.log('📚 Found', catalogLanguageCodes.length, 'languages in local catalog')
-      
+
+
       // Merge and deduplicate
       const languageMap = new Map<string, { code: string; name: string; source: 'catalog' | 'door43' }>()
-      
+
       // Add catalog languages with proper names from Door43
       for (const code of catalogLanguageCodes) {
         languageMap.set(code, {
@@ -50,7 +50,7 @@ export function LanguageSelectorStep() {
           source: 'catalog'
         })
       }
-      
+
       // Add remaining Door43 languages that aren't in catalog
       for (const lang of door43Langs) {
         if (!languageMap.has(lang.code)) {
@@ -61,18 +61,18 @@ export function LanguageSelectorStep() {
           })
         }
       }
-      
+
       const merged = Array.from(languageMap.values()).sort((a, b) => a.name.localeCompare(b.name))
-      
+
       // Update workspace store
       setAvailableLanguages(merged)
-      
-      const catalogCount = Array.from(languageMap.values()).filter(l => l.source === 'catalog').length
-      console.log('✅ Total unique languages:', merged.length)
-      console.log('   From catalog:', catalogCount)
-      console.log('   From Door43:', door43Langs.length)
-      console.log('   Merged (deduplicated):', merged.length)
-      
+
+      const _catalogCount = Array.from(languageMap.values()).filter(l => l.source === 'catalog').length
+
+
+
+
+
       return merged
     },
     dependencies: [],
@@ -96,7 +96,7 @@ export function LanguageSelectorStep() {
       </div>
     )
   }
-  
+
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -112,7 +112,7 @@ export function LanguageSelectorStep() {
       </div>
     )
   }
-  
+
   return (
     <div>
       {/* Search */}
@@ -140,7 +140,7 @@ export function LanguageSelectorStep() {
             onToggle={toggleLanguage}
             getKey={(lang) => lang.code}
             getStatus={() => 'cached'}
-            renderItem={(lang, isSelected, status) => (
+            renderItem={(lang, _isSelected, _status) => (
               <>
                 <div className="font-semibold text-gray-900 mb-0.5">{lang.name}</div>
                 <div className="text-sm text-gray-500">{lang.code}</div>
@@ -160,7 +160,7 @@ export function LanguageSelectorStep() {
             onToggle={toggleLanguage}
             getKey={(lang) => lang.code}
             getStatus={() => 'online'}
-            renderItem={(lang, isSelected, status) => (
+            renderItem={(lang, _isSelected, _status) => (
               <>
                 <div className="font-semibold text-gray-900 mb-0.5">{lang.name}</div>
                 <div className="text-sm text-gray-500">{lang.code}</div>

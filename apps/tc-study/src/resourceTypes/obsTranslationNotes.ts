@@ -12,7 +12,9 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { TranslationNotesLoader } from '@bt-synergy/translation-notes-loader'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { TranslationNotesViewer } from '../components/resources/TranslationNotesViewer'
+import { asResourceViewer } from './asResourceViewer'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const obsTranslationNotesResourceType: ResourceTypeDefinition = defineResourceType({
@@ -39,10 +41,10 @@ export const obsTranslationNotesResourceType: ResourceTypeDefinition = defineRes
     debug: false,
   },
 
-  downloadPriority: 3,
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.OBS_NOTES),
 
   // ===== UI LAYER =====
-  viewer: TranslationNotesViewer as any,
+  viewer: asResourceViewer(TranslationNotesViewer),
 
   // ===== FEATURES =====
   features: {

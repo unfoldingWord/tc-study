@@ -1,54 +1,123 @@
 /**
- * Hook for loading and managing Table of Contents (TOC) and available books
+ * Hook for loading and managing Table of Contents (TOC) and available books.
+ *
+ * Prefer Phase-1 AppStore ingredients so scripture content can load on language
+ * switch before catalog metadata is written (Phase 2).
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { useApp, useCatalogManager, useNavigation } from '../../../../contexts'
 import type { BookInfo, ResourceTOC } from '../../../../contexts/types-only'
+import { buildBookInfosFromIngredients } from '../../../../features/nav/bcvNavHelpers'
 import { defaultSectionsService } from '../../../../lib/services/default-sections'
-import {
-  getStandardBookOrderIndex,
-  getStandardVerseCount,
-} from '../../../../lib/versification'
+import { isOriginalLanguageResource } from '../../../../utils/resourceHelpers'
 
-export function useTOC(
-  resourceKey: string,
+type IngredientLike = { identifier?: string; title?: string }
+
+function hasGatewayScripture(
+  loaded: Record<
+    string,
+    | {
+        type?: unknown
+        category?: unknown
+        language?: string
+        languageCode?: string
+        subject?: string
+      }
+    | undefined
+  >
+): boolean {
+  return Object.values(loaded).some((r) => {
+    if (!r) return false
+    const isScripture =
+      String(r.category ?? '').toLowerCase() === 'scripture' ||
+      String(r.type ?? '').toLowerCase() === 'scripture'
+    if (!isScripture) return false
+    const lang = r.languageCode || r.language || ''
+    return !isOriginalLanguageResource(lang, r.subject || '')
+  })
+}
+
+function ingredientsFromLoadedResource(
+  loaded: Record<string, { verifiedIngredients?: IngredientLike[]; ingredients?: IngredientLike[] } | undefined>,
   resourceId: string,
+  resourceKey: string
+): IngredientLike[] {
+  const self = loaded[resourceId] || loaded[resourceKey]
+  if (!self) return []
+  if (self.verifiedIngredients && self.verifiedIngredients.length > 0) {
+    return self.verifiedIngredients
+  }
+  if (self.ingredients && self.ingredients.length > 0) {
+    return self.ingredients
+  }
+  return []
+}
+
+function shouldBecomeAnchor(options: {
   isAnchor?: boolean
-) {
+  selfIsOriginal: boolean
+  anchorResourceId: string | null | undefined
+  loadedResources: Record<
+    string,
+    { language?: string; languageCode?: string; subject?: string } | undefined
+  >
+}): boolean {
+  const { isAnchor, selfIsOriginal, anchorResourceId, loadedResources } = options
+  if (isAnchor) return true
+
+  // Original-language must not win the anchor race over gateway scripture.
+  if (selfIsOriginal && hasGatewayScripture(loadedResources)) return false
+
+  if (!anchorResourceId) return true
+
+  const current = loadedResources[anchorResourceId]
+  const currentLang = current?.languageCode || current?.language || ''
+  const currentIsOl = isOriginalLanguageResource(currentLang, current?.subject || '')
+  // Gateway scripture may replace an OL-only anchor after language switch.
+  return currentIsOl && !selfIsOriginal
+}
+
+export function useTOC(resourceKey: string, resourceId: string, isAnchor?: boolean) {
   const catalogManager = useCatalogManager()
   const app = useApp()
   const navigation = useNavigation()
   const [availableBooks, setAvailableBooks] = useState<BookInfo[]>([])
   const [loadedTOC, setLoadedTOC] = useState<ResourceTOC | null>(null)
-  const [isLoadingTOC, setIsLoadingTOC] = useState(true) // true until first metadata load completes
-  const tocSetRef = useRef(false) // Track if TOC has been set to prevent infinite loops
+  const [isLoadingTOC, setIsLoadingTOC] = useState(true)
+  const tocSetRef = useRef(false)
   const [catalogCheckTrigger, setCatalogCheckTrigger] = useState(0)
   const metadataCheckIntervalRef = useRef<number | undefined>(undefined)
 
-  // Poll catalog until metadata is available (for Phase 2 background loading).
-  // Only start polling after initial TOC load has completed with no books, to avoid overlapping work and re-render thrashing.
+  // Re-trigger TOC when Phase-1 ingredients appear or catalog metadata lands.
   useEffect(() => {
     const checkForMetadata = async () => {
       try {
+        const local = ingredientsFromLoadedResource(app.loadedResources, resourceId, resourceKey)
+        if (local.length > 0) {
+          setCatalogCheckTrigger((prev) => prev + 1)
+          if (metadataCheckIntervalRef.current) {
+            clearInterval(metadataCheckIntervalRef.current)
+            metadataCheckIntervalRef.current = undefined
+          }
+          return
+        }
         const metadata = await catalogManager.getResourceMetadata(resourceKey)
         if (metadata?.contentMetadata?.ingredients && metadata.contentMetadata.ingredients.length > 0) {
-          // Metadata is available! Trigger TOC reload
-          setCatalogCheckTrigger(prev => prev + 1)
+          setCatalogCheckTrigger((prev) => prev + 1)
           if (metadataCheckIntervalRef.current) {
             clearInterval(metadataCheckIntervalRef.current)
             metadataCheckIntervalRef.current = undefined
           }
         }
-      } catch (err) {
-        // Ignore errors during polling
+      } catch {
+        // Ignore polling errors
       }
     }
 
-    // Only poll when initial load is done and we still have no books (5s interval to reduce thrashing)
     if (!isLoadingTOC && availableBooks.length === 0) {
       checkForMetadata()
-      metadataCheckIntervalRef.current = window.setInterval(checkForMetadata, 5000)
+      metadataCheckIntervalRef.current = window.setInterval(checkForMetadata, 2000)
     }
 
     return () => {
@@ -56,95 +125,76 @@ export function useTOC(
         clearInterval(metadataCheckIntervalRef.current)
       }
     }
-  }, [resourceKey, catalogManager, availableBooks.length, isLoadingTOC])
+  }, [
+    resourceKey,
+    resourceId,
+    catalogManager,
+    availableBooks.length,
+    isLoadingTOC,
+    app.loadedResources,
+  ])
 
   useEffect(() => {
     let cancelled = false
 
+    const applyBooks = async (ingredients: IngredientLike[]) => {
+      const books = buildBookInfosFromIngredients(ingredients)
+      if (!books.length) return
+
+      setAvailableBooks(books)
+
+      const toc: ResourceTOC = {
+        resourceId,
+        resourceType: 'scripture',
+        books,
+      }
+      setLoadedTOC(toc)
+
+      const self = app.loadedResources[resourceId] || app.loadedResources[resourceKey]
+      const selfLang = self?.languageCode || self?.language || ''
+      const selfIsOriginal = isOriginalLanguageResource(selfLang, self?.subject || '')
+
+      if (
+        !tocSetRef.current &&
+        shouldBecomeAnchor({
+          isAnchor,
+          selfIsOriginal,
+          anchorResourceId: app.anchorResourceId,
+          loadedResources: app.loadedResources,
+        })
+      ) {
+        app.setAnchorResource(resourceId, toc)
+        if (!(selfIsOriginal && hasGatewayScripture(app.loadedResources))) {
+          navigation.setAvailableBooks(books)
+        }
+        const currentBook = navigation.currentReference.book
+        const sections = await defaultSectionsService.getDefaultSections(currentBook)
+        if (!cancelled && sections.length > 0) {
+          navigation.setBookSections(currentBook, sections)
+        }
+        tocSetRef.current = true
+      }
+    }
+
     const loadTOC = async () => {
       setIsLoadingTOC(true)
       try {
-        // Get resource metadata to find available books
+        const localIngredients = ingredientsFromLoadedResource(
+          app.loadedResources,
+          resourceId,
+          resourceKey
+        )
+        if (localIngredients.length > 0) {
+          if (!cancelled) await applyBooks(localIngredients)
+          return
+        }
+
         const metadata = await catalogManager.getResourceMetadata(resourceKey)
-        
         if (cancelled) return
 
-        if (metadata && metadata.contentMetadata?.ingredients) {
-          // Extract book codes from ingredients
-          const ingredients = metadata.contentMetadata.ingredients
-          const bookCodes = new Set<string>()
-
-          // Scripture resources have ingredients with identifiers as 3-letter codes (e.g., 'gen', 'exo', 'mat')
-          // The path field contains the full file path (e.g., '01-GEN.usfm', '41-MAT.usfm')
-          ingredients.forEach((ing: any) => {
-            const identifier = ing.identifier
-            if (!identifier) return
-
-            // Normalize to lowercase
-            const normalizedId = identifier.toLowerCase()
-
-            // Book codes should be 2-4 characters (e.g., 'gen', 'exo', 'mat', 'jude')
-            if (normalizedId && normalizedId.length >= 2 && normalizedId.length <= 4) {
-              bookCodes.add(normalizedId)
-            }
-          })
-
-          // Convert to BookInfo array (use ingredient.title when catalog provides it)
-          const books: BookInfo[] = Array.from(bookCodes)
-            .map((code) => {
-              const bookIngredients = ingredients.filter((ing: any) =>
-                ing.identifier?.toLowerCase() === code
-              )
-              const chapters = bookIngredients.length || 1
-              const verses = getStandardVerseCount(code)
-              const name = bookIngredients[0]?.title || code.toUpperCase()
-              const primaryOrder = getStandardBookOrderIndex(code)
-
-              return {
-                code,
-                name, // From catalog ingredient.title when available
-                chapters: verses?.length || chapters,
-                verses,
-                primaryOrder,
-              }
-            })
-            .sort((a, b) => {
-              if (a.primaryOrder !== b.primaryOrder) return a.primaryOrder - b.primaryOrder
-              return a.code.localeCompare(b.code)
-            })
-            .map(({ primaryOrder: _p, ...book }) => book)
-
-          setAvailableBooks(books)
-
-          // Store TOC for potential activation
-            const toc: ResourceTOC = {
-              resourceId,
-              resourceType: 'scripture',
-              books,
-            }
-          setLoadedTOC(toc)
-
-          // Auto-set as anchor if:
-          // 1. Explicitly marked as anchor (isAnchor prop)
-          // 2. OR no anchor resource exists yet (first scripture resource wins)
-          const shouldSetAsAnchor = (isAnchor || !app.anchorResourceId) && !tocSetRef.current
-          
-          if (shouldSetAsAnchor) {
-            app.setAnchorResource(resourceId, toc)
-            navigation.setAvailableBooks(books)
-            
-            // Load default sections for the current book (will be replaced by content sections when content loads)
-            const currentBook = navigation.currentReference.book
-            const sections = await defaultSectionsService.getDefaultSections(currentBook)
-            if (!cancelled && sections.length > 0) {
-              navigation.setBookSections(currentBook, sections)
-            }
-            
-            tocSetRef.current = true
-          }
-
-          // Note: Auto-navigation to first book should be handled by parent component
-          // if current book isn't available
+        const catalogIngredients = metadata?.contentMetadata?.ingredients
+        if (catalogIngredients && catalogIngredients.length > 0) {
+          await applyBooks(catalogIngredients)
         } else {
           console.warn('⚠️ No ingredients found in metadata for resource:', resourceKey)
           setAvailableBooks([])
@@ -155,9 +205,7 @@ export function useTOC(
         setAvailableBooks([])
         setLoadedTOC(null)
       } finally {
-        if (!cancelled) {
-          setIsLoadingTOC(false)
-        }
+        if (!cancelled) setIsLoadingTOC(false)
       }
     }
 
@@ -168,31 +216,26 @@ export function useTOC(
     }
   }, [resourceKey, catalogManager, isAnchor, resourceId, app, navigation, catalogCheckTrigger])
 
-  // Reset TOC set flag when resource changes
   useEffect(() => {
     tocSetRef.current = false
   }, [resourceId])
 
-  // Function to manually set this resource as anchor
   const setAsAnchor = async () => {
-    if (loadedTOC) {
-      // Update AppContext
-      app.setAnchorResource(resourceId, loadedTOC)
-      // Update NavigationContext with the available books
+    if (!loadedTOC) return
+    app.setAnchorResource(resourceId, loadedTOC)
+    const self = app.loadedResources[resourceId] || app.loadedResources[resourceKey]
+    const selfLang = self?.languageCode || self?.language || ''
+    const selfIsOriginal = isOriginalLanguageResource(selfLang, self?.subject || '')
+    if (!(selfIsOriginal && hasGatewayScripture(app.loadedResources))) {
       navigation.setAvailableBooks(loadedTOC.books)
-
-      // Load default sections for the current book (will be replaced by content sections when content loads)
-      const currentBook = navigation.currentReference.book
-      const sections = await defaultSectionsService.getDefaultSections(currentBook)
-      if (sections.length > 0) {
-        navigation.setBookSections(currentBook, sections)
-      }
-
-      tocSetRef.current = true
     }
+    const currentBook = navigation.currentReference.book
+    const sections = await defaultSectionsService.getDefaultSections(currentBook)
+    if (sections.length > 0) {
+      navigation.setBookSections(currentBook, sections)
+    }
+    tocSetRef.current = true
   }
 
   return { availableBooks, isLoadingTOC, setAsAnchor }
 }
-
-

@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "echo \"Tests coming soon\""
+    "test": "node -e \"console.error('ERROR: translation-notes-loader has no real tests'); process.exit(1)\""
   },
   "keywords": [
     "translation",

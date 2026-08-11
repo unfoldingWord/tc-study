@@ -6,7 +6,7 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { TranslationAcademyLoader, generateTAIngredients } from '@bt-synergy/translation-academy-loader'
-import { TranslationAcademyViewer } from '../components/resources/TranslationAcademyViewer'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const translationAcademyResourceType: ResourceTypeDefinition = defineResourceType({
@@ -31,8 +31,7 @@ export const translationAcademyResourceType: ResourceTypeDefinition = defineReso
     debug: false,
   },
   
-  // Download priority for background downloading
-  downloadPriority: 30, // Less critical than scripture and words
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.TRANSLATION_ACADEMY),
   
   /**
    * Ingredients generator for Translation Academy
@@ -44,7 +43,7 @@ export const translationAcademyResourceType: ResourceTypeDefinition = defineReso
    * 
    * This ensures complete ingredients even when catalog API doesn't provide them.
    */
-  ingredientsGenerator: async (door43Resource: any, door43Client: any) => {
+  ingredientsGenerator: async (door43Resource, door43Client) => {
     const { owner, language, id: resourceId } = door43Resource
     
     // Get the release tag from the Door43 Catalog API response
@@ -52,16 +51,6 @@ export const translationAcademyResourceType: ResourceTypeDefinition = defineReso
     // Priority: release.tag_name (from catalog API) > master
     const ref = door43Resource.release?.tag_name || 'master'
     
-    console.log(`🔍 TA Ingredients Generator - Resource info:`, {
-      owner,
-      language,
-      resourceId,
-      releaseTag: door43Resource.release?.tag_name,
-      releaseObject: door43Resource.release,
-      version: door43Resource.version,
-      selectedRef: ref,
-      hasRelease: !!door43Resource.release
-    })
     
     // Use the shared generateTAIngredients function
     // It returns { ingredients, fileCount, method }, we need just ingredients
@@ -74,18 +63,12 @@ export const translationAcademyResourceType: ResourceTypeDefinition = defineReso
       debug: true, // Enable debug to see what's happening
     })
     
-    console.log(`🔨 TA Ingredients generation result:`, {
-      ingredientCount: result.ingredients?.length || 0,
-      fileCount: result.fileCount,
-      method: result.method,
-      sample: result.ingredients?.slice(0, 3)
-    })
     
     return result.ingredients
   },
   
   // ===== UI LAYER =====
-  viewer: TranslationAcademyViewer,
+  // Modal-only: no panel viewer (articles open via EntryViewerRegistry)
   
   // ===== FEATURES =====
   features: {
@@ -119,5 +102,3 @@ export const translationAcademyResourceType: ResourceTypeDefinition = defineReso
   license: 'MIT',
 })
 
-// Re-export for convenience
-export { TranslationAcademyViewer } from '../components/resources/TranslationAcademyViewer'

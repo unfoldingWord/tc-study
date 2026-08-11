@@ -4,12 +4,17 @@ import {
   buildReadRouteTailFromNavigation,
   formatBibleNavRef,
   formatObsFrameRangeNavRef,
+  isBibleNavType,
+  isKnownBibleBookCode,
   navigationModeFromReadNav,
+  parseBibleBookOnlyNavRef,
   parseBibleNavRef,
   parseBibleSectionNavRef,
   parseObsFrameNavRef,
   parseObsFrameRangeNavRef,
   parseObsStoryNavRef,
+  resolveDefaultStartForBook,
+  resolveReadRouteFromParams,
   slugifyReadNavSegment,
 } from './readRoutes'
 
@@ -92,5 +97,97 @@ describe('readRoutes', () => {
         section1Based: null,
       })
     ).toEqual({ resourceType: 'obs', navType: 'ref', navRef: '1.8-1.10' })
+  })
+
+  test('isKnownBibleBookCode / parseBibleBookOnlyNavRef', () => {
+    expect(isKnownBibleBookCode('3jn')).toBe(true)
+    expect(isKnownBibleBookCode('GEN')).toBe(true)
+    expect(isKnownBibleBookCode('ref')).toBe(false)
+    expect(isKnownBibleBookCode('xyz')).toBe(false)
+    expect(parseBibleBookOnlyNavRef('3JN')).toBe('3jn')
+    expect(parseBibleBookOnlyNavRef('tit 1')).toBeNull()
+    expect(parseBibleBookOnlyNavRef('chapter')).toBeNull()
+    expect(isBibleNavType('ref')).toBe(true)
+    expect(isBibleNavType('3jn')).toBe(false)
+  })
+
+  test('resolveDefaultStartForBook by nav mode', () => {
+    expect(resolveDefaultStartForBook('3jn', 'ref')).toEqual({
+      kind: 'ref',
+      ref: { book: '3jn', chapter: 1, verse: 1 },
+    })
+    expect(resolveDefaultStartForBook('3jn', 'chapter')).toEqual({
+      kind: 'ref',
+      ref: { book: '3jn', chapter: 1, verse: 1 },
+    })
+    expect(resolveDefaultStartForBook('3jn', 'passage')).toEqual({
+      kind: 'ref',
+      ref: { book: '3jn', chapter: 1, verse: 1 },
+    })
+    expect(resolveDefaultStartForBook('3jn', 'section')).toEqual({
+      kind: 'section',
+      book: '3jn',
+      section1Based: 1,
+    })
+    expect(resolveDefaultStartForBook('not-a-book', 'ref')).toBeNull()
+  })
+
+  test('resolveReadRouteFromParams book-only and OBS story shorthand', () => {
+    expect(
+      resolveReadRouteFromParams({
+        languageCode: 'es-419',
+        resourceType: 'bible',
+        navType: '3jn',
+      })
+    ).toEqual({
+      readRouteTail: { resourceType: 'bible', navRef: '3jn' },
+      partialRouteHint: undefined,
+    })
+
+    expect(
+      resolveReadRouteFromParams({
+        languageCode: 'es-419',
+        resourceType: 'bible',
+        navType: 'section',
+        navRef: '3jn',
+      })
+    ).toEqual({
+      readRouteTail: { resourceType: 'bible', navType: 'section', navRef: '3jn' },
+      partialRouteHint: undefined,
+    })
+
+    expect(
+      resolveReadRouteFromParams({
+        languageCode: 'es-419',
+        resourceType: 'bible',
+        navType: 'chapter',
+      })
+    ).toEqual({
+      readRouteTail: null,
+      partialRouteHint: { resourceType: 'bible', navType: 'chapter' },
+    })
+
+    expect(
+      resolveReadRouteFromParams({
+        languageCode: 'es-419',
+        resourceType: 'obs',
+        navType: '12',
+      })
+    ).toEqual({
+      readRouteTail: { resourceType: 'obs', navType: 'story', navRef: '12' },
+      partialRouteHint: undefined,
+    })
+
+    expect(
+      resolveReadRouteFromParams({
+        languageCode: 'es-419',
+        resourceType: 'bible',
+        navType: 'ref',
+        navRef: '3jn%201%3A1',
+      })
+    ).toEqual({
+      readRouteTail: { resourceType: 'bible', navType: 'ref', navRef: '3jn 1:1' },
+      partialRouteHint: undefined,
+    })
   })
 })

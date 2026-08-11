@@ -4,9 +4,11 @@
 
 The Panel System Test page at `/test/panels` provides a comprehensive testing environment for the linked-panels system, with a focus on **two-way resource switching and signal propagation**.
 
+> **DEV-only:** The route is gated by `import.meta.env.DEV` in `App.tsx` and is not registered in production builds.
+
 ## Accessing the Test Page
 
-Navigate to: `http://localhost:3001/test/panels`
+Navigate to: `http://localhost:5173/test/panels` (local Vite DEV server only)
 
 ## What's Been Implemented
 
@@ -60,7 +62,7 @@ Each mock test resource displays:
 
 ### Scenario 1: Simple Signal Propagation
 
-1. Go to `/test/panels` in Mock Resources mode
+1. Go to DEV-only `/test/panels` in Mock Resources mode
 2. Panel 1 starts with `test-1`, Panel 2 starts with `test-1`
 3. In Panel 1, click "Token Click"
 4. Observe: Panel 2 receives the message (shows in "Received" counter)
@@ -213,4 +215,4 @@ useEvents(resourceId, (message) => {
 - Test Page: `apps/tc-study/src/components/test/PanelSystemTest.tsx`
 - Message Plugins: `apps/tc-study/src/plugins/messageTypePlugins.ts`
 - Message Types: `apps/tc-study/src/plugins/types.ts`
-- Route: `apps/tc-study/src/App.tsx` (line with `/test/panels` route)
+- Route: `apps/tc-study/src/App.tsx` (`import.meta.env.DEV` gated `/test/panels` route)

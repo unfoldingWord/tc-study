@@ -1,6 +1,6 @@
 /**
  * ScriptureViewer - Main component for displaying scripture with proper USFM parsing
- * 
+ *
  * Features:
  * - Loads content based on current reference
  * - Tokenizes for inter-panel communication
@@ -10,35 +10,35 @@
  * - Uses ProcessedScripture format from @bt-synergy/usfm-processor
  */
 
+import { useSignalHandler } from '@bt-synergy/resource-panels'
 import { Book } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useEvents } from 'linked-panels'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
 import { useCatalogManager, useCurrentReference, useNavigation } from '../../../contexts'
 import type { ResourceMetadata } from '../../../contexts/types'
-import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
+import { useWizardStore } from '../../../lib/stores/wizardStore'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getBookTitle } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { ScriptureContent } from './components'
-import { useContent, useContentRequests, useHighlighting, useScriptureEvents, useTOC, useTokenBroadcast, useUnderlinedTokens } from './hooks'
+import { useContent, useHighlighting, useTOC, useTokenBroadcast, useUnderlinedTokens } from './hooks'
 import type { ScriptureViewerProps } from './types'
 
 export function ScriptureViewer({
   resourceId,
   resourceKey,
   resource,
-  server = 'git.door43.org',
-  owner = 'unfoldingWord',
+  server: _server = 'git.door43.org',
+  owner: _owner = 'unfoldingWord',
   language = 'es',
-  resourceType = 'bible',
+  resourceType: _resourceType = 'bible',
   isAnchor,
 }: ScriptureViewerProps) {
   const currentRef = useCurrentReference()
   const { navigateToReference } = useNavigation()
   const catalogManager = useCatalogManager()
-  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
+  const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const [catalogMetadata, setCatalogMetadata] = useState<ResourceMetadata | null>(null)
 
   // Track if we've set this resource as anchor to prevent repeated calls
@@ -47,7 +47,7 @@ export function ScriptureViewer({
   // Load catalog metadata
   useEffect(() => {
     let cancelled = false
-    
+
     const loadCatalogMetadata = async () => {
       try {
         const metadata = await catalogManager.getResourceMetadata(resourceKey)
@@ -58,9 +58,9 @@ export function ScriptureViewer({
         console.error('Failed to load catalog metadata:', err)
       }
     }
-    
+
     loadCatalogMetadata()
-    
+
     return () => {
       cancelled = true
     }
@@ -69,11 +69,15 @@ export function ScriptureViewer({
   // Load TOC and available books
   const { availableBooks, isLoadingTOC, setAsAnchor } = useTOC(resourceKey, resourceId, isAnchor)
 
-  // Register as last active scripture when this viewer is mounted (so book titles use our ingredients)
+  // Register as last active scripture when this viewer is mounted (so book titles use our ingredients).
+  // On leave: only clear if we still own lastActive; fall back to anchor so sibling scripture can publish tokens.
   useEffect(() => {
     useAppStore.getState().setLastActiveScriptureResource(resourceId)
     return () => {
-      useAppStore.getState().setLastActiveScriptureResource(null)
+      const app = useAppStore.getState()
+      if (app.lastActiveScriptureResourceId === resourceId) {
+        app.setLastActiveScriptureResource(app.anchorResourceId)
+      }
     }
   }, [resourceId])
 
@@ -85,17 +89,20 @@ export function ScriptureViewer({
     }
   }, [resourceId, availableBooks.length, setAsAnchor])
 
+  // Prefer resource.language over the prop default ('es') so OL resources
+  // (el-x-koine / hbo) correctly detect isOriginalLanguage on /read.
+  const languageCode = resource?.language ?? language
+
   // Load content for current book/chapter
   const {
     loadedContent,
     isLoading,
     error,
-    currentChapter,
+    currentChapter: _currentChapter,
     displayVerses,
-  } = useContent(resourceKey, availableBooks, language)
-  
+  } = useContent(resourceKey, availableBooks, languageCode)
+
   // Language direction: catalog first, then list-languages, then known RTL codes (so /read/ar works before APIs load)
-  const languageCode = resource?.language ?? language
   const languageFromList = availableLanguages.find((l) => l.code === languageCode)
   const languageDirection = getLanguageDirection(
     catalogMetadata?.languageDirection ?? undefined,
@@ -112,7 +119,7 @@ export function ScriptureViewer({
     effectiveResource.languageName ??
     (catalogMetadata as ResourceMetadata & { language_title?: string })?.language_title ??
     effectiveResource.language ??
-    language
+    languageCode
   const currentBookTitle = getBookTitle(effectiveResource, currentRef.book)
 
   // Must come before useHighlighting so the coverage set is available for click decisions
@@ -124,17 +131,11 @@ export function ScriptureViewer({
     selectedTokenId,
     handleTokenClick,
     handleVerseFilter,
-  } = useHighlighting(resourceId, language, underlinedSemanticIds)
+  } = useHighlighting(resourceId, languageCode, underlinedSemanticIds)
 
-  // Handle inter-panel events
-  useScriptureEvents(resourceId)
-  
   // Listen for verse-navigation signals (from modals, other panels, etc.)
   const handleVerseNavigation = useCallback((signal: VerseNavigationSignal) => {
-    console.log('[ScriptureViewer] Received verse-navigation signal:', signal.verse)
-
     const { book, chapter, verse, endChapter, endVerse } = signal.verse
-
     navigateToReference({
       book: book || currentRef.book,
       chapter: chapter ?? currentRef.chapter,
@@ -142,39 +143,21 @@ export function ScriptureViewer({
       endChapter: endChapter ?? currentRef.endChapter,
       endVerse: endVerse ?? currentRef.endVerse,
     })
-
-    console.log('[ScriptureViewer] Navigated to:', {
-      book,
-      chapter,
-      verse,
-      endChapter,
-      endVerse,
-    })
   }, [navigateToReference, currentRef.book, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
 
-  useEvents(
+  useSignalHandler<VerseNavigationSignal>(
+    'verse-navigation',
     resourceId,
-    ['verse-navigation'],
-    handleVerseNavigation as (payload: any) => void
+    handleVerseNavigation
   )
 
-  // Handle content requests from other panels (e.g., TWL viewer)
-  // DEPRECATED: This will be removed in favor of broadcast approach
-  useContentRequests({
-    resourceId,
-    resourceKey,
-    loadedContent,
-    language,
-  })
-
-  // Broadcast tokens to other panels (new broadcast approach)
+  // Token STATE only — request/response content path is quarantined
   // Broadcast ALL verses in current chapter for TWL/TN to have complete data
-  // This allows help resources to show links for the entire chapter
   useTokenBroadcast({
     resourceId,
     resourceKey,
     loadedContent,
-    language,
+    language: languageCode,
     languageDirection,
     currentChapter: currentRef.chapter || 1,
     currentVerse: 1, // Start from verse 1
@@ -197,15 +180,15 @@ export function ScriptureViewer({
 
   return (
     <div className="h-full flex flex-col" dir={languageDirection}>
-      <ResourceViewerHeader 
+      <ResourceViewerHeader
         title={resource.title}
         subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}
         icon={Book}
         direction={languageDirection}
       />
-      
-      <div 
-        className="flex-1 p-6 relative cursor-pointer" 
+
+      <div
+        className="flex-1 p-6 relative cursor-pointer bg-white"
         onClick={handleViewerClick}
         role="button"
         tabIndex={0}
@@ -232,7 +215,7 @@ export function ScriptureViewer({
           onTokenClick={handleTokenClick}
           onVerseClick={handleVerseClick}
           onChapterClick={handleChapterClick}
-          language={language}
+          language={languageCode}
           languageDirection={languageDirection}
         />
         </div>

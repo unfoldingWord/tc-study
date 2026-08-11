@@ -2,17 +2,17 @@
  * ScriptureDebugInfo - Debug panel showing internal state
  */
 
-import type { ProcessedVerse } from '@bt-synergy/usfm-processor'
-import type { BookInfo } from '../../../../contexts/types-only'
+import type { ProcessedChapter, ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
+import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
 
 interface ScriptureDebugInfoProps {
   isLoading: boolean
   error: string | null
-  loadedContent: any
+  loadedContent: ProcessedScripture | null
   availableBooks: BookInfo[]
-  currentChapter: any
+  currentChapter: ProcessedChapter | null
   displayVerses: ProcessedVerse[]
-  currentRef: any
+  currentRef: ReferenceState
 }
 
 export function ScriptureDebugInfo({

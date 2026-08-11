@@ -8,7 +8,7 @@
  * from its `index.ts` file.
  */
 
-import type { ResourceTypeRegistry } from '@bt-synergy/resource-types'
+import type { ResourceTypeDefinition, ResourceTypeRegistry } from '@bt-synergy/resource-types'
 
 /**
  * Automatically register all internal resource types
@@ -24,7 +24,7 @@ export async function autoRegisterResourceTypes(
   // Use Vite's glob import to find all resource type index files
   // Excludes this autoRegister.ts file and any test files
   const resourceTypeModules = import.meta.glob<{
-    [key: string]: any
+    [key: string]: unknown
   }>('./**/index.ts', {
     eager: false, // Lazy load to handle errors gracefully
   })
@@ -51,8 +51,7 @@ export async function autoRegisterResourceTypes(
               'displayName' in value
             ) {
               // This looks like a ResourceTypeDefinition
-              console.log(`[AutoRegister] Registering internal resource type: ${value.id}`)
-              registry.register(value)
+              registry.register(value as ResourceTypeDefinition)
             }
           }
         } catch (error) {

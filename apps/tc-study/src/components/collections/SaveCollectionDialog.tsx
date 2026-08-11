@@ -46,11 +46,10 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
     
     try {
       const collectionId = await saveAsCollection(name.trim(), description.trim() || undefined)
-      console.log('✅ Collection saved:', collectionId)
       onSaved?.(collectionId)
       onClose()
-    } catch (err: any) {
-      setError(err.message || 'Failed to save collection')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save collection')
       console.error('Save failed:', err)
     } finally {
       setProcessing(false)
@@ -70,7 +69,6 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
       
       // If offline mode (includeContent), download all content first
       if (includeContent) {
-        console.log('📥 Downloading content for offline use...')
         setDownloadProgress('Preparing download...')
         
         // Get all unique resource keys from workspace
@@ -81,7 +79,6 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
           }
         }
         
-        console.log(`   📦 Downloading ${allResourceKeys.size} resources...`)
         
         // Download each resource
         let current = 0
@@ -95,7 +92,6 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
             }
             
             setDownloadProgress(`Downloading ${current}/${allResourceKeys.size}: ${metadata.title}`)
-            console.log(`   ⬇️  Downloading: ${metadata.title}`)
             
             // For scripture resources, download all books
             if (metadata.contentStructure === 'book' && metadata.contentMetadata?.books) {
@@ -108,7 +104,6 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
                   // This will download from Door43 if not cached, and store in cache
                   // Pass bookCode as a string directly (not as an object)
                   await catalogManager.loadContent(resourceKey, bookCode)
-                  console.log(`      ✅ Downloaded book: ${bookCode}`)
                 } catch (bookError) {
                   console.error(`      ❌ Failed to download ${bookCode}:`, bookError)
                 }
@@ -117,7 +112,6 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
               // For other resource types, load content (empty string for full content)
               try {
                 await catalogManager.loadContent(resourceKey, '')
-                console.log(`      ✅ Downloaded content`)
               } catch (contentError) {
                 console.error(`      ❌ Failed to download content:`, contentError)
               }
@@ -128,7 +122,6 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
         }
         
         setDownloadProgress('Creating download package...')
-        console.log('✅ All content downloaded')
       }
       
       // Now export with the cached content
@@ -145,8 +138,8 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
       setTimeout(() => {
         onClose()
       }, 500)
-    } catch (err: any) {
-      setError(err.message || 'Failed to download collection')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to download collection')
       console.error('Download failed:', err)
       setDownloadProgress(null)
     } finally {

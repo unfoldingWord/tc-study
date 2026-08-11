@@ -1,17 +1,18 @@
 /**
  * Collection Export Dialog
- * 
+ *
  * UI for exporting the current workspace as a shareable collection package
  */
 
 import { useState, useEffect } from 'react'
-import { Download, Package, FileArchive, X, Database, Wifi, Check } from 'lucide-react'
+import { Download, Package, FileArchive, X, Database, Wifi } from 'lucide-react'
 import { collectionExportService } from '../../lib/services/CollectionExportService'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { usePackageStore } from '../../lib/stores/packageStore'
 import { useCatalogManager } from '../../contexts/CatalogContext'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import type { ResourcePackage } from '@bt-synergy/package-storage'
+import type { WorkspacePackage } from '../../features/workspace/workspaceTypes'
 
 interface CollectionExportDialogProps {
   isOpen: boolean
@@ -21,65 +22,71 @@ interface CollectionExportDialogProps {
 export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDialogProps) {
   const packages = usePackageStore(state => state.packages)
   const loadPackages = usePackageStore(state => state.loadPackages)
-  const workspace = useWorkspaceStore(state => state.currentPackage)
+  const _workspace = useWorkspaceStore(state => state.currentPackage)
   const catalogManager = useCatalogManager()
-  
+
   const [selectedPackage, setSelectedPackage] = useState<ResourcePackage | null>(null)
   const [includeContent, setIncludeContent] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   useEffect(() => {
     if (isOpen) {
       loadPackages()
     }
   }, [isOpen, loadPackages])
-  
+
   if (!isOpen) return null
-  
+
   const handleExport = async () => {
     if (!selectedPackage) return
-    
+
     setExporting(true)
     setError(null)
-    
+
     try {
       const cacheAdapter = new IndexedDBCacheAdapter({
         dbName: 'bt-synergy-cache',
         storeName: 'cache-entries',
         version: 1
       })
-      
+
       // Convert ResourcePackage to WorkspacePackage format for export
-      const workspacePackage: any = {
+      const workspacePackage: WorkspacePackage = {
         id: selectedPackage.id,
         name: selectedPackage.name,
         version: selectedPackage.version,
         description: selectedPackage.description,
         resources: new Map(),
-        panels: selectedPackage.panelLayout?.panels || []
+        panels: (selectedPackage.panelLayout?.panels || []).map((p, i) => ({
+          id: p.id,
+          name: p.title || p.id,
+          resourceKeys: p.resourceIds || [],
+          activeIndex: 0,
+          position: i,
+        })),
       }
-      
+
       await collectionExportService.exportCollection(
         workspacePackage,
         catalogManager,
         cacheAdapter,
         { includeContent }
       )
-      
+
       // Close dialog after successful export
       setTimeout(() => {
         setSelectedPackage(null)
         onClose()
       }, 500)
-    } catch (err: any) {
-      setError(err.message || 'Failed to export collection')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to export collection')
       console.error('Export failed:', err)
     } finally {
       setExporting(false)
     }
   }
-  
+
   // Show collection list if no package selected
   if (!selectedPackage) {
     return (
@@ -99,7 +106,7 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
               <X className="w-4 h-4" />
             </button>
           </div>
-          
+
           {/* Collection List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
             {packages.length === 0 ? (
@@ -131,7 +138,7 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
       </div>
     )
   }
-  
+
   // Show export options when package is selected
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -162,7 +169,7 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
             <X className="w-4 h-4" />
           </button>
         </div>
-        
+
         {/* Content */}
         <div className="p-4 space-y-4">
           {/* Export Mode Toggle */}
@@ -170,8 +177,8 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
             <button
               onClick={() => setIncludeContent(false)}
               className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                !includeContent 
-                  ? 'border-blue-500 bg-blue-50' 
+                !includeContent
+                  ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-blue-300'
               }`}
               aria-label="Export metadata only (requires internet to load content)"
@@ -183,12 +190,12 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
               </span>
               <span className="text-xs text-gray-500">~1 MB</span>
             </button>
-            
+
             <button
               onClick={() => setIncludeContent(true)}
               className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
-                includeContent 
-                  ? 'border-green-500 bg-green-50' 
+                includeContent
+                  ? 'border-green-500 bg-green-50'
                   : 'border-gray-200 hover:border-green-300'
               }`}
               aria-label="Include downloaded content for offline use"
@@ -201,7 +208,7 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
               <span className="text-xs text-gray-500">Larger</span>
             </button>
           </div>
-          
+
           {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm">
@@ -209,7 +216,7 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
             </div>
           )}
         </div>
-        
+
         {/* Footer */}
         <div className="flex items-center gap-2 p-4 border-t">
           <button

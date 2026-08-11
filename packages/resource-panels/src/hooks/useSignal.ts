@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import type { BaseSignal, SignalType, ResourceType, ResourceMetadata, ResourceFilter } from '../core/types'
+import type { BaseSignal, SignalType, ResourceType, PanelResourceMetadata, ResourceFilter } from '../core/types'
 import { useResourcePanel } from './useResourcePanel'
 
 /**
@@ -49,10 +49,10 @@ import { useResourcePanel } from './useResourcePanel'
 export function useSignal<T extends BaseSignal>(
   signalType: SignalType<T>,
   resourceId: string,
-  resourceMetadata?: ResourceType | ResourceMetadata
+  resourceMetadata?: ResourceType | PanelResourceMetadata
 ) {
-  // Normalize to ResourceMetadata
-  const metadata: ResourceMetadata = typeof resourceMetadata === 'string' 
+  // Normalize to PanelResourceMetadata
+  const metadata: PanelResourceMetadata = typeof resourceMetadata === 'string' 
     ? { type: resourceMetadata }
     : resourceMetadata || {}
   

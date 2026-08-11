@@ -1,11 +1,14 @@
 # @bt-synergy/resource-panels
 
-High-level wrapper around `@bt-toolkit/linked-panels` for building interactive, communicating resources in the BT Synergy ecosystem.
+High-level wrapper around the npm package [`linked-panels`](https://www.npmjs.com/package/linked-panels) for building interactive, communicating resources in the BT Synergy ecosystem.
+
+> **Panel SoT:** depend on npm `linked-panels` (see `packages/README.md`). Do **not** use the archived workspace stub `@bt-synergy/linked-panels` (no `src/`). There is no `@bt-toolkit/linked-panels` package.
 
 ## Features
 
 - ✅ **Type-safe signal system** with IntelliSense support
 - ✅ **Simple, intuitive hooks** for common use cases  
+- ✅ **EVENT + STATE messaging** — `useSignal` / `useSignalHandler` and `useResourceState` / `useResourceStateSender`
 - ✅ **Flexible multi-dimensional filtering** - tags, categories, languages, custom metadata
 - ✅ **Message lifecycle management** - persistent and ephemeral messages
 - ✅ **Signal discovery** - easily see what signals other resources send
@@ -29,7 +32,7 @@ High-level wrapper around `@bt-toolkit/linked-panels` for building interactive, 
 
 ## Why This Package?
 
-While `@bt-toolkit/linked-panels` provides the low-level messaging infrastructure, `@bt-synergy/resource-panels` adds significant developer experience improvements:
+While npm `linked-panels` provides the low-level messaging infrastructure, `@bt-synergy/resource-panels` adds significant developer experience improvements:
 
 | Feature | `linked-panels` (Low-Level) | `resource-panels` (High-Level) |
 |---------|----------------------------|--------------------------------|
@@ -398,6 +401,44 @@ useSignalHandler<TokenClickSignal>(
     debug: true
   }
 )
+```
+
+### `useResourceState<T>(resourceId, stateKey)`
+
+Subscribe to the current **STATE** message for a key (wraps linked-panels `useCurrentState`).
+
+```tsx
+import {
+  useResourceState,
+  RESOURCE_STATE_KEYS,
+  type ScriptureTokensStateSignal,
+} from '@bt-synergy/resource-panels'
+
+const tokens = useResourceState<ScriptureTokensStateSignal>(
+  resourceId,
+  RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS
+)
+```
+
+Canonical keys: `RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS` (single-owner), `NOTES_TOKEN_GROUPS_TN` / `NOTES_TOKEN_GROUPS_TWL`, `OBS_FRAME_QUOTES_TN` / `OBS_FRAME_QUOTES_TWL` (per-publisher; receivers merge).
+
+### `useResourceStateSender<T>(signalType, resourceId, stateKey, metadata?)`
+
+Send **STATE** messages (injects `lifecycle: 'state'`, `stateKey`, `sourceResourceId`, `timestamp`).
+
+```tsx
+const { sendState } = useResourceStateSender<ScriptureTokensStateSignal>(
+  'scripture-tokens-broadcast',
+  resourceId,
+  RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS,
+  { type: 'scripture' }
+)
+
+sendState({
+  reference: { book: 'JHN', chapter: 1, verse: 1 },
+  tokens: [...],
+  resourceMetadata: { id: resourceKey, language: 'en', type: 'scripture' },
+})
 ```
 
 ### `useMultiSignalHandler(signalTypes[], resourceId, handler, options?)`
@@ -769,7 +810,7 @@ function MyLexicon({ resourceId }: { resourceId: string }) {
 
 ### Step 5: Test
 
-Use `/test/panels` route to verify:
+Use the DEV-only `/test/panels` route to verify:
 
 1. Your resource sends signals correctly
 2. Your resource receives signals correctly  
@@ -839,7 +880,7 @@ useSignalHandler<TokenClickSignal>('token-click', resourceId, (signal) => {
 
 1. **Always use TypeScript types** - The signal types provide safety and IntelliSense
 2. **Include meaningful data** - Fill in optional fields like `transliteration` and `meaning`
-3. **Test with Signal Monitor** - Use `/test/panels` to verify communication
+3. **Test with Signal Monitor** - Use DEV-only `/test/panels` to verify communication
 4. **Document your signals** - Add JSDoc comments explaining what your resource sends/receives
 5. **Filter signals appropriately** - Use `fromResources` or `onlyTargeted` to avoid processing irrelevant signals
 6. **Handle errors gracefully** - Wrap signal handling in try-catch
@@ -876,10 +917,20 @@ const { sendSignal } = useSignal<CustomSignal>('custom-event', resourceId)
 
 ## Migration from Direct linked-panels Usage
 
-### Before
+Prefer `@bt-synergy/resource-panels` for both EVENT and STATE so apps do not import
+`useResourceAPI` / `useCurrentState` / `useMessaging` from `linked-panels` in production viewers.
+
+| linked-panels | resource-panels |
+|---|---|
+| `useMessaging` / `useEvents` (EVENT) | `useSignalHandler` |
+| `useResourceAPI().messaging.sendToAll` (EVENT) | `useSignal` |
+| `useCurrentState(resourceId, stateKey)` | `useResourceState` |
+| `useResourceAPI().messaging.sendToAll` (STATE) | `useResourceStateSender` |
+
+### EVENT — Before
 
 ```tsx
-import { useResourceAPI, useMessaging } from '@bt-toolkit/linked-panels'
+import { useResourceAPI, useMessaging } from 'linked-panels'
 
 function MyViewer({ resourceId }: { resourceId: string }) {
   const api = useResourceAPI(resourceId)
@@ -910,7 +961,7 @@ function MyViewer({ resourceId }: { resourceId: string }) {
 }
 ```
 
-### After
+### EVENT — After
 
 ```tsx
 import { useSignal, useSignalHandler, TokenClickSignal } from '@bt-synergy/resource-panels'
@@ -930,6 +981,46 @@ function MyViewer({ resourceId }: { resourceId: string }) {
   }
 }
 ```
+
+### STATE — Before
+
+```tsx
+import { useCurrentState, useResourceAPI } from 'linked-panels'
+
+const tokens = useCurrentState(resourceId, 'current-scripture-tokens')
+const api = useResourceAPI(resourceId)
+api.messaging.sendToAll({
+  type: 'scripture-tokens-broadcast',
+  lifecycle: 'state',
+  stateKey: 'current-scripture-tokens',
+  // ...
+})
+```
+
+### STATE — After
+
+```tsx
+import {
+  useResourceState,
+  useResourceStateSender,
+  RESOURCE_STATE_KEYS,
+  type ScriptureTokensStateSignal,
+} from '@bt-synergy/resource-panels'
+
+const tokens = useResourceState<ScriptureTokensStateSignal>(
+  resourceId,
+  RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS
+)
+
+const { sendState } = useResourceStateSender<ScriptureTokensStateSignal>(
+  'scripture-tokens-broadcast',
+  resourceId,
+  RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS
+)
+sendState({ reference, tokens, resourceMetadata })
+```
+
+**tc-study P5 migration order (viewers):** Scripture token broadcast → WordsLinks subscribe → TN/TWL notes groups + OBS quotes → CombinedHelps → ObsViewer.
 
 ## Documentation
 
@@ -965,7 +1056,7 @@ Example components:
 
 ## Testing
 
-Use the Panel Communication Test page at `/test/panels` to:
+Use the Panel Communication Test page at `/test/panels` (**DEV builds only** — gated by `import.meta.env.DEV` in tc-study) to:
 
 - Test signal sending and receiving
 - View the Signal Monitor to see all messages
@@ -1089,7 +1180,7 @@ sendToAll({ token: { ... } }) // Action (ephemeral by default)
 1. Check `debug: true` in `useSignalHandler` to see filter logs
 2. Verify `resourceMetadata` matches `targetFilter`
 3. Ensure resource is listening for correct signal type
-4. Check Signal Monitor at `/test/panels`
+4. Check Signal Monitor at DEV-only `/test/panels`
 
 ### Messages piling up?
 

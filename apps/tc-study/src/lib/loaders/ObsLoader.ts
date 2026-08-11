@@ -54,16 +54,45 @@ function getStoryPath(metadata: ResourceMetadata, storyId: string): string | nul
   return null
 }
 
+type ObsCacheAdapter = {
+  get: (key: string) => Promise<{ content?: unknown } | null | undefined>
+  set: (key: string, value: unknown) => Promise<void>
+}
+
+type ObsCatalogAdapter = {
+  get: (resourceKey: string) => Promise<ResourceMetadata | null | undefined>
+}
+
+type ObsDoor43Client = {
+  findRepository: (
+    owner: string,
+    repoName: string,
+    stage: string
+  ) => Promise<{ release?: { tag_name?: string }; default_branch?: string } | null>
+  fetchTextContent: (
+    owner: string,
+    repoName: string,
+    path: string,
+    ref: string
+  ) => Promise<string>
+  config?: { baseUrl?: string }
+}
+
 export class ObsLoader implements ResourceLoader {
-  private cacheAdapter: any
-  private catalogAdapter: any
-  private door43Client: any
+  private cacheAdapter: ObsCacheAdapter
+  private catalogAdapter: ObsCatalogAdapter
+  private door43Client: ObsDoor43Client
   private debug: boolean
 
-  constructor(config: any) {
-    this.cacheAdapter = config.cacheAdapter
-    this.catalogAdapter = config.catalogAdapter
-    this.door43Client = config.door43Client
+  constructor(config: {
+    cacheAdapter: unknown
+    catalogAdapter: unknown
+    door43Client: unknown
+    debug?: boolean
+  }) {
+    this.cacheAdapter = config.cacheAdapter as ObsCacheAdapter
+    this.catalogAdapter = config.catalogAdapter as ObsCatalogAdapter
+    this.door43Client = config.door43Client as ObsDoor43Client
     this.debug = config.debug ?? false
   }
 
@@ -153,10 +182,6 @@ export class ObsLoader implements ResourceLoader {
       /* ignore */
     }
 
-    if (this.debug) {
-      console.log(`[ObsLoader] Loaded ${resourceKey} story ${padded}`, parsed.frames.length, 'frames')
-    }
-
     return parsed
   }
 
@@ -173,12 +198,7 @@ export class ObsLoader implements ResourceLoader {
     const metadata = await this.getMetadata(resourceKey)
     const ingredients = metadata.contentMetadata?.ingredients
     if (!ingredients || !Array.isArray(ingredients)) {
-      if (this.debug) console.log(`[ObsLoader] No ingredients for ${resourceKey}, skipping download`)
       return
-    }
-
-    if (this.debug) {
-      console.log(`[ObsLoader] Prefetching ${ingredients.length} stories for ${resourceKey}`)
     }
 
     const storyIds: string[] = []
@@ -191,22 +211,19 @@ export class ObsLoader implements ResourceLoader {
     // Fallback: iterate 1–50 if ingredients don't have numeric identifiers
     const toFetch = storyIds.length > 0 ? storyIds : Array.from({ length: 50 }, (_, i) => String(i + 1))
 
-    let loaded = 0
-    let failed = 0
+    let _loaded = 0
+    let _failed = 0
     for (const storyId of toFetch) {
       try {
         await this.loadContent(resourceKey, storyId)
-        loaded++
+        _loaded++
       } catch (err) {
-        failed++
+        _failed++
         if (this.debug) {
           console.warn(`[ObsLoader] Failed to prefetch story ${storyId} for ${resourceKey}:`, err)
         }
       }
     }
 
-    if (this.debug) {
-      console.log(`[ObsLoader] Prefetch complete for ${resourceKey}: ${loaded} loaded, ${failed} failed`)
-    }
   }
 }

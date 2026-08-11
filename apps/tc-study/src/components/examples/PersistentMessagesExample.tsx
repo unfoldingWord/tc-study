@@ -1,6 +1,6 @@
 /**
  * Example: Persistent vs Ephemeral Messages
- * 
+ *
  * This demonstrates the difference between:
  * - Ephemeral messages (cleared on navigation)
  * - Persistent messages (stay until manually cleared)
@@ -33,7 +33,7 @@ export function PersistentMessagesExample({
     getLatestSignal,
     getSignalsOfType,
     getSignalCount,
-    clearAllSignals,
+    clearAllSignals: _clearAllSignals,
     clearSignalsOfType,
     clearSignal,
   } = useSignalStore(resourceId)
@@ -70,8 +70,8 @@ export function PersistentMessagesExample({
   useSignalHandler<VerseNavigationSignal>(
     'verse-navigation',
     resourceId,
-    (signal) => {
-      console.log('📖 Verse navigation received:', signal.reference)
+    (_signal) => {
+
     },
     { debug: true }
   )

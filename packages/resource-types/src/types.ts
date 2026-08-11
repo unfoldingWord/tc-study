@@ -4,9 +4,36 @@
  * Defines the structure for resource type plugins
  */
 
-import type { BaseSignal, ResourceMetadata } from '@bt-synergy/resource-panels'
 import type { ComponentType } from 'react'
 import type { ResourceLoader, ResourceViewerProps } from './base-types'
+
+/**
+ * Narrow panel-filter descriptor for communication config.
+ * Not catalog SoT — map into `@bt-synergy/resource-panels` PanelResourceMetadata at send time.
+ */
+export interface PanelResourceDescriptor {
+  type?: string
+  tags?: string[]
+  categories?: string[]
+  language?: string
+  subject?: string
+  testament?: 'OT' | 'NT' | 'both'
+  scope?: string
+  owner?: string
+  custom?: Record<string, unknown>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any
+}
+
+/**
+ * Minimal signal shape for handler typing without depending on resource-panels.
+ * Index signature stays loose so handlers can cast to concrete panel signal types.
+ */
+export interface ResourceSignal {
+  type: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any
+}
 
 /**
  * API filters for Door43 catalog requests
@@ -103,7 +130,7 @@ export interface PlatformViewers {
 /**
  * Signal handler configuration
  */
-export interface SignalHandlerConfig<T extends BaseSignal = BaseSignal> {
+export interface SignalHandlerConfig<T extends ResourceSignal = ResourceSignal> {
   /** Signal type to handle */
   signalType: string
   /** Handler function */
@@ -137,8 +164,8 @@ export interface ResourceDependency {
  * Communication configuration for a resource type
  */
 export interface CommunicationConfig {
-  /** Resource metadata for signal filtering */
-  metadata?: Partial<ResourceMetadata>
+  /** Narrow panel-filter descriptor (not catalog ResourceMetadata) */
+  metadata?: Partial<PanelResourceDescriptor>
   
   /** Signal handlers this resource type implements */
   handlers?: SignalHandlerConfig[]
@@ -396,13 +423,11 @@ export function defineResourceType(definition: ResourceTypeDefinition): Resource
   if (!definition.loader) {
     throw new Error('Resource type definition must have a loader')
   }
-  if (!definition.viewer) {
-    throw new Error('Resource type definition must have a viewer')
-  }
-  
+  // viewer is optional: omit for modal-only resources (Entry Viewer Registry)
+
   // Note: Viewer enhancement happens at runtime in the registry
   // to avoid circular dependencies with React hooks
-  
+
   return definition
 }
 

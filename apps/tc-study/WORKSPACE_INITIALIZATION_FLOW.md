@@ -1,5 +1,11 @@
 # Workspace Initialization Flow
 
+> **OBSOLETE (historical boot path):** This document describes a historical boot path that used
+> `window.__catalogManager__` and related window globals. Production code must not reintroduce
+> those flags (see `src/utils/windowGlobalsGuards.test.ts` and `src/lib/stores/stateOwnership.ts`).
+> Catalog access is via `CatalogContext` / `useCatalogManager()`. Treat the snippets below as
+> archaeology, not current architecture.
+
 ## Overview
 
 This document describes how the workspace is initialized when the app starts, including the logic for loading saved workspaces and preloaded resources.

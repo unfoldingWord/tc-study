@@ -24,10 +24,10 @@ export default function Collections() {
   const uninstallPackage = usePackageStore(state => state.uninstallPackage)
   const setActivePackage = usePackageStore(state => state.setActivePackage)
   const loading = usePackageStore(state => state.loading)
-  
+
   const [refreshing, setRefreshing] = useState(false)
   const [showModal, setShowModal] = useState(false)
-  const [catalogResources, setCatalogResources] = useState<ResourceMetadata[]>([])
+  const [_catalogResources, setCatalogResources] = useState<ResourceMetadata[]>([])
   const [loadingResources, setLoadingResources] = useState(true)
   const [showExportDialog, setShowExportDialog] = useState(false)
   const [showImportDialog, setShowImportDialog] = useState(false)
@@ -93,9 +93,17 @@ export default function Collections() {
     setShowModal(true)
   }
 
-  const installedCollections = packages.filter((pkg: any) => pkg.status === 'installed')
-  const buildingCollections = packages.filter((pkg: any) => pkg.status === 'installing')
-  const errorCollections = packages.filter((pkg: any) => pkg.status === 'error')
+  const packageStatus = (pkg: { status?: string }) => pkg.status
+  const installedCollections = packages.filter(
+    (pkg) => packageStatus(pkg as { status?: string }) === 'installed'
+  )
+  const buildingCollections = packages.filter(
+    (pkg) => packageStatus(pkg as { status?: string }) === 'installing'
+  )
+  const errorCollections = packages.filter(
+    (pkg) => packageStatus(pkg as { status?: string }) === 'error'
+  )
+  const asCardPackage = (pkg: (typeof packages)[number]) => pkg as unknown as ResourcePackage
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -113,7 +121,7 @@ export default function Collections() {
                 </span>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowImportDialog(true)}
@@ -156,7 +164,7 @@ export default function Collections() {
           </div>
         </div>
       </div>
-      
+
       <div className="max-w-7xl mx-auto px-6 py-6">
 
       {/* Loading State */}
@@ -200,10 +208,10 @@ export default function Collections() {
             </span>
           </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {buildingCollections.map((pkg: any) => (
+            {buildingCollections.map((pkg) => (
               <PackageCard
                 key={pkg.id}
-                package={pkg}
+                package={asCardPackage(pkg)}
                 onOpen={handleOpenCollection}
                 onDelete={handleDeleteCollection}
                 onManage={handleManageCollection}
@@ -226,10 +234,10 @@ export default function Collections() {
             </span>
           </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {errorCollections.map((pkg: any) => (
+            {errorCollections.map((pkg) => (
               <PackageCard
                 key={pkg.id}
-                package={pkg}
+                package={asCardPackage(pkg)}
                 onOpen={handleOpenCollection}
                 onDelete={handleDeleteCollection}
                 onManage={handleManageCollection}
@@ -252,10 +260,10 @@ export default function Collections() {
             </span>
           </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {installedCollections.map((pkg: any) => (
+            {installedCollections.map((pkg) => (
               <PackageCard
                 key={pkg.id}
-                package={pkg}
+                package={asCardPackage(pkg)}
                 onOpen={handleOpenCollection}
                 onDelete={handleDeleteCollection}
                 onManage={handleManageCollection}
@@ -266,34 +274,32 @@ export default function Collections() {
         </div>
       )}
       </div>
-      
+
       {/* Collection Modal */}
       {showModal && (
         <CollectionModal
           onClose={handleCloseModal}
-          onComplete={async (collectionId) => {
-            console.log('✅ Collection created:', collectionId)
+          onComplete={async (_collectionId) => {
             await loadPackages()
           }}
           onResourcesAdded={async () => {
-            console.log('✅ Resources added to catalog')
             await loadCatalogResources()
           }}
         />
       )}
-      
+
       {/* Export Dialog */}
       <CollectionExportDialog
         isOpen={showExportDialog}
         onClose={() => setShowExportDialog(false)}
       />
-      
+
       {/* Import Dialog */}
       <CollectionImportDialog
         isOpen={showImportDialog}
         onClose={() => setShowImportDialog(false)}
       />
-      
+
       {/* Manage Collection Dialog */}
       {selectedCollection && (
         <ManageCollectionDialog

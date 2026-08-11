@@ -1,16 +1,23 @@
 /**
- * SortableTab - Individual draggable/sortable tab using dnd-kit
- * Provides smooth animations and transforms during drag operations
+ * SortableTab — panel resource tab with pointer long-press / distance drag.
+ * Presentation (icon / short label) is resolved upstream; this component stays type-agnostic.
  */
 
-import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
+import type { LucideIcon } from 'lucide-react'
+import type { StudioPanelId } from '../../features/studio/studioDnDHelpers'
+import { TAB_DND_ATTR, useTabDnD } from '../../features/dnd/TabDnDContext'
 
 interface SortableTabProps {
   id: string
+  panelId: StudioPanelId
   isActive: boolean
+  /** Short abbrev text (always provided; may be hidden when icon-only) */
   label: string
-  tooltip?: string // Full resource name for tooltip
+  /** Full resource title for aria-label / title */
+  tooltip?: string
+  Icon?: LucideIcon | null
+  /** When false and Icon is set, tab is icon-only */
+  showLabel?: boolean
   colorScheme: 'blue' | 'purple'
   onClick: () => void
 }
@@ -28,58 +35,73 @@ const tabColors = {
   },
 }
 
-export function SortableTab({ id, isActive, label, tooltip, colorScheme, onClick }: SortableTabProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id })
-
+export function SortableTab({
+  id,
+  panelId,
+  isActive,
+  label,
+  tooltip,
+  Icon = null,
+  showLabel = true,
+  colorScheme,
+  onClick,
+}: SortableTabProps) {
+  const { activeId, isDragging, beginTabPress, shouldSuppressClick } = useTabDnD()
   const colors = tabColors[colorScheme]
+  const isThisDragging = activeId === id
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
-
-  // Determine which color scheme to use
   let colorClasses: string
   let borderStyle: string
-  
-  if (isDragging) {
-    // When dragging, show dashed border placeholder style
+
+  if (isThisDragging) {
     colorClasses = colors.dragging
     borderStyle = 'border-2 border-dashed'
   } else {
-    // Normal state
     colorClasses = isActive ? colors.active : colors.inactive
-    borderStyle = isActive ? '' : ''
+    borderStyle = ''
   }
+
+  const accessibleName = tooltip || label
+  const visibleLabel = showLabel || !Icon
 
   return (
     <button
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
       type="button"
       role="tab"
       aria-selected={isActive}
-      aria-label={label}
-      title={tooltip || label}
-      onClick={onClick}
+      aria-label={accessibleName}
+      title={accessibleName}
+      {...{
+        [TAB_DND_ATTR.tabKey]: id,
+        [TAB_DND_ATTR.tabPanel]: panelId,
+      }}
+      onPointerDown={(e) => {
+        beginTabPress({
+          key: id,
+          panelId,
+          label,
+          Icon: Icon ?? null,
+          showShortLabel: visibleLabel,
+          event: e,
+        })
+      }}
+      onClick={() => {
+        if (shouldSuppressClick()) return
+        onClick()
+      }}
       className={`
-        flex-shrink-0 px-3 py-1.5 text-xs font-medium whitespace-nowrap
+        flex-shrink-0 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap
+        inline-flex items-center gap-1
+        select-none [-webkit-touch-callout:none]
         ${borderStyle} transition-all duration-150 cursor-grab active:cursor-grabbing
         ${colorClasses}
-        ${isDragging ? 'animate-pulse' : ''}
+        ${isThisDragging ? 'animate-pulse opacity-60' : ''}
         ${isActive ? 'rounded-t-lg' : 'rounded-t-lg'}
+        ${isDragging ? 'touch-none' : ''}
       `}
     >
-      {label}
+      {Icon ? <Icon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden /> : null}
+      {visibleLabel ? <span>{label}</span> : null}
     </button>
   )
 }

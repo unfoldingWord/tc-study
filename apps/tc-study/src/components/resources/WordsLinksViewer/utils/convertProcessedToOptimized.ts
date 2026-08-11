@@ -61,9 +61,9 @@ function convertWordTokenToOptimizedToken(wordToken: WordToken, index: number): 
   // CRITICAL: Extract lemma and strong data for original language tokens
   // These come from USFM \zaln markers in original language texts
   // For original language (UGNT/UHB): alignment data IS the token's own lemma/strong
-  const lemma = wordToken.alignment?.lemma || (wordToken as any).lemma
-  const strong = wordToken.alignment?.strong || (wordToken as any).strong  
-  const morph = wordToken.alignment?.morph || (wordToken as any).morph
+  const lemma = wordToken.alignment?.lemma
+  const strong = wordToken.alignment?.strong
+  const morph = wordToken.alignment?.morph
 
   const optimizedToken: OptimizedToken = {
     id: semanticId,

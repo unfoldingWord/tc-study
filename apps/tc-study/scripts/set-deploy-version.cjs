@@ -2,7 +2,8 @@
 /**
  * Set VITE_DEPLOY_VERSION for the next build and print it.
  * Usage: node scripts/set-deploy-version.cjs
- * Or use from deploy:quick which runs this then build then wrangler.
+ * Used by deploy:UNSAFE_master-without-check (hard-gated emergency hatch —
+ * does not run `check`; not a green gate). Prefer `bun run deploy` or CI.
  */
 const { execSync } = require('child_process')
 

@@ -14,7 +14,7 @@ interface DraggableResourceItemProps {
 }
 
 export function DraggableResourceItem({
-  id,
+  id: _id,
   title,
   isActive = false,
   onRemove,

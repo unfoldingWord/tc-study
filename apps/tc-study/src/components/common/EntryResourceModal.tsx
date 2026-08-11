@@ -5,13 +5,15 @@
  * with history stack navigation support.
  */
 
-import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader, Minimize2, X } from 'lucide-react'
+import { AlertCircle, ArrowLeft, ArrowRight, Check, Minimize2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '../../contexts/AppContext'
 import { useCatalogManager } from '../../contexts/CatalogContext'
 import { useEntryViewerRegistry } from '../../contexts/EntryViewerContext'
-import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
-import { useStudyStore } from '../../store/studyStore'
+import { useWizardStore } from '../../lib/stores/wizardStore'
+import { useEntryModalStore } from '../../features/entries'
+import { LoadingSpinner } from '../../shared/LoadingSpinner'
+import { buildEntryModalResourceInfo } from './buildEntryModalResourceInfo'
 import { ErrorBoundary } from './ErrorBoundary'
 
 interface EntryResourceModalProps {
@@ -19,28 +21,30 @@ interface EntryResourceModalProps {
 }
 
 export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps) {
-  const modalState = useStudyStore((s: any) => s.modal)
-  const closeModal = useStudyStore((s: any) => s.closeModal)
-  const minimizeModal = useStudyStore((s: any) => s.minimizeModal)
-  const restoreModal = useStudyStore((s: any) => s.restoreModal)
-  const modalGoBack = useStudyStore((s: any) => s.modalGoBack)
-  const modalGoForward = useStudyStore((s: any) => s.modalGoForward)
-  const canModalGoBack = useStudyStore((s: any) => s.canModalGoBack)
-  const canModalGoForward = useStudyStore((s: any) => s.canModalGoForward)
-  const openModal = useStudyStore((s: any) => s.openModal)
+  const modalState = useEntryModalStore((s) => s.modal)
+  const closeModal = useEntryModalStore((s) => s.closeModal)
+  const minimizeModal = useEntryModalStore((s) => s.minimizeModal)
+  const restoreModal = useEntryModalStore((s) => s.restoreModal)
+  const modalGoBack = useEntryModalStore((s) => s.modalGoBack)
+  const modalGoForward = useEntryModalStore((s) => s.modalGoForward)
+  const canModalGoBack = useEntryModalStore((s) => s.canModalGoBack)
+  const canModalGoForward = useEntryModalStore((s) => s.canModalGoForward)
+  const openModal = useEntryModalStore((s) => s.openModal)
   const loadedResources = useAppStore((s) => s.loadedResources)
   const catalogManager = useCatalogManager()
   const entryViewerRegistry = useEntryViewerRegistry()
-  const navigationStatus = useStudyStore((s: any) => s.modal.navigationStatus)
-  const availableLanguages = useWorkspaceStore((s) => s.availableLanguages)
+  const navigationStatus = useEntryModalStore((s) => s.modal.navigationStatus)
+  const availableLanguages = useWizardStore((s) => s.availableLanguages)
 
   const [resourceMetadata, setResourceMetadata] = useState<any>(null)
   const [loadingMetadata, setLoadingMetadata] = useState(false)
   const [entryContent, setEntryContent] = useState<any>(null)
 
   // Extract resourceId and entryId from modalState (safe even if modal is closed)
-  const resourceId = modalState.resourceKey ? modalState.resourceKey.split('#')[0] : null
-  const entryId = modalState.resourceKey?.includes('#') ? modalState.resourceKey.split('#')[1] : null
+  const resourceId = modalState.resourceKey ? modalState.resourceKey.split('#')[0] : undefined
+  const entryId = modalState.resourceKey?.includes('#')
+    ? modalState.resourceKey.split('#')[1]
+    : undefined
   const resource = resourceId ? loadedResources[resourceId] : null
 
   // RTL: must run before any early return (hooks order)
@@ -54,6 +58,13 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
     const entry = availableLanguages.find((l) => l.code === lang)
     return entry?.direction === 'rtl' ? 'rtl' : 'ltr'
   }, [resource, resourceMetadata, resourceId, availableLanguages])
+
+  // Prefer loaded resource; memoize catalog fallback so viewers don't see a new
+  // metadata object identity on every parent re-render (e.g. onContentLoaded).
+  const resourceInfo = useMemo(
+    () => buildEntryModalResourceInfo(resourceId, resource, resourceMetadata),
+    [resourceId, resource, resourceMetadata]
+  )
   
   // Reset entry content when entry changes
   useEffect(() => {
@@ -72,7 +83,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
     
     // If resource is already loaded, use it
     if (resource) {
-      console.log('[EntryResourceModal] Using loaded resource:', resourceId)
+
       return
     }
     
@@ -82,12 +93,12 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
       return
     }
     
-    console.log('[EntryResourceModal] Fetching metadata from catalog:', resourceId)
+
     setLoadingMetadata(true)
     
     catalogManager.getResourceMetadata(resourceId)
       .then((metadata) => {
-        console.log('[EntryResourceModal] Got metadata from catalog:', metadata)
+
         if (metadata) {
           setResourceMetadata(metadata)
         } else {
@@ -105,14 +116,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
   // Debug: Log resource lookup
   useEffect(() => {
     if (modalState.resourceKey) {
-      console.log('[EntryResourceModal] Modal state:', {
-        resourceKey: modalState.resourceKey,
-        resourceId,
-        entryId,
-        hasResource: !!resource,
-        hasMetadata: !!resourceMetadata,
-        loadedResourcesKeys: Object.keys(loadedResources),
-      })
+      // intentionally empty
     }
   }, [modalState.resourceKey, resourceId, entryId, resource, resourceMetadata, loadedResources])
 
@@ -121,7 +125,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
     if (onEntryLinkClick) {
       onEntryLinkClick(resourceId, entryId)
     } else {
-      // Fallback: use studyStore directly
+      // Fallback: use entryModalStore directly
       const resourceKey = entryId ? `${resourceId}#${entryId}` : resourceId
       openModal(resourceKey)
     }
@@ -160,7 +164,9 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
                 navigationStatus === 'warning' ? 'bg-amber-100' :
                 'bg-red-100'
               }`}>
-                {navigationStatus === 'navigating' && <Loader className="w-3 h-3 text-blue-600 animate-spin" />}
+                {navigationStatus === 'navigating' && (
+                  <LoadingSpinner size="sm" label="Navigating" className="text-blue-600" />
+                )}
                 {navigationStatus === 'success' && <Check className="w-3 h-3 text-green-600" />}
                 {navigationStatus === 'warning' && <AlertCircle className="w-3 h-3 text-amber-600" />}
                 {navigationStatus === 'error' && <AlertCircle className="w-3 h-3 text-red-600" />}
@@ -198,15 +204,6 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
     )
   }
 
-  // Determine resource info - prefer loaded resource, fallback to catalog metadata
-  const resourceInfo = resource || (resourceMetadata ? {
-    id: resourceId,
-    key: resourceId,
-    title: resourceMetadata.title || resourceId,
-    type: resourceMetadata.type || 'words',
-    metadata: resourceMetadata,
-  } : null)
-  
   // Extract entry term from entryId (format: "bible/kt/grace" -> "grace")
   const entryTerm = entryId ? entryId.split('/').pop() || entryId : null
 
@@ -276,20 +273,17 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
             </div>
           }>
             {(() => {
-              console.log('[EntryResourceModal] Rendering content:', {
-                resourceId,
-                entryId,
-                hasResourceInfo: !!resourceInfo,
-                hasMetadata: !!resourceMetadata,
-                loadingMetadata,
-              })
+
               
               // If loading metadata and we don't have it yet, show loader
               if (loadingMetadata && !resourceMetadata) {
                 return (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader className="w-8 h-8 animate-spin text-blue-600" />
-                  </div>
+                  <LoadingSpinner
+                    centered
+                    label="Loading resource"
+                    className="text-blue-600"
+                    containerClassName="h-full"
+                  />
                 )
               }
               
@@ -303,8 +297,8 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
                 )
               }
               
-              // Must have an entryId to display in modal
-              if (!entryId) {
+              // Must have resource + entry to display in modal
+              if (!resourceId || !entryId) {
                 return (
                   <div className="p-6 text-gray-600">
                     <p>No entry specified</p>
@@ -312,6 +306,9 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
                   </div>
                 )
               }
+
+              const resolvedResourceId = resourceId
+              const resolvedEntryId = entryId
               
               // Use Entry Viewer Registry to get the appropriate viewer
               // ResourceInfo now extends ResourceMetadata, so we use resourceInfo directly
@@ -319,7 +316,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
               const EntryViewer = entryViewerRegistry.getEntryViewer({
                 type: metadata?.type,
                 subject: metadata?.subject,
-                resourceId: resourceId,
+                resourceId: resolvedResourceId,
                 owner: metadata?.owner,
                 languageCode: metadata?.language, // Use language, not languageCode
               })
@@ -329,7 +326,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
                   <div className="p-6 text-gray-600">
                     <p className="mb-4">No entry viewer registered for this resource type</p>
                     <p className="text-sm text-gray-500">Type: {metadata?.type || 'unknown'}</p>
-                    {entryId && <p className="text-sm text-gray-500">Entry: {entryId}</p>}
+                    <p className="text-sm text-gray-500">Entry: {resolvedEntryId}</p>
                     <p className="text-xs text-gray-400 mt-4">
                       Developers: Register an entry viewer using the Entry Viewer Registry
                     </p>
@@ -343,8 +340,8 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
                 return (
                   <EntryViewer
                     key={modalState.resourceKey}
-                    resourceKey={resourceId}
-                    entryId={entryId}
+                    resourceKey={resolvedResourceId}
+                    entryId={resolvedEntryId}
                     metadata={metadata}
                     direction={modalDirection}
                     onEntryLinkClick={handleOpenEntry}

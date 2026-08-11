@@ -22,7 +22,7 @@ function findTitleInIngredients(
   entryId: string,
   resourceType: 'academy' | 'words'
 ): string | null {
-  const ingredient = ingredients.find((ing: any) => {
+  const ingredient = ingredients.find((ing: { identifier?: string; path?: string; title?: string }) => {
     if (ing.identifier === entryId) return true
     if (ing.path && ing.path.replace(/\.md$/, '') === entryId) return true
     if (resourceType === 'academy') {
@@ -67,7 +67,7 @@ export function useEntryTitles(resourceKey: string, taMetadata?: TAMetadataForTi
   const fetchEntryTitle = useCallback(async (rcLink: string, forceRefetch = false): Promise<string | null> => {
     // Parse the rc:// link
     const parsed = parseRcLink(rcLink)
-    
+
     if (!parsed.isValid) {
       console.warn('[Entry Titles] Invalid rc:// link:', rcLink)
       return null
@@ -164,7 +164,7 @@ export function useEntryTitles(resourceKey: string, taMetadata?: TAMetadataForTi
       entryTitlesRef.current.set(cacheKey, title)
       setEntryTitles(prev => new Map(prev).set(cacheKey, title))
       return title
-    } catch (error) {
+    } catch (_error) {
       // Silently fail - use fallback title
       const fallback = parsed.entryId.split('/').pop() || 'Unknown'
       entryTitlesRef.current.set(cacheKey, fallback)

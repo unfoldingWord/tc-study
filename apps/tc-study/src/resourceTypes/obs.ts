@@ -3,8 +3,10 @@
  */
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { ObsViewer } from '../components/resources/ObsViewer'
 import { ObsLoader } from '../lib/loaders/ObsLoader'
+import { asResourceViewer } from './asResourceViewer'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const obsResourceType: ResourceTypeDefinition = defineResourceType({
@@ -20,14 +22,14 @@ export const obsResourceType: ResourceTypeDefinition = defineResourceType({
   subjects: ['Open Bible Stories'],
   aliases: ['obs', 'stories', 'open-bible-stories'],
 
-  loader: ObsLoader as any,
+  loader: ObsLoader,
   loaderConfig: {
     debug: false,
   },
 
-  downloadPriority: 5,
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.OBS),
 
-  viewer: ObsViewer as any,
+  viewer: asResourceViewer(ObsViewer),
 
   features: {
     highlighting: false,

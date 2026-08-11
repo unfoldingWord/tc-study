@@ -6,7 +6,9 @@
 
 import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/resource-types'
 import { ScriptureLoader } from '@bt-synergy/scripture-loader'
+import { getDownloadPriority } from '../config/loaderConfig'
 import { ScriptureViewer } from '../components/resources/ScriptureViewer/index'
+import { asResourceViewer } from './asResourceViewer'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 
 export const scriptureResourceType: ResourceTypeDefinition = defineResourceType({
@@ -37,14 +39,13 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
     debug: true, // Enable debug logging to troubleshoot issues
   },
   
-  // Download priority for background downloading (1 = highest priority)
-  downloadPriority: 2, // Second priority after Translation Notes
+  downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.SCRIPTURE),
   
   // Note: No ingredientsGenerator needed - Door43 catalog API provides book lists
   // If ingredients are missing, that indicates a problem with Door43 data
   
   // ===== UI LAYER =====
-  viewer: ScriptureViewer as any,
+  viewer: asResourceViewer(ScriptureViewer),
   
   // ===== FEATURES =====
   features: {

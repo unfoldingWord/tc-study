@@ -3,7 +3,7 @@
  * Separate state keys so both resources can contribute without overwriting.
  */
 
-import { useCurrentState } from 'linked-panels'
+import { RESOURCE_STATE_KEYS, useResourceState } from '@bt-synergy/resource-panels'
 import { useMemo } from 'react'
 import type { NotesTokenGroupsSignal } from '../../../../signals/studioSignals'
 
@@ -19,8 +19,14 @@ function flattenGroups(state: NotesTokenGroupsSignal | null | undefined, into: S
 }
 
 export function useUnderlinedTokens(resourceId: string): Set<string> {
-  const tnState = useCurrentState<NotesTokenGroupsSignal>(resourceId, 'current-notes-token-groups-tn')
-  const twlState = useCurrentState<NotesTokenGroupsSignal>(resourceId, 'current-notes-token-groups-twl')
+  const tnState = useResourceState<NotesTokenGroupsSignal>(
+    resourceId,
+    RESOURCE_STATE_KEYS.NOTES_TOKEN_GROUPS_TN
+  )
+  const twlState = useResourceState<NotesTokenGroupsSignal>(
+    resourceId,
+    RESOURCE_STATE_KEYS.NOTES_TOKEN_GROUPS_TWL
+  )
 
   return useMemo(() => {
     const next = new Set<string>()

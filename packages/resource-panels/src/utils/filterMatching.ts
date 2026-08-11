@@ -1,4 +1,4 @@
-import type { ResourceMetadata, ResourceFilter } from '../core/types'
+import type { PanelResourceMetadata, ResourceFilter } from '../core/types'
 
 /**
  * Check if a value matches a filter criteria
@@ -37,7 +37,7 @@ function matchesCriteria(value: any, filter: any): boolean {
  * 
  * @example
  * ```typescript
- * const metadata: ResourceMetadata = {
+ * const metadata: PanelResourceMetadata = {
  *   type: 'scripture',
  *   tags: ['NT', 'Gospel'],
  *   language: 'en',
@@ -51,7 +51,7 @@ function matchesCriteria(value: any, filter: any): boolean {
  * ```
  */
 export function matchesFilter(
-  metadata: ResourceMetadata | undefined,
+  metadata: PanelResourceMetadata | undefined,
   filter: ResourceFilter | undefined
 ): boolean {
   // No filter means match all
@@ -109,9 +109,9 @@ export function matchesFilter(
  * Handles both old (sourceResourceType) and new (sourceMetadata) formats
  */
 export function normalizeMetadata(
-  metadata: ResourceMetadata | undefined,
+  metadata: PanelResourceMetadata | undefined,
   legacyType: string | undefined
-): ResourceMetadata {
+): PanelResourceMetadata {
   if (metadata) return metadata
   
   if (legacyType) {

@@ -1,12 +1,14 @@
 /**
  * Dependency Resolver
- * 
+ *
  * Resolves resource dependencies and reorders download/load queues
  * to ensure dependencies are processed before dependent resources.
  */
 
+import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import type { ResourceDependency } from '@bt-synergy/resource-types'
+import { getDownloadPriority } from '../../config/loaderConfig'
 import type { ResourceCompletenessChecker } from './ResourceCompletenessChecker'
 
 export interface ResolvedResource {
@@ -16,15 +18,30 @@ export interface ResolvedResource {
   priority: number
 }
 
+/** CatalogManager plus optional legacy bulk listing. */
+type ResolverCatalogManager = CatalogManager & {
+  getAllResources?: () => Promise<ResourceMetadata[]>
+}
+
+type ResolverResourceTypeRegistry = {
+  get: (id: string) =>
+    | {
+        id?: string
+        downloadPriority?: number
+        dependencies?: Array<string | { resourceType: string }>
+      }
+    | undefined
+}
+
 export class DependencyResolver {
-  private catalogManager: any
-  private resourceTypeRegistry: any
+  private catalogManager: ResolverCatalogManager
+  private resourceTypeRegistry: ResolverResourceTypeRegistry
   private completenessChecker?: ResourceCompletenessChecker
   private debug: boolean
 
   constructor(
-    catalogManager: any,
-    resourceTypeRegistry: any,
+    catalogManager: ResolverCatalogManager,
+    resourceTypeRegistry: ResolverResourceTypeRegistry,
     completenessChecker?: ResourceCompletenessChecker,
     debug = false
   ) {
@@ -93,15 +110,15 @@ export class DependencyResolver {
     const targetOwner = dependency.owner || (dependency.sameOwner !== false ? sourceOwner : undefined)
     const targetLanguage = dependency.language || (dependency.sameLanguage ? sourceLanguage : undefined)
 
-    // Get all resources from catalog
-    const allResources = await this.catalogManager.getAllResources()
+    // Get all resources from catalog (legacy bulk API; absent on stock CatalogManager)
+    const allResources = (await this.catalogManager.getAllResources?.()) ?? []
 
     // Filter resources that match the dependency
     const matchingKeys: string[] = []
 
     for (const resource of allResources) {
       const resourceType = this.resourceTypeRegistry.get(resource.type)
-      
+
       // Check if resource type matches
       if (resourceType?.id !== dependency.resourceType) {
         continue
@@ -125,9 +142,7 @@ export class DependencyResolver {
       matchingKeys.push(resource.resourceKey)
     }
 
-    if (this.debug && matchingKeys.length > 0) {
-      console.log(`[DEP] Found ${matchingKeys.length} dependencies for ${sourceResourceKey}:`, matchingKeys)
-    }
+
 
     return matchingKeys
   }
@@ -141,13 +156,11 @@ export class DependencyResolver {
     resources: ResolvedResource[],
     skipComplete = true
   ): Promise<ResolvedResource[]> {
-    if (this.debug) {
-      console.log(`[DEP] Reordering ${resources.length} resources with dependency resolution...`)
-    }
+
 
     // Check which resources are already complete
     const completenessMap = new Map<string, boolean>()
-    
+
     if (skipComplete && this.completenessChecker) {
       for (const resource of resources) {
         const status = await this.completenessChecker.checkResource(resource.resourceKey)
@@ -160,16 +173,14 @@ export class DependencyResolver {
     if (skipComplete && this.completenessChecker) {
       const beforeCount = pendingResources.length
       pendingResources = pendingResources.filter(r => !completenessMap.get(r.resourceKey))
-      const skipped = beforeCount - pendingResources.length
-      
-      if (this.debug && skipped > 0) {
-        console.log(`[DEP] Skipped ${skipped} already-complete resources`)
-      }
+      const _skipped = beforeCount - pendingResources.length
+
+
     }
 
     // Resolve dependencies for pending resources
     const dependencyMap = new Map<string, string[]>()
-    
+
     for (const resource of pendingResources) {
       const deps = await this.resolveDependencies(resource.resourceKey)
       dependencyMap.set(resource.resourceKey, deps)
@@ -202,9 +213,7 @@ export class DependencyResolver {
         } else if (!depResource && !completenessMap.has(depKey)) {
           // Dependency is not in pending list and not checked for completeness
           // This means it might need to be added to the queue
-          if (this.debug) {
-            console.log(`[DEP] Dependency ${depKey} not in queue, checking status...`)
-          }
+
         }
       }
 
@@ -228,9 +237,9 @@ export class DependencyResolver {
     const finalOrder = this.sortByPriorityPreservingDependencies(ordered)
 
     if (this.debug) {
-      console.log(`[DEP] Reordering complete: ${finalOrder.length} resources in dependency order`)
+
       if (finalOrder.length <= 10) {
-        console.log('[DEP] Order:', finalOrder.map(r => r.resourceKey))
+        // intentionally empty
       }
     }
 
@@ -243,46 +252,46 @@ export class DependencyResolver {
   private sortByPriorityPreservingDependencies(resources: ResolvedResource[]): ResolvedResource[] {
     // Create dependency depth map
     const depthMap = new Map<string, number>()
-    
+
     const calculateDepth = (resource: ResolvedResource, visited = new Set<string>()): number => {
       if (depthMap.has(resource.resourceKey)) {
         return depthMap.get(resource.resourceKey)!
       }
-      
+
       if (visited.has(resource.resourceKey)) {
         return 0 // Circular - treat as depth 0
       }
-      
+
       visited.add(resource.resourceKey)
-      
+
       if (resource.dependencies.length === 0) {
         depthMap.set(resource.resourceKey, 0)
         return 0
       }
-      
+
       const maxDepth = Math.max(
         ...resource.dependencies.map(depKey => {
           const depResource = resources.find(r => r.resourceKey === depKey)
           return depResource ? calculateDepth(depResource, new Set(visited)) + 1 : 0
         })
       )
-      
+
       depthMap.set(resource.resourceKey, maxDepth)
       return maxDepth
     }
-    
+
     // Calculate depth for all resources
     resources.forEach(r => calculateDepth(r))
-    
+
     // Sort by depth first (dependencies come first), then by priority
     return resources.sort((a, b) => {
       const depthA = depthMap.get(a.resourceKey) || 0
       const depthB = depthMap.get(b.resourceKey) || 0
-      
+
       if (depthA !== depthB) {
         return depthA - depthB // Lower depth first (dependencies)
       }
-      
+
       return a.priority - b.priority // Then by priority
     })
   }
@@ -297,13 +306,13 @@ export class DependencyResolver {
   ): Promise<ResolvedResource[]> {
     const expanded = new Map<string, ResolvedResource>()
     const toProcess = [...resources]
-    
+
     // Add all original resources
     resources.forEach(r => expanded.set(r.resourceKey, r))
-    
+
     while (toProcess.length > 0) {
       const current = toProcess.shift()!
-      
+
       // Skip if already complete
       if (skipComplete && this.completenessChecker) {
         const status = await this.completenessChecker.checkResource(current.resourceKey)
@@ -311,52 +320,47 @@ export class DependencyResolver {
           continue
         }
       }
-      
+
       // Resolve dependencies
       const deps = await this.resolveDependencies(current.resourceKey)
-      
+
       for (const depKey of deps) {
         // Skip if already in expanded list
         if (expanded.has(depKey)) continue
-        
+
         // Skip if already complete
         if (skipComplete && this.completenessChecker) {
           const status = await this.completenessChecker.checkResource(depKey)
           if (status.isComplete) {
-            if (this.debug) {
-              console.log(`[DEP] Dependency ${depKey} already complete, skipping`)
-            }
+
             continue
           }
         }
-        
+
         // Get metadata for dependency
         const depMetadata = await this.catalogManager.getResourceMetadata(depKey)
         if (!depMetadata) continue
-        
-        // Get priority for dependency
-        const depResourceType = this.resourceTypeRegistry.get(depMetadata.type)
-        const depPriority = depResourceType?.downloadPriority ?? 50
-        
+
+        // Priority SoT: loaderConfig
+        const depPriority = getDownloadPriority(depMetadata.type)
+
         // Resolve dependencies of this dependency
         const depDeps = await this.resolveDependencies(depKey)
-        
+
         const depResource: ResolvedResource = {
           resourceKey: depKey,
           metadata: depMetadata,
           dependencies: depDeps,
           priority: depPriority
         }
-        
+
         expanded.set(depKey, depResource)
         toProcess.push(depResource)
-        
-        if (this.debug) {
-          console.log(`[DEP] Added missing dependency: ${depKey}`)
-        }
+
+
       }
     }
-    
+
     return Array.from(expanded.values())
   }
 }

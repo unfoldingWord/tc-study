@@ -8,19 +8,19 @@ import type { TokenDisplayProps } from '../types'
 
 export const TokenRenderer = memo(function TokenRenderer({
   token,
-  index,
+  index: _index,
   isHighlighted,
   isSelected,
   isUnderlined = false,
   onTokenClick,
-  isOriginalLanguage,
+  isOriginalLanguage: _isOriginalLanguage,
 }: TokenDisplayProps) {
   // Get token text (WordToken uses 'content' property)
   // Trim text/punctuation tokens to remove extra spaces
-  const rawText = token.content || (token as any).text || ''
+  const rawText = token.content || ''
   const tokenType = token.type as string
-  const tokenText = (tokenType === 'text' || tokenType === 'punctuation') 
-    ? rawText.trim() 
+  const tokenText = (tokenType === 'text' || tokenType === 'punctuation')
+    ? rawText.trim()
     : rawText
 
   // All word tokens are clickable:
@@ -36,7 +36,7 @@ export const TokenRenderer = memo(function TokenRenderer({
 
   // No padding for punctuation and text tokens (they should be adjacent to words)
   const paddingClass = (tokenType === 'punctuation' || tokenType === 'text') ? '' : 'px-0.5'
-  
+
   return (
     <span
       onClick={handleClick}

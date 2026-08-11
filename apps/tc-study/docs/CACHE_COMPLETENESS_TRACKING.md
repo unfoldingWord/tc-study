@@ -1,5 +1,8 @@
 # Cache Completeness Tracking System
 
+> **OBSOLETE snippets:** Any examples using `window.__catalogManager__` are historical.
+> Use `CatalogContext` / `useCatalogManager()` instead (see `src/lib/stores/stateOwnership.ts`).
+
 ## 🎯 Overview
 
 The cache completeness tracking system **automatically detects incomplete downloads** and resumes them in the background. Instead of manually triggering downloads, the system intelligently checks what's cached and what's missing, then starts the worker automatically.

@@ -378,7 +378,7 @@ console.log(meta.example)        // Example payload
 
 ### Use the Panel Communication Test Page
 
-1. Navigate to `/test/panels`
+1. Navigate to DEV-only `/test/panels` (`import.meta.env.DEV`; not in production)
 2. Load your resource in a panel
 3. Test sending signals with the "Send Token" button
 4. Load another resource in the second panel
@@ -477,7 +477,7 @@ See these files for real implementations:
 
 ### Signals not being received
 
-1. Check the Signal Monitor at `/test/panels`
+1. Check the Signal Monitor at DEV-only `/test/panels`
 2. Enable `debug: true` in `useSignalHandler`
 3. Verify the signal type matches exactly (case-sensitive)
 4. Check console for validation errors

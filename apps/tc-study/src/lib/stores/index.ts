@@ -1,11 +1,21 @@
 /**
- * Store exports
- * Zustand stores for TC Study
+ * Store exports — Zustand stores for TC Study.
+ *
+ * Ownership map: see `./stateOwnership.ts`.
  */
 
 export { usePackageStore } from './packageStore'
-export { usePanelStore } from './panelStore'
-export { useResourceStore } from './resourceStore'
-
-export type { BibleReference, PanelResource } from './panelStore'
-
+export {
+  useWorkspaceStore,
+  type PanelConfig,
+  type WorkspacePackage,
+  type WorkspaceStore,
+} from './workspaceStore'
+export {
+  useWizardStore,
+  type WizardLanguage,
+  type WizardMode,
+  type WizardOrganization,
+  type WizardStep,
+  type WizardStore,
+} from './wizardStore'

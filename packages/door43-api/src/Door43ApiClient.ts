@@ -7,6 +7,8 @@
  * @see .cursorrules for Door43 API guidelines
  */
 
+import { inferDoor43ResourceTypeId } from '@bt-synergy/resource-catalog'
+
 // ============================================================================
 // UTILITIES
 // ============================================================================
@@ -1009,30 +1011,11 @@ export class Door43ApiClient {
   }
 
   /**
-   * Infer resource type from ID and subject
+   * Infer resource type from ID and subject via shared RESOURCE_TYPE_IDS helper.
    * @private
    */
   private inferResourceType(id: string, _subject: string): string {
-    const typeMap: Record<string, string> = {
-      'ult': 'scripture',
-      'glt': 'scripture',
-      'ust': 'scripture',
-      'gst': 'scripture',
-      'ulb': 'scripture',
-      'udb': 'scripture',
-      'ugnt': 'scripture',
-      'uhb': 'scripture',
-      'tn': 'notes',
-      'tq': 'questions',
-      'tw': 'words',
-      'twl': 'words_links',
-      'ta': 'academy',
-      'obs': 'stories',
-      'obs-tn': 'notes',
-      'obs-tq': 'questions',
-    };
-
-    return typeMap[id.toLowerCase()] || 'unknown';
+    return inferDoor43ResourceTypeId(id);
   }
 
   // ==========================================================================

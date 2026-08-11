@@ -27,7 +27,7 @@ function highlightAffectsVerse(
 
 // Helper to get token ID (WordToken uses 'uniqueId' property)
 function getTokenId(token: WordToken): string {
-  return token.uniqueId || (token as any).id || ''
+  return token.uniqueId || ''
 }
 
 /**
@@ -146,7 +146,7 @@ export const VerseRenderer = memo(function VerseRenderer({
       const nextToken = filteredTokens[index + 1]
       const tokenId = getTokenId(token)
       const tokenVerseRef = token.verseRef || verse.reference
-      const tokenOccurrence = token.occurrence || (token as any).occ || 1
+      const tokenOccurrence = token.occurrence || 1
       
       // Generate semantic ID in format: verseRef:content:occurrence
       // This preserves Unicode characters and matches across languages
@@ -157,40 +157,47 @@ export const VerseRenderer = memo(function VerseRenderer({
       let isSelected = false
       
       if (highlightTarget) {
+        // Case-insensitive: book codes / verseRef casing can differ between OL tokens
+        // and \zaln-derived aligned IDs (coverage/underline checks already lowercase).
+        const tokenKey = tokenSemanticId.toLowerCase()
+        const targetKey = highlightTarget.semanticId.toLowerCase()
+        const alignedTargetKeys =
+          highlightTarget.alignedSemanticIds?.map((id) => id.toLowerCase()) ?? []
+
         if (isOriginalLanguage) {
           // For original language:
           // First check for EXACT match (when same token is clicked in this resource)
-          if (tokenSemanticId === highlightTarget.semanticId) {
+          if (tokenKey === targetKey) {
             isHighlighted = true
             isSelected = true
           }
           // Then check cross-panel alignment (when target language word is clicked in another resource)
           // When a target language word is clicked, it sends the IDs of original language words it aligns to
-          else if (highlightTarget.alignedSemanticIds && highlightTarget.alignedSemanticIds.length > 0) {
+          else if (alignedTargetKeys.length > 0) {
             // This token is highlighted if its ID is in the array of aligned original language IDs
-            isHighlighted = highlightTarget.alignedSemanticIds.includes(tokenSemanticId)
+            isHighlighted = alignedTargetKeys.includes(tokenKey)
           }
         } else {
           // For target language:
           // First check for EXACT match (when same token is clicked in this resource)
-          if (tokenSemanticId === highlightTarget.semanticId) {
+          if (tokenKey === targetKey) {
             isHighlighted = true
             isSelected = true
           }
           // Then check cross-panel alignment (when original language token is clicked in another resource)
           else if (token.alignedOriginalWordIds && token.alignedOriginalWordIds.length > 0) {
-            const alignedIds = token.alignedOriginalWordIds.map(id => String(id))
+            const alignedIds = token.alignedOriginalWordIds.map((id) => String(id).toLowerCase())
             
             // Check if the highlight target's semantic ID is in this token's alignment
             // (This handles: user clicks Greek word → English word highlights)
-            if (alignedIds.includes(highlightTarget.semanticId)) {
+            if (alignedIds.includes(targetKey)) {
               isHighlighted = true
               isSelected = true
             }
             // Also check if any of the target's aligned IDs match
             // (This handles: user clicks Greek word that aligns to multiple words)
-            else if (highlightTarget.alignedSemanticIds) {
-              isHighlighted = highlightTarget.alignedSemanticIds.some(id => alignedIds.includes(id))
+            else if (alignedTargetKeys.length > 0) {
+              isHighlighted = alignedTargetKeys.some((id) => alignedIds.includes(id))
             }
           }
         }
@@ -203,7 +210,7 @@ export const VerseRenderer = memo(function VerseRenderer({
         if (isOriginalLanguage) {
           isUnderlined = underlinedSemanticIds.has(key)
         } else {
-          const rawAlign = token.alignedOriginalWordIds || (token as any).align || []
+          const rawAlign = token.alignedOriginalWordIds || []
           const alignedIds = Array.isArray(rawAlign) ? rawAlign.map((id: unknown) => String(id)) : []
           isUnderlined = alignedIds.some((id) => underlinedSemanticIds.has(id.toLowerCase()))
         }

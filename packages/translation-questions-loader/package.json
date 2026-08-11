@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "echo \"Tests coming soon\""
+    "test": "node -e \"console.error('ERROR: translation-questions-loader has no real tests'); process.exit(1)\""
   },
   "dependencies": {
     "@bt-synergy/catalog-manager": "workspace:*",

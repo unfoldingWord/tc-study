@@ -111,4 +111,17 @@ export interface ResourceInfo extends ResourceMetadata {
   /** Synthetic combined TN+TWL row only — which TN/TWL resource keys backs this viewer. */
   helpsTnResourceKey?: string
   helpsTwlResourceKey?: string
+
+  /** Wizard / selection UI flags (ephemeral; not catalog SoT). */
+  isInWorkspace?: boolean
+  isCached?: boolean
+  isSupported?: boolean
+  isAutoIncluded?: boolean
+  hasDependencies?: boolean
+  dependenciesAvailable?: boolean
+  autoAddedDependencies?: string[]
+  missingDependencies?: unknown[]
+  viewerName?: string
+  /** Catalog display alias sometimes present on Door43 results. */
+  name?: string
 }

@@ -2,14 +2,18 @@
  * WordLinkCard Component
  *
  * Individual card for a Translation Words Link.
- * Design matches Notes entries: quote on top, entry link on bottom with modal icon.
+ * Design matches Notes entries: quote on top, first-paragraph preview, entry link on bottom.
  * Entry title stays more prominent than the quote.
  */
 
-import { ExternalLink, Loader } from 'lucide-react'
+import { ExternalLink, MoreHorizontal } from 'lucide-react'
 import { memo } from 'react'
+import { useAppStore } from '../../../../contexts/AppContext'
+import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
+import { parseTWLink } from '../../../../features/helps/quoteTokens'
+import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
+import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
 import type { TokenFilter, TranslationWordsLink } from '../types'
-import { parseTWLink } from '../utils'
 
 interface AlignedToken {
   content: string
@@ -23,6 +27,8 @@ interface WordLinkCardProps {
   isSelected: boolean
   twTitle: string
   isLoadingTitle: boolean
+  /** First content paragraph of the TW article; omit/null when not loaded or empty */
+  twPreview?: string | null
   onTitleClick: (link: TranslationWordsLink) => void  // Opens TW article modal
   onQuoteClick: (link: TranslationWordsLink) => void  // Broadcasts tokens for highlighting
   tokenFilter: TokenFilter | null
@@ -38,22 +44,24 @@ export const WordLinkCard = memo(function WordLinkCard({
   isSelected,
   twTitle,
   isLoadingTitle,
+  twPreview = null,
   onTitleClick,
   onQuoteClick,
-  tokenFilter,
+  tokenFilter: _tokenFilter,
   targetResourceId,
   languageDirection = 'ltr',
   obsMode = false,
 }: WordLinkCardProps) {
   const twInfo = parseTWLink(link.twLink)
   const isKeyTerm = twInfo.category === 'kt'
-  const alignedTokens = (link as any).alignedTokens
+  const alignedTokens = (link as TranslationWordsLink & { alignedTokens?: AlignedToken[] }).alignedTokens
   const hasAlignedTokens = alignedTokens && alignedTokens.length > 0
 
-  // Extract resource abbreviation (e.g., "ult" from "unfoldingWord/en/ult")
-  const resourceAbbreviation = targetResourceId
-    ? targetResourceId.split('/').pop()?.toUpperCase() || ''
-    : ''
+  // DCS abbreviation from AppStore (e.g. glt key → TPL); fall back to key segment
+  const targetScripture = useAppStore((s) =>
+    targetResourceId ? s.loadedResources[targetResourceId] : undefined
+  )
+  const resourceAbbreviation = getResourceBadgeLabel(targetResourceId, targetScripture)
 
   return (
     <div
@@ -130,6 +138,30 @@ export const WordLinkCard = memo(function WordLinkCard({
         </button>
       )}
 
+      {/* First-paragraph preview (mirrors TN note body — clicks bubble to card for quote highlight) */}
+      {twPreview ? (
+        <div className="relative mt-1.5" dir={languageDirection}>
+          <div className="pe-7">
+            <MarkdownRenderer
+              content={twPreview}
+              className="text-base text-gray-700 leading-relaxed prose prose-base max-w-none"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onTitleClick(link)
+            }}
+            className="absolute top-0 end-0 p-1 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+            title="See more"
+            aria-label="See more"
+          >
+            <MoreHorizontal className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : null}
+
       {/* Entry Link - On bottom, with modal icon (matches Notes support reference style) */}
       <div className="mt-1.5 pt-1.5 border-t border-gray-100/50">
         <button
@@ -142,10 +174,7 @@ export const WordLinkCard = memo(function WordLinkCard({
         >
           <ExternalLink className={`w-3.5 h-3.5 flex-shrink-0 ${isKeyTerm ? 'text-indigo-600' : 'text-teal-600'}`} />
           {isLoadingTitle ? (
-            <span className="flex items-center gap-2 italic text-gray-400 text-sm">
-              <Loader className="w-3.5 h-3.5 animate-spin" />
-              Loading...
-            </span>
+            <LoadingSpinner size="sm" label="Loading title" className="text-gray-400" />
           ) : (
             <span className={`font-semibold text-base group-hover/title:text-blue-600 transition-colors ${isKeyTerm ? 'text-indigo-900' : 'text-teal-900'}`}>
               {twTitle}

@@ -3,19 +3,35 @@
  * Shows loading state, content info, metadata, and highlight state
  */
 
-import type { ProcessedChapter, ProcessedScripture } from '@bt-synergy/usfm-processor'
+import type { ProcessedChapter, ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
 import { X } from 'lucide-react'
 import type { ReferenceState } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken } from '../types'
+
+type BookLike = string | { identifier?: string; code?: string; id?: string }
+type LangLike = { title?: string; name?: string; identifier?: string; code?: string }
+
+/** Debug-only metadata shape (catalog fields vary by resource). */
+type DebugCatalogMetadata = {
+  license?: unknown
+  longDescription?: unknown
+  licenseFile?: unknown
+  contentMetadata?: {
+    contentType?: unknown
+    preloadedBundleFile?: unknown
+    ingredients?: unknown[]
+  }
+  [key: string]: unknown
+}
 
 interface DebugPanelProps {
   isLoading: boolean
   error: Error | null
   loadedContent: ProcessedScripture | null
-  catalogMetadata: any
-  availableBooks: string[]
+  catalogMetadata: DebugCatalogMetadata | null
+  availableBooks: BookLike[]
   currentChapter: ProcessedChapter | null
-  displayVerses: any[]
+  displayVerses: ProcessedVerse[]
   currentRef: ReferenceState
   highlightTarget: OriginalLanguageToken | null
   onClose: () => void
@@ -103,32 +119,32 @@ export function DebugPanel({
               })}
               
               {/* Explicitly show license if present */}
-              {catalogMetadata.license && (
+              {catalogMetadata.license != null && (
                 <div className="bg-yellow-50 p-1 rounded">
-                  <strong>License:</strong> {catalogMetadata.license}
+                  <strong>License:</strong> {String(catalogMetadata.license)}
                 </div>
               )}
               
               {/* Long Description / README */}
-              {catalogMetadata.longDescription && (
+              {catalogMetadata.longDescription != null && (
                 <details className="mt-2">
                   <summary className="cursor-pointer text-gray-600 hover:text-gray-800 font-semibold">
                     📖 README / Long Description
                   </summary>
                   <div className="mt-2 text-xs bg-gray-50 p-3 rounded max-h-60 overflow-y-auto whitespace-pre-wrap">
-                    {catalogMetadata.longDescription}
+                    {String(catalogMetadata.longDescription)}
                   </div>
                 </details>
               )}
               
               {/* LICENSE File */}
-              {catalogMetadata.licenseFile && (
+              {catalogMetadata.licenseFile != null && (
                 <details className="mt-2">
                   <summary className="cursor-pointer text-gray-600 hover:text-gray-800 font-semibold">
                     📜 LICENSE File
                   </summary>
                   <div className="mt-2 text-xs bg-gray-50 p-3 rounded max-h-60 overflow-y-auto whitespace-pre-wrap font-mono">
-                    {catalogMetadata.licenseFile}
+                    {String(catalogMetadata.licenseFile)}
                   </div>
                 </details>
               )}
@@ -136,8 +152,8 @@ export function DebugPanel({
               {/* Show contentMetadata if present */}
               {catalogMetadata.contentMetadata && (
                 <>
-                  <div className="mt-2"><strong>Content Type:</strong> {catalogMetadata.contentMetadata.contentType || 'N/A'}</div>
-                  {catalogMetadata.contentMetadata.preloadedBundleFile && (
+                  <div className="mt-2"><strong>Content Type:</strong> {String(catalogMetadata.contentMetadata.contentType ?? 'N/A')}</div>
+                  {catalogMetadata.contentMetadata.preloadedBundleFile != null && (
                     <div><strong>Preloaded:</strong> ✅ Yes</div>
                   )}
                   {catalogMetadata.contentMetadata.ingredients && (
@@ -167,7 +183,10 @@ export function DebugPanel({
               <div className="max-h-20 overflow-y-auto mb-2">
                 {availableBooks.map((book, idx) => {
                   // Handle both string and object formats
-                  const bookCode = typeof book === 'string' ? book : (book as any).identifier || (book as any).code || (book as any).id || String(book)
+                  const bookCode =
+                    typeof book === 'string'
+                      ? book
+                      : book.identifier || book.code || book.id || String(book)
                   return <span key={idx}>{bookCode}{idx < availableBooks.length - 1 ? ', ' : ''}</span>
                 })}
               </div>
@@ -197,7 +216,7 @@ export function DebugPanel({
                 if (value && typeof value === 'object' && !Array.isArray(value)) {
                   // Handle language object specially
                   if (key === 'language') {
-                    const lang = value as any
+                    const lang = value as LangLike
                     return (
                       <div key={key}>
                         <strong>Language:</strong> {lang.title || lang.name || lang.identifier || lang.code || 'N/A'}

@@ -1,6 +1,6 @@
 /**
  * useBackgroundDownload Hook
- * 
+ *
  * Manages background resource downloads using a Web Worker for non-blocking operations.
  * Provides:
  * - Automatic download triggering when resources are loaded
@@ -10,6 +10,10 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import {
+  createInitialDownloadProgress,
+  shouldAcceptWorkerMessage,
+} from '../features/download/backgroundDownloadRun'
 import type { DownloadProgress } from '../lib/services/BackgroundDownloadManager'
 
 export type { DownloadProgress }
@@ -22,8 +26,8 @@ export interface BackgroundDownloadStats {
 }
 
 export interface UseBackgroundDownloadReturn {
-  /** Start downloading specific resources */
-  startDownload: (resourceKeys: string[]) => void
+  /** Start downloading specific resources; false if skipped (already downloading / no worker) */
+  startDownload: (resourceKeys: string[], totalIngredients?: number) => boolean
   /** Stop all downloads */
   stopDownload: () => void
   /** Current download statistics */
@@ -45,27 +49,25 @@ export interface UseBackgroundDownloadOptions {
 
 /**
  * Hook for managing background resource downloads
- * 
+ *
  * @example
  * ```typescript
  * const { startDownload, stopDownload, stats, isDownloading } = useBackgroundDownload({
  *   autoStart: true,
  *   skipExisting: true
  * })
- * 
+ *
  * // Start downloads manually
  * startDownload(['unfoldingWord/en/ult', 'unfoldingWord/en/tw'])
- * 
- * // Monitor progress
- * console.log('Progress:', stats.progress)
- * console.log('Downloading:', isDownloading)
+ *
+ * // Monitor progress via stats / isDownloading
  * ```
  */
 export function useBackgroundDownload(
   options: UseBackgroundDownloadOptions = {}
 ): UseBackgroundDownloadReturn {
   const {
-    autoStart = false,
+    autoStart: _autoStart = false,
     skipExisting = true,
     debug = false,
   } = options
@@ -81,13 +83,20 @@ export function useBackgroundDownload(
   // Worker reference
   const workerRef = useRef<Worker | null>(null)
   const isInitialized = useRef(false)
+  /** Avoid stale closure blocking start right after stopDownload (language switch). */
+  const isDownloadingRef = useRef(false)
+  /**
+   * Monotonic run id shared with the worker. Bumped on start/stop/unmount so
+   * in-flight progress/complete from a cancelled run cannot re-arm the UI.
+   */
+  const runIdRef = useRef(0)
 
   /**
    * Initialize the Web Worker
    */
   const initializeWorker = useCallback(() => {
     if (isInitialized.current) return
-    
+
     try {
       // Create worker
       workerRef.current = new Worker(
@@ -97,47 +106,48 @@ export function useBackgroundDownload(
 
       // Handle messages from worker
       workerRef.current.onmessage = (event) => {
-        const { type, payload } = event.data
+        const { type, payload, runId } = event.data as {
+          type: string
+          payload: DownloadProgress | { message?: string; queue?: string[] } | null
+          runId?: unknown
+        }
 
-        // Only log non-progress messages or significant progress milestones to avoid console spam
-        if (debug && type !== 'progress') {
-          console.log('[BG-DL] 🔌 Hook Worker message:', type, payload)
-        } else if (debug && type === 'progress' && payload.overallProgress % 10 === 0) {
-          // Only log progress at 0%, 10%, 20%, ... 100% milestones (overall progress, not per-resource)
-          const completed = payload.completedIngredients || 0
-          const total = payload.totalIngredients || 0
-          console.log(`[BG-DL] 🔌 Hook Progress: ${completed}/${total} ingredients (${payload.overallProgress}%)`)
+        // Drop superseded runs (language-switch stop/start overlap, unmount).
+        if (!shouldAcceptWorkerMessage(runIdRef.current, runId)) {
+          return
         }
 
         switch (type) {
           case 'progress':
+            // stopDownload clears the ref first; ignore cancel-time notifies
+            if (!isDownloadingRef.current) return
             setStats((prev) => ({
               ...prev,
               isDownloading: true,
-              progress: payload,
+              progress: payload as DownloadProgress,
               error: null,
             }))
             break
 
           case 'complete':
-            console.log('[BG-DL] 🔌 Hook ✅ Downloads complete:', {
-              completed: payload.completedIngredients,
-              total: payload.totalIngredients,
-              failed: payload.failedIngredients
-            })
+            isDownloadingRef.current = false
             setStats((prev) => ({
               ...prev,
               isDownloading: false,
-              progress: payload,
+              progress: (payload as DownloadProgress | null) ?? null,
               queue: [],
             }))
             break
 
           case 'error':
+            isDownloadingRef.current = false
             setStats((prev) => ({
               ...prev,
               isDownloading: false,
-              error: payload.message,
+              error:
+                payload && typeof payload === 'object' && 'message' in payload
+                  ? String((payload as { message?: string }).message ?? 'Worker error')
+                  : 'Worker error',
             }))
             console.error('[BG-DL] 🔌 Hook Worker error:', payload)
             break
@@ -145,7 +155,10 @@ export function useBackgroundDownload(
           case 'queue-updated':
             setStats((prev) => ({
               ...prev,
-              queue: payload.queue,
+              queue:
+                payload && typeof payload === 'object' && 'queue' in payload
+                  ? ((payload as { queue?: string[] }).queue ?? prev.queue)
+                  : prev.queue,
             }))
             break
 
@@ -159,6 +172,8 @@ export function useBackgroundDownload(
       // Handle worker errors
       workerRef.current.onerror = (error) => {
         console.error('[BG-DL] 🔌 Hook Worker error:', error)
+        runIdRef.current += 1
+        isDownloadingRef.current = false
         setStats((prev) => ({
           ...prev,
           isDownloading: false,
@@ -167,10 +182,8 @@ export function useBackgroundDownload(
       }
 
       isInitialized.current = true
-      
-      if (debug) {
-        console.log('[BG-DL] 🔌 Hook Worker initialized')
-      }
+
+
     } catch (error) {
       console.error('[BG-DL] 🔌 Hook Failed to initialize worker:', error)
       setStats((prev) => ({
@@ -184,15 +197,13 @@ export function useBackgroundDownload(
    * Start downloading specific resources
    * @param resourceKeys - List of resources to download
    * @param totalIngredients - Pre-calculated total number of ingredients across all resources
+   * @returns false when skipped (already downloading or worker unavailable)
    */
   const startDownload = useCallback(
-    (resourceKeys: string[], totalIngredients?: number) => {
+    (resourceKeys: string[], totalIngredients?: number): boolean => {
       // ⚠️ Prevent starting new downloads if already downloading
-      if (stats.isDownloading) {
-        if (debug) {
-          console.log('[BG-DL] 🔌 Hook Skipping download request - already downloading')
-        }
-        return
+      if (isDownloadingRef.current) {
+        return false
       }
 
       if (!workerRef.current) {
@@ -201,52 +212,56 @@ export function useBackgroundDownload(
 
       if (!workerRef.current) {
         console.error('[BG-DL] 🔌 Hook Worker not available')
-        return
+        return false
       }
 
-      if (debug) {
-        console.log('[BG-DL] 🔌 Hook Starting downloads:', resourceKeys, totalIngredients ? `(${totalIngredients} total ingredients)` : '')
-      }
-
+      runIdRef.current += 1
+      const runId = runIdRef.current
+      isDownloadingRef.current = true
       workerRef.current.postMessage({
         type: 'start',
         payload: {
           resourceKeys,
           skipExisting,
-          totalIngredients, // ✅ Pass pre-calculated total to worker
+          totalIngredients,
+          runId,
         },
       })
 
-      setStats((prev) => ({
-        ...prev,
+      setStats({
         isDownloading: true,
+        progress: createInitialDownloadProgress(resourceKeys, totalIngredients),
         queue: resourceKeys,
         error: null,
-      }))
+      })
+      return true
     },
-    [initializeWorker, skipExisting, debug, stats.isDownloading]
+    [initializeWorker, skipExisting]
   )
 
   /**
    * Stop all downloads
    */
   const stopDownload = useCallback(() => {
-    if (!workerRef.current) return
+    // Invalidate in-flight progress/complete before the worker replies
+    runIdRef.current += 1
+    const runId = runIdRef.current
+    isDownloadingRef.current = false
 
-    if (debug) {
-      console.log('[BG-DL] 🔌 Hook Stopping downloads')
+    if (workerRef.current) {
+      workerRef.current.postMessage({
+        type: 'stop',
+        payload: { runId },
+      })
     }
 
-    workerRef.current.postMessage({
-      type: 'stop',
-    })
-
-    setStats((prev) => ({
-      ...prev,
+    setStats({
       isDownloading: false,
+      progress: null,
       queue: [],
-    }))
-  }, [debug])
+      error: null,
+    })
+  }, [])
 
   /**
    * Initialize worker on mount
@@ -255,11 +270,16 @@ export function useBackgroundDownload(
     initializeWorker()
 
     return () => {
-      // Cleanup worker on unmount
+      // Invalidate + clear so StrictMode/HMR terminate cannot leave a stuck 0% UI
+      runIdRef.current += 1
+      isDownloadingRef.current = false
+      setStats({
+        isDownloading: false,
+        progress: null,
+        queue: [],
+        error: null,
+      })
       if (workerRef.current) {
-        if (debug) {
-          console.log('[BG-DL] 🔌 Hook Cleaning up worker')
-        }
         workerRef.current.terminate()
         workerRef.current = null
         isInitialized.current = false

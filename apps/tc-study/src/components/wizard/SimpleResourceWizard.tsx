@@ -1,15 +1,11 @@
 /**
  * SimpleResourceWizard - Fast and easy resource addition
- * 
+ *
  * Minimal-click interface for adding resources to panels
  */
 
-import type { ResourceMetadata } from '@bt-synergy/catalog-manager'
-import { BookOpen, BookText, Check, Download, Library, Link as LinkIcon, MessageSquare, Package, Plus, Search, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { useCatalogManager } from '../../contexts'
-import { useAppStore } from '../../contexts/AppContext'
-import { usePackageStore } from '../../lib/stores/packageStore'
+import { BookOpen, Check, Download, Library, Package, Plus, Search, X } from 'lucide-react'
+import { useSimpleResourceWizard } from '../../features/wizard/useSimpleResourceWizard'
 import { AddToCatalogWizard } from '../catalog/AddToCatalogWizard'
 import { SimpleCollectionCreator } from '../collections/SimpleCollectionCreator'
 
@@ -19,162 +15,31 @@ interface SimpleResourceWizardProps {
   onAddResource: (resourceId: string) => void
 }
 
-type SubModal = 'add-to-catalog' | 'create-collection' | null
-
 export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: SimpleResourceWizardProps) {
-  const [activeTab, setActiveTab] = useState<'collections' | 'catalog'>('collections')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [addedResources, setAddedResources] = useState<Set<string>>(new Set())
-  const [subModal, setSubModal] = useState<SubModal>(null)
-  const [previousModal, setPreviousModal] = useState<SubModal>(null) // Track the previous modal for back navigation
-  const [catalogResources, setCatalogResources] = useState<any[]>([])
-  const [isLoadingCatalog, setIsLoadingCatalog] = useState(true)
-
-  // Get real data from stores
-  const packages = usePackageStore((s: any) => s.packages) || []
-  const loadedResources = useAppStore((s) => s.loadedResources)
-  const catalogManager = useCatalogManager()
-  
-  // Shared function to load catalog resources
-  const loadCatalogResources = async () => {
-    try {
-      setIsLoadingCatalog(true)
-      
-      // Use the standard searchResources method with empty filters to get all resources
-      const allMetadata = await catalogManager.searchResources({})
-      
-      console.log(`📚 Found ${allMetadata.length} resources in catalog`)
-      
-      const resources = allMetadata
-        .filter((metadata): metadata is ResourceMetadata => metadata !== null)
-        .map((metadata) => {
-          try {
-            console.log(`🔍 Processing resource:`, metadata.resourceKey)
-            
-            // ResourceType is a string enum in our catalog — stringify for display rows
-            let typeString = String(metadata.type ?? 'unknown')
-            
-            const resource = {
-              id: metadata.resourceKey,
-              name: metadata.title || metadata.resourceKey,
-              owner: metadata.owner || 'unknown',
-              language: metadata.language || 'en',
-              type: typeString,
-              subject: metadata.subject || 'unknown',
-              downloaded: true,
-            }
-            console.log(`✅ Created resource object for ${metadata.resourceKey}:`, resource)
-            return resource
-          } catch (err) {
-            console.error(`❌ Failed to process resource ${metadata.resourceKey}:`, err)
-            return null
-          }
-        })
-        .filter((r): r is NonNullable<typeof r> => r !== null)
-      
-      const validResources = resources.filter(r => r !== null)
-      console.log(`✅ Loaded ${validResources.length} valid resources from catalog`)
-      setCatalogResources(validResources)
-    } catch (error) {
-      console.error('❌ Failed to load catalog resources:', error)
-    } finally {
-      setIsLoadingCatalog(false)
-    }
-  }
-
-  // Load catalog resources on mount
-  useEffect(() => {
-    loadCatalogResources()
-  }, [catalogManager])
-
-  // Get icon for resource type
-  const getResourceIcon = (type: string) => {
-    switch (type) {
-      case 'scripture': return BookOpen
-      case 'words': return BookText
-      case 'notes': return MessageSquare
-      case 'words-links': return LinkIcon
-      default: return Library
-    }
-  }
-
-  // Transform packages into collections format
-  const collections = useMemo(() => {
-    return packages.map((pkg: any) => ({
-      id: pkg.id,
-      name: pkg.title || pkg.name || pkg.id,
-      resources: catalogResources
-        .filter((r: any) => pkg.resources?.includes(r.id) || pkg.resourceIds?.includes(r.id))
-        .map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          type: r.type || 'unknown',
-          icon: getResourceIcon(r.type || 'unknown'),
-        }))
-    })).filter((c: any) => c.resources.length > 0)
-  }, [packages, catalogResources])
-
-  // Filter catalog resources to exclude those in collections
-  const catalogOnlyResources = useMemo(() => {
-    const collectionResourceIds = new Set(
-      collections.flatMap((c: any) => c.resources.map((r: any) => r.id))
-    )
-    
-    return catalogResources.filter((r: any) => !collectionResourceIds.has(r.id))
-  }, [catalogResources, collections])
+  const {
+    activeTab,
+    setActiveTab,
+    searchQuery,
+    setSearchQuery,
+    addedResources,
+    subModal,
+    setSubModal,
+    previousModal,
+    collections,
+    catalogOnlyResources,
+    filteredCatalogResources,
+    isLoadingCatalog,
+    handleAddResource,
+    handleCatalogComplete,
+    handleCollectionComplete,
+    handleOpenCatalogFromCollection,
+    handleBackFromCatalog,
+    setPreviousModal,
+  } = useSimpleResourceWizard(onAddResource)
 
   const panelColor = targetPanel === 'panel-1' ? 'blue' : 'purple'
   const panelNumber = targetPanel === 'panel-1' ? '1' : '2'
 
-  const handleAddResource = (resourceId: string) => {
-    onAddResource(resourceId)
-    setAddedResources(prev => new Set([...prev, resourceId]))
-  }
-
-  const filteredCatalogResources = catalogOnlyResources.filter(r =>
-    r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.owner.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  // Handle sub-modal completion
-  const handleCatalogComplete = async () => {
-    // Reload catalog resources after import
-    console.log('🔄 Reloading catalog after adding resources...')
-    await loadCatalogResources()
-    
-    // If we came from collection creator, go back to it
-    if (previousModal === 'create-collection') {
-      setSubModal('create-collection')
-      setPreviousModal(null)
-    } else {
-      setSubModal(null)
-      setPreviousModal(null)
-    }
-  }
-
-  const handleCollectionComplete = (collectionId?: string) => {
-    setSubModal(null)
-    setPreviousModal(null)
-    console.log('✅ Collection created:', collectionId)
-    // Could refresh collections list here
-  }
-
-  const handleOpenCatalogFromCollection = () => {
-    setPreviousModal('create-collection') // Remember we came from collection creator
-    setSubModal('add-to-catalog')
-  }
-
-  const handleBackFromCatalog = () => {
-    // Go back to the previous modal (collection creator)
-    if (previousModal) {
-      setSubModal(previousModal)
-      setPreviousModal(null)
-    } else {
-      setSubModal(null)
-    }
-  }
-
-  // If a sub-modal is open, render it instead
   if (subModal === 'add-to-catalog') {
     return (
       <AddToCatalogWizard
@@ -335,14 +200,14 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
                   </div>
                 </div>
               ) : (
-                collections.map((collection: any) => (
+                collections.map((collection) => (
                   <div key={collection.id} className="border border-gray-200 rounded-lg p-4">
                     <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                       <Package className="w-5 h-5 text-gray-600" />
                       {collection.name}
                     </h3>
                     <div className="space-y-2">
-                      {collection.resources.map((resource: any) => {
+                      {collection.resources.map((resource) => {
                         const isAdded = addedResources.has(resource.id)
                         const Icon = resource.icon
                         return (

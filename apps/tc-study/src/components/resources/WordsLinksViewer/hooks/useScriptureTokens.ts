@@ -1,16 +1,14 @@
 /**
  * useScriptureTokens Hook
- * 
+ *
  * Simple hook to receive scripture tokens from active panels via broadcast.
  * Replaces the complex request/response pattern with a simple state listener.
- * 
- * Note: Uses useCurrentState from linked-panels to receive STATE lifecycle signals.
- * useSignalHandler from @bt-synergy/resource-panels only works with EVENT lifecycle signals.
+ *
+ * Uses resource-panels STATE subscribe (`useResourceState`).
  */
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
-import { useCurrentState } from 'linked-panels'
-import { useEffect } from 'react'
+import { RESOURCE_STATE_KEYS, useResourceState } from '@bt-synergy/resource-panels'
 import type { ScriptureTokensBroadcastSignal } from '../../../../signals/studioSignals'
 
 interface UseScriptureTokensOptions {
@@ -37,17 +35,16 @@ interface ScriptureTokensResult {
 }
 
 export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): ScriptureTokensResult {
-  // Use useCurrentState from linked-panels to receive state lifecycle signals
-  const scriptureTokensBroadcast = useCurrentState<ScriptureTokensBroadcastSignal>(
+  const scriptureTokensBroadcast = useResourceState<ScriptureTokensBroadcastSignal>(
     resourceId,
-    'current-scripture-tokens'
+    RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS
   )
-  
+
   const isClearMessage =
     scriptureTokensBroadcast &&
     scriptureTokensBroadcast.tokens.length === 0 &&
     !scriptureTokensBroadcast.reference.book
-  
+
   if (!scriptureTokensBroadcast || isClearMessage) {
     return {
       tokens: [],
@@ -57,7 +54,7 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
       sourceResourceId: null,
     }
   }
-  
+
   return {
     tokens: scriptureTokensBroadcast.tokens,
     reference: scriptureTokensBroadcast.reference,

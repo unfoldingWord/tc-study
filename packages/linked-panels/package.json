@@ -1,7 +1,8 @@
 {
   "name": "@bt-synergy/linked-panels",
+  "private": true,
   "version": "1.0.0",
-  "description": "Cross-panel communication system for coordinated resource interactions",
+  "description": "[ARCHIVED stub] Do not use — SoT is npm linked-panels (see ARCHIVED.md)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

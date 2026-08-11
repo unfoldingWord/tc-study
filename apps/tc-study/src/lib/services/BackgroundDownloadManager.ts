@@ -7,10 +7,23 @@
  * Resolves and handles dependencies automatically.
  */
 
+import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import type { ProgressCallback } from '@bt-synergy/resource-types'
+import { getDownloadPriority } from '../../config/loaderConfig'
+import type { LoaderRegistry } from '../loaders/LoaderRegistry'
 import type { ResourceCompletenessChecker } from './ResourceCompletenessChecker'
 import { DependencyResolver, type ResolvedResource } from './DependencyResolver'
+
+/** CatalogManager plus optional legacy bulk listing used by download-all. */
+type DownloadCatalogManager = CatalogManager & {
+  getAllResources?: () => Promise<ResourceMetadata[]>
+}
+
+/** Full registry or worker stub used only for get()/priority. */
+type DownloadResourceTypeRegistry = {
+  get: (id: string) => { id?: string; downloadPriority?: number } | undefined
+}
 
 export interface DownloadTask {
   resourceKey: string
@@ -46,9 +59,9 @@ export interface DownloadProgress {
 }
 
 export class BackgroundDownloadManager {
-  private loaderRegistry: any
-  private catalogManager: any
-  private resourceTypeRegistry: any
+  private loaderRegistry: LoaderRegistry
+  private catalogManager: DownloadCatalogManager
+  private resourceTypeRegistry: DownloadResourceTypeRegistry
   private completenessChecker?: ResourceCompletenessChecker
   private dependencyResolver: DependencyResolver
   private config: Required<DownloadManagerConfig>
@@ -57,9 +70,9 @@ export class BackgroundDownloadManager {
   private onProgressCallback?: (progress: DownloadProgress) => void
 
   constructor(
-    loaderRegistry: any,
-    catalogManager: any,
-    resourceTypeRegistry: any,
+    loaderRegistry: LoaderRegistry,
+    catalogManager: DownloadCatalogManager,
+    resourceTypeRegistry: DownloadResourceTypeRegistry,
     config?: DownloadManagerConfig,
     completenessChecker?: ResourceCompletenessChecker
   ) {
@@ -100,13 +113,13 @@ export class BackgroundDownloadManager {
     }
 
     this.isDownloading = true
-    console.log('📦 [BG-DL] 📥 Manager Starting background downloads with dependency resolution...')
+
 
     try {
-      // Get all resources from catalog
-      const resources = await this.catalogManager.getAllResources()
-      if (!resources || resources.length === 0) {
-        console.log('ℹ️ No resources in catalog to download')
+      // Get all resources from catalog (legacy bulk API; absent on stock CatalogManager)
+      const resources = (await this.catalogManager.getAllResources?.()) ?? []
+      if (resources.length === 0) {
+
         return
       }
 
@@ -117,18 +130,18 @@ export class BackgroundDownloadManager {
       })
 
       if (downloadableResources.length === 0) {
-        console.log('ℹ️ No downloadable resources found')
+
         return
       }
 
-      console.log(`📋 Found ${downloadableResources.length} downloadable resources`)
+
 
       // Convert to ResolvedResource format with priorities and dependencies
       const resolvedResources: ResolvedResource[] = []
       
       for (const resource of downloadableResources) {
-        const resourceType = this.resourceTypeRegistry.get(resource.type)
-        const priority = resourceType?.downloadPriority ?? 50
+        // Priority SoT: loaderConfig (not plugin field copies)
+        const priority = getDownloadPriority(resource.type)
         
         // Resolve dependencies for this resource
         const dependencies = await this.dependencyResolver.resolveDependencies(resource.resourceKey)
@@ -142,13 +155,13 @@ export class BackgroundDownloadManager {
       }
 
       // Expand list to include missing dependencies
-      console.log('🔍 [BG-DL] Resolving and expanding dependencies...')
+
       const expandedResources = await this.dependencyResolver.expandWithDependencies(
         resolvedResources,
         this.config.skipExisting
       )
 
-      console.log(`📦 [BG-DL] Expanded to ${expandedResources.length} resources (including dependencies)`)
+
 
       // Reorder with dependency resolution (also filters out complete resources)
       const orderedResources = await this.dependencyResolver.reorderWithDependencies(
@@ -157,11 +170,11 @@ export class BackgroundDownloadManager {
       )
 
       if (orderedResources.length === 0) {
-        console.log('✅ [BG-DL] All resources already downloaded')
+
         return
       }
 
-      console.log(`📥 [BG-DL] Queued ${orderedResources.length} resources for download (after filtering complete)`)
+
 
       // Create download tasks
       this.tasks.clear()
@@ -182,7 +195,7 @@ export class BackgroundDownloadManager {
         if (this.config.skipExisting && this.completenessChecker) {
           const status = await this.completenessChecker.checkResource(resolved.resourceKey)
           if (status.isComplete) {
-            console.log(`⏭️  [BG-DL] Skipping ${resolved.resourceKey} (already complete)`)
+
             const task = this.tasks.get(resolved.resourceKey)
             if (task) {
               task.status = 'completed'
@@ -197,7 +210,7 @@ export class BackgroundDownloadManager {
         await this.downloadResource(resolved.resourceKey)
       }
 
-      console.log('✅ [BG-DL] 📥 Manager All downloads complete')
+
     } finally {
       this.isDownloading = false
     }
@@ -242,13 +255,13 @@ export class BackgroundDownloadManager {
       let method = this.config.downloadMethod
       if (metadata.release?.zipball_url) {
         method = 'zip'
-        console.log(`📦 Using ZIP method for ${resourceKey} (zipball available)`)
+
       } else {
         method = 'individual'
-        console.log(`📄 Using individual method for ${resourceKey} (no zipball)`)
+
       }
 
-      console.log(`📥 Downloading ${resourceKey} with method: ${method}`)
+
 
       // Create progress callback
       const onProgress: ProgressCallback = (progress) => {
@@ -280,7 +293,7 @@ export class BackgroundDownloadManager {
         })
       }
 
-      console.log(`✅ Downloaded ${resourceKey}`)
+
     } catch (error) {
       console.error(`❌ Failed to download ${resourceKey}:`, error)
       task.status = 'failed'
@@ -331,7 +344,7 @@ export class BackgroundDownloadManager {
    * Cancel all downloads (if possible)
    */
   async cancelDownloads(): Promise<void> {
-    console.log('🛑 [BG-DL] 📥 Manager Cancelling downloads...')
+
     this.isDownloading = false
     
     // Update all pending tasks to cancelled
