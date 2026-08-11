@@ -45,6 +45,18 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Vite aliases root node_modules/linked-panels/dist (npm package). Bun sometimes
+      # leaves the symlink without extracting dist on clean Linux runners — repair if needed.
+      - name: Ensure linked-panels dist
+        run: |
+          if [ ! -f node_modules/linked-panels/dist/index.js ]; then
+            echo "linked-panels dist missing after install; forcing reinstall of package"
+            rm -rf node_modules/linked-panels node_modules/.bun/linked-panels@*
+            bun install --frozen-lockfile
+          fi
+          test -f node_modules/linked-panels/dist/index.js
+          ls -la node_modules/linked-panels/dist/index.js
+
       # Build package deps without swallowing errors (no `|| true`)
       - name: Build workspace packages (tc-study deps)
         run: bunx turbo run build --filter=tc-study^...

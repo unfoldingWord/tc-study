@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "bt-synergy-monorepo",
+      "dependencies": {
+        "linked-panels": "1.0.0-beta.2",
+      },
       "devDependencies": {
         "cross-env": "^7.0.3",
         "turbo": "latest",
