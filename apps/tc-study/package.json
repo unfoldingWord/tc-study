@@ -19,14 +19,15 @@
     "test": "bun test src",
     "test:behavior": "node scripts/test-lanes.cjs behavior",
     "test:arch": "node scripts/test-lanes.cjs arch",
-    "check": "bun test src && bun run type-check && bun run lint",
+    "check": "node scripts/write-app-version.cjs && bun test src && bun run type-check && bun run lint",
     "test:e2e": "node scripts/e2e-free-port.cjs && playwright test",
     "test:e2e:ui": "node scripts/e2e-free-port.cjs && playwright test --ui",
     "test:e2e:install": "playwright install chromium",
     "deploy": "bash scripts/deploy.sh",
     "deploy:cf": "bash scripts/deploy.sh",
     "deploy:UNSAFE_master-without-check": "node scripts/unsafe-deploy-master-without-check.cjs",
-    "build:analyze": "bunx vite-bundle-visualizer -t treemap -o dist/stats.html --open true"
+    "build:analyze": "bunx vite-bundle-visualizer -t treemap -o dist/stats.html --open true",
+    "pretype-check": "node scripts/write-app-version.cjs"
   },
   "dependencies": {
     "@bt-synergy/cache-adapter-indexeddb": "workspace:*",
