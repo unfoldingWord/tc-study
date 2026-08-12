@@ -55,8 +55,18 @@ export {
   projectToProcessedScripture,
   viewModelFromProcessedScripture,
   usjTokensFromProcessedVerse,
+  buildUsjLayoutBlocks,
+  filterUsjLayoutBlocks,
+  indentLevelForMarker,
+  roleForMarker,
   USJ_PROCESSING_VERSION,
   USJ_TOOL_VERSIONS,
+} from '@bt-synergy/usj-processor'
+export type {
+  UsjLayoutBlock,
+  UsjLayoutInline,
+  UsjLayoutBlockRole,
+  FilterUsjLayoutOptions,
 } from '@bt-synergy/usj-processor'
 
 /**
