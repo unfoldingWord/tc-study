@@ -56,12 +56,12 @@ export function PanelHeader({
 
   const colors = {
     blue: {
-      gradient: 'from-panel-1-soft to-canvas',
+      strip: 'bg-panel-1-soft/70',
       button: 'hover:bg-accent/15 active:bg-accent/25',
       icon: 'text-panel-1-fg',
     },
     purple: {
-      gradient: 'from-panel-2-soft to-canvas',
+      strip: 'bg-panel-2-soft/70',
       button: 'hover:bg-panel-2/15 active:bg-panel-2/25',
       icon: 'text-panel-2-fg',
     },
@@ -69,8 +69,8 @@ export function PanelHeader({
   const c = colors[colorScheme]
 
   return (
-    <div className={`px-2 pt-1.5 pb-0 md:px-3 md:pt-2 md:pb-0 bg-gradient-to-r ${c.gradient}`}>
-      <div className="flex items-center gap-2 min-w-0">
+    <div className={`px-chrome pt-chrome-tight pb-0 border-b border-border-subtle ${c.strip}`}>
+      <div className="flex items-center gap-chrome-tight min-w-0">
         <ResourceTabs
           resources={resources}
           currentIndex={currentIndex}
@@ -90,13 +90,13 @@ export function PanelHeader({
           <div className="relative flex-shrink-0" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
-              className={`p-2.5 min-w-10 min-h-10 flex items-center justify-center rounded ${c.button} transition-colors`}
+              className={`p-chrome min-w-8 min-h-8 flex items-center justify-center rounded-md ${c.button} transition-colors`}
               title="Actions"
               aria-label="Resource actions"
               aria-expanded={menuOpen}
               aria-haspopup="true"
             >
-              <MoreVertical className={`w-5 h-5 ${c.icon}`} />
+              <MoreVertical className={`w-4 h-4 ${c.icon}`} />
             </button>
             {menuOpen && (
               <div

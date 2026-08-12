@@ -100,12 +100,12 @@ export function NavigationBarCompact({
   )
 
   return (
-    <div className="flex items-center gap-2 w-full">
-      <div className="flex items-center gap-1">
+    <div className="flex items-center gap-chrome-tight w-full">
+      <div className="flex items-center gap-0.5">
         {navigation.canGoBack() && (
           <button
             onClick={() => navigation.goBack()}
-            className="p-2 rounded-full hover:bg-muted text-fg-secondary hover:text-fg transition-colors"
+            className="p-chrome-tight rounded-full hover:bg-muted text-fg-secondary hover:text-fg transition-colors"
             title="Go back in navigation history"
             aria-label="Go back"
           >
@@ -115,11 +115,11 @@ export function NavigationBarCompact({
       </div>
 
       <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center gap-2 bg-accent-soft px-2 py-2 rounded-full">
+        <div className="flex items-center gap-chrome-tight bg-accent-soft px-chrome py-chrome-tight rounded-full">
           <button
             onClick={isRtl ? handleNext : handlePrevious}
             disabled={isRtl ? !canGoNext() : !canGoPrevious()}
-            className="w-7 h-7 rounded-full bg-accent/25 hover:bg-accent/35 disabled:opacity-40 disabled:cursor-not-allowed text-accent-fg transition-colors flex items-center justify-center flex-shrink-0"
+            className="w-6 h-6 rounded-full bg-accent/25 hover:bg-accent/35 disabled:opacity-40 disabled:cursor-not-allowed text-accent-fg transition-colors flex items-center justify-center flex-shrink-0"
             title={isRtl ? `Next ${modeLabel}` : `Previous ${modeLabel}`}
             aria-label={isRtl ? 'Next' : 'Previous'}
           >
@@ -165,11 +165,11 @@ export function NavigationBarCompact({
             )}
           </div>
 
-          <div className="w-px h-6 bg-accent/30" />
+          <div className="w-px h-5 bg-accent/30" />
 
           <button
             onClick={() => setIsNavigatorOpen(true)}
-            className="px-3 py-1 hover:bg-accent/15 text-sm font-medium text-accent-fg transition-colors rounded-md inline-flex items-center gap-1"
+            className="px-chrome py-0.5 hover:bg-accent/15 text-chrome font-medium text-accent-fg transition-colors rounded-md inline-flex items-center gap-chrome-tight"
             title="Click to navigate or adjust range"
             dir={isRtl && currentRef.book !== 'obs' ? 'rtl' : 'ltr'}
           >
@@ -189,7 +189,7 @@ export function NavigationBarCompact({
           <button
             onClick={isRtl ? handlePrevious : handleNext}
             disabled={isRtl ? !canGoPrevious() : !canGoNext()}
-            className="w-7 h-7 rounded-full bg-accent/25 hover:bg-accent/35 disabled:opacity-40 disabled:cursor-not-allowed text-accent-fg transition-colors flex items-center justify-center flex-shrink-0"
+            className="w-6 h-6 rounded-full bg-accent/25 hover:bg-accent/35 disabled:opacity-40 disabled:cursor-not-allowed text-accent-fg transition-colors flex items-center justify-center flex-shrink-0"
             title={isRtl ? `Previous ${modeLabel}` : `Next ${modeLabel}`}
             aria-label={isRtl ? 'Previous' : 'Next'}
           >
@@ -198,7 +198,7 @@ export function NavigationBarCompact({
         </div>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-chrome-tight">
         {downloadIndicator}
         {showLanguagePicker && (
           <LanguagePicker

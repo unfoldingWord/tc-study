@@ -28,16 +28,16 @@ export function ResourceViewerHeader({
   direction = 'ltr',
 }: ResourceViewerHeaderProps) {
   return (
-    <div className="flex-shrink-0 px-4 py-3 mt-2" dir={direction}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 min-w-0">
+    <div className="flex-shrink-0 px-content py-chrome border-b border-border-subtle/80" dir={direction}>
+      <div className="flex items-center justify-between gap-stack">
+        <div className="flex items-center gap-chrome-tight min-w-0">
           {Icon && <Icon className="w-3.5 h-3.5 text-fg-muted flex-shrink-0" />}
           <div className="min-w-0">
-            <h2 className="text-[10px] font-semibold text-fg-secondary truncate tracking-widest uppercase">
+            <h2 className="text-micro font-semibold text-fg-secondary truncate tracking-wide uppercase">
               {title}
             </h2>
             {subtitle && (
-              <p className="text-xs text-fg-muted truncate">
+              <p className="text-caption text-fg-muted truncate">
                 {subtitle}
               </p>
             )}

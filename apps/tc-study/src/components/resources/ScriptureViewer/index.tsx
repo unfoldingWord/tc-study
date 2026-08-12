@@ -187,7 +187,7 @@ export function ScriptureViewer({
       />
 
       <div
-        className="flex-1 p-6 relative cursor-pointer bg-scripture text-scripture-fg"
+        className="flex-1 p-content-lg relative cursor-pointer bg-scripture text-scripture-fg"
         onClick={handleViewerClick}
         role="button"
         tabIndex={0}

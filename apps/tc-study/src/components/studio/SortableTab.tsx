@@ -24,14 +24,14 @@ interface SortableTabProps {
 
 const tabColors = {
   blue: {
-    active: 'bg-gradient-to-b from-panel-1-soft to-surface text-panel-1-fg font-semibold',
+    active: 'bg-surface text-panel-1-fg font-semibold shadow-sm',
     // fg-secondary (not muted): readable on panel-*-soft header strip in dark
-    inactive: 'text-fg-secondary hover:text-fg hover:bg-muted/60',
+    inactive: 'text-fg-secondary hover:text-fg hover:bg-muted/50',
     dragging: 'bg-panel-1-soft text-panel-1 border-panel-1/40',
   },
   purple: {
-    active: 'bg-gradient-to-b from-panel-2-soft to-surface text-panel-2-fg font-semibold',
-    inactive: 'text-fg-secondary hover:text-fg hover:bg-muted/60',
+    active: 'bg-surface text-panel-2-fg font-semibold shadow-sm',
+    inactive: 'text-fg-secondary hover:text-fg hover:bg-muted/50',
     dragging: 'bg-panel-2-soft text-panel-2 border-panel-2/40',
   },
 }
@@ -91,13 +91,13 @@ export function SortableTab({
         onClick()
       }}
       className={`
-        flex-shrink-0 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap
-        inline-flex items-center gap-1
+        flex-shrink-0 px-chrome py-chrome-tight text-chrome font-medium whitespace-nowrap
+        inline-flex items-center gap-chrome-tight
         select-none [-webkit-touch-callout:none]
-        ${borderStyle} transition-all duration-150 cursor-grab active:cursor-grabbing
+        ${borderStyle} transition-colors duration-150 cursor-grab active:cursor-grabbing
         ${colorClasses}
         ${isThisDragging ? 'animate-pulse opacity-60' : ''}
-        ${isActive ? 'rounded-t-lg' : 'rounded-t-lg'}
+        rounded-md
         ${isDragging ? 'touch-none' : ''}
       `}
     >

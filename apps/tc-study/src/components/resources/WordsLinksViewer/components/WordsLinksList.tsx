@@ -52,20 +52,20 @@ export function WordsLinksList({
   return (
     <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
       <ResourceViewerHeader title={resource.title} icon={Link} direction={languageDirection} />
-      <div className="p-4">
+      <div className="p-content">
         {!dependenciesReady ? (
           <LoadingSpinner
             centered
             label="Loading dependencies"
             className="text-helps"
-            containerClassName="py-12"
+            containerClassName="py-8"
           />
         ) : loading ? (
           <LoadingSpinner
             centered
             label="Loading content"
             className="text-helps"
-            containerClassName="py-12"
+            containerClassName="py-8"
           />
         ) : error ? (
           <div
@@ -94,7 +94,7 @@ export function WordsLinksList({
             <BookOpen className="w-16 h-16 text-fg-muted" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-stack-lg">
             {Object.entries(linksByVerse)
               .sort(([a], [b]) => {
                 const [chapterA, verseA] = a.split(':').map(Number)
@@ -110,14 +110,14 @@ export function WordsLinksList({
                   bookCode || 'gen'
                 )
                 return (
-                  <div key={chapterVerse} className="space-y-2">
+                  <div key={chapterVerse} className="space-y-stack">
                     <div
-                      className="px-2.5 py-1.5 bg-chip-verse rounded-lg"
+                      className="px-chrome py-chrome-tight bg-chip-verse rounded-md"
                       dir={languageDirection}
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-chrome-tight">
                         <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
-                        <h3 className="text-xs font-semibold text-fg-secondary">
+                        <h3 className="text-chrome font-semibold text-fg-secondary">
                           {(() => {
                             const { bookPart, numberPart } = formatVerseRefParts(
                               resolved,
@@ -140,7 +140,7 @@ export function WordsLinksList({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-3">
+                    <div className="grid grid-cols-1 gap-stack">
                       {verseLinks.map((link) => {
                         const twInfo = parseTWLink(link.twLink)
                         const twTitle = getTWTitle(link)

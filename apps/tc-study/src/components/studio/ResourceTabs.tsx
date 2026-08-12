@@ -62,9 +62,9 @@ export function ResourceTabs({
     <div
       key="cross-panel-placeholder"
       className={`
-        flex-shrink-0 px-2 py-1.5 text-xs font-medium whitespace-nowrap
-        inline-flex items-center gap-1
-        border-2 rounded-t animate-pulse
+        flex-shrink-0 px-chrome py-chrome-tight text-chrome font-medium whitespace-nowrap
+        inline-flex items-center gap-chrome-tight
+        border-2 rounded-md animate-pulse
         ${placeholderColors[colorScheme]}
       `}
     >
@@ -79,9 +79,9 @@ export function ResourceTabs({
         {showDropPlaceholder && (
           <div
             className={`
-              flex-shrink-0 px-2 py-1.5 text-xs font-medium whitespace-nowrap
-              inline-flex items-center gap-1
-              border-2 rounded animate-pulse
+              flex-shrink-0 px-chrome py-chrome-tight text-chrome font-medium whitespace-nowrap
+              inline-flex items-center gap-chrome-tight
+              border-2 rounded-md animate-pulse
               ${placeholderColors[colorScheme]}
             `}
           >
@@ -104,7 +104,7 @@ export function ResourceTabs({
         scrollLocked ? 'overflow-x-hidden' : 'overflow-x-auto'
       }`}
     >
-      <div className="flex gap-1" role="tablist" aria-label="Resources">
+      <div className="flex gap-chrome-tight pb-chrome-tight" role="tablist" aria-label="Resources">
         {resources.map((resource, idx) => {
           const key = resource.key || resource.id
           const presentation = getTabPresentation(resource)

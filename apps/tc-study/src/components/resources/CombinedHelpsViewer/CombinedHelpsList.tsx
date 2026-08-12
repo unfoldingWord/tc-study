@@ -65,10 +65,10 @@ function FilterButton({
       onClick={onClick}
       title={label}
       aria-label={label}
-      className={`rounded-full p-1.5 transition-colors ${
+      className={`rounded-full p-chrome-tight transition-colors ${
         active
-          ? 'bg-helps text-white shadow-sm'
-          : 'border border-helps/40 text-helps-fg bg-surface hover:bg-helps-soft'
+          ? 'bg-helps text-white'
+          : 'border border-helps/30 text-helps-fg bg-surface hover:bg-helps-soft'
       }`}
     >
       {icon}
@@ -140,10 +140,10 @@ export function CombinedHelpsList({
           </div>
         }
       />
-      <div className="p-4">
+      <div className="p-content">
         {noSources ? (
-          <div className="text-center py-12 text-fg-muted text-sm">
-            <FileText className="w-10 h-10 mx-auto mb-2 text-fg-muted opacity-50" />
+          <div className="text-center py-8 text-fg-muted text-sm">
+            <FileText className="w-8 h-8 mx-auto mb-2 text-fg-muted opacity-50" />
             <p>No Translation Notes or Word Links found for this language.</p>
           </div>
         ) : !depsOk ? (
@@ -151,26 +151,26 @@ export function CombinedHelpsList({
             centered
             label="Loading dependencies"
             className="text-helps"
-            containerClassName="py-12"
+            containerClassName="py-8"
           />
         ) : loading ? (
           <LoadingSpinner
             centered
             label="Loading helps"
             className="text-helps"
-            containerClassName="py-12"
+            containerClassName="py-8"
           />
         ) : (
           <>
-            {tnError && tnKey ? <p className="text-xs text-danger mb-2">{tnError}</p> : null}
-            {twlError && twlKey ? <p className="text-xs text-danger mb-2">{twlError}</p> : null}
+            {tnError && tnKey ? <p className="text-chrome text-danger mb-stack">{tnError}</p> : null}
+            {twlError && twlKey ? <p className="text-chrome text-danger mb-stack">{twlError}</p> : null}
             {mergedGroups.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-fg-muted">
-                <BookOpen className="w-14 h-14 mb-2 opacity-70" />
+              <div className="flex flex-col items-center justify-center py-8 text-fg-muted">
+                <BookOpen className="w-10 h-10 mb-2 opacity-70" />
                 <p className="text-sm">No entries for this passage.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-stack-lg">
                 {mergedGroups.map((group) => {
                   const resolved = getBookTitleWithFallback(
                     effectiveResource,
@@ -178,13 +178,13 @@ export function CombinedHelpsList({
                     bookCode || 'gen'
                   )
                   return (
-                    <div key={group.ref} className="space-y-3">
+                    <div key={group.ref} className="space-y-stack">
                       <div
-                        className="flex items-center gap-2 px-2.5 py-1.5 bg-chip-verse rounded-lg"
+                        className="flex items-center gap-chrome-tight px-chrome py-chrome-tight bg-chip-verse rounded-md"
                         dir={targetLanguageDirection}
                       >
                         <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
-                        <h3 className="text-xs font-semibold text-fg-secondary">
+                        <h3 className="text-chrome font-semibold text-fg-secondary">
                           {(() => {
                             const { bookPart, numberPart } = formatVerseRefParts(
                               resolved,
@@ -204,7 +204,7 @@ export function CombinedHelpsList({
                             )
                           })()}
                         </h3>
-                        <span className="ml-auto px-2 py-0.5 bg-helps-soft text-chip-verse-fg rounded-full text-[10px] font-medium">
+                        <span className="ml-auto px-1.5 py-0.5 bg-helps-soft text-chip-verse-fg rounded-full text-micro font-medium">
                           {group.items.length}
                         </span>
                       </div>

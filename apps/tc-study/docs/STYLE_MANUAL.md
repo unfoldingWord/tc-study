@@ -119,15 +119,20 @@ Markdown headings in `remarkRenderer` map `h1`→`text-2xl` … `h6`→`text-xs`
 
 ---
 
-## Spacing & density (guidance)
+## Spacing & type hierarchy tokens
 
-No custom spacing tokens yet — use Tailwind spacing. Prefer:
+Defined in `src/index.css` `@theme` (Tailwind utilities):
 
-- Compact chrome: `p-2` / `px-3 py-2` for headers and tab strips
-- Content panes: `p-4`–`p-6` for scripture; slightly tighter (`gap-2` / `p-3`) for helps lists
-- Avoid double borders + heavy card stacking; prefer surface on canvas with `border-border` or `border-border-subtle`
+| Token | Value | Utilities | Use |
+|-------|-------|-----------|-----|
+| `chrome` | `0.5rem` (8px) | `p-chrome`, `px-chrome`, `gap-chrome` | Read bar / panel header insets |
+| `chrome-tight` | `0.375rem` (6px) | `py-chrome-tight`, `gap-chrome-tight` | Compact vertical chrome |
+| `content` | `0.75rem` (12px) | `p-content` | Helps lists & card padding |
+| `content-lg` | `1rem` (16px) | `p-content-lg` | Scripture reading pad |
+| `stack` / `stack-lg` | `0.5rem` / `0.75rem` | `space-y-stack`, `gap-stack` | Card & group vertical rhythm |
+| `micro` / `caption` / `chrome` (text) | `10px` / `11px` / `12px` | `text-micro`, `text-caption`, `text-chrome` | Badges, meta, tabs |
 
-Hierarchical / iOS-like work should tighten chrome first (read header, panel tabs, helps list rows) before rewriting content layouts.
+Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double borders + heavy card shadows; hairline `border-border-subtle` and flat `rounded-md` keep the iOS-like hierarchy.
 
 ---
 

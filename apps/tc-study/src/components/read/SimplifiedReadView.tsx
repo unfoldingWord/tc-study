@@ -262,7 +262,7 @@ export function SimplifiedReadView({
     >
       <div className="h-full flex flex-col overflow-hidden">
         <div className="relative z-30 flex-shrink-0 flex flex-col order-2 md:order-1 overflow-visible">
-          <div className="flex items-center gap-1 bg-surface border-border-subtle border-t md:border-t-0 md:border-b px-2 py-1.5 overflow-visible">
+          <div className="flex items-center gap-chrome-tight bg-surface/90 backdrop-blur-md border-border-subtle border-t md:border-t-0 md:border-b px-chrome py-chrome-tight overflow-visible">
             <div className="flex-1 min-w-0">
               <NavigationBar
                 isCompact={true}

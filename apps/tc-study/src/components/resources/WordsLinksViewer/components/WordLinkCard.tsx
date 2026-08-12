@@ -40,7 +40,7 @@ interface WordLinkCardProps {
 }
 
 const quoteChipClass =
-  'w-full text-start mb-1.5 px-3 py-2 bg-chip-quote hover:bg-chip-quote-hover rounded-lg transition-all duration-150'
+  'w-full text-start mb-stack px-chrome py-chrome-tight bg-chip-quote hover:bg-chip-quote-hover rounded-md transition-colors duration-150'
 
 export const WordLinkCard = memo(function WordLinkCard({
   link,
@@ -69,10 +69,10 @@ export const WordLinkCard = memo(function WordLinkCard({
   return (
     <div
       className={`
-        group rounded-lg p-3 cursor-pointer transition-all duration-150 border
+        group rounded-md p-content cursor-pointer transition-colors duration-150 border
         ${isSelected
-          ? 'bg-helps-soft shadow-sm border-helps/40'
-          : 'bg-surface hover:shadow-sm hover:border-border border-border-subtle'
+          ? 'bg-helps-soft border-helps/40'
+          : 'bg-surface hover:border-border border-border-subtle'
         }
       `}
       onClick={(hasAlignedTokens || obsMode) ? () => onQuoteClick(link) : undefined}
