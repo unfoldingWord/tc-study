@@ -12,6 +12,7 @@
   --color-canvas: var(--theme-canvas);
   --color-surface: var(--theme-surface);
   --color-elevated: var(--theme-elevated);
+  --color-tab-selected: var(--theme-tab-selected);
   --color-muted: var(--theme-muted);
   --color-border: var(--theme-border);
   --color-border-subtle: var(--theme-border-subtle);
@@ -68,6 +69,8 @@
   --theme-canvas: #f4f2ef;
   --theme-surface: #ffffff;
   --theme-elevated: #ffffff;
+  /* Selected resource tab on panel-*-soft strip — elevated white in light */
+  --theme-tab-selected: #ffffff;
   --theme-muted: #ebe8e4;
   --theme-border: #e0dcd6;
   --theme-border-subtle: #efece8;
@@ -126,6 +129,8 @@
   --theme-canvas: #17191c;
   --theme-surface: #212428;
   --theme-elevated: #2a2e34;
+  /* Selected tab — darker than panel-*-soft strip (surface reads too light there) */
+  --theme-tab-selected: #141618;
   --theme-muted: #2f343b;
   --theme-border: #3a4048;
   --theme-border-subtle: #2c3138;

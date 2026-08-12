@@ -24,13 +24,14 @@ interface SortableTabProps {
 
 const tabColors = {
   blue: {
-    active: 'bg-surface text-panel-1-fg font-semibold shadow-sm',
+    // tab-selected: elevated white in light; darker than panel-*-soft strip in dark
+    active: 'bg-tab-selected text-panel-1-fg font-semibold shadow-sm',
     // fg-secondary (not muted): readable on panel-*-soft header strip in dark
     inactive: 'text-fg-secondary hover:text-fg hover:bg-muted/50',
     dragging: 'bg-panel-1-soft text-panel-1 border-panel-1/40',
   },
   purple: {
-    active: 'bg-surface text-panel-2-fg font-semibold shadow-sm',
+    active: 'bg-tab-selected text-panel-2-fg font-semibold shadow-sm',
     inactive: 'text-fg-secondary hover:text-fg hover:bg-muted/50',
     dragging: 'bg-panel-2-soft text-panel-2 border-panel-2/40',
   },

@@ -33,6 +33,7 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 | `canvas` | `#f4f2ef` | `#17191c` | App background (`body`) |
 | `surface` | `#ffffff` | `#212428` | Cards, modal panels, resource viewer headers (`ResourceViewerHeader`) |
 | `elevated` | `#ffffff` | `#2a2e34` | Raised panels / dialogs |
+| `tab-selected` | `#ffffff` | `#141618` | Active `SortableTab` on `panel-*-soft` strip (elevated in light; darker than strip in dark) |
 | `muted` | `#ebe8e4` | `#2f343b` | Soft fills, hover chips, scrollbar track |
 | `border` | `#e0dcd6` | `#3a4048` | Primary borders |
 | `border-subtle` | `#efece8` | `#2c3138` | Hairline / soft separators |
@@ -144,7 +145,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 - **Helps cards:** `surface` + chip tokens for verse/quote; prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
 - **Helps filter pill:** `bg-filter-chip text-filter-chip-fg` (borderless `h-7` capsule) — not `accent-soft`, which washes out on header chrome.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
-- **Panel tabs:** soft strip `from-panel-*-soft`; inactive label `text-fg-secondary`.
+- **Panel tabs:** soft strip `bg-panel-*-soft/70`; selected `bg-tab-selected`; inactive label `text-fg-secondary`.
 - **Focus:** global `ring-accent` + `ring-offset-canvas` on `:focus-visible`.
 
 ---

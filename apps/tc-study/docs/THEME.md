@@ -69,7 +69,12 @@ TN / Combined Helps prose links are rendered in `src/lib/markdown/remarkRenderer
 | External `http(s)` | `text-accent hover:text-accent-hover underline` | |
 | Invalid `rc://` | `text-fg-muted` | Disabled span |
 
-Resource tabs (`SortableTab`) on `from-panel-*-soft` headers use `text-fg-secondary` when inactive so labels stay readable in dark mode (avoid `text-fg-muted` on the soft strip).
+Resource tabs (`SortableTab`) on `bg-panel-*-soft/70` headers:
+
+| State | Classes | Notes |
+|-------|---------|--------|
+| Selected | `bg-tab-selected text-panel-*-fg` | Light: elevated white; dark: darker than the soft strip (`surface` was too light there) |
+| Inactive | `text-fg-secondary` | Readable on soft strip (avoid `text-fg-muted`) |
 
 ## Add another theme later
 
