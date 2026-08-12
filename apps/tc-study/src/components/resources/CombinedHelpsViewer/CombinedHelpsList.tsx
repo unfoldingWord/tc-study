@@ -1,5 +1,5 @@
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
-import { BookMarked, BookOpen, FileText, LayoutList, Layers, NotebookPen } from 'lucide-react'
+import { BookOpen, FileText, Layers } from 'lucide-react'
 import React from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
@@ -9,6 +9,7 @@ import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TranslationNoteCard, type NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
 import { WordLinkCard } from '../WordsLinksViewer/components'
 import type { TokenFilter } from '../WordsLinksViewer/types'
+import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import type { HelpsKindFilter } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
@@ -48,34 +49,6 @@ export interface CombinedHelpsListProps {
   onNoteSelect: (note: { id: string }) => void
   onTitleClick: (link: TranslationWordsLink) => void
   onLinkQuoteClick: (link: TranslationWordsLink) => void
-}
-
-function FilterButton({
-  active,
-  icon,
-  label,
-  onClick,
-}: {
-  active: boolean
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className={`rounded-full p-chrome-tight transition-colors ${
-        active
-          ? 'bg-helps text-white'
-          : 'border border-helps/30 text-helps-fg bg-surface hover:bg-helps-soft'
-      }`}
-    >
-      {icon}
-    </button>
-  )
 }
 
 export function CombinedHelpsList({
@@ -122,28 +95,9 @@ export function CombinedHelpsList({
         direction={targetLanguageDirection}
         actions={
           // While a token/verse/OBS filter is active, reuse the trailing header
-          // slot so phones do not grow a second chrome band; kind toggles return on clear.
+          // slot so phones do not grow a second chrome band; kind menu returns on clear.
           filterScopeBar ?? (
-            <div className="flex items-center gap-1">
-              <FilterButton
-                active={kindFilter === 'all'}
-                icon={<LayoutList className="w-3.5 h-3.5" />}
-                label="All"
-                onClick={() => setKindFilter('all')}
-              />
-              <FilterButton
-                active={kindFilter === 'notes'}
-                icon={<NotebookPen className="w-3.5 h-3.5" />}
-                label="Notes"
-                onClick={() => setKindFilter('notes')}
-              />
-              <FilterButton
-                active={kindFilter === 'twl'}
-                icon={<BookMarked className="w-3.5 h-3.5" />}
-                label="Word Links"
-                onClick={() => setKindFilter('twl')}
-              />
-            </div>
+            <HelpsKindFilterMenu kindFilter={kindFilter} setKindFilter={setKindFilter} />
           )
         }
       />
