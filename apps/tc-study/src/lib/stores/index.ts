@@ -6,6 +6,10 @@
 
 export { usePackageStore } from './packageStore'
 export {
+  useScriptureDisplayStore,
+  type ScriptureLayoutMode,
+} from './scriptureDisplayStore'
+export {
   useWorkspaceStore,
   type PanelConfig,
   type WorkspacePackage,

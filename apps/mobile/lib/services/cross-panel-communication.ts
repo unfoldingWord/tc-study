@@ -7,7 +7,7 @@
 
 // import { QuoteMatcher } from './quote-matcher';
 import { generateSemanticId } from '../utils/semantic-id-generator';
-import type { OptimizedChapter, OptimizedToken, ProcessedChapter, ProcessedVerse, WordToken } from './usfm-processor';
+import type { OptimizedChapter, OptimizedToken, ProcessedChapter, ProcessedVerse, WordToken } from './usj-scripture-processor';
 
 // Original Language Token - the common reference for all cross-panel communication
 // Updated for optimized format with semantic IDs

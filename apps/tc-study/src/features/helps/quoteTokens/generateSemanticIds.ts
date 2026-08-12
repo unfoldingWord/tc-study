@@ -10,6 +10,7 @@
  */
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
+import { semanticIdFor } from '@bt-synergy/scripture-loader'
 
 interface GenerateSemanticIdOptions {
   token: OptimizedToken
@@ -26,8 +27,7 @@ interface GenerateSemanticIdOptions {
  * Target tokens align using zaln.content (the inflected form), not zaln.lemma
  */
 export function generateSemanticId({ token, verseRef, occurrence }: GenerateSemanticIdOptions): string {
-  // Use actual text (inflected form) as it appears in scripture
-  return `${verseRef}:${token.text}:${occurrence}`
+  return semanticIdFor(verseRef, token.text, occurrence)
 }
 
 /**
@@ -47,37 +47,26 @@ export function generateSemanticIdsForQuoteTokens(
   verse: number,
   baseOccurrence?: number
 ): string[] {
-  // CRITICAL: Use lowercase to match scripture viewer's semantic ID format!
-  // Scripture tokens have IDs like "tit 1:1:word:1" (lowercase book code)
+  // Lowercase book to match common Door43 ingredient casing; matchers compare case-insensitively.
   const verseRef = `${bookCode.toLowerCase()} ${chapter}:${verse}`
 
   // For single-token quotes, use the TWL occurrence directly
-  // This ensures "Θεοῦ" occurrence 2 gets semantic ID "tit 1:1:Θεοῦ:2"
   if (tokens.length === 1 && baseOccurrence !== undefined) {
-    return [generateSemanticId({
-      token: tokens[0],
-      verseRef,
-      occurrence: baseOccurrence,
-    })]
+    return [
+      generateSemanticId({
+        token: tokens[0],
+        verseRef,
+        occurrence: baseOccurrence,
+      }),
+    ]
   }
 
-  // For multi-token quotes, use the occurrence from the token itself (set by QuoteMatcher)
-  // CRITICAL: Use actual text, not lemma!
-  // TWL origWords = inflected forms, zaln.content = inflected forms
-  // CRITICAL: QuoteMatcher now sets the verse-wide occurrence on each token
-  const semanticIds = tokens.map(token => {
-    // Use the occurrence from the token (calculated by QuoteMatcher)
-    // This is the verse-wide occurrence, not the quote-wide occurrence
-    const occurrence = token.occurrence || 1
-
-    const semanticId = generateSemanticId({
+  // Multi-token / multi-part: occurrence is verse-wide (set by QuoteMatcher)
+  return tokens.map((token) =>
+    generateSemanticId({
       token,
       verseRef,
-      occurrence,
+      occurrence: token.occurrence || 1,
     })
-
-    return semanticId
-  })
-
-  return semanticIds
+  )
 }

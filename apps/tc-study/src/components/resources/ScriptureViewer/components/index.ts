@@ -2,12 +2,9 @@
  * ScriptureViewer Components
  */
 
-export { DebugPanel } from './DebugPanel'
+export { FormattedScriptureContent } from './FormattedScriptureContent'
 export { ScriptureContent } from './ScriptureContent'
-export { ScriptureDebugInfo } from './ScriptureDebugInfo'
 export { ScriptureHeader } from './ScriptureHeader'
-export { ScriptureMetadata } from './ScriptureMetadata'
+export { ScriptureLayoutToggle } from './ScriptureLayoutToggle'
 export { TokenRenderer } from './TokenRenderer'
 export { VerseRenderer } from './VerseRenderer'
-
-

@@ -172,7 +172,7 @@ describe('messagingGuards', () => {
     ).toBe(false)
   })
 
-  test('ScriptureViewer production path does not wire useContentRequests', () => {
+  test('ScriptureViewer uses token STATE only (no content-request path)', () => {
     const index = readFileSync(
       join(ROOT, 'components/resources/ScriptureViewer/index.tsx'),
       'utf8'
@@ -183,14 +183,10 @@ describe('messagingGuards', () => {
       join(ROOT, 'components/resources/ScriptureViewer/hooks/index.ts'),
       'utf8'
     )
-    // Export may remain for rollback, but production index must not import it
-    expect(index).not.toMatch(/from\s+['"]\.\/hooks['"][\s\S]*useContentRequests/)
-    expect(hooksIndex).toContain('useContentRequests')
-    const quarantined = readFileSync(
-      join(ROOT, 'components/resources/ScriptureViewer/hooks/useContentRequests.ts'),
-      'utf8'
-    )
-    expect(quarantined).toContain('QUARANTINED')
+    expect(hooksIndex).not.toMatch(/\buseContentRequests\b/)
+    expect(
+      existsSync(join(ROOT, 'components/resources/ScriptureViewer/hooks/useContentRequests.ts'))
+    ).toBe(false)
   })
 
   test('OBS quotes and scripture tokens use ownership-safe STATE keys', () => {

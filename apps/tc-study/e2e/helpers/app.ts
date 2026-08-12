@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import {
+  buildE2EAlignmentWorkspace,
   buildE2ECacheEntries,
   buildE2ECatalogEntries,
   buildE2EHelpsWorkspace,
@@ -10,7 +11,13 @@ import { seedIndexedDb } from './idb'
 /** Wait until catalog services + resource types are ready (loading gate dismissed). */
 export async function waitForCatalogReady(page: Page): Promise<void> {
   await expect(page.getByLabel('Loading catalog')).toHaveCount(0, { timeout: 45_000 })
-  await expect(page.getByLabel('Resource type registration failed')).toHaveCount(0)
+  const regFailed = page.getByLabel('Resource type registration failed')
+  const failedCount = await regFailed.count()
+  if (failedCount > 0) {
+    const title = await regFailed.getAttribute('title')
+    throw new Error(`Resource type registration failed: ${title ?? '(no title)'}`)
+  }
+  await expect(regFailed).toHaveCount(0)
 }
 
 /** Collect uncaught page errors for "does not crash" assertions. */
@@ -28,6 +35,27 @@ export function trackPageErrors(page: Page): string[] {
  */
 export async function seedHelpsWorkspace(page: Page): Promise<void> {
   const workspace = buildE2EHelpsWorkspace()
+  const navigation = buildE2ENavigationState()
+
+  await seedIndexedDb(page, {
+    catalogEntries: buildE2ECatalogEntries(),
+    cacheEntries: buildE2ECacheEntries(),
+  })
+
+  await page.addInitScript(
+    ({ pkg, nav }) => {
+      localStorage.setItem('tc-study-workspace', JSON.stringify(pkg))
+      localStorage.setItem('bt-synergy:navigation-state', JSON.stringify(nav))
+    },
+    { pkg: workspace, nav: navigation }
+  )
+}
+
+/**
+ * Seed ULT + UGNT side-by-side for Paul ↔ Παῦλος token-click highlight.
+ */
+export async function seedAlignmentWorkspace(page: Page): Promise<void> {
+  const workspace = buildE2EAlignmentWorkspace()
   const navigation = buildE2ENavigationState()
 
   await seedIndexedDb(page, {

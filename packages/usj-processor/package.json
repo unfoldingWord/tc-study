@@ -1,0 +1,23 @@
+{
+  "name": "@bt-synergy/usj-processor",
+  "version": "0.0.0-spike",
+  "private": true,
+  "description": "USFM→USJ→UsjScriptureViewModel processor (tc-study scripture path)",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "link:usfm-tools:local": "node scripts/link-usfm-tools.cjs",
+    "test": "bun test",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@usfm-tools/parser": "^0.1.1",
+    "@usfm-tools/types": "^0.1.0",
+    "@usfm-tools/usj-core": "^0.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

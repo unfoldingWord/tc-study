@@ -7,7 +7,7 @@
  * - Exposes TOC for navigation
  * - Handles verse ranges
  * - Highlights based on messages
- * - Uses ProcessedScripture format from @bt-synergy/usfm-processor
+ * - Primary SoT: UsjScriptureViewModel via ScriptureLoader.loadViewModel()
  */
 
 import { useSignalHandler } from '@bt-synergy/resource-panels'
@@ -21,7 +21,7 @@ import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getBookTitle } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
-import { ScriptureContent } from './components'
+import { ScriptureContent, ScriptureLayoutToggle } from './components'
 import { useContent, useHighlighting, useTOC, useTokenBroadcast, useUnderlinedTokens } from './hooks'
 import type { ScriptureViewerProps } from './types'
 
@@ -93,9 +93,8 @@ export function ScriptureViewer({
   // (el-x-koine / hbo) correctly detect isOriginalLanguage on /read.
   const languageCode = resource?.language ?? language
 
-  // Load content for current book/chapter
   const {
-    loadedContent,
+    viewModel,
     isLoading,
     error,
     currentChapter: _currentChapter,
@@ -151,18 +150,17 @@ export function ScriptureViewer({
     handleVerseNavigation
   )
 
-  // Token STATE only — request/response content path is quarantined
-  // Broadcast ALL verses in current chapter for TWL/TN to have complete data
+  // SCRIPTURE_TOKENS from UsjWordToken[] — Helps keep semanticId + alignedOriginalWordIds
   useTokenBroadcast({
     resourceId,
     resourceKey,
-    loadedContent,
+    viewModel,
     language: languageCode,
     languageDirection,
     currentChapter: currentRef.chapter || 1,
-    currentVerse: 1, // Start from verse 1
-    endChapter: currentRef.chapter, // Same chapter
-    endVerse: 999, // All verses in chapter (will be clamped to actual verse count)
+    currentVerse: 1,
+    endChapter: currentRef.chapter,
+    endVerse: 999,
   })
 
   const handleVerseClick = useCallback((chapter: number, verse: number) => {
@@ -185,6 +183,7 @@ export function ScriptureViewer({
         subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}
         icon={Book}
         direction={languageDirection}
+        actions={<ScriptureLayoutToggle />}
       />
 
       <div
@@ -205,7 +204,7 @@ export function ScriptureViewer({
           isLoading={isLoading}
           isLoadingTOC={isLoadingTOC}
           error={error}
-          loadedContent={loadedContent}
+          viewModel={viewModel}
           availableBooks={availableBooks}
           displayVerses={displayVerses}
           currentRef={currentRef}

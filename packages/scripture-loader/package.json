@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "node -e \"console.error('ERROR: scripture-loader has no real tests'); process.exit(1)\""
+    "test": "bun test"
   },
   "keywords": [
     "bible",
@@ -25,7 +25,7 @@
     "@bt-synergy/resource-catalog": "workspace:*",
     "@bt-synergy/resource-parsers": "workspace:*",
     "@bt-synergy/resource-types": "workspace:*",
-    "@bt-synergy/usfm-processor": "workspace:*",
+    "@bt-synergy/usj-processor": "workspace:*",
     "jszip": "^3.10.1"
   },
   "peerDependencies": {

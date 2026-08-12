@@ -25,7 +25,11 @@
  *   - Return aligned target tokens for display
  */
 
-import type { OptimizedChapter, OptimizedToken, OptimizedVerse } from '../parsers/usfm/usfm-processor';
+import type {
+  OptimizedChapter,
+  OptimizedToken,
+  OptimizedVerse,
+} from '../types/optimized-tokens'
 
 export interface QuoteReference {
   book: string;
@@ -414,8 +418,8 @@ export class QuoteMatcher {
       const tokenStart = currentPos;
       const tokenEnd = currentPos + tokenText.length;
       
-      // Count occurrence for this word (using actual text, not normalized)
-      const wordKey = token.text;
+      // Verse-wide occurrence: case-insensitive on surface (matches USJ / identity contract)
+      const wordKey = token.text.toLowerCase();
       const currentCount = occurrenceCounts.get(wordKey) || 0;
       const occurrence = currentCount + 1;
       occurrenceCounts.set(wordKey, occurrence);

@@ -7,7 +7,7 @@
 import type { CacheEntry } from '@bt-synergy/resource-cache'
 
 /** Key prefixes for book-organized resources that we store by chapter. */
-export const BOOK_ORGANIZED_PREFIXES = ['scripture:', 'tn:', 'tq:'] as const
+export const BOOK_ORGANIZED_PREFIXES = ['scripture:', 'scripture-usj:', 'tn:', 'tq:'] as const
 
 /** Marker in stored entry to indicate chunked (manifest-only) record. */
 export const CHUNKED_MARKER = '_chunkedBook'
@@ -76,7 +76,27 @@ function scriptureChapters(entry: CacheEntry): { metadata: unknown; chapters: un
 
 export function canSplitScripture(key: string, entry: CacheEntry): boolean {
   const chapters = (entry.content as { chapters?: unknown[] })?.chapters
-  return key.startsWith('scripture:') && isScriptureEntry(entry) && (chapters?.length ?? 0) > 0
+  // Legacy ProcessedScripture only — not scripture-usj: (handled separately)
+  return (
+    key.startsWith('scripture:') &&
+    !key.startsWith('scripture-usj:') &&
+    isScriptureEntry(entry) &&
+    (chapters?.length ?? 0) > 0
+  )
+}
+
+/** USJ SoT: content.chapters = [{ number, content: nodes[] }], plus alignmentMap. */
+function isUsjScriptureEntry(entry: CacheEntry | Record<string, unknown>): boolean {
+  const c = (entry as CacheEntry).content ?? entry
+  const chapters = (c as { chapters?: unknown })?.chapters
+  if (!Array.isArray(chapters) || chapters.length === 0) return false
+  const first = chapters[0] as { content?: unknown; verses?: unknown } | undefined
+  // ProcessedScripture chapters have verses[]; USJ slices have content nodes[]
+  return Array.isArray(first?.content) && !Array.isArray(first?.verses)
+}
+
+export function canSplitUsjScripture(key: string, entry: CacheEntry): boolean {
+  return key.startsWith('scripture-usj:') && isUsjScriptureEntry(entry)
 }
 
 /** WordAlignment has verseRef e.g. "TIT 1:1"; we split by chapter using bookCode + " " + ch + ":". */
@@ -136,6 +156,122 @@ export function splitScriptureEntry(
   }))
 
   return { manifestEntry, chapterEntries, alignmentEntries }
+}
+
+/**
+ * Split USJ SoT for chapter-level storage.
+ * Chapter nodes → key:chNum. AlignmentMap subset → key:chNum:alignments.
+ */
+export function splitUsjScriptureEntry(
+  key: string,
+  entry: CacheEntry
+): { manifestEntry: CacheEntry; chapterEntries: Array<{ key: string; entry: CacheEntry }>; alignmentEntries: Array<{ key: string; entry: CacheEntry }> } {
+  const content = entry.content as Record<string, unknown> & {
+    chapters?: Array<{ number?: number; content?: unknown[] }>
+    alignmentMap?: Record<string, unknown[]>
+    bookCode?: string
+    metadata?: Record<string, unknown>
+  }
+  const chapters = content.chapters ?? []
+  const alignmentMap = content.alignmentMap ?? {}
+  const bookCode = String(
+    content.bookCode ?? content.metadata?.bookCode ?? key.split(':').pop() ?? ''
+  ).toLowerCase()
+
+  const bookLevelContent: Record<string, unknown> = {
+    ...content,
+    chapters: undefined,
+    usj: undefined,
+    alignmentMap: undefined,
+    [CHUNKED_MARKER]: true,
+  }
+  delete bookLevelContent.chapters
+  delete bookLevelContent.usj
+  delete bookLevelContent.alignmentMap
+
+  const manifestEntry: CacheEntry = {
+    ...entry,
+    content: bookLevelContent,
+    metadata: { ...(entry.metadata as Record<string, unknown>), [CHUNKED_MARKER]: true },
+  }
+
+  const chapterEntries = chapters.map((ch, i) => {
+    const chapterNum = ch?.number ?? i + 1
+    return {
+      key: `${key}:${chapterNum}`,
+      entry: { ...entry, content: { number: chapterNum, content: ch.content ?? [] } } as CacheEntry,
+    }
+  })
+
+  const chapterNums = chapters.map((ch, i) => ch?.number ?? i + 1)
+  const alignmentEntries = chapterNums.map((chapterNum) => {
+    const prefix = `${bookCode} ${chapterNum}:`.toLowerCase()
+    const subset: Record<string, unknown[]> = {}
+    for (const [verseRef, groups] of Object.entries(alignmentMap)) {
+      if (verseRef.toLowerCase().startsWith(prefix)) {
+        subset[verseRef] = groups
+      }
+    }
+    return {
+      key: `${key}:${chapterNum}:alignments`,
+      entry: { ...entry, content: subset } as CacheEntry,
+    }
+  })
+
+  return { manifestEntry, chapterEntries, alignmentEntries }
+}
+
+export function reassembleUsjScripture(
+  manifestEntry: CacheEntry,
+  chapterRecords: Array<{ key: string; entry: CacheEntry }>
+): CacheEntry {
+  const content = manifestEntry.content as Record<string, unknown>
+  const contentEntries = chapterRecords.filter((r) => !r.key.endsWith(':alignments'))
+  const alignmentEntries = chapterRecords.filter((r) => r.key.endsWith(':alignments'))
+
+  const chapters = contentEntries
+    .sort((a, b) => {
+      const na = parseInt(a.key.split(':').pop() ?? '0', 10)
+      const nb = parseInt(b.key.split(':').pop() ?? '0', 10)
+      return na - nb
+    })
+    .map((c) => {
+      const ch = c.entry.content as { number?: number; content?: unknown[] }
+      return { number: ch.number ?? 0, content: ch.content ?? [] }
+    })
+
+  const alignmentMap: Record<string, unknown[]> = {}
+  for (const r of alignmentEntries) {
+    const subset = r.entry.content as Record<string, unknown[]>
+    if (subset && typeof subset === 'object' && !Array.isArray(subset)) {
+      Object.assign(alignmentMap, subset)
+    }
+  }
+
+  const usjContent: unknown[] = []
+  for (const ch of chapters) {
+    usjContent.push(...(ch.content ?? []))
+  }
+
+  const reassembledContent = {
+    ...content,
+    chapters,
+    alignmentMap,
+    usj: { type: 'USJ', version: '3.0', content: usjContent },
+  }
+  delete (reassembledContent as Record<string, unknown>)[CHUNKED_MARKER]
+  const outMetadata = manifestEntry.metadata
+    ? (() => {
+        const m = { ...(manifestEntry.metadata as Record<string, unknown>) }
+        delete m[CHUNKED_MARKER]
+        return m
+      })()
+    : undefined
+  return {
+    ...manifestEntry,
+    content: reassembledContent,
+    metadata: outMetadata,
+  }
 }
 
 /**
@@ -296,7 +432,12 @@ export function reassembleQuestions(manifestEntry: CacheEntry, chapterEntries: A
 // --- Unified split / reassemble ---
 
 export function canSplitBookEntry(key: string, entry: CacheEntry): boolean {
-  return canSplitScripture(key, entry) || canSplitNotes(key, entry) || canSplitQuestions(key, entry)
+  return (
+    canSplitUsjScripture(key, entry) ||
+    canSplitScripture(key, entry) ||
+    canSplitNotes(key, entry) ||
+    canSplitQuestions(key, entry)
+  )
 }
 
 export type ChapterEntry = { key: string; entry: CacheEntry }
@@ -305,6 +446,7 @@ export function splitBookEntry(
   key: string,
   entry: CacheEntry
 ): { manifestEntry: CacheEntry; chapterEntries: ChapterEntry[]; alignmentEntries?: ChapterEntry[] } {
+  if (canSplitUsjScripture(key, entry)) return splitUsjScriptureEntry(key, entry)
   if (canSplitScripture(key, entry)) return splitScriptureEntry(key, entry)
   if (canSplitNotes(key, entry)) return splitNotesEntry(key, entry)
   if (canSplitQuestions(key, entry)) return splitQuestionsEntry(key, entry)
@@ -319,6 +461,7 @@ export function reassembleBookEntry(
   manifestEntry: CacheEntry,
   chapterRecords: Array<{ key: string; entry: CacheEntry }>
 ): CacheEntry {
+  if (key.startsWith('scripture-usj:')) return reassembleUsjScripture(manifestEntry, chapterRecords)
   if (key.startsWith('scripture:')) return reassembleScripture(manifestEntry, chapterRecords)
   if (key.startsWith('tn:')) return reassembleNotes(manifestEntry, chapterRecords)
   if (key.startsWith('tq:')) return reassembleQuestions(manifestEntry, chapterRecords)

@@ -1,8 +1,8 @@
-/**
- * ScriptureViewer Types
- */
-
-import type { ProcessedScripture, ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
+import type {
+  UsjScriptureViewModel,
+  UsjVerseView,
+  UsjWordToken,
+} from '@bt-synergy/scripture-loader'
 import type { BookInfo } from '../../../contexts/types-only'
 import type { ResourceInfo } from '../../../contexts/types'
 
@@ -18,46 +18,40 @@ export interface ScriptureViewerProps {
 }
 
 export interface ScriptureViewerState {
-  loadedContent: ProcessedScripture | null
+  viewModel: UsjScriptureViewModel | null
   availableBooks: BookInfo[]
   isLoading: boolean
   error: string | null
 }
 
-/**
- * Original language token structure for cross-panel highlighting
- * Matches the mobile app's pattern
- */
 export interface OriginalLanguageToken {
-  semanticId: string // Format: verseRef:content:occurrence (preserves Unicode)
-  alignedSemanticIds?: string[] // Other semantic IDs this token aligns to
-  content: string // The actual word content
-  verseRef: string // Verse reference
-  strong?: string // Strong's number (optional)
+  semanticId: string
+  alignedSemanticIds?: string[]
+  content: string
+  verseRef: string
+  strong?: string
   lemma?: string
   morph?: string
 }
 
+export type DisplayUsjVerse = UsjVerseView & { chapterNumber: number }
+
 export interface VerseDisplayProps {
-  verse: ProcessedVerse
+  verse: DisplayUsjVerse
   chapterNumber: number
-  highlightTarget: OriginalLanguageToken | null // Mobile app pattern
-  /** Original-language semantic IDs from TN/TWL for passive underlining */
+  highlightTarget: OriginalLanguageToken | null
   underlinedSemanticIds?: Set<string>
-  onTokenClick: (token: WordToken) => void
+  onTokenClick: (token: UsjWordToken) => void
   onVerseClick?: (chapter: number, verse: number) => void
   isOriginalLanguage: boolean
 }
 
 export interface TokenDisplayProps {
-  token: WordToken
+  token: UsjWordToken
   index: number
   isHighlighted: boolean
   isSelected: boolean
-  /** Passive underline from loaded TN/TWL quote coverage */
   isUnderlined?: boolean
-  onTokenClick: (token: WordToken) => void
+  onTokenClick: (token: UsjWordToken) => void
   isOriginalLanguage: boolean
 }
-
-

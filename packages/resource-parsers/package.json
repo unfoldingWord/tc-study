@@ -29,7 +29,7 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "usfm-js": "^3.1.0"
+    "@bt-synergy/usj-processor": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -45,4 +45,3 @@
     }
   }
 }
-

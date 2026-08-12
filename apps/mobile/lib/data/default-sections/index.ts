@@ -74,7 +74,7 @@ import { book1tiSections, book1tiMetadata } from './1ti';
 import { book2tiSections, book2tiMetadata } from './2ti';
 
 // Types
-export type { TranslatorSection } from '../../../services/usfm-processor';
+export type { TranslatorSection } from '../../../services/usj-scripture-processor';
 
 export interface BookMetadata {
   bookCode: string;

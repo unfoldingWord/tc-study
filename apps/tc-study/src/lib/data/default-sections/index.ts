@@ -3,7 +3,7 @@
  * Lazy-loads sections per book to reduce initial bundle size
  */
 
-import type { TranslatorSection } from '@bt-synergy/usfm-processor'
+import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 
 export type { TranslatorSection }
 

@@ -1,4 +1,4 @@
-import type { TranslatorSection } from '@bt-synergy/usfm-processor'
+import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 import { AlertCircle, ArrowLeft, BookOpen, Check } from 'lucide-react'
 import type { RefObject } from 'react'
 import type { ResourceInfo } from '../../contexts/types'

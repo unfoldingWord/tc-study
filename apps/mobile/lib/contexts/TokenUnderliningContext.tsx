@@ -7,7 +7,7 @@
  */
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import type { OptimizedToken } from '../services/usfm-processor';
+import type { OptimizedToken } from '../services/usj-scripture-processor';
 
 export interface TokenGroup {
   id: string;

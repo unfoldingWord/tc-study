@@ -37,6 +37,7 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
     enableMemoryCache: true,
     memoryCacheSize: 50, // Cache up to 50 chapters
     debug: true, // Enable debug logging to troubleshoot issues
+    // USJ-only process path. Cache SoT: scripture-usj:
   },
   
   downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.SCRIPTURE),

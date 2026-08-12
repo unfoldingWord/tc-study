@@ -6,7 +6,7 @@
  * and used throughout the application.
  */
 
-import type { OptimizedChapter, OptimizedToken } from '../services/usfm-processor';
+import type { OptimizedChapter, OptimizedToken } from '../services/usj-scripture-processor';
 
 // ============================================================================
 // TRANSLATION NOTES
@@ -141,5 +141,5 @@ export interface ProcessedContent {
 }
 
 // Re-export OptimizedToken for convenience
-export type { OptimizedToken } from '../services/usfm-processor';
+export type { OptimizedToken } from '../services/usj-scripture-processor';
 

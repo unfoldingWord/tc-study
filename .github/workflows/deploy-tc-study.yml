@@ -42,6 +42,8 @@ jobs:
         with:
           bun-version: 1.3.3
 
+      # @usfm-tools/* from npm via @bt-synergy/usj-processor (+ root hoist).
+      # See packages/usj-processor/README.md — no usfm-ast checkout required.
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -56,6 +58,11 @@ jobs:
           fi
           test -f node_modules/linked-panels/dist/index.js
           ls -la node_modules/linked-panels/dist/index.js
+
+      - name: Verify @usfm-tools dist
+        run: |
+          test -f node_modules/@usfm-tools/parser/dist/index.js
+          test -f node_modules/@usfm-tools/usj-core/dist/index.mjs
 
       # Build package deps without swallowing errors (no `|| true`)
       - name: Build workspace packages (tc-study deps)

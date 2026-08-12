@@ -5,7 +5,7 @@
  */
 
 import { AdapterConfig, BookInfo, BookOrganizedAdapter, ResourceAdapterInfo, ResourceType, ScriptureMetadata } from '../../types/context';
-import { OptimizedScripture, usfmProcessor } from '../usfm-processor';
+import { OptimizedScripture, usjScriptureProcessor } from '../usj-scripture-processor';
 import { getDoor43ApiClient } from '@bt-synergy/door43-api';
 
 export interface Door43ScriptureConfig {
@@ -217,7 +217,7 @@ export class Door43ScriptureAdapter implements BookOrganizedAdapter {
       const bookName = this.getBookName(bookCode);
       
       
-      const processingResult = await usfmProcessor.processUSFMOptimized(usfmContent, bookCode, bookName, language);
+      const processingResult = await usjScriptureProcessor.processUSFMOptimized(usfmContent, bookCode, bookName, language);
       
       
       

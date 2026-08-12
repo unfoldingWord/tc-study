@@ -20,11 +20,12 @@
  * - Any TSV resource with quote/origWords + occurrence + reference
  */
 
-import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import { useMemo } from 'react'
 import { useCurrentReference } from '../../../../contexts'
+import { findAlignedTokens } from '../../../../features/helps/findAlignedTokens'
 import { generateSemanticIdsForQuoteTokens } from '../../../../features/helps/quoteTokens'
 import { useScriptureTokens } from './useScriptureTokens'
+import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 
 /** Minimal link shape needed to attach aligned tokens (TN pseudo-links + full TWL rows). */
 type LinkQuotesInput = {
@@ -41,127 +42,6 @@ interface UseAlignedTokensOptions<TLink extends LinkQuotesInput> {
   links: TLink[]
 }
 
-interface AlignedToken {
-  content: string
-  semanticId: string
-  verseRef: string
-  position: number
-  type?: 'word' | 'punctuation' | 'whitespace' | 'text' | 'gap' // Type to distinguish between words, punctuation, whitespace, text, and gaps
-}
-
-/**
- * Find aligned tokens in target language tokens from broadcast
- * Includes punctuation between contiguous matches and ellipsis for gaps
- */
-function findAlignedTokens(
-  targetTokens: OptimizedToken[],
-  originalSemanticIds: string[],
-  bookCode: string,
-  chapter: number,
-  verse: number
-): AlignedToken[] {
-  // CRITICAL: Use lowercase to match scripture viewer's semantic ID format!
-  const verseRef = `${bookCode.toLowerCase()} ${chapter}:${verse}`
-
-  // First, find all matched word token positions
-  const matchedPositions: number[] = []
-  targetTokens.forEach((token, index) => {
-    const tk = token as OptimizedToken & { alignedOriginalWordIds?: unknown[] }
-    const alignedIds: unknown[] = Array.isArray(tk.alignedOriginalWordIds)
-      ? tk.alignedOriginalWordIds
-      : []
-
-    // Check if any of the original semantic IDs match
-    // Compare case-insensitively (broadcast/USFM may use "TIT 1:1:...", we generate "tit 1:1:...")
-    const hasMatch = originalSemanticIds.some(originalId => {
-      return alignedIds.some(alignedId => {
-        const alignedIdStr = String(alignedId)
-        return alignedIdStr.toLowerCase() === originalId.toLowerCase()
-      })
-    })
-
-    if (hasMatch && token.type === 'word') {
-      matchedPositions.push(index)
-    }
-  })
-
-  if (matchedPositions.length === 0) {
-    return []
-  }
-
-  // Now build the result array including words, punctuation, and gaps
-  const result: AlignedToken[] = []
-
-  matchedPositions.forEach((position, matchIndex) => {
-    const token = targetTokens[position]
-    const tokenOccurrence = token.occurrence || 1
-    const semanticId = `${verseRef}:${token.text}:${tokenOccurrence}`
-
-    // Add the matched word
-    result.push({
-      content: token.text,
-      semanticId,
-      verseRef,
-      position,
-      type: 'word',
-    })
-
-    // Check if there's a next matched word
-    if (matchIndex < matchedPositions.length - 1) {
-      const nextPosition = matchedPositions[matchIndex + 1]
-      const gap = nextPosition - position
-
-      if (gap > 1) {
-        // There are tokens between (gap >= 2)
-        const betweenTokens = []
-        let hasWordsBetween = false
-
-        for (let i = position + 1; i < nextPosition; i++) {
-          const token = targetTokens[i]
-          if (token.type === 'word') {
-            hasWordsBetween = true
-            // Don't break - we still need to collect punctuation
-          } else if (
-            token.type === 'punctuation' ||
-            token.type === 'whitespace' ||
-            token.type === 'number' ||
-            token.type === 'paragraph-marker' ||
-            (token as { type?: string }).type === 'text'
-          ) {
-            const marked: AlignedToken = {
-              content: token.text,
-              semanticId: `${verseRef}:${token.type}:${i}`,
-              verseRef,
-              position: i,
-              type:
-                token.type === 'whitespace'
-                  ? 'whitespace'
-                  : 'punctuation',
-            }
-            betweenTokens.push(marked)
-          }
-        }
-
-        if (hasWordsBetween) {
-          // There are words between - add gap ellipsis
-          result.push({
-            content: '…',
-            semanticId: `${verseRef}:gap:${position + 1}`,
-            verseRef,
-            position: position + 1,
-            type: 'gap',
-          })
-        } else {
-          // No words between (contiguous matches) - include all punctuation and whitespace
-          result.push(...betweenTokens)
-        }
-      }
-    }
-  })
-
-  return result
-}
-
 export function useAlignedTokens<TLink extends LinkQuotesInput>({
   resourceKey: _resourceKey,
   resourceId,
@@ -174,11 +54,14 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
 
   // Build aligned tokens for each link
   const linksWithAlignedTokens = useMemo((): Array<
-    TLink & { alignedTokens: AlignedToken[] | undefined; semanticIds?: string[] }
+    TLink & {
+      alignedTokens: ReturnType<typeof findAlignedTokens> | undefined
+      semanticIds?: string[]
+    }
   > => {
     if (!hasTokens || !links || links.length === 0) {
       return links.map((link) => ({ ...link, alignedTokens: undefined })) as Array<
-        TLink & { alignedTokens: AlignedToken[] | undefined }
+        TLink & { alignedTokens: undefined }
       >
     }
 
@@ -186,25 +69,19 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     const currentChapter = currentRef.chapter || 1
     const refBookLower = tokenReference?.book?.toLowerCase() ?? ''
 
-    const linksWithAlignedTokens = links.map(link => {
-      // Only process links with quote tokens (original language tokens)
+    return links.map((link) => {
       if (!link.quoteTokens || link.quoteTokens.length === 0) {
         return { ...link, alignedTokens: undefined }
       }
 
-      // Parse link reference
       const refParts = link.reference.split(':')
       const linkChapter = parseInt(refParts[0] || '1', 10)
       const linkVerse = parseInt(refParts[1] || '1', 10)
 
-      // Only process links in current chapter
       if (linkChapter !== currentChapter) {
         return { ...link, alignedTokens: undefined }
       }
 
-      // Check if we have broadcast tokens for this chapter
-      // We now broadcast full chapter, so just verify book and chapter match
-      // Compare book case-insensitively (broadcast may use "TIT", currentRef uses "tit")
       if (
         !tokenReference ||
         refBookLower !== bookCode ||
@@ -213,7 +90,6 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         return { ...link, alignedTokens: undefined }
       }
 
-      // Check if this link's verse is within the broadcast range
       const broadcastStartVerse = tokenReference.verse || 1
       const broadcastEndVerse = tokenReference.endVerse || broadcastStartVerse
 
@@ -221,8 +97,6 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         return { ...link, alignedTokens: undefined }
       }
 
-      // Generate semantic IDs for original language tokens
-      // Pass baseOccurrence for single-token quotes (TN/TWL occurrence from link)
       const linkOccurrence = parseInt(String(link.occurrence ?? '1'), 10)
       const originalSemanticIds = generateSemanticIdsForQuoteTokens(
         link.quoteTokens,
@@ -232,7 +106,6 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         linkOccurrence
       )
 
-      // Find aligned tokens in target language
       const alignedTokens = findAlignedTokens(
         targetTokens,
         originalSemanticIds,
@@ -244,19 +117,14 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       return {
         ...link,
         alignedTokens: alignedTokens.length > 0 ? alignedTokens : undefined,
-        // Cache semantic IDs so downstream memos (underline groups, token filter) can
-        // reuse them without calling generateSemanticIdsForQuoteTokens again.
         semanticIds: originalSemanticIds,
       }
     })
-
-    return linksWithAlignedTokens
-
   }, [links, targetTokens, tokenReference, hasTokens, currentRef.book, currentRef.chapter])
 
   return {
     linksWithAlignedTokens,
-    loading: false, // No loading state needed with broadcast!
+    loading: false,
     loadingAligned: false,
     alignedError: null as string | null,
     error: null,

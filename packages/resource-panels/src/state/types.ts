@@ -14,14 +14,22 @@ import {
 } from './keys'
 
 /**
- * Minimal token shape for scripture-tokens STATE.
+ * Minimal token shape for scripture-tokens STATE (USJ broadcast).
  * Apps may widen (e.g. OptimizedToken[]) — no index signature so structural
  * subtypes remain assignable.
+ *
+ * Helps consumers rely on semanticId + alignedOriginalWordIds for underlines.
  */
 export interface ScriptureStateToken {
   id?: number | string
   text?: string
   type?: string
+  verseRef?: string
+  occurrence?: number
+  /** `${verseRef}:${content}:${occurrence}` — underline / highlight match key */
+  semanticId?: string
+  /** OL semantic IDs this gateway token aligns to */
+  alignedOriginalWordIds?: string[]
 }
 
 /**

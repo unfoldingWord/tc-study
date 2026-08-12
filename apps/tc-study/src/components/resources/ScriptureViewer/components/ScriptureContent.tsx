@@ -1,27 +1,25 @@
-/**
- * ScriptureContent - Main content area displaying verses
- */
-
-import type { ProcessedScripture, ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
+import type { UsjScriptureViewModel, UsjWordToken } from '@bt-synergy/scripture-loader'
 import { BookX } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
+import { useScriptureDisplayStore } from '../../../../lib/stores/scriptureDisplayStore'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
-import type { OriginalLanguageToken } from '../types'
+import type { DisplayUsjVerse, OriginalLanguageToken } from '../types'
+import { FormattedScriptureContent } from './FormattedScriptureContent'
 import { VerseRenderer } from './VerseRenderer'
 
 interface ScriptureContentProps {
   isLoading: boolean
   isLoadingTOC?: boolean
   error: string | null
-  loadedContent: ProcessedScripture | null
+  viewModel: UsjScriptureViewModel | null
   availableBooks: BookInfo[]
-  displayVerses: ProcessedVerse[]
+  displayVerses: DisplayUsjVerse[]
   currentRef: ReferenceState
   highlightTarget: OriginalLanguageToken | null
   underlinedSemanticIds?: Set<string>
   selectedTokenId: string | null
-  onTokenClick: (token: WordToken) => void
+  onTokenClick: (token: UsjWordToken) => void
   onVerseClick?: (chapter: number, verse: number) => void
   onChapterClick?: (chapter: number) => void
   language?: string
@@ -32,7 +30,7 @@ export function ScriptureContent({
   isLoading,
   isLoadingTOC = false,
   error,
-  loadedContent,
+  viewModel,
   availableBooks,
   displayVerses,
   currentRef,
@@ -45,36 +43,22 @@ export function ScriptureContent({
   language,
   languageDirection = 'ltr',
 }: ScriptureContentProps) {
+  const layoutMode = useScriptureDisplayStore((s) => s.layoutMode)
   const containerRef = useRef<HTMLDivElement>(null)
   const lastScrolledTokenRef = useRef<string | null>(null)
 
-  // Auto-scroll to highlighted token when highlightTarget changes
   useEffect(() => {
-    // Only scroll if there's a highlight target and it's different from last scrolled
-    if (!highlightTarget || !selectedTokenId) {
-      return
-    }
+    if (!highlightTarget || !selectedTokenId) return
+    if (lastScrolledTokenRef.current === selectedTokenId) return
 
-    // Don't scroll again to the same token
-    if (lastScrolledTokenRef.current === selectedTokenId) {
-      return
-    }
-
-    // Wait a tick for DOM to update
     const timer = setTimeout(() => {
       const highlightedElements = containerRef.current?.querySelectorAll('[data-highlighted="true"]')
-
       if (highlightedElements && highlightedElements.length > 0) {
-        const firstHighlighted = highlightedElements[0] as HTMLElement
-
-        // Scroll with smooth behavior and center alignment
-        firstHighlighted.scrollIntoView({
+        ;(highlightedElements[0] as HTMLElement).scrollIntoView({
           behavior: 'smooth',
           block: 'center',
-          inline: 'nearest'
+          inline: 'nearest',
         })
-
-        // Remember this token to avoid redundant scrolls
         lastScrolledTokenRef.current = selectedTokenId
       }
     }, 100)
@@ -82,33 +66,24 @@ export function ScriptureContent({
     return () => clearTimeout(timer)
   }, [highlightTarget, selectedTokenId])
 
-  // Reset scroll tracking when reference changes
   useEffect(() => {
     lastScrolledTokenRef.current = null
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
 
-  // Group verses by chapter for cross-chapter range support.
-  // Must be called before any early returns to satisfy Rules of Hooks.
   const { versesByChapter, chapters } = useMemo(() => {
     const grouped = displayVerses.reduce((acc, verse) => {
-      const verseWithChapter = verse as ProcessedVerse & { chapterNumber?: number }
-      const chapterNum = verseWithChapter.chapterNumber || currentRef.chapter
-      if (!acc[chapterNum]) {
-        acc[chapterNum] = []
-      }
+      const chapterNum = verse.chapterNumber || currentRef.chapter
+      if (!acc[chapterNum]) acc[chapterNum] = []
       acc[chapterNum].push(verse)
       return acc
-    }, {} as Record<number, ProcessedVerse[]>)
+    }, {} as Record<number, DisplayUsjVerse[]>)
     return {
       versesByChapter: grouped,
       chapters: Object.keys(grouped).map(Number).sort((a, b) => a - b),
     }
   }, [displayVerses, currentRef.chapter])
 
-  // Show full-screen loading only when we have no content yet (initial load).
-  // When we already have content and isLoading flips (e.g. token click triggers a refetch),
-  // keep showing the current content to avoid the spinner replacing the text.
-  const showFullScreenLoading = (isLoadingTOC || isLoading) && !loadedContent
+  const showFullScreenLoading = (isLoadingTOC || isLoading) && !viewModel
   if (showFullScreenLoading) {
     return (
       <LoadingSpinner
@@ -121,7 +96,6 @@ export function ScriptureContent({
   }
 
   if (error) {
-    // Special handling for "book not available" case
     if (error === 'BOOK_NOT_AVAILABLE') {
       return (
         <div
@@ -134,8 +108,6 @@ export function ScriptureContent({
         </div>
       )
     }
-
-    // General error display for other errors
     return (
       <div className="text-center py-12 text-red-600">
         <p className="font-semibold">Error loading content</p>
@@ -144,7 +116,7 @@ export function ScriptureContent({
     )
   }
 
-  if (!loadedContent) {
+  if (!viewModel) {
     return (
       <div className="text-center py-12 text-gray-500">
         <p>No content available for {currentRef.book.toUpperCase()}</p>
@@ -166,41 +138,49 @@ export function ScriptureContent({
     )
   }
 
-  // Determine if this is an original language resource
   const isOriginalLanguage = language === 'el-x-koine' || language === 'hbo'
-  const _isCrossChapter = chapters.length > 1
 
   return (
     <div ref={containerRef} className="space-y-6" dir={languageDirection}>
-      {chapters.map((chapterNum) => (
-        <div key={chapterNum} className="space-y-1">
-          {/* Chapter Header - shown for each chapter in cross-chapter ranges */}
-          <h2
-            className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200 cursor-pointer hover:text-blue-600 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation()
-              onChapterClick?.(chapterNum)
-            }}
-          >
-            {chapterNum}
-          </h2>
-
-          {/* Verses in this chapter */}
-          {versesByChapter[chapterNum].map((verse) => (
-        <VerseRenderer
-              key={`${chapterNum}:${verse.number}`}
-          verse={verse}
-              chapterNumber={chapterNum}
-              highlightTarget={highlightTarget}
-              underlinedSemanticIds={underlinedSemanticIds}
+      {layoutMode === 'formatted' && viewModel ? (
+        <FormattedScriptureContent
+          viewModel={viewModel}
+          currentRef={currentRef}
+          highlightTarget={highlightTarget}
+          underlinedSemanticIds={underlinedSemanticIds}
           onTokenClick={onTokenClick}
-              onVerseClick={onVerseClick}
-              isOriginalLanguage={isOriginalLanguage}
+          onVerseClick={onVerseClick}
+          onChapterClick={onChapterClick}
+          isOriginalLanguage={isOriginalLanguage}
         />
-          ))}
-        </div>
-      ))}
+      ) : (
+        chapters.map((chapterNum) => (
+          <div key={chapterNum} className="space-y-1" data-scripture-layout="verse-block">
+            <h2
+              className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200 cursor-pointer hover:text-blue-600 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation()
+                onChapterClick?.(chapterNum)
+              }}
+            >
+              {chapterNum}
+            </h2>
+
+            {versesByChapter[chapterNum]!.map((verse) => (
+              <VerseRenderer
+                key={`${chapterNum}:${verse.number}`}
+                verse={verse}
+                chapterNumber={chapterNum}
+                highlightTarget={highlightTarget}
+                underlinedSemanticIds={underlinedSemanticIds}
+                onTokenClick={onTokenClick}
+                onVerseClick={onVerseClick}
+                isOriginalLanguage={isOriginalLanguage}
+              />
+            ))}
+          </div>
+        ))
+      )}
     </div>
   )
 }
-

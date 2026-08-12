@@ -18,7 +18,7 @@ import {
   NotesTokenGroupsBroadcast
 } from '../../plugins/notes-scripture-plugin';
 import { QuoteMatcher, QuoteMatchResult } from '../../services/quote-matcher';
-import { OptimizedScripture, OptimizedToken } from '../../services/usfm-processor';
+import { OptimizedScripture, OptimizedToken } from '../../services/usj-scripture-processor';
 import {
   NoteSelectionBroadcast,
   NoteTokenGroup

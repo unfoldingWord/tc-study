@@ -4,7 +4,7 @@ Complete Scripture resource type package for tc-study applications.
 
 ## Features
 
-- ✅ **USFM Parser** - Parse Bible texts in USFM format
+- ✅ **USFM → USJ parsing** - Parse Bible texts via the USJ-backed process path
 - ✅ **Verse-level precision** - Navigate and display at verse level
 - ✅ **Inter-panel communication** - Send/receive signals for token clicks, navigation, etc.
 - ✅ **Highlighting support** - Visual highlighting of verses and words
@@ -16,7 +16,7 @@ Complete Scripture resource type package for tc-study applications.
 
 ```bash
 # In your app
-pnpm add @bt-synergy/scripture-resource
+bun add @bt-synergy/scripture-resource
 ```
 
 ## Quick Start
@@ -108,20 +108,20 @@ Customize in resource type settings:
 
 - `@bt-synergy/resource-types` - Base resource type system
 - `@bt-synergy/resource-panels` - Inter-panel communication
-- `@bt-synergy/usfm-processor` - USFM parsing
+- `@bt-synergy/scripture-loader` - USJ-backed scripture load/process path (`@bt-synergy/usj-processor`)
 - `@bt-synergy/resource-cache` - Caching infrastructure
 
 ## Development
 
 ```bash
 # Build
-pnpm build
+bun run build
 
 # Watch mode
-pnpm dev
+bun run dev
 
 # Clean
-pnpm clean
+bun run clean
 ```
 
 ## Examples

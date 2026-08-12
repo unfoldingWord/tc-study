@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@bt-synergy/door43-api": "workspace:*",
+    "@bt-synergy/usj-processor": "workspace:*",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
@@ -76,7 +77,6 @@
     "jszip": "^3.10.1",
     "tar": "^6.2.0",
     "tsx": "^4.20.4",
-    "usfm-js": "^3.4.3",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

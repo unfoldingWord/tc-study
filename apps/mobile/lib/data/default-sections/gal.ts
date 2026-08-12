@@ -5,7 +5,7 @@
  * Sections: 59
  */
 
-import type { TranslatorSection } from '../../services/usfm-processor';
+import type { TranslatorSection } from '../../services/usj-scripture-processor';
 
 export const galSections: TranslatorSection[] = [
   {

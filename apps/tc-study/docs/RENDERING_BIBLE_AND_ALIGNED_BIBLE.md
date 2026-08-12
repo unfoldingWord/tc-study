@@ -133,7 +133,7 @@ const content = await catalogManager.loadResourceContent(
 
 **For Both Bible and Aligned Bible:**
 - Uses the same `ScriptureLoader.loadContent()` method
-- Returns `ProcessedScripture` format from `@bt-synergy/usfm-processor`
+- Returns `ProcessedScripture` format from `@bt-synergy/scripture-loader` / `@bt-synergy/usj-processor`
 - Aligned Bible resources may include additional alignment data in `content.alignments`
 
 ### 5. Alignment Data Handling

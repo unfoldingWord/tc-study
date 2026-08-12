@@ -31,16 +31,20 @@ export type {
   TranslationWord,
   AcademyArticle,
   OptimizedToken,
-} from './types'
-
-// USFM Parser
-export {
-  USFMProcessor,
-  OptimizedScripture,
   OptimizedChapter,
   OptimizedVerse,
-  usfmProcessor,
-} from './parsers/usfm'
+  OptimizedParagraph,
+} from './types'
+
+// USJ Helps projections (OptimizedScripture DTO)
+export {
+  processUsfmToOptimizedScripture,
+  viewModelToOptimizedScripture,
+  viewModelToOptimizedChapters,
+  extractUsjBroadcastTokens,
+} from './parsers/scripture'
+export type { OptimizedScripture, BroadcastScriptureToken } from './parsers/scripture'
+
 
 // TSV Parsers
 export {
