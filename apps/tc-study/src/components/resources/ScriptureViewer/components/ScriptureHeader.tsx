@@ -18,11 +18,11 @@ export function ScriptureHeader({
 
   return (
     <div className="mb-4">
-      <h3 className="text-lg font-semibold text-gray-900">{resourceKey}</h3>
-      <p className="text-sm text-gray-500">{refString}</p>
+      <h3 className="text-lg font-semibold text-scripture-fg">{resourceKey}</h3>
+      <p className="text-sm text-scripture-muted">{refString}</p>
       {isAnchor && (
-        <span className="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
-          ⚓ Anchor Resource
+        <span className="inline-block mt-1 px-2 py-0.5 bg-accent-soft text-accent-fg text-xs rounded">
+          Anchor
         </span>
       )}
     </div>

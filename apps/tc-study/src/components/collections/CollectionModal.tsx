@@ -30,8 +30,8 @@ export function CollectionModal({ onClose, onComplete, onResourcesAdded }: Colle
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-overlay backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-surface border border-border rounded-2xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
         {view === 'creator' ? (
           <SimpleCollectionCreator
             onClose={onClose}

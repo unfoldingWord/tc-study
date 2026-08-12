@@ -85,18 +85,18 @@ export function SelectableGrid<T>({
             className={`
               relative p-3 rounded-lg border-2 transition-all
               ${locked
-                ? 'cursor-default border-green-500 bg-green-50'
+                ? 'cursor-default border-accent bg-accent-soft'
                 : disabled 
-                  ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' 
+                  ? 'opacity-50 cursor-not-allowed border-border bg-muted' 
                   : isSelected
-                    ? 'cursor-pointer border-blue-500 bg-blue-50'
-                    : 'cursor-pointer border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    ? 'cursor-pointer border-accent bg-accent-soft'
+                    : 'cursor-pointer border-border hover:border-accent/50 hover:bg-accent-soft bg-surface'
               }
             `}
             title={key}
           >
             {isSelected && !disabled && (
-              <Check className={`absolute top-1.5 right-1.5 w-4 h-4 ${locked ? 'text-green-600' : 'text-blue-600'}`} />
+              <Check className={`absolute top-1.5 right-1.5 w-4 h-4 ${locked ? 'text-accent' : 'text-accent'}`} />
             )}
             {renderItem(item, isSelected, disabled)}
           </div>
@@ -145,12 +145,12 @@ export function SelectableGridWithStatus<T>({
         const status = getStatus(item)
         
         const borderColor = isSelected
-          ? status === 'cached' ? 'border-green-500' : 'border-blue-500'
-          : 'border-gray-200 hover:border-blue-300'
+          ? status === 'cached' ? 'border-accent' : 'border-accent'
+          : 'border-border hover:border-accent/50'
           
         const bgColor = isSelected
-          ? status === 'cached' ? 'bg-green-50' : 'bg-blue-50'
-          : 'hover:bg-blue-50'
+          ? status === 'cached' ? 'bg-accent-soft' : 'bg-accent-soft'
+          : 'bg-surface hover:bg-accent-soft'
         
         return (
           <div
@@ -163,7 +163,7 @@ export function SelectableGridWithStatus<T>({
             title={key}
           >
             {isSelected && (
-              <Check className={`absolute top-1.5 right-1.5 w-4 h-4 ${status === 'cached' ? 'text-green-600' : 'text-blue-600'}`} />
+              <Check className={`absolute top-1.5 right-1.5 w-4 h-4 text-accent`} />
             )}
             {renderItem(item, isSelected, status)}
           </div>

@@ -51,33 +51,33 @@ export function OriginalLanguageResourceCard({
         relative p-3 rounded-lg border-2 transition-all text-left
         ${
           isLocked
-            ? 'border-green-500 bg-green-50 cursor-default'
+            ? 'border-accent bg-accent-soft cursor-default'
             : isSelected
-              ? 'border-blue-500 bg-blue-50'
-              : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+              ? 'border-accent bg-accent-soft'
+              : 'border-border hover:border-accent hover:bg-accent-soft'
         }
       `}
     >
       {isSelected && (
         <Check
           className={`absolute top-1.5 ${isSelected ? 'right-8' : 'right-1.5'} w-4 h-4 ${
-            isLocked ? 'text-green-600' : 'text-blue-600'
+            isLocked ? 'text-accent' : 'text-accent'
           }`}
         />
       )}
 
       <button
         onClick={(e) => onShowInfo(e, resource)}
-        className="absolute top-1.5 right-1.5 p-1 hover:bg-blue-100 rounded transition-colors z-10"
+        className="absolute top-1.5 right-1.5 p-1 hover:bg-accent-soft rounded transition-colors z-10"
         title="Resource information"
         aria-label="Resource information"
       >
-        <Info className="w-3.5 h-3.5 text-blue-600" />
+        <Info className="w-3.5 h-3.5 text-accent" />
       </button>
 
-      <div className="font-semibold text-gray-900 text-sm mb-0.5">{resource.title}</div>
+      <div className="font-semibold text-fg text-sm mb-0.5">{resource.title}</div>
 
-      <div className="text-xs text-gray-500 pb-5">
+      <div className="text-xs text-fg-secondary pb-5">
         <div className="truncate">{resource.owner}</div>
       </div>
 
@@ -87,7 +87,7 @@ export function OriginalLanguageResourceCard({
           aria-label="Already in collection"
           className="absolute bottom-1.5 left-1.5 inline-flex"
         >
-          <Package className="w-3.5 h-3.5 text-purple-600" />
+          <Package className="w-3.5 h-3.5 text-panel-2-fg" />
         </span>
       ) : isCached ? (
         <span
@@ -95,7 +95,7 @@ export function OriginalLanguageResourceCard({
           aria-label="Cached offline"
           className="absolute bottom-1.5 left-1.5 inline-flex"
         >
-          <Database className="w-3.5 h-3.5 text-green-600" />
+          <Database className="w-3.5 h-3.5 text-accent" />
         </span>
       ) : (
         <span
@@ -103,11 +103,11 @@ export function OriginalLanguageResourceCard({
           aria-label="Available online"
           className="absolute bottom-1.5 left-1.5 inline-flex"
         >
-          <Wifi className="w-3.5 h-3.5 text-blue-500" />
+          <Wifi className="w-3.5 h-3.5 text-accent" />
         </span>
       )}
 
-      <Book className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 text-gray-400" />
+      <Book className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 text-fg-muted" />
     </button>
   )
 }

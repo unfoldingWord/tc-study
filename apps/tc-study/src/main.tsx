@@ -4,6 +4,7 @@ import App from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { CatalogProvider } from './contexts'
 import { EntryViewerProvider } from './contexts/EntryViewerContext'
+import { ThemeBootstrap } from './features/theme'
 import './index.css'
 import { entryViewerRegistry } from './lib/viewers/EntryViewerRegistry'
 import { registerDefaultEntryViewers } from './lib/viewers/registerEntryViewers'
@@ -21,6 +22,7 @@ try {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <StrictModeWrapper>
     <ErrorBoundary>
+      <ThemeBootstrap />
       <CatalogProvider>
         <EntryViewerProvider registry={entryViewerRegistry}>
           <App />

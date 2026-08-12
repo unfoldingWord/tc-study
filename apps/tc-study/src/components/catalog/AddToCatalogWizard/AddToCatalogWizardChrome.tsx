@@ -63,17 +63,17 @@ export function AddToCatalogWizardHeader({
 }: AddToCatalogWizardHeaderProps) {
   return (
     <>
-      <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+      <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-muted">
         <div className="flex items-center gap-2">
-          <Download className="w-5 h-5 text-blue-600" />
+          <Download className="w-5 h-5 text-accent" />
           {selectedResourceKeysSize > 0 && (
-            <span className="text-sm font-medium text-gray-900">{selectedResourceKeysSize}</span>
+            <span className="text-sm font-medium text-fg">{selectedResourceKeysSize}</span>
           )}
         </div>
         <button
           onClick={onCancel}
           disabled={isProcessing}
-          className="p-1 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+          className="p-1 hover:bg-muted rounded transition-colors disabled:opacity-50"
           title="Close"
           aria-label="Close"
         >
@@ -81,7 +81,7 @@ export function AddToCatalogWizardHeader({
         </button>
       </div>
 
-      <div className="px-4 py-2 border-b border-gray-200 bg-white">
+      <div className="px-4 py-2 border-b border-border bg-surface">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2">
             {WIZARD_STEPS.map((step, index) => {
@@ -97,9 +97,9 @@ export function AddToCatalogWizardHeader({
                   <div
                     className={`
                       p-1.5 rounded-full transition-colors
-                      ${isActive ? 'bg-blue-600 text-white' : ''}
-                      ${isComplete ? 'bg-green-600 text-white' : ''}
-                      ${!isActive && !isComplete ? 'bg-gray-200 text-gray-600' : ''}
+                      ${isActive ? 'bg-accent text-white' : ''}
+                      ${isComplete ? 'bg-accent text-white' : ''}
+                      ${!isActive && !isComplete ? 'bg-muted text-fg-secondary' : ''}
                     `}
                     title={step.replace('-', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                   >
@@ -107,16 +107,16 @@ export function AddToCatalogWizardHeader({
                   </div>
                   {index < WIZARD_STEPS.length - 1 &&
                     (step !== 'original-languages' || shouldShowOriginalLanguages) && (
-                      <ChevronRight className="w-3 h-3 mx-0.5 text-gray-400" />
+                      <ChevronRight className="w-3 h-3 mx-0.5 text-fg-muted" />
                     )}
                 </div>
               )
             })}
           </div>
 
-          <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
-            <Package className="w-3.5 h-3.5 text-gray-600" />
-            <span className="text-xs font-medium text-gray-900">
+          <div className="flex items-center gap-1 px-2 py-1 bg-muted rounded-full">
+            <Package className="w-3.5 h-3.5 text-fg-secondary" />
+            <span className="text-xs font-medium text-fg">
               {wizardStep === 'review' ? selectedForDownloadSize : selectedResourceKeysSize}
             </span>
           </div>
@@ -124,10 +124,10 @@ export function AddToCatalogWizardHeader({
       </div>
 
       {isProcessing && (
-        <div className="px-4 py-2 border-b bg-blue-50 border-blue-200">
+        <div className="px-4 py-2 border-b bg-accent-soft border-accent">
           <div className="flex items-center gap-2">
-            <Download className="w-4 h-4 text-blue-600 animate-pulse" />
-            <span className="text-sm font-medium text-blue-900">Processing resources...</span>
+            <Download className="w-4 h-4 text-accent animate-pulse" />
+            <span className="text-sm font-medium text-accent-fg">Processing resources...</span>
           </div>
         </div>
       )}
@@ -147,12 +147,12 @@ export function AddToCatalogWizardFooter({
   onDownload,
 }: AddToCatalogWizardFooterProps) {
   return (
-      <div className="px-4 py-2 border-t border-gray-200 bg-gray-50">
+      <div className="px-4 py-2 border-t border-border bg-muted">
         <div className="flex items-center justify-between">
           <button
             onClick={onBack}
             disabled={currentStepIndex === 0 || isProcessing}
-            className="p-1.5 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="p-1.5 border border-border rounded hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title="Back"
             aria-label="Go back"
             data-testid="wizard-back-btn"
@@ -164,7 +164,7 @@ export function AddToCatalogWizardFooter({
             <button
               onClick={onCancel}
               disabled={isProcessing}
-              className="p-1.5 text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50 transition-colors"
+              className="p-1.5 text-fg-secondary hover:bg-muted rounded disabled:opacity-50 transition-colors"
               title="Cancel"
               aria-label="Cancel wizard"
               data-testid="wizard-cancel-btn"
@@ -176,7 +176,7 @@ export function AddToCatalogWizardFooter({
               <button
                 onClick={onNext}
                 disabled={!canProceed || isProcessing}
-                className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 bg-accent text-white rounded hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 title="Next"
                 aria-label="Next step"
                 data-testid="wizard-next-btn"
@@ -188,7 +188,7 @@ export function AddToCatalogWizardFooter({
                 <button
                   onClick={onAddOnly}
                   disabled={!canProceed || isProcessing}
-                  className="p-2 bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 bg-muted text-white rounded hover:bg-elevated disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Add to catalog (metadata only)"
                   aria-label="Add to catalog"
                 >
@@ -197,7 +197,7 @@ export function AddToCatalogWizardFooter({
                 <button
                   onClick={onDownload}
                   disabled={!canProceed || isProcessing}
-                  className="p-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 bg-accent text-white rounded hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   title="Add to catalog and download content (continues in background)"
                   aria-label="Download resources"
                 >

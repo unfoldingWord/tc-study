@@ -62,7 +62,7 @@ export function OrganizationSelectorStep() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     )
   }
@@ -70,10 +70,10 @@ export function OrganizationSelectorStep() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+        <AlertCircle className="w-12 h-12 text-danger mb-4" />
         <button
           onClick={retry}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors"
           title="Retry loading organizations"
           aria-label="Retry loading organizations"
         >
@@ -86,7 +86,7 @@ export function OrganizationSelectorStep() {
   if (selectedLanguages.size === 0) {
     return (
       <div className="text-center py-20">
-        <Building2 className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+        <Building2 className="w-16 h-16 mx-auto mb-4 text-fg-muted" />
       </div>
     )
   }
@@ -96,12 +96,12 @@ export function OrganizationSelectorStep() {
       {/* Search */}
       <div className="mb-4">
         <div className="relative">
-          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900 placeholder-gray-400"
+            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent bg-surface text-fg placeholder:text-fg-muted"
             placeholder="Search..."
             aria-label="Search organizations"
           />
@@ -111,8 +111,8 @@ export function OrganizationSelectorStep() {
       {/* Organization Grid using shared SelectableGrid */}
       <div className="space-y-4">
         {filteredOrganizations.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <div className="text-center py-12 text-fg-secondary">
+            <Building2 className="w-12 h-12 mx-auto mb-3 text-fg-muted" />
           </div>
         ) : (
           <SelectableGrid
@@ -130,8 +130,8 @@ export function OrganizationSelectorStep() {
                   />
                 )}
 
-                <div className="font-semibold text-gray-900 mb-0.5 pr-6 truncate">{org.name}</div>
-                <div className="text-sm text-gray-500 truncate">{org.username}</div>
+                <div className="font-semibold text-fg mb-0.5 pr-6 truncate">{org.name}</div>
+                <div className="text-sm text-fg-secondary truncate">{org.username}</div>
               </>
             )}
           />

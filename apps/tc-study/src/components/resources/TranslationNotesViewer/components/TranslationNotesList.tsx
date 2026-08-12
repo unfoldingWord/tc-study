@@ -49,24 +49,24 @@ export function TranslationNotesList({
   onNoteSelect,
 }: TranslationNotesListProps) {
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50" dir={targetLanguageDirection}>
+    <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
       <ResourceViewerHeader title={resource.title} icon={FileText} direction={targetLanguageDirection} />
       <div className="p-4">
         {loading ? (
           <LoadingSpinner
             centered
             label="Loading content"
-            className="text-amber-500"
+            className="text-helps"
             containerClassName="py-12"
           />
         ) : error ? (
-          <div className="text-center py-12 text-gray-500">
-            <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <div className="text-center py-12 text-fg-muted">
+            <BookOpen className="w-12 h-12 mx-auto mb-4 text-fg-muted opacity-50" />
             <p className="text-sm">{error}</p>
           </div>
         ) : Object.keys(notesByVerse).length === 0 ? (
           <div className="flex items-center justify-center h-full" title="No notes for this passage">
-            <BookOpen className="w-16 h-16 text-gray-300 opacity-60" />
+            <BookOpen className="w-16 h-16 text-fg-muted opacity-60" />
           </div>
         ) : (
           <div className="space-y-4">
@@ -79,11 +79,11 @@ export function TranslationNotesList({
               return (
                 <div key={verse} className="space-y-3">
                   <div
-                    className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg"
+                    className="flex items-center gap-2 px-2.5 py-1.5 bg-chip-verse rounded-lg"
                     dir={targetLanguageDirection}
                   >
-                    <BookOpen className="w-3.5 h-3.5 text-amber-500" />
-                    <h3 className="text-xs font-semibold text-gray-700">
+                    <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
+                    <h3 className="text-xs font-semibold text-fg-secondary">
                       {(() => {
                         const { bookPart, numberPart } = formatVerseRefParts(
                           resolved,
@@ -103,7 +103,7 @@ export function TranslationNotesList({
                         )
                       })()}
                     </h3>
-                    <span className="ml-auto px-2 py-0.5 bg-amber-100/50 text-amber-700 rounded-full text-[10px] font-medium">
+                    <span className="ml-auto px-2 py-0.5 bg-helps-soft text-chip-verse-fg rounded-full text-[10px] font-medium">
                       {verseNotes.length}
                     </span>
                   </div>

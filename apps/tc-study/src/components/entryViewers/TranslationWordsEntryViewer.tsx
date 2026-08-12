@@ -149,7 +149,7 @@ export function TranslationWordsEntryViewer({
       <LoadingSpinner
         centered
         label="Loading entry"
-        className="text-blue-600"
+        className="text-accent"
         containerClassName="h-full p-8"
       />
     )
@@ -159,9 +159,9 @@ export function TranslationWordsEntryViewer({
   if (error) {
     return (
       <div className="p-6 text-center">
-        <FileText className="w-12 h-12 text-red-400 mx-auto mb-3" />
-        <p className="text-red-600 font-semibold mb-2">Failed to load entry</p>
-        <p className="text-sm text-gray-600">{error}</p>
+        <FileText className="w-12 h-12 text-danger opacity-70 mx-auto mb-3" />
+        <p className="text-danger font-semibold mb-2">Failed to load entry</p>
+        <p className="text-sm text-fg-secondary">{error}</p>
       </div>
     )
   }
@@ -169,8 +169,8 @@ export function TranslationWordsEntryViewer({
   // No word loaded
   if (!word) {
     return (
-      <div className="p-6 text-center text-gray-600">
-        <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+      <div className="p-6 text-center text-fg-secondary">
+        <FileText className="w-12 h-12 text-fg-muted mx-auto mb-3" />
         <p>No entry loaded</p>
       </div>
     )
@@ -179,12 +179,12 @@ export function TranslationWordsEntryViewer({
   // Render article content
   const isRtl = direction === 'rtl'
   return (
-    <div className="h-full relative" dir={direction}>
+    <div className="h-full relative bg-surface text-fg" dir={direction}>
       {/* Debug toggle button for raw markdown (dev tool - only in development) */}
       {import.meta.env.DEV && (
         <button
           onClick={() => setShowRawMarkdown(!showRawMarkdown)}
-          className={`absolute top-4 z-10 flex items-center justify-center p-1.5 bg-gray-500/30 hover:bg-gray-600/50 text-gray-600 hover:text-gray-800 rounded transition-all opacity-50 hover:opacity-100 ${isRtl ? 'left-4' : 'right-4'}`}
+          className={`absolute top-4 z-10 flex items-center justify-center p-1.5 bg-muted/80 hover:bg-muted text-fg-secondary hover:text-fg rounded transition-all opacity-50 hover:opacity-100 ${isRtl ? 'left-4' : 'right-4'}`}
           title={showRawMarkdown ? "Show rendered view" : "Show raw markdown"}
           dir="ltr"
         >
@@ -198,15 +198,15 @@ export function TranslationWordsEntryViewer({
 
       <article className={`max-w-4xl mx-auto p-6 ${isRtl ? 'text-right' : 'text-left'}`}>
         {/* Custom styled header */}
-        <header className="mb-6 pb-4 border-b border-gray-200">
-          <h1 className="text-3xl font-bold text-gray-900">{word.term}</h1>
+        <header className="mb-6 pb-4 border-b border-border">
+          <h1 className="text-3xl font-bold text-fg">{word.term}</h1>
         </header>
 
         {/* Main Content - toggle between rendered and raw markdown */}
         {word.content ? (
           showRawMarkdown ? (
             <div className="mb-8">
-              <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+              <div className="bg-elevated text-fg border border-border p-4 rounded-lg overflow-x-auto">
                 <pre className="text-sm font-mono whitespace-pre-wrap">
                   <code>{word.content}</code>
                 </pre>
@@ -215,7 +215,7 @@ export function TranslationWordsEntryViewer({
           ) : (
             <MarkdownRenderer
               content={word.content}
-              className="prose prose-slate max-w-none mb-8 prose-blockquote:text-slate-900 prose-blockquote:opacity-100 [&_blockquote]:text-slate-900 [&_blockquote_p]:text-slate-900 [&_blockquote_em]:text-inherit"
+              className="prose max-w-none mb-8 text-fg prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent prose-li:text-fg-secondary prose-blockquote:text-fg prose-blockquote:opacity-100 [&_blockquote]:text-fg [&_blockquote_p]:text-fg [&_blockquote_em]:text-inherit"
               onInternalLinkClick={(href, linkType, linkText) => {
 
                 // Handle rc links (Door43 resource links)
@@ -420,7 +420,7 @@ export function TranslationWordsEntryViewer({
             />
           )
         ) : (
-          <p className="text-gray-500">No content available</p>
+          <p className="text-fg-muted">No content available</p>
         )}
       </article>
     </div>

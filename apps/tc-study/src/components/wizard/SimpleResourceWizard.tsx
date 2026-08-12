@@ -37,7 +37,6 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
     setPreviousModal,
   } = useSimpleResourceWizard(onAddResource)
 
-  const panelColor = targetPanel === 'panel-1' ? 'blue' : 'purple'
   const panelNumber = targetPanel === 'panel-1' ? '1' : '2'
 
   if (subModal === 'add-to-catalog') {
@@ -52,8 +51,8 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
 
   if (subModal === 'create-collection') {
     return (
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="fixed inset-0 bg-overlay backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-surface border border-border rounded-2xl shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden">
           <SimpleCollectionCreator
             onClose={() => {
               setSubModal(null)
@@ -69,19 +68,19 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-overlay backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="bg-surface border border-border rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full ${panelColor === 'blue' ? 'bg-blue-500' : 'bg-purple-500'} text-white flex items-center justify-center font-bold text-lg`}>
+            <div className={`w-10 h-10 rounded-full ${targetPanel === 'panel-1' ? 'bg-panel-1' : 'bg-panel-2'} text-white flex items-center justify-center font-bold text-lg`}>
               {panelNumber}
             </div>
-            <BookOpen className={`w-6 h-6 ${panelColor === 'blue' ? 'text-blue-600' : 'text-purple-600'}`} />
+            <BookOpen className={`w-6 h-6 ${targetPanel === 'panel-1' ? 'text-panel-1-fg' : 'text-panel-2-fg'}`} />
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-700"
+            className="p-2 hover:bg-muted rounded-lg transition-colors text-fg-secondary"
             title="Close"
             aria-label="Close"
           >
@@ -90,23 +89,23 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
         </div>
 
         {/* Search Bar & Action Buttons */}
-        <div className="px-6 py-4 border-b border-gray-200 space-y-3">
+        <div className="px-6 py-4 border-b border-border space-y-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-muted" />
               <input
                 type="text"
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent"
                 aria-label="Search resources"
               />
             </div>
             {activeTab === 'collections' && (
               <button
                 onClick={() => setSubModal('create-collection')}
-                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="p-2 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors"
                 title="New collection"
                 aria-label="Create new collection"
               >
@@ -116,7 +115,7 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
             {activeTab === 'catalog' && (
               <button
                 onClick={() => setSubModal('add-to-catalog')}
-                className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="p-2 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors"
                 title="Import from Door43"
                 aria-label="Import resources from Door43"
               >
@@ -126,23 +125,23 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-200 -mb-3">
+          <div className="flex border-b border-border -mb-3">
             <button
               onClick={() => setActiveTab('collections')}
               className={`px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'collections'
-                  ? `${panelColor === 'blue' ? 'border-blue-600' : 'border-purple-600'}`
-                  : 'border-transparent hover:border-gray-300'
+                  ? `${targetPanel === 'panel-1' ? 'border-panel-1' : 'border-panel-2'}`
+                  : 'border-transparent hover:border-border'
               }`}
               title="My collections"
               aria-label="My collections"
             >
               <div className="flex items-center gap-2">
-                <Package className={`w-5 h-5 ${activeTab === 'collections' ? (panelColor === 'blue' ? 'text-blue-600' : 'text-purple-600') : 'text-gray-500'}`} />
+                <Package className={`w-5 h-5 ${activeTab === 'collections' ? (targetPanel === 'panel-1' ? 'text-panel-1-fg' : 'text-panel-2-fg') : 'text-fg-secondary'}`} />
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                   activeTab === 'collections'
-                    ? (panelColor === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700')
-                    : 'bg-gray-100 text-gray-600'
+                    ? (targetPanel === 'panel-1' ? 'bg-panel-1-soft text-panel-1-fg' : 'bg-panel-2-soft text-panel-2-fg')
+                    : 'bg-muted text-fg-secondary'
                 }`}>
                   {collections.length}
                 </span>
@@ -152,18 +151,18 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
               onClick={() => setActiveTab('catalog')}
               className={`px-4 py-3 border-b-2 transition-colors ${
                 activeTab === 'catalog'
-                  ? `${panelColor === 'blue' ? 'border-blue-600' : 'border-purple-600'}`
-                  : 'border-transparent hover:border-gray-300'
+                  ? `${targetPanel === 'panel-1' ? 'border-panel-1' : 'border-panel-2'}`
+                  : 'border-transparent hover:border-border'
               }`}
               title="Browse catalog"
               aria-label="Browse catalog"
             >
               <div className="flex items-center gap-2">
-                <Library className={`w-5 h-5 ${activeTab === 'catalog' ? (panelColor === 'blue' ? 'text-blue-600' : 'text-purple-600') : 'text-gray-500'}`} />
+                <Library className={`w-5 h-5 ${activeTab === 'catalog' ? (targetPanel === 'panel-1' ? 'text-panel-1-fg' : 'text-panel-2-fg') : 'text-fg-secondary'}`} />
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                   activeTab === 'catalog'
-                    ? (panelColor === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700')
-                    : 'bg-gray-100 text-gray-600'
+                    ? (targetPanel === 'panel-1' ? 'bg-panel-1-soft text-panel-1-fg' : 'bg-panel-2-soft text-panel-2-fg')
+                    : 'bg-muted text-fg-secondary'
                 }`}>
                   {isLoadingCatalog ? '...' : catalogOnlyResources.length}
                 </span>
@@ -179,11 +178,11 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
             <div className="space-y-6">
               {collections.length === 0 ? (
                 <div className="text-center py-16">
-                  <Package className="w-20 h-20 text-gray-300 mx-auto mb-6" />
+                  <Package className="w-20 h-20 text-fg-muted mx-auto mb-6" />
                   <div className="flex items-center justify-center gap-3">
                     <button
                       onClick={() => setSubModal('create-collection')}
-                      className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                      className="p-3 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors shadow-sm"
                       title="Create collection"
                       aria-label="Create new collection"
                     >
@@ -191,7 +190,7 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
                     </button>
                     <button
                       onClick={() => setActiveTab('catalog')}
-                      className="p-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                      className="p-3 bg-muted text-fg-secondary rounded-lg hover:bg-muted transition-colors"
                       title="Browse catalog"
                       aria-label="Switch to catalog tab"
                     >
@@ -201,9 +200,9 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
                 </div>
               ) : (
                 collections.map((collection) => (
-                  <div key={collection.id} className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Package className="w-5 h-5 text-gray-600" />
+                  <div key={collection.id} className="border border-border rounded-lg p-4">
+                    <h3 className="font-semibold text-fg mb-3 flex items-center gap-2">
+                      <Package className="w-5 h-5 text-fg-secondary" />
                       {collection.name}
                     </h3>
                     <div className="space-y-2">
@@ -217,23 +216,23 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
                             disabled={isAdded}
                             className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
                               isAdded
-                                ? 'bg-green-50 border-green-300 cursor-not-allowed'
-                                : `border-gray-200 hover:border-${panelColor}-300 hover:bg-${panelColor}-50`
+                                ? 'bg-accent-soft border-accent cursor-not-allowed'
+                                : `border-border hover:border-accent hover:bg-accent-soft`
                             }`}
                           >
                             <div className="flex items-center gap-3">
-                              <Icon className={`w-5 h-5 ${isAdded ? 'text-green-600' : 'text-gray-600'}`} />
+                              <Icon className={`w-5 h-5 ${isAdded ? 'text-accent' : 'text-fg-secondary'}`} />
                               <div className="text-left">
-                                <div className={`font-medium ${isAdded ? 'text-green-900' : 'text-gray-900'}`}>
+                                <div className={`font-medium ${isAdded ? 'text-accent-fg' : 'text-fg'}`}>
                                   {resource.name}
                                 </div>
-                                <div className="text-xs text-gray-500 capitalize">{resource.type}</div>
+                                <div className="text-xs text-fg-secondary capitalize">{resource.type}</div>
                               </div>
                             </div>
                             {isAdded ? (
-                              <Check className="w-5 h-5 text-green-600" />
+                              <Check className="w-5 h-5 text-accent" />
                             ) : (
-                              <Plus className={`w-5 h-5 ${panelColor === 'blue' ? 'text-blue-600' : 'text-purple-600'}`} />
+                              <Plus className={`w-5 h-5 ${targetPanel === 'panel-1' ? 'text-panel-1-fg' : 'text-panel-2-fg'}`} />
                             )}
                           </button>
                         )
@@ -251,16 +250,16 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
                 {isLoadingCatalog ? (
                   // Loading state
                   <div className="text-center py-16">
-                    <Library className="w-20 h-20 text-gray-300 mx-auto mb-6 animate-pulse" />
-                    <div className="text-gray-500">Loading catalog...</div>
+                    <Library className="w-20 h-20 text-fg-muted mx-auto mb-6 animate-pulse" />
+                    <div className="text-fg-secondary">Loading catalog...</div>
                   </div>
                 ) : catalogOnlyResources.length === 0 ? (
                   // Empty catalog - show import button
                   <div className="text-center py-16">
-                    <Library className="w-20 h-20 text-gray-300 mx-auto mb-6" />
+                    <Library className="w-20 h-20 text-fg-muted mx-auto mb-6" />
                     <button
                       onClick={() => setSubModal('add-to-catalog')}
-                      className="p-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                      className="p-3 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors shadow-sm"
                       title="Import from Door43"
                       aria-label="Import resources from Door43"
                     >
@@ -270,7 +269,7 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
                 ) : filteredCatalogResources.length === 0 ? (
                   // Has resources but search returned nothing
                   <div className="text-center py-16">
-                    <Search className="w-20 h-20 text-gray-300 mx-auto" />
+                    <Search className="w-20 h-20 text-fg-muted mx-auto" />
                   </div>
                 ) : (
                   filteredCatalogResources.map(resource => {
@@ -282,24 +281,24 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
                         disabled={isAdded}
                         className={`w-full flex items-center justify-between p-4 rounded-lg border transition-all ${
                           isAdded
-                            ? 'bg-green-50 border-green-300 cursor-not-allowed'
-                            : `border-gray-200 hover:border-${panelColor}-300 hover:bg-${panelColor}-50`
+                            ? 'bg-accent-soft border-accent cursor-not-allowed'
+                            : `border-border hover:border-accent hover:bg-accent-soft`
                         }`}
                       >
                         <div className="text-left flex-1">
-                          <div className={`font-medium ${isAdded ? 'text-green-900' : 'text-gray-900'}`}>
+                          <div className={`font-medium ${isAdded ? 'text-accent-fg' : 'text-fg'}`}>
                             {resource.name}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-fg-secondary">
                             {resource.owner} • {resource.language} • {resource.type}
                           </div>
                         </div>
                         {isAdded ? (
-                          <Check className="w-5 h-5 text-green-600" />
+                          <Check className="w-5 h-5 text-accent" />
                         ) : resource.downloaded ? (
-                          <Plus className={`w-5 h-5 ${panelColor === 'blue' ? 'text-blue-600' : 'text-purple-600'}`} />
+                          <Plus className={`w-5 h-5 ${targetPanel === 'panel-1' ? 'text-panel-1-fg' : 'text-panel-2-fg'}`} />
                         ) : (
-                          <Download className="w-5 h-5 text-blue-600" />
+                          <Download className="w-5 h-5 text-accent" />
                         )}
                       </button>
                     )
@@ -311,18 +310,18 @@ export function SimpleResourceWizard({ targetPanel, onClose, onAddResource }: Si
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-border bg-muted flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Check className={`w-5 h-5 ${panelColor === 'blue' ? 'text-blue-600' : 'text-purple-600'}`} />
+            <Check className={`w-5 h-5 ${targetPanel === 'panel-1' ? 'text-panel-1-fg' : 'text-panel-2-fg'}`} />
             <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-              panelColor === 'blue' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+              targetPanel === 'panel-1' ? 'bg-panel-1-soft text-panel-1-fg' : 'bg-panel-2-soft text-panel-2-fg'
             }`}>
               {addedResources.size}
             </span>
           </div>
           <button
             onClick={onClose}
-            className={`px-6 py-2 ${panelColor === 'blue' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'} text-white rounded-lg transition-colors font-medium`}
+            className={`px-6 py-2 ${targetPanel === 'panel-1' ? 'bg-panel-1 hover:opacity-90' : 'bg-panel-2 hover:opacity-90'} text-white rounded-lg transition-colors font-medium`}
             title="Close"
             aria-label="Close and return to studio"
           >

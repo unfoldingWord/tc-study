@@ -2,6 +2,7 @@ import { BookOpen, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { navItems } from '../config/navItems'
+import { ThemeToggle } from '../features/theme'
 
 export default function Layout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -13,21 +14,23 @@ export default function Layout() {
   const isReadPage = location.pathname.startsWith('/read')
 
   return (
-    <div className="flex h-dynamic-screen flex-col bg-gray-50 overflow-hidden">
+    <div className="flex h-dynamic-screen flex-col bg-canvas overflow-hidden">
       {!isReadPage && (
-        <header className="flex-shrink-0 border-b border-gray-100 bg-white/80 backdrop-blur-sm relative z-[110]">
+        <header className="flex-shrink-0 border-b border-border-subtle bg-surface/80 backdrop-blur-sm relative z-[110]">
           <nav className="flex items-center justify-between px-3 py-1.5">
             <div className="flex items-center gap-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-blue-600 to-blue-700">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-accent to-accent-hover">
                 <BookOpen className="h-3.5 w-3.5 text-white" />
               </div>
-              <span className="text-base font-semibold text-gray-900">TC Study</span>
+              <span className="text-base font-semibold text-fg">TC Study</span>
             </div>
 
             <div className="flex items-center gap-0.5">
+              <ThemeToggle size="sm" />
+
               <NavLink
                 to={activeNavItem.path}
-                className="p-1.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                className="p-1.5 rounded-md bg-accent-soft text-accent hover:opacity-90 transition-colors"
                 title={activeNavItem.name}
                 aria-label={activeNavItem.name}
               >
@@ -37,19 +40,19 @@ export default function Layout() {
               <div className="relative">
                 <button
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                  className="p-1.5 rounded-md hover:bg-muted transition-colors"
                   title={isMenuOpen ? 'Close menu' : 'Open menu'}
                   aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
                 >
                   {isMenuOpen ? (
-                    <X className="h-4 w-4 text-gray-600" />
+                    <X className="h-4 w-4 text-fg-secondary" />
                   ) : (
-                    <Menu className="h-4 w-4 text-gray-600" />
+                    <Menu className="h-4 w-4 text-fg-secondary" />
                   )}
                 </button>
 
                 {isMenuOpen && (
-                  <div className="absolute top-full right-0 mt-1.5 z-[100] bg-white rounded-lg shadow-xl border border-gray-200 py-1 w-[40px]">
+                  <div className="absolute top-full right-0 mt-1.5 z-[100] bg-elevated rounded-lg shadow-xl border border-border py-1 w-[40px]">
                     {navItems.map((item) => (
                       <NavLink
                         key={item.name}
@@ -58,8 +61,8 @@ export default function Layout() {
                         className={({ isActive }) =>
                           `flex items-center justify-center py-2 transition-colors ${
                             isActive
-                              ? 'bg-blue-50 text-blue-600'
-                              : 'text-gray-700 hover:bg-gray-50'
+                              ? 'bg-accent-soft text-accent'
+                              : 'text-fg-secondary hover:bg-muted'
                           }`
                         }
                         title={item.name}

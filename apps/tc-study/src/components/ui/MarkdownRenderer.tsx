@@ -27,9 +27,9 @@ function setCached(content: string, node: React.ReactNode): void {
 function MarkdownSkeleton({ className = '' }: { className?: string }) {
   return (
     <div className={`space-y-2 ${className}`} aria-hidden="true">
-      <div className="h-3 w-full max-w-[100%] rounded bg-gray-200 animate-pulse" />
-      <div className="h-3 w-full max-w-[95%] rounded bg-gray-200 animate-pulse" />
-      <div className="h-3 w-full max-w-[88%] rounded bg-gray-200 animate-pulse" />
+      <div className="h-3 w-full max-w-[100%] rounded bg-muted animate-pulse" />
+      <div className="h-3 w-full max-w-[95%] rounded bg-muted animate-pulse" />
+      <div className="h-3 w-full max-w-[88%] rounded bg-muted animate-pulse" />
     </div>
   )
 }

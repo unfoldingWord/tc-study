@@ -105,7 +105,7 @@ export function NavigationBarCompact({
         {navigation.canGoBack() && (
           <button
             onClick={() => navigation.goBack()}
-            className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
+            className="p-2 rounded-full hover:bg-muted text-fg-secondary hover:text-fg transition-colors"
             title="Go back in navigation history"
             aria-label="Go back"
           >
@@ -115,11 +115,11 @@ export function NavigationBarCompact({
       </div>
 
       <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center gap-2 bg-blue-50 px-2 py-2 rounded-full">
+        <div className="flex items-center gap-2 bg-accent-soft px-2 py-2 rounded-full">
           <button
             onClick={isRtl ? handleNext : handlePrevious}
             disabled={isRtl ? !canGoNext() : !canGoPrevious()}
-            className="w-7 h-7 rounded-full bg-blue-200 hover:bg-blue-300 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 transition-colors flex items-center justify-center flex-shrink-0"
+            className="w-7 h-7 rounded-full bg-accent/25 hover:bg-accent/35 disabled:opacity-40 disabled:cursor-not-allowed text-accent-fg transition-colors flex items-center justify-center flex-shrink-0"
             title={isRtl ? `Next ${modeLabel}` : `Previous ${modeLabel}`}
             aria-label={isRtl ? 'Next' : 'Previous'}
           >
@@ -132,7 +132,7 @@ export function NavigationBarCompact({
                 <button
                   type="button"
                   onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
-                  className="p-1.5 hover:bg-blue-100 text-blue-700 transition-colors rounded-full flex items-center justify-center"
+                  className="p-1.5 hover:bg-accent/15 text-accent-fg transition-colors rounded-full flex items-center justify-center"
                   title={`Navigation type: ${modeLabel}`}
                 >
                   {navigationMode === 'chapter' ? (
@@ -150,7 +150,7 @@ export function NavigationBarCompact({
                 <button
                   type="button"
                   onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
-                  className="p-1.5 hover:bg-blue-100 text-blue-700 transition-colors rounded-full flex items-center justify-center"
+                  className="p-1.5 hover:bg-accent/15 text-accent-fg transition-colors rounded-full flex items-center justify-center"
                   title={`Navigation type: ${modeLabel}`}
                 >
                   {navigationMode === 'verse' && <BookOpen className="w-4 h-4" />}
@@ -165,11 +165,11 @@ export function NavigationBarCompact({
             )}
           </div>
 
-          <div className="w-px h-6 bg-blue-200" />
+          <div className="w-px h-6 bg-accent/30" />
 
           <button
             onClick={() => setIsNavigatorOpen(true)}
-            className="px-3 py-1 hover:bg-blue-100 text-sm font-medium text-blue-900 transition-colors rounded-md inline-flex items-center gap-1"
+            className="px-3 py-1 hover:bg-accent/15 text-sm font-medium text-accent-fg transition-colors rounded-md inline-flex items-center gap-1"
             title="Click to navigate or adjust range"
             dir={isRtl && currentRef.book !== 'obs' ? 'rtl' : 'ltr'}
           >
@@ -189,7 +189,7 @@ export function NavigationBarCompact({
           <button
             onClick={isRtl ? handlePrevious : handleNext}
             disabled={isRtl ? !canGoPrevious() : !canGoNext()}
-            className="w-7 h-7 rounded-full bg-blue-200 hover:bg-blue-300 disabled:opacity-40 disabled:cursor-not-allowed text-blue-700 transition-colors flex items-center justify-center flex-shrink-0"
+            className="w-7 h-7 rounded-full bg-accent/25 hover:bg-accent/35 disabled:opacity-40 disabled:cursor-not-allowed text-accent-fg transition-colors flex items-center justify-center flex-shrink-0"
             title={isRtl ? `Previous ${modeLabel}` : `Next ${modeLabel}`}
             aria-label={isRtl ? 'Previous' : 'Next'}
           >
@@ -212,7 +212,7 @@ export function NavigationBarCompact({
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 rounded-full hover:bg-gray-100 text-gray-600 hover:text-gray-800 transition-colors"
+            className="p-2 rounded-full hover:bg-muted text-fg-secondary hover:text-fg transition-colors"
             title={isMenuOpen ? 'Close menu' : 'Open menu'}
             aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
           >

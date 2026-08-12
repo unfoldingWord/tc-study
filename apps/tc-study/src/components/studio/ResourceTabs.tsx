@@ -53,8 +53,8 @@ export function ResourceTabs({
   const panelId = (panelIdProp ?? 'panel-1') as StudioPanelId
 
   const placeholderColors = {
-    blue: 'bg-blue-50 text-blue-400 border-blue-200 border-dashed',
-    purple: 'bg-purple-50 text-purple-400 border-purple-200 border-dashed',
+    blue: 'bg-panel-1-soft text-panel-1 border-panel-1/40 border-dashed',
+    purple: 'bg-panel-2-soft text-panel-2 border-panel-2/40 border-dashed',
   }
 
   const PlaceholderIcon = placeholderIcon

@@ -90,16 +90,16 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
   // Show collection list if no package selected
   if (!selectedPackage) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
+      <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50">
+        <div className="bg-surface border border-border rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b">
             <div className="flex items-center gap-3">
-              <Download className="w-6 h-6 text-blue-600" aria-label="Download collection" />
+              <Download className="w-6 h-6 text-accent" aria-label="Download collection" />
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+              className="p-1.5 hover:bg-muted rounded transition-colors"
               aria-label="Close dialog"
               title="Close dialog"
             >
@@ -110,8 +110,8 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
           {/* Collection List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
             {packages.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <Package className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <div className="text-center py-12 text-fg-secondary">
+                <Package className="w-12 h-12 mx-auto mb-3 text-fg-muted" />
                 <p className="text-sm">No saved collections</p>
               </div>
             ) : (
@@ -119,15 +119,15 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
                 <button
                   key={pkg.id}
                   onClick={() => setSelectedPackage(pkg)}
-                  className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-left"
+                  className="w-full p-4 border-2 border-border rounded-lg hover:border-accent hover:bg-accent-soft transition-all text-left"
                   title={`Select ${pkg.name}`}
                   aria-label={`Select collection ${pkg.name}`}
                 >
                   <div className="flex items-center gap-3">
-                    <Package className="w-5 h-5 text-gray-400" />
+                    <Package className="w-5 h-5 text-fg-muted" />
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold truncate">{pkg.name}</div>
-                      <div className="text-xs text-gray-500">v{pkg.version}</div>
+                      <div className="text-xs text-fg-secondary">v{pkg.version}</div>
                     </div>
                   </div>
                 </button>
@@ -141,28 +141,28 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
 
   // Show export options when package is selected
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50">
+      <div className="bg-surface border border-border rounded-lg shadow-xl w-full max-w-md mx-4">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSelectedPackage(null)}
-              className="p-1 hover:bg-gray-100 rounded transition-colors"
+              className="p-1 hover:bg-muted rounded transition-colors"
               title="Back to collection list"
               aria-label="Back to collection list"
             >
               ←
             </button>
-            <FileArchive className="w-6 h-6 text-blue-600" aria-label="Export collection" />
+            <FileArchive className="w-6 h-6 text-accent" aria-label="Export collection" />
             <div className="flex items-center gap-2">
               <span className="font-semibold" title={`Collection name: ${selectedPackage.name}`}>{selectedPackage.name}</span>
-              <span className="text-xs text-gray-400" title={`Version: ${selectedPackage.version}`}>v{selectedPackage.version}</span>
+              <span className="text-xs text-fg-muted" title={`Version: ${selectedPackage.version}`}>v{selectedPackage.version}</span>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+            className="p-1.5 hover:bg-muted rounded transition-colors"
             aria-label="Close dialog"
             title="Close dialog"
           >
@@ -178,40 +178,40 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
               onClick={() => setIncludeContent(false)}
               className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
                 !includeContent
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-blue-300'
+                  ? 'border-accent bg-accent-soft'
+                  : 'border-border hover:border-accent'
               }`}
               aria-label="Export metadata only (requires internet to load content)"
               title="Export metadata only - Content downloads on-demand (requires internet)"
             >
-              <Wifi className={`w-6 h-6 ${!includeContent ? 'text-blue-600' : 'text-gray-400'}`} />
-              <span className={`text-sm font-medium ${!includeContent ? 'text-blue-900' : 'text-gray-600'}`}>
+              <Wifi className={`w-6 h-6 ${!includeContent ? 'text-accent' : 'text-fg-muted'}`} />
+              <span className={`text-sm font-medium ${!includeContent ? 'text-accent-fg' : 'text-fg-secondary'}`}>
                 Online
               </span>
-              <span className="text-xs text-gray-500">~1 MB</span>
+              <span className="text-xs text-fg-secondary">~1 MB</span>
             </button>
 
             <button
               onClick={() => setIncludeContent(true)}
               className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
                 includeContent
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 hover:border-green-300'
+                  ? 'border-accent bg-accent-soft'
+                  : 'border-border hover:border-accent'
               }`}
               aria-label="Include downloaded content for offline use"
               title="Include content - Works offline but larger file size"
             >
-              <Database className={`w-6 h-6 ${includeContent ? 'text-green-600' : 'text-gray-400'}`} />
-              <span className={`text-sm font-medium ${includeContent ? 'text-green-900' : 'text-gray-600'}`}>
+              <Database className={`w-6 h-6 ${includeContent ? 'text-accent' : 'text-fg-muted'}`} />
+              <span className={`text-sm font-medium ${includeContent ? 'text-accent-fg' : 'text-fg-secondary'}`}>
                 Offline
               </span>
-              <span className="text-xs text-gray-500">Larger</span>
+              <span className="text-xs text-fg-secondary">Larger</span>
             </button>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm">
+            <div className="bg-danger-soft border border-danger rounded-lg p-3 text-danger text-sm">
               {error}
             </div>
           )}
@@ -222,7 +222,7 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
           <button
             onClick={() => setSelectedPackage(null)}
             disabled={exporting}
-            className="flex-1 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-2 text-fg-secondary hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
             aria-label="Back"
             title="Back to collection list"
           >
@@ -231,7 +231,7 @@ export function CollectionExportDialog({ isOpen, onClose }: CollectionExportDial
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent text-white hover:bg-accent-hover rounded-lg transition-colors disabled:opacity-50"
             aria-label={exporting ? "Downloading..." : "Download collection as .btc.zip file"}
             title={exporting ? "Downloading..." : "Download collection as .btc.zip file"}
           >

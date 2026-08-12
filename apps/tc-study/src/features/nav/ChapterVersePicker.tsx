@@ -45,22 +45,22 @@ export function ChapterVersePicker({
   return (
     <>
       <div className="flex-1 flex flex-col min-h-0">
-        <div className="px-6 py-3 flex items-center justify-between border-b border-gray-200 bg-gray-50 flex-shrink-0">
+        <div className="px-6 py-3 flex items-center justify-between border-b border-border bg-muted flex-shrink-0">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onBack}
-              className="flex items-center gap-1 text-blue-600 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded transition-colors"
+              className="flex items-center gap-1 text-accent hover:text-accent-fg p-1.5 hover:bg-accent-soft rounded transition-colors"
               title="Change book"
               aria-label="Change book"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <BookOpen className="w-4 h-4 text-gray-500" />
+            <BookOpen className="w-4 h-4 text-fg-secondary" />
           </div>
-          <div className="text-sm text-gray-600 flex items-center gap-2">
+          <div className="text-sm text-fg-secondary flex items-center gap-2">
             <strong>{title}</strong>
-            <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+            <span className="px-2 py-0.5 bg-muted text-fg-secondary rounded text-xs font-medium">
               {selectionCount}
             </span>
           </div>
@@ -73,7 +73,7 @@ export function ChapterVersePicker({
                 <button
                   type="button"
                   onClick={() => onChapterClick(chapter)}
-                  className="mb-3 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold text-gray-700 text-sm transition-colors"
+                  className="mb-3 px-3 py-1.5 bg-muted hover:bg-muted rounded-lg font-bold text-fg-secondary text-sm transition-colors"
                   title={`${chapter}`}
                   aria-label={`Chapter ${chapter}`}
                 >
@@ -96,10 +96,10 @@ export function ChapterVersePicker({
                           w-8 h-8 text-xs font-medium rounded transition-all
                           ${
                             isStart || isEnd
-                              ? 'bg-blue-600 text-white ring-2 ring-blue-400 font-bold'
+                              ? 'bg-accent text-white ring-2 ring-accent font-bold'
                               : selected
                                 ? 'bg-blue-400 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                : 'bg-muted text-fg-secondary hover:bg-muted'
                           }
                         `}
                       >

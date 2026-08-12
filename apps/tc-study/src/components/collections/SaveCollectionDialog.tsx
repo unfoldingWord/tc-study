@@ -153,16 +153,16 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
   const panelCount = workspace.panels.length
   
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-overlay flex items-center justify-center z-50">
+      <div className="bg-surface border border-border rounded-lg shadow-xl w-full max-w-md mx-4">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-3">
-            <span title="Save or download collection"><Save className="w-6 h-6 text-blue-600" aria-label="Save or download collection" /></span>
+            <span title="Save or download collection"><Save className="w-6 h-6 text-accent" aria-label="Save or download collection" /></span>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+            className="p-1.5 hover:bg-muted rounded transition-colors"
             aria-label="Close dialog"
             title="Close dialog"
           >
@@ -175,12 +175,12 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
           {/* Stats */}
           <div className="flex items-center justify-center gap-6">
             <div className="flex items-center gap-2" title="Resources in collection" aria-label="Resources in collection">
-              <Package className="w-5 h-5 text-gray-400" />
+              <Package className="w-5 h-5 text-fg-muted" />
               <span className="text-2xl font-bold">{resourceCount}</span>
             </div>
-            <div className="w-px h-8 bg-gray-200" />
+            <div className="w-px h-8 bg-muted" />
             <div className="flex items-center gap-2" title="Panels configured" aria-label="Panels configured">
-              <div className="w-5 h-5 flex items-center justify-center text-gray-400 text-lg">⊞</div>
+              <div className="w-5 h-5 flex items-center justify-center text-fg-muted text-lg">⊞</div>
               <span className="text-2xl font-bold">{panelCount}</span>
             </div>
           </div>
@@ -195,14 +195,14 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
               }}
               className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
                 actionMode === 'save'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-blue-300'
+                  ? 'border-accent bg-accent-soft'
+                  : 'border-border hover:border-accent'
               }`}
               aria-label="Save to collections database"
               title="Save to collections database"
             >
-              <span title="Save to DB"><Save className={`w-6 h-6 ${actionMode === 'save' ? 'text-blue-600' : 'text-gray-400'}`} /></span>
-              <span className={`text-sm font-medium ${actionMode === 'save' ? 'text-blue-900' : 'text-gray-600'}`}>
+              <span title="Save to DB"><Save className={`w-6 h-6 ${actionMode === 'save' ? 'text-accent' : 'text-fg-muted'}`} /></span>
+              <span className={`text-sm font-medium ${actionMode === 'save' ? 'text-accent-fg' : 'text-fg-secondary'}`}>
                 Save
               </span>
             </button>
@@ -215,14 +215,14 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
               }}
               className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
                 actionMode === 'download'
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 hover:border-green-300'
+                  ? 'border-accent bg-accent-soft'
+                  : 'border-border hover:border-accent'
               }`}
               aria-label="Download as .btc.zip file"
               title="Download as .btc.zip file"
             >
-              <span title="Download"><Download className={`w-6 h-6 ${actionMode === 'download' ? 'text-green-600' : 'text-gray-400'}`} /></span>
-              <span className={`text-sm font-medium ${actionMode === 'download' ? 'text-green-900' : 'text-gray-600'}`}>
+              <span title="Download"><Download className={`w-6 h-6 ${actionMode === 'download' ? 'text-accent' : 'text-fg-muted'}`} /></span>
+              <span className={`text-sm font-medium ${actionMode === 'download' ? 'text-accent-fg' : 'text-fg-secondary'}`}>
                 Download
               </span>
             </button>
@@ -237,7 +237,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Collection name"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none text-center text-lg font-medium"
+                className="w-full px-4 py-3 border-2 border-border rounded-lg focus:border-accent focus:outline-none text-center text-lg font-medium"
                 autoFocus
                 disabled={processing}
                 aria-label="Collection name"
@@ -248,7 +248,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Description (optional)"
                 rows={2}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:border-blue-500 focus:outline-none text-sm resize-none"
+                className="w-full px-4 py-3 border-2 border-border rounded-lg focus:border-accent focus:outline-none text-sm resize-none"
                 disabled={processing}
                 aria-label="Collection description"
                 title="Enter collection description (optional)"
@@ -261,48 +261,48 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
                 onClick={() => setIncludeContent(false)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
                   !includeContent
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-blue-300'
+                    ? 'border-accent bg-accent-soft'
+                    : 'border-border hover:border-accent'
                 }`}
                 aria-label="Download metadata only (requires internet to load content)"
                 title="Metadata only - Content downloads on-demand (requires internet)"
               >
-                <span title="Online mode"><Wifi className={`w-6 h-6 ${!includeContent ? 'text-blue-600' : 'text-gray-400'}`} /></span>
-                <span className={`text-sm font-medium ${!includeContent ? 'text-blue-900' : 'text-gray-600'}`}>
+                <span title="Online mode"><Wifi className={`w-6 h-6 ${!includeContent ? 'text-accent' : 'text-fg-muted'}`} /></span>
+                <span className={`text-sm font-medium ${!includeContent ? 'text-accent-fg' : 'text-fg-secondary'}`}>
                   Online
                 </span>
-                <span className="text-xs text-gray-500">~1 MB</span>
+                <span className="text-xs text-fg-secondary">~1 MB</span>
               </button>
               
               <button
                 onClick={() => setIncludeContent(true)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all ${
                   includeContent
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-gray-200 hover:border-green-300'
+                    ? 'border-accent bg-accent-soft'
+                    : 'border-border hover:border-accent'
                 }`}
                 aria-label="Include downloaded content for offline use"
                 title="Include content - Works offline but larger file size"
               >
-                <span title="Offline mode"><Database className={`w-6 h-6 ${includeContent ? 'text-green-600' : 'text-gray-400'}`} /></span>
-                <span className={`text-sm font-medium ${includeContent ? 'text-green-900' : 'text-gray-600'}`}>
+                <span title="Offline mode"><Database className={`w-6 h-6 ${includeContent ? 'text-accent' : 'text-fg-muted'}`} /></span>
+                <span className={`text-sm font-medium ${includeContent ? 'text-accent-fg' : 'text-fg-secondary'}`}>
                   Offline
                 </span>
-                <span className="text-xs text-gray-500">Larger</span>
+                <span className="text-xs text-fg-secondary">Larger</span>
               </button>
             </div>
           )}
           
           {/* Download Progress */}
           {downloadProgress && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-800 text-sm text-center">
+            <div className="bg-accent-soft border border-accent rounded-lg p-3 text-accent-fg text-sm text-center">
               {downloadProgress}
             </div>
           )}
           
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800 text-sm text-center">
+            <div className="bg-danger-soft border border-danger rounded-lg p-3 text-danger text-sm text-center">
               {error}
             </div>
           )}
@@ -313,7 +313,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
           <button
             onClick={onClose}
             disabled={processing}
-            className="flex-1 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-2 text-fg-secondary hover:bg-muted rounded-lg transition-colors disabled:opacity-50"
             aria-label="Cancel"
             title="Cancel"
           >
@@ -322,7 +322,7 @@ export function SaveCollectionDialog({ isOpen, onClose, onSaved }: SaveCollectio
           <button
             onClick={handleAction}
             disabled={processing || (actionMode === 'save' && !name.trim())}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent text-white hover:bg-accent-hover rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label={processing ? "Processing..." : actionMode === 'save' ? "Save collection" : "Download collection"}
             title={processing ? "Processing..." : actionMode === 'save' ? "Save collection" : "Download collection"}
           >

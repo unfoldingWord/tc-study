@@ -50,21 +50,21 @@ export function WordsLinksList({
   onQuoteClick,
 }: WordsLinksListProps) {
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50" dir={languageDirection}>
+    <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
       <ResourceViewerHeader title={resource.title} icon={Link} direction={languageDirection} />
       <div className="p-4">
         {!dependenciesReady ? (
           <LoadingSpinner
             centered
             label="Loading dependencies"
-            className="text-purple-500"
+            className="text-helps"
             containerClassName="py-12"
           />
         ) : loading ? (
           <LoadingSpinner
             centered
             label="Loading content"
-            className="text-purple-500"
+            className="text-helps"
             containerClassName="py-12"
           />
         ) : error ? (
@@ -74,7 +74,7 @@ export function WordsLinksList({
             aria-label={`Word links not available for ${bookCode?.toUpperCase() || 'this book'}`}
             title={`Word links not available for ${bookCode?.toUpperCase() || 'this book'}`}
           >
-            <BookX className="w-16 h-16 text-gray-400" />
+            <BookX className="w-16 h-16 text-fg-muted" />
           </div>
         ) : Object.keys(linksByVerse).length === 0 ? (
           <div
@@ -91,7 +91,7 @@ export function WordsLinksList({
                 : 'No word links available for this reference'
             }
           >
-            <BookOpen className="w-16 h-16 text-gray-400" />
+            <BookOpen className="w-16 h-16 text-fg-muted" />
           </div>
         ) : (
           <div className="space-y-4">
@@ -112,12 +112,12 @@ export function WordsLinksList({
                 return (
                   <div key={chapterVerse} className="space-y-2">
                     <div
-                      className="px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg"
+                      className="px-2.5 py-1.5 bg-chip-verse rounded-lg"
                       dir={languageDirection}
                     >
                       <div className="flex items-center gap-2">
-                        <BookOpen className="w-3.5 h-3.5 text-purple-600" />
-                        <h3 className="text-xs font-semibold text-gray-700">
+                        <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
+                        <h3 className="text-xs font-semibold text-fg-secondary">
                           {(() => {
                             const { bookPart, numberPart } = formatVerseRefParts(
                               resolved,

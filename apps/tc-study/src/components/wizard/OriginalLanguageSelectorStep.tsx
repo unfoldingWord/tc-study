@@ -191,7 +191,7 @@ export function OriginalLanguageSelectorStep() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     )
   }
@@ -202,8 +202,8 @@ export function OriginalLanguageSelectorStep() {
         {greekResources.length > 0 && (
           <div>
             <div className="mb-2 flex items-center gap-2">
-              <Book className="w-4 h-4 text-blue-600" />
-              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">
+              <Book className="w-4 h-4 text-accent" />
+              <span className="px-2 py-0.5 bg-muted text-fg-secondary rounded-full text-xs font-semibold">
                 {greekResources.length}
               </span>
             </div>
@@ -224,8 +224,8 @@ export function OriginalLanguageSelectorStep() {
         {hebrewResources.length > 0 && (
           <div>
             <div className="mb-2 flex items-center gap-2">
-              <Book className="w-4 h-4 text-blue-600" />
-              <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full text-xs font-semibold">
+              <Book className="w-4 h-4 text-accent" />
+              <span className="px-2 py-0.5 bg-muted text-fg-secondary rounded-full text-xs font-semibold">
                 {hebrewResources.length}
               </span>
             </div>

@@ -24,7 +24,7 @@ export function blockClassForMarker(
   indentLevel: number
 ): string {
   const indent = indentClassForLevel(indentLevel)
-  const base = 'leading-relaxed text-lg text-gray-900'
+  const base = 'leading-relaxed text-lg text-scripture-fg'
 
   if (role === 'break' || marker === 'b') {
     return 'h-3'
@@ -32,9 +32,9 @@ export function blockClassForMarker(
 
   if (role === 'heading' || role === 'intro') {
     if (marker === 's2' || marker === 's3' || marker === 's4') {
-      return `mt-4 mb-2 text-base italic text-gray-700 text-center ${indent}`
+      return `mt-4 mb-2 text-base italic text-fg-secondary text-center ${indent}`
     }
-    return `mt-5 mb-3 text-base font-semibold text-gray-800 text-center ${indent}`
+    return `mt-5 mb-3 text-base font-semibold text-scripture-fg text-center ${indent}`
   }
 
   if (marker === 'qc') {
