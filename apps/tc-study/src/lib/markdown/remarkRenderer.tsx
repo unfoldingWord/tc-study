@@ -92,25 +92,18 @@ export class RemarkMarkdownRenderer {
               if (!parsed.isValid) {
                 // Invalid rc:// link - render as disabled link
                 return (
-                  <span className="text-gray-500 cursor-not-allowed" title={`Invalid rc:// link: ${href}`}>
+                  <span className="text-fg-muted cursor-not-allowed" title={`Invalid rc:// link: ${href}`}>
                     {props.children}
                   </span>
                 )
               }
 
-              // Get icon based on resource type
+              // Get icon based on resource type (color is shared semantic accent — not type-tinted)
               const Icon = parsed.resourceType === 'academy' 
                 ? GraduationCap 
                 : parsed.resourceType === 'words'
                 ? Hash
                 : BookOpen
-
-              // Determine color scheme based on resource type
-              const colorClass = parsed.resourceType === 'academy'
-                ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50'
-                : parsed.resourceType === 'words'
-                ? 'text-blue-600 hover:text-blue-800 hover:bg-blue-50'
-                : 'text-green-600 hover:text-green-800 hover:bg-green-50'
 
               // Try to get entry title from resolver
               let displayText = linkText
@@ -127,11 +120,14 @@ export class RemarkMarkdownRenderer {
                 displayText = getRcLinkDisplayName(parsed)
               }
 
+              const linkTitle = `${parsed.resourceAbbrev.toUpperCase()}: ${parsed.entryId}`
               return (
                 <button
+                  type="button"
                   onClick={() => this.options.onInternalLinkClick?.(href, 'rc', linkText)}
-                  className={`inline-flex items-center gap-1 ${colorClass} rounded px-1 py-0.5 transition-colors cursor-pointer font-medium`}
-                  title={`${parsed.resourceAbbrev.toUpperCase()}: ${parsed.entryId}`}
+                  className="inline-flex items-center gap-1 text-accent hover:text-accent-hover hover:bg-muted rounded px-1 py-0.5 transition-colors cursor-pointer font-medium"
+                  title={linkTitle}
+                  aria-label={linkTitle}
                 >
                   <Icon className="w-3.5 h-3.5 flex-shrink-0" />
                   <span>{displayText}</span>
@@ -141,11 +137,14 @@ export class RemarkMarkdownRenderer {
             
             // Handle relative links (../, ./)
             if (isRelativeLink(href)) {
+              const relativeTitle = `Relative link: ${href}`
               return (
                 <button
+                  type="button"
                   onClick={() => this.options.onInternalLinkClick?.(href, 'relative', linkText)}
-                  className="inline-flex items-center gap-1 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded px-1 py-0.5 transition-colors cursor-pointer"
-                  title={`Relative link: ${href}`}
+                  className="inline-flex items-center gap-1 text-fg-secondary hover:text-fg hover:bg-muted rounded px-1 py-0.5 transition-colors cursor-pointer"
+                  title={relativeTitle}
+                  aria-label={relativeTitle}
                 >
                   <BookOpen className="w-3.5 h-3.5" />
                   <span>{props.children}</span>
@@ -159,7 +158,7 @@ export class RemarkMarkdownRenderer {
                 {...props} 
                 target={this.options.linkTarget || '_blank'}
                 rel={this.options.linkTarget === '_blank' ? 'noopener noreferrer' : undefined}
-                className="text-blue-600 hover:text-blue-800 underline"
+                className="text-accent hover:text-accent-hover underline"
               />
             )
           },

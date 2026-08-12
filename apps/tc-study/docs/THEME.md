@@ -43,6 +43,19 @@ Verse group headers and quote buttons on Combined Helps / TN / TWL cards use ded
 
 Pair with shared `surface`, `fg`, `fg-secondary`, `fg-muted`, `border`, `helps*` for card chrome and entry links.
 
+## Helps inline markdown links
+
+TN / Combined Helps prose links are rendered in `src/lib/markdown/remarkRenderer.tsx`. Use shared semantic colors (no purple/blue/green `*-50` hover chips):
+
+| Link kind | Classes | Notes |
+|-----------|---------|--------|
+| `rc://` (TA / TW / other) | `text-accent hover:text-accent-hover hover:bg-muted` | Type distinguished by icon (`GraduationCap` / `Hash` / `BookOpen`), not tint |
+| Relative (`../`, `./`) | `text-fg-secondary hover:text-fg hover:bg-muted` | e.g. verse ranges like `3:12–15` |
+| External `http(s)` | `text-accent hover:text-accent-hover underline` | |
+| Invalid `rc://` | `text-fg-muted` | Disabled span |
+
+Resource tabs (`SortableTab`) on `from-panel-*-soft` headers use `text-fg-secondary` when inactive so labels stay readable in dark mode (avoid `text-fg-muted` on the soft strip).
+
 ## Add another theme later
 
 Option A — extra root class (e.g. `.sepia`) with its own `--theme-*` block, resolve in the store.
