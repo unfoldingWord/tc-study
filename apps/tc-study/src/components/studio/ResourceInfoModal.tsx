@@ -83,7 +83,8 @@ export function ResourceInfoModal({
 
   return (
     <ModalPortal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* z-[100]: above EntryResourceModal / other z-50 overlays when nested */}
+      <div className="fixed inset-0 z-[100] flex items-center justify-center">
         <div
           className="absolute inset-0 bg-overlay backdrop-blur-sm"
           onClick={onClose}

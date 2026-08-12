@@ -6,7 +6,7 @@ import { useWorkspaceStore } from '../../../features/workspace/workspaceStore'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { ResourceInfoModal } from '../../studio/ResourceInfoModal'
 import { chromeIconButtonClass } from '../common/chromeIconButton'
-import { mergeResourceInfoDocs } from '../common/enrichResourceInfoDocs'
+import { lookupWorkspaceResource } from '../common/lookupWorkspaceResource'
 import {
   licenseIdOf,
   releaseVersionOf,
@@ -16,54 +16,11 @@ import { useEnrichedResourceInfoModal } from '../common/useEnrichedResourceInfoM
 
 export { licenseIdOf, releaseVersionOf, toResourceInfoModalProps }
 
-function lookupLoadedResource(
-  loadedResources: Record<string, ResourceInfo | undefined>,
-  key: string
-): ResourceInfo | undefined {
-  if (!key) return undefined
-  return (
-    loadedResources[key] ??
-    Object.values(loadedResources).find((r) => r?.key === key || r?.id === key)
-  )
-}
-
 /**
  * Resolve a helps peer (TN/TWL) for Sources rows.
- *
- * Unlock 1 keeps TN/TWL in the workspace package map but strips them from panel
- * keys, so AppStore `loadedResources` often has TN (orphan from an earlier
- * assign) and never projects TWL (stripped in the same tick as assign). Prefer
- * the package map — that is the SoT for helps pointers.
+ * Prefer workspace package map (Unlock 1 may strip TN/TWL from panel keys).
  */
-export function lookupHelpsSourceResource(
-  key: string,
-  packageResources: Map<string, ResourceInfo> | Record<string, ResourceInfo> | undefined,
-  loadedResources: Record<string, ResourceInfo | undefined>
-): ResourceInfo | undefined {
-  if (!key) return undefined
-  let fromPackage: ResourceInfo | undefined
-  if (packageResources) {
-    fromPackage =
-      packageResources instanceof Map ? packageResources.get(key) : packageResources[key]
-    if (!fromPackage) {
-      if (packageResources instanceof Map) {
-        for (const r of packageResources.values()) {
-          if (r?.key === key || r?.id === key) {
-            fromPackage = r
-            break
-          }
-        }
-      } else {
-        fromPackage = Object.values(packageResources).find((r) => r?.key === key || r?.id === key)
-      }
-    }
-  }
-  const fromLoaded = lookupLoadedResource(loadedResources, key)
-  // Package map is SoT for helps pointers, but often lacks README (add path skips enrichment).
-  // Hydrate docs from loadedResources when present, then modal may async-enrich if still missing.
-  if (fromPackage) return mergeResourceInfoDocs(fromPackage, fromLoaded)
-  return fromLoaded
-}
+export const lookupHelpsSourceResource = lookupWorkspaceResource
 
 type SourceKind = 'tn' | 'twl'
 
