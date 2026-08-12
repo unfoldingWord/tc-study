@@ -56,8 +56,8 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 | `accent-fg` | `#1e40af` | `#93c5fd` | Text on accent-soft |
 | `danger` | `#dc2626` | `#f87171` | Errors / destructive |
 | `danger-soft` | `#fef2f2` | `#3f1d1d` | Soft error fill |
-| `highlight` | `#fef08a` | `#5c4a14` | Verse / note selection wash |
-| `highlight-strong` | `#fde047` | `#7a641c` | Stronger selection border/fill |
+| `highlight` | `#fef08a` | `#5c4a14` | Verse / note selection wash; Helps filter value pill fill |
+| `highlight-strong` | `#fde047` | `#7a641c` | Stronger selection border/fill; filter × hover wash |
 | `underline` | `#a8a29e` | `#9a948c` | Dotted scripture underlines |
 | `overlay` | `rgb(0 0 0 / 0.5)` | `rgb(0 0 0 / 0.55)` | Modal/dialog scrim (`bg-overlay`) |
 
@@ -83,7 +83,6 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 |-------|-------|------|-------------|
 | `chip-verse` / `chip-verse-fg` | `#eeeaf8` / `#5b21b6` | `#2f2a3d` / `#c4b5fd` | Verse/ref group headers + count badges |
 | `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `#eef4ff` / `#e0eaff` / `#1e40af` | `#1e2a3d` / `#243548` / `#93c5fd` | Scripture / OBS quote chips |
-| `filter-chip` / `filter-chip-fg` | `#dbeafe` / `#1e40af` | `#243548` / `#93c5fd` | Helps header filter value capsule (stronger than `accent-soft` on `surface` headers) |
 
 Ring offset uses `canvas` (`--color-ring-offset`).
 
@@ -145,7 +144,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 - **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`.
 - **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` (near-white light / elevated charcoal dark) so titles + Helps chrome lift off `bg-canvas` list areas — not transparent/`canvas` gray.
 - **Helps cards:** `surface` + chip tokens for verse/quote; prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
-- **Helps filter pill:** `bg-filter-chip text-filter-chip-fg` (borderless `h-7` capsule) — not `accent-soft`, which washes out on header chrome.
+- **Helps filter pill:** `bg-highlight text-scripture-fg` (borderless `h-7` capsule) — same wash as highlighted scripture tokens (`TokenRenderer`), so filter ↔ selection feel related.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
 - **Panel tabs:** soft strip `bg-panel-*-soft/70` at fixed `h-chrome-bar`; tabs `h-chrome-control` (icon-only and labeled share one height); selected `bg-tab-selected`; inactive label `text-fg-secondary`.
 - **Focus:** global `ring-accent` + `ring-offset-canvas` on `:focus-visible`.
