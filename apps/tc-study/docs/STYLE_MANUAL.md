@@ -81,8 +81,9 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `chip-verse` / `chip-verse-fg` | `#eeeaf8` / `#5b21b6` | `#2f2a3d` / `#c4b5fd` | Verse/ref group headers + count badges |
 | `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `#eef4ff` / `#e0eaff` / `#1e40af` | `#1e2a3d` / `#243548` / `#93c5fd` | Scripture / OBS quote chips |
+
+Verse/ref group headers use shared `muted` + `fg-secondary` (see `helpsCardStyles` — `HELPS_VERSE_HEADER`), not a lavender chip.
 
 Ring offset uses `canvas` (`--color-ring-offset`).
 
@@ -142,8 +143,9 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 ## Reading & chrome conventions
 
 - **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`.
-- **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` (near-white light / elevated charcoal dark) so titles + Helps chrome lift off `bg-canvas` list areas — not transparent/`canvas` gray.
-- **Helps cards:** `surface` + chip tokens for verse/quote; selected TN/TWL use soft `helps-soft/30` + `border-l-helps` + light `ring-helps/30` (not a full-card `highlight` wash). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
+- **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` with a hairline `border-b`; Helps list panels also use `bg-surface` (`HELPS_LIST_PANEL`) so verse chips sit on white/elevated charcoal — not cool `canvas` gray.
+- **Helps verse headers:** `bg-muted` + `text-fg-secondary` (+ book icon, ref, count on `bg-surface`) — neutral muted chips, not lavender `chip-verse`.
+- **Helps cards:** idle `surface` + border; quote chips use `chip-quote*`; selected TN/TWL use soft `helps-soft/30` + `border-l-helps` + light `ring-helps/30` (not a full-card `highlight` wash). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
 - **Helps filter pill:** `bg-highlight text-scripture-fg` (borderless `h-7` capsule) — same wash as highlighted scripture tokens (`TokenRenderer`), so filter ↔ selection feel related.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
 - **Panel tabs:** soft strip `bg-panel-*-soft/70` at fixed `h-chrome-bar`; tabs `h-chrome-control` (icon-only and labeled share one height); selected `bg-tab-selected`; inactive label `text-fg-secondary`.

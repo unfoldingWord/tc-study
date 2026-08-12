@@ -4,6 +4,11 @@ import { formatVerseRefParts, getBookTitleWithFallback } from '../../../../utils
 import { parseTWLink } from '../../../../features/helps/quoteTokens'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { ResourceViewerHeader } from '../../common/ResourceViewerHeader'
+import {
+  HELPS_LIST_PANEL,
+  HELPS_VERSE_HEADER,
+  HELPS_VERSE_HEADER_ICON,
+} from '../../helpsCardStyles'
 import type { ResourceInfo } from '../../../../contexts/types'
 import type { TokenFilter } from '../types'
 import type { LinkWithAlignments } from '../hooks/useWordsLinksPipeline'
@@ -54,7 +59,7 @@ export function WordsLinksList({
   onQuoteClick,
 }: WordsLinksListProps) {
   return (
-    <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
+    <div className={HELPS_LIST_PANEL} dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
         icon={Link}
@@ -121,33 +126,28 @@ export function WordsLinksList({
                 )
                 return (
                   <div key={chapterVerse} className="space-y-stack">
-                    <div
-                      className="px-chrome py-chrome-tight bg-chip-verse rounded-md"
-                      dir={languageDirection}
-                    >
-                      <div className="flex items-center gap-chrome-tight">
-                        <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
-                        <h3 className="text-chrome font-semibold text-fg-secondary">
-                          {(() => {
-                            const { bookPart, numberPart } = formatVerseRefParts(
-                              resolved,
-                              `${chapter}:${verse}`,
-                              languageDirection === 'rtl'
-                            )
-                            return languageDirection === 'rtl' ? (
-                              <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
-                                <span>{numberPart}</span>
-                                <span>{bookPart}</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex gap-1" dir="ltr">
-                                <span>{bookPart}</span>
-                                <span>{numberPart}</span>
-                              </span>
-                            )
-                          })()}
-                        </h3>
-                      </div>
+                    <div className={HELPS_VERSE_HEADER} dir={languageDirection}>
+                      <BookOpen className={HELPS_VERSE_HEADER_ICON} />
+                      <h3 className="text-chrome font-semibold text-fg-secondary">
+                        {(() => {
+                          const { bookPart, numberPart } = formatVerseRefParts(
+                            resolved,
+                            `${chapter}:${verse}`,
+                            languageDirection === 'rtl'
+                          )
+                          return languageDirection === 'rtl' ? (
+                            <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
+                              <span>{numberPart}</span>
+                              <span>{bookPart}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex gap-1" dir="ltr">
+                              <span>{bookPart}</span>
+                              <span>{numberPart}</span>
+                            </span>
+                          )
+                        })()}
+                      </h3>
                     </div>
 
                     <div className="grid grid-cols-1 gap-stack">

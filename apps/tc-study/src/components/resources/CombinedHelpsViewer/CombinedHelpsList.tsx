@@ -9,6 +9,12 @@ import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { TranslationNoteCard, type NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
 import { WordLinkCard } from '../WordsLinksViewer/components'
 import type { TokenFilter } from '../WordsLinksViewer/types'
+import {
+  HELPS_LIST_PANEL,
+  HELPS_VERSE_COUNT,
+  HELPS_VERSE_HEADER,
+  HELPS_VERSE_HEADER_ICON,
+} from '../helpsCardStyles'
 import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import type { HelpsKindFilter } from './types'
@@ -89,7 +95,7 @@ export function CombinedHelpsList({
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
   return (
-    <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
+    <div className={HELPS_LIST_PANEL} dir={targetLanguageDirection}>
       <ResourceViewerHeader
         title={resource.title}
         icon={Layers}
@@ -143,11 +149,8 @@ export function CombinedHelpsList({
                   )
                   return (
                     <div key={group.ref} className="space-y-stack">
-                      <div
-                        className="flex items-center gap-chrome-tight px-chrome py-chrome-tight bg-chip-verse rounded-md"
-                        dir={targetLanguageDirection}
-                      >
-                        <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
+                      <div className={HELPS_VERSE_HEADER} dir={targetLanguageDirection}>
+                        <BookOpen className={HELPS_VERSE_HEADER_ICON} />
                         <h3 className="text-chrome font-semibold text-fg-secondary">
                           {(() => {
                             const { bookPart, numberPart } = formatVerseRefParts(
@@ -168,9 +171,7 @@ export function CombinedHelpsList({
                             )
                           })()}
                         </h3>
-                        <span className="ml-auto px-1.5 py-0.5 bg-helps-soft text-chip-verse-fg rounded-full text-micro font-medium">
-                          {group.items.length}
-                        </span>
+                        <span className={HELPS_VERSE_COUNT}>{group.items.length}</span>
                       </div>
 
                       {group.items.map((item, idx) => {

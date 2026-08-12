@@ -46,17 +46,17 @@ Modal panels themselves use `bg-surface` / `bg-elevated`, with `border-border`, 
 
 ## Helps reading chips
 
-Verse group headers and quote buttons on Combined Helps / TN / TWL cards use dedicated chip tokens (solid fills — not hard-coded `*-50` gradients):
+Quote buttons on Combined Helps / TN / TWL cards use dedicated chip tokens (solid fills — not hard-coded `*-50` gradients). Verse/ref group headers use neutral shell tokens via `helpsCardStyles` (`HELPS_VERSE_HEADER` = `bg-muted` + `text-fg-secondary`).
 
 | Token | Utilities | Use |
 |-------|-----------|-----|
-| `chip-verse` / `chip-verse-fg` | `bg-chip-verse`, `text-chip-verse-fg` | Verse/ref group headers + count badges |
+| `muted` / `fg-secondary` / `surface` | `bg-muted`, `text-fg-secondary`, `bg-surface` | Verse/ref group headers + count badges (`HELPS_VERSE_*`) |
 | `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `bg-chip-quote`, `hover:bg-chip-quote-hover`, `text-chip-quote-fg` | Scripture / OBS quote chips on note & word-link cards |
 | `highlight` / `scripture-fg` | `bg-highlight`, `text-scripture-fg` | Helps header filter value pill (`TokenFilterBanner`) — same tokens as highlighted scripture (`TokenRenderer`); × uses `text-scripture-fg/70` + `hover:bg-highlight-strong/70` |
 
-`ResourceViewerHeader` (scripture titles + Helps chrome strip) uses `bg-surface` so it stays lighter than the surrounding `bg-canvas` content in light mode, and remains distinct (not near-black-on-black) in dark mode.
+Helps list panels (`HELPS_LIST_PANEL`) and `ResourceViewerHeader` both use `bg-surface` so verse headers sit on white/elevated charcoal (not cool `canvas` gray). Header strip keeps a hairline `border-b` for chrome separation.
 
-Pair with shared `surface`, `fg`, `fg-secondary`, `fg-muted`, `border`, `helps*` for card chrome and entry links.
+Pair with shared `surface`, `fg`, `fg-secondary`, `fg-muted`, `border`, `helps*` for card chrome and entry links. Selected TN/TWL cards use `HELPS_CARD_SELECTED` (`helps-soft/30` + left `border-l-helps` + light ring).
 
 ## Helps inline markdown links
 
