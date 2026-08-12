@@ -21,7 +21,7 @@ import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getBookTitle } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
-import { ScriptureContent } from './components'
+import { ScriptureContent, ScriptureLayoutToggle } from './components'
 import { useContent, useHighlighting, useTOC, useTokenBroadcast, useUnderlinedTokens } from './hooks'
 import type { ScriptureViewerProps } from './types'
 
@@ -183,6 +183,7 @@ export function ScriptureViewer({
         subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}
         icon={Book}
         direction={languageDirection}
+        actions={<ScriptureLayoutToggle />}
       />
 
       <div

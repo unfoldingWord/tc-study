@@ -2,8 +2,10 @@ import type { UsjScriptureViewModel, UsjWordToken } from '@bt-synergy/scripture-
 import { BookX } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
+import { useScriptureDisplayStore } from '../../../../lib/stores/scriptureDisplayStore'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import type { DisplayUsjVerse, OriginalLanguageToken } from '../types'
+import { FormattedScriptureContent } from './FormattedScriptureContent'
 import { VerseRenderer } from './VerseRenderer'
 
 interface ScriptureContentProps {
@@ -41,6 +43,7 @@ export function ScriptureContent({
   language,
   languageDirection = 'ltr',
 }: ScriptureContentProps) {
+  const layoutMode = useScriptureDisplayStore((s) => s.layoutMode)
   const containerRef = useRef<HTMLDivElement>(null)
   const lastScrolledTokenRef = useRef<string | null>(null)
 
@@ -139,32 +142,45 @@ export function ScriptureContent({
 
   return (
     <div ref={containerRef} className="space-y-6" dir={languageDirection}>
-      {chapters.map((chapterNum) => (
-        <div key={chapterNum} className="space-y-1">
-          <h2
-            className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200 cursor-pointer hover:text-blue-600 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation()
-              onChapterClick?.(chapterNum)
-            }}
-          >
-            {chapterNum}
-          </h2>
+      {layoutMode === 'formatted' && viewModel ? (
+        <FormattedScriptureContent
+          viewModel={viewModel}
+          currentRef={currentRef}
+          highlightTarget={highlightTarget}
+          underlinedSemanticIds={underlinedSemanticIds}
+          onTokenClick={onTokenClick}
+          onVerseClick={onVerseClick}
+          onChapterClick={onChapterClick}
+          isOriginalLanguage={isOriginalLanguage}
+        />
+      ) : (
+        chapters.map((chapterNum) => (
+          <div key={chapterNum} className="space-y-1" data-scripture-layout="verse-block">
+            <h2
+              className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200 cursor-pointer hover:text-blue-600 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation()
+                onChapterClick?.(chapterNum)
+              }}
+            >
+              {chapterNum}
+            </h2>
 
-          {versesByChapter[chapterNum]!.map((verse) => (
-            <VerseRenderer
-              key={`${chapterNum}:${verse.number}`}
-              verse={verse}
-              chapterNumber={chapterNum}
-              highlightTarget={highlightTarget}
-              underlinedSemanticIds={underlinedSemanticIds}
-              onTokenClick={onTokenClick}
-              onVerseClick={onVerseClick}
-              isOriginalLanguage={isOriginalLanguage}
-            />
-          ))}
-        </div>
-      ))}
+            {versesByChapter[chapterNum]!.map((verse) => (
+              <VerseRenderer
+                key={`${chapterNum}:${verse.number}`}
+                verse={verse}
+                chapterNumber={chapterNum}
+                highlightTarget={highlightTarget}
+                underlinedSemanticIds={underlinedSemanticIds}
+                onTokenClick={onTokenClick}
+                onVerseClick={onVerseClick}
+                isOriginalLanguage={isOriginalLanguage}
+              />
+            ))}
+          </div>
+        ))
+      )}
     </div>
   )
 }
