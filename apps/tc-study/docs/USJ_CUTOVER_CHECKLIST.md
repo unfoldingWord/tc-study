@@ -50,7 +50,15 @@
 | resource-parsers (`b3e0e99` + DTO deprecate) | **Done** — `USFMProcessor` `@deprecated`; prefer `processUsfmToOptimizedScripture` |
 | mobile (`54950e9` + rename) | **Done** — `UsjScriptureProcessor`; `usfm-processor` thin alias |
 | Cache (`c0f101f`) | **Done** — `scripture-usj:` only; legacy ignored |
-| Platform (`@usfm-tools` link / CI) | **Done** |
+| Platform (`@usfm-tools` npm / CI) | **Done** — published npm deps; see `packages/usj-processor/README.md` |
+
+## Packaging (single documented path)
+
+**Authoritative:** [`packages/usj-processor/README.md`](../../../packages/usj-processor/README.md) → **Setup (`@usfm-tools/*`)**.
+
+1. `bun install` at repo root — published `@usfm-tools/parser` + `usj-core` + `types`
+2. CI: frozen root lockfile only (no usfm-ast checkout). Vite keeps CJS `commonjsOptions` / `needsInterop` for parser/types.
+3. Optional unpublished override: `bun run link:usfm-tools:local` against a usfm-ast checkout
 
 ## Go / no-go
 

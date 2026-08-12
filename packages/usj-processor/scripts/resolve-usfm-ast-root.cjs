@@ -1,9 +1,10 @@
 /**
- * Resolve usfm-ast checkout root for local sibling + CI nested clone.
+ * Resolve optional usfm-ast checkout for local npm override only.
+ * Default install path is published @usfm-tools/* (see usj-processor README).
  *
  * Order:
  * 1. USFM_AST_ROOT env
- * 2. <repo>/usfm-ast (CI nested checkout)
+ * 2. <repo>/usfm-ast (nested checkout)
  * 3. <repo>/../usfm-ast (local sibling layout)
  */
 const fs = require('fs')

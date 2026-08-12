@@ -8,12 +8,7 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "declaration": true,
-    "noEmit": true,
-    "paths": {
-      "@usfm-tools/parser": ["../../../usfm-ast/packages/usfm-parser/dist/index.d.ts"],
-      "@usfm-tools/usj-core": ["../../../usfm-ast/packages/usfm-usj-core/dist/index.d.ts"],
-      "@usfm-tools/types": ["../../../usfm-ast/packages/shared-types/dist/index.d.ts"]
-    }
+    "noEmit": true
   },
   "include": ["src/**/*", "tests/**/*"]
 }

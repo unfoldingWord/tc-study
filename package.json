@@ -12,7 +12,7 @@
     "build:debug": "cross-env DEBUG_BUILD=1 turbo run build",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
-    "link:usfm-tools": "node packages/usj-processor/scripts/link-usfm-tools.cjs",
+    "link:usfm-tools:local": "node packages/usj-processor/scripts/link-usfm-tools.cjs",
     "mobile": "bun --cwd apps/mobile dev",
     "web": "bun --cwd apps/web dev"
   },
@@ -26,6 +26,9 @@
     "bun": ">=1.3.3"
   },
   "dependencies": {
+    "@usfm-tools/parser": "^0.1.1",
+    "@usfm-tools/types": "^0.1.0",
+    "@usfm-tools/usj-core": "^0.1.1",
     "linked-panels": "1.0.0-beta.2"
   }
 }

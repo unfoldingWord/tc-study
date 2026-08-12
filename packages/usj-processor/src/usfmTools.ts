@@ -1,14 +1,8 @@
 /**
- * Bridge to `@usfm-tools/*` (usfm-ast built packages).
+ * Bridge to published `@usfm-tools/*` (npm).
  *
- * Resolution (local + CI):
- * 1. `bun run link:usfm-tools` → node_modules/@usfm-tools/* (verifies dist)
- * 2. Vite aliases prefer that linked dist (apps/tc-study/scripts/usfm-tools-vite-aliases.cjs)
- * 3. commonjsOptions include usfm-ast parser/types so Rollup converts CJS `exports`
- *
- * usj-core: import compiled ESM `dist/index.mjs` via the linked package path so Bun
- * does not evaluate the package entry’s type-only re-exports from `@usfm-tools/types`
- * (AlignmentGroup is interface-only — breaks Bun package entry load).
+ * Supported install: `bun install` at monorepo root (see README).
+ * Optional local override against a usfm-ast checkout: `bun run link:usfm-tools:local`.
  */
 
 import * as UsfmParserModule from '@usfm-tools/parser'
@@ -18,7 +12,7 @@ import {
   stripAlignments,
   tokenizeGatewayUsj,
   type AlignmentMap,
-} from '../../../node_modules/@usfm-tools/usj-core/dist/index.mjs'
+} from '@usfm-tools/usj-core'
 
 type UsfmParserCtor = new (options?: unknown) => {
   parse: (usfm: string) => unknown
@@ -40,7 +34,7 @@ function resolveUsfmParser(): UsfmParserCtor {
     return def as UsfmParserCtor
   }
   throw new Error(
-    '[usj-processor] USFMParser not found in @usfm-tools/parser (CJS/ESM interop failed). Run: bun run link:usfm-tools'
+    '[usj-processor] USFMParser not found in @usfm-tools/parser (CJS/ESM interop failed). Run: bun install'
   )
 }
 

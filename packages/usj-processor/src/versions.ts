@@ -4,10 +4,10 @@
  */
 export const USJ_PROCESSING_VERSION = '2.0.0-usj'
 
-/** Embedded tool versions written into USJ cache metadata. */
+/** Embedded tool versions written into USJ cache metadata (match package.json deps). */
 export const USJ_TOOL_VERSIONS = {
-  parser: '0.1.0',
-  usjCore: '0.1.0',
+  parser: '0.1.1',
+  usjCore: '0.1.1',
 } as const
 
 export type UsjToolVersions = {

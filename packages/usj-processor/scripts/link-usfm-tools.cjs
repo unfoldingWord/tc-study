@@ -1,16 +1,17 @@
 /**
- * Create node_modules/@usfm-tools/{parser,types,usj-core} → usfm-ast packages.
+ * OPTIONAL local override: junction node_modules/@usfm-tools/* → usfm-ast packages.
  *
- * Safe no-op if links already point at a usable target with dist.
- * Does not run `bun install` / build on usfm-ast — build dist first.
+ * Default path is published npm (@usfm-tools/* in package.json). Use this only when
+ * developing against an unpublished usfm-ast checkout. Re-run `bun install` to restore npm.
  *
  * Layout (either):
  * - Local: Git/Github/{bt-synergy,usfm-ast}
- * - CI: checkout usfm-ast into <repo>/usfm-ast (or set USFM_AST_ROOT)
+ * - Nested: <repo>/usfm-ast
+ * - Custom: USFM_AST_ROOT=/path/to/usfm-ast
  *
  * Usage:
+ *   bun run link:usfm-tools:local
  *   node packages/usj-processor/scripts/link-usfm-tools.cjs
- *   bun run --filter @bt-synergy/usj-processor link:usfm-tools
  */
 const fs = require('fs')
 const path = require('path')
@@ -27,7 +28,10 @@ const nm = path.join(repoRoot, 'node_modules', '@usfm-tools')
 
 if (!usfmAst) {
   console.error(
-    '[link-usfm-tools] usfm-ast not found. Clone sibling ../usfm-ast, nest at ./usfm-ast, or set USFM_AST_ROOT.'
+    '[link-usfm-tools:local] usfm-ast not found. Clone sibling ../usfm-ast, nest at ./usfm-ast, or set USFM_AST_ROOT.'
+  )
+  console.error(
+    '[link-usfm-tools:local] For normal use, prefer published npm: bun install (see packages/usj-processor/README.md).'
   )
   process.exitCode = 1
   process.exit()
@@ -36,10 +40,10 @@ if (!usfmAst) {
 const links = usfmToolsPackagePaths(usfmAst)
 const missingDist = missingDistEntries(links)
 if (missingDist.length > 0) {
-  console.error('[link-usfm-tools] usfm-ast packages missing dist (build usfm-ast first):')
+  console.error('[link-usfm-tools:local] usfm-ast packages missing dist (build usfm-ast first):')
   for (const line of missingDist) console.error(`  - ${line}`)
   console.error(
-    '[link-usfm-tools] from usfm-ast: bun install && bun run build --filter @usfm-tools/parser --filter @usfm-tools/types --filter @usfm-tools/usj-core'
+    '[link-usfm-tools:local] from usfm-ast: bun install && bun run build --filter @usfm-tools/parser --filter @usfm-tools/types --filter @usfm-tools/usj-core'
   )
   process.exitCode = 1
   process.exit()
@@ -50,30 +54,19 @@ fs.mkdirSync(nm, { recursive: true })
 let linked = 0
 for (const [name, target] of Object.entries(links)) {
   const dest = path.join(nm, name)
-  const distOk = fs.existsSync(path.join(dest, DIST_ENTRIES[name]))
-
   try {
-    const stat = fs.lstatSync(dest)
-    if ((stat.isSymbolicLink() || stat.isDirectory()) && distOk) {
-      console.log(`[link-usfm-tools] ok ${name}`)
-      continue
+    if (fs.existsSync(dest)) {
+      fs.rmSync(dest, { recursive: true, force: true })
     }
-    // Broken / stale link without dist — replace
-    fs.rmSync(dest, { recursive: true, force: true })
-  } catch {
-    /* missing */
-  }
-
-  try {
     fs.symlinkSync(target, dest, 'junction')
-    console.log(`[link-usfm-tools] linked ${name} -> ${target}`)
+    console.log(`[link-usfm-tools:local] linked ${name} -> ${target}`)
     linked += 1
   } catch (err) {
-    console.error(`[link-usfm-tools] failed ${name}:`, err.message)
+    console.error(`[link-usfm-tools:local] failed ${name}:`, err.message)
     process.exitCode = 1
   }
 }
 
 console.log(
-  `[link-usfm-tools] usfm-ast=${usfmAst}${linked ? ` (created ${linked})` : ' (already linked)'}`
+  `[link-usfm-tools:local] usfm-ast=${usfmAst} (overrode npm with ${linked} junctions; bun install restores published packages)`
 )

@@ -7,12 +7,15 @@
   "module": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "link:usfm-tools": "node scripts/link-usfm-tools.cjs",
-    "pretest": "node scripts/link-usfm-tools.cjs",
+    "link:usfm-tools:local": "node scripts/link-usfm-tools.cjs",
     "test": "bun test",
     "type-check": "tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@usfm-tools/parser": "^0.1.1",
+    "@usfm-tools/types": "^0.1.0",
+    "@usfm-tools/usj-core": "^0.1.1"
+  },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "typescript": "^5.3.3"

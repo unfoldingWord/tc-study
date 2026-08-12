@@ -6,7 +6,7 @@ const workspaceRoot = path.resolve(projectRoot, '../..');
 
 const config = getDefaultConfig(projectRoot);
 
-// Monorepo: watch workspace packages + linked usfm-ast tools used by usj-processor
+// Monorepo: watch workspace packages (@usfm-tools/* from npm via usj-processor)
 config.watchFolders = [workspaceRoot];
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),

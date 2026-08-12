@@ -21,7 +21,7 @@ const deployVersion =
 /**
  * Keep in sync with vite.config.js (Vite prefers .js when both exist).
  * linked-panels module store must be a single instance — see vite.config.js comment.
- * @usfm-tools/*: scripts/usfm-tools-vite-aliases.cjs + link-usfm-tools.cjs
+ * @usfm-tools/*: npm via usj-processor; CJS interop in usfm-tools-vite-aliases.cjs
  */
 const linkedPanelsEntry = path.resolve(
   __dirname,
@@ -70,8 +70,8 @@ export default defineConfig({
   },
   build: {
     ...sharedBuild.build,
-    // usfm-ast CJS dist may sit outside node_modules (alias). Without this,
-    // Rollup leaves `exports` bare → "exports is not defined" when resourceTypes load.
+    // CJS @usfm-tools/parser|types: without include, Rollup leaves bare `exports`
+    // → "exports is not defined" when resourceTypes load (e2e Journey 4/8).
     commonjsOptions: {
       include: usfmTools.commonjsInclude,
     },

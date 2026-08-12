@@ -1,9 +1,12 @@
 /**
- * Shared Vite alias + fs.allow roots for @usfm-tools/* (USJ bridge).
- * Prefer linked node_modules dist; fall back to USFM_AST_ROOT / nested / sibling usfm-ast.
+ * Vite helpers for @usfm-tools/* (published npm under node_modules).
  *
- * Keep vite.config.js and vite.config.ts in sync via this helper
- * (Vite loads .js first when both exist).
+ * Default: no path aliases — let Vite resolve package exports.
+ * Keep commonjs include + needsInterop for CJS parser/types (e2e Journey 4/8).
+ *
+ * Optional local override: alias to usfm-ast dist only when node_modules is
+ * missing and a usfm-ast checkout provides dist (after link:usfm-tools:local
+ * node_modules usually already has junctions — no alias needed).
  */
 const path = require('path')
 const {
@@ -15,21 +18,18 @@ function getUsfmToolsViteResolve() {
   const usfmAstRoot = resolveUsfmAstRoot()
   const entries = resolveUsfmToolsDistEntries(usfmAstRoot)
 
-  const missing = Object.entries(entries)
-    .filter(([, p]) => !p)
-    .map(([name]) => name)
-
-  if (missing.length > 0) {
-    console.warn(
-      `[tc-study vite] missing @usfm-tools dist for: ${missing.join(', ')}. ` +
-        `Build usfm-ast then run: node packages/usj-processor/scripts/link-usfm-tools.cjs`
-    )
-  }
-
-  const alias = {
-    '@usfm-tools/parser': entries.parser || '@usfm-tools/parser',
-    '@usfm-tools/types': entries.types || '@usfm-tools/types',
-    '@usfm-tools/usj-core': entries['usj-core'] || '@usfm-tools/usj-core',
+  const alias = {}
+  for (const [name, distPath] of Object.entries(entries)) {
+    const pkg = `@usfm-tools/${name}`
+    if (!distPath) {
+      console.warn(
+        `[tc-study vite] missing ${pkg}. Run: bun install (or bun run link:usfm-tools:local for usfm-ast override)`
+      )
+      continue
+    }
+    if (usfmAstRoot && distPath.startsWith(usfmAstRoot)) {
+      alias[pkg] = distPath
+    }
   }
 
   const fsAllow = []
@@ -39,7 +39,7 @@ function getUsfmToolsViteResolve() {
     usfmAstRoot,
     alias,
     fsAllow,
-    /** Rollup must convert sibling/nested CJS parser (outside node_modules). */
+    /** CJS parser/types in node_modules (and optional usfm-ast fallback). */
     commonjsInclude: [/node_modules/, /usfm-ast[\\/]packages[\\/](usfm-parser|shared-types)/],
   }
 }
