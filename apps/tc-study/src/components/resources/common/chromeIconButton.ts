@@ -1,6 +1,6 @@
 /**
  * Shared idle/active classes for ResourceViewerHeader trailing icon buttons
- * (ScriptureLayoutToggle, Combined Helps Sources / kind filter, etc.).
+ * (ResourceInfoButton, ScriptureLayoutToggle, Combined Helps Sources / kind filter, etc.).
  */
 export function chromeIconButtonClass(active: boolean): string {
   return `p-1.5 rounded-md transition-colors ${

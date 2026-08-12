@@ -59,6 +59,7 @@ export function WordsLinksList({
         title={resource.title}
         icon={Link}
         direction={languageDirection}
+        infoResource={resource}
         actions={filterScopeBar ?? undefined}
       />
       <div className="p-content">

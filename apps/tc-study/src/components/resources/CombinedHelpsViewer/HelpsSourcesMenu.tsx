@@ -1,29 +1,17 @@
 import { BookMarked, Info, NotebookPen, Scale } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWorkspaceStore } from '../../../features/workspace/workspaceStore'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { ResourceInfoModal } from '../../studio/ResourceInfoModal'
 import { chromeIconButtonClass } from '../common/chromeIconButton'
+import {
+  licenseIdOf,
+  toResourceInfoModalProps,
+} from '../common/resourceInfoModalProps'
 
-export function licenseIdOf(resource: ResourceInfo | undefined): string {
-  if (!resource?.license) return ''
-  return typeof resource.license === 'string' ? resource.license : resource.license.id || ''
-}
-
-export function toResourceInfoModalProps(resource: ResourceInfo) {
-  return {
-    title: resource.title,
-    key: resource.key,
-    owner: typeof resource.owner === 'string' ? resource.owner : undefined,
-    languageCode: resource.languageCode ?? resource.language,
-    subject: resource.subject,
-    description: resource.description,
-    readme: resource.readme,
-    license: licenseIdOf(resource),
-  }
-}
+export { licenseIdOf, toResourceInfoModalProps }
 
 function lookupLoadedResource(
   loadedResources: Record<string, ResourceInfo | undefined>,
@@ -76,34 +64,14 @@ interface SourceRow {
 interface HelpsSourcesMenuProps {
   tnKey: string
   twlKey: string
-  /** Controlled open (e.g. PanelHeader ··· Info redirect). */
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-  /** Header Sources trigger. Default true; set false when only opening via PanelHeader. */
-  showTrigger?: boolean
-  /** Optional external anchor for controlled open (PanelHeader ··· button). */
-  anchorRef?: RefObject<HTMLElement | null>
 }
 
 /**
  * Icon-first Sources control for Combined Helps.
  * Lists resolved TN + TWL packages; row opens real ResourceInfoModal metadata.
  */
-export function HelpsSourcesMenu({
-  tnKey,
-  twlKey,
-  open: openControlled,
-  onOpenChange,
-  showTrigger = true,
-  anchorRef,
-}: HelpsSourcesMenuProps) {
-  const [openInternal, setOpenInternal] = useState(false)
-  const open = openControlled ?? openInternal
-  const setOpen = (next: boolean) => {
-    onOpenChange?.(next)
-    if (openControlled === undefined) setOpenInternal(next)
-  }
-
+export function HelpsSourcesMenu({ tnKey, twlKey }: HelpsSourcesMenuProps) {
+  const [open, setOpen] = useState(false)
   const [infoResource, setInfoResource] = useState<ResourceInfo | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -124,9 +92,8 @@ export function HelpsSourcesMenu({
   useEffect(() => {
     if (!open) return
     const update = () => {
-      const el = (showTrigger ? buttonRef.current : null) ?? anchorRef?.current ?? null
+      const el = buttonRef.current
       if (!el) {
-        // Fallback: top-right of viewport when no anchor (still usable from PanelHeader).
         setPos({ top: 56, right: 12 })
         return
       }
@@ -140,7 +107,7 @@ export function HelpsSourcesMenu({
       window.removeEventListener('resize', update)
       window.removeEventListener('scroll', update, true)
     }
-  }, [open, showTrigger, anchorRef])
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -150,7 +117,6 @@ export function HelpsSourcesMenu({
     const onDown = (e: MouseEvent) => {
       const t = e.target as Node
       if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return
-      if (anchorRef?.current?.contains(t)) return
       setOpen(false)
     }
     document.addEventListener('keydown', onKey)
@@ -159,25 +125,23 @@ export function HelpsSourcesMenu({
       document.removeEventListener('keydown', onKey)
       document.removeEventListener('mousedown', onDown)
     }
-  }, [open, anchorRef])
+  }, [open])
 
   return (
     <div className="relative flex items-center">
-      {showTrigger ? (
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={() => setOpen(!open)}
-          title="Sources"
-          aria-label="Sources"
-          aria-expanded={open}
-          aria-haspopup="menu"
-          aria-pressed={open}
-          className={chromeIconButtonClass(open)}
-        >
-          <Info className="w-4 h-4" aria-hidden />
-        </button>
-      ) : null}
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen(!open)}
+        title="Sources"
+        aria-label="Sources"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-pressed={open}
+        className={chromeIconButtonClass(open)}
+      >
+        <Info className="w-4 h-4" aria-hidden />
+      </button>
 
       {open && pos ? (
         <ModalPortal>

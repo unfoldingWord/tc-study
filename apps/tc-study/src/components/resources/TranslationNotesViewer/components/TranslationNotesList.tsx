@@ -58,6 +58,7 @@ export function TranslationNotesList({
         title={resource.title}
         icon={FileText}
         direction={targetLanguageDirection}
+        infoResource={resource}
         actions={filterScopeBar ?? undefined}
       />
       <div className="p-content">

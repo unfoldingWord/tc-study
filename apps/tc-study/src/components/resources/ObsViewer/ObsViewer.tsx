@@ -126,6 +126,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
         subtitle={subtitle}
         icon={BookMarked}
         direction="ltr"
+        infoResource={resource}
       />
       <div className="flex-1 min-h-0 overflow-auto p-4 bg-white">
         {loading && (

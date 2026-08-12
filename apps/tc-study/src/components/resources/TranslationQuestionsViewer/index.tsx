@@ -215,10 +215,11 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
   return (
     <div className="h-full flex flex-col">
       <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
-        <ResourceViewerHeader 
+        <ResourceViewerHeader
           title={resource.title}
           icon={MessageCircleQuestion}
           direction={languageDirection}
+          infoResource={resource}
         />
         <div className="p-4 space-y-4">
         {Object.entries(questionsByVerse).map(([verse, verseQuestions]) => (

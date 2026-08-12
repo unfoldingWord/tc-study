@@ -183,6 +183,7 @@ export function ScriptureViewer({
         subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}
         icon={Book}
         direction={languageDirection}
+        infoResource={resource}
         actions={<ScriptureLayoutToggle />}
       />
 
