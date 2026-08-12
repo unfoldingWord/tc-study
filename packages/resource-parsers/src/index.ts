@@ -31,16 +31,14 @@ export type {
   TranslationWord,
   AcademyArticle,
   OptimizedToken,
+  OptimizedChapter,
+  OptimizedVerse,
+  OptimizedParagraph,
 } from './types'
 
 // USFM Parser
-export {
-  USFMProcessor,
-  OptimizedScripture,
-  OptimizedChapter,
-  OptimizedVerse,
-  usfmProcessor,
-} from './parsers/usfm'
+export { USFMProcessor, usfmProcessor } from './parsers/usfm'
+export type { OptimizedScripture } from './parsers/usfm'
 
 // TSV Parsers
 export {

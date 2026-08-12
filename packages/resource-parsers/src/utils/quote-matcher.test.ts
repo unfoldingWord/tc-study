@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { OptimizedChapter } from '../parsers/usfm/usfm-processor'
+import type { OptimizedChapter } from '../types/optimized-tokens'
 import { QuoteMatcher } from './quote-matcher'
 
 function chapter(words: string[]): OptimizedChapter[] {

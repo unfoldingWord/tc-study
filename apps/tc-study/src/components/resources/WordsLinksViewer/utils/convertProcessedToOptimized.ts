@@ -1,14 +1,17 @@
 /**
- * Convert ProcessedScripture (USJ or legacy projection) to OptimizedChapter[]
- * for QuoteMatcher / CombinedHelps.
+ * @deprecated Prefer viewModelToOptimizedChapters from @bt-synergy/scripture-loader.
  *
- * Occurrence and surface text must match the frozen identity contract:
- *   semanticId = `${verseRef}:${content}:${occurrence}`
- * Occurrence is verse-wide, 1-based, case-insensitive on content.
+ * Convert transitional ProcessedScripture projection to OptimizedChapter[] for
+ * QuoteMatcher. Kept for rollback / non-Helps callers only.
  */
 
 import type { OptimizedChapter, OptimizedToken, OptimizedVerse } from '@bt-synergy/resource-parsers'
-import type { ProcessedChapter, ProcessedScripture, ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
+import type {
+  ProcessedChapter,
+  ProcessedScripture,
+  ProcessedVerse,
+  WordToken,
+} from '@bt-synergy/scripture-loader'
 
 /**
  * Convert WordToken to OptimizedToken.
@@ -86,6 +89,7 @@ function convertProcessedChapterToOptimizedChapter(processedChapter: ProcessedCh
 
 /**
  * Convert ProcessedScripture to OptimizedChapter[]
+ * @deprecated Prefer viewModelToOptimizedChapters(viewModel)
  */
 export function convertProcessedScriptureToOptimizedChapters(
   processedScripture: ProcessedScripture

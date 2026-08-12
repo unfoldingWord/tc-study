@@ -6,7 +6,7 @@
  * and used throughout the application.
  */
 
-import type { OptimizedChapter, OptimizedToken } from './parsers/usfm/usfm-processor';
+import type { OptimizedChapter, OptimizedToken } from './types/optimized-tokens'
 
 // ============================================================================
 // TRANSLATION NOTES
@@ -140,6 +140,11 @@ export interface ProcessedContent {
   wordsLinks?: ProcessedWordsLinks;  // For translation words links
 }
 
-// Re-export OptimizedToken for convenience
-export type { OptimizedToken } from './parsers/usfm/usfm-processor';
+// Re-export optimized DTOs for Helps / QuoteMatcher (no usfm-js import)
+export type {
+  OptimizedToken,
+  OptimizedChapter,
+  OptimizedVerse,
+  OptimizedParagraph,
+} from './types/optimized-tokens'
 

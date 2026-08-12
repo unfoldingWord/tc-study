@@ -25,7 +25,11 @@
  *   - Return aligned target tokens for display
  */
 
-import type { OptimizedChapter, OptimizedToken, OptimizedVerse } from '../parsers/usfm/usfm-processor';
+import type {
+  OptimizedChapter,
+  OptimizedToken,
+  OptimizedVerse,
+} from '../types/optimized-tokens'
 
 export interface QuoteReference {
   book: string;
