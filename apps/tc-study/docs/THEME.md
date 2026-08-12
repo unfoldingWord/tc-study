@@ -56,7 +56,7 @@ Quote buttons on Combined Helps / TN / TWL cards use dedicated chip tokens (soli
 
 Helps list panels (`HELPS_LIST_PANEL`) and `ResourceViewerHeader` both use `bg-surface` so verse headers sit on white/elevated charcoal (not cool `canvas` gray). Header strip keeps a hairline `border-b` for chrome separation.
 
-Pair with shared `surface`, `fg`, `fg-secondary`, `fg-muted`, `border`, `helps*` for card chrome and entry links. Selected TN/TWL cards use `HELPS_CARD_SELECTED` (`bg-accent-soft` + even `border-border`).
+Pair with shared `surface`, `fg`, `fg-secondary`, `fg-muted`, `border`, `helps*` for card chrome and entry links. Selected TN/TWL cards use `HELPS_CARD_SELECTED` (`bg-accent-soft/50` + even `border-border`).
 
 ## Helps inline markdown links
 
