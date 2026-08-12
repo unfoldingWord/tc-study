@@ -1,5 +1,6 @@
 /**
- * Shared TN / TWL / CombinedHelps filter banners (token, verse, OBS quote).
+ * Shared TN / TWL / CombinedHelps filter scope bar (token, verse, OBS quote).
+ * Renders TokenFilterBanner whenever a filter is active (including 0 matches).
  */
 
 import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/helpsDisplayFilters'
