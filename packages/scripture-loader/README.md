@@ -1,22 +1,23 @@
 # `@bt-synergy/scripture-loader`
 
-Loads Door43 scripture (USFM) into `ProcessedScripture` for catalog-manager / tc-study.
+Loads Door43 scripture (USFM) via **USJ + AlignmentMap** SoT for catalog-manager / tc-study.
 
 ## Process path: USJ replaces usfm-js
 
-**Default on** — `@bt-synergy/usj-processor` (`@usfm-tools/parser` → USJ → temporary `ProcessedScripture` projection).
+**Default on** — `@bt-synergy/usj-processor`:
 
-Legacy `@bt-synergy/usfm-processor` (usfm-js) is **opt-out only** and loaded via dynamic import so the default path does not eagerly construct it.
+`USFM → UsjDocument + AlignmentMap → UsjScriptureViewModel` (+ temporary `ProcessedScripture` projection).
 
-| Control | Example |
-|---------|---------|
-| Default | USJ on |
-| Opt out (rollback) | `USE_USJ_PIPELINE=0` or `VITE_USE_USJ_PIPELINE=0` |
-| Loader option | `new ScriptureLoader({ …, useUsjPipeline: false })` |
+| API | Use |
+|-----|-----|
+| `processUsfmToUsjResult({ usfmText, bookId })` | **Preferred** — `{ viewModel, scripture, cacheContent, usj, alignmentMap }` |
+| `viewModelFromUsjCache(content, bookId, proc)` | Rebuild view model from `scripture-usj:` entry |
+| `processUsfmToScripture({ …, useUsjPipeline })` | Transitional — projection only |
+| `ScriptureLoader.loadContent` | Still returns `ProcessedScripture` for drop-in UI |
 
-When **on** (default): USFM string → `@bt-synergy/usj-processor` → `ProcessedScripture` for callers.
+Legacy `@bt-synergy/usfm-processor` (usfm-js) is **opt-out only** (`USE_USJ_PIPELINE=0`) via dynamic import.
 
-`ProcessedScripture` is a **temporary projection DTO** (TokenRenderer / CombinedHelps). Sunset when those consumers migrate; CombinedHelps / semantic-ID identity remains the hard part.
+Identity contract: `semanticIdFor` / `UsjWordToken` — see plan **Authoritative runtime contract**.
 
 ### Storage (USJ default)
 

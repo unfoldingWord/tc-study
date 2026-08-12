@@ -199,4 +199,38 @@ describe('P1 USE_USJ_PIPELINE — Titus semantic parity', () => {
     expect(mismatches.slice(0, 8)).toEqual([])
     expect(matched).toBe(compared)
   })
+
+  test('underline target: ULT Paul resolves to Παῦλος semantic id (both pipelines)', async () => {
+    const bookId = 'tit'
+    const legacy = await processUsfmToScripture({
+      usfmText: ULT_USFM,
+      bookId,
+      useUsjPipeline: false,
+    })
+    attachAlignmentSemanticIds(
+      legacy,
+      legacy.chapters.flatMap((c) => c.verses)
+    )
+    const usj = await processUsfmToScripture({
+      usfmText: ULT_USFM,
+      bookId,
+      useUsjPipeline: true,
+    })
+
+    const findPaul = (scripture: ProcessedScripture) =>
+      scripture.chapters
+        .find((c) => c.number === 1)
+        ?.verses.find((v) => v.number === 1)
+        ?.wordTokens?.find((t) => t.type === 'word' && t.content === 'Paul')
+
+    const legacyPaul = findPaul(legacy)
+    const usjPaul = findPaul(usj)
+    expect(legacyPaul?.alignedOriginalWordIds?.length).toBeGreaterThan(0)
+    expect(usjPaul?.alignedOriginalWordIds?.length).toBeGreaterThan(0)
+
+    const norm = (ids: string[] | undefined) =>
+      (ids || []).map((id) => id.toLowerCase()).sort()
+    expect(norm(usjPaul!.alignedOriginalWordIds)).toEqual(norm(legacyPaul!.alignedOriginalWordIds))
+    expect(norm(usjPaul!.alignedOriginalWordIds).some((id) => id.includes('παῦλος'))).toBe(true)
+  })
 })

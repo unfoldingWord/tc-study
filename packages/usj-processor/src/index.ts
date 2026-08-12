@@ -10,11 +10,30 @@ export {
   collectSemanticIdSet,
   collectSurfaceOccurrenceSet,
   compareAlignedOriginalWordIds,
-  semanticIdFor,
   type ParityReport,
   type ParityBucket,
   type AlignmentParity,
 } from './parity'
+export {
+  semanticIdFor,
+  remapVerseRefBookCode,
+  assignSurfaceOccurrences,
+  semanticIdKey,
+  type SurfaceOccurrence,
+} from './identity'
+export {
+  buildUsjViewModel,
+  attachAlignedOriginalWordIds,
+  flattenUsjTokens,
+  collectViewModelSemanticIdSet,
+  type UsjScriptureViewModel,
+  type UsjChapterView,
+  type UsjVerseView,
+  type UsjWordToken,
+  type BuildUsjViewModelParams,
+} from './usjViewModel'
+export { projectToProcessedScripture } from './projectToProcessedScripture'
 export { collectUsjWords, parseVerseSid, extractText } from './usjWalk'
 export { USJ_PROCESSING_VERSION, USJ_TOOL_VERSIONS, type UsjToolVersions } from './versions'
 export type { CachedUsjDocument, UsjScriptureCacheContent } from './usjCacheTypes'
+export type { AlignmentMap } from './usfmTools'

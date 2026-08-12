@@ -1,64 +1,58 @@
 # `@bt-synergy/usj-processor`
 
-Adapter: Door43 USFM → `@usfm-tools/parser` USJ → `@usfm-tools/usj-core` `stripAlignments` → `ProcessedScripture` / `WordToken` shapes compatible with today’s tc-study interactivity contract.
+USFM → **USJ + AlignmentMap** (parse/cache SoT) → **`UsjScriptureViewModel`** (runtime identity).
 
-**Replace path:** Default process path in `@bt-synergy/scripture-loader` (USJ replaces usfm-js). Opt out with `USE_USJ_PIPELINE=0`.  
-When on, loader persists USJ SoT under `scripture-usj:…` (`processingVersion` `2.0.0-usj`) and still returns `ProcessedScripture` to the app.
+Replaces unmaintained usfm-js as the default scripture process path in `@bt-synergy/scripture-loader`.
 
-## Local `usfm-ast` wiring
+## Runtime API (for Viewer / Panels)
 
-Sibling clone required:
+```ts
+import {
+  USJProcessor,
+  semanticIdFor,
+  buildUsjViewModel,
+  projectToProcessedScripture,
+  type UsjScriptureViewModel,
+  type UsjWordToken,
+} from '@bt-synergy/usj-processor'
 
-```text
-Git/Github/bt-synergy
-Git/Github/usfm-ast
+const proc = new USJProcessor()
+const { viewModel, scripture, usj, alignmentMap } = await proc.processUSFM(
+  usfmText,
+  bookCode, // e.g. 'tit' from Door43
+  bookName
+)
+
+// Preferred: viewModel.chapters[].verses[].tokens[]
+// token.semanticId === semanticIdFor(token.verseRef, token.content, token.occurrence)
+// token.alignedOriginalWordIds → OL ids for cross-resource highlight
+
+// Transitional UI: scripture (ProcessedScripture projection)
 ```
 
-`@usfm-tools/*` cannot be linked via Bun `file:` / workspace deps from this monorepo: those packages use internal `workspace:*` references that only resolve inside **usfm-ast**.
+### Identity
 
-Spike bridge: `src/usfmTools.ts` imports compiled output by relative path:
+`semanticId = ${verseRef}:${content}:${occurrence}`
 
-- `../../../../usfm-ast/packages/usfm-parser/dist/index.js`
-- `../../../../usfm-ast/packages/usfm-usj-core/dist/index.mjs`
+- `content` from USJ `\w` (not lemma, not `tokenizeGatewayUsj`)
+- occurrence verse-wide, 1-based, case-insensitive
+- match with `.toLowerCase()`
 
-Build those packages first (from `usfm-ast`):
+See plan: `usj_base_format_migration.plan.md` → **Authoritative runtime contract**.
+
+## Cache
+
+`toUsjCacheContent(result)` → `UsjScriptureCacheContent` for `scripture-usj:` keys.  
+`fromUsjCacheContentFull(cached)` → full `{ viewModel, scripture, usj, alignmentMap }`.
+
+## Rollback
+
+Loader opt-out: `USE_USJ_PIPELINE=0` (lazy usfm-js). Not the end state.
+
+## Setup
 
 ```bash
-bun install
-# ensure @usfm-tools/types, @usfm-tools/parser, @usfm-tools/usj-core dist/ exist
-bun run build
-```
-
-Then from `bt-synergy`:
-
-```bash
-bun install
+# sibling usfm-ast must be built
+node packages/usj-processor/scripts/link-usfm-tools.cjs
 bun test packages/usj-processor
-```
-
-**P1 status:** Relative `dist/` bridge retained — Bun `file:` / `workspace:*` for `@usfm-tools/*` still blocked by usfm-ast internal `workspace:*` deps. Prefer publishing `@usfm-tools/*` (or a Bun workspace that includes usfm-ast packages) before P2 default-on.
-
-## Tokenization rule (locked by P0)
-
-Walk USJ `char` / `marker: "w"` nodes with verse `sid` context (sibling `\v` markers).  
-Do **not** use `tokenizeGatewayUsj` for semantic IDs — whitespace splits keep trailing punctuation (`Paul,`) and break parity with `usfm-js` `\w` tokens.
-
-Occurrences are verse-wide, 1-based, **case-insensitive** on surface (same as `@bt-synergy/usfm-processor`).
-
-Semantic ID schema unchanged: `verseRef:content:occurrence` (case-insensitive match).
-
-## Fixtures
-
-Committed under `fixtures/`:
-
-- `en_ult_TIT.usfm` — unfoldingWord English ULT Titus
-- `el-x-koine_ugnt_TIT.usfm` — unfoldingWord UGNT Titus
-- `en_tn_TIT.tsv` — English TN Titus (for later QuoteMatcher / underline checks)
-
-## Run parity tests
-
-```bash
-bun test packages/usj-processor
-# or
-cd packages/usj-processor && bun test
 ```

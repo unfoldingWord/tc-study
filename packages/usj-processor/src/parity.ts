@@ -4,6 +4,8 @@
 
 import type { ProcessedScripture, WordToken } from '@bt-synergy/usfm-processor'
 
+import { semanticIdFor } from './identity'
+
 export interface TokenKey {
   semanticId: string
   content: string
@@ -54,9 +56,7 @@ function wordTokens(
   return out
 }
 
-export function semanticIdFor(verseRef: string, content: string, occurrence: number): string {
-  return `${verseRef}:${content}:${occurrence}`
-}
+export { semanticIdFor }
 
 export function collectSemanticIdSet(
   scripture: ProcessedScripture,

@@ -1,18 +1,19 @@
 /**
- * USFM → ProcessedScripture.
+ * USFM → USJ SoT → view model / temporary ProcessedScripture projection.
  *
- * Default: @bt-synergy/usj-processor (USJ replace path).
+ * Default: @bt-synergy/usj-processor (USJ replaces usfm-js).
  * Opt-out: @bt-synergy/usfm-processor via dynamic import (transitional rollback only).
  *
- * TODO(sunset): ProcessedScripture is a temporary projection DTO for TokenRenderer /
- * CombinedHelps. Target: drop usfm-js dependency; migrate callers to USJ-native
- * identity or keep a thin projection with an explicit removal date once
- * CombinedHelps/semantic-ID consumers are migrated (hard part).
+ * Prefer processUsfmToUsjResult() for new code (returns viewModel + cache payload).
+ * processUsfmToScripture() remains for TokenRenderer / CombinedHelps until they migrate.
  */
 
 import type { ProcessedScripture, USFMProcessingOptions, USFMProcessor } from '@bt-synergy/usfm-processor'
-import type { USJProcessor } from '@bt-synergy/usj-processor'
-import { USJProcessor as USJProcessorCtor } from '@bt-synergy/usj-processor'
+import {
+  USJProcessor,
+  type USJProcessResult,
+  type UsjScriptureCacheContent,
+} from '@bt-synergy/usj-processor'
 
 const DEFAULT_OPTIONS: USFMProcessingOptions = {
   includeAlignments: true,
@@ -33,7 +34,7 @@ export interface ProcessUsfmParams {
 }
 
 async function resolveUsjProcessor(existing?: USJProcessor): Promise<USJProcessor> {
-  return existing ?? new USJProcessorCtor()
+  return existing ?? new USJProcessor()
 }
 
 /** Lazy-load legacy usfm-js path so the default USJ bundle does not need it eagerly. */
@@ -43,9 +44,42 @@ async function resolveUsfmProcessor(existing?: USFMProcessor): Promise<USFMProce
   return new USFMProcessor()
 }
 
+export interface ProcessUsfmToUsjResult extends USJProcessResult {
+  /** Ready-to-store scripture-usj: payload */
+  cacheContent: UsjScriptureCacheContent
+}
+
+/**
+ * Default process path: USFM → USJ + AlignmentMap → UsjScriptureViewModel.
+ * Also returns temporary ProcessedScripture projection + cache payload.
+ */
+export async function processUsfmToUsjResult(
+  params: Omit<ProcessUsfmParams, 'useUsjPipeline'> & { useUsjPipeline?: true }
+): Promise<ProcessUsfmToUsjResult> {
+  const {
+    usfmText,
+    bookId,
+    bookName = bookId.toUpperCase(),
+    options = DEFAULT_OPTIONS,
+    debug = false,
+  } = params
+
+  if (debug) {
+    console.log('[scripture-loader] processing via USJProcessor → UsjScriptureViewModel')
+  }
+
+  const usjProcessor = await resolveUsjProcessor(params.usjProcessor)
+  const opts: USFMProcessingOptions = { ...DEFAULT_OPTIONS, ...options }
+  const result = await usjProcessor.processUSFM(usfmText, bookId, bookName, opts)
+  const cacheContent = usjProcessor.toUsjCacheContent(result, bookId, bookName)
+  return { ...result, cacheContent }
+}
+
 /**
  * Process a USFM string into ProcessedScripture via the selected pipeline.
- * Callers / cache always receive the same ProcessedScripture shape (temporary DTO).
+ * Default = USJ projection. Opt-out = legacy usfm-js.
+ *
+ * @deprecated Prefer processUsfmToUsjResult().viewModel for new consumers.
  */
 export async function processUsfmToScripture(
   params: ProcessUsfmParams
@@ -62,12 +96,15 @@ export async function processUsfmToScripture(
   const opts: USFMProcessingOptions = { ...DEFAULT_OPTIONS, ...options }
 
   if (useUsjPipeline) {
-    if (debug) {
-      console.log('[scripture-loader] USE_USJ_PIPELINE=on — processing via USJProcessor (default)')
-    }
-    const usjProcessor = await resolveUsjProcessor(params.usjProcessor)
-    const { scripture } = await usjProcessor.processUSFM(usfmText, bookId, bookName, opts)
-    return scripture
+    const result = await processUsfmToUsjResult({
+      usfmText,
+      bookId,
+      bookName,
+      options: opts,
+      usjProcessor: params.usjProcessor,
+      debug,
+    })
+    return result.scripture
   }
 
   if (debug) {
