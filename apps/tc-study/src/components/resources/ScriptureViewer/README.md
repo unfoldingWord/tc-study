@@ -6,14 +6,14 @@ Primary render path: **UsjScriptureViewModel** / **UsjWordToken**.
 
 ```ts
 const loader = loaderRegistry.getLoader(RESOURCE_TYPE_IDS.SCRIPTURE) as ScriptureLoader
-const { viewModel, scripture, fromUsjCache } =
-  await loader.loadScriptureResult(resourceKey, bookId)
-// or: await loader.loadViewModel(resourceKey, bookId)
+const viewModel = await loader.loadViewModel(resourceKey, bookId)
 ```
 
-`useContent` → `loadUsjScripture()` wraps that API (fallback: `loadContent` + `viewModelFromProcessedScripture`).
+`useContent` → `loadUsjViewModel()` (requires ScriptureLoader `loadViewModel` / `loadScriptureResult`).
+No `loadContent` / ProcessedScripture fallback.
 
-Helps keep using `loadContent()` → ProcessedScripture — untouched.
+Helps QuoteMatcher path: `loadViewModel` + `viewModelToOptimizedChapters` (Helps DTO).
+`ScriptureLoader.loadContent()` remains for the ResourceLoader contract only (ProcessedScripture projection).
 
 ## Helps DOM contract (Journey 4 / 8)
 

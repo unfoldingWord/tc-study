@@ -3,8 +3,7 @@
  *
  * Parse SoT: `@bt-synergy/usj-processor` (`USJProcessor`, UsjScriptureViewModel).
  * OptimizedScripture here is the mobile Helps/viewer envelope derived from that view model.
- * Prefer importing from this module (`usj-scripture-processor`); `usfm-processor` is a
- * deprecated alias for one release.
+ * Import OptimizedScripture / UsjScriptureProcessor from this module.
  */
 
 import {
@@ -642,13 +641,3 @@ export class UsjScriptureProcessor {
 }
 
 export const usjScriptureProcessor = new UsjScriptureProcessor()
-
-/**
- * @deprecated Prefer `UsjScriptureProcessor` / `usjScriptureProcessor`.
- */
-export class USFMProcessor extends UsjScriptureProcessor {}
-
-/**
- * @deprecated Prefer `usjScriptureProcessor`.
- */
-export const usfmProcessor = usjScriptureProcessor

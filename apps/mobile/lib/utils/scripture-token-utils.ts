@@ -2,7 +2,7 @@
  * Utility functions for extracting and filtering scripture tokens
  */
 
-import type { OptimizedScripture, OptimizedToken } from '../services/usfm-processor';
+import type { OptimizedScripture, OptimizedToken } from '../services/usj-scripture-processor';
 
 export interface NavigationReference {
   book: string;

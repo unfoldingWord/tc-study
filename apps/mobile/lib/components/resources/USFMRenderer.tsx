@@ -11,7 +11,7 @@ import { useNavigation } from '../../contexts/NavigationContext';
 import { TokenUnderliningProvider, useTokenUnderlining, type TokenGroup } from '../../contexts/TokenUnderliningContext';
 import { useScrollToHighlightedToken } from '../../hooks/useScrollToHighlightedToken';
 import { getCrossPanelCommunicationService, type CrossPanelMessage, type OriginalLanguageToken, type TokenHighlightMessage } from '../../services/cross-panel-communication';
-import type { OptimizedScripture, OptimizedToken, OptimizedVerse } from '../../services/usfm-processor';
+import type { OptimizedScripture, OptimizedToken, OptimizedVerse } from '../../services/usj-scripture-processor';
 import type { WordAlignment } from '../../types/context';
 import type { NoteSelectionBroadcast, NotesTokenGroupsBroadcast, TokenClickBroadcast, VerseReferenceFilterBroadcast } from '../../types/scripture-messages';
 import type { TTSWordBoundary } from '../../types/tts';

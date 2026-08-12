@@ -2,16 +2,12 @@
  * Helps DTO: OptimizedScripture derived from UsjScriptureViewModel.
  *
  * Ownership: QuoteMatcher / Helps chapters live here (OptimizedToken family).
- * Runtime identity SoT remains UsjScriptureViewModel / UsjWordToken via
- * `@bt-synergy/usj-processor` (`USJProcessor`). Prefer:
- *   USJProcessor.processUSFM → viewModel → viewModelToOptimizedScripture / Chapters
+ * Runtime identity SoT: UsjScriptureViewModel / UsjWordToken via USJProcessor.
  */
 
 import {
   USJProcessor,
-  type ProcessingResult,
   type TranslatorSection,
-  type USFMProcessingOptions,
   type UsjScriptureViewModel,
 } from '@bt-synergy/usj-processor'
 import type { OptimizedChapter } from '../../types/optimized-tokens'
@@ -24,7 +20,7 @@ export type {
   OptimizedChapter,
 } from '../../types/optimized-tokens'
 
-export type { ProcessingResult, TranslatorSection, USFMProcessingOptions }
+export type { TranslatorSection }
 
 /** Helps / adapter DTO — chapters are QuoteMatcher-compatible OptimizedChapter[]. */
 export interface OptimizedScripture {
@@ -97,51 +93,3 @@ export async function processUsfmToOptimizedScripture(
   })
   return viewModelToOptimizedScripture(viewModel, bookCode, bookName, language)
 }
-
-/**
- * @deprecated Prefer `USJProcessor` + `viewModelToOptimizedScripture` /
- * `processUsfmToOptimizedScripture`. Kept as a thin alias for one release.
- */
-export class USFMProcessor {
-  private readonly usj = new USJProcessor()
-
-  /**
-   * @deprecated Prefer `USJProcessor.processUSFM` (returns viewModel + scripture).
-   */
-  async processUSFM(
-    usfmContent: string,
-    bookCode: string,
-    bookName: string,
-    options: USFMProcessingOptions = {}
-  ): Promise<ProcessingResult> {
-    const { scripture } = await this.usj.processUSFM(
-      usfmContent,
-      bookCode,
-      bookName,
-      options
-    )
-    return {
-      structuredText: scripture,
-      translatorSections: scripture.translatorSections ?? [],
-      alignments: scripture.alignments ?? [],
-      metadata: scripture.metadata,
-    }
-  }
-
-  /**
-   * @deprecated Prefer `processUsfmToOptimizedScripture`.
-   */
-  async processUSFMOptimized(
-    usfmContent: string,
-    bookCode: string,
-    bookName: string,
-    language?: string
-  ): Promise<OptimizedScripture> {
-    return processUsfmToOptimizedScripture(usfmContent, bookCode, bookName, language)
-  }
-}
-
-/**
- * @deprecated Prefer `processUsfmToOptimizedScripture` / `USJProcessor`.
- */
-export const usfmProcessor = new USFMProcessor()

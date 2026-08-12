@@ -4,7 +4,7 @@ import {
   usjTokensFromProcessedVerse,
   type ProcessedScripture,
 } from '@bt-synergy/scripture-loader'
-import { loadUsjScripture } from './loadUsjViewModel'
+import { loadUsjViewModel } from './loadUsjViewModel'
 
 function stubProcessed(): ProcessedScripture {
   return {
@@ -63,43 +63,44 @@ function stubProcessed(): ProcessedScripture {
   }
 }
 
-describe('loadUsjScripture', () => {
-  test('uses loadScriptureResult when available', async () => {
+describe('loadUsjViewModel', () => {
+  test('uses loadViewModel when available', async () => {
     const vm = viewModelFromProcessedScripture(stubProcessed())
-    const scripture = stubProcessed()
-    const result = await loadUsjScripture(
+    const result = await loadUsjViewModel(
+      {
+        loadViewModel: async () => vm,
+        loadScriptureResult: async () => {
+          throw new Error('should not call loadScriptureResult')
+        },
+      },
+      'unfoldingWord/en/ult',
+      'tit'
+    )
+    expect(result.chapters[0]!.verses[0]!.tokens[0]!.semanticId).toBe('tit 1:1:Paul:1')
+  })
+
+  test('falls back to loadScriptureResult.viewModel', async () => {
+    const vm = viewModelFromProcessedScripture(stubProcessed())
+    const result = await loadUsjViewModel(
       {
         loadScriptureResult: async () => ({
           viewModel: vm,
-          scripture,
+          scripture: stubProcessed(),
           fromUsjCache: true,
         }),
-        loadContent: async () => {
-          throw new Error('should not call loadContent')
-        },
       },
-      { loadContent: async () => { throw new Error('no catalog') } },
       'unfoldingWord/en/ult',
       'tit'
     )
-    expect(result.fromUsjCache).toBe(true)
-    expect(result.viewModel.chapters[0]!.verses[0]!.tokens[0]!.semanticId).toBe(
-      'tit 1:1:Paul:1'
-    )
-  })
-
-  test('falls back to loadContent + viewModelFromProcessedScripture', async () => {
-    const scripture = stubProcessed()
-    const result = await loadUsjScripture(
-      null,
-      { loadContent: async () => scripture },
-      'unfoldingWord/en/ult',
-      'tit'
-    )
-    expect(result.fromUsjCache).toBe(false)
-    expect(result.viewModel.chapters[0]!.verses[0]!.tokens[0]!.alignedOriginalWordIds).toEqual([
+    expect(result.chapters[0]!.verses[0]!.tokens[0]!.alignedOriginalWordIds).toEqual([
       'tit 1:1:Παῦλος:1',
     ])
+  })
+
+  test('throws when no USJ-capable scripture loader', async () => {
+    await expect(loadUsjViewModel(null, 'unfoldingWord/en/ult', 'tit')).rejects.toThrow(
+      /loadViewModel required/
+    )
   })
 })
 

@@ -1,56 +1,35 @@
 /**
- * Viewer load adapter — primary path is ScriptureLoader.loadScriptureResult().
- * Falls back to loadContent() + viewModelFromProcessedScripture when needed.
+ * Viewer load adapter — UsjScriptureViewModel via ScriptureLoader only.
+ * No loadContent / ProcessedScripture fallback.
  */
 
-import {
-  ScriptureLoader,
-  isProcessedScriptureContent,
-  viewModelFromProcessedScripture,
-  type ProcessedScripture,
-  type ScriptureLoadResult,
-  type UsjScriptureViewModel,
-} from '@bt-synergy/scripture-loader'
+import type { ScriptureLoader, UsjScriptureViewModel } from '@bt-synergy/scripture-loader'
 
-export type ScriptureLoaderLike = Pick<ScriptureLoader, 'loadScriptureResult' | 'loadContent'>
-
-export type CatalogManagerLike = {
-  loadContent: (resourceKey: string, bookId: string) => Promise<unknown>
+export type ScriptureLoaderLike = {
+  loadViewModel?: ScriptureLoader['loadViewModel']
+  loadScriptureResult?: ScriptureLoader['loadScriptureResult']
 }
-
-export type LoadUsjScriptureResult = ScriptureLoadResult
 
 /**
- * Prefer loader.loadScriptureResult (USJ view model + projection).
- * Fallback: catalog/loader loadContent → viewModelFromProcessedScripture.
+ * Require a scripture loader with loadViewModel (or loadScriptureResult).
  */
-export async function loadUsjScripture(
+export async function loadUsjViewModel(
   scriptureLoader: ScriptureLoaderLike | null | undefined,
-  catalogManager: CatalogManagerLike,
   resourceKey: string,
   bookId: string
-): Promise<LoadUsjScriptureResult> {
+): Promise<UsjScriptureViewModel> {
+  if (scriptureLoader && typeof scriptureLoader.loadViewModel === 'function') {
+    return scriptureLoader.loadViewModel(resourceKey, bookId)
+  }
+
   if (scriptureLoader && typeof scriptureLoader.loadScriptureResult === 'function') {
-    return scriptureLoader.loadScriptureResult(resourceKey, bookId)
+    const { viewModel } = await scriptureLoader.loadScriptureResult(resourceKey, bookId)
+    return viewModel
   }
 
-  const loaded =
-    scriptureLoader && typeof scriptureLoader.loadContent === 'function'
-      ? await scriptureLoader.loadContent(resourceKey, bookId)
-      : await catalogManager.loadContent(resourceKey, bookId)
-
-  if (!isProcessedScriptureContent(loaded)) {
-    throw new Error(
-      `Scripture load for ${resourceKey}/${bookId} did not return ProcessedScripture`
-    )
-  }
-
-  const scripture = loaded as ProcessedScripture
-  return {
-    viewModel: viewModelFromProcessedScripture(scripture),
-    scripture,
-    fromUsjCache: false,
-  }
+  throw new Error(
+    `Scripture loader with loadViewModel required for ${resourceKey}/${bookId}`
+  )
 }
 
-export type { UsjScriptureViewModel, ProcessedScripture }
+export type { UsjScriptureViewModel }

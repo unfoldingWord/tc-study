@@ -2,7 +2,7 @@
  * Optimized token / chapter DTOs for QuoteMatcher and Helps.
  *
  * Prefer projecting from UsjScriptureViewModel via viewModelToOptimizedChapters
- * (parsers/usfm/usj-projection.ts). Kept as a stable DTO for Helps matchers.
+ * (parsers/scripture/usj-projection.ts). Kept as a stable DTO for Helps matchers.
  */
 
 export interface OptimizedToken {

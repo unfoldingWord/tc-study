@@ -5,7 +5,7 @@
  * Sections: 5
  */
 
-import type { TranslatorSection } from '../../services/usfm-processor';
+import type { TranslatorSection } from '../../services/usj-scripture-processor';
 
 export const book2jnSections: TranslatorSection[] = [
   {

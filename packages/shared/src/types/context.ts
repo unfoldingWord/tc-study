@@ -7,7 +7,7 @@
 
 import { LinkedPanelsConfig } from 'linked-panels'
 import React from 'react'
-import type { OptimizedChapter, OptimizedScripture, OptimizedToken, OptimizedVerse } from '../services/usfm-processor'
+import type { OptimizedChapter, OptimizedScripture, OptimizedToken, OptimizedVerse } from '@bt-synergy/resource-parsers'
 import type { ProcessedContent } from './processed-content'
 
 // ============================================================================

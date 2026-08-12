@@ -9,7 +9,7 @@ import type { LoaderRegistry } from '../loaders/LoaderRegistry'
 export interface LoadedResourceContent {
   resourceKey: string
   metadata: ResourceMetadata
-  content: unknown // Scripture: ProcessedScripture, Words: TranslationWord, etc.
+  content: unknown // Scripture: ProcessedScripture projection; prefer loadViewModel in viewers
   loadedAt: Date
   type: 'scripture' | 'obs' | 'words' | 'notes' | 'questions' | 'academy' | 'unknown'
 }

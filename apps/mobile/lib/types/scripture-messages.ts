@@ -3,7 +3,7 @@
  */
 
 import { BaseMessageContent } from 'linked-panels';
-import type { OptimizedToken } from '../services/usfm-processor';
+import type { OptimizedToken } from '../services/usj-scripture-processor';
 
 /**
  * Scripture tokens broadcast message

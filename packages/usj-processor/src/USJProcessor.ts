@@ -8,7 +8,7 @@
  * Word surfaces come from USJ `char`/`w` nodes (not tokenizeGatewayUsj).
  */
 
-import type { ProcessedScripture, USFMProcessingOptions } from './processedTypes'
+import type { ProcessedScripture, USJProcessingOptions } from './processedTypes'
 import { projectToProcessedScripture } from './projectToProcessedScripture'
 import type { CachedUsjDocument, UsjScriptureCacheContent } from './usjCacheTypes'
 import { buildUsjViewModel, type UsjScriptureViewModel } from './usjViewModel'
@@ -62,7 +62,7 @@ export class USJProcessor {
     usfmText: string,
     bookCode: string,
     bookName: string,
-    options: USFMProcessingOptions = {}
+    options: USJProcessingOptions = {}
   ): Promise<USJProcessResult> {
     const parser = new USFMParser()
     parser.parse(usfmText)
@@ -83,7 +83,7 @@ export class USJProcessor {
     alignmentMap: AlignmentMap,
     bookCode: string,
     bookName: string,
-    options: USFMProcessingOptions = {}
+    options: USJProcessingOptions = {}
   ): USJProcessResult {
     const includeAlignments = options.includeAlignments !== false
     const includeWordTokens = options.includeWordTokens !== false
@@ -117,7 +117,7 @@ export class USJProcessor {
     alignmentMap: AlignmentMap,
     bookCode: string,
     bookName: string,
-    options: USFMProcessingOptions = {}
+    options: USJProcessingOptions = {}
   ): ProcessedScripture {
     return this.fromUsjAndAlignments(usj, alignmentMap, bookCode, bookName, options).scripture
   }
@@ -158,7 +158,7 @@ export class USJProcessor {
     cached: UsjScriptureCacheContent,
     bookCode: string,
     bookName?: string,
-    options?: USFMProcessingOptions
+    options?: USJProcessingOptions
   ): ProcessedScripture {
     return this.fromUsjCacheContentFull(cached, bookCode, bookName, options).scripture
   }
@@ -168,7 +168,7 @@ export class USJProcessor {
     cached: UsjScriptureCacheContent,
     bookCode: string,
     bookName?: string,
-    options?: USFMProcessingOptions
+    options?: USJProcessingOptions
   ): USJProcessResult {
     if (!isUsjCacheVersionCompatible(cached.metadata)) {
       throw new Error(

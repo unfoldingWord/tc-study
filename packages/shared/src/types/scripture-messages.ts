@@ -3,7 +3,7 @@
  */
 
 import { BaseMessageContent } from 'linked-panels';
-import type { OptimizedToken } from '../services/usfm-processor';
+import type { OptimizedToken } from '@bt-synergy/resource-parsers';
 
 /**
  * Scripture tokens broadcast message

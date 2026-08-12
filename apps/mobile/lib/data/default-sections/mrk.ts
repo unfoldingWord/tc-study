@@ -5,7 +5,7 @@
  * Sections: 269
  */
 
-import type { TranslatorSection } from '../../services/usfm-processor';
+import type { TranslatorSection } from '../../services/usj-scripture-processor';
 
 export const mrkSections: TranslatorSection[] = [
   {

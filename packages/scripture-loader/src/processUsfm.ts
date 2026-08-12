@@ -10,12 +10,12 @@
 import {
   USJProcessor,
   type ProcessedScripture,
-  type USFMProcessingOptions,
+  type USJProcessingOptions,
   type USJProcessResult,
   type UsjScriptureCacheContent,
 } from '@bt-synergy/usj-processor'
 
-const DEFAULT_OPTIONS: USFMProcessingOptions = {
+const DEFAULT_OPTIONS: USJProcessingOptions = {
   includeAlignments: true,
   includeWordTokens: true,
   includeParagraphs: true,
@@ -25,7 +25,7 @@ export interface ProcessUsfmParams {
   usfmText: string
   bookId: string
   bookName?: string
-  options?: USFMProcessingOptions
+  options?: USJProcessingOptions
   /** Optional shared processor instance (avoids re-construct per call) */
   usjProcessor?: USJProcessor
   debug?: boolean
@@ -60,7 +60,7 @@ export async function processUsfmToUsjResult(
   }
 
   const usjProcessor = await resolveUsjProcessor(params.usjProcessor)
-  const opts: USFMProcessingOptions = { ...DEFAULT_OPTIONS, ...options }
+  const opts: USJProcessingOptions = { ...DEFAULT_OPTIONS, ...options }
   const result = await usjProcessor.processUSFM(usfmText, bookId, bookName, opts)
   const cacheContent = usjProcessor.toUsjCacheContent(result, bookId, bookName)
   return { ...result, cacheContent }

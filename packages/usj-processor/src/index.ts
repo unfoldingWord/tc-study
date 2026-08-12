@@ -55,5 +55,5 @@ export type {
   WordAlignment,
   TranslatorSection,
   ProcessingResult,
-  USFMProcessingOptions,
+  USJProcessingOptions,
 } from './processedTypes'

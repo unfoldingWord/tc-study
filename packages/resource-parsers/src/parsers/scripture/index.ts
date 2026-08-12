@@ -6,12 +6,8 @@
 export {
   processUsfmToOptimizedScripture,
   viewModelToOptimizedScripture,
-  /** @deprecated Prefer processUsfmToOptimizedScripture / USJProcessor */
-  USFMProcessor,
-  /** @deprecated Prefer processUsfmToOptimizedScripture / USJProcessor */
-  usfmProcessor,
 } from './optimized-scripture'
-export type { OptimizedScripture, ProcessingResult } from './optimized-scripture'
+export type { OptimizedScripture } from './optimized-scripture'
 export {
   viewModelToOptimizedChapters,
   extractUsjBroadcastTokens,

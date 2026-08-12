@@ -7,7 +7,7 @@
  * - Exposes TOC for navigation
  * - Handles verse ranges
  * - Highlights based on messages
- * - Primary SoT: UsjScriptureViewModel via ScriptureLoader.loadScriptureResult()
+ * - Primary SoT: UsjScriptureViewModel via ScriptureLoader.loadViewModel()
  */
 
 import { useSignalHandler } from '@bt-synergy/resource-panels'

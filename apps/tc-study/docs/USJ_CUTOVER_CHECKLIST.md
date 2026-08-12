@@ -9,7 +9,7 @@
 |-------|---------|
 | **tc-study scripture path** | **DELETE COMPLETE** |
 | **Workspace-wide `usfm-js` npm / runtime imports** | **DELETE COMPLETE** |
-| Non-runtime leftovers | Docs scrubbed. Facade names `USFMProcessor` / `usfm-processor.ts` deprecated → `processUsfmToOptimizedScripture` / `UsjScriptureProcessor` (thin aliases for one release). `catalog-cli` `contentType: 'usfm-json'` is a filesystem cache label, not an npm package. |
+| Non-runtime leftovers | `USFMProcessor` / `usfm-processor.ts` **deleted** (use `processUsfmToOptimizedScripture` / `UsjScriptureProcessor` / `@bt-synergy/usj-processor`). `catalog-cli` `contentType: 'usfm-json'` kept — FilesystemCacheAdapter metadata label, not the deleted npm package. |
 
 ## Authoritative contract (do not regress)
 
@@ -47,8 +47,8 @@
 | Helps (`db38685`, `7e8159d`) | **Done** |
 | Viewer (`45107f9`) | **Done** |
 | Pipeline (`e29d85a`) | **Done** — deleted `@bt-synergy/usfm-processor` |
-| resource-parsers (`b3e0e99` + DTO deprecate) | **Done** — `USFMProcessor` `@deprecated`; prefer `processUsfmToOptimizedScripture` |
-| mobile (`54950e9` + rename) | **Done** — `UsjScriptureProcessor`; `usfm-processor` thin alias |
+| resource-parsers | **Done** — `parsers/scripture/optimized-scripture.ts`; aliases deleted |
+| mobile | **Done** — `usj-scripture-processor` only; `usfm-processor.ts` deleted |
 | Cache (`c0f101f`) | **Done** — `scripture-usj:` only; legacy ignored |
 | Platform (`@usfm-tools` npm / CI) | **Done** — published npm deps; see `packages/usj-processor/README.md` |
 

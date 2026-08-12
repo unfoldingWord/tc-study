@@ -137,7 +137,7 @@ export interface ProcessingResult {
   metadata: ProcessedScripture['metadata']
 }
 
-export interface USFMProcessingOptions {
+export interface USJProcessingOptions {
   language?: string
   includeWordTokens?: boolean
   includeAlignments?: boolean

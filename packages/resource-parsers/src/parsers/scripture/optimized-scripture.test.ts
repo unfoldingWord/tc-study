@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { QuoteMatcher } from '../../utils/quote-matcher'
 import {
   processUsfmToOptimizedScripture,
-  usfmProcessor,
+  viewModelToOptimizedScripture,
 } from './optimized-scripture'
 import { viewModelToOptimizedChapters } from './usj-projection'
 import { USJProcessor } from '@bt-synergy/usj-processor'
@@ -30,15 +30,15 @@ describe('OptimizedScripture from USJ', () => {
     expect(optimized.meta.type).toBe('original')
   })
 
-  test('deprecated USFMProcessor.processUSFM still returns ProcessedScripture projection', async () => {
-    const result = await usfmProcessor.processUSFM(ULT_USFM, 'tit', 'Titus', {
+  test('USJProcessor.processUSFM returns ProcessedScripture projection', async () => {
+    const { scripture } = await new USJProcessor().processUSFM(ULT_USFM, 'tit', 'Titus', {
       language: 'en',
       includeWordTokens: true,
       includeAlignments: true,
     })
-    expect(result.structuredText.bookCode.toLowerCase()).toBe('tit')
-    expect(result.structuredText.chapters.length).toBeGreaterThan(0)
-    expect(result.metadata.hasWordTokens).toBe(true)
+    expect(scripture.bookCode.toLowerCase()).toBe('tit')
+    expect(scripture.chapters.length).toBeGreaterThan(0)
+    expect(scripture.metadata.hasWordTokens).toBe(true)
   })
 
   test('viewModelToOptimizedChapters matches processUsfmToOptimizedScripture chapters', async () => {
@@ -47,6 +47,12 @@ describe('OptimizedScripture from USJ', () => {
       includeWordTokens: true,
     })
     const fromVm = viewModelToOptimizedChapters(viewModel)
+    const fromEnvelope = viewModelToOptimizedScripture(
+      viewModel,
+      'tit',
+      'Titus',
+      'el-x-koine'
+    )
     const optimized = await processUsfmToOptimizedScripture(
       UGNT_USFM,
       'tit',
@@ -54,6 +60,7 @@ describe('OptimizedScripture from USJ', () => {
       'el-x-koine'
     )
     expect(optimized.chapters).toEqual(fromVm)
+    expect(fromEnvelope.chapters).toEqual(fromVm)
   })
 
   test('QuoteMatcher finds quote on USJ-optimized chapters', async () => {

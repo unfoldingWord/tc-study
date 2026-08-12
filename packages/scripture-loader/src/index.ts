@@ -71,5 +71,5 @@ export type {
   WordAlignment,
   TranslatorSection,
   ProcessingResult,
-  USFMProcessingOptions,
+  USJProcessingOptions,
 } from '@bt-synergy/usj-processor'

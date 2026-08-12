@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useWorkspaceSelector } from '../../contexts/WorkspaceContext';
-import { OptimizedScripture } from '../../services/usfm-processor';
+import { OptimizedScripture } from '../../services/usj-scripture-processor';
 import { USFMRenderer } from './USFMRenderer';
 
 export interface OriginalScriptureViewerProps {

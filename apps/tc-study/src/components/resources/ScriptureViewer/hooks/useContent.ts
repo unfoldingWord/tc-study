@@ -4,7 +4,6 @@ import {
 } from '@bt-synergy/scripture-loader'
 import { useEffect, useMemo, useState } from 'react'
 import {
-  useCatalogManager,
   useCurrentReference,
   useLoaderRegistry,
   useNavigation,
@@ -14,7 +13,7 @@ import { defaultSectionsService } from '../../../../lib/services/default-section
 import { extractVerseCountsFromContent } from '../../../../lib/versification'
 import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
 import type { DisplayUsjVerse } from '../types'
-import { loadUsjScripture } from '../utils/loadUsjViewModel'
+import { loadUsjViewModel } from '../utils/loadUsjViewModel'
 
 function chapterVerseMapFromViewModel(
   viewModel: UsjScriptureViewModel
@@ -31,7 +30,6 @@ export function useContent(
   availableBooks: BookInfo[],
   _language?: string
 ) {
-  const catalogManager = useCatalogManager()
   const loaderRegistry = useLoaderRegistry()
   const currentRef = useCurrentReference()
   const navigation = useNavigation()
@@ -64,12 +62,7 @@ export function useContent(
           | ScriptureLoader
           | undefined
 
-        const { viewModel: vm, scripture } = await loadUsjScripture(
-          loader,
-          catalogManager,
-          resourceKey,
-          bookCode
-        )
+        const vm = await loadUsjViewModel(loader, resourceKey, bookCode)
         if (cancelled) return
 
         navigation.updateBookVerseCount(
@@ -77,11 +70,8 @@ export function useContent(
           extractVerseCountsFromContent(chapterVerseMapFromViewModel(vm))
         )
 
-        const sections =
-          scripture.translatorSections && scripture.translatorSections.length > 0
-            ? scripture.translatorSections
-            : await defaultSectionsService.getDefaultSections(bookCode)
-
+        // Sections come from default book data (view model has no section DTO).
+        const sections = await defaultSectionsService.getDefaultSections(bookCode)
         if (sections.length > 0) {
           navigation.setBookSections(bookCode, sections)
         }
@@ -101,7 +91,7 @@ export function useContent(
     return () => {
       cancelled = true
     }
-  }, [currentRef.book, resourceKey, catalogManager, loaderRegistry, availableBookCodesStr])
+  }, [currentRef.book, resourceKey, loaderRegistry, availableBookCodesStr])
 
   const relevantChapters = useMemo(() => {
     if (!viewModel) return []

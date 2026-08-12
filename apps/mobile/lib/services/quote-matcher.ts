@@ -5,7 +5,7 @@
  * and finding corresponding aligned tokens in target language translations.
  */
 
-import { OptimizedToken, OptimizedVerse, OptimizedChapter } from './usfm-processor';
+import { OptimizedToken, OptimizedVerse, OptimizedChapter } from './usj-scripture-processor';
 
 export interface QuoteReference {
   book: string;

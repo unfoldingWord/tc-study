@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '../../contexts/NavigationContext';
 import { useWorkspaceSelector } from '../../contexts/WorkspaceContext';
-import { OptimizedScripture } from '../../services/usfm-processor';
+import { OptimizedScripture } from '../../services/usj-scripture-processor';
 import { NotesTokenGroupsBroadcast, ScriptureTokensBroadcast } from '../../types/scripture-messages';
 import { TTSWordBoundary } from '../../types/tts';
 import { extractTokensFromVerseRange } from '../../utils/scripture-token-utils';
