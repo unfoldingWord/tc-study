@@ -82,6 +82,7 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 |-------|-------|------|-------------|
 | `chip-verse` / `chip-verse-fg` | `#eeeaf8` / `#5b21b6` | `#2f2a3d` / `#c4b5fd` | Verse/ref group headers + count badges |
 | `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `#eef4ff` / `#e0eaff` / `#1e40af` | `#1e2a3d` / `#243548` / `#93c5fd` | Scripture / OBS quote chips |
+| `filter-chip` / `filter-chip-fg` | `#dbeafe` / `#1e40af` | `#243548` / `#93c5fd` | Helps header filter value capsule (stronger than `accent-soft` on `canvas`) |
 
 Ring offset uses `canvas` (`--color-ring-offset`).
 
@@ -140,6 +141,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 
 - **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`.
 - **Helps cards:** `surface` + chip tokens for verse/quote; prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
+- **Helps filter pill:** `bg-filter-chip text-filter-chip-fg` (borderless `h-7` capsule) — not `accent-soft`, which washes out on `canvas` headers.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
 - **Panel tabs:** soft strip `from-panel-*-soft`; inactive label `text-fg-secondary`.
 - **Focus:** global `ring-accent` + `ring-offset-canvas` on `:focus-visible`.

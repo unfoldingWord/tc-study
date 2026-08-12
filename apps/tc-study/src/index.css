@@ -44,6 +44,8 @@
   --color-chip-quote: var(--theme-chip-quote);
   --color-chip-quote-hover: var(--theme-chip-quote-hover);
   --color-chip-quote-fg: var(--theme-chip-quote-fg);
+  --color-filter-chip: var(--theme-filter-chip);
+  --color-filter-chip-fg: var(--theme-filter-chip-fg);
   --color-overlay: var(--theme-overlay);
   --color-ring-offset: var(--theme-canvas);
 
@@ -109,6 +111,10 @@
   --theme-chip-quote-hover: #e0eaff;
   --theme-chip-quote-fg: #1e40af;
 
+  /* Header filter value capsule — stronger than accent-soft so it pops on canvas */
+  --theme-filter-chip: #dbeafe;
+  --theme-filter-chip-fg: #1e40af;
+
   /* Modal / dialog scrim */
   --theme-overlay: rgb(0 0 0 / 0.5);
 }
@@ -161,6 +167,10 @@
   --theme-chip-quote: #1e2a3d;
   --theme-chip-quote-hover: #243548;
   --theme-chip-quote-fg: #93c5fd;
+
+  /* Header filter value capsule — stronger than accent-soft so it pops on canvas */
+  --theme-filter-chip: #243548;
+  --theme-filter-chip-fg: #93c5fd;
 
   --theme-overlay: rgb(0 0 0 / 0.55);
 }
