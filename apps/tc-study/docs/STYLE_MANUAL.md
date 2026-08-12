@@ -30,58 +30,58 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `canvas` | `#f4f2ef` | `#17191c` | App background (`body`) |
-| `surface` | `#ffffff` | `#212428` | Cards, modal panels, resource viewer headers (`ResourceViewerHeader`) |
-| `elevated` | `#ffffff` | `#2a2e34` | Raised panels / dialogs |
-| `tab-selected` | `#ffffff` | `#141618` | Active `SortableTab` on `panel-*-soft` strip (elevated in light; darker than strip in dark) |
-| `muted` | `#ebe8e4` | `#2f343b` | Soft fills, hover chips, scrollbar track |
-| `border` | `#e0dcd6` | `#3a4048` | Primary borders |
-| `border-subtle` | `#efece8` | `#2c3138` | Hairline / soft separators |
+| `canvas` | `#f4f2ef` | `#121417` | App background (`body`) |
+| `surface` | `#ffffff` | `#1e2228` | Cards, modal panels, resource viewer headers (`ResourceViewerHeader`) |
+| `elevated` | `#ffffff` | `#2c3138` | Raised panels / dialogs |
+| `tab-selected` | `#ffffff` | `#0e1013` | Active `SortableTab` on `panel-*-soft` strip (elevated in light; darker than strip in dark) |
+| `muted` | `#ebe8e4` | `#3a4049` | Soft fills, hover chips, scrollbar track |
+| `border` | `#e0dcd6` | `#4a515a` | Primary borders |
+| `border-subtle` | `#efece8` | `#323840` | Hairline / soft separators |
 
 ### Foreground
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `fg` | `#1c1917` | `#ece8e3` | Primary text |
-| `fg-secondary` | `#57534e` | `#b0aaa3` | Secondary labels, inactive tab text on soft strips |
-| `fg-muted` | `#a8a29e` | `#7a7470` | Placeholders, disabled, de-emphasized |
+| `fg` | `#1c1917` | `#f0ebe6` | Primary text |
+| `fg-secondary` | `#57534e` | `#c2bbb3` | Secondary labels, inactive tab text on soft strips |
+| `fg-muted` | `#a8a29e` | `#8a837c` | Placeholders, disabled, de-emphasized |
 
 ### Accent & feedback
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `accent` | `#2563eb` | `#6eb0ff` | Primary actions, focus ring, `rc://` links |
-| `accent-hover` | `#1d4ed8` | `#93c5fd` | Hover on accent |
-| `accent-soft` | `#eff6ff` | `#1a2f4a` | Soft accent fill |
-| `accent-fg` | `#1e40af` | `#93c5fd` | Text on accent-soft |
+| `accent` | `#2563eb` | `#7bb8ff` | Primary actions, focus ring, `rc://` links |
+| `accent-hover` | `#1d4ed8` | `#a5d0ff` | Hover on accent |
+| `accent-soft` | `#eff6ff` | `#335578` | Soft accent fill (BCV pill, badges) — must clear canvas in dark |
+| `accent-fg` | `#1e40af` | `#e8f1ff` | High-contrast text on accent-soft |
 | `danger` | `#dc2626` | `#f87171` | Errors / destructive |
 | `danger-soft` | `#fef2f2` | `#3f1d1d` | Soft error fill |
 | `highlight` | `#fef08a` | `#5c4a14` | Verse / note selection wash; Helps filter value pill fill |
 | `highlight-strong` | `#fde047` | `#7a641c` | Stronger selection border/fill; filter × hover wash |
-| `underline` | `#a8a29e` | `#9a948c` | Dotted scripture underlines |
+| `underline` | `#a8a29e` | `#a8a29a` | Dotted scripture underlines |
 | `overlay` | `rgb(0 0 0 / 0.5)` | `rgb(0 0 0 / 0.55)` | Modal/dialog scrim (`bg-overlay`) |
 
 ### Scripture paper
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `scripture` | `#fffef9` | `#1c1f24` | Scripture pane background |
-| `scripture-fg` | `#1c1917` | `#e8e4df` | Scripture body text |
-| `scripture-muted` | `#78716c` | `#9a948c` | Empty / italic / secondary scripture |
+| `scripture` | `#fffef9` | `#2a3038` | Scripture pane background (lifted above canvas in dark) |
+| `scripture-fg` | `#1c1917` | `#f2eee8` | Scripture body text |
+| `scripture-muted` | `#78716c` | `#a8a29a` | Empty / italic / secondary scripture |
 
 ### Panels & helps
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `panel-1` / `panel-1-soft` / `panel-1-fg` | `#2563eb` / `#eff6ff` / `#1d4ed8` | `#6eb0ff` / `#1a2f4a` / `#93c5fd` | Panel 1 chrome (blue scheme) |
-| `panel-2` / `panel-2-soft` / `panel-2-fg` | `#7c3aed` / `#f5f3ff` / `#6d28d9` | `#a78bfa` / `#2a2438` / `#c4b5fd` | Panel 2 chrome (purple scheme) |
-| `helps` / `helps-soft` / `helps-fg` | `#7c3aed` / `#f5f3ff` / `#5b21b6` | `#a78bfa` / `#2a2438` / `#c4b5fd` | Combined Helps accents |
+| `panel-1` / `panel-1-soft` / `panel-1-fg` | `#2563eb` / `#eff6ff` / `#1d4ed8` | `#7bb8ff` / `#335578` / `#dbeafe` | Panel 1 chrome (blue scheme) |
+| `panel-2` / `panel-2-soft` / `panel-2-fg` | `#7c3aed` / `#f5f3ff` / `#6d28d9` | `#b39dfa` / `#322b45` / `#ddd6fe` | Panel 2 chrome (purple scheme) |
+| `helps` / `helps-soft` / `helps-fg` | `#7c3aed` / `#f5f3ff` / `#5b21b6` | `#b39dfa` / `#322b45` / `#ddd6fe` | Combined Helps accents |
 
 ### Reading chips
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `#eef4ff` / `#e0eaff` / `#1e40af` | `#1e2a3d` / `#243548` / `#93c5fd` | Scripture / OBS quote chips |
+| `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `#eef4ff` / `#e0eaff` / `#1e40af` | `#334866` / `#3d5678` / `#e8f1ff` | Scripture / OBS quote chips |
 
 Verse/ref group headers use shared `muted/50` + `fg-secondary` (see `helpsCardStyles` — `HELPS_VERSE_HEADER`), not a lavender chip.
 
@@ -142,7 +142,8 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 
 ## Reading & chrome conventions
 
-- **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`.
+- **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`. In dark, scripture paper must sit clearly above `canvas` (avoid near-black-on-black).
+- **BCV pill (`NavigationBarCompact`):** `bg-accent-soft` + `text-accent-fg` — soft fill must clear canvas; accent-fg is the readable chrome text on that fill (not `text-accent` alone).
 - **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` with a hairline `border-b`; Helps list panels also use `bg-surface` (`HELPS_LIST_PANEL`) so verse chips sit on white/elevated charcoal — not cool `canvas` gray.
 - **Helps verse headers:** `bg-muted/50` + `text-fg-secondary` (+ book icon, ref, count on `bg-surface`) — neutral muted chips (lighter than full `muted`), not lavender `chip-verse`.
 - **Helps cards:** idle `surface` + border; quote chips use `chip-quote*`; selected TN/TWL use light yellow `bg-highlight/15` + even `border-border` (no left bar / ring / blue or purple wash). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
