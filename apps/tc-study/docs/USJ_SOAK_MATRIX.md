@@ -1,6 +1,6 @@
 # USJ soak matrix (manual) — Titus linked panels
 
-Clear `scripture:` / `scripture-usj:` IndexedDB keys (or wipe origin data) before each pass. Default build = USJ on (`ddc0a56+` contract).
+Clear `scripture:` / `scripture-usj:` IndexedDB keys (or wipe origin data) before each pass. Default build = USJ on (`89b99aa+` / Pipeline `ddc0a56` contract).
 
 ## Resources
 
@@ -39,4 +39,4 @@ Clear `scripture:` / `scripture-usj:` IndexedDB keys (or wipe origin data) befor
 
 | Date | Tester | Commit | Result | Blockers |
 |------|--------|--------|--------|----------|
-| | | | | |
+| 2026-08-12 | QA (automated only) | `89b99aa` | Unit/integration **34/34 green**. Manual rows 1–10 empty. Local Playwright blocked (`vite` worker `iife` on `useBackgroundDownload`). | Viewer viewModel WIP; loader ProcessedScripture-only; Platform e2e build; usfm-js delete blocked |

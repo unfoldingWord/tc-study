@@ -56,3 +56,11 @@ Loader opt-out: `USE_USJ_PIPELINE=0` (lazy usfm-js). Not the end state.
 node packages/usj-processor/scripts/link-usfm-tools.cjs
 bun test packages/usj-processor
 ```
+
+## Parity gates (QA)
+
+- ViewModel identity + projection: `tests/usjViewModel.identity.test.ts`
+- Titus vs legacy: `tests/titus-parity.test.ts`
+- Cross-resource **Paul ↔ Παῦλος** (viewModel-first): `tests/cross-resource-alignment.test.ts`
+- App cutover / soak: `apps/tc-study/docs/USJ_CUTOVER_CHECKLIST.md`, `USJ_SOAK_MATRIX.md`
+
