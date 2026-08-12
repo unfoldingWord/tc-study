@@ -44,6 +44,7 @@
     "@bt-synergy/resource-parsers": "workspace:*",
     "@bt-synergy/resource-types": "workspace:*",
     "@bt-synergy/scripture-loader": "workspace:*",
+    "@bt-synergy/usj-processor": "workspace:*",
     "@bt-synergy/translation-academy-loader": "workspace:*",
     "@bt-synergy/translation-notes-loader": "workspace:*",
     "@bt-synergy/translation-questions-loader": "workspace:*",

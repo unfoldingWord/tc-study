@@ -211,6 +211,7 @@
         "@bt-synergy/translation-words-links-loader": "workspace:*",
         "@bt-synergy/translation-words-loader": "workspace:*",
         "@bt-synergy/usfm-processor": "workspace:*",
+        "@bt-synergy/usj-processor": "workspace:*",
         "@tailwindcss/vite": "^4.1.18",
         "clsx": "^2.1.0",
         "file-saver": "^2.0.5",

@@ -1,27 +1,15 @@
-/**
- * Hook for broadcasting scripture tokens to other panels
- *
- * Broadcasts current scripture tokens as a STATE message that persists
- * until unmounted or navigation changes. Other panels can access this
- * via useResourceState(resourceId, RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS).
- *
- * Single-owner policy: only lastActive (else anchor) scripture may publish
- * to the shared SCRIPTURE_TOKENS key — avoids multi-panel last-writer-wins.
- * When neither is set, nobody publishes (bootstrap deny).
- */
-
 import { RESOURCE_STATE_KEYS, useResourceStateSender } from '@bt-synergy/resource-panels'
-import type { ProcessedScripture } from '@bt-synergy/usfm-processor'
+import type { UsjScriptureViewModel } from '@bt-synergy/scripture-loader'
 import { useEffect } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
 import { isScriptureTokensOwner } from '../../../../features/messaging/scriptureTokensOwnership'
-import { extractOptimizedTokens } from '../../../../features/helps/scriptureTokensBroadcast'
 import type { ScriptureTokensBroadcastSignal } from '../../../../signals/studioSignals'
+import { extractUsjBroadcastTokens } from '../utils/extractUsjBroadcastTokens'
 
 interface UseTokenBroadcastOptions {
   resourceId: string
   resourceKey: string
-  loadedContent: ProcessedScripture | null
+  viewModel: UsjScriptureViewModel | null
   language: string
   languageDirection?: 'ltr' | 'rtl'
   currentChapter: number
@@ -33,7 +21,7 @@ interface UseTokenBroadcastOptions {
 export function useTokenBroadcast({
   resourceId,
   resourceKey,
-  loadedContent,
+  viewModel,
   language,
   languageDirection = 'ltr',
   currentChapter,
@@ -54,23 +42,17 @@ export function useTokenBroadcast({
     resourceId,
     RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS,
     'scripture',
-    // Owner clears via clearState on leave; non-owners must not tombstone the owner's key
     { clearOnUnmount: isOwner }
   )
 
-  // Broadcast tokens whenever content or navigation changes (owner only).
   useEffect(() => {
     if (!isOwner) return
 
-    const bookCode = loadedContent?.metadata?.bookCode || ''
+    const bookCode = viewModel?.bookCode || ''
 
-    if (!loadedContent || !bookCode || !currentChapter || !currentVerse) {
+    if (!viewModel || !bookCode || !currentChapter || !currentVerse) {
       sendState({
-        reference: {
-          book: '',
-          chapter: 0,
-          verse: 0,
-        },
+        reference: { book: '', chapter: 0, verse: 0 },
         tokens: [],
         resourceMetadata: {
           id: resourceKey,
@@ -82,14 +64,6 @@ export function useTokenBroadcast({
       return
     }
 
-    const tokens = extractOptimizedTokens(
-      loadedContent,
-      currentChapter,
-      currentVerse,
-      endChapter,
-      endVerse
-    )
-
     sendState({
       reference: {
         book: bookCode,
@@ -98,7 +72,13 @@ export function useTokenBroadcast({
         endChapter: endChapter || undefined,
         endVerse: endVerse || undefined,
       },
-      tokens,
+      tokens: extractUsjBroadcastTokens(
+        viewModel,
+        currentChapter,
+        currentVerse,
+        endChapter,
+        endVerse
+      ),
       resourceMetadata: {
         id: resourceKey,
         language,
@@ -110,19 +90,17 @@ export function useTokenBroadcast({
     isOwner,
     resourceId,
     resourceKey,
-    loadedContent,
+    viewModel,
     language,
     languageDirection,
     currentChapter,
     currentVerse,
     endChapter,
     endVerse,
+    sendState,
   ])
 
-  // When ownership is lost (another scripture became lastActive), tombstone only if we own the key.
   useEffect(() => {
-    if (!isOwner) {
-      clearState()
-    }
+    if (!isOwner) clearState()
   }, [isOwner, clearState])
 }

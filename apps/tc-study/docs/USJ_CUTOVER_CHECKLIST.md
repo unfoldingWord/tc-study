@@ -45,7 +45,7 @@ Combined local unit/integration (2026-08-12): **34 pass / 0 fail**
 
 | Team | Blocker |
 |------|---------|
-| **Viewer** | viewModel cutover still WIP; when importing `@bt-synergy/usj-processor` must add workspace dep to `apps/tc-study/package.json` |
+| **Viewer** | viewModel via `loadScriptureResult` / `loadViewModel`; Helps DOM attrs preserved; usfm-js delete still blocked elsewhere |
 | **Pipeline** | Loader returns ProcessedScripture only; types still live in `usfm-processor` |
 | **Platform** | `@usfm-tools/*` sibling `dist/` / link-script bridge; local e2e `worker.format=iife` vite build failure |
 | **QA** | Full soak matrix sign-off (manual rows still empty); Journey 4/8 CI green not yet confirmed here |
