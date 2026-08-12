@@ -6,12 +6,12 @@
  */
 
 import * as UsfmParserModule from '@usfm-tools/parser'
+import type { AlignmentMap } from '@usfm-tools/types'
 import {
   chapterSliceToUsjDocument,
   splitUsjByChapter,
   stripAlignments,
   tokenizeGatewayUsj,
-  type AlignmentMap,
 } from '@usfm-tools/usj-core'
 
 type UsfmParserCtor = new (options?: unknown) => {
