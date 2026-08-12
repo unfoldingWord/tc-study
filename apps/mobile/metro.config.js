@@ -1,6 +1,17 @@
+const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
 
-const config = getDefaultConfig(__dirname);
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, '../..');
+
+const config = getDefaultConfig(projectRoot);
+
+// Monorepo: watch workspace packages + linked usfm-ast tools used by usj-processor
+config.watchFolders = [workspaceRoot];
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+];
 
 // Add .zip files as assets
 config.resolver.assetExts.push('zip');
@@ -14,4 +25,3 @@ config.resolver.sourceExts = config.resolver.sourceExts.filter(
 // Use release build for reliable testing: npx expo run:android --variant release
 
 module.exports = config;
-

@@ -67,7 +67,7 @@
 | Rank | Area | Status / justification |
 |------|------|------------------------|
 | 1 | `packages/resource-parsers` | **Done** — `USFMProcessor` is a thin `USJProcessor` wrapper; `usfm-js` removed. Helps projection (`viewModelToOptimizedChapters`) owned here; scripture-loader re-exports. |
-| 2 | `apps/mobile` | **Migrated** — local `usfm-processor.ts` is a USJ facade (`@bt-synergy/usj-processor`); `usfm-js` removed from mobile `package.json`. |
+| 2 | `apps/mobile` | **Done** — local `usfm-processor.ts` is a thin `USJProcessor` facade (same pattern as resource-parsers); `usfm-js` dep/lockfiles removed. |
 | 3 | Stale docs / `bundle-stats.json` | Historical mentions only — non-runtime. |
 | — | `catalog-cli` `usfm-json` | ContentType string only — not the npm package. |
 
