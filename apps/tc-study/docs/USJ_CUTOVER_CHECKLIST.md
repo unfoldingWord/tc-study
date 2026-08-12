@@ -1,14 +1,14 @@
 # USJ cutover checklist — full replacement of usfm-js
 
 **PR:** https://github.com/unfoldingWord/tc-study/pull/19  
-**Branch tip:** `1050658` (Pipeline docs) atop delete `e29d85a`, Helps `7e8159d` / `db38685`  
-**QA re-verify tip:** `1050658` / `e29d85a`
+**Branch tip:** `54950e9` (mobile USJ) atop resource-parsers `b3e0e99`, Viewer `45107f9`, Pipeline `e29d85a`  
+**QA re-verify tip:** `54950e9`
 
 ## Two-tier delete status
 
 | Scope | Verdict |
 |-------|---------|
-| **tc-study scripture path** (`usj-processor`, `scripture-loader`, `apps/tc-study` scripture) | **DELETE COMPLETE** |
+| **tc-study scripture path** (`usj-processor`, `scripture-loader`, `apps/tc-study` code) | **DELETE COMPLETE** |
 | **Workspace-wide `usfm-js` npm dep** | **COMPLETE** for packages + mobile — only stale docs / `usfm-json` contentType strings remain |
 
 ## Authoritative contract (do not regress)
@@ -23,14 +23,14 @@
 | Helps | `loadViewModel` + `viewModelToOptimizedChapters` / `extractUsjBroadcastTokens` (**done**) |
 | Rollback | **Removed** — no `USE_USJ_PIPELINE` / lazy usfm-js |
 
-## Automated gates (QA @ `1050658`)
+## Automated gates (QA @ `54950e9`)
 
 | Gate | Status |
 |------|--------|
-| `bun test` usj-processor + scripture-loader + quote-matcher + usjHelpsUnderline + viewer | **40/40 green** |
-| Pipeline packages (`usj-processor` + `scripture-loader`) | **29/29** @ `e29d85a` |
-| Playwright Journey 4 | **2/2 green** |
-| Playwright Journey 8 | **2/2 green** |
+| Key suites (usj-processor + scripture-loader + resource-parsers + helps quote/underline) | **85/85 green** |
+| Mobile USJ smoke (`usfm-processor.usj.smoke.test.ts`) | **2/2 green** |
+| Pipeline packages @ delete | **29/29** @ `e29d85a` |
+| Playwright Journey 4 / 8 | Re-run after port fix (see soak / PR comment) |
 | Helps unit/integration | **50 green** @ `7e8159d` |
 | Manual soak matrix | See `USJ_SOAK_MATRIX.md` |
 
@@ -38,18 +38,20 @@
 
 | Team | Item | Status |
 |------|------|--------|
-| **Helps** | CombinedHelps/QuoteMatcher on viewModel; zero usfm-processor in helps path | **Done** (`db38685`, `7e8159d`) |
-| **Viewer** | `loadScriptureResult` → viewModel; SCRIPTURE_TOKENS via `extractUsjBroadcastTokens` | **Done** |
-| **Pipeline** | Remove `USE_USJ_PIPELINE`; delete `@bt-synergy/usfm-processor`; USJ-only loader/workers | **Done** (`e29d85a`) |
-| **Platform** | `@usfm-tools/*` link + Vite aliases; CI nests `usfm-ast/` | **Done** (see usj-processor README) |
+| **Helps** | CombinedHelps/QuoteMatcher on viewModel | **Done** (`db38685`, `7e8159d`) |
+| **Viewer** | viewModel path; zero tc-study code imports of usfm-processor/usfm-js | **Done** (`45107f9`) |
+| **Pipeline** | Delete `@bt-synergy/usfm-processor`; USJ-only loader | **Done** (`e29d85a`) |
+| **resource-parsers** | Drop `usfm-js`; USFM via `USJProcessor`; Helps projection helpers here | **Done** (`b3e0e99`) |
+| **mobile** | Drop `usfm-js`; local processor → `USJProcessor` facade | **Done** (`54950e9`) |
+| **Platform** | `@usfm-tools/*` link + Vite aliases; CI nests `usfm-ast/` | **Done** |
 
 ## Go / no-go
 
 | Decision | Recommendation |
 |----------|----------------|
 | **(a) Merge PR #19** | Human merge when CI green — **do not auto-merge** |
-| **(b) tc-study scripture usfm-js / `@bt-synergy/usfm-processor` delete** | **COMPLETE** (`e29d85a`) |
-| **(c) Workspace-wide usfm-js purge** | **COMPLETE** for runtime npm deps — docs/`usfm-json` string leftovers only |
+| **(b) tc-study scripture / app code usfm-js delete** | **COMPLETE** |
+| **(c) Workspace-wide usfm-js purge** | **COMPLETE** for packages + mobile (stale docs / `usfm-json` strings only) |
 
 ## Delete-wave exit criteria (tc-study scripture)
 
@@ -57,19 +59,19 @@
 |---|-----------|--------|
 | 1 | No runtime `usfm-js` dep for tc-study scripture packages | **Met** |
 | 2 | `@bt-synergy/usfm-processor` removed | **Met** |
-| 3 | Unit/integration green | **Met** (40/40) |
-| 4 | Journey 4/8 e2e green | **Met** (4/4 @ tip) |
-| 5 | Soak: Titus underlines + OL↔ULT highlights | **Met** |
+| 3 | Unit/integration green | **Met** (85/85 key suites @ `b3e0e99`) |
+| 4 | Journey 4/8 e2e green | Pending re-run after preview port clash |
+| 5 | Soak: Titus underlines + OL↔ULT highlights | **Met** (prior + units) |
 | 6 | Checklist: tc-study scripture delete **COMPLETE** | **Met** |
 
 ## Workspace leftovers (ranked)
 
 | Rank | Area | Status / justification |
 |------|------|------------------------|
-| 1 | `packages/resource-parsers` | **Done** — `USFMProcessor` is a thin `USJProcessor` wrapper; `usfm-js` removed. Helps projection (`viewModelToOptimizedChapters`) owned here; scripture-loader re-exports. |
-| 2 | `apps/mobile` | **Done** — local `usfm-processor.ts` is a thin `USJProcessor` facade (same pattern as resource-parsers); `usfm-js` dep/lockfiles removed. |
-| 3 | Stale docs / `bundle-stats.json` | Historical mentions only — non-runtime. |
+| 1 | Stale docs / local `bundle-stats.json` | Non-runtime (`bundle-stats.json` gitignored). |
 | — | `catalog-cli` `usfm-json` | ContentType string only — not the npm package. |
+| ~~resource-parsers~~ | | **Cleared** @ `b3e0e99` |
+| ~~apps/mobile~~ | | **Cleared** @ `54950e9` |
 
 ## Rollback
 
