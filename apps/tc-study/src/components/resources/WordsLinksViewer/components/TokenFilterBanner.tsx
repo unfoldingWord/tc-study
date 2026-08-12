@@ -1,8 +1,8 @@
 /**
  * TokenFilterBanner — inline filter scope chrome
  *
- * Compact chip for ResourceViewerHeader actions (not a dedicated row).
- * Funnel + value pill + match count + large clear. Visible on 0 matches ("0 · all").
+ * Compact trailing cluster for ResourceViewerHeader actions (not a dedicated row).
+ * Funnel + value pill + match count + medium clear. Visible on 0 matches ("0 · all").
  */
 
 import { Filter, X } from 'lucide-react'
@@ -32,7 +32,7 @@ export function TokenFilterBanner({
     <div
       role="status"
       data-testid="helps-filter-scope-bar"
-      className="flex items-center gap-chrome-tight min-w-0 max-w-full"
+      className="inline-flex items-center gap-1 min-w-0 max-w-full"
       title={statusLabel}
       aria-label={statusLabel}
     >
@@ -63,18 +63,16 @@ export function TokenFilterBanner({
         )}
       </span>
 
-      {/* Visual circle is tight; hit target ≥40px via size-10 without growing the header row. */}
+      {/* ~30px soft accent control; ≥40px hit via invisible before — no solid orb. */}
       <button
         type="button"
         onClick={onClearFilter}
         data-testid="helps-filter-clear"
-        className="group shrink-0 relative flex size-7 items-center justify-center rounded-full text-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-canvas before:absolute before:inset-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+        className="group relative shrink-0 flex size-[30px] items-center justify-center rounded-full border border-accent/50 bg-accent-soft text-accent-fg transition-colors hover:border-accent hover:bg-accent hover:text-surface active:border-accent active:bg-accent active:text-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-canvas before:absolute before:inset-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
         title="Clear filter"
         aria-label="Clear filter"
       >
-        <span className="flex size-7 items-center justify-center rounded-full bg-accent shadow-sm transition-colors group-hover:bg-accent-hover group-active:bg-accent-hover">
-          <X className="w-4 h-4 stroke-[2.5]" aria-hidden />
-        </span>
+        <X className="w-3.5 h-3.5 stroke-[2.5]" aria-hidden />
       </button>
     </div>
   )
