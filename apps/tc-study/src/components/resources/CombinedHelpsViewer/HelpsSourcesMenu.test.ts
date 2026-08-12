@@ -50,4 +50,20 @@ describe('lookupHelpsSourceResource', () => {
       lookupHelpsSourceResource('u/en/twl', new Map(), { 'u/en/twl': twl })?.title
     ).toBe('TWL')
   })
+
+  test('hydrates missing README from loadedResources onto package map entry', () => {
+    const tnPackage = res({ key: 'u/en/tn', type: 'notes', title: 'Translation Notes' })
+    const tnLoaded = res({
+      key: 'u/en/tn',
+      type: 'notes',
+      title: 'Translation Notes',
+      readme: '# TN README',
+    })
+    const packageResources = new Map<string, ResourceInfo>([['u/en/tn', tnPackage]])
+    const found = lookupHelpsSourceResource('u/en/tn', packageResources, {
+      'u/en/tn': tnLoaded,
+    })
+    expect(found?.readme).toBe('# TN README')
+    expect(found?.title).toBe('Translation Notes')
+  })
 })

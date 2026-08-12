@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import { X, FileText, Scale, Building2, Languages, Copy, Check } from 'lucide-react'
+import { X, FileText, Scale, Building2, Languages, Copy, Check, Loader } from 'lucide-react'
 import { ModalPortal } from '../shared/ModalPortal'
 import { MarkdownRenderer } from '../ui/MarkdownRenderer'
 
@@ -18,6 +18,8 @@ interface ResourceInfoModalProps {
     readme?: string
     license?: string
   }
+  /** True while README is being fetched asynchronously (chrome already visible). */
+  loadingBody?: boolean
 }
 
 const README_PROSE_CLASS =
@@ -41,7 +43,12 @@ function isDescriptionRedundant(description: string | undefined, readme: string 
   return norm(readme).includes(norm(description))
 }
 
-export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoModalProps) {
+export function ResourceInfoModal({
+  isOpen,
+  onClose,
+  resource,
+  loadingBody = false,
+}: ResourceInfoModalProps) {
   const [copied, setCopied] = useState(false)
 
   const title = asTrimmedString(resource.title) ?? 'Resource'
@@ -201,6 +208,15 @@ export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoMod
             {readme ? (
               <div className="p-content-lg">
                 <MarkdownRenderer content={readme} className={README_PROSE_CLASS} />
+              </div>
+            ) : loadingBody ? (
+              <div
+                className="flex items-center justify-center py-16 text-fg-muted"
+                role="status"
+                aria-label="Loading"
+                title="Loading"
+              >
+                <Loader className="w-8 h-8 animate-spin opacity-70" aria-hidden="true" />
               </div>
             ) : hasBody ? null : (
               <div

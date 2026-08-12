@@ -3,7 +3,7 @@ import { useState } from 'react'
 import type { ResourceInfo } from '../../../contexts/types'
 import { ResourceInfoModal } from '../../studio/ResourceInfoModal'
 import { chromeIconButtonClass } from './chromeIconButton'
-import { toResourceInfoModalProps } from './resourceInfoModalProps'
+import { useEnrichedResourceInfoModal } from './useEnrichedResourceInfoModal'
 
 interface ResourceInfoButtonProps {
   resource: ResourceInfo
@@ -12,9 +12,11 @@ interface ResourceInfoButtonProps {
 /**
  * Chrome Info control for ResourceViewerHeader — opens ResourceInfoModal
  * for the current single resource (scripture, TN/TWL/TQ standalone, OBS, etc.).
+ * Chrome opens immediately; README is hydrated async when missing.
  */
 export function ResourceInfoButton({ resource }: ResourceInfoButtonProps) {
   const [open, setOpen] = useState(false)
+  const { modalResource, loadingBody } = useEnrichedResourceInfoModal(open ? resource : null)
 
   return (
     <>
@@ -28,11 +30,14 @@ export function ResourceInfoButton({ resource }: ResourceInfoButtonProps) {
       >
         <Info className="w-4 h-4" aria-hidden />
       </button>
-      <ResourceInfoModal
-        isOpen={open}
-        onClose={() => setOpen(false)}
-        resource={toResourceInfoModalProps(resource)}
-      />
+      {modalResource ? (
+        <ResourceInfoModal
+          isOpen={open}
+          onClose={() => setOpen(false)}
+          resource={modalResource}
+          loadingBody={loadingBody}
+        />
+      ) : null}
     </>
   )
 }

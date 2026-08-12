@@ -6,11 +6,13 @@ import { useWorkspaceStore } from '../../../features/workspace/workspaceStore'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { ResourceInfoModal } from '../../studio/ResourceInfoModal'
 import { chromeIconButtonClass } from '../common/chromeIconButton'
+import { mergeResourceInfoDocs } from '../common/enrichResourceInfoDocs'
 import {
   licenseIdOf,
   releaseVersionOf,
   toResourceInfoModalProps,
 } from '../common/resourceInfoModalProps'
+import { useEnrichedResourceInfoModal } from '../common/useEnrichedResourceInfoModal'
 
 export { licenseIdOf, releaseVersionOf, toResourceInfoModalProps }
 
@@ -39,20 +41,28 @@ export function lookupHelpsSourceResource(
   loadedResources: Record<string, ResourceInfo | undefined>
 ): ResourceInfo | undefined {
   if (!key) return undefined
+  let fromPackage: ResourceInfo | undefined
   if (packageResources) {
-    const fromPackage =
+    fromPackage =
       packageResources instanceof Map ? packageResources.get(key) : packageResources[key]
-    if (fromPackage) return fromPackage
-    if (packageResources instanceof Map) {
-      for (const r of packageResources.values()) {
-        if (r?.key === key || r?.id === key) return r
+    if (!fromPackage) {
+      if (packageResources instanceof Map) {
+        for (const r of packageResources.values()) {
+          if (r?.key === key || r?.id === key) {
+            fromPackage = r
+            break
+          }
+        }
+      } else {
+        fromPackage = Object.values(packageResources).find((r) => r?.key === key || r?.id === key)
       }
-    } else {
-      const byScan = Object.values(packageResources).find((r) => r?.key === key || r?.id === key)
-      if (byScan) return byScan
     }
   }
-  return lookupLoadedResource(loadedResources, key)
+  const fromLoaded = lookupLoadedResource(loadedResources, key)
+  // Package map is SoT for helps pointers, but often lacks README (add path skips enrichment).
+  // Hydrate docs from loadedResources when present, then modal may async-enrich if still missing.
+  if (fromPackage) return mergeResourceInfoDocs(fromPackage, fromLoaded)
+  return fromLoaded
 }
 
 type SourceKind = 'tn' | 'twl'
@@ -80,6 +90,7 @@ export function HelpsSourcesMenu({ tnKey, twlKey }: HelpsSourcesMenuProps) {
 
   const loadedResources = useAppStore((s) => s.loadedResources)
   const packageResources = useWorkspaceStore((s) => s.currentPackage?.resources)
+  const { modalResource, loadingBody } = useEnrichedResourceInfoModal(infoResource)
 
   const sources = useMemo((): SourceRow[] => {
     const rows: SourceRow[] = []
@@ -197,11 +208,12 @@ export function HelpsSourcesMenu({ tnKey, twlKey }: HelpsSourcesMenuProps) {
         </ModalPortal>
       ) : null}
 
-      {infoResource ? (
+      {modalResource ? (
         <ResourceInfoModal
           isOpen
           onClose={() => setInfoResource(null)}
-          resource={toResourceInfoModalProps(infoResource)}
+          resource={modalResource}
+          loadingBody={loadingBody}
         />
       ) : null}
     </div>
