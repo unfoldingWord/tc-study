@@ -5,6 +5,7 @@ import type { ResourceInfo } from '../../../contexts/types'
 import { useWorkspaceStore } from '../../../features/workspace/workspaceStore'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { ResourceInfoModal } from '../../studio/ResourceInfoModal'
+import { chromeIconButtonClass } from '../common/chromeIconButton'
 
 export function licenseIdOf(resource: ResourceInfo | undefined): string {
   if (!resource?.license) return ''
@@ -171,13 +172,10 @@ export function HelpsSourcesMenu({
           aria-label="Sources"
           aria-expanded={open}
           aria-haspopup="menu"
-          className={`rounded-full p-chrome-tight transition-colors ${
-            open
-              ? 'bg-helps text-white'
-              : 'border border-helps/30 text-helps-fg bg-surface hover:bg-helps-soft'
-          }`}
+          aria-pressed={open}
+          className={chromeIconButtonClass(open)}
         >
-          <Info className="w-3.5 h-3.5" />
+          <Info className="w-4 h-4" aria-hidden />
         </button>
       ) : null}
 

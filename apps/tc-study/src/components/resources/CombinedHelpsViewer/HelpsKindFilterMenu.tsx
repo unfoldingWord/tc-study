@@ -1,6 +1,7 @@
 import { BookMarked, Check, LayoutList, NotebookPen, SlidersHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ModalPortal } from '../../shared/ModalPortal'
+import { chromeIconButtonClass } from '../common/chromeIconButton'
 import type { HelpsKindFilter } from './types'
 
 const KIND_OPTIONS: {
@@ -68,13 +69,10 @@ export function HelpsKindFilterMenu({ kindFilter, setKindFilter }: HelpsKindFilt
         aria-label="Filter kinds"
         aria-expanded={open}
         aria-haspopup="menu"
-        className={`rounded-full p-chrome-tight transition-colors ${
-          open || kindFilter !== 'all'
-            ? 'bg-helps text-white'
-            : 'border border-helps/30 text-helps-fg bg-surface hover:bg-helps-soft'
-        }`}
+        aria-pressed={open || kindFilter !== 'all'}
+        className={chromeIconButtonClass(open || kindFilter !== 'all')}
       >
-        <SlidersHorizontal className="w-3.5 h-3.5" />
+        <SlidersHorizontal className="w-4 h-4" aria-hidden />
       </button>
 
       {open && pos ? (
