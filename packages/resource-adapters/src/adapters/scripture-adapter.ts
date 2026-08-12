@@ -36,18 +36,13 @@ export class ScriptureAdapter extends BaseResourceAdapter<OptimizedScripture> {
     // Download USFM content
     const usfmContent = await this.downloadContent(usfmUrl)
     
-    // Parse USFM
-    const processingResult = await usfmProcessor.processUSFM(
+    // Parse USFM via USJ → OptimizedScripture (QuoteMatcher-compatible chapters)
+    const optimized = await usfmProcessor.processUSFMOptimized(
       usfmContent,
       bookCode,
       bookName || bookCode
     )
-    
-    return this.createResult(
-      processingResult.structuredText as any,
-      resource,
-      bookCode,
-      bookName
-    )
+
+    return this.createResult(optimized, resource, bookCode, bookName)
   }
 }

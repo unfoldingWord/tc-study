@@ -1,8 +1,8 @@
 /**
  * Optimized token / chapter DTOs for QuoteMatcher and Helps.
  *
- * Kept separate from parsers/usfm/usfm-processor.ts so Helps / QuoteMatcher do not
- * import the usfm-js-backed processor module.
+ * Prefer projecting from UsjScriptureViewModel via viewModelToOptimizedChapters
+ * (parsers/usfm/usj-projection.ts). Kept as a stable DTO for Helps matchers.
  */
 
 export interface OptimizedToken {

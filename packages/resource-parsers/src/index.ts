@@ -36,9 +36,14 @@ export type {
   OptimizedParagraph,
 } from './types'
 
-// USFM Parser
-export { USFMProcessor, usfmProcessor } from './parsers/usfm'
-export type { OptimizedScripture } from './parsers/usfm'
+// USFM Parser (USJ-backed; no usfm-js)
+export {
+  USFMProcessor,
+  usfmProcessor,
+  viewModelToOptimizedChapters,
+  extractUsjBroadcastTokens,
+} from './parsers/usfm'
+export type { OptimizedScripture, BroadcastScriptureToken, ProcessingResult } from './parsers/usfm'
 
 // TSV Parsers
 export {

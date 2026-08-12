@@ -140,7 +140,7 @@ export interface ProcessedContent {
   wordsLinks?: ProcessedWordsLinks;  // For translation words links
 }
 
-// Re-export optimized DTOs for Helps / QuoteMatcher (no usfm-js import)
+// Re-export optimized DTOs for Helps / QuoteMatcher
 export type {
   OptimizedToken,
   OptimizedChapter,

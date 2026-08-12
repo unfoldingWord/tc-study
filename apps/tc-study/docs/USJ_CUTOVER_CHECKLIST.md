@@ -9,7 +9,7 @@
 | Scope | Verdict |
 |-------|---------|
 | **tc-study scripture path** (`usj-processor`, `scripture-loader`, `apps/tc-study` scripture) | **DELETE COMPLETE** |
-| **Workspace-wide `usfm-js`** | **Not complete** — justified leftovers remain (below) |
+| **Workspace-wide `usfm-js` npm dep** | **COMPLETE** for packages + mobile — only stale docs / `usfm-json` contentType strings remain |
 
 ## Authoritative contract (do not regress)
 
@@ -49,7 +49,7 @@
 |----------|----------------|
 | **(a) Merge PR #19** | Human merge when CI green — **do not auto-merge** |
 | **(b) tc-study scripture usfm-js / `@bt-synergy/usfm-processor` delete** | **COMPLETE** (`e29d85a`) |
-| **(c) Workspace-wide usfm-js purge** | **OPEN** — leftovers below |
+| **(c) Workspace-wide usfm-js purge** | **COMPLETE** for runtime npm deps — docs/`usfm-json` string leftovers only |
 
 ## Delete-wave exit criteria (tc-study scripture)
 
@@ -66,8 +66,8 @@
 
 | Rank | Area | Status / justification |
 |------|------|------------------------|
-| 1 | `packages/resource-parsers` | Still depends on `usfm-js` + exports `USFMProcessor`. **tc-study does not import `USFMProcessor`** (only `QuoteMatcher` + Optimized* / TN types). Types already split for Helps. Other teams purging. |
-| 2 | `apps/mobile` | Separate Expo app with local `usfm-js` — **out of PR #19 / tc-study scripture scope** (justified leftover for this PR). |
+| 1 | `packages/resource-parsers` | **Done** — `USFMProcessor` is a thin `USJProcessor` wrapper; `usfm-js` removed. Helps projection (`viewModelToOptimizedChapters`) owned here; scripture-loader re-exports. |
+| 2 | `apps/mobile` | **Migrated** — local `usfm-processor.ts` is a USJ facade (`@bt-synergy/usj-processor`); `usfm-js` removed from mobile `package.json`. |
 | 3 | Stale docs / `bundle-stats.json` | Historical mentions only — non-runtime. |
 | — | `catalog-cli` `usfm-json` | ContentType string only — not the npm package. |
 
