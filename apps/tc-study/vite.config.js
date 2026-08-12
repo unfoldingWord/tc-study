@@ -70,6 +70,11 @@ export default defineConfig({
     },
     build: {
         ...sharedBuild.build,
+        // Sibling usfm-ast CJS dist is outside node_modules (Vite alias). Without this,
+        // Rollup leaves `exports` bare → "exports is not defined" when resourceTypes load.
+        commonjsOptions: {
+            include: [/node_modules/, /usfm-ast[\\/]packages[\\/](usfm-parser|shared-types)/],
+        },
         rollupOptions: {
             ...sharedBuild.build?.rollupOptions,
             output: {

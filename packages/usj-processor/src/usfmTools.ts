@@ -10,8 +10,6 @@
  */
 
 import * as UsfmParserModule from '@usfm-tools/parser'
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error — sibling package outside this monorepo (ESM build)
 import {
   chapterSliceToUsjDocument,
   splitUsjByChapter,

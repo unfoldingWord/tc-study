@@ -11,7 +11,13 @@ import { seedIndexedDb } from './idb'
 /** Wait until catalog services + resource types are ready (loading gate dismissed). */
 export async function waitForCatalogReady(page: Page): Promise<void> {
   await expect(page.getByLabel('Loading catalog')).toHaveCount(0, { timeout: 45_000 })
-  await expect(page.getByLabel('Resource type registration failed')).toHaveCount(0)
+  const regFailed = page.getByLabel('Resource type registration failed')
+  const failedCount = await regFailed.count()
+  if (failedCount > 0) {
+    const title = await regFailed.getAttribute('title')
+    throw new Error(`Resource type registration failed: ${title ?? '(no title)'}`)
+  }
+  await expect(regFailed).toHaveCount(0)
 }
 
 /** Collect uncaught page errors for "does not crash" assertions. */
