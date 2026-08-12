@@ -2,7 +2,7 @@
 
 Loads Door43 scripture (USFM) via **USJ + AlignmentMap** SoT for catalog-manager / tc-study.
 
-## Process path: USJ only (usfm-js removed)
+## Process path: USJ only
 
 `USFM → UsjDocument + AlignmentMap → UsjScriptureViewModel` (+ temporary `ProcessedScripture` projection).
 
@@ -44,5 +44,5 @@ See `apps/tc-study/docs/USJ_CUTOVER_CHECKLIST.md` → **Cache clear (once)**.
 bun run dev -- --port 8080 --host
 ```
 
-Requires sibling `usfm-ast` built + `node packages/usj-processor/scripts/link-usfm-tools.cjs`  
-(Vite aliases `@usfm-tools/*` in `apps/tc-study/vite.config.js`).
+Requires `@usfm-tools/*` from npm via `@bt-synergy/usj-processor` (`bun install` at repo root).  
+See `packages/usj-processor/README.md` — Setup.

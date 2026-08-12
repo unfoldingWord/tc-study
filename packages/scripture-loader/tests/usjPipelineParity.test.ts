@@ -1,5 +1,5 @@
 /**
- * USJ-only processUsfmToScripture gates for Titus (usfm-js removed).
+ * USJ-only processUsfmToScripture gates for Titus.
  */
 
 import { describe, expect, test } from 'bun:test'

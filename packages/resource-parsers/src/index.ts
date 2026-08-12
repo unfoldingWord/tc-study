@@ -36,12 +36,16 @@ export type {
   OptimizedParagraph,
 } from './types'
 
-// USFM Parser (USJ-backed; no usfm-js)
+// USJ Helps projections (OptimizedScripture DTO) + deprecated USFMProcessor aliases
 export {
-  USFMProcessor,
-  usfmProcessor,
+  processUsfmToOptimizedScripture,
+  viewModelToOptimizedScripture,
   viewModelToOptimizedChapters,
   extractUsjBroadcastTokens,
+  /** @deprecated Prefer processUsfmToOptimizedScripture / USJProcessor */
+  USFMProcessor,
+  /** @deprecated Prefer processUsfmToOptimizedScripture / USJProcessor */
+  usfmProcessor,
 } from './parsers/usfm'
 export type { OptimizedScripture, BroadcastScriptureToken, ProcessingResult } from './parsers/usfm'
 

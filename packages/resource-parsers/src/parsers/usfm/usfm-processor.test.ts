@@ -2,7 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { QuoteMatcher } from '../../utils/quote-matcher'
-import { usfmProcessor } from './usfm-processor'
+import {
+  processUsfmToOptimizedScripture,
+  usfmProcessor,
+} from './optimized-scripture'
 import { viewModelToOptimizedChapters } from './usj-projection'
 import { USJProcessor } from '@bt-synergy/usj-processor'
 
@@ -10,9 +13,9 @@ const FIXTURES = join(import.meta.dir, '..', '..', '..', '..', 'usj-processor', 
 const UGNT_USFM = readFileSync(join(FIXTURES, 'el-x-koine_ugnt_TIT.usfm'), 'utf8')
 const ULT_USFM = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
 
-describe('USFMProcessor (USJ-backed)', () => {
-  test('processUSFMOptimized preserves Παῦλος occurrence for QuoteMatcher', async () => {
-    const optimized = await usfmProcessor.processUSFMOptimized(
+describe('OptimizedScripture from USJ', () => {
+  test('processUsfmToOptimizedScripture preserves Παῦλος occurrence for QuoteMatcher', async () => {
+    const optimized = await processUsfmToOptimizedScripture(
       UGNT_USFM,
       'tit',
       'Titus',
@@ -27,7 +30,7 @@ describe('USFMProcessor (USJ-backed)', () => {
     expect(optimized.meta.type).toBe('original')
   })
 
-  test('processUSFM returns ProcessedScripture projection from USJ', async () => {
+  test('deprecated USFMProcessor.processUSFM still returns ProcessedScripture projection', async () => {
     const result = await usfmProcessor.processUSFM(ULT_USFM, 'tit', 'Titus', {
       language: 'en',
       includeWordTokens: true,
@@ -38,13 +41,13 @@ describe('USFMProcessor (USJ-backed)', () => {
     expect(result.metadata.hasWordTokens).toBe(true)
   })
 
-  test('viewModelToOptimizedChapters matches processUSFMOptimized chapters', async () => {
+  test('viewModelToOptimizedChapters matches processUsfmToOptimizedScripture chapters', async () => {
     const { viewModel } = await new USJProcessor().processUSFM(UGNT_USFM, 'tit', 'Titus', {
       language: 'el-x-koine',
       includeWordTokens: true,
     })
     const fromVm = viewModelToOptimizedChapters(viewModel)
-    const optimized = await usfmProcessor.processUSFMOptimized(
+    const optimized = await processUsfmToOptimizedScripture(
       UGNT_USFM,
       'tit',
       'Titus',
@@ -54,7 +57,7 @@ describe('USFMProcessor (USJ-backed)', () => {
   })
 
   test('QuoteMatcher finds quote on USJ-optimized chapters', async () => {
-    const optimized = await usfmProcessor.processUSFMOptimized(
+    const optimized = await processUsfmToOptimizedScripture(
       UGNT_USFM,
       'tit',
       'Titus',

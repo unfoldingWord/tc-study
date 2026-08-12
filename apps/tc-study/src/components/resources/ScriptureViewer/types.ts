@@ -1,5 +1,4 @@
 import type {
-  ProcessedScripture,
   UsjScriptureViewModel,
   UsjVerseView,
   UsjWordToken,
@@ -20,7 +19,6 @@ export interface ScriptureViewerProps {
 
 export interface ScriptureViewerState {
   viewModel: UsjScriptureViewModel | null
-  loadedContent: ProcessedScripture | null
   availableBooks: BookInfo[]
   isLoading: boolean
   error: string | null

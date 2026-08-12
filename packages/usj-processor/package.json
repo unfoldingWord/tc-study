@@ -2,7 +2,7 @@
   "name": "@bt-synergy/usj-processor",
   "version": "0.0.0-spike",
   "private": true,
-  "description": "USFM→USJ→ProcessedScripture processor (tc-study scripture path; replaces usfm-js)",
+  "description": "USFM→USJ→UsjScriptureViewModel processor (tc-study scripture path)",
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",

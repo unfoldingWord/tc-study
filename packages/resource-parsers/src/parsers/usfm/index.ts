@@ -1,10 +1,17 @@
 /**
- * USFM parser exports — USJ-backed facade (`USFMProcessor` name kept for API stability).
- * SoT: `@bt-synergy/usj-processor` (not the deleted `@bt-synergy/usfm-processor` package).
+ * USFM → USJ Helps projections (OptimizedScripture / OptimizedChapter).
+ * Parse SoT: `@bt-synergy/usj-processor` (`USJProcessor`, UsjScriptureViewModel).
  */
 
-export { USFMProcessor, usfmProcessor } from './usfm-processor'
-export type { OptimizedScripture, ProcessingResult } from './usfm-processor'
+export {
+  processUsfmToOptimizedScripture,
+  viewModelToOptimizedScripture,
+  /** @deprecated Prefer processUsfmToOptimizedScripture / USJProcessor */
+  USFMProcessor,
+  /** @deprecated Prefer processUsfmToOptimizedScripture / USJProcessor */
+  usfmProcessor,
+} from './optimized-scripture'
+export type { OptimizedScripture, ProcessingResult } from './optimized-scripture'
 export {
   viewModelToOptimizedChapters,
   extractUsjBroadcastTokens,

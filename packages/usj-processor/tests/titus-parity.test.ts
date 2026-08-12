@@ -1,5 +1,5 @@
 /**
- * USJ Titus fixture gates (post-usfm-js delete).
+ * USJ Titus fixture gates.
  * Self-consistency + identity / alignment / punctuation guards.
  */
 

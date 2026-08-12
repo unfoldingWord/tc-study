@@ -1,7 +1,7 @@
 /**
  * USFM → USJ SoT → view model / temporary ProcessedScripture projection.
  *
- * Sole process path: @bt-synergy/usj-processor (usfm-js removed).
+ * Sole process path: @bt-synergy/usj-processor.
  *
  * Prefer processUsfmToUsjResult() for new code (returns viewModel + cache payload).
  * processUsfmToScripture() remains for TokenRenderer / CombinedHelps until they migrate.

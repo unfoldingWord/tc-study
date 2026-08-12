@@ -1,6 +1,5 @@
 import {
   ScriptureLoader,
-  type ProcessedScripture,
   type UsjScriptureViewModel,
 } from '@bt-synergy/scripture-loader'
 import { useEffect, useMemo, useState } from 'react'
@@ -17,6 +16,16 @@ import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
 import type { DisplayUsjVerse } from '../types'
 import { loadUsjScripture } from '../utils/loadUsjViewModel'
 
+function chapterVerseMapFromViewModel(
+  viewModel: UsjScriptureViewModel
+): Record<string, number> {
+  const map: Record<string, number> = {}
+  for (const ch of viewModel.chapters) {
+    map[String(ch.number)] = ch.verses.length
+  }
+  return map
+}
+
 export function useContent(
   resourceKey: string,
   availableBooks: BookInfo[],
@@ -27,7 +36,6 @@ export function useContent(
   const currentRef = useCurrentReference()
   const navigation = useNavigation()
   const [viewModel, setViewModel] = useState<UsjScriptureViewModel | null>(null)
-  const [loadedContent, setLoadedContent] = useState<ProcessedScripture | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,7 +52,6 @@ export function useContent(
       setIsLoading(false)
       setError('BOOK_NOT_AVAILABLE')
       setViewModel(null)
-      setLoadedContent(null)
       return
     }
 
@@ -65,12 +72,10 @@ export function useContent(
         )
         if (cancelled) return
 
-        if (scripture.metadata?.chapterVerseMap) {
-          navigation.updateBookVerseCount(
-            bookCode,
-            extractVerseCountsFromContent(scripture.metadata.chapterVerseMap)
-          )
-        }
+        navigation.updateBookVerseCount(
+          bookCode,
+          extractVerseCountsFromContent(chapterVerseMapFromViewModel(vm))
+        )
 
         const sections =
           scripture.translatorSections && scripture.translatorSections.length > 0
@@ -82,13 +87,11 @@ export function useContent(
         }
 
         setViewModel(vm)
-        setLoadedContent(scripture)
       } catch (err) {
         if (cancelled) return
         console.error('❌ Error loading UsjScriptureViewModel:', err)
         setError(err instanceof Error ? err.message : 'Unknown error')
         setViewModel(null)
-        setLoadedContent(null)
       } finally {
         if (!cancelled) setIsLoading(false)
       }
@@ -141,7 +144,6 @@ export function useContent(
 
   return {
     viewModel,
-    loadedContent,
     isLoading,
     error,
     currentChapter,

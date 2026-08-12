@@ -1,20 +1,20 @@
 /**
- * Smoke: mobile USFMProcessor facade uses USJ (no usfm-js).
+ * Smoke: mobile UsjScriptureProcessor → OptimizedScripture via USJ.
  */
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { usfmProcessor } from './usfm-processor'
+import { usjScriptureProcessor } from './usj-scripture-processor'
 
 const FIXTURE = join(
   import.meta.dir,
   '../../../../packages/usj-processor/fixtures/en_ult_TIT.usfm'
 )
 
-describe('mobile usfm-processor USJ facade', () => {
+describe('mobile usj-scripture-processor', () => {
   test('processUSFMOptimized returns aligned OptimizedScripture for Titus ULT', async () => {
     const usfm = readFileSync(FIXTURE, 'utf8')
-    const result = await usfmProcessor.processUSFMOptimized(usfm, 'tit', 'Titus', 'en')
+    const result = await usjScriptureProcessor.processUSFMOptimized(usfm, 'tit', 'Titus', 'en')
 
     expect(result.meta.bookCode).toBe('tit')
     expect(result.meta.type).toBe('aligned')
@@ -34,7 +34,7 @@ describe('mobile usfm-processor USJ facade', () => {
 
   test('processUSFM returns ProcessedScripture chapters', async () => {
     const usfm = readFileSync(FIXTURE, 'utf8')
-    const { structuredText, alignments } = await usfmProcessor.processUSFM(
+    const { structuredText, alignments } = await usjScriptureProcessor.processUSFM(
       usfm,
       'tit',
       'Titus'

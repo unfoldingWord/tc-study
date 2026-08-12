@@ -2,7 +2,7 @@
 
 USFM → **USJ + AlignmentMap** (parse/cache SoT) → **`UsjScriptureViewModel`** (runtime identity).
 
-Sole scripture process path in `@bt-synergy/scripture-loader` (usfm-js removed).
+Sole scripture process path in `@bt-synergy/scripture-loader`.
 
 ## Runtime API (for Viewer / Panels)
 

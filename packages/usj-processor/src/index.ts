@@ -43,8 +43,8 @@ export type { CachedUsjDocument, UsjScriptureCacheContent } from './usjCacheType
 export type { AlignmentMap } from './usfmTools'
 
 /**
- * ProcessedScripture DTO types — owned here (USJ projection). Import from
- * @bt-synergy/usj-processor or @bt-synergy/scripture-loader; do not use usfm-processor.
+ * Transitional ProcessedScripture DTO types (USJ projection). Prefer
+ * UsjScriptureViewModel / UsjWordToken for new Viewer / Helps code.
  */
 export type {
   ProcessedScripture,

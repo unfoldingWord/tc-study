@@ -1,8 +1,8 @@
 /**
- * Transitional ProcessedScripture DTO types.
+ * Transitional ProcessedScripture DTO types (projection from UsjScriptureViewModel).
  *
- * Owned here (no @bt-synergy/usfm-processor / usfm-js). Helps runtime is USJ-only
- * (`UsjScriptureViewModel`); keep projection helpers for cache migrate-read / legacy UI.
+ * Runtime identity SoT: UsjScriptureViewModel / UsjWordToken.
+ * Keep these types for ResourceLoader.loadContent + cache migrate helpers.
  */
 
 export interface WordToken {
