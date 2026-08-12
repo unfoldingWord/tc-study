@@ -105,7 +105,7 @@
   --theme-helps-soft: #f5f3ff;
   --theme-helps-fg: #5b21b6;
 
-  /* Helps reading chips (scripture / OBS quotes) — verse headers use muted */
+  /* Helps reading chips (scripture / OBS quotes) — verse headers use muted/50 */
   --theme-chip-quote: #eef4ff;
   --theme-chip-quote-hover: #e0eaff;
   --theme-chip-quote-fg: #1e40af;

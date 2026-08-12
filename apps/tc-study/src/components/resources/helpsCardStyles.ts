@@ -5,9 +5,9 @@
 /** Scrollable helps content (under ResourceViewerHeader). */
 export const HELPS_LIST_PANEL = 'flex-1 overflow-y-auto bg-surface'
 
-/** Verse / ref group header — neutral muted chip (not lavender wash). */
+/** Verse / ref group header — lighter than full muted so chips sit softly on surface. */
 export const HELPS_VERSE_HEADER =
-  'flex items-center gap-chrome-tight px-chrome py-chrome-tight bg-muted rounded-md'
+  'flex items-center gap-chrome-tight px-chrome py-chrome-tight bg-muted/50 rounded-md'
 
 export const HELPS_VERSE_HEADER_ICON = 'w-3.5 h-3.5 text-fg-secondary'
 

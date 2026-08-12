@@ -46,11 +46,11 @@ Modal panels themselves use `bg-surface` / `bg-elevated`, with `border-border`, 
 
 ## Helps reading chips
 
-Quote buttons on Combined Helps / TN / TWL cards use dedicated chip tokens (solid fills — not hard-coded `*-50` gradients). Verse/ref group headers use neutral shell tokens via `helpsCardStyles` (`HELPS_VERSE_HEADER` = `bg-muted` + `text-fg-secondary`).
+Quote buttons on Combined Helps / TN / TWL cards use dedicated chip tokens (solid fills — not hard-coded `*-50` gradients). Verse/ref group headers use neutral shell tokens via `helpsCardStyles` (`HELPS_VERSE_HEADER` = `bg-muted/50` + `text-fg-secondary`).
 
 | Token | Utilities | Use |
 |-------|-----------|-----|
-| `muted` / `fg-secondary` / `surface` | `bg-muted`, `text-fg-secondary`, `bg-surface` | Verse/ref group headers + count badges (`HELPS_VERSE_*`) |
+| `muted` / `fg-secondary` / `surface` | `bg-muted/50`, `text-fg-secondary`, `bg-surface` | Verse/ref group headers + count badges (`HELPS_VERSE_*`) |
 | `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `bg-chip-quote`, `hover:bg-chip-quote-hover`, `text-chip-quote-fg` | Scripture / OBS quote chips on note & word-link cards |
 | `highlight` / `scripture-fg` | `bg-highlight`, `text-scripture-fg` | Helps header filter value pill (`TokenFilterBanner`) — same tokens as highlighted scripture (`TokenRenderer`); × uses `text-scripture-fg/70` + `hover:bg-highlight-strong/70` |
 
