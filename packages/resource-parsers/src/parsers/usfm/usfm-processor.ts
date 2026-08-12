@@ -1,10 +1,12 @@
 /**
- * USFM processing for resource-parsers — thin wrapper over @bt-synergy/usj-processor.
+ * Transitional OptimizedScripture facade for resource-parsers.
  *
- * Parse SoT is UsjDocument + AlignmentMap (via USJProcessor). Helps / QuoteMatcher
- * prefer UsjScriptureViewModel + viewModelToOptimizedChapters (same projection
- * scripture-loader re-exports). This class remains for ScriptureAdapter /
- * OptimizedScripture consumers in resource-adapters / package-builder.
+ * Public name stays `USFMProcessor` / `usfm-processor.ts` to avoid import churn in
+ * resource-adapters / package-builder. Internally this is a thin wrapper over
+ * `@bt-synergy/usj-processor` (`USJProcessor`). Parse SoT is UsjDocument +
+ * AlignmentMap. Prefer UsjScriptureViewModel + viewModelToOptimizedChapters
+ * (also re-exported by scripture-loader) for new Helps / QuoteMatcher code.
+ * There is no `@bt-synergy/usfm-processor` package and no usfm-js dependency.
  */
 
 import {
@@ -85,7 +87,7 @@ function viewModelToOptimizedScripture(
 }
 
 /**
- * USFM Processor — routes through USJProcessor (no usfm-js).
+ * Legacy-named facade over `USJProcessor` (kept for Stable OptimizedScripture callers).
  */
 export class USFMProcessor {
   private readonly usj = new USJProcessor()

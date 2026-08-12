@@ -9,7 +9,7 @@
 |-------|---------|
 | **tc-study scripture path** | **DELETE COMPLETE** |
 | **Workspace-wide `usfm-js` npm / runtime imports** | **DELETE COMPLETE** |
-| Non-runtime leftovers | Comments / cutover docs saying “removed”; `catalog-cli` contentType string `usfm-json` (not the npm package); gitignored local `bundle-stats.json` |
+| Non-runtime leftovers | Docs scrubbed (`scripture-resource` README; obsolete `package.json.backup` deleted). Facade names `USFMProcessor` / `usfm-processor.ts` kept on purpose (USJ-backed; comments clarified). `catalog-cli` `contentType: 'usfm-json'` is a filesystem cache label, not the npm package. No committed `bundle-stats.json` to scrub. |
 
 ## Authoritative contract (do not regress)
 

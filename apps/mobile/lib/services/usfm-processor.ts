@@ -1,8 +1,10 @@
 /**
- * Mobile scripture processor — USJ path (usfm-js removed).
+ * Mobile scripture processor — transitional USJ-backed facade.
  *
- * Parse/process via @bt-synergy/usj-processor, then project into the
- * OptimizedScripture shape consumed by Door43ScriptureAdapter / USFMRenderer.
+ * Public name stays `USFMProcessor` / `usfm-processor.ts` so Door43ScriptureAdapter,
+ * USFMRenderer, and mobile type imports do not churn. Internally parse/process
+ * via `@bt-synergy/usj-processor` (`USJProcessor`), then project into the
+ * OptimizedScripture DTO. No usfm-js; no `@bt-synergy/usfm-processor` package.
  */
 
 import {
@@ -591,6 +593,7 @@ function resolveTranslatorSections(
 // Processor
 // ============================================================================
 
+/** Legacy-named facade over `USJProcessor` (stable mobile OptimizedScripture API). */
 export class USFMProcessor {
   private readonly usj = new USJProcessor()
 

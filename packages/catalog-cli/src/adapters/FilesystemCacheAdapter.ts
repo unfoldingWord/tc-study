@@ -35,7 +35,7 @@ export class FilesystemCacheAdapter {
     // Create subdirectories for better organization
     const parts = key.split('/')
     
-    // Determine file extension based on content type
+    // Cache contentType label for structured/JSON book payloads (not the npm package usfm-js).
     const ext = contentType === 'usfm-json' ? '.json' : '.txt'
     
     if (parts.length >= 3) {

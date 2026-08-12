@@ -657,6 +657,7 @@ program
         await fs.writeFile(targetPath, content, 'utf-8')
         
         // Write metadata
+        // FilesystemCacheAdapter contentType label (cache metadata), not usfm-js.
         await fs.writeFile(targetPath + '.meta.json', JSON.stringify({
           contentType: 'usfm-json',
           cachedAt: new Date().toISOString(),

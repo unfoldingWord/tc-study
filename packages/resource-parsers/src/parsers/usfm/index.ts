@@ -1,5 +1,6 @@
 /**
- * USFM Parser Exports (USJ-backed; no usfm-js)
+ * USFM parser exports — USJ-backed facade (`USFMProcessor` name kept for API stability).
+ * SoT: `@bt-synergy/usj-processor` (not the deleted `@bt-synergy/usfm-processor` package).
  */
 
 export { USFMProcessor, usfmProcessor } from './usfm-processor'
