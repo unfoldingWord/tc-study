@@ -1,8 +1,9 @@
 /**
- * Helpers for USJ SoT cache dual-read / migrate.
+ * Helpers for scripture-usj: SoT cache read (version-gated).
  *
- * Primary cache namespace: scripture-usj:{resourceKey}:{book}
+ * Namespace: scripture-usj:{resourceKey}:{book}
  * Payload: UsjScriptureCacheContent (USJ document + AlignmentMap).
+ * Legacy `scripture:` blobs are not read here.
  */
 
 import {

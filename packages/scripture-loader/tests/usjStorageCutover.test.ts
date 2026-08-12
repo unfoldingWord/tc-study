@@ -1,5 +1,5 @@
 /**
- * P2: scripture-usj SoT dual-read / version refuse / migrate-on-write.
+ * scripture-usj SoT — USJ-only cache, version refuse, no legacy migrate-read.
  */
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'fs'
@@ -17,6 +17,7 @@ import {
 } from '../../cache-adapter-indexeddb/src/bookChunkedStorage'
 
 const FIXTURES = join(import.meta.dir, '../../usj-processor/fixtures')
+const ULT_USFM = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
 
 class MemoryCacheAdapter {
   store = new Map<string, { content: unknown; timestamp?: number; metadata?: unknown }>()
@@ -37,7 +38,6 @@ class MemoryCacheAdapter {
   }
 
   async set(key: string, entry: { content: unknown; timestamp?: number }) {
-    // Mimic IndexedDB chapter split for USJ keys when chapters present
     if (canSplitUsjScripture(key, entry as any)) {
       const { manifestEntry, chapterEntries, alignmentEntries } = splitUsjScriptureEntry(
         key,
@@ -69,21 +69,28 @@ function chapterRecordsFor(adapter: MemoryCacheAdapter, key: string) {
     .map(([k, entry]) => ({ key: k, entry: entry as any }))
 }
 
-describe('P2 USJ storage cutover', () => {
+function stubDoor43Loader(cache: MemoryCacheAdapter, bookId = 'tit') {
+  return new ScriptureLoader({
+    cacheAdapter: cache,
+    catalogAdapter: {
+      get: async () => ({
+        contentMetadata: { ingredients: [{ identifier: bookId, path: './tit.usfm' }] },
+      }),
+    },
+    door43Client: {
+      findRepository: async () => ({ default_branch: 'master' }),
+      fetchTextContent: async () => ULT_USFM,
+    },
+  })
+}
+
+describe('USJ storage cutover (scripture-usj only)', () => {
   test('writes scripture-usj SoT with 2.0.0-usj + tool versions', async () => {
     const cache = new MemoryCacheAdapter()
-    const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
-    const loader = new ScriptureLoader({
-      cacheAdapter: cache,
-      door43Client: {},
-      debug: false,
-    })
-
-    // Bypass Door43: call private processAndCache via loadContent path by seeding miss + stub client
     const resourceKey = 'unfoldingWord/en/ult'
     const bookId = 'tit'
     const usjProcessor = new USJProcessor()
-    const result = await usjProcessor.processUSFM(ult, bookId, 'TIT')
+    const result = await usjProcessor.processUSFM(ULT_USFM, bookId, 'TIT')
     const content = usjProcessor.toUsjCacheContent(result, bookId, 'TIT')
     await cache.set(usjScriptureKey(resourceKey, bookId), { content, timestamp: Date.now() })
 
@@ -92,24 +99,22 @@ describe('P2 USJ storage cutover', () => {
     expect(cache.store.has(usjScriptureKey(resourceKey, bookId))).toBe(true)
     expect(result.scripture.metadata.version).toBe(USJ_PROCESSING_VERSION)
 
-    // Dual-read via loader
+    const loader = stubDoor43Loader(cache)
     const loaded = (await loader.loadContent(resourceKey, bookId)) as {
       metadata: { version: string }
       chapters: unknown[]
     }
     expect(loaded.metadata.version).toBe(USJ_PROCESSING_VERSION)
     expect(loaded.chapters.length).toBeGreaterThan(0)
-    // App contract: ProcessedScripture shape (chapters with verses), not raw USJ
     expect((loaded.chapters[0] as { verses?: unknown[] }).verses).toBeDefined()
   })
 
-  test('dual-read prefers USJ over legacy ProcessedScripture', async () => {
+  test('reads scripture-usj even when legacy scripture: is present', async () => {
     const cache = new MemoryCacheAdapter()
     const resourceKey = 'unfoldingWord/en/ult'
     const bookId = 'tit'
-    const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
     const usjProcessor = new USJProcessor()
-    const result = await usjProcessor.processUSFM(ult, bookId, 'TIT')
+    const result = await usjProcessor.processUSFM(ULT_USFM, bookId, 'TIT')
 
     await cache.set(legacyScriptureKey(resourceKey, bookId), {
       content: {
@@ -121,23 +126,19 @@ describe('P2 USJ storage cutover', () => {
       content: usjProcessor.toUsjCacheContent(result, bookId, 'TIT'),
     })
 
-    const loader = new ScriptureLoader({
-      cacheAdapter: cache,
-      door43Client: {},
-    })
+    const loader = stubDoor43Loader(cache)
     const loaded = (await loader.loadContent(resourceKey, bookId)) as {
       metadata: { version: string }
     }
     expect(loaded.metadata.version).toBe(USJ_PROCESSING_VERSION)
   })
 
-  test('dual-read falls back to legacy when USJ missing', async () => {
+  test('ignores legacy scripture: when USJ missing and re-processes from USFM', async () => {
     const cache = new MemoryCacheAdapter()
     const resourceKey = 'unfoldingWord/en/ult'
     const bookId = 'tit'
-    const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
     const usjProcessor = new USJProcessor()
-    const result = await usjProcessor.processUSFM(ult, bookId, 'TIT')
+    const result = await usjProcessor.processUSFM(ULT_USFM, bookId, 'TIT')
     await cache.set(legacyScriptureKey(resourceKey, bookId), {
       content: {
         ...result.scripture,
@@ -145,28 +146,24 @@ describe('P2 USJ storage cutover', () => {
       },
     })
 
-    const loader = new ScriptureLoader({
-      cacheAdapter: cache,
-      door43Client: {},
-    })
+    const loader = stubDoor43Loader(cache)
     const loaded = (await loader.loadContent(resourceKey, bookId)) as {
       metadata: { version: string }
     }
-    expect(loaded.metadata.version).toBe('1.0.0-legacy-marker')
+    expect(loaded.metadata.version).toBe(USJ_PROCESSING_VERSION)
+    expect(cache.store.has(usjScriptureKey(resourceKey, bookId))).toBe(true)
   })
 
-  test('refuses mismatched USJ processingVersion / tool versions', async () => {
+  test('refuses mismatched USJ version, ignores legacy, reprocesses from USFM', async () => {
     const cache = new MemoryCacheAdapter()
     const resourceKey = 'unfoldingWord/en/ult'
     const bookId = 'tit'
-    const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
     const usjProcessor = new USJProcessor()
-    const result = await usjProcessor.processUSFM(ult, bookId, 'TIT')
+    const result = await usjProcessor.processUSFM(ULT_USFM, bookId, 'TIT')
     const bad = usjProcessor.toUsjCacheContent(result, bookId, 'TIT')
     bad.metadata.version = '0.0.0-usj-spike'
     await cache.set(usjScriptureKey(resourceKey, bookId), { content: bad })
 
-    // Legacy present so load still succeeds after refuse+delete USJ
     await cache.set(legacyScriptureKey(resourceKey, bookId), {
       content: {
         ...result.scripture,
@@ -174,21 +171,51 @@ describe('P2 USJ storage cutover', () => {
       },
     })
 
-    const loader = new ScriptureLoader({
-      cacheAdapter: cache,
-      door43Client: {},
-    })
+    const loader = stubDoor43Loader(cache)
     const loaded = (await loader.loadContent(resourceKey, bookId)) as {
       metadata: { version: string }
     }
-    expect(loaded.metadata.version).toBe('1.0.0-legacy-marker')
-    expect(cache.store.has(usjScriptureKey(resourceKey, bookId))).toBe(false)
+    expect(loaded.metadata.version).toBe(USJ_PROCESSING_VERSION)
+    // Bad USJ deleted then rewritten with good content
+    const rewritten = cache.store.get(usjScriptureKey(resourceKey, bookId))
+    expect(rewritten).toBeTruthy()
+    expect(
+      (rewritten!.content as { metadata?: { version?: string } }).metadata?.version
+    ).toBe(USJ_PROCESSING_VERSION)
+  })
+
+  test('legacy-only miss without Door43 surfaces clear stale-cache hint', async () => {
+    const cache = new MemoryCacheAdapter()
+    const resourceKey = 'unfoldingWord/en/ult'
+    const bookId = 'tit'
+    const usjProcessor = new USJProcessor()
+    const result = await usjProcessor.processUSFM(ULT_USFM, bookId, 'TIT')
+    await cache.set(legacyScriptureKey(resourceKey, bookId), {
+      content: result.scripture,
+    })
+
+    const loader = new ScriptureLoader({
+      cacheAdapter: cache,
+      catalogAdapter: {
+        get: async () => ({
+          contentMetadata: { ingredients: [{ identifier: bookId, path: './tit.usfm' }] },
+        }),
+      },
+      door43Client: {
+        findRepository: async () => {
+          throw new Error('network down')
+        },
+      },
+    })
+
+    await expect(loader.loadScriptureResult(resourceKey, bookId)).rejects.toThrow(
+      /Clear IndexedDB keys starting with/
+    )
   })
 
   test('USJ chapter split/rejoin preserves alignment map entries', async () => {
-    const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
     const usjProcessor = new USJProcessor()
-    const result = await usjProcessor.processUSFM(ult, 'tit', 'TIT')
+    const result = await usjProcessor.processUSFM(ULT_USFM, 'tit', 'TIT')
     const content = usjProcessor.toUsjCacheContent(result, 'tit', 'TIT')
     expect(content.chapters?.length).toBeGreaterThan(0)
 
@@ -217,8 +244,7 @@ describe('P2 USJ storage cutover', () => {
 
   test('processUsfmToUsjResult is the only write path (no legacy scripture: writes)', async () => {
     const { processUsfmToUsjResult } = await import('../src/processUsfm')
-    const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
-    const result = await processUsfmToUsjResult({ usfmText: ult, bookId: 'tit' })
+    const result = await processUsfmToUsjResult({ usfmText: ULT_USFM, bookId: 'tit' })
     expect(result.cacheContent.metadata.version).toBe(USJ_PROCESSING_VERSION)
     expect(isUsjScriptureCacheContent(result.cacheContent)).toBe(true)
   })

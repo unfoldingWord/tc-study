@@ -1,11 +1,10 @@
 /**
  * Scripture Loader - Package Exports
  *
- * Sole process path = USJ (UsjScriptureViewModel + scripture-usj: cache).
- * Helps: prefer loadViewModel() + viewModelToOptimizedChapters / extractUsjBroadcastTokens.
+ * Sole process + cache path = USJ (`scripture-usj:`).
+ * Primary API: ScriptureLoader.loadScriptureResult / loadViewModel.
+ * Helps: loadViewModel() + viewModelToOptimizedChapters / extractUsjBroadcastTokens.
  * ProcessedScripture helpers are transitional projections only.
- *
- * Viewer / Helps: prefer types from here (or @bt-synergy/usj-processor).
  */
 
 export { ScriptureLoader } from './ScriptureLoader'
@@ -21,6 +20,7 @@ export {
   usjScriptureKey,
   LEGACY_SCRIPTURE_PREFIX,
   USJ_SCRIPTURE_PREFIX,
+  STALE_SCRIPTURE_CACHE_HINT,
   isUsjScriptureKey,
   isLegacyScriptureKey,
 } from './scriptureCacheKeys'

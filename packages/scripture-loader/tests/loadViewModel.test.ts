@@ -1,5 +1,5 @@
 /**
- * ScriptureLoader.loadViewModel / loadScriptureResult — first-class USJ path.
+ * ScriptureLoader.loadViewModel / loadScriptureResult — primary USJ path.
  */
 
 import { describe, expect, test } from 'bun:test'
@@ -89,14 +89,14 @@ describe('ScriptureLoader.loadViewModel', () => {
     expect(bundle.scripture.chapters.length).toBe(viewModel.chapters.length)
     expect(bundle.scripture.metadata.version).toBe(USJ_PROCESSING_VERSION)
 
-    // Helps path unchanged
+    // ResourceLoader projection path
     const content = await loader.loadContent(resourceKey, bookId)
     expect((content as { metadata: { version: string } }).metadata.version).toBe(
       USJ_PROCESSING_VERSION
     )
   })
 
-  test('legacy scripture: cache synthesizes viewModel (fromUsjCache false)', async () => {
+  test('ignores legacy scripture: and re-processes USFM into scripture-usj', async () => {
     const cache = new MemoryCacheAdapter()
     const resourceKey = 'unfoldingWord/en/ult'
     const bookId = 'tit'
@@ -109,12 +109,21 @@ describe('ScriptureLoader.loadViewModel', () => {
 
     const loader = new ScriptureLoader({
       cacheAdapter: cache,
-      door43Client: {},
+      catalogAdapter: {
+        get: async () => ({
+          contentMetadata: { ingredients: [{ identifier: bookId, path: './tit.usfm' }] },
+        }),
+      },
+      door43Client: {
+        findRepository: async () => ({ default_branch: 'master' }),
+        fetchTextContent: async () => ULT_USFM,
+      },
     })
 
     const bundle = await loader.loadScriptureResult(resourceKey, bookId)
     expect(bundle.fromUsjCache).toBe(false)
     expect(bundle.viewModel.chapters[0]?.verses[0]?.tokens.length).toBeGreaterThan(0)
-    expect(bundle.scripture.bookCode).toBe(bookId)
+    expect(bundle.scripture.metadata.version).toBe(USJ_PROCESSING_VERSION)
+    expect(cache.store.has(usjScriptureKey(resourceKey, bookId))).toBe(true)
   })
 })

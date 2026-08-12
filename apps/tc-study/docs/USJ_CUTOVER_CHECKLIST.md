@@ -58,6 +58,16 @@
 | **(a) Merge PR #19** | Human merge when CI green — **do not auto-merge** |
 | **(b) Delete wave (usfm-js unused; USJ parity gates green)** | **COMPLETE** |
 
+## Cache clear (once)
+
+**Do this once** after pulling the USJ cutover (users and local devs):
+
+1. Open DevTools → **Application** → **IndexedDB** → `tc-study-cache` → `cache-entries`
+2. Delete every key starting with `scripture:` **and** `scripture-usj:` (or delete the whole DB)
+3. Reload the app and re-download / open books so they rewrite **only** under `scripture-usj:`
+
+Why: legacy `scripture:` usfm-js / ProcessedScripture blobs are **hard-deprecated** — the loader never migrate-reads them. Offline skip and workers check `scripture-usj:` only. Stale/incompatible USJ entries are deleted and reprocessed from USFM source; if load fails offline with leftovers present, errors include a clear clear-cache hint.
+
 ## Rollback
 
-No pipeline flag. Clear IndexedDB keys matching `scripture:` and `scripture-usj:`, reload, re-download.
+No pipeline flag. Same as **Cache clear (once)** above, then reload and re-download.

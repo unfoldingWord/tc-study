@@ -2,31 +2,29 @@
  * Scripture Loader
  *
  * Loads scripture content (USFM files) from cache or Door43 API.
- * Sole process path: @bt-synergy/usj-processor (USJ replaces usfm-js).
+ * Sole process + cache path: @bt-synergy/usj-processor → `scripture-usj:` SoT.
  *
- * Preferred API: loadViewModel() / loadScriptureResult() → UsjScriptureViewModel.
- * Transitional: loadContent() → ProcessedScripture (Helps / ResourceLoader contract).
+ * Primary API: loadScriptureResult() / loadViewModel().
+ * ResourceLoader contract: loadContent() → ProcessedScripture projection only.
  */
 
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog';
-import type { ProgressCallback, ResourceLoader } from '@bt-synergy/resource-types';
+import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import type { ProgressCallback, ResourceLoader } from '@bt-synergy/resource-types'
 import {
   USJProcessor,
-  viewModelFromProcessedScripture,
   type ProcessedScripture,
   type UsjScriptureViewModel,
-} from '@bt-synergy/usj-processor';
+} from '@bt-synergy/usj-processor'
 
-import { processUsfmToUsjResult } from './processUsfm';
-import type { ScriptureLoadResult } from './scriptureLoadResult';
-import { legacyScriptureKey, usjScriptureKey } from './scriptureCacheKeys';
-import type { ScriptureLoaderConfig } from './types';
+import { processUsfmToUsjResult } from './processUsfm'
+import type { ScriptureLoadResult } from './scriptureLoadResult'
 import {
-  isProcessedScriptureContent,
-  isUsjScriptureCacheContent,
-  processedFromUsjCache,
-  usjResultFromCache,
-} from './usjCache';
+  legacyScriptureKey,
+  STALE_SCRIPTURE_CACHE_HINT,
+  usjScriptureKey,
+} from './scriptureCacheKeys'
+import type { ScriptureLoaderConfig } from './types'
+import { processedFromUsjCache, usjResultFromCache } from './usjCache'
 
 /**
  * Produce a human-readable description from any thrown value, including
@@ -34,18 +32,22 @@ import {
  */
 function describeError(err: unknown): string {
   if (err instanceof Error) {
-    return err.message;
+    return err.message
   }
   if (err !== null && typeof err === 'object') {
-    const e = err as Record<string, unknown>;
-    const parts: string[] = [];
-    if (typeof e['message'] === 'string') parts.push(e['message']);
-    if (typeof e['code'] === 'string') parts.push(`code=${e['code']}`);
-    if (typeof e['status'] === 'number') parts.push(`status=${e['status']}`);
-    if (parts.length > 0) return parts.join(' ');
-    try { return JSON.stringify(err); } catch { /* ignore */ }
+    const e = err as Record<string, unknown>
+    const parts: string[] = []
+    if (typeof e['message'] === 'string') parts.push(e['message'])
+    if (typeof e['code'] === 'string') parts.push(`code=${e['code']}`)
+    if (typeof e['status'] === 'number') parts.push(`status=${e['status']}`)
+    if (parts.length > 0) return parts.join(' ')
+    try {
+      return JSON.stringify(err)
+    } catch {
+      /* ignore */
+    }
   }
-  return String(err);
+  return String(err)
 }
 
 /**
@@ -79,7 +81,7 @@ export class ScriptureLoader implements ResourceLoader {
     this.door43Client = config.door43Client
     this.debug = config.debug || false
     if (this.debug) {
-      console.log('[ScriptureLoader] pipeline=usj (USJ-only; usfm-js removed)')
+      console.log('[ScriptureLoader] pipeline=usj (USJ-only; scripture-usj: SoT)')
     }
   }
 
@@ -142,10 +144,14 @@ export class ScriptureLoader implements ResourceLoader {
     return (await this.processAndCacheResult(usfmText, resourceKey, bookId)).scripture
   }
 
+  /**
+   * Read scripture-usj: only. Legacy `scripture:` blobs are never served —
+   * on miss we re-process from USFM source (Door43 / zip).
+   */
   private async readCachedResult(
     resourceKey: string,
     bookId: string
-  ): Promise<ScriptureLoadResult | null> {
+  ): Promise<{ result: ScriptureLoadResult | null; hadLegacy: boolean }> {
     const usjKey = usjScriptureKey(resourceKey, bookId)
     try {
       const usjCached = await this.cacheAdapter.get(usjKey)
@@ -160,56 +166,48 @@ export class ScriptureLoader implements ResourceLoader {
             console.log(`Cache hit (USJ SoT) for ${usjKey}`)
           }
           return {
-            viewModel: full.viewModel,
-            scripture: full.scripture,
-            fromUsjCache: true,
+            result: {
+              viewModel: full.viewModel,
+              scripture: full.scripture,
+              fromUsjCache: true,
+            },
+            hadLegacy: false,
           }
         }
-        if (isUsjScriptureCacheContent(usjCached.content)) {
-          if (this.debug) {
-            console.warn(
-              `[ScriptureLoader] Refusing mismatched USJ cache version at ${usjKey}; will reprocess`
-            )
-          }
-          await this.cacheAdapter.delete(usjKey)
-        }
+        console.warn(
+          `[ScriptureLoader] Stale/incompatible USJ cache at ${usjKey}; deleting. ${STALE_SCRIPTURE_CACHE_HINT}`
+        )
+        await this.cacheAdapter.delete(usjKey)
       }
     } catch (err) {
       console.warn('[ScriptureLoader] USJ cache error:', err)
     }
 
-    // Migrate-read legacy scripture: blobs (do not write new ones)
+    // Hard-deprecate: never migrate-read legacy scripture: processed blobs.
+    const hadLegacy = await this.warnIfLegacyScripturePresent(resourceKey, bookId)
+    return { result: null, hadLegacy }
+  }
+
+  private async warnIfLegacyScripturePresent(
+    resourceKey: string,
+    bookId: string
+  ): Promise<boolean> {
     const legacyKey = legacyScriptureKey(resourceKey, bookId)
     try {
       const legacy = await this.cacheAdapter.get(legacyKey)
-      if (legacy?.content && isProcessedScriptureContent(legacy.content)) {
-        if (this.debug) {
-          console.log(
-            `Cache hit (legacy scripture) for ${legacyKey} — serving; USJ migrate on re-fetch`
-          )
-        }
-        return {
-          viewModel: viewModelFromProcessedScripture(legacy.content),
-          scripture: legacy.content,
-          fromUsjCache: false,
-        }
-      }
-      if (legacy?.content && (legacy.content as { usfm?: string }).usfm) {
-        if (this.debug) {
-          console.log('⚠️ Cached content is old raw USFM format, reprocessing to USJ...')
-        }
-        return this.processAndCacheResult(
-          (legacy.content as { usfm: string }).usfm,
-          resourceKey,
-          bookId
+      if (legacy?.content) {
+        console.warn(
+          `[ScriptureLoader] Ignoring deprecated ${legacyKey} (scripture-usj: only). ${STALE_SCRIPTURE_CACHE_HINT}`
         )
+        return true
       }
-    } catch (err) {
-      console.warn('[ScriptureLoader] Legacy cache error:', err)
+    } catch {
+      /* ignore */
     }
-    return null
+    return false
   }
 
+  /** Offline skip / download: only scripture-usj: with compatible version counts. */
   private async hasUsableCache(resourceKey: string, bookId: string): Promise<boolean> {
     try {
       const usjCached = await this.cacheAdapter.get(usjScriptureKey(resourceKey, bookId))
@@ -219,13 +217,10 @@ export class ScriptureLoader implements ResourceLoader {
       ) {
         return true
       }
-    } catch { /* ignore */ }
-    try {
-      const legacy = await this.cacheAdapter.get(legacyScriptureKey(resourceKey, bookId))
-      return Boolean(legacy?.content && isProcessedScriptureContent(legacy.content))
     } catch {
-      return false
+      /* ignore */
     }
+    return false
   }
 
   private async fetchUsfmText(resourceKey: string, bookId: string): Promise<string> {
@@ -311,18 +306,18 @@ export class ScriptureLoader implements ResourceLoader {
   }
 
   /**
-   * Preferred load path: UsjScriptureViewModel + transitional ProcessedScripture.
-   * Viewer should use `viewModel`; Helps may keep using `scripture`.
+   * Primary load API: UsjScriptureViewModel + transitional ProcessedScripture.
+   * Cache: scripture-usj: only; miss → fetch USFM → process → write scripture-usj:.
    */
   async loadScriptureResult(
     resourceKey: string,
     bookId: string
   ): Promise<ScriptureLoadResult> {
-    const fromCache = await this.readCachedResult(resourceKey, bookId)
+    const { result: fromCache, hadLegacy } = await this.readCachedResult(resourceKey, bookId)
     if (fromCache) return fromCache
 
     if (this.debug) {
-      console.log(`Cache miss, fetching ${resourceKey}/${bookId} from Door43...`)
+      console.log(`Cache miss (scripture-usj:), fetching ${resourceKey}/${bookId} from Door43...`)
     }
 
     try {
@@ -354,8 +349,9 @@ export class ScriptureLoader implements ResourceLoader {
         }
       }
 
+      const staleSuffix = hadLegacy ? ` ${STALE_SCRIPTURE_CACHE_HINT}` : ''
       const wrapped = new Error(
-        `Scripture content not available for ${resourceKey}/${bookId}: ${describeError(err)}`
+        `Scripture content not available for ${resourceKey}/${bookId}: ${describeError(err)}.${staleSuffix}`
       )
       ;(wrapped as Error & { cause?: unknown }).cause = err
       throw wrapped
@@ -363,7 +359,7 @@ export class ScriptureLoader implements ResourceLoader {
   }
 
   /**
-   * First-class USJ runtime view for Viewer (identity + alignments).
+   * Primary Viewer API — UsjScriptureViewModel (identity + alignments).
    */
   async loadViewModel(resourceKey: string, bookId: string): Promise<UsjScriptureViewModel> {
     const { viewModel } = await this.loadScriptureResult(resourceKey, bookId)
@@ -371,7 +367,8 @@ export class ScriptureLoader implements ResourceLoader {
   }
 
   /**
-   * ResourceLoader contract / Helps transitional path — ProcessedScripture projection only.
+   * ResourceLoader contract — ProcessedScripture projection only.
+   * Prefer loadViewModel() / loadScriptureResult() for new code.
    */
   async loadContent(resourceKey: string, bookId: string): Promise<unknown> {
     const { scripture } = await this.loadScriptureResult(resourceKey, bookId)
@@ -395,11 +392,14 @@ export class ScriptureLoader implements ResourceLoader {
   }
 
   async clearCache(resourceKey: string): Promise<void> {
-    console.warn('[ScriptureLoader] clearCache not implemented')
+    console.warn(
+      `[ScriptureLoader] clearCache not implemented for ${resourceKey}. ${STALE_SCRIPTURE_CACHE_HINT}`
+    )
   }
 
   /**
-   * Download entire scripture resource (all books) for offline use
+   * Download entire scripture resource (all books) for offline use.
+   * Writes scripture-usj: only; skipExisting checks USJ SoT only.
    */
   async downloadResource(
     resourceKey: string,
@@ -448,8 +448,8 @@ export class ScriptureLoader implements ResourceLoader {
         downloadCompletedAt: new Date().toISOString(),
         downloadMethod: method,
         entryCount: ingredients.length,
-        expectedEntryCount: ingredients.length
-      }
+        expectedEntryCount: ingredients.length,
+      },
     })
 
     console.log(`✅ [ScriptureLoader] Download complete for ${resourceKey}`)
@@ -478,7 +478,7 @@ export class ScriptureLoader implements ResourceLoader {
     const ref = metadata.release?.tag_name || (metadata as any).default_branch || 'master'
 
     const zipballBuffer = await this.door43Client.downloadZipball(owner, repoName, ref)
-    
+
     console.log(`✅ Downloaded zipball: ${(zipballBuffer.byteLength / (1024 * 1024)).toFixed(2)} MB`)
 
     const jszipMod = await import('jszip')
@@ -499,18 +499,21 @@ export class ScriptureLoader implements ResourceLoader {
 
       try {
         if (skipExisting && (await this.hasUsableCache(resourceKey, bookId))) {
-          console.log(`⏭️ Skipping ${bookId} (already cached)`)
+          console.log(`⏭️ Skipping ${bookId} (already cached in scripture-usj:)`)
           loaded++
           if (onProgress) {
             onProgress({
               loaded,
               total,
               percentage: Math.round((loaded / total) * 100),
-              message: `Skipped ${bookId} (already cached)`
+              message: `Skipped ${bookId} (already cached)`,
             })
           }
           continue
         }
+
+        // Legacy-only cache must not count as offline-ready
+        await this.warnIfLegacyScripturePresent(resourceKey, bookId)
 
         const bookPath = ingredient.path
         if (!bookPath) {
@@ -518,7 +521,7 @@ export class ScriptureLoader implements ResourceLoader {
         }
 
         const normalizedPath = bookPath.replace(/^\.\//, '')
-        
+
         let zipFile: { dir?: boolean; async?(type: string): Promise<unknown> } | null = null
         for (const [fileName, file] of Object.entries(zip.files)) {
           const entry = file as { dir?: boolean }
@@ -538,7 +541,7 @@ export class ScriptureLoader implements ResourceLoader {
               loaded,
               total,
               percentage: Math.round((loaded / total) * 100),
-              message: `Skipped ${bookId} (not in repo)`
+              message: `Skipped ${bookId} (not in repo)`,
             })
           }
           continue
@@ -546,7 +549,7 @@ export class ScriptureLoader implements ResourceLoader {
 
         const raw = await (zipFile as { async(type: string): Promise<unknown> }).async('string')
         const usfmContent = raw as string
-        
+
         if (this.debug) {
           console.log(`📖 Processing ${bookId} from ZIP (${usfmContent.length} bytes)`)
         }
@@ -555,13 +558,13 @@ export class ScriptureLoader implements ResourceLoader {
 
         processed++
         loaded++
-        
+
         if (onProgress) {
           onProgress({
             loaded,
             total,
             percentage: Math.round((loaded / total) * 100),
-            message: `Processed ${bookId}`
+            message: `Processed ${bookId}`,
           })
         }
       } catch (error) {
@@ -572,7 +575,7 @@ export class ScriptureLoader implements ResourceLoader {
             loaded,
             total,
             percentage: Math.round((loaded / total) * 100),
-            message: `Failed: ${bookId}`
+            message: `Failed: ${bookId}`,
           })
         }
       }
@@ -600,21 +603,21 @@ export class ScriptureLoader implements ResourceLoader {
 
       try {
         if (skipExisting && (await this.hasUsableCache(resourceKey, bookId))) {
-          console.log(`⏭️ Skipping ${bookId} (already cached)`)
+          console.log(`⏭️ Skipping ${bookId} (already cached in scripture-usj:)`)
           loaded++
           if (onProgress) {
             onProgress({
               loaded,
               total,
               percentage: Math.round((loaded / total) * 100),
-              message: `Skipped ${bookId} (already cached)`
+              message: `Skipped ${bookId} (already cached)`,
             })
           }
           continue
         }
 
         console.log(`📥 Downloading ${bookId}...`)
-        await this.loadContent(resourceKey, bookId)
+        await this.loadScriptureResult(resourceKey, bookId)
 
         loaded++
         if (onProgress) {
@@ -622,18 +625,24 @@ export class ScriptureLoader implements ResourceLoader {
             loaded,
             total,
             percentage: Math.round((loaded / total) * 100),
-            message: `Downloaded ${bookId}`
+            message: `Downloaded ${bookId}`,
           })
         }
       } catch (error) {
-        console.error(`❌ Failed to download ${bookId}:`, error)
+        const msg = describeError(error)
+        console.error(
+          `❌ Failed to download ${bookId}:`,
+          msg.includes('scripture-usj') || msg.includes('Stale scripture')
+            ? msg
+            : `${msg} ${STALE_SCRIPTURE_CACHE_HINT}`
+        )
         loaded++
         if (onProgress) {
           onProgress({
             loaded,
             total,
             percentage: Math.round((loaded / total) * 100),
-            message: `Failed: ${bookId}`
+            message: `Failed: ${bookId}`,
           })
         }
       }
