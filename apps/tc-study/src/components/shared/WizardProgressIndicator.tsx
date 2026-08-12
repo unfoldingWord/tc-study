@@ -47,7 +47,7 @@ export function WizardProgressIndicator<T extends string = string>({
   const currentStepIndex = visibleSteps.findIndex(step => step.id === currentStep)
   
   return (
-    <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+    <div className="px-6 py-3 border-b border-border bg-muted">
       <div className="flex items-center justify-between text-sm">
         <div className="flex items-center gap-2">
           {visibleSteps.map((step, index) => {
@@ -60,16 +60,16 @@ export function WizardProgressIndicator<T extends string = string>({
                 <div
                   className={`
                     p-2 rounded-full transition-colors
-                    ${isActive ? 'bg-blue-600 text-white' : ''}
-                    ${isComplete ? 'bg-green-600 text-white' : ''}
-                    ${!isActive && !isComplete ? 'bg-gray-200 text-gray-600' : ''}
+                    ${isActive ? 'bg-accent text-white' : ''}
+                    ${isComplete ? 'bg-accent text-white' : ''}
+                    ${!isActive && !isComplete ? 'bg-muted text-fg-secondary border border-border' : ''}
                   `}
                   title={step.label}
                 >
                   <StepIcon className="w-4 h-4" />
                 </div>
                 {index < visibleSteps.length - 1 && (
-                  <ChevronRight className="w-4 h-4 mx-1 text-gray-400" />
+                  <ChevronRight className="w-4 h-4 mx-1 text-fg-muted" />
                 )}
               </div>
             )
@@ -78,10 +78,10 @@ export function WizardProgressIndicator<T extends string = string>({
         
         {/* Item count badge */}
         {(itemCount !== undefined || ItemCountIcon) && (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-full border border-gray-200">
-            {ItemCountIcon && <ItemCountIcon className="w-4 h-4 text-gray-600" />}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface rounded-full border border-border">
+            {ItemCountIcon && <ItemCountIcon className="w-4 h-4 text-fg-secondary" />}
             {itemCount !== undefined && (
-              <span className="font-medium text-gray-900">{itemCount}</span>
+              <span className="font-medium text-fg">{itemCount}</span>
             )}
           </div>
         )}
@@ -89,6 +89,3 @@ export function WizardProgressIndicator<T extends string = string>({
     </div>
   )
 }
-
-
-

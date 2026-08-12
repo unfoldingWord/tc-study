@@ -32,6 +32,16 @@ Switching mechanism: `class="dark"` on `<html>` (also `data-theme` and `color-sc
 
 Prefer semantic tokens over scattering `dark:` one-offs or baking theme into business logic.
 
+## Modal overlays
+
+Dialogs use a shared scrim token so backdrops stay consistent in light and dark:
+
+| Token | Utilities | Use |
+|-------|-----------|-----|
+| `overlay` | `bg-overlay` | Full-screen modal/dialog backdrop (optionally with `backdrop-blur-sm`) |
+
+Modal panels themselves use `bg-surface` / `bg-elevated`, with `border-border`, `text-fg`, `text-fg-secondary`, `bg-muted` for chrome — not hard-coded `bg-white` / `text-gray-*`.
+
 ## Helps reading chips
 
 Verse group headers and quote buttons on Combined Helps / TN / TWL cards use dedicated chip tokens (solid fills — not hard-coded `*-50` gradients):

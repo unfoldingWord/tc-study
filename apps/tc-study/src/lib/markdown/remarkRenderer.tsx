@@ -188,7 +188,7 @@ export class RemarkMarkdownRenderer {
           blockquote: (props: MdElementProps) => (
             <blockquote
               {...props}
-              // Modal stays bg-white; avoid dark:text-* (OS dark → light text on white).
+              // Prefer semantic tokens; avoid OS-only dark:text-* on themed surfaces.
               className="border-l-4 border-blue-300 pl-4 italic mb-4 text-slate-900 [&_p]:text-slate-900 [&_em]:text-inherit [&_strong]:text-inherit [&_blockquote]:text-slate-900 [&_blockquote_p]:text-slate-900"
             />
           ),

@@ -37,8 +37,8 @@ export function ObsStoryPicker({
                   p-2 rounded-lg border text-sm font-medium transition-all
                   ${
                     isHighlighted
-                      ? 'border-blue-500 bg-blue-50 text-blue-900'
-                      : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50 text-gray-800'
+                      ? 'border-accent bg-accent-soft text-accent-fg'
+                      : 'border-border hover:border-accent hover:bg-muted text-fg'
                   }
                 `}
               >

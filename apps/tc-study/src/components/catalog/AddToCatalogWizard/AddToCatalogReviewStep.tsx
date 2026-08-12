@@ -15,9 +15,9 @@ export function AddToCatalogReviewStep({
   return (
     <div className="space-y-2">
       {reviewResources.size === 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600" />
-          <span className="text-xs text-green-800">All resources already in catalog</span>
+        <div className="bg-accent-soft border border-border rounded-lg p-3 flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-accent" />
+          <span className="text-xs text-accent-fg">All resources already in catalog</span>
         </div>
       )}
 
@@ -28,7 +28,7 @@ export function AddToCatalogReviewStep({
             return (
               <div
                 key={resourceKey}
-                className="flex items-center gap-2 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 p-3 border border-border rounded-lg hover:bg-muted transition-colors"
               >
                 <input
                   type="checkbox"
@@ -42,16 +42,16 @@ export function AddToCatalogReviewStep({
                     }
                     onSelectionChange(newSelection)
                   }}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  className="w-4 h-4 text-accent rounded focus:ring-2 focus:ring-accent cursor-pointer"
                 />
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-gray-900 text-sm truncate">{resource.title}</h4>
+                  <h4 className="font-medium text-fg text-sm truncate">{resource.title}</h4>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded font-mono">
+                    <span className="text-xs px-1.5 py-0.5 bg-muted text-fg-secondary rounded font-mono">
                       {resource.language || '??'}
                     </span>
                     {resource.ingredients && (
-                      <span className="flex items-center gap-0.5 text-xs text-gray-500">
+                      <span className="flex items-center gap-0.5 text-xs text-fg-secondary">
                         <BookOpen className="w-3 h-3" />
                         {resource.ingredients.length}
                       </span>

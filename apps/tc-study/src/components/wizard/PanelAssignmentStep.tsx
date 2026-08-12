@@ -27,7 +27,7 @@ export function PanelAssignmentStep() {
   const setActiveResourceInPanel = useWorkspaceStore((state) => state.setActiveResourceInPanel)
   
   if (!currentPackage) {
-    return <div className="text-center py-12 text-gray-500">No workspace package loaded</div>
+    return <div className="text-center py-12 text-fg-secondary">No workspace package loaded</div>
   }
   
   // Get panel configs (dynamic panels)
@@ -131,18 +131,18 @@ export function PanelAssignmentStep() {
       onDragStart={() => handleDragStart(resourceKey)}
       onDragEnd={handleDragEnd}
       className={`
-        p-3 bg-white border-2 rounded-lg cursor-move transition-all
-        ${isDragging ? 'opacity-50 border-blue-500' : 'border-gray-200 hover:border-blue-300'}
-        ${isActive ? 'ring-2 ring-blue-500 border-blue-500' : ''}
+        p-3 bg-surface border-2 rounded-lg cursor-move transition-all
+        ${isDragging ? 'opacity-50 border-accent' : 'border-border hover:border-accent'}
+        ${isActive ? 'ring-2 ring-accent border-accent' : ''}
       `}
     >
       <div className="flex items-start gap-2">
-        <GripVertical className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+        <GripVertical className="w-4 h-4 text-fg-muted flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-gray-900 text-sm truncate">
+          <div className="font-medium text-fg text-sm truncate">
             {resource.title}
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-fg-secondary">
             {resource.owner} • {resource.language.toUpperCase()}
           </div>
         </div>
@@ -152,12 +152,12 @@ export function PanelAssignmentStep() {
               type="radio"
               checked={isActive}
               onChange={() => handleSetActive(panelId, index)}
-              className="w-4 h-4 text-blue-600"
+              className="w-4 h-4 text-accent"
               title="Set as active"
             />
             <button
               onClick={() => handleRemove(resourceKey, panelId)}
-              className="p-1 hover:bg-red-50 rounded text-red-600"
+              className="p-1 hover:bg-danger-soft rounded text-danger"
               title="Remove from panel"
             >
               <X className="w-4 h-4" />
@@ -179,13 +179,13 @@ export function PanelAssignmentStep() {
   }) => (
     <div className="flex flex-col h-full">
       {/* Panel Header */}
-      <div className="bg-gray-100 border-2 border-gray-300 border-b-0 rounded-t-lg px-4 py-3">
+      <div className="bg-muted border-2 border-border border-b-0 rounded-t-lg px-4 py-3">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Monitor className="w-5 h-5 text-gray-600" />
+          <h3 className="font-semibold text-fg flex items-center gap-2">
+            <Monitor className="w-5 h-5 text-fg-secondary" />
             {panelId === 'panel-1' ? 'Panel 1' : 'Panel 2'}
           </h3>
-          <span className="text-sm text-gray-600 bg-white px-2 py-1 rounded border border-gray-300">
+          <span className="text-sm text-fg-secondary bg-surface px-2 py-1 rounded border border-border">
             {resources.length} resource(s)
           </span>
         </div>
@@ -197,12 +197,12 @@ export function PanelAssignmentStep() {
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, panelId)}
         className={`
-          flex-1 p-4 border-2 rounded-b-lg min-h-[400px] transition-all bg-white
-          ${dragOverPanel === panelId ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}
+          flex-1 p-4 border-2 rounded-b-lg min-h-[400px] transition-all bg-surface
+          ${dragOverPanel === panelId ? 'border-accent bg-accent-soft' : 'border-border'}
         `}
       >
         {resources.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+          <div className="flex flex-col items-center justify-center h-full text-fg-muted">
             <Plus className="w-12 h-12 mb-2" />
             <p className="text-sm">Drag resources here</p>
             <p className="text-xs mt-1">This panel is empty</p>
@@ -229,19 +229,19 @@ export function PanelAssignmentStep() {
     <div>
       {/* Header */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Assign to Panels</h2>
-        <p className="text-gray-600">
+        <h2 className="text-2xl font-bold text-fg mb-2">Assign to Panels</h2>
+        <p className="text-fg-secondary">
           Drag resources to Panel 1 or Panel 2 below. The panels are displayed side-by-side as they will appear in the studio.
         </p>
       </div>
       
       {/* Instructions */}
-      <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="mb-6 p-4 bg-accent-soft border border-accent rounded-lg">
         <div className="flex items-start gap-3">
-          <Layers className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-blue-900">
+          <Layers className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-accent-fg">
             <p className="font-medium mb-1">How to assign:</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-800">
+            <ul className="list-disc list-inside space-y-1 text-accent-fg">
               <li>Drag unassigned resources to a panel</li>
               <li>Click the radio button to set which resource shows first</li>
               <li>Click X to remove a resource from a panel</li>
@@ -254,7 +254,7 @@ export function PanelAssignmentStep() {
       {/* Unassigned Resources */}
       {unassignedResources.length > 0 && (
         <div className="mb-6">
-          <h3 className="font-semibold text-gray-900 mb-3">
+          <h3 className="font-semibold text-fg mb-3">
             Unassigned Resources ({unassignedResources.length})
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -287,15 +287,15 @@ export function PanelAssignmentStep() {
       </div>
       
       {/* Summary */}
-      <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+      <div className="mt-6 p-4 bg-muted border border-border rounded-lg">
         <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-gray-900">Summary:</span>
+            <span className="font-semibold text-fg">Summary:</span>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <span className="text-gray-600">New Resources:</span>
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 font-medium rounded">
+              <span className="text-fg-secondary">New Resources:</span>
+              <span className="px-2 py-1 bg-accent-soft text-accent-fg font-medium rounded">
                 {Array.from(selectedResourceKeys).filter(key => {
                   const resource = availableResources.get(key)
                   return !resource?.isInWorkspace
@@ -303,14 +303,14 @@ export function PanelAssignmentStep() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-gray-600">Panel 1:</span>
-              <span className="px-2 py-1 bg-green-100 text-green-800 font-medium rounded">
+              <span className="text-fg-secondary">Panel 1:</span>
+              <span className="px-2 py-1 bg-accent-soft text-accent-fg font-medium rounded">
                 {panel1Resources.length}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-gray-600">Panel 2:</span>
-              <span className="px-2 py-1 bg-purple-100 text-purple-800 font-medium rounded">
+              <span className="text-fg-secondary">Panel 2:</span>
+              <span className="px-2 py-1 bg-panel-2-soft text-panel-2-fg font-medium rounded">
                 {panel2Resources.length}
               </span>
             </div>

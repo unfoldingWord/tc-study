@@ -41,7 +41,7 @@ export function ResourceSelectorStep() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-accent" />
       </div>
     )
   }
@@ -49,7 +49,7 @@ export function ResourceSelectorStep() {
   if (selectedLanguages.size === 0) {
     return (
       <div className="text-center py-20">
-        <Languages className="w-16 h-16 mx-auto text-gray-300" />
+        <Languages className="w-16 h-16 mx-auto text-fg-muted" />
       </div>
     )
   }
@@ -58,7 +58,7 @@ export function ResourceSelectorStep() {
     <div>
       {resourcesArray.length === 0 ? (
         <div className="text-center py-12">
-          <Book className="w-12 h-12 mx-auto text-gray-300" />
+          <Book className="w-12 h-12 mx-auto text-fg-muted" />
         </div>
       ) : (
         <SelectableGrid

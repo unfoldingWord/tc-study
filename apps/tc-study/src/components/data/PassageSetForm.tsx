@@ -169,20 +169,20 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-overlay backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-surface border border-border rounded-2xl shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-xl font-semibold text-gray-900">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between flex-shrink-0">
+          <h2 className="text-xl font-semibold text-fg">
             {passageSet ? 'Edit Passage Set' : 'New Passage Set'}
           </h2>
           <button
             onClick={onCancel}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
             aria-label="Close"
             data-testid="form-close-btn"
           >
-            <X className="w-5 h-5 text-gray-600" />
+            <X className="w-5 h-5 text-fg-secondary" />
           </button>
         </div>
 
@@ -191,22 +191,22 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
           <div className="space-y-6">
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Name <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-fg-secondary mb-2">
+                Name <span className="text-danger">*</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Romans Road to Salvation"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
                 data-testid="passage-set-name-input"
               />
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-fg-secondary mb-2">
                 Description
               </label>
               <textarea
@@ -214,7 +214,7 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional description..."
                 rows={2}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                className="w-full px-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent resize-none"
                 data-testid="passage-set-description-input"
               />
             </div>
@@ -222,12 +222,12 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
             {/* Passages */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <label className="block text-sm font-medium text-gray-700">
-                  Passages <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium text-fg-secondary">
+                  Passages <span className="text-danger">*</span>
                 </label>
                 <button
                   onClick={addPassage}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors text-sm"
                   data-testid="add-passage-btn"
                 >
                   <Plus className="w-4 h-4" />
@@ -236,19 +236,19 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
               </div>
 
               {passages.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                  <p className="text-gray-500 text-sm">No passages yet. Click "Add Passage" to start.</p>
+                <div className="text-center py-8 bg-muted rounded-lg">
+                  <p className="text-fg-secondary text-sm">No passages yet. Click "Add Passage" to start.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {passages.map((passage, index) => (
-                    <div key={index} className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
+                    <div key={index} className="flex items-center gap-3 p-4 bg-muted rounded-lg">
                       <div className="flex-1 grid grid-cols-3 gap-3">
                         {/* Book */}
                         <select
                           value={passage.book}
                           onChange={(e) => updatePassage(index, 'book', e.target.value)}
-                          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent"
                           data-testid={`passage-${index}-book`}
                         >
                           {BOOKS.map(book => (
@@ -263,7 +263,7 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
                           onChange={(e) => updatePassage(index, 'chapter', e.target.value)}
                           placeholder="Chapter"
                           min="1"
-                          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent"
                           data-testid={`passage-${index}-chapter`}
                         />
 
@@ -274,7 +274,7 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
                           onChange={(e) => updatePassage(index, 'verse', e.target.value)}
                           placeholder="Verse"
                           min="1"
-                          className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="px-3 py-2 border border-border rounded-lg text-sm focus:ring-2 focus:ring-accent focus:border-accent"
                           data-testid={`passage-${index}-verse`}
                         />
                       </div>
@@ -282,12 +282,12 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
                       {/* Delete */}
                       <button
                         onClick={() => removePassage(index)}
-                        className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 hover:bg-danger-soft rounded-lg transition-colors"
                         title="Remove passage"
                         aria-label="Remove passage"
                         data-testid={`remove-passage-${index}`}
                       >
-                        <Trash2 className="w-4 h-4 text-red-600" />
+                        <Trash2 className="w-4 h-4 text-danger" />
                       </button>
                     </div>
                   ))}
@@ -298,10 +298,10 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 flex-shrink-0 bg-gray-50">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3 flex-shrink-0 bg-muted">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            className="px-4 py-2 text-fg-secondary hover:bg-muted rounded-lg transition-colors"
             data-testid="cancel-btn"
           >
             Cancel
@@ -309,7 +309,7 @@ export function PassageSetForm({ passageSet, onSave, onCancel }: PassageSetFormP
           <button
             onClick={handleSave}
             disabled={!name.trim() || passages.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             data-testid="save-btn"
           >
             <Save className="w-4 h-4" />

@@ -21,7 +21,7 @@ export function BookPicker({
   if (books.length === 0) {
     return (
       <div className="flex-1 overflow-auto p-4">
-        <div className="flex flex-col items-center justify-center py-12 text-gray-500 text-sm">
+        <div className="flex flex-col items-center justify-center py-12 text-fg-secondary text-sm">
           No Bible books found in any loaded scripture resource.
         </div>
       </div>
@@ -47,13 +47,13 @@ export function BookPicker({
                 p-3 rounded-lg border transition-all text-left hover:shadow-sm
                 ${
                   isSelected
-                    ? 'border-blue-500 bg-blue-50 shadow-sm'
-                    : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                    ? 'border-accent bg-accent-soft shadow-sm'
+                    : 'border-border hover:border-accent hover:bg-muted'
                 }
               `}
             >
-              <div className="font-semibold text-gray-900">{fullBookName}</div>
-              <div className="text-[10px] text-gray-400 uppercase tracking-wide mt-1">
+              <div className="font-semibold text-fg">{fullBookName}</div>
+              <div className="text-[10px] text-fg-muted uppercase tracking-wide mt-1">
                 {book.code}
               </div>
             </button>

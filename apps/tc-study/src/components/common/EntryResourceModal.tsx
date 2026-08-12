@@ -208,7 +208,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
   const entryTerm = entryId ? entryId.split('/').pop() || entryId : null
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => {
+    <div className="fixed inset-0 bg-overlay backdrop-blur-sm flex items-center justify-center z-50" onClick={(e) => {
       // Close on backdrop click
       if (e.target === e.currentTarget) {
         closeModal()

@@ -16,14 +16,14 @@ export function ScopeTabs({
   onSelectObs,
 }: ScopeTabsProps) {
   return (
-    <div className="flex border-b border-gray-200 bg-gray-50 px-3 py-2 gap-2 flex-shrink-0">
+    <div className="flex border-b border-border bg-muted px-3 py-2 gap-2 flex-shrink-0">
       <button
         type="button"
         onClick={onSelectScripture}
         className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
           pickerScope === 'scripture'
-            ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
-            : 'text-gray-600 hover:bg-gray-100'
+            ? 'bg-surface text-accent-fg shadow-sm border border-border'
+            : 'text-fg-secondary hover:bg-muted'
         }`}
       >
         <BookOpen className="w-4 h-4 shrink-0" />
@@ -34,8 +34,8 @@ export function ScopeTabs({
         onClick={onSelectObs}
         className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
           pickerScope === 'obs'
-            ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
-            : 'text-gray-600 hover:bg-gray-100'
+            ? 'bg-surface text-accent-fg shadow-sm border border-border'
+            : 'text-fg-secondary hover:bg-muted'
         } disabled:opacity-40 disabled:cursor-not-allowed`}
       >
         <BookMarked className="w-4 h-4 shrink-0" />
@@ -57,14 +57,14 @@ export function ObsModeTabs({
   onSelectVerse,
 }: ObsModeTabsProps) {
   return (
-    <div className="flex border-b border-gray-200 bg-gray-50 px-3 py-2 gap-2 flex-shrink-0">
+    <div className="flex border-b border-border bg-muted px-3 py-2 gap-2 flex-shrink-0">
       <button
         type="button"
         onClick={onSelectChapter}
         className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center ${
           pickerObsMode === 'chapter'
-            ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
-            : 'text-gray-600 hover:bg-gray-100'
+            ? 'bg-surface text-accent-fg shadow-sm border border-border'
+            : 'text-fg-secondary hover:bg-muted'
         }`}
         title="Story"
         aria-label="Story"
@@ -76,8 +76,8 @@ export function ObsModeTabs({
         onClick={onSelectVerse}
         className={`flex-1 rounded-lg py-2 text-sm font-medium transition-colors flex items-center justify-center ${
           pickerObsMode === 'verse'
-            ? 'bg-white text-blue-700 shadow-sm border border-gray-200'
-            : 'text-gray-600 hover:bg-gray-100'
+            ? 'bg-surface text-accent-fg shadow-sm border border-border'
+            : 'text-fg-secondary hover:bg-muted'
         }`}
         title="Frame"
         aria-label="Frame"
