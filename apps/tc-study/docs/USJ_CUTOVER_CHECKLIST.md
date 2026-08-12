@@ -1,7 +1,8 @@
 # USJ cutover checklist — full replacement of usfm-js
 
 **PR:** https://github.com/unfoldingWord/tc-study/pull/19  
-**Branch:** `feat/usj-replace-usfm-js`
+**Branch tip (remote):** `7e8159d` (Helps `db38685` + `7e8159d` atop `ec46829`)  
+**QA verified:** units + Journey 4/8 on Helps tip + local Pipeline delete WIP
 
 ## Authoritative contract (do not regress)
 
@@ -11,48 +12,53 @@
 | Runtime identity | `UsjScriptureViewModel` / `UsjWordToken` |
 | Match key | `semanticId = ${verseRef}:${content}:${occurrence}` |
 | Cross-resource | `alignedOriginalWordIds` |
-| Viewer | `loadScriptureResult` / `loadViewModel` (**done**) |
-| Helps | `loadViewModel` + `viewModelToOptimizedChapters` / `extractUsjBroadcastTokens` (**done** — USJ-only) |
-| Rollback | **Removed** — `USE_USJ_PIPELINE` / lazy usfm-js path deleted |
+| Viewer | `loadScriptureResult` → viewModel (**done**) |
+| Helps | `loadViewModel` / `viewModelToOptimizedChapters` / `extractUsjBroadcastTokens` (**done** @ `7e8159d`) |
+| Rollback | **Removed in Pipeline WIP** — not yet on remote tip |
 
-## Pipeline wave status
-
-| Item | Status |
-|------|--------|
-| USJ-only `processUsfm` / `ScriptureLoader` | **Done** |
-| Delete `USE_USJ_PIPELINE` opt-out | **Done** |
-| Types owned by `@bt-synergy/usj-processor` | **Done** |
-| `@bt-synergy/usfm-processor` package deleted | **Done** |
-| tc-study imports → `@bt-synergy/scripture-loader` | **Done** |
-| Workers / download path USJ-only | **Done** |
-| Cache write: `scripture-usj:` only; legacy `scripture:` migrate-read | **Done** |
-| Helps zero usfm-processor/usfm-js on CombinedHelps path | **Done** (`db38685`, `7e8159d`) |
-| `bun test` usj-processor + scripture-loader | **29/29 green** |
-
-## Automated gates
+## Automated gates (QA)
 
 | Gate | Status |
 |------|--------|
-| `bun test packages/usj-processor packages/scripture-loader` | **29/29** |
-| Playwright Journey 4 / 8 | Re-verify after push |
-| Manual soak matrix | See `USJ_SOAK_MATRIX.md` |
+| `bun test` usj-processor + scripture-loader + quote-matcher + usjHelpsUnderline + viewer | **40/40 green** |
+| Playwright Journey 4 (quote click + local token click) | **2/2 green** |
+| Playwright Journey 8 (Paul ↔ Παῦλος both ways) | **2/2 green** |
+| Helps unit/integration (Helps team) | **50 green** @ `7e8159d` |
+| Manual soak matrix | Sample rows OK — see `USJ_SOAK_MATRIX.md` |
+
+## Team wave status
+
+| Team | Item | Status |
+|------|------|--------|
+| **Helps** | CombinedHelps/QuoteMatcher on `UsjScriptureViewModel`; zero `usfm-processor` in helps path | **Done** (`db38685`, `7e8159d`) |
+| **Viewer** | `loadScriptureResult` → viewModel; debug/usfm-processor leftovers purged in WIP | **Done** (runtime) |
+| **Pipeline** | Remove `USE_USJ_PIPELINE` / usfm-js; delete `@bt-synergy/usfm-processor`; USJ-only loader | **WIP local / not on remote tip** |
+| **Platform** | `@usfm-tools/*` CI packaging (sibling dist / link) | **Open** (CI unit job still fails without usfm-ast) |
 
 ## Go / no-go
 
 | Decision | Recommendation |
 |----------|----------------|
-| **(a) Merge PR #19** | Human merge when CI green |
-| **(b) Delete usfm-js from tc-study scripture path** | **GO** — `@bt-synergy/usfm-processor` deleted; loader/workers USJ-only |
+| **(a) Merge USJ-default PR #19** | Hold human merge until delete wave lands or explicitly ship USJ-default-only |
+| **(b) Delete usfm-js / `@bt-synergy/usfm-processor`** | **NO-GO on remote tip** — Helps cleared; Pipeline delete not pushed |
 
-## Remaining workspace refs (out of Pipeline / non-blocking for tc-study scripture)
+## Delete-wave exit criteria
 
-| Area | Ref |
-|------|-----|
-| `packages/resource-parsers` | Own `usfm-js` dep + `parsers/usfm/usfm-processor.ts` (QuoteMatcher Optimized DTOs are separate) |
-| `apps/mobile` | Local `usfm-js` + `lib/services/usfm-processor.ts` |
-| Docs | Stale mentions in `RENDERING_*.md`, `packages/README.md`, soak matrix rollback row |
-| `catalog-cli` | `usfm-json` contentType string (filesystem cache ext only) |
+| # | Criterion | Status |
+|---|-----------|--------|
+| 1 | No runtime `usfm-js` dep for tc-study scripture (`package.json` + imports) | **Pending Pipeline push** (true in local WIP; remote `7e8159d` still lists `@bt-synergy/usfm-processor`) |
+| 2 | `@bt-synergy/usfm-processor` unused or removed | **Pending Pipeline push** (deleted in local WIP; still on remote tree) |
+| 3 | Unit/integration green | **Met** (40/40) |
+| 4 | Journey 4/8 e2e green | **Met** (4/4) |
+| 5 | Soak: Titus underlines + OL↔ULT highlights | **Met** (prior soak + Journey 4/8 re-green) |
+| 6 | This checklist: delete wave **COMPLETE** | **Not yet** |
+
+## Ranked remaining blockers
+
+1. **Pipeline (P0):** Commit + push USJ-only / delete `@bt-synergy/usfm-processor` + drop `usfm-js` from tc-study scripture graph (staged WIP exists locally).
+2. **Platform (P1):** CI `@usfm-tools/*` packaging so `scripture-loader` build does not require ad-hoc sibling `dist` (blocks green CI after delete).
+3. **Out of scope:** `resource-parsers` / `apps/mobile` own `usfm-js` copies — not tc-study scripture path.
 
 ## Rollback
 
-No pipeline flag. Clear IndexedDB keys matching `scripture:` and `scripture-usj:`, reload, re-download.
+After Pipeline delete lands: no pipeline flag. Clear IndexedDB keys matching `scripture:` and `scripture-usj:`, reload, re-download.
