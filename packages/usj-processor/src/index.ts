@@ -33,7 +33,28 @@ export {
   type BuildUsjViewModelParams,
 } from './usjViewModel'
 export { projectToProcessedScripture } from './projectToProcessedScripture'
+export {
+  viewModelFromProcessedScripture,
+  usjTokensFromProcessedVerse,
+} from './viewModelFromProcessed'
 export { collectUsjWords, parseVerseSid, extractText } from './usjWalk'
 export { USJ_PROCESSING_VERSION, USJ_TOOL_VERSIONS, type UsjToolVersions } from './versions'
 export type { CachedUsjDocument, UsjScriptureCacheContent } from './usjCacheTypes'
 export type { AlignmentMap } from './usfmTools'
+
+/**
+ * Transitional ProcessedScripture DTO types — re-exported so Viewer / Helps can
+ * import from @bt-synergy/usj-processor (or @bt-synergy/scripture-loader) and
+ * stop depending on @bt-synergy/usfm-processor. Physical home moves when usfm-js is deleted.
+ */
+export type {
+  ProcessedScripture,
+  ProcessedChapter,
+  ProcessedVerse,
+  ProcessedParagraph,
+  WordToken,
+  WordAlignment,
+  TranslatorSection,
+  ProcessingResult,
+  USFMProcessingOptions,
+} from '@bt-synergy/usfm-processor'
