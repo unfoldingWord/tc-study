@@ -60,7 +60,8 @@ export function SortableTab({
     borderStyle = 'border-2 border-dashed'
   } else {
     colorClasses = isActive ? colors.active : colors.inactive
-    borderStyle = ''
+    // Reserve border box so selected / icon-only / labeled tabs share one height
+    borderStyle = 'border-2 border-transparent'
   }
 
   const accessibleName = tooltip || label
@@ -92,8 +93,9 @@ export function SortableTab({
         onClick()
       }}
       className={`
-        flex-shrink-0 px-chrome py-chrome-tight text-chrome font-medium whitespace-nowrap
-        inline-flex items-center gap-chrome-tight
+        flex-shrink-0 h-chrome-control min-h-chrome-control px-chrome text-chrome font-medium
+        whitespace-nowrap leading-none
+        inline-flex items-center justify-center gap-chrome-tight
         select-none [-webkit-touch-callout:none]
         ${borderStyle} transition-colors duration-150 cursor-grab active:cursor-grabbing
         ${colorClasses}
@@ -103,7 +105,7 @@ export function SortableTab({
       `}
     >
       {Icon ? <Icon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden /> : null}
-      {visibleLabel ? <span>{label}</span> : null}
+      {visibleLabel ? <span className="leading-none">{label}</span> : null}
     </button>
   )
 }

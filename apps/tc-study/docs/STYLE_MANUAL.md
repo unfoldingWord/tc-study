@@ -129,6 +129,8 @@ Defined in `src/index.css` `@theme` (Tailwind utilities):
 |-------|-------|-----------|-----|
 | `chrome` | `0.5rem` (8px) | `p-chrome`, `px-chrome`, `gap-chrome` | Read bar / panel header insets |
 | `chrome-tight` | `0.375rem` (6px) | `py-chrome-tight`, `gap-chrome-tight` | Compact vertical chrome |
+| `chrome-bar` | `2.5rem` (40px) | `h-chrome-bar` | Fixed panel header strip height |
+| `chrome-control` | `1.75rem` (28px) | `h-chrome-control`, `w-chrome-control` | Tab / compact control height |
 | `content` | `0.75rem` (12px) | `p-content` | Helps lists & card padding |
 | `content-lg` | `1rem` (16px) | `p-content-lg` | Scripture reading pad |
 | `stack` / `stack-lg` | `0.5rem` / `0.75rem` | `space-y-stack`, `gap-stack` | Card & group vertical rhythm |
@@ -145,7 +147,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 - **Helps cards:** `surface` + chip tokens for verse/quote; prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
 - **Helps filter pill:** `bg-filter-chip text-filter-chip-fg` (borderless `h-7` capsule) — not `accent-soft`, which washes out on header chrome.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
-- **Panel tabs:** soft strip `bg-panel-*-soft/70`; selected `bg-tab-selected`; inactive label `text-fg-secondary`.
+- **Panel tabs:** soft strip `bg-panel-*-soft/70` at fixed `h-chrome-bar`; tabs `h-chrome-control` (icon-only and labeled share one height); selected `bg-tab-selected`; inactive label `text-fg-secondary`.
 - **Focus:** global `ring-accent` + `ring-offset-canvas` on `:focus-visible`.
 
 ---

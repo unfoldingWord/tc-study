@@ -58,15 +58,16 @@ export function ResourceTabs({
   }
 
   const PlaceholderIcon = placeholderIcon
+  const placeholderTabClass = `
+    flex-shrink-0 h-chrome-control min-h-chrome-control px-chrome text-chrome font-medium
+    whitespace-nowrap leading-none
+    inline-flex items-center justify-center gap-chrome-tight
+    border-2 rounded-md animate-pulse
+  `
   const placeholderElement = showDropPlaceholder ? (
     <div
       key="cross-panel-placeholder"
-      className={`
-        flex-shrink-0 px-chrome py-chrome-tight text-chrome font-medium whitespace-nowrap
-        inline-flex items-center gap-chrome-tight
-        border-2 rounded-md animate-pulse
-        ${placeholderColors[colorScheme]}
-      `}
+      className={`${placeholderTabClass} ${placeholderColors[colorScheme]}`}
     >
       {PlaceholderIcon ? <PlaceholderIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden /> : null}
       {placeholderLabel || (!PlaceholderIcon ? 'Drop here' : null)}
@@ -75,16 +76,9 @@ export function ResourceTabs({
 
   if (resources.length === 0) {
     return (
-      <div className="flex-1 min-w-0 flex items-center">
+      <div className="flex-1 min-w-0 h-full flex items-center">
         {showDropPlaceholder && (
-          <div
-            className={`
-              flex-shrink-0 px-chrome py-chrome-tight text-chrome font-medium whitespace-nowrap
-              inline-flex items-center gap-chrome-tight
-              border-2 rounded-md animate-pulse
-              ${placeholderColors[colorScheme]}
-            `}
-          >
+          <div className={`${placeholderTabClass} ${placeholderColors[colorScheme]}`}>
             {PlaceholderIcon ? (
               <PlaceholderIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
             ) : null}
@@ -100,11 +94,15 @@ export function ResourceTabs({
 
   return (
     <div
-      className={`flex-1 min-w-0 overflow-y-hidden touch-pan-x ${
+      className={`flex-1 min-w-0 h-full flex items-center overflow-y-hidden touch-pan-x ${
         scrollLocked ? 'overflow-x-hidden' : 'overflow-x-auto'
       }`}
     >
-      <div className="flex gap-chrome-tight pb-chrome-tight" role="tablist" aria-label="Resources">
+      <div
+        className="flex items-center gap-chrome-tight h-full"
+        role="tablist"
+        aria-label="Resources"
+      >
         {resources.map((resource, idx) => {
           const key = resource.key || resource.id
           const presentation = getTabPresentation(resource)

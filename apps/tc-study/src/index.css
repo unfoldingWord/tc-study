@@ -53,6 +53,8 @@
   /* Hierarchy: chrome / content spacing + caption type (iOS-like density) */
   --spacing-chrome: 0.5rem; /* 8px — bar & header insets */
   --spacing-chrome-tight: 0.375rem; /* 6px — compact vertical chrome */
+  --spacing-chrome-bar: 2.5rem; /* 40px — panel header strip (fixed) */
+  --spacing-chrome-control: 1.75rem; /* 28px — tab / compact control height */
   --spacing-content: 0.75rem; /* 12px — list / secondary content pad */
   --spacing-content-lg: 1rem; /* 16px — scripture reading pad */
   --spacing-stack: 0.5rem; /* 8px — tight vertical stacks */

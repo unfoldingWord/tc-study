@@ -69,8 +69,10 @@ export function PanelHeader({
   const c = colors[colorScheme]
 
   return (
-    <div className={`px-chrome pt-chrome-tight pb-0 border-b border-border-subtle ${c.strip}`}>
-      <div className="flex items-center gap-chrome-tight min-w-0">
+    <div
+      className={`h-chrome-bar px-chrome flex items-center border-b border-border-subtle ${c.strip}`}
+    >
+      <div className="flex items-center gap-chrome-tight min-w-0 w-full h-full">
         <ResourceTabs
           resources={resources}
           currentIndex={currentIndex}
@@ -90,7 +92,7 @@ export function PanelHeader({
           <div className="relative flex-shrink-0" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
-              className={`p-chrome min-w-8 min-h-8 flex items-center justify-center rounded-md ${c.button} transition-colors`}
+              className={`h-chrome-control w-chrome-control flex items-center justify-center rounded-md ${c.button} transition-colors`}
               title="Actions"
               aria-label="Resource actions"
               aria-expanded={menuOpen}
