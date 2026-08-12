@@ -63,6 +63,11 @@ export default defineConfig({
     needsInterop: ['@usfm-tools/parser', '@usfm-tools/types'],
   },
   ...sharedBuild,
+  // Workers use dynamic imports (download manager / loaders). Default IIFE cannot
+  // code-split; ES matches `new Worker(..., { type: 'module' })` in hooks.
+  worker: {
+    format: 'es',
+  },
   build: {
     ...sharedBuild.build,
     rollupOptions: {
