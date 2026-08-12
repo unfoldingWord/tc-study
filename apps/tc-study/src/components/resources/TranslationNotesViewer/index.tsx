@@ -255,8 +255,10 @@ export function TranslationNotesViewer({
     [resourceKey, onEntryLinkClick]
   )
 
-  return (
-    <div className="h-full flex flex-col">
+  // Element wrapper is always truthy — only pass when a filter is active so
+  // lists can fall back to ResourceViewerHeader via `??`.
+  const filterScopeBar =
+    obsQuoteFilter || tokenFilter || verseFilter ? (
       <HelpsFilterBanners
         obsQuoteFilter={obsQuoteFilter}
         tokenFilter={tokenFilter}
@@ -270,13 +272,17 @@ export function TranslationNotesViewer({
         onClearTokenFilter={() => setTokenFilter(null)}
         onClearVerseFilter={() => setVerseFilter(null)}
       />
+    ) : null
 
+  return (
+    <div className="h-full flex flex-col">
       <TranslationNotesList
         resource={resource}
         effectiveResource={effectiveResource}
         bookCode={currentRef.book}
         bookTitleSource={bookTitleSource}
         targetLanguageDirection={targetLanguageDirection}
+        filterScopeBar={filterScopeBar}
         loading={loading}
         error={error}
         notesByVerse={notesByVerse}

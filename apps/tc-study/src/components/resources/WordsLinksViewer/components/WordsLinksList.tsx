@@ -1,4 +1,5 @@
 import { BookOpen, BookX, Link } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../../utils/bookNames'
 import { parseTWLink } from '../../../../features/helps/quoteTokens'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
@@ -14,6 +15,8 @@ export interface WordsLinksListProps {
   bookCode?: string
   bookTitleSource: unknown
   languageDirection: 'ltr' | 'rtl'
+  /** When set, replaces ResourceViewerHeader so filter adds no extra vertical chrome. */
+  filterScopeBar?: ReactNode
   dependenciesReady: boolean
   loading: boolean
   error: string | null | undefined
@@ -35,6 +38,7 @@ export function WordsLinksList({
   bookCode,
   bookTitleSource,
   languageDirection,
+  filterScopeBar,
   dependenciesReady,
   loading,
   error,
@@ -51,7 +55,9 @@ export function WordsLinksList({
 }: WordsLinksListProps) {
   return (
     <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
-      <ResourceViewerHeader title={resource.title} icon={Link} direction={languageDirection} />
+      {filterScopeBar ?? (
+        <ResourceViewerHeader title={resource.title} icon={Link} direction={languageDirection} />
+      )}
       <div className="p-content">
         {!dependenciesReady ? (
           <LoadingSpinner

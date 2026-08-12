@@ -1,4 +1,5 @@
 import { BookOpen, FileText } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../../utils/bookNames'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { ResourceViewerHeader } from '../../common/ResourceViewerHeader'
@@ -11,6 +12,8 @@ export interface TranslationNotesListProps {
   bookCode?: string
   bookTitleSource: unknown
   targetLanguageDirection: 'ltr' | 'rtl'
+  /** When set, replaces ResourceViewerHeader so filter adds no extra vertical chrome. */
+  filterScopeBar?: ReactNode
   loading: boolean
   error: string | null | undefined
   notesByVerse: Record<string, NoteWithTokens[]>
@@ -33,6 +36,7 @@ export function TranslationNotesList({
   bookCode,
   bookTitleSource,
   targetLanguageDirection,
+  filterScopeBar,
   loading,
   error,
   notesByVerse,
@@ -50,7 +54,13 @@ export function TranslationNotesList({
 }: TranslationNotesListProps) {
   return (
     <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
-      <ResourceViewerHeader title={resource.title} icon={FileText} direction={targetLanguageDirection} />
+      {filterScopeBar ?? (
+        <ResourceViewerHeader
+          title={resource.title}
+          icon={FileText}
+          direction={targetLanguageDirection}
+        />
+      )}
       <div className="p-content">
         {loading ? (
           <LoadingSpinner

@@ -20,6 +20,8 @@ export interface CombinedHelpsListProps {
   targetLanguageDirection: 'ltr' | 'rtl'
   kindFilter: HelpsKindFilter
   setKindFilter: (v: HelpsKindFilter) => void
+  /** When set, replaces ResourceViewerHeader so filter adds no extra vertical chrome. */
+  filterScopeBar?: React.ReactNode
   noSources: boolean
   depsOk: boolean
   loading: boolean
@@ -84,6 +86,7 @@ export function CombinedHelpsList({
   targetLanguageDirection,
   kindFilter,
   setKindFilter,
+  filterScopeBar,
   noSources,
   depsOk,
   loading,
@@ -113,33 +116,35 @@ export function CombinedHelpsList({
 }: CombinedHelpsListProps) {
   return (
     <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
-      <ResourceViewerHeader
-        title={resource.title}
-        icon={Layers}
-        direction={targetLanguageDirection}
-        actions={
-          <div className="flex items-center gap-1">
-            <FilterButton
-              active={kindFilter === 'all'}
-              icon={<LayoutList className="w-3.5 h-3.5" />}
-              label="All"
-              onClick={() => setKindFilter('all')}
-            />
-            <FilterButton
-              active={kindFilter === 'notes'}
-              icon={<NotebookPen className="w-3.5 h-3.5" />}
-              label="Notes"
-              onClick={() => setKindFilter('notes')}
-            />
-            <FilterButton
-              active={kindFilter === 'twl'}
-              icon={<BookMarked className="w-3.5 h-3.5" />}
-              label="Word Links"
-              onClick={() => setKindFilter('twl')}
-            />
-          </div>
-        }
-      />
+      {filterScopeBar ?? (
+        <ResourceViewerHeader
+          title={resource.title}
+          icon={Layers}
+          direction={targetLanguageDirection}
+          actions={
+            <div className="flex items-center gap-1">
+              <FilterButton
+                active={kindFilter === 'all'}
+                icon={<LayoutList className="w-3.5 h-3.5" />}
+                label="All"
+                onClick={() => setKindFilter('all')}
+              />
+              <FilterButton
+                active={kindFilter === 'notes'}
+                icon={<NotebookPen className="w-3.5 h-3.5" />}
+                label="Notes"
+                onClick={() => setKindFilter('notes')}
+              />
+              <FilterButton
+                active={kindFilter === 'twl'}
+                icon={<BookMarked className="w-3.5 h-3.5" />}
+                label="Word Links"
+                onClick={() => setKindFilter('twl')}
+              />
+            </div>
+          }
+        />
+      )}
       <div className="p-content">
         {noSources ? (
           <div className="text-center py-8 text-fg-muted text-sm">
