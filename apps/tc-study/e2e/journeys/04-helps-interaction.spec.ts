@@ -25,7 +25,11 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
     const loading = page.getByRole('status', { name: /Loading helps|Loading dependencies/i })
     await expect(loading).toHaveCount(0, { timeout: 45_000 })
 
-    const notesFilter = page.getByRole('button', { name: 'Notes' })
+    // Kind filter is an icon menu (Filter kinds → Notes / Word Links / All).
+    const filterKinds = page.getByRole('button', { name: 'Filter kinds' })
+    await expect(filterKinds).toBeVisible({ timeout: 15_000 })
+    await filterKinds.click()
+    const notesFilter = page.getByRole('menuitemradio', { name: 'Notes' })
     await expect(notesFilter).toBeVisible({ timeout: 15_000 })
     await notesFilter.click()
 
