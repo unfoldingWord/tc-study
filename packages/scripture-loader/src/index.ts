@@ -2,7 +2,10 @@
  * Scripture Loader - Package Exports
  *
  * Default process path = USJ (UsjScriptureViewModel + scripture-usj: cache).
- * ProcessedScripture helpers are transitional projections for Viewer / Panels.
+ * ProcessedScripture helpers are transitional projections for Helps.
+ *
+ * Viewer: prefer loadViewModel() / loadScriptureResult() and import types from here
+ * (not @bt-synergy/usfm-processor).
  */
 
 export { ScriptureLoader } from './ScriptureLoader'
@@ -29,9 +32,10 @@ export {
   viewModelFromUsjCache,
   processedFromUsjCache,
 } from './usjCache'
+export type { ScriptureLoadResult } from './scriptureLoadResult'
 export type * from './types'
 
-/** Re-export runtime contract types other teams should import. */
+/** Runtime identity + view-model contract (preferred). */
 export type {
   UsjScriptureViewModel,
   UsjWordToken,
@@ -44,7 +48,25 @@ export type {
 export {
   semanticIdFor,
   semanticIdKey,
+  projectToProcessedScripture,
+  viewModelFromProcessedScripture,
+  usjTokensFromProcessedVerse,
   USJ_PROCESSING_VERSION,
   USJ_TOOL_VERSIONS,
 } from '@bt-synergy/usj-processor'
 
+/**
+ * Transitional ProcessedScripture DTO — import from here (or usj-processor),
+ * not from @bt-synergy/usfm-processor, so Viewer can drop usfm-processor.
+ */
+export type {
+  ProcessedScripture,
+  ProcessedChapter,
+  ProcessedVerse,
+  ProcessedParagraph,
+  WordToken,
+  WordAlignment,
+  TranslatorSection,
+  ProcessingResult,
+  USFMProcessingOptions,
+} from '@bt-synergy/usj-processor'
