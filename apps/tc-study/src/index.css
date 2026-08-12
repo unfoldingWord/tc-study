@@ -114,54 +114,58 @@
   --theme-overlay: rgb(0 0 0 / 0.5);
 }
 
-/* —— Dark: calm charcoal / elevated surfaces (not OLED pure black) —— */
+/* —— Dark: calm charcoal with clearer surface steps (not OLED / not muddy) —— */
 .dark {
   color-scheme: dark;
 
-  --theme-canvas: #17191c;
-  --theme-surface: #212428;
-  --theme-elevated: #2a2e34;
+  /* Shell: deeper canvas so surface / scripture / soft fills read as distinct layers */
+  --theme-canvas: #121417;
+  --theme-surface: #1e2228;
+  --theme-elevated: #2c3138;
   /* Selected tab — darker than panel-*-soft strip (surface reads too light there) */
-  --theme-tab-selected: #141618;
-  --theme-muted: #2f343b;
-  --theme-border: #3a4048;
-  --theme-border-subtle: #2c3138;
+  --theme-tab-selected: #0e1013;
+  --theme-muted: #3a4049;
+  --theme-border: #4a515a;
+  --theme-border-subtle: #323840;
 
-  --theme-fg: #ece8e3;
-  --theme-fg-secondary: #b0aaa3;
-  --theme-fg-muted: #7a7470;
+  --theme-fg: #f0ebe6;
+  --theme-fg-secondary: #c2bbb3;
+  --theme-fg-muted: #8a837c;
 
-  --theme-accent: #6eb0ff;
-  --theme-accent-hover: #93c5fd;
-  --theme-accent-soft: #1a2f4a;
-  --theme-accent-fg: #93c5fd;
+  --theme-accent: #7bb8ff;
+  --theme-accent-hover: #a5d0ff;
+  /* Soft fill must clear canvas — used by BCV pill + accent chips */
+  --theme-accent-soft: #335578;
+  /* High-contrast text on accent-soft (BCV pill, badges) */
+  --theme-accent-fg: #e8f1ff;
 
-  --theme-scripture: #1c1f24;
-  --theme-scripture-fg: #e8e4df;
-  --theme-scripture-muted: #9a948c;
+  /* Scripture paper lifted above canvas for readable reading pane */
+  --theme-scripture: #2a3038;
+  --theme-scripture-fg: #f2eee8;
+  --theme-scripture-muted: #a8a29a;
 
   --theme-highlight: #5c4a14;
   --theme-highlight-strong: #7a641c;
-  --theme-underline: #9a948c;
+  --theme-underline: #a8a29a;
 
   --theme-danger: #f87171;
   --theme-danger-soft: #3f1d1d;
 
-  --theme-panel-1-soft: #1a2f4a;
-  --theme-panel-1: #6eb0ff;
-  --theme-panel-1-fg: #93c5fd;
+  --theme-panel-1-soft: #335578;
+  --theme-panel-1: #7bb8ff;
+  --theme-panel-1-fg: #dbeafe;
 
-  --theme-panel-2-soft: #2a2438;
-  --theme-panel-2: #a78bfa;
-  --theme-panel-2-fg: #c4b5fd;
+  --theme-panel-2-soft: #322b45;
+  --theme-panel-2: #b39dfa;
+  --theme-panel-2-fg: #ddd6fe;
 
-  --theme-helps: #a78bfa;
-  --theme-helps-soft: #2a2438;
-  --theme-helps-fg: #c4b5fd;
+  --theme-helps: #b39dfa;
+  --theme-helps-soft: #322b45;
+  --theme-helps-fg: #ddd6fe;
 
-  --theme-chip-quote: #1e2a3d;
-  --theme-chip-quote-hover: #243548;
-  --theme-chip-quote-fg: #93c5fd;
+  --theme-chip-quote: #334866;
+  --theme-chip-quote-hover: #3d5678;
+  --theme-chip-quote-fg: #e8f1ff;
 
   --theme-overlay: rgb(0 0 0 / 0.55);
 }
