@@ -1,6 +1,7 @@
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useCallback, useState } from 'react'
 import type { ResourceInfo } from '../../../contexts/types'
+import { releaseVersionOf } from '../../resources/common/resourceInfoModalProps'
 
 interface InfoResourcePayload {
   key: string
@@ -9,6 +10,7 @@ interface InfoResourcePayload {
   languageCode?: string
   subject?: string
   description?: string
+  version?: string
   readme?: string
   license?: string
 }
@@ -54,6 +56,7 @@ export function useResourceInfoModal() {
         languageCode: resource.language,
         subject: resource.category || resource.subject,
         description: resource.description,
+        version: releaseVersionOf(resource),
         readme: enrichedData.readme,
         license: enrichedData.license,
       })

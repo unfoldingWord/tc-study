@@ -8,10 +8,11 @@ import { ResourceInfoModal } from '../../studio/ResourceInfoModal'
 import { chromeIconButtonClass } from '../common/chromeIconButton'
 import {
   licenseIdOf,
+  releaseVersionOf,
   toResourceInfoModalProps,
 } from '../common/resourceInfoModalProps'
 
-export { licenseIdOf, toResourceInfoModalProps }
+export { licenseIdOf, releaseVersionOf, toResourceInfoModalProps }
 
 function lookupLoadedResource(
   loadedResources: Record<string, ResourceInfo | undefined>,
@@ -161,8 +162,9 @@ export function HelpsSourcesMenu({ tnKey, twlKey }: HelpsSourcesMenuProps) {
                 const Icon = kind === 'tn' ? NotebookPen : BookMarked
                 const lang = (resource.languageCode ?? resource.language ?? '').toString()
                 const owner = typeof resource.owner === 'string' ? resource.owner : ''
+                const version = releaseVersionOf(resource)
                 const license = licenseIdOf(resource)
-                const meta = [owner, lang, license].filter(Boolean).join(' · ')
+                const meta = [owner, lang, version, license].filter(Boolean).join(' · ')
                 const label =
                   kind === 'tn'
                     ? resource.title || 'Translation Notes'

@@ -1,6 +1,7 @@
 import React from 'react'
 import { X, FileText, Scale } from 'lucide-react'
 import { ModalPortal } from '../shared/ModalPortal'
+import { MarkdownRenderer } from '../ui/MarkdownRenderer'
 
 interface ResourceInfoModalProps {
   isOpen: boolean
@@ -12,13 +13,27 @@ interface ResourceInfoModalProps {
     languageCode?: string
     subject?: string
     description?: string
+    /** Catalog / release version when available (e.g. `v45`, `1.0.0`). */
+    version?: string
     readme?: string
     license?: string
   }
 }
 
+const README_PROSE_CLASS =
+  'text-sm text-fg leading-relaxed prose prose-sm max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent prose-li:text-fg-secondary prose-blockquote:text-fg-secondary'
+
 export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoModalProps) {
   if (!isOpen) return null
+
+  const version =
+    typeof resource.version === 'string' && resource.version.trim()
+      ? resource.version.trim()
+      : undefined
+  const readme =
+    typeof resource.readme === 'string' && resource.readme.trim()
+      ? resource.readme
+      : undefined
 
   return (
     <ModalPortal>
@@ -73,6 +88,16 @@ export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoMod
             </p>
           </div>
 
+          {/* Version (catalog / release) */}
+          {version && (
+            <div>
+              <h3 className="text-sm font-semibold text-fg-secondary mb-1">Version</h3>
+              <p className="text-sm text-fg font-mono bg-muted px-3 py-2 rounded border border-border">
+                {version}
+              </p>
+            </div>
+          )}
+
           {/* Subject */}
           {resource.subject && (
             <div>
@@ -89,16 +114,10 @@ export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoMod
             </div>
           )}
 
-          {/* README */}
-          {resource.readme && (
-            <div>
-              <h3 className="text-sm font-semibold text-fg-secondary mb-2 flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                README
-              </h3>
-              <div className="text-sm text-fg whitespace-pre-wrap bg-muted px-4 py-3 rounded border border-border max-h-64 overflow-y-auto">
-                {typeof resource.readme === 'string' ? resource.readme : JSON.stringify(resource.readme)}
-              </div>
+          {/* README — rendered markdown, no section title */}
+          {readme && (
+            <div className="bg-muted px-4 py-3 rounded border border-border max-h-64 overflow-y-auto">
+              <MarkdownRenderer content={readme} className={README_PROSE_CLASS} />
             </div>
           )}
 
@@ -116,7 +135,7 @@ export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoMod
           )}
 
           {/* Fallback if no details available */}
-          {!resource.description && !resource.readme && !resource.license && (
+          {!resource.description && !readme && !resource.license && !version && (
             <div className="text-center py-8 text-fg-muted">
               <FileText className="w-12 h-12 mx-auto mb-2 opacity-60" />
               <p className="text-sm font-medium mb-1 text-fg-secondary">No extended information available</p>
