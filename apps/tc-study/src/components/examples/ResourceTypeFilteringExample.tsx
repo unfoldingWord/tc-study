@@ -44,6 +44,7 @@ export function ResourceTypeFilteringExample({
     'token-click',
     resourceId,
     (signal) => {
+      if (!signal.token) return
       setReceivedSignals((prev) => [
         `✅ Token: "${signal.token.content}" from ${signal.sourceResourceType || 'unknown'}`,
         ...prev.slice(0, 9),

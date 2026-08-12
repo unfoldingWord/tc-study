@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useCurrentReference } from '../../../../contexts'
 import type { TokenClickSignal, VerseFilterSignal } from '../../../../signals/studioSignals'
 import type { OriginalLanguageToken } from '../types'
+import { tokenMatchesHighlightTarget } from '../utils/tokenHighlight'
 import { semanticIdKey } from '../utils/wordIdentity'
 
 export function useHighlighting(
@@ -31,12 +32,21 @@ export function useHighlighting(
   currentRefRef.current = currentRef
   const underlinedRef = useRef(underlinedSemanticIds)
   underlinedRef.current = underlinedSemanticIds
+  const highlightTargetRef = useRef(highlightTarget)
+  highlightTargetRef.current = highlightTarget
+  /** True when the active selection also owns a scripture-driven verse filter (uncovered click). */
+  const ownsVerseFilterRef = useRef(false)
 
   useSignalHandler<TokenClickSignal>(
     'token-click',
     resourceId,
     useCallback((signal) => {
       if (signal.sourceResourceId === resourceId) return
+      if (signal.token === null) {
+        setHighlightTarget(null)
+        ownsVerseFilterRef.current = false
+        return
+      }
       setHighlightTarget({
         semanticId: signal.token.semanticId,
         alignedSemanticIds: signal.token.alignedSemanticIds,
@@ -61,6 +71,17 @@ export function useHighlighting(
             ? [...token.alignedOriginalWordIds]
             : undefined
 
+        // Toggle-off: clicking the active highlight clears selection + owned filters.
+        if (tokenMatchesHighlightTarget(token, highlightTargetRef.current)) {
+          setHighlightTarget(null)
+          sendToAll({ lifecycle: 'event', token: null })
+          if (ownsVerseFilterRef.current) {
+            sendVerseFilter({ lifecycle: 'event', filter: null })
+            ownsVerseFilterRef.current = false
+          }
+          return
+        }
+
         const tokenKey = semanticIdKey(semanticId)
         const alignedKeys = alignedSemanticIds?.map(semanticIdKey) ?? []
         const hasCoverage =
@@ -77,6 +98,8 @@ export function useHighlighting(
           content: tokenContent,
           verseRef,
         })
+
+        ownsVerseFilterRef.current = !hasCoverage
 
         sendToAll({
           lifecycle: 'event',
@@ -107,6 +130,7 @@ export function useHighlighting(
   const handleVerseFilter = useCallback(
     (chapter: number, verse?: number) => {
       setHighlightTarget(null)
+      ownsVerseFilterRef.current = false
       sendVerseFilter({ lifecycle: 'event', filter: { chapter, verse } })
     },
     [sendVerseFilter]

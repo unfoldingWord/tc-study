@@ -23,9 +23,10 @@ export const STUDIO_SIGNAL_REGISTRY = {
     },
   },
   'token-click': {
-    description: 'Word/token clicked in scripture',
+    description:
+      'Word/token clicked in scripture; token=null clears the active highlight and helps token filter',
     typicalSenders: ['scripture'],
-    typicalReceivers: ['words-links', 'original-language'],
+    typicalReceivers: ['words-links', 'original-language', 'combined-helps', 'notes'],
     example: {
       type: 'token-click',
       token: {
@@ -38,9 +39,10 @@ export const STUDIO_SIGNAL_REGISTRY = {
     },
   },
   'verse-filter': {
-    description: 'Filter entries by verse or chapter click in scripture',
+    description:
+      'Filter entries by verse or chapter click in scripture; filter=null clears a prior verse filter',
     typicalSenders: ['scripture'],
-    typicalReceivers: ['notes', 'words-links'],
+    typicalReceivers: ['notes', 'words-links', 'combined-helps'],
     example: {
       type: 'verse-filter',
       filter: { chapter: 3, verse: 5 },

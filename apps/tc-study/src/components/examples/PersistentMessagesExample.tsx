@@ -56,7 +56,7 @@ export function PersistentMessagesExample({
     'token-click',
     resourceId,
     (signal) => {
-      if (!signal.persistent) {
+      if (!signal.persistent && signal.token) {
         setEphemeralMessages((prev) => [
           `Token: ${signal.token.content} (${signal.token.semanticId})`,
           ...prev.slice(0, 4),

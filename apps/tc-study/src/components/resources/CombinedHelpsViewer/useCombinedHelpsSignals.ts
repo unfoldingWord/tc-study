@@ -93,6 +93,13 @@ export function useCombinedHelpsSignals({
     useCallback(
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
+        // Toggle-off: clear token filter owned by the scripture selection (keep OBS/underlines).
+        if (signal.token === null) {
+          setTokenFilter(null)
+          setSelectedNoteId(null)
+          setSelectedLinkId(null)
+          return
+        }
         // Uncovered scripture clicks broadcast token-click for scripture highlighting
         // but also send verse-filter for helps — ignore the token filter here.
         if (signal.token.hasHelpsCoverage === false) return
@@ -117,6 +124,12 @@ export function useCombinedHelpsSignals({
     useCallback(
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
+        if (signal.filter === null) {
+          setVerseFilter(null)
+          setSelectedNoteId(null)
+          setSelectedLinkId(null)
+          return
+        }
         setVerseFilter({
           chapter: signal.filter.chapter,
           verse: signal.filter.verse,

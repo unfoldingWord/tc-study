@@ -75,6 +75,11 @@ export function useTranslationNotesSignals({
     useCallback(
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
+        if (signal.token === null) {
+          setTokenFilter(null)
+          setSelectedNoteId(null)
+          return
+        }
         if (signal.token.hasHelpsCoverage === false) return
         setTokenFilter({
           semanticId: signal.token.semanticId,
@@ -96,6 +101,11 @@ export function useTranslationNotesSignals({
     useCallback(
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
+        if (signal.filter === null) {
+          setVerseFilter(null)
+          setSelectedNoteId(null)
+          return
+        }
         setVerseFilter({
           chapter: signal.filter.chapter,
           verse: signal.filter.verse,

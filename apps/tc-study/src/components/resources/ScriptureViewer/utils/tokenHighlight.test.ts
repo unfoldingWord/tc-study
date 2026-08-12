@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { UsjWordToken } from '@bt-synergy/scripture-loader'
-import { resolveTokenVisualState } from './tokenHighlight'
+import { resolveTokenVisualState, tokenMatchesHighlightTarget } from './tokenHighlight'
 import { semanticIdFor, semanticIdKey } from './wordIdentity'
 
 function usjWord(
@@ -78,5 +78,52 @@ describe('resolveTokenVisualState (Journey 4/8 contract)', () => {
       underlinedSemanticIds: new Set([semanticIdKey('tit 1:1:Θεοῦ:1')]),
     })
     expect(state.isUnderlined).toBe(true)
+  })
+})
+
+describe('tokenMatchesHighlightTarget (toggle-off)', () => {
+  const paulos = usjWord({ content: 'Παῦλος', verseRef: 'tit 1:1' })
+  const paul = usjWord({
+    content: 'Paul',
+    verseRef: 'tit 1:1',
+    alignedOriginalWordIds: ['tit 1:1:Παῦλος:1'],
+  })
+  const other = usjWord({ content: 'servant', verseRef: 'tit 1:1' })
+
+  test('same semanticId matches', () => {
+    expect(
+      tokenMatchesHighlightTarget(paul, {
+        semanticId: paul.semanticId,
+        alignedSemanticIds: paul.alignedOriginalWordIds,
+        content: 'Paul',
+        verseRef: 'tit 1:1',
+      })
+    ).toBe(true)
+  })
+
+  test('aligned cross-pane token matches active selection', () => {
+    expect(
+      tokenMatchesHighlightTarget(paulos, {
+        semanticId: paul.semanticId,
+        alignedSemanticIds: ['tit 1:1:Παῦλος:1'],
+        content: 'Paul',
+        verseRef: 'tit 1:1',
+      })
+    ).toBe(true)
+  })
+
+  test('unrelated token does not match', () => {
+    expect(
+      tokenMatchesHighlightTarget(other, {
+        semanticId: paul.semanticId,
+        alignedSemanticIds: paul.alignedOriginalWordIds,
+        content: 'Paul',
+        verseRef: 'tit 1:1',
+      })
+    ).toBe(false)
+  })
+
+  test('null highlight never matches', () => {
+    expect(tokenMatchesHighlightTarget(paul, null)).toBe(false)
   })
 })

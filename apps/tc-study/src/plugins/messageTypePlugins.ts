@@ -30,6 +30,12 @@ function isTokenClickSignal(content: unknown): content is TokenClickSignal {
   if (message.lifecycle !== 'event' && message.lifecycle !== 'request' && message.lifecycle !== 'response') {
     return false
   }
+  if (typeof message.sourceResourceId !== 'string') return false
+  if (typeof message.timestamp !== 'number') return false
+
+  // null token = clear active highlight / helps token filter (toggle-off)
+  if (message.token === null) return true
+
   if (!message.token || typeof message.token !== 'object') return false
   if (typeof message.token.id !== 'string') return false
   if (typeof message.token.content !== 'string') return false
@@ -44,9 +50,6 @@ function isTokenClickSignal(content: unknown): content is TokenClickSignal {
       if (typeof id !== 'string') return false
     }
   }
-
-  if (typeof message.sourceResourceId !== 'string') return false
-  if (typeof message.timestamp !== 'number') return false
 
   return true
 }
@@ -74,11 +77,13 @@ function isVerseFilterSignal(content: unknown): content is VerseFilterSignal {
   const msg = content as VerseFilterSignal
   if (msg.type !== 'verse-filter') return false
   if (msg.lifecycle !== 'event') return false
+  if (typeof msg.sourceResourceId !== 'string') return false
+  if (typeof msg.timestamp !== 'number') return false
+  // null filter = clear a prior scripture-driven verse filter
+  if (msg.filter === null) return true
   if (!msg.filter || typeof msg.filter !== 'object') return false
   if (typeof msg.filter.chapter !== 'number') return false
   if (msg.filter.verse !== undefined && typeof msg.filter.verse !== 'number') return false
-  if (typeof msg.sourceResourceId !== 'string') return false
-  if (typeof msg.timestamp !== 'number') return false
   return true
 }
 

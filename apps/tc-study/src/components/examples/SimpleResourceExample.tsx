@@ -54,7 +54,10 @@ export function SimpleResourceExample({ resourceId, resourceTitle }: SimpleResou
     'token-click',
     resourceId,
     (signal) => {
-
+      if (!signal.token) {
+        setReceivedToken('')
+        return
+      }
       setReceivedToken(`${signal.token.content} (${signal.token.semanticId})`)
     },
     { debug: true } // Enable debug logging during development

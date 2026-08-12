@@ -30,6 +30,10 @@ export interface BookNavigationSignal extends BaseSignal {
 
 export interface TokenClickSignal extends BaseSignal {
   type: 'token-click'
+  /**
+   * Clicked token payload, or `null` to clear the active highlight / helps token filter
+   * (toggle-off when the user clicks the already-selected token).
+   */
   token: {
     id: string
     content: string
@@ -42,15 +46,16 @@ export interface TokenClickSignal extends BaseSignal {
     alignedSemanticIds?: string[]
     /** True when the clicked token is covered by a loaded TN/TWL quote. */
     hasHelpsCoverage?: boolean
-  }
+  } | null
 }
 
 export interface VerseFilterSignal extends BaseSignal {
   type: 'verse-filter'
+  /** Verse/chapter filter, or `null` to clear a prior scripture-driven verse filter. */
   filter: {
     chapter: number
     verse?: number
-  }
+  } | null
 }
 
 export interface TextSelectionSignal extends BaseSignal {
