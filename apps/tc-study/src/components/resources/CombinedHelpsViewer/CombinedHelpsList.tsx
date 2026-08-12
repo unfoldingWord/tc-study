@@ -10,6 +10,7 @@ import { TranslationNoteCard, type NoteWithTokens } from '../TranslationNotesVie
 import { WordLinkCard } from '../WordsLinksViewer/components'
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
+import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import type { HelpsKindFilter } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
@@ -94,11 +95,13 @@ export function CombinedHelpsList({
         icon={Layers}
         direction={targetLanguageDirection}
         actions={
-          // While a token/verse/OBS filter is active, reuse the trailing header
-          // slot so phones do not grow a second chrome band; kind menu returns on clear.
-          filterScopeBar ?? (
-            <HelpsKindFilterMenu kindFilter={kindFilter} setKindFilter={setKindFilter} />
-          )
+          // Sources stays visible even when token/verse/OBS filter replaces the kind menu.
+          <>
+            <HelpsSourcesMenu tnKey={tnKey} twlKey={twlKey} />
+            {filterScopeBar ?? (
+              <HelpsKindFilterMenu kindFilter={kindFilter} setKindFilter={setKindFilter} />
+            )}
+          </>
         }
       />
       <div className="p-content">

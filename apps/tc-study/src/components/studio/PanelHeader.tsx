@@ -1,9 +1,14 @@
 import { ArrowLeftRight, Info, MoreVertical, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useAppStore } from '../../contexts/AppContext'
 import { useResourceTypeRegistry } from '../../contexts/CatalogContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useTabDnDOptional } from '../../features/dnd/TabDnDContext'
 import { resolveTabPresentationFromRegistry } from '../../features/tabs'
+import { isCombinedHelpsResourceType } from '../../utils/normalizeResourceTypeId'
+import { HelpsSourcesMenu, toResourceInfoModalProps } from '../resources/CombinedHelpsViewer/HelpsSourcesMenu'
+import { resolveCombinedHelpsResourceKeys } from '../resources/CombinedHelpsViewer/useCombinedHelpsResources'
+import { primaryLangCode } from '../resources/CombinedHelpsViewer/combinedHelpsUtils'
 import { ResourceInfoModal } from './ResourceInfoModal'
 import { ResourceTabs } from './ResourceTabs'
 
@@ -41,9 +46,31 @@ export function PanelHeader({
 }: PanelHeaderProps) {
   const registry = useResourceTypeRegistry()
   const { activeIcon } = useTabDnDOptional()
+  const loadedResources = useAppStore((s) => s.loadedResources)
   const [showInfoModal, setShowInfoModal] = useState(false)
+  const [showHelpsSources, setShowHelpsSources] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const actionsButtonRef = useRef<HTMLButtonElement>(null)
+
+  const isHelpsTab =
+    !!currentResource && isCombinedHelpsResourceType(currentResource.type)
+
+  const helpsSourceKeys = useMemo(() => {
+    if (!currentResource || !isHelpsTab) return { tnKey: '', twlKey: '' }
+    const wantLang = primaryLangCode(
+      currentResource.language || currentResource.languageCode || ''
+    )
+    const helpsScope: 'scripture' | 'obs' =
+      currentResource.appliesToScope === 'obs' ? 'obs' : 'scripture'
+    return resolveCombinedHelpsResourceKeys({
+      loadedResources,
+      wantLang,
+      injectedTnKey: currentResource.helpsTnResourceKey,
+      injectedTwlKey: currentResource.helpsTwlResourceKey,
+      helpsScope,
+    })
+  }, [currentResource, isHelpsTab, loadedResources])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -53,6 +80,11 @@ export function PanelHeader({
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [menuOpen])
+
+  // Close Helps sources when leaving the Helps tab.
+  useEffect(() => {
+    if (!isHelpsTab) setShowHelpsSources(false)
+  }, [isHelpsTab])
 
   const colors = {
     blue: {
@@ -91,6 +123,7 @@ export function PanelHeader({
         {currentResource && (
           <div className="relative flex-shrink-0" ref={menuRef}>
             <button
+              ref={actionsButtonRef}
               onClick={() => setMenuOpen((o) => !o)}
               className={`h-chrome-control w-chrome-control flex items-center justify-center rounded-md ${c.button} transition-colors`}
               title="Actions"
@@ -108,12 +141,16 @@ export function PanelHeader({
                 <button
                   role="menuitem"
                   onClick={() => {
-                    setShowInfoModal(true)
+                    if (isHelpsTab) {
+                      setShowHelpsSources(true)
+                    } else {
+                      setShowInfoModal(true)
+                    }
                     setMenuOpen(false)
                   }}
                   className="flex items-center justify-center p-2 hover:bg-muted"
-                  title="Resource info"
-                  aria-label="Resource info"
+                  title={isHelpsTab ? 'Sources' : 'Resource info'}
+                  aria-label={isHelpsTab ? 'Sources' : 'Resource info'}
                 >
                   <Info className="w-4 h-4 text-fg-secondary" />
                 </button>
@@ -149,25 +186,24 @@ export function PanelHeader({
         )}
       </div>
 
-      {currentResource && (
+      {currentResource && isHelpsTab ? (
+        <HelpsSourcesMenu
+          tnKey={helpsSourceKeys.tnKey}
+          twlKey={helpsSourceKeys.twlKey}
+          open={showHelpsSources}
+          onOpenChange={setShowHelpsSources}
+          showTrigger={false}
+          anchorRef={actionsButtonRef}
+        />
+      ) : null}
+
+      {currentResource && !isHelpsTab ? (
         <ResourceInfoModal
           isOpen={showInfoModal}
           onClose={() => setShowInfoModal(false)}
-          resource={{
-            title: currentResource.title,
-            key: currentResource.key,
-            owner: currentResource.owner,
-            languageCode: currentResource.languageCode ?? currentResource.language,
-            subject: currentResource.subject,
-            description: currentResource.description,
-            readme: currentResource.readme,
-            license:
-              typeof currentResource.license === 'string'
-                ? currentResource.license
-                : currentResource.license?.id,
-          }}
+          resource={toResourceInfoModalProps(currentResource)}
         />
-      )}
+      ) : null}
     </div>
   )
 }
