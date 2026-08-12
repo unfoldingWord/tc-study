@@ -1,5 +1,7 @@
 /**
- * Shared TN / TWL / CombinedHelps filter banners (token, verse, OBS quote).
+ * Shared TN / TWL / CombinedHelps filter scope chrome (token, verse, OBS quote).
+ * Renders TokenFilterBanner whenever a filter is active (including 0 matches).
+ * Inline chip for ResourceViewerHeader actions — not a stacked extra row.
  */
 
 import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/helpsDisplayFilters'

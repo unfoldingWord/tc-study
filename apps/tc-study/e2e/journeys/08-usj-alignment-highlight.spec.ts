@@ -29,6 +29,13 @@ test.describe('Journey 8: USJ alignment highlight (Paul ↔ Παῦλος)', () 
 
     await expect(paul).toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
     await expect(paulos).toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
+    await expect(paul).toHaveAttribute('aria-pressed', 'true')
+
+    // Toggle-off: re-clicking the active selection clears cross-pane highlights
+    await paul.click()
+    await expect(paul).not.toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
+    await expect(paulos).not.toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
+    await expect(paul).toHaveAttribute('aria-pressed', 'false')
 
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
   })
@@ -54,6 +61,13 @@ test.describe('Journey 8: USJ alignment highlight (Paul ↔ Παῦλος)', () 
 
     await expect(paulos).toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
     await expect(paul).toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
+    await expect(paulos).toHaveAttribute('aria-pressed', 'true')
+
+    // Toggle-off from the OL side clears gateway highlight too
+    await paulos.click()
+    await expect(paulos).not.toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
+    await expect(paul).not.toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
+    await expect(paulos).toHaveAttribute('aria-pressed', 'false')
 
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
   })

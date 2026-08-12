@@ -5,6 +5,7 @@
 import { MapPin, X } from 'lucide-react'
 import { useNavigation, useNavigationHistory, useNavigationHistoryIndex } from '../../contexts'
 import type { BCVReference } from '../../contexts/types'
+import { ModalPortal } from '../shared/ModalPortal'
 
 interface NavigationHistoryModalProps {
   onClose: () => void
@@ -34,6 +35,7 @@ export function NavigationHistoryModal({ onClose }: NavigationHistoryModalProps)
   }
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
@@ -127,5 +129,6 @@ export function NavigationHistoryModal({ onClose }: NavigationHistoryModalProps)
         )}
       </div>
     </div>
+    </ModalPortal>
   )
 }

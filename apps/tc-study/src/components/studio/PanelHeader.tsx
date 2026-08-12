@@ -1,10 +1,9 @@
-import { ArrowLeftRight, Info, MoreVertical, X } from 'lucide-react'
+import { ArrowLeftRight, MoreVertical, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useResourceTypeRegistry } from '../../contexts/CatalogContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useTabDnDOptional } from '../../features/dnd/TabDnDContext'
 import { resolveTabPresentationFromRegistry } from '../../features/tabs'
-import { ResourceInfoModal } from './ResourceInfoModal'
 import { ResourceTabs } from './ResourceTabs'
 
 interface PanelHeaderProps {
@@ -41,7 +40,6 @@ export function PanelHeader({
 }: PanelHeaderProps) {
   const registry = useResourceTypeRegistry()
   const { activeIcon } = useTabDnDOptional()
-  const [showInfoModal, setShowInfoModal] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -56,12 +54,12 @@ export function PanelHeader({
 
   const colors = {
     blue: {
-      gradient: 'from-panel-1-soft to-canvas',
+      strip: 'bg-panel-1-soft/70',
       button: 'hover:bg-accent/15 active:bg-accent/25',
       icon: 'text-panel-1-fg',
     },
     purple: {
-      gradient: 'from-panel-2-soft to-canvas',
+      strip: 'bg-panel-2-soft/70',
       button: 'hover:bg-panel-2/15 active:bg-panel-2/25',
       icon: 'text-panel-2-fg',
     },
@@ -69,8 +67,10 @@ export function PanelHeader({
   const c = colors[colorScheme]
 
   return (
-    <div className={`px-2 pt-1.5 pb-0 md:px-3 md:pt-2 md:pb-0 bg-gradient-to-r ${c.gradient}`}>
-      <div className="flex items-center gap-2 min-w-0">
+    <div
+      className={`h-chrome-bar px-chrome flex items-center border-b border-border-subtle ${c.strip}`}
+    >
+      <div className="flex items-center gap-chrome-tight min-w-0 w-full h-full">
         <ResourceTabs
           resources={resources}
           currentIndex={currentIndex}
@@ -90,31 +90,19 @@ export function PanelHeader({
           <div className="relative flex-shrink-0" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
-              className={`p-2.5 min-w-10 min-h-10 flex items-center justify-center rounded ${c.button} transition-colors`}
+              className={`h-chrome-control w-chrome-control flex items-center justify-center rounded-md ${c.button} transition-colors`}
               title="Actions"
               aria-label="Resource actions"
               aria-expanded={menuOpen}
               aria-haspopup="true"
             >
-              <MoreVertical className={`w-5 h-5 ${c.icon}`} />
+              <MoreVertical className={`w-4 h-4 ${c.icon}`} />
             </button>
             {menuOpen && (
               <div
                 className="absolute right-0 top-full mt-1 w-auto py-1 bg-elevated border border-border rounded-lg shadow-lg z-50"
                 role="menu"
               >
-                <button
-                  role="menuitem"
-                  onClick={() => {
-                    setShowInfoModal(true)
-                    setMenuOpen(false)
-                  }}
-                  className="flex items-center justify-center p-2 hover:bg-muted"
-                  title="Resource info"
-                  aria-label="Resource info"
-                >
-                  <Info className="w-4 h-4 text-fg-secondary" />
-                </button>
                 {onMoveToOtherPanel && (
                   <button
                     role="menuitem"
@@ -146,26 +134,6 @@ export function PanelHeader({
           </div>
         )}
       </div>
-
-      {currentResource && (
-        <ResourceInfoModal
-          isOpen={showInfoModal}
-          onClose={() => setShowInfoModal(false)}
-          resource={{
-            title: currentResource.title,
-            key: currentResource.key,
-            owner: currentResource.owner,
-            languageCode: currentResource.languageCode ?? currentResource.language,
-            subject: currentResource.subject,
-            description: currentResource.description,
-            readme: currentResource.readme,
-            license:
-              typeof currentResource.license === 'string'
-                ? currentResource.license
-                : currentResource.license?.id,
-          }}
-        />
-      )}
     </div>
   )
 }

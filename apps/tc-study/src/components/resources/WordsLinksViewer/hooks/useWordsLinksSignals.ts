@@ -82,6 +82,11 @@ export function useWordsLinksSignals({
     useCallback(
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
+        if (signal.token === null) {
+          setTokenFilter(null)
+          setSelectedLink(null)
+          return
+        }
         if (signal.token.hasHelpsCoverage === false) return
         setTokenFilter({
           semanticId: signal.token.semanticId,
@@ -103,6 +108,11 @@ export function useWordsLinksSignals({
     useCallback(
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
+        if (signal.filter === null) {
+          setVerseFilter(null)
+          setSelectedLink(null)
+          return
+        }
         setVerseFilter({
           chapter: signal.filter.chapter,
           verse: signal.filter.verse,

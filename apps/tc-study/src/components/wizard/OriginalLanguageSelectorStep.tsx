@@ -14,6 +14,7 @@ import { useCatalog } from '../../contexts/CatalogContext'
 import { door43LanguageResourceToMetadata } from '../../features/wizard/door43LanguageResourceToMetadata'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { useWizardStore } from '../../lib/stores/wizardStore'
+import { releaseVersionOf } from '../resources/common/resourceInfoModalProps'
 import { ResourceInfoModal } from '../studio/ResourceInfoModal'
 import {
   OriginalLanguageResourceCard,
@@ -39,6 +40,7 @@ export function OriginalLanguageSelectorStep() {
     languageCode?: string
     subject?: string
     description?: string
+    version?: string
     readme?: string
     license?: string
   } | null>(null)
@@ -176,6 +178,7 @@ export function OriginalLanguageSelectorStep() {
         languageCode: resource.language,
         subject: resource.subject,
         description: resource.description,
+        version: releaseVersionOf(resource),
         readme: enrichedData.readme,
         license:
           typeof enrichedData.license === 'string' ? enrichedData.license : undefined,

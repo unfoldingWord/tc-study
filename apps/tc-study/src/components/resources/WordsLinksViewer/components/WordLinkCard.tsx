@@ -13,6 +13,7 @@ import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseTWLink } from '../../../../features/helps/quoteTokens'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
+import { HELPS_CARD_IDLE, HELPS_CARD_SELECTED } from '../../helpsCardStyles'
 import type { TokenFilter, TranslationWordsLink } from '../types'
 
 interface AlignedToken {
@@ -40,7 +41,7 @@ interface WordLinkCardProps {
 }
 
 const quoteChipClass =
-  'w-full text-start mb-1.5 px-3 py-2 bg-chip-quote hover:bg-chip-quote-hover rounded-lg transition-all duration-150'
+  'w-full text-start mb-stack px-chrome py-chrome-tight bg-chip-quote hover:bg-chip-quote-hover rounded-md transition-colors duration-150'
 
 export const WordLinkCard = memo(function WordLinkCard({
   link,
@@ -69,11 +70,9 @@ export const WordLinkCard = memo(function WordLinkCard({
   return (
     <div
       className={`
-        group rounded-lg p-3 cursor-pointer transition-all duration-150 border
-        ${isSelected
-          ? 'bg-helps-soft shadow-sm border-helps/40'
-          : 'bg-surface hover:shadow-sm hover:border-border border-border-subtle'
-        }
+        group rounded-md p-content cursor-pointer transition-colors duration-150 border
+        ${isSelected ? HELPS_CARD_SELECTED : HELPS_CARD_IDLE}
+
       `}
       onClick={(hasAlignedTokens || obsMode) ? () => onQuoteClick(link) : undefined}
       role="article"

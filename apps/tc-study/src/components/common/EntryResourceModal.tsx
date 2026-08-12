@@ -10,11 +10,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '../../contexts/AppContext'
 import { useCatalogManager } from '../../contexts/CatalogContext'
 import { useEntryViewerRegistry } from '../../contexts/EntryViewerContext'
-import { useWizardStore } from '../../lib/stores/wizardStore'
 import { useEntryModalStore } from '../../features/entries'
+import { useWorkspaceStore } from '../../features/workspace/workspaceStore'
+import { useWizardStore } from '../../lib/stores/wizardStore'
 import { LoadingSpinner } from '../../shared/LoadingSpinner'
+import { ResourceInfoButton } from '../resources/common/ResourceInfoButton'
 import { buildEntryModalResourceInfo } from './buildEntryModalResourceInfo'
 import { ErrorBoundary } from './ErrorBoundary'
+import { resolveEntryParentResourceInfo } from './resolveEntryParentResourceInfo'
 
 interface EntryResourceModalProps {
   onEntryLinkClick?: (resourceId: string, entryId?: string) => void
@@ -31,6 +34,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
   const canModalGoForward = useEntryModalStore((s) => s.canModalGoForward)
   const openModal = useEntryModalStore((s) => s.openModal)
   const loadedResources = useAppStore((s) => s.loadedResources)
+  const packageResources = useWorkspaceStore((s) => s.currentPackage?.resources)
   const catalogManager = useCatalogManager()
   const entryViewerRegistry = useEntryViewerRegistry()
   const navigationStatus = useEntryModalStore((s) => s.modal.navigationStatus)
@@ -64,6 +68,18 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
   const resourceInfo = useMemo(
     () => buildEntryModalResourceInfo(resourceId, resource, resourceMetadata),
     [resourceId, resource, resourceMetadata]
+  )
+
+  // Parent TW/TA package for ResourceInfo (not the per-article stub / entry id).
+  const parentInfoResource = useMemo(
+    () =>
+      resolveEntryParentResourceInfo(
+        resourceId,
+        packageResources,
+        loadedResources,
+        resourceMetadata
+      ),
+    [resourceId, packageResources, loadedResources, resourceMetadata]
   )
   
   // Reset entry content when entry changes
@@ -251,16 +267,18 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
             </h2>
           </div>
 
-          {/* Minimize Button */}
-          <button
-            onClick={minimizeModal}
-            className="p-1.5 hover:bg-surface rounded-md transition-colors"
-            aria-label="Minimize"
-            title="Minimize"
-            dir="ltr"
-          >
-            <Minimize2 className="w-4 h-4 text-fg-secondary" />
-          </button>
+          {/* Info (parent TW/TA package) + Minimize — LTR chrome cluster */}
+          <div className="flex items-center gap-0.5" dir="ltr">
+            {parentInfoResource ? <ResourceInfoButton resource={parentInfoResource} /> : null}
+            <button
+              onClick={minimizeModal}
+              className="p-1.5 hover:bg-surface rounded-md transition-colors text-fg-muted hover:text-fg-secondary"
+              aria-label="Minimize"
+              title="Minimize"
+            >
+              <Minimize2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Content - dir for RTL so entry content flows correctly */}

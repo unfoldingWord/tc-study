@@ -25,7 +25,11 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
     const loading = page.getByRole('status', { name: /Loading helps|Loading dependencies/i })
     await expect(loading).toHaveCount(0, { timeout: 45_000 })
 
-    const notesFilter = page.getByRole('button', { name: 'Notes' })
+    // Kind filter is an icon menu (Filter kinds → Notes / Word Links / All).
+    const filterKinds = page.getByRole('button', { name: 'Filter kinds' })
+    await expect(filterKinds).toBeVisible({ timeout: 15_000 })
+    await filterKinds.click()
+    const notesFilter = page.getByRole('menuitemradio', { name: 'Notes' })
     await expect(notesFilter).toBeVisible({ timeout: 15_000 })
     await notesFilter.click()
 
@@ -56,7 +60,8 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
 
     // Note body click selects the card (quote button stops propagation)
     await noteCard.getByText(E2E_NOTE_TEXT).click()
-    await expect(noteCard).toHaveClass(/bg-highlight\/50|border-highlight-strong/)
+    await expect(noteCard).toHaveClass(/bg-highlight\/15/)
+    await expect(noteCard).toHaveClass(/border-border/)
 
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
   })
@@ -78,6 +83,17 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
 
     await expect(godToken).toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
     await expect(godToken).toHaveClass(/highlighted-token/)
+    await expect(godToken).toHaveAttribute('aria-pressed', 'true')
+
+    // Covered click sets helps token filter; toggle-off clears highlight + filter, keeps underline
+    const filterBar = page.getByTestId('helps-filter-scope-bar')
+    await expect(filterBar).toBeVisible({ timeout: 10_000 })
+
+    await godToken.click()
+    await expect(godToken).not.toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
+    await expect(godToken).toHaveAttribute('aria-pressed', 'false')
+    await expect(filterBar).toHaveCount(0)
+    await expect(godToken).toHaveAttribute('data-underlined', 'true')
 
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
   })

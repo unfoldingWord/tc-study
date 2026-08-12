@@ -254,14 +254,15 @@ export function CombinedHelpsViewer({
   const loading = !!(tnKey && tnLoading) || !!(twlKey && twlLoading)
   const noSources = !tnKey && !twlKey
 
-  return (
-    <div className="h-full flex flex-col">
+  // null when inactive so CombinedHelps can keep kind toggles in the header slot.
+  const filterScopeBar =
+    obsQuoteFilter || tokenFilter || verseFilter ? (
       <HelpsFilterBanners
         obsQuoteFilter={obsQuoteFilter}
-          tokenFilter={tokenFilter}
+        tokenFilter={tokenFilter}
         verseFilter={verseFilter}
         displayCount={displayCount}
-          hasMatches={hasMatches}
+        hasMatches={hasMatches}
         onClearObsQuoteFilter={() => {
           setObsQuoteFilter(null)
           setSelectedNoteId(null)
@@ -270,7 +271,10 @@ export function CombinedHelpsViewer({
         onClearTokenFilter={() => setTokenFilter(null)}
         onClearVerseFilter={() => setVerseFilter(null)}
       />
+    ) : null
 
+  return (
+    <div className="h-full flex flex-col">
       <CombinedHelpsList
         resource={resource}
         effectiveResource={effectiveResource}
@@ -279,6 +283,7 @@ export function CombinedHelpsViewer({
         targetLanguageDirection={targetLanguageDirection}
         kindFilter={kindFilter}
         setKindFilter={setKindFilter}
+        filterScopeBar={filterScopeBar}
         noSources={noSources}
         depsOk={depsOk}
         loading={loading}

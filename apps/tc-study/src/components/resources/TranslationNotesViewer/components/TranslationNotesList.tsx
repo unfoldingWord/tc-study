@@ -1,7 +1,14 @@
 import { BookOpen, FileText } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../../utils/bookNames'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { ResourceViewerHeader } from '../../common/ResourceViewerHeader'
+import {
+  HELPS_LIST_PANEL,
+  HELPS_VERSE_COUNT,
+  HELPS_VERSE_HEADER,
+  HELPS_VERSE_HEADER_ICON,
+} from '../../helpsCardStyles'
 import { TranslationNoteCard, type NoteWithTokens } from './TranslationNoteCard'
 import type { ResourceInfo } from '../../../../contexts/types'
 
@@ -11,6 +18,8 @@ export interface TranslationNotesListProps {
   bookCode?: string
   bookTitleSource: unknown
   targetLanguageDirection: 'ltr' | 'rtl'
+  /** Inline filter chip for header actions (no extra chrome row). */
+  filterScopeBar?: ReactNode
   loading: boolean
   error: string | null | undefined
   notesByVerse: Record<string, NoteWithTokens[]>
@@ -33,6 +42,7 @@ export function TranslationNotesList({
   bookCode,
   bookTitleSource,
   targetLanguageDirection,
+  filterScopeBar,
   loading,
   error,
   notesByVerse,
@@ -49,27 +59,33 @@ export function TranslationNotesList({
   onNoteSelect,
 }: TranslationNotesListProps) {
   return (
-    <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
-      <ResourceViewerHeader title={resource.title} icon={FileText} direction={targetLanguageDirection} />
-      <div className="p-4">
+    <div className={HELPS_LIST_PANEL} dir={targetLanguageDirection}>
+      <ResourceViewerHeader
+        title={resource.title}
+        icon={FileText}
+        direction={targetLanguageDirection}
+        infoResource={resource}
+        actions={filterScopeBar ?? undefined}
+      />
+      <div className="p-content">
         {loading ? (
           <LoadingSpinner
             centered
             label="Loading content"
             className="text-helps"
-            containerClassName="py-12"
+            containerClassName="py-8"
           />
         ) : error ? (
-          <div className="text-center py-12 text-fg-muted">
-            <BookOpen className="w-12 h-12 mx-auto mb-4 text-fg-muted opacity-50" />
+          <div className="text-center py-8 text-fg-muted">
+            <BookOpen className="w-10 h-10 mx-auto mb-2 text-fg-muted opacity-50" />
             <p className="text-sm">{error}</p>
           </div>
         ) : Object.keys(notesByVerse).length === 0 ? (
           <div className="flex items-center justify-center h-full" title="No notes for this passage">
-            <BookOpen className="w-16 h-16 text-fg-muted opacity-60" />
+            <BookOpen className="w-12 h-12 text-fg-muted opacity-60" />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-stack-lg">
             {Object.entries(notesByVerse).map(([verse, verseNotes]) => {
               const resolved = getBookTitleWithFallback(
                 effectiveResource,
@@ -77,13 +93,10 @@ export function TranslationNotesList({
                 bookCode ?? ''
               )
               return (
-                <div key={verse} className="space-y-3">
-                  <div
-                    className="flex items-center gap-2 px-2.5 py-1.5 bg-chip-verse rounded-lg"
-                    dir={targetLanguageDirection}
-                  >
-                    <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
-                    <h3 className="text-xs font-semibold text-fg-secondary">
+                <div key={verse} className="space-y-stack">
+                  <div className={HELPS_VERSE_HEADER} dir={targetLanguageDirection}>
+                    <BookOpen className={HELPS_VERSE_HEADER_ICON} />
+                    <h3 className="text-chrome font-semibold text-fg-secondary">
                       {(() => {
                         const { bookPart, numberPart } = formatVerseRefParts(
                           resolved,
@@ -103,9 +116,7 @@ export function TranslationNotesList({
                         )
                       })()}
                     </h3>
-                    <span className="ml-auto px-2 py-0.5 bg-helps-soft text-chip-verse-fg rounded-full text-[10px] font-medium">
-                      {verseNotes.length}
-                    </span>
+                    <span className={HELPS_VERSE_COUNT}>{verseNotes.length}</span>
                   </div>
 
                   {verseNotes.map((note, idx) => {

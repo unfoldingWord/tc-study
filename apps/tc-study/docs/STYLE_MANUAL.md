@@ -31,8 +31,9 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
 | `canvas` | `#f4f2ef` | `#17191c` | App background (`body`) |
-| `surface` | `#ffffff` | `#212428` | Cards, headers, modal panels |
+| `surface` | `#ffffff` | `#212428` | Cards, modal panels, resource viewer headers (`ResourceViewerHeader`) |
 | `elevated` | `#ffffff` | `#2a2e34` | Raised panels / dialogs |
+| `tab-selected` | `#ffffff` | `#141618` | Active `SortableTab` on `panel-*-soft` strip (elevated in light; darker than strip in dark) |
 | `muted` | `#ebe8e4` | `#2f343b` | Soft fills, hover chips, scrollbar track |
 | `border` | `#e0dcd6` | `#3a4048` | Primary borders |
 | `border-subtle` | `#efece8` | `#2c3138` | Hairline / soft separators |
@@ -55,8 +56,8 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 | `accent-fg` | `#1e40af` | `#93c5fd` | Text on accent-soft |
 | `danger` | `#dc2626` | `#f87171` | Errors / destructive |
 | `danger-soft` | `#fef2f2` | `#3f1d1d` | Soft error fill |
-| `highlight` | `#fef08a` | `#5c4a14` | Verse / note selection wash |
-| `highlight-strong` | `#fde047` | `#7a641c` | Stronger selection border/fill |
+| `highlight` | `#fef08a` | `#5c4a14` | Verse / note selection wash; Helps filter value pill fill |
+| `highlight-strong` | `#fde047` | `#7a641c` | Stronger selection border/fill; filter × hover wash |
 | `underline` | `#a8a29e` | `#9a948c` | Dotted scripture underlines |
 | `overlay` | `rgb(0 0 0 / 0.5)` | `rgb(0 0 0 / 0.55)` | Modal/dialog scrim (`bg-overlay`) |
 
@@ -80,8 +81,9 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `chip-verse` / `chip-verse-fg` | `#eeeaf8` / `#5b21b6` | `#2f2a3d` / `#c4b5fd` | Verse/ref group headers + count badges |
 | `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `#eef4ff` / `#e0eaff` / `#1e40af` | `#1e2a3d` / `#243548` / `#93c5fd` | Scripture / OBS quote chips |
+
+Verse/ref group headers use shared `muted/50` + `fg-secondary` (see `helpsCardStyles` — `HELPS_VERSE_HEADER`), not a lavender chip.
 
 Ring offset uses `canvas` (`--color-ring-offset`).
 
@@ -119,24 +121,34 @@ Markdown headings in `remarkRenderer` map `h1`→`text-2xl` … `h6`→`text-xs`
 
 ---
 
-## Spacing & density (guidance)
+## Spacing & type hierarchy tokens
 
-No custom spacing tokens yet — use Tailwind spacing. Prefer:
+Defined in `src/index.css` `@theme` (Tailwind utilities):
 
-- Compact chrome: `p-2` / `px-3 py-2` for headers and tab strips
-- Content panes: `p-4`–`p-6` for scripture; slightly tighter (`gap-2` / `p-3`) for helps lists
-- Avoid double borders + heavy card stacking; prefer surface on canvas with `border-border` or `border-border-subtle`
+| Token | Value | Utilities | Use |
+|-------|-------|-----------|-----|
+| `chrome` | `0.5rem` (8px) | `p-chrome`, `px-chrome`, `gap-chrome` | Read bar / panel header insets |
+| `chrome-tight` | `0.375rem` (6px) | `py-chrome-tight`, `gap-chrome-tight` | Compact vertical chrome |
+| `chrome-bar` | `2.5rem` (40px) | `h-chrome-bar` | Fixed panel header strip height |
+| `chrome-control` | `1.75rem` (28px) | `h-chrome-control`, `w-chrome-control` | Tab / compact control height |
+| `content` | `0.75rem` (12px) | `p-content` | Helps lists & card padding |
+| `content-lg` | `1rem` (16px) | `p-content-lg` | Scripture reading pad |
+| `stack` / `stack-lg` | `0.5rem` / `0.75rem` | `space-y-stack`, `gap-stack` | Card & group vertical rhythm |
+| `micro` / `caption` / `chrome` (text) | `10px` / `11px` / `12px` | `text-micro`, `text-caption`, `text-chrome` | Badges, meta, tabs |
 
-Hierarchical / iOS-like work should tighten chrome first (read header, panel tabs, helps list rows) before rewriting content layouts.
+Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double borders + heavy card shadows; hairline `border-border-subtle` and flat `rounded-md` keep the iOS-like hierarchy.
 
 ---
 
 ## Reading & chrome conventions
 
 - **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`.
-- **Helps cards:** `surface` + chip tokens for verse/quote; prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
+- **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` with a hairline `border-b`; Helps list panels also use `bg-surface` (`HELPS_LIST_PANEL`) so verse chips sit on white/elevated charcoal — not cool `canvas` gray.
+- **Helps verse headers:** `bg-muted/50` + `text-fg-secondary` (+ book icon, ref, count on `bg-surface`) — neutral muted chips (lighter than full `muted`), not lavender `chip-verse`.
+- **Helps cards:** idle `surface` + border; quote chips use `chip-quote*`; selected TN/TWL use light yellow `bg-highlight/15` + even `border-border` (no left bar / ring / blue or purple wash). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
+- **Helps filter pill:** `bg-highlight text-scripture-fg` (borderless `h-7` capsule) — same wash as highlighted scripture tokens (`TokenRenderer`), so filter ↔ selection feel related.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
-- **Panel tabs:** soft strip `from-panel-*-soft`; inactive label `text-fg-secondary`.
+- **Panel tabs:** soft strip `bg-panel-*-soft/70` at fixed `h-chrome-bar`; tabs `h-chrome-control` (icon-only and labeled share one height); selected `bg-tab-selected`; inactive label `text-fg-secondary`.
 - **Focus:** global `ring-accent` + `ring-offset-canvas` on `:focus-visible`.
 
 ---

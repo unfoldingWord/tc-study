@@ -1,10 +1,12 @@
 /**
- * TokenFilterBanner Component
+ * TokenFilterBanner — inline filter scope chrome
  *
- * Shows active token filter with clear button
+ * Compact trailing cluster for ResourceViewerHeader actions (not a dedicated row).
+ * Funnel + dismissible value pill (label + in-pill ×) + match count.
+ * Visible on 0 matches ("0 · all").
  */
 
-import { Hash } from 'lucide-react'
+import { Filter, X } from 'lucide-react'
 import type { TokenFilter } from '../types'
 
 interface TokenFilterBannerProps {
@@ -16,33 +18,62 @@ interface TokenFilterBannerProps {
 
 export function TokenFilterBanner({
   tokenFilter,
-  displayLinksCount: _displayLinksCount,
+  displayLinksCount,
   hasMatches,
-  onClearFilter
+  onClearFilter,
 }: TokenFilterBannerProps) {
-  // Don't show banner if there are no matches
-  if (!hasMatches) {
-    return null
-  }
+  const filterValue = tokenFilter.content
+  // On 0-match fallback, displayLinksCount is the unfiltered length — show 0 instead.
+  const matchCount = hasMatches ? displayLinksCount : 0
+  const statusLabel = hasMatches
+    ? `Filtering by ${filterValue}, ${matchCount} matches`
+    : `Filtering by ${filterValue}, 0 matches, showing all`
 
   return (
-    <div className="px-4 py-1.5 border-b bg-accent-soft border-accent/30 flex items-center justify-center gap-2">
-      <div className="inline-flex items-center gap-1.5 bg-surface border border-accent/40 rounded-md px-2 py-0.5">
-        <Hash className="w-3 h-3 text-accent" />
-        <span className="text-xs text-fg-secondary">
-          {tokenFilter.content}
-        </span>
+    <div
+      role="status"
+      data-testid="helps-filter-scope-bar"
+      className="inline-flex items-center gap-chrome-tight min-w-0 max-w-full"
+      title={statusLabel}
+      aria-label={statusLabel}
+    >
+      <Filter className="w-3.5 h-3.5 shrink-0 text-accent" aria-hidden />
+
+      {/* Same highlight wash as scripture tokens (TokenRenderer) so filter ↔ selection feel related. */}
+      <span
+        className="inline-flex items-center gap-0.5 min-w-0 max-w-[10rem] h-7 rounded-full bg-highlight pl-2.5 pr-1 text-chrome font-medium text-scripture-fg"
+        title={filterValue}
+      >
+        <span className="min-w-0 truncate leading-none">{filterValue}</span>
         <button
+          type="button"
           onClick={onClearFilter}
-          className="ml-0.5 rounded hover:bg-muted p-0.5 text-fg-muted hover:text-fg-secondary transition-colors"
+          data-testid="helps-filter-clear"
+          className="relative shrink-0 flex items-center justify-center rounded-full p-chrome-tight text-scripture-fg/70 transition-colors hover:bg-highlight-strong/70 hover:text-scripture-fg active:text-scripture-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-canvas before:absolute before:inset-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
           title="Clear filter"
-          aria-label="Clear token filter"
+          aria-label="Clear filter"
         >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <X className="w-3.5 h-3.5 stroke-[2.25]" aria-hidden />
         </button>
-      </div>
+      </span>
+
+      <span
+        className={`shrink-0 text-chrome tabular-nums ${
+          hasMatches ? 'text-fg-secondary' : 'text-fg-muted'
+        }`}
+        title={hasMatches ? `${matchCount} matches` : 'No matches — showing all'}
+        aria-hidden
+      >
+        {hasMatches ? (
+          matchCount
+        ) : (
+          <>
+            <span>0</span>
+            <span className="mx-0.5 opacity-50">·</span>
+            <span>all</span>
+          </>
+        )}
+      </span>
     </div>
   )
 }

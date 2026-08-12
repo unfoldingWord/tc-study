@@ -336,7 +336,7 @@ export function TranslationAcademyEntryViewer({
                   <button
                     key={idx}
                     onClick={() => handleRelatedArticleClick(articleId)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-helps-soft hover:bg-chip-verse text-helps-fg rounded-md text-sm font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-helps-soft hover:bg-muted text-helps-fg rounded-md text-sm font-medium transition-colors"
                   >
                     <GraduationCap className="w-3.5 h-3.5" />
                     {displayName}

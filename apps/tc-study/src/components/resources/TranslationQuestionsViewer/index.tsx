@@ -18,6 +18,12 @@ import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bo
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { LoadingSpinner } from '../../../shared/LoadingSpinner'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
+import {
+  HELPS_LIST_PANEL,
+  HELPS_VERSE_COUNT,
+  HELPS_VERSE_HEADER,
+  HELPS_VERSE_HEADER_ICON,
+} from '../helpsCardStyles'
 import type { ResourceInfo } from '../../../contexts/types'
 
 const TQ_CACHE_MAX = 50
@@ -214,40 +220,37 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
-        <ResourceViewerHeader 
+      <div className={HELPS_LIST_PANEL} dir={languageDirection}>
+        <ResourceViewerHeader
           title={resource.title}
           icon={MessageCircleQuestion}
           direction={languageDirection}
+          infoResource={resource}
         />
         <div className="p-4 space-y-4">
         {Object.entries(questionsByVerse).map(([verse, verseQuestions]) => (
           <div key={verse} className="space-y-3">
             {/* Verse Header - LTR: book 1:4; RTL: 4:1 book (flex enforces order when book is RTL script) */}
-            <div className="px-2.5 py-1.5 bg-chip-verse rounded-lg" dir={languageDirection}>
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
-                <h3 className="text-xs font-semibold text-fg-secondary">
-                  {(() => {
-                    const bookName = getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book)
-                    const { bookPart, numberPart } = formatVerseRefParts(bookName, verse, languageDirection === 'rtl')
-                    return languageDirection === 'rtl' ? (
-                      <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
-                        <span>{numberPart}</span>
-                        <span>{bookPart}</span>
-                      </span>
-                    ) : (
-                      <span className="inline-flex gap-1" dir="ltr">
-                        <span>{bookPart}</span>
-                        <span>{numberPart}</span>
-                      </span>
-                    )
-                  })()}
-                </h3>
-                <span className="ml-auto px-2 py-0.5 bg-accent-soft text-accent-fg rounded-full text-[10px] font-medium">
-                  {verseQuestions.length}
-                </span>
-              </div>
+            <div className={HELPS_VERSE_HEADER} dir={languageDirection}>
+              <BookOpen className={HELPS_VERSE_HEADER_ICON} />
+              <h3 className="text-chrome font-semibold text-fg-secondary">
+                {(() => {
+                  const bookName = getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book)
+                  const { bookPart, numberPart } = formatVerseRefParts(bookName, verse, languageDirection === 'rtl')
+                  return languageDirection === 'rtl' ? (
+                    <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
+                      <span>{numberPart}</span>
+                      <span>{bookPart}</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex gap-1" dir="ltr">
+                      <span>{bookPart}</span>
+                      <span>{numberPart}</span>
+                    </span>
+                  )
+                })()}
+              </h3>
+              <span className={HELPS_VERSE_COUNT}>{verseQuestions.length}</span>
             </div>
 
             {/* Questions for this verse */}

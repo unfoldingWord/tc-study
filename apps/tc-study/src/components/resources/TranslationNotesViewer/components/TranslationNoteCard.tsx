@@ -13,6 +13,7 @@ import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
+import { HELPS_CARD_IDLE, HELPS_CARD_SELECTED } from '../../helpsCardStyles'
 import { parseScriptureLink } from '../utils/parseScriptureLink'
 
 interface AlignedToken {
@@ -49,9 +50,9 @@ interface TranslationNoteCardProps {
 }
 
 const quoteChipClass =
-  'w-full text-start mb-2.5 px-3 py-2 bg-chip-quote hover:bg-chip-quote-hover rounded-lg transition-all duration-150'
+  'w-full text-start mb-stack px-chrome py-chrome-tight bg-chip-quote hover:bg-chip-quote-hover rounded-md transition-colors duration-150'
 const quoteChipStaticClass =
-  'w-full text-start mb-2.5 px-3 py-2 bg-chip-quote rounded-lg border border-border-subtle'
+  'w-full text-start mb-stack px-chrome py-chrome-tight bg-chip-quote rounded-md border border-border-subtle'
 
 export const TranslationNoteCard = memo(function TranslationNoteCard({
   note,
@@ -133,11 +134,9 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   return (
     <div
       className={`
-        group rounded-lg p-3 cursor-pointer transition-all duration-150 border
-        ${isSelected 
-          ? 'bg-highlight/50 shadow-sm border-highlight-strong' 
-          : 'bg-surface hover:shadow-sm hover:border-border border-border-subtle'
-        }
+        group rounded-md p-content cursor-pointer transition-colors duration-150 border
+        ${isSelected ? HELPS_CARD_SELECTED : HELPS_CARD_IDLE}
+
       `}
       onClick={() => {
         onClick(note)

@@ -12,6 +12,7 @@
   --color-canvas: var(--theme-canvas);
   --color-surface: var(--theme-surface);
   --color-elevated: var(--theme-elevated);
+  --color-tab-selected: var(--theme-tab-selected);
   --color-muted: var(--theme-muted);
   --color-border: var(--theme-border);
   --color-border-subtle: var(--theme-border-subtle);
@@ -39,13 +40,24 @@
   --color-helps: var(--theme-helps);
   --color-helps-soft: var(--theme-helps-soft);
   --color-helps-fg: var(--theme-helps-fg);
-  --color-chip-verse: var(--theme-chip-verse);
-  --color-chip-verse-fg: var(--theme-chip-verse-fg);
   --color-chip-quote: var(--theme-chip-quote);
   --color-chip-quote-hover: var(--theme-chip-quote-hover);
   --color-chip-quote-fg: var(--theme-chip-quote-fg);
   --color-overlay: var(--theme-overlay);
   --color-ring-offset: var(--theme-canvas);
+
+  /* Hierarchy: chrome / content spacing + caption type (iOS-like density) */
+  --spacing-chrome: 0.5rem; /* 8px — bar & header insets */
+  --spacing-chrome-tight: 0.375rem; /* 6px — compact vertical chrome */
+  --spacing-chrome-bar: 2.5rem; /* 40px — panel header strip (fixed) */
+  --spacing-chrome-control: 1.75rem; /* 28px — tab / compact control height */
+  --spacing-content: 0.75rem; /* 12px — list / secondary content pad */
+  --spacing-content-lg: 1rem; /* 16px — scripture reading pad */
+  --spacing-stack: 0.5rem; /* 8px — tight vertical stacks */
+  --spacing-stack-lg: 0.75rem; /* 12px — group stacks */
+  --text-micro: 0.625rem; /* 10px — badges */
+  --text-caption: 0.6875rem; /* 11px — chrome labels */
+  --text-chrome: 0.75rem; /* 12px — tabs / compact UI */
 }
 
 /* —— Light (default): warm study paper / soft gray shell —— */
@@ -55,6 +67,8 @@
   --theme-canvas: #f4f2ef;
   --theme-surface: #ffffff;
   --theme-elevated: #ffffff;
+  /* Selected resource tab on panel-*-soft strip — elevated white in light */
+  --theme-tab-selected: #ffffff;
   --theme-muted: #ebe8e4;
   --theme-border: #e0dcd6;
   --theme-border-subtle: #efece8;
@@ -91,9 +105,7 @@
   --theme-helps-soft: #f5f3ff;
   --theme-helps-fg: #5b21b6;
 
-  /* Helps reading chips (verse headers + scripture quotes) */
-  --theme-chip-verse: #eeeaf8;
-  --theme-chip-verse-fg: #5b21b6;
+  /* Helps reading chips (scripture / OBS quotes) — verse headers use muted/50 */
   --theme-chip-quote: #eef4ff;
   --theme-chip-quote-hover: #e0eaff;
   --theme-chip-quote-fg: #1e40af;
@@ -109,6 +121,8 @@
   --theme-canvas: #17191c;
   --theme-surface: #212428;
   --theme-elevated: #2a2e34;
+  /* Selected tab — darker than panel-*-soft strip (surface reads too light there) */
+  --theme-tab-selected: #141618;
   --theme-muted: #2f343b;
   --theme-border: #3a4048;
   --theme-border-subtle: #2c3138;
@@ -145,8 +159,6 @@
   --theme-helps-soft: #2a2438;
   --theme-helps-fg: #c4b5fd;
 
-  --theme-chip-verse: #2f2a3d;
-  --theme-chip-verse-fg: #c4b5fd;
   --theme-chip-quote: #1e2a3d;
   --theme-chip-quote-hover: #243548;
   --theme-chip-quote-fg: #93c5fd;

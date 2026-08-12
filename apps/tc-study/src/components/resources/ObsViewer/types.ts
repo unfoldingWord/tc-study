@@ -1,9 +1,10 @@
+import type { ResourceInfo } from '../../../contexts/types'
 import type { ObsFrameQuoteEntry } from '../../../signals/studioSignals'
 
 export interface ObsViewerProps {
   resourceId: string
   resourceKey: string
-  resource: { title?: string; language?: string }
+  resource: ResourceInfo
   isAnchor?: boolean
 }
 
