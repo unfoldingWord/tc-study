@@ -2,6 +2,8 @@
 
 Layered UI (boneless / lifeless / headless) for light + dark, with room for more themes later.
 
+Broader style guide (full palette tables, typography, chrome conventions): **[STYLE_MANUAL.md](./STYLE_MANUAL.md)**.
+
 ## Layers
 
 | Layer | Location | Role |
