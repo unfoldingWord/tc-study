@@ -2,6 +2,7 @@ import { BookMarked, Info, NotebookPen, Scale } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
+import { useWorkspaceStore } from '../../../features/workspace/workspaceStore'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { ResourceInfoModal } from '../../studio/ResourceInfoModal'
 
@@ -32,6 +33,36 @@ function lookupLoadedResource(
     loadedResources[key] ??
     Object.values(loadedResources).find((r) => r?.key === key || r?.id === key)
   )
+}
+
+/**
+ * Resolve a helps peer (TN/TWL) for Sources rows.
+ *
+ * Unlock 1 keeps TN/TWL in the workspace package map but strips them from panel
+ * keys, so AppStore `loadedResources` often has TN (orphan from an earlier
+ * assign) and never projects TWL (stripped in the same tick as assign). Prefer
+ * the package map — that is the SoT for helps pointers.
+ */
+export function lookupHelpsSourceResource(
+  key: string,
+  packageResources: Map<string, ResourceInfo> | Record<string, ResourceInfo> | undefined,
+  loadedResources: Record<string, ResourceInfo | undefined>
+): ResourceInfo | undefined {
+  if (!key) return undefined
+  if (packageResources) {
+    const fromPackage =
+      packageResources instanceof Map ? packageResources.get(key) : packageResources[key]
+    if (fromPackage) return fromPackage
+    if (packageResources instanceof Map) {
+      for (const r of packageResources.values()) {
+        if (r?.key === key || r?.id === key) return r
+      }
+    } else {
+      const byScan = Object.values(packageResources).find((r) => r?.key === key || r?.id === key)
+      if (byScan) return byScan
+    }
+  }
+  return lookupLoadedResource(loadedResources, key)
 }
 
 type SourceKind = 'tn' | 'twl'
@@ -78,15 +109,16 @@ export function HelpsSourcesMenu({
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
 
   const loadedResources = useAppStore((s) => s.loadedResources)
+  const packageResources = useWorkspaceStore((s) => s.currentPackage?.resources)
 
   const sources = useMemo((): SourceRow[] => {
     const rows: SourceRow[] = []
-    const tn = lookupLoadedResource(loadedResources, tnKey)
-    const twl = lookupLoadedResource(loadedResources, twlKey)
+    const tn = lookupHelpsSourceResource(tnKey, packageResources, loadedResources)
+    const twl = lookupHelpsSourceResource(twlKey, packageResources, loadedResources)
     if (tn) rows.push({ kind: 'tn', resource: tn })
     if (twl) rows.push({ kind: 'twl', resource: twl })
     return rows
-  }, [loadedResources, tnKey, twlKey])
+  }, [loadedResources, packageResources, tnKey, twlKey])
 
   useEffect(() => {
     if (!open) return
@@ -172,10 +204,10 @@ export function HelpsSourcesMenu({
                 const label =
                   kind === 'tn'
                     ? resource.title || 'Translation Notes'
-                    : resource.title || 'Word Links'
+                    : resource.title || 'Translation Words List'
                 return (
                   <button
-                    key={`${kind}-${resource.key}`}
+                    key={`${kind}-${resource.key || resource.id}`}
                     type="button"
                     role="menuitem"
                     title={label}
