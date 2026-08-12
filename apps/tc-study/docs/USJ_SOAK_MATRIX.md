@@ -1,6 +1,6 @@
 # USJ soak matrix (manual) — Titus linked panels
 
-Clear `scripture:` / `scripture-usj:` IndexedDB keys (or wipe origin data) before each pass. Default build = USJ on (`89b99aa+` / Pipeline `ddc0a56` contract).
+Clear `scripture:` / `scripture-usj:` IndexedDB keys (or wipe origin data) before each pass. Default build = USJ on (`092f238+` Viewer viewModel; Pipeline `loadViewModel`).
 
 ## Resources
 
@@ -39,4 +39,5 @@ Clear `scripture:` / `scripture-usj:` IndexedDB keys (or wipe origin data) befor
 
 | Date | Tester | Commit | Result | Blockers |
 |------|--------|--------|--------|----------|
-| 2026-08-12 | QA (automated only) | `89b99aa` | Unit/integration **34/34 green**. Manual rows 1–10 empty. Local Playwright blocked (`vite` worker `iife` on `useBackgroundDownload`). | Viewer viewModel WIP; loader ProcessedScripture-only; Platform e2e build; usfm-js delete blocked |
+| 2026-08-12 | QA | `89b99aa` | Unit 34/34; e2e blocked on vite worker iife (later fixed). | — |
+| 2026-08-12 | QA | `092f238` | Unit/integration **36/36 green**. Vite worker `es` OK. Journey 4/8 **fail**: `Resource type registration failed: exports is not defined`. Manual soak blocked. | Platform/E2E CJS interop; usfm-js delete still NO-GO |
