@@ -1,97 +1,58 @@
 /**
- * Convert ProcessedScripture (from @bt-synergy/usfm-processor) to OptimizedChapter[]
- * (from @bt-synergy/resource-parsers) for use with quote building utilities.
+ * Convert ProcessedScripture (USJ or legacy projection) to OptimizedChapter[]
+ * for QuoteMatcher / CombinedHelps.
+ *
+ * Occurrence and surface text must match the frozen identity contract:
+ *   semanticId = `${verseRef}:${content}:${occurrence}`
+ * Occurrence is verse-wide, 1-based, case-insensitive on content.
  */
 
 import type { OptimizedChapter, OptimizedToken, OptimizedVerse } from '@bt-synergy/resource-parsers'
 import type { ProcessedChapter, ProcessedScripture, ProcessedVerse, WordToken } from '@bt-synergy/usfm-processor'
 
 /**
- * Convert WordToken to OptimizedToken
+ * Convert WordToken to OptimizedToken.
+ * Preserves processor-assigned occurrence so QuoteMatcher / semantic IDs stay in lockstep with USJ.
  */
 function convertWordTokenToOptimizedToken(wordToken: WordToken, index: number): OptimizedToken {
-  // Extract semantic ID from uniqueId if available
-  // Format: "verseRef:content:occurrence" -> extract numeric ID
-  let semanticId = index + 1 // Default to sequential ID
-  
-  // Try to extract semantic ID from uniqueId
-  if (wordToken.uniqueId) {
-    // If uniqueId contains a numeric ID, use it
-    const idMatch = wordToken.uniqueId.match(/:(\d+)$/)
-    if (idMatch) {
-      semanticId = parseInt(idMatch[1], 10)
-    } else {
-      // Generate a hash-based ID from the uniqueId
-      let hash = 0
-      for (let i = 0; i < wordToken.uniqueId.length; i++) {
-        const char = wordToken.uniqueId.charCodeAt(i)
-        hash = ((hash << 5) - hash) + char
-        hash = hash & hash // Convert to 32-bit integer
-      }
-      semanticId = Math.abs(hash) || (index + 1)
-    }
-  }
-
-  // Map WordToken.type to OptimizedToken.type
-  // WordToken: 'word' | 'text' | 'punctuation'
-  // OptimizedToken: 'word' | 'punctuation' | 'number' | 'whitespace' | 'paragraph-marker'
-  let tokenType: OptimizedToken['type'] = 'word'
-  
-  // Check content to properly categorize the token
   const content = wordToken.content || ''
   const trimmedContent = content.trim()
-  
-  // If content is only whitespace, mark as whitespace
+
+  let tokenType: OptimizedToken['type'] = 'word'
   if (content.length > 0 && trimmedContent.length === 0) {
     tokenType = 'whitespace'
-  }
-  // If content is only punctuation (non-word characters), mark as punctuation
-  else if (trimmedContent.length > 0 && /^[^\p{L}\p{N}]+$/u.test(trimmedContent)) {
+  } else if (trimmedContent.length > 0 && /^[^\p{L}\p{N}]+$/u.test(trimmedContent)) {
     tokenType = 'punctuation'
-  }
-  // If type is explicitly marked as punctuation
-  else if (wordToken.type === 'punctuation') {
+  } else if (wordToken.type === 'punctuation') {
     tokenType = 'punctuation'
-  }
-  // Otherwise it's a word
-  else if (wordToken.type === 'word' || wordToken.type === 'text') {
+  } else if (wordToken.type === 'word' || wordToken.type === 'text') {
     tokenType = 'word'
   }
 
-  // CRITICAL: Extract lemma and strong data for original language tokens
-  // These come from USFM \zaln markers in original language texts
-  // For original language (UGNT/UHB): alignment data IS the token's own lemma/strong
-  const lemma = wordToken.alignment?.lemma
-  const strong = wordToken.alignment?.strong
-  const morph = wordToken.alignment?.morph
-
+  // Sequential numeric id is only for OptimizedToken shape — highlight match key is
+  // verseRef:content:occurrence (built later by generateSemanticIdsForQuoteTokens).
   const optimizedToken: OptimizedToken = {
-    id: semanticId,
-    text: wordToken.content || '',
+    id: index + 1,
+    text: content,
     type: tokenType,
-    strong,
-    lemma,
-    morph,
+    strong: wordToken.alignment?.strong,
+    lemma: wordToken.alignment?.lemma,
+    morph: wordToken.alignment?.morph,
+    occurrence: wordToken.occurrence,
   }
 
   return optimizedToken
 }
 
-/**
- * Convert ProcessedVerse to OptimizedVerse
- */
 function convertProcessedVerseToOptimizedVerse(processedVerse: ProcessedVerse): OptimizedVerse {
   const optimizedTokens: OptimizedToken[] = []
-  
+
   if (processedVerse.wordTokens && processedVerse.wordTokens.length > 0) {
     processedVerse.wordTokens.forEach((wordToken, index) => {
-      // Only convert word tokens (skip punctuation-only tokens if needed, but include them for now)
-      const optimizedToken = convertWordTokenToOptimizedToken(wordToken, index)
-      optimizedTokens.push(optimizedToken)
+      optimizedTokens.push(convertWordTokenToOptimizedToken(wordToken, index))
     })
   }
 
-  // Convert paragraphId from string to number if needed
   let paragraphIdNum: number | undefined = undefined
   if (processedVerse.paragraphId !== undefined) {
     if (typeof processedVerse.paragraphId === 'number') {
@@ -114,17 +75,12 @@ function convertProcessedVerseToOptimizedVerse(processedVerse: ProcessedVerse): 
   }
 }
 
-/**
- * Convert ProcessedChapter to OptimizedChapter
- */
 function convertProcessedChapterToOptimizedChapter(processedChapter: ProcessedChapter): OptimizedChapter {
-  const optimizedVerses: OptimizedVerse[] = processedChapter.verses.map(convertProcessedVerseToOptimizedVerse)
-
   return {
     number: processedChapter.number,
     verseCount: processedChapter.verseCount,
     paragraphCount: processedChapter.paragraphCount,
-    verses: optimizedVerses,
+    verses: processedChapter.verses.map(convertProcessedVerseToOptimizedVerse),
   }
 }
 
@@ -139,9 +95,5 @@ export function convertProcessedScriptureToOptimizedChapters(
     return []
   }
 
-  const optimizedChapters: OptimizedChapter[] = processedScripture.chapters.map(
-    convertProcessedChapterToOptimizedChapter
-  )
-
-  return optimizedChapters
+  return processedScripture.chapters.map(convertProcessedChapterToOptimizedChapter)
 }

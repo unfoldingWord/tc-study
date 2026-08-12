@@ -43,6 +43,7 @@ export type {
 } from '@bt-synergy/usj-processor'
 export {
   semanticIdFor,
+  semanticIdKey,
   USJ_PROCESSING_VERSION,
   USJ_TOOL_VERSIONS,
 } from '@bt-synergy/usj-processor'
