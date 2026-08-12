@@ -52,7 +52,9 @@ Verse group headers and quote buttons on Combined Helps / TN / TWL cards use ded
 |-------|-----------|-----|
 | `chip-verse` / `chip-verse-fg` | `bg-chip-verse`, `text-chip-verse-fg` | Verse/ref group headers + count badges |
 | `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `bg-chip-quote`, `hover:bg-chip-quote-hover`, `text-chip-quote-fg` | Scripture / OBS quote chips on note & word-link cards |
-| `filter-chip` / `filter-chip-fg` | `bg-filter-chip`, `text-filter-chip-fg` | Helps header filter value pill (`TokenFilterBanner`) — borderless capsule tuned to contrast against `canvas` (do not reuse pale `accent-soft` there) |
+| `filter-chip` / `filter-chip-fg` | `bg-filter-chip`, `text-filter-chip-fg` | Helps header filter value pill (`TokenFilterBanner`) — borderless capsule tuned to contrast against `surface` headers (do not reuse pale `accent-soft` there) |
+
+`ResourceViewerHeader` (scripture titles + Helps chrome strip) uses `bg-surface` so it stays lighter than the surrounding `bg-canvas` content in light mode, and remains distinct (not near-black-on-black) in dark mode.
 
 Pair with shared `surface`, `fg`, `fg-secondary`, `fg-muted`, `border`, `helps*` for card chrome and entry links.
 

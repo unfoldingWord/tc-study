@@ -39,7 +39,7 @@ export function TokenFilterBanner({
     >
       <Filter className="w-3.5 h-3.5 shrink-0 text-accent" aria-hidden />
 
-      {/* Borderless filter capsule: filter-chip fill pops on canvas headers (accent-soft does not). */}
+      {/* Borderless filter capsule: filter-chip fill pops on surface headers (accent-soft does not). */}
       <span
         className="inline-flex items-center gap-0.5 min-w-0 max-w-[10rem] h-7 rounded-full bg-filter-chip pl-2.5 pr-1 text-chrome font-medium text-filter-chip-fg"
         title={filterValue}

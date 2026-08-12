@@ -28,7 +28,7 @@ export function ResourceViewerHeader({
   direction = 'ltr',
 }: ResourceViewerHeaderProps) {
   return (
-    <div className="flex-shrink-0 px-content py-chrome border-b border-border-subtle/80" dir={direction}>
+    <div className="flex-shrink-0 bg-surface px-content py-chrome border-b border-border-subtle/80" dir={direction}>
       <div className="flex items-center justify-between gap-stack">
         <div className="flex items-center gap-chrome-tight min-w-0">
           {Icon && <Icon className="w-3.5 h-3.5 text-fg-muted flex-shrink-0" />}
