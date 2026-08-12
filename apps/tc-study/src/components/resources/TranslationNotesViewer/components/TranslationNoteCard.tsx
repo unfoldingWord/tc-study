@@ -13,6 +13,7 @@ import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
+import { HELPS_CARD_IDLE, HELPS_CARD_SELECTED } from '../../helpsCardStyles'
 import { parseScriptureLink } from '../utils/parseScriptureLink'
 
 interface AlignedToken {
@@ -134,10 +135,8 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
     <div
       className={`
         group rounded-md p-content cursor-pointer transition-colors duration-150 border
-        ${isSelected 
-          ? 'bg-highlight/50 border-highlight-strong' 
-          : 'bg-surface hover:border-border border-border-subtle'
-        }
+        ${isSelected ? HELPS_CARD_SELECTED : HELPS_CARD_IDLE}
+
       `}
       onClick={() => {
         onClick(note)

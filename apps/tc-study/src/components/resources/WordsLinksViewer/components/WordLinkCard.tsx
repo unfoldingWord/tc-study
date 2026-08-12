@@ -13,6 +13,7 @@ import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseTWLink } from '../../../../features/helps/quoteTokens'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
+import { HELPS_CARD_IDLE, HELPS_CARD_SELECTED } from '../../helpsCardStyles'
 import type { TokenFilter, TranslationWordsLink } from '../types'
 
 interface AlignedToken {
@@ -70,10 +71,8 @@ export const WordLinkCard = memo(function WordLinkCard({
     <div
       className={`
         group rounded-md p-content cursor-pointer transition-colors duration-150 border
-        ${isSelected
-          ? 'bg-helps-soft border-helps/40'
-          : 'bg-surface hover:border-border border-border-subtle'
-        }
+        ${isSelected ? HELPS_CARD_SELECTED : HELPS_CARD_IDLE}
+
       `}
       onClick={(hasAlignedTokens || obsMode) ? () => onQuoteClick(link) : undefined}
       role="article"

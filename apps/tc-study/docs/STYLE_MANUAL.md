@@ -143,7 +143,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 
 - **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`.
 - **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` (near-white light / elevated charcoal dark) so titles + Helps chrome lift off `bg-canvas` list areas — not transparent/`canvas` gray.
-- **Helps cards:** `surface` + chip tokens for verse/quote; prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
+- **Helps cards:** `surface` + chip tokens for verse/quote; selected TN/TWL use soft `helps-soft/30` + `border-l-helps` + light `ring-helps/30` (not a full-card `highlight` wash). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
 - **Helps filter pill:** `bg-highlight text-scripture-fg` (borderless `h-7` capsule) — same wash as highlighted scripture tokens (`TokenRenderer`), so filter ↔ selection feel related.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
 - **Panel tabs:** soft strip `bg-panel-*-soft/70` at fixed `h-chrome-bar`; tabs `h-chrome-control` (icon-only and labeled share one height); selected `bg-tab-selected`; inactive label `text-fg-secondary`.
