@@ -1,6 +1,7 @@
 /**
- * Deterministic TN / scripture / catalog fixtures for Journey 4 highlight.
- * Greek quote Θεοῦ aligns to English "God" via alignedOriginalWordIds.
+ * Deterministic TN / scripture / catalog fixtures for Journey 4–8 highlight.
+ * - Θεοῦ ↔ God via alignedOriginalWordIds (TN quote / underline)
+ * - Παῦλος ↔ Paul via alignedOriginalWordIds (cross-panel token-click)
  */
 
 export const E2E_TN_KEY = 'unfoldingWord/e2e/tn'
@@ -13,7 +14,10 @@ export const E2E_UHB_KEY = 'unfoldingWord/hbo/uhb'
 export const E2E_BOOK = 'tit'
 export const E2E_QUOTE_GREEK = 'Θεοῦ'
 export const E2E_QUOTE_EN = 'God'
+export const E2E_PAUL_GREEK = 'Παῦλος'
+export const E2E_PAUL_EN = 'Paul'
 export const E2E_OL_SEMANTIC_ID = `${E2E_BOOK} 1:1:${E2E_QUOTE_GREEK}:1`
+export const E2E_PAUL_OL_SEMANTIC_ID = `${E2E_BOOK} 1:1:${E2E_PAUL_GREEK}:1`
 export const E2E_NOTE_ID = 'e2e-note-1'
 export const E2E_NOTE_TEXT = 'E2E note about God.'
 
@@ -290,8 +294,20 @@ export function buildE2ECacheEntries() {
   const ugnt = processedScripture({
     bookCode: E2E_BOOK,
     language: 'el-x-koine',
-    verseText: E2E_QUOTE_GREEK,
+    verseText: `${E2E_PAUL_GREEK} ${E2E_QUOTE_GREEK}`,
     tokens: [
+      wordToken({
+        content: E2E_PAUL_GREEK,
+        verseRef: `${E2E_BOOK} 1:1`,
+        alignment: {
+          strong: 'G3972',
+          lemma: 'Παῦλος',
+          morph: 'N-NMS',
+          occurrence: '1',
+          occurrences: '1',
+          content: E2E_PAUL_GREEK,
+        },
+      }),
       wordToken({
         content: E2E_QUOTE_GREEK,
         verseRef: `${E2E_BOOK} 1:1`,
@@ -310,8 +326,13 @@ export function buildE2ECacheEntries() {
   const ult = processedScripture({
     bookCode: E2E_BOOK,
     language: 'e2e',
-    verseText: E2E_QUOTE_EN,
+    verseText: `${E2E_PAUL_EN} ${E2E_QUOTE_EN}`,
     tokens: [
+      wordToken({
+        content: E2E_PAUL_EN,
+        verseRef: `${E2E_BOOK} 1:1`,
+        alignedOriginalWordIds: [E2E_PAUL_OL_SEMANTIC_ID],
+      }),
       wordToken({
         content: E2E_QUOTE_EN,
         verseRef: `${E2E_BOOK} 1:1`,
@@ -320,6 +341,8 @@ export function buildE2ECacheEntries() {
     ],
   })
 
+  // Seed legacy `scripture:` keys — USJ dual-read falls back here for offline e2e.
+  // Do not put ProcessedScripture under `scripture-usj:` (loader expects USJ SoT shape).
   return [
     { key: `tn:${E2E_TN_KEY}:${E2E_BOOK}`, entry: tnProcessed },
     { key: `twl:${E2E_TWL_KEY}:${E2E_BOOK}`, entry: twlProcessed },
@@ -334,6 +357,28 @@ export function buildE2ECacheEntries() {
   ]
 }
 
+function scriptureResourceEntry(opts: {
+  key: string
+  title: string
+  language: string
+  resourceId: string
+  subject: string
+}) {
+  return {
+    id: opts.key,
+    key: opts.key,
+    resourceKey: opts.key,
+    title: opts.title,
+    type: 'scripture',
+    subject: opts.subject,
+    owner: 'unfoldingWord',
+    language: opts.language,
+    languageCode: opts.language,
+    resourceId: opts.resourceId,
+    server: 'git.door43.org',
+  }
+}
+
 export function buildE2EHelpsWorkspace() {
   return {
     id: 'e2e-helps',
@@ -343,19 +388,13 @@ export function buildE2EHelpsWorkspace() {
     resources: [
       [
         E2E_ULT_KEY,
-        {
-          id: E2E_ULT_KEY,
+        scriptureResourceEntry({
           key: E2E_ULT_KEY,
-          resourceKey: E2E_ULT_KEY,
           title: 'E2E ULT',
-          type: 'scripture',
-          subject: 'Aligned Bible',
-          owner: 'unfoldingWord',
           language: 'e2e',
-          languageCode: 'e2e',
           resourceId: 'ult',
-          server: 'git.door43.org',
-        },
+          subject: 'Aligned Bible',
+        }),
       ],
       [
         E2E_TN_KEY,
@@ -402,6 +441,54 @@ export function buildE2EHelpsWorkspace() {
         id: 'panel-2',
         name: 'Panel 2',
         resourceKeys: [E2E_TN_KEY, E2E_TWL_KEY],
+        activeIndex: 0,
+        position: 1,
+      },
+    ],
+  }
+}
+
+/** Two linked scripture panels for Paul ↔ Παῦλος cross-resource highlight. */
+export function buildE2EAlignmentWorkspace() {
+  return {
+    id: 'e2e-alignment',
+    name: 'E2E Alignment Workspace',
+    version: '1.0.0',
+    description: 'Playwright OL↔ULT seed',
+    resources: [
+      [
+        E2E_ULT_KEY,
+        scriptureResourceEntry({
+          key: E2E_ULT_KEY,
+          title: 'E2E ULT',
+          language: 'e2e',
+          resourceId: 'ult',
+          subject: 'Aligned Bible',
+        }),
+      ],
+      [
+        E2E_UGNT_KEY,
+        scriptureResourceEntry({
+          key: E2E_UGNT_KEY,
+          title: 'E2E UGNT',
+          language: 'el-x-koine',
+          resourceId: 'ugnt',
+          subject: 'Greek New Testament',
+        }),
+      ],
+    ],
+    panels: [
+      {
+        id: 'panel-1',
+        name: 'Panel 1',
+        resourceKeys: [E2E_ULT_KEY],
+        activeIndex: 0,
+        position: 0,
+      },
+      {
+        id: 'panel-2',
+        name: 'Panel 2',
+        resourceKeys: [E2E_UGNT_KEY],
         activeIndex: 0,
         position: 1,
       },

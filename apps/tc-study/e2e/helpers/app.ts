@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import {
+  buildE2EAlignmentWorkspace,
   buildE2ECacheEntries,
   buildE2ECatalogEntries,
   buildE2EHelpsWorkspace,
@@ -28,6 +29,27 @@ export function trackPageErrors(page: Page): string[] {
  */
 export async function seedHelpsWorkspace(page: Page): Promise<void> {
   const workspace = buildE2EHelpsWorkspace()
+  const navigation = buildE2ENavigationState()
+
+  await seedIndexedDb(page, {
+    catalogEntries: buildE2ECatalogEntries(),
+    cacheEntries: buildE2ECacheEntries(),
+  })
+
+  await page.addInitScript(
+    ({ pkg, nav }) => {
+      localStorage.setItem('tc-study-workspace', JSON.stringify(pkg))
+      localStorage.setItem('bt-synergy:navigation-state', JSON.stringify(nav))
+    },
+    { pkg: workspace, nav: navigation }
+  )
+}
+
+/**
+ * Seed ULT + UGNT side-by-side for Paul ↔ Παῦλος token-click highlight.
+ */
+export async function seedAlignmentWorkspace(page: Page): Promise<void> {
+  const workspace = buildE2EAlignmentWorkspace()
   const navigation = buildE2ENavigationState()
 
   await seedIndexedDb(page, {

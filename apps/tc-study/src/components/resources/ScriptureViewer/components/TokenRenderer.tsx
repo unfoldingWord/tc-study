@@ -1,8 +1,14 @@
 /**
- * TokenRenderer - Renders individual word tokens with highlighting and click handling
- * Matches the pattern from mobile app's USFMRenderer/WordTokenRenderer
+ * TokenRenderer — word spans with highlight / underline / click.
+ *
+ * DOM contract for Helps / linked panels (USJ identity):
+ * - data-token-semantic-id = verseRef:content:occurrence (via semanticIdFor)
+ * - data-underlined / data-highlighted for e2e + CSS
+ *
+ * Visual styling ownership stays with Viewer; attrs are the Helps integration surface.
  */
 
+import { semanticIdFor } from '@bt-synergy/scripture-loader'
 import { memo } from 'react'
 import type { TokenDisplayProps } from '../types'
 
@@ -15,18 +21,18 @@ export const TokenRenderer = memo(function TokenRenderer({
   onTokenClick,
   isOriginalLanguage: _isOriginalLanguage,
 }: TokenDisplayProps) {
-  // Get token text (WordToken uses 'content' property)
-  // Trim text/punctuation tokens to remove extra spaces
   const rawText = token.content || ''
   const tokenType = token.type as string
-  const tokenText = (tokenType === 'text' || tokenType === 'punctuation')
-    ? rawText.trim()
-    : rawText
+  const tokenText =
+    tokenType === 'text' || tokenType === 'punctuation' ? rawText.trim() : rawText
 
-  // All word tokens are clickable:
-  // - Aligned tokens → token-click (alignment-based filtering)
-  // - Non-aligned / non-covered tokens → verse-filter (handled in useHighlighting)
   const isClickable = token.type === 'word'
+  const occurrence = token.occurrence || 1
+  const verseRef = token.verseRef || ''
+  const semanticId =
+    token.type === 'word' && verseRef
+      ? semanticIdFor(verseRef, token.content || '', occurrence)
+      : token.uniqueId || ''
 
   const handleClick = () => {
     if (isClickable) {
@@ -34,14 +40,15 @@ export const TokenRenderer = memo(function TokenRenderer({
     }
   }
 
-  // No padding for punctuation and text tokens (they should be adjacent to words)
-  const paddingClass = (tokenType === 'punctuation' || tokenType === 'text') ? '' : 'px-0.5'
+  const paddingClass =
+    tokenType === 'punctuation' || tokenType === 'text' ? '' : 'px-0.5'
 
   return (
     <span
       onClick={handleClick}
-      data-token-semantic-id={token.uniqueId}
+      data-token-semantic-id={semanticId}
       data-highlighted={isHighlighted || isSelected ? 'true' : undefined}
+      data-underlined={isUnderlined ? 'true' : undefined}
       className={`
         rounded ${paddingClass} transition-all inline-block
         ${isClickable ? 'cursor-pointer hover:bg-gray-100' : ''}
@@ -55,5 +62,3 @@ export const TokenRenderer = memo(function TokenRenderer({
     </span>
   )
 })
-
-

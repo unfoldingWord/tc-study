@@ -7,7 +7,7 @@ import { seedHelpsWorkspace, trackPageErrors, waitForCatalogReady } from '../hel
  * Journey 4: Helps interaction.
  *
  * Seeds IndexedDB TN + UGNT + ULT (aligned) so CombinedHelps can build quoteTokens,
- * show a clickable quote, and highlight scripture tokens via token-click.
+ * show a clickable quote, underline coverage tokens, and highlight via token-click.
  */
 test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
   test('note quote click highlights scripture token', async ({ page }) => {
@@ -39,7 +39,12 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
     await expect(quoteBtn).toBeVisible({ timeout: 30_000 })
     await expect(quoteBtn).toContainText(E2E_QUOTE_EN)
 
-    // Before click: coverage may underline, but token highlight class is absent
+    // Coverage underline on aligned English token (TN → Θεοῦ → God)
+    const godToken = page.locator('[data-token-semantic-id]').filter({ hasText: E2E_QUOTE_EN }).first()
+    await expect(godToken).toBeVisible({ timeout: 30_000 })
+    await expect(godToken).toHaveAttribute('data-underlined', 'true', { timeout: 30_000 })
+
+    // Before quote click: token highlight class is absent
     await expect(page.locator('[data-highlighted="true"]')).toHaveCount(0)
 
     await quoteBtn.click()
@@ -52,6 +57,27 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
     // Note body click selects the card (quote button stops propagation)
     await noteCard.getByText(E2E_NOTE_TEXT).click()
     await expect(noteCard).toHaveClass(/from-amber-50|border-amber-200/)
+
+    expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
+  })
+
+  test('scripture token click highlights covered token locally', async ({ page }) => {
+    const errors = trackPageErrors(page)
+    await mockDoor43Network(page)
+    await seedHelpsWorkspace(page)
+
+    await page.goto('/studio')
+    await waitForCatalogReady(page)
+
+    const loading = page.getByRole('status', { name: /Loading helps|Loading dependencies|Loading scripture/i })
+    await expect(loading).toHaveCount(0, { timeout: 45_000 })
+
+    const godToken = page.locator('[data-token-semantic-id]').filter({ hasText: E2E_QUOTE_EN }).first()
+    await expect(godToken).toBeVisible({ timeout: 30_000 })
+    await godToken.click()
+
+    await expect(godToken).toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
+    await expect(godToken).toHaveClass(/highlighted-token/)
 
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
   })
