@@ -6,7 +6,7 @@
 
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import type { ResourceLoader } from '@bt-synergy/catalog-manager'
-import { ScriptureLoader } from '@bt-synergy/scripture-loader'
+import { resolveUseUsjPipeline, ScriptureLoader } from '@bt-synergy/scripture-loader'
 import { TranslationAcademyLoader } from '@bt-synergy/translation-academy-loader'
 import { TranslationNotesLoader } from '@bt-synergy/translation-notes-loader'
 import { TranslationQuestionsLoader } from '@bt-synergy/translation-questions-loader'
@@ -24,6 +24,8 @@ export interface WorkerLoaderDeps {
   catalogAdapter: unknown
   door43Client: unknown
   debug?: boolean
+  /** Optional override; otherwise USE_USJ_PIPELINE / VITE_USE_USJ_PIPELINE / default off */
+  useUsjPipeline?: boolean
 }
 
 /** Shared ctor shape across worker loaders (adapters typed loosely at the worker boundary). */
@@ -32,6 +34,7 @@ type LoaderConfig = {
   catalogAdapter: unknown
   door43Client: unknown
   debug: boolean
+  useUsjPipeline?: boolean
 }
 
 type LoaderCtor = (deps: WorkerLoaderDeps) => ResourceLoader
@@ -45,9 +48,21 @@ function toLoaderConfig(deps: WorkerLoaderDeps): LoaderConfig {
   }
 }
 
+function toScriptureLoaderConfig(deps: WorkerLoaderDeps): LoaderConfig {
+  return {
+    ...toLoaderConfig(deps),
+    useUsjPipeline: resolveUseUsjPipeline(
+      deps.useUsjPipeline ??
+        (import.meta.env.VITE_USE_USJ_PIPELINE === '1' ||
+          import.meta.env.VITE_USE_USJ_PIPELINE === 'true' ||
+          undefined)
+    ),
+  }
+}
+
 /** Worker-download factories only (no combined-helps — mainPlugin only). */
 const LOADER_FACTORIES: Partial<Record<LoaderFactoryKey, LoaderCtor>> = {
-  scripture: (deps) => new ScriptureLoader(toLoaderConfig(deps)),
+  scripture: (deps) => new ScriptureLoader(toScriptureLoaderConfig(deps)),
   words: (deps) => new TranslationWordsLoader(toLoaderConfig(deps)),
   'words-links': (deps) => new TranslationWordsLinksLoader(toLoaderConfig(deps)),
   academy: (deps) => new TranslationAcademyLoader(toLoaderConfig(deps)),

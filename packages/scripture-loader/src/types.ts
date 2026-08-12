@@ -80,6 +80,14 @@ export interface ScriptureLoaderConfig {
   
   /** Enable debug logging */
   debug?: boolean
+
+  /**
+   * Feature flag: use @bt-synergy/usj-processor (USFM→USJ→ProcessedScripture).
+   * Default false = legacy @bt-synergy/usfm-processor (byte-stable).
+   * When omitted, also reads USE_USJ_PIPELINE / VITE_USE_USJ_PIPELINE env.
+   * When on (P2): writes/reads `scripture-usj:…` SoT; dual-reads legacy `scripture:…`.
+   */
+  useUsjPipeline?: boolean
 }
 
 /**

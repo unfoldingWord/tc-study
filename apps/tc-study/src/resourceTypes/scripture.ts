@@ -37,6 +37,11 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
     enableMemoryCache: true,
     memoryCacheSize: 50, // Cache up to 50 chapters
     debug: true, // Enable debug logging to troubleshoot issues
+    // P1/P2 dual-path: default off. Enable with VITE_USE_USJ_PIPELINE=1 (or USE_USJ_PIPELINE).
+    // Flag on → scripture-usj: SoT + dual-read legacy scripture:. Clear both after toggling.
+    useUsjPipeline:
+      import.meta.env.VITE_USE_USJ_PIPELINE === '1' ||
+      import.meta.env.VITE_USE_USJ_PIPELINE === 'true',
   },
   
   downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.SCRIPTURE),

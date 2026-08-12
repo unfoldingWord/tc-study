@@ -1,0 +1,22 @@
+{
+  "name": "@bt-synergy/usj-processor",
+  "version": "0.0.0-spike",
+  "private": true,
+  "description": "USFM→USJ→ProcessedScripture adapter (USE_USJ_PIPELINE path for scripture-loader)",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "link:usfm-tools": "node scripts/link-usfm-tools.cjs",
+    "pretest": "node scripts/link-usfm-tools.cjs",
+    "test": "bun test",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@bt-synergy/usfm-processor": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

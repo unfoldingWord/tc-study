@@ -662,6 +662,7 @@
         "@bt-synergy/resource-parsers": "workspace:*",
         "@bt-synergy/resource-types": "workspace:*",
         "@bt-synergy/usfm-processor": "workspace:*",
+        "@bt-synergy/usj-processor": "workspace:*",
         "jszip": "^3.10.1",
       },
       "devDependencies": {
@@ -854,6 +855,17 @@
         "usfm-js": "^3.4.3",
       },
       "devDependencies": {
+        "typescript": "^5.3.3",
+      },
+    },
+    "packages/usj-processor": {
+      "name": "@bt-synergy/usj-processor",
+      "version": "0.0.0-spike",
+      "dependencies": {
+        "@bt-synergy/usfm-processor": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "^20.10.0",
         "typescript": "^5.3.3",
       },
     },
@@ -1202,6 +1214,8 @@
     "@bt-synergy/unified-catalog-store": ["@bt-synergy/unified-catalog-store@workspace:packages/unified-catalog-store"],
 
     "@bt-synergy/usfm-processor": ["@bt-synergy/usfm-processor@workspace:packages/usfm-processor"],
+
+    "@bt-synergy/usj-processor": ["@bt-synergy/usj-processor@workspace:packages/usj-processor"],
 
     "@cloudflare/kv-asset-handler": ["@cloudflare/kv-asset-handler@0.4.2", "", {}, "sha512-SIOD2DxrRRwQ+jgzlXCqoEFiKOFqaPjhnNTGKXSRLvp1HiOvapLaFG2kEr9dYQTYe8rKrd9uvDUzmAITeNyaHQ=="],
 

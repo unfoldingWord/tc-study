@@ -19,6 +19,11 @@ const linkedPanelsEntry = path.resolve(
   __dirname,
   '../../node_modules/linked-panels/dist/index.js'
 )
+// Sibling usfm-ast (USJ pipeline bridge — @bt-synergy/usj-processor imports dist/)
+const usfmAstRoot = path.resolve(__dirname, '../../../usfm-ast')
+const usfmToolsParser = path.resolve(usfmAstRoot, 'packages/usfm-parser/dist/index.js')
+const usfmToolsTypes = path.resolve(usfmAstRoot, 'packages/shared-types/dist/index.js')
+const usfmToolsUsjCore = path.resolve(usfmAstRoot, 'packages/usfm-usj-core/dist/index.mjs')
 const sharedBuild = getSharedBuildConfig()
 
 export default defineConfig({
@@ -41,6 +46,10 @@ export default defineConfig({
       'linked-panels': linkedPanelsEntry,
       // Alias workspace packages to their source (so dev uses latest code without rebuilding packages)
       '@bt-synergy/navigation': path.resolve(__dirname, '../../packages/navigation/src/index.ts'),
+      // Resolve @usfm-tools/* for CJS parser requires inside usj-processor bridge
+      '@usfm-tools/parser': usfmToolsParser,
+      '@usfm-tools/types': usfmToolsTypes,
+      '@usfm-tools/usj-core': usfmToolsUsjCore,
     },
     dedupe: ['react', 'react-dom', 'linked-panels'],
   },
@@ -48,7 +57,10 @@ export default defineConfig({
     include: [
       'linked-panels',
       '@bt-synergy/cache-adapter-indexeddb',
+      '@usfm-tools/parser',
+      '@usfm-tools/types',
     ],
+    needsInterop: ['@usfm-tools/parser', '@usfm-tools/types'],
   },
   ...sharedBuild,
   build: {
@@ -68,5 +80,8 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    fs: {
+      allow: [path.resolve(__dirname, '../..'), usfmAstRoot],
+    },
   },
 })
