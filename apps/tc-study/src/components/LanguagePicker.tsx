@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useCatalogManager, useResourceTypeRegistry } from '../contexts'
 import { useWizardStore } from '../lib/stores/wizardStore'
+import { ModalPortal } from './shared/ModalPortal'
 import { SelectableGridWithStatus } from './shared/SelectableGrid'
 
 // Cache key for localStorage
@@ -230,6 +231,7 @@ export function LanguagePicker({
       </button>
 
       {isOpen && (
+        <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-overlay backdrop-blur-sm"
@@ -388,6 +390,7 @@ export function LanguagePicker({
             )}
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   )

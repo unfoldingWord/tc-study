@@ -1,5 +1,6 @@
 import React from 'react'
 import { X, FileText, Scale } from 'lucide-react'
+import { ModalPortal } from '../shared/ModalPortal'
 
 interface ResourceInfoModalProps {
   isOpen: boolean
@@ -20,6 +21,7 @@ export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoMod
   if (!isOpen) return null
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
@@ -136,5 +138,6 @@ export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoMod
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
