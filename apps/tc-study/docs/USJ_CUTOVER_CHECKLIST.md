@@ -2,7 +2,7 @@
 
 **PR:** https://github.com/unfoldingWord/tc-study/pull/19  
 **Branch tip:** `54950e9` (mobile USJ) atop resource-parsers `b3e0e99`, Viewer `45107f9`, Pipeline `e29d85a`  
-**QA re-verify tip:** `54950e9`
+**QA re-verify tip:** `54950e9` / Journey 4/8 confirmed green after `b3e0e99`
 
 ## Two-tier delete status
 
@@ -30,7 +30,7 @@
 | Key suites (usj-processor + scripture-loader + resource-parsers + helps quote/underline) | **85/85 green** |
 | Mobile USJ smoke (`usfm-processor.usj.smoke.test.ts`) | **2/2 green** |
 | Pipeline packages @ delete | **29/29** @ `e29d85a` |
-| Playwright Journey 4 / 8 | Re-run after port fix (see soak / PR comment) |
+| Playwright Journey 4 / 8 | **4/4 green** @ `b3e0e99` |
 | Helps unit/integration | **50 green** @ `7e8159d` |
 | Manual soak matrix | See `USJ_SOAK_MATRIX.md` |
 
@@ -60,7 +60,7 @@
 | 1 | No runtime `usfm-js` dep for tc-study scripture packages | **Met** |
 | 2 | `@bt-synergy/usfm-processor` removed | **Met** |
 | 3 | Unit/integration green | **Met** (85/85 key suites @ `b3e0e99`) |
-| 4 | Journey 4/8 e2e green | Pending re-run after preview port clash |
+| 4 | Journey 4/8 e2e green | **Met** (4/4 @ `b3e0e99`) |
 | 5 | Soak: Titus underlines + OL↔ULT highlights | **Met** (prior + units) |
 | 6 | Checklist: tc-study scripture delete **COMPLETE** | **Met** |
 
