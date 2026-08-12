@@ -1,7 +1,7 @@
 # USJ soak matrix (manual) — Titus linked panels
 
 Clear `scripture:` / `scripture-usj:` IndexedDB keys (or wipe origin data) before each pass.  
-Default build = USJ-only (tip `54950e9` / docs `d99f712`; workspace `usfm-js` npm deps cleared).
+Default build = USJ-only (**DELETE WAVE COMPLETE** @ tip `6817f79` / mobile `54950e9`).
 
 ## Resources
 
@@ -24,21 +24,22 @@ Default build = USJ-only (tip `54950e9` / docs `d99f712`; workspace `usfm-js` np
 | 9 | Rollback `VITE_USE_USJ_PIPELINE=0` | Legacy path sample | **N/A** | Flag removed |
 | 10 | Re-enable USJ default | USJ restored | **N/A** | USJ-only |
 
-## Automated (authoritative for highlight/underline)
+## Automated (authoritative)
 
-| Check | Where | Result |
-|-------|--------|--------|
-| ViewModel + Paul↔Παῦλος | `bun test packages/usj-processor` | green |
-| Pipeline / storage | `bun test packages/scripture-loader` | green |
-| QuoteMatcher + USFMProcessor USJ | `packages/resource-parsers` | green @ `b3e0e99` |
-| Helps underline / quote suites | `apps/tc-study/src/features/helps` | green |
-| Journey 4 + 8 | Playwright | **4/4 green** @ `b3e0e99` |
-| Combined key suites @ `b3e0e99` | above | **85/85 green** |
+| Check | Result |
+|-------|--------|
+| usj-processor | **15/15** |
+| scripture-loader | **14/14** |
+| resource-parsers | **6/6** |
+| Helps underline / quote | **14/14** |
+| Mobile USJ smoke | **2/2** |
+| Viewer load + highlight | **7/7** |
+| Journey 4 + 8 | **4/4** |
 
 ## Soak findings log
 
 | Date | Tester | Commit | Result | Blockers |
 |------|--------|--------|--------|----------|
-| 2026-08-12 | QA | tip `1050658` | **40/40** units; Journey 4/8 **4/4**. tc-study scripture DELETE COMPLETE. | resource-parsers + mobile |
-| 2026-08-12 | QA | tip `b3e0e99` | Key suites **85/85**; Journey 4/8 **4/4**; resource-parsers `usfm-js` **gone**. | mobile still open |
-| 2026-08-12 | QA | tip `54950e9` / `d99f712` | Journey 4/8 **4/4** (@ `b3e0e99`); workspace `usfm-js` package.json + imports **empty**. | Stale docs / `usfm-json` strings only |
+| 2026-08-12 | QA | `b3e0e99` | **85/85** key suites; Journey 4/8 **4/4**; resource-parsers clean | mobile |
+| 2026-08-12 | QA | `54950e9` / `d99f712` | mobile usfm-js gone | docs only |
+| 2026-08-12 | QA | tip `6817f79` final gate | Workspace `usfm-js` package.json + imports **empty**; suites green; Journey 4/8 **4/4**. **DELETE WAVE COMPLETE**. | None (runtime). Non-runtime: docs comments; `usfm-json` contentType string |
