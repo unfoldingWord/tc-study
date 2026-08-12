@@ -44,7 +44,7 @@ export function ResourceViewerHeader({
           </div>
         </div>
         {actions && (
-          <div className="flex-shrink-0">
+          <div className="flex min-w-0 flex-shrink justify-end">
             {actions}
           </div>
         )}

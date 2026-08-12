@@ -254,8 +254,7 @@ export function CombinedHelpsViewer({
   const loading = !!(tnKey && tnLoading) || !!(twlKey && twlLoading)
   const noSources = !tnKey && !twlKey
 
-  // Element wrapper is always truthy — only pass when a filter is active so
-  // lists can fall back to ResourceViewerHeader via `??`.
+  // null when inactive so CombinedHelps can keep kind toggles in the header slot.
   const filterScopeBar =
     obsQuoteFilter || tokenFilter || verseFilter ? (
       <HelpsFilterBanners

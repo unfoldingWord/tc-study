@@ -276,8 +276,6 @@ export function WordsLinksViewer({
     [isObs, currentRef.book, broadcastObsHighlight, sendTokenClick]
   )
 
-  // Element wrapper is always truthy — only pass when a filter is active so
-  // lists can fall back to ResourceViewerHeader via `??`.
   const filterScopeBar =
     obsQuoteFilter || tokenFilter || verseFilter ? (
       <HelpsFilterBanners

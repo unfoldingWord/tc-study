@@ -15,7 +15,7 @@ export interface WordsLinksListProps {
   bookCode?: string
   bookTitleSource: unknown
   languageDirection: 'ltr' | 'rtl'
-  /** When set, replaces ResourceViewerHeader so filter adds no extra vertical chrome. */
+  /** Inline filter chip for header actions (no extra chrome row). */
   filterScopeBar?: ReactNode
   dependenciesReady: boolean
   loading: boolean
@@ -55,9 +55,12 @@ export function WordsLinksList({
 }: WordsLinksListProps) {
   return (
     <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
-      {filterScopeBar ?? (
-        <ResourceViewerHeader title={resource.title} icon={Link} direction={languageDirection} />
-      )}
+      <ResourceViewerHeader
+        title={resource.title}
+        icon={Link}
+        direction={languageDirection}
+        actions={filterScopeBar ?? undefined}
+      />
       <div className="p-content">
         {!dependenciesReady ? (
           <LoadingSpinner

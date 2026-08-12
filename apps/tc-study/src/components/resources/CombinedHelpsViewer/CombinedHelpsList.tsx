@@ -20,7 +20,7 @@ export interface CombinedHelpsListProps {
   targetLanguageDirection: 'ltr' | 'rtl'
   kindFilter: HelpsKindFilter
   setKindFilter: (v: HelpsKindFilter) => void
-  /** When set, replaces ResourceViewerHeader so filter adds no extra vertical chrome. */
+  /** Inline filter chip for header actions (no extra chrome row). */
   filterScopeBar?: React.ReactNode
   noSources: boolean
   depsOk: boolean
@@ -116,12 +116,14 @@ export function CombinedHelpsList({
 }: CombinedHelpsListProps) {
   return (
     <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
-      {filterScopeBar ?? (
-        <ResourceViewerHeader
-          title={resource.title}
-          icon={Layers}
-          direction={targetLanguageDirection}
-          actions={
+      <ResourceViewerHeader
+        title={resource.title}
+        icon={Layers}
+        direction={targetLanguageDirection}
+        actions={
+          // While a token/verse/OBS filter is active, reuse the trailing header
+          // slot so phones do not grow a second chrome band; kind toggles return on clear.
+          filterScopeBar ?? (
             <div className="flex items-center gap-1">
               <FilterButton
                 active={kindFilter === 'all'}
@@ -142,9 +144,9 @@ export function CombinedHelpsList({
                 onClick={() => setKindFilter('twl')}
               />
             </div>
-          }
-        />
-      )}
+          )
+        }
+      />
       <div className="p-content">
         {noSources ? (
           <div className="text-center py-8 text-fg-muted text-sm">

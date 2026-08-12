@@ -12,7 +12,7 @@ export interface TranslationNotesListProps {
   bookCode?: string
   bookTitleSource: unknown
   targetLanguageDirection: 'ltr' | 'rtl'
-  /** When set, replaces ResourceViewerHeader so filter adds no extra vertical chrome. */
+  /** Inline filter chip for header actions (no extra chrome row). */
   filterScopeBar?: ReactNode
   loading: boolean
   error: string | null | undefined
@@ -54,13 +54,12 @@ export function TranslationNotesList({
 }: TranslationNotesListProps) {
   return (
     <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
-      {filterScopeBar ?? (
-        <ResourceViewerHeader
-          title={resource.title}
-          icon={FileText}
-          direction={targetLanguageDirection}
-        />
-      )}
+      <ResourceViewerHeader
+        title={resource.title}
+        icon={FileText}
+        direction={targetLanguageDirection}
+        actions={filterScopeBar ?? undefined}
+      />
       <div className="p-content">
         {loading ? (
           <LoadingSpinner
