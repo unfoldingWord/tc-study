@@ -20,4 +20,4 @@ export const HELPS_CARD_IDLE =
   'bg-surface hover:border-border border-border-subtle'
 
 /** Selected: light yellow highlight wash + even border (no left bar / ring / blue or purple wash). */
-export const HELPS_CARD_SELECTED = 'bg-highlight/40 border-border'
+export const HELPS_CARD_SELECTED = 'bg-highlight/25 border-border'
