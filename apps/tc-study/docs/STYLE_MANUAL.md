@@ -145,7 +145,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 - **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`.
 - **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` with a hairline `border-b`; Helps list panels also use `bg-surface` (`HELPS_LIST_PANEL`) so verse chips sit on white/elevated charcoal — not cool `canvas` gray.
 - **Helps verse headers:** `bg-muted` + `text-fg-secondary` (+ book icon, ref, count on `bg-surface`) — neutral muted chips, not lavender `chip-verse`.
-- **Helps cards:** idle `surface` + border; quote chips use `chip-quote*`; selected TN/TWL use light yellow `bg-highlight/25` + even `border-border` (no left bar / ring / blue or purple wash). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
+- **Helps cards:** idle `surface` + border; quote chips use `chip-quote*`; selected TN/TWL use light yellow `bg-highlight/15` + even `border-border` (no left bar / ring / blue or purple wash). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
 - **Helps filter pill:** `bg-highlight text-scripture-fg` (borderless `h-7` capsule) — same wash as highlighted scripture tokens (`TokenRenderer`), so filter ↔ selection feel related.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
 - **Panel tabs:** soft strip `bg-panel-*-soft/70` at fixed `h-chrome-bar`; tabs `h-chrome-control` (icon-only and labeled share one height); selected `bg-tab-selected`; inactive label `text-fg-secondary`.
