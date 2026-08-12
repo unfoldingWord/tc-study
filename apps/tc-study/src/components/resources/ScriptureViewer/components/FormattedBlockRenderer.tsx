@@ -83,7 +83,7 @@ export const FormattedBlockRenderer = memo(function FormattedBlockRenderer({
 
         if (item.kind === 'heading') {
           return (
-            <span key={`h-${blockIndex}-${index}`} className="text-gray-800">
+            <span key={`h-${blockIndex}-${index}`} className="text-scripture-fg">
               {item.text}
             </span>
           )

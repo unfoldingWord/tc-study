@@ -72,7 +72,7 @@ export function FormattedScriptureContent({
         return (
           <div key={chapterNum} className="space-y-0.5">
             <h2
-              className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200 cursor-pointer hover:text-blue-600 transition-colors"
+              className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
               onClick={(e) => {
                 e.stopPropagation()
                 onChapterClick?.(chapterNum)

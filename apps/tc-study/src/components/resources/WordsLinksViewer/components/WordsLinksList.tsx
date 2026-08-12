@@ -50,7 +50,7 @@ export function WordsLinksList({
   onQuoteClick,
 }: WordsLinksListProps) {
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50" dir={languageDirection}>
+    <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
       <ResourceViewerHeader title={resource.title} icon={Link} direction={languageDirection} />
       <div className="p-4">
         {!dependenciesReady ? (

@@ -67,8 +67,8 @@ function FilterButton({
       aria-label={label}
       className={`rounded-full p-1.5 transition-colors ${
         active
-          ? 'bg-violet-600 text-white shadow-sm'
-          : 'border border-violet-300 text-violet-800 bg-white hover:bg-violet-50'
+          ? 'bg-helps text-white shadow-sm'
+          : 'border border-helps/40 text-helps-fg bg-surface hover:bg-helps-soft'
       }`}
     >
       {icon}
@@ -112,7 +112,7 @@ export function CombinedHelpsList({
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50" dir={targetLanguageDirection}>
+    <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
       <ResourceViewerHeader
         title={resource.title}
         icon={Layers}

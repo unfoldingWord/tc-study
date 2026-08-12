@@ -58,7 +58,7 @@ export function NavigationTypeSelector({ onClose }: NavigationTypeSelectorProps)
       
       {/* Dropdown: opens upward on mobile (bar at bottom), downward on md+ (bar at top) */}
       <div
-        className="absolute bottom-full left-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 bg-white rounded-lg shadow-md border border-gray-200 py-1 z-50"
+        className="absolute bottom-full left-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 bg-elevated rounded-lg shadow-md border border-border py-1 z-50"
         onClick={(e) => e.stopPropagation()}
       >
         {navigationTypes.map(({ mode, icon: Icon, label }) => {
@@ -72,7 +72,7 @@ export function NavigationTypeSelector({ onClose }: NavigationTypeSelectorProps)
                 w-full flex items-center justify-center px-3 py-2 transition-colors relative
                 ${isActive
                   ? 'bg-blue-50 text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  : 'text-fg-secondary hover:bg-muted'
                 }
               `}
               title={label}

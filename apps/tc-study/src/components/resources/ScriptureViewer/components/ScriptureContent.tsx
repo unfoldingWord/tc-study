@@ -89,7 +89,7 @@ export function ScriptureContent({
       <LoadingSpinner
         centered
         label="Loading scripture"
-        className="text-blue-600"
+        className="text-accent"
         containerClassName="py-12"
       />
     )
@@ -104,12 +104,12 @@ export function ScriptureContent({
           aria-label="Book not available in this resource"
           title="Book not available in this resource"
         >
-          <BookX className="w-16 h-16 text-gray-400" />
+          <BookX className="w-16 h-16 text-fg-muted" />
         </div>
       )
     }
     return (
-      <div className="text-center py-12 text-red-600">
+      <div className="text-center py-12 text-danger">
         <p className="font-semibold">Error loading content</p>
         <p className="text-sm mt-2">{error}</p>
       </div>
@@ -118,7 +118,7 @@ export function ScriptureContent({
 
   if (!viewModel) {
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-fg-secondary">
         <p>No content available for {currentRef.book.toUpperCase()}</p>
         <p className="text-sm mt-2">
           Available books: {availableBooks.map((b) => b.code).join(', ').toUpperCase()}
@@ -132,7 +132,7 @@ export function ScriptureContent({
       currentRef.endVerse ? `-${currentRef.endVerse}` : ''
     }`
     return (
-      <div className="text-center py-12 text-gray-500">
+      <div className="text-center py-12 text-fg-secondary">
         <p>No verses found for {refString}</p>
       </div>
     )
@@ -157,7 +157,7 @@ export function ScriptureContent({
         chapters.map((chapterNum) => (
           <div key={chapterNum} className="space-y-1" data-scripture-layout="verse-block">
             <h2
-              className="text-2xl font-bold text-gray-800 mb-4 pb-2 border-b border-gray-200 cursor-pointer hover:text-blue-600 transition-colors"
+              className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
               onClick={(e) => {
                 e.stopPropagation()
                 onChapterClick?.(chapterNum)

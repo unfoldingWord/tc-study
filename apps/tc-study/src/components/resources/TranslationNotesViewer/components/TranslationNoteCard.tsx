@@ -130,8 +130,8 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       className={`
         group rounded-lg p-3 cursor-pointer transition-all duration-150 border
         ${isSelected 
-          ? 'bg-gradient-to-br from-amber-50 via-amber-50 to-orange-50 shadow-sm border-amber-200' 
-          : 'bg-white hover:shadow-sm hover:border-gray-200 border-gray-100'
+          ? 'bg-highlight/50 shadow-sm border-highlight-strong' 
+          : 'bg-surface hover:shadow-sm hover:border-border border-border-subtle'
         }
       `}
       onClick={() => {

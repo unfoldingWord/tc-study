@@ -69,7 +69,7 @@ export const WordLinkCard = memo(function WordLinkCard({
         group rounded-lg p-3 cursor-pointer transition-all duration-150 border
         ${isSelected
           ? 'bg-gradient-to-br from-purple-50 via-purple-50 to-indigo-50 shadow-sm border-purple-200'
-          : 'bg-white hover:shadow-sm hover:border-gray-200 border-gray-100'
+          : 'bg-surface hover:shadow-sm hover:border-border border-border-subtle'
         }
       `}
       onClick={(hasAlignedTokens || obsMode) ? () => onQuoteClick(link) : undefined}

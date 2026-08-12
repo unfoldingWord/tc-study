@@ -37,6 +37,7 @@ import { useReadPanelResize } from '../../features/read/useReadPanelResize'
 import { useReadUrlSync } from '../../features/read/useReadUrlSync'
 import { createStudioPluginRegistry } from '../../features/studio/createStudioPluginRegistry'
 import { moveResourceBetweenPanels } from '../../features/workspace/resourceMutations'
+import { ThemeToggle } from '../../features/theme'
 import { NavigationBar } from '../studio/NavigationBar'
 import { DownloadIndicator } from './DownloadIndicator'
 import { ExportProgressToast } from './ExportProgressToast'
@@ -261,25 +262,28 @@ export function SimplifiedReadView({
     >
       <div className="h-full flex flex-col overflow-hidden">
         <div className="relative z-30 flex-shrink-0 flex flex-col order-2 md:order-1 overflow-visible">
-          <div className="flex items-center bg-white border-gray-100/50 border-t md:border-t-0 md:border-b px-2 py-1.5 overflow-visible">
-            <NavigationBar
-              isCompact={true}
-              onToggleCompact={undefined}
-              showLanguagePicker={true}
-              onLanguageSelected={handleLanguageSelected}
-              autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
-              languagePickerRequired={isLanguagePickerRequired}
-              downloadIndicator={
-                <DownloadIndicator
-                  isDownloading={isBackgroundDownloading}
-                  progress={downloadStats.progress ?? undefined}
-                />
-              }
-              onDownloadCollection={
-                isCollectionFullyCached ? handleDirectDownloadCollection : undefined
-              }
-              onLoadCollection={() => setShowLoadDialog(true)}
-            />
+          <div className="flex items-center gap-1 bg-surface border-border-subtle border-t md:border-t-0 md:border-b px-2 py-1.5 overflow-visible">
+            <div className="flex-1 min-w-0">
+              <NavigationBar
+                isCompact={true}
+                onToggleCompact={undefined}
+                showLanguagePicker={true}
+                onLanguageSelected={handleLanguageSelected}
+                autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
+                languagePickerRequired={isLanguagePickerRequired}
+                downloadIndicator={
+                  <DownloadIndicator
+                    isDownloading={isBackgroundDownloading}
+                    progress={downloadStats.progress ?? undefined}
+                  />
+                }
+                onDownloadCollection={
+                  isCollectionFullyCached ? handleDirectDownloadCollection : undefined
+                }
+                onLoadCollection={() => setShowLoadDialog(true)}
+              />
+            </div>
+            <ThemeToggle size="sm" />
           </div>
         </div>
 

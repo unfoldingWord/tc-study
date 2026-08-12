@@ -56,14 +56,14 @@ export function PanelHeader({
 
   const colors = {
     blue: {
-      gradient: 'from-blue-50 to-gray-50',
-      button: 'hover:bg-blue-100 active:bg-blue-200',
-      icon: 'text-blue-600',
+      gradient: 'from-panel-1-soft to-canvas',
+      button: 'hover:bg-accent/15 active:bg-accent/25',
+      icon: 'text-panel-1-fg',
     },
     purple: {
-      gradient: 'from-purple-50 to-gray-50',
-      button: 'hover:bg-purple-100 active:bg-purple-200',
-      icon: 'text-purple-600',
+      gradient: 'from-panel-2-soft to-canvas',
+      button: 'hover:bg-panel-2/15 active:bg-panel-2/25',
+      icon: 'text-panel-2-fg',
     },
   }
   const c = colors[colorScheme]
@@ -100,7 +100,7 @@ export function PanelHeader({
             </button>
             {menuOpen && (
               <div
-                className="absolute right-0 top-full mt-1 w-auto py-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                className="absolute right-0 top-full mt-1 w-auto py-1 bg-elevated border border-border rounded-lg shadow-lg z-50"
                 role="menu"
               >
                 <button
@@ -109,11 +109,11 @@ export function PanelHeader({
                     setShowInfoModal(true)
                     setMenuOpen(false)
                   }}
-                  className="flex items-center justify-center p-2 hover:bg-gray-100"
+                  className="flex items-center justify-center p-2 hover:bg-muted"
                   title="Resource info"
                   aria-label="Resource info"
                 >
-                  <Info className="w-4 h-4 text-gray-500" />
+                  <Info className="w-4 h-4 text-fg-secondary" />
                 </button>
                 {onMoveToOtherPanel && (
                   <button
@@ -122,11 +122,11 @@ export function PanelHeader({
                       onMoveToOtherPanel()
                       setMenuOpen(false)
                     }}
-                    className="flex items-center justify-center p-2 hover:bg-gray-100"
+                    className="flex items-center justify-center p-2 hover:bg-muted"
                     title="Move to other panel"
                     aria-label="Move to other panel"
                   >
-                    <ArrowLeftRight className="w-4 h-4 text-gray-500" />
+                    <ArrowLeftRight className="w-4 h-4 text-fg-secondary" />
                   </button>
                 )}
                 <button
@@ -135,11 +135,11 @@ export function PanelHeader({
                     onRemove()
                     setMenuOpen(false)
                   }}
-                  className="flex items-center justify-center p-2 hover:bg-red-50"
+                  className="flex items-center justify-center p-2 hover:bg-danger-soft"
                   title="Remove from panel"
                   aria-label="Remove from panel"
                 >
-                  <X className="w-4 h-4 text-red-600" />
+                  <X className="w-4 h-4 text-danger" />
                 </button>
               </div>
             )}

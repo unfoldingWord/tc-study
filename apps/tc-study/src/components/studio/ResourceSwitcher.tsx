@@ -39,24 +39,24 @@ export function ResourceSwitcher({
   // Color mappings for different panels
   const colorClasses = {
     blue: {
-      button: 'bg-blue-500 hover:bg-blue-600 disabled:bg-gray-200',
-      dot: 'bg-blue-500',
-      dotInactive: 'bg-gray-300',
+      button: 'bg-panel-1 hover:opacity-90 disabled:bg-muted',
+      dot: 'bg-panel-1',
+      dotInactive: 'bg-fg-muted',
     },
     purple: {
-      button: 'bg-purple-500 hover:bg-purple-600 disabled:bg-gray-200',
-      dot: 'bg-purple-500',
-      dotInactive: 'bg-gray-300',
+      button: 'bg-panel-2 hover:opacity-90 disabled:bg-muted',
+      dot: 'bg-panel-2',
+      dotInactive: 'bg-fg-muted',
     },
     green: {
-      button: 'bg-green-500 hover:bg-green-600 disabled:bg-gray-200',
-      dot: 'bg-green-500',
-      dotInactive: 'bg-gray-300',
+      button: 'bg-accent hover:bg-accent-hover disabled:bg-muted',
+      dot: 'bg-accent',
+      dotInactive: 'bg-fg-muted',
     },
     orange: {
-      button: 'bg-orange-500 hover:bg-orange-600 disabled:bg-gray-200',
-      dot: 'bg-orange-500',
-      dotInactive: 'bg-gray-300',
+      button: 'bg-accent hover:bg-accent-hover disabled:bg-muted',
+      dot: 'bg-accent',
+      dotInactive: 'bg-fg-muted',
     },
   }
 
@@ -113,7 +113,7 @@ export function ResourceSwitcher({
   return (
     <div
       ref={containerRef}
-      className="flex items-center justify-center gap-1.5 py-2 bg-gray-50 border-t border-gray-200"
+      className="flex items-center justify-center gap-1.5 py-2 bg-canvas border-t border-border"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}

@@ -12,7 +12,7 @@ interface WordsLinksHeaderProps {
 
 export function WordsLinksHeader({ refString }: WordsLinksHeaderProps) {
   return (
-    <div className="px-4 py-3 border-b bg-gray-50">
+    <div className="px-4 py-3 border-b border-border bg-canvas">
       <div className="flex items-center gap-2">
         <Link2 className="w-5 h-5 text-blue-600" />
         <h3 className="text-sm font-semibold text-gray-900">Translation Words Links</h3>

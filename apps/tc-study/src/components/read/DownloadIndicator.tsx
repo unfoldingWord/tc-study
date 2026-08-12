@@ -83,19 +83,19 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
       {/* Icon Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        className="relative p-2 hover:bg-muted rounded-lg transition-colors"
         title="Download progress"
         aria-label="Download progress"
       >
         {isDownloading ? (
-          <Loader2 className="w-5 h-5 text-green-600 animate-spin" />
+          <Loader2 className="w-5 h-5 text-accent animate-spin" />
         ) : (
-          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <CheckCircle2 className="w-5 h-5 text-accent" />
         )}
 
         {/* Badge with percentage */}
         {isDownloading && (
-          <span className="absolute -top-1 -right-1 bg-green-600 text-white text-[10px] font-medium px-1 rounded-full min-w-[20px] text-center">
+          <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-medium px-1 rounded-full min-w-[20px] text-center">
             {overallProgress}%
           </span>
         )}
@@ -103,30 +103,30 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
 
       {/* Mobile: bar at bottom → open up; md+: bar at top → open down */}
       {isOpen && (
-        <div className="absolute right-0 bottom-full mb-1 md:top-full md:bottom-auto md:mt-1 md:mb-0 bg-white rounded-lg shadow-lg border border-gray-200 p-3 min-w-[280px] z-50">
+        <div className="absolute right-0 bottom-full mb-1 md:top-full md:bottom-auto md:mt-1 md:mb-0 bg-elevated rounded-lg shadow-lg border border-border p-3 min-w-[280px] z-50">
           {/* Header */}
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
-            <Download className="w-4 h-4 text-gray-600" />
+          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border-subtle">
+            <Download className="w-4 h-4 text-fg-secondary" />
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900">
+              <div className="text-sm font-medium text-fg">
                 {completed} / {total}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-fg-muted">
                 {overallProgress}%
               </div>
             </div>
             {isDownloading ? (
-              <Loader2 className="w-4 h-4 text-green-600 animate-spin" />
+              <Loader2 className="w-4 h-4 text-accent animate-spin" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <CheckCircle2 className="w-4 h-4 text-accent" />
             )}
           </div>
 
           {/* Progress Bar */}
           <div className="mb-3">
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-green-500 transition-all duration-300 ease-out"
+                className="h-full bg-accent transition-all duration-300 ease-out"
                 style={{ width: `${overallProgress}%` }}
               />
             </div>
@@ -134,7 +134,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
 
           {/* Elapsed time — visible only while downloading */}
           {isDownloading && startedAt != null && (
-            <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+            <div className="flex items-center justify-between text-xs text-fg-muted mb-2">
               <span>Elapsed</span>
               <span className="font-mono">{elapsedLabel}</span>
             </div>
@@ -142,17 +142,17 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
 
           {/* Current Resource & Ingredient */}
           {isDownloading && (progress?.currentResource || progress?.currentIngredient) && (
-            <div className="mt-3 pt-2 border-t border-gray-100 space-y-1">
+            <div className="mt-3 pt-2 border-t border-border-subtle space-y-1">
               {progress.currentResource && (
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+                <div className="flex items-center gap-2 text-xs text-fg-secondary">
+                  <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
                   <span className="truncate font-medium">
                     {progress.currentResource.split('/').pop()}
                   </span>
                 </div>
               )}
               {progress.currentIngredient && (
-                <div className="flex items-center gap-2 text-xs text-gray-500 pl-3.5">
+                <div className="flex items-center gap-2 text-xs text-fg-muted pl-3.5">
                   <span className="truncate">
                     → {progress.currentIngredient}
                   </span>

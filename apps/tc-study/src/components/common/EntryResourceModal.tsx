@@ -169,7 +169,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
                 )}
                 {navigationStatus === 'success' && <Check className="w-3 h-3 text-green-600" />}
                 {navigationStatus === 'warning' && <AlertCircle className="w-3 h-3 text-amber-600" />}
-                {navigationStatus === 'error' && <AlertCircle className="w-3 h-3 text-red-600" />}
+                {navigationStatus === 'error' && <AlertCircle className="w-3 h-3 text-danger" />}
               </div>
             )}
             
@@ -214,39 +214,39 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
         closeModal()
       }
     }}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()} dir={modalDirection}>
+      <div className="bg-surface rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()} dir={modalDirection}>
         {/* Icon-based Modal Header - controls in LTR so arrows/icons don't mirror in RTL */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted">
           {/* History Navigation - RTL: left arrow=forward, right arrow=back (same as nav bar) */}
           <div className="flex items-center gap-1" dir="ltr">
             <button
               onClick={modalDirection === 'rtl' ? modalGoForward : modalGoBack}
               disabled={modalDirection === 'rtl' ? !canModalGoForward() : !canModalGoBack()}
-              className="p-1.5 hover:bg-white rounded-md transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+              className="p-1.5 hover:bg-surface rounded-md transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
               aria-label={modalDirection === 'rtl' ? 'Forward' : 'Back'}
               title={modalDirection === 'rtl' ? 'Forward' : 'Back'}
             >
-              <ArrowLeft className="w-4 h-4 text-gray-700" />
+              <ArrowLeft className="w-4 h-4 text-fg-secondary" />
             </button>
             <button
               onClick={modalDirection === 'rtl' ? modalGoBack : modalGoForward}
               disabled={modalDirection === 'rtl' ? !canModalGoBack() : !canModalGoForward()}
-              className="p-1.5 hover:bg-white rounded-md transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+              className="p-1.5 hover:bg-surface rounded-md transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
               aria-label={modalDirection === 'rtl' ? 'Back' : 'Forward'}
               title={modalDirection === 'rtl' ? 'Back' : 'Forward'}
             >
-              <ArrowRight className="w-4 h-4 text-gray-700" />
+              <ArrowRight className="w-4 h-4 text-fg-secondary" />
             </button>
             
             {/* History position indicator */}
-            <span className="ml-2 text-xs text-gray-500 font-mono">
+            <span className="ml-2 text-xs text-fg-muted font-mono">
               {modalState.historyIndex + 1}/{modalState.history.length}
             </span>
           </div>
 
           {/* Resource title - minimal (inherits modal dir for RTL titles) */}
           <div className="flex-1 mx-4 truncate text-center">
-            <h2 className="text-sm font-medium text-gray-900 truncate">
+            <h2 className="text-sm font-medium text-fg truncate">
               {entryTerm || resourceInfo?.title || resourceId}
             </h2>
           </div>
@@ -254,22 +254,22 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
           {/* Minimize Button */}
           <button
             onClick={minimizeModal}
-            className="p-1.5 hover:bg-white rounded-md transition-colors"
+            className="p-1.5 hover:bg-surface rounded-md transition-colors"
             aria-label="Minimize"
             title="Minimize"
             dir="ltr"
           >
-            <Minimize2 className="w-4 h-4 text-gray-600" />
+            <Minimize2 className="w-4 h-4 text-fg-secondary" />
           </button>
         </div>
 
         {/* Modal Content - dir for RTL so entry content flows correctly */}
-        <div className="flex-1 overflow-auto bg-white min-h-0" dir={modalDirection}>
+        <div className="flex-1 overflow-auto bg-surface min-h-0" dir={modalDirection}>
           <ErrorBoundary fallback={
-            <div className="p-6 text-red-600 bg-white">
+            <div className="p-6 text-danger bg-surface">
               <p className="font-semibold mb-2">Something went wrong</p>
               <p className="text-sm">Check the browser console for details.</p>
-              <p className="text-xs text-gray-500 mt-2">Resource: {resourceId} | Entry: {entryId || 'none'}</p>
+              <p className="text-xs text-fg-muted mt-2">Resource: {resourceId} | Entry: {entryId || 'none'}</p>
             </div>
           }>
             {(() => {
@@ -290,7 +290,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
               // No resource found
               if (!resourceInfo && !resourceMetadata) {
                 return (
-                  <div className="p-6 text-gray-600">
+                  <div className="p-6 text-fg-secondary">
                     <p>Resource not found: {resourceId}</p>
                     {entryId && <p className="text-sm mt-2">Entry: {entryId}</p>}
                   </div>
@@ -300,7 +300,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
               // Must have resource + entry to display in modal
               if (!resourceId || !entryId) {
                 return (
-                  <div className="p-6 text-gray-600">
+                  <div className="p-6 text-fg-secondary">
                     <p>No entry specified</p>
                     <p className="text-sm mt-2">Entry Modal requires an entry ID to display</p>
                   </div>
@@ -323,11 +323,11 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
               
               if (!EntryViewer) {
                 return (
-                  <div className="p-6 text-gray-600">
+                  <div className="p-6 text-fg-secondary">
                     <p className="mb-4">No entry viewer registered for this resource type</p>
-                    <p className="text-sm text-gray-500">Type: {metadata?.type || 'unknown'}</p>
-                    <p className="text-sm text-gray-500">Entry: {resolvedEntryId}</p>
-                    <p className="text-xs text-gray-400 mt-4">
+                    <p className="text-sm text-fg-muted">Type: {metadata?.type || 'unknown'}</p>
+                    <p className="text-sm text-fg-muted">Entry: {resolvedEntryId}</p>
+                    <p className="text-xs text-fg-muted mt-4">
                       Developers: Register an entry viewer using the Entry Viewer Registry
                     </p>
                   </div>
@@ -351,10 +351,10 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
               } catch (error) {
                 console.error('[EntryResourceModal] Error rendering entry viewer:', error)
                 return (
-                  <div className="p-6 text-red-600 bg-white">
+                  <div className="p-6 text-danger bg-surface">
                     <p className="font-semibold mb-2">Error rendering entry viewer</p>
                     <p className="text-sm">{error instanceof Error ? error.message : String(error)}</p>
-                    <p className="text-xs text-gray-500 mt-2">Check console for details</p>
+                    <p className="text-xs text-fg-muted mt-2">Check console for details</p>
                   </div>
                 )
               }

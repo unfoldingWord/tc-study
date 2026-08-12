@@ -29,7 +29,7 @@ const PanelSystemTest = import.meta.env.DEV
 function PageLoader() {
   return (
     <div className="flex items-center justify-center min-h-[200px]" aria-label="Loading">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      <Loader2 className="w-8 h-8 animate-spin text-accent" />
     </div>
   )
 }
@@ -87,11 +87,11 @@ function App() {
           aria-label="Resource type registration failed"
           title={resourceTypesError.message}
         >
-          <AlertCircle className="w-10 h-10 text-red-500" />
+          <AlertCircle className="w-10 h-10 text-danger" />
         </div>
       ) : !catalogReady ? (
-        <div className="flex items-center justify-center min-h-screen" aria-label="Loading catalog">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <div className="flex items-center justify-center min-h-screen bg-canvas" aria-label="Loading catalog">
+          <Loader2 className="w-8 h-8 animate-spin text-accent" />
         </div>
       ) : (
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

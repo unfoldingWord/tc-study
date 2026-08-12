@@ -27,8 +27,8 @@ export function ScriptureLayoutToggle() {
       data-scripture-layout-toggle={layoutMode}
       className={`p-1.5 rounded-md transition-colors ${
         isFormatted
-          ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-          : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+          ? 'bg-accent-soft text-accent hover:bg-accent/15'
+          : 'text-fg-muted hover:bg-muted hover:text-fg-secondary'
       }`}
     >
       <Icon className="w-4 h-4" aria-hidden />

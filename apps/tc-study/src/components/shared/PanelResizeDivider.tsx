@@ -35,7 +35,7 @@ export function PanelResizeDivider({
       ref={rootRef}
       onMouseDown={onMouseDown}
       className={`flex-shrink-0 transition-colors relative flex items-center justify-center touch-none select-none ${
-        isResizing ? 'bg-blue-500' : 'bg-gray-200 hover:bg-blue-400'
+        isResizing ? 'bg-accent' : 'bg-border hover:bg-accent/70'
       } md:w-1.5 md:h-full md:cursor-ew-resize w-full h-1.5 cursor-ns-resize`}
       title="Drag to resize panels"
       aria-label="Resize panels"
@@ -46,7 +46,7 @@ export function PanelResizeDivider({
           <div
             key={i}
             className={`w-1 h-1 rounded-full transition-colors ${
-              isResizing ? 'bg-white' : 'bg-gray-400'
+              isResizing ? 'bg-surface' : 'bg-fg-muted'
             }`}
           />
         ))}

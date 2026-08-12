@@ -49,7 +49,7 @@ export function TranslationNotesList({
   onNoteSelect,
 }: TranslationNotesListProps) {
   return (
-    <div className="flex-1 overflow-y-auto bg-gray-50" dir={targetLanguageDirection}>
+    <div className="flex-1 overflow-y-auto bg-canvas" dir={targetLanguageDirection}>
       <ResourceViewerHeader title={resource.title} icon={FileText} direction={targetLanguageDirection} />
       <div className="p-4">
         {loading ? (

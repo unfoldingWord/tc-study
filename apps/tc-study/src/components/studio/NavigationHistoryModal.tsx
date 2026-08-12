@@ -44,20 +44,20 @@ export function NavigationHistoryModal({ onClose }: NavigationHistoryModalProps)
       
       {/* Modal */}
       <div
-        className="relative flex flex-col bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden m-4"
+        className="relative flex flex-col bg-surface border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden m-4"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby="history-modal-title"
       >
         {/* Header */}
-        <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between bg-gray-50 flex-shrink-0">
+        <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-muted flex-shrink-0">
           <div className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-blue-600" />
+            <MapPin className="w-5 h-5 text-accent" />
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
+            className="p-1 hover:bg-surface rounded transition-colors text-fg-secondary"
             title="Close"
             aria-label="Close"
           >
@@ -66,9 +66,9 @@ export function NavigationHistoryModal({ onClose }: NavigationHistoryModalProps)
         </div>
 
         {/* History list */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0 bg-canvas">
           {history.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+            <div className="flex flex-col items-center justify-center py-12 text-fg-muted">
               <MapPin className="w-16 h-16" />
             </div>
           ) : (
@@ -82,15 +82,15 @@ export function NavigationHistoryModal({ onClose }: NavigationHistoryModalProps)
                   <button
                     key={index}
                     onClick={() => handleNavigateToHistoryItem(index)}
-                    className={`w-full px-4 py-2 flex items-center gap-3 hover:bg-gray-50 transition-colors ${
-                      isCurrent ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                    className={`w-full px-4 py-2 flex items-center gap-3 hover:bg-muted transition-colors ${
+                      isCurrent ? 'bg-accent-soft border-l-4 border-accent' : ''
                     } ${isAfterCurrent ? 'opacity-50' : ''}`}
                     title={isCurrent ? 'Current location' : 'Jump to this reference'}
                   >
                     {/* Current indicator or number */}
                     <div className={`
                       flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold
-                      ${isCurrent ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'}
+                      ${isCurrent ? 'bg-accent text-white' : 'bg-muted text-fg-secondary'}
                     `}>
                       {isCurrent ? (
                         <MapPin className="w-4 h-4" />
@@ -103,7 +103,7 @@ export function NavigationHistoryModal({ onClose }: NavigationHistoryModalProps)
                     <div className="flex-1 text-left">
                       <div
                         className={`font-medium text-sm ${
-                          isCurrent ? 'text-blue-900' : 'text-gray-900'
+                          isCurrent ? 'text-accent-fg' : 'text-fg'
                         }`}
                       >
                         {formatReference(ref)}
@@ -118,8 +118,8 @@ export function NavigationHistoryModal({ onClose }: NavigationHistoryModalProps)
 
         {/* Footer */}
         {history.length > 0 && (
-          <div className="px-4 py-2 border-t border-gray-200 bg-gray-50 flex-shrink-0">
-            <div className="flex items-center justify-center gap-1.5 text-sm text-gray-600 font-medium">
+          <div className="px-4 py-2 border-t border-border bg-muted flex-shrink-0">
+            <div className="flex items-center justify-center gap-1.5 text-sm text-fg-secondary font-medium">
               <MapPin className="w-4 h-4" />
               <span>{history.length}</span>
             </div>

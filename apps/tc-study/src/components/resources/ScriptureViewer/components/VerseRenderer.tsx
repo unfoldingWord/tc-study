@@ -31,10 +31,10 @@ export const VerseRenderer = memo(function VerseRenderer({
   const renderVerseContent = () => {
     if (!verse.tokens || verse.tokens.length === 0) {
       if (verse.text) {
-        return <span className="text-gray-500 italic">{verse.text}</span>
+        return <span className="text-scripture-muted italic">{verse.text}</span>
       }
       return (
-        <span className="text-red-500 italic">
+        <span className="text-danger italic">
           [No content available for verse {verse.number}]
         </span>
       )
@@ -67,7 +67,7 @@ export const VerseRenderer = memo(function VerseRenderer({
   return (
     <div className="mb-2 leading-relaxed">
       <span
-        className="text-sm font-bold text-blue-600 mr-2 select-none cursor-pointer hover:text-blue-700"
+        className="text-sm font-bold text-accent mr-2 select-none cursor-pointer hover:text-accent-hover"
         onClick={(e) => {
           e.stopPropagation()
           onVerseClick?.(chapterNumber, verse.number)
@@ -84,7 +84,7 @@ export const VerseRenderer = memo(function VerseRenderer({
       >
         {verse.number}
       </span>
-      <span className="text-lg text-gray-900">{renderVerseContent()}</span>
+      <span className="text-lg text-scripture-fg">{renderVerseContent()}</span>
     </div>
   )
 }, (prev, next) => {

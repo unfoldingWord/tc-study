@@ -24,14 +24,14 @@ interface SortableTabProps {
 
 const tabColors = {
   blue: {
-    active: 'bg-gradient-to-b from-blue-100 to-blue-50 text-blue-700 font-semibold',
-    inactive: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50',
-    dragging: 'bg-blue-50 text-blue-400 border-blue-200',
+    active: 'bg-gradient-to-b from-panel-1-soft to-surface text-panel-1-fg font-semibold',
+    inactive: 'text-fg-muted hover:text-fg-secondary hover:bg-muted/50',
+    dragging: 'bg-panel-1-soft text-panel-1 border-panel-1/40',
   },
   purple: {
-    active: 'bg-gradient-to-b from-purple-100 to-purple-50 text-purple-700 font-semibold',
-    inactive: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50/50',
-    dragging: 'bg-purple-50 text-purple-400 border-purple-200',
+    active: 'bg-gradient-to-b from-panel-2-soft to-surface text-panel-2-fg font-semibold',
+    inactive: 'text-fg-muted hover:text-fg-secondary hover:bg-muted/50',
+    dragging: 'bg-panel-2-soft text-panel-2 border-panel-2/40',
   },
 }
 

@@ -29,9 +29,9 @@ export const TokenRenderer = memo(function TokenRenderer({
       data-highlighted={isHighlighted || isSelected ? 'true' : undefined}
       data-underlined={isUnderlined ? 'true' : undefined}
       className={`
-        rounded px-0.5 transition-all inline-block cursor-pointer hover:bg-gray-100 text-gray-900
-        ${isHighlighted || isSelected ? 'bg-yellow-100 highlighted-token' : ''}
-        ${isUnderlined ? 'underline decoration-dotted decoration-gray-400 decoration-1 underline-offset-3' : ''}
+        rounded px-0.5 transition-all inline-block cursor-pointer hover:bg-muted text-scripture-fg
+        ${isHighlighted || isSelected ? 'bg-highlight highlighted-token' : ''}
+        ${isUnderlined ? 'underline decoration-dotted decoration-underline decoration-1 underline-offset-3' : ''}
       `}
       style={{ minHeight: '1.5rem' }}
       role="button"

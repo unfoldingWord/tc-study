@@ -1,40 +1,168 @@
 @import "tailwindcss";
 
+/*
+ * Theme tokens (boneless): semantic CSS variables → Tailwind color utilities.
+ * Switch via `html.dark` (or data-theme). Prefer these over one-off `dark:` classes.
+ * See docs/THEME.md
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-canvas: var(--theme-canvas);
+  --color-surface: var(--theme-surface);
+  --color-elevated: var(--theme-elevated);
+  --color-muted: var(--theme-muted);
+  --color-border: var(--theme-border);
+  --color-border-subtle: var(--theme-border-subtle);
+  --color-fg: var(--theme-fg);
+  --color-fg-secondary: var(--theme-fg-secondary);
+  --color-fg-muted: var(--theme-fg-muted);
+  --color-accent: var(--theme-accent);
+  --color-accent-hover: var(--theme-accent-hover);
+  --color-accent-soft: var(--theme-accent-soft);
+  --color-accent-fg: var(--theme-accent-fg);
+  --color-scripture: var(--theme-scripture);
+  --color-scripture-fg: var(--theme-scripture-fg);
+  --color-scripture-muted: var(--theme-scripture-muted);
+  --color-highlight: var(--theme-highlight);
+  --color-highlight-strong: var(--theme-highlight-strong);
+  --color-underline: var(--theme-underline);
+  --color-danger: var(--theme-danger);
+  --color-danger-soft: var(--theme-danger-soft);
+  --color-panel-1-soft: var(--theme-panel-1-soft);
+  --color-panel-1: var(--theme-panel-1);
+  --color-panel-1-fg: var(--theme-panel-1-fg);
+  --color-panel-2-soft: var(--theme-panel-2-soft);
+  --color-panel-2: var(--theme-panel-2);
+  --color-panel-2-fg: var(--theme-panel-2-fg);
+  --color-helps: var(--theme-helps);
+  --color-helps-soft: var(--theme-helps-soft);
+  --color-helps-fg: var(--theme-helps-fg);
+  --color-ring-offset: var(--theme-canvas);
+}
+
+/* —— Light (default): warm study paper / soft gray shell —— */
+:root {
+  color-scheme: light;
+
+  --theme-canvas: #f4f2ef;
+  --theme-surface: #ffffff;
+  --theme-elevated: #ffffff;
+  --theme-muted: #ebe8e4;
+  --theme-border: #e0dcd6;
+  --theme-border-subtle: #efece8;
+
+  --theme-fg: #1c1917;
+  --theme-fg-secondary: #57534e;
+  --theme-fg-muted: #a8a29e;
+
+  --theme-accent: #2563eb;
+  --theme-accent-hover: #1d4ed8;
+  --theme-accent-soft: #eff6ff;
+  --theme-accent-fg: #1e40af;
+
+  --theme-scripture: #fffef9;
+  --theme-scripture-fg: #1c1917;
+  --theme-scripture-muted: #78716c;
+
+  --theme-highlight: #fef08a;
+  --theme-highlight-strong: #fde047;
+  --theme-underline: #a8a29e;
+
+  --theme-danger: #dc2626;
+  --theme-danger-soft: #fef2f2;
+
+  --theme-panel-1-soft: #eff6ff;
+  --theme-panel-1: #2563eb;
+  --theme-panel-1-fg: #1d4ed8;
+
+  --theme-panel-2-soft: #f5f3ff;
+  --theme-panel-2: #7c3aed;
+  --theme-panel-2-fg: #6d28d9;
+
+  --theme-helps: #7c3aed;
+  --theme-helps-soft: #f5f3ff;
+  --theme-helps-fg: #5b21b6;
+}
+
+/* —— Dark: calm charcoal / elevated surfaces (not OLED pure black) —— */
+.dark {
+  color-scheme: dark;
+
+  --theme-canvas: #17191c;
+  --theme-surface: #212428;
+  --theme-elevated: #2a2e34;
+  --theme-muted: #2f343b;
+  --theme-border: #3a4048;
+  --theme-border-subtle: #2c3138;
+
+  --theme-fg: #ece8e3;
+  --theme-fg-secondary: #b0aaa3;
+  --theme-fg-muted: #7a7470;
+
+  --theme-accent: #6eb0ff;
+  --theme-accent-hover: #93c5fd;
+  --theme-accent-soft: #1a2f4a;
+  --theme-accent-fg: #93c5fd;
+
+  --theme-scripture: #1c1f24;
+  --theme-scripture-fg: #e8e4df;
+  --theme-scripture-muted: #9a948c;
+
+  --theme-highlight: #5c4a14;
+  --theme-highlight-strong: #7a641c;
+  --theme-underline: #9a948c;
+
+  --theme-danger: #f87171;
+  --theme-danger-soft: #3f1d1d;
+
+  --theme-panel-1-soft: #1a2f4a;
+  --theme-panel-1: #6eb0ff;
+  --theme-panel-1-fg: #93c5fd;
+
+  --theme-panel-2-soft: #2a2438;
+  --theme-panel-2: #a78bfa;
+  --theme-panel-2-fg: #c4b5fd;
+
+  --theme-helps: #a78bfa;
+  --theme-helps-soft: #2a2438;
+  --theme-helps-fg: #c4b5fd;
+}
+
 @layer base {
   * {
     @apply antialiased;
   }
-  
+
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-canvas text-fg;
   }
-  
-  /* Smooth scrolling */
+
   html {
     scroll-behavior: smooth;
   }
-  
-  /* Remove default focus outline and add custom one */
+
   *:focus-visible {
-    @apply outline-none ring-2 ring-blue-500 ring-offset-2 rounded-lg;
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-canvas rounded-lg;
   }
-  
-  /* Custom scrollbar */
+
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  
+
   ::-webkit-scrollbar-track {
-    @apply bg-gray-100;
+    background: var(--theme-muted);
   }
-  
+
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full;
+    background: var(--theme-fg-muted);
+    border-radius: 9999px;
   }
-  
+
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400;
+    background: var(--theme-fg-secondary);
   }
 }
 
@@ -61,14 +189,14 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  
+
   .line-clamp-2 {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
-  
+
   .line-clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;

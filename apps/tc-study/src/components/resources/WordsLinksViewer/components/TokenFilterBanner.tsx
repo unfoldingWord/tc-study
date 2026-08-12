@@ -27,7 +27,7 @@ export function TokenFilterBanner({
 
   return (
     <div className="px-4 py-1.5 border-b bg-blue-50 border-blue-200 flex items-center justify-center gap-2">
-      <div className="inline-flex items-center gap-1.5 bg-white border border-blue-200 rounded-md px-2 py-0.5">
+      <div className="inline-flex items-center gap-1.5 bg-surface border border-accent/40 rounded-md px-2 py-0.5">
         <Hash className="w-3 h-3 text-blue-500" />
         <span className="text-xs text-gray-700">
           {tokenFilter.content}
