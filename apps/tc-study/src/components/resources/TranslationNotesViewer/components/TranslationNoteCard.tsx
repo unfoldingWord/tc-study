@@ -48,6 +48,11 @@ interface TranslationNoteCardProps {
   obsMode?: boolean
 }
 
+const quoteChipClass =
+  'w-full text-start mb-2.5 px-3 py-2 bg-chip-quote hover:bg-chip-quote-hover rounded-lg transition-all duration-150'
+const quoteChipStaticClass =
+  'w-full text-start mb-2.5 px-3 py-2 bg-chip-quote rounded-lg border border-border-subtle'
+
 export const TranslationNoteCard = memo(function TranslationNoteCard({
   note,
   isSelected,
@@ -152,12 +157,12 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
               onQuoteClick(note)
             }
           }}
-          className="w-full text-start mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
+          className={quoteChipClass}
           title="Click to highlight these words in scripture"
           dir={languageDirection}
         >
           <div className="text-base leading-relaxed" dir={languageDirection}>
-            <span className="italic text-gray-700">
+            <span className="italic text-fg-secondary">
               &ldquo;
               {note.alignedTokens!.map((token, index) => {
                 // For whitespace and text tokens, render them as-is (they already contain their spacing)
@@ -191,7 +196,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
               &rdquo;
             </span>
             {resourceAbbreviation && (
-              <span className="ms-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
+              <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
                 {resourceAbbreviation}
               </span>
             )}
@@ -202,16 +207,16 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       {/* Fallback: Original language quote when target alignment is missing (e.g. scripture has no \zaln) */}
       {!hasAlignedTokens && note.quote && note.quote.trim().length > 0 && !obsMode && (
         <div
-          className="w-full text-start mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 rounded-lg border border-blue-100/50"
+          className={quoteChipStaticClass}
           title="Original language phrase (target language alignment not available)"
           dir={languageDirection}
         >
           <div className="text-base leading-relaxed" dir={languageDirection}>
-            <span className="italic text-gray-700">
+            <span className="italic text-fg-secondary">
               &ldquo;{note.quote}&rdquo;
             </span>
             {resourceAbbreviation && (
-              <span className="ms-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
+              <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
                 {resourceAbbreviation}
               </span>
             )}
@@ -226,16 +231,16 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
             e.stopPropagation()
             onQuoteClick?.(note)
           }}
-          className="w-full text-start mb-2.5 px-3 py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/80 hover:from-blue-100/80 hover:to-indigo-100/80 rounded-lg transition-all duration-150"
+          className={quoteChipClass}
           title="Click to highlight this phrase in the story frame"
           dir={languageDirection}
         >
           <div className="text-base leading-relaxed" dir={languageDirection}>
-            <span className="italic text-gray-700">
+            <span className="italic text-fg-secondary">
               &ldquo;{note.quote}&rdquo;
             </span>
             {resourceAbbreviation && (
-              <span className="ms-2 px-1.5 py-0.5 bg-white/80 backdrop-blur rounded text-[10px] text-blue-600 font-medium">
+              <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
                 {resourceAbbreviation}
               </span>
             )}
@@ -247,13 +252,13 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       {note.note && (
         <div className="relative" dir={languageDirection}>
           {showRawMarkdown ? (
-            <pre className="text-xs text-gray-600 leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 p-2.5 rounded-lg overflow-x-auto">
+            <pre className="text-xs text-fg-secondary leading-relaxed whitespace-pre-wrap font-mono bg-muted p-2.5 rounded-lg overflow-x-auto">
               {note.note}
             </pre>
           ) : (
             <MarkdownRenderer
               content={note.note}
-              className="text-base text-gray-700 leading-relaxed prose prose-base max-w-none"
+              className="text-base text-fg-secondary leading-relaxed prose prose-base max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent"
               onInternalLinkClick={handleInternalLinkClick}
               getEntryTitle={getEntryTitle}
             />
@@ -264,7 +269,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
               e.stopPropagation()
               setShowRawMarkdown(!showRawMarkdown)
             }}
-            className="absolute top-0 right-0 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+            className="absolute top-0 right-0 p-1 text-fg-muted hover:text-fg-secondary hover:bg-muted rounded-md transition-colors opacity-0 group-hover:opacity-100"
             title={showRawMarkdown ? "Show rendered markdown" : "Show raw markdown"}
           >
             <Code className="w-3.5 h-3.5" />
@@ -274,7 +279,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
 
       {/* Support Reference - Link to Translation Academy */}
       {note.supportReference && note.supportReference.startsWith('rc://') && (
-        <div className="mt-2.5 pt-2.5 border-t border-gray-100/50" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-2.5 pt-2.5 border-t border-border-subtle" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -282,12 +287,12 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
                 onSupportReferenceClick(note.supportReference)
               }
             }}
-            className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-helps-fg hover:text-helps transition-colors"
             title={`Learn more: ${taTitle}`}
           >
             <ExternalLink className="w-3 h-3" />
             {isLoadingTATitle ? (
-              <LoadingSpinner size="sm" label="Loading title" className="text-gray-400" />
+              <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
             ) : (
               <span>{taTitle}</span>
             )}
@@ -301,7 +306,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
           {note.tags.split(',').filter(Boolean).map((tag, idx) => (
             <span
               key={idx}
-              className="px-1.5 py-0.5 bg-gray-100/50 text-gray-600 rounded text-[10px]"
+              className="px-1.5 py-0.5 bg-muted text-fg-secondary rounded text-[10px]"
             >
               {tag.trim()}
             </span>

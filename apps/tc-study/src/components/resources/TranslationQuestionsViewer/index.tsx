@@ -180,7 +180,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
       <LoadingSpinner
         centered
         label="Loading questions"
-        className="text-blue-600"
+        className="text-accent"
         containerClassName="h-full"
       />
     )
@@ -190,9 +190,9 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
     return (
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center max-w-md">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Questions</h3>
-          <p className="text-gray-600">{error}</p>
+          <AlertCircle className="w-12 h-12 text-danger mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-fg mb-2">Failed to Load Questions</h3>
+          <p className="text-fg-secondary">{error}</p>
         </div>
       </div>
     )
@@ -202,9 +202,9 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
     return (
       <div className="flex items-center justify-center h-full p-6">
         <div className="text-center max-w-md">
-          <HelpCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Questions Available</h3>
-          <p className="text-gray-600">
+          <HelpCircle className="w-12 h-12 text-fg-muted mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-fg mb-2">No Questions Available</h3>
+          <p className="text-fg-secondary">
             No questions are available for this verse range.
           </p>
         </div>
@@ -214,7 +214,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex-1 overflow-y-auto bg-gray-50" dir={languageDirection}>
+      <div className="flex-1 overflow-y-auto bg-canvas" dir={languageDirection}>
         <ResourceViewerHeader 
           title={resource.title}
           icon={MessageCircleQuestion}
@@ -224,10 +224,10 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
         {Object.entries(questionsByVerse).map(([verse, verseQuestions]) => (
           <div key={verse} className="space-y-3">
             {/* Verse Header - LTR: book 1:4; RTL: 4:1 book (flex enforces order when book is RTL script) */}
-            <div className="px-2.5 py-1.5 bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-lg" dir={languageDirection}>
+            <div className="px-2.5 py-1.5 bg-chip-verse rounded-lg" dir={languageDirection}>
               <div className="flex items-center gap-2">
-                <BookOpen className="w-3.5 h-3.5 text-blue-600" />
-                <h3 className="text-xs font-semibold text-gray-700">
+                <BookOpen className="w-3.5 h-3.5 text-chip-verse-fg" />
+                <h3 className="text-xs font-semibold text-fg-secondary">
                   {(() => {
                     const bookName = getBookTitleWithFallback(effectiveResource, bookTitleSource, currentRef.book)
                     const { bookPart, numberPart } = formatVerseRefParts(bookName, verse, languageDirection === 'rtl')
@@ -244,7 +244,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
                     )
                   })()}
                 </h3>
-                <span className="ml-auto px-2 py-0.5 bg-blue-100/50 text-blue-700 rounded-full text-[10px] font-medium">
+                <span className="ml-auto px-2 py-0.5 bg-accent-soft text-accent-fg rounded-full text-[10px] font-medium">
                   {verseQuestions.length}
                 </span>
               </div>
@@ -260,8 +260,8 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
                   className={`
                     group rounded-lg p-3 transition-all duration-150 border
                     ${isExpanded
-                      ? 'bg-gradient-to-br from-green-50 via-green-50 to-emerald-50 shadow-sm border-green-200' 
-                      : 'bg-white hover:shadow-sm hover:border-gray-200 border-gray-100'
+                      ? 'bg-accent-soft shadow-sm border-accent/40' 
+                      : 'bg-surface hover:shadow-sm hover:border-border border-border-subtle'
                     }
                   `}
                 >
@@ -270,22 +270,22 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
                     onClick={() => toggleQuestion(question.id)}
                     className="w-full text-left flex items-start gap-3"
                   >
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-semibold mt-0.5">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-chip-quote text-chip-quote-fg flex items-center justify-center text-xs font-semibold mt-0.5">
                       {index + 1}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-base text-gray-900 font-medium leading-relaxed">
+                        <p className="text-base text-fg font-medium leading-relaxed">
                           {question.question}
                         </p>
                         {isExpanded ? (
-                          <ChevronUp className="w-4 h-4 text-gray-500 flex-shrink-0 mt-1" />
+                          <ChevronUp className="w-4 h-4 text-fg-secondary flex-shrink-0 mt-1" />
                         ) : (
-                          <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0 mt-1" />
+                          <ChevronDown className="w-4 h-4 text-fg-muted flex-shrink-0 mt-1" />
                         )}
                       </div>
                       {question.quote && (
-                        <p className="text-sm text-gray-600 italic mt-1.5">
+                        <p className="text-sm text-fg-secondary italic mt-1.5">
                           "{question.quote}"
                         </p>
                       )}
@@ -294,11 +294,11 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
 
                   {/* Answer (Expanded) */}
                   {isExpanded && (
-                    <div className="mt-2.5 pt-2.5 border-t border-gray-100/50">
+                    <div className="mt-2.5 pt-2.5 border-t border-border-subtle">
                       <div className="pl-9">
                         <div className="flex items-start gap-2">
-                          <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-1" />
-                          <p className="text-base text-gray-700 leading-relaxed flex-1">{question.response}</p>
+                          <CheckCircle className="w-4 h-4 text-accent flex-shrink-0 mt-1" />
+                          <p className="text-base text-fg-secondary leading-relaxed flex-1">{question.response}</p>
                         </div>
                       </div>
                     </div>

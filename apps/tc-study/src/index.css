@@ -39,6 +39,11 @@
   --color-helps: var(--theme-helps);
   --color-helps-soft: var(--theme-helps-soft);
   --color-helps-fg: var(--theme-helps-fg);
+  --color-chip-verse: var(--theme-chip-verse);
+  --color-chip-verse-fg: var(--theme-chip-verse-fg);
+  --color-chip-quote: var(--theme-chip-quote);
+  --color-chip-quote-hover: var(--theme-chip-quote-hover);
+  --color-chip-quote-fg: var(--theme-chip-quote-fg);
   --color-ring-offset: var(--theme-canvas);
 }
 
@@ -84,6 +89,13 @@
   --theme-helps: #7c3aed;
   --theme-helps-soft: #f5f3ff;
   --theme-helps-fg: #5b21b6;
+
+  /* Helps reading chips (verse headers + scripture quotes) */
+  --theme-chip-verse: #eeeaf8;
+  --theme-chip-verse-fg: #5b21b6;
+  --theme-chip-quote: #eef4ff;
+  --theme-chip-quote-hover: #e0eaff;
+  --theme-chip-quote-fg: #1e40af;
 }
 
 /* —— Dark: calm charcoal / elevated surfaces (not OLED pure black) —— */
@@ -128,6 +140,12 @@
   --theme-helps: #a78bfa;
   --theme-helps-soft: #2a2438;
   --theme-helps-fg: #c4b5fd;
+
+  --theme-chip-verse: #2f2a3d;
+  --theme-chip-verse-fg: #c4b5fd;
+  --theme-chip-quote: #1e2a3d;
+  --theme-chip-quote-hover: #243548;
+  --theme-chip-quote-fg: #93c5fd;
 }
 
 @layer base {

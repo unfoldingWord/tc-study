@@ -153,22 +153,22 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
           {/* Restore button */}
           <button
             onClick={restoreModal}
-            className="relative flex items-center gap-2 pl-4 pr-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all hover:shadow-xl"
+            className="relative flex items-center gap-2 pl-4 pr-4 py-3 bg-accent hover:bg-accent-hover text-white rounded-full shadow-lg transition-all hover:shadow-xl"
             title="Restore entry modal"
           >
             {/* Navigation status badge */}
             {navigationStatus !== 'idle' && (
               <div className={`absolute -top-2 -left-2 flex items-center justify-center p-1.5 rounded-full shadow-lg ${
-                navigationStatus === 'navigating' ? 'bg-blue-100' :
-                navigationStatus === 'success' ? 'bg-green-100' :
-                navigationStatus === 'warning' ? 'bg-amber-100' :
-                'bg-red-100'
+                navigationStatus === 'navigating' ? 'bg-accent-soft' :
+                navigationStatus === 'success' ? 'bg-accent-soft' :
+                navigationStatus === 'warning' ? 'bg-highlight' :
+                'bg-danger-soft'
               }`}>
                 {navigationStatus === 'navigating' && (
-                  <LoadingSpinner size="sm" label="Navigating" className="text-blue-600" />
+                  <LoadingSpinner size="sm" label="Navigating" className="text-accent" />
                 )}
-                {navigationStatus === 'success' && <Check className="w-3 h-3 text-green-600" />}
-                {navigationStatus === 'warning' && <AlertCircle className="w-3 h-3 text-amber-600" />}
+                {navigationStatus === 'success' && <Check className="w-3 h-3 text-accent-fg" />}
+                {navigationStatus === 'warning' && <AlertCircle className="w-3 h-3 text-fg" />}
                 {navigationStatus === 'error' && <AlertCircle className="w-3 h-3 text-danger" />}
               </div>
             )}
@@ -185,7 +185,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
               e.stopPropagation()
               closeModal()
             }}
-            className="absolute -top-1.5 -right-1.5 p-1.5 bg-gray-700 hover:bg-gray-800 rounded-full shadow-md transition-colors cursor-pointer"
+            className="absolute -top-1.5 -right-1.5 p-1.5 bg-elevated hover:bg-muted border border-border rounded-full shadow-md transition-colors cursor-pointer"
             title="Close entry modal"
             role="button"
             aria-label="Close"
@@ -197,7 +197,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
               }
             }}
           >
-            <X className="w-3 h-3 text-white" />
+            <X className="w-3 h-3 text-fg" />
           </div>
         </div>
       </div>
@@ -281,7 +281,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
                   <LoadingSpinner
                     centered
                     label="Loading resource"
-                    className="text-blue-600"
+                    className="text-accent"
                     containerClassName="h-full"
                   />
                 )

@@ -150,7 +150,7 @@ export function TranslationAcademyEntryViewer({
       <LoadingSpinner
         centered
         label="Loading article"
-        className="text-purple-600"
+        className="text-helps"
         containerClassName="h-full p-8"
       />
     )
@@ -160,9 +160,9 @@ export function TranslationAcademyEntryViewer({
   if (error) {
     return (
       <div className="p-6 text-center">
-        <FileText className="w-12 h-12 text-red-400 mx-auto mb-3" />
-        <p className="text-red-600 font-semibold mb-2">Failed to load article</p>
-        <p className="text-sm text-gray-600">{error}</p>
+        <FileText className="w-12 h-12 text-danger opacity-70 mx-auto mb-3" />
+        <p className="text-danger font-semibold mb-2">Failed to load article</p>
+        <p className="text-sm text-fg-secondary">{error}</p>
       </div>
     )
   }
@@ -170,8 +170,8 @@ export function TranslationAcademyEntryViewer({
   // No article loaded
   if (!article) {
     return (
-      <div className="p-6 text-center text-gray-600">
-        <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+      <div className="p-6 text-center text-fg-secondary">
+        <FileText className="w-12 h-12 text-fg-muted mx-auto mb-3" />
         <p>No article loaded</p>
       </div>
     )
@@ -180,12 +180,12 @@ export function TranslationAcademyEntryViewer({
   // Render article content
   const isRtl = direction === 'rtl'
   return (
-    <div className="h-full relative" dir={direction}>
+    <div className="h-full relative bg-surface text-fg" dir={direction}>
       {/* Debug toggle button for raw markdown (dev tool - only in development) */}
       {import.meta.env.DEV && (
         <button
           onClick={() => setShowRawMarkdown(!showRawMarkdown)}
-          className={`absolute top-4 z-10 flex items-center justify-center p-1.5 bg-gray-500/30 hover:bg-gray-600/50 text-gray-600 hover:text-gray-800 rounded transition-all opacity-50 hover:opacity-100 ${isRtl ? 'left-4' : 'right-4'}`}
+          className={`absolute top-4 z-10 flex items-center justify-center p-1.5 bg-muted/80 hover:bg-muted text-fg-secondary hover:text-fg rounded transition-all opacity-50 hover:opacity-100 ${isRtl ? 'left-4' : 'right-4'}`}
           title={showRawMarkdown ? "Show rendered view" : "Show raw markdown"}
           dir="ltr"
         >
@@ -199,13 +199,13 @@ export function TranslationAcademyEntryViewer({
 
       <article className={`max-w-4xl mx-auto p-6 ${isRtl ? 'text-right' : 'text-left'}`}>
         {/* Custom styled header */}
-        <header className="mb-6 pb-4 border-b border-gray-200">
+        <header className="mb-6 pb-4 border-b border-border">
           <div className="flex items-start gap-3">
-            <GraduationCap className="w-6 h-6 text-purple-600 mt-1 flex-shrink-0" />
+            <GraduationCap className="w-6 h-6 text-helps-fg mt-1 flex-shrink-0" />
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{article.title}</h1>
+              <h1 className="text-3xl font-bold text-fg mb-2">{article.title}</h1>
               {article.question && (
-                <p className="text-lg text-gray-700 leading-relaxed italic">
+                <p className="text-lg text-fg-secondary leading-relaxed italic">
                   This page answers: {article.question}
                 </p>
               )}
@@ -217,7 +217,7 @@ export function TranslationAcademyEntryViewer({
         {article.content ? (
           showRawMarkdown ? (
             <div className="mb-8">
-              <div className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto">
+              <div className="bg-elevated text-fg border border-border p-4 rounded-lg overflow-x-auto">
                 <pre className="text-sm font-mono whitespace-pre-wrap">
                   <code>{article.content}</code>
                 </pre>
@@ -226,7 +226,7 @@ export function TranslationAcademyEntryViewer({
           ) : (
             <MarkdownRenderer 
               content={article.content}
-              className="prose prose-slate max-w-none mb-8 prose-blockquote:text-slate-900 prose-blockquote:opacity-100 [&_blockquote]:text-slate-900 [&_blockquote_p]:text-slate-900 [&_blockquote_em]:text-inherit"
+              className="prose max-w-none mb-8 text-fg prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent prose-li:text-fg-secondary prose-blockquote:text-fg prose-blockquote:opacity-100 [&_blockquote]:text-fg [&_blockquote_p]:text-fg [&_blockquote_em]:text-inherit"
               onInternalLinkClick={(href, linkType, linkText) => {
 
                 
@@ -317,13 +317,13 @@ export function TranslationAcademyEntryViewer({
             />
           )
         ) : (
-          <p className="text-gray-500">No content available</p>
+          <p className="text-fg-muted">No content available</p>
         )}
 
         {/* Related Articles */}
         {article.relatedArticles && article.relatedArticles.length > 0 && (
-          <div className={`mt-8 pt-6 border-t border-gray-200 ${isRtl ? 'text-right' : ''}`}>
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">Related Articles</h3>
+          <div className={`mt-8 pt-6 border-t border-border ${isRtl ? 'text-right' : ''}`}>
+            <h3 className="text-lg font-semibold text-fg mb-3">Related Articles</h3>
             <div className={`flex flex-wrap gap-2 ${isRtl ? 'flex-row-reverse justify-end' : ''}`}>
               {article.relatedArticles.map((relatedLink, idx) => {
                 // Extract article ID from link if it's a full rc link
@@ -336,7 +336,7 @@ export function TranslationAcademyEntryViewer({
                   <button
                     key={idx}
                     onClick={() => handleRelatedArticleClick(articleId)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-md text-sm font-medium transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-helps-soft hover:bg-chip-verse text-helps-fg rounded-md text-sm font-medium transition-colors"
                   >
                     <GraduationCap className="w-3.5 h-3.5" />
                     {displayName}

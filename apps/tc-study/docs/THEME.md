@@ -32,6 +32,17 @@ Switching mechanism: `class="dark"` on `<html>` (also `data-theme` and `color-sc
 
 Prefer semantic tokens over scattering `dark:` one-offs or baking theme into business logic.
 
+## Helps reading chips
+
+Verse group headers and quote buttons on Combined Helps / TN / TWL cards use dedicated chip tokens (solid fills — not hard-coded `*-50` gradients):
+
+| Token | Utilities | Use |
+|-------|-----------|-----|
+| `chip-verse` / `chip-verse-fg` | `bg-chip-verse`, `text-chip-verse-fg` | Verse/ref group headers + count badges |
+| `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `bg-chip-quote`, `hover:bg-chip-quote-hover`, `text-chip-quote-fg` | Scripture / OBS quote chips on note & word-link cards |
+
+Pair with shared `surface`, `fg`, `fg-secondary`, `fg-muted`, `border`, `helps*` for card chrome and entry links.
+
 ## Add another theme later
 
 Option A — extra root class (e.g. `.sepia`) with its own `--theme-*` block, resolve in the store.

@@ -26,15 +26,15 @@ export function TokenFilterBanner({
   }
 
   return (
-    <div className="px-4 py-1.5 border-b bg-blue-50 border-blue-200 flex items-center justify-center gap-2">
+    <div className="px-4 py-1.5 border-b bg-accent-soft border-accent/30 flex items-center justify-center gap-2">
       <div className="inline-flex items-center gap-1.5 bg-surface border border-accent/40 rounded-md px-2 py-0.5">
-        <Hash className="w-3 h-3 text-blue-500" />
-        <span className="text-xs text-gray-700">
+        <Hash className="w-3 h-3 text-accent" />
+        <span className="text-xs text-fg-secondary">
           {tokenFilter.content}
         </span>
         <button
           onClick={onClearFilter}
-          className="ml-0.5 rounded hover:bg-gray-100 p-0.5 text-gray-400 hover:text-gray-600 transition-colors"
+          className="ml-0.5 rounded hover:bg-muted p-0.5 text-fg-muted hover:text-fg-secondary transition-colors"
           title="Clear filter"
           aria-label="Clear token filter"
         >
