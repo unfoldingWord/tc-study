@@ -82,10 +82,11 @@ export interface ScriptureLoaderConfig {
   debug?: boolean
 
   /**
-   * Feature flag: use @bt-synergy/usj-processor (USFM→USJ→ProcessedScripture).
-   * Default false = legacy @bt-synergy/usfm-processor (byte-stable).
+   * Process path: @bt-synergy/usj-processor (USFM→USJ→ProcessedScripture).
+   * Default **true** (USJ replaces usfm-js). Set false / USE_USJ_PIPELINE=0 for
+   * transitional usfm-js rollback only.
    * When omitted, also reads USE_USJ_PIPELINE / VITE_USE_USJ_PIPELINE env.
-   * When on (P2): writes/reads `scripture-usj:…` SoT; dual-reads legacy `scripture:…`.
+   * When on: writes/reads `scripture-usj:…` SoT; dual-reads legacy `scripture:…`.
    */
   useUsjPipeline?: boolean
 }

@@ -1,10 +1,15 @@
 /**
  * Resolve USE_USJ_PIPELINE feature flag.
  *
+ * Strategy: USJ **replaces** usfm-js as the parse SoT. Dual-path is transitional only.
+ *
  * Precedence (first explicit wins):
  * 1. Loader constructor option `useUsjPipeline`
  * 2. process.env.USE_USJ_PIPELINE / VITE_USE_USJ_PIPELINE
- * 3. Default: false (legacy usfm-processor path — byte-stable)
+ * 3. Default: **true** (USJ path — `@bt-synergy/usj-processor`)
+ *
+ * Opt out (legacy usfm-js rollback): "0", "false", "no" (case-insensitive),
+ * or `useUsjPipeline: false`.
  *
  * Truthy env values: "1", "true", "yes" (case-insensitive).
  */
@@ -38,5 +43,5 @@ function readEnvUseUsjPipeline(): boolean | undefined {
  */
 export function resolveUseUsjPipeline(option?: UseUsjPipelineOption): boolean {
   if (typeof option === 'boolean') return option
-  return readEnvUseUsjPipeline() ?? false
+  return readEnvUseUsjPipeline() ?? true
 }

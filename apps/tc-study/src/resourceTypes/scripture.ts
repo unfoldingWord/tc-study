@@ -37,11 +37,15 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
     enableMemoryCache: true,
     memoryCacheSize: 50, // Cache up to 50 chapters
     debug: true, // Enable debug logging to troubleshoot issues
-    // P1/P2 dual-path: default off. Enable with VITE_USE_USJ_PIPELINE=1 (or USE_USJ_PIPELINE).
-    // Flag on → scripture-usj: SoT + dual-read legacy scripture:. Clear both after toggling.
-    useUsjPipeline:
-      import.meta.env.VITE_USE_USJ_PIPELINE === '1' ||
-      import.meta.env.VITE_USE_USJ_PIPELINE === 'true',
+    // USJ is the default process path (replaces usfm-js). Opt out: VITE_USE_USJ_PIPELINE=0.
+    // undefined → scripture-loader resolveUseUsjPipeline default true.
+    // Clear scripture: / scripture-usj: keys after toggling.
+    useUsjPipeline: (() => {
+      const v = import.meta.env.VITE_USE_USJ_PIPELINE
+      if (v === '0' || v === 'false') return false
+      if (v === '1' || v === 'true') return true
+      return undefined
+    })(),
   },
   
   downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.SCRIPTURE),

@@ -24,7 +24,7 @@ export interface WorkerLoaderDeps {
   catalogAdapter: unknown
   door43Client: unknown
   debug?: boolean
-  /** Optional override; otherwise USE_USJ_PIPELINE / VITE_USE_USJ_PIPELINE / default off */
+  /** Optional override; otherwise USE_USJ_PIPELINE / VITE_USE_USJ_PIPELINE / default on (USJ) */
   useUsjPipeline?: boolean
 }
 
@@ -53,9 +53,12 @@ function toScriptureLoaderConfig(deps: WorkerLoaderDeps): LoaderConfig {
     ...toLoaderConfig(deps),
     useUsjPipeline: resolveUseUsjPipeline(
       deps.useUsjPipeline ??
-        (import.meta.env.VITE_USE_USJ_PIPELINE === '1' ||
-          import.meta.env.VITE_USE_USJ_PIPELINE === 'true' ||
-          undefined)
+        (() => {
+          const v = import.meta.env.VITE_USE_USJ_PIPELINE
+          if (v === '0' || v === 'false') return false
+          if (v === '1' || v === 'true') return true
+          return undefined
+        })()
     ),
   }
 }

@@ -11,9 +11,9 @@ afterEach(() => {
 })
 
 describe('resolveUseUsjPipeline', () => {
-  test('defaults to false when unset', () => {
-    expect(resolveUseUsjPipeline()).toBe(false)
-    expect(resolveUseUsjPipeline(undefined)).toBe(false)
+  test('defaults to true when unset (USJ replaces usfm-js)', () => {
+    expect(resolveUseUsjPipeline()).toBe(true)
+    expect(resolveUseUsjPipeline(undefined)).toBe(true)
   })
 
   test('explicit option wins over env', () => {
@@ -32,5 +32,7 @@ describe('resolveUseUsjPipeline', () => {
   test('reads VITE_USE_USJ_PIPELINE when USE_USJ unset', () => {
     process.env.VITE_USE_USJ_PIPELINE = '1'
     expect(resolveUseUsjPipeline()).toBe(true)
+    process.env.VITE_USE_USJ_PIPELINE = 'false'
+    expect(resolveUseUsjPipeline()).toBe(false)
   })
 })

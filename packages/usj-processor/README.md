@@ -2,7 +2,7 @@
 
 Adapter: Door43 USFM → `@usfm-tools/parser` USJ → `@usfm-tools/usj-core` `stripAlignments` → `ProcessedScripture` / `WordToken` shapes compatible with today’s tc-study interactivity contract.
 
-**P1/P2:** Wired behind `USE_USJ_PIPELINE` in `@bt-synergy/scripture-loader` (default **off**).  
+**Replace path:** Default process path in `@bt-synergy/scripture-loader` (USJ replaces usfm-js). Opt out with `USE_USJ_PIPELINE=0`.  
 When on, loader persists USJ SoT under `scripture-usj:…` (`processingVersion` `2.0.0-usj`) and still returns `ProcessedScripture` to the app.
 
 ## Local `usfm-ast` wiring

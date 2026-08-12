@@ -2,17 +2,19 @@
  * Scripture Loader
  *
  * Loads scripture content (USFM files) from cache or Door43 API.
- * Processes USFM into ProcessedScripture via usfm-processor (default) or
- * usj-processor when USE_USJ_PIPELINE / useUsjPipeline is on.
+ * Default process path: @bt-synergy/usj-processor (USJ replaces usfm-js).
+ * Opt out with USE_USJ_PIPELINE=0 / useUsjPipeline: false for transitional usfm-js rollback.
  *
- * P2: When USJ pipeline is on, persistent SoT is `scripture-usj:…` (USJ + AlignmentMap);
- * callers still receive ProcessedScripture only. Flag-off keeps legacy `scripture:…`.
+ * When USJ pipeline is on (default): persistent SoT is `scripture-usj:…` (USJ + AlignmentMap);
+ * callers still receive ProcessedScripture only (temporary projection DTO — TODO sunset).
+ * Flag-off keeps legacy `scripture:…` + lazy-loaded usfm-processor.
  */
 
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog';
 import type { ProgressCallback, ResourceLoader } from '@bt-synergy/resource-types';
-import type { ProcessedScripture } from '@bt-synergy/usfm-processor';
-import { USFMProcessor } from '@bt-synergy/usfm-processor';
+// TODO(sunset): ProcessedScripture type lives in usfm-processor for now; move or thin-reexport
+// once CombinedHelps / TokenRenderer no longer require this projection.
+import type { ProcessedScripture, USFMProcessor } from '@bt-synergy/usfm-processor';
 import { USJProcessor } from '@bt-synergy/usj-processor';
 
 import { processUsfmToScripture } from './processUsfm';
@@ -68,8 +70,10 @@ export class ScriptureLoader implements ResourceLoader {
   private door43Client: any
   private debug: boolean
   private useUsjPipeline: boolean
-  private usfmProcessor: USFMProcessor
-  private usjProcessor: USJProcessor
+  /** Lazy: only constructed on legacy opt-out path. */
+  private usfmProcessor: USFMProcessor | null = null
+  /** Lazy: constructed on first USJ process/cache read (default path). */
+  private usjProcessor: USJProcessor | null = null
 
   constructor(config: ScriptureLoaderConfig | any) {
     this.cacheAdapter = config.cacheAdapter
@@ -77,12 +81,10 @@ export class ScriptureLoader implements ResourceLoader {
     this.door43Client = config.door43Client
     this.debug = config.debug || false
     this.useUsjPipeline = resolveUseUsjPipeline(config.useUsjPipeline)
-    this.usfmProcessor = new USFMProcessor()
-    this.usjProcessor = new USJProcessor()
     if (this.debug) {
       console.log(
         `[ScriptureLoader] pipeline=${this.useUsjPipeline ? 'usj' : 'usfm'} ` +
-          `(USE_USJ_PIPELINE default off)`
+          `(USJ default on; set USE_USJ_PIPELINE=0 for usfm-js rollback)`
       )
     }
   }
@@ -92,17 +94,36 @@ export class ScriptureLoader implements ResourceLoader {
     return this.useUsjPipeline
   }
 
+  private getUsjProcessor(): USJProcessor {
+    if (!this.usjProcessor) {
+      this.usjProcessor = new USJProcessor()
+    }
+    return this.usjProcessor
+  }
+
+  private async getUsfmProcessor(): Promise<USFMProcessor> {
+    if (!this.usfmProcessor) {
+      const { USFMProcessor } = await import('@bt-synergy/usfm-processor')
+      this.usfmProcessor = new USFMProcessor()
+    }
+    return this.usfmProcessor
+  }
+
   private async processUsfm(
     usfmText: string,
     bookId: string
   ): Promise<ProcessedScripture> {
+    const usjProcessor = this.useUsjPipeline ? this.getUsjProcessor() : undefined
+    const usfmProcessor = this.useUsjPipeline
+      ? undefined
+      : await this.getUsfmProcessor()
     return processUsfmToScripture({
       usfmText,
       bookId,
       bookName: bookId.toUpperCase(),
       useUsjPipeline: this.useUsjPipeline,
-      usfmProcessor: this.usfmProcessor,
-      usjProcessor: this.usjProcessor,
+      usfmProcessor,
+      usjProcessor,
       debug: this.debug,
     })
   }
@@ -117,12 +138,13 @@ export class ScriptureLoader implements ResourceLoader {
     bookId: string
   ): Promise<ProcessedScripture> {
     if (this.useUsjPipeline) {
-      const result = await this.usjProcessor.processUSFM(
+      const usj = this.getUsjProcessor()
+      const result = await usj.processUSFM(
         usfmText,
         bookId,
         bookId.toUpperCase()
       )
-      const usjContent = this.usjProcessor.toUsjCacheContent(
+      const usjContent = usj.toUsjCacheContent(
         result,
         bookId,
         bookId.toUpperCase()
@@ -174,7 +196,7 @@ export class ScriptureLoader implements ResourceLoader {
           const adapted = processedFromUsjCache(
             usjCached.content,
             bookId,
-            this.usjProcessor
+            this.getUsjProcessor()
           )
           if (adapted) {
             if (this.debug) {
@@ -247,7 +269,7 @@ export class ScriptureLoader implements ResourceLoader {
         const usjCached = await this.cacheAdapter.get(usjScriptureKey(resourceKey, bookId))
         if (
           usjCached?.content &&
-          processedFromUsjCache(usjCached.content, bookId, this.usjProcessor)
+          processedFromUsjCache(usjCached.content, bookId, this.getUsjProcessor())
         ) {
           return true
         }
