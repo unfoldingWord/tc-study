@@ -56,7 +56,7 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
 
     // Note body click selects the card (quote button stops propagation)
     await noteCard.getByText(E2E_NOTE_TEXT).click()
-    await expect(noteCard).toHaveClass(/bg-accent-soft\/50/)
+    await expect(noteCard).toHaveClass(/bg-highlight\/40/)
     await expect(noteCard).toHaveClass(/border-border/)
 
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
