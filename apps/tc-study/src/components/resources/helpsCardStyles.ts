@@ -19,5 +19,5 @@ export const HELPS_VERSE_COUNT =
 export const HELPS_CARD_IDLE =
   'bg-surface hover:border-border border-border-subtle'
 
-/** Selected: muted fill + even border (no left bar / ring / wash). */
-export const HELPS_CARD_SELECTED = 'bg-muted/40 border-border'
+/** Selected: soft blue fill + even border (no left bar / ring / purple or yellow wash). */
+export const HELPS_CARD_SELECTED = 'bg-accent-soft border-border'
