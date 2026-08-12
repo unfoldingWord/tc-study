@@ -5,7 +5,7 @@
  * Sections: 356
  */
 
-import type { TranslatorSection } from '@bt-synergy/usfm-processor';
+import type { TranslatorSection } from '@bt-synergy/scripture-loader';
 
 export const book1kiSections: TranslatorSection[] = [
   {

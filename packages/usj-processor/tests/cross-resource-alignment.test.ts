@@ -1,15 +1,12 @@
 /**
- * Cross-resource alignment parity: gateway ↔ original (Paul ↔ Παῦλος).
- * Prefers UsjScriptureViewModel APIs; also checks projection vs legacy.
+ * Cross-resource alignment: gateway ↔ original (Paul ↔ Παῦλος).
+ * Prefers UsjScriptureViewModel APIs; projection must match viewModel.
  */
 
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { USFMProcessor } from '@bt-synergy/usfm-processor'
-
-import { attachAlignmentSemanticIds } from '../src/attachAlignmentSemanticIds'
 import {
   flattenUsjTokens,
   semanticIdFor,
@@ -63,42 +60,25 @@ describe('Cross-resource alignment — Paul ↔ Παῦλος (viewModel)', () =
     )
   })
 
-  test('viewModel projection matches legacy Paul ↔ Παῦλος targets', async () => {
+  test('viewModel projection matches Paul ↔ Παῦλος alignedOriginalWordIds', async () => {
     const usj = await new USJProcessor().processUSFM(ULT_USFM, 'tit', 'Titus', {
       language: 'en',
     })
-    const legacy = await new USFMProcessor().processUSFM(ULT_USFM, 'tit', 'Titus', {
-      language: 'en',
-      includeWordTokens: true,
-      includeAlignments: true,
-    })
-    attachAlignmentSemanticIds(
-      legacy,
-      legacy.chapters.flatMap((c) => c.verses)
-    )
 
     const vmPaul = findVmWord(flattenUsjTokens(usj.viewModel, 1), 'Paul')
     const projPaul = usj.scripture.chapters
       .find((c) => c.number === 1)
       ?.verses.find((v) => v.number === 1)
       ?.wordTokens?.find((t) => t.type === 'word' && t.content === 'Paul')
-    const legacyPaul = legacy.chapters
-      .find((c) => c.number === 1)
-      ?.verses.find((v) => v.number === 1)
-      ?.wordTokens?.find((t) => t.type === 'word' && t.content === 'Paul')
 
     expect(vmPaul).toBeTruthy()
     expect(projPaul).toBeTruthy()
-    expect(legacyPaul).toBeTruthy()
 
     const norm = (ids: string[] | undefined) =>
       (ids || []).map((id) => id.toLowerCase()).sort()
 
     expect(norm(vmPaul!.alignedOriginalWordIds)).toEqual(
       norm(projPaul!.alignedOriginalWordIds)
-    )
-    expect(norm(vmPaul!.alignedOriginalWordIds)).toEqual(
-      norm(legacyPaul!.alignedOriginalWordIds)
     )
     expect(norm(vmPaul!.alignedOriginalWordIds).some((id) => id.includes('παῦλος'))).toBe(true)
   })

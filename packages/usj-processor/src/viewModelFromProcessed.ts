@@ -1,12 +1,11 @@
 /**
  * Synthesize UsjScriptureViewModel from transitional ProcessedScripture.
- * Used for legacy scripture: cache hits and USE_USJ_PIPELINE=0 rollback.
+ * Used for legacy `scripture:` cache hits during migration to `scripture-usj:`.
  * Empty usj/alignmentMap — not a true USJ SoT round-trip.
  */
 
-import type { ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
-
 import { semanticIdFor } from './identity'
+import type { ProcessedScripture, ProcessedVerse } from './processedTypes'
 import type { UsjScriptureViewModel, UsjVerseView, UsjWordToken } from './usjViewModel'
 import { USJ_PROCESSING_VERSION, USJ_TOOL_VERSIONS } from './versions'
 

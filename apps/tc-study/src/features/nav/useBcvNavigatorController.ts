@@ -1,4 +1,4 @@
-import type { TranslatorSection } from '@bt-synergy/usfm-processor'
+import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {

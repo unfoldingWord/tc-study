@@ -1,10 +1,9 @@
 /**
- * Parity report helpers for USJ vs legacy usfm-processor outputs.
+ * Parity report helpers for comparing two ProcessedScripture projections.
  */
 
-import type { ProcessedScripture, WordToken } from '@bt-synergy/usfm-processor'
-
 import { semanticIdFor } from './identity'
+import type { ProcessedScripture, WordToken } from './processedTypes'
 
 export interface TokenKey {
   semanticId: string

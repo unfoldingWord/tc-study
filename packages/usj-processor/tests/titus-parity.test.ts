@@ -1,98 +1,79 @@
 /**
- * P0 parity: USJ adapter vs @bt-synergy/usfm-processor on ULT + UGNT Titus.
- *
- * Gates (plan):
- * - ≥99% word surface+occurrence
- * - OL / gateway semantic ID set equality (case-insensitive)
- * - alignedOriginalWordIds equality for ULT tokens that have alignments
+ * USJ Titus fixture gates (post-usfm-js delete).
+ * Self-consistency + identity / alignment / punctuation guards.
  */
 
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { USFMProcessor } from '@bt-synergy/usfm-processor'
-
-import { attachAlignmentSemanticIds } from '../src/attachAlignmentSemanticIds'
-import { buildParityReport, formatParityReport } from '../src/parity'
+import { collectSemanticIdSet, collectSurfaceOccurrenceSet } from '../src/parity'
 import { USJProcessor } from '../src/USJProcessor'
+import { flattenUsjTokens, semanticIdFor } from '../src/index'
 
 const FIXTURES = join(import.meta.dir, '..', 'fixtures')
 
 const ULT_USFM = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
 const UGNT_USFM = readFileSync(join(FIXTURES, 'el-x-koine_ugnt_TIT.usfm'), 'utf8')
 
-const PASS_THRESHOLD = 99
+describe('USJ Titus fixtures — self-consistency', () => {
+  test('ULT Titus chapter 1: deterministic process + non-empty identity sets', async () => {
+    const proc = new USJProcessor()
+    const a = await proc.processUSFM(ULT_USFM, 'TIT', 'Titus', {
+      language: 'en',
+      includeWordTokens: true,
+      includeAlignments: true,
+    })
+    const b = await proc.processUSFM(ULT_USFM, 'TIT', 'Titus', {
+      language: 'en',
+      includeWordTokens: true,
+      includeAlignments: true,
+    })
 
-async function processBoth(usfm: string, language: string) {
-  const legacyProc = new USFMProcessor()
-  const usjProc = new USJProcessor()
+    const idsA = collectSemanticIdSet(a.scripture, 1)
+    const idsB = collectSemanticIdSet(b.scripture, 1)
+    expect([...idsA].sort()).toEqual([...idsB].sort())
+    expect(idsA.size).toBeGreaterThan(0)
 
-  const legacy = await legacyProc.processUSFM(usfm, 'TIT', 'Titus', {
-    language,
-    includeWordTokens: true,
-    includeAlignments: true,
-  })
-  attachAlignmentSemanticIds(
-    legacy,
-    legacy.chapters.flatMap((c) => c.verses)
-  )
+    const surfaces = collectSurfaceOccurrenceSet(a.scripture, 1)
+    expect(surfaces.size).toBeGreaterThan(0)
 
-  const { scripture: usj } = await usjProc.processUSFM(usfm, 'TIT', 'Titus', {
-    language,
-    includeWordTokens: true,
-    includeAlignments: true,
-  })
+    const vmTokens = flattenUsjTokens(a.viewModel, 1)
+    expect(vmTokens.length).toBeGreaterThan(0)
+    expect(vmTokens.every((t) => t.semanticId === semanticIdFor(t.verseRef, t.content, t.occurrence))).toBe(
+      true
+    )
 
-  return { legacy, usj }
-}
-
-function assertParity(
-  label: string,
-  legacy: Awaited<ReturnType<typeof processBoth>>['legacy'],
-  usj: Awaited<ReturnType<typeof processBoth>>['usj'],
-  chapterFilter: number | 'all'
-) {
-  const report = buildParityReport(label, legacy, usj, chapterFilter)
-  // Always print counts for spike go/no-go evidence
-  console.log(formatParityReport(report))
-
-  expect(report.wordSurfaceOccurrence.pct).toBeGreaterThanOrEqual(PASS_THRESHOLD)
-  expect(report.semanticIds.pct).toBeGreaterThanOrEqual(PASS_THRESHOLD)
-  expect(report.semanticIds.leftOnly.length).toBe(0)
-  expect(report.semanticIds.rightOnly.length).toBe(0)
-  expect(report.alignedOriginalWordIds.pct).toBeGreaterThanOrEqual(PASS_THRESHOLD)
-  expect(report.alignedOriginalWordIds.mismatches.length).toBe(0)
-
-  return report
-}
-
-describe('USJ P0 parity — Titus fixtures', () => {
-  test('ULT Titus chapter 1: surface / semantic IDs / alignedOriginalWordIds', async () => {
-    const { legacy, usj } = await processBoth(ULT_USFM, 'en')
-    const report = assertParity('ULT', legacy, usj, 1)
-    expect(report.wordSurfaceOccurrence.leftSize).toBeGreaterThan(0)
-    expect(report.alignedOriginalWordIds.legacyAlignedCount).toBeGreaterThan(0)
+    const aligned = vmTokens.filter((t) => t.alignedOriginalWordIds.length > 0)
+    expect(aligned.length).toBeGreaterThan(0)
   })
 
-  test('UGNT Titus chapter 1: OL semantic ID set equality', async () => {
-    const { legacy, usj } = await processBoth(UGNT_USFM, 'el-x-koine')
-    const report = assertParity('UGNT', legacy, usj, 1)
-    expect(report.wordSurfaceOccurrence.leftSize).toBeGreaterThan(0)
-    // UGNT has no zaln alignments
-    expect(report.alignedOriginalWordIds.legacyAlignedCount).toBe(0)
+  test('UGNT Titus chapter 1: OL semantic IDs; no gateway alignments', async () => {
+    const { scripture, viewModel } = await new USJProcessor().processUSFM(
+      UGNT_USFM,
+      'TIT',
+      'Titus',
+      { language: 'el-x-koine', includeWordTokens: true, includeAlignments: true }
+    )
+    const ids = collectSemanticIdSet(scripture, 1)
+    expect(ids.size).toBeGreaterThan(0)
+    const aligned = flattenUsjTokens(viewModel, 1).filter((t) => t.alignedOriginalWordIds.length > 0)
+    expect(aligned.length).toBe(0)
   })
 
-  test('ULT + UGNT full Titus book (cheap full-book check)', async () => {
-    const ult = await processBoth(ULT_USFM, 'en')
-    assertParity('ULT', ult.legacy, ult.usj, 'all')
-
-    const ugnt = await processBoth(UGNT_USFM, 'el-x-koine')
-    assertParity('UGNT', ugnt.legacy, ugnt.usj, 'all')
+  test('ULT + UGNT full Titus book process succeeds', async () => {
+    const proc = new USJProcessor()
+    const ult = await proc.processUSFM(ULT_USFM, 'TIT', 'Titus', { language: 'en' })
+    const ugnt = await proc.processUSFM(UGNT_USFM, 'TIT', 'Titus', {
+      language: 'el-x-koine',
+    })
+    expect(ult.scripture.chapters.length).toBeGreaterThan(0)
+    expect(ugnt.scripture.chapters.length).toBeGreaterThan(0)
+    expect(collectSemanticIdSet(ult.scripture, 'all').size).toBeGreaterThan(0)
+    expect(collectSemanticIdSet(ugnt.scripture, 'all').size).toBeGreaterThan(0)
   })
 
   test('documents tokenizeGatewayUsj punctuation pitfall (not used by adapter)', async () => {
-    // Guardrail: whitespace tokenization attaches commas and must not drive semantic IDs.
     const { USFMParser, stripAlignments, tokenizeGatewayUsj } = await import('../src/usfmTools')
     const parser = new USFMParser()
     parser.parse(ULT_USFM)

@@ -37,15 +37,7 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
     enableMemoryCache: true,
     memoryCacheSize: 50, // Cache up to 50 chapters
     debug: true, // Enable debug logging to troubleshoot issues
-    // USJ is the default process path (replaces usfm-js). Opt out: VITE_USE_USJ_PIPELINE=0.
-    // undefined → scripture-loader resolveUseUsjPipeline default true.
-    // Clear scripture: / scripture-usj: keys after toggling.
-    useUsjPipeline: (() => {
-      const v = import.meta.env.VITE_USE_USJ_PIPELINE
-      if (v === '0' || v === 'false') return false
-      if (v === '1' || v === 'true') return true
-      return undefined
-    })(),
+    // USJ-only process path (usfm-js removed). Cache SoT: scripture-usj:
   },
   
   downloadPriority: getDownloadPriority(RESOURCE_TYPE_IDS.SCRIPTURE),

@@ -1,12 +1,14 @@
 /**
- * Bridge to sibling `usfm-ast` built packages.
+ * Bridge to `@usfm-tools/*` (usfm-ast built packages).
  *
- * - Parser: `@usfm-tools/parser` (CJS). Vite aliases + optimizeDeps.needsInterop;
- *   Bun/tests resolve via `node_modules/@usfm-tools/*` symlink (scripts/link-usfm-tools.cjs).
- * - usj-core: import compiled ESM `dist/index.mjs` by relative path so Bun does not
- *   evaluate type-only re-exports from `@usfm-tools/types` (AlignmentGroup is interface-only).
+ * Resolution (local + CI):
+ * 1. `bun run link:usfm-tools` → node_modules/@usfm-tools/* (verifies dist)
+ * 2. Vite aliases prefer that linked dist (apps/tc-study/scripts/usfm-tools-vite-aliases.cjs)
+ * 3. commonjsOptions include usfm-ast parser/types so Rollup converts CJS `exports`
  *
- * Layout: Git/Github/{bt-synergy,usfm-ast} with parser/usj-core/types dist built.
+ * usj-core: import compiled ESM `dist/index.mjs` via the linked package path so Bun
+ * does not evaluate the package entry’s type-only re-exports from `@usfm-tools/types`
+ * (AlignmentGroup is interface-only — breaks Bun package entry load).
  */
 
 import * as UsfmParserModule from '@usfm-tools/parser'
@@ -16,7 +18,7 @@ import {
   stripAlignments,
   tokenizeGatewayUsj,
   type AlignmentMap,
-} from '../../../../usfm-ast/packages/usfm-usj-core/dist/index.mjs'
+} from '../../../node_modules/@usfm-tools/usj-core/dist/index.mjs'
 
 type UsfmParserCtor = new (options?: unknown) => {
   parse: (usfm: string) => unknown
@@ -38,7 +40,7 @@ function resolveUsfmParser(): UsfmParserCtor {
     return def as UsfmParserCtor
   }
   throw new Error(
-    '[usj-processor] USFMParser not found in @usfm-tools/parser (CJS/ESM interop failed)'
+    '[usj-processor] USFMParser not found in @usfm-tools/parser (CJS/ESM interop failed). Run: bun run link:usfm-tools'
   )
 }
 

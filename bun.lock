@@ -210,7 +210,6 @@
         "@bt-synergy/translation-questions-loader": "workspace:*",
         "@bt-synergy/translation-words-links-loader": "workspace:*",
         "@bt-synergy/translation-words-loader": "workspace:*",
-        "@bt-synergy/usfm-processor": "workspace:*",
         "@bt-synergy/usj-processor": "workspace:*",
         "@tailwindcss/vite": "^4.1.18",
         "clsx": "^2.1.0",
@@ -662,7 +661,6 @@
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
         "@bt-synergy/resource-types": "workspace:*",
-        "@bt-synergy/usfm-processor": "workspace:*",
         "@bt-synergy/usj-processor": "workspace:*",
         "jszip": "^3.10.1",
       },
@@ -683,7 +681,6 @@
         "@bt-synergy/resource-panels": "workspace:*",
         "@bt-synergy/resource-signals": "workspace:*",
         "@bt-synergy/resource-types": "workspace:*",
-        "@bt-synergy/usfm-processor": "workspace:*",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
       },
@@ -849,22 +846,9 @@
         "zustand": "^4.0.0",
       },
     },
-    "packages/usfm-processor": {
-      "name": "@bt-synergy/usfm-processor",
-      "version": "0.1.0",
-      "dependencies": {
-        "usfm-js": "^3.4.3",
-      },
-      "devDependencies": {
-        "typescript": "^5.3.3",
-      },
-    },
     "packages/usj-processor": {
       "name": "@bt-synergy/usj-processor",
       "version": "0.0.0-spike",
-      "dependencies": {
-        "@bt-synergy/usfm-processor": "workspace:*",
-      },
       "devDependencies": {
         "@types/node": "^20.10.0",
         "typescript": "^5.3.3",
@@ -1213,8 +1197,6 @@
     "@bt-synergy/ui-controls": ["@bt-synergy/ui-controls@workspace:packages/ui-controls"],
 
     "@bt-synergy/unified-catalog-store": ["@bt-synergy/unified-catalog-store@workspace:packages/unified-catalog-store"],
-
-    "@bt-synergy/usfm-processor": ["@bt-synergy/usfm-processor@workspace:packages/usfm-processor"],
 
     "@bt-synergy/usj-processor": ["@bt-synergy/usj-processor@workspace:packages/usj-processor"],
 

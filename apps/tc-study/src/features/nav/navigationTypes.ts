@@ -3,7 +3,7 @@
  * Slices under features/nav compose into useNavigationStore.
  */
 
-import type { TranslatorSection } from '@bt-synergy/usfm-processor'
+import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 import type { BCVReference, BookInfo, NavigationCatalogScope, NavigationMode, PassageSet } from '../../contexts/types'
 
 export interface NavigationState {

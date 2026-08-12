@@ -2,7 +2,7 @@
  * Translator-section navigation (set sections + next/prev).
  */
 
-import type { TranslatorSection } from '@bt-synergy/usfm-processor'
+import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 import { findSectionIndexForRef } from './bcvNavHelpers'
 import type { NavigationGet, NavigationSet, NavigationStore } from './navigationTypes'
 

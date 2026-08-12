@@ -43,9 +43,8 @@ export type { CachedUsjDocument, UsjScriptureCacheContent } from './usjCacheType
 export type { AlignmentMap } from './usfmTools'
 
 /**
- * Transitional ProcessedScripture DTO types — re-exported so Viewer / Helps can
- * import from @bt-synergy/usj-processor (or @bt-synergy/scripture-loader) and
- * stop depending on @bt-synergy/usfm-processor. Physical home moves when usfm-js is deleted.
+ * ProcessedScripture DTO types — owned here (USJ projection). Import from
+ * @bt-synergy/usj-processor or @bt-synergy/scripture-loader; do not use usfm-processor.
  */
 export type {
   ProcessedScripture,
@@ -57,4 +56,4 @@ export type {
   TranslatorSection,
   ProcessingResult,
   USFMProcessingOptions,
-} from '@bt-synergy/usfm-processor'
+} from './processedTypes'

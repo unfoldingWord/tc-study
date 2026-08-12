@@ -2,9 +2,7 @@
 
 Loads Door43 scripture (USFM) via **USJ + AlignmentMap** SoT for catalog-manager / tc-study.
 
-## Process path: USJ replaces usfm-js
-
-**Default on** — `@bt-synergy/usj-processor`:
+## Process path: USJ only (usfm-js removed)
 
 `USFM → UsjDocument + AlignmentMap → UsjScriptureViewModel` (+ temporary `ProcessedScripture` projection).
 
@@ -12,77 +10,35 @@ Loads Door43 scripture (USFM) via **USJ + AlignmentMap** SoT for catalog-manager
 |-----|-----|
 | `processUsfmToUsjResult({ usfmText, bookId })` | **Preferred** — `{ viewModel, scripture, cacheContent, usj, alignmentMap }` |
 | `viewModelFromUsjCache(content, bookId, proc)` | Rebuild view model from `scripture-usj:` entry |
-| `processUsfmToScripture({ …, useUsjPipeline })` | Transitional — projection only |
-| `ScriptureLoader.loadContent` | Still returns `ProcessedScripture` for drop-in UI |
-
-Legacy `@bt-synergy/usfm-processor` (usfm-js) is **opt-out only** (`USE_USJ_PIPELINE=0`) via dynamic import.
+| `processUsfmToScripture({ usfmText, bookId })` | Transitional — projection only |
+| `ScriptureLoader.loadViewModel` / `loadScriptureResult` | Preferred Viewer path |
+| `ScriptureLoader.loadContent` | Helps — returns `ProcessedScripture` projection from USJ |
 
 Identity contract: `semanticIdFor` / `UsjWordToken` — see plan **Authoritative runtime contract**.
 
-### Storage (USJ default)
+### Storage
 
-| | Legacy (`scripture:…`) | USJ SoT (`scripture-usj:…`) |
-|--|------------------------|-----------------------------|
-| Flag **off** (rollback) | Read + write ProcessedScripture | Unused |
-| Flag **on** (default) | Dual-read fallback (upgrade open) | Prefer read; write on process |
+| Namespace | Role |
+|-----------|------|
+| `scripture-usj:…` | **Primary** — write on process; prefer read |
+| `scripture:…` | Legacy migrate-read only (no new writes) |
 
 - Content `processingVersion`: `2.0.0-usj` (+ embedded `@usfm-tools/parser` / `usj-core` versions).
 - Mismatched versions are refused (deleted) and reprocessed on next fetch.
 - Chapter / `:alignments` chunks via `@bt-synergy/cache-adapter-indexeddb`.
-- App still consumes **ProcessedScripture only** (no UsfmReadonlyView yet).
 
-### Clear cache after toggling
+### Clear cache
 
 IndexedDB DB: `tc-study-cache` / store `cache-entries`.
 
 DevTools → Application → IndexedDB → delete keys starting with `scripture:` and/or `scripture-usj:`,  
 or wipe the DB, then reload so books re-fetch and reprocess.
 
-```js
-// Console helper
-;(async () => {
-  const db = await new Promise((res, rej) => {
-    const r = indexedDB.open('tc-study-cache')
-    r.onsuccess = () => res(r.result)
-    r.onerror = () => rej(r.error)
-  })
-  const keys = await new Promise((res, rej) => {
-    const tx = db.transaction('cache-entries', 'readonly')
-    const req = tx.objectStore('cache-entries').getAllKeys()
-    req.onsuccess = () => res(req.result)
-    req.onerror = () => rej(req.error)
-  })
-  const del = keys.filter((k) => /^scripture(-usj)?:/.test(String(k)))
-  await new Promise((res, rej) => {
-    const tx = db.transaction('cache-entries', 'readwrite')
-    const store = tx.objectStore('cache-entries')
-    for (const k of del) store.delete(k)
-    tx.oncomplete = () => res()
-    tx.onerror = () => rej(tx.error)
-  })
-  db.close()
-  console.log('deleted', del.length, 'scripture keys')
-})()
-```
-
 ### tc-study
 
 ```bash
-# default = USJ path
 bun run dev -- --port 8080 --host
-
-# legacy usfm-js rollback
-VITE_USE_USJ_PIPELINE=0 bun run dev -- --port 8080 --host
 ```
 
 Requires sibling `usfm-ast` built + `node packages/usj-processor/scripts/link-usfm-tools.cjs`  
 (Vite aliases `@usfm-tools/*` in `apps/tc-study/vite.config.js`).
-
-Worker download path reads the same Vite env via `workerLoaderRegistry`.
-
-## Tests
-
-```bash
-bun test packages/scripture-loader
-bun test packages/usj-processor
-```

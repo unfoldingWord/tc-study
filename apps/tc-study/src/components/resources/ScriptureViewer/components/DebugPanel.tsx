@@ -3,7 +3,7 @@
  * Shows loading state, content info, metadata, and highlight state
  */
 
-import type { ProcessedChapter, ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
+import type { ProcessedChapter, ProcessedScripture, ProcessedVerse } from '@bt-synergy/scripture-loader'
 import { X } from 'lucide-react'
 import type { ReferenceState } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken } from '../types'

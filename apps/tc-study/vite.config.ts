@@ -1,9 +1,16 @@
+import { createRequire } from 'module'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import path from 'path'
 import { defineConfig } from 'vite'
 import checker from 'vite-plugin-checker'
 import { getSharedBuildConfig } from '../../config/vite-build'
+
+const require = createRequire(import.meta.url)
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const { getUsfmToolsViteResolve } = require('./scripts/usfm-tools-vite-aliases.cjs')
+const usfmTools = getUsfmToolsViteResolve()
 
 // Build id: set VITE_DEPLOY_VERSION before build for reproducible deploys; otherwise build timestamp
 const deployVersion =
@@ -14,16 +21,12 @@ const deployVersion =
 /**
  * Keep in sync with vite.config.js (Vite prefers .js when both exist).
  * linked-panels module store must be a single instance — see vite.config.js comment.
+ * @usfm-tools/*: scripts/usfm-tools-vite-aliases.cjs + link-usfm-tools.cjs
  */
 const linkedPanelsEntry = path.resolve(
   __dirname,
   '../../node_modules/linked-panels/dist/index.js'
 )
-// Sibling usfm-ast (USJ pipeline bridge — @bt-synergy/usj-processor imports dist/)
-const usfmAstRoot = path.resolve(__dirname, '../../../usfm-ast')
-const usfmToolsParser = path.resolve(usfmAstRoot, 'packages/usfm-parser/dist/index.js')
-const usfmToolsTypes = path.resolve(usfmAstRoot, 'packages/shared-types/dist/index.js')
-const usfmToolsUsjCore = path.resolve(usfmAstRoot, 'packages/usfm-usj-core/dist/index.mjs')
 const sharedBuild = getSharedBuildConfig()
 
 export default defineConfig({
@@ -46,10 +49,7 @@ export default defineConfig({
       'linked-panels': linkedPanelsEntry,
       // Alias workspace packages to their source (so dev uses latest code without rebuilding packages)
       '@bt-synergy/navigation': path.resolve(__dirname, '../../packages/navigation/src/index.ts'),
-      // Resolve @usfm-tools/* for CJS parser requires inside usj-processor bridge
-      '@usfm-tools/parser': usfmToolsParser,
-      '@usfm-tools/types': usfmToolsTypes,
-      '@usfm-tools/usj-core': usfmToolsUsjCore,
+      ...usfmTools.alias,
     },
     dedupe: ['react', 'react-dom', 'linked-panels'],
   },
@@ -70,17 +70,20 @@ export default defineConfig({
   },
   build: {
     ...sharedBuild.build,
-    // Sibling usfm-ast CJS dist is outside node_modules (Vite alias). Without this,
+    // usfm-ast CJS dist may sit outside node_modules (alias). Without this,
     // Rollup leaves `exports` bare → "exports is not defined" when resourceTypes load.
     commonjsOptions: {
-      include: [/node_modules/, /usfm-ast[\\/]packages[\\/](usfm-parser|shared-types)/],
+      include: usfmTools.commonjsInclude,
     },
     rollupOptions: {
       ...sharedBuild.build?.rollupOptions,
       output: {
         ...sharedBuild.build?.rollupOptions?.output,
         manualChunks(id) {
-          if (id.includes('node_modules/linked-panels') || id.includes(`${path.sep}linked-panels${path.sep}`)) {
+          if (
+            id.includes('node_modules/linked-panels') ||
+            id.includes(`${path.sep}linked-panels${path.sep}`)
+          ) {
             return 'linked-panels'
           }
         },
@@ -91,7 +94,7 @@ export default defineConfig({
     port: 3000,
     open: true,
     fs: {
-      allow: [path.resolve(__dirname, '../..'), usfmAstRoot],
+      allow: [path.resolve(__dirname, '../..'), ...usfmTools.fsAllow],
     },
   },
 })

@@ -26,7 +26,7 @@ Chosen defaults until a deliberate migration:
 
 | Concern | Keep (SoT for tc-study) | Do not grow for tc-study |
 |---|---|---|
-| USFM | `@bt-synergy/usfm-processor` | `resource-parsers` USFM path |
+| USFM/USJ | `@bt-synergy/usj-processor` + `@bt-synergy/scripture-loader` | tc-study scripture path (usfm-js removed) |
 | Loading | `*-loader` + `catalog-manager` | `resource-adapters` / `package-builder-engine` |
 | Signals | `resource-panels` | `resource-signals` (orphaned) |
 | Catalog IndexedDB | `@bt-synergy/catalog-adapter-indexeddb` | In-app adapter forks |

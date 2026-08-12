@@ -2,7 +2,7 @@
  * ScriptureDebugInfo - Debug panel showing internal state
  */
 
-import type { ProcessedChapter, ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
+import type { ProcessedChapter, ProcessedScripture, ProcessedVerse } from '@bt-synergy/scripture-loader'
 import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
 
 interface ScriptureDebugInfoProps {

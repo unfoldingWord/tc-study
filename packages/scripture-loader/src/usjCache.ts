@@ -5,10 +5,10 @@
  * Payload: UsjScriptureCacheContent (USJ document + AlignmentMap).
  */
 
-import type { ProcessedScripture } from '@bt-synergy/usfm-processor'
 import {
   USJProcessor,
   isUsjCacheVersionCompatible,
+  type ProcessedScripture,
   type USJProcessResult,
   type UsjScriptureCacheContent,
   type UsjScriptureViewModel,

@@ -8,8 +8,7 @@
  * Word surfaces come from USJ `char`/`w` nodes (not tokenizeGatewayUsj).
  */
 
-import type { ProcessedScripture, USFMProcessingOptions } from '@bt-synergy/usfm-processor'
-
+import type { ProcessedScripture, USFMProcessingOptions } from './processedTypes'
 import { projectToProcessedScripture } from './projectToProcessedScripture'
 import type { CachedUsjDocument, UsjScriptureCacheContent } from './usjCacheTypes'
 import { buildUsjViewModel, type UsjScriptureViewModel } from './usjViewModel'

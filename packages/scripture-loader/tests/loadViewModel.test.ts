@@ -73,7 +73,6 @@ describe('ScriptureLoader.loadViewModel', () => {
     const loader = new ScriptureLoader({
       cacheAdapter: cache,
       door43Client: {},
-      useUsjPipeline: true,
     })
 
     const viewModel = await loader.loadViewModel(resourceKey, bookId)
@@ -111,7 +110,6 @@ describe('ScriptureLoader.loadViewModel', () => {
     const loader = new ScriptureLoader({
       cacheAdapter: cache,
       door43Client: {},
-      useUsjPipeline: true,
     })
 
     const bundle = await loader.loadScriptureResult(resourceKey, bookId)

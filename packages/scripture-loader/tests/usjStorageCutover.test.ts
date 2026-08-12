@@ -9,6 +9,7 @@ import { USJ_PROCESSING_VERSION, USJ_TOOL_VERSIONS, USJProcessor } from '@bt-syn
 
 import { ScriptureLoader } from '../src/ScriptureLoader'
 import { legacyScriptureKey, usjScriptureKey } from '../src/scriptureCacheKeys'
+import { isUsjScriptureCacheContent } from '../src/usjCache'
 import {
   canSplitUsjScripture,
   reassembleUsjScripture,
@@ -69,13 +70,12 @@ function chapterRecordsFor(adapter: MemoryCacheAdapter, key: string) {
 }
 
 describe('P2 USJ storage cutover', () => {
-  test('flag on writes scripture-usj SoT with 2.0.0-usj + tool versions', async () => {
+  test('writes scripture-usj SoT with 2.0.0-usj + tool versions', async () => {
     const cache = new MemoryCacheAdapter()
     const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
     const loader = new ScriptureLoader({
       cacheAdapter: cache,
       door43Client: {},
-      useUsjPipeline: true,
       debug: false,
     })
 
@@ -124,7 +124,6 @@ describe('P2 USJ storage cutover', () => {
     const loader = new ScriptureLoader({
       cacheAdapter: cache,
       door43Client: {},
-      useUsjPipeline: true,
     })
     const loaded = (await loader.loadContent(resourceKey, bookId)) as {
       metadata: { version: string }
@@ -149,7 +148,6 @@ describe('P2 USJ storage cutover', () => {
     const loader = new ScriptureLoader({
       cacheAdapter: cache,
       door43Client: {},
-      useUsjPipeline: true,
     })
     const loaded = (await loader.loadContent(resourceKey, bookId)) as {
       metadata: { version: string }
@@ -179,7 +177,6 @@ describe('P2 USJ storage cutover', () => {
     const loader = new ScriptureLoader({
       cacheAdapter: cache,
       door43Client: {},
-      useUsjPipeline: true,
     })
     const loaded = (await loader.loadContent(resourceKey, bookId)) as {
       metadata: { version: string }
@@ -218,30 +215,11 @@ describe('P2 USJ storage cutover', () => {
     )
   })
 
-  test('flag off does not write scripture-usj keys', async () => {
-    const cache = new MemoryCacheAdapter()
-    const resourceKey = 'unfoldingWord/en/ult'
-    const bookId = 'tit'
+  test('processUsfmToUsjResult is the only write path (no legacy scripture: writes)', async () => {
+    const { processUsfmToUsjResult } = await import('../src/processUsfm')
     const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
-
-    // Use processUsfmToScripture path by stubbing door43 is not needed — write via flag-off loader internals
-    const { processUsfmToScripture } = await import('../src/processUsfm')
-    const scripture = await processUsfmToScripture({
-      usfmText: ult,
-      bookId,
-      useUsjPipeline: false,
-    })
-    await cache.set(legacyScriptureKey(resourceKey, bookId), { content: scripture })
-
-    const loader = new ScriptureLoader({
-      cacheAdapter: cache,
-      door43Client: {},
-      useUsjPipeline: false,
-    })
-    const loaded = await loader.loadContent(resourceKey, bookId)
-    expect(loaded).toBeTruthy()
-    expect(
-      [...cache.store.keys()].some((k) => k.startsWith('scripture-usj:'))
-    ).toBe(false)
+    const result = await processUsfmToUsjResult({ usfmText: ult, bookId: 'tit' })
+    expect(result.cacheContent.metadata.version).toBe(USJ_PROCESSING_VERSION)
+    expect(isUsjScriptureCacheContent(result.cacheContent)).toBe(true)
   })
 })

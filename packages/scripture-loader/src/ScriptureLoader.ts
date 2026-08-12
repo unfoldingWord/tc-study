@@ -2,8 +2,7 @@
  * Scripture Loader
  *
  * Loads scripture content (USFM files) from cache or Door43 API.
- * Default process path: @bt-synergy/usj-processor (USJ replaces usfm-js).
- * Opt out with USE_USJ_PIPELINE=0 / useUsjPipeline: false for transitional usfm-js rollback.
+ * Sole process path: @bt-synergy/usj-processor (USJ replaces usfm-js).
  *
  * Preferred API: loadViewModel() / loadScriptureResult() → UsjScriptureViewModel.
  * Transitional: loadContent() → ProcessedScripture (Helps / ResourceLoader contract).
@@ -11,15 +10,14 @@
 
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog';
 import type { ProgressCallback, ResourceLoader } from '@bt-synergy/resource-types';
-import type { ProcessedScripture, USFMProcessor } from '@bt-synergy/usfm-processor';
 import {
   USJProcessor,
   viewModelFromProcessedScripture,
+  type ProcessedScripture,
   type UsjScriptureViewModel,
 } from '@bt-synergy/usj-processor';
 
-import { processUsfmToScripture, processUsfmToUsjResult } from './processUsfm';
-import { resolveUseUsjPipeline } from './resolveUseUsjPipeline';
+import { processUsfmToUsjResult } from './processUsfm';
 import type { ScriptureLoadResult } from './scriptureLoadResult';
 import { legacyScriptureKey, usjScriptureKey } from './scriptureCacheKeys';
 import type { ScriptureLoaderConfig } from './types';
@@ -72,10 +70,7 @@ export class ScriptureLoader implements ResourceLoader {
   private catalogAdapter: any
   private door43Client: any
   private debug: boolean
-  private useUsjPipeline: boolean
-  /** Lazy: only constructed on legacy opt-out path. */
-  private usfmProcessor: USFMProcessor | null = null
-  /** Lazy: constructed on first USJ process/cache read (default path). */
+  /** Lazy: constructed on first USJ process/cache read. */
   private usjProcessor: USJProcessor | null = null
 
   constructor(config: ScriptureLoaderConfig | any) {
@@ -83,18 +78,14 @@ export class ScriptureLoader implements ResourceLoader {
     this.catalogAdapter = config.catalogAdapter
     this.door43Client = config.door43Client
     this.debug = config.debug || false
-    this.useUsjPipeline = resolveUseUsjPipeline(config.useUsjPipeline)
     if (this.debug) {
-      console.log(
-        `[ScriptureLoader] pipeline=${this.useUsjPipeline ? 'usj' : 'usfm'} ` +
-          `(USJ default on; set USE_USJ_PIPELINE=0 for usfm-js rollback)`
-      )
+      console.log('[ScriptureLoader] pipeline=usj (USJ-only; usfm-js removed)')
     }
   }
 
-  /** Whether this loader instance uses the USJ processor path. */
+  /** Always true — USJ is the only process path. */
   get isUsjPipeline(): boolean {
-    return this.useUsjPipeline
+    return true
   }
 
   private getUsjProcessor(): USJProcessor {
@@ -104,17 +95,8 @@ export class ScriptureLoader implements ResourceLoader {
     return this.usjProcessor
   }
 
-  private async getUsfmProcessor(): Promise<USFMProcessor> {
-    if (!this.usfmProcessor) {
-      const { USFMProcessor } = await import('@bt-synergy/usfm-processor')
-      this.usfmProcessor = new USFMProcessor()
-    }
-    return this.usfmProcessor
-  }
-
   /**
-   * Process USFM and persist to the active cache namespace.
-   * Flag on → scripture-usj SoT; flag off → legacy scripture:.
+   * Process USFM and persist to scripture-usj: SoT.
    */
   private async processAndCacheResult(
     usfmText: string,
@@ -123,61 +105,30 @@ export class ScriptureLoader implements ResourceLoader {
   ): Promise<ScriptureLoadResult> {
     const bookName = bookId.toUpperCase()
 
-    if (this.useUsjPipeline) {
-      const result = await processUsfmToUsjResult({
-        usfmText,
-        bookId,
-        bookName,
-        usjProcessor: this.getUsjProcessor(),
-        debug: this.debug,
-      })
-      const usjKey = usjScriptureKey(resourceKey, bookId)
-      try {
-        await this.cacheAdapter.set(usjKey, {
-          content: result.cacheContent,
-          timestamp: Date.now(),
-          resourceKey,
-          bookId,
-        })
-        if (this.debug) {
-          console.log(`[ScriptureLoader] Cached USJ SoT ${usjKey}`)
-        }
-      } catch (err) {
-        console.warn('[ScriptureLoader] Failed to cache USJ SoT:', err)
-      }
-      return {
-        viewModel: result.viewModel,
-        scripture: result.scripture,
-        fromUsjCache: false,
-      }
-    }
-
-    const usfmProcessor = await this.getUsfmProcessor()
-    const scripture = await processUsfmToScripture({
+    const result = await processUsfmToUsjResult({
       usfmText,
       bookId,
       bookName,
-      useUsjPipeline: false,
-      usfmProcessor,
+      usjProcessor: this.getUsjProcessor(),
       debug: this.debug,
     })
-    const cacheKey = legacyScriptureKey(resourceKey, bookId)
+    const usjKey = usjScriptureKey(resourceKey, bookId)
     try {
-      await this.cacheAdapter.set(cacheKey, {
-        content: scripture,
+      await this.cacheAdapter.set(usjKey, {
+        content: result.cacheContent,
         timestamp: Date.now(),
         resourceKey,
         bookId,
       })
       if (this.debug) {
-        console.log(`[ScriptureLoader] Cached ${cacheKey}`)
+        console.log(`[ScriptureLoader] Cached USJ SoT ${usjKey}`)
       }
     } catch (err) {
-      console.warn('[ScriptureLoader] Failed to cache:', err)
+      console.warn('[ScriptureLoader] Failed to cache USJ SoT:', err)
     }
     return {
-      viewModel: viewModelFromProcessedScripture(scripture),
-      scripture,
+      viewModel: result.viewModel,
+      scripture: result.scripture,
       fromUsjCache: false,
     }
   }
@@ -195,107 +146,80 @@ export class ScriptureLoader implements ResourceLoader {
     resourceKey: string,
     bookId: string
   ): Promise<ScriptureLoadResult | null> {
-    if (this.useUsjPipeline) {
-      const usjKey = usjScriptureKey(resourceKey, bookId)
-      try {
-        const usjCached = await this.cacheAdapter.get(usjKey)
-        if (usjCached?.content) {
-          const full = usjResultFromCache(
-            usjCached.content,
-            bookId,
-            this.getUsjProcessor()
-          )
-          if (full) {
-            if (this.debug) {
-              console.log(`Cache hit (USJ SoT) for ${usjKey}`)
-            }
-            return {
-              viewModel: full.viewModel,
-              scripture: full.scripture,
-              fromUsjCache: true,
-            }
-          }
-          if (isUsjScriptureCacheContent(usjCached.content)) {
-            if (this.debug) {
-              console.warn(
-                `[ScriptureLoader] Refusing mismatched USJ cache version at ${usjKey}; will reprocess`
-              )
-            }
-            await this.cacheAdapter.delete(usjKey)
-          }
-        }
-      } catch (err) {
-        console.warn('[ScriptureLoader] USJ cache error:', err)
-      }
-
-      const legacyKey = legacyScriptureKey(resourceKey, bookId)
-      try {
-        const legacy = await this.cacheAdapter.get(legacyKey)
-        if (legacy?.content && isProcessedScriptureContent(legacy.content)) {
+    const usjKey = usjScriptureKey(resourceKey, bookId)
+    try {
+      const usjCached = await this.cacheAdapter.get(usjKey)
+      if (usjCached?.content) {
+        const full = usjResultFromCache(
+          usjCached.content,
+          bookId,
+          this.getUsjProcessor()
+        )
+        if (full) {
           if (this.debug) {
-            console.log(
-              `Cache hit (legacy scripture) for ${legacyKey} — serving; USJ migrate on re-fetch`
-            )
+            console.log(`Cache hit (USJ SoT) for ${usjKey}`)
           }
           return {
-            viewModel: viewModelFromProcessedScripture(legacy.content),
-            scripture: legacy.content,
-            fromUsjCache: false,
+            viewModel: full.viewModel,
+            scripture: full.scripture,
+            fromUsjCache: true,
           }
         }
-      } catch (err) {
-        console.warn('[ScriptureLoader] Legacy cache error:', err)
+        if (isUsjScriptureCacheContent(usjCached.content)) {
+          if (this.debug) {
+            console.warn(
+              `[ScriptureLoader] Refusing mismatched USJ cache version at ${usjKey}; will reprocess`
+            )
+          }
+          await this.cacheAdapter.delete(usjKey)
+        }
       }
-      return null
+    } catch (err) {
+      console.warn('[ScriptureLoader] USJ cache error:', err)
     }
 
-    const cacheKey = legacyScriptureKey(resourceKey, bookId)
+    // Migrate-read legacy scripture: blobs (do not write new ones)
+    const legacyKey = legacyScriptureKey(resourceKey, bookId)
     try {
-      const cached = await this.cacheAdapter.get(cacheKey)
-      if (!cached) return null
-      const content = cached.content
-      if (isProcessedScriptureContent(content)) {
+      const legacy = await this.cacheAdapter.get(legacyKey)
+      if (legacy?.content && isProcessedScriptureContent(legacy.content)) {
         if (this.debug) {
-          console.log(`Cache hit for ${cacheKey}`)
+          console.log(
+            `Cache hit (legacy scripture) for ${legacyKey} — serving; USJ migrate on re-fetch`
+          )
         }
         return {
-          viewModel: viewModelFromProcessedScripture(content),
-          scripture: content,
+          viewModel: viewModelFromProcessedScripture(legacy.content),
+          scripture: legacy.content,
           fromUsjCache: false,
         }
       }
-      if (content && (content as { usfm?: string }).usfm) {
+      if (legacy?.content && (legacy.content as { usfm?: string }).usfm) {
         if (this.debug) {
-          console.log('⚠️ Cached content is old raw USFM format, reprocessing...')
+          console.log('⚠️ Cached content is old raw USFM format, reprocessing to USJ...')
         }
         return this.processAndCacheResult(
-          (content as { usfm: string }).usfm,
+          (legacy.content as { usfm: string }).usfm,
           resourceKey,
           bookId
         )
       }
-      if (this.debug) {
-        console.warn('⚠️ Invalid cached content format, deleting and refetching')
-      }
-      await this.cacheAdapter.delete(cacheKey)
     } catch (err) {
-      console.warn('[ScriptureLoader] Cache error:', err)
+      console.warn('[ScriptureLoader] Legacy cache error:', err)
     }
     return null
   }
 
   private async hasUsableCache(resourceKey: string, bookId: string): Promise<boolean> {
-    if (this.useUsjPipeline) {
-      try {
-        const usjCached = await this.cacheAdapter.get(usjScriptureKey(resourceKey, bookId))
-        if (
-          usjCached?.content &&
-          processedFromUsjCache(usjCached.content, bookId, this.getUsjProcessor())
-        ) {
-          return true
-        }
-      } catch { /* ignore */ }
-    }
+    try {
+      const usjCached = await this.cacheAdapter.get(usjScriptureKey(resourceKey, bookId))
+      if (
+        usjCached?.content &&
+        processedFromUsjCache(usjCached.content, bookId, this.getUsjProcessor())
+      ) {
+        return true
+      }
+    } catch { /* ignore */ }
     try {
       const legacy = await this.cacheAdapter.get(legacyScriptureKey(resourceKey, bookId))
       return Boolean(legacy?.content && isProcessedScriptureContent(legacy.content))
@@ -371,9 +295,7 @@ export class ScriptureLoader implements ResourceLoader {
         contentLength: usfmContent.length,
         preview: usfmContent.substring(0, 100),
       })
-      console.log(
-        `🔍 Step 5: Processing USFM with ${this.useUsjPipeline ? 'USJProcessor' : 'USFMProcessor'}`
-      )
+      console.log('🔍 Step 5: Processing USFM with USJProcessor')
     }
 
     return usfmContent

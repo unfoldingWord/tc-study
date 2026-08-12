@@ -4,7 +4,7 @@
  * Format: verseRef:content:occurrence (Unicode surface, not lemma).
  */
 
-import type { ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
+import type { ProcessedScripture, ProcessedVerse } from './processedTypes'
 
 function generateSemanticId(verseRef: string, content: string, occurrence: number): string {
   return `${verseRef}:${content}:${occurrence}`

@@ -12,6 +12,7 @@
     "build:debug": "cross-env DEBUG_BUILD=1 turbo run build",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
+    "link:usfm-tools": "node packages/usj-processor/scripts/link-usfm-tools.cjs",
     "mobile": "bun --cwd apps/mobile dev",
     "web": "bun --cwd apps/web dev"
   },

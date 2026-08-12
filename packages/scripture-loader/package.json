@@ -25,7 +25,6 @@
     "@bt-synergy/resource-catalog": "workspace:*",
     "@bt-synergy/resource-parsers": "workspace:*",
     "@bt-synergy/resource-types": "workspace:*",
-    "@bt-synergy/usfm-processor": "workspace:*",
     "@bt-synergy/usj-processor": "workspace:*",
     "jszip": "^3.10.1"
   },

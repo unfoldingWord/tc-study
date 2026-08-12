@@ -2,7 +2,7 @@
  * ScriptureMetadata - Metadata panel showing book and chapter information
  */
 
-import type { ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
+import type { ProcessedScripture, ProcessedVerse } from '@bt-synergy/scripture-loader'
 import type { OriginalLanguageToken } from '../types'
 import { useCurrentReference } from '../../../../contexts'
 

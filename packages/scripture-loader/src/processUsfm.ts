@@ -1,16 +1,16 @@
 /**
  * USFM → USJ SoT → view model / temporary ProcessedScripture projection.
  *
- * Default: @bt-synergy/usj-processor (USJ replaces usfm-js).
- * Opt-out: @bt-synergy/usfm-processor via dynamic import (transitional rollback only).
+ * Sole process path: @bt-synergy/usj-processor (usfm-js removed).
  *
  * Prefer processUsfmToUsjResult() for new code (returns viewModel + cache payload).
  * processUsfmToScripture() remains for TokenRenderer / CombinedHelps until they migrate.
  */
 
-import type { ProcessedScripture, USFMProcessingOptions, USFMProcessor } from '@bt-synergy/usfm-processor'
 import {
   USJProcessor,
+  type ProcessedScripture,
+  type USFMProcessingOptions,
   type USJProcessResult,
   type UsjScriptureCacheContent,
 } from '@bt-synergy/usj-processor'
@@ -25,10 +25,8 @@ export interface ProcessUsfmParams {
   usfmText: string
   bookId: string
   bookName?: string
-  useUsjPipeline: boolean
   options?: USFMProcessingOptions
-  /** Optional shared processor instances (avoids re-construct per call) */
-  usfmProcessor?: USFMProcessor
+  /** Optional shared processor instance (avoids re-construct per call) */
   usjProcessor?: USJProcessor
   debug?: boolean
 }
@@ -37,24 +35,17 @@ async function resolveUsjProcessor(existing?: USJProcessor): Promise<USJProcesso
   return existing ?? new USJProcessor()
 }
 
-/** Lazy-load legacy usfm-js path so the default USJ bundle does not need it eagerly. */
-async function resolveUsfmProcessor(existing?: USFMProcessor): Promise<USFMProcessor> {
-  if (existing) return existing
-  const { USFMProcessor } = await import('@bt-synergy/usfm-processor')
-  return new USFMProcessor()
-}
-
 export interface ProcessUsfmToUsjResult extends USJProcessResult {
   /** Ready-to-store scripture-usj: payload */
   cacheContent: UsjScriptureCacheContent
 }
 
 /**
- * Default process path: USFM → USJ + AlignmentMap → UsjScriptureViewModel.
+ * Sole process path: USFM → USJ + AlignmentMap → UsjScriptureViewModel.
  * Also returns temporary ProcessedScripture projection + cache payload.
  */
 export async function processUsfmToUsjResult(
-  params: Omit<ProcessUsfmParams, 'useUsjPipeline'> & { useUsjPipeline?: true }
+  params: ProcessUsfmParams
 ): Promise<ProcessUsfmToUsjResult> {
   const {
     usfmText,
@@ -76,42 +67,13 @@ export async function processUsfmToUsjResult(
 }
 
 /**
- * Process a USFM string into ProcessedScripture via the selected pipeline.
- * Default = USJ projection. Opt-out = legacy usfm-js.
+ * Process a USFM string into ProcessedScripture (USJ projection).
  *
  * @deprecated Prefer processUsfmToUsjResult().viewModel for new consumers.
  */
 export async function processUsfmToScripture(
   params: ProcessUsfmParams
 ): Promise<ProcessedScripture> {
-  const {
-    usfmText,
-    bookId,
-    bookName = bookId.toUpperCase(),
-    useUsjPipeline,
-    options = DEFAULT_OPTIONS,
-    debug = false,
-  } = params
-
-  const opts: USFMProcessingOptions = { ...DEFAULT_OPTIONS, ...options }
-
-  if (useUsjPipeline) {
-    const result = await processUsfmToUsjResult({
-      usfmText,
-      bookId,
-      bookName,
-      options: opts,
-      usjProcessor: params.usjProcessor,
-      debug,
-    })
-    return result.scripture
-  }
-
-  if (debug) {
-    console.log(
-      '[scripture-loader] USE_USJ_PIPELINE=off — legacy USFMProcessor (usfm-js rollback)'
-    )
-  }
-  const usfmProcessor = await resolveUsfmProcessor(params.usfmProcessor)
-  return usfmProcessor.processUSFM(usfmText, bookId, bookName, opts)
+  const result = await processUsfmToUsjResult(params)
+  return result.scripture
 }

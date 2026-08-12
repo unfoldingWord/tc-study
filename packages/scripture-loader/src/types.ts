@@ -80,15 +80,6 @@ export interface ScriptureLoaderConfig {
   
   /** Enable debug logging */
   debug?: boolean
-
-  /**
-   * Process path: @bt-synergy/usj-processor (USFM→USJ→ProcessedScripture).
-   * Default **true** (USJ replaces usfm-js). Set false / USE_USJ_PIPELINE=0 for
-   * transitional usfm-js rollback only.
-   * When omitted, also reads USE_USJ_PIPELINE / VITE_USE_USJ_PIPELINE env.
-   * When on: writes/reads `scripture-usj:…` SoT; dual-reads legacy `scripture:…`.
-   */
-  useUsjPipeline?: boolean
 }
 
 /**

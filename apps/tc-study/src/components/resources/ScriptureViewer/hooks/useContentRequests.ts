@@ -9,7 +9,7 @@
  */
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
-import type { ProcessedScripture } from '@bt-synergy/usfm-processor'
+import type { ProcessedScripture } from '@bt-synergy/scripture-loader'
 import { useCallback, useEffect, useRef } from 'react'
 import type {
   ScriptureContentRequestSignal,

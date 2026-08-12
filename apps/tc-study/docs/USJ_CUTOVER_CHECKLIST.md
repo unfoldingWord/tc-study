@@ -1,7 +1,7 @@
 # USJ cutover checklist — full replacement of usfm-js
 
 **PR:** https://github.com/unfoldingWord/tc-study/pull/19  
-**Branch tip:** `678c928` (Vite CJS include for sibling `@usfm-tools/parser`) atop Viewer `092f238`, Pipeline `loadViewModel`, Helps e2e.
+**Branch:** `feat/usj-replace-usfm-js`
 
 ## Authoritative contract (do not regress)
 
@@ -11,41 +11,48 @@
 | Runtime identity | `UsjScriptureViewModel` / `UsjWordToken` |
 | Match key | `semanticId = ${verseRef}:${content}:${occurrence}` |
 | Cross-resource | `alignedOriginalWordIds` |
-| Viewer | `loadScriptureResult` → viewModel (**done**) |
-| Helps | Still `loadContent()` → ProcessedScripture (**intentional**) |
-| Rollback | Lazy usfm-js via `USE_USJ_PIPELINE=0` / `VITE_USE_USJ_PIPELINE=0` |
+| Viewer | `loadScriptureResult` / `loadViewModel` (**done**) |
+| Helps | `loadViewModel` + `viewModelToOptimizedChapters` / `extractUsjBroadcastTokens` (**done** — USJ-only) |
+| Rollback | **Removed** — `USE_USJ_PIPELINE` / lazy usfm-js path deleted |
+
+## Pipeline wave status
+
+| Item | Status |
+|------|--------|
+| USJ-only `processUsfm` / `ScriptureLoader` | **Done** |
+| Delete `USE_USJ_PIPELINE` opt-out | **Done** |
+| Types owned by `@bt-synergy/usj-processor` | **Done** |
+| `@bt-synergy/usfm-processor` package deleted | **Done** |
+| tc-study imports → `@bt-synergy/scripture-loader` | **Done** |
+| Workers / download path USJ-only | **Done** |
+| Cache write: `scripture-usj:` only; legacy `scripture:` migrate-read | **Done** |
+| Helps zero usfm-processor/usfm-js on CombinedHelps path | **Done** (`db38685`, `7e8159d`) |
+| `bun test` usj-processor + scripture-loader | **29/29 green** |
 
 ## Automated gates
 
 | Gate | Status |
 |------|--------|
-| `bun test` usj-processor + scripture-loader + quote-matcher + usjHelpsUnderline (+ viewer load) | **36/36 green** (`678c928`) |
-| Playwright Journey 4 (underline + quote click + local token click) | **2/2 green** |
-| Playwright Journey 8 (Paul ↔ Παῦλος both ways) | **2/2 green** |
-| Vite CJS sibling parser (`exports is not defined`) | **Fixed** (`678c928`) |
-| Manual soak matrix | Sample rows filled — see `USJ_SOAK_MATRIX.md` |
+| `bun test packages/usj-processor packages/scripture-loader` | **29/29** |
+| Playwright Journey 4 / 8 | Re-verify after push |
+| Manual soak matrix | See `USJ_SOAK_MATRIX.md` |
 
 ## Go / no-go
 
 | Decision | Recommendation |
 |----------|----------------|
-| **(a) Merge USJ-default PR #19** | **GO / merge-ready** — unit+e2e green; registration fixed; soak sample OK. Human merge still required (do not auto-merge). |
-| **(b) Delete usfm-js / `@bt-synergy/usfm-processor`** | **NO-GO** |
+| **(a) Merge PR #19** | Human merge when CI green |
+| **(b) Delete usfm-js from tc-study scripture path** | **GO** — `@bt-synergy/usfm-processor` deleted; loader/workers USJ-only |
 
-## Remaining blockers for deleting usfm-js only
+## Remaining workspace refs (out of Pipeline / non-blocking for tc-study scripture)
 
-| Team | Blocker |
-|------|---------|
-| **Pipeline** | Lazy usfm-js rollback path still required until sunset policy |
-| **Helps / Pipeline** | Helps still on `loadContent()` + `ProcessedScripture` coupling to `usfm-processor` types |
-| **Platform** | `@usfm-tools/*` sibling `dist` / packaging bridge (prod without sibling clone) |
+| Area | Ref |
+|------|-----|
+| `packages/resource-parsers` | Own `usfm-js` dep + `parsers/usfm/usfm-processor.ts` (QuoteMatcher Optimized DTOs are separate) |
+| `apps/mobile` | Local `usfm-js` + `lib/services/usfm-processor.ts` |
+| Docs | Stale mentions in `RENDERING_*.md`, `packages/README.md`, soak matrix rollback row |
+| `catalog-cli` | `usfm-json` contentType string (filesystem cache ext only) |
 
-## Rollback (until delete)
+## Rollback
 
-```bash
-USE_USJ_PIPELINE=0
-# or
-VITE_USE_USJ_PIPELINE=0
-```
-
-Clear IndexedDB keys matching `scripture:` and `scripture-usj:`, reload.
+No pipeline flag. Clear IndexedDB keys matching `scripture:` and `scripture-usj:`, reload, re-download.

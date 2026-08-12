@@ -6,7 +6,7 @@
  * This utility bridges that gap.
  */
 
-import type { ProcessedScripture, ProcessedVerse } from '@bt-synergy/usfm-processor'
+import type { ProcessedScripture, ProcessedVerse } from '@bt-synergy/scripture-loader'
 
 /**
  * Attach alignment data to tokens in verses

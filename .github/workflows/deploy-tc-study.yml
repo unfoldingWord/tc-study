@@ -37,6 +37,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # USJ bridge: @usfm-tools/* from usfm-ast (nested clone; see packages/usj-processor/README.md)
+      - name: Checkout usfm-ast
+        uses: actions/checkout@v4
+        with:
+          repository: abelpz/usfm-ast
+          path: usfm-ast
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -56,6 +63,14 @@ jobs:
           fi
           test -f node_modules/linked-panels/dist/index.js
           ls -la node_modules/linked-panels/dist/index.js
+
+      - name: Build + link @usfm-tools (usfm-ast)
+        run: |
+          cd usfm-ast
+          bun install --frozen-lockfile
+          bun run build --filter @usfm-tools/parser --filter @usfm-tools/types --filter @usfm-tools/usj-core
+          cd ..
+          bun run link:usfm-tools
 
       # Build package deps without swallowing errors (no `|| true`)
       - name: Build workspace packages (tc-study deps)

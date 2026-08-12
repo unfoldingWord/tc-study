@@ -5,7 +5,7 @@
  * Sections: 430
  */
 
-import type { TranslatorSection } from '@bt-synergy/usfm-processor';
+import type { TranslatorSection } from '@bt-synergy/scripture-loader';
 
 export const matSections: TranslatorSection[] = [
   {

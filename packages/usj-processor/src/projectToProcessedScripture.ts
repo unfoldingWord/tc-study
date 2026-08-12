@@ -6,15 +6,14 @@
  * QuoteMatcher keep working during the replace train without a UI rewrite.
  */
 
+import { remapVerseRefBookCode } from './identity'
 import type {
   ProcessedChapter,
   ProcessedScripture,
   ProcessedVerse,
   WordAlignment,
   WordToken,
-} from '@bt-synergy/usfm-processor'
-
-import { remapVerseRefBookCode } from './identity'
+} from './processedTypes'
 import type { AlignmentMap } from './usfmTools'
 import type { UsjScriptureViewModel, UsjWordToken } from './usjViewModel'
 

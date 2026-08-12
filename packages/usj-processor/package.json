@@ -2,7 +2,7 @@
   "name": "@bt-synergy/usj-processor",
   "version": "0.0.0-spike",
   "private": true,
-  "description": "USFM→USJ→ProcessedScripture processor (default scripture-loader path; replaces usfm-js)",
+  "description": "USFM→USJ→ProcessedScripture processor (tc-study scripture path; replaces usfm-js)",
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
@@ -12,9 +12,7 @@
     "test": "bun test",
     "type-check": "tsc --noEmit"
   },
-  "dependencies": {
-    "@bt-synergy/usfm-processor": "workspace:*"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^20.10.0",
     "typescript": "^5.3.3"

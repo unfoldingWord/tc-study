@@ -1,69 +1,9 @@
 /**
- * USFM Processing Types
- * Compatible with @bt-toolkit and bt-synergy ecosystems
+ * Transitional ProcessedScripture DTO types.
+ *
+ * Owned here (no @bt-synergy/usfm-processor / usfm-js). Helps runtime is USJ-only
+ * (`UsjScriptureViewModel`); keep projection helpers for cache migrate-read / legacy UI.
  */
-
-// ============================================================================
-// USFM JSON Types (from usfm-js library)
-// ============================================================================
-
-export interface USFMHeader {
-  tag?: string
-  content?: string
-  type?: string
-  text?: string
-}
-
-export interface USFMWordObject {
-  text: string
-  tag: 'w'
-  type: 'word'
-  occurrence: string
-  occurrences: string
-}
-
-export interface USFMTextObject {
-  type: 'text'
-  text: string
-}
-
-export interface USFMAlignmentObject {
-  tag: 'zaln'
-  type: 'milestone'
-  strong: string
-  lemma: string
-  morph: string
-  occurrence: string
-  occurrences: string
-  content: string
-  children: (USFMWordObject | USFMTextObject)[]
-  endTag: string
-}
-
-export interface USFMParagraphObject {
-  tag: 'p' | 'q' | 'q1' | 'q2' | 'm' | 'mi' | 'pc' | 'pr' | 'cls'
-  type: 'paragraph' | 'quote'
-  nextChar?: string
-}
-
-export type USFMVerseObject = USFMAlignmentObject | USFMTextObject | USFMWordObject | USFMParagraphObject
-
-export interface USFMVerse {
-  verseObjects: USFMVerseObject[]
-}
-
-export interface USFMChapter {
-  [verseNumber: string]: USFMVerse
-}
-
-export interface USFMDocument {
-  headers: USFMHeader[]
-  chapters: { [chapterNumber: string]: USFMChapter }
-}
-
-// ============================================================================
-// Processed Types (output format)
-// ============================================================================
 
 export interface WordToken {
   uniqueId: string
@@ -100,6 +40,7 @@ export interface WordAlignment {
     morph: string
     occurrence: string
     occurrences: string
+    content: string
   }[]
 }
 
@@ -139,16 +80,6 @@ export interface ProcessedChapter {
   paragraphs: ProcessedParagraph[]
 }
 
-export interface ProcessedBook {
-  id: string
-  name: string
-  headers: USFMHeader[]
-  chapters: ProcessedChapter[]
-  totalVerses: number
-  totalParagraphs: number
-  language?: string
-}
-
 /**
  * Translator Section (marked with \ts\* in USFM)
  * Used for section-based navigation
@@ -167,8 +98,7 @@ export interface TranslatorSection {
 }
 
 /**
- * Processed Scripture (bt-toolkit compatible format)
- * Top-level wrapper with rich metadata
+ * Processed Scripture — transitional Helps / TokenRenderer projection from USJ.
  */
 export interface ProcessedScripture {
   book: string
@@ -181,18 +111,18 @@ export interface ProcessedScripture {
     version: string
     hasAlignments: boolean
     hasSections: boolean
-    hasWordTokens: boolean  // ✅ Our enhancement
+    hasWordTokens: boolean
     totalChapters: number
     totalVerses: number
     totalParagraphs: number
-    chapterVerseMap: Record<number, number>  // ✅ Quick lookup: { 1: 31, 2: 25, ... } (chapter → verse count)
+    chapterVerseMap: Record<number, number>
     statistics: {
       totalChapters: number
       totalVerses: number
       totalParagraphs: number
       totalSections: number
       totalAlignments: number
-      totalWordTokens?: number  // ✅ Our enhancement
+      totalWordTokens?: number
     }
   }
   chapters: ProcessedChapter[]
@@ -200,9 +130,6 @@ export interface ProcessedScripture {
   alignments?: WordAlignment[]
 }
 
-/**
- * Processing result with separated concerns
- */
 export interface ProcessingResult {
   structuredText: ProcessedScripture
   translatorSections: TranslatorSection[]
@@ -210,33 +137,10 @@ export interface ProcessingResult {
   metadata: ProcessedScripture['metadata']
 }
 
-// ============================================================================
-// Processing Options
-// ============================================================================
-
 export interface USFMProcessingOptions {
-  /**
-   * Language code (e.g., 'en', 'hbo', 'el-x-koine')
-   */
   language?: string
-  
-  /**
-   * Include word tokens for highlighting
-   */
   includeWordTokens?: boolean
-  
-  /**
-   * Include alignment data
-   */
   includeAlignments?: boolean
-  
-  /**
-   * Include paragraph structure
-   */
   includeParagraphs?: boolean
-  
-  /**
-   * Generate unique IDs for tokens
-   */
   generateTokenIds?: boolean
 }
