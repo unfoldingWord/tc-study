@@ -1,5 +1,5 @@
-import React from 'react'
-import { X, FileText, Scale } from 'lucide-react'
+import React, { useCallback, useMemo, useState } from 'react'
+import { X, FileText, Scale, Building2, Languages, Copy, Check } from 'lucide-react'
 import { ModalPortal } from '../shared/ModalPortal'
 import { MarkdownRenderer } from '../ui/MarkdownRenderer'
 
@@ -23,140 +23,194 @@ interface ResourceInfoModalProps {
 const README_PROSE_CLASS =
   'text-sm text-fg leading-relaxed prose prose-sm max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent prose-li:text-fg-secondary prose-blockquote:text-fg-secondary'
 
+function asTrimmedString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed || undefined
+}
+
+function formatVersionBadge(version: string): string {
+  return /^v/i.test(version) ? version : `v${version}`
+}
+
+/** True when description is empty or already covered by the README body. */
+function isDescriptionRedundant(description: string | undefined, readme: string | undefined): boolean {
+  if (!description) return true
+  if (!readme) return false
+  const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()
+  return norm(readme).includes(norm(description))
+}
+
 export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoModalProps) {
+  const [copied, setCopied] = useState(false)
+
+  const title = asTrimmedString(resource.title) ?? 'Resource'
+  const key = asTrimmedString(resource.key)
+  const owner = asTrimmedString(resource.owner)
+  const languageCode = asTrimmedString(resource.languageCode)?.toUpperCase()
+  const subject = asTrimmedString(resource.subject)
+  const description = asTrimmedString(resource.description)
+  const version = asTrimmedString(resource.version)
+  const readme = asTrimmedString(resource.readme)
+  const license = asTrimmedString(resource.license)
+
+  const showDescription = useMemo(
+    () => !isDescriptionRedundant(description, readme),
+    [description, readme]
+  )
+
+  const handleCopyKey = useCallback(async () => {
+    if (!key) return
+    try {
+      await navigator.clipboard.writeText(key)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard may be unavailable; title tooltip still exposes the full key.
+    }
+  }, [key])
+
   if (!isOpen) return null
 
-  const version =
-    typeof resource.version === 'string' && resource.version.trim()
-      ? resource.version.trim()
-      : undefined
-  const readme =
-    typeof resource.readme === 'string' && resource.readme.trim()
-      ? resource.readme
-      : undefined
+  const hasBody = Boolean(readme || showDescription)
 
   return (
     <ModalPortal>
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-overlay backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div
+          className="absolute inset-0 bg-overlay backdrop-blur-sm"
+          onClick={onClose}
+          aria-hidden="true"
+        />
 
-      {/* Modal */}
-      <div
-        className="relative bg-surface border border-border rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col m-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="resource-info-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <FileText className="w-5 h-5 text-accent flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <h2 id="resource-info-title" className="text-lg font-semibold text-fg truncate">
-                {resource.title}
-              </h2>
-              {resource.owner && (
-                <p className="text-xs text-fg-secondary truncate">
-                  {typeof resource.owner === 'string' ? resource.owner : JSON.stringify(resource.owner)} · {typeof resource.languageCode === 'string' ? resource.languageCode.toUpperCase() : ''}
-                </p>
+        <div
+          className="relative bg-surface border border-border rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col m-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="resource-info-title"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Sticky chrome: title + chips + meta strip */}
+          <div className="flex-shrink-0 border-b border-border-subtle bg-surface">
+            <div className="flex items-start justify-between gap-3 px-content-lg pt-content pb-chrome">
+              <div className="min-w-0 flex-1 space-y-chrome-tight">
+                <h2
+                  id="resource-info-title"
+                  className="text-lg font-semibold text-fg leading-snug truncate"
+                  title={title}
+                >
+                  {title}
+                </h2>
+
+                {(owner || languageCode) && (
+                  <div className="flex flex-wrap items-center gap-chrome-tight">
+                    {owner && (
+                      <span
+                        className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-md bg-muted text-caption text-fg-secondary"
+                        title={owner}
+                      >
+                        <Building2 className="w-3 h-3 flex-shrink-0 text-fg-muted" aria-hidden="true" />
+                        <span className="truncate">{owner}</span>
+                      </span>
+                    )}
+                    {languageCode && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-caption text-fg-secondary"
+                        title={languageCode}
+                      >
+                        <Languages className="w-3 h-3 flex-shrink-0 text-fg-muted" aria-hidden="true" />
+                        <span>{languageCode}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 hover:bg-muted rounded-md transition-colors flex-shrink-0 text-fg-secondary"
+                title="Close"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Meta strip — version / subject / key / license; no field labels */}
+            <div className="flex flex-wrap items-center gap-chrome-tight px-content-lg pb-content">
+              {version && (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent-soft text-accent-fg text-micro font-semibold font-mono"
+                  title={version}
+                >
+                  {formatVersionBadge(version)}
+                </span>
+              )}
+
+              {subject && (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-caption text-fg-muted truncate max-w-[12rem]"
+                  title={subject}
+                >
+                  {subject}
+                </span>
+              )}
+
+              {key && (
+                <button
+                  type="button"
+                  onClick={handleCopyKey}
+                  className="inline-flex items-center gap-1 min-w-0 max-w-[14rem] px-2 py-0.5 rounded-md bg-muted text-caption text-fg-secondary font-mono hover:bg-border-subtle transition-colors"
+                  title={key}
+                  aria-label={copied ? 'Copied resource key' : 'Copy resource key'}
+                >
+                  <span className="truncate">{key}</span>
+                  {copied ? (
+                    <Check className="w-3 h-3 flex-shrink-0 text-accent" aria-hidden="true" />
+                  ) : (
+                    <Copy className="w-3 h-3 flex-shrink-0 text-fg-muted" aria-hidden="true" />
+                  )}
+                </button>
+              )}
+
+              {license && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-caption text-fg-secondary"
+                  title={license}
+                >
+                  <Scale className="w-3 h-3 flex-shrink-0 text-fg-muted" aria-hidden="true" />
+                  <span className="truncate max-w-[10rem]">{license}</span>
+                </span>
               )}
             </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 hover:bg-surface rounded-md transition-colors flex-shrink-0 text-fg-secondary"
-            title="Close"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-canvas">
-          {/* Resource Key */}
-          <div>
-            <h3 className="text-sm font-semibold text-fg-secondary mb-1">Resource ID</h3>
-            <p className="text-sm text-fg font-mono bg-muted px-3 py-2 rounded border border-border">
-              {typeof resource.key === 'string' ? resource.key : JSON.stringify(resource.key)}
-            </p>
-          </div>
-
-          {/* Version (catalog / release) */}
-          {version && (
-            <div>
-              <h3 className="text-sm font-semibold text-fg-secondary mb-1">Version</h3>
-              <p className="text-sm text-fg font-mono bg-muted px-3 py-2 rounded border border-border">
-                {version}
+            {showDescription && description && (
+              <p className="px-content-lg pb-content text-sm text-fg-secondary leading-relaxed line-clamp-3">
+                {description}
               </p>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Subject */}
-          {resource.subject && (
-            <div>
-              <h3 className="text-sm font-semibold text-fg-secondary mb-1">Subject</h3>
-              <p className="text-sm text-fg">{typeof resource.subject === 'string' ? resource.subject : JSON.stringify(resource.subject)}</p>
-            </div>
-          )}
-
-          {/* Description */}
-          {resource.description && (
-            <div>
-              <h3 className="text-sm font-semibold text-fg-secondary mb-1">Description</h3>
-              <p className="text-sm text-fg whitespace-pre-wrap">{typeof resource.description === 'string' ? resource.description : JSON.stringify(resource.description)}</p>
-            </div>
-          )}
-
-          {/* README — rendered markdown, no section title */}
-          {readme && (
-            <div className="bg-muted px-4 py-3 rounded border border-border max-h-64 overflow-y-auto">
-              <MarkdownRenderer content={readme} className={README_PROSE_CLASS} />
-            </div>
-          )}
-
-          {/* License */}
-          {resource.license && (
-            <div>
-              <h3 className="text-sm font-semibold text-fg-secondary mb-2 flex items-center gap-2">
-                <Scale className="w-4 h-4" />
-                License
-              </h3>
-              <div className="text-sm text-fg whitespace-pre-wrap bg-muted px-4 py-3 rounded border border-border">
-                {typeof resource.license === 'string' ? resource.license : JSON.stringify(resource.license)}
+          {/* README — primary scrollable body */}
+          <div className="flex-1 min-h-0 overflow-y-auto bg-canvas">
+            {readme ? (
+              <div className="p-content-lg">
+                <MarkdownRenderer content={readme} className={README_PROSE_CLASS} />
               </div>
-            </div>
-          )}
-
-          {/* Fallback if no details available */}
-          {!resource.description && !readme && !resource.license && !version && (
-            <div className="text-center py-8 text-fg-muted">
-              <FileText className="w-12 h-12 mx-auto mb-2 opacity-60" />
-              <p className="text-sm font-medium mb-1 text-fg-secondary">No extended information available</p>
-              <p className="text-xs">This resource doesn't include README or LICENSE documentation</p>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end px-4 py-3 border-t border-border bg-muted">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-fg-secondary hover:bg-surface hover:text-fg rounded-md transition-colors"
-            title="Close"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
+            ) : hasBody ? null : (
+              <div
+                className="flex items-center justify-center py-16 text-fg-muted"
+                role="status"
+                aria-label="No extended information available"
+                title="No extended information available"
+              >
+                <FileText className="w-12 h-12 opacity-50" />
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
     </ModalPortal>
   )
 }
