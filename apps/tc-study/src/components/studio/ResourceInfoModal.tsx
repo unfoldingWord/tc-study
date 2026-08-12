@@ -94,13 +94,24 @@ export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoMod
           <div className="flex-shrink-0 border-b border-border-subtle bg-surface">
             <div className="flex items-start justify-between gap-3 px-content-lg pt-content pb-chrome">
               <div className="min-w-0 flex-1 space-y-chrome-tight">
-                <h2
-                  id="resource-info-title"
-                  className="text-lg font-semibold text-fg leading-snug truncate"
-                  title={title}
-                >
-                  {title}
-                </h2>
+                <div className="flex items-center gap-2 min-w-0">
+                  <h2
+                    id="resource-info-title"
+                    className="text-lg font-semibold text-fg leading-snug truncate"
+                    title={title}
+                  >
+                    {title}
+                  </h2>
+                  {version && (
+                    <span
+                      className="inline-flex items-center flex-shrink-0 px-2.5 py-1 rounded-md bg-muted text-sm font-semibold text-fg font-mono tracking-tight"
+                      title={formatVersionBadge(version)}
+                      aria-label={`Version ${formatVersionBadge(version)}`}
+                    >
+                      {formatVersionBadge(version)}
+                    </span>
+                  )}
+                </div>
 
                 {(owner || languageCode) && (
                   <div className="flex flex-wrap items-center gap-chrome-tight">
@@ -137,53 +148,46 @@ export function ResourceInfoModal({ isOpen, onClose, resource }: ResourceInfoMod
               </button>
             </div>
 
-            {/* Meta strip — version / subject / key / license; no field labels */}
-            <div className="flex flex-wrap items-center gap-chrome-tight px-content-lg pb-content">
-              {version && (
-                <span
-                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent-soft text-accent-fg text-micro font-semibold font-mono"
-                  title={version}
-                >
-                  {formatVersionBadge(version)}
-                </span>
-              )}
+            {/* Meta strip — subject / key / license; no field labels */}
+            {(subject || key || license) && (
+              <div className="flex flex-wrap items-center gap-chrome-tight px-content-lg pb-content">
+                {subject && (
+                  <span
+                    className="inline-flex items-center px-2 py-0.5 rounded-md bg-accent-soft text-caption text-accent-fg truncate max-w-[12rem]"
+                    title={subject}
+                  >
+                    {subject}
+                  </span>
+                )}
 
-              {subject && (
-                <span
-                  className="inline-flex items-center px-2 py-0.5 rounded-md bg-muted text-caption text-fg-muted truncate max-w-[12rem]"
-                  title={subject}
-                >
-                  {subject}
-                </span>
-              )}
+                {key && (
+                  <button
+                    type="button"
+                    onClick={handleCopyKey}
+                    className="inline-flex items-center gap-1 min-w-0 max-w-[14rem] px-2 py-0.5 rounded-md bg-accent-soft text-caption text-accent-fg font-mono hover:bg-muted transition-colors"
+                    title={key}
+                    aria-label={copied ? 'Copied resource key' : 'Copy resource key'}
+                  >
+                    <span className="truncate">{key}</span>
+                    {copied ? (
+                      <Check className="w-3 h-3 flex-shrink-0 text-accent" aria-hidden="true" />
+                    ) : (
+                      <Copy className="w-3 h-3 flex-shrink-0 opacity-70" aria-hidden="true" />
+                    )}
+                  </button>
+                )}
 
-              {key && (
-                <button
-                  type="button"
-                  onClick={handleCopyKey}
-                  className="inline-flex items-center gap-1 min-w-0 max-w-[14rem] px-2 py-0.5 rounded-md bg-muted text-caption text-fg-secondary font-mono hover:bg-border-subtle transition-colors"
-                  title={key}
-                  aria-label={copied ? 'Copied resource key' : 'Copy resource key'}
-                >
-                  <span className="truncate">{key}</span>
-                  {copied ? (
-                    <Check className="w-3 h-3 flex-shrink-0 text-accent" aria-hidden="true" />
-                  ) : (
-                    <Copy className="w-3 h-3 flex-shrink-0 text-fg-muted" aria-hidden="true" />
-                  )}
-                </button>
-              )}
-
-              {license && (
-                <span
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-caption text-fg-secondary"
-                  title={license}
-                >
-                  <Scale className="w-3 h-3 flex-shrink-0 text-fg-muted" aria-hidden="true" />
-                  <span className="truncate max-w-[10rem]">{license}</span>
-                </span>
-              )}
-            </div>
+                {license && (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-soft text-caption text-accent-fg"
+                    title={license}
+                  >
+                    <Scale className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+                    <span className="truncate max-w-[10rem]">{license}</span>
+                  </span>
+                )}
+              </div>
+            )}
 
             {showDescription && description && (
               <p className="px-content-lg pb-content text-sm text-fg-secondary leading-relaxed line-clamp-3">
