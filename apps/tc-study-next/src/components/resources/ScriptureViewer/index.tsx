@@ -18,7 +18,6 @@ import { useCatalogManager, useCurrentReference, useNavigation } from '../../../
 import type { ResourceMetadata } from '../../../contexts/types'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
-import { getBookTitle } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { ScriptureContent, ScriptureLayoutToggle } from './components'
@@ -109,18 +108,6 @@ export function ScriptureViewer({
     languageCode
   )
 
-  // Use latest resource from store so we get ingredients when Phase 2 metadata loads (localized book title)
-  const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
-  const effectiveResource = resourceFromStore ?? resource
-
-  // Language and book title from current scripture metadata (for header)
-  const languageDisplay =
-    effectiveResource.languageName ??
-    (catalogMetadata as ResourceMetadata & { language_title?: string })?.language_title ??
-    effectiveResource.language ??
-    languageCode
-  const currentBookTitle = getBookTitle(effectiveResource, currentRef.book)
-
   // Must come before useHighlighting so the coverage set is available for click decisions
   const underlinedSemanticIds = useUnderlinedTokens(resourceId)
 
@@ -180,7 +167,6 @@ export function ScriptureViewer({
     <div className="h-full flex flex-col" dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
-        subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}
         icon={Book}
         direction={languageDirection}
         infoResource={resource}
