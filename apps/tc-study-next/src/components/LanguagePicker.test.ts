@@ -31,6 +31,27 @@ describe('LanguagePicker (issue #24 helps list)', () => {
   })
 })
 
+describe('LanguagePicker dismiss (bootstrap vs per-panel)', () => {
+  const openSrc = readFileSync(join(import.meta.dir, 'useLanguagePickerOpen.ts'), 'utf8')
+
+  test('required blocks Close, overlay click, and Escape', () => {
+    expect(pickerSrc).toContain('if (required) return')
+    expect(pickerSrc).toContain('onClick={required ? undefined : closeModal}')
+    expect(pickerSrc).toContain('{!required &&')
+    expect(openSrc).toContain("e.key !== 'Escape'")
+    expect(openSrc).toContain('if (required) return')
+  })
+
+  test('per-panel header picker does not pass required', () => {
+    const headerSrc = readFileSync(
+      join(import.meta.dir, 'read/ReadPanelHeader.tsx'),
+      'utf8'
+    )
+    const pickerBlock = headerSrc.slice(headerSrc.indexOf('<LanguagePicker'))
+    expect(pickerBlock).not.toContain('required')
+  })
+})
+
 describe('LanguagePicker chrome + text kind filter', () => {
   test('one Languages icon in the dialog header (trigger + header only)', () => {
     const uses = pickerSrc.match(/<Languages /g) ?? []

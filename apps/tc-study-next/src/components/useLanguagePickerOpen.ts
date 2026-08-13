@@ -29,5 +29,16 @@ export function useLanguagePickerOpen(options: {
     }
   }, [autoOpen, required, setOpen])
 
+  useEffect(() => {
+    if (!isOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (required) return
+      setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isOpen, required, setOpen])
+
   return { isOpen, setOpen }
 }

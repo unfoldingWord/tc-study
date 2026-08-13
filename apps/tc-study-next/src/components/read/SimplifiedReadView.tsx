@@ -78,7 +78,6 @@ export function SimplifiedReadView({
     currentLanguageCode,
     isCollectionFullyCached,
     shouldAutoOpenLanguagePicker,
-    isLanguagePickerRequired,
     handleLanguageSelected,
     handlePanelLanguageSelected,
     handlePanelModeSwitch,
@@ -225,7 +224,7 @@ export function SimplifiedReadView({
               showLanguagePicker={showBootstrapPicker}
               onLanguageSelected={handleLanguageSelected}
               autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
-              languagePickerRequired={false}
+              languagePickerRequired={needsBootstrap}
               onNavigationScopeCommitted={handleNavigatorScopeCommitted}
               downloadIndicator={
                 <DownloadIndicator
