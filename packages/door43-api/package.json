@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "test": "bun test Door43ApiClient.test.ts Door43ApiClient.resourceType.test.ts",
+    "test": "bun test Door43ApiClient.test.ts Door43ApiClient.resourceType.test.ts readResponseArrayBufferWithProgress.test.ts",
     "test:integration": "bun test Door43ApiClient.integration.test.ts",
     "test:all": "bun test",
     "type-check": "tsc --noEmit"

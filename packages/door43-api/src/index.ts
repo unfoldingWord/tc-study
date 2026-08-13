@@ -14,6 +14,12 @@ export type {
 } from './Door43ApiClient';
 
 export {
+  readResponseArrayBufferWithProgress,
+} from './readResponseArrayBufferWithProgress'
+
+export type { ByteProgressCallback } from './readResponseArrayBufferWithProgress'
+
+export {
     getContentUrl,
     getUSFMUrl,
     getNotesUrl,

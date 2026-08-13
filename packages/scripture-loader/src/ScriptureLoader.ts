@@ -477,7 +477,30 @@ export class ScriptureLoader implements ResourceLoader {
     const repoName = `${language}_${resourceId}`
     const ref = metadata.release?.tag_name || (metadata as any).default_branch || 'master'
 
-    const zipballBuffer = await this.door43Client.downloadZipball(owner, repoName, ref)
+    if (onProgress) {
+      onProgress({
+        loaded: 0,
+        total: ingredients.length,
+        percentage: 0,
+        message: 'Downloading zip',
+      })
+    }
+
+    const zipballBuffer = await this.door43Client.downloadZipball(
+      owner,
+      repoName,
+      ref,
+      onProgress
+        ? (p) => {
+            onProgress({
+              loaded: 0,
+              total: ingredients.length,
+              percentage: p.percentage,
+              message: 'Downloading zip',
+            })
+          }
+        : undefined
+    )
 
     console.log(`✅ Downloaded zipball: ${(zipballBuffer.byteLength / (1024 * 1024)).toFixed(2)} MB`)
 

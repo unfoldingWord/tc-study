@@ -502,13 +502,32 @@ export class TranslationWordsLoader implements ResourceLoader {
       throw new Error('No zipball URL available, falling back to individual downloads')
     }
 
-    // Download and extract ZIP
-    const response = await fetch(zipUrl)
-    if (!response.ok) {
-      throw new Error(`Failed to download ZIP: ${response.statusText}`)
+    // Download and extract ZIP via Door43 client (byte progress during fetch)
+    if (onProgress) {
+      onProgress({
+        loaded: 0,
+        total: 1,
+        percentage: 0,
+        message: 'Downloading zip',
+      })
     }
-
-    const arrayBuffer = await response.arrayBuffer()
+    const repoName = `${language}_${resourceId}`
+    const ref = metadata.release?.tag_name || (metadata as { default_branch?: string }).default_branch || 'master'
+    const arrayBuffer = await this.door43Client.downloadZipball(
+      owner,
+      repoName,
+      ref,
+      onProgress
+        ? (p: { percentage: number }) => {
+            onProgress({
+              loaded: 0,
+              total: 1,
+              percentage: p.percentage,
+              message: 'Downloading zip',
+            })
+          }
+        : undefined
+    )
     const zip = await JSZip.loadAsync(arrayBuffer)
 
     // Extract all markdown files from bible/kt/, bible/names/, bible/other/
