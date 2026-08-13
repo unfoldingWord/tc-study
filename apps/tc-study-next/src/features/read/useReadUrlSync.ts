@@ -10,8 +10,6 @@ import {
   useNavigationScope,
 } from '../../contexts'
 import {
-  buildReadPath,
-  buildReadRouteTailFromNavigation,
   findPassageSetByNavSlug,
   navigationModeFromReadNav,
   navigationScopeFromResourceType,
@@ -25,10 +23,9 @@ import {
   type ReadRouteTail,
   type ResolvedBookStart,
 } from '../../utils/readRoutes'
-import { shouldApplyDeepLinkTail, shouldWriteBackReadUrl } from './readBootstrapPolicy'
+import { readUrlWriteBackAction, shouldApplyDeepLinkTail } from './readBootstrapPolicy'
 
 export interface UseReadUrlSyncOptions {
-  requireLanguageInUrl: boolean
   readRouteTail?: ReadRouteTail | null
   partialRouteHint?: PartialRouteHint
   currentLanguageCode: string | null
@@ -39,7 +36,6 @@ export interface UseReadUrlSyncOptions {
  * Deep-link apply + canonical URL write-back for `/read/...` routes.
  */
 export function useReadUrlSync({
-  requireLanguageInUrl,
   readRouteTail = null,
   partialRouteHint,
   currentLanguageCode,
@@ -239,35 +235,22 @@ export function useReadUrlSync({
     })
   }, [navigation, currentNavRef.book, currentSections])
 
-  // Keep URL in sync with navigation (canonical `/read/...` template)
+  // Keep URL in sync with navigation (canonical `/read/...` template), including
+  // resume from cache on bare `/read` (replace so back does not trap).
   useEffect(() => {
-    if (
-      !shouldWriteBackReadUrl({
-        requireLanguageInUrl,
-        currentLanguageCode,
-        suppressUrlSync: suppressUrlSyncRef.current,
-      })
-    ) {
-      return
-    }
-    // Narrowed by shouldWriteBackReadUrl
-    const lang = currentLanguageCode as string
-
-    const tail = buildReadRouteTailFromNavigation({
+    const action = readUrlWriteBackAction({
+      pathname: location.pathname,
+      language: currentLanguageCode,
+      suppressUrlSync: suppressUrlSyncRef.current,
       scope: navigationScope,
       mode: navigationMode,
       ref: currentNavRef,
       passageSet: currentPassageSet,
-      section1Based: navigationMode === 'section' && currentSectionIndex >= 0 ? currentSectionIndex + 1 : null,
+      section1Based:
+        navigationMode === 'section' && currentSectionIndex >= 0 ? currentSectionIndex + 1 : null,
     })
-    if (!tail) return
-
-    const path = buildReadPath(lang, tail)
-    if (location.pathname !== path) {
-      navigate(path, { replace: true })
-    }
+    if (action) navigate(action.replace, { replace: true })
   }, [
-    requireLanguageInUrl,
     currentLanguageCode,
     navigationScope,
     navigationMode,

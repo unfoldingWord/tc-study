@@ -122,7 +122,6 @@ export function SimplifiedReadView({
   }, [panels, navigationScope, subjects])
 
   useReadUrlSync({
-    requireLanguageInUrl,
     readRouteTail,
     partialRouteHint,
     currentLanguageCode,
