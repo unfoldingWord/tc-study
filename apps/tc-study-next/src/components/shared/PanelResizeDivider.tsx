@@ -10,6 +10,24 @@ const COLLAPSED_ARROWS = {
 
 export type DividerCollapsedArrow = keyof typeof COLLAPSED_ARROWS
 
+/** Hit target stays inside overflow-hidden: expand inward when collapsed; never md:h-full + -translate-y-1/2. */
+function hitOverlayClass(collapsedArrow: DividerCollapsedArrow | null): string {
+  const base = 'absolute touch-none'
+  if (collapsedArrow === 'left') return `${base} inset-y-0 right-0 w-4`
+  if (collapsedArrow === 'right') return `${base} inset-y-0 left-0 w-4`
+  if (collapsedArrow === 'up') return `${base} inset-x-0 bottom-0 h-4`
+  if (collapsedArrow === 'down') return `${base} inset-x-0 top-0 h-4`
+  return `${base} left-0 w-full h-4 top-1/2 -translate-y-1/2 md:left-1/2 md:top-0 md:w-4 md:h-full md:-translate-x-1/2 md:translate-y-0`
+}
+
+function collapsedArrowClass(dir: DividerCollapsedArrow): string {
+  const icon = 'w-3 h-3 text-fg-muted pointer-events-none absolute'
+  if (dir === 'left') return `${icon} right-0 top-1/2 -translate-y-1/2`
+  if (dir === 'right') return `${icon} left-0 top-1/2 -translate-y-1/2`
+  if (dir === 'up') return `${icon} bottom-0 left-1/2 -translate-x-1/2`
+  return `${icon} top-0 left-1/2 -translate-x-1/2`
+}
+
 interface PanelResizeDividerProps {
   isResizing: boolean
   onMouseDown: (e: MouseEvent) => void
@@ -45,15 +63,13 @@ export function PanelResizeDivider({
     return () => node.removeEventListener('touchstart', handleTouchStart)
   }, [collapsedArrow])
 
-  const barClass = `flex-shrink-0 min-w-0 min-h-0 border-0 p-0 appearance-none transition-colors relative flex items-center justify-center touch-none select-none ${
+  const barClass = `flex-shrink-0 min-w-0 min-h-0 border-0 p-0 appearance-none transition-colors relative z-10 flex items-center justify-center touch-none select-none overflow-visible ${
     isResizing ? 'bg-accent' : 'bg-border hover:bg-accent/70'
-  } md:w-1.5 md:h-full w-full h-1.5 ${
+  } md:w-1.5 md:self-stretch md:h-auto w-full h-1.5 ${
     collapsedArrow ? 'cursor-pointer md:cursor-pointer' : 'cursor-ns-resize md:cursor-ew-resize'
   }`
 
-  const hitOverlay = (
-    <div className="absolute md:left-1/2 md:-translate-x-1/2 md:top-0 md:w-4 md:h-full top-1/2 -translate-y-1/2 left-0 w-full h-4 touch-none" />
-  )
+  const hitOverlay = <div className={hitOverlayClass(collapsedArrow)} />
 
   if (collapsedArrow) {
     const Arrow = COLLAPSED_ARROWS[collapsedArrow]
@@ -67,7 +83,7 @@ export function PanelResizeDivider({
         aria-label={label}
       >
         {hitOverlay}
-        <Arrow className="w-3 h-3 text-fg-muted pointer-events-none relative" />
+        <Arrow className={collapsedArrowClass(collapsedArrow)} />
       </button>
     )
   }

@@ -84,7 +84,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
   return (
     <div
       ref={resizeContainerRef}
-      className="h-full overflow-hidden panels-resize-container relative flex flex-col md:flex-row"
+      className="h-full min-h-0 overflow-hidden panels-resize-container relative flex flex-col md:flex-row"
       data-panel-1-language={panels['panel-1'].languageCode ?? ''}
       data-panel-2-language={panels['panel-2'].languageCode ?? ''}
       data-panel-1-mode={panels['panel-1'].mode}
@@ -120,6 +120,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         onSwitchTextMode={onSwitchTextMode}
       />
 
+      {/* Parked pane is out of flow; this strip stays in the visible flex row. */}
       <PanelResizeDivider
         isResizing={isResizingPanels}
         onMouseDown={handlePanelDividerMouseDown}

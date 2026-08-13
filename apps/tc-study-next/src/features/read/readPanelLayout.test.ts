@@ -56,5 +56,39 @@ describe('readPanelLayout', () => {
     expect(hidden.visibility).toBe('hidden')
     expect(hidden.flexBasis).toBe(0)
     expect(hidden.position).toBe('absolute')
+    expect(hidden.height).toBe(0)
+    expect(hidden.top).toBe(0)
+    expect(hidden.left).toBe(0)
+  })
+
+  test('visible pane grows into leftover so the divider stays in the flex row', () => {
+    const rightParked = panelStayMountedStyle({
+      layout: 'two',
+      panelId: 'panel-1',
+      collapsedPanelId: 'panel-2',
+      panel1Percent: 100,
+    })
+    expect(rightParked.flexGrow).toBe(1)
+    expect(rightParked.flexShrink).toBe(1)
+    expect(rightParked.flexBasis).toBe(0)
+    expect(rightParked.position).toBeUndefined()
+
+    const leftParked = panelStayMountedStyle({
+      layout: 'two',
+      panelId: 'panel-2',
+      collapsedPanelId: 'panel-1',
+      panel1Percent: 0,
+    })
+    expect(leftParked.flexGrow).toBe(1)
+    expect(leftParked.flexBasis).toBe(0)
+
+    const onePanel = panelStayMountedStyle({
+      layout: 'one',
+      panelId: 'panel-1',
+      collapsedPanelId: null,
+      panel1Percent: 100,
+    })
+    expect(onePanel.flexGrow).toBe(1)
+    expect(onePanel.flexBasis).toBe(0)
   })
 })

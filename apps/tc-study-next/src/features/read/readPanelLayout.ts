@@ -97,19 +97,24 @@ export function panelStayMountedStyle(options: {
       flexShrink: 0,
       flexBasis: 0,
       width: 0,
+      height: 0,
       minWidth: 0,
       minHeight: 0,
       overflow: 'hidden',
       visibility: 'hidden',
       pointerEvents: 'none',
       position: 'absolute',
+      top: 0,
+      left: 0,
     }
   }
-  if (options.layout === 'one') {
+  // Sole visible pane: grow into leftover after the 1.5px divider.
+  // flexBasis 100% + flexShrink 0 puts the strip past overflow-hidden.
+  if (options.layout === 'one' || options.collapsedPanelId) {
     return {
       flexGrow: 1,
       flexShrink: 1,
-      flexBasis: '100%',
+      flexBasis: 0,
       minWidth: 0,
       minHeight: 0,
       visibility: 'visible',
