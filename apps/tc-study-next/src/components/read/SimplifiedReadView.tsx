@@ -34,7 +34,6 @@ import { useWizardStore } from '../../lib/stores/wizardStore'
 import { NavigationBar } from '../studio/NavigationBar'
 import { DownloadIndicator } from './DownloadIndicator'
 import { ExportProgressToast } from './ExportProgressToast'
-import { ReadLayoutToggle } from './ReadLayoutToggle'
 import { ReadPanelsArea } from './ReadPanelsArea'
 import {
   type PartialRouteHint,
@@ -141,6 +140,7 @@ export function SimplifiedReadView({
     handlePanelDividerTouchStart,
     collapsedPanelId,
     expandPanel,
+    restoreCollapsed,
   } = useReadPanelLayout()
 
   const [showLoadDialog, setShowLoadDialog] = useState(false)
@@ -217,30 +217,27 @@ export function SimplifiedReadView({
     >
       <div className="h-full flex flex-col overflow-hidden">
         <div className="relative z-30 flex-shrink-0 flex flex-col order-2 md:order-1 overflow-visible">
-          <div className="flex items-center gap-chrome-tight bg-surface/90 backdrop-blur-md border-border-subtle border-t md:border-t-0 md:border-b px-chrome py-chrome-tight overflow-visible">
-            <div className="flex-1 min-w-0">
-              <NavigationBar
-                isCompact={true}
-                onToggleCompact={undefined}
-                showLanguagePicker={showBootstrapPicker}
-                onLanguageSelected={handleLanguageSelected}
-                autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
-                languagePickerRequired={false}
-                onNavigationScopeCommitted={handleNavigatorScopeCommitted}
-                downloadIndicator={
-                  <DownloadIndicator
-                    isDownloading={isBackgroundDownloading}
-                    progress={downloadStats.progress ?? undefined}
-                    error={downloadStats.error}
-                  />
-                }
-                onDownloadCollection={
-                  isCollectionFullyCached ? handleDirectDownloadCollection : undefined
-                }
-                onLoadCollection={() => setShowLoadDialog(true)}
-              />
-            </div>
-            <ReadLayoutToggle layout={layout} onLayoutChange={(next) => setLayout(next, true)} />
+          <div className="bg-surface/90 backdrop-blur-md border-border-subtle border-t md:border-t-0 md:border-b px-chrome py-chrome-tight overflow-visible">
+            <NavigationBar
+              isCompact={true}
+              onToggleCompact={undefined}
+              showLanguagePicker={showBootstrapPicker}
+              onLanguageSelected={handleLanguageSelected}
+              autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
+              languagePickerRequired={false}
+              onNavigationScopeCommitted={handleNavigatorScopeCommitted}
+              downloadIndicator={
+                <DownloadIndicator
+                  isDownloading={isBackgroundDownloading}
+                  progress={downloadStats.progress ?? undefined}
+                  error={downloadStats.error}
+                />
+              }
+              onDownloadCollection={
+                isCollectionFullyCached ? handleDirectDownloadCollection : undefined
+              }
+              onLoadCollection={() => setShowLoadDialog(true)}
+            />
           </div>
         </div>
 
@@ -257,6 +254,7 @@ export function SimplifiedReadView({
               handlePanelDividerMouseDown={handlePanelDividerMouseDown}
               handlePanelDividerTouchStart={handlePanelDividerTouchStart}
               expandPanel={expandPanel}
+              restoreCollapsed={restoreCollapsed}
               filteredPanel1Keys={filteredPanel1Keys}
               filteredPanel2Keys={filteredPanel2Keys}
               filteredPanel1Resources={filteredPanel1Resources}

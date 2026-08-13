@@ -1,18 +1,20 @@
 /**
- * Resize + collapse-to-rail. Collapse commits on drag end (no flicker mid-drag).
+ * Resize + collapse-to-divider. Collapse commits on drag end (no flicker mid-drag).
  */
 
 import { useCallback, useEffect, useRef } from 'react'
 import {
   collapseAfterDragEnd,
-  restoredSplitPercent,
+  restoreCollapsedDivider,
 } from './readPanelLayout'
 import { useReadPanelResize } from './useReadPanelResize'
 import { useReadPanelStore } from './readPanelStore'
 
 export function useReadPanelLayout() {
+  const layout = useReadPanelStore((s) => s.layout)
   const splitPercent = useReadPanelStore((s) => s.splitPercent)
   const collapsedPanelId = useReadPanelStore((s) => s.collapsedPanelId)
+  const setLayout = useReadPanelStore((s) => s.setLayout)
   const setSplitPercent = useReadPanelStore((s) => s.setSplitPercent)
   const setCollapsedPanelId = useReadPanelStore((s) => s.setCollapsedPanelId)
   const previousSplitRef = useRef(splitPercent)
@@ -41,11 +43,21 @@ export function useReadPanelLayout() {
   const expandPanel = useCallback(
     (panelId: 'panel-1' | 'panel-2') => {
       if (collapsedPanelId !== panelId) return
-      setCollapsedPanelId(null)
-      setSplitPercent(restoredSplitPercent(previousSplitRef.current))
+      const next = restoreCollapsedDivider(previousSplitRef.current)
+      setCollapsedPanelId(next.collapsedPanelId)
+      setSplitPercent(next.splitPercent)
     },
     [collapsedPanelId, setCollapsedPanelId, setSplitPercent]
   )
+
+  const restoreCollapsed = useCallback(() => {
+    if (layout === 'one') {
+      setLayout('two', true)
+      return
+    }
+    if (!collapsedPanelId) return
+    expandPanel(collapsedPanelId)
+  }, [collapsedPanelId, expandPanel, layout, setLayout])
 
   const displayWidth = isResizingPanels
     ? panel1Width
@@ -60,5 +72,6 @@ export function useReadPanelLayout() {
     panel1Width: displayWidth,
     collapsedPanelId,
     expandPanel,
+    restoreCollapsed,
   }
 }

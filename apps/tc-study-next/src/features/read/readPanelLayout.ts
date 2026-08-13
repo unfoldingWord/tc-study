@@ -1,6 +1,8 @@
 /**
- * One- vs two-panel layout + collapse-to-rail (issues #31–#32).
- * Collapse is two-panel with one parked; one-panel layout has no rail.
+ * One- vs two-panel layout + collapse-to-divider (issues #31–#32).
+ * Collapse is two-panel with one parked behind the same thin resize strip.
+ * One-panel layout parks panel-2 the same way so the rail can add it;
+ * token reopen (#33) still requires layout === 'two'.
  */
 
 import type { CSSProperties } from 'react'
@@ -9,8 +11,9 @@ import type { ReadLayoutMode } from './readPanelPersistence'
 
 export const COLLAPSE_THRESHOLD_PERCENT = 12
 export const DEFAULT_SPLIT_PERCENT = 50
-export const RAIL_PX = 44
 export const NARROW_VIEWPORT_MQ = '(max-width: 767px)'
+
+export type CollapsedDividerArrow = 'left' | 'right' | 'up' | 'down'
 
 export function defaultLayoutForViewport(isNarrow: boolean, persisted?: ReadLayoutMode, userChosen?: boolean): ReadLayoutMode {
   if (userChosen && persisted) return persisted
@@ -41,6 +44,17 @@ export function restoredSplitPercent(previous: number | null | undefined): numbe
   return DEFAULT_SPLIT_PERCENT
 }
 
+/** Click the collapsed divider: clear park, restore previous split or ~50%. */
+export function restoreCollapsedDivider(previousSplit: number | null | undefined): {
+  collapsedPanelId: null
+  splitPercent: number
+} {
+  return {
+    collapsedPanelId: null,
+    splitPercent: restoredSplitPercent(previousSplit),
+  }
+}
+
 export function isPanelOffFlow(options: {
   layout: ReadLayoutMode
   panelId: ReadPanelId
@@ -50,13 +64,24 @@ export function isPanelOffFlow(options: {
   return options.collapsedPanelId === options.panelId
 }
 
-export function showPanelRail(options: {
+/** Panel parked behind the divider rail (includes one-panel → add panel-2). */
+export function dividerCollapsedPanelId(options: {
   layout: ReadLayoutMode
-  panelId: ReadPanelId
   collapsedPanelId: ReadPanelId | null
-}): boolean {
-  if (options.layout !== 'two') return false
-  return options.collapsedPanelId === options.panelId
+}): ReadPanelId | null {
+  if (options.layout === 'one') return 'panel-2'
+  return options.collapsedPanelId
+}
+
+/** Arrow points inward — toward the remaining visible panel. */
+export function collapsedDividerArrowDir(options: {
+  collapsedPanelId: ReadPanelId
+  stacked: boolean
+}): CollapsedDividerArrow {
+  if (options.stacked) {
+    return options.collapsedPanelId === 'panel-1' ? 'down' : 'up'
+  }
+  return options.collapsedPanelId === 'panel-1' ? 'right' : 'left'
 }
 
 /** Stay mounted: hidden / flex 0, never unmount. */

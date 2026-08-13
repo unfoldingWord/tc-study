@@ -1,5 +1,9 @@
 import { useTabDnD } from '../../features/dnd/TabDnDContext'
-import { panelStayMountedStyle, showPanelRail } from '../../features/read/readPanelLayout'
+import {
+  collapsedDividerArrowDir,
+  dividerCollapsedPanelId,
+  panelStayMountedStyle,
+} from '../../features/read/readPanelLayout'
 import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
 import type { ReadPanelId, ReadPanelMode, ReadPanelModels } from '../../features/read/readPanelModel'
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
@@ -8,7 +12,6 @@ import { useStudioResources } from '../../hooks'
 import { EntryResourceModal } from '../common/EntryResourceModal'
 import { PanelResizeDivider } from '../shared/PanelResizeDivider'
 import { ReadLinkedPanel } from './ReadLinkedPanel'
-import { ReadPanelRail } from './ReadPanelRail'
 import type { MouseEvent, RefObject } from 'react'
 
 interface ReadPanelsAreaProps {
@@ -22,6 +25,7 @@ interface ReadPanelsAreaProps {
   handlePanelDividerMouseDown: (e: MouseEvent) => void
   handlePanelDividerTouchStart: () => void
   expandPanel: (panelId: ReadPanelId) => void
+  restoreCollapsed: () => void
   filteredPanel1Keys: string[]
   filteredPanel2Keys: string[]
   filteredPanel1Resources: ReturnType<typeof useFilteredReadPanelKeys>['filteredPanel1Resources']
@@ -54,6 +58,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
     handlePanelDividerMouseDown,
     handlePanelDividerTouchStart,
     expandPanel,
+    restoreCollapsed,
     filteredPanel1Keys,
     filteredPanel2Keys,
     filteredPanel1Resources,
@@ -71,29 +76,20 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
     onSwitchTextMode,
   } = props
 
-  const orientation = isNarrow ? 'horizontal' : 'vertical'
-  const showDivider = layout === 'two' && !collapsedPanelId
+  const parkedId = dividerCollapsedPanelId({ layout, collapsedPanelId })
+  const collapsedArrow = parkedId
+    ? collapsedDividerArrowDir({ collapsedPanelId: parkedId, stacked: isNarrow })
+    : null
 
   return (
     <div
       ref={resizeContainerRef}
-      className={`h-full overflow-hidden panels-resize-container relative ${
-        layout === 'two' ? 'flex flex-col md:flex-row' : 'flex flex-row'
-      }`}
+      className="h-full overflow-hidden panels-resize-container relative flex flex-col md:flex-row"
       data-panel-1-language={panels['panel-1'].languageCode ?? ''}
       data-panel-2-language={panels['panel-2'].languageCode ?? ''}
       data-panel-1-mode={panels['panel-1'].mode}
       data-panel-2-mode={panels['panel-2'].mode}
     >
-      {showPanelRail({ layout, panelId: 'panel-1', collapsedPanelId }) ? (
-        <ReadPanelRail
-          panelId="panel-1"
-          orientation={orientation}
-          colorScheme="blue"
-          onExpand={() => expandPanel('panel-1')}
-        />
-      ) : null}
-
       <ReadLinkedPanel
         panelId="panel-1"
         otherPanelId="panel-2"
@@ -124,22 +120,13 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         onSwitchTextMode={onSwitchTextMode}
       />
 
-      {showDivider ? (
-        <PanelResizeDivider
-          isResizing={isResizingPanels}
-          onMouseDown={handlePanelDividerMouseDown}
-          onTouchStart={handlePanelDividerTouchStart}
-        />
-      ) : null}
-
-      {showPanelRail({ layout, panelId: 'panel-2', collapsedPanelId }) ? (
-        <ReadPanelRail
-          panelId="panel-2"
-          orientation={orientation}
-          colorScheme="purple"
-          onExpand={() => expandPanel('panel-2')}
-        />
-      ) : null}
+      <PanelResizeDivider
+        isResizing={isResizingPanels}
+        onMouseDown={handlePanelDividerMouseDown}
+        onTouchStart={handlePanelDividerTouchStart}
+        collapsedArrow={collapsedArrow}
+        onRestoreCollapsed={restoreCollapsed}
+      />
 
       <ReadLinkedPanel
         panelId="panel-2"

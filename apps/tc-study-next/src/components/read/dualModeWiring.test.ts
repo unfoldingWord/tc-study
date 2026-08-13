@@ -6,7 +6,11 @@ const viewSrc = readFileSync(join(import.meta.dir, 'SimplifiedReadView.tsx'), 'u
 const panelSrc = readFileSync(join(import.meta.dir, 'ReadLinkedPanel.tsx'), 'utf8')
 const areaSrc = readFileSync(join(import.meta.dir, 'ReadPanelsArea.tsx'), 'utf8')
 const headerSrc = readFileSync(join(import.meta.dir, 'ReadPanelHeader.tsx'), 'utf8')
-const railSrc = readFileSync(join(import.meta.dir, 'ReadPanelRail.tsx'), 'utf8')
+const dividerSrc = readFileSync(join(import.meta.dir, '../shared/PanelResizeDivider.tsx'), 'utf8')
+const hookSrc = readFileSync(
+  join(import.meta.dir, '../../features/read/useReadPanelLayout.ts'),
+  'utf8'
+)
 const bootstrapSrc = readFileSync(
   join(import.meta.dir, '../../features/read/useReadLanguageBootstrap.ts'),
   'utf8'
@@ -47,17 +51,27 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(viewSrc).not.toContain('textLanguageCode={currentLanguageCode}')
   })
 
-  test('#31 one- vs two-panel layout control persists', () => {
-    expect(viewSrc).toContain('ReadLayoutToggle')
+  test('#31 one- vs two-panel: divider rail adds the second; no expand-left toggle', () => {
+    expect(viewSrc).not.toContain('ReadLayoutToggle')
     expect(viewSrc).toContain('defaultLayoutForViewport')
-    expect(areaSrc).toContain("layout === 'two'")
+    expect(viewSrc).toContain('restoreCollapsed')
+    expect(areaSrc).toContain('restoreCollapsed')
+    expect(hookSrc).toContain("setLayout('two', true)")
   })
 
-  test('#32 collapse stays mounted; rail expands', () => {
+  test('#32 collapse stays mounted; same thin divider with inward arrow', () => {
     expect(areaSrc).toContain('panelStayMountedStyle')
-    expect(areaSrc).toContain('ReadPanelRail')
-    expect(railSrc).toContain('Show other panel')
-    expect(railSrc).toContain('RAIL_PX')
+    expect(areaSrc).toContain('PanelResizeDivider')
+    expect(areaSrc).not.toContain('ReadPanelRail')
+    expect(areaSrc).toContain('collapsedDividerArrowDir')
+    expect(dividerSrc).toContain('md:w-1.5')
+    expect(dividerSrc).toContain('h-1.5')
+    expect(dividerSrc).toContain('bg-border')
+    expect(dividerSrc).toContain('collapsedArrow')
+    expect(dividerSrc).toContain('ChevronLeft')
+    expect(dividerSrc).toContain('Show other panel')
+    expect(dividerSrc).not.toContain('RAIL_PX')
+    expect(hookSrc).toContain('restoreCollapsedDivider')
   })
 
   test('#33 reopen collapsed panel on cross-panel token', () => {
