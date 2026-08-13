@@ -4,6 +4,7 @@ import { join } from 'node:path'
 
 const src = readFileSync(join(import.meta.dir, 'ReadPanelHeader.tsx'), 'utf8')
 const modeSrc = readFileSync(join(import.meta.dir, 'ReadModeSwitch.tsx'), 'utf8')
+const chromeSrc = readFileSync(join(import.meta.dir, 'readHeaderChrome.ts'), 'utf8')
 const studio = readFileSync(join(import.meta.dir, '../studio/PanelHeader.tsx'), 'utf8')
 
 describe('ReadPanelHeader (issue #30)', () => {
@@ -18,13 +19,22 @@ describe('ReadPanelHeader (issue #30)', () => {
     expect(src).not.toContain('MoreVertical')
   })
 
-  test('language + mode share LanguagePicker trigger chrome in one cluster', () => {
-    expect(src).toContain('bg-muted/50')
-    expect(src).toContain('divide-x divide-border-subtle')
+  test('language + mode share compact header icon chrome in one cluster', () => {
     expect(src).toContain('ml-auto')
-    expect(modeSrc).toContain('p-1 text-fg-secondary hover:bg-muted')
+    expect(src).toContain('gap-0')
+    expect(src).toContain('READ_HEADER_ICON_BUTTON')
+    expect(src).not.toContain('bg-muted/50')
+    expect(src).not.toContain('divide-x')
+    expect(src).not.toContain('min-w-11')
+    expect(src).not.toContain('hover:bg-panel-2')
+    expect(src).not.toContain('text-panel-2-fg')
+    expect(modeSrc).toContain('READ_HEADER_ICON_BUTTON')
     expect(modeSrc).toContain('w-4 h-4')
+    expect(modeSrc).not.toContain('min-w-11')
     expect(modeSrc).not.toContain('w-5 h-5')
+    expect(chromeSrc).toContain('h-9 w-9')
+    expect(chromeSrc).toContain('hover:bg-muted')
+    expect(chromeSrc).not.toContain('hover:bg-panel-')
   })
 
   test('does not edit studio PanelHeader', () => {

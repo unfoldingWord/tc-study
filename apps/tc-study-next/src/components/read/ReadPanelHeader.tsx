@@ -13,6 +13,7 @@ import { resolveTabPresentationFromRegistry } from '../../features/tabs'
 import { LanguagePicker } from '../LanguagePicker'
 import { ResourceTabs } from '../studio/ResourceTabs'
 import { ReadModeSwitch } from './ReadModeSwitch'
+import { READ_HEADER_ICON_BUTTON } from './readHeaderChrome'
 
 interface ReadPanelHeaderProps {
   resources: ResourceInfo[]
@@ -80,10 +81,7 @@ export function ReadPanelHeader({
 
         <div className="flex-shrink-0 flex items-center gap-chrome-tight ml-auto">
           {headerActions}
-          <div
-            className="inline-flex items-center divide-x divide-border-subtle rounded-md bg-muted/50"
-            role="group"
-          >
+          <div className="inline-flex items-center gap-0" role="group">
             <LanguagePicker
               compact
               listMode={languageListMode}
@@ -91,7 +89,7 @@ export function ReadPanelHeader({
               open={pickerOpen}
               onOpenChange={setPickerOpen}
               onLanguageSelected={onLanguageSelected}
-              triggerClassName="min-h-11 min-w-11 justify-center"
+              triggerClassName={READ_HEADER_ICON_BUTTON}
             />
             <ReadModeSwitch mode={mode} onModeSwitch={onModeSwitch} />
           </div>

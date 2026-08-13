@@ -1,5 +1,6 @@
 import { BookOpen, LifeBuoy } from 'lucide-react'
 import type { ReadPanelMode } from '../../features/read/readPanelModel'
+import { READ_HEADER_ICON_BUTTON } from './readHeaderChrome'
 
 interface ReadModeSwitchProps {
   mode: ReadPanelMode
@@ -15,7 +16,7 @@ export function ReadModeSwitch({ mode, onModeSwitch }: ReadModeSwitchProps) {
     <button
       type="button"
       onClick={() => onModeSwitch(nextMode)}
-      className="flex items-center justify-center rounded p-1 text-fg-secondary hover:bg-muted transition-colors min-h-11 min-w-11"
+      className={READ_HEADER_ICON_BUTTON}
       title={modeTitle}
       aria-label={modeTitle}
     >
