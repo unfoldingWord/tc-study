@@ -1,6 +1,6 @@
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { BookOpen, Layers } from 'lucide-react'
-import React from 'react'
+import React, { useLayoutEffect, useRef } from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
 import type { ResourceInfo } from '../../../contexts/types'
@@ -24,7 +24,8 @@ import type { LanguageListNameFields } from '../../../features/read/languageList
 import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
-import type { HelpsKindFilter } from './types'
+import { helpsFilterIdentity, scrollHelpsToTop } from './scrollHelpsToTop'
+import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
 export interface CombinedHelpsListProps {
@@ -53,6 +54,8 @@ export interface CombinedHelpsListProps {
   targetSourceId: string | null | undefined
   helpsScope: 'scripture' | 'obs'
   tokenFilter: TokenFilter | null
+  verseFilter: VerseFilterState | null
+  obsQuoteFilter: ObsQuoteFilter | null
   loadingTitles: Set<string>
   twLoadingTitles: Set<string>
   getEntryTitle: (rc: string) => string | null
@@ -92,6 +95,8 @@ export function CombinedHelpsList({
   targetSourceId,
   helpsScope,
   tokenFilter,
+  verseFilter,
+  obsQuoteFilter,
   loadingTitles,
   twLoadingTitles,
   getEntryTitle,
@@ -105,6 +110,12 @@ export function CombinedHelpsList({
   onTitleClick,
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
+  const listPanelRef = useRef<HTMLDivElement>(null)
+  const filterIdentity = helpsFilterIdentity({ tokenFilter, verseFilter, obsQuoteFilter })
+  useLayoutEffect(() => {
+    scrollHelpsToTop(listPanelRef.current)
+  }, [filterIdentity])
+
   const emptyReason = resolveHelpsListEmptyReason({
     noSources,
     loading,
@@ -124,7 +135,7 @@ export function CombinedHelpsList({
     : null
 
   return (
-    <div className={HELPS_LIST_PANEL} dir={languageDirection}>
+    <div ref={listPanelRef} className={HELPS_LIST_PANEL} dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
         icon={Layers}

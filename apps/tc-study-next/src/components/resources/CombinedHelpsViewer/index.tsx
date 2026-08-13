@@ -329,6 +329,8 @@ export function CombinedHelpsViewer({
         targetSourceId={targetSourceId}
         helpsScope={helpsScope}
         tokenFilter={tokenFilter}
+        verseFilter={verseFilter}
+        obsQuoteFilter={obsQuoteFilter}
         loadingTitles={loadingTitles}
         twLoadingTitles={twLoadingTitles}
         getEntryTitle={getEntryTitle}
