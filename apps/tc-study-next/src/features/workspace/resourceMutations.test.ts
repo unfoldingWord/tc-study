@@ -122,14 +122,14 @@ describe('resourceMutations', () => {
   })
 
   test('assign after modal-only add creates membership; remove prunes', () => {
-    const tn = res({ key: 'u/en/tn', type: 'notes' })
-    addResource(tn)
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeUndefined()
+    const tq = res({ key: 'u/en/tq', type: 'questions' })
+    addResource(tq)
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeUndefined()
 
-    assignResourceToPanel('u/en/tn', 'panel-2')
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeTruthy()
+    assignResourceToPanel('u/en/tq', 'panel-2')
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeTruthy()
 
-    removeResourceFromPanel('u/en/tn', 'panel-2')
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeUndefined()
+    removeResourceFromPanel('u/en/tq', 'panel-2')
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeUndefined()
   })
 })

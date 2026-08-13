@@ -10,6 +10,8 @@ export interface HelpsLanguageActions {
   selectHelpsLanguage: (languageCode: string) => void
   /** Full selected helps code (`es-419`), not CombinedHelps' collapsed primary (`es`). */
   selectedLanguageCode?: string | null
+  /** Raw helps-panel catalog fetch — CombinedHelps membership must not hide this. */
+  isCatalogLoading?: boolean
 }
 
 const HelpsLanguageActionsContext = createContext<HelpsLanguageActions | null>(null)

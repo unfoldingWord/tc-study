@@ -139,12 +139,18 @@ export async function loadReadLanguageCatalog(
   const nextHelpsKeys: string[] = []
   const metadataPromises: Array<Promise<ResourceInfo | null>> = []
 
-  for (const search of searches) {
-    const pages = await searchCatalogHitsForTarget(door43Client, {
-      languageCode: search.languageCode,
-      target: search.target,
-      navigationScope,
-    })
+  const searchPages = await Promise.all(
+    searches.map(async (search) => ({
+      search,
+      pages: await searchCatalogHitsForTarget(door43Client, {
+        languageCode: search.languageCode,
+        target: search.target,
+        navigationScope,
+      }),
+    }))
+  )
+
+  for (const { search, pages } of searchPages) {
 
     if (pages.every((page) => page.catalogResults.length === 0)) {
       console.warn(

@@ -41,7 +41,6 @@ export interface CombinedHelpsListProps {
   helpsLanguageName: string | LanguageListNameFields
   passageLabel: string
   noSources: boolean
-  depsOk: boolean
   loading: boolean
   tnError?: string | null
   twlError?: string | null
@@ -81,7 +80,6 @@ export function CombinedHelpsList({
   helpsLanguageName,
   passageLabel,
   noSources,
-  depsOk,
   loading,
   tnError,
   twlError,
@@ -110,7 +108,7 @@ export function CombinedHelpsList({
   const emptyReason = resolveHelpsListEmptyReason({
     noSources,
     loading,
-    depsOk,
+    depsOk: true,
     mergedEmpty: mergedGroups.length === 0,
     hasLoadError: !!(tnError && tnKey) || !!(twlError && twlKey),
     hasActiveFilter: !!filterScopeBar,
@@ -144,13 +142,6 @@ export function CombinedHelpsList({
       <div className="p-content max-w-3xl mx-auto w-full">
         {explainedEmpty ? (
           <CombinedHelpsEmptyState view={explainedEmpty} />
-        ) : !depsOk ? (
-          <LoadingSpinner
-            centered
-            label="Loading dependencies"
-            className="text-helps"
-            containerClassName="py-8"
-          />
         ) : loading ? (
           <LoadingSpinner
             centered

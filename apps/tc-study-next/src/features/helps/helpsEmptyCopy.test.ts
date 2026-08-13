@@ -179,6 +179,19 @@ describe('resolveHelpsListEmptyReason', () => {
     ).toBe('no-sources')
   })
 
+  test('empty list is not shown while loading (even with no sources yet)', () => {
+    expect(
+      resolveHelpsListEmptyReason({
+        noSources: true,
+        loading: true,
+        depsOk: false,
+        mergedEmpty: true,
+        hasLoadError: false,
+        hasActiveFilter: false,
+      })
+    ).toBeNull()
+  })
+
   test('English + Exodus with notes is not empty', () => {
     expect(
       resolveHelpsListEmptyReason({

@@ -64,8 +64,9 @@ export function resolveHelpsListEmptyReason(options: {
   hasLoadError: boolean
   hasActiveFilter: boolean
 }): HelpsListEmptyReason {
+  // Loading wins — never paint the empty well while TN/TWL or catalog is in flight.
+  if (options.loading) return null
   if (options.noSources) return 'no-sources'
-  if (!options.depsOk || options.loading) return null
   if (!options.mergedEmpty) return null
   if (options.hasLoadError) return null
   if (options.hasActiveFilter) return 'filter-miss'

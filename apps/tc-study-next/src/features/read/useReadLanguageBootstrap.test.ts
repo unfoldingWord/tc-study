@@ -19,7 +19,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(src).toContain('pushReadLanguageUrl(navigate, languageCode)')
     expect(src).toContain('canSeedBothPanelLanguages')
     expect(src).toContain('seedBothLanguages(languageCode)')
-    expect(src).toContain('catalogLoadForDefaultPair')
+    expect(src).toContain('coldStartCatalogLoads')
     expect(src).toContain('catalogLoadForSinglePanel')
   })
 
@@ -37,7 +37,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     const mismatchAt = body.indexOf('textModeMismatchFromCache')
     const mismatchReturn = body.indexOf('return', mismatchAt)
     expect(mismatchReturn).toBeGreaterThan(mismatchAt)
-    expect(mismatchReturn).toBeLessThan(body.indexOf('catalogLoadForDefaultPair'))
+    expect(mismatchReturn).toBeLessThan(body.indexOf('coldStartCatalogLoads'))
   })
 
   test('helps picker path does not apply text-language pick navigation', () => {
@@ -56,6 +56,14 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(body).toContain('catalogLoadForSinglePanel')
     expect(body).not.toContain('seedBothLanguages')
     expect(body).not.toContain('pushReadLanguageUrl')
+  })
+
+  test('cold-start catalog loads run in parallel so helps does not wait on scripture', () => {
+    const handler = src.slice(src.indexOf('const handleLanguageSelected'))
+    const body = handler.slice(0, handler.indexOf('const { handleSwitchTextMode'))
+    expect(body).toContain('coldStartCatalogLoads')
+    expect(body).toContain('Promise.all')
+    expect(body).toContain('runCatalogLoad')
   })
 
   test('catalog load receives the resolved Bible/OBS scope', () => {

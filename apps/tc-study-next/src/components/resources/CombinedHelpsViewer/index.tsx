@@ -15,6 +15,7 @@ import {
   fullHelpsLangFromResourceKey,
   resolveHelpsLanguageCodeForCopy,
 } from '../../../features/helps/helpsEmptyCopy'
+import { isHelpsContentPending } from '../../../features/helps/helpsListLoading'
 import { listedLanguageByCode } from '../../../features/read/languageListDisplayName'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { useEntryTitles } from '../TranslationNotesViewer/hooks/useEntryTitles'
@@ -120,7 +121,7 @@ export function CombinedHelpsViewer({
     setSelectedLinkId(null)
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
 
-  const { catalogMetadata, depsOk } = useCombinedHelpsDeps({
+  const { catalogMetadata } = useCombinedHelpsDeps({
     resourceKey,
     tnKey,
     twlKey,
@@ -263,7 +264,10 @@ export function CombinedHelpsViewer({
     setSelectedLinkId,
   })
 
-  const loading = !!(tnKey && tnLoading) || !!(twlKey && twlLoading)
+  const loading = isHelpsContentPending({
+    tnKey, twlKey, tnLoading, twlLoading,
+    catalogLoading: Boolean(helpsLanguageActions?.isCatalogLoading),
+  })
   const noSources = !tnKey && !twlKey
   const helpsLanguageCodeForCopy = resolveHelpsLanguageCodeForCopy({
     selectedCode: helpsLanguageActions?.selectedLanguageCode,
@@ -313,7 +317,6 @@ export function CombinedHelpsViewer({
         helpsLanguageName={helpsLanguageName}
         passageLabel={passageLabel}
         noSources={noSources}
-        depsOk={depsOk}
         loading={loading}
         tnError={tnError}
         twlError={twlError}

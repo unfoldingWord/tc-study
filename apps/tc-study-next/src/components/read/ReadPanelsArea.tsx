@@ -110,6 +110,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
           catalogLoading: isLoadingByPanel['panel-1'],
           hasMembership: filteredPanel1Keys.length > 0,
         })}
+        catalogLoading={isLoadingByPanel['panel-1']}
         showDropPlaceholder={hoverPanelId === 'panel-1'}
         placeholderLabel={dragLabel}
         placeholderIndex={hoverPanelId === 'panel-1' ? dropIndex ?? undefined : undefined}
@@ -150,6 +151,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
           catalogLoading: isLoadingByPanel['panel-2'],
           hasMembership: filteredPanel2Keys.length > 0,
         })}
+        catalogLoading={isLoadingByPanel['panel-2']}
         showDropPlaceholder={hoverPanelId === 'panel-2'}
         placeholderLabel={dragLabel}
         placeholderIndex={hoverPanelId === 'panel-2' ? dropIndex ?? undefined : undefined}

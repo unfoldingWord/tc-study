@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { catalogLoadForDefaultPair, catalogLoadForSinglePanel } from './runReadPanelCatalog'
+import {
+  catalogLoadForDefaultPair,
+  catalogLoadForSinglePanel,
+  coldStartCatalogLoads,
+} from './runReadPanelCatalog'
 import type { ReadPanelModels } from './readPanelModel'
 
 describe('runReadPanelCatalog', () => {
@@ -33,6 +37,20 @@ describe('runReadPanelCatalog', () => {
       loadTarget: 'text',
       destPanelId: 'panel-2',
     })
+  })
+
+  test('cold-start scripture+helps pair triggers a both-target load (helps does not wait)', () => {
+    const panels: ReadPanelModels = {
+      'panel-1': { mode: 'scripture', languageCode: 'en' },
+      'panel-2': { mode: 'helps', languageCode: 'en' },
+    }
+    expect(coldStartCatalogLoads(panels)).toEqual([
+      {
+        textLanguageCode: 'en',
+        helpsLanguageCode: 'en',
+        loadTarget: 'both',
+      },
+    ])
   })
 
   test('same-language dual scripture still yields two independent text dests', () => {

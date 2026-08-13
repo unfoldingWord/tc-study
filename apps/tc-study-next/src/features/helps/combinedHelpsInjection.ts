@@ -17,8 +17,9 @@ export interface HelpsKeyPair {
   twlKey?: string
 }
 
+/** Inject when either TN or TWL exists so first-open is not blocked on both catalog hits. */
 export function shouldInjectCombinedHelps(pair: HelpsKeyPair): boolean {
-  return Boolean(pair.tnKey && pair.twlKey)
+  return Boolean(pair.tnKey || pair.twlKey)
 }
 
 export function findHelpsKeysAmongResources(

@@ -24,7 +24,7 @@ export function useWordsLinksContent({
   const loaderRegistry = useLoaderRegistry()
   
   const [content, setContent] = useState<ProcessedWordsLinks | null>(wordsLinksContent || null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(() => Boolean(resourceKey) && !wordsLinksContent)
   const [error, setError] = useState<string | null>(null)
   
   // Load content when book changes

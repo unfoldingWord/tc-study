@@ -43,7 +43,7 @@ import {
 import { loadLanguagesCache } from './languagesCache'
 import { shouldDeferLanguageCatalogLoad } from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
-import { catalogLoadForDefaultPair, catalogLoadForSinglePanel } from './runReadPanelCatalog'
+import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
 import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
@@ -177,6 +177,8 @@ export function useReadLanguageBootstrap({
       setIsLanguagePickerRequired(false)
       if (canSeedBothPanelLanguages()) {
         seedBothLanguages(languageCode)
+      } else if (!useReadPanelStore.getState().panels['panel-1'].languageCode) {
+        setPanelLanguage('panel-1', languageCode)
       }
       maybeCancelDownloads('text')
 
@@ -213,15 +215,8 @@ export function useReadLanguageBootstrap({
 
       autoLoadedLanguageForUrlRef.current = languageCode
       const snapshot = useReadPanelStore.getState().panels
-      const pair = catalogLoadForDefaultPair(snapshot)
-      if (pair) {
-        await runCatalogLoad({ ...pair, navigationScope: scope })
-        return
-      }
-      for (const panelId of ['panel-1', 'panel-2'] as const) {
-        const one = catalogLoadForSinglePanel(snapshot, panelId)
-        if (one) await runCatalogLoad({ ...one, navigationScope: scope })
-      }
+      const loads = coldStartCatalogLoads(snapshot)
+      await Promise.all(loads.map((one) => runCatalogLoad({ ...one, navigationScope: scope })))
     },
     [
       maybeCancelDownloads,
@@ -231,6 +226,7 @@ export function useReadLanguageBootstrap({
       helpsLanguageCode,
       runCatalogLoad,
       seedBothLanguages,
+      setPanelLanguage,
     ]
   )
 

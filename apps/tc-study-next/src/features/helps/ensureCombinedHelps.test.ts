@@ -73,15 +73,16 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     expect(out.panels[0]!.resourceKeys).not.toContain('u/en/obs-twl')
   })
 
-  test('no inject when only one helps side present', () => {
+  test('injects CombinedHelps when only one helps side present', () => {
     const resources = new Map<string, ResourceInfo>([
       ['u/en/tn', res({ key: 'u/en/tn', type: 'notes' })],
     ])
     const panels = [{ id: 'panel-2', resourceKeys: ['u/en/tn'], activeIndex: 0 }]
-    const out = ensureCombinedHelpsInWorkspace({ resources, panels })
-    expect(out.injected).toEqual([])
-    expect(out.removed).toEqual([])
-    expect(out.resources.has(COMBINED_HELPS_RESOURCE_ID)).toBe(false)
+    const out = ensureCombinedHelpsInWorkspace({ resources, panels, languageCode: 'en' })
+    expect(out.injected).toContain(COMBINED_HELPS_RESOURCE_ID)
+    expect(out.resources.has(COMBINED_HELPS_RESOURCE_ID)).toBe(true)
+    expect(out.resources.get(COMBINED_HELPS_RESOURCE_ID)?.helpsTnResourceKey).toBe('u/en/tn')
+    expect(out.panels[0]!.resourceKeys).toEqual([COMBINED_HELPS_RESOURCE_ID])
   })
 
   test('Read bootstrap policy fixture: TN+TWL in language load → CombinedHelps present', () => {
@@ -162,7 +163,7 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     expect(out.panels[0]!.resourceKeys[out.panels[0]!.activeIndex]).toBe('u/en/tq')
   })
 
-  test('reconcile removes CombinedHelps when TN drops and restores TWL tab', () => {
+  test('keeps CombinedHelps when TN drops and TWL remains', () => {
     const resources = new Map<string, ResourceInfo>([
       ['u/en/twl', res({ key: 'u/en/twl', type: 'words-links' })],
       [
@@ -173,21 +174,19 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     const panels = [
       {
         id: 'panel-2',
-        // Unlock 1: TN/TWL already stripped while CombinedHelps was present
         resourceKeys: [COMBINED_HELPS_RESOURCE_ID],
         activeIndex: 0,
       },
     ]
 
     const out = ensureCombinedHelpsInWorkspace({ resources, panels, languageCode: 'en' })
-    expect(out.removed).toContain(COMBINED_HELPS_RESOURCE_ID)
-    expect(out.resources.has(COMBINED_HELPS_RESOURCE_ID)).toBe(false)
-    expect(out.panels[0]!.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
-    expect(out.panels[0]!.resourceKeys).toContain('u/en/twl')
-    expect(out.panels[0]!.resourceKeys[out.panels[0]!.activeIndex]).toBe('u/en/twl')
+    expect(out.removed).toEqual([])
+    expect(out.resources.has(COMBINED_HELPS_RESOURCE_ID)).toBe(true)
+    expect(out.resources.get(COMBINED_HELPS_RESOURCE_ID)?.helpsTwlResourceKey).toBe('u/en/twl')
+    expect(out.panels[0]!.resourceKeys).toEqual([COMBINED_HELPS_RESOURCE_ID])
   })
 
-  test('reconcile removes CombinedHelps when TWL drops and restores TN tab', () => {
+  test('keeps CombinedHelps when TWL drops and TN remains', () => {
     const resources = new Map<string, ResourceInfo>([
       ['u/en/tn', res({ key: 'u/en/tn', type: 'notes' })],
       [
@@ -204,11 +203,33 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     ]
 
     const out = ensureCombinedHelpsInWorkspace({ resources, panels })
-    expect(out.removed).toContain(COMBINED_HELPS_RESOURCE_ID)
-    expect(out.panels[0]!.resourceKeys).toEqual(['u/en/tn'])
+    expect(out.removed).toEqual([])
+    expect(out.panels[0]!.resourceKeys).toEqual([COMBINED_HELPS_RESOURCE_ID])
+    expect(out.resources.get(COMBINED_HELPS_RESOURCE_ID)?.helpsTnResourceKey).toBe('u/en/tn')
   })
 
-  test('reconcile removes OBS CombinedHelps when OBS twin incomplete', () => {
+  test('reconcile removes CombinedHelps when both helps sides drop', () => {
+    const resources = new Map<string, ResourceInfo>([
+      [
+        COMBINED_HELPS_RESOURCE_ID,
+        res({ key: COMBINED_HELPS_RESOURCE_ID, type: 'combined-helps' }),
+      ],
+    ])
+    const panels = [
+      {
+        id: 'panel-2',
+        resourceKeys: [COMBINED_HELPS_RESOURCE_ID],
+        activeIndex: 0,
+      },
+    ]
+
+    const out = ensureCombinedHelpsInWorkspace({ resources, panels, languageCode: 'en' })
+    expect(out.removed).toContain(COMBINED_HELPS_RESOURCE_ID)
+    expect(out.resources.has(COMBINED_HELPS_RESOURCE_ID)).toBe(false)
+    expect(out.panels[0]!.resourceKeys).toEqual([])
+  })
+
+  test('keeps OBS CombinedHelps when only one OBS twin remains', () => {
     const resources = new Map<string, ResourceInfo>([
       ['u/en/obs-tn', res({ key: 'u/en/obs-tn', type: 'obs-notes' })],
       [
@@ -225,9 +246,9 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     ]
 
     const out = ensureCombinedHelpsInWorkspace({ resources, panels, languageCode: 'en' })
-    expect(out.removed).toContain(OBS_COMBINED_HELPS_RESOURCE_ID)
-    expect(out.resources.has(OBS_COMBINED_HELPS_RESOURCE_ID)).toBe(false)
-    expect(out.panels[0]!.resourceKeys).toEqual(['u/en/obs-tn'])
+    expect(out.removed).toEqual([])
+    expect(out.resources.has(OBS_COMBINED_HELPS_RESOURCE_ID)).toBe(true)
+    expect(out.panels[0]!.resourceKeys).toEqual([OBS_COMBINED_HELPS_RESOURCE_ID])
   })
 
   test('Read path uses the same ensure helper as Studio (via applyCombinedHelpsEnsure)', () => {

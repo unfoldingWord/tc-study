@@ -27,6 +27,11 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
     expect(src).toContain('page.hydrateTarget')
   })
 
+  test('text and helps catalog searches run in parallel', () => {
+    expect(src).toContain('Promise.all')
+    expect(src).toContain('searchPages')
+  })
+
   test('clears only the switched pane', () => {
     expect(src).toContain('panelClearTargetForLoad(loadTarget, destPanelId)')
     expect(src).toContain('shouldReconcileHelpsOnPanelClear')

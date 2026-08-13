@@ -33,8 +33,8 @@ const SCOPE_IDS: Record<HelpsScope, string> = {
 const ORIGINAL_LANG_CODES = new Set(['el-x-koine', 'hbo', 'und', ''])
 
 /**
- * Ensure CombinedHelps synthetic resources exist when both TN and TWL (or OBS twins)
- * are present; remove/reconcile them when a side drops.
+ * Ensure CombinedHelps synthetic resources exist when TN and/or TWL (or OBS twins)
+ * are present; remove them only when both sides drop.
  *
  * Unlock 1 (single tab key space): when CombinedHelps is present for a scope,
  * strip that scope's raw TN/TWL from panel.resourceKeys. TN/TWL remain in the

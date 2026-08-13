@@ -49,3 +49,18 @@ export function catalogLoadForDefaultPair(panels: ReadPanelModels): ReadPanelCat
     loadTarget: 'both',
   }
 }
+
+/**
+ * Cold-start / first-pick catalog jobs. Default scripture+helps pair is one
+ * `both` load so helps does not wait on a sequential panel-1 scripture fetch.
+ */
+export function coldStartCatalogLoads(panels: ReadPanelModels): ReadPanelCatalogLoad[] {
+  const pair = catalogLoadForDefaultPair(panels)
+  if (pair) return [pair]
+  const loads: ReadPanelCatalogLoad[] = []
+  for (const panelId of ['panel-1', 'panel-2'] as const) {
+    const one = catalogLoadForSinglePanel(panels, panelId)
+    if (one) loads.push(one)
+  }
+  return loads
+}

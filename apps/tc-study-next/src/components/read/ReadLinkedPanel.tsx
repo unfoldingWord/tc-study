@@ -42,6 +42,8 @@ interface ReadLinkedPanelProps {
   filteredResources: ResourceInfo[]
   panelResources: StudioPanelApi
   isLoadingResources: boolean
+  /** Raw catalog fetch for this panel (not gated on membership). */
+  catalogLoading?: boolean
   showDropPlaceholder: boolean
   placeholderLabel: string
   placeholderIndex: number | undefined
@@ -60,6 +62,7 @@ function ReadPanelBody({
   filteredResources,
   panelResources,
   isLoadingResources,
+  catalogLoading = false,
   showDropPlaceholder,
   placeholderLabel,
   placeholderIndex,
@@ -92,9 +95,10 @@ function ReadPanelBody({
             openHelpsPicker: () => setPickerOpen(true),
             selectHelpsLanguage: onLanguageSelected,
             selectedLanguageCode: null,
+            isCatalogLoading: catalogLoading,
           }
         : null,
-    [isHelps, onLanguageSelected]
+    [isHelps, onLanguageSelected, catalogLoading]
   )
   const scriptureMismatch = mode === 'scripture' ? textModeMismatch : null
   const mismatchScope = scriptureMismatch?.switchScope

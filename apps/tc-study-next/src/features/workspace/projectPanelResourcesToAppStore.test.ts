@@ -137,15 +137,15 @@ describe('projectPanelResourcesToAppStore', () => {
       )
     ).toBe(true)
 
-    const tn = res({ key: 'u/en/tn', type: 'notes' })
+    const tq = res({ key: 'u/en/tq', type: 'questions' })
     // Package-only until assign — projector owns AppStore membership
-    addResource(tn)
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeUndefined()
-    assignResourceToPanel('u/en/tn', 'panel-2')
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeTruthy()
+    addResource(tq)
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeUndefined()
+    assignResourceToPanel('u/en/tq', 'panel-2')
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeTruthy()
 
-    removeResourceFromPanel('u/en/tn', 'panel-2')
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeUndefined()
+    removeResourceFromPanel('u/en/tq', 'panel-2')
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeUndefined()
     // Still on panel-1
     expect(useAppStore.getState().loadedResources['u/en/ult']).toBeTruthy()
   })
