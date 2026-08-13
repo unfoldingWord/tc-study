@@ -5,8 +5,11 @@ import {
   HELPS_EMPTY_COPY,
   explainedHelpsEmptyKind,
   formatHelpsPassageLabel,
+  fullHelpsLangFromResourceKey,
   helpsLanguageDisplayName,
+  helpsLanguageNameFromList,
   resolveHelpsEmptyView,
+  resolveHelpsLanguageCodeForCopy,
   resolveHelpsListEmptyReason,
 } from './helpsEmptyCopy'
 
@@ -18,7 +21,7 @@ const ES_LISTED = {
 } as const
 
 describe('resolveHelpsEmptyView', () => {
-  test('Spanish + Galatians 1 uses catalog anglicized_name, not the autonym', () => {
+  test('Spanish + Galatians 1 uses catalog anglicized_name with native in parentheses', () => {
     const view = resolveHelpsEmptyView({
       kind: 'no-passage',
       languageCode: 'es',
@@ -26,7 +29,7 @@ describe('resolveHelpsEmptyView', () => {
       passageLabel: formatHelpsPassageLabel('gal', 1),
     })
     expect(view.kind).toBe('no-passage')
-    expect(view.message).toBe(HELPS_EMPTY_COPY.noPassage('Spanish', 'Galatians 1'))
+    expect(view.message).toBe(HELPS_EMPTY_COPY.noPassage('Spanish (Español)', 'Galatians 1'))
     expect(view.message).toContain('Spanish')
     expect(view.message).not.toContain('español')
     expect(view.message).toContain('Galatians')
@@ -56,7 +59,7 @@ describe('resolveHelpsEmptyView', () => {
       passageLabel: 'Exodus 1',
     })
     expect(view.kind).toBe('no-sources')
-    expect(view.message).toBe(HELPS_EMPTY_COPY.noSources('Spanish'))
+    expect(view.message).toBe(HELPS_EMPTY_COPY.noSources('Spanish (Español)'))
     expect(view.message).not.toContain('Exodus')
     expect(view.actionLabel).toBe(HELPS_EMPTY_COPY.useDefaultHelps('English'))
     expect(view.actionShortLabel).toBe('English')
@@ -73,14 +76,75 @@ describe('resolveHelpsEmptyView', () => {
     expect(view.actionShortLabel).toBeNull()
     expect(view.defaultHelpsLanguageCode).toBeNull()
     expect(view.message).toContain('English')
+    expect(view.message).not.toContain('(English)')
     expect(view.message).toContain('Exodus')
+  })
+
+  test('identical native and anglicized names do not duplicate in parentheses', () => {
+    const view = resolveHelpsEmptyView({
+      kind: 'no-passage',
+      languageCode: 'en',
+      languageName: { name: 'English', anglicizedName: 'English' },
+      passageLabel: 'Exodus 1',
+    })
+    expect(view.message).toBe(HELPS_EMPTY_COPY.noPassage('English', 'Exodus 1'))
+    expect(view.message).not.toContain('(English)')
   })
 
   test('English display name is used for the default action without a listed name', () => {
     expect(helpsLanguageDisplayName('en')).toBe('English')
     expect(helpsLanguageDisplayName('es')).toBe('es')
-    expect(helpsLanguageDisplayName('es', ES_LISTED)).toBe('Spanish')
+    expect(helpsLanguageDisplayName('es', ES_LISTED)).toBe('Spanish (Español)')
     expect(helpsLanguageDisplayName('es', { name: 'español' })).toBe('Español')
+    expect(
+      helpsLanguageDisplayName('en', { name: 'English', anglicizedName: 'English' })
+    ).toBe('English')
+    expect(
+      helpsLanguageDisplayName('en', { name: 'English', anglicizedName: 'English' })
+    ).not.toContain('(English)')
+  })
+
+  test('es-419 empty copy uses list anglicizedName with native in parentheses', () => {
+    const es419 = {
+      code: 'es-419',
+      name: 'Español Latin America',
+      anglicizedName: 'Latin American Spanish',
+    } as const
+    const view = resolveHelpsEmptyView({
+      kind: 'no-passage',
+      languageCode: 'es-419',
+      languageName: es419,
+      passageLabel: formatHelpsPassageLabel('jdg', 1),
+    })
+    expect(view.message).toBe(
+      HELPS_EMPTY_COPY.noPassage(
+        'Latin American Spanish (Español Latin America)',
+        'Judges 1'
+      )
+    )
+    expect(view.message).toContain('Latin American Spanish (Español Latin America)')
+    expect(view.message).not.toBe(HELPS_EMPTY_COPY.noPassage('Spanish', 'Judges 1'))
+  })
+
+  test('es with anglicizedName Spanish still says Spanish', () => {
+    const view = resolveHelpsEmptyView({
+      kind: 'no-passage',
+      languageCode: 'es',
+      languageName: { code: 'es', anglicizedName: 'Spanish' },
+      passageLabel: formatHelpsPassageLabel('jdg', 1),
+    })
+    expect(view.message).toBe(HELPS_EMPTY_COPY.noPassage('Spanish', 'Judges 1'))
+  })
+
+  test('es-419 never uses a different language’s Spanish list entry', () => {
+    expect(helpsLanguageDisplayName('es-419', ES_LISTED)).toBe('es-419')
+    expect(
+      helpsLanguageDisplayName('es-419', {
+        code: 'es-419',
+        name: 'Español Latin America',
+        anglicizedName: 'Latin American Spanish',
+      })
+    ).toBe('Latin American Spanish (Español Latin America)')
   })
 
   test('formatHelpsPassageLabel names Exodus 1 from book + chapter', () => {
@@ -158,5 +222,54 @@ describe('explainedHelpsEmptyKind', () => {
     expect(explainedHelpsEmptyKind('no-passage')).toBe('no-passage')
     expect(explainedHelpsEmptyKind('no-sources')).toBe('no-sources')
     expect(explainedHelpsEmptyKind(null)).toBeNull()
+  })
+})
+
+const ES_419_LISTED = {
+  code: 'es-419',
+  name: 'Español Latin America',
+  anglicizedName: 'Latin American Spanish',
+} as const
+
+const PICKER_LIST = [ES_LISTED, ES_419_LISTED]
+
+describe('resolveHelpsLanguageCodeForCopy', () => {
+  test('keeps selected es-419 when CombinedHelps stored collapsed es', () => {
+    expect(
+      resolveHelpsLanguageCodeForCopy({
+        selectedCode: 'es-419',
+        keyLanguage: 'es-419',
+        resourceLanguage: 'es',
+      })
+    ).toBe('es-419')
+    expect(
+      resolveHelpsLanguageCodeForCopy({
+        selectedCode: 'es',
+        keyLanguage: 'es-419',
+        resourceLanguage: 'es',
+      })
+    ).toBe('es-419')
+    expect(
+      resolveHelpsLanguageCodeForCopy({
+        selectedCode: null,
+        keyLanguage: '',
+        resourceLanguage: 'es',
+      })
+    ).toBe('es')
+  })
+
+  test('TN key language segment keeps es-419', () => {
+    expect(fullHelpsLangFromResourceKey('es-419_gl/es-419/tn')).toBe('es-419')
+    expect(fullHelpsLangFromResourceKey('unfoldingWord/es/tn')).toBe('es')
+  })
+})
+
+describe('helpsLanguageNameFromList', () => {
+  test('exact es-419 lookup does not take Spanish from es', () => {
+    expect(helpsLanguageNameFromList('es-419', PICKER_LIST)).toBe(
+      'Latin American Spanish (Español Latin America)'
+    )
+    expect(helpsLanguageNameFromList('es', PICKER_LIST)).toBe('Spanish (Español)')
+    expect(helpsLanguageNameFromList('es', PICKER_LIST)).not.toContain('Latin American')
   })
 })

@@ -38,7 +38,7 @@ describe('CombinedHelpsEmptyState', () => {
         createElement(CombinedHelpsEmptyState, { view })
       )
     )
-    expect(html).toContain('Spanish')
+    expect(html).toContain('Spanish (Español)')
     expect(html).not.toContain('español')
     expect(html).toContain('Galatians')
     expect(html).toContain('<svg')
@@ -75,5 +75,34 @@ describe('CombinedHelpsEmptyState', () => {
     expect(html).not.toContain(HELPS_EMPTY_COPY.useDefaultHelps('English'))
     expect(html).toContain(HELPS_EMPTY_COPY.chooseHelpsLanguage)
     expect(html).toContain(`aria-label="${HELPS_EMPTY_COPY.chooseHelpsLanguage}"`)
+  })
+
+  test('es-419 Judges 1 empty copy uses Latin American Spanish, not Spanish', () => {
+    const view = resolveHelpsEmptyView({
+      kind: 'no-passage',
+      languageCode: 'es-419',
+      languageName: {
+        code: 'es-419',
+        name: 'Español Latin America',
+        anglicizedName: 'Latin American Spanish',
+      },
+      passageLabel: 'Judges 1',
+    })
+    const html = renderToStaticMarkup(
+      createElement(
+        HelpsLanguageActionsProvider,
+        {
+          value: {
+            openHelpsPicker: () => {},
+            selectHelpsLanguage: () => {},
+            selectedLanguageCode: 'es-419',
+          },
+        },
+        createElement(CombinedHelpsEmptyState, { view })
+      )
+    )
+    expect(html).toContain('Latin American Spanish (Español Latin America)')
+    expect(html).toContain('Judges')
+    expect(html).not.toContain(HELPS_EMPTY_COPY.noPassage('Spanish', 'Judges 1'))
   })
 })

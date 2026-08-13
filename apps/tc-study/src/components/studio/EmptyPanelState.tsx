@@ -2,7 +2,17 @@
  * EmptyPanelState - Minimalistic empty state for panels
  */
 
-import { Plus } from 'lucide-react'
+import { BookMarked, BookOpen, Plus, type LucideIcon } from 'lucide-react'
+import {
+  TEXT_MODE_MISMATCH_COPY,
+  type TextModeMismatchKind,
+} from '../../features/read/textModeMismatch'
+import {
+  EmptyStateActionButton,
+  EmptyStateIcon,
+  EmptyStateLayout,
+  EmptyStateMessage,
+} from '../shared/EmptyStateLayout'
 
 export interface EmptyPanelStateProps {
   panelId: string
@@ -12,9 +22,42 @@ export interface EmptyPanelStateProps {
   onAddResource?: () => void
   /** When set, the message is a clickable CTA (helps-pane language picker). */
   onMessageClick?: () => void
-  /** Labeled action (panel-1 mode mismatch). Icon-first exception: sentence + button. */
+  /** Full a11y label (panel-1 mode mismatch). Visible text is `actionShortLabel`. */
   actionLabel?: string
+  /** Compact visible action (e.g. `Stories` / `Bible`). */
+  actionShortLabel?: string
   onAction?: () => void
+  /** Drives the large muted icon (BookOpen / BookMarked). */
+  emptyKind?: TextModeMismatchKind
+}
+
+function mismatchIcons(kind?: TextModeMismatchKind, actionLabel?: string): {
+  EmptyIcon: LucideIcon
+  ActionIcon: LucideIcon
+  shortLabel: string
+} | null {
+  if (kind === 'obs-only' || actionLabel === TEXT_MODE_MISMATCH_COPY.switchToStories) {
+    return {
+      EmptyIcon: BookMarked,
+      ActionIcon: BookMarked,
+      shortLabel: TEXT_MODE_MISMATCH_COPY.stories,
+    }
+  }
+  if (kind === 'bible-only' || actionLabel === TEXT_MODE_MISMATCH_COPY.switchToBible) {
+    return {
+      EmptyIcon: BookOpen,
+      ActionIcon: BookOpen,
+      shortLabel: TEXT_MODE_MISMATCH_COPY.bible,
+    }
+  }
+  if (kind === 'neither') {
+    return {
+      EmptyIcon: BookOpen,
+      ActionIcon: BookOpen,
+      shortLabel: '',
+    }
+  }
+  return null
 }
 
 export function EmptyPanelState({
@@ -24,12 +67,19 @@ export function EmptyPanelState({
   onAddResource,
   onMessageClick,
   actionLabel,
+  actionShortLabel,
   onAction,
+  emptyKind,
 }: EmptyPanelStateProps) {
   const label = message ?? panelName
   const showAction = !!(actionLabel && onAction)
+  const chrome = mismatchIcons(emptyKind, actionLabel)
+  const shortLabel = actionShortLabel ?? chrome?.shortLabel
+  const showMismatchIcon = !!(chrome && (showAction || emptyKind))
+
   return (
-    <div className="h-full flex flex-col items-center justify-center gap-3 px-4">
+    <EmptyStateLayout className={onAddResource ? 'h-full' : undefined}>
+      {showMismatchIcon && chrome ? <EmptyStateIcon icon={chrome.EmptyIcon} /> : null}
       {label && onMessageClick && !showAction ? (
         <button
           type="button"
@@ -41,18 +91,15 @@ export function EmptyPanelState({
           {label}
         </button>
       ) : label ? (
-        <p className="text-sm text-fg-secondary text-center max-w-sm">{label}</p>
+        <EmptyStateMessage>{label}</EmptyStateMessage>
       ) : null}
-      {showAction ? (
-        <button
-          type="button"
-          onClick={onAction}
-          className="px-2.5 py-1 rounded-md border border-accent text-accent text-sm font-medium hover:bg-accent-soft"
-          title={actionLabel}
-          aria-label={actionLabel}
-        >
-          {actionLabel}
-        </button>
+      {showAction && chrome && shortLabel ? (
+        <EmptyStateActionButton
+          icon={chrome.ActionIcon}
+          label={actionLabel!}
+          shortLabel={shortLabel}
+          onClick={onAction!}
+        />
       ) : null}
       {onAddResource ? (
       <button
@@ -64,6 +111,6 @@ export function EmptyPanelState({
         <Plus className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
       </button>
       ) : null}
-    </div>
+    </EmptyStateLayout>
   )
 }

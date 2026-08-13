@@ -43,6 +43,8 @@ interface ReadLinkedPanelProps {
   placeholderIndex: number | undefined
   /** Panel-2 only: opens helps language picker (does not change `/read/:textLang`). */
   onHelpsLanguageSelected?: (languageCode: string) => void
+  /** Full selected helps BCP-47 code for empty copy (`es-419`, not collapsed `es`). */
+  helpsLanguageCode?: string | null
   /** Panel-1 only: text language has no content for the current Bible/OBS mode. */
   textModeMismatch?: TextModeMismatchView | null
   onSwitchTextMode?: (scope: 'scripture' | 'obs') => void
@@ -60,6 +62,7 @@ function ReadPanelBody({
   placeholderLabel,
   placeholderIndex,
   onHelpsLanguageSelected,
+  helpsLanguageCode,
   textModeMismatch,
   onSwitchTextMode,
   current,
@@ -82,9 +85,10 @@ function ReadPanelBody({
         ? {
             openHelpsPicker: () => setHelpsPickerOpen(true),
             selectHelpsLanguage: onHelpsLanguageSelected,
+            selectedLanguageCode: helpsLanguageCode ?? null,
           }
         : null,
-    [showHelpsPicker, onHelpsLanguageSelected]
+    [showHelpsPicker, onHelpsLanguageSelected, helpsLanguageCode]
   )
   const panel1Mismatch = panelId === 'panel-1' ? textModeMismatch : null
   const mismatchScope = panel1Mismatch?.switchScope
@@ -161,7 +165,7 @@ function ReadPanelBody({
 
       <div
         ref={swipeHandlers.ref}
-        className="flex-1 min-h-0 overflow-auto"
+        className="flex-1 min-h-0 overflow-auto bg-surface"
         onTouchStart={swipeHandlers.onTouchStart}
         onTouchMove={swipeHandlers.onTouchMove}
         onTouchEnd={swipeHandlers.onTouchEnd}
@@ -187,6 +191,8 @@ function ReadPanelBody({
                 showHelpsPicker ? () => setHelpsPickerOpen(true) : undefined
               }
               actionLabel={panel1Mismatch?.actionLabel ?? undefined}
+              actionShortLabel={panel1Mismatch?.actionShortLabel ?? undefined}
+              emptyKind={panel1Mismatch?.kind}
               onAction={mismatchAction}
             />
           )

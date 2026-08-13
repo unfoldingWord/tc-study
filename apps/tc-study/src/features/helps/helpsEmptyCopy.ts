@@ -7,7 +7,8 @@
 import { getBookTitleStatic } from '../../utils/bookNames'
 import { DEFAULT_HELPS_LANGUAGE_CODE } from '../read/defaultHelpsLanguage'
 import {
-  languageAnglicizedDisplayName,
+  languageEnglishCopyDisplayName,
+  listedLanguageByCode,
   type LanguageListNameFields,
 } from '../read/languageListDisplayName'
 
@@ -78,20 +79,76 @@ export function explainedHelpsEmptyKind(reason: HelpsListEmptyReason): HelpsEmpt
   return null
 }
 
-/** Display name for copy: anglicized/English name, then native `name`, then `en` → English, else the code. */
+/** Language segment from `owner/lang/id` — keep region (`es-419`), do not collapse to `es`. */
+export function fullHelpsLangFromResourceKey(key: string | undefined): string {
+  if (!key || !key.includes('/')) return ''
+  return (key.split('/')[1] || '').trim()
+}
+
+/**
+ * Same-family codes: keep the more specific tag (`es-419` over collapsed `es`).
+ * Different languages: keep `preferred`.
+ */
+function preferSpecificLanguageCode(preferred: string, alternate: string): string {
+  const a = preferred.trim()
+  const b = alternate.trim()
+  if (!a) return b
+  if (!b) return a
+  if (primaryLang(a) === primaryLang(b) && b.length > a.length) return b
+  return a
+}
+
+/**
+ * Helps language for English empty copy: selected picker code, then TN/TWL key
+ * language, then CombinedHelps resource language. Never collapse `es-419` → `es`.
+ */
+export function resolveHelpsLanguageCodeForCopy(options: {
+  selectedCode?: string | null
+  keyLanguage?: string | null
+  resourceLanguage?: string | null
+}): string {
+  const selected = options.selectedCode?.trim() || ''
+  const fromKey = options.keyLanguage?.trim() || ''
+  const fromResource = options.resourceLanguage?.trim() || ''
+  if (selected) return preferSpecificLanguageCode(selected, fromKey || fromResource)
+  if (fromKey) return preferSpecificLanguageCode(fromKey, fromResource)
+  return fromResource
+}
+
+function listedFieldsForCode(
+  code: string,
+  listed?: string | LanguageListNameFields
+): LanguageListNameFields | undefined {
+  if (typeof listed === 'string') {
+    return { anglicizedName: listed, name: listed }
+  }
+  const listedCode = listed?.code?.trim() || ''
+  const want = code.trim()
+  if (listedCode && want && listedCode.toLowerCase() !== want.toLowerCase()) {
+    return undefined
+  }
+  return listed
+}
+
+/** Display name for English copy: anglicized (+ native in parentheses when it differs). */
 export function helpsLanguageDisplayName(
   code: string,
   listed?: string | LanguageListNameFields
 ): string {
-  const fields: LanguageListNameFields | undefined =
-    typeof listed === 'string'
-      ? { anglicizedName: listed, name: listed }
-      : listed
-  const fromList = languageAnglicizedDisplayName(fields, '')
+  const fields = listedFieldsForCode(code, listed)
+  const fromList = languageEnglishCopyDisplayName(fields, '')
   if (fromList) return fromList
   const lang = primaryLang(code)
   if (lang === 'en') return 'English'
   return code.trim() || lang
+}
+
+/** Anglicized empty-copy name from the same list the picker uses (exact code). */
+export function helpsLanguageNameFromList(
+  code: string,
+  languages: readonly LanguageListNameFields[] | undefined
+): string {
+  return helpsLanguageDisplayName(code, listedLanguageByCode(languages, code))
 }
 
 export function resolveHelpsEmptyView(options: {

@@ -126,22 +126,22 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
         direction={languageDirection}
         infoResource={resource}
       />
-      <div className="flex-1 min-h-0 overflow-auto p-4 bg-white">
+      <div className="flex-1 min-h-0 overflow-auto p-content-lg bg-scripture text-scripture-fg">
         {loading && (
           <LoadingSpinner
             centered
             label={isRange ? 'Loading stories' : 'Loading story'}
-            className="text-blue-600"
+            className="text-accent"
             containerClassName="h-40"
           />
         )}
         {error && !loading && (
-          <div className="rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm p-4">
+          <div className="rounded-lg border border-danger bg-danger-soft text-danger text-sm p-4">
             {error}
           </div>
         )}
         {!loading && !error && currentRef.book !== 'obs' && (
-          <p className="text-gray-600 text-sm">
+          <p className="text-scripture-muted text-sm">
             Switch the navigation scope to <strong>Open Bible Stories</strong> and pick a story,
             or use the Bible / OBS tab in the book navigator.
           </p>
@@ -179,7 +179,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
         )}
 
         {!loading && !error && currentRef.book === 'obs' && !isRange && story && !currentFrame && (
-          <p className="text-amber-800 text-sm">
+          <p className="text-scripture-muted text-sm">
             No frame {frameNum} in this story (try another frame).
           </p>
         )}

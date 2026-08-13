@@ -9,7 +9,13 @@ import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
-import { formatHelpsPassageLabel } from '../../../features/helps/helpsEmptyCopy'
+import { useHelpsLanguageActions } from '../../../features/helps/HelpsLanguageActionsContext'
+import {
+  formatHelpsPassageLabel,
+  fullHelpsLangFromResourceKey,
+  resolveHelpsLanguageCodeForCopy,
+} from '../../../features/helps/helpsEmptyCopy'
+import { listedLanguageByCode } from '../../../features/read/languageListDisplayName'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { useEntryTitles } from '../TranslationNotesViewer/hooks/useEntryTitles'
 import { useTAMetadataForTitles } from '../TranslationNotesViewer/hooks/useTAMetadataForTitles'
@@ -58,6 +64,7 @@ export function CombinedHelpsViewer({
   const bookTitleSource = useBookTitleSource()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const loadedResources = useAppStore((s) => s.loadedResources)
+  const helpsLanguageActions = useHelpsLanguageActions()
 
   const [kindFilter, setKindFilter] = useState<HelpsKindFilter>('all')
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
@@ -258,8 +265,17 @@ export function CombinedHelpsViewer({
 
   const loading = !!(tnKey && tnLoading) || !!(twlKey && twlLoading)
   const noSources = !tnKey && !twlKey
-  const listedHelpsLang =
-    availableLanguages.find((l) => primaryLangCode(l.code) === wantLang) || languageFromList
+  const helpsLanguageCodeForCopy = resolveHelpsLanguageCodeForCopy({
+    selectedCode: helpsLanguageActions?.selectedLanguageCode,
+    keyLanguage: fullHelpsLangFromResourceKey(tnKey) || fullHelpsLangFromResourceKey(twlKey),
+    resourceLanguage:
+      effectiveResource.language ||
+      effectiveResource.languageCode ||
+      resource.language ||
+      resource.languageCode ||
+      '',
+  })
+  const listedHelpsLang = listedLanguageByCode(availableLanguages, helpsLanguageCodeForCopy)
   const helpsLanguageName = listedHelpsLang ?? ''
   const passageLabel = formatHelpsPassageLabel(currentRef.book, currentRef.chapter)
 
@@ -293,7 +309,7 @@ export function CombinedHelpsViewer({
         kindFilter={kindFilter}
         setKindFilter={setKindFilter}
         filterScopeBar={filterScopeBar}
-        helpsLanguageCode={wantLang}
+        helpsLanguageCode={helpsLanguageCodeForCopy}
         helpsLanguageName={helpsLanguageName}
         passageLabel={passageLabel}
         noSources={noSources}

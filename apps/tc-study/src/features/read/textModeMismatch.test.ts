@@ -8,6 +8,7 @@ import {
   resolveTextModeMismatch,
   type TextModeMismatchView,
 } from './textModeMismatch'
+import { languageEnglishCopyDisplayName } from './languageListDisplayName'
 
 /** Frozen availability fixtures (same DoD languages as picker / helps tests). */
 const AVAIL = Object.freeze({
@@ -37,6 +38,7 @@ describe('resolveTextModeMismatch', () => {
     expect(view?.kind).toBe('obs-only')
     expect(view?.message).toBe(TEXT_MODE_MISMATCH_COPY.noBibleHasObs('Bhojpuri'))
     expect(view?.actionLabel).toBe(TEXT_MODE_MISMATCH_COPY.switchToStories)
+    expect(view?.actionShortLabel).toBe(TEXT_MODE_MISMATCH_COPY.stories)
     expect(view?.switchScope).toBe('obs')
   })
 
@@ -46,7 +48,28 @@ describe('resolveTextModeMismatch', () => {
     expect(view?.message).toBe(TEXT_MODE_MISMATCH_COPY.noObsHasBible('Spanish'))
     expect(view?.message).not.toContain('español')
     expect(view?.actionLabel).toBe(TEXT_MODE_MISMATCH_COPY.switchToBible)
+    expect(view?.actionShortLabel).toBe(TEXT_MODE_MISMATCH_COPY.bible)
     expect(view?.switchScope).toBe('scripture')
+  })
+
+  test('es-419 mismatch sentence uses the same English copy helper as CombinedHelps', () => {
+    const name = languageEnglishCopyDisplayName(
+      {
+        code: 'es-419',
+        name: 'Español Latin America',
+        anglicizedName: 'Latin American Spanish',
+      },
+      'es-419'
+    )
+    expect(name).toBe('Latin American Spanish (Español Latin America)')
+    const view = resolveTextModeMismatch({
+      navigationScope: 'obs',
+      availability: AVAIL.es,
+      languageCode: 'es-419',
+      languageName: name,
+    })
+    expect(view?.message).toBe(TEXT_MODE_MISMATCH_COPY.noObsHasBible(name))
+    expect(view?.message).toContain('Latin American Spanish (Español Latin America)')
   })
 
   test('matching content is not a mismatch (no auto switch)', () => {
@@ -68,6 +91,7 @@ describe('resolveTextModeMismatch', () => {
     expect(view?.kind).toBe('neither')
     expect(view?.message).toBe(TEXT_MODE_MISMATCH_COPY.neither('Swahili'))
     expect(view?.actionLabel).toBeNull()
+    expect(view?.actionShortLabel).toBeNull()
     expect(view?.switchScope).toBeNull()
     expect(mismatch('obs', 'sw', 'Swahili')?.kind).toBe('neither')
   })

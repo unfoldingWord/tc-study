@@ -2,8 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import {
   door43ToListNameFields,
   languageAnglicizedDisplayName,
+  languageEnglishCopyDisplayName,
   languageListDisplayName,
   languagePickerA11yLabel,
+  listedLanguageByCode,
   sentenceCaseLanguageName,
 } from './languageListDisplayName'
 
@@ -47,5 +49,42 @@ describe('languageListDisplayName', () => {
   test('sentence-cases lowercase autonyms when anglicized_name is missing', () => {
     expect(sentenceCaseLanguageName('español')).toBe('Español')
     expect(sentenceCaseLanguageName('Spanish')).toBe('Spanish')
+  })
+
+  test('es-419 picker stays native; English copy uses anglicizedName', () => {
+    const es419 = {
+      code: 'es-419',
+      name: 'Español Latin America',
+      anglicizedName: 'Latin American Spanish',
+    } as const
+    expect(languageListDisplayName(es419, 'es-419')).toBe('Español Latin America')
+    expect(languageAnglicizedDisplayName(es419, 'es-419')).toBe('Latin American Spanish')
+    expect(languagePickerA11yLabel(es419, 'es-419')).toBe(
+      'Español Latin America (Latin American Spanish)'
+    )
+    expect(listedLanguageByCode([ES_LISTED, es419], 'es-419')).toEqual(es419)
+    expect(listedLanguageByCode([ES_LISTED, es419], 'es-419')?.anglicizedName).not.toBe('Spanish')
+    expect(listedLanguageByCode([ES_LISTED, es419], 'es')?.anglicizedName).toBe('Spanish')
+  })
+
+  test('English sentence copy is anglicized with native in parentheses when they differ', () => {
+    const es419 = {
+      code: 'es-419',
+      name: 'Español Latin America',
+      anglicizedName: 'Latin American Spanish',
+    } as const
+    expect(languageEnglishCopyDisplayName(es419, 'es-419')).toBe(
+      'Latin American Spanish (Español Latin America)'
+    )
+    expect(languageEnglishCopyDisplayName(ES_LISTED, 'es')).toBe('Spanish (Español)')
+    expect(
+      languageEnglishCopyDisplayName({ name: 'English', anglicizedName: 'English' }, 'en')
+    ).toBe('English')
+    expect(languageEnglishCopyDisplayName({ name: 'English', anglicizedName: 'English' }, 'en')).not.toContain(
+      '(English)'
+    )
+    expect(languageEnglishCopyDisplayName({ anglicizedName: 'Spanish' }, 'es')).toBe('Spanish')
+    expect(languageEnglishCopyDisplayName({ name: 'español' }, 'es')).toBe('Español')
+    expect(languageListDisplayName(es419, 'es-419')).toBe('Español Latin America')
   })
 })

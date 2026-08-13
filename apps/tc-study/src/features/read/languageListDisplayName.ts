@@ -29,6 +29,13 @@ function pickLanguageLabel(
   return sentenceCaseLanguageName(raw)
 }
 
+/** Append `(parenthetical)` only when it differs from `primary` (case-insensitive). */
+function withParentheticalIfDifferent(primary: string, parenthetical: string): string {
+  const extra = parenthetical.trim()
+  if (!extra || extra.toLowerCase() === primary.toLowerCase()) return primary
+  return `${primary} (${extra})`
+}
+
 /** Picker/list card title: native `name` (autonym), then anglicizedName, then code. */
 export function languageListDisplayName(
   listed?: LanguageListNameFields | null,
@@ -45,6 +52,34 @@ export function languageAnglicizedDisplayName(
   return pickLanguageLabel(listed, fallbackCode, true)
 }
 
+/**
+ * English sentence subject: anglicizedName, with sentence-cased native `name`
+ * in parentheses only when both exist and they differ (case-insensitive).
+ * Picker cards stay native-primary via `languageListDisplayName`.
+ */
+export function languageEnglishCopyDisplayName(
+  listed?: LanguageListNameFields | null,
+  fallbackCode = ''
+): string {
+  const subject = languageAnglicizedDisplayName(listed, fallbackCode)
+  const nativeRaw = listed?.name?.trim() || ''
+  const anglicizedRaw = listed?.anglicizedName?.trim() || ''
+  if (!nativeRaw || !anglicizedRaw) return subject
+  return withParentheticalIfDifferent(subject, languageListDisplayName(listed, ''))
+}
+
+/**
+ * Exact BCP-47 match against picker/list metadata. Never collapses `es-419` → `es`.
+ */
+export function listedLanguageByCode<T extends LanguageListNameFields>(
+  languages: readonly T[] | undefined | null,
+  code: string
+): T | undefined {
+  const want = code.trim().toLowerCase()
+  if (!want || !languages) return undefined
+  return languages.find((lang) => (lang.code || '').trim().toLowerCase() === want)
+}
+
 /** Card `title` / `aria-label`: native primary, anglicized in parentheses when it differs. */
 export function languagePickerA11yLabel(
   listed?: LanguageListNameFields | null,
@@ -52,8 +87,7 @@ export function languagePickerA11yLabel(
 ): string {
   const native = languageListDisplayName(listed, fallbackCode)
   const anglicized = languageAnglicizedDisplayName(listed, '')
-  if (anglicized && anglicized !== native) return `${native} (${anglicized})`
-  return native
+  return withParentheticalIfDifferent(native, anglicized)
 }
 
 /** Map a Door43 API language into list `name` (autonym) + `anglicizedName`. */

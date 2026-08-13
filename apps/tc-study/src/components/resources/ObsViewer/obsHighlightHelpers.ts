@@ -5,10 +5,10 @@ import type { ObsFrameQuoteEntry } from '../../../signals/studioSignals'
 export const OBS_QUOTE_CAPABLE_TYPES = new Set(['obs-notes', 'obs-words-links'])
 
 export const QUOTE_BUTTON_ACTIVE_CLASS =
-  'bg-yellow-100 underline decoration-dotted decoration-amber-500 decoration-1 underline-offset-2 rounded-sm'
+  'bg-highlight underline decoration-dotted decoration-underline decoration-1 underline-offset-2 rounded-sm'
 
 export const QUOTE_BUTTON_IDLE_CLASS =
-  'underline decoration-dotted decoration-gray-400 decoration-1 underline-offset-2 hover:bg-gray-100/60 rounded-sm'
+  'underline decoration-dotted decoration-underline decoration-1 underline-offset-2 hover:bg-muted rounded-sm'
 
 export function sortedSourceIdsKey(ids: string[]): string {
   return [...ids].sort().join('\0')

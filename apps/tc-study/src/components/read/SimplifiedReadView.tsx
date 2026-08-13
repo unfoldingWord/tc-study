@@ -164,6 +164,7 @@ function ReadPanelsArea(props: {
           hoverPanelId === 'panel-2' ? dropIndex ?? undefined : undefined
         }
         onHelpsLanguageSelected={onHelpsLanguageSelected}
+        helpsLanguageCode={helpsLanguageCode}
       />
 
       <EntryResourceModal onEntryLinkClick={onEntryLinkClick} />

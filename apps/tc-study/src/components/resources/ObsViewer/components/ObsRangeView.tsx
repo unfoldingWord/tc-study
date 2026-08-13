@@ -46,7 +46,7 @@ export function ObsRangeView(props: {
         if (!storyData) {
           return (
             <div key={sNum} className="flex items-center gap-2 py-2">
-              <LoadingSpinner size="sm" label={`Loading story ${sNum}`} className="text-blue-600" />
+              <LoadingSpinner size="sm" label={`Loading story ${sNum}`} className="text-accent" />
             </div>
           )
         }
@@ -61,7 +61,7 @@ export function ObsRangeView(props: {
 
         return (
           <div key={sNum}>
-            <h3 className="text-base font-bold text-gray-700 border-b border-gray-200 pb-1 mb-5">
+            <h3 className="text-base font-bold text-scripture-fg border-b border-border pb-1 mb-5">
               {storyData.title}
             </h3>
             <div className="space-y-8">
@@ -75,11 +75,11 @@ export function ObsRangeView(props: {
                     : null
                 return (
                   <div key={frame.frameNumber} className="space-y-3">
-                    <p className="text-xs text-gray-400 font-medium">
+                    <p className="text-xs text-scripture-muted font-medium">
                       {sNum} · {frame.frameNumber}
                     </p>
                     {resolved ? (
-                      <div className="text-gray-900 leading-relaxed whitespace-pre-wrap">
+                      <div className="text-scripture-fg leading-relaxed whitespace-pre-wrap">
                         <ObsQuoteSpans
                           spans={resolved.spans}
                           enriched={resolved.enriched}
@@ -94,7 +94,7 @@ export function ObsRangeView(props: {
                         />
                       </div>
                     ) : (
-                      <p className="text-gray-900 leading-relaxed whitespace-pre-wrap">
+                      <p className="text-scripture-fg leading-relaxed whitespace-pre-wrap">
                         {frame.text}
                       </p>
                     )}
@@ -102,7 +102,7 @@ export function ObsRangeView(props: {
                       <img
                         src={frame.resolvedSrc || frame.imageUrl}
                         alt=""
-                        className="w-full rounded-lg border border-gray-200 shadow-sm bg-gray-50"
+                        className="w-full rounded-lg border border-border shadow-sm bg-muted"
                         loading="lazy"
                       />
                     )}

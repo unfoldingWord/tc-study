@@ -8,6 +8,8 @@ import { createContext, useContext, type ReactNode } from 'react'
 export interface HelpsLanguageActions {
   openHelpsPicker: () => void
   selectHelpsLanguage: (languageCode: string) => void
+  /** Full selected helps code (`es-419`), not CombinedHelps' collapsed primary (`es`). */
+  selectedLanguageCode?: string | null
 }
 
 const HelpsLanguageActionsContext = createContext<HelpsLanguageActions | null>(null)

@@ -9,7 +9,7 @@
 
 import type { BCVReference, NavigationCatalogScope } from '../../contexts/types'
 import type { LanguageAvailabilityFlags } from './languageAvailability'
-import { languageAnglicizedDisplayName } from './languageListDisplayName'
+import { languageEnglishCopyDisplayName } from './languageListDisplayName'
 import { loadLanguagesCache } from './languagesCache'
 
 export type TextModeMismatchKind = 'obs-only' | 'bible-only' | 'neither'
@@ -24,6 +24,8 @@ export const TEXT_MODE_MISMATCH_COPY = {
     `${name} doesn't have a Bible or Open Bible Stories yet.`,
   switchToStories: 'Switch to Stories',
   switchToBible: 'Switch to Bible',
+  stories: 'Stories',
+  bible: 'Bible',
 } as const
 
 export interface TextModeMismatchView {
@@ -32,6 +34,8 @@ export interface TextModeMismatchView {
   languageName: string
   message: string
   actionLabel: string | null
+  /** Compact visible action (`Stories` / `Bible`); full sentence lives in `actionLabel`. */
+  actionShortLabel: string | null
   switchScope: NavigationCatalogScope | null
 }
 
@@ -60,6 +64,7 @@ export function resolveTextModeMismatch(options: {
       languageName: name,
       message: TEXT_MODE_MISMATCH_COPY.neither(name),
       actionLabel: null,
+      actionShortLabel: null,
       switchScope: null,
     }
   }
@@ -71,6 +76,7 @@ export function resolveTextModeMismatch(options: {
       languageName: name,
       message: TEXT_MODE_MISMATCH_COPY.noObsHasBible(name),
       actionLabel: TEXT_MODE_MISMATCH_COPY.switchToBible,
+      actionShortLabel: TEXT_MODE_MISMATCH_COPY.bible,
       switchScope: 'scripture',
     }
   }
@@ -81,6 +87,7 @@ export function resolveTextModeMismatch(options: {
     languageName: name,
     message: TEXT_MODE_MISMATCH_COPY.noBibleHasObs(name),
     actionLabel: TEXT_MODE_MISMATCH_COPY.switchToStories,
+    actionShortLabel: TEXT_MODE_MISMATCH_COPY.stories,
     switchScope: 'obs',
   }
 }
@@ -98,7 +105,7 @@ export function textModeMismatchFromCache(options: {
     navigationScope: options.navigationScope,
     availability: lang?.availability,
     languageCode: code,
-    languageName: languageAnglicizedDisplayName(lang, code),
+    languageName: languageEnglishCopyDisplayName(lang, code),
   })
 }
 

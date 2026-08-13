@@ -39,7 +39,7 @@ export function ObsSingleFrameView(props: {
     <div className="max-w-2xl mx-auto space-y-4">
       <div
         ref={frameTextRef}
-        className="prose prose-base max-w-none text-gray-900 whitespace-pre-wrap leading-relaxed"
+        className="prose prose-base max-w-none text-scripture-fg prose-p:text-scripture-fg prose-headings:text-scripture-fg whitespace-pre-wrap leading-relaxed"
       >
         <ObsQuoteSpans
           spans={spans}
@@ -56,7 +56,7 @@ export function ObsSingleFrameView(props: {
         <img
           src={currentFrame.resolvedSrc || currentFrame.imageUrl}
           alt=""
-          className="w-full rounded-lg border border-gray-200 shadow-sm bg-gray-50"
+          className="w-full rounded-lg border border-border shadow-sm bg-muted"
           loading="lazy"
         />
       ) : null}

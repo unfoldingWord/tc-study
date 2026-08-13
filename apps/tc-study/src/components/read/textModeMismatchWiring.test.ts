@@ -15,7 +15,10 @@ describe('text-mode mismatch wiring (issue #25)', () => {
     expect(panelSrc).toContain('onSwitchTextMode')
     expect(panelSrc).toContain('panel1Mismatch')
     expect(panelSrc).toContain('actionLabel={panel1Mismatch?.actionLabel')
+    expect(panelSrc).toContain('actionShortLabel={panel1Mismatch?.actionShortLabel')
+    expect(panelSrc).toContain('emptyKind={panel1Mismatch?.kind}')
     expect(panelSrc).toContain("panelId === 'panel-1'")
+    expect(panelSrc).toContain('flex-1 min-h-0 overflow-auto bg-surface')
   })
 
   test('panel-2 keeps the helps empty CTA from A2', () => {
@@ -41,6 +44,6 @@ describe('text-mode mismatch wiring (issue #25)', () => {
   })
 
   test('mismatch empty copy uses anglicized English names, not autonyms', () => {
-    expect(mismatchSrc).toContain('languageAnglicizedDisplayName')
+    expect(mismatchSrc).toContain('languageEnglishCopyDisplayName')
   })
 })
