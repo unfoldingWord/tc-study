@@ -1,0 +1,246 @@
+@import "tailwindcss";
+
+/*
+ * Theme tokens (boneless): semantic CSS variables → Tailwind color utilities.
+ * Switch via `html.dark` (or data-theme). Prefer these over one-off `dark:` classes.
+ * See docs/THEME.md
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-canvas: var(--theme-canvas);
+  --color-surface: var(--theme-surface);
+  --color-elevated: var(--theme-elevated);
+  --color-tab-selected: var(--theme-tab-selected);
+  --color-muted: var(--theme-muted);
+  --color-border: var(--theme-border);
+  --color-border-subtle: var(--theme-border-subtle);
+  --color-fg: var(--theme-fg);
+  --color-fg-secondary: var(--theme-fg-secondary);
+  --color-fg-muted: var(--theme-fg-muted);
+  --color-accent: var(--theme-accent);
+  --color-accent-hover: var(--theme-accent-hover);
+  --color-accent-soft: var(--theme-accent-soft);
+  --color-accent-fg: var(--theme-accent-fg);
+  --color-scripture: var(--theme-scripture);
+  --color-scripture-fg: var(--theme-scripture-fg);
+  --color-scripture-muted: var(--theme-scripture-muted);
+  --color-highlight: var(--theme-highlight);
+  --color-highlight-strong: var(--theme-highlight-strong);
+  --color-underline: var(--theme-underline);
+  --color-danger: var(--theme-danger);
+  --color-danger-soft: var(--theme-danger-soft);
+  --color-panel-1-soft: var(--theme-panel-1-soft);
+  --color-panel-1: var(--theme-panel-1);
+  --color-panel-1-fg: var(--theme-panel-1-fg);
+  --color-panel-2-soft: var(--theme-panel-2-soft);
+  --color-panel-2: var(--theme-panel-2);
+  --color-panel-2-fg: var(--theme-panel-2-fg);
+  --color-helps: var(--theme-helps);
+  --color-helps-soft: var(--theme-helps-soft);
+  --color-helps-fg: var(--theme-helps-fg);
+  --color-chip-quote: var(--theme-chip-quote);
+  --color-chip-quote-hover: var(--theme-chip-quote-hover);
+  --color-chip-quote-fg: var(--theme-chip-quote-fg);
+  --color-overlay: var(--theme-overlay);
+  --color-ring-offset: var(--theme-canvas);
+
+  /* Hierarchy: chrome / content spacing + caption type (iOS-like density) */
+  --spacing-chrome: 0.5rem; /* 8px — bar & header insets */
+  --spacing-chrome-tight: 0.375rem; /* 6px — compact vertical chrome */
+  --spacing-chrome-bar: 2.5rem; /* 40px — panel header strip (fixed) */
+  --spacing-chrome-control: 1.75rem; /* 28px — tab / compact control height */
+  --spacing-content: 0.75rem; /* 12px — list / secondary content pad */
+  --spacing-content-lg: 1rem; /* 16px — scripture reading pad */
+  --spacing-stack: 0.5rem; /* 8px — tight vertical stacks */
+  --spacing-stack-lg: 0.75rem; /* 12px — group stacks */
+  --text-micro: 0.625rem; /* 10px — badges */
+  --text-caption: 0.6875rem; /* 11px — chrome labels */
+  --text-chrome: 0.75rem; /* 12px — tabs / compact UI */
+}
+
+/* —— Light (default): warm study paper / soft gray shell —— */
+:root {
+  color-scheme: light;
+
+  --theme-canvas: #f4f2ef;
+  --theme-surface: #ffffff;
+  --theme-elevated: #ffffff;
+  /* Selected resource tab on panel-*-soft strip — elevated white in light */
+  --theme-tab-selected: #ffffff;
+  --theme-muted: #ebe8e4;
+  --theme-border: #e0dcd6;
+  --theme-border-subtle: #efece8;
+
+  --theme-fg: #1c1917;
+  --theme-fg-secondary: #57534e;
+  --theme-fg-muted: #a8a29e;
+
+  --theme-accent: #2563eb;
+  --theme-accent-hover: #1d4ed8;
+  --theme-accent-soft: #eff6ff;
+  --theme-accent-fg: #1e40af;
+
+  --theme-scripture: #fffef9;
+  --theme-scripture-fg: #1c1917;
+  --theme-scripture-muted: #78716c;
+
+  --theme-highlight: #fef08a;
+  --theme-highlight-strong: #fde047;
+  --theme-underline: #a8a29e;
+
+  --theme-danger: #dc2626;
+  --theme-danger-soft: #fef2f2;
+
+  --theme-panel-1-soft: #eff6ff;
+  --theme-panel-1: #2563eb;
+  --theme-panel-1-fg: #1d4ed8;
+
+  --theme-panel-2-soft: #f5f3ff;
+  --theme-panel-2: #7c3aed;
+  --theme-panel-2-fg: #6d28d9;
+
+  --theme-helps: #7c3aed;
+  --theme-helps-soft: #f5f3ff;
+  --theme-helps-fg: #5b21b6;
+
+  /* Helps reading chips (scripture / OBS quotes) — verse headers use muted/50 */
+  --theme-chip-quote: #eef4ff;
+  --theme-chip-quote-hover: #e0eaff;
+  --theme-chip-quote-fg: #1e40af;
+
+  /* Modal / dialog scrim */
+  --theme-overlay: rgb(0 0 0 / 0.5);
+}
+
+/* —— Dark: calm charcoal with clearer surface steps (not OLED / not muddy) —— */
+.dark {
+  color-scheme: dark;
+
+  /* Shell: deeper canvas so surface / scripture / soft fills read as distinct layers */
+  --theme-canvas: #121417;
+  --theme-surface: #1e2228;
+  --theme-elevated: #2c3138;
+  /* Selected tab — darker than panel-*-soft strip (surface reads too light there) */
+  --theme-tab-selected: #0e1013;
+  --theme-muted: #3a4049;
+  --theme-border: #4a515a;
+  --theme-border-subtle: #323840;
+
+  --theme-fg: #f0ebe6;
+  --theme-fg-secondary: #c2bbb3;
+  --theme-fg-muted: #8a837c;
+
+  --theme-accent: #7bb8ff;
+  --theme-accent-hover: #a5d0ff;
+  /* Soft fill must clear canvas — used by BCV pill + accent chips */
+  --theme-accent-soft: #335578;
+  /* High-contrast text on accent-soft (BCV pill, badges) */
+  --theme-accent-fg: #e8f1ff;
+
+  /* Scripture paper lifted above canvas for readable reading pane */
+  --theme-scripture: #2a3038;
+  --theme-scripture-fg: #f2eee8;
+  --theme-scripture-muted: #a8a29a;
+
+  --theme-highlight: #5c4a14;
+  --theme-highlight-strong: #7a641c;
+  --theme-underline: #a8a29a;
+
+  --theme-danger: #f87171;
+  --theme-danger-soft: #3f1d1d;
+
+  --theme-panel-1-soft: #335578;
+  --theme-panel-1: #7bb8ff;
+  --theme-panel-1-fg: #dbeafe;
+
+  --theme-panel-2-soft: #322b45;
+  --theme-panel-2: #b39dfa;
+  --theme-panel-2-fg: #ddd6fe;
+
+  --theme-helps: #b39dfa;
+  --theme-helps-soft: #322b45;
+  --theme-helps-fg: #ddd6fe;
+
+  --theme-chip-quote: #334866;
+  --theme-chip-quote-hover: #3d5678;
+  --theme-chip-quote-fg: #e8f1ff;
+
+  --theme-overlay: rgb(0 0 0 / 0.55);
+}
+
+@layer base {
+  * {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-canvas text-fg;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-canvas rounded-lg;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--theme-muted);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--theme-fg-muted);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--theme-fg-secondary);
+  }
+}
+
+@layer utilities {
+  /*
+   * Dynamic viewport height: accounts for mobile browser UI (address bar, nav bar).
+   * 100dvh = visible viewport; avoids needing to scroll to see bottom nav on phones.
+   * Fallback to 100vh for older browsers.
+   */
+  .h-dynamic-screen {
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .min-h-dynamic-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* Line clamp utilities */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

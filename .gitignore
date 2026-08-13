@@ -46,6 +46,9 @@ Thumbs.db
 apps/tc-study/public/preloaded/
 apps/tc-study/.bundle-cache/
 apps/tc-study/.bt-cache/
+apps/tc-study-next/public/preloaded/
+apps/tc-study-next/.bundle-cache/
+apps/tc-study-next/.bt-cache/
 apps/mobile/resource-downloader/app.db
 exports/uw-translation-resources/
 packages/catalog-cli/test-*.zip

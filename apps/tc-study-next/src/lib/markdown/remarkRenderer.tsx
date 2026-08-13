@@ -1,0 +1,297 @@
+/**
+ * Remark Markdown Renderer
+ * 
+ * Converts markdown content to React components using the unified/remark ecosystem.
+ * Similar to bt-studio's approach but adapted for tc-study architecture.
+ */
+
+import { BookOpen, GraduationCap, Hash } from 'lucide-react'
+import React, { Fragment } from 'react'
+import * as prod from 'react/jsx-runtime'
+import rehypeReact from 'rehype-react'
+import remarkGfm from 'remark-gfm'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
+import { unified } from 'unified'
+import { getRcLinkDisplayName, isRelativeLink, parseRcLink } from './rc-link-parser'
+
+/** Props shape for rehype-react element mappings (typed; no explicit any). */
+type MdElementProps = React.HTMLAttributes<HTMLElement> & {
+  href?: string
+  className?: string
+  children?: React.ReactNode
+}
+
+export interface MarkdownRendererOptions {
+
+  allowDangerousHtml?: boolean
+  linkTarget?: '_blank' | '_self'
+  headerBaseLevel?: number
+  customComponents?: Record<string, React.ComponentType<MdElementProps>>
+  
+  // Handler for internal links (rc links, relative paths, etc.)
+  // linkText is the text content of the link (useful for parsing verse ranges)
+  onInternalLinkClick?: (href: string, linkType: 'rc' | 'relative' | 'unknown', linkText?: string) => void
+  
+  // Resolver for getting display titles for rc:// links (TW/TA entries)
+  // Returns null if no title is available (will use link text or fallback)
+  getEntryTitle?: (rcLink: string) => string | null
+}
+
+export class RemarkMarkdownRenderer {
+  /** Plugin chain narrows `Processor<>` generics inconsistently across versions */
+  private processor: unknown = null
+  private options: MarkdownRendererOptions
+
+  constructor(options: MarkdownRendererOptions = {}) {
+    this.options = {
+      linkTarget: '_blank',
+      headerBaseLevel: 3,
+      allowDangerousHtml: false,
+      ...options
+    }
+    this.initializeProcessor()
+  }
+
+  /**
+   * Initialize the remark processor with plugins
+   */
+  private initializeProcessor() {
+    if (this.processor) return this.processor
+
+    this.processor = unified()
+      .use(remarkParse) // Parse markdown to AST
+      .use(remarkGfm) // Add GitHub Flavored Markdown support (tables, strikethrough, etc.)
+      .use(remarkRehype, { 
+        allowDangerousHtml: this.options.allowDangerousHtml || false 
+      }) // Convert markdown AST to HTML AST
+      .use(rehypeReact, {
+        Fragment,
+        jsx: prod.jsx,
+        jsxs: prod.jsxs,
+        components: {
+          // Standard component mappings with Tailwind classes
+          a: (props: MdElementProps) => {
+            const href = props.href || ''
+            
+            // Extract link text for passing to handler (useful for parsing verse ranges)
+            const getLinkText = (): string => {
+              const children = props.children
+              if (typeof children === 'string') return children
+              if (Array.isArray(children)) {
+                return children.map(c => typeof c === 'string' ? c : '').join('')
+              }
+              return ''
+            }
+            const linkText = getLinkText()
+            
+            // Handle rc:// links (Door43 resource links)
+            if (href.startsWith('rc://')) {
+              const parsed = parseRcLink(href)
+              
+              if (!parsed.isValid) {
+                // Invalid rc:// link - render as disabled link
+                return (
+                  <span className="text-fg-muted cursor-not-allowed" title={`Invalid rc:// link: ${href}`}>
+                    {props.children}
+                  </span>
+                )
+              }
+
+              // Get icon based on resource type (color is shared semantic accent — not type-tinted)
+              const Icon = parsed.resourceType === 'academy' 
+                ? GraduationCap 
+                : parsed.resourceType === 'words'
+                ? Hash
+                : BookOpen
+
+              // Try to get entry title from resolver
+              let displayText = linkText
+              if (this.options.getEntryTitle) {
+                const title = this.options.getEntryTitle(href)
+                if (title) {
+                  displayText = title
+                } else if (linkText === href || linkText.startsWith('rc://')) {
+                  // If no title and linkText is the raw link, use fallback from parsed data
+                  displayText = getRcLinkDisplayName(parsed)
+                }
+              } else if (linkText === href || linkText.startsWith('rc://')) {
+                // No resolver but linkText is raw link - use fallback
+                displayText = getRcLinkDisplayName(parsed)
+              }
+
+              const linkTitle = `${parsed.resourceAbbrev.toUpperCase()}: ${parsed.entryId}`
+              return (
+                <button
+                  type="button"
+                  onClick={() => this.options.onInternalLinkClick?.(href, 'rc', linkText)}
+                  className="inline-flex items-center gap-1 text-accent hover:text-accent-hover hover:bg-muted rounded px-1 py-0.5 transition-colors cursor-pointer font-medium"
+                  title={linkTitle}
+                  aria-label={linkTitle}
+                >
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{displayText}</span>
+                </button>
+              )
+            }
+            
+            // Handle relative links (../, ./)
+            if (isRelativeLink(href)) {
+              const relativeTitle = `Relative link: ${href}`
+              return (
+                <button
+                  type="button"
+                  onClick={() => this.options.onInternalLinkClick?.(href, 'relative', linkText)}
+                  className="inline-flex items-center gap-1 text-fg-secondary hover:text-fg hover:bg-muted rounded px-1 py-0.5 transition-colors cursor-pointer"
+                  title={relativeTitle}
+                  aria-label={relativeTitle}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>{props.children}</span>
+                </button>
+              )
+            }
+            
+            // External link
+            return (
+              <a 
+                {...props} 
+                target={this.options.linkTarget || '_blank'}
+                rel={this.options.linkTarget === '_blank' ? 'noopener noreferrer' : undefined}
+                className="text-accent hover:text-accent-hover underline"
+              />
+            )
+          },
+          h1: (props: MdElementProps) => <h1 {...props} className="text-2xl font-bold mb-4 mt-6 first:mt-0" />,
+          h2: (props: MdElementProps) => <h2 {...props} className="text-xl font-semibold mb-3 mt-5" />,
+          h3: (props: MdElementProps) => <h3 {...props} className="text-lg font-semibold mb-2 mt-4" />,
+          h4: (props: MdElementProps) => <h4 {...props} className="text-base font-semibold mb-2 mt-3" />,
+          h5: (props: MdElementProps) => <h5 {...props} className="text-sm font-semibold mb-1 mt-2" />,
+          h6: (props: MdElementProps) => <h6 {...props} className="text-xs font-semibold mb-1 mt-2" />,
+          p: (props: MdElementProps) => <p {...props} className="mb-4 last:mb-0 leading-relaxed" />,
+          ul: (props: MdElementProps) => <ul {...props} className="mb-4 ml-6 list-disc space-y-1" />,
+          ol: (props: MdElementProps) => <ol {...props} className="mb-4 ml-6 list-decimal space-y-1" />,
+          li: (props: MdElementProps) => <li {...props} className="leading-relaxed" />,
+          code: (props: MdElementProps) => {
+            // Inline code (no className means inline)
+            if (!props.className) {
+              return (
+                <code {...props} className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800 dark:text-gray-200" />
+              )
+            }
+            // Code block (has className from language)
+            return <code {...props} />
+          },
+          pre: (props: MdElementProps) => (
+            <pre {...props} className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4 text-sm" />
+          ),
+          blockquote: (props: MdElementProps) => (
+            <blockquote
+              {...props}
+              // Prefer semantic tokens; avoid OS-only dark:text-* on themed surfaces.
+              className="border-l-4 border-blue-300 pl-4 italic mb-4 text-slate-900 [&_p]:text-slate-900 [&_em]:text-inherit [&_strong]:text-inherit [&_blockquote]:text-slate-900 [&_blockquote_p]:text-slate-900"
+            />
+          ),
+          strong: (props: MdElementProps) => <strong {...props} className="font-semibold" />,
+          em: (props: MdElementProps) => <em {...props} className="italic" />,
+          hr: (props: MdElementProps) => <hr {...props} className="my-6 border-t border-gray-300" />,
+          
+          // Table components (GitHub Flavored Markdown)
+          table: (props: MdElementProps) => (
+            <div className="overflow-x-auto mb-4">
+              <table {...props} className="min-w-full border-collapse border border-gray-300 dark:border-gray-700" />
+            </div>
+          ),
+          thead: (props: MdElementProps) => <thead {...props} className="bg-gray-50 dark:bg-gray-800" />,
+          tbody: (props: MdElementProps) => <tbody {...props} />,
+          tr: (props: MdElementProps) => <tr {...props} className="border-b border-gray-200 dark:border-gray-700" />,
+          th: (props: MdElementProps) => (
+            <th {...props} className="border border-gray-300 dark:border-gray-700 px-4 py-2 text-left font-semibold" />
+          ),
+          td: (props: MdElementProps) => (
+            <td {...props} className="border border-gray-300 dark:border-gray-700 px-4 py-2" />
+          ),
+          
+          // User custom components (override everything else)
+          ...this.options.customComponents
+        }
+      }) // Convert HTML AST to React components
+
+    return this.processor
+  }
+
+  /**
+   * Update the renderer options
+   */
+  updateOptions(newOptions: Partial<MarkdownRendererOptions>) {
+    this.options = { ...this.options, ...newOptions }
+    this.processor = null // Force re-initialization
+    this.initializeProcessor()
+  }
+
+  /**
+   * Parse markdown content and return React components
+   */
+  async renderToReact(content: string): Promise<React.ReactNode> {
+    if (!content) return null
+
+    // Preprocess content
+    const preprocessedContent = this.preprocessContent(content)
+
+    const processor = this.initializeProcessor() as {
+      process: (content: string) => Promise<{ result: unknown }>
+    }
+    const file = await processor.process(preprocessedContent)
+
+    return file.result as React.ReactNode
+  }
+
+  /**
+   * Preprocess content to handle escaped characters and special patterns
+   */
+  private preprocessContent(content: string): string {
+    let processed = content
+      // Handle escaped characters
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '  ')
+      .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'")
+      .replace(/\\r/g, '\r')
+      // Normalize line endings
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+
+    // Handle standalone rc links (Door43 format)
+    // Convert double-bracket rc links to markdown format
+    processed = processed.replace(
+      /\[\[rc:\/\/([^\]]+)\]\]/g,
+      '[rc://$1](rc://$1)'
+    )
+
+    // Handle standalone relative links
+    // Convert [[../path]] to [../path](../path)
+    processed = processed.replace(
+      /\[\[(\.\.[^\]]+)\]\]/g,
+      '[$1]($1)'
+    )
+
+    return processed
+  }
+
+  /**
+   * Render markdown synchronously (for simple use cases)
+   * Returns a Promise for API consistency
+   */
+  render(content: string): Promise<React.ReactNode> {
+    return this.renderToReact(content)
+  }
+}
+
+// Export a singleton instance for convenience
+export const remarkRenderer = new RemarkMarkdownRenderer({
+  linkTarget: '_blank',
+  headerBaseLevel: 3,
+  allowDangerousHtml: false
+})
+
+export default RemarkMarkdownRenderer

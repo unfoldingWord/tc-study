@@ -1,0 +1,158 @@
+import { BookOpen, FileText } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { formatVerseRefParts, getBookTitleWithFallback } from '../../../../utils/bookNames'
+import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
+import { ResourceViewerHeader } from '../../common/ResourceViewerHeader'
+import {
+  HELPS_LIST_PANEL,
+  HELPS_VERSE_COUNT,
+  HELPS_VERSE_HEADER,
+  HELPS_VERSE_HEADER_ICON,
+} from '../../helpsCardStyles'
+import { TranslationNoteCard, type NoteWithTokens } from './TranslationNoteCard'
+import type { ResourceInfo } from '../../../../contexts/types'
+
+export interface TranslationNotesListProps {
+  resource: ResourceInfo
+  effectiveResource: ResourceInfo
+  bookCode?: string
+  bookTitleSource: unknown
+  languageDirection: 'ltr' | 'rtl'
+  /** Inline filter chip for header actions (no extra chrome row). */
+  filterScopeBar?: ReactNode
+  loading: boolean
+  error: string | null | undefined
+  notesByVerse: Record<string, NoteWithTokens[]>
+  selectedNoteId: string | null
+  targetSourceId: string | null | undefined
+  resourceKey: string
+  isObs: boolean
+  loadingTitles: Set<string>
+  getTATitle: (note: NoteWithTokens) => string
+  getEntryTitle: (rcLink: string) => string | null
+  onSupportReferenceClick: (supportRef: string) => void
+  onEntryLinkClick?: (resourceKey: string, entryId: string) => void
+  onQuoteClick: (note: NoteWithTokens) => void
+  onNoteSelect: (note: { id: string }) => void
+}
+
+export function TranslationNotesList({
+  resource,
+  effectiveResource,
+  bookCode,
+  bookTitleSource,
+  languageDirection,
+  filterScopeBar,
+  loading,
+  error,
+  notesByVerse,
+  selectedNoteId,
+  targetSourceId,
+  resourceKey,
+  isObs,
+  loadingTitles,
+  getTATitle,
+  getEntryTitle,
+  onSupportReferenceClick,
+  onEntryLinkClick,
+  onQuoteClick,
+  onNoteSelect,
+}: TranslationNotesListProps) {
+  return (
+    <div className={HELPS_LIST_PANEL} dir={languageDirection}>
+      <ResourceViewerHeader
+        title={resource.title}
+        icon={FileText}
+        direction={languageDirection}
+        infoResource={resource}
+        actions={filterScopeBar ?? undefined}
+      />
+      <div className="p-content">
+        {loading ? (
+          <LoadingSpinner
+            centered
+            label="Loading content"
+            className="text-helps"
+            containerClassName="py-8"
+          />
+        ) : error ? (
+          <div className="text-center py-8 text-fg-muted">
+            <BookOpen className="w-10 h-10 mx-auto mb-2 text-fg-muted opacity-50" />
+            <p className="text-sm">{error}</p>
+          </div>
+        ) : Object.keys(notesByVerse).length === 0 ? (
+          <div className="flex items-center justify-center h-full" title="No notes for this passage">
+            <BookOpen className="w-12 h-12 text-fg-muted opacity-60" />
+          </div>
+        ) : (
+          <div className="space-y-stack-lg">
+            {Object.entries(notesByVerse).map(([verse, verseNotes]) => {
+              const resolved = getBookTitleWithFallback(
+                effectiveResource,
+                bookTitleSource as never,
+                bookCode ?? ''
+              )
+              return (
+                <div key={verse} className="space-y-stack">
+                  <div className={HELPS_VERSE_HEADER} dir={languageDirection}>
+                    <BookOpen className={HELPS_VERSE_HEADER_ICON} />
+                    <h3 className="text-chrome font-semibold text-fg-secondary">
+                      {(() => {
+                        const { bookPart, numberPart } = formatVerseRefParts(
+                          resolved,
+                          verse,
+                          languageDirection === 'rtl'
+                        )
+                        return languageDirection === 'rtl' ? (
+                          <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
+                            <span>{numberPart}</span>
+                            <span>{bookPart}</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex gap-1" dir="ltr">
+                            <span>{bookPart}</span>
+                            <span>{numberPart}</span>
+                          </span>
+                        )
+                      })()}
+                    </h3>
+                    <span className={HELPS_VERSE_COUNT}>{verseNotes.length}</span>
+                  </div>
+
+                  {verseNotes.map((note, idx) => {
+                    const entryTitle = note.supportReference?.startsWith('rc://')
+                      ? getEntryTitle(note.supportReference)
+                      : null
+                    const taTitle = entryTitle ?? getTATitle(note)
+                    const isLoadingTitle = note.supportReference
+                      ? loadingTitles.has(note.supportReference.match(/rc:\/\/\*\/ta\/man\/(.+)/)?.[1] || '')
+                      : false
+
+                    return (
+                      <TranslationNoteCard
+                        key={note.id || `${verse}-${idx}`}
+                        note={note}
+                        isSelected={selectedNoteId === note.id}
+                        onSupportReferenceClick={onSupportReferenceClick}
+                        onEntryLinkClick={onEntryLinkClick}
+                        onQuoteClick={onQuoteClick}
+                        onClick={onNoteSelect}
+                        targetResourceId={targetSourceId || undefined}
+                        resourceKey={resourceKey}
+                        languageDirection={languageDirection}
+                        taTitle={taTitle ?? undefined}
+                        isLoadingTATitle={isLoadingTitle}
+                        getEntryTitle={getEntryTitle}
+                        obsMode={isObs}
+                      />
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,133 @@
+/**
+ * Resource Tabs – always-draggable tabs (including single-tab panels).
+ * Pointer FSM lives in TabDnDProvider; this strip handles overflow vs drag.
+ */
+
+import React from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { useTabDnDOptional } from '../../features/dnd/TabDnDContext'
+import type { StudioPanelId } from '../../features/studio/studioDnDHelpers'
+import type { TabPresentation } from '../../features/tabs'
+import { SortableTab } from './SortableTab'
+
+interface Resource {
+  id: string
+  key: string
+  title: string
+  languageCode?: string
+  owner?: string
+  type?: string
+}
+
+interface ResourceTabsProps {
+  resources: Resource[]
+  currentIndex: number
+  onIndexChange: (index: number) => void
+  /** Resolve tab presentation (icon + short label) from resource */
+  getTabPresentation: (resource: Resource) => TabPresentation
+  colorScheme: 'blue' | 'purple'
+  panelId?: string
+  /** Show a ghost placeholder tab when dragging from another panel */
+  showDropPlaceholder?: boolean
+  /** Label for the placeholder tab */
+  placeholderLabel?: string
+  /** Icon for the placeholder tab */
+  placeholderIcon?: LucideIcon | null
+  /** Index where the placeholder should appear (null = end of tabs) */
+  placeholderIndex?: number | null
+}
+
+export function ResourceTabs({
+  resources,
+  currentIndex,
+  onIndexChange,
+  getTabPresentation,
+  colorScheme,
+  panelId: panelIdProp,
+  showDropPlaceholder = false,
+  placeholderLabel = '',
+  placeholderIcon = null,
+  placeholderIndex = null,
+}: ResourceTabsProps) {
+  const { scrollLocked } = useTabDnDOptional()
+  const panelId = (panelIdProp ?? 'panel-1') as StudioPanelId
+
+  const placeholderColors = {
+    blue: 'bg-panel-1-soft text-panel-1 border-panel-1/40 border-dashed',
+    purple: 'bg-panel-2-soft text-panel-2 border-panel-2/40 border-dashed',
+  }
+
+  const PlaceholderIcon = placeholderIcon
+  const placeholderTabClass = `
+    flex-shrink-0 h-chrome-control min-h-chrome-control px-chrome text-chrome font-medium
+    whitespace-nowrap leading-none
+    inline-flex items-center justify-center gap-chrome-tight
+    border-2 rounded-md animate-pulse
+  `
+  const placeholderElement = showDropPlaceholder ? (
+    <div
+      key="cross-panel-placeholder"
+      className={`${placeholderTabClass} ${placeholderColors[colorScheme]}`}
+    >
+      {PlaceholderIcon ? <PlaceholderIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden /> : null}
+      {placeholderLabel || (!PlaceholderIcon ? 'Drop here' : null)}
+    </div>
+  ) : null
+
+  if (resources.length === 0) {
+    return (
+      <div className="flex-1 min-w-0 h-full flex items-center">
+        {showDropPlaceholder && (
+          <div className={`${placeholderTabClass} ${placeholderColors[colorScheme]}`}>
+            {PlaceholderIcon ? (
+              <PlaceholderIcon className="w-3.5 h-3.5 flex-shrink-0" aria-hidden />
+            ) : null}
+            {placeholderLabel || (!PlaceholderIcon ? 'Drop here' : null)}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const showPlaceholderAtEnd =
+    placeholderIndex === null || placeholderIndex >= resources.length
+
+  return (
+    <div
+      className={`flex-1 min-w-0 h-full flex items-center overflow-y-hidden touch-pan-x ${
+        scrollLocked ? 'overflow-x-hidden' : 'overflow-x-auto'
+      }`}
+    >
+      <div
+        className="flex items-center gap-chrome-tight h-full"
+        role="tablist"
+        aria-label="Resources"
+      >
+        {resources.map((resource, idx) => {
+          const key = resource.key || resource.id
+          const presentation = getTabPresentation(resource)
+          return (
+            <React.Fragment key={key}>
+              {showDropPlaceholder &&
+                !showPlaceholderAtEnd &&
+                placeholderIndex === idx &&
+                placeholderElement}
+              <SortableTab
+                id={key}
+                panelId={panelId}
+                isActive={idx === currentIndex}
+                label={presentation.shortLabel}
+                tooltip={presentation.title}
+                Icon={presentation.Icon}
+                showLabel={presentation.showShortLabel}
+                colorScheme={colorScheme}
+                onClick={() => onIndexChange(idx)}
+              />
+            </React.Fragment>
+          )
+        })}
+        {showDropPlaceholder && showPlaceholderAtEnd && placeholderElement}
+      </div>
+    </div>
+  )
+}

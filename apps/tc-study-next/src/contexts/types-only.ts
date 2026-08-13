@@ -1,0 +1,8 @@
+/**
+ * Type-only exports from contexts
+ * 
+ * This file ONLY exports types, no runtime values or hooks.
+ * Used by components to avoid circular dependencies.
+ */
+
+export type { BCVReference, BookInfo, NavigationCatalogScope, NavigationMode, PassageSet, ReferenceState, ResourceInfo, ResourceTOC } from './types'
