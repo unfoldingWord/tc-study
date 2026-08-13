@@ -21,7 +21,9 @@ import {
   clearReadPanelsForLanguageSwitch,
   shouldReconcileHelpsOnPanelClear,
 } from './clearReadPanelsForLanguageSwitch'
+import { isPanelCatalogSpinner } from './panelCatalogLoading'
 import { hydrateReadCatalogHits } from './hydrateReadCatalogHits'
+import { resolveLoadedPanelResource } from './resolveLoadedPanelResource'
 import type { CatalogEntry } from './readCatalogIdentity'
 import { catalogLoadForSinglePanel } from './runReadPanelCatalog'
 
@@ -184,6 +186,35 @@ describe('same-language dual scripture (no infinite loop)', () => {
     expect(p1.resourceKeys.filter((k) => p2.resourceKeys.includes(k))).toEqual([])
     expect(p2.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
     expect(p1.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
+
+    const loaded = useAppStore.getState().loadedResources
+    expect(loaded['unfoldingWord/en/ult#2']?.id).toBe('unfoldingWord/en/ult#2')
+    expect(loaded['unfoldingWord/en/ult#2']?.key).toBe('unfoldingWord/en/ult')
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: true,
+        hasMembership: p2.resourceKeys.includes('unfoldingWord/en/ult#2'),
+      })
+    ).toBe(false)
+  })
+
+  test('panel-2 scripture membership stops spinner even if instance was not projected', () => {
+    addResource(res({ key: 'unfoldingWord/en/ult', type: 'scripture' }), { panelId: 'panel-1' })
+    addResource(res({ key: 'unfoldingWord/en/ult', type: 'scripture' }), {
+      panelId: 'panel-2',
+      allowMultipleInstances: true,
+    })
+    const hung = { ...useAppStore.getState().loadedResources }
+    delete hung['unfoldingWord/en/ult#2']
+    const resolved = resolveLoadedPanelResource(hung, 'unfoldingWord/en/ult#2')
+    expect(resolved?.id).toBe('unfoldingWord/en/ult#2')
+    expect(resolved?.key).toBe('unfoldingWord/en/ult')
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: true,
+        hasMembership: true,
+      })
+    ).toBe(false)
   })
 
   test('hydrate / mode switch never lists the same base resource twice on one panel', () => {

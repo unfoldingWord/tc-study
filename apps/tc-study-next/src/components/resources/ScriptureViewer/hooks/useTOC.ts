@@ -43,13 +43,16 @@ function ingredientsFromLoadedResource(
   resourceId: string,
   resourceKey: string
 ): IngredientLike[] {
-  const self = loaded[resourceId] || loaded[resourceKey]
-  if (!self) return []
-  if (self.verifiedIngredients && self.verifiedIngredients.length > 0) {
-    return self.verifiedIngredients
-  }
-  if (self.ingredients && self.ingredients.length > 0) {
-    return self.ingredients
+  const baseKey = resourceId.replace(/#\d+$/, '')
+  for (const key of [resourceId, resourceKey, baseKey]) {
+    const self = loaded[key]
+    if (!self) continue
+    if (self.verifiedIngredients && self.verifiedIngredients.length > 0) {
+      return self.verifiedIngredients
+    }
+    if (self.ingredients && self.ingredients.length > 0) {
+      return self.ingredients
+    }
   }
   return []
 }

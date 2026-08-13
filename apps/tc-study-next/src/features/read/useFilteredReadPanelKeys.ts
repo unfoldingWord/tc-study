@@ -6,6 +6,7 @@
 import { useMemo, useRef } from 'react'
 import type { ResourceInfo } from '../../contexts/types'
 import { filterReadPanelKeysByMode } from './filterReadPanelKeys'
+import { resolveLoadedPanelResource } from './resolveLoadedPanelResource'
 import type { ReadPanelMode } from './readPanelModel'
 
 type ResourceTypeRegistryLike = {
@@ -66,11 +67,17 @@ export function useFilteredReadPanelKeys(args: {
   }, [panel2ResourceKeys, panel2Mode, navigationScope, loadedResources, resourceTypeRegistry, currentBook])
 
   const filteredPanel1Resources = useMemo(
-    () => filteredPanel1Keys.map((key) => loadedResources[key]).filter(Boolean) as ResourceInfo[],
+    () =>
+      filteredPanel1Keys
+        .map((key) => resolveLoadedPanelResource(loadedResources, key))
+        .filter(Boolean) as ResourceInfo[],
     [filteredPanel1Keys, loadedResources]
   )
   const filteredPanel2Resources = useMemo(
-    () => filteredPanel2Keys.map((key) => loadedResources[key]).filter(Boolean) as ResourceInfo[],
+    () =>
+      filteredPanel2Keys
+        .map((key) => resolveLoadedPanelResource(loadedResources, key))
+        .filter(Boolean) as ResourceInfo[],
     [filteredPanel2Keys, loadedResources]
   )
 

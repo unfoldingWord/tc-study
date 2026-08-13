@@ -11,6 +11,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(src).toContain('handlePanelLanguageSelected')
     expect(src).toContain('isLoadingTextResources')
     expect(src).toContain('isLoadingHelpsResources')
+    expect(src).toContain('isLoadingByPanel')
     expect(src).toContain('helpsLanguageCode')
   })
 
@@ -64,6 +65,8 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(loadSrc).toContain('navigationScope: options.navigationScope')
     expect(loadSrc).toContain('loadReadLanguageCatalog')
     expect(loadSrc).toContain('destPanelId')
+    expect(loadSrc).toContain('destPanelsForCatalogLoad')
+    expect(loadSrc).toContain('isLoadingByPanel')
   })
 
   test('explicit switch and BCV commit go through useReadTextModeSwitch', () => {

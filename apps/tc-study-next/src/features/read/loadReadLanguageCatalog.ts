@@ -15,6 +15,7 @@ import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
 import { useNavigationStore } from '../nav/navigationStore'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
+import { projectCurrentWorkspacePanels } from '../workspace/resourceMutations'
 import { narrowExpectedToCataloged } from './catalogBackgroundDownloadPolicy'
 import {
   clearReadPanelsForLanguageSwitch,
@@ -219,6 +220,9 @@ export async function loadReadLanguageCatalog(
     nextHelpsKeys,
   })
   setExpectedResources([...merged.textKeys, ...merged.helpsKeys])
+  // Skip-if-base-key hydrate still leaves instance ids on the dest panel —
+  // re-project so `ult#2` / `ugnt#2` exist in the AppStore read model.
+  projectCurrentWorkspacePanels()
 
   const collectionLangs = [...new Set(searches.map((s) => s.languageCode))]
 

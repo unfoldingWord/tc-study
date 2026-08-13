@@ -97,6 +97,7 @@ export function useReadLanguageBootstrap({
   const {
     isLoadingTextResources,
     isLoadingHelpsResources,
+    isLoadingByPanel,
     expectedResources,
     setExpectedResources,
     metadataUpdateCounter,
@@ -286,6 +287,7 @@ export function useReadLanguageBootstrap({
     isLoadingResources,
     isLoadingTextResources,
     isLoadingHelpsResources,
+    isLoadingByPanel,
     currentLanguageCode,
     helpsLanguageCode,
     isCollectionFullyCached,

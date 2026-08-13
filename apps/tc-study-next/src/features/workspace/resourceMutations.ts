@@ -72,6 +72,8 @@ export function addResource(
     if (already) {
       if (!ws.hasResourceInPackage(resource.key)) {
         ws.addResourceToPackage(resource)
+      } else {
+        projectCurrentWorkspacePanels()
       }
       return already
     }

@@ -7,6 +7,7 @@ import {
 import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
 import type { ReadPanelId, ReadPanelMode, ReadPanelModels } from '../../features/read/readPanelModel'
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
+import { isPanelCatalogSpinner } from '../../features/read/panelCatalogLoading'
 import { useFilteredReadPanelKeys } from '../../features/read/useFilteredReadPanelKeys'
 import { useStudioResources } from '../../hooks'
 import { EntryResourceModal } from '../common/EntryResourceModal'
@@ -32,8 +33,7 @@ interface ReadPanelsAreaProps {
   filteredPanel2Resources: ReturnType<typeof useFilteredReadPanelKeys>['filteredPanel2Resources']
   panel1Resources: ReturnType<typeof useStudioResources>
   panel2Resources: ReturnType<typeof useStudioResources>
-  isLoadingTextResources: boolean
-  isLoadingHelpsResources: boolean
+  isLoadingByPanel: Record<ReadPanelId, boolean>
   onEntryLinkClick: (resourceId: string, entryId?: string) => void
   p1Dir: 'ltr' | 'rtl'
   p2Dir: 'ltr' | 'rtl'
@@ -65,8 +65,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
     filteredPanel2Resources,
     panel1Resources,
     panel2Resources,
-    isLoadingTextResources,
-    isLoadingHelpsResources,
+    isLoadingByPanel,
     onPanelLanguageSelected,
     onPanelModeSwitch,
     p1Dir,
@@ -107,9 +106,10 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         filteredKeys={filteredPanel1Keys}
         filteredResources={filteredPanel1Resources}
         panelResources={panel1Resources}
-        isLoadingResources={
-          panels['panel-1'].mode === 'scripture' ? isLoadingTextResources : isLoadingHelpsResources
-        }
+        isLoadingResources={isPanelCatalogSpinner({
+          catalogLoading: isLoadingByPanel['panel-1'],
+          hasMembership: filteredPanel1Keys.length > 0,
+        })}
         showDropPlaceholder={hoverPanelId === 'panel-1'}
         placeholderLabel={dragLabel}
         placeholderIndex={hoverPanelId === 'panel-1' ? dropIndex ?? undefined : undefined}
@@ -146,9 +146,10 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         filteredKeys={filteredPanel2Keys}
         filteredResources={filteredPanel2Resources}
         panelResources={panel2Resources}
-        isLoadingResources={
-          panels['panel-2'].mode === 'scripture' ? isLoadingTextResources : isLoadingHelpsResources
-        }
+        isLoadingResources={isPanelCatalogSpinner({
+          catalogLoading: isLoadingByPanel['panel-2'],
+          hasMembership: filteredPanel2Keys.length > 0,
+        })}
         showDropPlaceholder={hoverPanelId === 'panel-2'}
         placeholderLabel={dragLabel}
         placeholderIndex={hoverPanelId === 'panel-2' ? dropIndex ?? undefined : undefined}

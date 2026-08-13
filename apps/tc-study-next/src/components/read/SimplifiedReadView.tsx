@@ -74,8 +74,7 @@ export function SimplifiedReadView({
   const {
     packageStore,
     isLoadingResources,
-    isLoadingTextResources,
-    isLoadingHelpsResources,
+    isLoadingByPanel,
     currentLanguageCode,
     isCollectionFullyCached,
     shouldAutoOpenLanguagePicker,
@@ -263,8 +262,7 @@ export function SimplifiedReadView({
               filteredPanel2Resources={filteredPanel2Resources}
               panel1Resources={panel1Resources}
               panel2Resources={panel2Resources}
-              isLoadingTextResources={isLoadingTextResources}
-              isLoadingHelpsResources={isLoadingHelpsResources}
+              isLoadingByPanel={isLoadingByPanel}
               onEntryLinkClick={handleOpenEntry}
               p1Dir={p1Dir}
               p2Dir={p2Dir}
