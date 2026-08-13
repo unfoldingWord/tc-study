@@ -133,10 +133,47 @@ describe('original-language tabs (book-scoped, dual scripture)', () => {
     expect(p2.some((k) => getBaseResourceKey(k) === UHB_RESOURCE_KEY)).toBe(false)
     expect(p1).toContain(UGNT_RESOURCE_KEY)
     expect(p2).toContain(`${UGNT_RESOURCE_KEY}#2`)
+    expect(p1.at(-1)).toBe(UGNT_RESOURCE_KEY)
+    expect(p2.at(-1)).toBe(`${UGNT_RESOURCE_KEY}#2`)
+    expect(p1[0]).not.toBe(UGNT_RESOURCE_KEY)
     expect(baseTabKeys(p1).sort()).toEqual(baseTabKeys(p2).sort())
     expect(p1.filter((k) => p2.includes(k))).toEqual([])
     expect(p1).not.toContain(COMBINED_HELPS_RESOURCE_ID)
     expect(p2).not.toContain(COMBINED_HELPS_RESOURCE_ID)
+  })
+
+  test('Titus hydrate+sync appends UGNT (does not start with it)', () => {
+    seedEnglishScripture('panel-1')
+    hydrateOrig('panel-1', 'tit')
+    syncOriginalLanguageOnScripturePanels({
+      bookCode: 'tit',
+      scripturePanelIds: ['panel-1'],
+    })
+
+    const p1 = panelKeys('panel-1')
+    expect(p1).toEqual([
+      'unfoldingWord/en/ult',
+      'unfoldingWord/en/ust',
+      'unfoldingWord/en/bsb',
+      'unfoldingWord/en/t4t',
+      UGNT_RESOURCE_KEY,
+    ])
+  })
+
+  test('sync moves a leading UGNT to the end of the scripture panel', () => {
+    addResource(res({ key: UGNT_RESOURCE_KEY }), { panelId: 'panel-1' })
+    seedEnglishScripture('panel-1')
+    expect(panelKeys('panel-1')[0]).toBe(UGNT_RESOURCE_KEY)
+
+    syncOriginalLanguageOnScripturePanels({
+      bookCode: 'tit',
+      scripturePanelIds: ['panel-1'],
+    })
+
+    const p1 = panelKeys('panel-1')
+    expect(p1.at(-1)).toBe(UGNT_RESOURCE_KEY)
+    expect(p1[0]).not.toBe(UGNT_RESOURCE_KEY)
+    expect(p1.filter((k) => getBaseResourceKey(k) === UGNT_RESOURCE_KEY)).toHaveLength(1)
   })
 
   test('switching Titus → Ruth drops UGNT and shows UHB on both scripture panels', () => {
@@ -156,6 +193,8 @@ describe('original-language tabs (book-scoped, dual scripture)', () => {
     expect(p2.some((k) => getBaseResourceKey(k) === UGNT_RESOURCE_KEY)).toBe(false)
     expect(p1).toContain(UHB_RESOURCE_KEY)
     expect(p2).toContain(`${UHB_RESOURCE_KEY}#2`)
+    expect(p1.at(-1)).toBe(UHB_RESOURCE_KEY)
+    expect(p2.at(-1)).toBe(`${UHB_RESOURCE_KEY}#2`)
     expect(baseTabKeys(p1).sort()).toEqual(baseTabKeys(p2).sort())
   })
 
@@ -167,7 +206,7 @@ describe('original-language tabs (book-scoped, dual scripture)', () => {
     hydrateOrig('panel-1', 'tit')
     const p1 = panelKeys('panel-1')
     expect(p1).not.toContain(UHB_RESOURCE_KEY)
-    expect(p1).toContain(UGNT_RESOURCE_KEY)
+    expect(p1.at(-1)).toBe(UGNT_RESOURCE_KEY)
   })
 
   test('ES vs EN scripture panels keep different gateway tabs while sharing UGNT on Titus', () => {

@@ -9,7 +9,6 @@ import type { ResourceInfo } from '../../contexts/types'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
   collectPanelResourceKeys,
-  existingPanelInstanceId,
   generateInstanceId,
   getBaseResourceKey,
 } from '../workspace/projectPanelResourcesToAppStore'
@@ -53,6 +52,7 @@ export function buildOriginalLanguageResourceInfo(spec: OriginalLanguageSpec): R
 /**
  * Keep only the original that matches `bookCode` on each scripture panel.
  * Dual panes get distinct instance ids (`ugnt` vs `ugnt#2`).
+ * Matching OL is always appended (never left at index 0 / prepended).
  */
 export function syncOriginalLanguageOnScripturePanels(options: {
   bookCode: string
@@ -77,25 +77,34 @@ export function syncOriginalLanguageOnScripturePanels(options: {
     for (const panelId of options.scripturePanelIds) {
       const panel = state.currentPackage.panels.find((p) => p.id === panelId)
       if (!panel) continue
+      const prevActiveKey = panel.resourceKeys[panel.activeIndex]
       const next: string[] = []
+      let keptOl: string | undefined
       for (const key of panel.resourceKeys) {
         if (!isOriginalLanguagePanelKey(key)) {
           next.push(key)
           continue
         }
-        if (keepKey && getBaseResourceKey(key) === keepKey) {
-          next.push(key)
+        if (keepKey && getBaseResourceKey(key) === keepKey && !keptOl) {
+          keptOl = key
         } else {
           pruneKeys.add(key)
         }
       }
-      if (keepKey && !existingPanelInstanceId(next, keepKey)) {
-        const instanceId = generateInstanceId(keepKey, existingIds)
-        existingIds.add(instanceId)
-        next.push(instanceId)
+      if (keepKey) {
+        if (keptOl) {
+          next.push(keptOl)
+        } else {
+          const instanceId = generateInstanceId(keepKey, existingIds)
+          existingIds.add(instanceId)
+          next.push(instanceId)
+        }
       }
       panel.resourceKeys = next
-      if (panel.activeIndex >= next.length) {
+      const moved = prevActiveKey ? next.indexOf(prevActiveKey) : -1
+      if (moved >= 0) {
+        panel.activeIndex = moved
+      } else if (panel.activeIndex >= next.length) {
         panel.activeIndex = Math.max(0, next.length - 1)
       }
     }
