@@ -12,11 +12,13 @@ import {
   type LoadReadLanguageCatalogDeps,
 } from './loadReadLanguageCatalog'
 import type { CatalogLoadTarget } from './readCatalogPanelPolicy'
+import type { ReadPanelId } from './readPanelModel'
 
 export interface RunReadCatalogLoadOptions {
   textLanguageCode: string
   helpsLanguageCode: string
   loadTarget: CatalogLoadTarget
+  destPanelId?: ReadPanelId
   navigationScope: string
 }
 
@@ -41,6 +43,7 @@ export function useReadCatalogLoad() {
       | 'textLanguageCode'
       | 'helpsLanguageCode'
       | 'loadTarget'
+      | 'destPanelId'
       | 'navigationScope'
       | 'existingTextKeys'
       | 'existingHelpsKeys'
@@ -71,6 +74,7 @@ export function useReadCatalogLoad() {
           textLanguageCode: options.textLanguageCode,
           helpsLanguageCode: options.helpsLanguageCode,
           loadTarget: options.loadTarget,
+          destPanelId: options.destPanelId,
           navigationScope: options.navigationScope,
           existingTextKeys: textKeysRef.current,
           existingHelpsKeys: helpsKeysRef.current,

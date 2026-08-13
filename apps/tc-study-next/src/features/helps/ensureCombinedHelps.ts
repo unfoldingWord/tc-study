@@ -7,6 +7,8 @@ import {
   COMBINED_HELPS_IDS,
   COMBINED_HELPS_RESOURCE_ID,
   OBS_COMBINED_HELPS_RESOURCE_ID,
+  combinedHelpsIdForPanel,
+  isCombinedHelpsId,
 } from './combinedHelpsIds'
 import {
   buildCombinedHelpsResourceInfo,
@@ -47,6 +49,8 @@ export function ensureCombinedHelpsInWorkspace(options: {
   resources: Map<string, ResourceInfo> | Record<string, ResourceInfo>
   panels: WorkspacePanelLike[]
   languageCode?: string
+  /** Default panel-2 so existing bootstrap stays green. */
+  panelId?: string
 }): {
   resources: Map<string, ResourceInfo>
   panels: WorkspacePanelLike[]
@@ -68,16 +72,20 @@ export function ensureCombinedHelpsInWorkspace(options: {
   const injected: string[] = []
   const removed: string[] = []
 
-  const panel2 = panels.find((p) => p.id === 'panel-2') || panels[1]
+  const targetPanelId = options.panelId || 'panel-2'
+  const helpsPanel =
+    panels.find((p) => p.id === targetPanelId) ||
+    panels.find((p) => p.id === 'panel-2') ||
+    panels[1]
   const previousActiveKey =
-    panel2 && panel2.resourceKeys.length > 0
-      ? panel2.resourceKeys[
-          clampIndex(panel2.activeIndex, panel2.resourceKeys.length)
+    helpsPanel && helpsPanel.resourceKeys.length > 0
+      ? helpsPanel.resourceKeys[
+          clampIndex(helpsPanel.activeIndex, helpsPanel.resourceKeys.length)
         ]
       : null
 
   for (const scope of ['scripture', 'obs'] as HelpsScope[]) {
-    const id = SCOPE_IDS[scope]
+    const id = combinedHelpsIdForPanel(SCOPE_IDS[scope], targetPanelId)
     const pair = findHelpsKeysAmongResources(resourceMap.values(), scope, { langCode })
 
     if (!shouldInjectCombinedHelps(pair)) {
@@ -89,9 +97,8 @@ export function ensureCombinedHelpsInWorkspace(options: {
           panel.resourceKeys = panel.resourceKeys.filter((k) => k !== id)
         }
         removed.push(id)
-        // CombinedHelps dropped — restore remaining raw TN/TWL onto panel-2 tabs
-        if (panel2) {
-          restoreHelpsPairKeysToPanel(panel2, resourceMap, pair)
+        if (helpsPanel) {
+          restoreHelpsPairKeysToPanel(helpsPanel, resourceMap, pair)
         }
       }
       continue
@@ -102,6 +109,7 @@ export function ensureCombinedHelpsInWorkspace(options: {
       languageCode: langCode || 'und',
       tnKey: pair.tnKey,
       twlKey: pair.twlKey,
+      id,
     })
     if (!resourceMap.has(id)) {
       resourceMap.set(id, info)
@@ -117,9 +125,9 @@ export function ensureCombinedHelpsInWorkspace(options: {
       } as ResourceInfo)
     }
 
-    if (panel2 && !panel2.resourceKeys.includes(id)) {
-      const insertAt = scope === 'scripture' ? 0 : panel2.resourceKeys.length
-      panel2.resourceKeys.splice(insertAt, 0, id)
+    if (helpsPanel && !helpsPanel.resourceKeys.includes(id)) {
+      const insertAt = scope === 'scripture' ? 0 : helpsPanel.resourceKeys.length
+      helpsPanel.resourceKeys.splice(insertAt, 0, id)
       if (!injected.includes(id)) injected.push(id)
     }
 
@@ -127,10 +135,10 @@ export function ensureCombinedHelpsInWorkspace(options: {
     stripScopedHelpsPeersFromPanels(panels, resourceMap, scope)
   }
 
-  if (panel2) {
-    normalizePanel2HelpsOrder(panel2)
-    panel2.activeIndex = resolvePanel2ActiveIndex({
-      resourceKeys: panel2.resourceKeys,
+  if (helpsPanel) {
+    normalizePanel2HelpsOrder(helpsPanel)
+    helpsPanel.activeIndex = resolvePanel2ActiveIndex({
+      resourceKeys: helpsPanel.resourceKeys,
       resources: resourceMap,
       previousActiveKey,
     })
@@ -260,7 +268,7 @@ export function guessGatewayLanguage(
       const r = resources.get(key) || resources.get(baseKey(key))
       if (!r) continue
       const id = r.key || r.id || ''
-      if (COMBINED_HELPS_IDS.has(id)) continue
+      if (isCombinedHelpsId(id) || COMBINED_HELPS_IDS.has(id)) continue
       const lang = resourceLang(r)
       if (!lang) continue
       const type = String(r.type || '')

@@ -53,7 +53,7 @@ export function useReadPanelResize(initialPercent = 50) {
       const newPercent = isVertical
         ? ((clientY - rect.top) / rect.height) * 100
         : ((clientX - rect.left) / rect.width) * 100
-      setPanel1Width(Math.max(20, Math.min(80, newPercent)))
+      setPanel1Width(Math.max(0, Math.min(100, newPercent)))
     }
 
     const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY)

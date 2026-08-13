@@ -15,7 +15,7 @@ import { ensureCombinedHelpsInWorkspace } from './ensureCombinedHelps'
  * package, writes panels/resources back, then projects all panel keys into
  * AppStore (pruning reconciled-away CombinedHelps ids).
  */
-export function applyCombinedHelpsEnsure(languageCode?: string): string[] {
+export function applyCombinedHelpsEnsure(languageCode?: string, panelId?: string): string[] {
   const pkg = useWorkspaceStore.getState().currentPackage
   if (!pkg) return []
 
@@ -23,6 +23,7 @@ export function applyCombinedHelpsEnsure(languageCode?: string): string[] {
     resources: pkg.resources,
     panels: pkg.panels,
     languageCode,
+    panelId,
   })
 
   useWorkspaceStore.setState((state) => {

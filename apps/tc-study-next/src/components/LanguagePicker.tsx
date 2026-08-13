@@ -50,6 +50,8 @@ interface LanguagePickerProps {
   /** Controlled open — empty-state CTA can open the same instance. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** Extra classes on the trigger (Read panel chrome uses thumb-sized targets). */
+  triggerClassName?: string
 }
 
 export function LanguagePicker({
@@ -61,6 +63,7 @@ export function LanguagePicker({
   helpsFlag,
   open,
   onOpenChange,
+  triggerClassName,
 }: LanguagePickerProps) {
   const { isOpen, setOpen } = useLanguagePickerOpen({
     autoOpen,
@@ -173,7 +176,7 @@ export function LanguagePicker({
         onClick={() => setOpen(true)}
         className={`flex items-center gap-1.5 rounded transition-colors ${
           compact ? 'p-1 text-fg-secondary hover:bg-muted' : 'px-3 py-1.5 bg-accent text-white hover:bg-accent-hover shadow-md'
-        }`}
+        } ${triggerClassName ?? ''}`}
         title={triggerLabel}
         aria-label={triggerLabel}
       >

@@ -14,6 +14,7 @@ import {
   catalogIdentity,
   type CatalogEntry,
 } from './readCatalogIdentity'
+import type { ReadPanelId } from './readPanelModel'
 
 const BOOK_COMPANION_TYPES = new Set([
   'notes',
@@ -30,6 +31,8 @@ export interface HydrateReadCatalogHitsDeps {
   catalogResults: CatalogEntry[]
   languageCode: string
   target: CatalogLoadTarget
+  /** When set, primary/companion land on this panel (two scripture panes stay independent). */
+  destPanelId?: ReadPanelId
   resourceTypeRegistry: {
     getTypeForSubject: (subject: string) => string | undefined
     get: (typeId: string) => { contentRole?: string } | undefined
@@ -66,6 +69,7 @@ export function hydrateReadCatalogHits(
     catalogResults,
     languageCode,
     target,
+    destPanelId,
     resourceTypeRegistry,
     viewerRegistry,
     getPanel,
@@ -87,7 +91,12 @@ export function hydrateReadCatalogHits(
     const typeDef = resourceTypeRegistry.get(typeId)
     const isPrimary = typeDef?.contentRole === 'primary'
     const hasViewer = viewerRegistry.hasViewer(typeId)
-    const assignment = panelAssignmentForContentRole(typeDef?.contentRole, target, hasViewer)
+    const assignment = panelAssignmentForContentRole(
+      typeDef?.contentRole,
+      target,
+      hasViewer,
+      destPanelId
+    )
     if (assignment.kind === 'skip') continue
 
     const type = typeId as ResourceType

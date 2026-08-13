@@ -21,7 +21,11 @@ const READ_PANEL_IDS = new Set(['panel-1', 'panel-2'])
 
 export type ReadPanelClearTarget = 'panel-1' | 'panel-2' | 'both'
 
-export function panelClearTargetForLoad(loadTarget: CatalogLoadTarget): ReadPanelClearTarget {
+export function panelClearTargetForLoad(
+  loadTarget: CatalogLoadTarget,
+  destPanelId?: ReadPanelClearTarget
+): ReadPanelClearTarget {
+  if (destPanelId === 'panel-1' || destPanelId === 'panel-2') return destPanelId
   if (loadTarget === 'text') return 'panel-1'
   if (loadTarget === 'helps') return 'panel-2'
   return 'both'

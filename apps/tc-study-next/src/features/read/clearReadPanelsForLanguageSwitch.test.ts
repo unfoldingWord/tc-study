@@ -271,5 +271,6 @@ describe('panelClearTargetForLoad', () => {
     expect(panelClearTargetForLoad('text')).toBe('panel-1')
     expect(panelClearTargetForLoad('helps')).toBe('panel-2')
     expect(panelClearTargetForLoad('both')).toBe('both')
+    expect(panelClearTargetForLoad('text', 'panel-2')).toBe('panel-2')
   })
 })

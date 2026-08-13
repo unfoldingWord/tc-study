@@ -27,7 +27,7 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
   })
 
   test('clears only the switched pane', () => {
-    expect(src).toContain('panelClearTargetForLoad(loadTarget)')
+    expect(src).toContain('panelClearTargetForLoad(loadTarget, destPanelId)')
     expect(src).toContain('clearReadPanelsForLanguageSwitch(helpsLanguageCode')
   })
 })

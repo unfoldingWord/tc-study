@@ -15,6 +15,32 @@ type ResourceTypeRegistryLike = {
   getScopeForType: (id: string) => string | null
 }
 
+export function filterReadPanelKeysByMode(
+  mode: 'scripture' | 'helps',
+  args: {
+    resourceKeys: string[]
+    loadedResources: Record<string, ResourceInfo | undefined>
+    resourceTypeRegistry: ResourceTypeRegistryLike
+    navigationScope: string
+    currentBook: string
+  }
+): string[] {
+  if (mode === 'helps') {
+    return filterReadPanel2Keys({
+      panel2ResourceKeys: args.resourceKeys,
+      loadedResources: args.loadedResources,
+      resourceTypeRegistry: args.resourceTypeRegistry,
+      navigationScope: args.navigationScope,
+      currentBook: args.currentBook,
+    })
+  }
+  return args.resourceKeys.filter((key) => {
+    const scope = getResourceAppliesToScope(key, args.loadedResources, args.resourceTypeRegistry)
+    if (scope !== args.navigationScope && scope !== null) return false
+    return resourceSupportsBook(key, args.loadedResources, args.currentBook)
+  })
+}
+
 export function filterReadPanel2Keys(args: {
   panel2ResourceKeys: string[]
   loadedResources: Record<string, ResourceInfo | undefined>

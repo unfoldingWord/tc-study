@@ -11,12 +11,14 @@ import {
   type Door43Resource,
 } from '../../lib/services/ResourceMetadataFactory'
 import { panelAssignmentForContentRole, type CatalogLoadTarget } from './readCatalogPanelPolicy'
+import type { ReadPanelId } from './readPanelModel'
 import { asString, catalogIdentity, type CatalogEntry } from './readCatalogIdentity'
 
 export function collectCatalogMetadataPromises(options: {
   catalogResults: CatalogEntry[]
   languageCode: string
   target: CatalogLoadTarget
+  destPanelId?: ReadPanelId
   catalogManager: CatalogManager
   resourceTypeRegistry: ResourceTypeRegistry
   viewerRegistry: { hasViewer: (typeId: string) => boolean }
@@ -25,6 +27,7 @@ export function collectCatalogMetadataPromises(options: {
     catalogResults,
     languageCode,
     target,
+    destPanelId,
     catalogManager,
     resourceTypeRegistry,
     viewerRegistry,
@@ -39,7 +42,12 @@ export function collectCatalogMetadataPromises(options: {
 
     const typeDef = resourceTypeRegistry.get(type)
     const hasViewer = viewerRegistry.hasViewer(type)
-    const assignment = panelAssignmentForContentRole(typeDef?.contentRole, target, hasViewer)
+    const assignment = panelAssignmentForContentRole(
+      typeDef?.contentRole,
+      target,
+      hasViewer,
+      destPanelId
+    )
     if (assignment.kind === 'skip') return null
 
     const release = item.release ?? item.catalog?.prod

@@ -51,9 +51,12 @@ export function buildCombinedHelpsResourceInfo(options: {
   languageCode: string
   tnKey?: string
   twlKey?: string
+  /** Override resource key (per-panel CombinedHelps when both panes are helps). */
+  id?: string
 }): ResourceInfo {
   const isObs = options.scope === 'obs'
-  const id = isObs ? OBS_COMBINED_HELPS_RESOURCE_ID : COMBINED_HELPS_RESOURCE_ID
+  const id =
+    options.id || (isObs ? OBS_COMBINED_HELPS_RESOURCE_ID : COMBINED_HELPS_RESOURCE_ID)
   const type = isObs
     ? RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS
     : RESOURCE_TYPE_IDS.COMBINED_HELPS

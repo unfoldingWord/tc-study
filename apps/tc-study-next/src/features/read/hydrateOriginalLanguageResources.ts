@@ -29,6 +29,7 @@ export interface HydrateOriginalLanguageDeps {
     resource: ResourceInfo,
     options?: { panelId?: string; index?: number; allowMultipleInstances?: boolean }
   ) => void
+  destPanelId?: 'panel-1' | 'panel-2'
 }
 
 export function hydrateOriginalLanguageResources(deps: HydrateOriginalLanguageDeps): {
@@ -65,9 +66,10 @@ export function hydrateOriginalLanguageResources(deps: HydrateOriginalLanguageDe
     }
 
     loadedKeys.push(resourceKey)
-    const currentPanel = getPanel('panel-1')
+    const destPanelId = deps.destPanelId ?? 'panel-1'
+    const currentPanel = getPanel(destPanelId)
     const currentIndex = currentPanel?.resourceKeys.length || 0
-    addResource(basicResourceInfo, { panelId: 'panel-1', index: currentIndex })
+    addResource(basicResourceInfo, { panelId: destPanelId, index: currentIndex })
   }
 
   const metadataPromises = ORIGINAL_RESOURCES.map(async (orig): Promise<ResourceInfo | null> => {

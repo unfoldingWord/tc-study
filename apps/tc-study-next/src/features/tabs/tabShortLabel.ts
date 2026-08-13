@@ -1,6 +1,7 @@
 import {
   COMBINED_HELPS_IDS,
   OBS_COMBINED_HELPS_RESOURCE_ID,
+  isCombinedHelpsId,
 } from '../helps/combinedHelpsIds'
 import { isCombinedHelpsResourceType } from '../../utils/normalizeResourceTypeId'
 
@@ -19,7 +20,7 @@ export function getTabShortLabel(resource: TabShortLabelResource | null | undefi
   if (key === OBS_COMBINED_HELPS_RESOURCE_ID) {
     return 'OBS Helps'
   }
-  if (COMBINED_HELPS_IDS.has(key) || isCombinedHelpsResourceType(resource?.type)) {
+  if (isCombinedHelpsId(key) || COMBINED_HELPS_IDS.has(key) || isCombinedHelpsResourceType(resource?.type)) {
     return key === OBS_COMBINED_HELPS_RESOURCE_ID ? 'OBS Helps' : 'Helps'
   }
   const abbrev = resource?.abbreviation?.trim()

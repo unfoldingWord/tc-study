@@ -390,4 +390,37 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     expect(ch.languageCode).toBe('en')
     expect(out.panels[1]!.resourceKeys).toContain(COMBINED_HELPS_RESOURCE_ID)
   })
+
+  test('panelId panel-1 injects a scoped CombinedHelps without stealing panel-2', () => {
+    const resources = new Map<string, ResourceInfo>([
+      ['u/es/tn', res({ key: 'u/es/tn', type: 'notes', language: 'es', languageCode: 'es' })],
+      ['u/es/twl', res({ key: 'u/es/twl', type: 'words-links', language: 'es', languageCode: 'es' })],
+      ['u/en/tn', res({ key: 'u/en/tn', type: 'notes', language: 'en', languageCode: 'en' })],
+      ['u/en/twl', res({ key: 'u/en/twl', type: 'words-links', language: 'en', languageCode: 'en' })],
+    ])
+    const panels = [
+      { id: 'panel-1', resourceKeys: ['u/es/tn', 'u/es/twl'], activeIndex: 0 },
+      { id: 'panel-2', resourceKeys: [COMBINED_HELPS_RESOURCE_ID], activeIndex: 0 },
+    ]
+    resources.set(
+      COMBINED_HELPS_RESOURCE_ID,
+      res({
+        key: COMBINED_HELPS_RESOURCE_ID,
+        type: 'combined-helps',
+        language: 'en',
+        languageCode: 'en',
+      })
+    )
+
+    const out = ensureCombinedHelpsInWorkspace({
+      resources,
+      panels,
+      languageCode: 'es',
+      panelId: 'panel-1',
+    })
+    const scoped = `${COMBINED_HELPS_RESOURCE_ID}:panel-1`
+    expect(out.panels[0]!.resourceKeys).toContain(scoped)
+    expect(out.panels[1]!.resourceKeys).toContain(COMBINED_HELPS_RESOURCE_ID)
+    expect(out.resources.get(scoped)?.languageCode).toBe('es')
+  })
 })
