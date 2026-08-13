@@ -1,9 +1,10 @@
 /**
- * Text-language picker navigation (Epic #21).
+ * Text-language picker navigation (Epic #21 / issue #25).
  *
- * Picking an OBS-only or Bible-only language is an explicit tap: switch into
- * that type instead of the #25 mismatch empty state. Both-types keep the
- * current mode and reference. Explicit Switch / BCV scope is never overridden.
+ * Picker taps never auto-switch mode. OBS-only / Bible-only in the wrong mode
+ * stay put and show the mismatch empty. Switch / already-in-the-right-mode
+ * reuse this helper: keep the current ref, or jump to the default for the
+ * target mode. Explicit BCV scope is never overridden.
  */
 
 import type { BCVReference, NavigationCatalogScope } from '../../contexts/types'
@@ -12,7 +13,14 @@ import { applyTextModeScopeSwitch } from './textModeMismatch'
 
 export type TextLanguagePickDecision =
   | { action: 'keep' }
+  | { action: 'mismatch' }
   | { action: 'switch'; scope: NavigationCatalogScope }
+
+export type TextLanguagePickNav = {
+  setNavigationScope: (scope: NavigationCatalogScope) => void
+  navigateToReference: (ref: BCVReference) => void
+  currentReference?: BCVReference
+}
 
 export function resolveTextLanguagePickNavigation(options: {
   availability: LanguageAvailabilityFlags | undefined | null
@@ -26,22 +34,15 @@ export function resolveTextLanguagePickNavigation(options: {
   const availability = options.availability
   if (!availability) return { action: 'keep' }
 
-  const hasBible = availability.bible === true
-  const hasObs = availability.obs === true
-  if (hasBible === hasObs) return { action: 'keep' }
-
   const onObs = options.currentScope === 'obs'
-  if (hasObs) {
-    return onObs ? { action: 'keep' } : { action: 'switch', scope: 'obs' }
-  }
-  return onObs ? { action: 'switch', scope: 'scripture' } : { action: 'keep' }
+  const hasCurrent = onObs ? availability.obs === true : availability.bible === true
+  if (hasCurrent) return { action: 'keep' }
+
+  return { action: 'mismatch' }
 }
 
 export function applyTextLanguagePickNavigation(
-  nav: {
-    setNavigationScope: (scope: NavigationCatalogScope) => void
-    navigateToReference: (ref: BCVReference) => void
-  },
+  nav: TextLanguagePickNav,
   decision: TextLanguagePickDecision
 ): void {
   if (decision.action === 'switch') {

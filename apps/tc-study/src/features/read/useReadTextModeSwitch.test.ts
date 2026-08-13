@@ -5,14 +5,16 @@ import { join } from 'node:path'
 const src = readFileSync(join(import.meta.dir, 'useReadTextModeSwitch.ts'), 'utf8')
 
 describe('useReadTextModeSwitch (issue #25 BCV vs Switch)', () => {
-  test('Switch button resets to a default ref; BCV commit only reloads catalog', () => {
-    expect(src).toContain('applyTextModeScopeSwitch')
+  test('Switch button uses pick-navigation; BCV commit only reloads catalog', () => {
+    expect(src).toContain('applyTextLanguagePickNavigation')
     const switchFn = src.slice(src.indexOf('const handleSwitchTextMode'))
     const switchBody = switchFn.slice(0, switchFn.indexOf('const handleNavigatorScopeCommitted'))
-    expect(switchBody).toContain('applyTextModeScopeSwitch')
+    expect(switchBody).toContain('applyTextLanguagePickNavigation')
+    expect(switchBody).toContain("action: 'switch'")
     expect(switchBody).toContain('navigationScope: scope')
     const navFn = src.slice(src.indexOf('const handleNavigatorScopeCommitted'))
     expect(navFn).toContain('navigationScope: scope')
+    expect(navFn).not.toContain('applyTextLanguagePickNavigation')
     expect(navFn).not.toContain('applyTextModeScopeSwitch')
   })
 

@@ -19,7 +19,7 @@ const bootstrapSrc = readFileSync(
 )
 
 describe('BCV navigator Read wiring (issue #25)', () => {
-  test('text-language pick switches OBS-only / Bible-only via pick navigation', () => {
+  test('text-language pick does not auto-switch; mismatch empty + Switch handle mode', () => {
     const handler = bootstrapSrc.slice(bootstrapSrc.indexOf('const handleLanguageSelected'))
     const body = handler.slice(0, handler.indexOf('const { handleSwitchTextMode'))
     expect(body).toContain('resolveTextLanguagePickNavigation')

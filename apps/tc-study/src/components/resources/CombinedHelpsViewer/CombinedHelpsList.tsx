@@ -16,6 +16,7 @@ import {
   HELPS_VERSE_HEADER_ICON,
 } from '../helpsCardStyles'
 import {
+  explainedHelpsEmptyKind,
   resolveHelpsEmptyView,
   resolveHelpsListEmptyReason,
 } from '../../../features/helps/helpsEmptyCopy'
@@ -114,15 +115,15 @@ export function CombinedHelpsList({
     hasLoadError: !!(tnError && tnKey) || !!(twlError && twlKey),
     hasActiveFilter: !!filterScopeBar,
   })
-  const explainedEmpty =
-    emptyReason === 'no-sources' || emptyReason === 'no-passage'
-      ? resolveHelpsEmptyView({
-          kind: emptyReason,
-          languageCode: helpsLanguageCode,
-          languageName: helpsLanguageName,
-          passageLabel,
-        })
-      : null
+  const emptyKind = explainedHelpsEmptyKind(emptyReason)
+  const explainedEmpty = emptyKind
+    ? resolveHelpsEmptyView({
+        kind: emptyKind,
+        languageCode: helpsLanguageCode,
+        languageName: helpsLanguageName,
+        passageLabel,
+      })
+    : null
 
   return (
     <div className={HELPS_LIST_PANEL} dir={languageDirection}>
@@ -164,9 +165,6 @@ export function CombinedHelpsList({
             {mergedGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-fg-muted">
                 <BookOpen className="w-10 h-10 mb-2 opacity-70" />
-                {emptyReason === 'filter-miss' ? (
-                  <p className="text-sm">No entries for this passage.</p>
-                ) : null}
               </div>
             ) : (
               <div className="space-y-stack-lg">

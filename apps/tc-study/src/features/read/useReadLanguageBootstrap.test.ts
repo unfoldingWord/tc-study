@@ -20,7 +20,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(src).toContain('resolveReadCatalogLoadPlan')
   })
 
-  test('OBS-only / Bible-only text pick switches scope before the URL write', () => {
+  test('OBS-only / Bible-only text pick stays in mode; mismatch empty before URL write', () => {
     const handler = src.slice(src.indexOf('const handleLanguageSelected'))
     const body = handler.slice(0, handler.indexOf('const { handleSwitchTextMode'))
     expect(body).toContain('resolveTextLanguagePickNavigation')
@@ -33,6 +33,11 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(body).toContain("clearReadPanelsForLanguageSwitch(helpsLanguageCode ?? undefined, 'panel-1')")
     expect(body).not.toContain('writePersistedHelpsLanguage')
     expect(body).toContain('resolveAndPersistHelpsLanguage')
+    const mismatchAt = body.indexOf('textModeMismatchFromCache')
+    const mismatchReturn = body.indexOf('return', mismatchAt)
+    expect(mismatchReturn).toBeGreaterThan(mismatchAt)
+    expect(mismatchReturn).toBeLessThan(body.indexOf('resolveAndPersistHelpsLanguage'))
+    expect(mismatchReturn).toBeLessThan(body.indexOf('setHelpsLanguageCode'))
   })
 
   test('helps picker path does not apply text-language pick navigation', () => {

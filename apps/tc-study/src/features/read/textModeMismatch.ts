@@ -2,14 +2,14 @@
  * Panel-1 empty state when the text language has no content for the current
  * Bible/OBS mode (Epic #21 / issue #25).
  *
- * The empty-state view never auto-switches. OBS-only / Bible-only *picker*
- * taps switch via `textLanguagePickNavigation` instead of landing here.
- * Leftover cases: neither-type languages, and explicit Switch/BCV into a
- * mode the language does not have.
+ * Picker taps never auto-switch: they land here. Mode changes only on Switch.
+ * Same family: neither-type languages, and explicit BCV into a mode the
+ * language does not have.
  */
 
 import type { BCVReference, NavigationCatalogScope } from '../../contexts/types'
 import type { LanguageAvailabilityFlags } from './languageAvailability'
+import { languageAnglicizedDisplayName } from './languageListDisplayName'
 import { loadLanguagesCache } from './languagesCache'
 
 export type TextModeMismatchKind = 'obs-only' | 'bible-only' | 'neither'
@@ -98,7 +98,7 @@ export function textModeMismatchFromCache(options: {
     navigationScope: options.navigationScope,
     availability: lang?.availability,
     languageCode: code,
-    languageName: lang?.name?.trim() || code,
+    languageName: languageAnglicizedDisplayName(lang, code),
   })
 }
 
@@ -106,10 +106,15 @@ export function applyTextModeScopeSwitch(
   nav: {
     setNavigationScope: (scope: NavigationCatalogScope) => void
     navigateToReference: (ref: BCVReference) => void
+    currentReference?: BCVReference
   },
   scope: NavigationCatalogScope
 ): void {
   nav.setNavigationScope(scope)
+  const current = nav.currentReference
+  const alreadyOnTarget =
+    scope === 'obs' ? current?.book === 'obs' : !!(current && current.book !== 'obs')
+  if (alreadyOnTarget) return
   nav.navigateToReference(scope === 'obs' ? DEFAULT_OBS_REF : DEFAULT_BIBLE_REF)
 }
 

@@ -40,19 +40,27 @@ describe('resolveTextModeMismatch', () => {
     expect(view?.switchScope).toBe('obs')
   })
 
-  test('OBS mode + Bible-only language → inverse mismatch', () => {
-    const view = mismatch('obs', 'es', 'Español')
+  test('OBS mode + Bible-only language → inverse mismatch with anglicized name', () => {
+    const view = mismatch('obs', 'es', 'Spanish')
     expect(view?.kind).toBe('bible-only')
-    expect(view?.message).toBe(TEXT_MODE_MISMATCH_COPY.noObsHasBible('Español'))
+    expect(view?.message).toBe(TEXT_MODE_MISMATCH_COPY.noObsHasBible('Spanish'))
+    expect(view?.message).not.toContain('español')
     expect(view?.actionLabel).toBe(TEXT_MODE_MISMATCH_COPY.switchToBible)
     expect(view?.switchScope).toBe('scripture')
   })
 
   test('matching content is not a mismatch (no auto switch)', () => {
-    expect(mismatch('scripture', 'es', 'Español')).toBeNull()
+    expect(mismatch('scripture', 'es', 'Spanish')).toBeNull()
     expect(mismatch('obs', 'bho', 'Bhojpuri')).toBeNull()
     expect(mismatch('scripture', 'en', 'English')).toBeNull()
     expect(mismatch('obs', 'en', 'English')).toBeNull()
+  })
+
+  test('explicit BCV into a mode the language lacks still shows mismatch', () => {
+    const view = mismatch('scripture', 'bho', 'Bhojpuri')
+    expect(view?.kind).toBe('obs-only')
+    expect(view?.actionLabel).toBe(TEXT_MODE_MISMATCH_COPY.switchToStories)
+    expect(mismatch('obs', 'es', 'Spanish')?.kind).toBe('bible-only')
   })
 
   test('neither Bible nor OBS degrades without a switch action', () => {
@@ -153,5 +161,31 @@ describe('applyTextModeScopeSwitch', () => {
       'scripture'
     )
     expect(calls).toEqual(['scope:scripture', 'ref:tit'])
+  })
+
+  test('already showing an OBS ref keeps story/frame instead of jumping to 1:1', () => {
+    const calls: string[] = []
+    applyTextModeScopeSwitch(
+      {
+        currentReference: { book: 'obs', chapter: 3, verse: 2 },
+        setNavigationScope: (scope) => calls.push(`scope:${scope}`),
+        navigateToReference: (ref) => calls.push(`ref:${ref.book} ${ref.chapter}:${ref.verse}`),
+      },
+      'obs'
+    )
+    expect(calls).toEqual(['scope:obs'])
+  })
+
+  test('already showing a Bible ref keeps it instead of jumping to Titus 1:1', () => {
+    const calls: string[] = []
+    applyTextModeScopeSwitch(
+      {
+        currentReference: { book: 'jhn', chapter: 3, verse: 16 },
+        setNavigationScope: (scope) => calls.push(`scope:${scope}`),
+        navigateToReference: (ref) => calls.push(`ref:${ref.book}`),
+      },
+      'scripture'
+    )
+    expect(calls).toEqual(['scope:scripture'])
   })
 })

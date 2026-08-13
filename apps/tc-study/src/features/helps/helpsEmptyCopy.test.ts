@@ -3,6 +3,7 @@ import { DEFAULT_HELPS_LANGUAGE_CODE } from '../read/defaultHelpsLanguage'
 import { door43ToListNameFields } from '../read/languageListDisplayName'
 import {
   HELPS_EMPTY_COPY,
+  explainedHelpsEmptyKind,
   formatHelpsPassageLabel,
   helpsLanguageDisplayName,
   resolveHelpsEmptyView,
@@ -148,5 +149,14 @@ describe('resolveHelpsListEmptyReason', () => {
         hasActiveFilter: true,
       })
     ).toBe('filter-miss')
+  })
+})
+
+describe('explainedHelpsEmptyKind', () => {
+  test('filter-miss uses the no-passage explained empty, not a crash sentence', () => {
+    expect(explainedHelpsEmptyKind('filter-miss')).toBe('no-passage')
+    expect(explainedHelpsEmptyKind('no-passage')).toBe('no-passage')
+    expect(explainedHelpsEmptyKind('no-sources')).toBe('no-sources')
+    expect(explainedHelpsEmptyKind(null)).toBeNull()
   })
 })

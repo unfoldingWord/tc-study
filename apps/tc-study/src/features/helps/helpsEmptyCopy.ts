@@ -71,6 +71,13 @@ export function resolveHelpsListEmptyReason(options: {
   return 'no-passage'
 }
 
+/** Filter-miss uses the same explained empty as no-passage (not a crash sentence). */
+export function explainedHelpsEmptyKind(reason: HelpsListEmptyReason): HelpsEmptyKind | null {
+  if (reason === 'no-sources') return 'no-sources'
+  if (reason === 'no-passage' || reason === 'filter-miss') return 'no-passage'
+  return null
+}
+
 /** Display name for copy: anglicized/English name, then native `name`, then `en` → English, else the code. */
 export function helpsLanguageDisplayName(
   code: string,

@@ -4,6 +4,10 @@ import { join } from 'node:path'
 
 const panelSrc = readFileSync(join(import.meta.dir, 'ReadLinkedPanel.tsx'), 'utf8')
 const viewSrc = readFileSync(join(import.meta.dir, 'SimplifiedReadView.tsx'), 'utf8')
+const mismatchSrc = readFileSync(
+  join(import.meta.dir, '../../features/read/textModeMismatch.ts'),
+  'utf8'
+)
 
 describe('text-mode mismatch wiring (issue #25)', () => {
   test('panel-1 empty state can show mismatch copy + switch action', () => {
@@ -34,5 +38,9 @@ describe('text-mode mismatch wiring (issue #25)', () => {
     expect(area.slice(area.indexOf('panelId="panel-1"'), area.indexOf('panelId="panel-2"'))).toContain(
       'textModeMismatch={textModeMismatch}'
     )
+  })
+
+  test('mismatch empty copy uses anglicized English names, not autonyms', () => {
+    expect(mismatchSrc).toContain('languageAnglicizedDisplayName')
   })
 })

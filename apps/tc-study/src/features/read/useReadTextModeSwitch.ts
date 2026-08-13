@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useNavigationStore } from '../../contexts'
-import { applyTextModeScopeSwitch } from './textModeMismatch'
+import { applyTextLanguagePickNavigation } from './textLanguagePickNavigation'
 
 export type TextModeScope = 'scripture' | 'obs'
 
@@ -10,8 +10,9 @@ export type SelectTextLanguage = (
 ) => void | Promise<void>
 
 /**
- * Explicit Bible ↔ Stories taps. The panel-1 Switch button resets to a default
- * ref; BCV Apply keeps the user's pick and only reloads catalog.
+ * Explicit Bible ↔ Stories taps. Switch uses pick-navigation (default ref
+ * unless already showing a matching Bible/OBS ref). BCV Apply keeps the
+ * user's pick and only reloads catalog.
  */
 export function useReadTextModeSwitch(
   currentLanguageCode: string | null,
@@ -21,7 +22,10 @@ export function useReadTextModeSwitch(
     (scope: TextModeScope) => {
       const code = currentLanguageCode
       if (!code) return
-      applyTextModeScopeSwitch(useNavigationStore.getState(), scope)
+      applyTextLanguagePickNavigation(useNavigationStore.getState(), {
+        action: 'switch',
+        scope,
+      })
       void handleLanguageSelected(code, { navigationScope: scope })
     },
     [currentLanguageCode, handleLanguageSelected]
