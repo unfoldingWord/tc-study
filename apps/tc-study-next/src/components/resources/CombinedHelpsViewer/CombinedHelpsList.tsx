@@ -141,7 +141,7 @@ export function CombinedHelpsList({
           </>
         }
       />
-      <div className="p-content max-w-prose">
+      <div className="p-content max-w-3xl mx-auto w-full">
         {explainedEmpty ? (
           <CombinedHelpsEmptyState view={explainedEmpty} />
         ) : !depsOk ? (
