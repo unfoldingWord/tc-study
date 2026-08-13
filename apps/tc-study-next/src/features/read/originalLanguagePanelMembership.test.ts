@@ -198,6 +198,49 @@ describe('original-language tabs (book-scoped, dual scripture)', () => {
     expect(baseTabKeys(p1).sort()).toEqual(baseTabKeys(p2).sort())
   })
 
+  test('second sync is a no-op (no workspace or AppStore rewrite)', () => {
+    seedEnglishScripture('panel-1')
+    seedEnglishScripture('panel-2')
+    hydrateOrig('panel-1', 'tit')
+    hydrateOrig('panel-2', 'tit')
+    syncOriginalLanguageOnScripturePanels({
+      bookCode: 'tit',
+      scripturePanelIds: ['panel-1', 'panel-2'],
+    })
+
+    const beforeKeys1 = [...panelKeys('panel-1')]
+    const beforeKeys2 = [...panelKeys('panel-2')]
+    const beforeLoaded = useAppStore.getState().loadedResources
+
+    let workspaceWrites = 0
+    let appWrites = 0
+    const unsubWs = useWorkspaceStore.subscribe(() => {
+      workspaceWrites++
+    })
+    const unsubApp = useAppStore.subscribe(() => {
+      appWrites++
+    })
+    try {
+      syncOriginalLanguageOnScripturePanels({
+        bookCode: 'tit',
+        scripturePanelIds: ['panel-1', 'panel-2'],
+      })
+      syncOriginalLanguageOnScripturePanels({
+        bookCode: 'tit',
+        scripturePanelIds: ['panel-1', 'panel-2'],
+      })
+    } finally {
+      unsubWs()
+      unsubApp()
+    }
+
+    expect(workspaceWrites).toBe(0)
+    expect(appWrites).toBe(0)
+    expect(panelKeys('panel-1')).toEqual(beforeKeys1)
+    expect(panelKeys('panel-2')).toEqual(beforeKeys2)
+    expect(useAppStore.getState().loadedResources).toBe(beforeLoaded)
+  })
+
   test('leftover UHB from Ruth is removed when hydrating Titus on panel-1', () => {
     seedEnglishScripture('panel-1')
     hydrateOrig('panel-1', 'rut')

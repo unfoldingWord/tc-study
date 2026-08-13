@@ -95,6 +95,24 @@ export function buildProjectedResourceInstance(
   }
 }
 
+/** Skip AppStore upsert when projection would not change membership/runtime fields. */
+export function membershipProjectionUnchanged(
+  existing: ResourceInfo | undefined,
+  instance: ResourceInfo
+): boolean {
+  if (!existing) return false
+  return (
+    existing.id === instance.id &&
+    existing.key === instance.key &&
+    existing.title === instance.title &&
+    existing.owner === instance.owner &&
+    existing.language === instance.language &&
+    existing.toc === instance.toc &&
+    existing.verifiedIngredients === instance.verifiedIngredients &&
+    existing.verifiedRef === instance.verifiedRef
+  )
+}
+
 export interface ProjectPanelResourcesResult {
   projected: string[]
   missing: string[]
@@ -127,7 +145,9 @@ export function projectPanelResourcesToAppStore(options: {
       missing.push(panelKey)
       continue
     }
-    upsertLoadedResourceMembership(instance)
+    if (!membershipProjectionUnchanged(existing, instance)) {
+      upsertLoadedResourceMembership(instance)
+    }
     projected.push(panelKey)
   }
 

@@ -159,6 +159,32 @@ describe('projectPanelResourcesToAppStore', () => {
     expect(useAppStore.getState().loadedResources['u/en/ult']).toBeTruthy()
   })
 
+  test('second projection does not rewrite unchanged loadedResources', () => {
+    const ult = res({ key: 'u/en/ult' })
+    const resources = new Map([[ult.key, ult]])
+    const panels = [{ resourceKeys: ['u/en/ult', 'u/en/ult#2'] }]
+
+    projectPanelResourcesToAppStore({ panels, resources })
+    const first = useAppStore.getState().loadedResources
+    const firstUlt = first['u/en/ult']
+    const firstUlt2 = first['u/en/ult#2']
+
+    let writes = 0
+    const unsub = useAppStore.subscribe(() => {
+      writes++
+    })
+    try {
+      projectPanelResourcesToAppStore({ panels, resources })
+    } finally {
+      unsub()
+    }
+
+    expect(writes).toBe(0)
+    const second = useAppStore.getState().loadedResources
+    expect(second['u/en/ult']).toBe(firstUlt)
+    expect(second['u/en/ult#2']).toBe(firstUlt2)
+  })
+
   test('projector preserves runtime toc on upsert', () => {
     const ult = res({ key: 'u/en/ult' })
     upsertLoadedResourceMembership({

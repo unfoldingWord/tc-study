@@ -6,6 +6,7 @@
 import type { ResourceInfo } from '../../contexts/types'
 import { applyDualScopeHelpsPolicy } from '../helps/helpsPanelPolicy'
 import { originalLanguageBelongsOnBook } from './originalLanguageForBook'
+import { resolveLoadedPanelResource } from './resolveLoadedPanelResource'
 import {
   getResourceAppliesToScope,
   resourceSupportsBook,
@@ -66,7 +67,7 @@ export function filterReadPanel2Keys(args: {
   })
   const refs = scoped.map((key) => ({
     key,
-    type: loadedResources[key]?.type,
+    type: resolveLoadedPanelResource(loadedResources, key)?.type,
   }))
   return applyDualScopeHelpsPolicy(refs).visibleKeys
 }
