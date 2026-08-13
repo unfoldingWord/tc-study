@@ -16,6 +16,8 @@ describe('LanguagePicker (issue #24 helps list)', () => {
     expect(pickerSrc).toContain('onOpenChange')
     expect(pickerSrc).toContain('useLanguagePickerOpen')
     expect(pickerSrc).toContain('filterPickerLanguages')
+    expect(pickerSrc).toContain('mergePickerLanguages')
+    expect(pickerSrc).not.toContain('subjects: supportedSubjects')
   })
 
   test('header NavigationBar LanguagePicker stays on default text mode', () => {
@@ -26,5 +28,34 @@ describe('LanguagePicker (issue #24 helps list)', () => {
 
   test('stays under godSize budget', () => {
     expect(pickerSrc.split(/\r?\n/).length).toBeLessThanOrEqual(400)
+  })
+})
+
+describe('LanguagePicker chrome + text kind filter', () => {
+  test('one Languages icon in the dialog header (trigger + header only)', () => {
+    const uses = pickerSrc.match(/<Languages /g) ?? []
+    expect(uses.length).toBe(2)
+    expect(pickerSrc).not.toContain('Progress strip')
+    expect(pickerSrc).not.toContain('p-1.5 rounded-full bg-accent')
+  })
+
+  test('count lives next to the header icon, not on a globe bar', () => {
+    expect(pickerSrc).toContain('filteredLanguages.length')
+    expect(pickerSrc).toContain('bg-accent-soft text-accent-fg text-micro')
+    expect(pickerSrc).not.toContain('aria-label="Cancel"')
+  })
+
+  test('text mode wires LanguagePickerTextKindFilter; helps mode hides Filter', () => {
+    expect(pickerSrc).toContain('LanguagePickerTextKindFilter')
+    expect(pickerSrc).toContain("listMode !== 'helps'")
+    expect(pickerSrc).toContain('showTextKindFilter &&')
+  })
+
+  test('body uses LanguagePickerGrid with stack rhythm, not space-y-4', () => {
+    expect(pickerSrc).toContain("topic: 'tc-ready'")
+    expect(pickerSrc).toContain('LanguagePickerGrid')
+    expect(pickerSrc).toContain('flex flex-col gap-stack')
+    expect(pickerSrc).not.toContain('space-y-4')
+    expect(pickerSrc).not.toContain('SelectableGridWithStatus')
   })
 })

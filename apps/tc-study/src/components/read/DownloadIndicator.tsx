@@ -1,13 +1,15 @@
-import { Download, CheckCircle2, Loader2 } from 'lucide-react'
+import { AlertCircle, Download, Loader2 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
+import { shouldShowDownloadIndicator } from './downloadIndicatorVisibility'
 
 interface DownloadIndicatorProps {
   isDownloading: boolean
   progress?: DownloadProgress
+  error?: string | null
 }
 
-export function DownloadIndicator({ isDownloading, progress }: DownloadIndicatorProps) {
+export function DownloadIndicator({ isDownloading, progress, error }: DownloadIndicatorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -74,7 +76,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
   }, [isDownloading, completed, total, failed, progress])
 
   // Conditional return AFTER all hooks
-  if (!isDownloading && !progress) {
+  if (!shouldShowDownloadIndicator({ isDownloading, progress, error })) {
     return null
   }
 
@@ -90,7 +92,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
         {isDownloading ? (
           <Loader2 className="w-5 h-5 text-accent animate-spin" />
         ) : (
-          <CheckCircle2 className="w-5 h-5 text-accent" />
+          <AlertCircle className="w-5 h-5 text-danger" />
         )}
 
         {/* Badge with percentage */}
@@ -118,7 +120,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
             {isDownloading ? (
               <Loader2 className="w-4 h-4 text-accent animate-spin" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 text-accent" />
+              <AlertCircle className="w-4 h-4 text-danger" />
             )}
           </div>
 

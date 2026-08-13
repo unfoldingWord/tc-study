@@ -23,7 +23,7 @@ interface PanelHeaderProps {
   placeholderLabel?: string
   /** Index where the placeholder should appear (null = end of tabs) */
   placeholderIndex?: number | null
-  /** Extra chrome (e.g. helps-pane Languages picker). */
+  /** Trailing chrome on the right of the tab strip (e.g. helps-pane Languages picker). */
   headerActions?: ReactNode
 }
 
@@ -74,9 +74,6 @@ export function PanelHeader({
       className={`h-chrome-bar px-chrome flex items-center border-b border-border-subtle ${c.strip}`}
     >
       <div className="flex items-center gap-chrome-tight min-w-0 w-full h-full">
-        {headerActions ? (
-          <div className="flex-shrink-0 flex items-center">{headerActions}</div>
-        ) : null}
         <ResourceTabs
           resources={resources}
           currentIndex={currentIndex}
@@ -92,53 +89,58 @@ export function PanelHeader({
           placeholderIndex={placeholderIndex}
         />
 
-        {currentResource && (
-          <div className="relative flex-shrink-0" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((o) => !o)}
-              className={`h-chrome-control w-chrome-control flex items-center justify-center rounded-md ${c.button} transition-colors`}
-              title="Actions"
-              aria-label="Resource actions"
-              aria-expanded={menuOpen}
-              aria-haspopup="true"
-            >
-              <MoreVertical className={`w-4 h-4 ${c.icon}`} />
-            </button>
-            {menuOpen && (
-              <div
-                className="absolute right-0 top-full mt-1 w-auto py-1 bg-elevated border border-border rounded-lg shadow-lg z-50"
-                role="menu"
-              >
-                {onMoveToOtherPanel && (
-                  <button
-                    role="menuitem"
-                    onClick={() => {
-                      onMoveToOtherPanel()
-                      setMenuOpen(false)
-                    }}
-                    className="flex items-center justify-center p-2 hover:bg-muted"
-                    title="Move to other panel"
-                    aria-label="Move to other panel"
-                  >
-                    <ArrowLeftRight className="w-4 h-4 text-fg-secondary" />
-                  </button>
-                )}
+        {(headerActions || currentResource) ? (
+          <div className="flex-shrink-0 flex items-center gap-chrome-tight ml-auto">
+            {headerActions}
+            {currentResource && (
+              <div className="relative" ref={menuRef}>
                 <button
-                  role="menuitem"
-                  onClick={() => {
-                    onRemove()
-                    setMenuOpen(false)
-                  }}
-                  className="flex items-center justify-center p-2 hover:bg-danger-soft"
-                  title="Remove from panel"
-                  aria-label="Remove from panel"
+                  onClick={() => setMenuOpen((o) => !o)}
+                  className={`h-chrome-control w-chrome-control flex items-center justify-center rounded-md ${c.button} transition-colors`}
+                  title="Actions"
+                  aria-label="Resource actions"
+                  aria-expanded={menuOpen}
+                  aria-haspopup="true"
                 >
-                  <X className="w-4 h-4 text-danger" />
+                  <MoreVertical className={`w-4 h-4 ${c.icon}`} />
                 </button>
+                {menuOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-1 w-auto py-1 bg-elevated border border-border rounded-lg shadow-lg z-50"
+                    role="menu"
+                  >
+                    {onMoveToOtherPanel && (
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          onMoveToOtherPanel()
+                          setMenuOpen(false)
+                        }}
+                        className="flex items-center justify-center p-2 hover:bg-muted"
+                        title="Move to other panel"
+                        aria-label="Move to other panel"
+                      >
+                        <ArrowLeftRight className="w-4 h-4 text-fg-secondary" />
+                      </button>
+                    )}
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        onRemove()
+                        setMenuOpen(false)
+                      }}
+                      className="flex items-center justify-center p-2 hover:bg-danger-soft"
+                      title="Remove from panel"
+                      aria-label="Remove from panel"
+                    >
+                      <X className="w-4 h-4 text-danger" />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   )

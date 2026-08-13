@@ -77,3 +77,50 @@ describe('resolveHelpsViewerDirection', () => {
     ).toBe('rtl')
   })
 })
+
+describe('OBS text vs OBS helps direction (issue #24)', () => {
+  const langs = [
+    { code: 'ar', direction: 'rtl' as const },
+    { code: 'en', direction: 'ltr' as const },
+  ]
+
+  test('RTL OBS text + LTR English helps stay independent', () => {
+    const obsText = resolvePaneDirection({ languageCode: 'ar', availableLanguages: langs })
+    const obsHelps = resolveHelpsViewerDirection({
+      resourceDirection: resolvePaneDirection({ languageCode: 'en', availableLanguages: langs }),
+      targetScriptureDirection: obsText,
+    })
+    expect(obsText).toBe('rtl')
+    expect(obsHelps).toBe('ltr')
+  })
+
+  test('LTR OBS text + RTL helps stay independent', () => {
+    const obsText = resolvePaneDirection({ languageCode: 'en', availableLanguages: langs })
+    const obsHelps = resolveHelpsViewerDirection({
+      resourceDirection: resolvePaneDirection({ languageCode: 'ar', availableLanguages: langs }),
+      targetScriptureDirection: obsText,
+    })
+    expect(obsText).toBe('ltr')
+    expect(obsHelps).toBe('rtl')
+  })
+
+  test('OBS catalog metadata dir wins over an empty language list', () => {
+    expect(
+      resolvePaneDirection({
+        languageCode: 'fa-AF',
+        availableLanguages: [],
+        catalogDirection: 'rtl',
+      })
+    ).toBe('rtl')
+  })
+
+  test('OBS catalog metadata dir is used when language code is missing', () => {
+    expect(
+      resolvePaneDirection({
+        languageCode: null,
+        availableLanguages: [],
+        catalogDirection: 'rtl',
+      })
+    ).toBe('rtl')
+  })
+})

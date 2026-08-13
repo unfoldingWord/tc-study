@@ -1,5 +1,6 @@
 import { Download, FolderOpen, History, Info } from 'lucide-react'
 import type { BCVReference } from '../../contexts/types'
+import { ThemeToggle } from '../../features/theme'
 
 interface NavigationBarMenuProps {
   history: BCVReference[]
@@ -22,6 +23,7 @@ export function NavigationBarMenu({
 }: NavigationBarMenuProps) {
   return (
     <div className="absolute bottom-full right-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 w-auto bg-elevated rounded-lg shadow-xl border border-border py-1 z-50">
+      <ThemeToggle size="sm" variant="menu" />
       <button
         onClick={() => {
           onOpenHistory()

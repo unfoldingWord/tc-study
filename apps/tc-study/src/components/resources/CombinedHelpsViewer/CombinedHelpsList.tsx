@@ -1,5 +1,5 @@
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
-import { BookOpen, FileText, Layers } from 'lucide-react'
+import { BookOpen, Layers } from 'lucide-react'
 import React from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
@@ -15,8 +15,14 @@ import {
   HELPS_VERSE_HEADER,
   HELPS_VERSE_HEADER_ICON,
 } from '../helpsCardStyles'
+import {
+  resolveHelpsEmptyView,
+  resolveHelpsListEmptyReason,
+} from '../../../features/helps/helpsEmptyCopy'
+import type { LanguageListNameFields } from '../../../features/read/languageListDisplayName'
 import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
+import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
 import type { HelpsKindFilter } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
@@ -30,6 +36,9 @@ export interface CombinedHelpsListProps {
   setKindFilter: (v: HelpsKindFilter) => void
   /** Inline filter chip for header actions (no extra chrome row). */
   filterScopeBar?: React.ReactNode
+  helpsLanguageCode: string
+  helpsLanguageName: string | LanguageListNameFields
+  passageLabel: string
   noSources: boolean
   depsOk: boolean
   loading: boolean
@@ -67,6 +76,9 @@ export function CombinedHelpsList({
   kindFilter,
   setKindFilter,
   filterScopeBar,
+  helpsLanguageCode,
+  helpsLanguageName,
+  passageLabel,
   noSources,
   depsOk,
   loading,
@@ -94,6 +106,24 @@ export function CombinedHelpsList({
   onTitleClick,
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
+  const emptyReason = resolveHelpsListEmptyReason({
+    noSources,
+    loading,
+    depsOk,
+    mergedEmpty: mergedGroups.length === 0,
+    hasLoadError: !!(tnError && tnKey) || !!(twlError && twlKey),
+    hasActiveFilter: !!filterScopeBar,
+  })
+  const explainedEmpty =
+    emptyReason === 'no-sources' || emptyReason === 'no-passage'
+      ? resolveHelpsEmptyView({
+          kind: emptyReason,
+          languageCode: helpsLanguageCode,
+          languageName: helpsLanguageName,
+          passageLabel,
+        })
+      : null
+
   return (
     <div className={HELPS_LIST_PANEL} dir={languageDirection}>
       <ResourceViewerHeader
@@ -111,11 +141,8 @@ export function CombinedHelpsList({
         }
       />
       <div className="p-content">
-        {noSources ? (
-          <div className="text-center py-8 text-fg-muted text-sm">
-            <FileText className="w-8 h-8 mx-auto mb-2 text-fg-muted opacity-50" />
-            <p>No Translation Notes or Word Links found for this language.</p>
-          </div>
+        {explainedEmpty ? (
+          <CombinedHelpsEmptyState view={explainedEmpty} />
         ) : !depsOk ? (
           <LoadingSpinner
             centered
@@ -137,7 +164,9 @@ export function CombinedHelpsList({
             {mergedGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-fg-muted">
                 <BookOpen className="w-10 h-10 mb-2 opacity-70" />
-                <p className="text-sm">No entries for this passage.</p>
+                {emptyReason === 'filter-miss' ? (
+                  <p className="text-sm">No entries for this passage.</p>
+                ) : null}
               </div>
             ) : (
               <div className="space-y-stack-lg">

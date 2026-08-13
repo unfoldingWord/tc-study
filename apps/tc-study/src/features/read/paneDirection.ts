@@ -9,12 +9,18 @@ import type { RtlLanguageListEntry } from '../nav/resolveNavigationBarRtl'
 export function resolvePaneDirection(options: {
   languageCode: string | null | undefined
   availableLanguages: readonly RtlLanguageListEntry[]
+  /** Catalog/resource metadata dir, if known (wins over list + known codes). */
+  catalogDirection?: 'ltr' | 'rtl' | null
 }): 'ltr' | 'rtl' {
   const code = options.languageCode?.trim() || ''
-  if (!code) return 'ltr'
+  const catalog =
+    options.catalogDirection === 'rtl' || options.catalogDirection === 'ltr'
+      ? options.catalogDirection
+      : null
+  if (!code) return catalog ?? 'ltr'
   const listDir = options.availableLanguages.find((l) => l.code === code)?.direction
   const normalized = listDir === 'rtl' || listDir === 'ltr' ? listDir : null
-  return getLanguageDirection(normalized, null, code)
+  return getLanguageDirection(catalog, normalized, code)
 }
 
 /**

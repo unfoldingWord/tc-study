@@ -5,6 +5,7 @@ import {
   OBS_HELPS_SUBJECTS,
   OBS_SUBJECTS,
   availabilityForCode,
+  availabilityIfPresent,
   availabilityFromSubjects,
   emptyLanguageAvailability,
   fetchLanguageAvailabilityByCode,
@@ -168,6 +169,11 @@ describe('indexAvailabilityByLanguage', () => {
     expect(availabilityForCode(byCode, 'missing')).toEqual(emptyLanguageAvailability())
     expect(availabilityForCode(byCode, 'es').bibleHelps).toBe(true)
   })
+
+  test('availabilityIfPresent does not invent empty flags', () => {
+    expect(availabilityIfPresent(byCode, 'missing')).toBeUndefined()
+    expect(availabilityIfPresent(byCode, 'es')?.bibleHelps).toBe(true)
+  })
 })
 
 describe('fetchLanguageAvailabilityByCode', () => {
@@ -242,5 +248,64 @@ describe('fetchLanguageAvailabilityByCode', () => {
     expect([...byCode.keys()].sort()).toEqual(['es', 'hi', 'pt', 'tpi'])
     expect(byCode.get('es')?.bibleHelps).toBe(true)
     expect(byCode.get('pt')?.bible).toBe(true)
+  })
+
+  test('OBS-helps subjects are queried one-at-a-time without topic (not a 4-subject AND)', async () => {
+    const calls: Array<{ subjects?: string[]; topic?: string; limit?: number }> = []
+    const client: LanguageAvailabilityClient = {
+      async getLanguages(filters) {
+        calls.push({
+          subjects: filters?.subjects,
+          topic: filters?.topic,
+          limit: filters?.limit,
+        })
+        const subject = filters?.subjects?.[0]
+        if (subject && OBS_HELPS_SUBJECTS.includes(subject as (typeof OBS_HELPS_SUBJECTS)[number])) {
+          if (subject === 'OBS Translation Notes') return [{ code: 'hi' }, { code: 'fr' }]
+          if (subject === 'TSV OBS Translation Notes') return [{ code: 'en' }, { code: 'id' }]
+          return [{ code: 'en' }]
+        }
+        return []
+      },
+    }
+    const byCode = await fetchLanguageAvailabilityByCode(client)
+    const obsHelpsCalls = calls.filter((call) =>
+      (call.subjects ?? []).some((subject) =>
+        OBS_HELPS_SUBJECTS.includes(subject as (typeof OBS_HELPS_SUBJECTS)[number])
+      )
+    )
+    expect(obsHelpsCalls.length).toBe(OBS_HELPS_SUBJECTS.length)
+    expect(obsHelpsCalls.every((call) => call.subjects?.length === 1)).toBe(true)
+    expect(obsHelpsCalls.every((call) => call.topic === undefined)).toBe(true)
+    expect(obsHelpsCalls.every((call) => call.limit === 1000)).toBe(true)
+    expect(byCode.get('hi')?.obsHelps).toBe(true)
+    expect(byCode.get('fr')?.obsHelps).toBe(true)
+    expect(byCode.get('en')?.obsHelps).toBe(true)
+    expect(byCode.get('id')?.obsHelps).toBe(true)
+  })
+
+  test('multi-subject AND client still unions OBS-helps when fetched per subject', async () => {
+    const tsvGls = ['en', 'es-419', 'id'] as const
+    const prodObsTn = ['hi', 'fr', 'ru', 'sw'] as const
+    const client: LanguageAvailabilityClient = {
+      async getLanguages(filters) {
+        const subjects = filters?.subjects ?? []
+        if (subjects.length !== 1) {
+          return tsvGls.map((code) => ({ code }))
+        }
+        const subject = subjects[0]
+        if (subject === 'TSV OBS Translation Notes') {
+          return tsvGls.map((code) => ({ code }))
+        }
+        if (subject === 'OBS Translation Notes') {
+          return prodObsTn.map((code) => ({ code }))
+        }
+        return []
+      },
+    }
+    const byCode = await fetchLanguageAvailabilityByCode(client)
+    for (const code of [...tsvGls, ...prodObsTn]) {
+      expect(byCode.get(code)?.obsHelps).toBe(true)
+    }
   })
 })

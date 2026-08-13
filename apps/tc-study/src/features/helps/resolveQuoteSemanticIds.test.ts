@@ -70,4 +70,17 @@ describe('resolveQuoteSemanticIds', () => {
       )
     ).toEqual(['tit 1:1:Θεοῦ:1'])
   })
+
+  test('falls back to alignedTokens when quoteTokens are missing', () => {
+    expect(
+      resolveQuoteSemanticIds(
+        {
+          alignedTokens: [{ semanticId: 'tit 1:1:Paul:1', type: 'word' }],
+        },
+        'tit',
+        1,
+        1
+      )
+    ).toEqual(['tit 1:1:Paul:1'])
+  })
 })

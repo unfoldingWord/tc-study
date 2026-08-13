@@ -240,57 +240,60 @@ export class Door43ApiClient {
     }
     if (filters?.stage) params.append('stage', filters.stage)
     if (filters?.topic) params.append('topic', filters.topic)
+    // DCS list/languages currently returns the full set and ignores page/limit.
+    // A high limit is harmless if ignored and protects deployments that paginate.
+    params.set('limit', '1000')
     
     const queryString = params.toString()
-    const listEndpoint = queryString 
-      ? `/api/v1/catalog/list/languages?${queryString}`
-      : '/api/v1/catalog/list/languages'
+    const listEndpoint = `/api/v1/catalog/list/languages?${queryString}`
     
     const filterSummary = filters?.subjects ? `${filters.subjects.length} subjects` : 'all subjects'
     const stageSummary = filters?.stage || 'all stages'
     const topicSummary = filters?.topic ? `, ${filters.topic}` : ''
     console.log(`📡 Fetching languages (${filterSummary}, ${stageSummary}${topicSummary})`)
     
+    const mapListLang = (lang: any): Door43Language => ({
+      code: lang.lc || lang.identifier || lang.code,
+      name: lang.ln || lang.name || lang.ang || lang.title,
+      direction: (lang.ld || lang.direction || 'ltr') as 'ltr' | 'rtl',
+      anglicized_name: lang.ang || lang.anglicized_name,
+    })
+
     // Primary: catalog/list/languages
     try {
       const response = await this.request<{ ok: boolean; data: any[] | null }>(listEndpoint)
       if (response.ok && Array.isArray(response.data) && response.data.length > 0) {
-        // API returns: lc (language code), ln (native name), ang (anglicized name), ld (direction)
-        return response.data.map((lang: any) => ({
-          code: lang.lc || lang.identifier || lang.code,
-          name: lang.ln || lang.name || lang.ang || lang.title,
-          direction: (lang.ld || lang.direction || 'ltr') as 'ltr' | 'rtl',
-          anglicized_name: lang.ang || lang.anglicized_name,
-        }))
+        return response.data.map(mapListLang)
       }
     } catch (e) {
       console.warn('⚠️ catalog/list/languages failed, falling back to catalog/search', e)
     }
 
-    // Fallback: derive unique languages from catalog/search (handles broken list/languages endpoint)
+    // Fallback: paginate catalog/search (default page is far smaller than the catalog).
     console.log('📡 Falling back to catalog/search to derive languages...')
-    const searchParams = new URLSearchParams()
-    if (filters?.subjects && filters.subjects.length > 0) {
-      filters.subjects.forEach(subject => searchParams.append('subject', subject))
-    }
-    if (filters?.stage) searchParams.append('stage', filters.stage)
-    if (filters?.topic) searchParams.append('topic', filters.topic)
-    searchParams.set('limit', '500')
-
-    const searchResponse = await this.request<{ ok: boolean; data: any[] | null }>(
-      `/api/v1/catalog/search?${searchParams.toString()}`
-    )
-    if (!searchResponse.ok || !Array.isArray(searchResponse.data)) {
-      console.warn('🌐 Found 0 languages from Door43')
-      return []
-    }
-
-    // Deduplicate by language code, preferring GL entries
+    const SEARCH_PAGE_SIZE = 500
     const langMap = new Map<string, Door43Language>()
-    for (const entry of searchResponse.data) {
-      const code: string = entry.language || entry.language_code || ''
-      if (!code) continue
-      if (!langMap.has(code)) {
+    for (let page = 1; page <= 50; page++) {
+      const searchParams = new URLSearchParams()
+      if (filters?.subjects && filters.subjects.length > 0) {
+        filters.subjects.forEach(subject => searchParams.append('subject', subject))
+      }
+      if (filters?.stage) searchParams.append('stage', filters.stage)
+      if (filters?.topic) searchParams.append('topic', filters.topic)
+      searchParams.set('limit', String(SEARCH_PAGE_SIZE))
+      searchParams.set('page', String(page))
+
+      const searchResponse = await this.request<{ ok: boolean; data: any[] | null }>(
+        `/api/v1/catalog/search?${searchParams.toString()}`
+      )
+      if (!searchResponse.ok || !Array.isArray(searchResponse.data) || searchResponse.data.length === 0) {
+        break
+      }
+
+      const sizeBefore = langMap.size
+      for (const entry of searchResponse.data) {
+        const code: string = entry.language || entry.language_code || ''
+        if (!code || langMap.has(code)) continue
         langMap.set(code, {
           code,
           name: entry.language_title || entry.language_name || code.toUpperCase(),
@@ -298,7 +301,11 @@ export class Door43ApiClient {
           anglicized_name: entry.language_anglicized_name,
         })
       }
+
+      if (searchResponse.data.length < SEARCH_PAGE_SIZE) break
+      if (langMap.size === sizeBefore) break
     }
+
     const langs = Array.from(langMap.values())
     console.log(`🌐 Found ${langs.length} languages from Door43 (via catalog/search fallback)`)
     return langs

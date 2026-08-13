@@ -9,6 +9,7 @@ import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
+import { formatHelpsPassageLabel } from '../../../features/helps/helpsEmptyCopy'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { useEntryTitles } from '../TranslationNotesViewer/hooks/useEntryTitles'
 import { useTAMetadataForTitles } from '../TranslationNotesViewer/hooks/useTAMetadataForTitles'
@@ -257,6 +258,10 @@ export function CombinedHelpsViewer({
 
   const loading = !!(tnKey && tnLoading) || !!(twlKey && twlLoading)
   const noSources = !tnKey && !twlKey
+  const listedHelpsLang =
+    availableLanguages.find((l) => primaryLangCode(l.code) === wantLang) || languageFromList
+  const helpsLanguageName = listedHelpsLang ?? ''
+  const passageLabel = formatHelpsPassageLabel(currentRef.book, currentRef.chapter)
 
   // null when inactive so CombinedHelps can keep kind toggles in the header slot.
   const filterScopeBar =
@@ -288,6 +293,9 @@ export function CombinedHelpsViewer({
         kindFilter={kindFilter}
         setKindFilter={setKindFilter}
         filterScopeBar={filterScopeBar}
+        helpsLanguageCode={wantLang}
+        helpsLanguageName={helpsLanguageName}
+        passageLabel={passageLabel}
         noSources={noSources}
         depsOk={depsOk}
         loading={loading}

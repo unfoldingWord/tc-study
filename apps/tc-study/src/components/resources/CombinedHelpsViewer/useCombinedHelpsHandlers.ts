@@ -6,6 +6,7 @@ import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useCallback } from 'react'
 import type { ObsFrameHighlightSignal, TokenClickSignal } from '../../../signals/studioSignals'
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
+import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import type { NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
 
 type SendTokenClick = (data: {
@@ -81,35 +82,43 @@ export function useCombinedHelpsHandlers({
         })
         return
       }
-      if (!note.quoteTokens?.length) return
+      if (note.quoteTokens?.length) {
+        const refParts = note.reference.split(':')
+        const chapter = parseInt(refParts[0] || '1', 10)
+        const verse = parseInt(refParts[1] || '1', 10)
+        const book = bookCode?.toLowerCase() || ''
+        const baseOccurrence = parseInt(note.occurrence || '1', 10)
+        const semanticIds = generateSemanticIdsForQuoteTokens(
+          note.quoteTokens,
+          book,
+          chapter,
+          verse,
+          baseOccurrence
+        )
+        const firstToken = note.quoteTokens[0]
+        if (!firstToken) return
+        sendTokenClick({
+          lifecycle: 'event',
+          token: {
+            id: String(firstToken.id),
+            content: firstToken.text,
+            semanticId: semanticIds[0],
+            verseRef: `${book} ${chapter}:${verse}`,
+            position: 0,
+            strong: firstToken.strong,
+            lemma: firstToken.lemma,
+            morph: firstToken.morph,
+            alignedSemanticIds: semanticIds,
+          },
+        })
+        return
+      }
       const refParts = note.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
       const verse = parseInt(refParts[1] || '1', 10)
-      const book = bookCode?.toLowerCase() || ''
-      const baseOccurrence = parseInt(note.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        note.quoteTokens,
-        book,
-        chapter,
-        verse,
-        baseOccurrence
-      )
-      const firstToken = note.quoteTokens[0]
-      if (!firstToken) return
-      sendTokenClick({
-        lifecycle: 'event',
-        token: {
-          id: String(firstToken.id),
-          content: firstToken.text,
-          semanticId: semanticIds[0],
-          verseRef: `${book} ${chapter}:${verse}`,
-          position: 0,
-          strong: firstToken.strong,
-          lemma: firstToken.lemma,
-          morph: firstToken.morph,
-          alignedSemanticIds: semanticIds,
-        },
-      })
+      const payload = buildQuoteClickPayload(note, bookCode?.toLowerCase() || '', chapter, verse)
+      if (!payload) return
+      sendTokenClick({ lifecycle: 'event', token: payload })
     },
     [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedNoteId]
   )
@@ -176,37 +185,45 @@ export function useCombinedHelpsHandlers({
         })
         return
       }
-      if (!link.quoteTokens?.length) return
+      if (link.quoteTokens?.length) {
+        const refParts = link.reference.split(':')
+        const chapter = parseInt(refParts[0] || '1', 10)
+        const verse = parseInt(refParts[1] || '1', 10)
+        const book = bookCode?.toLowerCase() || ''
+        const baseOccurrence = parseInt(link.occurrence || '1', 10)
+        const semanticIds = generateSemanticIdsForQuoteTokens(
+          link.quoteTokens,
+          book,
+          chapter,
+          verse,
+          baseOccurrence
+        )
+        link.quoteTokens.forEach((token, index) => {
+          const semanticId = semanticIds[index]
+          if (!semanticId) return
+          sendTokenClick({
+            lifecycle: 'event',
+            token: {
+              id: String(token.id),
+              content: token.text,
+              semanticId,
+              verseRef: `${book} ${chapter}:${verse}`,
+              position: index,
+              strong: token.strong,
+              lemma: token.lemma,
+              morph: token.morph,
+              alignedSemanticIds: [semanticId],
+            },
+          })
+        })
+        return
+      }
       const refParts = link.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
       const verse = parseInt(refParts[1] || '1', 10)
-      const book = bookCode?.toLowerCase() || ''
-      const baseOccurrence = parseInt(link.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        link.quoteTokens,
-        book,
-        chapter,
-        verse,
-        baseOccurrence
-      )
-      link.quoteTokens.forEach((token, index) => {
-        const semanticId = semanticIds[index]
-        if (!semanticId) return
-        sendTokenClick({
-          lifecycle: 'event',
-          token: {
-            id: String(token.id),
-            content: token.text,
-            semanticId,
-            verseRef: `${book} ${chapter}:${verse}`,
-            position: index,
-            strong: token.strong,
-            lemma: token.lemma,
-            morph: token.morph,
-            alignedSemanticIds: [semanticId],
-          },
-        })
-      })
+      const payload = buildQuoteClickPayload(link, bookCode?.toLowerCase() || '', chapter, verse)
+      if (!payload) return
+      sendTokenClick({ lifecycle: 'event', token: payload })
     },
     [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedLinkId]
   )

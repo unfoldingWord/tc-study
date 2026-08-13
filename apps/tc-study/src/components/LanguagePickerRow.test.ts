@@ -100,6 +100,10 @@ describe('LanguagePickerRow', () => {
     expect(html).not.toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.obs}"`)
     expect(html).toContain('English')
     expect(html).toContain('en')
+    expect(html).toContain('border-border-subtle')
+    expect(html).toContain('rounded-md')
+    expect(html).toContain('text-sm font-semibold')
+    expect(html).toContain('text-caption text-fg-muted')
   })
 
   test('obs-only row exposes OBS label, not Bible', () => {
@@ -118,6 +122,24 @@ describe('LanguagePickerRow', () => {
     expect(html).toContain('Bhojpuri')
   })
 
+  test('Spanish row uses the autonym as the card title, not anglicized_name', () => {
+    const html = renderToStaticMarkup(
+      createElement(LanguagePickerRow, {
+        lang: lang(emptyLanguageAvailability(), {
+          code: 'es',
+          name: 'español',
+          anglicizedName: 'Spanish',
+        }),
+        status: 'online',
+      })
+    )
+    expect(html).toContain('>Español<')
+    expect(html).not.toMatch(/>Spanish</)
+    expect(html).toContain('title="Español (Spanish)"')
+    expect(html).toContain('aria-label="Español (Spanish)"')
+    expect(html).toContain('es')
+  })
+
   test('both badges when Bible and OBS are available', () => {
     const html = renderToStaticMarkup(
       createElement(LanguagePickerRow, {
@@ -132,6 +154,17 @@ describe('LanguagePickerRow', () => {
     )
     expect(html).toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.bible}"`)
     expect(html).toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.obs}"`)
+  })
+
+  test('selected card uses accent border and soft fill', () => {
+    const html = renderToStaticMarkup(
+      createElement(LanguagePickerRow, {
+        lang: lang(emptyLanguageAvailability()),
+        status: 'online',
+        selected: true,
+      })
+    )
+    expect(html).toContain('border-accent bg-accent-soft')
   })
 
   test('neither degrades: row still renders, no Bible/OBS badges', () => {
@@ -149,13 +182,17 @@ describe('LanguagePickerRow', () => {
 })
 
 describe('LanguagePicker list contract (issue #24 / #25)', () => {
-  test('wires listMode/helpsFlag through filterPickerLanguages; still uses LanguagePickerRow', () => {
+  test('wires listMode/helpsFlag through filterPickerLanguages; grid uses LanguagePickerRow', () => {
     const src = readFileSync(join(import.meta.dir, 'LanguagePicker.tsx'), 'utf8')
+    const gridSrc = readFileSync(join(import.meta.dir, 'LanguagePickerGrid.tsx'), 'utf8')
     expect(src).toContain("listMode = 'text'")
     expect(src).toContain('helpsFlag')
     expect(src).toContain('filterPickerLanguages')
-    expect(src).toContain('LanguagePickerRow')
+    expect(src).toContain('LanguagePickerGrid')
+    expect(src).toContain('LanguagePickerTextKindFilter')
+    expect(src).not.toContain('space-y-4')
     expect(src).not.toMatch(/availability\.(bible|obs)/)
+    expect(gridSrc).toContain('LanguagePickerRow')
     const loc = src.split(/\r?\n/).length
     expect(loc).toBeLessThanOrEqual(400)
   })

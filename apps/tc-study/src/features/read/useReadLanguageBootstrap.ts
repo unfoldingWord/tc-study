@@ -3,6 +3,7 @@
  * Heavy work lives in sibling modules:
  * - useReadIngredientHydration
  * - useReadCollectionCompleteness
+ * - useReadCatalogLoad
  * - loadReadLanguageCatalog
  * - readLanguageLoadPlan
  */
@@ -17,20 +18,20 @@ import {
   useViewerRegistry,
 } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
-import { useBackgroundDownload, useCatalogBackgroundDownload, useResourceManagement } from '../../hooks'
+import { useBackgroundDownload, useCatalogBackgroundDownload } from '../../hooks'
 import { usePackageStore } from '../../lib/stores/packageStore'
-import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
-import {
-  loadReadLanguageCatalog,
-  type LoadReadLanguageCatalogDeps,
-} from './loadReadLanguageCatalog'
 import { pushReadLanguageUrl } from './pushReadLanguageUrl'
 import {
-  applyTextModeScopeSwitch,
-  navigationScopeFromReadPath,
+  applyTextLanguagePickNavigation,
+  catalogScopeAfterTextLanguagePick,
+  resolveTextLanguagePickNavigation,
+} from './textLanguagePickNavigation'
+import {
+  resolveCatalogNavigationScope,
   textModeMismatchFromCache,
 } from './textModeMismatch'
+import { useReadTextModeSwitch } from './useReadTextModeSwitch'
 import {
   readPersistedHelpsLanguage,
   resolveAndPersistHelpsLanguage,
@@ -43,11 +44,11 @@ import {
 } from './downloadIsolationPolicy'
 import { loadLanguagesCache } from './languagesCache'
 import { shouldDeferLanguageCatalogLoad } from './readBootstrapPolicy'
-import type { CatalogLoadTarget } from './readCatalogPanelPolicy'
 import {
   availabilityLookupFromListed,
   resolveReadCatalogLoadPlan,
 } from './readLanguageLoadPlan'
+import { useReadCatalogLoad } from './useReadCatalogLoad'
 import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
 
@@ -75,15 +76,6 @@ export function useReadLanguageBootstrap({
   const packageStore = usePackageStore()
   const loadedResources = useAppStore((s) => s.loadedResources)
 
-  const setActiveResourceInPanel = useWorkspaceStore((s) => s.setActiveResourceInPanel)
-  const getPanel = useWorkspaceStore((s) => s.getPanel)
-  const { addResource } = useResourceManagement()
-
-  const [isLoadingTextResources, setIsLoadingTextResources] = useState(false)
-  const [isLoadingHelpsResources, setIsLoadingHelpsResources] = useState(false)
-  const [expectedResources, setExpectedResources] = useState<string[]>([])
-  const [metadataUpdateCounter, setMetadataUpdateCounter] = useState(0)
-
   const [shouldAutoOpenLanguagePicker, setShouldAutoOpenLanguagePicker] = useState(requireLanguageInUrl)
   const [isLanguagePickerRequired, setIsLanguagePickerRequired] = useState(requireLanguageInUrl)
 
@@ -98,8 +90,16 @@ export function useReadLanguageBootstrap({
     readPersistedHelpsLanguage()
   )
 
-  const textKeysRef = useRef<string[]>([])
-  const helpsKeysRef = useRef<string[]>([])
+  const {
+    isLoadingTextResources,
+    isLoadingHelpsResources,
+    expectedResources,
+    setExpectedResources,
+    metadataUpdateCounter,
+    textKeysRef,
+    helpsKeysRef,
+    runCatalogLoad,
+  } = useReadCatalogLoad()
 
   useEffect(() => {
     resolveAndPersistHelpsLanguage(currentLanguageCode || initialLanguage || '')
@@ -147,23 +147,6 @@ export function useReadLanguageBootstrap({
     debug: true,
   })
 
-  const catalogLoadDeps = useCallback(
-    (): Omit<
-      LoadReadLanguageCatalogDeps,
-      'textLanguageCode' | 'helpsLanguageCode' | 'loadTarget' | 'existingTextKeys' | 'existingHelpsKeys'
-    > => ({
-      catalogManager: catalogManager as LoadReadLanguageCatalogDeps['catalogManager'],
-      resourceTypeRegistry: resourceTypeRegistry as LoadReadLanguageCatalogDeps['resourceTypeRegistry'],
-      viewerRegistry,
-      getPanel,
-      addResource,
-      setActiveResourceInPanel,
-      setExpectedResources,
-      onMetadataBatch: (count) => setMetadataUpdateCounter((prev) => prev + count),
-    }),
-    [catalogManager, resourceTypeRegistry, viewerRegistry, getPanel, addResource, setActiveResourceInPanel]
-  )
-
   const maybeCancelDownloads = useCallback(
     (switchedPane: DownloadPane) => {
       if (!isBackgroundDownloadingRef.current) return
@@ -182,68 +165,37 @@ export function useReadLanguageBootstrap({
     [stopDownload]
   )
 
-  const runCatalogLoad = useCallback(
-    async (options: {
-      textLanguageCode: string
-      helpsLanguageCode: string
-      loadTarget: CatalogLoadTarget
-    }) => {
-      if (options.loadTarget === 'text' || options.loadTarget === 'both') {
-        setIsLoadingTextResources(true)
-      }
-      if (options.loadTarget === 'helps' || options.loadTarget === 'both') {
-        setIsLoadingHelpsResources(true)
-      }
-      try {
-        const result = await loadReadLanguageCatalog({
-          ...catalogLoadDeps(),
-          textLanguageCode: options.textLanguageCode,
-          helpsLanguageCode: options.helpsLanguageCode,
-          loadTarget: options.loadTarget,
-          existingTextKeys: textKeysRef.current,
-          existingHelpsKeys: helpsKeysRef.current,
-        })
-        if (options.loadTarget === 'text' || options.loadTarget === 'both') {
-          textKeysRef.current = result.textKeys
-        }
-        if (options.loadTarget === 'helps' || options.loadTarget === 'both') {
-          helpsKeysRef.current = result.helpsKeys
-        }
-      } catch (error) {
-        console.error('Error loading resources:', error)
-      } finally {
-        if (options.loadTarget === 'text' || options.loadTarget === 'both') {
-          setIsLoadingTextResources(false)
-        }
-        if (options.loadTarget === 'helps' || options.loadTarget === 'both') {
-          setIsLoadingHelpsResources(false)
-        }
-      }
-    },
-    [catalogLoadDeps]
-  )
-
   const handleLanguageSelected = useCallback(
-    async (languageCode: string) => {
+    async (languageCode: string, options?: { navigationScope?: 'scripture' | 'obs' }) => {
       setShouldAutoOpenLanguagePicker(false)
       setIsLanguagePickerRequired(false)
       setCurrentLanguageCode(languageCode)
       maybeCancelDownloads('text')
+
+      const subjects =
+        typeof resourceTypeRegistry.getSupportedSubjects === 'function'
+          ? resourceTypeRegistry.getSupportedSubjects()
+          : []
+      const listed = loadLanguagesCache(subjects)
+      const availabilityFor = availabilityLookupFromListed(listed)
+      const scopeFromUrl = resolveCatalogNavigationScope({
+        pathname: typeof window !== 'undefined' ? window.location.pathname : '',
+        storeScope: useNavigationStore.getState().navigationScope,
+        explicitScope: options?.navigationScope,
+      })
+      const pick = resolveTextLanguagePickNavigation({
+        availability: availabilityFor(languageCode),
+        currentScope: scopeFromUrl,
+        explicitScope: options?.navigationScope,
+      })
+      applyTextLanguagePickNavigation(useNavigationStore.getState(), pick)
+      const scope = catalogScopeAfterTextLanguagePick(scopeFromUrl, pick)
       pushReadLanguageUrl(navigate, languageCode)
 
       if (shouldDeferLanguageCatalogLoad(initialLanguage)) {
         return
       }
 
-      const subjects =
-        typeof resourceTypeRegistry.getSupportedSubjects === 'function'
-          ? resourceTypeRegistry.getSupportedSubjects()
-          : []
-      const storeScope = useNavigationStore.getState().navigationScope
-      const scope = navigationScopeFromReadPath(
-        typeof window !== 'undefined' ? window.location.pathname : '',
-        storeScope
-      )
       if (textModeMismatchFromCache({ languageCode, navigationScope: scope, supportedSubjects: subjects })) {
         textKeysRef.current = []
         setExpectedResources(helpsKeysRef.current)
@@ -258,7 +210,7 @@ export function useReadLanguageBootstrap({
         currentHelpsLanguage: helpsKeysRef.current.length === 0 ? null : helpsLanguageCode,
         persistedHelpsLanguage: persisted,
         navigationScope: scope,
-        availabilityFor: availabilityLookupFromListed(loadLanguagesCache(subjects)),
+        availabilityFor,
       })
       setHelpsLanguageCode(plan.helpsLanguageCode)
 
@@ -267,6 +219,7 @@ export function useReadLanguageBootstrap({
         textLanguageCode: languageCode,
         helpsLanguageCode: plan.helpsLanguageCode,
         loadTarget: plan.loadTarget,
+        navigationScope: scope,
       })
     },
     [
@@ -279,14 +232,9 @@ export function useReadLanguageBootstrap({
     ]
   )
 
-  const handleSwitchTextMode = useCallback(
-    (scope: 'scripture' | 'obs') => {
-      const code = currentLanguageCode
-      if (!code) return
-      applyTextModeScopeSwitch(useNavigationStore.getState(), scope)
-      void handleLanguageSelected(code)
-    },
-    [currentLanguageCode, handleLanguageSelected]
+  const { handleSwitchTextMode, handleNavigatorScopeCommitted } = useReadTextModeSwitch(
+    currentLanguageCode,
+    handleLanguageSelected
   )
 
   const handleHelpsLanguageSelected = useCallback(
@@ -298,13 +246,14 @@ export function useReadLanguageBootstrap({
       const textCode = currentLanguageCode || initialLanguage
       if (!textCode) return
 
+      const navigationScope = useNavigationStore.getState().navigationScope
       const plan = resolveReadCatalogLoadPlan({
         switchedPane: 'helps',
         textLanguageCode: textCode,
         nextHelpsLanguageCode: languageCode,
         currentHelpsLanguage: helpsLanguageCode,
         persistedHelpsLanguage: languageCode,
-        navigationScope: useNavigationStore.getState().navigationScope,
+        navigationScope,
         availabilityFor: () => undefined,
       })
 
@@ -312,6 +261,7 @@ export function useReadLanguageBootstrap({
         textLanguageCode: textCode,
         helpsLanguageCode: plan.helpsLanguageCode,
         loadTarget: plan.loadTarget,
+        navigationScope,
       })
     },
     [maybeCancelDownloads, currentLanguageCode, initialLanguage, helpsLanguageCode, runCatalogLoad]
@@ -341,6 +291,7 @@ export function useReadLanguageBootstrap({
     handleLanguageSelected,
     handleHelpsLanguageSelected,
     handleSwitchTextMode,
+    handleNavigatorScopeCommitted,
     isBackgroundDownloading,
     downloadStats,
   }

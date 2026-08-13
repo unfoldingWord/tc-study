@@ -10,6 +10,8 @@ import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { RESOURCE_TYPE_IDS } from '../../../resourceTypes/resourceTypeIds'
 import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/helpsDisplayFilters'
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
+import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
+import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { HelpsFilterBanners } from '../shared/HelpsFilterBanners'
@@ -69,7 +71,7 @@ export function WordsLinksViewer({
 
   const languageCode = resource?.language ?? resourceKey.split('/')[1]?.split('_')[0] ?? ''
   const languageFromList = availableLanguages.find((l) => l.code === languageCode)
-  const languageDirection = getLanguageDirection(
+  const resourceDirection = getLanguageDirection(
     catalogMetadata?.languageDirection ?? undefined,
     languageFromList?.direction ?? undefined,
     languageCode
@@ -136,7 +138,12 @@ export function WordsLinksViewer({
     setSelectedLink,
   })
 
-  const { sourceResourceId: targetSourceId } = useScriptureTokens({ resourceId })
+  const { sourceResourceId: targetSourceId, resourceMetadata: targetScriptureMetadata } =
+    useScriptureTokens({ resourceId })
+  const helpsLanguageDirection = resolveHelpsViewerDirection({
+    resourceDirection,
+    targetScriptureDirection: targetScriptureMetadata?.languageDirection,
+  })
 
   useEffect(() => {
     const checkCatalog = async () => {
@@ -241,37 +248,50 @@ export function WordsLinksViewer({
         })
         return
       }
-      if (!link.quoteTokens?.length) return
+      if (link.quoteTokens?.length) {
+        const refParts = link.reference.split(':')
+        const chapter = parseInt(refParts[0] || '1', 10)
+        const verse = parseInt(refParts[1] || '1', 10)
+        const bookCode = currentRef.book?.toLowerCase() || ''
+        const baseOccurrence = parseInt(link.occurrence || '1', 10)
+        const semanticIds = generateSemanticIdsForQuoteTokens(
+          link.quoteTokens,
+          bookCode,
+          chapter,
+          verse,
+          baseOccurrence
+        )
+        link.quoteTokens.forEach((token, index) => {
+          const semanticId = semanticIds[index]
+          if (!semanticId) return
+          sendTokenClick({
+            lifecycle: 'event',
+            token: {
+              id: String(token.id),
+              content: token.text,
+              semanticId,
+              verseRef: `${bookCode} ${chapter}:${verse}`,
+              position: index,
+              strong: token.strong,
+              lemma: token.lemma,
+              morph: token.morph,
+              alignedSemanticIds: [semanticId],
+            },
+          })
+        })
+        return
+      }
       const refParts = link.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
       const verse = parseInt(refParts[1] || '1', 10)
-      const bookCode = currentRef.book?.toLowerCase() || ''
-      const baseOccurrence = parseInt(link.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        link.quoteTokens,
-        bookCode,
+      const payload = buildQuoteClickPayload(
+        link,
+        currentRef.book?.toLowerCase() || '',
         chapter,
-        verse,
-        baseOccurrence
+        verse
       )
-      link.quoteTokens.forEach((token, index) => {
-        const semanticId = semanticIds[index]
-        if (!semanticId) return
-        sendTokenClick({
-          lifecycle: 'event',
-          token: {
-            id: String(token.id),
-            content: token.text,
-            semanticId,
-            verseRef: `${bookCode} ${chapter}:${verse}`,
-            position: index,
-            strong: token.strong,
-            lemma: token.lemma,
-            morph: token.morph,
-            alignedSemanticIds: [semanticId],
-          },
-        })
-      })
+      if (!payload) return
+      sendTokenClick({ lifecycle: 'event', token: payload })
     },
     [isObs, currentRef.book, broadcastObsHighlight, sendTokenClick]
   )
@@ -300,7 +320,7 @@ export function WordsLinksViewer({
         effectiveResource={effectiveResource}
         bookCode={currentRef.book}
         bookTitleSource={bookTitleSource}
-        languageDirection={languageDirection}
+        languageDirection={helpsLanguageDirection}
         filterScopeBar={filterScopeBar}
         dependenciesReady={dependenciesReady}
         loading={loading}

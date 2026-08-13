@@ -3,9 +3,10 @@
  */
 
 import { LinkedPanel } from '@bt-synergy/resource-panels'
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigationScope } from '../../contexts'
 import type { ResourceInfo } from '../../contexts/types'
+import { HelpsLanguageActionsProvider } from '../../features/helps/HelpsLanguageActionsContext'
 import { helpsFlagForNavigationScope } from '../../features/read/helpsLanguagePolicy'
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
 import { useSwipeGesture } from '../../hooks'
@@ -75,6 +76,16 @@ function ReadPanelBody({
   const navigationScope = useNavigationScope()
   const helpsFlag = helpsFlagForNavigationScope(navigationScope)
   const showHelpsPicker = panelId === 'panel-2' && !!onHelpsLanguageSelected
+  const helpsLanguageActions = useMemo(
+    () =>
+      showHelpsPicker && onHelpsLanguageSelected
+        ? {
+            openHelpsPicker: () => setHelpsPickerOpen(true),
+            selectHelpsLanguage: onHelpsLanguageSelected,
+          }
+        : null,
+    [showHelpsPicker, onHelpsLanguageSelected]
+  )
   const panel1Mismatch = panelId === 'panel-1' ? textModeMismatch : null
   const mismatchScope = panel1Mismatch?.switchScope
   const mismatchAction =
@@ -106,6 +117,7 @@ function ReadPanelBody({
   })
 
   return (
+    <HelpsLanguageActionsProvider value={helpsLanguageActions}>
     <div className="h-full flex flex-col">
       <PanelHeader
         panelId={panelId}
@@ -181,6 +193,7 @@ function ReadPanelBody({
         )}
       </div>
     </div>
+    </HelpsLanguageActionsProvider>
   )
 }
 

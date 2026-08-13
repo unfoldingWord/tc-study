@@ -11,6 +11,7 @@ import { useCatalogReady, useResourceTypesError } from './contexts/CatalogContex
 import { NavigationProvider } from './contexts/NavigationContext'
 import { useWorkspaceStore } from './lib/stores/workspaceStore'
 import { useWizardStore } from './lib/stores/wizardStore'
+import { door43ToListNameFields } from './features/read/languageListDisplayName'
 
 const Home = lazy(() => import('./pages/Home'))
 const Library = lazy(() => import('./pages/Library'))
@@ -50,12 +51,16 @@ function App() {
           const client = getDoor43ApiClient()
           const languages = await client.getLanguages({ stage: 'prod' })
 
-          const languageData = languages.map((lang) => ({
-            code: lang.code,
-            name: lang.name || lang.code.toUpperCase(),
-            source: 'door43' as const,
-            direction: lang.direction,
-          }))
+          const languageData = languages.map((lang) => {
+            const fields = door43ToListNameFields(lang)
+            return {
+              code: lang.code,
+              name: fields.name || lang.code.toUpperCase(),
+              anglicizedName: fields.anglicizedName,
+              source: 'door43' as const,
+              direction: lang.direction,
+            }
+          })
 
           setAvailableLanguages(languageData)
         } catch (error) {

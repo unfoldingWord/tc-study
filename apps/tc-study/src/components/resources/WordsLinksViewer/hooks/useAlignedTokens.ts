@@ -8,21 +8,17 @@
  * STEP 1: TWL origWords → Original Language tokens (via QuoteMatcher in useQuoteTokens)
  * STEP 2: Extract semantic IDs from original tokens (e.g., "TIT 1:1:Παῦλος:1")
  * STEP 3: Find target tokens where alignedOriginalWordIds contains our semantic IDs
- *
- * Semantic ID Matching:
- * - Original token has: id = "TIT 1:1:Παῦλος:1"
- * - Target token has: alignedOriginalWordIds = ["TIT 1:1:Παῦλος:1"]
- * - When they match → target token is part of the aligned quote
- *
- * This same algorithm works for:
- * - Translation Words Links (TWL) - uses origWords field
- * - Translation Notes (TN) - uses quote field
- * - Any TSV resource with quote/origWords + occurrence + reference
+ *         (or the token's own semanticId when UGNT/UHB is the text pane).
+ * STEP 4: If still empty and quote language matches text language (or text is OL),
+ *         match quote text against text-pane word tokens.
  */
 
 import { useMemo } from 'react'
 import { useCurrentReference } from '../../../../contexts'
-import { findAlignedTokens } from '../../../../features/helps/findAlignedTokens'
+import {
+  helpsLanguageFromResourceKey,
+  resolveAlignedQuoteTokens,
+} from '../../../../features/helps/resolveAlignedQuoteTokens'
 import { generateSemanticIdsForQuoteTokens } from '../../../../features/helps/quoteTokens'
 import { useScriptureTokens } from './useScriptureTokens'
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
@@ -43,19 +39,18 @@ interface UseAlignedTokensOptions<TLink extends LinkQuotesInput> {
 }
 
 export function useAlignedTokens<TLink extends LinkQuotesInput>({
-  resourceKey: _resourceKey,
+  resourceKey,
   resourceId,
   links,
 }: UseAlignedTokensOptions<TLink>) {
   const currentRef = useCurrentReference()
 
-  // Listen for scripture token broadcasts (simple state listener!)
-  const { tokens: targetTokens, reference: tokenReference, hasTokens } = useScriptureTokens({ resourceId })
+  const { tokens: targetTokens, reference: tokenReference, hasTokens, resourceMetadata } =
+    useScriptureTokens({ resourceId })
 
-  // Build aligned tokens for each link
   const linksWithAlignedTokens = useMemo((): Array<
     TLink & {
-      alignedTokens: ReturnType<typeof findAlignedTokens> | undefined
+      alignedTokens: ReturnType<typeof resolveAlignedQuoteTokens>['alignedTokens'] | undefined
       semanticIds?: string[]
     }
   > => {
@@ -68,12 +63,10 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     const bookCode = currentRef.book?.toLowerCase() || ''
     const currentChapter = currentRef.chapter || 1
     const refBookLower = tokenReference?.book?.toLowerCase() ?? ''
+    const quoteLanguage = helpsLanguageFromResourceKey(resourceKey)
+    const textLanguage = resourceMetadata?.language
 
     return links.map((link) => {
-      if (!link.quoteTokens || link.quoteTokens.length === 0) {
-        return { ...link, alignedTokens: undefined }
-      }
-
       const refParts = link.reference.split(':')
       const linkChapter = parseInt(refParts[0] || '1', 10)
       const linkVerse = parseInt(refParts[1] || '1', 10)
@@ -98,29 +91,44 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       }
 
       const linkOccurrence = parseInt(String(link.occurrence ?? '1'), 10)
-      const originalSemanticIds = generateSemanticIdsForQuoteTokens(
-        link.quoteTokens,
-        bookCode,
-        linkChapter,
-        linkVerse,
-        linkOccurrence
-      )
+      const originalSemanticIds = link.quoteTokens?.length
+        ? generateSemanticIdsForQuoteTokens(
+            link.quoteTokens,
+            bookCode,
+            linkChapter,
+            linkVerse,
+            linkOccurrence
+          )
+        : []
 
-      const alignedTokens = findAlignedTokens(
+      const { alignedTokens, semanticIds } = resolveAlignedQuoteTokens({
         targetTokens,
         originalSemanticIds,
+        quoteText: link.origWords,
+        occurrence: linkOccurrence,
         bookCode,
-        linkChapter,
-        linkVerse
-      )
+        chapter: linkChapter,
+        verse: linkVerse,
+        quoteLanguage,
+        textLanguage,
+      })
 
       return {
         ...link,
         alignedTokens: alignedTokens.length > 0 ? alignedTokens : undefined,
-        semanticIds: originalSemanticIds,
+        semanticIds: semanticIds.length > 0 ? semanticIds : undefined,
       }
     })
-  }, [links, targetTokens, tokenReference, hasTokens, currentRef.book, currentRef.chapter])
+  }, [
+    links,
+    targetTokens,
+    tokenReference,
+    hasTokens,
+    currentRef.book,
+    currentRef.chapter,
+    resourceKey,
+    resourceMetadata?.language,
+  ])
 
   return {
     linksWithAlignedTokens,

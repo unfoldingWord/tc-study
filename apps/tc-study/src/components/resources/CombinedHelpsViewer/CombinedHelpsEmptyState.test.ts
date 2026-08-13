@@ -1,0 +1,79 @@
+import { describe, expect, test } from 'bun:test'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { HelpsLanguageActionsProvider } from '../../../features/helps/HelpsLanguageActionsContext'
+import { HELPS_EMPTY_COPY, resolveHelpsEmptyView } from '../../../features/helps/helpsEmptyCopy'
+import { door43ToListNameFields } from '../../../features/read/languageListDisplayName'
+import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
+
+const ES_LISTED = door43ToListNameFields({
+  code: 'es',
+  name: 'español',
+  anglicized_name: 'Spanish',
+})
+
+describe('CombinedHelpsEmptyState', () => {
+  test('Spanish + Galatians 1 names language from catalog metadata; English action is icon + aria-label', () => {
+    let selected: string | null = null
+    let pickerOpened = false
+    const view = resolveHelpsEmptyView({
+      kind: 'no-passage',
+      languageCode: 'es',
+      languageName: ES_LISTED,
+      passageLabel: 'Galatians 1',
+    })
+    const html = renderToStaticMarkup(
+      createElement(
+        HelpsLanguageActionsProvider,
+        {
+          value: {
+            openHelpsPicker: () => {
+              pickerOpened = true
+            },
+            selectHelpsLanguage: (code: string) => {
+              selected = code
+            },
+          },
+        },
+        createElement(CombinedHelpsEmptyState, { view })
+      )
+    )
+    expect(html).toContain('Spanish')
+    expect(html).not.toContain('español')
+    expect(html).toContain('Galatians')
+    expect(html).toContain('<svg')
+    expect(html).toContain(HELPS_EMPTY_COPY.useDefaultHelps('English'))
+    expect(html).toContain(`title="${HELPS_EMPTY_COPY.useDefaultHelps('English')}"`)
+    expect(html).toContain(`aria-label="${HELPS_EMPTY_COPY.useDefaultHelps('English')}"`)
+    expect(html).toContain('>English<')
+    expect(selected).toBeNull()
+    expect(pickerOpened).toBe(false)
+  })
+
+  test('already on English: no Use-English button; Languages icon + sentence open the picker', () => {
+    const view = resolveHelpsEmptyView({
+      kind: 'no-passage',
+      languageCode: 'en',
+      languageName: 'English',
+      passageLabel: 'Exodus 1',
+    })
+    const html = renderToStaticMarkup(
+      createElement(
+        HelpsLanguageActionsProvider,
+        {
+          value: {
+            openHelpsPicker: () => {},
+            selectHelpsLanguage: () => {},
+          },
+        },
+        createElement(CombinedHelpsEmptyState, { view })
+      )
+    )
+    expect(html).toContain('English')
+    expect(html).toContain('Exodus')
+    expect(html).toContain('<svg')
+    expect(html).not.toContain(HELPS_EMPTY_COPY.useDefaultHelps('English'))
+    expect(html).toContain(HELPS_EMPTY_COPY.chooseHelpsLanguage)
+    expect(html).toContain(`aria-label="${HELPS_EMPTY_COPY.chooseHelpsLanguage}"`)
+  })
+})

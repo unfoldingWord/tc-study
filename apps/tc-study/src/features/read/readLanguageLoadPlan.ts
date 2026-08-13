@@ -23,7 +23,7 @@ export function availabilityLookupFromListed(
 ): (code: string) => LanguageAvailabilityFlags | undefined {
   const byCode = new Map<string, LanguageAvailabilityFlags>()
   for (const lang of languages ?? []) {
-    if (lang.code) byCode.set(lang.code, lang.availability)
+    if (lang.code && lang.availability) byCode.set(lang.code, lang.availability)
   }
   return (code) => byCode.get(code)
 }

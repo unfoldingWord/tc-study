@@ -9,6 +9,7 @@ import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/helpsDisplayFilters'
 import { generateSemanticIdsForQuoteTokens } from '../../../features/helps/quoteTokens'
+import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
 import { getLanguageDirection } from '../../../utils/languageDirection'
@@ -212,35 +213,48 @@ export function TranslationNotesViewer({
         })
         return
       }
-      if (!note.quoteTokens?.length) return
+      if (note.quoteTokens?.length) {
+        const refParts = note.reference.split(':')
+        const chapter = parseInt(refParts[0] || '1', 10)
+        const verse = parseInt(refParts[1] || '1', 10)
+        const bookCode = currentRef.book?.toLowerCase() || ''
+        const baseOccurrence = parseInt(note.occurrence || '1', 10)
+        const semanticIds = generateSemanticIdsForQuoteTokens(
+          note.quoteTokens,
+          bookCode,
+          chapter,
+          verse,
+          baseOccurrence
+        )
+        const firstToken = note.quoteTokens[0]
+        if (!firstToken) return
+        sendTokenClick({
+          lifecycle: 'event',
+          token: {
+            id: String(firstToken.id),
+            content: firstToken.text,
+            semanticId: semanticIds[0],
+            verseRef: `${bookCode} ${chapter}:${verse}`,
+            position: 0,
+            strong: firstToken.strong,
+            lemma: firstToken.lemma,
+            morph: firstToken.morph,
+            alignedSemanticIds: semanticIds,
+          },
+        })
+        return
+      }
       const refParts = note.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
       const verse = parseInt(refParts[1] || '1', 10)
-      const bookCode = currentRef.book?.toLowerCase() || ''
-      const baseOccurrence = parseInt(note.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        note.quoteTokens,
-        bookCode,
+      const payload = buildQuoteClickPayload(
+        note,
+        currentRef.book?.toLowerCase() || '',
         chapter,
-        verse,
-        baseOccurrence
+        verse
       )
-      const firstToken = note.quoteTokens[0]
-      if (!firstToken) return
-      sendTokenClick({
-        lifecycle: 'event',
-        token: {
-          id: String(firstToken.id),
-          content: firstToken.text,
-          semanticId: semanticIds[0],
-          verseRef: `${bookCode} ${chapter}:${verse}`,
-          position: 0,
-          strong: firstToken.strong,
-          lemma: firstToken.lemma,
-          morph: firstToken.morph,
-          alignedSemanticIds: semanticIds,
-        },
-      })
+      if (!payload) return
+      sendTokenClick({ lifecycle: 'event', token: payload })
     },
     [isObs, currentRef.book, broadcastObsHighlight, sendTokenClick]
   )

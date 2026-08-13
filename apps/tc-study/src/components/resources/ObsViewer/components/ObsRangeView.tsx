@@ -1,7 +1,5 @@
 import type { FrameSpan } from '../../../../lib/obs/highlightFrameText'
-import { enrichObsFrameQuoteEntries } from '../../../../lib/obs/enrichObsFrameQuotes'
-import { computeFrameSpans } from '../../../../lib/obs/highlightFrameText'
-import { computeFrameWordSpans } from '../../../../lib/obs/highlightFrameWords'
+import { resolveObsHighlightSpans } from '../../../../lib/obs/resolveObsHighlightSpans'
 import type { ObsFrame, ParsedObsStory } from '../../../../lib/obs/parseObsMarkdown'
 import type { MergedObsFrameQuotes } from '@bt-synergy/resource-panels'
 import type { ObsFrameQuoteEntry } from '../../../../signals/studioSignals'
@@ -71,36 +69,23 @@ export function ObsRangeView(props: {
                 const frameEntries: ObsFrameQuoteEntry[] = isPanel2QuoteCapable
                   ? (obsQuotesState?.frameQuoteMap?.[frame.frameNumber] ?? [])
                   : []
-                const frameSpecs = frameEntries.map((q) => ({
-                  quote: q.quote,
-                  occurrence: q.occurrence,
-                }))
-                const frameEnriched =
+                const resolved =
                   frameEntries.length > 0
-                    ? enrichObsFrameQuoteEntries(frame.text, frameEntries)
-                    : frameEntries
-                const frameWordMode =
-                  frameEntries.length > 0 &&
-                  frameEnriched.every((e) => e.startWord != null && e.endWord != null)
-                const frameSpans =
-                  frameSpecs.length > 0
-                    ? frameWordMode
-                      ? computeFrameWordSpans(frame.text, frameEnriched)
-                      : computeFrameSpans(frame.text, frameSpecs)
+                    ? resolveObsHighlightSpans(frame.text, frameEntries)
                     : null
                 return (
                   <div key={frame.frameNumber} className="space-y-3">
                     <p className="text-xs text-gray-400 font-medium">
                       {sNum} · {frame.frameNumber}
                     </p>
-                    {frameSpans ? (
+                    {resolved ? (
                       <div className="text-gray-900 leading-relaxed whitespace-pre-wrap">
                         <ObsQuoteSpans
-                          spans={frameSpans}
-                          enriched={frameEnriched}
+                          spans={resolved.spans}
+                          enriched={resolved.enriched}
                           activeHighlight={activeHighlight}
                           frameNumber={frame.frameNumber}
-                          useWordMode={frameWordMode}
+                          useWordMode={resolved.useWordMode}
                           storyNum={sNum}
                           onActivateWord={activateWordSpan}
                           onToggleEntry={(entry) =>

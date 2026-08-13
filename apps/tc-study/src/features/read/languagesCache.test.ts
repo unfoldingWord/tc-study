@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { emptyLanguageAvailability } from './languageAvailability'
 import {
   LANGUAGES_CACHE_KEY,
   LANGUAGES_CACHE_VERSION,
@@ -32,7 +31,8 @@ const SUBJECTS = ['Bible', 'Open Bible Stories']
 const SAMPLE: ListedLanguage[] = [
   {
     code: 'es',
-    name: 'Español',
+    name: 'español',
+    anglicizedName: 'Spanish',
     source: 'door43',
     direction: 'ltr',
     availability: {
@@ -49,9 +49,9 @@ describe('languagesCache', () => {
     g.localStorage?.removeItem(LANGUAGES_CACHE_KEY)
   })
 
-  test('round-trips availability flags at cache version 3', () => {
+  test('round-trips availability flags at cache version 6', () => {
     saveLanguagesCache(SAMPLE, SUBJECTS)
-    expect(LANGUAGES_CACHE_VERSION).toBe(3)
+    expect(LANGUAGES_CACHE_VERSION).toBe(6)
     expect(loadLanguagesCache(SUBJECTS)).toEqual(SAMPLE)
   })
 
@@ -62,7 +62,7 @@ describe('languagesCache', () => {
         version: 2,
         timestamp: Date.now(),
         subjects: SUBJECTS,
-        languages: [{ code: 'es', name: 'Español', source: 'door43' }],
+        languages: [{ code: 'es', name: 'español', source: 'door43' }],
       })
     )
     expect(loadLanguagesCache(SUBJECTS)).toBeNull()
@@ -73,11 +73,11 @@ describe('languagesCache', () => {
     expect(loadLanguagesCache(['Bible'])).toBeNull()
   })
 
-  test('fills missing availability on a v3 entry', () => {
+  test('does not invent empty flags for a v5 entry missing availability', () => {
     saveLanguagesCache(SAMPLE, SUBJECTS)
     const raw = JSON.parse(g.localStorage!.getItem(LANGUAGES_CACHE_KEY)!)
     delete raw.languages[0].availability
     g.localStorage!.setItem(LANGUAGES_CACHE_KEY, JSON.stringify(raw))
-    expect(loadLanguagesCache(SUBJECTS)?.[0].availability).toEqual(emptyLanguageAvailability())
+    expect(loadLanguagesCache(SUBJECTS)?.[0].availability).toBeUndefined()
   })
 })

@@ -25,10 +25,15 @@ import {
 interface BCVNavigatorProps {
   onClose: () => void
   mode?: 'verse' | 'section'
+  onNavigationScopeCommitted?: (scope: 'scripture' | 'obs') => void
 }
 
-export function BCVNavigator({ onClose, mode = 'verse' }: BCVNavigatorProps) {
-  const c = useBcvNavigatorController({ onClose, mode })
+export function BCVNavigator({
+  onClose,
+  mode = 'verse',
+  onNavigationScopeCommitted,
+}: BCVNavigatorProps) {
+  const c = useBcvNavigatorController({ onClose, mode, onNavigationScopeCommitted })
 
   if (!c.hasObsLoaded && c.availableBooks.length === 0) {
     return <BcvNavigatorEmpty onClose={onClose} />

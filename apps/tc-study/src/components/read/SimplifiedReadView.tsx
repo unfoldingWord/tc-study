@@ -42,7 +42,6 @@ import { useReadPanelResize } from '../../features/read/useReadPanelResize'
 import { useReadUrlSync } from '../../features/read/useReadUrlSync'
 import { createStudioPluginRegistry } from '../../features/studio/createStudioPluginRegistry'
 import { moveResourceBetweenPanels } from '../../features/workspace/resourceMutations'
-import { ThemeToggle } from '../../features/theme'
 import { useWizardStore } from '../../lib/stores/wizardStore'
 import { NavigationBar } from '../studio/NavigationBar'
 import { DownloadIndicator } from './DownloadIndicator'
@@ -197,6 +196,7 @@ export function SimplifiedReadView({
     handleLanguageSelected,
     handleHelpsLanguageSelected,
     handleSwitchTextMode,
+    handleNavigatorScopeCommitted,
     isBackgroundDownloading,
     downloadStats,
   } = useReadLanguageBootstrap({ initialLanguage, requireLanguageInUrl })
@@ -327,10 +327,12 @@ export function SimplifiedReadView({
                 onLanguageSelected={handleLanguageSelected}
                 autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
                 languagePickerRequired={isLanguagePickerRequired}
+                onNavigationScopeCommitted={handleNavigatorScopeCommitted}
                 downloadIndicator={
                   <DownloadIndicator
                     isDownloading={isBackgroundDownloading}
                     progress={downloadStats.progress ?? undefined}
+                    error={downloadStats.error}
                   />
                 }
                 onDownloadCollection={
@@ -339,7 +341,6 @@ export function SimplifiedReadView({
                 onLoadCollection={() => setShowLoadDialog(true)}
               />
             </div>
-            <ThemeToggle size="sm" />
           </div>
         </div>
 

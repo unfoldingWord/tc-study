@@ -4,6 +4,7 @@
 
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useMemo } from 'react'
+import type { AlignedToken } from '../../../../features/helps/findAlignedTokens'
 import {
   filterDisplayLinks,
   filterLinksByReferenceRange,
@@ -21,7 +22,7 @@ import { useQuoteTokens } from './useQuoteTokens'
 
 export type LinkWithAlignments = TranslationWordsLink & {
   quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
-  alignedTokens?: Array<{ position: number }>
+  alignedTokens?: AlignedToken[]
   semanticIds?: string[]
 }
 
@@ -102,7 +103,7 @@ export function useWordsLinksPipeline({
     const bookCode = currentRef.book?.toLowerCase() || ''
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const link of filteredByReference) {
-      if (!link.quoteTokens?.length) continue
+      if (!link.quoteTokens?.length && !link.semanticIds?.length) continue
       const cached = link.semanticIds
       const semanticIds =
         cached ??

@@ -8,6 +8,10 @@ import { useWizardStore } from '../../lib/stores/wizardStore'
 import { useCatalogManager } from '../../contexts'
 import { useDoor43Data } from '../../hooks'
 import { Loader2, Database, Wifi, Globe, AlertCircle, RefreshCw } from 'lucide-react'
+import {
+  door43ToListNameFields,
+  languageListDisplayName,
+} from '../../features/read/languageListDisplayName'
 import { SelectableGridWithStatus } from '../shared/SelectableGrid'
 
 export function LanguageSelectorStep() {
@@ -28,10 +32,12 @@ export function LanguageSelectorStep() {
 
 
 
-      // Create a map of language codes to names from Door43
       const door43NameMap = new Map<string, string>()
+      const door43AnglicizedMap = new Map<string, string>()
       for (const lang of door43Langs) {
-        door43NameMap.set(lang.code, lang.name || lang.code.toUpperCase())
+        const fields = door43ToListNameFields(lang)
+        door43NameMap.set(lang.code, fields.name || lang.code.toUpperCase())
+        if (fields.anglicizedName) door43AnglicizedMap.set(lang.code, fields.anglicizedName)
       }
 
       // Get catalog languages and use Door43 names if available
@@ -40,13 +46,17 @@ export function LanguageSelectorStep() {
 
 
       // Merge and deduplicate
-      const languageMap = new Map<string, { code: string; name: string; source: 'catalog' | 'door43' }>()
+      const languageMap = new Map<
+        string,
+        { code: string; name: string; anglicizedName?: string; source: 'catalog' | 'door43' }
+      >()
 
       // Add catalog languages with proper names from Door43
       for (const code of catalogLanguageCodes) {
         languageMap.set(code, {
           code,
           name: door43NameMap.get(code) || code.toUpperCase(),
+          anglicizedName: door43AnglicizedMap.get(code),
           source: 'catalog'
         })
       }
@@ -56,7 +66,7 @@ export function LanguageSelectorStep() {
         if (!languageMap.has(lang.code)) {
           languageMap.set(lang.code, {
             code: lang.code,
-            name: lang.name || lang.code.toUpperCase(),
+            ...door43ToListNameFields(lang),
             source: 'door43'
           })
         }
@@ -82,7 +92,8 @@ export function LanguageSelectorStep() {
     ? languages.filter(
         (lang) =>
           lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          lang.code.toLowerCase().includes(searchQuery.toLowerCase())
+          lang.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (lang.anglicizedName?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
       )
     : languages
 
@@ -142,7 +153,9 @@ export function LanguageSelectorStep() {
             getStatus={() => 'cached'}
             renderItem={(lang, _isSelected, _status) => (
               <>
-                <div className="font-semibold text-fg mb-0.5">{lang.name}</div>
+                <div className="font-semibold text-fg mb-0.5">
+                  {languageListDisplayName(lang, lang.code)}
+                </div>
                 <div className="text-sm text-fg-secondary">{lang.code}</div>
                 <div className="flex items-center gap-1 mt-1.5">
                   <Database className="w-3 h-3 text-accent" />
@@ -162,7 +175,9 @@ export function LanguageSelectorStep() {
             getStatus={() => 'online'}
             renderItem={(lang, _isSelected, _status) => (
               <>
-                <div className="font-semibold text-fg mb-0.5">{lang.name}</div>
+                <div className="font-semibold text-fg mb-0.5">
+                  {languageListDisplayName(lang, lang.code)}
+                </div>
                 <div className="text-sm text-fg-secondary">{lang.code}</div>
                 <div className="flex items-center gap-1 mt-1.5">
                   <Wifi className="w-3 h-3 text-accent" />

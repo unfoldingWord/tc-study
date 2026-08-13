@@ -79,6 +79,36 @@ describe('resolveTokenVisualState (Journey 4/8 contract)', () => {
     })
     expect(state.isUnderlined).toBe(true)
   })
+
+  test('same-language no zaln: underline via token semanticId', () => {
+    const paul = usjWord({ content: 'Paul', verseRef: 'tit 1:1' })
+    const state = resolveTokenVisualState(paul, {
+      isOriginalLanguage: false,
+      highlightTarget: null,
+      underlinedSemanticIds: new Set([semanticIdKey(paul.semanticId)]),
+    })
+    expect(state.isUnderlined).toBe(true)
+  })
+
+  test('minority token is not underlined by English/Greek semantic IDs', () => {
+    const minority = usjWord({ content: 'पौलुस', verseRef: 'tit 1:1' })
+    const state = resolveTokenVisualState(minority, {
+      isOriginalLanguage: false,
+      highlightTarget: null,
+      underlinedSemanticIds: new Set([semanticIdKey('tit 1:1:Παῦλος:1')]),
+    })
+    expect(state.isUnderlined).toBe(false)
+  })
+
+  test('OL pane underlines via own semanticId', () => {
+    const paulos = usjWord({ content: 'Παῦλος', verseRef: 'tit 1:1' })
+    const state = resolveTokenVisualState(paulos, {
+      isOriginalLanguage: true,
+      highlightTarget: null,
+      underlinedSemanticIds: new Set([semanticIdKey(paulos.semanticId)]),
+    })
+    expect(state.isUnderlined).toBe(true)
+  })
 })
 
 describe('tokenMatchesHighlightTarget (toggle-off)', () => {

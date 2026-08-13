@@ -23,6 +23,7 @@ describe('text-mode mismatch wiring (issue #25)', () => {
   test('SimplifiedReadView wires mismatch only to panel-1', () => {
     expect(viewSrc).toContain('textModeMismatch={textPaneMismatch}')
     expect(viewSrc).toContain('onSwitchTextMode={handleSwitchTextMode}')
+    expect(viewSrc).toContain('onNavigationScopeCommitted={handleNavigatorScopeCommitted}')
     expect(viewSrc).toContain('onHelpsLanguageSelected={handleHelpsLanguageSelected}')
     const areaStart = viewSrc.indexOf('function ReadPanelsArea')
     const areaEnd = viewSrc.indexOf('export function SimplifiedReadView')

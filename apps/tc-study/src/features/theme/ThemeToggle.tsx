@@ -11,17 +11,24 @@ interface ThemeToggleProps {
   cycle?: boolean
   className?: string
   size?: 'sm' | 'md'
+  /** `menu` matches NavigationBarCompact overflow rows. */
+  variant?: 'chrome' | 'menu'
 }
 
 export function ThemeToggle({
   cycle = false,
   className = '',
   size = 'md',
+  variant = 'chrome',
 }: ThemeToggleProps) {
   const { preference, effective, toggleLightDark, cyclePreference } = useTheme()
 
   const iconClass = size === 'sm' ? 'w-4 h-4' : 'w-4 h-4'
   const padClass = size === 'sm' ? 'p-1.5' : 'p-2'
+  const skin =
+    variant === 'menu'
+      ? 'flex items-center justify-center p-2 w-full text-fg-secondary hover:text-fg hover:bg-muted transition-colors'
+      : `${padClass} rounded-full text-fg-secondary hover:text-fg hover:bg-muted transition-colors`
 
   const title =
     preference === 'system'
@@ -40,7 +47,7 @@ export function ThemeToggle({
     <button
       type="button"
       onClick={cycle ? cyclePreference : toggleLightDark}
-      className={`${padClass} rounded-full text-fg-secondary hover:text-fg hover:bg-muted transition-colors ${className}`}
+      className={`${skin} ${className}`}
       title={title}
       aria-label={ariaLabel}
       aria-pressed={effective === 'dark'}

@@ -43,6 +43,7 @@ interface NavigationBarCompactProps {
   languagePickerRequired?: boolean
   onDownloadCollection?: () => void
   onLoadCollection?: () => void
+  onNavigationScopeCommitted?: (scope: 'scripture' | 'obs') => void
   isNavigatorOpen: boolean
   setIsNavigatorOpen: (open: boolean) => void
   isHistoryOpen: boolean
@@ -72,6 +73,7 @@ export function NavigationBarCompact({
   languagePickerRequired = false,
   onDownloadCollection,
   onLoadCollection,
+  onNavigationScopeCommitted,
   isNavigatorOpen,
   setIsNavigatorOpen,
   isHistoryOpen,
@@ -238,6 +240,7 @@ export function NavigationBarCompact({
         <BCVNavigator
           onClose={() => setIsNavigatorOpen(false)}
           mode={navigationMode === 'section' && currentRef.book !== 'obs' ? 'section' : 'verse'}
+          onNavigationScopeCommitted={onNavigationScopeCommitted}
         />
       )}
 

@@ -1,6 +1,11 @@
 /**
  * Panel-1 empty state when the text language has no content for the current
- * Bible/OBS mode (Epic #21 / issue #25). Mode never auto-switches.
+ * Bible/OBS mode (Epic #21 / issue #25).
+ *
+ * The empty-state view never auto-switches. OBS-only / Bible-only *picker*
+ * taps switch via `textLanguagePickNavigation` instead of landing here.
+ * Leftover cases: neither-type languages, and explicit Switch/BCV into a
+ * mode the language does not have.
  */
 
 import type { BCVReference, NavigationCatalogScope } from '../../contexts/types'
@@ -116,4 +121,19 @@ export function navigationScopeFromReadPath(
   const match = /(?:^|\/)read\/[^/]+\/(bible|obs)(?:\/|$)/.exec(pathname)
   if (!match || pathname.includes('/read-v1/')) return fallback
   return match[1] === 'obs' ? 'obs' : 'scripture'
+}
+
+/**
+ * Catalog-load scope: an explicit Switch / BCV Bible↔Stories tap wins so a
+ * stale `/read/.../bible|obs` URL cannot skip the load (issue #25).
+ */
+export function resolveCatalogNavigationScope(options: {
+  pathname: string
+  storeScope: string
+  explicitScope?: string
+}): string {
+  if (options.explicitScope === 'obs' || options.explicitScope === 'scripture') {
+    return options.explicitScope
+  }
+  return navigationScopeFromReadPath(options.pathname, options.storeScope)
 }

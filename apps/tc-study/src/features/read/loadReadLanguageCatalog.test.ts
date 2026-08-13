@@ -19,6 +19,13 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
     expect(src).not.toMatch(/applyCombinedHelpsEnsure\(textLanguageCode\)/)
   })
 
+  test('OBS helps search is scoped via searchCatalogHitsForTarget (not a blanket tc-ready search)', () => {
+    expect(src).toContain('searchCatalogHitsForTarget')
+    expect(src).toContain('navigationScope')
+    expect(src).not.toMatch(/topic:\s*'tc-ready'/)
+    expect(src).toContain('page.hydrateTarget')
+  })
+
   test('clears only the switched pane', () => {
     expect(src).toContain('panelClearTargetForLoad(loadTarget)')
     expect(src).toContain('clearReadPanelsForLanguageSwitch(helpsLanguageCode')

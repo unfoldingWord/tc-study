@@ -5,11 +5,11 @@
  */
 
 import { BookMarked } from 'lucide-react'
-import { useMemo } from 'react'
-import { useCurrentReference, useNavigationMode } from '../../../contexts'
-import { enrichObsFrameQuoteEntries } from '../../../lib/obs/enrichObsFrameQuotes'
-import { computeFrameSpans } from '../../../lib/obs/highlightFrameText'
-import { computeFrameWordSpans } from '../../../lib/obs/highlightFrameWords'
+import { useEffect, useMemo, useState } from 'react'
+import { useCatalogManager, useCurrentReference, useNavigationMode } from '../../../contexts'
+import { resolvePaneDirection } from '../../../features/read/paneDirection'
+import { resolveObsHighlightSpans } from '../../../lib/obs/resolveObsHighlightSpans'
+import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { LoadingSpinner } from '../../../shared/LoadingSpinner'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { ObsRangeView } from './components/ObsRangeView'
@@ -24,6 +24,11 @@ export type { ObsViewerProps } from './types'
 export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps) {
   const currentRef = useCurrentReference()
   const navigationMode = useNavigationMode()
+  const catalogManager = useCatalogManager()
+  const availableLanguages = useWizardStore((s) => s.availableLanguages)
+  const [catalogMetadata, setCatalogMetadata] = useState<{ languageDirection?: 'ltr' | 'rtl' } | null>(
+    null
+  )
   const storyNum = currentRef.book === 'obs' ? currentRef.chapter : 1
   const frameNum = currentRef.book === 'obs' ? currentRef.verse : 1
   // Story mode: chapter navigation for OBS — show every frame of the current story.
@@ -42,6 +47,23 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
       : frameNum
 
   const isRange = isStoryMode || endStory > storyNum || (endStory === storyNum && endFrame > frameNum)
+
+  useEffect(() => {
+    let cancelled = false
+    catalogManager.getResourceMetadata(resourceKey).then((meta) => {
+      if (!cancelled && meta) setCatalogMetadata(meta)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [resourceKey, catalogManager])
+
+  const languageCode = resource.language ?? resource.languageCode ?? ''
+  const languageDirection = resolvePaneDirection({
+    languageCode,
+    availableLanguages,
+    catalogDirection: catalogMetadata?.languageDirection ?? resource.languageDirection,
+  })
 
   const { storyMap, loading, error } = useObsStories({
     resourceKey,
@@ -87,47 +109,21 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
           : `${storyNum} · ${frameNum}${story?.title ? ` — ${story.title}` : ''}`
       : 'Select Open Bible Stories in the book navigator'
 
-  const specs = useMemo(
+  const { spans, enriched: enrichedQuotes, useWordMode: useWordUnderline } = useMemo(
     () =>
-      !isRange
-        ? quotesForFrame.map((q) => ({ quote: q.quote, occurrence: q.occurrence }))
-        : [],
-    [quotesForFrame, isRange]
+      !isRange && currentFrame?.text
+        ? resolveObsHighlightSpans(currentFrame.text, quotesForFrame)
+        : { spans: [], enriched: quotesForFrame, useWordMode: false },
+    [isRange, currentFrame?.text, quotesForFrame]
   )
-
-  const enrichedQuotes = useMemo(
-    () =>
-      currentFrame?.text && quotesForFrame.length
-        ? enrichObsFrameQuoteEntries(currentFrame.text, quotesForFrame)
-        : quotesForFrame,
-    [currentFrame?.text, quotesForFrame]
-  )
-
-  const useWordUnderline =
-    !isRange &&
-    enrichedQuotes.length > 0 &&
-    enrichedQuotes.every(
-      (e) =>
-        (e.startWord != null && e.endWord != null) ||
-        (e.wordRanges != null && e.wordRanges.length > 0)
-    )
-
-  const spans = useMemo(() => {
-    if (!currentFrame?.text) return []
-    if (!quotesForFrame.length) return [{ text: currentFrame.text }]
-    if (useWordUnderline) return computeFrameWordSpans(currentFrame.text, enrichedQuotes)
-    return computeFrameSpans(currentFrame.text, specs)
-  }, [currentFrame?.text, quotesForFrame.length, specs, useWordUnderline, enrichedQuotes])
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title || 'Open Bible Stories'}
         subtitle={subtitle}
         icon={BookMarked}
-        // Issue #24: OBS is text-pane content; mixed RTL needs resource languageDirection.
-        // Not a one-line helps-dir fix — leave header ltr until OBS RTL is owned.
-        direction="ltr"
+        direction={languageDirection}
         infoResource={resource}
       />
       <div className="flex-1 min-h-0 overflow-auto p-4 bg-white">

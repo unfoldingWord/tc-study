@@ -23,6 +23,7 @@ import { hydrateOriginalLanguageResources } from './hydrateOriginalLanguageResou
 import { hydrateReadCatalogHits } from './hydrateReadCatalogHits'
 import { collectCatalogMetadataPromises } from './hydrateReadCatalogMetadata'
 import { catalogTargetsForLoad, type CatalogLoadTarget } from './readCatalogPanelPolicy'
+import { searchCatalogHitsForTarget } from './readCatalogSearch'
 import {
   mergeExpectedResourceKeys,
   shouldHydrateOriginalLanguages,
@@ -32,6 +33,7 @@ export interface LoadReadLanguageCatalogDeps {
   textLanguageCode: string
   helpsLanguageCode: string
   loadTarget: CatalogLoadTarget
+  navigationScope: string
   existingTextKeys?: string[]
   existingHelpsKeys?: string[]
   catalogManager: CatalogManager
@@ -73,8 +75,12 @@ function activateGatewayScriptureTab(deps: {
 }
 
 /**
- * Load tc-ready catalog resources for text and/or helps language into workspace + panels,
+ * Load catalog resources for text and/or helps language into workspace + panels,
  * then hydrate metadata and save `*_tc-helps` collection(s) in the background.
+ *
+ * Text (and Bible helps) use `topic=tc-ready`. OBS helps search prod OBS TN/TWL
+ * subjects without requiring `topic=tc-ready`. CombinedHelps binds to
+ * `helpsLanguageCode`.
  */
 export async function loadReadLanguageCatalog(
   deps: LoadReadLanguageCatalogDeps
@@ -83,6 +89,7 @@ export async function loadReadLanguageCatalog(
     textLanguageCode,
     helpsLanguageCode,
     loadTarget,
+    navigationScope,
     catalogManager,
     resourceTypeRegistry,
     viewerRegistry,
@@ -113,41 +120,42 @@ export async function loadReadLanguageCatalog(
   const metadataPromises: Array<Promise<ResourceInfo | null>> = []
 
   for (const search of searches) {
-    const catalogResults = await door43Client.searchCatalog({
-      language: search.languageCode,
-      topic: 'tc-ready',
-      stage: 'prod' as const,
-      limit: 500,
+    const pages = await searchCatalogHitsForTarget(door43Client, {
+      languageCode: search.languageCode,
+      target: search.target,
+      navigationScope,
     })
 
-    if (catalogResults.length === 0) {
+    if (pages.every((page) => page.catalogResults.length === 0)) {
       console.warn(
-        '⚠️ No catalog results. The API may not support topic=tc-ready, or use a different topic value. Check the Network tab for the actual request (e.g. /api/v1/catalog/search?lang=...&topic=tc-ready&stage=prod&limit=500).'
+        `⚠️ No catalog results for ${search.languageCode} (${search.target}, scope=${navigationScope}).`
       )
     }
 
-    const hydrated = hydrateReadCatalogHits({
-      catalogResults,
-      languageCode: search.languageCode,
-      target: search.target,
-      resourceTypeRegistry,
-      viewerRegistry,
-      getPanel,
-      addResource,
-      setActiveResourceInPanel,
-    })
-    nextTextKeys.push(...hydrated.expectedTextKeys)
-    nextHelpsKeys.push(...hydrated.expectedHelpsKeys)
-    metadataPromises.push(
-      ...collectCatalogMetadataPromises({
-        catalogResults,
+    for (const page of pages) {
+      const hydrated = hydrateReadCatalogHits({
+        catalogResults: page.catalogResults,
         languageCode: search.languageCode,
-        target: search.target,
-        catalogManager,
+        target: page.hydrateTarget,
         resourceTypeRegistry,
         viewerRegistry,
+        getPanel,
+        addResource,
+        setActiveResourceInPanel,
       })
-    )
+      nextTextKeys.push(...hydrated.expectedTextKeys)
+      nextHelpsKeys.push(...hydrated.expectedHelpsKeys)
+      metadataPromises.push(
+        ...collectCatalogMetadataPromises({
+          catalogResults: page.catalogResults,
+          languageCode: search.languageCode,
+          target: page.hydrateTarget,
+          catalogManager,
+          resourceTypeRegistry,
+          viewerRegistry,
+        })
+      )
+    }
   }
 
   if (shouldHydrateOriginalLanguages(loadTarget)) {

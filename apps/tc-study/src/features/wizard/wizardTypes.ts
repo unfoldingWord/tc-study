@@ -17,6 +17,8 @@ export type WizardStep =
 export type WizardLanguage = {
   code: string
   name: string
+  /** Door43 `ang` — English/display name for empty-state copy (picker cards show `name`). */
+  anglicizedName?: string
   source: 'catalog' | 'door43'
   direction?: 'ltr' | 'rtl'
 }

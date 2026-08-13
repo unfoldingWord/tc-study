@@ -184,7 +184,7 @@ export function useCombinedHelpsPipeline({
   const underlineTnGroups = useMemo(() => {
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const note of notesWithAlignedTokens) {
-      if (!note.quoteTokens?.length) continue
+      if (!note.quoteTokens?.length && !note.semanticIds?.length) continue
       const { chapter, verse } = parseLinkChapterVerse(note.reference)
       const semanticIds = resolveQuoteSemanticIds(note as never, bookCodeLower, chapter, verse)
       if (semanticIds.length > 0) groups.push({ sourceId: note.id, semanticIds })
@@ -195,7 +195,7 @@ export function useCombinedHelpsPipeline({
   const underlineTwlGroups = useMemo(() => {
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const link of filteredByReference) {
-      if (!link.quoteTokens?.length) continue
+      if (!link.quoteTokens?.length && !link.semanticIds?.length) continue
       const { chapter, verse } = parseLinkChapterVerse(link.reference)
       const semanticIds = resolveQuoteSemanticIds(link as never, bookCodeLower, chapter, verse)
       if (semanticIds.length > 0) groups.push({ sourceId: link.id, semanticIds })

@@ -102,7 +102,7 @@ export function useTranslationNotesPipeline({
     const bookCode = currentRef.book?.toLowerCase() || ''
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const note of notesWithAlignedTokens) {
-      if (!note.quoteTokens?.length) continue
+      if (!note.quoteTokens?.length && !note.semanticIds?.length) continue
       const cached = note.semanticIds
       const semanticIds =
         cached ??

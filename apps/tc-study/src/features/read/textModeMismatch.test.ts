@@ -4,6 +4,7 @@ import {
   TEXT_MODE_MISMATCH_COPY,
   applyTextModeScopeSwitch,
   navigationScopeFromReadPath,
+  resolveCatalogNavigationScope,
   resolveTextModeMismatch,
   type TextModeMismatchView,
 } from './textModeMismatch'
@@ -90,6 +91,33 @@ describe('resolveTextModeMismatch', () => {
       languageName: '  ',
     })
     expect(view?.message).toBe(TEXT_MODE_MISMATCH_COPY.noBibleHasObs('bho'))
+  })
+})
+
+describe('resolveCatalogNavigationScope', () => {
+  test('explicit BCV / Switch tap wins over a stale bible URL', () => {
+    expect(
+      resolveCatalogNavigationScope({
+        pathname: '/read/bho/bible/ref/tit%201:1',
+        storeScope: 'obs',
+        explicitScope: 'obs',
+      })
+    ).toBe('obs')
+  })
+
+  test('language pick (no explicit scope) still reads the URL, then store', () => {
+    expect(
+      resolveCatalogNavigationScope({
+        pathname: '/read/es/bible/ref/tit%201:1',
+        storeScope: 'obs',
+      })
+    ).toBe('scripture')
+    expect(
+      resolveCatalogNavigationScope({
+        pathname: '/read/es',
+        storeScope: 'obs',
+      })
+    ).toBe('obs')
   })
 })
 

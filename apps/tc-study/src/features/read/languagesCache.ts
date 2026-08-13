@@ -1,22 +1,23 @@
 /**
  * Language-list cache for Read / LanguagePicker.
- * v3 adds per-language availability flags (issue #22). Bump version to invalidate.
+ * v6: OBS-helps flags union prod subject lists (not the 3 tc-ready TSV GLs).
+ * Bump version to invalidate.
  */
 
-import {
-  emptyLanguageAvailability,
-  type LanguageAvailabilityFlags,
-} from './languageAvailability'
+import { type LanguageAvailabilityFlags } from './languageAvailability'
 
 export const LANGUAGES_CACHE_KEY = 'tc-study:languages-cache'
-export const LANGUAGES_CACHE_VERSION = 3
+export const LANGUAGES_CACHE_VERSION = 6
 
 export interface ListedLanguage {
   code: string
   name: string
+  /** Door43 `ang` — English/display name for empty-state copy (picker cards show `name`). */
+  anglicizedName?: string
   source: 'catalog' | 'door43'
   direction?: 'ltr' | 'rtl'
-  availability: LanguageAvailabilityFlags
+  /** Present when Door43 subject lookups returned flags; omit = unknown (Any fail-open). */
+  availability?: LanguageAvailabilityFlags
 }
 
 interface CachedLanguages {
@@ -33,9 +34,11 @@ function subjectsMatch(cached: string[], current: string[]): boolean {
 }
 
 function normalizeListedLanguage(lang: ListedLanguage): ListedLanguage {
+  const anglicizedName = lang.anglicizedName?.trim() || undefined
   return {
     ...lang,
-    availability: lang.availability ?? emptyLanguageAvailability(),
+    anglicizedName,
+    availability: lang.availability,
   }
 }
 

@@ -45,6 +45,13 @@ describe('getScriptureResources', () => {
     const books = getScriptureResources(loaded, 'es-419')
     expect(books.map((r) => r.key)).toEqual(['es-419_gl/es-419/glt'])
   })
+
+  test('does not fall back to leftover English when the preferred language has no Bible', () => {
+    const loaded = {
+      'u/en/ult': res({ key: 'u/en/ult', type: 'scripture', language: 'en', languageCode: 'en' }),
+    }
+    expect(getScriptureResources(loaded, 'bho')).toEqual([])
+  })
 })
 
 describe('findObsCatalogKey', () => {
@@ -59,6 +66,14 @@ describe('findObsCatalogKey', () => {
       }),
     }
     expect(findObsCatalogKey(loaded, 'es-419')).toBe('Door43-Catalog/es-419/obs')
+  })
+
+  test('does not fall back to another language when preferLanguage is set', () => {
+    const loaded = {
+      'u/en/obs': res({ key: 'u/en/obs', type: 'obs', language: 'en', languageCode: 'en' }),
+    }
+    expect(findObsCatalogKey(loaded, 'bho')).toBeNull()
+    expect(findObsCatalogKey(loaded)).toBe('u/en/obs')
   })
 })
 

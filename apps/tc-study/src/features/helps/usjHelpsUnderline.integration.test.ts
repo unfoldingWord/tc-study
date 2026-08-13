@@ -83,6 +83,27 @@ describe('USJ CombinedHelps underline / alignment path (Titus)', () => {
     expect(wouldUnderline).toBe(true)
   })
 
+  test('OL bridge: UGNT tokens with empty alignedOriginalWordIds still match own semanticId', async () => {
+    const ugnt = await processUsjViewModel(UGNT_USFM, 'tit', 'el-x-koine')
+    const originalChapters = viewModelToOptimizedChapters(ugnt).filter((ch) => ch.number === 1)
+    const link: TranslationWordsLink = {
+      reference: '1:1',
+      id: 'paul-ol',
+      tags: 'names',
+      origWords: 'Παῦλος',
+      occurrence: '1',
+      articlePath: 'bible/names/paul',
+    }
+    const quoteTokens = buildQuoteTokens({ link, originalChapters, bookCode: 'tit' })
+    const semanticIds = generateSemanticIdsForQuoteTokens(quoteTokens, 'tit', 1, 1, 1)
+    const broadcast = extractUsjBroadcastTokens(ugnt, 1, 1, 1, 20)
+    const paulos = broadcast.find((t) => t.type === 'word' && t.text === 'Παῦλος')
+    expect(paulos).toBeTruthy()
+    expect(paulos!.alignedOriginalWordIds).toEqual([])
+    const aligned = findAlignedTokens(broadcast, semanticIds, 'tit', 1, 1)
+    expect(aligned.some((t) => t.content === 'Παῦλος')).toBe(true)
+  })
+
   test('TN-style Θεοῦ occurrence 1 → God underline group', async () => {
     const ugnt = await processUsjViewModel(UGNT_USFM, 'tit', 'el-x-koine')
     const ult = await processUsjViewModel(ULT_USFM, 'tit', 'en')

@@ -69,14 +69,15 @@ export function resolveTokenVisualState(
       } else if (alignedTargetKeys.length > 0) {
         isHighlighted = alignedTargetKeys.some((id) => alignedKeys.includes(id))
       }
+    } else if (alignedTargetKeys.includes(tokenKey)) {
+      isHighlighted = true
     }
   }
   let isUnderlined = false
   const underlines = opts.underlinedSemanticIds
   if (underlines && underlines.size > 0) {
-    isUnderlined = opts.isOriginalLanguage
-      ? underlines.has(tokenKey)
-      : alignedKeys.some((id) => underlines.has(id))
+    isUnderlined =
+      underlines.has(tokenKey) || alignedKeys.some((id) => underlines.has(id))
   }
   return { isHighlighted, isSelected, isUnderlined }
 }
