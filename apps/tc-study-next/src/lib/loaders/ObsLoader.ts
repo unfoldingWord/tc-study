@@ -193,7 +193,7 @@ export class ObsLoader implements ResourceLoader {
   async downloadResource(
     resourceKey: string,
     _options?: { method?: 'individual' | 'zip' | 'tar'; skipExisting?: boolean },
-    _onProgress?: ProgressCallback
+    onProgress?: ProgressCallback
   ): Promise<void> {
     const metadata = await this.getMetadata(resourceKey)
     const ingredients = metadata.contentMetadata?.ingredients
@@ -210,15 +210,27 @@ export class ObsLoader implements ResourceLoader {
 
     // Fallback: iterate 1–50 if ingredients don't have numeric identifiers
     const toFetch = storyIds.length > 0 ? storyIds : Array.from({ length: 50 }, (_, i) => String(i + 1))
+    const total = toFetch.length
 
-    let _loaded = 0
-    let _failed = 0
+    let loaded = 0
     for (const storyId of toFetch) {
       try {
         await this.loadContent(resourceKey, storyId)
-        _loaded++
+        loaded++
+        onProgress?.({
+          loaded,
+          total,
+          percentage: Math.round((loaded / total) * 100),
+          message: `Processed ${storyId}`,
+        })
       } catch (err) {
-        _failed++
+        loaded++
+        onProgress?.({
+          loaded,
+          total,
+          percentage: Math.round((loaded / total) * 100),
+          message: `Failed: ${storyId}`,
+        })
         if (this.debug) {
           console.warn(`[ObsLoader] Failed to prefetch story ${storyId} for ${resourceKey}:`, err)
         }
