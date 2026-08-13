@@ -17,6 +17,39 @@ export function shouldAcceptWorkerMessage(
   )
 }
 
+/**
+ * Per-resource wall clock. Zipball fetch only times out until headers arrive;
+ * a stalled body (0-byte / hung arrayBuffer) never resolves and would freeze
+ * the sequential worker at the last overall % (often a low single digit).
+ */
+export const RESOURCE_DOWNLOAD_TIMEOUT_MS = 180_000
+
+export function createResourceDownloadTimeoutError(
+  resourceKey: string,
+  timeoutMs: number
+): Error {
+  return new Error(`Download timed out after ${timeoutMs}ms: ${resourceKey}`)
+}
+
+/** Race a download against a timeout so one hung resource cannot block the queue. */
+export async function withResourceDownloadTimeout<T>(
+  work: Promise<T>,
+  timeoutMs: number,
+  resourceKey: string
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(createResourceDownloadTimeoutError(resourceKey, timeoutMs))
+    }, timeoutMs)
+  })
+  try {
+    return await Promise.race([work, timeout])
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
 /** Initial progress snapshot so the indicator is not stuck with a null payload. */
 export function createInitialDownloadProgress(
   resourceKeys: string[],

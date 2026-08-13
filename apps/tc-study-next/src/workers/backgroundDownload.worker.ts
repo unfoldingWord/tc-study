@@ -23,6 +23,10 @@ import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { CatalogManager } from '@bt-synergy/catalog-manager'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
 import { getDownloadPriority } from '../config/loaderConfig'
+import {
+  RESOURCE_DOWNLOAD_TIMEOUT_MS,
+  withResourceDownloadTimeout,
+} from '../features/download/backgroundDownloadRun'
 import { registerWorkerLoaders } from '../features/download/workerLoaderRegistry'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
@@ -424,20 +428,31 @@ async function downloadSpecificResources(
         throw new Error(`No loader available for ${resourceKey}`)
       }
 
-      // Mark as downloading
+      // Mark as downloading and pulse progress so the badge is not stuck on
+      // the previous % during a silent zipball fetch.
       const task = downloadManager['tasks'].get(resourceKey)
       if (task) {
         task.status = 'downloading'
       }
+      onProgress({
+        loaded: 0,
+        total: ingredientsCount,
+        percentage: 0,
+        message: `Downloading ${resourceKey.split('/').pop() ?? resourceKey}`,
+      })
 
-      // Download the resource
-      await loader.downloadResource(
-        resourceKey,
-        {
-          method,
-          skipExisting
-        },
-        onProgress
+      // Download the resource — skip if zip/body hang exceeds the wall clock
+      await withResourceDownloadTimeout(
+        loader.downloadResource(
+          resourceKey,
+          {
+            method,
+            skipExisting
+          },
+          onProgress
+        ),
+        RESOURCE_DOWNLOAD_TIMEOUT_MS,
+        resourceKey
       )
 
       // ✅ IMPORTANT: Update counts BEFORE marking as completed
