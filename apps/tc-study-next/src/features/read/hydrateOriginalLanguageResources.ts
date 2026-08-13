@@ -11,6 +11,7 @@ import {
   createResourceMetadata,
   type Door43Resource,
 } from '../../lib/services/ResourceMetadataFactory'
+import { existingPanelInstanceId } from '../workspace/projectPanelResourcesToAppStore'
 
 const ORIGINAL_RESOURCES = [
   { lang: 'el-x-koine', id: 'ugnt', label: 'UGNT', subject: 'Greek New Testament' },
@@ -68,6 +69,9 @@ export function hydrateOriginalLanguageResources(deps: HydrateOriginalLanguageDe
     loadedKeys.push(resourceKey)
     const destPanelId = deps.destPanelId ?? 'panel-1'
     const currentPanel = getPanel(destPanelId)
+    if (existingPanelInstanceId(currentPanel?.resourceKeys, resourceKey)) {
+      continue
+    }
     const currentIndex = currentPanel?.resourceKeys.length || 0
     addResource(basicResourceInfo, {
       panelId: destPanelId,

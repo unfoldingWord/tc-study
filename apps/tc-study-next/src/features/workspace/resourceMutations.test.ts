@@ -106,6 +106,21 @@ describe('resourceMutations', () => {
     ).toContain('u/en/ult')
   })
 
+  test('allowMultipleInstances does not put ult and ult#2 on the same panel', () => {
+    const ult = res({ key: 'u/en/ult' })
+    const first = addResource(ult, { panelId: 'panel-1' })
+    const second = addResource(ult, { panelId: 'panel-1', allowMultipleInstances: true })
+    const third = addResource(ult, { panelId: 'panel-2', allowMultipleInstances: true })
+
+    expect(first).toBe('u/en/ult')
+    expect(second).toBe('u/en/ult')
+    expect(third).toBe('u/en/ult#2')
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    expect(pkg.panels[0]!.resourceKeys).toEqual(['u/en/ult'])
+    expect(pkg.panels[1]!.resourceKeys).toEqual(['u/en/ult#2'])
+  })
+
   test('assign after modal-only add creates membership; remove prunes', () => {
     const tn = res({ key: 'u/en/tn', type: 'notes' })
     addResource(tn)

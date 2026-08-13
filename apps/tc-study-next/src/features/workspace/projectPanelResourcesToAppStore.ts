@@ -32,6 +32,15 @@ export function getBaseResourceKey(instanceId: string): string {
   return instanceId.replace(/#\d+$/, '')
 }
 
+/** Existing panel membership for this resource (base or `#N` instance). */
+export function existingPanelInstanceId(
+  resourceKeys: string[] | undefined,
+  resourceKey: string
+): string | undefined {
+  const base = getBaseResourceKey(resourceKey)
+  return (resourceKeys ?? []).find((k) => getBaseResourceKey(k) === base)
+}
+
 /**
  * Next instance id for a base key among existing ids (panel + AppStore).
  * First instance has no suffix; further instances use `#2`, `#3`, …

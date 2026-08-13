@@ -10,7 +10,7 @@ import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
-import { addResource } from '../workspace/resourceMutations'
+import { addResource, getBaseResourceKey } from '../workspace/resourceMutations'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
   applyPanelMode,
@@ -184,5 +184,61 @@ describe('same-language dual scripture (no infinite loop)', () => {
     expect(p1.resourceKeys.filter((k) => p2.resourceKeys.includes(k))).toEqual([])
     expect(p2.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
     expect(p1.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
+  })
+
+  test('hydrate / mode switch never lists the same base resource twice on one panel', () => {
+    function uniqueBases(keys: string[]) {
+      const bases = keys.map(getBaseResourceKey)
+      expect(bases).toEqual([...new Set(bases)])
+    }
+
+    function hydrateUlt(destPanelId: 'panel-1' | 'panel-2') {
+      hydrateReadCatalogHits({
+        catalogResults: [EN_ULT_HIT, { ...EN_ULT_HIT, title: 'ULT dup' }],
+        languageCode: 'en',
+        target: 'text',
+        destPanelId,
+        resourceTypeRegistry: registry(),
+        viewerRegistry: { hasViewer: () => true },
+        getPanel: (id) => useWorkspaceStore.getState().getPanel(id),
+        addResource,
+        setActiveResourceInPanel: (panelId, index) => {
+          useWorkspaceStore.getState().setActiveResourceInPanel(panelId, index)
+        },
+      })
+    }
+
+    hydrateUlt('panel-1')
+    hydrateUlt('panel-1')
+    let pkg = useWorkspaceStore.getState().currentPackage!
+    let p1 = pkg.panels.find((p) => p.id === 'panel-1')!
+    expect(p1.resourceKeys).toEqual(['unfoldingWord/en/ult'])
+    uniqueBases(p1.resourceKeys)
+
+    const panels: ReadPanelModels = applyPanelMode(
+      {
+        'panel-1': { mode: 'scripture', languageCode: 'en' },
+        'panel-2': { mode: 'helps', languageCode: 'en' },
+      },
+      'panel-2',
+      'scripture'
+    )
+    expect(catalogTargetsForPanelModels(panels)).toEqual([
+      { languageCode: 'en', target: 'text', destPanelId: 'panel-1' },
+      { languageCode: 'en', target: 'text', destPanelId: 'panel-2' },
+    ])
+
+    clearReadPanelsForLanguageSwitch('en', 'panel-2', { reconcileHelps: false })
+    hydrateUlt('panel-2')
+    hydrateUlt('panel-2')
+
+    pkg = useWorkspaceStore.getState().currentPackage!
+    p1 = pkg.panels.find((p) => p.id === 'panel-1')!
+    const p2 = pkg.panels.find((p) => p.id === 'panel-2')!
+    expect(p1.resourceKeys).toEqual(['unfoldingWord/en/ult'])
+    expect(p2.resourceKeys).toEqual(['unfoldingWord/en/ult#2'])
+    uniqueBases(p1.resourceKeys)
+    uniqueBases(p2.resourceKeys)
+    expect(p1.resourceKeys.filter((k) => p2.resourceKeys.includes(k))).toEqual([])
   })
 })

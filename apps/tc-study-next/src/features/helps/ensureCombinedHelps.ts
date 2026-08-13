@@ -132,10 +132,16 @@ export function ensureCombinedHelpsInWorkspace(options: {
       continue
     }
 
-    if (helpsPanel && !helpsPanel.resourceKeys.includes(id)) {
-      const insertAt = scope === 'scripture' ? 0 : helpsPanel.resourceKeys.length
-      helpsPanel.resourceKeys.splice(insertAt, 0, id)
-      if (!injected.includes(id)) injected.push(id)
+    if (helpsPanel) {
+      // Unscoped + `:panel-N` CombinedHelps must not both appear on one strip.
+      helpsPanel.resourceKeys = helpsPanel.resourceKeys.filter(
+        (k) => k === id || !isSameScopeCombinedHelpsId(k, scope)
+      )
+      if (!helpsPanel.resourceKeys.includes(id)) {
+        const insertAt = scope === 'scripture' ? 0 : helpsPanel.resourceKeys.length
+        helpsPanel.resourceKeys.splice(insertAt, 0, id)
+        if (!injected.includes(id)) injected.push(id)
+      }
     }
 
     // Single tab space: CombinedHelps owns the tab; TN/TWL stay in package only
@@ -152,6 +158,11 @@ export function ensureCombinedHelpsInWorkspace(options: {
   }
 
   return { resources: resourceMap, panels, injected, removed }
+}
+
+function isSameScopeCombinedHelpsId(key: string, scope: HelpsScope): boolean {
+  const base = SCOPE_IDS[scope]
+  return key === base || key.startsWith(`${base}:`)
 }
 
 /** Keep CombinedHelps ids at the front of panel-2 so painted order === store order. */

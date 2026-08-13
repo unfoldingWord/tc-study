@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { upsertLoadedResourceMembership } from './appStoreMembership'
 import {
   collectPanelResourceKeys,
+  existingPanelInstanceId,
   generateInstanceId,
   getBaseResourceKey,
   projectPanelResourcesToAppStore,
@@ -97,6 +98,9 @@ describe('projectPanelResourcesToAppStore', () => {
     expect(generateInstanceId('u/en/ult', [])).toBe('u/en/ult')
     expect(generateInstanceId('u/en/ult', ['u/en/ult'])).toBe('u/en/ult#2')
     expect(generateInstanceId('u/en/ult', ['u/en/ult', 'u/en/ult#2'])).toBe('u/en/ult#3')
+    expect(existingPanelInstanceId(['u/en/ult', 'u/en/tn'], 'u/en/ult#2')).toBe('u/en/ult')
+    expect(existingPanelInstanceId(['u/en/ult#2'], 'u/en/ult')).toBe('u/en/ult#2')
+    expect(existingPanelInstanceId(['u/en/tn'], 'u/en/ult')).toBeUndefined()
   })
 
   test('projector upserts every panel resourceKey into AppStore', () => {

@@ -14,6 +14,7 @@ import {
   catalogIdentity,
   type CatalogEntry,
 } from './readCatalogIdentity'
+import { existingPanelInstanceId } from '../workspace/projectPanelResourcesToAppStore'
 import type { ReadPanelId } from './readPanelModel'
 
 const BOOK_COMPANION_TYPES = new Set([
@@ -80,6 +81,7 @@ export function hydrateReadCatalogHits(
   const loadedKeys: string[] = []
   const expectedTextKeys: string[] = []
   const expectedHelpsKeys: string[] = []
+  const assignedThisPass = new Set<string>()
 
   for (const entry of catalogResults) {
     const id = catalogIdentity(entry, languageCode)
@@ -114,6 +116,17 @@ export function hydrateReadCatalogHits(
       BOOK_COMPANION_TYPES.has(typeId) || subject.toLowerCase().includes('bible')
         ? 'book'
         : 'entry'
+
+    if (assignment.kind === 'panel') {
+      const passKey = `${assignment.panelId}:${resourceKey}`
+      if (
+        assignedThisPass.has(passKey) ||
+        existingPanelInstanceId(getPanel(assignment.panelId)?.resourceKeys, resourceKey)
+      ) {
+        continue
+      }
+      assignedThisPass.add(passKey)
+    }
 
     const basicResourceInfo: ResourceInfo = {
       id: resourceKey,

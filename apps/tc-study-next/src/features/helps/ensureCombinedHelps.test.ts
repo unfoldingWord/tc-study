@@ -449,4 +449,41 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     expect(out.panels[1]!.resourceKeys).toEqual(['u/en/ult#2'])
     expect(out.panels[1]!.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
   })
+
+  test('does not keep unscoped and :panel-N CombinedHelps on the same panel', () => {
+    const resources = new Map<string, ResourceInfo>([
+      ['u/en/tn', res({ key: 'u/en/tn', type: 'notes' })],
+      ['u/en/twl', res({ key: 'u/en/twl', type: 'words-links' })],
+    ])
+    const scoped = `${COMBINED_HELPS_RESOURCE_ID}:panel-1`
+    resources.set(
+      COMBINED_HELPS_RESOURCE_ID,
+      res({
+        key: COMBINED_HELPS_RESOURCE_ID,
+        type: 'combined-helps',
+        language: 'en',
+        languageCode: 'en',
+      })
+    )
+    const panels = [
+      {
+        id: 'panel-1',
+        resourceKeys: [COMBINED_HELPS_RESOURCE_ID, 'u/en/tn', 'u/en/twl'],
+        activeIndex: 0,
+      },
+      { id: 'panel-2', resourceKeys: [], activeIndex: 0 },
+    ]
+
+    const out = ensureCombinedHelpsInWorkspace({
+      resources,
+      panels,
+      languageCode: 'en',
+      panelId: 'panel-1',
+    })
+    const helpsKeys = out.panels[0]!.resourceKeys.filter((k) =>
+      k === COMBINED_HELPS_RESOURCE_ID || k.startsWith(`${COMBINED_HELPS_RESOURCE_ID}:`)
+    )
+    expect(helpsKeys).toEqual([scoped])
+    expect(out.panels[0]!.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
+  })
 })

@@ -17,11 +17,16 @@ import type { ResourceInfo } from '../../contexts/types'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
   collectPanelResourceKeys,
+  existingPanelInstanceId,
   generateInstanceId,
   projectPanelResourcesToAppStore,
 } from './projectPanelResourcesToAppStore'
 
-export { generateInstanceId, getBaseResourceKey } from './projectPanelResourcesToAppStore'
+export {
+  existingPanelInstanceId,
+  generateInstanceId,
+  getBaseResourceKey,
+} from './projectPanelResourcesToAppStore'
 
 /** Project current workspace panels → AppStore (explicit restore / CombinedHelps sync). */
 export function projectCurrentWorkspacePanels(options?: {
@@ -60,6 +65,17 @@ export function addResource(
 ): string {
   const { allowMultipleInstances = false, panelId, index } = options
   const ws = useWorkspaceStore.getState()
+
+  if (panelId) {
+    const dest = ws.currentPackage?.panels.find((p) => p.id === panelId)
+    const already = existingPanelInstanceId(dest?.resourceKeys, resource.key)
+    if (already) {
+      if (!ws.hasResourceInPackage(resource.key)) {
+        ws.addResourceToPackage(resource)
+      }
+      return already
+    }
+  }
 
   let instanceId = resource.key
   if (allowMultipleInstances) {
