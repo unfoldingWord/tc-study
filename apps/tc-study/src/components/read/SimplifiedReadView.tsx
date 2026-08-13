@@ -27,6 +27,11 @@ import { useEntryModalStore } from '../../features/entries'
 import { CollectionImportDialog } from '../collections/CollectionImportDialog'
 import { EntryResourceModal } from '../common/EntryResourceModal'
 import { TabDnDProvider, useTabDnD } from '../../features/dnd/TabDnDContext'
+import { resolvePaneDirection } from '../../features/read/paneDirection'
+import {
+  textModeMismatchFromCache,
+  type TextModeMismatchView,
+} from '../../features/read/textModeMismatch'
 import { useFilteredReadPanelKeys } from '../../features/read/useFilteredReadPanelKeys'
 import { useReadCollectionExport } from '../../features/read/useReadCollectionExport'
 import { useReadGatewayBookCatalog } from '../../features/read/useReadGatewayBookCatalog'
@@ -38,6 +43,7 @@ import { useReadUrlSync } from '../../features/read/useReadUrlSync'
 import { createStudioPluginRegistry } from '../../features/studio/createStudioPluginRegistry'
 import { moveResourceBetweenPanels } from '../../features/workspace/resourceMutations'
 import { ThemeToggle } from '../../features/theme'
+import { useWizardStore } from '../../lib/stores/wizardStore'
 import { NavigationBar } from '../studio/NavigationBar'
 import { DownloadIndicator } from './DownloadIndicator'
 import { ExportProgressToast } from './ExportProgressToast'
@@ -70,8 +76,16 @@ function ReadPanelsArea(props: {
   filteredPanel2Resources: ReturnType<typeof useFilteredReadPanelKeys>['filteredPanel2Resources']
   panel1Resources: ReturnType<typeof useStudioResources>
   panel2Resources: ReturnType<typeof useStudioResources>
-  isLoadingResources: boolean
+  isLoadingTextResources: boolean
+  isLoadingHelpsResources: boolean
   onEntryLinkClick: (resourceId: string, entryId?: string) => void
+  textLanguageCode: string | null
+  helpsLanguageCode: string | null
+  textPaneDir: 'ltr' | 'rtl'
+  helpsPaneDir: 'ltr' | 'rtl'
+  onHelpsLanguageSelected: (languageCode: string) => void
+  textModeMismatch: TextModeMismatchView | null
+  onSwitchTextMode: (scope: 'scripture' | 'obs') => void
 }) {
   const { activeId, activeLabel, hoverPanelId, dropIndex } = useTabDnD()
   const dragLabel =
@@ -91,29 +105,42 @@ function ReadPanelsArea(props: {
     filteredPanel2Resources,
     panel1Resources,
     panel2Resources,
-    isLoadingResources,
+    isLoadingTextResources,
+    isLoadingHelpsResources,
     onEntryLinkClick,
+    textLanguageCode,
+    helpsLanguageCode,
+    textPaneDir,
+    helpsPaneDir,
+    onHelpsLanguageSelected,
+    textModeMismatch,
+    onSwitchTextMode,
   } = props
 
   return (
     <div
       ref={resizeContainerRef}
       className="h-full flex flex-col md:flex-row overflow-hidden panels-resize-container relative"
+      data-text-language={textLanguageCode ?? ''}
+      data-helps-language={helpsLanguageCode ?? ''}
     >
       <ReadLinkedPanel
         panelId="panel-1"
         otherPanelId="panel-2"
         colorScheme="blue"
         flexBasisPercent={panel1Width}
+        dir={textPaneDir}
         filteredKeys={filteredPanel1Keys}
         filteredResources={filteredPanel1Resources}
         panelResources={panel1Resources}
-        isLoadingResources={isLoadingResources}
+        isLoadingResources={isLoadingTextResources}
         showDropPlaceholder={hoverPanelId === 'panel-1'}
         placeholderLabel={dragLabel}
         placeholderIndex={
           hoverPanelId === 'panel-1' ? dropIndex ?? undefined : undefined
         }
+        textModeMismatch={textModeMismatch}
+        onSwitchTextMode={onSwitchTextMode}
       />
 
       <PanelResizeDivider
@@ -127,15 +154,17 @@ function ReadPanelsArea(props: {
         otherPanelId="panel-1"
         colorScheme="purple"
         flexBasisPercent={100 - panel1Width}
+        dir={helpsPaneDir}
         filteredKeys={filteredPanel2Keys}
         filteredResources={filteredPanel2Resources}
         panelResources={panel2Resources}
-        isLoadingResources={isLoadingResources}
+        isLoadingResources={isLoadingHelpsResources}
         showDropPlaceholder={hoverPanelId === 'panel-2'}
         placeholderLabel={dragLabel}
         placeholderIndex={
           hoverPanelId === 'panel-2' ? dropIndex ?? undefined : undefined
         }
+        onHelpsLanguageSelected={onHelpsLanguageSelected}
       />
 
       <EntryResourceModal onEntryLinkClick={onEntryLinkClick} />
@@ -158,16 +187,43 @@ export function SimplifiedReadView({
   const {
     packageStore,
     isLoadingResources,
+    isLoadingTextResources,
+    isLoadingHelpsResources,
     currentLanguageCode,
+    helpsLanguageCode,
     isCollectionFullyCached,
     shouldAutoOpenLanguagePicker,
     isLanguagePickerRequired,
     handleLanguageSelected,
+    handleHelpsLanguageSelected,
+    handleSwitchTextMode,
     isBackgroundDownloading,
     downloadStats,
   } = useReadLanguageBootstrap({ initialLanguage, requireLanguageInUrl })
 
   useReadGatewayBookCatalog(currentLanguageCode)
+
+  const availableLanguages = useWizardStore((s) => s.availableLanguages)
+  const textPaneDir = resolvePaneDirection({
+    languageCode: currentLanguageCode,
+    availableLanguages,
+  })
+  const helpsPaneDir = resolvePaneDirection({
+    languageCode: helpsLanguageCode,
+    availableLanguages,
+  })
+
+  const textPaneMismatch = useMemo(() => {
+    const subjects =
+      typeof resourceTypeRegistry.getSupportedSubjects === 'function'
+        ? resourceTypeRegistry.getSupportedSubjects()
+        : []
+    return textModeMismatchFromCache({
+      languageCode: currentLanguageCode,
+      navigationScope,
+      supportedSubjects: subjects,
+    })
+  }, [currentLanguageCode, navigationScope, resourceTypeRegistry])
 
   useReadUrlSync({
     requireLanguageInUrl,
@@ -301,8 +357,16 @@ export function SimplifiedReadView({
               filteredPanel2Resources={filteredPanel2Resources}
               panel1Resources={panel1Resources}
               panel2Resources={panel2Resources}
-              isLoadingResources={isLoadingResources}
+              isLoadingTextResources={isLoadingTextResources}
+              isLoadingHelpsResources={isLoadingHelpsResources}
               onEntryLinkClick={handleOpenEntry}
+              textLanguageCode={currentLanguageCode}
+              helpsLanguageCode={helpsLanguageCode}
+              textPaneDir={textPaneDir}
+              helpsPaneDir={helpsPaneDir}
+              onHelpsLanguageSelected={handleHelpsLanguageSelected}
+              textModeMismatch={textPaneMismatch}
+              onSwitchTextMode={handleSwitchTextMode}
             />
           </LinkedPanelsContainer>
         </div>

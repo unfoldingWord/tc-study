@@ -10,6 +10,7 @@ import { useWizardStore } from '../../../lib/stores/wizardStore'
 import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/helpsDisplayFilters'
 import { generateSemanticIdsForQuoteTokens } from '../../../features/helps/quoteTokens'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
+import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { HelpsFilterBanners } from '../shared/HelpsFilterBanners'
 import { useScriptureTokens } from '../WordsLinksViewer/hooks'
@@ -152,7 +153,10 @@ export function TranslationNotesViewer({
     languageFromList?.direction ?? undefined,
     languageCode
   )
-  const targetLanguageDirection = targetScriptureMetadata?.languageDirection ?? resourceDirection
+  const helpsLanguageDirection = resolveHelpsViewerDirection({
+    resourceDirection,
+    targetScriptureDirection: targetScriptureMetadata?.languageDirection,
+  })
 
   useEffect(() => {
     if (!displayNotes.length) return
@@ -279,7 +283,7 @@ export function TranslationNotesViewer({
         effectiveResource={effectiveResource}
         bookCode={currentRef.book}
         bookTitleSource={bookTitleSource}
-        targetLanguageDirection={targetLanguageDirection}
+        languageDirection={helpsLanguageDirection}
         filterScopeBar={filterScopeBar}
         loading={loading}
         error={error}

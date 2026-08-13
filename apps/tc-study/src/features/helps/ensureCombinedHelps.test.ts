@@ -359,4 +359,35 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     expect(ch.helpsTnResourceKey).toBe('u/es/tn')
     expect(ch.languageCode).toBe('es')
   })
+
+  test('panel-1 minority text without helps keeps existing CombinedHelps language', () => {
+    const resources = new Map<string, ResourceInfo>([
+      ['u/en/tn', res({ key: 'u/en/tn', type: 'notes', language: 'en', languageCode: 'en' })],
+      ['u/en/twl', res({ key: 'u/en/twl', type: 'words-links', language: 'en', languageCode: 'en' })],
+      ['u/bho/obs', res({ key: 'u/bho/obs', type: 'obs', language: 'bho', languageCode: 'bho' })],
+      [
+        COMBINED_HELPS_RESOURCE_ID,
+        res({
+          key: COMBINED_HELPS_RESOURCE_ID,
+          type: 'combined-helps',
+          language: 'en',
+          languageCode: 'en',
+          helpsTnResourceKey: 'u/en/tn',
+          helpsTwlResourceKey: 'u/en/twl',
+        }),
+      ],
+    ])
+    const panels = [
+      { id: 'panel-1', resourceKeys: ['u/bho/obs'], activeIndex: 0 },
+      { id: 'panel-2', resourceKeys: [COMBINED_HELPS_RESOURCE_ID], activeIndex: 0 },
+    ]
+
+    const out = ensureCombinedHelpsInWorkspace({ resources, panels })
+    expect(out.removed).toEqual([])
+    const ch = out.resources.get(COMBINED_HELPS_RESOURCE_ID)!
+    expect(ch.helpsTnResourceKey).toBe('u/en/tn')
+    expect(ch.helpsTwlResourceKey).toBe('u/en/twl')
+    expect(ch.languageCode).toBe('en')
+    expect(out.panels[1]!.resourceKeys).toContain(COMBINED_HELPS_RESOURCE_ID)
+  })
 })

@@ -12,6 +12,7 @@ const FEATURES_ROOT = import.meta.dir
 /** Relative to src/features/ — intentional composition over component viewers. */
 const ALLOWLIST = new Set([
   'read/resolveViewerForResource.tsx',
+  'read-v1/resolveViewerForResource.tsx',
   'nav/BcvNavigatorShell.tsx',
 ])
 

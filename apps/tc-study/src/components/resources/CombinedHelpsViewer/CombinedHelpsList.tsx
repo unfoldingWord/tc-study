@@ -25,7 +25,7 @@ export interface CombinedHelpsListProps {
   effectiveResource: ResourceInfo
   bookCode?: string
   bookTitleSource: unknown
-  targetLanguageDirection: 'ltr' | 'rtl'
+  languageDirection: 'ltr' | 'rtl'
   kindFilter: HelpsKindFilter
   setKindFilter: (v: HelpsKindFilter) => void
   /** Inline filter chip for header actions (no extra chrome row). */
@@ -63,7 +63,7 @@ export function CombinedHelpsList({
   effectiveResource,
   bookCode,
   bookTitleSource,
-  targetLanguageDirection,
+  languageDirection,
   kindFilter,
   setKindFilter,
   filterScopeBar,
@@ -95,11 +95,11 @@ export function CombinedHelpsList({
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
   return (
-    <div className={HELPS_LIST_PANEL} dir={targetLanguageDirection}>
+    <div className={HELPS_LIST_PANEL} dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
         icon={Layers}
-        direction={targetLanguageDirection}
+        direction={languageDirection}
         actions={
           // Sources stays visible even when token/verse/OBS filter replaces the kind menu.
           <>
@@ -149,16 +149,16 @@ export function CombinedHelpsList({
                   )
                   return (
                     <div key={group.ref} className="space-y-stack">
-                      <div className={HELPS_VERSE_HEADER} dir={targetLanguageDirection}>
+                      <div className={HELPS_VERSE_HEADER} dir={languageDirection}>
                         <BookOpen className={HELPS_VERSE_HEADER_ICON} />
                         <h3 className="text-chrome font-semibold text-fg-secondary">
                           {(() => {
                             const { bookPart, numberPart } = formatVerseRefParts(
                               resolved,
                               group.ref,
-                              targetLanguageDirection === 'rtl'
+                              languageDirection === 'rtl'
                             )
-                            return targetLanguageDirection === 'rtl' ? (
+                            return languageDirection === 'rtl' ? (
                               <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
                                 <span>{numberPart}</span>
                                 <span>{bookPart}</span>
@@ -197,7 +197,7 @@ export function CombinedHelpsList({
                                 onClick={onNoteSelect}
                                 targetResourceId={targetSourceId || undefined}
                                 resourceKey={tnKey || resourceKey}
-                                languageDirection={targetLanguageDirection}
+                                languageDirection={languageDirection}
                                 taTitle={taTitle}
                                 isLoadingTATitle={isLoadingTitle}
                                 getEntryTitle={getEntryTitle}
@@ -223,7 +223,7 @@ export function CombinedHelpsList({
                               onQuoteClick={onLinkQuoteClick}
                               tokenFilter={tokenFilter}
                               targetResourceId={targetSourceId}
-                              languageDirection={targetLanguageDirection}
+                              languageDirection={languageDirection}
                               obsMode={helpsScope === 'obs'}
                             />
                           </div>

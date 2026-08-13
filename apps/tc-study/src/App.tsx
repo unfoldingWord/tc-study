@@ -17,6 +17,7 @@ const Library = lazy(() => import('./pages/Library'))
 const Collections = lazy(() => import('./pages/Collections'))
 const Studio = lazy(() => import('./pages/Studio'))
 const Read = lazy(() => import('./pages/Read'))
+const ReadV1 = lazy(() => import('./pages/ReadV1'))
 const DataManagement = lazy(() => import('./pages/DataManagement'))
 const Settings = lazy(() => import('./pages/Settings'))
 /** Panel system playground — DEV-only; must not ship as a prod route. */
@@ -64,7 +65,7 @@ function App() {
 
       loadLanguages()
 
-      const isReadWithLanguage = window.location.pathname.match(/^\/read\/[^/]+(\/|$)/)
+      const isReadWithLanguage = window.location.pathname.match(/^\/read(-v1)?\/[^/]+(\/|$)/)
       // Read deep-link owns bootstrap; otherwise restore last workspace package.
       if (!isReadWithLanguage) {
         await loadSavedWorkspace()
@@ -170,6 +171,46 @@ function App() {
                     element={
                       <Suspense fallback={<ReadPageSkeleton />}>
                         <Read />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="read-v1"
+                    element={
+                      <Suspense fallback={<ReadPageSkeleton />}>
+                        <ReadV1 />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="read-v1/:languageCode/:resourceType/:navType/:navRef"
+                    element={
+                      <Suspense fallback={<ReadPageSkeleton />}>
+                        <ReadV1 />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="read-v1/:languageCode/:resourceType/:navType"
+                    element={
+                      <Suspense fallback={<ReadPageSkeleton />}>
+                        <ReadV1 />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="read-v1/:languageCode/:resourceType"
+                    element={
+                      <Suspense fallback={<ReadPageSkeleton />}>
+                        <ReadV1 />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="read-v1/:languageCode"
+                    element={
+                      <Suspense fallback={<ReadPageSkeleton />}>
+                        <ReadV1 />
                       </Suspense>
                     }
                   />

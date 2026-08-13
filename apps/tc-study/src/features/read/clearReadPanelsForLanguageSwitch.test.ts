@@ -8,7 +8,10 @@ import { upsertLoadedResourceMembership } from '../workspace/appStoreMembership'
 import { addResource } from '../workspace/resourceMutations'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { useNavigationStore } from '../nav/navigationStore'
-import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
+import {
+  clearReadPanelsForLanguageSwitch,
+  panelClearTargetForLoad,
+} from './clearReadPanelsForLanguageSwitch'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
 
 enableMapSet()
@@ -207,5 +210,66 @@ describe('clearReadPanelsForLanguageSwitch', () => {
 
     expect(useAppStore.getState().loadedResources['es-419_gl/es-419/glt']).toBeTruthy()
     expect(useAppStore.getState().loadedResources['Door43-Catalog/es-419/obs']).toBeTruthy()
+  })
+
+  test('text switch clears panel-1 only and keeps CombinedHelps on panel-2', () => {
+    addResource(res({ key: 'u/en/ult', type: 'scripture', language: 'en', languageCode: 'en' }), {
+      panelId: 'panel-1',
+    })
+    addResource(res({ key: 'u/en/tn', type: 'notes', language: 'en', languageCode: 'en' }), {
+      panelId: 'panel-2',
+    })
+    addResource(res({ key: 'u/en/twl', type: 'words-links', language: 'en', languageCode: 'en' }), {
+      panelId: 'panel-2',
+    })
+    applyCombinedHelpsEnsure('en')
+
+    useNavigationStore.setState({
+      availableBooks: [{ code: 'gen', name: 'Genesis', chapters: 50, verses: [] }],
+    })
+
+    clearReadPanelsForLanguageSwitch('en', 'panel-1')
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    expect(pkg.panels.find((p) => p.id === 'panel-1')!.resourceKeys).toEqual([])
+    expect(pkg.panels.find((p) => p.id === 'panel-2')!.resourceKeys).toContain(
+      COMBINED_HELPS_RESOURCE_ID
+    )
+    expect(useAppStore.getState().loadedResources[COMBINED_HELPS_RESOURCE_ID]).toBeTruthy()
+    expect(useAppStore.getState().loadedResources['u/en/ult']).toBeUndefined()
+    expect(useNavigationStore.getState().availableBooks).toEqual([])
+  })
+
+  test('helps switch clears panel-2 only and keeps panel-1 scripture', () => {
+    addResource(res({ key: 'u/bho/obs', type: 'obs', language: 'bho', languageCode: 'bho' }), {
+      panelId: 'panel-1',
+    })
+    addResource(res({ key: 'u/en/tn', type: 'notes', language: 'en', languageCode: 'en' }), {
+      panelId: 'panel-2',
+    })
+    addResource(res({ key: 'u/en/twl', type: 'words-links', language: 'en', languageCode: 'en' }), {
+      panelId: 'panel-2',
+    })
+    applyCombinedHelpsEnsure('en')
+
+    useNavigationStore.setState({
+      availableBooks: [{ code: 'obs', name: 'OBS', chapters: 50, verses: [] }],
+    })
+
+    clearReadPanelsForLanguageSwitch('es', 'panel-2')
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    expect(pkg.panels.find((p) => p.id === 'panel-1')!.resourceKeys).toContain('u/bho/obs')
+    expect(pkg.panels.find((p) => p.id === 'panel-2')!.resourceKeys).toEqual([])
+    expect(useAppStore.getState().loadedResources['u/bho/obs']).toBeTruthy()
+    expect(useNavigationStore.getState().availableBooks).toHaveLength(1)
+  })
+})
+
+describe('panelClearTargetForLoad', () => {
+  test('maps load target to a single pane (or both)', () => {
+    expect(panelClearTargetForLoad('text')).toBe('panel-1')
+    expect(panelClearTargetForLoad('helps')).toBe('panel-2')
+    expect(panelClearTargetForLoad('both')).toBe('both')
   })
 })

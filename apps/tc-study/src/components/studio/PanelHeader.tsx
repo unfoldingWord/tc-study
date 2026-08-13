@@ -1,5 +1,5 @@
 import { ArrowLeftRight, MoreVertical, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useResourceTypeRegistry } from '../../contexts/CatalogContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useTabDnDOptional } from '../../features/dnd/TabDnDContext'
@@ -23,6 +23,8 @@ interface PanelHeaderProps {
   placeholderLabel?: string
   /** Index where the placeholder should appear (null = end of tabs) */
   placeholderIndex?: number | null
+  /** Extra chrome (e.g. helps-pane Languages picker). */
+  headerActions?: ReactNode
 }
 
 export function PanelHeader({
@@ -37,6 +39,7 @@ export function PanelHeader({
   showDropPlaceholder = false,
   placeholderLabel = '',
   placeholderIndex = null,
+  headerActions,
 }: PanelHeaderProps) {
   const registry = useResourceTypeRegistry()
   const { activeIcon } = useTabDnDOptional()
@@ -71,6 +74,9 @@ export function PanelHeader({
       className={`h-chrome-bar px-chrome flex items-center border-b border-border-subtle ${c.strip}`}
     >
       <div className="flex items-center gap-chrome-tight min-w-0 w-full h-full">
+        {headerActions ? (
+          <div className="flex-shrink-0 flex items-center">{headerActions}</div>
+        ) : null}
         <ResourceTabs
           resources={resources}
           currentIndex={currentIndex}

@@ -9,31 +9,35 @@
 
 import {
     AlertCircle,
-    Database,
     Globe,
     Languages,
     Loader2,
     RefreshCw,
-    Wifi,
     X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useCatalogManager, useResourceTypeRegistry } from '../contexts'
+import {
+  filterPickerLanguages,
+  type LanguagePickerListMode,
+} from '../features/read/filterPickerLanguages'
+import type { HelpsModeFlag } from '../features/read/helpsLanguagePolicy'
+import {
+  availabilityForCode,
+  fetchLanguageAvailabilityByCode,
+} from '../features/read/languageAvailability'
+import {
+  loadLanguagesCache,
+  saveLanguagesCache,
+  withAvailability,
+  type ListedLanguage,
+} from '../features/read/languagesCache'
 import { useWizardStore } from '../lib/stores/wizardStore'
+import { LanguagePickerRow } from './LanguagePickerRow'
 import { ModalPortal } from './shared/ModalPortal'
 import { SelectableGridWithStatus } from './shared/SelectableGrid'
-
-// Cache key for localStorage
-const LANGUAGES_CACHE_KEY = 'tc-study:languages-cache'
-const CACHE_VERSION = 2 // Increment to invalidate cache (v2: include direction from list/languages)
-
-interface CachedLanguages {
-  version: number
-  timestamp: number
-  subjects: string[]
-  languages: Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>
-}
+import { useLanguagePickerOpen } from './useLanguagePickerOpen'
 
 interface LanguagePickerProps {
   onLanguageSelected?: (languageCode: string) => void
@@ -41,6 +45,13 @@ interface LanguagePickerProps {
   autoOpen?: boolean
   /** When true, the dialog cannot be dismissed without choosing a language (Read page on /read). */
   required?: boolean
+  /** Default `'text'` so header / Studio pickers are unchanged. */
+  listMode?: LanguagePickerListMode
+  /** Helps-list filter only (`bibleHelps` vs `obsHelps`). Ignored in text mode. */
+  helpsFlag?: HelpsModeFlag
+  /** Controlled open — empty-state CTA can open the same instance. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function LanguagePicker({
@@ -48,19 +59,20 @@ export function LanguagePicker({
   compact = false,
   autoOpen = false,
   required = false,
+  listMode = 'text',
+  helpsFlag,
+  open,
+  onOpenChange,
 }: LanguagePickerProps) {
-  const [isOpen, setIsOpen] = useState(() => autoOpen || required)
-
-  // Re-open when autoOpen or required transitions false → true after mount.
-  // The parent (SimplifiedReadView) is responsible for setting both to false
-  // before any LanguagePicker instance remounts, so this effect only fires
-  // for intentional re-opens (e.g. user navigates back to /read).
-  useEffect(() => {
-    if (autoOpen || required) {
-      setIsOpen(true)
-    }
-  }, [autoOpen, required])
+  const { isOpen, setOpen } = useLanguagePickerOpen({
+    autoOpen,
+    required,
+    open,
+    onOpenChange,
+  })
   const [searchQuery, setSearchQuery] = useState('')
+  const triggerLabel =
+    listMode === 'helps' ? 'Select helps language' : 'Select language'
 
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
@@ -69,52 +81,9 @@ export function LanguagePicker({
   // Get supported subjects for filtering (stable string for effect/callback deps)
   const supportedSubjects = resourceTypeRegistry.getSupportedSubjects()
   const supportedSubjectsKey = supportedSubjects.join(',')
-  
-  // Try to load from cache first
-  const loadFromCache = (): Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }> | null => {
-    try {
-      const cached = localStorage.getItem(LANGUAGES_CACHE_KEY)
-      if (!cached) return null
-      
-      const parsed: CachedLanguages = JSON.parse(cached)
-      
-      // Validate cache version and subjects match
-      if (parsed.version !== CACHE_VERSION) {
-        return null
-      }
-      
-      // Check if subjects match (order doesn't matter)
-      const cachedSubjects = new Set(parsed.subjects)
-      const currentSubjects = new Set(supportedSubjects)
-      if (cachedSubjects.size !== currentSubjects.size || 
-          !supportedSubjects.every(s => cachedSubjects.has(s))) {
-        return null
-      }
-      
-      return parsed.languages
-    } catch (error) {
-      console.warn('⚠️ Failed to load languages from cache:', error)
-      return null
-    }
-  }
-  
-  // Save to cache after successful fetch
-  const saveToCache = (languages: Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>) => {
-    try {
-      const cacheData: CachedLanguages = {
-        version: CACHE_VERSION,
-        timestamp: Date.now(),
-        subjects: supportedSubjects,
-        languages,
-      }
-      localStorage.setItem(LANGUAGES_CACHE_KEY, JSON.stringify(cacheData))
-    } catch (error) {
-      console.warn('⚠️ Failed to save languages to cache:', error)
-    }
-  }
 
   // Displayed list: show cache immediately, then update when revalidation completes
-  const [displayedLanguages, setDisplayedLanguages] = useState<Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>>([])
+  const [displayedLanguages, setDisplayedLanguages] = useState<ListedLanguage[]>([])
   const [isRevalidating, setIsRevalidating] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
@@ -123,11 +92,14 @@ export function LanguagePicker({
     setError(null)
     try {
       const client = getDoor43ApiClient()
-      const door43Langs = await client.getLanguages({
-        subjects: supportedSubjects,
-        stage: 'prod',
-        topic: 'tc-ready',
-      })
+      const [door43Langs, availabilityByCode] = await Promise.all([
+        client.getLanguages({
+          subjects: supportedSubjects,
+          stage: 'prod',
+          topic: 'tc-ready',
+        }),
+        fetchLanguageAvailabilityByCode(client),
+      ])
       const door43NameMap = new Map<string, string>()
       const door43DirectionMap = new Map<string, 'ltr' | 'rtl'>()
       for (const lang of door43Langs) {
@@ -136,32 +108,41 @@ export function LanguagePicker({
       }
       const catalogStats = await catalogManager.getCatalogStats()
       const catalogLanguageCodes = Object.keys(catalogStats.byLanguage)
-      const languageMap = new Map<
-        string,
-        { code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }
-      >()
+      const languageMap = new Map<string, ListedLanguage>()
       for (const code of catalogLanguageCodes) {
-        languageMap.set(code, {
+        languageMap.set(
           code,
-          name: door43NameMap.get(code) || code.toUpperCase(),
-          source: 'catalog',
-          direction: door43DirectionMap.get(code),
-        })
+          withAvailability(
+            {
+              code,
+              name: door43NameMap.get(code) || code.toUpperCase(),
+              source: 'catalog',
+              direction: door43DirectionMap.get(code),
+            },
+            availabilityForCode(availabilityByCode, code)
+          )
+        )
       }
       for (const lang of door43Langs) {
         if (!languageMap.has(lang.code)) {
-          languageMap.set(lang.code, {
-            code: lang.code,
-            name: lang.name || lang.code.toUpperCase(),
-            source: 'door43',
-            direction: lang.direction,
-          })
+          languageMap.set(
+            lang.code,
+            withAvailability(
+              {
+                code: lang.code,
+                name: lang.name || lang.code.toUpperCase(),
+                source: 'door43',
+                direction: lang.direction,
+              },
+              availabilityForCode(availabilityByCode, lang.code)
+            )
+          )
         }
       }
       const merged = Array.from(languageMap.values()).sort((a, b) =>
         a.name.localeCompare(b.name)
       )
-      saveToCache(merged)
+      saveLanguagesCache(merged, supportedSubjects)
       setDisplayedLanguages(merged)
       setAvailableLanguages(merged)
     } catch (err) {
@@ -179,7 +160,7 @@ export function LanguagePicker({
   useEffect(() => {
     if (!isOpen) return
 
-    const cached = loadFromCache()
+    const cached = loadLanguagesCache(supportedSubjects)
     if (cached?.length) {
       setDisplayedLanguages(cached)
       setAvailableLanguages(cached)
@@ -194,38 +175,36 @@ export function LanguagePicker({
   const isLoading = isRevalidating && displayedLanguages.length === 0
   const retry = revalidate
 
-  const filteredLanguages = searchQuery
-    ? languages.filter(
-        (lang) =>
-          lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          lang.code.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : languages
+  const filteredLanguages = filterPickerLanguages(languages, {
+    searchQuery,
+    listMode,
+    helpsFlag,
+  })
 
   const catalogLanguages = filteredLanguages.filter((l) => l.source === 'catalog')
   const onlineLanguages = filteredLanguages.filter((l) => l.source === 'door43')
 
   const closeModal = () => {
     if (required) return
-    setIsOpen(false)
+    setOpen(false)
     setSearchQuery('')
   }
 
   const handleSelect = (code: string) => {
     onLanguageSelected?.(code)
-    setIsOpen(false)
+    setOpen(false)
     setSearchQuery('')
   }
 
   return (
     <div className="relative">
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => setOpen(true)}
         className={`flex items-center gap-1.5 rounded transition-colors ${
           compact ? 'p-1 text-fg-secondary hover:bg-muted' : 'px-3 py-1.5 bg-accent text-white hover:bg-accent-hover shadow-md'
         }`}
-        title="Select language"
-        aria-label="Select language"
+        title={triggerLabel}
+        aria-label={triggerLabel}
       >
         <Languages className="w-4 h-4" />
       </button>
@@ -334,14 +313,8 @@ export function LanguagePicker({
                         onToggle={handleSelect}
                         getKey={(lang) => lang.code}
                         getStatus={() => 'cached'}
-                        renderItem={(lang, _selected, _status) => (
-                          <>
-                            <div className="font-semibold text-fg mb-0.5">{lang.name}</div>
-                            <div className="text-sm text-fg-muted">{lang.code}</div>
-                            <div className="flex items-center gap-1 mt-1.5">
-                              <Database className="w-3 h-3 text-accent" />
-                            </div>
-                          </>
+                        renderItem={(lang, _selected, status) => (
+                          <LanguagePickerRow lang={lang} status={status} />
                         )}
                       />
                     )}
@@ -352,14 +325,8 @@ export function LanguagePicker({
                         onToggle={handleSelect}
                         getKey={(lang) => lang.code}
                         getStatus={() => 'online'}
-                        renderItem={(lang, _selected, _status) => (
-                          <>
-                            <div className="font-semibold text-fg mb-0.5">{lang.name}</div>
-                            <div className="text-sm text-fg-muted">{lang.code}</div>
-                            <div className="flex items-center gap-1 mt-1.5">
-                              <Wifi className="w-3 h-3 text-accent" />
-                            </div>
-                          </>
+                        renderItem={(lang, _selected, status) => (
+                          <LanguagePickerRow lang={lang} status={status} />
                         )}
                       />
                     )}

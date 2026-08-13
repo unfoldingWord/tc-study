@@ -245,7 +245,7 @@ function baseKey(key: string): string {
  * `languageCode` (panel assign / UGNT hydrate / Studio mutations).
  *
  * Priority:
- * 1. Panel-1 primary scripture/OBS (Read GL) — ignores UGNT/UHB
+ * 1. Panel-1 primary scripture/OBS when that language still has a TN+TWL pair
  * 2. Existing CombinedHelps language if that language still has a TN+TWL pair
  * 3. Any language that currently has a complete scripture TN+TWL pair
  * 4. First gateway language among package resources
@@ -264,14 +264,10 @@ export function guessGatewayLanguage(
       const lang = resourceLang(r)
       if (!lang) continue
       const type = String(r.type || '')
-      if (type === 'scripture' || type === 'obs') return lang
-    }
-    for (const key of panel1.resourceKeys) {
-      const r = resources.get(key) || resources.get(baseKey(key))
-      if (!r) continue
-      if (COMBINED_HELPS_IDS.has(r.key || r.id || '')) continue
-      const lang = resourceLang(r)
-      if (lang) return lang
+      if (type !== 'scripture' && type !== 'obs') continue
+      const scope: HelpsScope = type === 'obs' ? 'obs' : 'scripture'
+      const pair = findHelpsKeysAmongResources(resources.values(), scope, { langCode: lang })
+      if (shouldInjectCombinedHelps(pair)) return lang
     }
   }
 

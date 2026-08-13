@@ -32,6 +32,10 @@ function extractBaseKey(key: string): string {
 
 /** Original-language adds (UGNT/UHB) must not steer CombinedHelps pairing. */
 function gatewayLanguageHint(resource: ResourceInfo): string | undefined {
+  const type = String(resource.type || '')
+  // Primary text resources must not steer CombinedHelps (split text vs helps languages).
+  if (type === 'scripture' || type === 'obs') return undefined
+
   const raw = String(resource.languageCode || resource.language || '')
     .trim()
     .toLowerCase()

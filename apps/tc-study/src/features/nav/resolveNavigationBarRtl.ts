@@ -1,5 +1,5 @@
 import type { ResourceInfo } from '../../contexts/types'
-import { isRtlLanguageCode } from '../../utils/languageDirection'
+import { getLanguageDirection, isRtlLanguageCode } from '../../utils/languageDirection'
 import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
 
 export type RtlLanguageListEntry = { code: string; direction?: string }
@@ -31,17 +31,27 @@ export function dirFromResource(
 }
 
 /**
- * Nav chrome RTL follows the gateway reading language (active scripture / anchor),
- * never “any loaded resource is RTL” (UHB would always poison English sessions).
+ * Nav chrome RTL follows the **text** language (Read URL / gateway scripture),
+ * never the helps pane and never “any loaded resource is RTL” (UHB would
+ * poison English sessions; Arabic helps must not flip an English header).
  */
 export function resolveNavigationBarRtl(options: {
   anchorResource?: RtlResourceLike | null
   bookTitleSource?: RtlResourceLike | null
   availableLanguages: RtlLanguageListEntry[]
+  /** Read text-pane language (URL). When set, wins over resource metadata. */
+  textLanguageCode?: string | null
 }): boolean {
-  const { anchorResource, bookTitleSource, availableLanguages } = options
+  const { anchorResource, bookTitleSource, availableLanguages, textLanguageCode } = options
 
-  // Prefer last-active / title scripture (usually gateway) over OL anchor races.
+  const textCode = textLanguageCode?.trim() || ''
+  if (textCode && !isOriginalLanguageResource(textCode, '')) {
+    const listDir = availableLanguages.find((l) => l.code === textCode)?.direction
+    const normalized = listDir === 'rtl' || listDir === 'ltr' ? listDir : null
+    return getLanguageDirection(normalized, null, textCode) === 'rtl'
+  }
+
+  // Studio / no URL lang: last-active / title scripture over OL anchor races.
   for (const res of [bookTitleSource, anchorResource]) {
     const dir = dirFromResource(res, availableLanguages)
     if (dir === true) return true

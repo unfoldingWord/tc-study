@@ -17,7 +17,7 @@ export interface TranslationNotesListProps {
   effectiveResource: ResourceInfo
   bookCode?: string
   bookTitleSource: unknown
-  targetLanguageDirection: 'ltr' | 'rtl'
+  languageDirection: 'ltr' | 'rtl'
   /** Inline filter chip for header actions (no extra chrome row). */
   filterScopeBar?: ReactNode
   loading: boolean
@@ -41,7 +41,7 @@ export function TranslationNotesList({
   effectiveResource,
   bookCode,
   bookTitleSource,
-  targetLanguageDirection,
+  languageDirection,
   filterScopeBar,
   loading,
   error,
@@ -59,11 +59,11 @@ export function TranslationNotesList({
   onNoteSelect,
 }: TranslationNotesListProps) {
   return (
-    <div className={HELPS_LIST_PANEL} dir={targetLanguageDirection}>
+    <div className={HELPS_LIST_PANEL} dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
         icon={FileText}
-        direction={targetLanguageDirection}
+        direction={languageDirection}
         infoResource={resource}
         actions={filterScopeBar ?? undefined}
       />
@@ -94,16 +94,16 @@ export function TranslationNotesList({
               )
               return (
                 <div key={verse} className="space-y-stack">
-                  <div className={HELPS_VERSE_HEADER} dir={targetLanguageDirection}>
+                  <div className={HELPS_VERSE_HEADER} dir={languageDirection}>
                     <BookOpen className={HELPS_VERSE_HEADER_ICON} />
                     <h3 className="text-chrome font-semibold text-fg-secondary">
                       {(() => {
                         const { bookPart, numberPart } = formatVerseRefParts(
                           resolved,
                           verse,
-                          targetLanguageDirection === 'rtl'
+                          languageDirection === 'rtl'
                         )
-                        return targetLanguageDirection === 'rtl' ? (
+                        return languageDirection === 'rtl' ? (
                           <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
                             <span>{numberPart}</span>
                             <span>{bookPart}</span>
@@ -139,7 +139,7 @@ export function TranslationNotesList({
                         onClick={onNoteSelect}
                         targetResourceId={targetSourceId || undefined}
                         resourceKey={resourceKey}
-                        languageDirection={targetLanguageDirection}
+                        languageDirection={languageDirection}
                         taTitle={taTitle ?? undefined}
                         isLoadingTATitle={isLoadingTitle}
                         getEntryTitle={getEntryTitle}

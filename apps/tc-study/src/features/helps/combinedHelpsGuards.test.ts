@@ -23,9 +23,9 @@ describe('combinedHelpsGuards', () => {
     expect(catalogLoad).not.toContain('buildCombinedHelpsResourceInfo')
     expect(catalogLoad).not.toContain('shouldInjectCombinedHelps')
     expect(catalogLoad).not.toContain('findHelpsKeysForScope')
-    // Must run after ORIGINAL_RESOURCES hydrate so UGNT add cannot clobber GL helps
-    const ensureAt = catalogLoad.indexOf('applyCombinedHelpsEnsure(languageCode)')
-    const ugntHydrateAt = catalogLoad.indexOf('for (const orig of ORIGINAL_RESOURCES)')
+    // Must run after UGNT/UHB hydrate so original-lang adds cannot clobber GL helps
+    const ensureAt = catalogLoad.indexOf('applyCombinedHelpsEnsure(helpsLanguageCode)')
+    const ugntHydrateAt = catalogLoad.indexOf('hydrateOriginalLanguageResources')
     expect(ugntHydrateAt).toBeGreaterThan(-1)
     expect(ensureAt).toBeGreaterThan(ugntHydrateAt)
     // Atomic clear (not per-key remove) so English CombinedHelps cannot re-inject mid-switch
@@ -63,5 +63,8 @@ describe('combinedHelpsGuards', () => {
     expect(slice).toMatch(/removeResourceFromPackage:[\s\S]*reconcileCombinedHelps/)
     expect(slice).toMatch(/assignResourceToPanel:[\s\S]*reconcileCombinedHelps/)
     expect(slice).toMatch(/removeResourceFromPanel:[\s\S]*reconcileCombinedHelps/)
+    // Text-pane scripture/OBS must not become the CombinedHelps language hint
+    expect(slice).toContain("if (type === 'scripture' || type === 'obs') return undefined")
   })
 })
+

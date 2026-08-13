@@ -8,6 +8,7 @@ import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceT
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
+import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { useEntryTitles } from '../TranslationNotesViewer/hooks/useEntryTitles'
 import { useTAMetadataForTitles } from '../TranslationNotesViewer/hooks/useTAMetadataForTitles'
@@ -132,7 +133,10 @@ export function CombinedHelpsViewer({
     languageFromList?.direction ?? undefined,
     languageCode
   )
-  const targetLanguageDirection = targetScriptureMetadata?.languageDirection ?? resourceDirection
+  const helpsLanguageDirection = resolveHelpsViewerDirection({
+    resourceDirection,
+    targetScriptureDirection: targetScriptureMetadata?.languageDirection,
+  })
 
   const { loadingTitles, fetchTATitle, getTATitle } = useTATitles(tnKey || resourceKey)
   const taMetadata = useTAMetadataForTitles(tnKey || resourceKey)
@@ -280,7 +284,7 @@ export function CombinedHelpsViewer({
         effectiveResource={effectiveResource}
         bookCode={currentRef.book}
         bookTitleSource={bookTitleSource}
-        targetLanguageDirection={targetLanguageDirection}
+        languageDirection={helpsLanguageDirection}
         kindFilter={kindFilter}
         setKindFilter={setKindFilter}
         filterScopeBar={filterScopeBar}

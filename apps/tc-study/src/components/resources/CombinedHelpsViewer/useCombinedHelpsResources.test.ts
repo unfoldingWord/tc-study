@@ -53,4 +53,23 @@ describe('resolveCombinedHelpsResourceKeys', () => {
 
     expect(result).toEqual({ tnKey: 'u/es/tn', twlKey: 'u/es/twl' })
   })
+
+  test('keeps English helps keys when minority scripture is also loaded', () => {
+    const loadedResources = {
+      'u/bho/glt': res({ key: 'u/bho/glt', type: 'scripture', language: 'bho', languageCode: 'bho' }),
+      'u/en/tn': res({ key: 'u/en/tn', type: 'notes', language: 'en', languageCode: 'en' }),
+      'u/en/twl': res({ key: 'u/en/twl', type: 'words-links', language: 'en', languageCode: 'en' }),
+    }
+
+    const result = resolveCombinedHelpsResourceKeys({
+      loadedResources,
+      wantLang: 'en',
+      injectedTnKey: 'u/en/tn',
+      injectedTwlKey: 'u/en/twl',
+      helpsScope: 'scripture',
+    })
+
+    expect(result).toEqual({ tnKey: 'u/en/tn', twlKey: 'u/en/twl' })
+  })
 })
+

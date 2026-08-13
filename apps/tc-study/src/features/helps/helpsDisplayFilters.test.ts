@@ -55,6 +55,23 @@ describe('filterDisplayNotes', () => {
     },
   ]
 
+  test('verseFilter keeps English tN for the clicked verse (language-agnostic)', () => {
+    const verseNotes = [
+      ...notes,
+      { id: 'n2', reference: '1:3', quote: 'another', occurrence: '1' },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(verseNotes, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: { chapter: 1, verse: 1, timestamp: 1 },
+      tokenFilter: null,
+      bookCodeLower: 'tit',
+    })
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['n1'])
+  })
+
+
   test('token filter with fallbackWhenEmpty restores list when no match', () => {
     const { displayNotes, hasNoteMatches } = filterDisplayNotes(notes, {
       helpsScope: 'scripture',

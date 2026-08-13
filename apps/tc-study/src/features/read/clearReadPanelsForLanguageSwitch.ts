@@ -1,14 +1,12 @@
 /**
- * Atomically clear Read panels when switching language.
+ * Atomically clear Read panel(s) when switching text or helps language.
  *
  * Per-key removeResourceFromPanel re-runs CombinedHelps reconcile against English
  * leftovers still in the package, which re-injects English CombinedHelps mid-clear
  * and can leave panel membership / AppStore projection racing the new language load.
  *
- * Also flushes AppStore `loadedResources` for prior panel keys — stale
- * `verifiedIngredients` on a previous-language key (still in AppStore but off-panel)
- * would otherwise be preserved on re-project and hide GL scripture tabs for the
- * current book.
+ * Text switch clears panel-1 only (panel-2 / CombinedHelps stay). Helps switch
+ * clears panel-2 only. Full `both` still flushes stale AppStore projections.
  */
 
 import { useAppStore } from '../../contexts/AppContext'
@@ -17,56 +15,79 @@ import type { PanelConfig } from '../../lib/stores/workspaceStore'
 import { ensureCombinedHelpsInWorkspace } from '../helps/ensureCombinedHelps'
 import { useNavigationStore } from '../nav/navigationStore'
 import { projectCurrentWorkspacePanels } from '../workspace/resourceMutations'
+import type { CatalogLoadTarget } from './readCatalogPanelPolicy'
 
 const READ_PANEL_IDS = new Set(['panel-1', 'panel-2'])
 
+export type ReadPanelClearTarget = 'panel-1' | 'panel-2' | 'both'
+
+export function panelClearTargetForLoad(loadTarget: CatalogLoadTarget): ReadPanelClearTarget {
+  if (loadTarget === 'text') return 'panel-1'
+  if (loadTarget === 'helps') return 'panel-2'
+  return 'both'
+}
+
+function panelsToClear(panelTarget: ReadPanelClearTarget): Set<string> {
+  if (panelTarget === 'both') return new Set(READ_PANEL_IDS)
+  return new Set([panelTarget])
+}
+
 /**
- * Clears panel-1/panel-2 membership, resets activeIndex, reconciles CombinedHelps
- * for the *target* gateway language (so English leftovers cannot re-inject), and
- * prunes AppStore entries that left all panels (plus any lingering loaded keys).
+ * Clears the targeted Read panel(s), optionally reconciles CombinedHelps for the
+ * *helps* gateway language, and prunes AppStore entries that left the surviving panels.
  */
-export function clearReadPanelsForLanguageSwitch(languageCode?: string): string[] {
+export function clearReadPanelsForLanguageSwitch(
+  languageCode?: string,
+  panelTarget: ReadPanelClearTarget = 'both'
+): string[] {
   const pkg = useWorkspaceStore.getState().currentPackage
   if (!pkg) return []
 
+  const clearIds = panelsToClear(panelTarget)
   const pruneKeys = new Set<string>()
   for (const panel of pkg.panels) {
-    if (!READ_PANEL_IDS.has(panel.id)) continue
+    if (!clearIds.has(panel.id)) continue
     for (const key of panel.resourceKeys) {
       if (key) pruneKeys.add(key)
     }
   }
-  // Drop stale AppStore projections from earlier languages (may be off-panel already)
-  for (const key of Object.keys(useAppStore.getState().loadedResources)) {
-    if (key) pruneKeys.add(key)
+
+  if (panelTarget === 'both') {
+    for (const key of Object.keys(useAppStore.getState().loadedResources)) {
+      if (key) pruneKeys.add(key)
+    }
   }
+
+  const shouldReconcileHelps = panelTarget === 'panel-2' || panelTarget === 'both'
 
   useWorkspaceStore.setState((state) => {
     if (!state.currentPackage) return
     for (const panel of state.currentPackage.panels) {
-      if (!READ_PANEL_IDS.has(panel.id)) continue
+      if (!clearIds.has(panel.id)) continue
       panel.resourceKeys = []
       panel.activeIndex = 0
     }
 
-    const ensured = ensureCombinedHelpsInWorkspace({
-      resources: state.currentPackage.resources,
-      panels: state.currentPackage.panels,
-      languageCode,
-    })
-    state.currentPackage.resources = ensured.resources
-    state.currentPackage.panels = ensured.panels as PanelConfig[]
-    for (const id of ensured.removed) pruneKeys.add(id)
+    if (shouldReconcileHelps) {
+      const ensured = ensureCombinedHelpsInWorkspace({
+        resources: state.currentPackage.resources,
+        panels: state.currentPackage.panels,
+        languageCode,
+      })
+      state.currentPackage.resources = ensured.resources
+      state.currentPackage.panels = ensured.panels as PanelConfig[]
+      for (const id of ensured.removed) pruneKeys.add(id)
+    }
     state.isPackageModified = true
   })
 
   projectCurrentWorkspacePanels({ pruneKeys })
 
-  // Drop prior-language book catalog so deep-links / navigateToReference do not
-  // snap against stale partial GL books (e.g. es-419) while the new language loads.
-  useNavigationStore.setState((state) => {
-    state.availableBooks = []
-  })
+  if (panelTarget === 'panel-1' || panelTarget === 'both') {
+    useNavigationStore.setState((state) => {
+      state.availableBooks = []
+    })
+  }
 
   return [...pruneKeys]
 }

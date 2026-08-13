@@ -24,6 +24,8 @@ async function countMatches(re: RegExp): Promise<number> {
     const rel = path.replace(/\\/g, '/')
     if (rel.includes('.test.') || rel.includes('__tests__')) continue
     if (rel.includes('node_modules')) continue
+    // Snapshot backup of pre-Epic-21 Read — do not count duplicated freeze patterns.
+    if (rel.includes('read-v1')) continue
     const src = readFileSync(join(ROOT, path), 'utf8')
     const matches = src.match(re)
     if (matches) count += matches.length

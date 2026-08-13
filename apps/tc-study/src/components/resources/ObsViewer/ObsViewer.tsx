@@ -125,6 +125,8 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
         title={resource.title || 'Open Bible Stories'}
         subtitle={subtitle}
         icon={BookMarked}
+        // Issue #24: OBS is text-pane content; mixed RTL needs resource languageDirection.
+        // Not a one-line helps-dir fix — leave header ltr until OBS RTL is owned.
         direction="ltr"
         infoResource={resource}
       />
