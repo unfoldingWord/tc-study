@@ -28,6 +28,7 @@ import { useReadLinkedPanelsConfig } from '../../features/read/useReadLinkedPane
 import { useReadPanelDnD } from '../../features/read/useReadPanelDnD'
 import { useReadPanelLayout } from '../../features/read/useReadPanelLayout'
 import { useReadUrlSync } from '../../features/read/useReadUrlSync'
+import { useSyncOriginalLanguageTabs } from '../../features/read/useSyncOriginalLanguageTabs'
 import { createStudioPluginRegistry } from '../../features/studio/createStudioPluginRegistry'
 import { moveResourceBetweenPanels } from '../../features/workspace/resourceMutations'
 import { useWizardStore } from '../../lib/stores/wizardStore'
@@ -89,6 +90,7 @@ export function SimplifiedReadView({
   } = useReadLanguageBootstrap({ initialLanguage, requireLanguageInUrl })
 
   useReadGatewayBookCatalog(currentLanguageCode)
+  useSyncOriginalLanguageTabs(currentNavRef.book)
 
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const p1Dir = resolvePaneDirection({

@@ -5,6 +5,7 @@
 
 import type { ResourceInfo } from '../../contexts/types'
 import { applyDualScopeHelpsPolicy } from '../helps/helpsPanelPolicy'
+import { originalLanguageBelongsOnBook } from './originalLanguageForBook'
 import {
   getResourceAppliesToScope,
   resourceSupportsBook,
@@ -35,6 +36,7 @@ export function filterReadPanelKeysByMode(
     })
   }
   return args.resourceKeys.filter((key) => {
+    if (!originalLanguageBelongsOnBook(key, args.currentBook)) return false
     const scope = getResourceAppliesToScope(key, args.loadedResources, args.resourceTypeRegistry)
     if (scope !== args.navigationScope && scope !== null) return false
     return resourceSupportsBook(key, args.loadedResources, args.currentBook)
@@ -57,6 +59,7 @@ export function filterReadPanel2Keys(args: {
   } = args
 
   const scoped = panel2ResourceKeys.filter((key) => {
+    if (!originalLanguageBelongsOnBook(key, currentBook)) return false
     const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
     if (scope !== navigationScope && scope !== null) return false
     return resourceSupportsBook(key, loadedResources, currentBook)

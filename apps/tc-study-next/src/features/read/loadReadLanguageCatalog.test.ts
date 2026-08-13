@@ -16,6 +16,7 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
     expect(src).toContain('applyCombinedHelpsEnsure(helpsLanguageCode)')
     expect(src).toContain('shouldHydrateOriginalLanguages(loadTarget)')
     expect(src).toContain('hydrateOriginalLanguageResources')
+    expect(src).toContain('currentBook:')
     expect(src).not.toMatch(/applyCombinedHelpsEnsure\(textLanguageCode\)/)
   })
 

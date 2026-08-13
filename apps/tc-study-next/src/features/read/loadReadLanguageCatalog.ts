@@ -13,6 +13,7 @@ import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
+import { useNavigationStore } from '../nav/navigationStore'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
 import { narrowExpectedToCataloged } from './catalogBackgroundDownloadPolicy'
 import {
@@ -189,9 +190,8 @@ export async function loadReadLanguageCatalog(
     const orig = hydrateOriginalLanguageResources({
       catalogManager,
       resourceTypeRegistry,
-      getPanel,
-      addResource,
       destPanelId: destPanelId ?? 'panel-1',
+      currentBook: useNavigationStore.getState().currentReference.book,
     })
     nextTextKeys.push(...orig.loadedKeys)
     metadataPromises.push(...orig.metadataPromises)
