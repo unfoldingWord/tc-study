@@ -4,7 +4,9 @@
 
 import { RESOURCE_STATE_KEYS, useResourceStateSender } from '@bt-synergy/resource-panels'
 import { useEffect, useRef } from 'react'
+import { tokenGroupsBroadcastDedupeKey } from '../../../features/helps/scriptureReadyUnderlineRebind'
 import type { NotesTokenGroupsSignal } from '../../../signals/studioSignals'
+import { useScriptureContentRevision } from '../WordsLinksViewer/hooks'
 import type { HelpsKindFilter } from './types'
 
 export interface UseCombinedHelpsTokenGroupsBroadcastParams {
@@ -43,11 +45,12 @@ export function useCombinedHelpsTokenGroupsBroadcast({
   )
   const lastTnKeyRef = useRef<string | null>(null)
   const lastTwlKeyRef = useRef<string | null>(null)
+  const scriptureRevision = useScriptureContentRevision(resourceId)
 
   useEffect(() => {
     if (helpsScope === 'obs') return
     const activeGroups = kindFilter === 'twl' ? [] : underlineTnGroups
-    const key = `${kindFilter}:${activeGroups.map((g) => `${g.sourceId}:${g.semanticIds.length}`).join('|')}`
+    const key = tokenGroupsBroadcastDedupeKey(kindFilter, activeGroups, scriptureRevision)
     if (key === lastTnKeyRef.current) return
     lastTnKeyRef.current = key
     const parts = (tnKey || resourceKey).split('/')
@@ -57,12 +60,12 @@ export function useCombinedHelpsTokenGroupsBroadcast({
       resourceMetadata: { id: tnKey || resourceKey, language, type: 'tn' },
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps -- sendState ref is stable; key dedupes
-  }, [resourceId, tnKey, resourceKey, underlineTnGroups, kindFilter, helpsScope])
+  }, [resourceId, tnKey, resourceKey, underlineTnGroups, kindFilter, helpsScope, scriptureRevision])
 
   useEffect(() => {
     if (helpsScope === 'obs') return
     const activeGroups = kindFilter === 'notes' ? [] : underlineTwlGroups
-    const key = `${kindFilter}:${activeGroups.map((g) => `${g.sourceId}:${g.semanticIds.length}`).join('|')}`
+    const key = tokenGroupsBroadcastDedupeKey(kindFilter, activeGroups, scriptureRevision)
     if (key === lastTwlKeyRef.current) return
     lastTwlKeyRef.current = key
     const parts = (twlKey || resourceKey).split('/')
@@ -72,6 +75,6 @@ export function useCombinedHelpsTokenGroupsBroadcast({
       resourceMetadata: { id: twlKey || resourceKey, language, type: 'words-links' },
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resourceId, twlKey, resourceKey, underlineTwlGroups, kindFilter, helpsScope])
+  }, [resourceId, twlKey, resourceKey, underlineTwlGroups, kindFilter, helpsScope, scriptureRevision])
 
 }
