@@ -21,11 +21,21 @@ describe('readPanelLayout', () => {
   })
 
   test('drag past min width collapses the smaller panel', () => {
+    expect(COLLAPSE_THRESHOLD_PERCENT).toBe(30)
     expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT).collapsedPanelId).toBe('panel-1')
     expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT - 1).collapsedPanelId).toBe('panel-1')
+    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT + 1).collapsedPanelId).toBeNull()
     expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT).collapsedPanelId).toBe('panel-2')
     expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT + 1).collapsedPanelId).toBe('panel-2')
+    expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT - 1).collapsedPanelId).toBeNull()
     expect(collapseAfterDragEnd(50).collapsedPanelId).toBeNull()
+  })
+
+  test('when both panes meet the threshold, still collapse only the smaller one', () => {
+    // Shares always sum to 100, so both ≤30% cannot happen. Equal shares collapse panel-1.
+    expect(collapseAfterDragEnd(20).collapsedPanelId).toBe('panel-1')
+    expect(collapseAfterDragEnd(80).collapsedPanelId).toBe('panel-2')
+    expect(collapseAfterDragEnd(10).collapsedPanelId).not.toBe(collapseAfterDragEnd(90).collapsedPanelId)
   })
 
   test('click restore uses previous split or 50% and clears collapse', () => {
@@ -33,6 +43,8 @@ describe('readPanelLayout', () => {
     expect(restoreCollapsedDivider(5)).toEqual({ collapsedPanelId: null, splitPercent: 50 })
     expect(restoredSplitPercent(40)).toBe(40)
     expect(restoredSplitPercent(5)).toBe(50)
+    expect(restoredSplitPercent(COLLAPSE_THRESHOLD_PERCENT)).toBe(50)
+    expect(restoredSplitPercent(COLLAPSE_THRESHOLD_PERCENT + 1)).toBe(COLLAPSE_THRESHOLD_PERCENT + 1)
   })
 
   test('inward arrow points at the remaining visible panel', () => {

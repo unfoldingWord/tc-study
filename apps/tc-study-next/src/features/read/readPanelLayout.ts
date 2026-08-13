@@ -9,7 +9,8 @@ import type { CSSProperties } from 'react'
 import type { ReadPanelId } from './readPanelModel'
 import type { ReadLayoutMode } from './readPanelPersistence'
 
-export const COLLAPSE_THRESHOLD_PERCENT = 12
+/** Pane share of the panels container at or below which drag-end snaps to collapse. */
+export const COLLAPSE_THRESHOLD_PERCENT = 30
 export const DEFAULT_SPLIT_PERCENT = 50
 export const NARROW_VIEWPORT_MQ = '(max-width: 767px)'
 
@@ -24,13 +25,16 @@ export function collapseAfterDragEnd(percent: number): {
   splitPercent: number
   collapsedPanelId: ReadPanelId | null
 } {
-  if (percent <= COLLAPSE_THRESHOLD_PERCENT) {
-    return { splitPercent: percent, collapsedPanelId: 'panel-1' }
+  const panel1Share = percent
+  const panel2Share = 100 - percent
+  const panel1TooSmall = panel1Share <= COLLAPSE_THRESHOLD_PERCENT
+  const panel2TooSmall = panel2Share <= COLLAPSE_THRESHOLD_PERCENT
+  if (!panel1TooSmall && !panel2TooSmall) {
+    return { splitPercent: percent, collapsedPanelId: null }
   }
-  if (percent >= 100 - COLLAPSE_THRESHOLD_PERCENT) {
-    return { splitPercent: percent, collapsedPanelId: 'panel-2' }
-  }
-  return { splitPercent: percent, collapsedPanelId: null }
+  // Collapse only the smaller pane (even if both somehow meet the threshold).
+  const collapsedPanelId: ReadPanelId = panel1Share <= panel2Share ? 'panel-1' : 'panel-2'
+  return { splitPercent: percent, collapsedPanelId }
 }
 
 export function restoredSplitPercent(previous: number | null | undefined): number {
