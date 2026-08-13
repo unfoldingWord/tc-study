@@ -69,7 +69,11 @@ export function hydrateOriginalLanguageResources(deps: HydrateOriginalLanguageDe
     const destPanelId = deps.destPanelId ?? 'panel-1'
     const currentPanel = getPanel(destPanelId)
     const currentIndex = currentPanel?.resourceKeys.length || 0
-    addResource(basicResourceInfo, { panelId: destPanelId, index: currentIndex })
+    addResource(basicResourceInfo, {
+      panelId: destPanelId,
+      index: currentIndex,
+      allowMultipleInstances: true,
+    })
   }
 
   const metadataPromises = ORIGINAL_RESOURCES.map(async (orig): Promise<ResourceInfo | null> => {

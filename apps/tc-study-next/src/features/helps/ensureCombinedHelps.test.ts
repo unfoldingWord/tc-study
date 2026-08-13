@@ -423,4 +423,30 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     expect(out.panels[1]!.resourceKeys).toContain(COMBINED_HELPS_RESOURCE_ID)
     expect(out.resources.get(scoped)?.languageCode).toBe('es')
   })
+
+  test('does not inject CombinedHelps onto a scripture panel-2 (same-lang dual scripture)', () => {
+    const resources = new Map<string, ResourceInfo>([
+      ['u/en/ult', res({ key: 'u/en/ult', type: 'scripture' })],
+      ['u/en/tn', res({ key: 'u/en/tn', type: 'notes' })],
+      ['u/en/twl', res({ key: 'u/en/twl', type: 'words-links' })],
+    ])
+    const panels = [
+      { id: 'panel-1', resourceKeys: ['u/en/ult'], activeIndex: 0 },
+      { id: 'panel-2', resourceKeys: ['u/en/ult#2', COMBINED_HELPS_RESOURCE_ID], activeIndex: 0 },
+    ]
+    resources.set(
+      COMBINED_HELPS_RESOURCE_ID,
+      res({
+        key: COMBINED_HELPS_RESOURCE_ID,
+        type: 'combined-helps',
+        language: 'en',
+        languageCode: 'en',
+      })
+    )
+
+    const out = ensureCombinedHelpsInWorkspace({ resources, panels, languageCode: 'en' })
+    expect(out.panels[0]!.resourceKeys).toEqual(['u/en/ult'])
+    expect(out.panels[1]!.resourceKeys).toEqual(['u/en/ult#2'])
+    expect(out.panels[1]!.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
+  })
 })

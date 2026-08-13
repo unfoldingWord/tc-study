@@ -139,4 +139,43 @@ describe('hydrateReadCatalogHits', () => {
       { key: 'unfoldingWord/en/twl', panelId: 'panel-2' },
     ])
   })
+
+  test('same-language dest panel-2 requests a new instance so LinkedPanels ids stay unique', () => {
+    const enUlt: CatalogEntry[] = [
+      {
+        name: 'en_ult',
+        owner: 'unfoldingWord',
+        language: 'en',
+        identifier: 'ult',
+        title: 'ULT',
+        subject: 'Aligned Bible',
+        release: { tag_name: 'v1' },
+      },
+    ]
+    const added: Array<{ key: string; panelId?: string; allowMultipleInstances?: boolean }> = []
+    hydrateReadCatalogHits({
+      catalogResults: enUlt,
+      languageCode: 'en',
+      target: 'text',
+      destPanelId: 'panel-2',
+      resourceTypeRegistry: registry(),
+      viewerRegistry: viewer(),
+      getPanel: (id) =>
+        id === 'panel-1'
+          ? { resourceKeys: ['unfoldingWord/en/ult'] }
+          : { resourceKeys: [] },
+      addResource: (resource, options) => {
+        added.push({
+          key: resource.key,
+          panelId: options?.panelId,
+          allowMultipleInstances: options?.allowMultipleInstances,
+        })
+      },
+      setActiveResourceInPanel: () => undefined,
+    })
+
+    expect(added).toEqual([
+      { key: 'unfoldingWord/en/ult', panelId: 'panel-2', allowMultipleInstances: true },
+    ])
+  })
 })

@@ -31,6 +31,15 @@ export function panelClearTargetForLoad(
   return 'both'
 }
 
+/** Text dest (including panel-2 scripture) must not re-inject CombinedHelps onto that pane. */
+export function shouldReconcileHelpsOnPanelClear(
+  loadTarget: CatalogLoadTarget,
+  panelTarget: ReadPanelClearTarget
+): boolean {
+  if (loadTarget === 'text') return false
+  return panelTarget === 'panel-2' || panelTarget === 'both'
+}
+
 function panelsToClear(panelTarget: ReadPanelClearTarget): Set<string> {
   if (panelTarget === 'both') return new Set(READ_PANEL_IDS)
   return new Set([panelTarget])
@@ -42,7 +51,8 @@ function panelsToClear(panelTarget: ReadPanelClearTarget): Set<string> {
  */
 export function clearReadPanelsForLanguageSwitch(
   languageCode?: string,
-  panelTarget: ReadPanelClearTarget = 'both'
+  panelTarget: ReadPanelClearTarget = 'both',
+  options?: { reconcileHelps?: boolean }
 ): string[] {
   const pkg = useWorkspaceStore.getState().currentPackage
   if (!pkg) return []
@@ -62,7 +72,8 @@ export function clearReadPanelsForLanguageSwitch(
     }
   }
 
-  const shouldReconcileHelps = panelTarget === 'panel-2' || panelTarget === 'both'
+  const shouldReconcileHelps =
+    options?.reconcileHelps ?? (panelTarget === 'panel-2' || panelTarget === 'both')
 
   useWorkspaceStore.setState((state) => {
     if (!state.currentPackage) return

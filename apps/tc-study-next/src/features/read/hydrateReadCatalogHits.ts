@@ -153,7 +153,12 @@ export function hydrateReadCatalogHits(
     if (assignment.kind === 'panel') {
       const currentPanel = getPanel(assignment.panelId)
       const currentIndex = currentPanel?.resourceKeys.length || 0
-      addResource(basicResourceInfo, { panelId: assignment.panelId, index: currentIndex })
+      addResource(basicResourceInfo, {
+        panelId: assignment.panelId,
+        index: currentIndex,
+        // Same-language dual scripture: second pane gets ult#2 so LinkedPanels ids stay unique.
+        allowMultipleInstances: true,
+      })
       if (currentIndex === 0) {
         setActiveResourceInPanel(assignment.panelId, 0)
       }

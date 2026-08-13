@@ -18,6 +18,7 @@ import { narrowExpectedToCataloged } from './catalogBackgroundDownloadPolicy'
 import {
   clearReadPanelsForLanguageSwitch,
   panelClearTargetForLoad,
+  shouldReconcileHelpsOnPanelClear,
 } from './clearReadPanelsForLanguageSwitch'
 import { hydrateOriginalLanguageResources } from './hydrateOriginalLanguageResources'
 import { hydrateReadCatalogHits } from './hydrateReadCatalogHits'
@@ -117,7 +118,10 @@ export async function loadReadLanguageCatalog(
   })
   setExpectedResources([...startExpected.textKeys, ...startExpected.helpsKeys])
 
-  clearReadPanelsForLanguageSwitch(helpsLanguageCode, panelClearTargetForLoad(loadTarget, destPanelId))
+  const panelTarget = panelClearTargetForLoad(loadTarget, destPanelId)
+  clearReadPanelsForLanguageSwitch(helpsLanguageCode, panelTarget, {
+    reconcileHelps: shouldReconcileHelpsOnPanelClear(loadTarget, panelTarget),
+  })
 
   const door43Client = getDoor43ApiClient()
   const searches =

@@ -97,7 +97,7 @@ export function ensureCombinedHelpsInWorkspace(options: {
           panel.resourceKeys = panel.resourceKeys.filter((k) => k !== id)
         }
         removed.push(id)
-        if (helpsPanel) {
+        if (helpsPanel && !panelHasPrimaryText(helpsPanel, resourceMap)) {
           restoreHelpsPairKeysToPanel(helpsPanel, resourceMap, pair)
         }
       }
@@ -125,6 +125,13 @@ export function ensureCombinedHelpsInWorkspace(options: {
       } as ResourceInfo)
     }
 
+    // Dual scripture (same lang): panel-2 is not always helps — never inject there.
+    if (helpsPanel && panelHasPrimaryText(helpsPanel, resourceMap)) {
+      helpsPanel.resourceKeys = helpsPanel.resourceKeys.filter((k) => k !== id)
+      stripScopedHelpsPeersFromPanels(panels, resourceMap, scope)
+      continue
+    }
+
     if (helpsPanel && !helpsPanel.resourceKeys.includes(id)) {
       const insertAt = scope === 'scripture' ? 0 : helpsPanel.resourceKeys.length
       helpsPanel.resourceKeys.splice(insertAt, 0, id)
@@ -135,7 +142,7 @@ export function ensureCombinedHelpsInWorkspace(options: {
     stripScopedHelpsPeersFromPanels(panels, resourceMap, scope)
   }
 
-  if (helpsPanel) {
+  if (helpsPanel && !panelHasPrimaryText(helpsPanel, resourceMap)) {
     normalizePanel2HelpsOrder(helpsPanel)
     helpsPanel.activeIndex = resolvePanel2ActiveIndex({
       resourceKeys: helpsPanel.resourceKeys,
@@ -224,6 +231,20 @@ function clampIndex(index: number, length: number): number {
   if (typeof index !== 'number' || index < 0) return 0
   if (index >= length) return length - 1
   return index
+}
+
+/** Scripture/OBS on a panel means it is a text pane — CombinedHelps must not land there. */
+function panelHasPrimaryText(
+  panel: WorkspacePanelLike,
+  resources: Map<string, ResourceInfo>
+): boolean {
+  return panel.resourceKeys.some((key) => {
+    if (isCombinedHelpsId(key)) return false
+    const r = resources.get(key) || resources.get(baseKey(key))
+    if (!r) return false
+    const type = String(r.type || '')
+    return type === 'scripture' || type === 'obs'
+  })
 }
 
 function primaryLang(code: string | undefined | null): string {
