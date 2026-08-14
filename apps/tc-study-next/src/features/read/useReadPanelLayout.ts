@@ -1,8 +1,8 @@
 /**
- * Resize + collapse-to-divider. Live drag snaps at the 30/70 detent with
- * resistance past it; collapse commits during drag once the pointer crosses
- * detent + DETENT_COMMIT_OFFSET (or on release if already past that offset).
- * Release on the detent stays at 30/70.
+ * Resize + collapse-to-divider. Live drag jumps to 30/70 once the pointer
+ * is within DETENT_CAPTURE_PERCENT, then hard-locks until commit. Collapse
+ * commits during drag once the pointer crosses detent + DETENT_COMMIT_OFFSET
+ * (or on release if already past that offset). Release on the detent stays at 30/70.
  */
 
 import { useCallback, useEffect, useRef } from 'react'
@@ -14,7 +14,7 @@ import {
   layoutRestoreTweenRange,
   restoreCollapsedDivider,
 } from './readPanelLayout'
-import { prefersReducedMotion, useReadPanelCollapse } from './useReadPanelCollapse'
+import { useReadPanelCollapse } from './useReadPanelCollapse'
 import { useReadPanelResize } from './useReadPanelResize'
 import { useReadPanelStore } from './readPanelStore'
 
@@ -79,8 +79,7 @@ export function useReadPanelLayout() {
   }, [collapsedPanelId, expandPanel, layout, runTween, setLayout, setSplitPercent])
 
   const displayWidth = isResizingPanels
-    ? displayedSplitFromPointer(panel1Width, { reducedMotion: prefersReducedMotion() })
-        .splitPercent
+    ? displayedSplitFromPointer(panel1Width).splitPercent
     : tweenPercent !== null
       ? tweenPercent
       : collapsedPanelId

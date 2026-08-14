@@ -10,8 +10,8 @@ import {
   collapseEase,
   collapseTweenRange,
   defaultLayoutForViewport,
+  DETENT_CAPTURE_PERCENT,
   DETENT_COMMIT_OFFSET_PERCENT,
-  DETENT_RESISTANCE,
   displayedSplitFromPointer,
   dividerCollapsedPanelId,
   edgeSplitPercent,
@@ -33,22 +33,30 @@ describe('readPanelLayout', () => {
     expect(defaultLayoutForViewport(true, 'two', false)).toBe('one')
   })
 
-  test('live drag matches the pointer until the 30/70 detent', () => {
+  test('live drag matches the pointer until the capture band', () => {
     expect(COLLAPSE_THRESHOLD_PERCENT).toBe(30)
-    expect(DETENT_RESISTANCE).toBeGreaterThanOrEqual(0.25)
-    expect(DETENT_RESISTANCE).toBeLessThanOrEqual(0.35)
+    expect(DETENT_CAPTURE_PERCENT).toBeGreaterThanOrEqual(3)
+    expect(DETENT_CAPTURE_PERCENT).toBeLessThanOrEqual(4)
     expect(displayedSplitFromPointer(50)).toEqual({ splitPercent: 50, zone: 'live' })
-    expect(displayedSplitFromPointer(COLLAPSE_THRESHOLD_PERCENT + 1)).toEqual({
-      splitPercent: COLLAPSE_THRESHOLD_PERCENT + 1,
+    expect(displayedSplitFromPointer(COLLAPSE_THRESHOLD_PERCENT + DETENT_CAPTURE_PERCENT + 1)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT + DETENT_CAPTURE_PERCENT + 1,
       zone: 'live',
     })
-    expect(displayedSplitFromPointer(100 - COLLAPSE_THRESHOLD_PERCENT - 1)).toEqual({
-      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT - 1,
+    expect(displayedSplitFromPointer(100 - COLLAPSE_THRESHOLD_PERCENT - DETENT_CAPTURE_PERCENT - 1)).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT - DETENT_CAPTURE_PERCENT - 1,
       zone: 'live',
     })
   })
 
-  test('snap sticks visually at the 30% / 70% detent', () => {
+  test('magnetic capture jumps to 30/70 when the pointer is close enough', () => {
+    expect(displayedSplitFromPointer(COLLAPSE_THRESHOLD_PERCENT + DETENT_CAPTURE_PERCENT)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'detent',
+    })
+    expect(displayedSplitFromPointer(100 - COLLAPSE_THRESHOLD_PERCENT - DETENT_CAPTURE_PERCENT)).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'detent',
+    })
     expect(displayedSplitFromPointer(COLLAPSE_THRESHOLD_PERCENT)).toEqual({
       splitPercent: COLLAPSE_THRESHOLD_PERCENT,
       zone: 'detent',
@@ -59,41 +67,37 @@ describe('readPanelLayout', () => {
     })
   })
 
-  test('resistance past the detent shrinks the small pane slower than the pointer', () => {
-    const left = displayedSplitFromPointer(20)
-    expect(left.zone).toBe('resistance')
-    expect(left.splitPercent).toBe(
-      COLLAPSE_THRESHOLD_PERCENT - (COLLAPSE_THRESHOLD_PERCENT - 20) * DETENT_RESISTANCE
-    )
-    expect(left.splitPercent).toBeGreaterThan(20)
-    expect(left.splitPercent).toBeLessThan(COLLAPSE_THRESHOLD_PERCENT)
+  test('hard lock: captured split stays at 30/70 until commit (no rubber-band)', () => {
+    const justPastLow = COLLAPSE_THRESHOLD_PERCENT - 1
+    const justPastHigh = 100 - COLLAPSE_THRESHOLD_PERCENT + 1
+    const nearCommitLow = COLLAPSE_THRESHOLD_PERCENT - DETENT_COMMIT_OFFSET_PERCENT + 1
+    const nearCommitHigh = 100 - COLLAPSE_THRESHOLD_PERCENT + DETENT_COMMIT_OFFSET_PERCENT - 1
 
-    const right = displayedSplitFromPointer(80)
-    expect(right.zone).toBe('resistance')
-    expect(right.splitPercent).toBe(
-      100 - COLLAPSE_THRESHOLD_PERCENT + (80 - (100 - COLLAPSE_THRESHOLD_PERCENT)) * DETENT_RESISTANCE
-    )
-    expect(right.splitPercent).toBeLessThan(80)
-    expect(right.splitPercent).toBeGreaterThan(100 - COLLAPSE_THRESHOLD_PERCENT)
-
-    const nearer = displayedSplitFromPointer(20).splitPercent
-    const farther = displayedSplitFromPointer(10).splitPercent
-    expect(nearer - farther).toBeCloseTo(10 * DETENT_RESISTANCE)
-  })
-
-  test('reduced motion skips rubber-band but still marks resistance past the detent', () => {
-    expect(displayedSplitFromPointer(20, { reducedMotion: true })).toEqual({
+    expect(displayedSplitFromPointer(justPastLow)).toEqual({
       splitPercent: COLLAPSE_THRESHOLD_PERCENT,
-      zone: 'resistance',
+      zone: 'detent',
     })
-    expect(displayedSplitFromPointer(80, { reducedMotion: true })).toEqual({
+    expect(displayedSplitFromPointer(nearCommitLow)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'detent',
+    })
+    expect(displayedSplitFromPointer(20)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'detent',
+    })
+    expect(displayedSplitFromPointer(justPastHigh)).toEqual({
       splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT,
-      zone: 'resistance',
+      zone: 'detent',
     })
-    expect(displayedSplitFromPointer(50, { reducedMotion: true })).toEqual({
-      splitPercent: 50,
-      zone: 'live',
+    expect(displayedSplitFromPointer(nearCommitHigh)).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'detent',
     })
+    expect(displayedSplitFromPointer(80)).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'detent',
+    })
+    expect(displayedSplitFromPointer(20).splitPercent).toBe(displayedSplitFromPointer(10).splitPercent)
   })
 
   test('release on the detent stays; release past detent+offset collapses', () => {
@@ -109,7 +113,11 @@ describe('readPanelLayout', () => {
     expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT + 1).collapsedPanelId).toBeNull()
     expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT - 1).collapsedPanelId).toBeNull()
     expect(collapseAfterDragEnd(50).collapsedPanelId).toBeNull()
-    // Rubber-band past the detent but short of the commit offset: snap back.
+    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT + DETENT_CAPTURE_PERCENT)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT,
+      collapsedPanelId: null,
+    })
+    // Locked on detent, short of the commit offset: stay at 30/70.
     expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT - 1)).toEqual({
       splitPercent: COLLAPSE_THRESHOLD_PERCENT,
       collapsedPanelId: null,

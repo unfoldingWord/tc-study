@@ -11,53 +11,44 @@ import type { ReadLayoutMode } from './readPanelPersistence'
 
 /** Pane share of the panels container that is the magnetic collapse detent. */
 export const COLLAPSE_THRESHOLD_PERCENT = 30
-/** Gain past the detent: small pane shrinks slower than the pointer (notch, not a wall). */
-export const DETENT_RESISTANCE = 0.3
+/**
+ * How close the pointer must get to 30/70 before the displayed split jumps
+ * to the detent and hard-locks (no further resize until commit).
+ */
+export const DETENT_CAPTURE_PERCENT = 4
 /**
  * Container % past the 30/70 detent that commits collapse.
- * Compared against the **pointer** (raw container %), not the displayed rubber-band,
- * so reduced motion (no overshoot) still commits at the same travel.
- * Displayed lag at commit is offset × DETENT_RESISTANCE (~1.5pp).
+ * Compared against the **pointer** (raw container %), not the displayed split,
+ * so the pane can stay frozen at 30/70 until this offset is reached.
  */
 export const DETENT_COMMIT_OFFSET_PERCENT = 5
 export const DEFAULT_SPLIT_PERCENT = 50
 export const NARROW_VIEWPORT_MQ = '(max-width: 767px)'
 
 export type CollapsedDividerArrow = 'left' | 'right' | 'up' | 'down'
-export type DragSplitZone = 'live' | 'detent' | 'resistance'
+export type DragSplitZone = 'live' | 'detent'
 
 function clampPercent(percent: number): number {
   return Math.max(0, Math.min(100, percent))
 }
 
 /**
- * Pointer % → displayed split. Live until 30/70, snap on the detent, then
- * resistance past it. Reduced motion keeps the snap and skips the rubber-band.
+ * Pointer % → displayed split. Live 1:1 until within DETENT_CAPTURE_PERCENT
+ * of 30/70, then jump to the detent and stay locked. No rubber-band.
  */
-export function displayedSplitFromPointer(
-  pointerPercent: number,
-  options?: { reducedMotion?: boolean }
-): { splitPercent: number; zone: DragSplitZone } {
+export function displayedSplitFromPointer(pointerPercent: number): {
+  splitPercent: number
+  zone: DragSplitZone
+} {
   const pointer = clampPercent(pointerPercent)
   const low = COLLAPSE_THRESHOLD_PERCENT
   const high = 100 - COLLAPSE_THRESHOLD_PERCENT
-  if (pointer > low && pointer < high) {
+  if (pointer > low + DETENT_CAPTURE_PERCENT && pointer < high - DETENT_CAPTURE_PERCENT) {
     return { splitPercent: pointer, zone: 'live' }
   }
-  if (pointer === low || pointer === high) {
-    return { splitPercent: pointer, zone: 'detent' }
-  }
-  if (pointer < low) {
-    const overshoot = low - pointer
-    return {
-      splitPercent: options?.reducedMotion ? low : low - overshoot * DETENT_RESISTANCE,
-      zone: 'resistance',
-    }
-  }
-  const overshoot = pointer - high
   return {
-    splitPercent: options?.reducedMotion ? high : high + overshoot * DETENT_RESISTANCE,
-    zone: 'resistance',
+    splitPercent: pointer <= 50 ? low : high,
+    zone: 'detent',
   }
 }
 
@@ -80,7 +71,8 @@ export function collapseCommitPanelId(pointerPercent: number): ReadPanelId | nul
 
 /**
  * Mid-drag sample. Commit (end the pointer session, no pointer-up) once the
- * pointer crosses the commit offset; otherwise keep live / detent / rubber-band.
+ * pointer crosses the commit offset; otherwise keep live tracking or the
+ * hard-locked detent.
  */
 export function collapseDuringDrag(pointerPercent: number): {
   splitPercent: number

@@ -1,7 +1,7 @@
 /**
  * Tween splitPercent to the edge (collapse) or back (restore) — same flex
  * resize as live divider drag. Never translate panes. Never tween during drag.
- * Reduced motion skips the tween (and the live rubber-band in the layout hook).
+ * Reduced motion skips the tween.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'

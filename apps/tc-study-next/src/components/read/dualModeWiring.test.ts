@@ -88,7 +88,6 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(hookSrc).toContain('useReadPanelCollapse')
     expect(hookSrc).toContain('collapseTweenRange')
     expect(hookSrc).toContain('displayedSplitFromPointer')
-    expect(hookSrc).toContain('prefersReducedMotion')
     expect(hookSrc).toContain('edgeSplitPercent')
     expect(resizeHookSrc).toContain('collapseDuringDrag')
     expect(resizeHookSrc).toContain('draggingRef')
