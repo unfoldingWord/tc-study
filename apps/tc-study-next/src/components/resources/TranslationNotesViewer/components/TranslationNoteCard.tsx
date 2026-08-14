@@ -5,7 +5,7 @@
  */
 
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
-import { Code, ExternalLink } from 'lucide-react'
+import { Code, GraduationCap } from 'lucide-react'
 import { memo, startTransition, useCallback, useState } from 'react'
 import { useNavigationStore } from '../../../../contexts'
 import { useAppStore } from '../../../../contexts/AppContext'
@@ -303,7 +303,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
             title={`Learn more: ${taTitle}`}
             aria-label={`Learn more: ${taTitle}`}
           >
-            <ExternalLink className={HELPS_CARD_FOOTER_ICON} />
+            <GraduationCap className={HELPS_CARD_FOOTER_ICON} />
             {isLoadingTATitle ? (
               <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
             ) : (

@@ -33,10 +33,10 @@ export const HELPS_CARD_FOOTER = 'mt-2 pt-2 border-t border-border-subtle'
 export const HELPS_CARD_FOOTER_BUTTON =
   'flex items-center gap-1.5 w-full text-left text-sm font-medium transition-colors'
 
-/** Translation Words — accent (blue), same as TW entry viewer. */
+/** Translation Words — accent blue (CVD-safe vs TA amber). */
 export const HELPS_CARD_FOOTER_BUTTON_TW = `${HELPS_CARD_FOOTER_BUTTON} text-accent-fg hover:text-accent`
 
-/** Translation Academy — helps (purple), same as TA entry viewer. */
-export const HELPS_CARD_FOOTER_BUTTON_TA = `${HELPS_CARD_FOOTER_BUTTON} text-helps-fg hover:text-helps`
+/** Translation Academy — warning amber (not helps purple; blue/purple fails tritanopia). */
+export const HELPS_CARD_FOOTER_BUTTON_TA = `${HELPS_CARD_FOOTER_BUTTON} text-warning-fg hover:text-warning`
 
 export const HELPS_CARD_FOOTER_ICON = 'w-3.5 h-3.5 flex-shrink-0'

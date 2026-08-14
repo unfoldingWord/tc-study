@@ -56,6 +56,8 @@ Values below match `src/index.css` as of the dark-mode theme work. Utilities are
 | `accent-fg` | `#1e40af` | `#e8f1ff` | High-contrast text on accent-soft |
 | `danger` | `#dc2626` | `#f87171` | Errors / destructive |
 | `danger-soft` | `#fef2f2` | `#3f1d1d` | Soft error fill |
+| `warning` | `#d97706` | `#fbbf24` | Amber hover / saturated warning |
+| `warning-fg` | `#92400e` | `#fde68a` | High-contrast amber text (TA footers; pair with `accent-fg` for TW) |
 | `highlight` | `#fef08a` | `#5c4a14` | Verse / note selection wash; Helps filter value pill fill |
 | `highlight-strong` | `#fde047` | `#7a641c` | Stronger selection border/fill; filter × hover wash |
 | `underline` | `#a8a29e` | `#a8a29a` | Dotted scripture underlines |
@@ -146,7 +148,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 - **BCV pill (`NavigationBarCompact`):** `bg-accent-soft` + `text-accent-fg` — soft fill must clear canvas; accent-fg is the readable chrome text on that fill (not `text-accent` alone).
 - **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` with a hairline `border-b`; Helps list panels also use `bg-surface` (`HELPS_LIST_PANEL`) so verse chips sit on white/elevated charcoal — not cool `canvas` gray.
 - **Helps verse headers:** `bg-muted/50` + `text-fg-secondary` (+ book icon, ref, count on `bg-surface`) — neutral muted chips (lighter than full `muted`), not lavender `chip-verse`.
-- **Helps cards:** idle `surface` + border; quote chips use `chip-quote*`; selected TN/TWL use light yellow `bg-highlight/15` + even `border-border` (no left bar / ring / blue or purple wash). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
+- **Helps cards:** idle `surface` + border; quote chips use `chip-quote*`; selected TN/TWL use light yellow `bg-highlight/15` + even `border-border` (no left bar / ring / blue or purple wash). TA vs TW footers use `warning-fg` (amber) vs `accent-fg` (blue) — not `helps-fg` purple (blue/purple fails tritanopia). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
 - **Helps filter pill:** `bg-highlight text-scripture-fg` (borderless `h-7` capsule) — same wash as highlighted scripture tokens (`TokenRenderer`), so filter ↔ selection feel related.
 - **Modals:** `bg-overlay` scrim; panel `bg-surface` / `bg-elevated`, `border-border`, `text-fg`.
 - **Panel tabs:** soft strip `bg-panel-*-soft/70` at fixed `h-chrome-bar`; tabs `h-chrome-control` (icon-only and labeled share one height); selected `bg-tab-selected`; inactive label `text-fg-secondary`.
