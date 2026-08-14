@@ -25,3 +25,11 @@ export const HELPS_CARD_SELECTED = 'bg-highlight/15 border-border'
 /** Filter-word mark inside quote chips — same dotted underline as scripture tokens. */
 export const HELPS_QUOTE_FILTER_MARK =
   'underline decoration-dotted decoration-underline decoration-1 underline-offset-2'
+
+/** Article / title footer on TN + TWL cards — middle density between the two. */
+export const HELPS_CARD_FOOTER = 'mt-2 pt-2 border-t border-border-subtle'
+
+export const HELPS_CARD_FOOTER_BUTTON =
+  'flex items-center gap-1.5 w-full text-left text-sm font-medium text-helps-fg hover:text-helps transition-colors'
+
+export const HELPS_CARD_FOOTER_ICON = 'w-3.5 h-3.5 flex-shrink-0'

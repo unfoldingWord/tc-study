@@ -10,10 +10,15 @@ import { ExternalLink, MoreHorizontal } from 'lucide-react'
 import { memo } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
-import { parseTWLink } from '../../../../features/helps/quoteTokens'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
-import { HELPS_CARD_IDLE, HELPS_CARD_SELECTED } from '../../helpsCardStyles'
+import {
+  HELPS_CARD_FOOTER,
+  HELPS_CARD_FOOTER_BUTTON,
+  HELPS_CARD_FOOTER_ICON,
+  HELPS_CARD_IDLE,
+  HELPS_CARD_SELECTED,
+} from '../../helpsCardStyles'
 import { QuotedFilterText } from '../../shared/QuotedFilterText'
 import type { TokenFilter, TranslationWordsLink } from '../types'
 
@@ -57,8 +62,6 @@ export const WordLinkCard = memo(function WordLinkCard({
   languageDirection = 'ltr',
   obsMode = false,
 }: WordLinkCardProps) {
-  const twInfo = parseTWLink(link.twLink)
-  const isKeyTerm = twInfo.category === 'kt'
   const alignedTokens = (link as TranslationWordsLink & { alignedTokens?: AlignedToken[] }).alignedTokens
   const hasAlignedTokens = alignedTokens && alignedTokens.length > 0
   const filterText = tokenFilter?.content ?? null
@@ -167,28 +170,22 @@ export const WordLinkCard = memo(function WordLinkCard({
       ) : null}
 
       {/* Entry Link - On bottom, with modal icon (matches Notes support reference style) */}
-      <div className="mt-1.5 pt-1.5 border-t border-border-subtle">
+      <div className={HELPS_CARD_FOOTER} onClick={(e) => e.stopPropagation()}>
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation()
             onTitleClick(link)
           }}
-          className="flex items-center gap-1.5 w-full text-left transition-colors group/title"
+          className={HELPS_CARD_FOOTER_BUTTON}
           title={`View Translation Words article: ${twTitle}`}
+          aria-label={`View Translation Words article: ${twTitle}`}
         >
-          <ExternalLink
-            className={`w-3.5 h-3.5 flex-shrink-0 ${isKeyTerm ? 'text-helps-fg' : 'text-accent-fg'}`}
-          />
+          <ExternalLink className={HELPS_CARD_FOOTER_ICON} />
           {isLoadingTitle ? (
             <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
           ) : (
-            <span
-              className={`font-semibold text-base group-hover/title:text-accent transition-colors ${
-                isKeyTerm ? 'text-helps-fg' : 'text-accent-fg'
-              }`}
-            >
-              {twTitle}
-            </span>
+            <span>{twTitle}</span>
           )}
         </button>
       </div>

@@ -13,7 +13,13 @@ import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
-import { HELPS_CARD_IDLE, HELPS_CARD_SELECTED } from '../../helpsCardStyles'
+import {
+  HELPS_CARD_FOOTER,
+  HELPS_CARD_FOOTER_BUTTON,
+  HELPS_CARD_FOOTER_ICON,
+  HELPS_CARD_IDLE,
+  HELPS_CARD_SELECTED,
+} from '../../helpsCardStyles'
 import { QuotedFilterText } from '../../shared/QuotedFilterText'
 import type { TokenFilter } from '../../WordsLinksViewer/types'
 import { parseScriptureLink } from '../utils/parseScriptureLink'
@@ -284,18 +290,20 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
 
       {/* Support Reference - Link to Translation Academy */}
       {note.supportReference && note.supportReference.startsWith('rc://') && (
-        <div className="mt-2.5 pt-2.5 border-t border-border-subtle" onClick={(e) => e.stopPropagation()}>
+        <div className={HELPS_CARD_FOOTER} onClick={(e) => e.stopPropagation()}>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation()
               if (onSupportReferenceClick) {
                 onSupportReferenceClick(note.supportReference)
               }
             }}
-            className="flex items-center gap-1.5 text-xs text-helps-fg hover:text-helps transition-colors"
+            className={HELPS_CARD_FOOTER_BUTTON}
             title={`Learn more: ${taTitle}`}
+            aria-label={`Learn more: ${taTitle}`}
           >
-            <ExternalLink className="w-3 h-3" />
+            <ExternalLink className={HELPS_CARD_FOOTER_ICON} />
             {isLoadingTATitle ? (
               <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
             ) : (
