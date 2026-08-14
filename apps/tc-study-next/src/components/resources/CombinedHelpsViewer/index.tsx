@@ -8,6 +8,7 @@ import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceT
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
+import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
 import { useHelpsLanguageActions } from '../../../features/helps/HelpsLanguageActionsContext'
 import {
@@ -66,6 +67,7 @@ export function CombinedHelpsViewer({
   const bookTitleSource = useBookTitleSource()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const loadedResources = useAppStore((s) => s.loadedResources)
+  const packageResources = useWorkspaceStore((s) => s.currentPackage?.resources)
   const helpsLanguageActions = useHelpsLanguageActions()
 
   const [kindFilter, setKindFilter] = useState<HelpsKindFilter>('all')
@@ -75,8 +77,9 @@ export function CombinedHelpsViewer({
   const [obsQuoteFilter, setObsQuoteFilter] = useState<ObsQuoteFilter | null>(null)
 
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
-  const effectiveResource = resourceFromStore ?? resource
-  // Prefer store projection (updated on language switch) over possibly-stale props
+  const workspaceHelps = packageResources?.get(resource?.id || resource?.key || '')
+  const effectiveResource = workspaceHelps ?? resourceFromStore ?? resource
+  // Prefer workspace pointers (SoT) — AppStore projection can lag after Unlock 1.
   const wantLang = primaryLangCode(
     effectiveResource.language ||
       effectiveResource.languageCode ||
@@ -84,12 +87,13 @@ export function CombinedHelpsViewer({
       resource.languageCode ||
       ''
   )
-  const injectedTnKey = effectiveResource.helpsTnResourceKey
-  const injectedTwlKey = effectiveResource.helpsTwlResourceKey
+  const injectedTnKey = workspaceHelps?.helpsTnResourceKey ?? effectiveResource.helpsTnResourceKey
+  const injectedTwlKey = workspaceHelps?.helpsTwlResourceKey ?? effectiveResource.helpsTwlResourceKey
   const helpsScope: 'scripture' | 'obs' = effectiveResource.appliesToScope === 'obs' ? 'obs' : 'scripture'
 
   const { tnKey, twlKey } = useCombinedHelpsResources({
     loadedResources,
+    packageResources,
     wantLang,
     injectedTnKey,
     injectedTwlKey,

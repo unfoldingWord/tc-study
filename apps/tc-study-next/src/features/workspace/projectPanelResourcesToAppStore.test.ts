@@ -185,6 +185,33 @@ describe('projectPanelResourcesToAppStore', () => {
     expect(second['u/en/ult#2']).toBe(firstUlt2)
   })
 
+  test('projects CombinedHelps TN/TWL pointer updates after Unlock 1 strip', () => {
+    const combined = res({
+      key: '__combined-helps__',
+      type: 'combined-helps',
+      helpsTnResourceKey: 'u/en/tn',
+    })
+    const resources = new Map([[combined.key, combined]])
+    const panels = [{ resourceKeys: ['__combined-helps__'] }]
+
+    projectPanelResourcesToAppStore({ panels, resources })
+    expect(useAppStore.getState().loadedResources['__combined-helps__']?.helpsTwlResourceKey).toBeUndefined()
+
+    const withTwl = res({
+      key: '__combined-helps__',
+      type: 'combined-helps',
+      helpsTnResourceKey: 'u/en/tn',
+      helpsTwlResourceKey: 'u/en/twl',
+    })
+    projectPanelResourcesToAppStore({
+      panels,
+      resources: new Map([[withTwl.key, withTwl]]),
+    })
+    expect(useAppStore.getState().loadedResources['__combined-helps__']?.helpsTwlResourceKey).toBe(
+      'u/en/twl'
+    )
+  })
+
   test('projector preserves runtime toc on upsert', () => {
     const ult = res({ key: 'u/en/ult' })
     upsertLoadedResourceMembership({

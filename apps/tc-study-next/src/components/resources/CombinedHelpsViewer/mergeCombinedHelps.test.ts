@@ -141,6 +141,46 @@ describe('buildSortedMergedRows', () => {
   })
 })
 
+describe('Titus 1 CombinedHelps list (TN + TWL)', () => {
+  test('kindFilter all keeps notes and word links for the same passage', () => {
+    const notes = [
+      makeNote({ id: 'tn-intro', reference: '1:intro', quote: '', note: 'Chapter outline' }),
+      makeNote({ id: 'tn-paul', reference: '1:1', quote: 'Paul' }),
+    ]
+    const links = [
+      makeLink({
+        id: 'twl-faith',
+        reference: '1:1',
+        origWords: 'πίστιν',
+        twLink: 'rc://*/tw/dict/bible/kt/faith',
+        articlePath: 'bible/kt/faith',
+      }),
+      makeLink({
+        id: 'twl-christ',
+        reference: '1:1',
+        origWords: 'Χριστοῦ',
+        twLink: 'rc://*/tw/dict/bible/kt/christ',
+        articlePath: 'bible/kt/christ',
+      }),
+    ]
+
+    const rows = buildSortedMergedRows(notes, links, 'all')
+    expect(rows.some((r) => r.kind === 'tn')).toBe(true)
+    expect(rows.some((r) => r.kind === 'twl')).toBe(true)
+    expect(rows.filter((r) => r.kind === 'twl').map((r) => (r.kind === 'twl' ? r.link.id : ''))).toEqual([
+      'twl-faith',
+      'twl-christ',
+    ])
+
+    const groups = groupMergedRows(rows)
+    const verseOne = groups.find((g) => g.ref === '1:1')
+    expect(verseOne).toBeDefined()
+    expect(verseOne!.items.some((item) => item.kind === 'tn')).toBe(true)
+    expect(verseOne!.items.some((item) => item.kind === 'twl')).toBe(true)
+    expect(verseOne!.items.filter((item) => item.kind === 'twl')).toHaveLength(2)
+  })
+})
+
 describe('groupMergedRows', () => {
   test('groups consecutive rows with the same ref', () => {
     const rows = buildSortedMergedRows(
