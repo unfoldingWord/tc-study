@@ -313,6 +313,7 @@ export function TranslationNotesViewer({
         onEntryLinkClick={onEntryLinkClick}
         onQuoteClick={handleQuoteClick}
         onNoteSelect={handleNoteSelect}
+        tokenFilter={tokenFilter}
       />
     </div>
   )

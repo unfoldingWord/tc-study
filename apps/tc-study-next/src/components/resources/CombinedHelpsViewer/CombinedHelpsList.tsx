@@ -231,6 +231,7 @@ export function CombinedHelpsList({
                                 isLoadingTATitle={isLoadingTitle}
                                 getEntryTitle={getEntryTitle}
                                 obsMode={helpsScope === 'obs'}
+                                tokenFilter={tokenFilter}
                               />
                             </div>
                           )

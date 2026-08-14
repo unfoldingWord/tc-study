@@ -21,3 +21,7 @@ export const HELPS_CARD_IDLE =
 
 /** Selected: light yellow highlight wash + even border (no left bar / ring / blue or purple wash). */
 export const HELPS_CARD_SELECTED = 'bg-highlight/15 border-border'
+
+/** Filter-word mark inside quote chips — same dotted underline as scripture tokens. */
+export const HELPS_QUOTE_FILTER_MARK =
+  'underline decoration-dotted decoration-underline decoration-1 underline-offset-2'

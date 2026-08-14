@@ -14,6 +14,7 @@ import { parseTWLink } from '../../../../features/helps/quoteTokens'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
 import { HELPS_CARD_IDLE, HELPS_CARD_SELECTED } from '../../helpsCardStyles'
+import { QuotedFilterText } from '../../shared/QuotedFilterText'
 import type { TokenFilter, TranslationWordsLink } from '../types'
 
 interface AlignedToken {
@@ -51,7 +52,7 @@ export const WordLinkCard = memo(function WordLinkCard({
   twPreview = null,
   onTitleClick,
   onQuoteClick,
-  tokenFilter: _tokenFilter,
+  tokenFilter,
   targetResourceId,
   languageDirection = 'ltr',
   obsMode = false,
@@ -60,6 +61,7 @@ export const WordLinkCard = memo(function WordLinkCard({
   const isKeyTerm = twInfo.category === 'kt'
   const alignedTokens = (link as TranslationWordsLink & { alignedTokens?: AlignedToken[] }).alignedTokens
   const hasAlignedTokens = alignedTokens && alignedTokens.length > 0
+  const filterText = tokenFilter?.content ?? null
 
   // DCS abbreviation from AppStore (e.g. glt key → TPL); fall back to key segment
   const targetScripture = useAppStore((s) =>
@@ -102,7 +104,7 @@ export const WordLinkCard = memo(function WordLinkCard({
               {alignedTokens.map((token: AlignedToken, index: number) => (
                 <span key={token.semanticId || index}>
                   {index > 0 && ' '}
-                  {token.content}
+                  <QuotedFilterText quote={token.content} filterText={filterText} />
                 </span>
               ))}
               &rdquo;
@@ -129,7 +131,7 @@ export const WordLinkCard = memo(function WordLinkCard({
         >
           <div className="text-base leading-relaxed">
             <span className="italic text-fg-secondary">
-              &ldquo;{link.origWords}&rdquo;
+              &ldquo;<QuotedFilterText quote={link.origWords} filterText={filterText} />&rdquo;
             </span>
             {resourceAbbreviation && (
               <span className="ml-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
