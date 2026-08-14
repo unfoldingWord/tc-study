@@ -13,10 +13,10 @@ export type DividerCollapsedArrow = keyof typeof COLLAPSED_ARROWS
 /** Hit target stays inside overflow-hidden: expand inward when collapsed; never md:h-full + -translate-y-1/2. */
 function hitOverlayClass(collapsedArrow: DividerCollapsedArrow | null): string {
   const base = 'absolute touch-none'
-  if (collapsedArrow === 'left') return `${base} inset-y-0 right-0 w-4`
-  if (collapsedArrow === 'right') return `${base} inset-y-0 left-0 w-4`
-  if (collapsedArrow === 'up') return `${base} inset-x-0 bottom-0 h-4`
-  if (collapsedArrow === 'down') return `${base} inset-x-0 top-0 h-4`
+  if (collapsedArrow === 'left') return `${base} inset-y-0 right-0 w-3`
+  if (collapsedArrow === 'right') return `${base} inset-y-0 left-0 w-3`
+  if (collapsedArrow === 'up') return `${base} inset-x-0 bottom-0 h-3`
+  if (collapsedArrow === 'down') return `${base} inset-x-0 top-0 h-3`
   return `${base} left-0 w-full h-4 top-1/2 -translate-y-1/2 md:left-1/2 md:top-0 md:w-4 md:h-full md:-translate-x-1/2 md:translate-y-0`
 }
 
@@ -56,7 +56,7 @@ export function PanelResizeDivider({
   }, [collapsedArrow])
 
   const sizeClass = collapsedArrow
-    ? 'md:w-4 md:self-stretch md:h-auto w-full h-4'
+    ? 'md:w-3 md:self-stretch md:h-auto w-full h-3'
     : 'md:w-1.5 md:self-stretch md:h-auto w-full h-1.5'
 
   const barClass = `flex-shrink-0 min-w-0 min-h-0 border-0 p-0 appearance-none transition-colors relative z-10 flex items-center justify-center touch-none select-none overflow-visible ${
@@ -79,7 +79,7 @@ export function PanelResizeDivider({
         aria-label={label}
       >
         {hitOverlay}
-        <Arrow className="w-3 h-3 text-fg-muted pointer-events-none" />
+        <Arrow className="w-2.5 h-2.5 text-fg-muted pointer-events-none" />
       </button>
     )
   }
