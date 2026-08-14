@@ -13,6 +13,13 @@ import type { ReadLayoutMode } from './readPanelPersistence'
 export const COLLAPSE_THRESHOLD_PERCENT = 30
 /** Gain past the detent: small pane shrinks slower than the pointer (notch, not a wall). */
 export const DETENT_RESISTANCE = 0.3
+/**
+ * Container % past the 30/70 detent that commits collapse.
+ * Compared against the **pointer** (raw container %), not the displayed rubber-band,
+ * so reduced motion (no overshoot) still commits at the same travel.
+ * Displayed lag at commit is offset × DETENT_RESISTANCE (~1.5pp).
+ */
+export const DETENT_COMMIT_OFFSET_PERCENT = 5
 export const DEFAULT_SPLIT_PERCENT = 50
 export const NARROW_VIEWPORT_MQ = '(max-width: 767px)'
 
@@ -59,18 +66,49 @@ export function defaultLayoutForViewport(isNarrow: boolean, persisted?: ReadLayo
   return isNarrow ? 'one' : 'two'
 }
 
-/** Release: stay on the detent; collapse only after pushing into resistance. */
-export function collapseAfterDragEnd(pointerPercent: number): {
+/** Pointer crossed detent ± DETENT_COMMIT_OFFSET_PERCENT (25% / 75%). */
+export function collapseCommitPanelId(pointerPercent: number): ReadPanelId | null {
+  const pointer = clampPercent(pointerPercent)
+  if (pointer <= COLLAPSE_THRESHOLD_PERCENT - DETENT_COMMIT_OFFSET_PERCENT) {
+    return 'panel-1'
+  }
+  if (pointer >= 100 - COLLAPSE_THRESHOLD_PERCENT + DETENT_COMMIT_OFFSET_PERCENT) {
+    return 'panel-2'
+  }
+  return null
+}
+
+/**
+ * Mid-drag sample. Commit (end the pointer session, no pointer-up) once the
+ * pointer crosses the commit offset; otherwise keep live / detent / rubber-band.
+ */
+export function collapseDuringDrag(pointerPercent: number): {
   splitPercent: number
   collapsedPanelId: ReadPanelId | null
 } {
   const drag = displayedSplitFromPointer(pointerPercent)
-  if (drag.zone !== 'resistance') {
+  return {
+    splitPercent: drag.splitPercent,
+    collapsedPanelId: collapseCommitPanelId(pointerPercent),
+  }
+}
+
+/** Release: stay on the detent unless the pointer reached the commit offset. */
+export function collapseAfterDragEnd(pointerPercent: number): {
+  splitPercent: number
+  collapsedPanelId: ReadPanelId | null
+} {
+  const collapsedPanelId = collapseCommitPanelId(pointerPercent)
+  const drag = displayedSplitFromPointer(pointerPercent)
+  if (collapsedPanelId) {
+    return { splitPercent: drag.splitPercent, collapsedPanelId }
+  }
+  if (drag.zone === 'live') {
     return { splitPercent: drag.splitPercent, collapsedPanelId: null }
   }
-  const collapsedPanelId: ReadPanelId =
-    pointerPercent <= 50 ? 'panel-1' : 'panel-2'
-  return { splitPercent: drag.splitPercent, collapsedPanelId }
+  const detent =
+    pointerPercent <= 50 ? COLLAPSE_THRESHOLD_PERCENT : 100 - COLLAPSE_THRESHOLD_PERCENT
+  return { splitPercent: detent, collapsedPanelId: null }
 }
 
 export function restoredSplitPercent(previous: number | null | undefined): number {

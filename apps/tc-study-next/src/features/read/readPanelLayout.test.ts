@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
   collapseAfterDragEnd,
+  collapseCommitPanelId,
+  collapseDuringDrag,
   collapsedDividerArrowDir,
   COLLAPSE_MOTION_EASING,
   COLLAPSE_MOTION_MS,
@@ -8,6 +10,7 @@ import {
   collapseEase,
   collapseTweenRange,
   defaultLayoutForViewport,
+  DETENT_COMMIT_OFFSET_PERCENT,
   DETENT_RESISTANCE,
   displayedSplitFromPointer,
   dividerCollapsedPanelId,
@@ -93,7 +96,8 @@ describe('readPanelLayout', () => {
     })
   })
 
-  test('release on the detent stays; release past the detent collapses', () => {
+  test('release on the detent stays; release past detent+offset collapses', () => {
+    expect(DETENT_COMMIT_OFFSET_PERCENT).toBe(5)
     expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT)).toEqual({
       splitPercent: COLLAPSE_THRESHOLD_PERCENT,
       collapsedPanelId: null,
@@ -105,6 +109,15 @@ describe('readPanelLayout', () => {
     expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT + 1).collapsedPanelId).toBeNull()
     expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT - 1).collapsedPanelId).toBeNull()
     expect(collapseAfterDragEnd(50).collapsedPanelId).toBeNull()
+    // Rubber-band past the detent but short of the commit offset: snap back.
+    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT - 1)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT,
+      collapsedPanelId: null,
+    })
+    expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT + 1)).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT,
+      collapsedPanelId: null,
+    })
 
     const left = collapseAfterDragEnd(20)
     expect(left.collapsedPanelId).toBe('panel-1')
@@ -114,6 +127,34 @@ describe('readPanelLayout', () => {
     expect(right.collapsedPanelId).toBe('panel-2')
     expect(right.splitPercent).toBe(displayedSplitFromPointer(80).splitPercent)
     expect(collapseAfterDragEnd(10).collapsedPanelId).not.toBe(collapseAfterDragEnd(90).collapsedPanelId)
+  })
+
+  test('drag past detent+offset collapses without a release event', () => {
+    const low = COLLAPSE_THRESHOLD_PERCENT - DETENT_COMMIT_OFFSET_PERCENT
+    const high = 100 - COLLAPSE_THRESHOLD_PERCENT + DETENT_COMMIT_OFFSET_PERCENT
+    expect(low).toBe(25)
+    expect(high).toBe(75)
+
+    expect(collapseCommitPanelId(COLLAPSE_THRESHOLD_PERCENT)).toBeNull()
+    expect(collapseCommitPanelId(low + 1)).toBeNull()
+    expect(collapseCommitPanelId(high - 1)).toBeNull()
+    expect(collapseDuringDrag(low + 1).collapsedPanelId).toBeNull()
+    expect(collapseDuringDrag(high - 1).collapsedPanelId).toBeNull()
+    expect(collapseDuringDrag(COLLAPSE_THRESHOLD_PERCENT).collapsedPanelId).toBeNull()
+
+    const left = collapseDuringDrag(low)
+    expect(left.collapsedPanelId).toBe('panel-1')
+    expect(left.splitPercent).toBe(displayedSplitFromPointer(low).splitPercent)
+    expect(collapseCommitPanelId(low)).toBe('panel-1')
+    expect(collapseCommitPanelId(low - 1)).toBe('panel-1')
+
+    const right = collapseDuringDrag(high)
+    expect(right.collapsedPanelId).toBe('panel-2')
+    expect(right.splitPercent).toBe(displayedSplitFromPointer(high).splitPercent)
+    expect(collapseCommitPanelId(high)).toBe('panel-2')
+
+    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT).collapsedPanelId).toBeNull()
+    expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT).collapsedPanelId).toBeNull()
   })
 
   test('click restore uses previous split or 50% and clears collapse', () => {

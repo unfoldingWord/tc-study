@@ -11,6 +11,10 @@ const hookSrc = readFileSync(
   join(import.meta.dir, '../../features/read/useReadPanelLayout.ts'),
   'utf8'
 )
+const resizeHookSrc = readFileSync(
+  join(import.meta.dir, '../../features/read/useReadPanelResize.ts'),
+  'utf8'
+)
 const collapseHookSrc = readFileSync(
   join(import.meta.dir, '../../features/read/useReadPanelCollapse.ts'),
   'utf8'
@@ -86,6 +90,16 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(hookSrc).toContain('displayedSplitFromPointer')
     expect(hookSrc).toContain('prefersReducedMotion')
     expect(hookSrc).toContain('edgeSplitPercent')
+    expect(resizeHookSrc).toContain('collapseDuringDrag')
+    expect(resizeHookSrc).toContain('draggingRef')
+    const handleMove = resizeHookSrc.slice(
+      resizeHookSrc.indexOf('const handleMove'),
+      resizeHookSrc.indexOf('const handleMouseMove')
+    )
+    expect(handleMove).toContain('collapseDuringDrag')
+    expect(handleMove).toContain('endResize')
+    expect(handleMove).not.toContain('mouseup')
+    expect(handleMove).not.toContain('touchend')
     expect(areaSrc).not.toContain('useReadPanelCollapse')
     expect(areaSrc).not.toContain('styleFor')
     expect(areaSrc).not.toContain('layoutCollapsedPanelId')

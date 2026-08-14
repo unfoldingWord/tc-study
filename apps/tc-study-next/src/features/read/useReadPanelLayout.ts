@@ -1,6 +1,8 @@
 /**
  * Resize + collapse-to-divider. Live drag snaps at the 30/70 detent with
- * resistance past it; collapse commits on release past the detent.
+ * resistance past it; collapse commits during drag once the pointer crosses
+ * detent + DETENT_COMMIT_OFFSET (or on release if already past that offset).
+ * Release on the detent stays at 30/70.
  */
 
 import { useCallback, useEffect, useRef } from 'react'
