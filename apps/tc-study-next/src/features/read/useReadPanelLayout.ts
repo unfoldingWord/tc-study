@@ -1,17 +1,18 @@
 /**
- * Resize + collapse-to-divider. Collapse commits on drag end (no flicker mid-drag).
- * Snap / restore tween splitPercent like a continued divider drag.
+ * Resize + collapse-to-divider. Live drag snaps at the 30/70 detent with
+ * resistance past it; collapse commits on release past the detent.
  */
 
 import { useCallback, useEffect, useRef } from 'react'
 import {
   collapseAfterDragEnd,
   collapseTweenRange,
+  displayedSplitFromPointer,
   edgeSplitPercent,
   layoutRestoreTweenRange,
   restoreCollapsedDivider,
 } from './readPanelLayout'
-import { useReadPanelCollapse } from './useReadPanelCollapse'
+import { prefersReducedMotion, useReadPanelCollapse } from './useReadPanelCollapse'
 import { useReadPanelResize } from './useReadPanelResize'
 import { useReadPanelStore } from './readPanelStore'
 
@@ -39,7 +40,7 @@ export function useReadPanelLayout() {
     const result = collapseAfterDragEnd(panel1Width)
     if (result.collapsedPanelId) {
       previousSplitRef.current = splitPercent
-      const { from, to } = collapseTweenRange(result.collapsedPanelId, panel1Width)
+      const { from, to } = collapseTweenRange(result.collapsedPanelId, result.splitPercent)
       runTween(from, to, () => {
         setSplitPercent(to)
         setCollapsedPanelId(result.collapsedPanelId)
@@ -76,7 +77,8 @@ export function useReadPanelLayout() {
   }, [collapsedPanelId, expandPanel, layout, runTween, setLayout, setSplitPercent])
 
   const displayWidth = isResizingPanels
-    ? panel1Width
+    ? displayedSplitFromPointer(panel1Width, { reducedMotion: prefersReducedMotion() })
+        .splitPercent
     : tweenPercent !== null
       ? tweenPercent
       : collapsedPanelId

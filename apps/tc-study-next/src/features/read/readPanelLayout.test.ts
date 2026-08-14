@@ -8,6 +8,8 @@ import {
   collapseEase,
   collapseTweenRange,
   defaultLayoutForViewport,
+  DETENT_RESISTANCE,
+  displayedSplitFromPointer,
   dividerCollapsedPanelId,
   edgeSplitPercent,
   isPanelOffFlow,
@@ -28,21 +30,89 @@ describe('readPanelLayout', () => {
     expect(defaultLayoutForViewport(true, 'two', false)).toBe('one')
   })
 
-  test('drag past min width collapses the smaller panel', () => {
+  test('live drag matches the pointer until the 30/70 detent', () => {
     expect(COLLAPSE_THRESHOLD_PERCENT).toBe(30)
-    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT).collapsedPanelId).toBe('panel-1')
-    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT - 1).collapsedPanelId).toBe('panel-1')
-    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT + 1).collapsedPanelId).toBeNull()
-    expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT).collapsedPanelId).toBe('panel-2')
-    expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT + 1).collapsedPanelId).toBe('panel-2')
-    expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT - 1).collapsedPanelId).toBeNull()
-    expect(collapseAfterDragEnd(50).collapsedPanelId).toBeNull()
+    expect(DETENT_RESISTANCE).toBeGreaterThanOrEqual(0.25)
+    expect(DETENT_RESISTANCE).toBeLessThanOrEqual(0.35)
+    expect(displayedSplitFromPointer(50)).toEqual({ splitPercent: 50, zone: 'live' })
+    expect(displayedSplitFromPointer(COLLAPSE_THRESHOLD_PERCENT + 1)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT + 1,
+      zone: 'live',
+    })
+    expect(displayedSplitFromPointer(100 - COLLAPSE_THRESHOLD_PERCENT - 1)).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT - 1,
+      zone: 'live',
+    })
   })
 
-  test('when both panes meet the threshold, still collapse only the smaller one', () => {
-    // Shares always sum to 100, so both ≤30% cannot happen. Equal shares collapse panel-1.
-    expect(collapseAfterDragEnd(20).collapsedPanelId).toBe('panel-1')
-    expect(collapseAfterDragEnd(80).collapsedPanelId).toBe('panel-2')
+  test('snap sticks visually at the 30% / 70% detent', () => {
+    expect(displayedSplitFromPointer(COLLAPSE_THRESHOLD_PERCENT)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'detent',
+    })
+    expect(displayedSplitFromPointer(100 - COLLAPSE_THRESHOLD_PERCENT)).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'detent',
+    })
+  })
+
+  test('resistance past the detent shrinks the small pane slower than the pointer', () => {
+    const left = displayedSplitFromPointer(20)
+    expect(left.zone).toBe('resistance')
+    expect(left.splitPercent).toBe(
+      COLLAPSE_THRESHOLD_PERCENT - (COLLAPSE_THRESHOLD_PERCENT - 20) * DETENT_RESISTANCE
+    )
+    expect(left.splitPercent).toBeGreaterThan(20)
+    expect(left.splitPercent).toBeLessThan(COLLAPSE_THRESHOLD_PERCENT)
+
+    const right = displayedSplitFromPointer(80)
+    expect(right.zone).toBe('resistance')
+    expect(right.splitPercent).toBe(
+      100 - COLLAPSE_THRESHOLD_PERCENT + (80 - (100 - COLLAPSE_THRESHOLD_PERCENT)) * DETENT_RESISTANCE
+    )
+    expect(right.splitPercent).toBeLessThan(80)
+    expect(right.splitPercent).toBeGreaterThan(100 - COLLAPSE_THRESHOLD_PERCENT)
+
+    const nearer = displayedSplitFromPointer(20).splitPercent
+    const farther = displayedSplitFromPointer(10).splitPercent
+    expect(nearer - farther).toBeCloseTo(10 * DETENT_RESISTANCE)
+  })
+
+  test('reduced motion skips rubber-band but still marks resistance past the detent', () => {
+    expect(displayedSplitFromPointer(20, { reducedMotion: true })).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'resistance',
+    })
+    expect(displayedSplitFromPointer(80, { reducedMotion: true })).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT,
+      zone: 'resistance',
+    })
+    expect(displayedSplitFromPointer(50, { reducedMotion: true })).toEqual({
+      splitPercent: 50,
+      zone: 'live',
+    })
+  })
+
+  test('release on the detent stays; release past the detent collapses', () => {
+    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT)).toEqual({
+      splitPercent: COLLAPSE_THRESHOLD_PERCENT,
+      collapsedPanelId: null,
+    })
+    expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT)).toEqual({
+      splitPercent: 100 - COLLAPSE_THRESHOLD_PERCENT,
+      collapsedPanelId: null,
+    })
+    expect(collapseAfterDragEnd(COLLAPSE_THRESHOLD_PERCENT + 1).collapsedPanelId).toBeNull()
+    expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT - 1).collapsedPanelId).toBeNull()
+    expect(collapseAfterDragEnd(50).collapsedPanelId).toBeNull()
+
+    const left = collapseAfterDragEnd(20)
+    expect(left.collapsedPanelId).toBe('panel-1')
+    expect(left.splitPercent).toBe(displayedSplitFromPointer(20).splitPercent)
+
+    const right = collapseAfterDragEnd(80)
+    expect(right.collapsedPanelId).toBe('panel-2')
+    expect(right.splitPercent).toBe(displayedSplitFromPointer(80).splitPercent)
     expect(collapseAfterDragEnd(10).collapsedPanelId).not.toBe(collapseAfterDragEnd(90).collapsedPanelId)
   })
 

@@ -1,12 +1,13 @@
 /**
  * Tween splitPercent to the edge (collapse) or back (restore) — same flex
  * resize as live divider drag. Never translate panes. Never tween during drag.
+ * Reduced motion skips the tween (and the live rubber-band in the layout hook).
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { COLLAPSE_MOTION_MS, tweenSplitAt } from './readPanelLayout'
 
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   return (
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches

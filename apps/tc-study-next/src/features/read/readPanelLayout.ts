@@ -9,32 +9,68 @@ import type { CSSProperties } from 'react'
 import type { ReadPanelId } from './readPanelModel'
 import type { ReadLayoutMode } from './readPanelPersistence'
 
-/** Pane share of the panels container at or below which drag-end snaps to collapse. */
+/** Pane share of the panels container that is the magnetic collapse detent. */
 export const COLLAPSE_THRESHOLD_PERCENT = 30
+/** Gain past the detent: small pane shrinks slower than the pointer (notch, not a wall). */
+export const DETENT_RESISTANCE = 0.3
 export const DEFAULT_SPLIT_PERCENT = 50
 export const NARROW_VIEWPORT_MQ = '(max-width: 767px)'
 
 export type CollapsedDividerArrow = 'left' | 'right' | 'up' | 'down'
+export type DragSplitZone = 'live' | 'detent' | 'resistance'
+
+function clampPercent(percent: number): number {
+  return Math.max(0, Math.min(100, percent))
+}
+
+/**
+ * Pointer % → displayed split. Live until 30/70, snap on the detent, then
+ * resistance past it. Reduced motion keeps the snap and skips the rubber-band.
+ */
+export function displayedSplitFromPointer(
+  pointerPercent: number,
+  options?: { reducedMotion?: boolean }
+): { splitPercent: number; zone: DragSplitZone } {
+  const pointer = clampPercent(pointerPercent)
+  const low = COLLAPSE_THRESHOLD_PERCENT
+  const high = 100 - COLLAPSE_THRESHOLD_PERCENT
+  if (pointer > low && pointer < high) {
+    return { splitPercent: pointer, zone: 'live' }
+  }
+  if (pointer === low || pointer === high) {
+    return { splitPercent: pointer, zone: 'detent' }
+  }
+  if (pointer < low) {
+    const overshoot = low - pointer
+    return {
+      splitPercent: options?.reducedMotion ? low : low - overshoot * DETENT_RESISTANCE,
+      zone: 'resistance',
+    }
+  }
+  const overshoot = pointer - high
+  return {
+    splitPercent: options?.reducedMotion ? high : high + overshoot * DETENT_RESISTANCE,
+    zone: 'resistance',
+  }
+}
 
 export function defaultLayoutForViewport(isNarrow: boolean, persisted?: ReadLayoutMode, userChosen?: boolean): ReadLayoutMode {
   if (userChosen && persisted) return persisted
   return isNarrow ? 'one' : 'two'
 }
 
-export function collapseAfterDragEnd(percent: number): {
+/** Release: stay on the detent; collapse only after pushing into resistance. */
+export function collapseAfterDragEnd(pointerPercent: number): {
   splitPercent: number
   collapsedPanelId: ReadPanelId | null
 } {
-  const panel1Share = percent
-  const panel2Share = 100 - percent
-  const panel1TooSmall = panel1Share <= COLLAPSE_THRESHOLD_PERCENT
-  const panel2TooSmall = panel2Share <= COLLAPSE_THRESHOLD_PERCENT
-  if (!panel1TooSmall && !panel2TooSmall) {
-    return { splitPercent: percent, collapsedPanelId: null }
+  const drag = displayedSplitFromPointer(pointerPercent)
+  if (drag.zone !== 'resistance') {
+    return { splitPercent: drag.splitPercent, collapsedPanelId: null }
   }
-  // Collapse only the smaller pane (even if both somehow meet the threshold).
-  const collapsedPanelId: ReadPanelId = panel1Share <= panel2Share ? 'panel-1' : 'panel-2'
-  return { splitPercent: percent, collapsedPanelId }
+  const collapsedPanelId: ReadPanelId =
+    pointerPercent <= 50 ? 'panel-1' : 'panel-2'
+  return { splitPercent: drag.splitPercent, collapsedPanelId }
 }
 
 export function restoredSplitPercent(previous: number | null | undefined): number {
