@@ -8,6 +8,7 @@
  */
 
 import { inferDoor43ResourceTypeId } from '@bt-synergy/resource-catalog'
+import { readResponseArrayBufferWithProgress } from './readResponseArrayBufferWithProgress'
 
 // ============================================================================
 // UTILITIES
@@ -1456,16 +1457,18 @@ export class Door43ApiClient {
 
   /**
    * Download repository archive (zipball) for a specific ref (tag, branch, or commit SHA)
-   * 
+   *
    * @param owner - Repository owner
    * @param repo - Repository name
    * @param ref - Git reference (tag, branch, or commit SHA) - default: 'master'
+   * @param onProgress - Optional byte-level progress (avoids silent multi-minute 0% UI)
    * @returns ArrayBuffer containing the zip file data
    */
   async downloadZipball(
     owner: string,
     repo: string,
-    ref: string = 'master'
+    ref: string = 'master',
+    onProgress?: (progress: { loaded: number; total: number; percentage: number }) => void
   ): Promise<ArrayBuffer> {
     if (!owner || !repo || !ref) {
       throw this.createError('Missing required parameters for zipball download', 'INVALID_PARAM');
@@ -1473,10 +1476,16 @@ export class Door43ApiClient {
 
     // Gitea archive endpoint: /api/v1/repos/{owner}/{repo}/archive/{ref}.zip
     const url = `${this.config.baseUrl}/api/v1/repos/${owner}/${repo}/archive/${encodeURIComponent(ref)}.zip`;
-    
+
     const authHeaders = this.getAuthHeaders();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
+    // Zipballs are large; use an idle timeout that resets as bytes arrive.
+    const idleMs = Math.max(this.config.timeout || 30000, 120000);
+    let timeoutId = setTimeout(() => controller.abort(), idleMs);
+    const bumpIdleTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => controller.abort(), idleMs);
+    };
 
     if (this.config.debug) {
       console.log(`📦 Downloading zipball for ${owner}/${repo}@${ref}`);
@@ -1493,9 +1502,10 @@ export class Door43ApiClient {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
+      bumpIdleTimeout();
 
       if (!response.ok) {
+        clearTimeout(timeoutId);
         const errorText = await response.text().catch(() => '');
         if (this.config.debug) {
           console.log(`❌ Zipball download failed: ${response.status}`);
@@ -1508,8 +1518,13 @@ export class Door43ApiClient {
         );
       }
 
-      const arrayBuffer = await response.arrayBuffer();
-      
+      const arrayBuffer = await readResponseArrayBufferWithProgress(
+        response,
+        onProgress,
+        bumpIdleTimeout
+      );
+      clearTimeout(timeoutId);
+
       if (this.config.debug) {
         const sizeMB = (arrayBuffer.byteLength / (1024 * 1024)).toFixed(2);
         console.log(`✅ Downloaded zipball: ${sizeMB} MB`);

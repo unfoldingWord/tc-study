@@ -18,6 +18,33 @@ export function shouldAcceptWorkerMessage(
 }
 
 /**
+ * Map a loader progress callback into completed ingredients for the current resource.
+ * Uses a peak so zip-byte soft progress (percentage) does not regress when extraction
+ * starts reporting low ingredient loaded counts.
+ */
+export function advanceResourceIngredientProgress(
+  ingredientsCount: number,
+  peakCompleted: number,
+  progress: { loaded?: number; total?: number; percentage?: number }
+): number {
+  let fromCallback = 0
+  if (
+    progress.loaded !== undefined &&
+    progress.total !== undefined &&
+    progress.total > 0
+  ) {
+    fromCallback = Math.floor((progress.loaded / progress.total) * ingredientsCount)
+  }
+  if (typeof progress.percentage === 'number' && progress.percentage > 0) {
+    fromCallback = Math.max(
+      fromCallback,
+      Math.floor((progress.percentage / 100) * ingredientsCount)
+    )
+  }
+  return Math.max(peakCompleted, fromCallback)
+}
+
+/**
  * Per-resource wall clock. Zipball fetch only times out until headers arrive;
  * a stalled body (0-byte / hung arrayBuffer) never resolves and would freeze
  * the sequential worker at the last overall % (often a low single digit).
