@@ -105,7 +105,7 @@ export function SimplifiedReadView({
       typeof resourceTypeRegistry.getSupportedSubjects === 'function'
         ? resourceTypeRegistry.getSupportedSubjects()
         : [],
-    []
+    [resourceTypeRegistry]
   )
   const panel1Mismatch = useMemo(() => {
     if (panels['panel-1'].mode !== 'scripture' || !panels['panel-1'].languageCode) return null
