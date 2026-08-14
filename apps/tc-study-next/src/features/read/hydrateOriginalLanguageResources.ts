@@ -12,6 +12,10 @@ import {
   type Door43Resource,
 } from '../../lib/services/ResourceMetadataFactory'
 import { useNavigationStore } from '../nav/navigationStore'
+import {
+  loadedResourcesForCatalogKey,
+  mergeCatalogMetadataOntoLoaded,
+} from './hydrateReadCatalogMetadata'
 import { originalLanguageSpecForBook, type OriginalLanguageSpec } from './originalLanguageForBook'
 import { syncOriginalLanguageOnScripturePanels } from './originalLanguagePanelMembership'
 import type { ReadPanelId } from './readPanelModel'
@@ -29,9 +33,9 @@ function metadataForSpec(
   orig: OriginalLanguageSpec,
   catalogManager: CatalogManager,
   resourceTypeRegistry: ResourceTypeRegistry
-): Promise<ResourceInfo | null> {
+): Promise<ResourceInfo[]> {
   const resourceKey = `unfoldingWord/${orig.lang}/${orig.id}`
-  return (async (): Promise<ResourceInfo | null> => {
+  return (async (): Promise<ResourceInfo[]> => {
     try {
       const catalogEntry = await (
         catalogManager.catalogAdapter as { get: (k: string) => Promise<unknown> }
@@ -66,28 +70,22 @@ function metadataForSpec(
 
           await catalogManager.addResourceToCatalog(metadata)
 
-          const existingResource = useAppStore.getState().loadedResources[resourceKey]
-          if (existingResource) {
-            return {
-              ...existingResource,
-              ...metadata,
-              id: existingResource.id,
-              key: existingResource.key,
-              toc: existingResource.toc,
-            }
-          }
+          return loadedResourcesForCatalogKey(
+            useAppStore.getState().loadedResources,
+            resourceKey
+          ).map((existing) => mergeCatalogMetadataOntoLoaded(existing, metadata as ResourceInfo))
         }
       }
     } catch (error) {
       console.warn(`⚠️ Failed to load metadata for ${resourceKey}:`, error)
     }
-    return null
+    return []
   })()
 }
 
 export function hydrateOriginalLanguageResources(deps: HydrateOriginalLanguageDeps): {
   loadedKeys: string[]
-  metadataPromises: Array<Promise<ResourceInfo | null>>
+  metadataPromises: Array<Promise<ResourceInfo[]>>
 } {
   const currentBook =
     deps.currentBook ?? useNavigationStore.getState().currentReference.book ?? ''

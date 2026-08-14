@@ -14,6 +14,35 @@ import { panelAssignmentForContentRole, type CatalogLoadTarget } from './readCat
 import type { ReadPanelId } from './readPanelModel'
 import { asString, catalogIdentity, type CatalogEntry } from './readCatalogIdentity'
 
+/** AppStore keys are instance ids (`glt#2`); catalog writes use the base key. */
+export function loadedResourcesForCatalogKey(
+  loaded: Record<string, ResourceInfo | undefined>,
+  resourceKey: string
+): ResourceInfo[] {
+  const base = resourceKey.replace(/#\d+$/, '')
+  const found: ResourceInfo[] = []
+  for (const [id, resource] of Object.entries(loaded)) {
+    if (!resource) continue
+    if (id === resourceKey || id.replace(/#\d+$/, '') === base) {
+      found.push(resource)
+    }
+  }
+  return found
+}
+
+export function mergeCatalogMetadataOntoLoaded(
+  existing: ResourceInfo,
+  metadata: ResourceInfo
+): ResourceInfo {
+  return {
+    ...existing,
+    ...metadata,
+    id: existing.id,
+    key: existing.key,
+    toc: existing.toc,
+  }
+}
+
 export function collectCatalogMetadataPromises(options: {
   catalogResults: CatalogEntry[]
   languageCode: string
@@ -22,7 +51,7 @@ export function collectCatalogMetadataPromises(options: {
   catalogManager: CatalogManager
   resourceTypeRegistry: ResourceTypeRegistry
   viewerRegistry: { hasViewer: (typeId: string) => boolean }
-}): Array<Promise<ResourceInfo | null>> {
+}): Array<Promise<ResourceInfo[]>> {
   const {
     catalogResults,
     languageCode,
@@ -33,12 +62,12 @@ export function collectCatalogMetadataPromises(options: {
     viewerRegistry,
   } = options
 
-  return catalogResults.map(async (entry): Promise<ResourceInfo | null> => {
+  return catalogResults.map(async (entry): Promise<ResourceInfo[]> => {
     const id = catalogIdentity(entry, languageCode)
-    if (!id) return null
+    if (!id) return []
     const { item, ownerStr, langStr, resourceId, resourceKey, subject, repoName } = id
     const type = resourceTypeRegistry.getTypeForSubject(subject)
-    if (!type) return null
+    if (!type) return []
 
     const typeDef = resourceTypeRegistry.get(type)
     const hasViewer = viewerRegistry.hasViewer(type)
@@ -48,10 +77,10 @@ export function collectCatalogMetadataPromises(options: {
       hasViewer,
       destPanelId
     )
-    if (assignment.kind === 'skip') return null
+    if (assignment.kind === 'skip') return []
 
     const release = item.release ?? item.catalog?.prod
-    if (!release?.tag_name) return null
+    if (!release?.tag_name) return []
 
     try {
       const abbreviation = asString(item.abbreviation).trim() || undefined
@@ -84,20 +113,13 @@ export function collectCatalogMetadataPromises(options: {
 
       await catalogManager.addResourceToCatalog(metadata)
 
-      const existingResource = useAppStore.getState().loadedResources[resourceKey]
-      if (existingResource) {
-        return {
-          ...existingResource,
-          ...metadata,
-          id: existingResource.id,
-          key: existingResource.key,
-          toc: existingResource.toc,
-        }
-      }
-      return null
+      return loadedResourcesForCatalogKey(
+        useAppStore.getState().loadedResources,
+        resourceKey
+      ).map((existing) => mergeCatalogMetadataOntoLoaded(existing, metadata as ResourceInfo))
     } catch (error) {
       console.warn(`⚠️ Failed to load metadata for ${resourceKey}:`, error)
-      return null
+      return []
     }
   })
 }

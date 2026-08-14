@@ -137,7 +137,7 @@ export async function loadReadLanguageCatalog(
       : catalogTargetsForLoad({ textLanguageCode, helpsLanguageCode, loadTarget })
   const nextTextKeys: string[] = []
   const nextHelpsKeys: string[] = []
-  const metadataPromises: Array<Promise<ResourceInfo | null>> = []
+  const metadataPromises: Array<Promise<ResourceInfo[]>> = []
 
   const searchPages = await Promise.all(
     searches.map(async (search) => ({
@@ -235,8 +235,8 @@ export async function loadReadLanguageCatalog(
   void Promise.allSettled(metadataPromises).then(async (results) => {
     const toAdd: ResourceInfo[] = []
     for (const result of results) {
-      if (result.status === 'fulfilled' && result.value) {
-        toAdd.push(result.value)
+      if (result.status === 'fulfilled') {
+        toAdd.push(...result.value)
       }
     }
     if (toAdd.length > 0) {
