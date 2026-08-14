@@ -127,62 +127,64 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
         infoResource={resource}
       />
       <div className="flex-1 min-h-0 overflow-auto p-content-lg bg-scripture text-scripture-fg">
-        {loading && (
-          <LoadingSpinner
-            centered
-            label={isRange ? 'Loading stories' : 'Loading story'}
-            className="text-accent"
-            containerClassName="h-40"
-          />
-        )}
-        {error && !loading && (
-          <div className="rounded-lg border border-danger bg-danger-soft text-danger text-sm p-4">
-            {error}
-          </div>
-        )}
-        {!loading && !error && currentRef.book !== 'obs' && (
-          <p className="text-scripture-muted text-sm">
-            Switch the navigation scope to <strong>Open Bible Stories</strong> and pick a story,
-            or use the Bible / OBS tab in the book navigator.
-          </p>
-        )}
+        <div className="max-w-3xl mx-auto w-full">
+          {loading && (
+            <LoadingSpinner
+              centered
+              label={isRange ? 'Loading stories' : 'Loading story'}
+              className="text-accent"
+              containerClassName="h-40"
+            />
+          )}
+          {error && !loading && (
+            <div className="rounded-lg border border-danger bg-danger-soft text-danger text-sm p-4">
+              {error}
+            </div>
+          )}
+          {!loading && !error && currentRef.book !== 'obs' && (
+            <p className="text-scripture-muted text-sm">
+              Switch the navigation scope to <strong>Open Bible Stories</strong> and pick a story,
+              or use the Bible / OBS tab in the book navigator.
+            </p>
+          )}
 
-        {!loading && !error && currentRef.book === 'obs' && isRange && (
-          <ObsRangeView
-            storyNum={storyNum}
-            endStory={endStory}
-            frameNum={frameNum}
-            endFrame={endFrame}
-            isStoryMode={isStoryMode}
-            storyMap={storyMap}
-            isPanel2QuoteCapable={isPanel2QuoteCapable}
-            obsQuotesState={obsQuotesState}
-            activeHighlight={activeHighlight}
-            activateWordSpan={activateWordSpan}
-            toggleRangeHighlight={toggleRangeHighlight}
-          />
-        )}
+          {!loading && !error && currentRef.book === 'obs' && isRange && (
+            <ObsRangeView
+              storyNum={storyNum}
+              endStory={endStory}
+              frameNum={frameNum}
+              endFrame={endFrame}
+              isStoryMode={isStoryMode}
+              storyMap={storyMap}
+              isPanel2QuoteCapable={isPanel2QuoteCapable}
+              obsQuotesState={obsQuotesState}
+              activeHighlight={activeHighlight}
+              activateWordSpan={activateWordSpan}
+              toggleRangeHighlight={toggleRangeHighlight}
+            />
+          )}
 
-        {!loading && !error && currentRef.book === 'obs' && !isRange && currentFrame && (
-          <ObsSingleFrameView
-            currentFrame={currentFrame}
-            spans={spans}
-            enrichedQuotes={enrichedQuotes}
-            activeHighlight={activeHighlight}
-            frameNum={frameNum}
-            storyNum={storyNum}
-            useWordUnderline={useWordUnderline}
-            frameTextRef={frameTextRef}
-            activateWordSpan={activateWordSpan}
-            toggleHighlightEntry={toggleHighlightEntry}
-          />
-        )}
+          {!loading && !error && currentRef.book === 'obs' && !isRange && currentFrame && (
+            <ObsSingleFrameView
+              currentFrame={currentFrame}
+              spans={spans}
+              enrichedQuotes={enrichedQuotes}
+              activeHighlight={activeHighlight}
+              frameNum={frameNum}
+              storyNum={storyNum}
+              useWordUnderline={useWordUnderline}
+              frameTextRef={frameTextRef}
+              activateWordSpan={activateWordSpan}
+              toggleHighlightEntry={toggleHighlightEntry}
+            />
+          )}
 
-        {!loading && !error && currentRef.book === 'obs' && !isRange && story && !currentFrame && (
-          <p className="text-scripture-muted text-sm">
-            No frame {frameNum} in this story (try another frame).
-          </p>
-        )}
+          {!loading && !error && currentRef.book === 'obs' && !isRange && story && !currentFrame && (
+            <p className="text-scripture-muted text-sm">
+              No frame {frameNum} in this story (try another frame).
+            </p>
+          )}
+        </div>
       </div>
     </div>
   )

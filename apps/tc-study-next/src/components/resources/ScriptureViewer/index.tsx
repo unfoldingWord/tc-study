@@ -186,7 +186,7 @@ export function ScriptureViewer({
         }}
       >
         {/* Content - scrolling handled by parent container */}
-        <div className="flex-1">
+        <div className="flex-1 max-w-3xl mx-auto w-full">
           <ScriptureContent
           isLoading={isLoading}
           isLoadingTOC={isLoadingTOC}
