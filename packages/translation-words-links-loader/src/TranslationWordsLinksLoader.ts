@@ -390,7 +390,7 @@ export class TranslationWordsLinksLoader implements ResourceLoader {
       repoName,
       ref,
       onProgress
-        ? (p) => {
+        ? (p: { percentage: number }) => {
             onProgress({
               loaded: 0,
               total: ingredients.length,
