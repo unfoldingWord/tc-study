@@ -17,6 +17,9 @@ export function shouldAcceptWorkerMessage(
   )
 }
 
+/** Badge floor while a run is queued/fetching so 0% never sticks. */
+export const STARTING_PROGRESS_PERCENT = 1
+
 /**
  * Map a loader progress callback into completed ingredients for the current resource.
  * Uses a peak so zip-byte soft progress (percentage) does not regress when extraction
@@ -42,6 +45,54 @@ export function advanceResourceIngredientProgress(
     )
   }
   return Math.max(peakCompleted, fromCallback)
+}
+
+/**
+ * Overall % while a resource is in flight. Zip-byte percentages are often too
+ * small to floor into an ingredient count, so the indicator would stay at 0/N
+ * unless we also scale the current resource's fetch % into the run total.
+ */
+export function computeInFlightOverallProgress(input: {
+  completedIngredients: number
+  totalIngredients: number
+  currentResourceIngredients: number
+  currentResourcePercent?: number
+}): number {
+  const total = input.totalIngredients
+  if (total <= 0) return STARTING_PROGRESS_PERCENT
+  const fromCompleted = (input.completedIngredients / total) * 100
+  const share = input.currentResourceIngredients / total
+  const fromCurrent =
+    typeof input.currentResourcePercent === 'number' && input.currentResourcePercent > 0
+      ? share * input.currentResourcePercent
+      : 0
+  return Math.min(
+    99,
+    Math.max(STARTING_PROGRESS_PERCENT, Math.round(fromCompleted + fromCurrent))
+  )
+}
+
+/**
+ * Badge percent: honor zip overallProgress when completed/total is still 0,
+ * and pulse 1% as soon as a run is downloading.
+ */
+export function displayDownloadPercent(input: {
+  isDownloading: boolean
+  completed: number
+  total: number
+  reportedOverall?: number
+}): number {
+  const fromCounts =
+    input.total > 0 ? Math.round((input.completed / input.total) * 100) : 0
+  const reported =
+    typeof input.reportedOverall === 'number' && Number.isFinite(input.reportedOverall)
+      ? input.reportedOverall
+      : 0
+  const computed = Math.max(fromCounts, reported)
+  if (input.isDownloading && computed <= 0) {
+    return STARTING_PROGRESS_PERCENT
+  }
+  return Math.min(100, Math.max(0, computed))
 }
 
 /**
@@ -77,12 +128,12 @@ export async function withResourceDownloadTimeout<T>(
   }
 }
 
-/** Initial progress snapshot so the indicator is not stuck with a null payload. */
+/** Initial progress snapshot so the indicator is not stuck with a null / 0% payload. */
 export function createInitialDownloadProgress(
   resourceKeys: string[],
   totalIngredients?: number
 ): {
-  currentResource: null
+  currentResource: string | null
   currentResourceProgress: number
   totalResources: number
   completedResources: number
@@ -92,17 +143,19 @@ export function createInitialDownloadProgress(
   totalIngredients: number
   completedIngredients: number
   failedIngredients: number
+  currentIngredient: null
 } {
   return {
-    currentResource: null,
-    currentResourceProgress: 0,
+    currentResource: resourceKeys[0] ?? null,
+    currentResourceProgress: STARTING_PROGRESS_PERCENT,
     totalResources: resourceKeys.length,
     completedResources: 0,
     failedResources: 0,
-    overallProgress: 0,
+    overallProgress: resourceKeys.length > 0 ? STARTING_PROGRESS_PERCENT : 0,
     tasks: [],
     totalIngredients: totalIngredients ?? 0,
     completedIngredients: 0,
     failedIngredients: 0,
+    currentIngredient: null,
   }
 }

@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  STARTING_PROGRESS_PERCENT,
   advanceResourceIngredientProgress,
+  computeInFlightOverallProgress,
   createInitialDownloadProgress,
+  displayDownloadPercent,
   shouldAcceptWorkerMessage,
   withResourceDownloadTimeout,
 } from './backgroundDownloadRun'
@@ -30,12 +33,67 @@ describe('backgroundDownloadRun', () => {
     )
   })
 
-  test('initial progress seeds totals without claiming completion', () => {
+  test('initial progress seeds totals with a starting pulse, not 0%', () => {
     const progress = createInitialDownloadProgress(['a/b/c', 'd/e/f'], 40)
-    expect(progress.overallProgress).toBe(0)
+    expect(progress.overallProgress).toBe(STARTING_PROGRESS_PERCENT)
+    expect(progress.currentResource).toBe('a/b/c')
     expect(progress.totalResources).toBe(2)
     expect(progress.totalIngredients).toBe(40)
     expect(progress.completedIngredients).toBe(0)
+  })
+
+  test('in-flight zip percent moves the badge before any ingredient floors', () => {
+    expect(
+      computeInFlightOverallProgress({
+        completedIngredients: 0,
+        totalIngredients: 66,
+        currentResourceIngredients: 66,
+        currentResourcePercent: 1,
+      })
+    ).toBe(STARTING_PROGRESS_PERCENT)
+    expect(
+      computeInFlightOverallProgress({
+        completedIngredients: 0,
+        totalIngredients: 200,
+        currentResourceIngredients: 200,
+        currentResourcePercent: 50,
+      })
+    ).toBe(50)
+    expect(
+      computeInFlightOverallProgress({
+        completedIngredients: 0,
+        totalIngredients: 100,
+        currentResourceIngredients: 50,
+        currentResourcePercent: 50,
+      })
+    ).toBe(25)
+  })
+
+  test('display percent pulses 1% while downloading at 0/N and honors zip overall', () => {
+    expect(
+      displayDownloadPercent({
+        isDownloading: true,
+        completed: 0,
+        total: 66,
+        reportedOverall: 0,
+      })
+    ).toBe(STARTING_PROGRESS_PERCENT)
+    expect(
+      displayDownloadPercent({
+        isDownloading: true,
+        completed: 0,
+        total: 66,
+        reportedOverall: 12,
+      })
+    ).toBe(12)
+    expect(
+      displayDownloadPercent({
+        isDownloading: false,
+        completed: 0,
+        total: 66,
+        reportedOverall: 0,
+      })
+    ).toBe(0)
   })
 
   test('zip-byte percentage advances and does not regress when extraction starts', () => {

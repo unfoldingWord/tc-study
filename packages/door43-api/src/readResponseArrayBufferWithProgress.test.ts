@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { readResponseArrayBufferWithProgress } from './readResponseArrayBufferWithProgress'
+import {
+  readResponseArrayBufferWithProgress,
+  zipBytePercentage,
+} from './readResponseArrayBufferWithProgress'
 
 function streamResponse(chunks: Uint8Array[], contentLength?: number): Response {
   const headers = new Headers()
@@ -36,5 +39,24 @@ describe('readResponseArrayBufferWithProgress', () => {
       new Response(new Uint8Array([9, 8, 7]))
     )
     expect(new Uint8Array(buf)).toEqual(new Uint8Array([9, 8, 7]))
+  })
+
+  test('chunked responses without Content-Length still report rising percent', async () => {
+    const updates: Array<{ loaded: number; percentage: number }> = []
+    const chunk = new Uint8Array(512 * 1024)
+    await readResponseArrayBufferWithProgress(
+      streamResponse([chunk, chunk]),
+      (p) => updates.push({ loaded: p.loaded, percentage: p.percentage })
+    )
+
+    expect(updates[0]?.percentage).toBe(0)
+    expect(updates.at(-1)?.percentage).toBeGreaterThan(0)
+    expect(updates.at(-1)?.percentage).toBeLessThanOrEqual(90)
+  })
+
+  test('zipBytePercentage eases unknown length toward 90 and uses real totals', () => {
+    expect(zipBytePercentage(0, 0)).toBe(0)
+    expect(zipBytePercentage(1_048_576, 0)).toBe(45)
+    expect(zipBytePercentage(3, 10)).toBe(30)
   })
 })

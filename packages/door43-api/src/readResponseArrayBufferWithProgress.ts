@@ -9,6 +9,15 @@ export type ByteProgressCallback = (progress: {
   percentage: number
 }) => void
 
+/** Known length → real %; chunked zipballs (no Content-Length) ease toward 90%. */
+export function zipBytePercentage(loaded: number, total: number): number {
+  if (total > 0) {
+    return Math.min(100, Math.round((loaded / total) * 100))
+  }
+  if (loaded <= 0) return 0
+  return Math.min(90, Math.round((loaded / (loaded + 1_048_576)) * 90))
+}
+
 export async function readResponseArrayBufferWithProgress(
   response: Response,
   onProgress?: ByteProgressCallback,
@@ -41,7 +50,7 @@ export async function readResponseArrayBufferWithProgress(
       onProgress({
         loaded,
         total,
-        percentage: total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0,
+        percentage: zipBytePercentage(loaded, total),
       })
     }
   }

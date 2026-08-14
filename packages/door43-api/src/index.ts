@@ -15,6 +15,7 @@ export type {
 
 export {
   readResponseArrayBufferWithProgress,
+  zipBytePercentage,
 } from './readResponseArrayBufferWithProgress'
 
 export type { ByteProgressCallback } from './readResponseArrayBufferWithProgress'

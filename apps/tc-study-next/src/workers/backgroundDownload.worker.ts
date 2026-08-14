@@ -24,7 +24,10 @@ import { CatalogManager } from '@bt-synergy/catalog-manager'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
 import { getDownloadPriority } from '../config/loaderConfig'
 import {
+  STARTING_PROGRESS_PERCENT,
   advanceResourceIngredientProgress,
+  computeInFlightOverallProgress,
+  createInitialDownloadProgress,
   RESOURCE_DOWNLOAD_TIMEOUT_MS,
   withResourceDownloadTimeout,
 } from '../features/download/backgroundDownloadRun'
@@ -181,6 +184,14 @@ self.onmessage = async (event: MessageEvent) => {
       case 'start': {
         const runId = typeof payload?.runId === 'number' ? payload.runId : 0
         activeRunId = runId
+        const { resourceKeys, skipExisting, totalIngredients } = payload
+
+        // Pulse before init/metadata so the badge leaves 0% immediately
+        postMessage({
+          type: 'progress',
+          runId,
+          payload: createInitialDownloadProgress(resourceKeys ?? [], totalIngredients),
+        })
 
         // Initialize if not already done
         if (!isInitialized) {
@@ -193,8 +204,6 @@ self.onmessage = async (event: MessageEvent) => {
         if (!downloadManager || !catalogManager) {
           throw new Error('Services not initialized')
         }
-
-        const { resourceKeys, skipExisting, totalIngredients } = payload
 
         // Update download manager config
         downloadManager['config'].skipExisting = skipExisting
@@ -286,7 +295,11 @@ async function downloadSpecificResources(
 
   for (const resourceKey of resourceKeys) {
     try {
-      const metadata = await catalogManager.getResourceMetadata(resourceKey)
+      const metadata = await withResourceDownloadTimeout(
+        catalogManager.getResourceMetadata(resourceKey),
+        RESOURCE_DOWNLOAD_TIMEOUT_MS,
+        resourceKey
+      )
       if (!metadata) {
         console.warn(`[BG-DL] ⚙️ Worker Metadata not found for ${resourceKey}`)
         continue
@@ -354,11 +367,11 @@ async function downloadSpecificResources(
     runId,
     payload: {
       currentResource: resourcesWithPriority[0]?.resourceKey ?? null,
-      currentResourceProgress: 0,
+      currentResourceProgress: STARTING_PROGRESS_PERCENT,
       totalResources: resourcesWithPriority.length,
       completedResources: 0,
       failedResources: 0,
-      overallProgress: 0,
+      overallProgress: STARTING_PROGRESS_PERCENT,
       totalIngredients,
       completedIngredients: 0,
       failedIngredients: 0,
@@ -420,10 +433,12 @@ async function downloadSpecificResources(
         failedIngredients,
         completedResources: completedResourceCount,
         failedResources: failedResourceCount,
-        overallProgress:
-          totalIngredients > 0
-            ? Math.round((completedIngredients / totalIngredients) * 100)
-            : 0,
+        overallProgress: computeInFlightOverallProgress({
+          completedIngredients,
+          totalIngredients,
+          currentResourceIngredients: ingredientsCount,
+          currentResourcePercent: STARTING_PROGRESS_PERCENT,
+        }),
       })
 
       // Create a custom progress callback for ingredient-level updates
@@ -442,13 +457,19 @@ async function downloadSpecificResources(
           progress
         )
 
-        // Overall progress = all previously completed + current resource's partial progress
+        // Overall progress = prior resources + this resource's zip/extract share
         const currentTotalCompleted = completedIngredients + currentResourcePeakCompleted
+        const fromPeakPercent =
+          ingredientsCount > 0
+            ? (currentResourcePeakCompleted / ingredientsCount) * 100
+            : 0
 
-        // Calculate overall percentage based on TOTAL ingredients across ALL resources
-        const overallProgress = totalIngredients > 0
-          ? Math.round((currentTotalCompleted / totalIngredients) * 100)
-          : 0
+        const overallProgress = computeInFlightOverallProgress({
+          completedIngredients,
+          totalIngredients,
+          currentResourceIngredients: ingredientsCount,
+          currentResourcePercent: Math.max(progress.percentage ?? 0, fromPeakPercent),
+        })
 
         // Extract current ingredient name from progress callback
         // All loaders use 'message' field with formats like:
@@ -493,7 +514,7 @@ async function downloadSpecificResources(
       onProgress({
         loaded: 0,
         total: ingredientsCount,
-        percentage: 0,
+        percentage: STARTING_PROGRESS_PERCENT,
         message: `Downloading ${resourceKey.split('/').pop() ?? resourceKey}`,
       })
 

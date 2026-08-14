@@ -1,5 +1,6 @@
 import { AlertCircle, Download, Loader2 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { displayDownloadPercent } from '../../features/download/backgroundDownloadRun'
 import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
 import { shouldShowDownloadIndicator } from './downloadIndicatorVisibility'
 
@@ -55,11 +56,12 @@ export function DownloadIndicator({ isDownloading, progress, error }: DownloadIn
   const failed = useIngredients
     ? (progress?.failedIngredients || 0)
     : (progress?.failedResources || 0)
-  // Prefer completed/total so badge matches detail when overallProgress lags at 0
-  const overallProgress =
-    total > 0
-      ? Math.round((completed / total) * 100)
-      : (progress?.overallProgress || 0)
+  const overallProgress = displayDownloadPercent({
+    isDownloading,
+    completed,
+    total,
+    reportedOverall: progress?.overallProgress,
+  })
 
   const elapsedMs = startedAt != null ? now - startedAt : 0
   const elapsedLabel = (() => {
