@@ -79,6 +79,8 @@ export function ReadPanelHeader({
           placeholderIndex={placeholderIndex}
         />
 
+        <div className="w-px h-5 bg-border-subtle flex-shrink-0" aria-hidden />
+
         <div className="flex-shrink-0 flex items-center gap-chrome-tight ml-auto">
           {headerActions}
           <div className="inline-flex items-center gap-0" role="group">

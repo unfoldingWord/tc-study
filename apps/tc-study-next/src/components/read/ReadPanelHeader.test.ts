@@ -25,6 +25,7 @@ describe('ReadPanelHeader (issue #30)', () => {
 
   test('language + mode share compact header icon chrome in one cluster', () => {
     expect(src).toContain('ml-auto')
+    expect(src).toContain('w-px h-5 bg-border-subtle')
     expect(src).toContain('gap-0')
     expect(src).toContain('READ_HEADER_ICON_BUTTON')
     expect(src).not.toContain('bg-muted/50')
