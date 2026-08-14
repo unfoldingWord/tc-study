@@ -15,7 +15,7 @@ import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
 import {
   HELPS_CARD_FOOTER,
-  HELPS_CARD_FOOTER_BUTTON,
+  HELPS_CARD_FOOTER_BUTTON_TA,
   HELPS_CARD_FOOTER_ICON,
   HELPS_CARD_IDLE,
   HELPS_CARD_SELECTED,
@@ -299,7 +299,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
                 onSupportReferenceClick(note.supportReference)
               }
             }}
-            className={HELPS_CARD_FOOTER_BUTTON}
+            className={HELPS_CARD_FOOTER_BUTTON_TA}
             title={`Learn more: ${taTitle}`}
             aria-label={`Learn more: ${taTitle}`}
           >

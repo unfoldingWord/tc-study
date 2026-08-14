@@ -29,7 +29,14 @@ export const HELPS_QUOTE_FILTER_MARK =
 /** Article / title footer on TN + TWL cards — middle density between the two. */
 export const HELPS_CARD_FOOTER = 'mt-2 pt-2 border-t border-border-subtle'
 
+/** Shared article-link row (layout only). Colors are per kind below. */
 export const HELPS_CARD_FOOTER_BUTTON =
-  'flex items-center gap-1.5 w-full text-left text-sm font-medium text-helps-fg hover:text-helps transition-colors'
+  'flex items-center gap-1.5 w-full text-left text-sm font-medium transition-colors'
+
+/** Translation Words — accent (blue), same as TW entry viewer. */
+export const HELPS_CARD_FOOTER_BUTTON_TW = `${HELPS_CARD_FOOTER_BUTTON} text-accent-fg hover:text-accent`
+
+/** Translation Academy — helps (purple), same as TA entry viewer. */
+export const HELPS_CARD_FOOTER_BUTTON_TA = `${HELPS_CARD_FOOTER_BUTTON} text-helps-fg hover:text-helps`
 
 export const HELPS_CARD_FOOTER_ICON = 'w-3.5 h-3.5 flex-shrink-0'

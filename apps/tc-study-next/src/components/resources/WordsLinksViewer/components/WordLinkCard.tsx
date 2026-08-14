@@ -14,7 +14,7 @@ import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
 import {
   HELPS_CARD_FOOTER,
-  HELPS_CARD_FOOTER_BUTTON,
+  HELPS_CARD_FOOTER_BUTTON_TW,
   HELPS_CARD_FOOTER_ICON,
   HELPS_CARD_IDLE,
   HELPS_CARD_SELECTED,
@@ -177,7 +177,7 @@ export const WordLinkCard = memo(function WordLinkCard({
             e.stopPropagation()
             onTitleClick(link)
           }}
-          className={HELPS_CARD_FOOTER_BUTTON}
+          className={HELPS_CARD_FOOTER_BUTTON_TW}
           title={`View Translation Words article: ${twTitle}`}
           aria-label={`View Translation Words article: ${twTitle}`}
         >
