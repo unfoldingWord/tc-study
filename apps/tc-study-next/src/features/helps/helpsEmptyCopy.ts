@@ -23,7 +23,7 @@ export const HELPS_EMPTY_COPY = {
     `${languageName} doesn't have helps for ${passage} yet.`,
   noSources: (languageName: string) =>
     `${languageName} doesn't have translation helps yet.`,
-  useDefaultHelps: (defaultName: string) => `Use ${defaultName} helps`,
+  switchToDefaultHelps: (defaultName: string) => `Use ${defaultName} helps`,
   chooseHelpsLanguage: 'Choose helps language',
 } as const
 
@@ -164,7 +164,7 @@ export function resolveHelpsEmptyView(options: {
   const defaultCode = (options.defaultHelpsLanguageCode?.trim() || DEFAULT_HELPS_LANGUAGE_CODE).trim()
   const alreadyOnDefault = primaryLang(options.languageCode) === primaryLang(defaultCode)
   const defaultName = helpsLanguageDisplayName(defaultCode, options.defaultHelpsLanguageName)
-  const actionLabel = alreadyOnDefault ? null : HELPS_EMPTY_COPY.useDefaultHelps(defaultName)
+  const actionLabel = alreadyOnDefault ? null : HELPS_EMPTY_COPY.switchToDefaultHelps(defaultName)
   const actionShortLabel = alreadyOnDefault ? null : defaultName
 
   if (options.kind === 'no-sources') {
