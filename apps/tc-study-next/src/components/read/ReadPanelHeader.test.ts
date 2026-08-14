@@ -11,6 +11,9 @@ describe('ReadPanelHeader (issue #30)', () => {
   test('has mode switch + language picker and no ellipsis actions', () => {
     expect(modeSrc).toContain('Show helps')
     expect(modeSrc).toContain('Show scripture')
+    expect(modeSrc).toContain('LifeBuoy')
+    expect(modeSrc).toContain('BookOpen')
+    expect(modeSrc).not.toContain('Layers')
     expect(src).toContain('LanguagePicker')
     expect(src).toContain('ReadModeSwitch')
     expect(src).toContain('min-h-11')
