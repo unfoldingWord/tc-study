@@ -15,6 +15,7 @@ const collapseHookSrc = readFileSync(
   join(import.meta.dir, '../../features/read/useReadPanelCollapse.ts'),
   'utf8'
 )
+const cssSrc = readFileSync(join(import.meta.dir, '../../index.css'), 'utf8')
 const bootstrapSrc = readFileSync(
   join(import.meta.dir, '../../features/read/useReadLanguageBootstrap.ts'),
   'utf8'
@@ -85,6 +86,13 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(areaSrc).toContain('layoutCollapsedPanelId')
     expect(panelSrc).toContain('read-panel-shell')
     expect(panelSrc).toContain('read-panel-sliding')
+    expect(panelSrc).toContain('read-panel-shell-sliding')
+    expect(headerSrc).toContain('read-panel-header')
+    expect(headerSrc).not.toMatch(/className=\{`[^`]*transition/)
+    expect(cssSrc).toContain('.read-panel-shell.read-panel-shell-sliding *')
+    expect(cssSrc).toContain('transform: none !important')
+    expect(cssSrc).toContain('.read-panel-header')
+    expect(cssSrc).toContain('isolation: isolate')
     expect(collapseHookSrc).toContain('prefers-reduced-motion')
     expect(collapseHookSrc).toContain('isResizingPanels')
     expect(collapseHookSrc).toContain('COLLAPSE_MOTION_MS')

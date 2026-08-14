@@ -95,13 +95,15 @@ export const COLLAPSE_MOTION_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
 export type PanelCollapseAnimPhase = 'idle' | 'out' | 'in'
 
 export function slideOffTransform(panelId: ReadPanelId, stacked: boolean): string {
-  if (stacked) return panelId === 'panel-1' ? 'translateY(-100%)' : 'translateY(100%)'
-  return panelId === 'panel-1' ? 'translateX(-100%)' : 'translateX(100%)'
+  if (stacked) {
+    return panelId === 'panel-1' ? 'translate3d(0, -100%, 0)' : 'translate3d(0, 100%, 0)'
+  }
+  return panelId === 'panel-1' ? 'translate3d(-100%, 0, 0)' : 'translate3d(100%, 0, 0)'
 }
 
-/** Same axis as slide-off so the browser interpolates one transform, not `none` → translate. */
-export function slideOnTransform(stacked: boolean): string {
-  return stacked ? 'translateY(0)' : 'translateX(0)'
+/** Same 3d function as slide-off so the compositor interpolates one layer, not `none` → translate. */
+export function slideOnTransform(_stacked?: boolean): string {
+  return 'translate3d(0, 0, 0)'
 }
 
 /**
@@ -188,6 +190,7 @@ export function panelCollapseMotionStyle(options: {
   return {
     position: 'absolute',
     zIndex: 2,
+    isolation: 'isolate',
     overflow: 'hidden',
     visibility: 'visible',
     pointerEvents: 'none',

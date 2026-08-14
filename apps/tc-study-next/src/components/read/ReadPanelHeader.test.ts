@@ -14,6 +14,7 @@ describe('ReadPanelHeader (issue #30)', () => {
     expect(src).toContain('LanguagePicker')
     expect(src).toContain('ReadModeSwitch')
     expect(src).toContain('min-h-11')
+    expect(src).toContain('read-panel-header')
     expect(src).not.toContain('Resource actions')
     expect(src).not.toContain('title="Actions"')
     expect(src).not.toContain('MoreVertical')

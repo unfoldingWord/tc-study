@@ -111,12 +111,12 @@ describe('readPanelLayout', () => {
   })
 
   test('slide-off transform points at the pane edge (side-by-side and stacked)', () => {
-    expect(slideOffTransform('panel-2', false)).toBe('translateX(100%)')
-    expect(slideOffTransform('panel-1', false)).toBe('translateX(-100%)')
-    expect(slideOffTransform('panel-2', true)).toBe('translateY(100%)')
-    expect(slideOffTransform('panel-1', true)).toBe('translateY(-100%)')
-    expect(slideOnTransform(false)).toBe('translateX(0)')
-    expect(slideOnTransform(true)).toBe('translateY(0)')
+    expect(slideOffTransform('panel-2', false)).toBe('translate3d(100%, 0, 0)')
+    expect(slideOffTransform('panel-1', false)).toBe('translate3d(-100%, 0, 0)')
+    expect(slideOffTransform('panel-2', true)).toBe('translate3d(0, 100%, 0)')
+    expect(slideOffTransform('panel-1', true)).toBe('translate3d(0, -100%, 0)')
+    expect(slideOnTransform(false)).toBe('translate3d(0, 0, 0)')
+    expect(slideOnTransform(true)).toBe('translate3d(0, 0, 0)')
   })
 
   test('restore keeps the entering pane parked in layout so the sibling stays 100%', () => {
@@ -197,8 +197,9 @@ describe('readPanelLayout', () => {
     expect(start.width).toBe('25%')
     expect(start.right).toBe(0)
     expect(start.left).toBe('auto')
-    expect(start.transform).toBe('translateX(0)')
+    expect(start.transform).toBe('translate3d(0, 0, 0)')
     expect(start.transition).toBe('none')
+    expect(start.isolation).toBe('isolate')
     expect(String(start.transition)).not.toContain('flex')
 
     const end = panelCollapseMotionStyle({
@@ -210,7 +211,8 @@ describe('readPanelLayout', () => {
       panel1Percent: 75,
       reducedMotion: false,
     })
-    expect(end.transform).toBe('translateX(100%)')
+    expect(end.transform).toBe('translate3d(100%, 0, 0)')
+    expect(end.isolation).toBe('isolate')
     expect(end.transition).toBe(
       `transform ${COLLAPSE_MOTION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
     )
@@ -229,8 +231,9 @@ describe('readPanelLayout', () => {
     })
     expect(start.position).toBe('absolute')
     expect(start.height).toBe('50%')
-    expect(start.transform).toBe('translateY(-100%)')
+    expect(start.transform).toBe('translate3d(0, -100%, 0)')
     expect(start.transition).toBe('none')
+    expect(start.isolation).toBe('isolate')
 
     const end = panelCollapseMotionStyle({
       panelId: 'panel-1',
@@ -242,7 +245,8 @@ describe('readPanelLayout', () => {
       reducedMotion: false,
     })
     expect(end.position).toBe('absolute')
-    expect(end.transform).toBe('translateY(0)')
+    expect(end.transform).toBe('translate3d(0, 0, 0)')
+    expect(end.isolation).toBe('isolate')
     expect(end.transition).toBe(
       `transform ${COLLAPSE_MOTION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
     )

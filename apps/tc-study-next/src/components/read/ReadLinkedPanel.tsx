@@ -212,10 +212,11 @@ export function ReadLinkedPanel(props: ReadLinkedPanelProps) {
   return (
     <DroppablePanel
       id={`${panelId}-droppable`}
-      className={`min-h-0 overflow-hidden read-panel-shell${sliding ? ' read-panel-sliding' : ''}`}
+      className={`min-h-0 overflow-hidden read-panel-shell${sliding ? ' read-panel-sliding read-panel-shell-sliding' : ''}`}
       style={mountStyle}
       colorScheme={colorScheme}
     >
+      {/* ReadPanelHeader must stay a descendant of this transforming shell. */}
       <div className="h-full min-h-0 overflow-hidden" dir={dir}>
         <LinkedPanel id={panelId}>
           {({ current, navigate }) => (

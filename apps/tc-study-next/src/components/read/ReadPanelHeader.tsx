@@ -62,7 +62,7 @@ export function ReadPanelHeader({
     colorScheme === 'blue' ? 'bg-panel-1-soft/70' : 'bg-panel-2-soft/70'
 
   return (
-    <div className={`min-h-11 h-11 px-chrome flex items-center border-b border-border-subtle ${strip}`}>
+    <div className={`read-panel-header min-h-11 h-11 px-chrome flex items-center border-b border-border-subtle ${strip}`}>
       <div className="flex items-center gap-chrome-tight min-w-0 w-full h-full">
         <ResourceTabs
           resources={resources}
