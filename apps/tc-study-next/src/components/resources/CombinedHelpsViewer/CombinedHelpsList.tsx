@@ -25,6 +25,7 @@ import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
 import { helpsFilterIdentity, scrollHelpsToTop } from './scrollHelpsToTop'
+import { isHelpsCardSelected, type HelpsCardSelection } from './helpsCardSelection'
 import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
@@ -49,8 +50,7 @@ export interface CombinedHelpsListProps {
   twlKey: string
   resourceKey: string
   mergedGroups: { ref: string; items: MergedRow[] }[]
-  selectedNoteId: string | null
-  selectedLinkId: string | null
+  selectedHelpsCard: HelpsCardSelection
   targetSourceId: string | null | undefined
   helpsScope: 'scripture' | 'obs'
   tokenFilter: TokenFilter | null
@@ -90,8 +90,7 @@ export function CombinedHelpsList({
   twlKey,
   resourceKey,
   mergedGroups,
-  selectedNoteId,
-  selectedLinkId,
+  selectedHelpsCard,
   targetSourceId,
   helpsScope,
   tokenFilter,
@@ -219,7 +218,7 @@ export function CombinedHelpsList({
                             <div key={`tn-${note.id}-${idx}`}>
                               <TranslationNoteCard
                                 note={note as NoteWithTokens}
-                                isSelected={selectedNoteId === note.id}
+                                isSelected={isHelpsCardSelected(selectedHelpsCard, 'tn', note.id)}
                                 onSupportReferenceClick={onSupportReferenceClick}
                                 onEntryLinkClick={onEntryLinkClick}
                                 onQuoteClick={onNoteQuoteClick}
@@ -245,7 +244,7 @@ export function CombinedHelpsList({
                           <div key={`twl-${link.id}-${idx}`}>
                             <WordLinkCard
                               link={link}
-                              isSelected={selectedLinkId === link.id}
+                              isSelected={isHelpsCardSelected(selectedHelpsCard, 'twl', link.id)}
                               twTitle={twTitle}
                               isLoadingTitle={isLoadingTwTitle}
                               twPreview={twPreview}

@@ -8,6 +8,7 @@ import type { ObsFrameHighlightSignal, TokenClickSignal } from '../../../signals
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
 import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import type { NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
+import type { HelpsCardSelection } from './helpsCardSelection'
 
 type SendTokenClick = (data: {
   lifecycle: 'event'
@@ -34,8 +35,7 @@ export interface UseCombinedHelpsHandlersParams {
   sendTokenClick: SendTokenClick
   sendEntryLinkClick: SendEntryLinkClick
   broadcastObsHighlight: BroadcastObsHighlight
-  setSelectedNoteId: (id: string | null) => void
-  setSelectedLinkId: (id: string | null) => void
+  setSelectedHelpsCard: (selection: HelpsCardSelection) => void
 }
 
 export function useCombinedHelpsHandlers({
@@ -48,18 +48,18 @@ export function useCombinedHelpsHandlers({
   sendTokenClick,
   sendEntryLinkClick,
   broadcastObsHighlight,
-  setSelectedNoteId,
-  setSelectedLinkId,
+  setSelectedHelpsCard,
 }: UseCombinedHelpsHandlersParams) {
   const handleNoteSelect = useCallback(
     (note: { id: string }) => {
-      setSelectedNoteId(note.id)
+      setSelectedHelpsCard({ kind: 'tn', id: note.id })
     },
-    [setSelectedNoteId]
+    [setSelectedHelpsCard]
   )
 
   const handleNoteQuoteClick = useCallback(
     (note: NoteWithTokens) => {
+      setSelectedHelpsCard({ kind: 'tn', id: note.id })
       if (helpsScope === 'obs') {
         const quote = note.quote?.trim()
         if (!quote) return
@@ -68,7 +68,6 @@ export function useCombinedHelpsHandlers({
         const verse = parseInt(refParts[1] || '1', 10)
         const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
         const occurrence = Number.isFinite(occRaw) ? occRaw : 1
-        setSelectedNoteId(note.id)
         broadcastObsHighlight({
           lifecycle: 'event',
           highlight: {
@@ -120,7 +119,7 @@ export function useCombinedHelpsHandlers({
       if (!payload) return
       sendTokenClick({ lifecycle: 'event', token: payload })
     },
-    [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedNoteId]
+    [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedHelpsCard]
   )
 
   const handleSupportReferenceClick = useCallback(
@@ -139,7 +138,7 @@ export function useCombinedHelpsHandlers({
 
   const handleTitleClick = useCallback(
     (link: TranslationWordsLink) => {
-      setSelectedLinkId(link.id)
+      setSelectedHelpsCard({ kind: 'twl', id: link.id })
       const twInfo = parseTWLink(link.twLink)
       const parts = (twlKey || resourceKey).split('/')
       if (parts.length < 2) return
@@ -158,12 +157,12 @@ export function useCombinedHelpsHandlers({
         },
       })
     },
-    [twlKey, resourceKey, onEntryLinkClick, sendEntryLinkClick, setSelectedLinkId]
+    [twlKey, resourceKey, onEntryLinkClick, sendEntryLinkClick, setSelectedHelpsCard]
   )
 
   const handleLinkQuoteClick = useCallback(
     (link: TranslationWordsLink) => {
-      setSelectedLinkId(link.id)
+      setSelectedHelpsCard({ kind: 'twl', id: link.id })
       if (helpsScope === 'obs') {
         const quote = link.origWords?.trim()
         if (!quote) return
@@ -225,7 +224,7 @@ export function useCombinedHelpsHandlers({
       if (!payload) return
       sendTokenClick({ lifecycle: 'event', token: payload })
     },
-    [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedLinkId]
+    [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedHelpsCard]
   )
 
   return {

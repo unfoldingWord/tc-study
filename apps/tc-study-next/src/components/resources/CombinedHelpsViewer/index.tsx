@@ -32,6 +32,7 @@ import type { TokenFilter } from '../WordsLinksViewer/types'
 import { HelpsFilterBanners } from '../shared/HelpsFilterBanners'
 import { CombinedHelpsList } from './CombinedHelpsList'
 import { primaryLangCode } from './combinedHelpsUtils'
+import type { HelpsCardSelection } from './helpsCardSelection'
 import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
 import { useCombinedHelpsDeps } from './useCombinedHelpsDeps'
 import { useCombinedHelpsHandlers } from './useCombinedHelpsHandlers'
@@ -68,8 +69,7 @@ export function CombinedHelpsViewer({
   const helpsLanguageActions = useHelpsLanguageActions()
 
   const [kindFilter, setKindFilter] = useState<HelpsKindFilter>('all')
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
-  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
+  const [selectedHelpsCard, setSelectedHelpsCard] = useState<HelpsCardSelection>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
   const [verseFilter, setVerseFilter] = useState<VerseFilterState | null>(null)
   const [obsQuoteFilter, setObsQuoteFilter] = useState<ObsQuoteFilter | null>(null)
@@ -117,8 +117,7 @@ export function CombinedHelpsViewer({
     setTokenFilter(null)
     setVerseFilter(null)
     setObsQuoteFilter(null)
-    setSelectedNoteId(null)
-    setSelectedLinkId(null)
+    setSelectedHelpsCard(null)
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
 
   const { catalogMetadata } = useCombinedHelpsDeps({
@@ -198,8 +197,7 @@ export function CombinedHelpsViewer({
     setTokenFilter,
     setVerseFilter,
     setObsQuoteFilter,
-    setSelectedNoteId,
-    setSelectedLinkId,
+    setSelectedHelpsCard,
   })
 
   const hasMatches = obsQuoteFilter
@@ -260,8 +258,7 @@ export function CombinedHelpsViewer({
     sendTokenClick,
     sendEntryLinkClick,
     broadcastObsHighlight,
-    setSelectedNoteId,
-    setSelectedLinkId,
+    setSelectedHelpsCard,
   })
 
   const loading = isHelpsContentPending({
@@ -294,8 +291,7 @@ export function CombinedHelpsViewer({
         hasMatches={hasMatches}
         onClearObsQuoteFilter={() => {
           setObsQuoteFilter(null)
-          setSelectedNoteId(null)
-          setSelectedLinkId(null)
+          setSelectedHelpsCard(null)
         }}
         onClearTokenFilter={() => setTokenFilter(null)}
         onClearVerseFilter={() => setVerseFilter(null)}
@@ -324,8 +320,7 @@ export function CombinedHelpsViewer({
         twlKey={twlKey}
         resourceKey={resourceKey}
         mergedGroups={mergedGroups}
-        selectedNoteId={selectedNoteId}
-        selectedLinkId={selectedLinkId}
+        selectedHelpsCard={selectedHelpsCard}
         targetSourceId={targetSourceId}
         helpsScope={helpsScope}
         tokenFilter={tokenFilter}
