@@ -6,7 +6,7 @@
  * Entry title stays more prominent than the quote.
  */
 
-import { ExternalLink, MoreHorizontal } from 'lucide-react'
+import { BookText, MoreHorizontal } from 'lucide-react'
 import { memo } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
@@ -181,7 +181,7 @@ export const WordLinkCard = memo(function WordLinkCard({
           title={`View Translation Words article: ${twTitle}`}
           aria-label={`View Translation Words article: ${twTitle}`}
         >
-          <ExternalLink className={HELPS_CARD_FOOTER_ICON} />
+          <BookText className={HELPS_CARD_FOOTER_ICON} />
           {isLoadingTitle ? (
             <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
           ) : (
