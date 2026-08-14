@@ -113,5 +113,5 @@ export function useReadPanelCollapse(options: {
     [animPanelId, phase, sliding, isNarrow, animPanel1Percent, isResizingPanels]
   )
 
-  return { styleFor, phase }
+  return { styleFor, phase, animPanelId }
 }

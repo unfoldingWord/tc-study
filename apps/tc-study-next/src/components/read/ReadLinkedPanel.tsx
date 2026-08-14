@@ -34,6 +34,8 @@ interface ReadLinkedPanelProps {
   otherPanelId: ReadPanelId
   colorScheme: 'blue' | 'purple'
   mountStyle: CSSProperties
+  /** Outer wrapper is sliding as one layer — descendants must not tween. */
+  sliding?: boolean
   dir: 'ltr' | 'rtl'
   mode: ReadPanelMode
   onModeSwitch: (mode: ReadPanelMode) => void
@@ -76,7 +78,7 @@ function ReadPanelBody({
   onSwitchTextMode,
   current,
   navigate,
-}: Omit<ReadLinkedPanelProps, 'mountStyle' | 'dir'> & {
+}: Omit<ReadLinkedPanelProps, 'mountStyle' | 'dir' | 'sliding'> & {
   current: { index: number; resource?: { component?: ReactNode } | null }
   navigate: {
     next: () => void
@@ -205,12 +207,12 @@ function ReadPanelBody({
 }
 
 export function ReadLinkedPanel(props: ReadLinkedPanelProps) {
-  const { panelId, colorScheme, mountStyle, dir, ...bodyProps } = props
+  const { panelId, colorScheme, mountStyle, sliding = false, dir, ...bodyProps } = props
 
   return (
     <DroppablePanel
       id={`${panelId}-droppable`}
-      className="min-h-0 overflow-hidden"
+      className={`min-h-0 overflow-hidden read-panel-shell${sliding ? ' read-panel-sliding' : ''}`}
       style={mountStyle}
       colorScheme={colorScheme}
     >

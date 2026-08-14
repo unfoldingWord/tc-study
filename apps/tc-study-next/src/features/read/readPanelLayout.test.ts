@@ -7,12 +7,14 @@ import {
   defaultLayoutForViewport,
   dividerCollapsedPanelId,
   isPanelOffFlow,
+  layoutCollapsedPanelId,
   nextCollapseAnimPhase,
   panelCollapseMotionStyle,
   panelStayMountedStyle,
   restoreCollapsedDivider,
   restoredSplitPercent,
   slideOffTransform,
+  slideOnTransform,
 } from './readPanelLayout'
 
 describe('readPanelLayout', () => {
@@ -113,6 +115,32 @@ describe('readPanelLayout', () => {
     expect(slideOffTransform('panel-1', false)).toBe('translateX(-100%)')
     expect(slideOffTransform('panel-2', true)).toBe('translateY(100%)')
     expect(slideOffTransform('panel-1', true)).toBe('translateY(-100%)')
+    expect(slideOnTransform(false)).toBe('translateX(0)')
+    expect(slideOnTransform(true)).toBe('translateY(0)')
+  })
+
+  test('restore keeps the entering pane parked in layout so the sibling stays 100%', () => {
+    expect(
+      layoutCollapsedPanelId({
+        collapsedPanelId: null,
+        phase: 'in',
+        animPanelId: 'panel-2',
+      })
+    ).toBe('panel-2')
+    expect(
+      layoutCollapsedPanelId({
+        collapsedPanelId: 'panel-1',
+        phase: 'out',
+        animPanelId: 'panel-1',
+      })
+    ).toBe('panel-1')
+    expect(
+      layoutCollapsedPanelId({
+        collapsedPanelId: null,
+        phase: 'idle',
+        animPanelId: null,
+      })
+    ).toBeNull()
   })
 
   test('collapse/restore phase: out on park, in on restore; reduced motion snaps', () => {
@@ -169,8 +197,9 @@ describe('readPanelLayout', () => {
     expect(start.width).toBe('25%')
     expect(start.right).toBe(0)
     expect(start.left).toBe('auto')
-    expect(start.transform).toBe('none')
-    expect(start.transition).toBe(`transform ${COLLAPSE_MOTION_MS}ms ease-out`)
+    expect(start.transform).toBe('translateX(0)')
+    expect(start.transition).toBe('none')
+    expect(String(start.transition)).not.toContain('flex')
 
     const end = panelCollapseMotionStyle({
       panelId: 'panel-2',
@@ -182,9 +211,13 @@ describe('readPanelLayout', () => {
       reducedMotion: false,
     })
     expect(end.transform).toBe('translateX(100%)')
+    expect(end.transition).toBe(
+      `transform ${COLLAPSE_MOTION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
+    )
+    expect(String(end.transition)).not.toMatch(/flex|width|height/)
   })
 
-  test('in motion starts off-edge then settles; idle and reduced motion skip', () => {
+  test('in motion is the same overlay layer; starts off-edge then settles', () => {
     const start = panelCollapseMotionStyle({
       panelId: 'panel-1',
       animPanelId: 'panel-1',
@@ -194,7 +227,10 @@ describe('readPanelLayout', () => {
       panel1Percent: 50,
       reducedMotion: false,
     })
+    expect(start.position).toBe('absolute')
+    expect(start.height).toBe('50%')
     expect(start.transform).toBe('translateY(-100%)')
+    expect(start.transition).toBe('none')
 
     const end = panelCollapseMotionStyle({
       panelId: 'panel-1',
@@ -205,7 +241,23 @@ describe('readPanelLayout', () => {
       panel1Percent: 50,
       reducedMotion: false,
     })
-    expect(end.transform).toBe('none')
+    expect(end.position).toBe('absolute')
+    expect(end.transform).toBe('translateY(0)')
+    expect(end.transition).toBe(
+      `transform ${COLLAPSE_MOTION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
+    )
+
+    expect(
+      panelCollapseMotionStyle({
+        panelId: 'panel-1',
+        animPanelId: 'panel-2',
+        phase: 'out',
+        sliding: true,
+        stacked: false,
+        panel1Percent: 80,
+        reducedMotion: false,
+      })
+    ).toEqual({ transition: 'none' })
 
     expect(
       panelCollapseMotionStyle({
@@ -229,5 +281,22 @@ describe('readPanelLayout', () => {
         reducedMotion: false,
       })
     ).toEqual({})
+  })
+
+  test('stay-mounted panes never declare a flex transition', () => {
+    const visible = panelStayMountedStyle({
+      layout: 'two',
+      panelId: 'panel-1',
+      collapsedPanelId: 'panel-2',
+      panel1Percent: 100,
+    })
+    expect(visible.transition).toBe('none')
+    const split = panelStayMountedStyle({
+      layout: 'two',
+      panelId: 'panel-1',
+      collapsedPanelId: null,
+      panel1Percent: 50,
+    })
+    expect(split.transition).toBe('none')
   })
 })

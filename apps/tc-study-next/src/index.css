@@ -245,6 +245,16 @@
   }
 }
 
+/* Collapse/restore: only the outer pane wrapper may tween transform.
+   Never tween flex-basis/width on panes (sibling reflow looks like a cascade). */
+.panels-resize-container > .read-panel-shell {
+  transition-property: none;
+}
+
+.panels-resize-container > .read-panel-shell.read-panel-sliding > * {
+  transition: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .panels-resize-container > * {
     transition: none !important;
