@@ -20,14 +20,6 @@ function hitOverlayClass(collapsedArrow: DividerCollapsedArrow | null): string {
   return `${base} left-0 w-full h-4 top-1/2 -translate-y-1/2 md:left-1/2 md:top-0 md:w-4 md:h-full md:-translate-x-1/2 md:translate-y-0`
 }
 
-function collapsedArrowClass(dir: DividerCollapsedArrow): string {
-  const icon = 'w-3 h-3 text-fg-muted pointer-events-none absolute'
-  if (dir === 'left') return `${icon} right-0 top-1/2 -translate-y-1/2`
-  if (dir === 'right') return `${icon} left-0 top-1/2 -translate-y-1/2`
-  if (dir === 'up') return `${icon} bottom-0 left-1/2 -translate-x-1/2`
-  return `${icon} top-0 left-1/2 -translate-x-1/2`
-}
-
 interface PanelResizeDividerProps {
   isResizing: boolean
   onMouseDown: (e: MouseEvent) => void
@@ -63,9 +55,13 @@ export function PanelResizeDivider({
     return () => node.removeEventListener('touchstart', handleTouchStart)
   }, [collapsedArrow])
 
+  const sizeClass = collapsedArrow
+    ? 'md:w-4 md:self-stretch md:h-auto w-full h-4'
+    : 'md:w-1.5 md:self-stretch md:h-auto w-full h-1.5'
+
   const barClass = `flex-shrink-0 min-w-0 min-h-0 border-0 p-0 appearance-none transition-colors relative z-10 flex items-center justify-center touch-none select-none overflow-visible ${
     isResizing ? 'bg-accent' : 'bg-border hover:bg-accent/70'
-  } md:w-1.5 md:self-stretch md:h-auto w-full h-1.5 ${
+  } ${sizeClass} ${
     collapsedArrow ? 'cursor-pointer md:cursor-pointer' : 'cursor-ns-resize md:cursor-ew-resize'
   }`
 
@@ -83,7 +79,7 @@ export function PanelResizeDivider({
         aria-label={label}
       >
         {hitOverlay}
-        <Arrow className={collapsedArrowClass(collapsedArrow)} />
+        <Arrow className="w-3 h-3 text-fg-muted pointer-events-none" />
       </button>
     )
   }

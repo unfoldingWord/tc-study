@@ -61,13 +61,15 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(hookSrc).toContain("setLayout('two', true)")
   })
 
-  test('#32 collapse stays mounted; same thin divider with inward arrow', () => {
+  test('#32 collapse stays mounted; thicker collapsed divider with inward arrow', () => {
     expect(areaSrc).toContain('panelStayMountedStyle')
     expect(areaSrc).toContain('PanelResizeDivider')
     expect(areaSrc).not.toContain('ReadPanelRail')
     expect(areaSrc).toContain('collapsedDividerArrowDir')
     expect(dividerSrc).toContain('md:w-1.5')
     expect(dividerSrc).toContain('h-1.5')
+    expect(dividerSrc).toContain('md:w-4')
+    expect(dividerSrc).toContain('w-full h-4')
     expect(dividerSrc).toContain('bg-border')
     expect(dividerSrc).toContain('collapsedArrow')
     expect(dividerSrc).toContain('ChevronLeft')
