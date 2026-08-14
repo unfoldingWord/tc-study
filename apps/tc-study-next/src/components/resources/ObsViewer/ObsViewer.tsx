@@ -127,7 +127,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
         infoResource={resource}
       />
       <div className="flex-1 min-h-0 overflow-auto p-content-lg bg-scripture text-scripture-fg">
-        <div className="max-w-3xl mx-auto w-full">
+        <div className="max-w-2xl mx-auto w-full">
           {loading && (
             <LoadingSpinner
               centered
