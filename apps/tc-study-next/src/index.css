@@ -245,25 +245,9 @@
   }
 }
 
-/* Collapse/restore: only the outer .read-panel-shell may tween transform.
-   Header + content must ride that one compositor layer — never their own. */
+/* Live drag + collapse/restore rAF write flex-basis each frame — never CSS-transition it. */
 .panels-resize-container > .read-panel-shell {
   transition-property: none;
-}
-
-.panels-resize-container > .read-panel-shell.read-panel-shell-sliding {
-  isolation: isolate;
-}
-
-.panels-resize-container > .read-panel-shell.read-panel-shell-sliding * {
-  transition: none !important;
-  transform: none !important;
-  will-change: auto !important;
-}
-
-.panels-resize-container > .read-panel-shell.read-panel-shell-sliding .read-panel-header {
-  position: relative !important;
-  top: auto !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

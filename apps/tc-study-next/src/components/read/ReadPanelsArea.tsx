@@ -2,10 +2,8 @@ import { useTabDnD } from '../../features/dnd/TabDnDContext'
 import {
   collapsedDividerArrowDir,
   dividerCollapsedPanelId,
-  layoutCollapsedPanelId,
   panelStayMountedStyle,
 } from '../../features/read/readPanelLayout'
-import { useReadPanelCollapse } from '../../features/read/useReadPanelCollapse'
 import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
 import type { ReadPanelId, ReadPanelMode, ReadPanelModels } from '../../features/read/readPanelModel'
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
@@ -77,21 +75,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
     onSwitchTextMode,
   } = props
 
-  const collapseAnim = useReadPanelCollapse({
-    collapsedPanelId,
-    layout,
-    isNarrow,
-    isResizingPanels,
-    panel1Width,
-  })
-  // Restore: keep the entering pane parked in layout so the visible pane stays
-  // at 100% — only the overlay translates (no sibling flex-basis tween).
-  const layoutParkedId = layoutCollapsedPanelId({
-    collapsedPanelId,
-    phase: collapseAnim.phase,
-    animPanelId: collapseAnim.animPanelId,
-  })
-  const parkedId = dividerCollapsedPanelId({ layout, collapsedPanelId: layoutParkedId })
+  const parkedId = dividerCollapsedPanelId({ layout, collapsedPanelId })
   const collapsedArrow = parkedId
     ? collapsedDividerArrowDir({ collapsedPanelId: parkedId, stacked: isNarrow })
     : null
@@ -109,16 +93,12 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         panelId="panel-1"
         otherPanelId="panel-2"
         colorScheme="blue"
-        mountStyle={{
-          ...panelStayMountedStyle({
-            layout,
-            panelId: 'panel-1',
-            collapsedPanelId: layoutParkedId,
-            panel1Percent: panel1Width,
-          }),
-          ...collapseAnim.styleFor('panel-1'),
-        }}
-        sliding={collapseAnim.phase !== 'idle' && collapseAnim.animPanelId === 'panel-1'}
+        mountStyle={panelStayMountedStyle({
+          layout,
+          panelId: 'panel-1',
+          collapsedPanelId,
+          panel1Percent: panel1Width,
+        })}
         dir={p1Dir}
         mode={panels['panel-1'].mode}
         onModeSwitch={(mode) => onPanelModeSwitch('panel-1', mode)}
@@ -154,16 +134,12 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         panelId="panel-2"
         otherPanelId="panel-1"
         colorScheme="purple"
-        mountStyle={{
-          ...panelStayMountedStyle({
-            layout,
-            panelId: 'panel-2',
-            collapsedPanelId: layoutParkedId,
-            panel1Percent: panel1Width,
-          }),
-          ...collapseAnim.styleFor('panel-2'),
-        }}
-        sliding={collapseAnim.phase !== 'idle' && collapseAnim.animPanelId === 'panel-2'}
+        mountStyle={panelStayMountedStyle({
+          layout,
+          panelId: 'panel-2',
+          collapsedPanelId,
+          panel1Percent: panel1Width,
+        })}
         dir={p2Dir}
         mode={panels['panel-2'].mode}
         onModeSwitch={(mode) => onPanelModeSwitch('panel-2', mode)}

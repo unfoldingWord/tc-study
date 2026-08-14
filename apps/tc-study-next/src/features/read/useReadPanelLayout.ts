@@ -1,12 +1,17 @@
 /**
  * Resize + collapse-to-divider. Collapse commits on drag end (no flicker mid-drag).
+ * Snap / restore tween splitPercent like a continued divider drag.
  */
 
 import { useCallback, useEffect, useRef } from 'react'
 import {
   collapseAfterDragEnd,
+  collapseTweenRange,
+  edgeSplitPercent,
+  layoutRestoreTweenRange,
   restoreCollapsedDivider,
 } from './readPanelLayout'
+import { useReadPanelCollapse } from './useReadPanelCollapse'
 import { useReadPanelResize } from './useReadPanelResize'
 import { useReadPanelStore } from './readPanelStore'
 
@@ -21,6 +26,7 @@ export function useReadPanelLayout() {
 
   const resize = useReadPanelResize(splitPercent)
   const { panel1Width, isResizingPanels } = resize
+  const { runTween, tweenPercent } = useReadPanelCollapse({ isResizingPanels })
   const wasResizingRef = useRef(false)
 
   useEffect(() => {
@@ -33,42 +39,50 @@ export function useReadPanelLayout() {
     const result = collapseAfterDragEnd(panel1Width)
     if (result.collapsedPanelId) {
       previousSplitRef.current = splitPercent
-      setCollapsedPanelId(result.collapsedPanelId)
+      const { from, to } = collapseTweenRange(result.collapsedPanelId, panel1Width)
+      runTween(from, to, () => {
+        setSplitPercent(to)
+        setCollapsedPanelId(result.collapsedPanelId)
+      })
     } else {
       setCollapsedPanelId(null)
       setSplitPercent(result.splitPercent)
     }
-  }, [isResizingPanels, panel1Width, setCollapsedPanelId, setSplitPercent, splitPercent])
+  }, [isResizingPanels, panel1Width, runTween, setCollapsedPanelId, setSplitPercent, splitPercent])
 
   const expandPanel = useCallback(
     (panelId: 'panel-1' | 'panel-2') => {
       if (collapsedPanelId !== panelId) return
       const next = restoreCollapsedDivider(previousSplitRef.current)
       setCollapsedPanelId(next.collapsedPanelId)
-      setSplitPercent(next.splitPercent)
+      runTween(edgeSplitPercent(panelId), next.splitPercent, () => {
+        setSplitPercent(next.splitPercent)
+      })
     },
-    [collapsedPanelId, setCollapsedPanelId, setSplitPercent]
+    [collapsedPanelId, runTween, setCollapsedPanelId, setSplitPercent]
   )
 
   const restoreCollapsed = useCallback(() => {
     if (layout === 'one') {
+      const { from, to } = layoutRestoreTweenRange(previousSplitRef.current)
       setLayout('two', true)
+      runTween(from, to, () => {
+        setSplitPercent(to)
+      })
       return
     }
     if (!collapsedPanelId) return
     expandPanel(collapsedPanelId)
-  }, [collapsedPanelId, expandPanel, layout, setLayout])
+  }, [collapsedPanelId, expandPanel, layout, runTween, setLayout, setSplitPercent])
 
-  // Keep the live drag percent for the frame between mouseup and collapse commit
-  // so the slide-out starts from the threshold size, not the previous split.
   const displayWidth = isResizingPanels
     ? panel1Width
-    : collapsedPanelId
-      ? collapsedPanelId === 'panel-1'
-        ? 0
-        : 100
-      : wasResizingRef.current
-        ? panel1Width
+    : tweenPercent !== null
+      ? tweenPercent
+      : collapsedPanelId
+        ? collapsedPanelId === 'panel-1'
+          ? 0
+          : 100
         : splitPercent
 
   return {

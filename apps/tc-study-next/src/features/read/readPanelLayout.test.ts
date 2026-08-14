@@ -2,19 +2,21 @@ import { describe, expect, test } from 'bun:test'
 import {
   collapseAfterDragEnd,
   collapsedDividerArrowDir,
+  COLLAPSE_MOTION_EASING,
   COLLAPSE_MOTION_MS,
   COLLAPSE_THRESHOLD_PERCENT,
+  collapseEase,
+  collapseTweenRange,
   defaultLayoutForViewport,
   dividerCollapsedPanelId,
+  edgeSplitPercent,
   isPanelOffFlow,
-  layoutCollapsedPanelId,
-  nextCollapseAnimPhase,
-  panelCollapseMotionStyle,
+  layoutRestoreTweenRange,
   panelStayMountedStyle,
   restoreCollapsedDivider,
+  restoreTweenRange,
   restoredSplitPercent,
-  slideOffTransform,
-  slideOnTransform,
+  tweenSplitAt,
 } from './readPanelLayout'
 
 describe('readPanelLayout', () => {
@@ -110,181 +112,63 @@ describe('readPanelLayout', () => {
     expect(onePanel.flexBasis).toBe(0)
   })
 
-  test('slide-off transform points at the pane edge (side-by-side and stacked)', () => {
-    expect(slideOffTransform('panel-2', false)).toBe('translate3d(100%, 0, 0)')
-    expect(slideOffTransform('panel-1', false)).toBe('translate3d(-100%, 0, 0)')
-    expect(slideOffTransform('panel-2', true)).toBe('translate3d(0, 100%, 0)')
-    expect(slideOffTransform('panel-1', true)).toBe('translate3d(0, -100%, 0)')
-    expect(slideOnTransform(false)).toBe('translate3d(0, 0, 0)')
-    expect(slideOnTransform(true)).toBe('translate3d(0, 0, 0)')
-  })
+  test('collapse/restore tween the same in-flow flex-basis live drag uses', () => {
+    expect(edgeSplitPercent('panel-1')).toBe(0)
+    expect(edgeSplitPercent('panel-2')).toBe(100)
+    expect(collapseTweenRange('panel-2', 72)).toEqual({ from: 72, to: 100 })
+    expect(collapseTweenRange('panel-1', 28)).toEqual({ from: 28, to: 0 })
+    expect(restoreTweenRange('panel-2', 40)).toEqual({ from: 100, to: 40 })
+    expect(restoreTweenRange('panel-1', 5)).toEqual({ from: 0, to: 50 })
+    expect(layoutRestoreTweenRange(45)).toEqual({ from: 100, to: 45 })
 
-  test('restore keeps the entering pane parked in layout so the sibling stays 100%', () => {
-    expect(
-      layoutCollapsedPanelId({
-        collapsedPanelId: null,
-        phase: 'in',
-        animPanelId: 'panel-2',
-      })
-    ).toBe('panel-2')
-    expect(
-      layoutCollapsedPanelId({
-        collapsedPanelId: 'panel-1',
-        phase: 'out',
-        animPanelId: 'panel-1',
-      })
-    ).toBe('panel-1')
-    expect(
-      layoutCollapsedPanelId({
-        collapsedPanelId: null,
-        phase: 'idle',
-        animPanelId: null,
-      })
-    ).toBeNull()
-  })
-
-  test('collapse/restore phase: out on park, in on restore; reduced motion snaps', () => {
-    expect(
-      nextCollapseAnimPhase({
-        prevCollapsed: null,
-        nextCollapsed: 'panel-2',
-        prevLayout: 'two',
-        nextLayout: 'two',
-        reducedMotion: false,
-      })
-    ).toEqual({ phase: 'out', panelId: 'panel-2' })
-    expect(
-      nextCollapseAnimPhase({
-        prevCollapsed: 'panel-1',
-        nextCollapsed: null,
-        prevLayout: 'two',
-        nextLayout: 'two',
-        reducedMotion: false,
-      })
-    ).toEqual({ phase: 'in', panelId: 'panel-1' })
-    expect(
-      nextCollapseAnimPhase({
-        prevCollapsed: null,
-        nextCollapsed: null,
-        prevLayout: 'one',
-        nextLayout: 'two',
-        reducedMotion: false,
-      })
-    ).toEqual({ phase: 'in', panelId: 'panel-2' })
-    expect(
-      nextCollapseAnimPhase({
-        prevCollapsed: 'panel-2',
-        nextCollapsed: 'panel-2',
-        prevLayout: 'two',
-        nextLayout: 'two',
-        reducedMotion: true,
-      })
-    ).toEqual({ phase: 'idle', panelId: null })
-  })
-
-  test('out motion keeps the pane visible then translates toward its edge', () => {
-    const start = panelCollapseMotionStyle({
+    const mid = panelStayMountedStyle({
+      layout: 'two',
       panelId: 'panel-2',
-      animPanelId: 'panel-2',
-      phase: 'out',
-      sliding: false,
-      stacked: false,
-      panel1Percent: 75,
-      reducedMotion: false,
+      collapsedPanelId: null,
+      panel1Percent: 85,
     })
-    expect(start.visibility).toBe('visible')
-    expect(start.position).toBe('absolute')
-    expect(start.width).toBe('25%')
-    expect(start.right).toBe(0)
-    expect(start.left).toBe('auto')
-    expect(start.transform).toBe('translate3d(0, 0, 0)')
-    expect(start.transition).toBe('none')
-    expect(start.isolation).toBe('isolate')
-    expect(String(start.transition)).not.toContain('flex')
+    expect(mid.flexBasis).toBe('15%')
+    expect(mid.position).toBeUndefined()
+    expect(mid.visibility).toBe('visible')
+    expect(mid.transition).toBe('none')
 
-    const end = panelCollapseMotionStyle({
-      panelId: 'panel-2',
-      animPanelId: 'panel-2',
-      phase: 'out',
-      sliding: true,
-      stacked: false,
-      panel1Percent: 75,
-      reducedMotion: false,
+    const sibling = panelStayMountedStyle({
+      layout: 'two',
+      panelId: 'panel-1',
+      collapsedPanelId: null,
+      panel1Percent: 85,
     })
-    expect(end.transform).toBe('translate3d(100%, 0, 0)')
-    expect(end.isolation).toBe('isolate')
-    expect(end.transition).toBe(
-      `transform ${COLLAPSE_MOTION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
-    )
-    expect(String(end.transition)).not.toMatch(/flex|width|height/)
+    expect(sibling.flexBasis).toBe('85%')
+    expect(sibling.position).toBeUndefined()
   })
 
-  test('in motion is the same overlay layer; starts off-edge then settles', () => {
-    const start = panelCollapseMotionStyle({
-      panelId: 'panel-1',
-      animPanelId: 'panel-1',
-      phase: 'in',
-      sliding: false,
-      stacked: true,
-      panel1Percent: 50,
-      reducedMotion: false,
+  test('split tween: last drag % → edge, ease-out, reduced motion jumps', () => {
+    expect(COLLAPSE_MOTION_MS).toBe(200)
+    expect(COLLAPSE_MOTION_EASING).toBe('cubic-bezier(0.4, 0, 0.2, 1)')
+    expect(collapseEase(0)).toBe(0)
+    expect(collapseEase(1)).toBe(1)
+    expect(tweenSplitAt({ from: 25, to: 0, elapsedMs: 0 })).toEqual({
+      splitPercent: 25,
+      done: false,
     })
-    expect(start.position).toBe('absolute')
-    expect(start.height).toBe('50%')
-    expect(start.transform).toBe('translate3d(0, -100%, 0)')
-    expect(start.transition).toBe('none')
-    expect(start.isolation).toBe('isolate')
-
-    const end = panelCollapseMotionStyle({
-      panelId: 'panel-1',
-      animPanelId: 'panel-1',
-      phase: 'in',
-      sliding: true,
-      stacked: true,
-      panel1Percent: 50,
-      reducedMotion: false,
+    expect(tweenSplitAt({ from: 25, to: 0, elapsedMs: COLLAPSE_MOTION_MS })).toEqual({
+      splitPercent: 0,
+      done: true,
     })
-    expect(end.position).toBe('absolute')
-    expect(end.transform).toBe('translate3d(0, 0, 0)')
-    expect(end.isolation).toBe('isolate')
-    expect(end.transition).toBe(
-      `transform ${COLLAPSE_MOTION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
-    )
-
-    expect(
-      panelCollapseMotionStyle({
-        panelId: 'panel-1',
-        animPanelId: 'panel-2',
-        phase: 'out',
-        sliding: true,
-        stacked: false,
-        panel1Percent: 80,
-        reducedMotion: false,
-      })
-    ).toEqual({ transition: 'none' })
-
-    expect(
-      panelCollapseMotionStyle({
-        panelId: 'panel-2',
-        animPanelId: 'panel-2',
-        phase: 'out',
-        sliding: true,
-        stacked: false,
-        panel1Percent: 80,
-        reducedMotion: true,
-      })
-    ).toEqual({})
-    expect(
-      panelCollapseMotionStyle({
-        panelId: 'panel-2',
-        animPanelId: 'panel-2',
-        phase: 'idle',
-        sliding: false,
-        stacked: false,
-        panel1Percent: 50,
-        reducedMotion: false,
-      })
-    ).toEqual({})
+    expect(tweenSplitAt({ from: 0, to: 50, elapsedMs: 0, reducedMotion: true })).toEqual({
+      splitPercent: 50,
+      done: true,
+    })
+    expect(tweenSplitAt({ from: 70, to: 70, elapsedMs: 10 })).toEqual({
+      splitPercent: 70,
+      done: true,
+    })
+    const mid = tweenSplitAt({ from: 25, to: 0, elapsedMs: 100 })
+    expect(mid.done).toBe(false)
+    expect(mid.splitPercent).toBeGreaterThan(0)
+    expect(mid.splitPercent).toBeLessThan(25)
+    // cubic-bezier(0.4, 0, 0.2, 1) is ahead of linear at t=0.5
+    expect(mid.splitPercent).toBeLessThan(12.5)
   })
 
   test('stay-mounted panes never declare a flex transition', () => {

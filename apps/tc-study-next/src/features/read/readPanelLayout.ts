@@ -92,124 +92,88 @@ export function collapsedDividerArrowDir(options: {
 export const COLLAPSE_MOTION_MS = 200
 export const COLLAPSE_MOTION_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
 
-export type PanelCollapseAnimPhase = 'idle' | 'out' | 'in'
-
-export function slideOffTransform(panelId: ReadPanelId, stacked: boolean): string {
-  if (stacked) {
-    return panelId === 'panel-1' ? 'translate3d(0, -100%, 0)' : 'translate3d(0, 100%, 0)'
-  }
-  return panelId === 'panel-1' ? 'translate3d(-100%, 0, 0)' : 'translate3d(100%, 0, 0)'
+/** Smaller pane goes to 0 width — same edge live drag would reach. */
+export function edgeSplitPercent(collapsedPanelId: ReadPanelId): number {
+  return collapsedPanelId === 'panel-1' ? 0 : 100
 }
 
-/** Same 3d function as slide-off so the compositor interpolates one layer, not `none` → translate. */
-export function slideOnTransform(_stacked?: boolean): string {
-  return 'translate3d(0, 0, 0)'
+export function collapseTweenRange(collapsedPanelId: ReadPanelId, fromPercent: number): {
+  from: number
+  to: number
+} {
+  return { from: fromPercent, to: edgeSplitPercent(collapsedPanelId) }
 }
 
-/**
- * During restore (`in`), keep treating the entering pane as parked so the
- * remaining pane stays pinned at 100% — do not tween its flex-basis.
- */
-export function layoutCollapsedPanelId(options: {
-  collapsedPanelId: ReadPanelId | null
-  phase: PanelCollapseAnimPhase
-  animPanelId: ReadPanelId | null
-}): ReadPanelId | null {
-  if (options.phase === 'in' && options.animPanelId) return options.animPanelId
-  return options.collapsedPanelId
-}
-
-export function nextCollapseAnimPhase(options: {
-  prevCollapsed: ReadPanelId | null
-  nextCollapsed: ReadPanelId | null
-  prevLayout: ReadLayoutMode
-  nextLayout: ReadLayoutMode
-  reducedMotion: boolean
-}): { phase: PanelCollapseAnimPhase; panelId: ReadPanelId | null } {
-  if (options.reducedMotion) return { phase: 'idle', panelId: null }
-  if (options.prevLayout === 'one' && options.nextLayout === 'two') {
-    return { phase: 'in', panelId: 'panel-2' }
-  }
-  if (options.prevLayout === 'two' && options.nextLayout === 'one') {
-    return { phase: 'out', panelId: 'panel-2' }
-  }
-  if (!options.prevCollapsed && options.nextCollapsed) {
-    return { phase: 'out', panelId: options.nextCollapsed }
-  }
-  if (options.prevCollapsed && !options.nextCollapsed) {
-    return { phase: 'in', panelId: options.prevCollapsed }
-  }
-  return { phase: 'idle', panelId: null }
-}
-
-function collapseSlideEdge(panelId: ReadPanelId, stacked: boolean): CSSProperties {
-  if (stacked) {
-    return panelId === 'panel-1'
-      ? { top: 0, bottom: 'auto', left: 0, right: 0 }
-      : { top: 'auto', bottom: 0, left: 0, right: 0 }
-  }
-  return panelId === 'panel-1'
-    ? { top: 0, bottom: 0, left: 0, right: 'auto' }
-    : { top: 0, bottom: 0, left: 'auto', right: 0 }
-}
-
-/** Overlay styles while a pane slides off or back in. Empty when idle / reduced motion. */
-export function panelCollapseMotionStyle(options: {
-  panelId: ReadPanelId
-  animPanelId: ReadPanelId | null
-  phase: PanelCollapseAnimPhase
-  sliding: boolean
-  stacked: boolean
-  panel1Percent: number
-  reducedMotion: boolean
-}): CSSProperties {
-  if (options.reducedMotion || options.phase === 'idle') {
-    return {}
-  }
-  if (options.animPanelId !== options.panelId) {
-    return { transition: 'none' }
-  }
-  const share =
-    options.panelId === 'panel-1' ? options.panel1Percent : 100 - options.panel1Percent
-  const off = slideOffTransform(options.panelId, options.stacked)
-  const on = slideOnTransform(options.stacked)
-  // First frame: park at the start transform with no transition so restore
-  // does not tween from identity → off (that reads as a bounce).
-  const transition = options.sliding
-    ? `transform ${COLLAPSE_MOTION_MS}ms ${COLLAPSE_MOTION_EASING}`
-    : 'none'
-  const transform =
-    options.phase === 'out'
-      ? options.sliding
-        ? off
-        : on
-      : options.sliding
-        ? on
-        : off
-
+export function restoreTweenRange(
+  collapsedPanelId: ReadPanelId,
+  previousSplit: number | null | undefined
+): { from: number; to: number } {
   return {
-    position: 'absolute',
-    zIndex: 2,
-    isolation: 'isolate',
-    overflow: 'hidden',
-    visibility: 'visible',
-    pointerEvents: 'none',
-    flexGrow: 0,
-    flexShrink: 0,
-    flexBasis: 'auto',
-    minWidth: 0,
-    minHeight: 0,
-    ...collapseSlideEdge(options.panelId, options.stacked),
-    ...(options.stacked
-      ? { height: `${share}%`, width: '100%' }
-      : { width: `${share}%`, height: '100%' }),
-    transform,
-    transition,
-    willChange: 'transform',
+    from: edgeSplitPercent(collapsedPanelId),
+    to: restoredSplitPercent(previousSplit),
   }
 }
 
-/** Stay mounted: hidden / flex 0, never unmount. Never tween flex (cascade). */
+/** One-panel restore bar: panel-1 is full, then the divider drags back in. */
+export function layoutRestoreTweenRange(previousSplit: number | null | undefined): {
+  from: number
+  to: number
+} {
+  return { from: 100, to: restoredSplitPercent(previousSplit) }
+}
+
+const EASE_X1 = 0.4
+const EASE_Y1 = 0
+const EASE_X2 = 0.2
+const EASE_Y2 = 1
+
+function bezierCoord(u: number, a: number, b: number): number {
+  const mt = 1 - u
+  return 3 * mt * mt * u * a + 3 * mt * u * u * b + u * u * u
+}
+
+function bezierCoordDeriv(u: number, a: number, b: number): number {
+  const mt = 1 - u
+  return 3 * mt * mt * a + 6 * mt * u * (b - a) + 3 * u * u * (1 - b)
+}
+
+/** Sample CSS `cubic-bezier(0.4, 0, 0.2, 1)` at time t in [0, 1]. */
+export function collapseEase(t: number): number {
+  if (t <= 0) return 0
+  if (t >= 1) return 1
+  let u = t
+  for (let i = 0; i < 8; i++) {
+    const x = bezierCoord(u, EASE_X1, EASE_X2) - t
+    const dx = bezierCoordDeriv(u, EASE_X1, EASE_X2)
+    if (Math.abs(x) < 1e-6 || Math.abs(dx) < 1e-6) break
+    u = Math.min(1, Math.max(0, u - x / dx))
+  }
+  return bezierCoord(u, EASE_Y1, EASE_Y2)
+}
+
+/** rAF sample of the same splitPercent live drag writes. */
+export function tweenSplitAt(options: {
+  from: number
+  to: number
+  elapsedMs: number
+  durationMs?: number
+  reducedMotion?: boolean
+}): { splitPercent: number; done: boolean } {
+  if (options.reducedMotion || options.from === options.to) {
+    return { splitPercent: options.to, done: true }
+  }
+  const duration = options.durationMs ?? COLLAPSE_MOTION_MS
+  if (options.elapsedMs >= duration) {
+    return { splitPercent: options.to, done: true }
+  }
+  if (options.elapsedMs <= 0) {
+    return { splitPercent: options.from, done: false }
+  }
+  const t = collapseEase(options.elapsedMs / duration)
+  return { splitPercent: options.from + (options.to - options.from) * t, done: false }
+}
+
+/** Stay mounted: hidden / flex 0, never unmount. Flex-basis updates come from splitPercent (drag or rAF). */
 export function panelStayMountedStyle(options: {
   layout: ReadLayoutMode
   panelId: ReadPanelId
@@ -236,7 +200,6 @@ export function panelStayMountedStyle(options: {
     }
   }
   // Sole visible pane: grow into leftover after the restore / resize strip.
-  // Pin immediately (flexGrow) — do not animate flex-basis alongside the slide.
   if (options.layout === 'one' || options.collapsedPanelId) {
     return {
       flexGrow: 1,
