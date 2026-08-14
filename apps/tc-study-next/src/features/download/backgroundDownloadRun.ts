@@ -143,7 +143,7 @@ export function createInitialDownloadProgress(
   totalIngredients: number
   completedIngredients: number
   failedIngredients: number
-  currentIngredient: null
+  currentIngredient: undefined
 } {
   return {
     currentResource: resourceKeys[0] ?? null,
@@ -156,6 +156,6 @@ export function createInitialDownloadProgress(
     totalIngredients: totalIngredients ?? 0,
     completedIngredients: 0,
     failedIngredients: 0,
-    currentIngredient: null,
+    currentIngredient: undefined,
   }
 }
