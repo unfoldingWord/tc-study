@@ -11,6 +11,10 @@ const hookSrc = readFileSync(
   join(import.meta.dir, '../../features/read/useReadPanelLayout.ts'),
   'utf8'
 )
+const collapseHookSrc = readFileSync(
+  join(import.meta.dir, '../../features/read/useReadPanelCollapse.ts'),
+  'utf8'
+)
 const bootstrapSrc = readFileSync(
   join(import.meta.dir, '../../features/read/useReadLanguageBootstrap.ts'),
   'utf8'
@@ -76,6 +80,12 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(dividerSrc).toContain('Show other panel')
     expect(dividerSrc).not.toContain('RAIL_PX')
     expect(hookSrc).toContain('restoreCollapsedDivider')
+    expect(areaSrc).toContain('useReadPanelCollapse')
+    expect(areaSrc).toContain('styleFor')
+    expect(collapseHookSrc).toContain('prefers-reduced-motion')
+    expect(collapseHookSrc).toContain('isResizingPanels')
+    expect(collapseHookSrc).toContain('COLLAPSE_MOTION_MS')
+    expect(viewSrc.split('\n').length).toBeLessThan(400)
   })
 
   test('#33 reopen collapsed panel on cross-panel token', () => {

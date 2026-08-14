@@ -2,13 +2,17 @@ import { describe, expect, test } from 'bun:test'
 import {
   collapseAfterDragEnd,
   collapsedDividerArrowDir,
+  COLLAPSE_MOTION_MS,
   COLLAPSE_THRESHOLD_PERCENT,
   defaultLayoutForViewport,
   dividerCollapsedPanelId,
   isPanelOffFlow,
+  nextCollapseAnimPhase,
+  panelCollapseMotionStyle,
   panelStayMountedStyle,
   restoreCollapsedDivider,
   restoredSplitPercent,
+  slideOffTransform,
 } from './readPanelLayout'
 
 describe('readPanelLayout', () => {
@@ -102,5 +106,128 @@ describe('readPanelLayout', () => {
     })
     expect(onePanel.flexGrow).toBe(1)
     expect(onePanel.flexBasis).toBe(0)
+  })
+
+  test('slide-off transform points at the pane edge (side-by-side and stacked)', () => {
+    expect(slideOffTransform('panel-2', false)).toBe('translateX(100%)')
+    expect(slideOffTransform('panel-1', false)).toBe('translateX(-100%)')
+    expect(slideOffTransform('panel-2', true)).toBe('translateY(100%)')
+    expect(slideOffTransform('panel-1', true)).toBe('translateY(-100%)')
+  })
+
+  test('collapse/restore phase: out on park, in on restore; reduced motion snaps', () => {
+    expect(
+      nextCollapseAnimPhase({
+        prevCollapsed: null,
+        nextCollapsed: 'panel-2',
+        prevLayout: 'two',
+        nextLayout: 'two',
+        reducedMotion: false,
+      })
+    ).toEqual({ phase: 'out', panelId: 'panel-2' })
+    expect(
+      nextCollapseAnimPhase({
+        prevCollapsed: 'panel-1',
+        nextCollapsed: null,
+        prevLayout: 'two',
+        nextLayout: 'two',
+        reducedMotion: false,
+      })
+    ).toEqual({ phase: 'in', panelId: 'panel-1' })
+    expect(
+      nextCollapseAnimPhase({
+        prevCollapsed: null,
+        nextCollapsed: null,
+        prevLayout: 'one',
+        nextLayout: 'two',
+        reducedMotion: false,
+      })
+    ).toEqual({ phase: 'in', panelId: 'panel-2' })
+    expect(
+      nextCollapseAnimPhase({
+        prevCollapsed: 'panel-2',
+        nextCollapsed: 'panel-2',
+        prevLayout: 'two',
+        nextLayout: 'two',
+        reducedMotion: true,
+      })
+    ).toEqual({ phase: 'idle', panelId: null })
+  })
+
+  test('out motion keeps the pane visible then translates toward its edge', () => {
+    const start = panelCollapseMotionStyle({
+      panelId: 'panel-2',
+      animPanelId: 'panel-2',
+      phase: 'out',
+      sliding: false,
+      stacked: false,
+      panel1Percent: 75,
+      reducedMotion: false,
+    })
+    expect(start.visibility).toBe('visible')
+    expect(start.position).toBe('absolute')
+    expect(start.width).toBe('25%')
+    expect(start.right).toBe(0)
+    expect(start.left).toBe('auto')
+    expect(start.transform).toBe('none')
+    expect(start.transition).toBe(`transform ${COLLAPSE_MOTION_MS}ms ease-out`)
+
+    const end = panelCollapseMotionStyle({
+      panelId: 'panel-2',
+      animPanelId: 'panel-2',
+      phase: 'out',
+      sliding: true,
+      stacked: false,
+      panel1Percent: 75,
+      reducedMotion: false,
+    })
+    expect(end.transform).toBe('translateX(100%)')
+  })
+
+  test('in motion starts off-edge then settles; idle and reduced motion skip', () => {
+    const start = panelCollapseMotionStyle({
+      panelId: 'panel-1',
+      animPanelId: 'panel-1',
+      phase: 'in',
+      sliding: false,
+      stacked: true,
+      panel1Percent: 50,
+      reducedMotion: false,
+    })
+    expect(start.transform).toBe('translateY(-100%)')
+
+    const end = panelCollapseMotionStyle({
+      panelId: 'panel-1',
+      animPanelId: 'panel-1',
+      phase: 'in',
+      sliding: true,
+      stacked: true,
+      panel1Percent: 50,
+      reducedMotion: false,
+    })
+    expect(end.transform).toBe('none')
+
+    expect(
+      panelCollapseMotionStyle({
+        panelId: 'panel-2',
+        animPanelId: 'panel-2',
+        phase: 'out',
+        sliding: true,
+        stacked: false,
+        panel1Percent: 80,
+        reducedMotion: true,
+      })
+    ).toEqual({})
+    expect(
+      panelCollapseMotionStyle({
+        panelId: 'panel-2',
+        animPanelId: 'panel-2',
+        phase: 'idle',
+        sliding: false,
+        stacked: false,
+        panel1Percent: 50,
+        reducedMotion: false,
+      })
+    ).toEqual({})
   })
 })

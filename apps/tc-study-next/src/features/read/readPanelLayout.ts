@@ -88,6 +88,102 @@ export function collapsedDividerArrowDir(options: {
   return options.collapsedPanelId === 'panel-1' ? 'right' : 'left'
 }
 
+/** Snap-to-collapse / restore only — not live drag. Tailwind `duration-200 ease-out`. */
+export const COLLAPSE_MOTION_MS = 200
+export const COLLAPSE_MOTION_EASING = 'ease-out'
+
+export type PanelCollapseAnimPhase = 'idle' | 'out' | 'in'
+
+export function slideOffTransform(panelId: ReadPanelId, stacked: boolean): string {
+  if (stacked) return panelId === 'panel-1' ? 'translateY(-100%)' : 'translateY(100%)'
+  return panelId === 'panel-1' ? 'translateX(-100%)' : 'translateX(100%)'
+}
+
+export function nextCollapseAnimPhase(options: {
+  prevCollapsed: ReadPanelId | null
+  nextCollapsed: ReadPanelId | null
+  prevLayout: ReadLayoutMode
+  nextLayout: ReadLayoutMode
+  reducedMotion: boolean
+}): { phase: PanelCollapseAnimPhase; panelId: ReadPanelId | null } {
+  if (options.reducedMotion) return { phase: 'idle', panelId: null }
+  if (options.prevLayout === 'one' && options.nextLayout === 'two') {
+    return { phase: 'in', panelId: 'panel-2' }
+  }
+  if (options.prevLayout === 'two' && options.nextLayout === 'one') {
+    return { phase: 'out', panelId: 'panel-2' }
+  }
+  if (!options.prevCollapsed && options.nextCollapsed) {
+    return { phase: 'out', panelId: options.nextCollapsed }
+  }
+  if (options.prevCollapsed && !options.nextCollapsed) {
+    return { phase: 'in', panelId: options.prevCollapsed }
+  }
+  return { phase: 'idle', panelId: null }
+}
+
+function collapseSlideEdge(panelId: ReadPanelId, stacked: boolean): CSSProperties {
+  if (stacked) {
+    return panelId === 'panel-1'
+      ? { top: 0, bottom: 'auto', left: 0, right: 0 }
+      : { top: 'auto', bottom: 0, left: 0, right: 0 }
+  }
+  return panelId === 'panel-1'
+    ? { top: 0, bottom: 0, left: 0, right: 'auto' }
+    : { top: 0, bottom: 0, left: 'auto', right: 0 }
+}
+
+/** Overlay styles while a pane slides off or back in. Empty when idle / reduced motion. */
+export function panelCollapseMotionStyle(options: {
+  panelId: ReadPanelId
+  animPanelId: ReadPanelId | null
+  phase: PanelCollapseAnimPhase
+  sliding: boolean
+  stacked: boolean
+  panel1Percent: number
+  reducedMotion: boolean
+}): CSSProperties {
+  if (
+    options.reducedMotion ||
+    options.phase === 'idle' ||
+    options.animPanelId !== options.panelId
+  ) {
+    return {}
+  }
+  const share =
+    options.panelId === 'panel-1' ? options.panel1Percent : 100 - options.panel1Percent
+  const off = slideOffTransform(options.panelId, options.stacked)
+  const transition = `transform ${COLLAPSE_MOTION_MS}ms ${COLLAPSE_MOTION_EASING}`
+
+  if (options.phase === 'out') {
+    return {
+      position: 'absolute',
+      zIndex: 2,
+      overflow: 'hidden',
+      visibility: 'visible',
+      pointerEvents: 'none',
+      flexGrow: 0,
+      flexShrink: 0,
+      flexBasis: 'auto',
+      minWidth: 0,
+      minHeight: 0,
+      ...collapseSlideEdge(options.panelId, options.stacked),
+      ...(options.stacked
+        ? { height: `${share}%`, width: '100%' }
+        : { width: `${share}%`, height: '100%' }),
+      transform: options.sliding ? off : 'none',
+      transition,
+    }
+  }
+
+  return {
+    visibility: 'visible',
+    overflow: 'hidden',
+    transform: options.sliding ? 'none' : off,
+    transition,
+  }
+}
+
 /** Stay mounted: hidden / flex 0, never unmount. */
 export function panelStayMountedStyle(options: {
   layout: ReadLayoutMode

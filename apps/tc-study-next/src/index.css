@@ -244,3 +244,9 @@
     overflow: hidden;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .panels-resize-container > * {
+    transition: none !important;
+  }
+}

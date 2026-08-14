@@ -59,13 +59,17 @@ export function useReadPanelLayout() {
     expandPanel(collapsedPanelId)
   }, [collapsedPanelId, expandPanel, layout, setLayout])
 
+  // Keep the live drag percent for the frame between mouseup and collapse commit
+  // so the slide-out starts from the threshold size, not the previous split.
   const displayWidth = isResizingPanels
     ? panel1Width
     : collapsedPanelId
       ? collapsedPanelId === 'panel-1'
         ? 0
         : 100
-      : splitPercent
+      : wasResizingRef.current
+        ? panel1Width
+        : splitPercent
 
   return {
     ...resize,

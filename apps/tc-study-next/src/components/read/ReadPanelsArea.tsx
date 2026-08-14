@@ -4,6 +4,7 @@ import {
   dividerCollapsedPanelId,
   panelStayMountedStyle,
 } from '../../features/read/readPanelLayout'
+import { useReadPanelCollapse } from '../../features/read/useReadPanelCollapse'
 import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
 import type { ReadPanelId, ReadPanelMode, ReadPanelModels } from '../../features/read/readPanelModel'
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
@@ -79,6 +80,13 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
   const collapsedArrow = parkedId
     ? collapsedDividerArrowDir({ collapsedPanelId: parkedId, stacked: isNarrow })
     : null
+  const collapseAnim = useReadPanelCollapse({
+    collapsedPanelId,
+    layout,
+    isNarrow,
+    isResizingPanels,
+    panel1Width,
+  })
 
   return (
     <div
@@ -93,12 +101,15 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         panelId="panel-1"
         otherPanelId="panel-2"
         colorScheme="blue"
-        mountStyle={panelStayMountedStyle({
-          layout,
-          panelId: 'panel-1',
-          collapsedPanelId,
-          panel1Percent: panel1Width,
-        })}
+        mountStyle={{
+          ...panelStayMountedStyle({
+            layout,
+            panelId: 'panel-1',
+            collapsedPanelId,
+            panel1Percent: panel1Width,
+          }),
+          ...collapseAnim.styleFor('panel-1'),
+        }}
         dir={p1Dir}
         mode={panels['panel-1'].mode}
         onModeSwitch={(mode) => onPanelModeSwitch('panel-1', mode)}
@@ -134,12 +145,15 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         panelId="panel-2"
         otherPanelId="panel-1"
         colorScheme="purple"
-        mountStyle={panelStayMountedStyle({
-          layout,
-          panelId: 'panel-2',
-          collapsedPanelId,
-          panel1Percent: panel1Width,
-        })}
+        mountStyle={{
+          ...panelStayMountedStyle({
+            layout,
+            panelId: 'panel-2',
+            collapsedPanelId,
+            panel1Percent: panel1Width,
+          }),
+          ...collapseAnim.styleFor('panel-2'),
+        }}
         dir={p2Dir}
         mode={panels['panel-2'].mode}
         onModeSwitch={(mode) => onPanelModeSwitch('panel-2', mode)}
