@@ -100,10 +100,13 @@ export function SimplifiedReadView({
     availableLanguages,
   })
 
-  const subjects =
-    typeof resourceTypeRegistry.getSupportedSubjects === 'function'
-      ? resourceTypeRegistry.getSupportedSubjects()
-      : []
+  const subjects = useMemo(
+    () =>
+      typeof resourceTypeRegistry.getSupportedSubjects === 'function'
+        ? resourceTypeRegistry.getSupportedSubjects()
+        : [],
+    []
+  )
   const panel1Mismatch = useMemo(() => {
     if (panels['panel-1'].mode !== 'scripture' || !panels['panel-1'].languageCode) return null
     return textModeMismatchFromCache({

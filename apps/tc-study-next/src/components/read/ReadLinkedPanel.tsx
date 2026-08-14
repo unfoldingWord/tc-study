@@ -56,7 +56,7 @@ interface ReadLinkedPanelProps {
 
 function ReadPanelBody({
   panelId,
-  otherPanelId,
+  otherPanelId: _otherPanelId,
   colorScheme,
   filteredKeys,
   filteredResources,
