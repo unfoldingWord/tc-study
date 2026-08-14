@@ -6,7 +6,7 @@
  * Entry title stays more prominent than the quote.
  */
 
-import { BookText, MoreHorizontal } from 'lucide-react'
+import { BookText } from 'lucide-react'
 import { memo } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
@@ -147,25 +147,11 @@ export const WordLinkCard = memo(function WordLinkCard({
 
       {/* First-paragraph preview (mirrors TN note body — clicks bubble to card for quote highlight) */}
       {twPreview ? (
-        <div className="relative mt-1.5" dir={languageDirection}>
-          <div className="pe-7">
-            <MarkdownRenderer
-              content={twPreview}
-              className="text-base text-fg-secondary leading-relaxed prose prose-base max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onTitleClick(link)
-            }}
-            className="absolute top-0 end-0 p-1 text-fg-muted hover:text-helps-fg hover:bg-helps-soft rounded-md transition-colors"
-            title="See more"
-            aria-label="See more"
-          >
-            <MoreHorizontal className="w-3.5 h-3.5" />
-          </button>
+        <div className="mt-1.5" dir={languageDirection}>
+          <MarkdownRenderer
+            content={twPreview}
+            className="text-base text-fg-secondary leading-relaxed prose prose-base max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent"
+          />
         </div>
       ) : null}
 
