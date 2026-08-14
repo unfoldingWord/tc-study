@@ -21,7 +21,7 @@ export function ReadCrossPanelReopen({
   collapsedPanelId,
   onReopen,
 }: ReadCrossPanelReopenProps) {
-  useMultiSignalHandler(CROSS_PANEL_REOPEN_SIGNALS as unknown as string[], sourceResourceId, (signal) => {
+  useMultiSignalHandler([...CROSS_PANEL_REOPEN_SIGNALS], sourceResourceId, (signal) => {
     if (signal.sourceResourceId !== sourceResourceId) return
     if (
       !shouldReopenCollapsedPanel({
