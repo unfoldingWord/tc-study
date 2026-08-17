@@ -14,8 +14,9 @@ describe('Read URL sync wiring (internal vs external)', () => {
     const panel = readFileSync(join(import.meta.dir, 'useReadPanelLanguageHandlers.ts'), 'utf8')
     const pick = panel.slice(panel.indexOf('const handlePanelLanguageSelected'))
     const body = pick.slice(0, pick.indexOf('const handlePanelModeSwitch'))
-    expect(body).toContain("panel.mode === 'scripture'")
+    expect(body).toContain('readUrlLangsFromPanels')
     expect(body).toContain('replaceReadLanguageUrlFromUi')
+    expect(body).not.toContain("if (panel.mode === 'scripture')")
     expect(body).toContain('catalogLoadForSinglePanel')
     expect(body).not.toContain('hydrateLanguagesFromUrl')
     expect(body).not.toContain('hydrateLanguagesFromHint')
@@ -23,7 +24,9 @@ describe('Read URL sync wiring (internal vs external)', () => {
     expect(body).not.toContain('coldStartCatalogLoads')
 
     const helps = panel.slice(panel.indexOf('const handleHelpsLanguageSelected'))
-    expect(helps).not.toContain('replaceReadLanguageUrlFromUi')
+    expect(helps).toContain("handlePanelLanguageSelected('panel-2'")
+    expect(helps).not.toContain('handleLanguageSelected')
+    expect(helps).not.toContain('resolveTextLanguagePickNavigation')
   })
 
   test('in-app URL write is replaceState, not React Router navigate', () => {

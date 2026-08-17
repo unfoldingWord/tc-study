@@ -52,10 +52,8 @@ export function useReadPanelLanguageHandlers(deps: {
       const resolvedCode = canonicalReadLanguageCode(languageCode)
       setPanelLanguage(panelId, resolvedCode)
       const panel = useReadPanelStore.getState().panels[panelId]
-      if (panel.mode === 'scripture') {
-        const langs = readUrlLangsFromPanels(useReadPanelStore.getState().panels)
-        if (langs.length) replaceReadLanguageUrlFromUi(langs)
-      }
+      const langs = readUrlLangsFromPanels(useReadPanelStore.getState().panels)
+      if (langs.length) replaceReadLanguageUrlFromUi(langs)
       maybeCancelDownloads(panel.mode === 'helps' ? 'helps' : 'text')
       const navigationScope = useNavigationStore.getState().navigationScope
       if (

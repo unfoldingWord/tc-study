@@ -161,4 +161,21 @@ describe('readUrlGrammar', () => {
       })
     ).toBe('/read/fr+en/obs/story/8')
   })
+
+  test('helps pick serializes both pane langs (fr + en → fr+en)', () => {
+    const before = {
+      'panel-1': { mode: 'scripture' as const, languageCode: 'fr' },
+      'panel-2': { mode: 'helps' as const, languageCode: 'id' },
+    }
+    expect(readUrlLangsFromPanels(before)).toEqual(['fr', 'id'])
+    const after = applyPanelLanguage(before, 'panel-2', 'en')
+    expect(after['panel-1'].languageCode).toBe('fr')
+    expect(readUrlLangsFromPanels(after)).toEqual(['fr', 'en'])
+    expect(
+      serializeReadUrl({
+        langs: readUrlLangsFromPanels(after),
+        tail: { resourceType: 'obs', navType: 'story', navRef: '8' },
+      })
+    ).toBe('/read/fr+en/obs/story/8')
+  })
 })

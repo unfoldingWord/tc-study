@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeEach } from 'bun:test'
 import { readUrlWriteBackAction, shouldPushReadLanguageUrl } from './readBootstrapPolicy'
 import { hydrateReadLanguagesFromParsedUrl } from './readColdStartPolicy'
-import { DEFAULT_READ_PANEL_MODELS } from './readPanelModel'
+import { applyPanelLanguage, DEFAULT_READ_PANEL_MODELS } from './readPanelModel'
 import { parseReadUrl, readUrlLangsFromPanels, serializeReadUrl } from './readUrlGrammar'
 import {
   applyReadPopstate,
@@ -32,6 +32,33 @@ describe('replaceReadUrlFromUi + navigationSource', () => {
     })
     expect(after.panels['panel-1'].languageCode).toBe('en')
     expect(after.panels['panel-2'].languageCode).toBe('fr')
+  })
+
+  test('helps pick updates fr+id → fr+en via replaceState; no hydrate; p1 stays fr', () => {
+    const stored = {
+      'panel-1': { mode: 'scripture' as const, languageCode: 'fr' },
+      'panel-2': { mode: 'helps' as const, languageCode: 'id' },
+    }
+    expect(readUrlLangsFromPanels(stored)).toEqual(['fr', 'id'])
+    const afterPick = applyPanelLanguage(stored, 'panel-2', 'en')
+    expect(afterPick['panel-1'].languageCode).toBe('fr')
+    expect(afterPick['panel-2'].languageCode).toBe('en')
+    const serializedLangs = readUrlLangsFromPanels(afterPick)
+    expect(serializedLangs).toEqual(['fr', 'en'])
+    const serialized = serializeReadUrl({
+      langs: serializedLangs,
+      tail: { resourceType: 'obs', navType: 'story', navRef: '8' },
+    })
+    expect(serialized).toBe('/read/fr+en/obs/story/8')
+    replaceReadUrlFromUi(serialized)
+    expect(getReadNavigationSource()).toBe('internal')
+    expect(shouldHydrateReadLanguages()).toBe(false)
+    const after = hydrateReadLanguagesFromParsedUrl({
+      panels: afterPick,
+      langs: shouldHydrateReadLanguages() ? serializedLangs : [],
+    })
+    expect(after.panels['panel-1'].languageCode).toBe('fr')
+    expect(after.panels['panel-2'].languageCode).toBe('en')
   })
 
   test('in-app scripture pick updates en → en+fr via replaceState, no hydrate', () => {

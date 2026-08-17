@@ -59,8 +59,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(helps).toContain("handlePanelLanguageSelected('panel-2'")
     expect(helps).not.toContain('resolveTextLanguagePickNavigation')
     expect(helps).not.toContain('applyTextLanguagePickNavigation')
-    expect(helps).not.toContain('replaceReadLanguageUrlFromUi')
-    expect(helps).not.toContain('pushReadLanguageUrl')
+    expect(helps).not.toContain('handleLanguageSelected')
   })
 
   test('per-panel language change never seeds the other panel', () => {
@@ -69,12 +68,16 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     const panel = panelSrc.slice(panelSrc.indexOf('const handlePanelLanguageSelected'))
     const body = panel.slice(0, panel.indexOf('const handlePanelModeSwitch'))
     expect(body).toContain('setPanelLanguage(panelId, resolvedCode)')
+    expect(body).toContain('readUrlLangsFromPanels')
+    expect(body).toContain('replaceReadLanguageUrlFromUi')
+    expect(body).not.toContain("if (panel.mode === 'scripture')")
+    expect(body.indexOf('readUrlLangsFromPanels')).toBeLessThan(body.indexOf('skipTextCatalogOnMismatch'))
     expect(body).toContain('skipTextCatalogOnMismatch')
     expect(body).toContain("panel.mode === 'scripture'")
     expect(body).toContain('catalogLoadForSinglePanel')
     expect(body).not.toContain('seedBothLanguages')
-    expect(body).not.toContain('pushReadLanguageUrl')
-    expect(body).toContain('replaceReadLanguageUrlFromUi')
+    expect(body).not.toContain('handleLanguageSelected')
+    expect(body).not.toContain('hydrateLanguagesFromUrl')
   })
 
   test('empty pane inherits the other pane language then loads that pane catalog', () => {

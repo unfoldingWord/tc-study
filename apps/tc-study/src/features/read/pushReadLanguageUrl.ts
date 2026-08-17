@@ -1,5 +1,5 @@
 /**
- * Replace the Read URL for a scripture-language change without React Router.
+ * Replace the Read URL for any panel language change without React Router.
  */
 
 import { useNavigationStore } from '../nav/navigationStore'
