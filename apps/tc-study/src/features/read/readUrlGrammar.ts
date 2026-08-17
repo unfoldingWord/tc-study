@@ -134,9 +134,8 @@ type PanelLangSnapshot = {
 }
 
 /**
- * Scripture / OBS-content panes own the language field.
- * Same code on both scripture panes → one lang (no `en+en`).
- * Diverged scripture panes → `lang1+lang2`. Helps-only language is omitted.
+ * Serialize from both panels’ `languageCode` (mode does not filter).
+ * Both set and different → `{p1}+{p2}`. Same or p2 empty → one lang.
  */
 export function readUrlLangsFromPanels(panels: Record<'panel-1' | 'panel-2', PanelLangSnapshot>): string[] {
   const c1 = panels['panel-1'].languageCode?.trim()
@@ -145,11 +144,8 @@ export function readUrlLangsFromPanels(panels: Record<'panel-1' | 'panel-2', Pan
   const c2 = panels['panel-2'].languageCode?.trim()
     ? canonicalReadLanguageCode(panels['panel-2'].languageCode!)
     : null
-  const s1 = panels['panel-1'].mode === 'scripture' ? c1 : null
-  const s2 = panels['panel-2'].mode === 'scripture' ? c2 : null
-  if (s1 && s2) return s1 === s2 ? [s1] : [s1, s2]
-  if (s1) return [s1]
-  if (s2 && c1 && panels['panel-1'].mode !== 'scripture') return [c1, s2]
-  if (s2) return [s2]
+  if (c1 && c2) return c1 === c2 ? [c1] : [c1, c2]
+  if (c1) return [c1]
+  if (c2) return [c2]
   return []
 }

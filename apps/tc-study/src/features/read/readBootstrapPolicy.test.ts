@@ -162,6 +162,25 @@ describe('readBootstrapPolicy', () => {
     ).toBeNull()
   })
 
+  test('write-back after dual-lang hydrate does not drop the helps lang', () => {
+    expect(
+      readUrlWriteBackAction({
+        pathname: '/read/es-419+en/obs/story/8',
+        language: 'es-419',
+        languages: ['es-419', 'en'],
+        suppressUrlSync: false,
+        navigationSource: 'internal',
+        scope: 'obs',
+        mode: 'chapter',
+        ref: { book: 'obs', chapter: 8, verse: 1 },
+        passageSet: null,
+        section1Based: null,
+      })
+    ).toBeNull()
+    expect(shouldPushReadLanguageUrl('/read/es-419+en/obs/story/8', ['es-419', 'en'])).toBe(false)
+    expect(shouldPushReadLanguageUrl('/read/es-419/obs/story/8', ['es-419'])).toBe(false)
+  })
+
   test('write-back can emit two scripture langs without treating bible as a lang', () => {
     expect(
       readUrlWriteBackAction({

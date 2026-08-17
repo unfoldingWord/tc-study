@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { languageCodeFromReadPathname } from './readBootstrapPolicy'
 import { applyPanelLanguage, DEFAULT_READ_PANEL_MODELS } from './readPanelModel'
-import { parseReadUrl } from './readUrlGrammar'
+import { parseReadUrl, readUrlLangsFromPanels, serializeReadUrl } from './readUrlGrammar'
 import {
   hydrateReadLanguagesFromHint,
   hydrateReadLanguagesFromParsedUrl,
@@ -246,6 +246,26 @@ describe('inheritEmptyPanelLanguage', () => {
     expect(hydrated.panels['panel-1'].languageCode).toBe('es-419')
     expect(hydrated.panels['panel-2'].languageCode).toBe('fr')
     expect(hydrated.inheritedPanelId).toBeNull()
+  })
+
+  test('external /read/es-419+en/obs/story/8 hydrates both panes and serialize keeps +en', () => {
+    const pathname = '/read/es-419+en/obs/story/8'
+    const langs = parseReadUrl(pathname).langs
+    expect(langs).toEqual(['es-419', 'en'])
+    const hydrated = hydrateReadLanguagesFromParsedUrl({
+      panels: DEFAULT_READ_PANEL_MODELS,
+      langs,
+    })
+    expect(hydrated.panels['panel-1'].languageCode).toBe('es-419')
+    expect(hydrated.panels['panel-2'].languageCode).toBe('en')
+    const serializedLangs = readUrlLangsFromPanels(hydrated.panels)
+    expect(serializedLangs).toEqual(['es-419', 'en'])
+    expect(
+      serializeReadUrl({
+        langs: serializedLangs,
+        tail: { resourceType: 'obs', navType: 'story', navRef: '8' },
+      })
+    ).toBe(pathname)
   })
 
   test('session restore with p1 set and p2 empty copies helps language only', () => {

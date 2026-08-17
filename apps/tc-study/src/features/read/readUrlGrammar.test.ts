@@ -112,13 +112,19 @@ describe('readUrlGrammar', () => {
     expect(parseReadUrl('/read-v1/en/bible/ref/tit%201:1').langs).toEqual([])
   })
 
-  test('scripture panes own URL langs; helps-only is omitted', () => {
+  test('both panel languageCodes serialize; helps lang is not omitted', () => {
     expect(
       readUrlLangsFromPanels({
         'panel-1': { mode: 'scripture', languageCode: 'en' },
         'panel-2': { mode: 'helps', languageCode: 'fr' },
       })
-    ).toEqual(['en'])
+    ).toEqual(['en', 'fr'])
+    expect(
+      readUrlLangsFromPanels({
+        'panel-1': { mode: 'scripture', languageCode: 'es-419' },
+        'panel-2': { mode: 'helps', languageCode: 'en' },
+      })
+    ).toEqual(['es-419', 'en'])
     expect(
       readUrlLangsFromPanels({
         'panel-1': { mode: 'scripture', languageCode: 'en' },
@@ -131,7 +137,28 @@ describe('readUrlGrammar', () => {
         'panel-2': { mode: 'scripture', languageCode: 'en' },
       })
     ).toEqual(['en'])
+    expect(
+      readUrlLangsFromPanels({
+        'panel-1': { mode: 'scripture', languageCode: 'es-419' },
+        'panel-2': { mode: 'helps', languageCode: 'es-419' },
+      })
+    ).toEqual(['es-419'])
     const seeded = applyPanelLanguage(DEFAULT_READ_PANEL_MODELS, 'panel-1', 'ha')
     expect(readUrlLangsFromPanels(seeded)).toEqual(['ha'])
+  })
+
+  test('in-app scripture pick keeps a set helps lang in the path', () => {
+    expect(
+      readUrlLangsFromPanels({
+        'panel-1': { mode: 'scripture', languageCode: 'fr' },
+        'panel-2': { mode: 'helps', languageCode: 'en' },
+      })
+    ).toEqual(['fr', 'en'])
+    expect(
+      serializeReadUrl({
+        langs: ['fr', 'en'],
+        tail: { resourceType: 'obs', navType: 'story', navRef: '8' },
+      })
+    ).toBe('/read/fr+en/obs/story/8')
   })
 })
