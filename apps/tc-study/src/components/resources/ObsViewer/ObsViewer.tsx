@@ -81,6 +81,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
 
   const {
     activeHighlight,
+    activeFrameFilter,
     frameTextRef,
     activateWordSpan,
     toggleHighlightEntry,
@@ -160,6 +161,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
               isPanel2QuoteCapable={isPanel2QuoteCapable}
               obsQuotesState={obsQuotesState}
               activeHighlight={activeHighlight}
+              activeFrameFilter={activeFrameFilter}
               activateWordSpan={activateWordSpan}
               toggleRangeHighlight={toggleRangeHighlight}
               onFrameClick={selectFrame}

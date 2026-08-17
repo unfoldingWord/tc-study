@@ -22,4 +22,14 @@ describe('OBS frame click → helps verse-filter', () => {
     expect(singleSrc).toContain('onClick={() => onFrameClick(storyNum, frameNum)}')
     expect(viewerSrc).toContain('onFrameClick={selectFrame}')
   })
+
+  test('range view marks the verse-filter frame active', () => {
+    expect(highlightSrc).toContain('activeFrameFilter')
+    expect(highlightSrc).toContain('setActiveFrameFilter')
+    expect(viewerSrc).toContain('activeFrameFilter={activeFrameFilter}')
+    expect(rangeSrc).toContain('isObsFrameFilterActive')
+    expect(rangeSrc).toContain('obsFrameChromeClass')
+    expect(rangeSrc).toContain('data-obs-frame-active')
+    expect(rangeSrc).toContain('data-obs-frame=')
+  })
 })

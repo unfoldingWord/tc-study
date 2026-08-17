@@ -80,6 +80,11 @@ export function useCombinedHelpsSignals({
     resourceId,
     resourceMetadata
   )
+  const { sendToAll: sendVerseFilter } = useSignal<VerseFilterSignal>(
+    'verse-filter',
+    resourceId,
+    resourceMetadata
+  )
   const { sendToAll: broadcastObsHighlight } = useSignal<ObsFrameHighlightSignal>(
     'obs-frame-highlight',
     resourceId,
@@ -109,6 +114,7 @@ export function useCombinedHelpsSignals({
         }
         setTokenFilter(nextFilter)
         setVerseFilter(null)
+        sendVerseFilter({ lifecycle: 'event', filter: null })
         setSelectedHelpsCard(
           focusFirstMatchingHelpsCard({
             notes: notesWithAlignedTokens,
@@ -130,6 +136,7 @@ export function useCombinedHelpsSignals({
         setTokenFilter,
         setVerseFilter,
         setSelectedHelpsCard,
+        sendVerseFilter,
       ]
     ),
     { debug: false, resourceMetadata }
@@ -197,6 +204,7 @@ export function useCombinedHelpsSignals({
     resourceMetadata,
     sendTokenClick,
     sendEntryLinkClick,
+    sendVerseFilter,
     broadcastObsHighlight,
   }
 }

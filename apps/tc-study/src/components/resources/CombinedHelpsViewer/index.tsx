@@ -180,7 +180,7 @@ export function CombinedHelpsViewer({
     obsQuoteFilter,
   })
 
-  const { sendTokenClick, sendEntryLinkClick, broadcastObsHighlight } = useCombinedHelpsSignals({
+  const { sendTokenClick, sendEntryLinkClick, sendVerseFilter, broadcastObsHighlight } = useCombinedHelpsSignals({
     resourceId,
     resourceKey,
     tnKey,
@@ -298,7 +298,10 @@ export function CombinedHelpsViewer({
           setSelectedHelpsCard(null)
         }}
         onClearTokenFilter={() => setTokenFilter(null)}
-        onClearVerseFilter={() => setVerseFilter(null)}
+        onClearVerseFilter={() => {
+          setVerseFilter(null)
+          sendVerseFilter({ lifecycle: 'event', filter: null })
+        }}
       />
     ) : null
 

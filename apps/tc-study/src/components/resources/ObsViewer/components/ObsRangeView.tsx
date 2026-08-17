@@ -5,6 +5,11 @@ import type { MergedObsFrameQuotes } from '@bt-synergy/resource-panels'
 import type { ObsFrameQuoteEntry } from '../../../../signals/studioSignals'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import type { ActiveHl } from '../types'
+import {
+  isObsFrameFilterActive,
+  obsFrameChromeClass,
+  type ObsVerseFilterRef,
+} from '../obsHighlightHelpers'
 import { ObsQuoteSpans } from './ObsQuoteSpans'
 
 export function ObsRangeView(props: {
@@ -17,6 +22,7 @@ export function ObsRangeView(props: {
   isPanel2QuoteCapable: boolean
   obsQuotesState: MergedObsFrameQuotes | null | undefined
   activeHighlight: ActiveHl | null
+  activeFrameFilter: ObsVerseFilterRef | null
   activateWordSpan: (
     span: FrameSpan,
     sNum: number,
@@ -36,6 +42,7 @@ export function ObsRangeView(props: {
     isPanel2QuoteCapable,
     obsQuotesState,
     activeHighlight,
+    activeFrameFilter,
     activateWordSpan,
     toggleRangeHighlight,
     onFrameClick,
@@ -75,11 +82,18 @@ export function ObsRangeView(props: {
                   frameEntries.length > 0
                     ? resolveObsHighlightSpans(frame.text, frameEntries)
                     : null
+                const isActive = isObsFrameFilterActive(
+                  activeFrameFilter,
+                  sNum,
+                  frame.frameNumber
+                )
                 return (
                   <div
                     key={frame.frameNumber}
-                    className="space-y-3 cursor-pointer"
+                    className={`space-y-3 cursor-pointer rounded-lg border p-2 ${obsFrameChromeClass(activeFrameFilter, sNum, frame.frameNumber)}`}
                     title={`Frame ${sNum} · ${frame.frameNumber}`}
+                    data-obs-frame={`${sNum}:${frame.frameNumber}`}
+                    data-obs-frame-active={isActive ? 'true' : undefined}
                     onClick={() => onFrameClick(sNum, frame.frameNumber)}
                   >
                     <p className="text-xs text-scripture-muted font-medium">

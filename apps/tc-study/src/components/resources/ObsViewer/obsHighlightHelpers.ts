@@ -10,12 +10,39 @@ export const QUOTE_BUTTON_ACTIVE_CLASS =
 export const QUOTE_BUTTON_IDLE_CLASS =
   'underline decoration-dotted decoration-underline decoration-1 underline-offset-2 hover:bg-muted rounded-sm'
 
+/** Frame that owns the current verse-filter — same wash as CombinedHelps selected cards. */
+export const OBS_FRAME_ACTIVE_CLASS = 'bg-highlight/15 border-border'
+
+export const OBS_FRAME_IDLE_CLASS = 'border-transparent'
+
+export type ObsVerseFilterRef = { chapter: number; verse?: number }
+
 /** Frame click → CombinedHelps verse-filter (story:frame). */
 export function obsFrameVerseFilter(
   storyNumber: number,
   frameNumber: number
 ): { chapter: number; verse: number } {
   return { chapter: storyNumber, verse: frameNumber }
+}
+
+/** True when `story.frame` is the current CombinedHelps verse-filter (e.g. 1:7). */
+export function isObsFrameFilterActive(
+  filter: ObsVerseFilterRef | null,
+  storyNum: number,
+  frameNum: number
+): boolean {
+  if (!filter || filter.verse === undefined) return false
+  return filter.chapter === storyNum && filter.verse === frameNum
+}
+
+export function obsFrameChromeClass(
+  filter: ObsVerseFilterRef | null,
+  storyNum: number,
+  frameNum: number
+): string {
+  return isObsFrameFilterActive(filter, storyNum, frameNum)
+    ? OBS_FRAME_ACTIVE_CLASS
+    : OBS_FRAME_IDLE_CLASS
 }
 
 export function sortedSourceIdsKey(ids: string[]): string {

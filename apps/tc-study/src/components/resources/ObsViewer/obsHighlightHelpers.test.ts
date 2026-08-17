@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  OBS_FRAME_ACTIVE_CLASS,
   isObsEntryActive,
+  isObsFrameFilterActive,
   isPanel2KeyQuoteCapable,
+  obsFrameChromeClass,
   obsFrameVerseFilter,
   sortedSourceIdsKey,
 } from './obsHighlightHelpers'
@@ -43,6 +46,18 @@ describe('obsHighlightHelpers', () => {
   test('frame click maps story/frame onto the verse-filter path', () => {
     expect(obsFrameVerseFilter(1, 3)).toEqual({ chapter: 1, verse: 3 })
     expect(obsFrameVerseFilter(12, 1)).toEqual({ chapter: 12, verse: 1 })
+  })
+
+  test('verse-filter 1:7 marks only frame 1·7 active', () => {
+    const filter = { chapter: 1, verse: 7 }
+    expect(isObsFrameFilterActive(filter, 1, 7)).toBe(true)
+    expect(isObsFrameFilterActive(filter, 1, 6)).toBe(false)
+    expect(isObsFrameFilterActive(filter, 1, 8)).toBe(false)
+    expect(isObsFrameFilterActive(filter, 2, 7)).toBe(false)
+    expect(isObsFrameFilterActive(null, 1, 7)).toBe(false)
+    expect(isObsFrameFilterActive({ chapter: 1 }, 1, 7)).toBe(false)
+    expect(obsFrameChromeClass(filter, 1, 7)).toBe(OBS_FRAME_ACTIVE_CLASS)
+    expect(obsFrameChromeClass(filter, 1, 6)).not.toContain('bg-highlight')
   })
 
   test('isPanel2KeyQuoteCapable detects tn/twl/combined', () => {

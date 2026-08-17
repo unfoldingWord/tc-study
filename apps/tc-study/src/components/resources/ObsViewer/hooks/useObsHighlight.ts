@@ -8,7 +8,12 @@ import type {
   VerseFilterSignal,
 } from '../../../../signals/studioSignals'
 import type { ActiveHl } from '../types'
-import { isObsEntryActive, obsFrameVerseFilter, sortedSourceIdsKey } from '../obsHighlightHelpers'
+import {
+  isObsEntryActive,
+  obsFrameVerseFilter,
+  sortedSourceIdsKey,
+  type ObsVerseFilterRef,
+} from '../obsHighlightHelpers'
 
 export function useObsHighlight(params: {
   resourceId: string
@@ -32,6 +37,7 @@ export function useObsHighlight(params: {
   } = params
 
   const [activeHighlight, setActiveHighlight] = useState<ActiveHl | null>(null)
+  const [activeFrameFilter, setActiveFrameFilter] = useState<ObsVerseFilterRef | null>(null)
   const frameTextRef = useRef<HTMLDivElement>(null)
 
   const resourceMetadata = {
@@ -93,8 +99,29 @@ export function useObsHighlight(params: {
     { debug: false, resourceMetadata }
   )
 
+  useSignalHandler<VerseFilterSignal>(
+    'verse-filter',
+    resourceId,
+    useCallback(
+      (signal) => {
+        if (signal.sourceResourceId === resourceId) return
+        if (signal.filter === null || signal.filter.verse === undefined) {
+          setActiveFrameFilter(null)
+          return
+        }
+        setActiveFrameFilter({
+          chapter: signal.filter.chapter,
+          verse: signal.filter.verse,
+        })
+      },
+      [resourceId]
+    ),
+    { debug: false, resourceMetadata }
+  )
+
   useEffect(() => {
     setActiveHighlight(null)
+    setActiveFrameFilter(null)
   }, [storyNum, frameNum, resourceKey])
 
   useEffect(() => {
@@ -216,13 +243,16 @@ export function useObsHighlight(params: {
 
   const selectFrame = useCallback(
     (sNum: number, fNum: number) => {
-      sendVerseFilter({ lifecycle: 'event', filter: obsFrameVerseFilter(sNum, fNum) })
+      const filter = obsFrameVerseFilter(sNum, fNum)
+      sendVerseFilter({ lifecycle: 'event', filter })
+      setActiveFrameFilter(filter)
     },
     [sendVerseFilter]
   )
 
   return {
     activeHighlight,
+    activeFrameFilter,
     frameTextRef,
     activateWordSpan,
     toggleHighlightEntry,
