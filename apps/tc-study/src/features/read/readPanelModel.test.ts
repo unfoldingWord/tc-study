@@ -8,6 +8,7 @@ import {
   firstHelpsLanguageCode,
   modeForContentRole,
   navigationLanguageCode,
+  needsReadLanguagePicker,
   shouldSeedBothPanelLanguages,
   type ReadPanelModels,
 } from './readPanelModel'
@@ -30,7 +31,7 @@ describe('readPanelModel independence', () => {
     expect(shouldSeedBothPanelLanguages(DEFAULT_READ_PANEL_MODELS)).toBe(true)
     expect(shouldSeedBothPanelLanguages(seededEs)).toBe(false)
     expect(shouldSeedBothPanelLanguages(applyPanelLanguage(DEFAULT_READ_PANEL_MODELS, 'panel-2', 'en'))).toBe(
-      false
+      true
     )
   })
 
@@ -76,6 +77,14 @@ describe('readPanelModel independence', () => {
       { languageCode: 'es', target: 'text', destPanelId: 'panel-1' },
       { languageCode: 'es', target: 'text', destPanelId: 'panel-2' },
     ])
+  })
+
+  test('helps-only leftover does not count as a scripture language for the picker', () => {
+    const helpsOnly = applyPanelLanguage(DEFAULT_READ_PANEL_MODELS, 'panel-2', 'en')
+    expect(navigationLanguageCode(helpsOnly)).toBeNull()
+    expect(needsReadLanguagePicker(helpsOnly)).toBe(true)
+    expect(needsReadLanguagePicker(DEFAULT_READ_PANEL_MODELS)).toBe(true)
+    expect(needsReadLanguagePicker(seededEs)).toBe(false)
   })
 
   test('navigation language follows panel-1 scripture and does not stand in for panel-2', () => {

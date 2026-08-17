@@ -12,6 +12,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(src).toContain('isLoadingTextResources')
     expect(src).toContain('isLoadingHelpsResources')
     expect(src).toContain('isLoadingByPanel')
+    expect(src).toContain('catalogSettledByPanel')
     expect(src).toContain('helpsLanguageCode')
   })
 
@@ -74,8 +75,9 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(src).toContain('hydrateLanguagesFromHint')
     const urlEffect = src.slice(src.lastIndexOf('const urlLang'))
     expect(urlEffect.indexOf('hydrateLanguagesFromHint(urlLang)')).toBeLessThan(
-      urlEffect.indexOf('handleLanguageSelected(urlLang)')
+      urlEffect.indexOf('handleLanguageSelected(lang)')
     )
+    expect(urlEffect).toContain('urlLang || cached')
   })
 
   test('cold-start catalog loads run in parallel so helps does not wait on scripture', () => {

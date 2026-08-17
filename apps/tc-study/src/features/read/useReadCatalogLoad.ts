@@ -37,6 +37,10 @@ export function useReadCatalogLoad() {
     'panel-1': false,
     'panel-2': false,
   })
+  const [catalogSettledByPanel, setCatalogSettledByPanel] = useState<Record<ReadPanelId, boolean>>({
+    'panel-1': false,
+    'panel-2': false,
+  })
   const [expectedResources, setExpectedResources] = useState<string[]>([])
   const [metadataUpdateCounter, setMetadataUpdateCounter] = useState(0)
   const textKeysRef = useRef<string[]>([])
@@ -71,7 +75,23 @@ export function useReadCatalogLoad() {
     })
     setIsLoadingTextResources(inflight.text > 0)
     setIsLoadingHelpsResources(inflight.helps > 0)
+    setCatalogSettledByPanel((prev) => {
+      const next = { ...prev }
+      for (const panelId of panels) {
+        if (inflight[panelId] === 0) next[panelId] = true
+      }
+      return next
+    })
   }
+
+  const resetCatalogSettled = useCallback((panels?: ReadPanelId[]) => {
+    const ids = panels ?? (['panel-1', 'panel-2'] as ReadPanelId[])
+    setCatalogSettledByPanel((prev) => {
+      const next = { ...prev }
+      for (const panelId of ids) next[panelId] = false
+      return next
+    })
+  }, [])
 
   const catalogLoadDeps = useCallback(
     (): Omit<
@@ -130,6 +150,8 @@ export function useReadCatalogLoad() {
     isLoadingTextResources,
     isLoadingHelpsResources,
     isLoadingByPanel,
+    catalogSettledByPanel,
+    resetCatalogSettled,
     expectedResources,
     setExpectedResources,
     metadataUpdateCounter,

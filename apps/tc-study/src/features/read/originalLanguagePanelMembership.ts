@@ -77,7 +77,11 @@ export function syncOriginalLanguageOnScripturePanels(options: {
   const pkg = useWorkspaceStore.getState().currentPackage
   if (!pkg || options.scripturePanelIds.length === 0) return []
 
-  const needsResource = Boolean(spec && keepKey && !pkg.resources.has(keepKey))
+  const anyGateway = options.scripturePanelIds.some((panelId) => {
+    const panel = pkg.panels.find((p) => p.id === panelId)
+    return panel?.resourceKeys.some((key) => !isOriginalLanguagePanelKey(key))
+  })
+  const needsResource = Boolean(anyGateway && spec && keepKey && !pkg.resources.has(keepKey))
   const pruneKeys = new Set<string>()
   const existingIds = new Set([
     ...Object.keys(useAppStore.getState().loadedResources),
@@ -90,9 +94,11 @@ export function syncOriginalLanguageOnScripturePanels(options: {
     const prevActiveKey = panel.resourceKeys[panel.activeIndex]
     const next: string[] = []
     let keptOl: string | undefined
+    let hasGateway = false
     for (const key of panel.resourceKeys) {
       if (!isOriginalLanguagePanelKey(key)) {
         next.push(key)
+        hasGateway = true
         continue
       }
       if (keepKey && getBaseResourceKey(key) === keepKey && !keptOl) {
@@ -101,7 +107,8 @@ export function syncOriginalLanguageOnScripturePanels(options: {
         pruneKeys.add(key)
       }
     }
-    if (keepKey) {
+    // Do not inject UGNT/UHB as the only tab — wait for ULT/GLT membership.
+    if (keepKey && hasGateway) {
       if (keptOl) {
         next.push(keptOl)
       } else {
@@ -109,6 +116,8 @@ export function syncOriginalLanguageOnScripturePanels(options: {
         existingIds.add(instanceId)
         next.push(instanceId)
       }
+    } else if (keptOl) {
+      pruneKeys.add(keptOl)
     }
     const moved = prevActiveKey ? next.indexOf(prevActiveKey) : -1
     const nextActive =

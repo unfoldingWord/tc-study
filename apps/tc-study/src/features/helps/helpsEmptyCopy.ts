@@ -164,9 +164,12 @@ export function resolveHelpsPaneNoSourcesView(options: {
   isLoading: boolean
   hasResource: boolean
   languageName?: string | LanguageListNameFields
+  /** False until the first helps catalog hydrate for this language finishes. */
+  catalogSettled?: boolean
 }): HelpsEmptyView | null {
   if (options.mode !== 'helps') return null
   if (options.isLoading || options.hasResource) return null
+  if (options.catalogSettled === false) return null
   const languageCode = options.languageCode?.trim() || ''
   if (!languageCode) return null
   return resolveHelpsEmptyView({

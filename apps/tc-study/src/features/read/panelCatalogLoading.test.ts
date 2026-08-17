@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 import type { ResourceInfo } from '../../contexts/types'
-import { destPanelsForCatalogLoad, isPanelCatalogSpinner } from './panelCatalogLoading'
+import {
+  destPanelsForCatalogLoad,
+  hasNonOriginalMembership,
+  isPanelCatalogSpinner,
+} from './panelCatalogLoading'
+import { UGNT_RESOURCE_KEY } from './originalLanguageForBook'
 import { resolveLoadedPanelResource } from './resolveLoadedPanelResource'
 
 function ult(id: string): ResourceInfo {
@@ -39,6 +44,15 @@ describe('panel catalog spinner + instance lookup', () => {
     expect(
       isPanelCatalogSpinner({ catalogLoading: false, hasMembership: false })
     ).toBe(false)
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: false,
+        hasMembership: false,
+        catalogSettled: false,
+      })
+    ).toBe(true)
+    expect(hasNonOriginalMembership([UGNT_RESOURCE_KEY])).toBe(false)
+    expect(hasNonOriginalMembership([UGNT_RESOURCE_KEY, 'unfoldingWord/en/ult'])).toBe(true)
   })
 
   test('dest panel-2 scripture load only marks panel-2', () => {

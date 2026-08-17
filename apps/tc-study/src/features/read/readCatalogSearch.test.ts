@@ -96,6 +96,21 @@ describe('catalogSearchRequestsForTarget', () => {
     expect(requests.every((r) => r.params.limit === 500)).toBe(true)
   })
 
+  test('eng catalog query normalizes to Door43 en', () => {
+    expect(
+      catalogSearchRequestsForTarget({
+        languageCode: 'eng',
+        target: 'helps',
+        navigationScope: 'scripture',
+      })
+    ).toEqual([
+      {
+        hydrateTarget: 'helps',
+        params: { language: 'en', topic: 'tc-ready', stage: 'prod', limit: 500 },
+      },
+    ])
+  })
+
   test('Bible helps still uses topic=tc-ready with no subject filter', () => {
     expect(
       catalogSearchRequestsForTarget({

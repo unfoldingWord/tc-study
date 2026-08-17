@@ -265,6 +265,29 @@ describe('resolveHelpsPaneNoSourcesView', () => {
     ).toBeNull()
   })
 
+  test('English helps catalog pending is spinner, not no-sources', () => {
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'en',
+        isLoading: false,
+        hasResource: false,
+        languageName: 'English',
+        catalogSettled: false,
+      })
+    ).toBeNull()
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'eng',
+        isLoading: true,
+        hasResource: false,
+        languageName: 'English',
+        catalogSettled: false,
+      })
+    ).toBeNull()
+  })
+
   test('language unset stays on the select-language path', () => {
     expect(
       resolveHelpsPaneNoSourcesView({

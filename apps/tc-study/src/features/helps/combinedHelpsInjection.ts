@@ -1,4 +1,5 @@
 import { ResourceFormat } from '@bt-synergy/resource-catalog'
+import { languageCodesMatch, primaryLanguageSegment } from '../../utils/languageCodeMatch'
 import type { ResourceInfo } from '../../contexts/types'
 import {
   COMBINED_HELPS_RESOURCE_ID,
@@ -30,7 +31,7 @@ export function findHelpsKeysAmongResources(
     skipKeys?: Set<string>
   }
 ): HelpsKeyPair {
-  const want = primaryLangSegment(options?.langCode || '')
+  const want = primaryLanguageSegment(options?.langCode || '')
   const skip = options?.skipKeys ?? new Set<string>()
   let tnKey: string | undefined
   let twlKey: string | undefined
@@ -92,14 +93,7 @@ export function buildCombinedHelpsResourceInfo(options: {
   } as unknown as ResourceInfo
 }
 
-function primaryLangSegment(code: string): string {
-  return String(code || '')
-    .trim()
-    .split(/[-_/]/)[0]!
-    .toLowerCase()
-}
-
 function keyMatchesLang(key: string, want: string): boolean {
-  const seg = primaryLangSegment(key.split('/')[1] || '')
-  return seg === want
+  const seg = primaryLanguageSegment(key.split('/')[1] || '')
+  return languageCodesMatch(seg, want)
 }

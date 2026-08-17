@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
 import { useScriptureDisplayStore } from '../../../../lib/stores/scriptureDisplayStore'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
+import { isScriptureBooksPending } from '../hooks/scriptureContentLoad'
 import type { DisplayUsjVerse, OriginalLanguageToken } from '../types'
 import { FormattedScriptureContent } from './FormattedScriptureContent'
 import { VerseRenderer } from './VerseRenderer'
@@ -83,7 +84,12 @@ export function ScriptureContent({
     }
   }, [displayVerses, currentRef.chapter])
 
-  const showFullScreenLoading = (isLoadingTOC || isLoading) && !viewModel
+  const showFullScreenLoading = isScriptureBooksPending({
+    isLoadingTOC,
+    isLoading,
+    availableBookCount: availableBooks.length,
+    hasViewModel: Boolean(viewModel),
+  })
   if (showFullScreenLoading) {
     return (
       <LoadingSpinner

@@ -59,6 +59,30 @@ describe('combinedHelpsInjection', () => {
     })
   })
 
+  test('en URL matches helps catalog keyed under eng (and reverse)', () => {
+    const engCatalog = [
+      fakeResource({ key: 'unfoldingWord/eng/tn', type: 'notes', language: 'eng', languageCode: 'eng' }),
+      fakeResource({ key: 'unfoldingWord/eng/twl', type: 'twl', language: 'eng', languageCode: 'eng' }),
+    ]
+    const fromEn = findHelpsKeysAmongResources(engCatalog, 'scripture', { langCode: 'en' })
+    expect(shouldInjectCombinedHelps(fromEn)).toBe(true)
+    expect(fromEn).toEqual({
+      tnKey: 'unfoldingWord/eng/tn',
+      twlKey: 'unfoldingWord/eng/twl',
+    })
+
+    const enCatalog = [
+      fakeResource({ key: 'unfoldingWord/en/tn', type: 'notes' }),
+      fakeResource({ key: 'unfoldingWord/en/twl', type: 'twl' }),
+    ]
+    const fromEng = findHelpsKeysAmongResources(enCatalog, 'scripture', { langCode: 'eng' })
+    expect(shouldInjectCombinedHelps(fromEng)).toBe(true)
+    expect(fromEng).toEqual({
+      tnKey: 'unfoldingWord/en/tn',
+      twlKey: 'unfoldingWord/en/twl',
+    })
+  })
+
   test('injects when only one side present', () => {
     const resources = [fakeResource({ key: 'uw/en/tn', type: 'notes' })]
     const pair = findHelpsKeysAmongResources(resources, 'scripture', { langCode: 'en' })

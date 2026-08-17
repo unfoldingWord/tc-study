@@ -21,14 +21,29 @@ describe('inheritEmptyPanelLanguage', () => {
     expect(next!.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'ha' })
   })
 
-  test('p2 has language and p1 is empty → p1 inherits without changing scripture mode', () => {
+  test('helps-only p2 does not seed empty scripture p1 (no silent English)', () => {
+    expect(
+      inheritEmptyPanelLanguage({
+        'panel-1': { mode: 'scripture', languageCode: null },
+        'panel-2': { mode: 'helps', languageCode: 'en' },
+      })
+    ).toBeNull()
+    expect(
+      inheritEmptyPanelLanguage({
+        'panel-1': { mode: 'scripture', languageCode: null },
+        'panel-2': { mode: 'helps', languageCode: 'eng' },
+      })
+    ).toBeNull()
+  })
+
+  test('p2 scripture with language and p1 empty → p1 inherits scripture mode', () => {
     const next = inheritEmptyPanelLanguage({
       'panel-1': { mode: 'scripture', languageCode: null },
-      'panel-2': { mode: 'helps', languageCode: 'ha' },
+      'panel-2': { mode: 'scripture', languageCode: 'ha' },
     })
     expect(next?.inheritedPanelId).toBe('panel-1')
     expect(next?.panels['panel-1']).toEqual({ mode: 'scripture', languageCode: 'ha' })
-    expect(next?.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'ha' })
+    expect(next?.panels['panel-2']).toEqual({ mode: 'scripture', languageCode: 'ha' })
   })
 
   test('both empty is left for the one-picker seed, not inherit', () => {

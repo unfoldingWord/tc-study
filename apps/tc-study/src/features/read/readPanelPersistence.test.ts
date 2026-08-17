@@ -85,11 +85,11 @@ describe('readPanelPersistence', () => {
     expect(next.panels['panel-2'].languageCode).toBe('tr')
   })
 
-  test('legacy helps key fills panel-2 only when the new store is empty', () => {
-    g.localStorage?.setItem(HELPS_LANGUAGE_STORAGE_KEY, 'fr')
+  test('legacy helps key does not seed empty /read (no silent English)', () => {
+    g.localStorage?.setItem(HELPS_LANGUAGE_STORAGE_KEY, 'en')
     const next = readPersistedReadPanels()
     expect(next.panels['panel-1'].languageCode).toBeNull()
-    expect(next.panels['panel-2'].languageCode).toBe('fr')
+    expect(next.panels['panel-2'].languageCode).toBeNull()
     expect(next.seededBoth).toBe(false)
   })
 })

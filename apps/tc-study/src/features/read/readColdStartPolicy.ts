@@ -32,6 +32,8 @@ export interface InheritEmptyPanelLanguageResult {
 
 /**
  * When exactly one pane has a language, copy it onto the empty pane.
+ * Helps-only language must not seed empty scripture (that is a leftover
+ * default, not a user/cache pick — do not silently apply `en`/`eng`).
  * Modes are unchanged. Returns null when both are empty or both are set.
  */
 export function inheritEmptyPanelLanguage(
@@ -47,7 +49,7 @@ export function inheritEmptyPanelLanguage(
       languageCode: p1,
     }
   }
-  if (p2 && !p1) {
+  if (p2 && !p1 && panels['panel-2'].mode === 'scripture') {
     return {
       panels: applyPanelLanguage(asModels, 'panel-1', p2),
       inheritedPanelId: 'panel-1',

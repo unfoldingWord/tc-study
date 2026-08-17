@@ -142,6 +142,14 @@ describe('original-language tabs (book-scoped, dual scripture)', () => {
     expect(p2).not.toContain(COMBINED_HELPS_RESOURCE_ID)
   })
 
+  test('empty scripture panel does not get UGNT as the only tab', () => {
+    syncOriginalLanguageOnScripturePanels({
+      bookCode: 'tit',
+      scripturePanelIds: ['panel-1'],
+    })
+    expect(panelKeys('panel-1')).toEqual([])
+  })
+
   test('Titus hydrate+sync appends UGNT (does not start with it)', () => {
     seedEnglishScripture('panel-1')
     hydrateOrig('panel-1', 'tit')

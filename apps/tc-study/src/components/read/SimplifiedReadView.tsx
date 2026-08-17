@@ -17,6 +17,7 @@ import { CollectionImportDialog } from '../collections/CollectionImportDialog'
 import { TabDnDProvider } from '../../features/dnd/TabDnDContext'
 import { resolvePaneDirection } from '../../features/read/paneDirection'
 import { defaultLayoutForViewport } from '../../features/read/readPanelLayout'
+import { needsReadLanguagePicker } from '../../features/read/readPanelModel'
 import { useReadPanelStore } from '../../features/read/readPanelStore'
 import { textModeMismatchFromCache } from '../../features/read/textModeMismatch'
 import { useFilteredReadPanelKeys } from '../../features/read/useFilteredReadPanelKeys'
@@ -75,6 +76,7 @@ export function SimplifiedReadView({
     packageStore,
     isLoadingResources,
     isLoadingByPanel,
+    catalogSettledByPanel,
     currentLanguageCode,
     isCollectionFullyCached,
     shouldAutoOpenLanguagePicker,
@@ -185,8 +187,7 @@ export function SimplifiedReadView({
     onEntryLinkClick: handleOpenEntry,
   })
 
-  const needsBootstrap =
-    !panels['panel-1'].languageCode && !panels['panel-2'].languageCode
+  const needsBootstrap = needsReadLanguagePicker(panels)
   const showBootstrapPicker = needsBootstrap
 
   return (
@@ -264,6 +265,7 @@ export function SimplifiedReadView({
               panel1Resources={panel1Resources}
               panel2Resources={panel2Resources}
               isLoadingByPanel={isLoadingByPanel}
+              catalogSettledByPanel={catalogSettledByPanel}
               onEntryLinkClick={handleOpenEntry}
               p1Dir={p1Dir}
               p2Dir={p2Dir}

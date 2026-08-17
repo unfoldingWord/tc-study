@@ -33,6 +33,7 @@ describe('helps empty copy wiring (issue #24)', () => {
     expect(panelSrc).toContain('openHelpsPicker:')
     expect(panelSrc).toContain('setPickerOpen(true)')
     expect(panelSrc).toContain('resolveHelpsPaneNoSourcesView')
+    expect(panelSrc).toContain('catalogSettled')
     expect(panelSrc).toContain('CombinedHelpsEmptyState')
   })
 

@@ -6,6 +6,7 @@
  * in the 3-GL tc-ready TSV set.
  */
 
+import { door43LanguageQueryCode } from '../../utils/languageCodeMatch'
 import { OBS_HELPS_SUBJECTS } from './languageAvailability'
 import type { CatalogLoadTarget } from './readCatalogPanelPolicy'
 import type { CatalogEntry } from './readCatalogIdentity'
@@ -61,7 +62,8 @@ export function catalogSearchRequestsForTarget(options: {
   target: CatalogLoadTarget
   navigationScope: string
 }): CatalogSearchRequest[] {
-  const { languageCode, target, navigationScope } = options
+  const { target, navigationScope } = options
+  const languageCode = door43LanguageQueryCode(options.languageCode)
   const obsHelps = isObsScope(navigationScope) && target !== 'text'
 
   if (target === 'text') return [tcReadyRequest(languageCode, 'text')]

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   applyScriptureContentLoadFailure,
+  isScriptureBooksPending,
   scriptureContentLoadKey,
   scriptureMetadataRevision,
 } from './scriptureContentLoad'
@@ -56,6 +57,33 @@ describe('scripture content load retry (language-switch race)', () => {
     expect(hard.retryWhenMetadataArrives).toBe(false)
     expect(hard.error).toMatch(/Resource metadata not found/)
     expect(hard.isLoading).toBe(false)
+  })
+
+  test('empty book list after hydrate is pending, not sticky no-content', () => {
+    expect(
+      isScriptureBooksPending({
+        isLoadingTOC: false,
+        isLoading: false,
+        availableBookCount: 0,
+        hasViewModel: false,
+      })
+    ).toBe(true)
+    expect(
+      isScriptureBooksPending({
+        isLoadingTOC: false,
+        isLoading: false,
+        availableBookCount: 1,
+        hasViewModel: false,
+      })
+    ).toBe(false)
+    expect(
+      isScriptureBooksPending({
+        isLoadingTOC: false,
+        isLoading: false,
+        availableBookCount: 0,
+        hasViewModel: true,
+      })
+    ).toBe(false)
   })
 
   test('useContent retries when the metadata revision lands', () => {

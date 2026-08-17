@@ -104,6 +104,8 @@ export function useReadLanguageBootstrap({
     isLoadingTextResources,
     isLoadingHelpsResources,
     isLoadingByPanel,
+    catalogSettledByPanel,
+    resetCatalogSettled,
     expectedResources,
     setExpectedResources,
     metadataUpdateCounter,
@@ -181,6 +183,10 @@ export function useReadLanguageBootstrap({
     async (languageCode: string, options?: { navigationScope?: 'scripture' | 'obs' }) => {
       setShouldAutoOpenLanguagePicker(false)
       setIsLanguagePickerRequired(false)
+      const panelsBefore = useReadPanelStore.getState().panels
+      const hadLanguageBeforePick =
+        panelsBefore['panel-1'].languageCode === languageCode ||
+        panelsBefore['panel-2'].languageCode === languageCode
       if (canSeedBothPanelLanguages()) {
         seedBothLanguages(languageCode)
       } else if (useReadPanelStore.getState().panels['panel-1'].languageCode !== languageCode) {
@@ -212,7 +218,8 @@ export function useReadLanguageBootstrap({
         pushReadLanguageUrl(navigate, languageCode)
       }
 
-      if (shouldDeferLanguageCatalogLoad(initialLanguage)) {
+      if (shouldDeferLanguageCatalogLoad(initialLanguage) && !hadLanguageBeforePick) {
+        autoLoadedLanguageForUrlRef.current = null
         return
       }
 
@@ -284,11 +291,17 @@ export function useReadLanguageBootstrap({
       initialLanguage?.trim() ||
       (typeof window !== 'undefined' ? languageCodeFromReadPathname(window.location.pathname) : null)
     if (urlLang) hydrateLanguagesFromHint(urlLang)
-    if (!urlLang) return
-    if (autoLoadedLanguageForUrlRef.current === urlLang) return
-    autoLoadedLanguageForUrlRef.current = urlLang
-    void handleLanguageSelected(urlLang)
+    const cached = navigationLanguageCode(useReadPanelStore.getState().panels)
+    const lang = urlLang || cached
+    if (!lang) return
+    if (autoLoadedLanguageForUrlRef.current === lang) return
+    autoLoadedLanguageForUrlRef.current = lang
+    void handleLanguageSelected(lang)
   }, [initialLanguage, handleLanguageSelected, hydrateLanguagesFromHint])
+
+  useEffect(() => {
+    resetCatalogSettled()
+  }, [panels['panel-1'].languageCode, panels['panel-2'].languageCode, resetCatalogSettled])
 
   useEffect(() => {
     const inheritedId = inheritEmptyLanguage()
@@ -314,6 +327,7 @@ export function useReadLanguageBootstrap({
     isLoadingTextResources,
     isLoadingHelpsResources,
     isLoadingByPanel,
+    catalogSettledByPanel,
     currentLanguageCode,
     helpsLanguageCode,
     isCollectionFullyCached,

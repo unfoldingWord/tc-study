@@ -45,11 +45,17 @@ export function panelIdsForMode(panels: ReadPanelModels, mode: ReadPanelMode): R
 }
 
 /**
- * True when neither panel has a language yet — one picker seeds both.
+ * True when no scripture/navigation language is set — one picker seeds both.
+ * A leftover helps-only default (`en`) must not block first-pick seed.
  * One-empty / one-set is inheritEmptyPanelLanguage in readColdStartPolicy.
  */
 export function shouldSeedBothPanelLanguages(panels: ReadPanelModels): boolean {
-  return !panels['panel-1'].languageCode && !panels['panel-2'].languageCode
+  return !navigationLanguageCode(panels)
+}
+
+/** Bare `/read` shows the required picker until a scripture language exists. */
+export function needsReadLanguagePicker(panels: ReadPanelModels): boolean {
+  return !navigationLanguageCode(panels)
 }
 
 /** Seed the same initial language onto both panels. Does not change modes. */

@@ -4,7 +4,6 @@
  * and never a shared scripture language for both panels.
  */
 
-import { readPersistedHelpsLanguage } from './defaultHelpsLanguage'
 import { inheritEmptyHelpsFromSession } from './readColdStartPolicy'
 import {
   DEFAULT_READ_PANEL_MODELS,
@@ -64,12 +63,11 @@ function parsePanels(raw: unknown): ReadPanelModels | null {
 }
 
 export function emptyPersistedReadPanels(): PersistedReadPanels {
-  const helps = readPersistedHelpsLanguage()
   return {
     ...DEFAULT_PERSISTED,
     panels: {
       'panel-1': { mode: 'scripture', languageCode: null },
-      'panel-2': { mode: 'helps', languageCode: helps },
+      'panel-2': { mode: 'helps', languageCode: null },
     },
   }
 }

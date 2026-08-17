@@ -31,6 +31,17 @@ export function scriptureContentLoadKey(
   return `${resourceKey}|${bookCode}|${metadataRevision}`
 }
 
+/** Empty book list while catalog/TOC is still hydrating is a spinner, not “no content”. */
+export function isScriptureBooksPending(options: {
+  isLoadingTOC: boolean
+  isLoading: boolean
+  availableBookCount: number
+  hasViewModel: boolean
+}): boolean {
+  if (options.hasViewModel) return false
+  return options.isLoadingTOC || options.isLoading || options.availableBookCount === 0
+}
+
 export function applyScriptureContentLoadFailure(
   error: unknown,
   allowHardMiss: boolean

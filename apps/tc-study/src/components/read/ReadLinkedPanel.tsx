@@ -49,6 +49,8 @@ interface ReadLinkedPanelProps {
   isLoadingResources: boolean
   /** Raw catalog fetch for this panel (not gated on membership). */
   catalogLoading?: boolean
+  /** False until the first catalog hydrate for this panel language finishes. */
+  catalogSettled?: boolean
   showDropPlaceholder: boolean
   placeholderLabel: string
   placeholderIndex: number | undefined
@@ -68,6 +70,7 @@ function ReadPanelBody({
   panelResources,
   isLoadingResources,
   catalogLoading = false,
+  catalogSettled = true,
   showDropPlaceholder,
   placeholderLabel,
   placeholderIndex,
@@ -112,9 +115,10 @@ function ReadPanelBody({
   const helpsNoSourcesView = resolveHelpsPaneNoSourcesView({
     mode,
     languageCode,
-    isLoading: isLoadingResources,
+    isLoading: isLoadingResources || catalogLoading,
     hasResource: Boolean(current.resource?.component) || filteredKeys.length > 0,
     languageName: listedHelpsLang ?? '',
+    catalogSettled,
   })
   const scriptureMismatch = mode === 'scripture' ? textModeMismatch : null
   const mismatchScope = scriptureMismatch?.switchScope
