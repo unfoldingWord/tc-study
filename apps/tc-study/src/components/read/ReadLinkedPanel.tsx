@@ -198,7 +198,16 @@ function ReadPanelBody({
         onMouseLeave={swipeHandlers.onMouseLeave}
       >
         {current.resource?.component || (
-          isLoadingResources ? (
+          scriptureMismatch ? (
+            <EmptyPanelState
+              panelId={panelId}
+              message={scriptureMismatch.message}
+              actionLabel={scriptureMismatch.actionLabel ?? undefined}
+              actionShortLabel={scriptureMismatch.actionShortLabel ?? undefined}
+              emptyKind={scriptureMismatch.kind}
+              onAction={mismatchAction}
+            />
+          ) : isLoadingResources ? (
             <LoadingSpinner
               centered
               label="Loading resources"
@@ -209,12 +218,8 @@ function ReadPanelBody({
           ) : (
             <EmptyPanelState
               panelId={panelId}
-              message={scriptureMismatch?.message ?? selectLanguageCta}
+              message={selectLanguageCta}
               onMessageClick={isHelps && selectLanguageCta ? () => setPickerOpen(true) : undefined}
-              actionLabel={scriptureMismatch?.actionLabel ?? undefined}
-              actionShortLabel={scriptureMismatch?.actionShortLabel ?? undefined}
-              emptyKind={scriptureMismatch?.kind}
-              onAction={mismatchAction}
             />
           )
         )}

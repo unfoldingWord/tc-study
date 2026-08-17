@@ -103,6 +103,7 @@ export function useReadLanguageBootstrap({
     isLoadingByPanel,
     catalogSettledByPanel,
     resetCatalogSettled,
+    markCatalogSettled,
     expectedResources,
     setExpectedResources,
     metadataUpdateCounter,
@@ -212,16 +213,18 @@ export function useReadLanguageBootstrap({
         pushReadLanguageUrl(navigate, resolvedCode)
       }
 
+      autoLoadedLanguageForUrlRef.current = resolvedCode
       if (textModeMismatchFromCache({ languageCode: resolvedCode, navigationScope: scope, supportedSubjects: subjects })) {
         textKeysRef.current = []
         setExpectedResources(helpsKeysRef.current)
         clearReadPanelsForLanguageSwitch(helpsLanguageCode ?? undefined, 'panel-1')
+        const helpsLoad = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, 'panel-2')
+        if (helpsLoad) await runCatalogLoad({ ...helpsLoad, navigationScope: scope })
+        markCatalogSettled(helpsLoad ? ['panel-1'] : ['panel-1', 'panel-2'])
         return
       }
 
-      autoLoadedLanguageForUrlRef.current = resolvedCode
-      const snapshot = useReadPanelStore.getState().panels
-      const loads = coldStartCatalogLoads(snapshot)
+      const loads = coldStartCatalogLoads(useReadPanelStore.getState().panels)
       await Promise.all(loads.map((one) => runCatalogLoad({ ...one, navigationScope: scope })))
     },
     [
@@ -230,6 +233,7 @@ export function useReadLanguageBootstrap({
       resourceTypeRegistry,
       helpsLanguageCode,
       runCatalogLoad,
+      markCatalogSettled,
       seedBothLanguages,
       setPanelLanguage,
       inheritEmptyLanguage,

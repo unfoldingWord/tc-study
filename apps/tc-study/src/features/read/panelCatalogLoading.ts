@@ -22,6 +22,20 @@ export function destPanelsForCatalogLoad(options: {
 }
 
 /**
+ * Unset language, known Bible/OBS mismatch, or finished hydrate — not pending.
+ * Empty Bible + OBS (or neither) is a settled empty, not an in-flight catalog.
+ */
+export function isReadPanelCatalogSettled(options: {
+  languageCode?: string | null
+  catalogSettled: boolean
+  hasKnownMismatch?: boolean
+}): boolean {
+  if (!options.languageCode?.trim()) return true
+  if (options.hasKnownMismatch) return true
+  return options.catalogSettled
+}
+
+/**
  * Panel-level spinner only while that panel is fetching and still empty.
  * Gateway/helps membership (including `ult#2`) means hydrate already assigned.
  * Original-language-only tabs do not count — UGNT must not hide the spinner.

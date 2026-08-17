@@ -38,10 +38,18 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     )
     expect(body).toContain('textModeMismatchFromCache')
     expect(body).toContain("clearReadPanelsForLanguageSwitch(helpsLanguageCode ?? undefined, 'panel-1')")
+    expect(body).toContain("catalogLoadForSinglePanel(useReadPanelStore.getState().panels, 'panel-2')")
+    expect(body).toContain('markCatalogSettled')
     const mismatchAt = body.indexOf('textModeMismatchFromCache')
     const mismatchReturn = body.indexOf('return', mismatchAt)
     expect(mismatchReturn).toBeGreaterThan(mismatchAt)
     expect(mismatchReturn).toBeLessThan(body.indexOf('coldStartCatalogLoads'))
+    expect(body.indexOf("catalogLoadForSinglePanel(useReadPanelStore.getState().panels, 'panel-2')")).toBeGreaterThan(
+      mismatchAt
+    )
+    expect(body.indexOf("catalogLoadForSinglePanel(useReadPanelStore.getState().panels, 'panel-2')")).toBeLessThan(
+      mismatchReturn
+    )
   })
 
   test('helps picker path does not apply text-language pick navigation', () => {
@@ -99,6 +107,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(loadSrc).toContain('destPanelId')
     expect(loadSrc).toContain('destPanelsForCatalogLoad')
     expect(loadSrc).toContain('isLoadingByPanel')
+    expect(loadSrc).toContain('markCatalogSettled')
   })
 
   test('explicit switch and BCV commit go through useReadTextModeSwitch', () => {

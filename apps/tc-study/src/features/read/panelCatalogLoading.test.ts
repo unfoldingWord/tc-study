@@ -5,6 +5,7 @@ import {
   destPanelsForCatalogLoad,
   hasNonOriginalMembership,
   isPanelCatalogSpinner,
+  isReadPanelCatalogSettled,
 } from './panelCatalogLoading'
 import { UGNT_RESOURCE_KEY } from './originalLanguageForBook'
 import { resolveLoadedPanelResource } from './resolveLoadedPanelResource'
@@ -53,6 +54,43 @@ describe('panel catalog spinner + instance lookup', () => {
     ).toBe(true)
     expect(hasNonOriginalMembership([UGNT_RESOURCE_KEY])).toBe(false)
     expect(hasNonOriginalMembership([UGNT_RESOURCE_KEY, 'unfoldingWord/en/ult'])).toBe(true)
+  })
+
+  test('OBS-only Bible mode is settled empty, not a pending catalog spinner', () => {
+    expect(
+      isReadPanelCatalogSettled({
+        languageCode: 'fr',
+        catalogSettled: false,
+        hasKnownMismatch: true,
+      })
+    ).toBe(true)
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: false,
+        hasMembership: false,
+        catalogSettled: isReadPanelCatalogSettled({
+          languageCode: 'fr',
+          catalogSettled: false,
+          hasKnownMismatch: true,
+        }),
+      })
+    ).toBe(false)
+    expect(
+      isReadPanelCatalogSettled({
+        languageCode: 'en',
+        catalogSettled: false,
+      })
+    ).toBe(false)
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: true,
+        hasMembership: false,
+        catalogSettled: isReadPanelCatalogSettled({
+          languageCode: 'en',
+          catalogSettled: false,
+        }),
+      })
+    ).toBe(true)
   })
 
   test('dest panel-2 scripture load only marks panel-2', () => {

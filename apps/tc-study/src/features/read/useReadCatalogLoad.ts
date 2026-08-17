@@ -93,6 +93,14 @@ export function useReadCatalogLoad() {
     })
   }, [])
 
+  const markCatalogSettled = useCallback((panels: ReadPanelId[]) => {
+    setCatalogSettledByPanel((prev) => {
+      const next = { ...prev }
+      for (const panelId of panels) next[panelId] = true
+      return next
+    })
+  }, [])
+
   const catalogLoadDeps = useCallback(
     (): Omit<
       LoadReadLanguageCatalogDeps,
@@ -152,6 +160,7 @@ export function useReadCatalogLoad() {
     isLoadingByPanel,
     catalogSettledByPanel,
     resetCatalogSettled,
+    markCatalogSettled,
     expectedResources,
     setExpectedResources,
     metadataUpdateCounter,

@@ -16,7 +16,8 @@ import {
   DEFAULT_READ_PANEL_MODELS,
   needsReadLanguagePicker,
 } from './readPanelModel'
-import { isPanelCatalogSpinner } from './panelCatalogLoading'
+import { isPanelCatalogSpinner, isReadPanelCatalogSettled } from './panelCatalogLoading'
+import { resolveTextModeMismatch, TEXT_MODE_MISMATCH_COPY } from './textModeMismatch'
 import { coldStartCatalogLoads } from './runReadPanelCatalog'
 
 describe('bare /read cold-start', () => {
@@ -90,6 +91,52 @@ describe('bare /read cold-start', () => {
         loadTarget: 'both',
       },
     ])
+  })
+
+  test('OBS-only language in Bible mode is switch-to-OBS empty, not spinner', () => {
+    const mismatch = resolveTextModeMismatch({
+      navigationScope: 'scripture',
+      availability: { bible: false, obs: true, bibleHelps: false, obsHelps: false },
+      languageCode: 'fr',
+      languageName: 'French',
+    })
+    expect(mismatch?.kind).toBe('obs-only')
+    expect(mismatch?.actionLabel).toBe(TEXT_MODE_MISMATCH_COPY.switchToStories)
+    expect(mismatch?.message).toBe(TEXT_MODE_MISMATCH_COPY.noBibleHasObs('French'))
+
+    const scriptureSettled = isReadPanelCatalogSettled({
+      languageCode: 'fr',
+      catalogSettled: false,
+      hasKnownMismatch: true,
+    })
+    expect(scriptureSettled).toBe(true)
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: false,
+        hasMembership: false,
+        catalogSettled: scriptureSettled,
+      })
+    ).toBe(false)
+
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'fr',
+        isLoading: false,
+        hasResource: false,
+        languageName: 'French',
+        catalogSettled: true,
+      })?.kind
+    ).toBe('no-sources')
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'fr',
+        isLoading: false,
+        hasResource: false,
+        catalogSettled: false,
+      })
+    ).toBeNull()
   })
 
   test('English helps catalog pending is spinner, not no-sources empty', () => {

@@ -14,11 +14,12 @@ describe('text-mode mismatch wiring (issue #25 / #30)', () => {
     expect(panelSrc).toContain('textModeMismatch')
     expect(panelSrc).toContain('onSwitchTextMode')
     expect(panelSrc).toContain('scriptureMismatch')
-    expect(panelSrc).toContain('actionLabel={scriptureMismatch?.actionLabel')
-    expect(panelSrc).toContain('actionShortLabel={scriptureMismatch?.actionShortLabel')
-    expect(panelSrc).toContain('emptyKind={scriptureMismatch?.kind}')
+    expect(panelSrc).toContain('actionLabel={scriptureMismatch.actionLabel')
+    expect(panelSrc).toContain('actionShortLabel={scriptureMismatch.actionShortLabel')
+    expect(panelSrc).toContain('emptyKind={scriptureMismatch.kind}')
     expect(panelSrc).toContain("mode === 'scripture'")
     expect(panelSrc).toContain('flex-1 min-h-0 overflow-auto bg-surface')
+    expect(panelSrc.indexOf('scriptureMismatch ?')).toBeLessThan(panelSrc.indexOf('isLoadingResources ?'))
   })
 
   test('helps mode keeps the language empty CTA', () => {
@@ -33,6 +34,10 @@ describe('text-mode mismatch wiring (issue #25 / #30)', () => {
     expect(viewSrc).toContain('onSwitchTextMode={handleSwitchTextMode}')
     expect(viewSrc).toContain('onNavigationScopeCommitted={handleNavigatorScopeCommitted}')
     expect(viewSrc).toContain('handlePanelLanguageSelected')
+    const areaSrc = readFileSync(join(import.meta.dir, 'ReadPanelsArea.tsx'), 'utf8')
+    expect(areaSrc).toContain('isReadPanelCatalogSettled')
+    expect(areaSrc).toContain('hasKnownMismatch: Boolean(panel1Mismatch)')
+    expect(areaSrc).toContain('hasKnownMismatch: Boolean(panel2Mismatch)')
   })
 
   test('mismatch empty copy uses anglicized English names, not autonyms', () => {
