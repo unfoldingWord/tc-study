@@ -33,6 +33,7 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
   test('#29 one bootstrap picker seeds both panels; cold-start is not dismissable', () => {
     expect(bootstrapSrc).toContain('seedBothLanguages(languageCode)')
     expect(bootstrapSrc).toContain('canSeedBothPanelLanguages')
+    expect(bootstrapSrc).toContain('inheritEmptyLanguage')
     expect(viewSrc).toContain('showLanguagePicker={showBootstrapPicker}')
     expect(viewSrc).toContain('needsBootstrap')
     expect(viewSrc).toContain('languagePickerRequired={needsBootstrap}')

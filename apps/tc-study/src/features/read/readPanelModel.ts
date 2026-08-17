@@ -44,7 +44,10 @@ export function panelIdsForMode(panels: ReadPanelModels, mode: ReadPanelMode): R
   return READ_PANEL_IDS.filter((id) => panels[id].mode === mode)
 }
 
-/** True when neither panel has a language yet — one picker seeds both. */
+/**
+ * True when neither panel has a language yet — one picker seeds both.
+ * One-empty / one-set is inheritEmptyPanelLanguage in readColdStartPolicy.
+ */
 export function shouldSeedBothPanelLanguages(panels: ReadPanelModels): boolean {
   return !panels['panel-1'].languageCode && !panels['panel-2'].languageCode
 }

@@ -5,6 +5,7 @@
 
 import { create } from 'zustand'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
+import { inheritEmptyPanelLanguage } from './readColdStartPolicy'
 import {
   applyPanelLanguage,
   applyPanelMode,
@@ -24,6 +25,7 @@ import {
 export interface ReadPanelStore extends PersistedReadPanels {
   seedBothLanguages: (languageCode: string) => void
   setPanelLanguage: (panelId: ReadPanelId, languageCode: string) => void
+  inheritEmptyLanguage: () => ReadPanelId | null
   setPanelMode: (panelId: ReadPanelId, mode: ReadPanelMode) => void
   setLayout: (layout: ReadLayoutMode, userChosen?: boolean) => void
   setCollapsedPanelId: (panelId: ReadPanelId | null) => void
@@ -60,6 +62,16 @@ export const useReadPanelStore = create<ReadPanelStore>((set, get) => ({
     const { panels } = get()
     if (panels[panelId].mode === 'helps') writePersistedHelpsLanguage(languageCode)
     persist(get())
+  },
+  inheritEmptyLanguage: () => {
+    const plan = inheritEmptyPanelLanguage(get().panels)
+    if (!plan) return null
+    set({ panels: plan.panels })
+    if (plan.panels[plan.inheritedPanelId].mode === 'helps') {
+      writePersistedHelpsLanguage(plan.languageCode)
+    }
+    persist(get())
+    return plan.inheritedPanelId
   },
   setPanelMode: (panelId, mode) => {
     set((state) => ({

@@ -19,6 +19,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(src).toContain('pushReadLanguageUrl(navigate, languageCode)')
     expect(src).toContain('canSeedBothPanelLanguages')
     expect(src).toContain('seedBothLanguages(languageCode)')
+    expect(src).toContain('inheritEmptyLanguage')
     expect(src).toContain('coldStartCatalogLoads')
     expect(src).toContain('catalogLoadForSinglePanel')
   })
@@ -56,6 +57,14 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(body).toContain('catalogLoadForSinglePanel')
     expect(body).not.toContain('seedBothLanguages')
     expect(body).not.toContain('pushReadLanguageUrl')
+  })
+
+  test('empty pane inherits the other pane language then loads that pane catalog', () => {
+    expect(src).toContain('inheritEmptyLanguage')
+    expect(src).toContain('catalogLoadForSinglePanel')
+    const handler = src.slice(src.indexOf('const handleLanguageSelected'))
+    const body = handler.slice(0, handler.indexOf('const { handleSwitchTextMode'))
+    expect(body.indexOf('inheritEmptyLanguage()')).toBeLessThan(body.indexOf('coldStartCatalogLoads'))
   })
 
   test('cold-start catalog loads run in parallel so helps does not wait on scripture', () => {

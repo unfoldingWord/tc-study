@@ -90,6 +90,7 @@ export function useReadLanguageBootstrap({
   const panels = useReadPanelStore((s) => s.panels)
   const seedBothLanguages = useReadPanelStore((s) => s.seedBothLanguages)
   const setPanelLanguage = useReadPanelStore((s) => s.setPanelLanguage)
+  const inheritEmptyLanguage = useReadPanelStore((s) => s.inheritEmptyLanguage)
   const currentLanguageCode =
     navigationLanguageCode(panels) || initialLanguage || null
   const helpsLanguageCode = firstHelpsLanguageCode(panels)
@@ -180,6 +181,7 @@ export function useReadLanguageBootstrap({
       } else if (!useReadPanelStore.getState().panels['panel-1'].languageCode) {
         setPanelLanguage('panel-1', languageCode)
       }
+      inheritEmptyLanguage()
       maybeCancelDownloads('text')
 
       const subjects =
@@ -227,6 +229,7 @@ export function useReadLanguageBootstrap({
       runCatalogLoad,
       seedBothLanguages,
       setPanelLanguage,
+      inheritEmptyLanguage,
     ]
   )
 
@@ -251,12 +254,13 @@ export function useReadLanguageBootstrap({
   const handlePanelModeSwitch = useCallback(
     async (panelId: 'panel-1' | 'panel-2', mode: 'scripture' | 'helps') => {
       useReadPanelStore.getState().setPanelMode(panelId, mode)
+      inheritEmptyLanguage()
       const navigationScope = useNavigationStore.getState().navigationScope
       const one = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, panelId)
       if (!one) return
       await runCatalogLoad({ ...one, navigationScope })
     },
-    [runCatalogLoad]
+    [inheritEmptyLanguage, runCatalogLoad]
   )
 
   const handleHelpsLanguageSelected = useCallback(
@@ -273,6 +277,20 @@ export function useReadLanguageBootstrap({
     autoLoadedLanguageForUrlRef.current = initialLanguage
     void handleLanguageSelected(initialLanguage)
   }, [initialLanguage, handleLanguageSelected])
+
+  useEffect(() => {
+    const inheritedId = inheritEmptyLanguage()
+    if (!inheritedId) return
+    const one = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, inheritedId)
+    if (!one) return
+    const navigationScope = useNavigationStore.getState().navigationScope
+    void runCatalogLoad({ ...one, navigationScope })
+  }, [
+    panels['panel-1'].languageCode,
+    panels['panel-2'].languageCode,
+    inheritEmptyLanguage,
+    runCatalogLoad,
+  ])
 
   return {
     loadedResources,

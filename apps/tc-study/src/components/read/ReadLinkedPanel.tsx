@@ -36,6 +36,7 @@ interface ReadLinkedPanelProps {
   mountStyle: CSSProperties
   dir: 'ltr' | 'rtl'
   mode: ReadPanelMode
+  languageCode: string | null
   onModeSwitch: (mode: ReadPanelMode) => void
   onLanguageSelected: (languageCode: string) => void
   filteredKeys: string[]
@@ -67,6 +68,7 @@ function ReadPanelBody({
   placeholderLabel,
   placeholderIndex,
   mode,
+  languageCode,
   onModeSwitch,
   onLanguageSelected,
   layout,
@@ -94,11 +96,11 @@ function ReadPanelBody({
         ? {
             openHelpsPicker: () => setPickerOpen(true),
             selectHelpsLanguage: onLanguageSelected,
-            selectedLanguageCode: null,
+            selectedLanguageCode: languageCode,
             isCatalogLoading: catalogLoading,
           }
         : null,
-    [isHelps, onLanguageSelected, catalogLoading]
+    [isHelps, languageCode, onLanguageSelected, catalogLoading]
   )
   const scriptureMismatch = mode === 'scripture' ? textModeMismatch : null
   const mismatchScope = scriptureMismatch?.switchScope
