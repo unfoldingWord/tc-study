@@ -21,6 +21,23 @@ describe('getTabShortLabel', () => {
     ).toBe('TPL')
   })
 
+  test('Combined Helps and OBS Helps share the compact Helps label', () => {
+    expect(
+      getTabShortLabel({
+        key: '__combined-helps__',
+        type: 'combined-helps',
+        title: 'Helps',
+      })
+    ).toBe('Helps')
+    expect(
+      getTabShortLabel({
+        key: '__combined-helps-obs__',
+        type: 'obs-combined-helps',
+        title: 'OBS Helps',
+      })
+    ).toBe('Helps')
+  })
+
   test('ignores blank abbreviation and falls back to key', () => {
     expect(
       getTabShortLabel({

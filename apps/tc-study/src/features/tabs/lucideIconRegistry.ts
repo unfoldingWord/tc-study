@@ -7,9 +7,9 @@ import {
   GraduationCap,
   Layers,
   LifeBuoy,
-  Lightbulb,
   Link,
   MessageCircleQuestion,
+  NotebookText,
 } from 'lucide-react'
 
 /**
@@ -24,9 +24,9 @@ export const LUCIDE_ICON_REGISTRY: Record<string, LucideIcon> = {
   GraduationCap,
   Layers,
   LifeBuoy,
-  Lightbulb,
   Link,
   MessageCircleQuestion,
+  NotebookText,
 }
 
 export function resolveLucideIconName(name: string | undefined | null): LucideIcon | null {
