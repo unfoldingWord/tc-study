@@ -7,8 +7,9 @@ describe('Read URL sync wiring (internal vs external)', () => {
     const hydrate = readFileSync(join(import.meta.dir, 'useReadUrlLanguageHydrate.ts'), 'utf8')
     expect(hydrate).toContain('shouldHydrateReadLanguages')
     expect(hydrate).toContain("getReadNavigationSource()")
-    expect(hydrate).toContain('hydrateLanguagesFromUrl')
+    expect(hydrate).toContain('hydrateLanguagesFromUrl(pathLangs)')
     expect(hydrate).toContain('handleLanguageSelected')
+    expect(hydrate).not.toContain('resolved.language ? [resolved.language]')
 
     const panel = readFileSync(join(import.meta.dir, 'useReadPanelLanguageHandlers.ts'), 'utf8')
     const pick = panel.slice(panel.indexOf('const handlePanelLanguageSelected'))

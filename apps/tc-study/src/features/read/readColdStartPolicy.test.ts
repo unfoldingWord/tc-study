@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { languageCodeFromReadPathname } from './readBootstrapPolicy'
 import { applyPanelLanguage, DEFAULT_READ_PANEL_MODELS } from './readPanelModel'
+import { parseReadUrl } from './readUrlGrammar'
 import {
   hydrateReadLanguagesFromHint,
   hydrateReadLanguagesFromParsedUrl,
@@ -103,7 +104,7 @@ describe('inheritEmptyPanelLanguage', () => {
     expect(hydrated.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'tr' })
   })
 
-  test('URL tr does not clobber a diverged helps language', () => {
+  test('hint (internal) does not clobber a diverged helps language', () => {
     const hydrated = hydrateReadLanguagesFromHint({
       panels: {
         'panel-1': { mode: 'scripture', languageCode: 'eng' },
@@ -181,7 +182,7 @@ describe('inheritEmptyPanelLanguage', () => {
     expect(hydrated.inheritedPanelId).toBeNull()
   })
 
-  test('external /read/en/bible sets both if other empty; does not overwrite stored p2', () => {
+  test('external single-lang overwrites persisted p2 (hint/internal does not)', () => {
     const emptyP2 = hydrateReadLanguagesFromParsedUrl({
       panels: {
         'panel-1': { mode: 'scripture', languageCode: null },
@@ -192,15 +193,59 @@ describe('inheritEmptyPanelLanguage', () => {
     expect(emptyP2.panels['panel-1'].languageCode).toBe('en')
     expect(emptyP2.panels['panel-2'].languageCode).toBe('en')
 
-    const storedP2 = hydrateReadLanguagesFromParsedUrl({
+    const storedP2 = {
+      'panel-1': { mode: 'scripture' as const, languageCode: 'en' },
+      'panel-2': { mode: 'helps' as const, languageCode: 'fr' },
+    }
+    const external = hydrateReadLanguagesFromParsedUrl({
+      panels: storedP2,
+      langs: ['en'],
+    })
+    expect(external.panels['panel-1'].languageCode).toBe('en')
+    expect(external.panels['panel-2'].languageCode).toBe('en')
+
+    const internal = hydrateReadLanguagesFromHint({
+      panels: storedP2,
+      hintLanguage: 'en',
+    })
+    expect(internal.panels['panel-1'].languageCode).toBe('en')
+    expect(internal.panels['panel-2'].languageCode).toBe('fr')
+  })
+
+  test('external /read/es-419/obs/story/8 sets both panes to es-419 over cached fr', () => {
+    const langs = parseReadUrl('/read/es-419/obs/story/8').langs
+    expect(langs).toEqual(['es-419'])
+    const hydrated = hydrateReadLanguagesFromParsedUrl({
       panels: {
         'panel-1': { mode: 'scripture', languageCode: 'en' },
         'panel-2': { mode: 'helps', languageCode: 'fr' },
       },
-      langs: ['en'],
+      langs,
     })
-    expect(storedP2.panels['panel-1'].languageCode).toBe('en')
-    expect(storedP2.panels['panel-2'].languageCode).toBe('fr')
+    expect(hydrated.panels['panel-1'].languageCode).toBe('es-419')
+    expect(hydrated.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'es-419' })
+    expect(coldStartCatalogLoads(hydrated.panels)).toEqual([
+      {
+        textLanguageCode: 'es-419',
+        helpsLanguageCode: 'es-419',
+        loadTarget: 'both',
+      },
+    ])
+  })
+
+  test('external /read/es-419+fr/obs/story/8 sets p1 and p2 independently', () => {
+    const langs = parseReadUrl('/read/es-419+fr/obs/story/8').langs
+    expect(langs).toEqual(['es-419', 'fr'])
+    const hydrated = hydrateReadLanguagesFromParsedUrl({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'en' },
+        'panel-2': { mode: 'helps', languageCode: 'tr' },
+      },
+      langs,
+    })
+    expect(hydrated.panels['panel-1'].languageCode).toBe('es-419')
+    expect(hydrated.panels['panel-2'].languageCode).toBe('fr')
+    expect(hydrated.inheritedPanelId).toBeNull()
   })
 
   test('session restore with p1 set and p2 empty copies helps language only', () => {

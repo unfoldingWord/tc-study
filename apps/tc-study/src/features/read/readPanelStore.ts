@@ -50,6 +50,24 @@ function persist(state: ReadPanelStore): void {
   })
 }
 
+function applyHydratePlan(
+  get: () => ReadPanelStore,
+  set: (partial: Pick<ReadPanelStore, 'panels'>) => void,
+  plan: { panels: ReadPanelStore['panels']; inheritedPanelId: ReadPanelId | null }
+): ReadPanelId | null {
+  const current = get().panels
+  const unchanged =
+    plan.panels['panel-1'].languageCode === current['panel-1'].languageCode &&
+    plan.panels['panel-2'].languageCode === current['panel-2'].languageCode
+  if (unchanged) return plan.inheritedPanelId
+  set({ panels: plan.panels })
+  const helpsCode =
+    plan.panels['panel-2'].mode === 'helps' ? plan.panels['panel-2'].languageCode : null
+  if (helpsCode) writePersistedHelpsLanguage(helpsCode)
+  persist(get())
+  return plan.inheritedPanelId
+}
+
 const initial = readPersistedReadPanels()
 
 export const useReadPanelStore = create<ReadPanelStore>((set, get) => ({
@@ -83,23 +101,24 @@ export const useReadPanelStore = create<ReadPanelStore>((set, get) => ({
     return plan.inheritedPanelId
   },
   hydrateLanguagesFromHint: (hintLanguage) => {
-    return get().hydrateLanguagesFromUrl(hintLanguage ? [hintLanguage] : [])
+    return applyHydratePlan(
+      get,
+      set,
+      hydrateReadLanguagesFromHint({
+        panels: get().panels,
+        hintLanguage: hintLanguage ?? null,
+      })
+    )
   },
   hydrateLanguagesFromUrl: (langs) => {
     const current = get().panels
-    const plan = langs.length
-      ? hydrateReadLanguagesFromParsedUrl({ panels: current, langs })
-      : hydrateReadLanguagesFromHint({ panels: current, hintLanguage: null })
-    const unchanged =
-      plan.panels['panel-1'].languageCode === current['panel-1'].languageCode &&
-      plan.panels['panel-2'].languageCode === current['panel-2'].languageCode
-    if (unchanged) return plan.inheritedPanelId
-    set({ panels: plan.panels })
-    const helpsCode =
-      plan.panels['panel-2'].mode === 'helps' ? plan.panels['panel-2'].languageCode : null
-    if (helpsCode) writePersistedHelpsLanguage(helpsCode)
-    persist(get())
-    return plan.inheritedPanelId
+    return applyHydratePlan(
+      get,
+      set,
+      langs.length
+        ? hydrateReadLanguagesFromParsedUrl({ panels: current, langs })
+        : hydrateReadLanguagesFromHint({ panels: current, hintLanguage: null })
+    )
   },
   setPanelMode: (panelId, mode) => {
     set((state) => ({

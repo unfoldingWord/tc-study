@@ -81,11 +81,10 @@ function asReadPanelModels(panels: InheritPanelLanguageSnapshot): ReadPanelModel
 }
 
 /**
- * URL hydrate: an explicit `:lang` is authoritative over a persisted session.
- * Apply it to panel-1 even when cache already has another language. An empty
- * sibling inherits the URL language. Panes that still share the previous
- * session language follow the URL (so cache `eng`/`eng` becomes `tr`/`tr`).
- * A diverged other pane is left alone.
+ * Internal / hint hydrate: apply a hint to panel-1. An empty sibling inherits.
+ * Panes that still share the previous session language follow the hint
+ * (`eng`/`eng` → `tr`/`tr`). A diverged other pane is left alone — in-app
+ * scripture pick must not overwrite a set helps language.
  */
 export function hydrateReadLanguagesFromHint(options: {
   panels: InheritPanelLanguageSnapshot
@@ -129,8 +128,9 @@ export function hydrateReadLanguagesFromHint(options: {
 }
 
 /**
- * External URL hydrate. One lang → existing hint rules (empty sibling inherits;
- * diverged sibling is left alone). Two langs → panel-1 / panel-2 authoritatively.
+ * External URL hydrate. One lang → both panels (path is authoritative;
+ * persisted p2 must not win). Two langs → panel-1 / panel-2 independently.
+ * Empty langs → inherit-empty only (bare `/read` cache restore).
  */
 export function hydrateReadLanguagesFromParsedUrl(options: {
   panels: InheritPanelLanguageSnapshot
@@ -148,9 +148,21 @@ export function hydrateReadLanguagesFromParsedUrl(options: {
       languageCode: langs[0]!,
     }
   }
+  if (langs.length === 1) {
+    const hint = langs[0]!
+    let panels = asReadPanelModels(options.panels)
+    panels = applyPanelLanguage(panels, 'panel-1', hint)
+    panels = applyPanelLanguage(panels, 'panel-2', hint)
+    return {
+      panels,
+      appliedHintTo: 'panel-1',
+      inheritedPanelId: 'panel-2',
+      languageCode: hint,
+    }
+  }
   return hydrateReadLanguagesFromHint({
     panels: options.panels,
-    hintLanguage: langs[0] ?? null,
+    hintLanguage: null,
   })
 }
 

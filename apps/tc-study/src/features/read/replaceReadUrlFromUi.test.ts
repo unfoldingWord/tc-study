@@ -63,6 +63,30 @@ describe('replaceReadUrlFromUi + navigationSource', () => {
     expect(getReadNavigationSource()).toBe('internal')
   })
 
+  test('external single-lang path overwrites persisted p2; internal pick does not', () => {
+    const stored = {
+      'panel-1': { mode: 'scripture' as const, languageCode: 'en' },
+      'panel-2': { mode: 'helps' as const, languageCode: 'fr' },
+    }
+    expect(shouldHydrateReadLanguages('external')).toBe(true)
+    const external = hydrateReadLanguagesFromParsedUrl({
+      panels: stored,
+      langs: shouldHydrateReadLanguages('external') ? ['es-419'] : [],
+    })
+    expect(external.panels['panel-1'].languageCode).toBe('es-419')
+    expect(external.panels['panel-2'].languageCode).toBe('es-419')
+
+    replaceReadUrlFromUi('/read/es-419/obs/story/8')
+    expect(getReadNavigationSource()).toBe('internal')
+    expect(shouldHydrateReadLanguages()).toBe(false)
+    const internal = hydrateReadLanguagesFromParsedUrl({
+      panels: stored,
+      langs: shouldHydrateReadLanguages() ? ['es-419'] : [],
+    })
+    expect(internal.panels['panel-1'].languageCode).toBe('en')
+    expect(internal.panels['panel-2'].languageCode).toBe('fr')
+  })
+
   test('popstate / back is external and applies path languages', () => {
     markReadNavigationInternal()
     expect(shouldHydrateReadLanguages()).toBe(false)

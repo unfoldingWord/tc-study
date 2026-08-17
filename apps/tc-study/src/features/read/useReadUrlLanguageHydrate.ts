@@ -28,14 +28,13 @@ export function useReadUrlLanguageHydrate(options: {
       cachedLanguage: cached,
     })
     const pathLangs = languageCodesFromReadPathname(pathname)
-    const langs =
-      pathLangs.length > 0 ? pathLangs : resolved.language ? [resolved.language] : []
-    const raw = langs[0] || options.initialLanguage?.trim()
+    // Path langs only — cache is not a single-lang URL (that would overwrite
+    // persisted p2 on bare `/read`). Empty path → inherit-empty only.
+    hydrateLanguagesFromUrl(pathLangs)
+    const raw = pathLangs[0] || resolved.language || options.initialLanguage?.trim()
     if (!raw) return
     const lang = canonicalReadLanguageCode(raw)
-    const applied = langs.length > 0 ? langs : [lang]
-    hydrateLanguagesFromUrl(applied)
-    const sig = applied.join(',')
+    const sig = pathLangs.length > 0 ? pathLangs.join(',') : lang
     if (autoLoadedLanguageForUrlRef.current === sig) return
     autoLoadedLanguageForUrlRef.current = sig
     options.handleLanguageSelected(lang)
