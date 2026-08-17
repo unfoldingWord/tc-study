@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { Book, Layers, LifeBuoy, MessageCircleQuestion } from 'lucide-react'
+import { Book, CircleHelp, Layers, LifeBuoy, MessageCircleQuestion } from 'lucide-react'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
 import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
 import { resolveLucideIconName } from './lucideIconRegistry'
@@ -32,7 +32,7 @@ describe('resolveTabPresentation', () => {
         icon: 'MessageCircleQuestion',
         contentRole: 'companion',
       },
-      [RESOURCE_TYPE_IDS.COMBINED_HELPS]: { icon: 'Layers', contentRole: 'companion' },
+      [RESOURCE_TYPE_IDS.COMBINED_HELPS]: { icon: 'CircleHelp', contentRole: 'companion' },
     }
 
   const getType = (id: string) => types[id] as never
@@ -77,7 +77,7 @@ describe('resolveTabPresentation', () => {
     expect(p.shortLabel).toBe('TPL')
   })
 
-  test('CombinedHelps special key resolves Layers from plugin', () => {
+  test('CombinedHelps special key resolves CircleHelp from plugin', () => {
     const p = resolveTabPresentation(
       {
         key: COMBINED_HELPS_RESOURCE_ID,
@@ -86,7 +86,7 @@ describe('resolveTabPresentation', () => {
       },
       { getType }
     )
-    expect(p.Icon).toBe(Layers)
+    expect(p.Icon).toBe(CircleHelp)
     expect(p.showShortLabel).toBe(false)
     expect(p.shortLabel).toBe('Helps')
     expect(p.title).toBe('Helps')
@@ -128,6 +128,7 @@ describe('resolveTabPresentation', () => {
 
 describe('lucideIconRegistry', () => {
   test('includes plugin icons used by tc-study', () => {
+    expect(resolveLucideIconName('CircleHelp')).toBe(CircleHelp)
     expect(resolveLucideIconName('Layers')).toBe(Layers)
     expect(resolveLucideIconName('LifeBuoy')).toBe(LifeBuoy)
     expect(resolveLucideIconName('Book')).toBe(Book)

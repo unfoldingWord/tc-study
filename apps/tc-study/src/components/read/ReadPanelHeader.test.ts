@@ -14,6 +14,7 @@ describe('ReadPanelHeader (issue #30)', () => {
     expect(modeSrc).toContain('LifeBuoy')
     expect(modeSrc).toContain('BookOpen')
     expect(modeSrc).not.toContain('Layers')
+    expect(modeSrc).not.toContain('CircleHelp')
     expect(src).toContain('LanguagePicker')
     expect(src).toContain('ReadModeSwitch')
     expect(src).toContain('min-h-11')
