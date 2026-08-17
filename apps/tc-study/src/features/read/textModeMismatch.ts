@@ -11,6 +11,7 @@ import type { BCVReference, NavigationCatalogScope, NavigationMode } from '../..
 import type { LanguageAvailabilityFlags } from './languageAvailability'
 import { languageEnglishCopyDisplayName } from './languageListDisplayName'
 import { loadLanguagesCache } from './languagesCache'
+import { parseReadUrl } from './readUrlGrammar'
 
 export type TextModeMismatchKind = 'obs-only' | 'bible-only' | 'neither'
 
@@ -132,14 +133,15 @@ export function applyTextModeScopeSwitch(
   nav.navigateToReference(scope === 'obs' ? DEFAULT_OBS_REF : DEFAULT_BIBLE_REF)
 }
 
-/** `/read/{lang}/bible|obs/...` — ignore `/read-v1`. */
+/** `/read/{lang}[/{lang2}]/bible|obs/...` — ignore `/read-v1`. */
 export function navigationScopeFromReadPath(
   pathname: string,
   fallback: string
 ): string {
-  const match = /(?:^|\/)read\/[^/]+\/(bible|obs)(?:\/|$)/.exec(pathname)
-  if (!match || pathname.includes('/read-v1/')) return fallback
-  return match[1] === 'obs' ? 'obs' : 'scripture'
+  if (pathname.includes('/read-v1/')) return fallback
+  const parsed = parseReadUrl(pathname)
+  if (!parsed.resourceType) return fallback
+  return parsed.resourceType === 'obs' ? 'obs' : 'scripture'
 }
 
 /**

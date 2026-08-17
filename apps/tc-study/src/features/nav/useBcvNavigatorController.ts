@@ -1,6 +1,6 @@
 import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useReadPathLanguageCode } from '../read/useReadPathLanguageCode'
 import {
   useAvailableBooks,
   useCatalogManager,
@@ -48,7 +48,7 @@ export function useBcvNavigatorController(options: {
   const currentRef = navigation.currentReference
   const bookTitleSource = useBookTitleSource()
 
-  const { languageCode: urlLanguageCode } = useParams<{ languageCode?: string }>()
+  const urlLanguageCode = useReadPathLanguageCode()
   const currentLanguage = (urlLanguageCode ?? '').toLowerCase()
 
   const obsCatalogKey = useMemo(

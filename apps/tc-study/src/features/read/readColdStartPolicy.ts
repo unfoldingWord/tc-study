@@ -128,6 +128,32 @@ export function hydrateReadLanguagesFromHint(options: {
   }
 }
 
+/**
+ * External URL hydrate. One lang → existing hint rules (empty sibling inherits;
+ * diverged sibling is left alone). Two langs → panel-1 / panel-2 authoritatively.
+ */
+export function hydrateReadLanguagesFromParsedUrl(options: {
+  panels: InheritPanelLanguageSnapshot
+  langs: string[]
+}): HydrateReadLanguagesFromHintResult {
+  const langs = options.langs.map((code) => trimmedPanelLanguage(code)).filter((code): code is string => !!code)
+  if (langs.length >= 2) {
+    let panels = asReadPanelModels(options.panels)
+    panels = applyPanelLanguage(panels, 'panel-1', langs[0]!)
+    panels = applyPanelLanguage(panels, 'panel-2', langs[1]!)
+    return {
+      panels,
+      appliedHintTo: 'panel-1',
+      inheritedPanelId: null,
+      languageCode: langs[0]!,
+    }
+  }
+  return hydrateReadLanguagesFromHint({
+    panels: options.panels,
+    hintLanguage: langs[0] ?? null,
+  })
+}
+
 /** Persist restore: copy panel-1 onto an empty panel-2 only (do not seed p1 from helps). */
 export function inheritEmptyHelpsFromSession(panels: ReadPanelModels): ReadPanelModels {
   const plan = inheritEmptyPanelLanguage(panels)

@@ -17,6 +17,8 @@ import {
   skipTextCatalogOnMismatch,
   supportedSubjectsFromRegistry,
 } from './scriptureLanguageMismatch'
+import { replaceReadLanguageUrlFromUi } from './pushReadLanguageUrl'
+import { readUrlLangsFromPanels } from './readUrlGrammar'
 import { useReadPanelStore } from './readPanelStore'
 import type { RunReadCatalogLoadOptions } from './useReadCatalogLoad'
 
@@ -50,6 +52,10 @@ export function useReadPanelLanguageHandlers(deps: {
       const resolvedCode = canonicalReadLanguageCode(languageCode)
       setPanelLanguage(panelId, resolvedCode)
       const panel = useReadPanelStore.getState().panels[panelId]
+      if (panel.mode === 'scripture') {
+        const langs = readUrlLangsFromPanels(useReadPanelStore.getState().panels)
+        if (langs.length) replaceReadLanguageUrlFromUi(langs)
+      }
       maybeCancelDownloads(panel.mode === 'helps' ? 'helps' : 'text')
       const navigationScope = useNavigationStore.getState().navigationScope
       if (

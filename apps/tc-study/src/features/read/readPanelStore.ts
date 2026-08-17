@@ -6,7 +6,11 @@
 import { create } from 'zustand'
 import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
-import { hydrateReadLanguagesFromHint, inheritEmptyPanelLanguage } from './readColdStartPolicy'
+import {
+  hydrateReadLanguagesFromHint,
+  hydrateReadLanguagesFromParsedUrl,
+  inheritEmptyPanelLanguage,
+} from './readColdStartPolicy'
 import {
   applyPanelLanguage,
   applyPanelMode,
@@ -28,6 +32,7 @@ export interface ReadPanelStore extends PersistedReadPanels {
   setPanelLanguage: (panelId: ReadPanelId, languageCode: string) => void
   inheritEmptyLanguage: () => ReadPanelId | null
   hydrateLanguagesFromHint: (hintLanguage?: string | null) => ReadPanelId | null
+  hydrateLanguagesFromUrl: (langs: string[]) => ReadPanelId | null
   setPanelMode: (panelId: ReadPanelId, mode: ReadPanelMode) => void
   setLayout: (layout: ReadLayoutMode, userChosen?: boolean) => void
   setCollapsedPanelId: (panelId: ReadPanelId | null) => void
@@ -78,8 +83,13 @@ export const useReadPanelStore = create<ReadPanelStore>((set, get) => ({
     return plan.inheritedPanelId
   },
   hydrateLanguagesFromHint: (hintLanguage) => {
+    return get().hydrateLanguagesFromUrl(hintLanguage ? [hintLanguage] : [])
+  },
+  hydrateLanguagesFromUrl: (langs) => {
     const current = get().panels
-    const plan = hydrateReadLanguagesFromHint({ panels: current, hintLanguage })
+    const plan = langs.length
+      ? hydrateReadLanguagesFromParsedUrl({ panels: current, langs })
+      : hydrateReadLanguagesFromHint({ panels: current, hintLanguage: null })
     const unchanged =
       plan.panels['panel-1'].languageCode === current['panel-1'].languageCode &&
       plan.panels['panel-2'].languageCode === current['panel-2'].languageCode

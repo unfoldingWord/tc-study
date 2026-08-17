@@ -9,7 +9,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   useCatalogManager,
   useCompletenessChecker,
@@ -20,8 +19,10 @@ import {
 import { useAppStore } from '../../contexts/AppContext'
 import { useBackgroundDownload, useCatalogBackgroundDownload } from '../../hooks'
 import { usePackageStore } from '../../lib/stores/packageStore'
-import { canonicalReadLanguageCode, languageCodesMatch } from '../../utils/languageCodeMatch'
-import { pushReadLanguageUrl } from './pushReadLanguageUrl'
+import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
+import { replaceReadLanguageUrlFromUi } from './pushReadLanguageUrl'
+import { readUrlLangsFromPanels } from './readUrlGrammar'
+import { markReadNavigationInternal } from './replaceReadUrlFromUi'
 import {
   applyTextLanguagePickNavigation,
   catalogScopeAfterTextLanguagePick,
@@ -42,13 +43,14 @@ import {
   type DownloadPane,
 } from './downloadIsolationPolicy'
 import { loadLanguagesCache } from './languagesCache'
-import { resolveReadLanguageFromUrlOrCache, shouldPushReadLanguageUrl } from './readBootstrapPolicy'
+import { shouldPushReadLanguageUrl } from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
 import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
 import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
 import { useReadPanelLanguageHandlers } from './useReadPanelLanguageHandlers'
+import { useReadUrlLanguageHydrate } from './useReadUrlLanguageHydrate'
 
 /** Set to true to disable automatic background downloads (e.g. for debugging). */
 const DISABLE_BACKGROUND_DOWNLOAD = false
@@ -66,7 +68,6 @@ export function useReadLanguageBootstrap({
   initialLanguage,
   requireLanguageInUrl = false,
 }: UseReadLanguageBootstrapOptions = {}) {
-  const navigate = useNavigate()
   const catalogManager = useCatalogManager()
   const viewerRegistry = useViewerRegistry()
   const resourceTypeRegistry = useResourceTypeRegistry()
@@ -88,12 +89,10 @@ export function useReadLanguageBootstrap({
     return () => window.clearTimeout(id)
   }, [shouldAutoOpenLanguagePicker])
 
-  const autoLoadedLanguageForUrlRef = useRef<string | null>(null)
   const panels = useReadPanelStore((s) => s.panels)
   const seedBothLanguages = useReadPanelStore((s) => s.seedBothLanguages)
   const setPanelLanguage = useReadPanelStore((s) => s.setPanelLanguage)
   const inheritEmptyLanguage = useReadPanelStore((s) => s.inheritEmptyLanguage)
-  const hydrateLanguagesFromHint = useReadPanelStore((s) => s.hydrateLanguagesFromHint)
   const currentLanguageCode =
     navigationLanguageCode(panels) || initialLanguage || null
   const helpsLanguageCode = firstHelpsLanguageCode(panels)
@@ -210,11 +209,12 @@ export function useReadLanguageBootstrap({
       applyTextLanguagePickNavigation(useNavigationStore.getState(), pick)
       const scope = catalogScopeAfterTextLanguagePick(scopeFromUrl, pick)
       const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
-      if (shouldPushReadLanguageUrl(pathname, resolvedCode)) {
-        pushReadLanguageUrl(navigate, resolvedCode)
+      const langs = readUrlLangsFromPanels(useReadPanelStore.getState().panels)
+      if (langs.length && shouldPushReadLanguageUrl(pathname, langs)) {
+        replaceReadLanguageUrlFromUi(langs)
+      } else {
+        markReadNavigationInternal()
       }
-
-      autoLoadedLanguageForUrlRef.current = resolvedCode
       if (
         skipTextCatalogOnMismatch({
           languageCode: resolvedCode,
@@ -238,7 +238,6 @@ export function useReadLanguageBootstrap({
     },
     [
       maybeCancelDownloads,
-      navigate,
       resourceTypeRegistry,
       helpsLanguageCode,
       runCatalogLoad,
@@ -269,26 +268,10 @@ export function useReadLanguageBootstrap({
     inheritEmptyLanguage,
   })
 
-  useEffect(() => {
-    const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
-    const cached = navigationLanguageCode(useReadPanelStore.getState().panels)
-    const resolved = resolveReadLanguageFromUrlOrCache({
-      pathname,
-      cachedLanguage: cached,
-    })
-    const raw = initialLanguage?.trim() || resolved.language
-    if (!raw) return
-    const lang = canonicalReadLanguageCode(raw)
-    hydrateLanguagesFromHint(lang)
-    if (
-      autoLoadedLanguageForUrlRef.current &&
-      languageCodesMatch(autoLoadedLanguageForUrlRef.current, lang)
-    ) {
-      return
-    }
-    autoLoadedLanguageForUrlRef.current = lang
-    void handleLanguageSelected(lang)
-  }, [initialLanguage, handleLanguageSelected, hydrateLanguagesFromHint])
+  useReadUrlLanguageHydrate({
+    initialLanguage,
+    handleLanguageSelected,
+  })
 
   useEffect(() => {
     resetCatalogSettled()

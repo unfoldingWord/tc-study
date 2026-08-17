@@ -1,12 +1,15 @@
 /**
- * Replace the Read URL for a text-language change without inventing a router.
+ * Replace the Read URL for a scripture-language change without React Router.
  */
 
-import type { NavigateFunction } from 'react-router-dom'
 import { useNavigationStore } from '../nav/navigationStore'
 import { buildReadPath, buildReadRouteTailFromNavigation } from '../../utils/readRoutes'
+import { replaceReadUrlFromUi } from './replaceReadUrlFromUi'
+import { serializeReadUrl } from './readUrlGrammar'
 
-export function pushReadLanguageUrl(navigate: NavigateFunction, languageCode: string): void {
+export function replaceReadLanguageUrlFromUi(languageCodes: string | string[]): void {
+  const langs = (Array.isArray(languageCodes) ? languageCodes : [languageCodes]).filter(Boolean)
+  if (langs.length === 0) return
   const nav = useNavigationStore.getState()
   const tail = buildReadRouteTailFromNavigation({
     scope: nav.navigationScope,
@@ -19,8 +22,8 @@ export function pushReadLanguageUrl(navigate: NavigateFunction, languageCode: st
         : null,
   })
   if (tail) {
-    navigate(buildReadPath(languageCode, tail), { replace: true })
+    replaceReadUrlFromUi(buildReadPath(langs, tail))
   } else {
-    navigate(`/read/${languageCode}`, { replace: true })
+    replaceReadUrlFromUi(serializeReadUrl({ langs }))
   }
 }

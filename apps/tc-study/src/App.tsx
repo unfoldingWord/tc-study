@@ -140,39 +140,7 @@ function App() {
                     }
                   />
                   <Route
-                    path="read"
-                    element={
-                      <Suspense fallback={<ReadPageSkeleton />}>
-                        <Read />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="read/:languageCode/:resourceType/:navType/:navRef"
-                    element={
-                      <Suspense fallback={<ReadPageSkeleton />}>
-                        <Read />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="read/:languageCode/:resourceType/:navType"
-                    element={
-                      <Suspense fallback={<ReadPageSkeleton />}>
-                        <Read />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="read/:languageCode/:resourceType"
-                    element={
-                      <Suspense fallback={<ReadPageSkeleton />}>
-                        <Read />
-                      </Suspense>
-                    }
-                  />
-                  <Route
-                    path="read/:languageCode"
+                    path="read/*"
                     element={
                       <Suspense fallback={<ReadPageSkeleton />}>
                         <Read />

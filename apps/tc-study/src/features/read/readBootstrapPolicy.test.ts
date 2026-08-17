@@ -16,6 +16,8 @@ describe('readBootstrapPolicy', () => {
   test('parses :lang from /read/{lang}/obs/... and ignores bare /read', () => {
     expect(languageCodeFromReadPathname('/read/tr/obs/ref/1.1')).toBe('tr')
     expect(languageCodeFromReadPathname('/read/ha/bible/ref/tit%201:1')).toBe('ha')
+    expect(languageCodeFromReadPathname('/read/en/fr/bible/ref/tit%201:1')).toBe('en')
+    expect(languageCodeFromReadPathname('/read/bible/ref/tit%201:1')).toBeNull()
     expect(languageCodeFromReadPathname('/read')).toBeNull()
     expect(languageCodeFromReadPathname('/read/')).toBeNull()
     expect(languageCodeFromReadPathname('/read-v1/tr/obs/ref/1.1')).toBeNull()
@@ -144,6 +146,22 @@ describe('readBootstrapPolicy', () => {
     ).toBeNull()
   })
 
+  test('write-back can emit two scripture langs without treating bible as a lang', () => {
+    expect(
+      readUrlWriteBackAction({
+        pathname: '/read/en/bible/ref/tit%201%3A1',
+        language: 'en',
+        languages: ['en', 'fr'],
+        suppressUrlSync: false,
+        scope: 'scripture',
+        mode: 'verse',
+        ref: { book: 'tit', chapter: 1, verse: 1 },
+        passageSet: null,
+        section1Based: null,
+      })
+    ).toEqual({ replace: '/read/en/fr/bible/ref/tit%201%3A1' })
+  })
+
   test('cached bible session on /read replaces to canonical path', () => {
     const session = {
       language: 'en',
@@ -192,7 +210,7 @@ describe('readBootstrapPolicy', () => {
     const src = readFileSync(join(import.meta.dir, 'useReadUrlSync.ts'), 'utf8')
     expect(src).toContain('readUrlWriteBackAction')
     expect(src).toContain('deepLinkPending')
-    expect(src).toContain('navigate(action.replace, { replace: true })')
+    expect(src).toContain('replaceReadUrlFromUi(action.replace)')
     expect(src).not.toContain('requireLanguageInUrl')
   })
 

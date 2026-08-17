@@ -12,6 +12,7 @@ import {
   navigationScopeFromResourceType,
   type ReadResourceType,
 } from '../../utils/readRoutes'
+import { parseReadUrl, readUrlLangsEqual } from './readUrlGrammar'
 
 /**
  * Defer catalog load only when no language is known yet (picker still required).
@@ -28,13 +29,16 @@ export function isBareReadPathname(pathname: string): boolean {
 }
 
 /**
- * `:lang` from `/read/{lang}/…` (ignore `/read-v1`). Bare `/read` is null.
+ * Panel-1 `:lang` from `/read/{lang}/…` or `/read/{lang}/{lang2}/…`.
+ * Reserved tokens (`bible`, `obs`, …) are never languages. Bare `/read` is null.
  */
 export function languageCodeFromReadPathname(pathname: string): string | null {
-  if (isBareReadPathname(pathname) || pathname.includes('/read-v1/')) return null
-  const match = /(?:^|\/)read\/([^/]+)(?:\/|$)/.exec(pathname)
-  const code = match?.[1]?.trim()
-  return code || null
+  return parseReadUrl(pathname).langs[0] ?? null
+}
+
+/** 0–2 canonical language codes from the Read path. */
+export function languageCodesFromReadPathname(pathname: string): string[] {
+  return parseReadUrl(pathname).langs
 }
 
 /**
@@ -57,10 +61,17 @@ export function resolveReadLanguageFromUrlOrCache(options: {
  * already has this `:lang` must not — that would rewrite a deep link with
  * cached nav (bible/tit instead of obs/1.1).
  */
-export function shouldPushReadLanguageUrl(pathname: string, languageCode: string): boolean {
-  const pathLang = languageCodeFromReadPathname(pathname)
-  if (!pathLang) return true
-  return canonicalReadLanguageCode(pathLang) !== canonicalReadLanguageCode(languageCode)
+export function shouldPushReadLanguageUrl(
+  pathname: string,
+  languageCode: string | string[]
+): boolean {
+  const want = (Array.isArray(languageCode) ? languageCode : [languageCode])
+    .map((code) => canonicalReadLanguageCode(code.trim()))
+    .filter(Boolean)
+  if (want.length === 0) return false
+  const pathLangs = languageCodesFromReadPathname(pathname)
+  if (pathLangs.length === 0) return true
+  return !readUrlLangsEqual(pathLangs, want)
 }
 
 /**
@@ -131,6 +142,7 @@ export function resumeBareReadNavigation(
 export function readUrlWriteBackAction(args: {
   pathname: string
   language: string | null | undefined
+  languages?: string[]
   suppressUrlSync: boolean
   scope: NavigationCatalogScope
   mode: NavigationMode
@@ -149,10 +161,17 @@ export function readUrlWriteBackAction(args: {
   ) {
     return null
   }
-  const urlLang = languageCodeFromReadPathname(args.pathname)
-  const rawLanguage = args.language || urlLang
-  const language = rawLanguage ? canonicalReadLanguageCode(rawLanguage) : null
-  if (!language) return null
+  const urlLangs = languageCodesFromReadPathname(args.pathname)
+  const langs = (
+    args.languages?.length
+      ? args.languages
+      : args.language
+        ? [args.language]
+        : urlLangs
+  )
+    .map((code) => canonicalReadLanguageCode(code.trim()))
+    .filter(Boolean)
+  if (langs.length === 0) return null
   const tail = buildReadRouteTailFromNavigation({
     scope: args.scope,
     mode: args.mode,
@@ -161,7 +180,7 @@ export function readUrlWriteBackAction(args: {
     section1Based: args.section1Based,
   })
   if (!tail) return null
-  const path = buildReadPath(language, tail)
+  const path = buildReadPath(langs, tail)
   if (args.pathname === path) return null
   return { replace: path }
 }

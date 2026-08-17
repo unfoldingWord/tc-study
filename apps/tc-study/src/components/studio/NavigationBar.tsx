@@ -2,7 +2,6 @@
  * NavigationBar - Context-aware navigation controls
  */
 
-import { useParams } from 'react-router-dom'
 import { useEffect } from 'react'
 import {
   useAvailableBooks,
@@ -16,6 +15,7 @@ import { useAppStore } from '../../contexts/AppContext'
 import { findObsCatalogKey } from '../../features/nav/bcvNavHelpers'
 import { useNavigationBarMovement } from '../../features/nav/useNavigationBarMovement'
 import { useNavigationBarRtl } from '../../features/nav/useNavigationBarRtl'
+import { useReadPathLanguageCode } from '../../features/read/useReadPathLanguageCode'
 import { useNavigationBarUiState } from '../../features/nav/useNavigationBarUiState'
 import { NavigationBarCompact } from './NavigationBarCompact'
 import { NavigationBarDisabled } from './NavigationBarDisabled'
@@ -54,7 +54,7 @@ export function NavigationBar({
   const storeHasNavigationSource = useHasNavigationSource()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
   const loadedResources = useAppStore((s) => s.loadedResources)
-  const { languageCode: urlLanguageCode } = useParams<{ languageCode?: string }>()
+  const urlLanguageCode = useReadPathLanguageCode()
 
   const isRtl = useNavigationBarRtl()
   const ui = useNavigationBarUiState()

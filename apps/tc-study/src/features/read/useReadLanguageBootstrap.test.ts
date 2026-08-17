@@ -18,7 +18,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
 
   test('URL stays on text language; first pick seeds both panels', () => {
     expect(src).toContain('shouldPushReadLanguageUrl')
-    expect(src).toContain('pushReadLanguageUrl(navigate, resolvedCode)')
+    expect(src).toContain('replaceReadLanguageUrlFromUi')
     expect(src).toContain('canSeedBothPanelLanguages')
     expect(src).toContain('seedBothLanguages(resolvedCode)')
     expect(src).toContain('inheritEmptyLanguage')
@@ -32,7 +32,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(body).toContain('resolveTextLanguagePickNavigation')
     expect(body).toContain('applyTextLanguagePickNavigation')
     expect(body.indexOf('applyTextLanguagePickNavigation')).toBeLessThan(body.indexOf('shouldPushReadLanguageUrl'))
-    expect(body.indexOf('shouldPushReadLanguageUrl')).toBeLessThan(body.indexOf('pushReadLanguageUrl'))
+    expect(body.indexOf('shouldPushReadLanguageUrl')).toBeLessThan(body.indexOf('replaceReadLanguageUrlFromUi'))
     expect(body.indexOf('catalogScopeAfterTextLanguagePick')).toBeLessThan(
       body.indexOf('skipTextCatalogOnMismatch')
     )
@@ -59,6 +59,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(helps).toContain("handlePanelLanguageSelected('panel-2'")
     expect(helps).not.toContain('resolveTextLanguagePickNavigation')
     expect(helps).not.toContain('applyTextLanguagePickNavigation')
+    expect(helps).not.toContain('replaceReadLanguageUrlFromUi')
     expect(helps).not.toContain('pushReadLanguageUrl')
   })
 
@@ -73,6 +74,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(body).toContain('catalogLoadForSinglePanel')
     expect(body).not.toContain('seedBothLanguages')
     expect(body).not.toContain('pushReadLanguageUrl')
+    expect(body).toContain('replaceReadLanguageUrlFromUi')
   })
 
   test('empty pane inherits the other pane language then loads that pane catalog', () => {
@@ -84,15 +86,14 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   })
 
   test('URL/session hydrate applies path language then inherit before catalog load', () => {
-    expect(src).toContain('resolveReadLanguageFromUrlOrCache')
-    expect(src).toContain('hydrateLanguagesFromHint')
+    expect(src).toContain('useReadUrlLanguageHydrate')
     expect(src).toContain('canonicalReadLanguageCode')
     expect(src).not.toContain('resolveColdStartReadLanguage')
     expect(src).not.toContain('shouldDeferLanguageCatalogLoad')
-    const urlEffect = src.slice(src.lastIndexOf('const pathname = typeof window'))
-    expect(urlEffect.indexOf('hydrateLanguagesFromHint(lang)')).toBeLessThan(
-      urlEffect.indexOf('handleLanguageSelected(lang)')
-    )
+    const hydrate = readFileSync(join(import.meta.dir, 'useReadUrlLanguageHydrate.ts'), 'utf8')
+    expect(hydrate).toContain('hydrateLanguagesFromUrl')
+    expect(hydrate).toContain('shouldHydrateReadLanguages')
+    expect(hydrate.indexOf('hydrateLanguagesFromUrl')).toBeLessThan(hydrate.indexOf('handleLanguageSelected(lang)'))
   })
 
   test('cold-start catalog loads run in parallel so helps does not wait on scripture', () => {

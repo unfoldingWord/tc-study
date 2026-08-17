@@ -1,5 +1,5 @@
-import { useParams } from 'react-router-dom'
 import { useAnchorResource, useBookTitleSource } from '../../contexts/AppContext'
+import { useReadPathLanguageCode } from '../read/useReadPathLanguageCode'
 import { useWizardStore } from '../../lib/stores/wizardStore'
 import { resolveNavigationBarRtl } from './resolveNavigationBarRtl'
 
@@ -9,7 +9,7 @@ import { resolveNavigationBarRtl } from './resolveNavigationBarRtl'
  * gateway scripture / anchor (see resolveNavigationBarRtl).
  */
 export function useNavigationBarRtl(): boolean {
-  const { languageCode: textLanguageCode } = useParams<{ languageCode?: string }>()
+  const textLanguageCode = useReadPathLanguageCode()
   const anchorResource = useAnchorResource()
   const bookTitleSource = useBookTitleSource()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)

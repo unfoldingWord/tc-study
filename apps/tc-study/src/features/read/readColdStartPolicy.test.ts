@@ -3,6 +3,7 @@ import { languageCodeFromReadPathname } from './readBootstrapPolicy'
 import { applyPanelLanguage, DEFAULT_READ_PANEL_MODELS } from './readPanelModel'
 import {
   hydrateReadLanguagesFromHint,
+  hydrateReadLanguagesFromParsedUrl,
   inheritEmptyHelpsFromSession,
   inheritEmptyPanelLanguage,
 } from './readColdStartPolicy'
@@ -155,6 +156,51 @@ describe('inheritEmptyPanelLanguage', () => {
         loadTarget: 'both',
       },
     ])
+  })
+
+  test('external /read/fr/obs hydrates fr and empty other pane inherits once', () => {
+    const hydrated = hydrateReadLanguagesFromParsedUrl({
+      panels: DEFAULT_READ_PANEL_MODELS,
+      langs: ['fr'],
+    })
+    expect(hydrated.panels['panel-1'].languageCode).toBe('fr')
+    expect(hydrated.panels['panel-2'].languageCode).toBe('fr')
+    expect(hydrated.inheritedPanelId).toBe('panel-2')
+  })
+
+  test('external /read/en/fr/bible sets p1=en and p2=fr', () => {
+    const hydrated = hydrateReadLanguagesFromParsedUrl({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'ha' },
+        'panel-2': { mode: 'helps', languageCode: 'tr' },
+      },
+      langs: ['en', 'fr'],
+    })
+    expect(hydrated.panels['panel-1'].languageCode).toBe('en')
+    expect(hydrated.panels['panel-2'].languageCode).toBe('fr')
+    expect(hydrated.inheritedPanelId).toBeNull()
+  })
+
+  test('external /read/en/bible sets both if other empty; does not overwrite stored p2', () => {
+    const emptyP2 = hydrateReadLanguagesFromParsedUrl({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: null },
+        'panel-2': { mode: 'helps', languageCode: null },
+      },
+      langs: ['en'],
+    })
+    expect(emptyP2.panels['panel-1'].languageCode).toBe('en')
+    expect(emptyP2.panels['panel-2'].languageCode).toBe('en')
+
+    const storedP2 = hydrateReadLanguagesFromParsedUrl({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'en' },
+        'panel-2': { mode: 'helps', languageCode: 'fr' },
+      },
+      langs: ['en'],
+    })
+    expect(storedP2.panels['panel-1'].languageCode).toBe('en')
+    expect(storedP2.panels['panel-2'].languageCode).toBe('fr')
   })
 
   test('session restore with p1 set and p2 empty copies helps language only', () => {
