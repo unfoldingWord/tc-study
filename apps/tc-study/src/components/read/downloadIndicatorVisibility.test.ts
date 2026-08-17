@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
 import {
   downloadFailureCount,
+  formatDownloadCurrentItemLabel,
   shouldShowDownloadIndicator,
 } from './downloadIndicatorVisibility'
 
@@ -94,5 +95,23 @@ describe('shouldShowDownloadIndicator', () => {
     expect(
       shouldShowDownloadIndicator({ isDownloading: false, progress: snapshot })
     ).toBe(true)
+  })
+})
+
+describe('formatDownloadCurrentItemLabel', () => {
+  test('current item en + ult includes language code and resource id', () => {
+    const label = formatDownloadCurrentItemLabel('unfoldingWord/en/ult')
+    expect(label).toContain('en')
+    expect(label).toContain('ult')
+    expect(label).toBe('en ult')
+  })
+
+  test('queued langs stay distinguishable (en ult vs es-419 glt)', () => {
+    expect(formatDownloadCurrentItemLabel('unfoldingWord/en/ult')).toBe('en ult')
+    expect(formatDownloadCurrentItemLabel('es-419_gl/es-419/glt')).toBe('es-419 glt')
+  })
+
+  test('does not invent a language from a bare resource id', () => {
+    expect(formatDownloadCurrentItemLabel('ult')).toBe('ult')
   })
 })

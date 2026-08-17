@@ -17,7 +17,9 @@ const layoutSrc = readFileSync(join(import.meta.dir, '../Layout.tsx'), 'utf8')
 describe('Read nav chrome: DownloadIndicator + ThemeToggle', () => {
   test('DownloadIndicator hides leftover success via shouldShowDownloadIndicator', () => {
     expect(indicatorSrc).toContain('shouldShowDownloadIndicator')
+    expect(indicatorSrc).toContain('formatDownloadCurrentItemLabel')
     expect(indicatorSrc).toContain('title="Download progress"')
+    expect(indicatorSrc).toContain('aria-label="Download progress"')
     expect(indicatorSrc).not.toContain('!isDownloading && !progress')
     expect(indicatorSrc).not.toContain('CheckCircle2')
     expect(viewSrc).toContain('error={downloadStats.error}')

@@ -2,7 +2,10 @@ import { AlertCircle, Download, Loader2 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { displayDownloadPercent } from '../../features/download/backgroundDownloadRun'
 import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
-import { shouldShowDownloadIndicator } from './downloadIndicatorVisibility'
+import {
+  formatDownloadCurrentItemLabel,
+  shouldShowDownloadIndicator,
+} from './downloadIndicatorVisibility'
 
 interface DownloadIndicatorProps {
   isDownloading: boolean
@@ -151,7 +154,7 @@ export function DownloadIndicator({ isDownloading, progress, error }: DownloadIn
                 <div className="flex items-center gap-2 text-xs text-fg-secondary">
                   <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
                   <span className="truncate font-medium">
-                    {progress.currentResource.split('/').pop()}
+                    {formatDownloadCurrentItemLabel(progress.currentResource)}
                   </span>
                 </div>
               )}
