@@ -94,7 +94,6 @@ describe('LanguagePickerRow', () => {
           bibleHelps: false,
           obsHelps: false,
         }),
-        status: 'online',
       })
     )
     expect(html).toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.bible}"`)
@@ -106,6 +105,8 @@ describe('LanguagePickerRow', () => {
     expect(html).toContain('rounded-md')
     expect(html).toContain('text-sm font-semibold')
     expect(html).toContain('text-caption text-fg-muted')
+    expect(html).not.toContain('M3 5V19A9 3 0 0 0 21 19V5')
+    expect(html).not.toContain('w-3 h-3 text-accent"')
   })
 
   test('obs-only row exposes OBS label, not Bible', () => {
@@ -115,7 +116,6 @@ describe('LanguagePickerRow', () => {
           { bible: false, obs: true, bibleHelps: false, obsHelps: false },
           { code: 'bho', name: 'Bhojpuri' }
         ),
-        status: 'cached',
       })
     )
     expect(html).toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.obs}"`)
@@ -132,7 +132,6 @@ describe('LanguagePickerRow', () => {
           name: 'español',
           anglicizedName: 'Spanish',
         }),
-        status: 'online',
       })
     )
     expect(html).toContain('>Español<')
@@ -151,7 +150,6 @@ describe('LanguagePickerRow', () => {
           bibleHelps: false,
           obsHelps: false,
         }),
-        status: 'online',
       })
     )
     expect(html).toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.bible}"`)
@@ -162,7 +160,6 @@ describe('LanguagePickerRow', () => {
     const html = renderToStaticMarkup(
       createElement(LanguagePickerRow, {
         lang: lang(emptyLanguageAvailability()),
-        status: 'online',
         selected: true,
       })
     )
@@ -178,7 +175,6 @@ describe('LanguagePickerRow', () => {
           name: 'español Latin America',
           anglicizedName: 'Spanish Latin America',
         }),
-        status: 'online',
         cardRole: 'current',
       })
     )
@@ -188,7 +184,6 @@ describe('LanguagePickerRow', () => {
           code: 'mr',
           name: 'मराठी',
         }),
-        status: 'online',
         cardRole: 'other',
       })
     )
@@ -208,13 +203,33 @@ describe('LanguagePickerRow', () => {
     const html = renderToStaticMarkup(
       createElement(LanguagePickerRow, {
         lang: lang(emptyLanguageAvailability(), { code: 'sw', name: 'Swahili' }),
-        status: 'online',
       })
     )
     expect(html).toContain('Swahili')
     expect(html).toContain('sw')
     expect(html).not.toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.bible}"`)
     expect(html).not.toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.obs}"`)
+  })
+
+  test('cards omit wifi and database source icons', () => {
+    const src = readFileSync(join(import.meta.dir, 'LanguagePickerRow.tsx'), 'utf8')
+    expect(src).not.toMatch(/\b(Database|Wifi)\b/)
+    const html = renderToStaticMarkup(
+      createElement(LanguagePickerRow, {
+        lang: lang({
+          bible: true,
+          obs: true,
+          bibleHelps: false,
+          obsHelps: false,
+        }),
+      })
+    )
+    expect(html).toContain('English')
+    expect(html).toContain('en')
+    expect(html).toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.bible}"`)
+    expect(html).toContain(`aria-label="${TEXT_LANGUAGE_BADGE_LABELS.obs}"`)
+    expect(html).not.toContain('M3 5V19A9 3 0 0 0 21 19V5')
+    expect(html).not.toContain('w-3 h-3 text-accent"')
   })
 })
 

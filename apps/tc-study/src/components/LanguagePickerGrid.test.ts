@@ -46,17 +46,38 @@ describe('LanguagePickerGrid', () => {
   test('both groups get a hairline + wifi split, not a section title', () => {
     const html = renderToStaticMarkup(
       createElement(LanguagePickerGrid, {
-        catalogLanguages: [lang({ code: 'en', name: 'English', source: 'catalog' })],
-        onlineLanguages: [lang({ code: 'es', name: 'Spanish', source: 'door43' })],
+        catalogLanguages: [
+          lang({
+            code: 'en',
+            name: 'English',
+            source: 'catalog',
+            availability: { bible: true, obs: false, bibleHelps: false, obsHelps: false },
+          }),
+        ],
+        onlineLanguages: [
+          lang({
+            code: 'es',
+            name: 'Spanish',
+            source: 'door43',
+            availability: { bible: false, obs: true, bibleHelps: false, obsHelps: false },
+          }),
+        ],
         onSelect: () => {},
       })
     )
     expect(html).toContain('role="separator"')
     expect(html).toContain('bg-border-subtle')
+    expect(html).toContain('w-3 h-3 text-fg-muted')
     expect(html).toContain('English')
+    expect(html).toContain('en')
     expect(html).toContain('Spanish')
+    expect(html).toContain('es')
+    expect(html).toContain('aria-label="Bible"')
+    expect(html).toContain('aria-label="OBS"')
     expect(html).not.toContain('Cached')
     expect(html).not.toContain('Online languages')
+    expect(html).not.toContain('M3 5V19A9 3 0 0 0 21 19V5')
+    expect(html).not.toContain('w-3 h-3 text-accent"')
   })
 
   test('p1 es-419 / p2 mr marks this pane strong and sibling soft', () => {

@@ -20,13 +20,11 @@ export interface LanguagePickerGridProps {
 
 function LanguageCardGrid({
   items,
-  status,
   onSelect,
   currentLanguageCode,
   otherLanguageCode,
 }: {
   items: ListedLanguage[]
-  status: 'cached' | 'online'
   onSelect: (code: string) => void
   currentLanguageCode?: string | null
   otherLanguageCode?: string | null
@@ -37,7 +35,6 @@ function LanguageCardGrid({
         <LanguagePickerRow
           key={lang.code}
           lang={lang}
-          status={status}
           cardRole={languagePickerCardRole(lang.code, currentLanguageCode, otherLanguageCode)}
           onSelect={onSelect}
         />
@@ -73,7 +70,6 @@ export function LanguagePickerGrid({
       {hasCatalog && (
         <LanguageCardGrid
           items={catalogLanguages}
-          status="cached"
           onSelect={onSelect}
           currentLanguageCode={currentLanguageCode}
           otherLanguageCode={otherLanguageCode}
@@ -89,7 +85,6 @@ export function LanguagePickerGrid({
       {hasOnline && (
         <LanguageCardGrid
           items={onlineLanguages}
-          status="online"
           onSelect={onSelect}
           currentLanguageCode={currentLanguageCode}
           otherLanguageCode={otherLanguageCode}
