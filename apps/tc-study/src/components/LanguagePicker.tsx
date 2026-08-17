@@ -254,7 +254,7 @@ export function LanguagePicker({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full pl-9 pr-3 py-chrome-tight border border-border-subtle rounded-md bg-surface text-fg placeholder:text-fg-muted focus:ring-2 focus:ring-accent focus:border-accent"
-                      placeholder="..."
+                      placeholder="Search..."
                       aria-label="Search languages"
                     />
                   </div>

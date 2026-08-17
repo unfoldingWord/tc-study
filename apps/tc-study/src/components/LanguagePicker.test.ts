@@ -71,6 +71,14 @@ describe('LanguagePicker chrome + text kind filter', () => {
     expect(pickerSrc).toContain('value={textKind} onChange={setTextKind}')
   })
 
+  test('search input uses Search... placeholder, not a visible label', () => {
+    expect(pickerSrc).toContain('placeholder="Search..."')
+    expect(pickerSrc).toContain('aria-label="Search languages"')
+    expect(pickerSrc).toContain('<Globe className="absolute left-3')
+    expect(pickerSrc).not.toContain('<label')
+    expect(pickerSrc).not.toMatch(/placeholder="\.\.\."/)
+  })
+
   test('body uses LanguagePickerGrid with stack rhythm, not space-y-4', () => {
     expect(pickerSrc).toContain("topic: 'tc-ready'")
     expect(pickerSrc).toContain('LanguagePickerGrid')

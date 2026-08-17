@@ -1,14 +1,29 @@
 /**
  * Compact language card grid for LanguagePicker.
- * Cached vs online: hairline + icon split when both groups exist.
+ * Cached vs online: hairline + icon above each group that is present.
  */
 
-import { Globe, Wifi } from 'lucide-react'
+import { Database, Globe, Wifi, type LucideIcon } from 'lucide-react'
 import { languagePickerCardRole } from '../features/read/languagePickerCardRole'
 import type { ListedLanguage } from '../features/read/languagesCache'
 import { LanguagePickerRow } from './LanguagePickerRow'
 
 const GRID_CLASS = 'grid grid-cols-2 md:grid-cols-3 gap-stack'
+
+function HairlineDivider({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <div
+      className="flex items-center gap-chrome"
+      role="separator"
+      title={label}
+      aria-label={label}
+    >
+      <span className="flex-1 h-px bg-border-subtle" />
+      <Icon className="w-3 h-3 text-fg-muted" aria-hidden />
+      <span className="flex-1 h-px bg-border-subtle" />
+    </div>
+  )
+}
 
 export interface LanguagePickerGridProps {
   catalogLanguages: ListedLanguage[]
@@ -68,27 +83,26 @@ export function LanguagePickerGrid({
   return (
     <div className="flex flex-col gap-stack">
       {hasCatalog && (
-        <LanguageCardGrid
-          items={catalogLanguages}
-          onSelect={onSelect}
-          currentLanguageCode={currentLanguageCode}
-          otherLanguageCode={otherLanguageCode}
-        />
-      )}
-      {hasCatalog && hasOnline && (
-        <div className="flex items-center gap-chrome" role="separator">
-          <span className="flex-1 h-px bg-border-subtle" />
-          <Wifi className="w-3 h-3 text-fg-muted" aria-hidden />
-          <span className="flex-1 h-px bg-border-subtle" />
-        </div>
+        <>
+          <HairlineDivider icon={Database} label="Cached" />
+          <LanguageCardGrid
+            items={catalogLanguages}
+            onSelect={onSelect}
+            currentLanguageCode={currentLanguageCode}
+            otherLanguageCode={otherLanguageCode}
+          />
+        </>
       )}
       {hasOnline && (
-        <LanguageCardGrid
-          items={onlineLanguages}
-          onSelect={onSelect}
-          currentLanguageCode={currentLanguageCode}
-          otherLanguageCode={otherLanguageCode}
-        />
+        <>
+          <HairlineDivider icon={Wifi} label="Online" />
+          <LanguageCardGrid
+            items={onlineLanguages}
+            onSelect={onSelect}
+            currentLanguageCode={currentLanguageCode}
+            otherLanguageCode={otherLanguageCode}
+          />
+        </>
       )}
     </div>
   )

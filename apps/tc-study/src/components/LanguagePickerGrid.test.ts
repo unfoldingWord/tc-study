@@ -43,7 +43,7 @@ describe('LanguagePickerGrid', () => {
     expect(html).not.toContain('<p ')
   })
 
-  test('both groups get a hairline + wifi split, not a section title', () => {
+  test('both groups get a cached then online hairline, not a section title', () => {
     const html = renderToStaticMarkup(
       createElement(LanguagePickerGrid, {
         catalogLanguages: [
@@ -66,17 +66,24 @@ describe('LanguagePickerGrid', () => {
       })
     )
     expect(html).toContain('role="separator"')
+    expect(html).toContain('aria-label="Cached"')
+    expect(html).toContain('title="Cached"')
+    expect(html).toContain('aria-label="Online"')
+    expect(html).toContain('title="Online"')
     expect(html).toContain('bg-border-subtle')
     expect(html).toContain('w-3 h-3 text-fg-muted')
+    expect(html).toContain('M3 5V19A9 3 0 0 0 21 19V5')
     expect(html).toContain('English')
     expect(html).toContain('en')
     expect(html).toContain('Spanish')
     expect(html).toContain('es')
     expect(html).toContain('aria-label="Bible"')
     expect(html).toContain('aria-label="OBS"')
-    expect(html).not.toContain('Cached')
+    expect(html.indexOf('aria-label="Cached"')).toBeLessThan(html.indexOf('English'))
+    expect(html.indexOf('English')).toBeLessThan(html.indexOf('aria-label="Online"'))
+    expect(html.indexOf('aria-label="Online"')).toBeLessThan(html.indexOf('Spanish'))
     expect(html).not.toContain('Online languages')
-    expect(html).not.toContain('M3 5V19A9 3 0 0 0 21 19V5')
+    expect(html).not.toContain('<p>')
     expect(html).not.toContain('w-3 h-3 text-accent"')
   })
 
@@ -117,7 +124,7 @@ describe('LanguagePickerGrid', () => {
     expect(html).not.toContain('aria-pressed')
   })
 
-  test('single group has no separator', () => {
+  test('cached-only group has a database hairline and no online divider', () => {
     const html = renderToStaticMarkup(
       createElement(LanguagePickerGrid, {
         catalogLanguages: [lang({ code: 'en', name: 'English', source: 'catalog' })],
@@ -125,7 +132,25 @@ describe('LanguagePickerGrid', () => {
         onSelect: () => {},
       })
     )
-    expect(html).not.toContain('role="separator"')
+    expect(html).toContain('role="separator"')
+    expect(html).toContain('aria-label="Cached"')
+    expect(html).toContain('M3 5V19A9 3 0 0 0 21 19V5')
     expect(html).toContain('English')
+    expect(html).not.toContain('aria-label="Online"')
+  })
+
+  test('online-only group has a wifi hairline and no cached divider', () => {
+    const html = renderToStaticMarkup(
+      createElement(LanguagePickerGrid, {
+        catalogLanguages: [],
+        onlineLanguages: [lang({ code: 'es', name: 'Spanish', source: 'door43' })],
+        onSelect: () => {},
+      })
+    )
+    expect(html).toContain('role="separator"')
+    expect(html).toContain('aria-label="Online"')
+    expect(html).toContain('Spanish')
+    expect(html).not.toContain('aria-label="Cached"')
+    expect(html).not.toContain('M3 5V19A9 3 0 0 0 21 19V5')
   })
 })
