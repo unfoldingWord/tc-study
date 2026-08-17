@@ -9,13 +9,27 @@ const headerSrc = readFileSync(join(import.meta.dir, 'ReadPanelHeader.tsx'), 'ut
 describe('helps picker wiring (issue #24 / #30)', () => {
   test('helps-mode chrome hosts LanguagePicker; empty CTA opens it', () => {
     expect(panelSrc).toContain("languageListMode={isHelps ? 'helps' : 'text'}")
-    expect(panelSrc).toContain('helpsFlag={isHelps ? helpsFlag : undefined}')
-    expect(panelSrc).toContain('helpsFlagForNavigationScope')
+    expect(panelSrc).not.toContain('helpsFlag')
+    expect(panelSrc).not.toContain('helpsFlagForNavigationScope')
     expect(panelSrc).toContain('onLanguageSelected={onLanguageSelected}')
     expect(panelSrc).toContain('emptyPanelSelectLanguageCta(languageCode)')
     expect(panelSrc).toContain(
       'onMessageClick={isHelps && selectLanguageCta ? () => setPickerOpen(true) : undefined}'
     )
+  })
+
+  test('both panel pickers share LanguagePicker + LanguagePickerTextKindFilter', () => {
+    expect(headerSrc).toContain('<LanguagePicker')
+    expect(headerSrc).toContain('listMode={languageListMode}')
+    expect(headerSrc).not.toContain('helpsFlag')
+    const pickerSrc = readFileSync(
+      join(import.meta.dir, '../LanguagePicker.tsx'),
+      'utf8'
+    )
+    expect(pickerSrc).toContain('LanguagePickerTextKindFilter')
+    expect(pickerSrc).toContain('Select helps language')
+    expect(pickerSrc).toContain('Select language')
+    expect(pickerSrc).not.toContain('showTextKindFilter')
   })
 
   test('LanguagePicker is trailing header chrome, not a left tab sibling', () => {

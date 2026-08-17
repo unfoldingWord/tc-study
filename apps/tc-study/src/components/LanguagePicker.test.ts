@@ -11,7 +11,6 @@ const navSrc = readFileSync(
 describe('LanguagePicker (issue #24 helps list)', () => {
   test('defaults listMode to text and supports controlled open', () => {
     expect(pickerSrc).toContain("listMode = 'text'")
-    expect(pickerSrc).toContain('helpsFlag')
     expect(pickerSrc).toContain('open?: boolean')
     expect(pickerSrc).toContain('onOpenChange')
     expect(pickerSrc).toContain('useLanguagePickerOpen')
@@ -23,7 +22,6 @@ describe('LanguagePicker (issue #24 helps list)', () => {
   test('header NavigationBar LanguagePicker stays on default text mode', () => {
     expect(navSrc).toContain('<LanguagePicker')
     expect(navSrc).not.toContain('listMode=')
-    expect(navSrc).not.toContain('helpsFlag=')
   })
 
   test('stays under godSize budget', () => {
@@ -66,10 +64,11 @@ describe('LanguagePicker chrome + text kind filter', () => {
     expect(pickerSrc).not.toContain('aria-label="Cancel"')
   })
 
-  test('text mode wires LanguagePickerTextKindFilter; helps mode hides Filter', () => {
+  test('text and helps modes both wire LanguagePickerTextKindFilter', () => {
     expect(pickerSrc).toContain('LanguagePickerTextKindFilter')
-    expect(pickerSrc).toContain("listMode !== 'helps'")
-    expect(pickerSrc).toContain('showTextKindFilter &&')
+    expect(pickerSrc).not.toContain("listMode !== 'helps'")
+    expect(pickerSrc).not.toContain('showTextKindFilter')
+    expect(pickerSrc).toContain('value={textKind} onChange={setTextKind}')
   })
 
   test('body uses LanguagePickerGrid with stack rhythm, not space-y-4', () => {

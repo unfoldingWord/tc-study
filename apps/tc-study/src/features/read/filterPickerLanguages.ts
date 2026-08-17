@@ -1,17 +1,13 @@
 /**
- * LanguagePicker list filtering (text vs helps). Extracted so the picker
- * stays under the god-size budget.
+ * LanguagePicker list filtering. Text and helps pickers share the same
+ * Scripture/OBS union + Bible/OBS filter (listMode is label-only).
  */
 
 import type { ListedLanguage } from './languagesCache'
-import {
-  filterLanguagesWithHelps,
-  type HelpsModeFlag,
-} from './helpsLanguagePolicy'
 
 export type LanguagePickerListMode = 'text' | 'helps'
 
-/** Text-picker Any (`both`) / Bible / OBS. Ignored when `listMode` is `'helps'`. */
+/** Any (`both`) / Bible / OBS. Same chrome for text and helps pickers. */
 export type TextKindFilter = 'bible' | 'obs' | 'both'
 
 export const DEFAULT_TEXT_KIND_FILTER: TextKindFilter = 'both'
@@ -29,21 +25,12 @@ export function filterPickerLanguages(
   languages: readonly ListedLanguage[],
   options: {
     searchQuery: string
-    listMode?: LanguagePickerListMode
-    helpsFlag?: HelpsModeFlag
     textKind?: TextKindFilter
   }
 ): ListedLanguage[] {
-  let list: ListedLanguage[]
-  if (options.listMode === 'helps') {
-    list = options.helpsFlag
-      ? filterLanguagesWithHelps(languages, options.helpsFlag)
-      : [...languages]
-  } else {
-    list = languages.filter((lang) =>
-      matchesTextKind(lang, options.textKind ?? DEFAULT_TEXT_KIND_FILTER)
-    )
-  }
+  const list = languages.filter((lang) =>
+    matchesTextKind(lang, options.textKind ?? DEFAULT_TEXT_KIND_FILTER)
+  )
 
   const q = options.searchQuery.trim().toLowerCase()
   if (!q) return list

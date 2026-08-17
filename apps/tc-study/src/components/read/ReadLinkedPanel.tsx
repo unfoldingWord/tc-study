@@ -4,11 +4,9 @@
 
 import { LinkedPanel } from '@bt-synergy/resource-panels'
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { useNavigationScope } from '../../contexts'
 import type { ResourceInfo } from '../../contexts/types'
 import { HelpsLanguageActionsProvider } from '../../features/helps/HelpsLanguageActionsContext'
 import { resolveHelpsPaneNoSourcesView } from '../../features/helps/helpsEmptyCopy'
-import { helpsFlagForNavigationScope } from '../../features/read/helpsLanguagePolicy'
 import { listedLanguageByCode } from '../../features/read/languageListDisplayName'
 import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
 import type { ReadPanelId, ReadPanelMode } from '../../features/read/readPanelModel'
@@ -94,8 +92,6 @@ function ReadPanelBody({
   }
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
-  const navigationScope = useNavigationScope()
-  const helpsFlag = helpsFlagForNavigationScope(navigationScope)
   const isHelps = mode === 'helps'
   const helpsLanguageActions = useMemo(
     () =>
@@ -178,7 +174,6 @@ function ReadPanelBody({
         onModeSwitch={onModeSwitch}
         onLanguageSelected={onLanguageSelected}
         languageListMode={isHelps ? 'helps' : 'text'}
-        helpsFlag={isHelps ? helpsFlag : undefined}
         languagePickerOpen={pickerOpen}
         onLanguagePickerOpenChange={setPickerOpen}
         showDropPlaceholder={showDropPlaceholder}

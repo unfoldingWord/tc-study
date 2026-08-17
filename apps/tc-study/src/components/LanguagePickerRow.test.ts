@@ -182,11 +182,11 @@ describe('LanguagePickerRow', () => {
 })
 
 describe('LanguagePicker list contract (issue #24 / #25)', () => {
-  test('wires listMode/helpsFlag through filterPickerLanguages; grid uses LanguagePickerRow', () => {
+  test('wires textKind through filterPickerLanguages; grid uses LanguagePickerRow', () => {
     const src = readFileSync(join(import.meta.dir, 'LanguagePicker.tsx'), 'utf8')
     const gridSrc = readFileSync(join(import.meta.dir, 'LanguagePickerGrid.tsx'), 'utf8')
     expect(src).toContain("listMode = 'text'")
-    expect(src).toContain('helpsFlag')
+    expect(src).toContain('textKind')
     expect(src).toContain('filterPickerLanguages')
     expect(src).toContain('LanguagePickerGrid')
     expect(src).toContain('LanguagePickerTextKindFilter')

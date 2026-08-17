@@ -7,7 +7,6 @@ import { useState, type ReactNode } from 'react'
 import { useResourceTypeRegistry } from '../../contexts/CatalogContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useTabDnDOptional } from '../../features/dnd/TabDnDContext'
-import type { HelpsModeFlag } from '../../features/read/helpsLanguagePolicy'
 import type { ReadPanelMode } from '../../features/read/readPanelModel'
 import { resolveTabPresentationFromRegistry } from '../../features/tabs'
 import { LanguagePicker } from '../LanguagePicker'
@@ -25,7 +24,6 @@ interface ReadPanelHeaderProps {
   onModeSwitch: (mode: ReadPanelMode) => void
   onLanguageSelected: (languageCode: string) => void
   languageListMode: 'text' | 'helps'
-  helpsFlag?: HelpsModeFlag
   languagePickerOpen?: boolean
   onLanguagePickerOpenChange?: (open: boolean) => void
   showDropPlaceholder?: boolean
@@ -44,7 +42,6 @@ export function ReadPanelHeader({
   onModeSwitch,
   onLanguageSelected,
   languageListMode,
-  helpsFlag,
   languagePickerOpen,
   onLanguagePickerOpenChange,
   showDropPlaceholder = false,
@@ -87,7 +84,6 @@ export function ReadPanelHeader({
             <LanguagePicker
               compact
               listMode={languageListMode}
-              helpsFlag={helpsFlag}
               open={pickerOpen}
               onOpenChange={setPickerOpen}
               onLanguageSelected={onLanguageSelected}

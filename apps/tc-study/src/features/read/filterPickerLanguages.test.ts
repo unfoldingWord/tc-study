@@ -41,7 +41,6 @@ describe('filterPickerLanguages', () => {
   test('default Any (both) lists OBS-only and Bible-only (issue #25)', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: '',
-      listMode: 'text',
     }).map((l) => l.code)
     expect(codes).toEqual(['en', 'es', 'bho', 'hi'])
     expect(codes).toContain('bho')
@@ -56,7 +55,6 @@ describe('filterPickerLanguages', () => {
   test('textKind bible keeps languages with availability.bible', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: '',
-      listMode: 'text',
       textKind: 'bible',
     }).map((l) => l.code)
     expect(codes).toEqual(['en', 'es'])
@@ -65,7 +63,6 @@ describe('filterPickerLanguages', () => {
   test('textKind obs keeps languages with availability.obs, including OBS-only', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: '',
-      listMode: 'text',
       textKind: 'obs',
     }).map((l) => l.code)
     expect(codes).toEqual(['en', 'bho', 'hi'])
@@ -74,31 +71,34 @@ describe('filterPickerLanguages', () => {
   test('textKind both (Any) is bible OR obs (not both-required)', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: '',
-      listMode: 'text',
       textKind: 'both',
     }).map((l) => l.code)
     expect(codes).toEqual(['en', 'es', 'bho', 'hi'])
   })
 
-  test('helps mode + bibleHelps keeps only Bible-helps languages', () => {
-    const codes = filterPickerLanguages(LANGS, {
+  test('text and helps pickers share the Scripture/OBS union; filter hides Bible-only or OBS-only', () => {
+    const textCodes = filterPickerLanguages(LANGS, { searchQuery: '' }).map((l) => l.code)
+    const helpsCodes = filterPickerLanguages(LANGS, { searchQuery: '' }).map((l) => l.code)
+    expect(textCodes).toEqual(['en', 'es', 'bho', 'hi'])
+    expect(helpsCodes).toEqual(textCodes)
+    expect(textCodes).toContain('bho')
+    expect(textCodes).not.toContain('sw')
+
+    const bibleCodes = filterPickerLanguages(LANGS, {
       searchQuery: '',
-      listMode: 'helps',
-      helpsFlag: 'bibleHelps',
+      textKind: 'bible',
     }).map((l) => l.code)
-    expect(codes).toEqual(['en', 'es'])
+    const obsCodes = filterPickerLanguages(LANGS, {
+      searchQuery: '',
+      textKind: 'obs',
+    }).map((l) => l.code)
+    expect(bibleCodes).toEqual(['en', 'es'])
+    expect(bibleCodes).not.toContain('bho')
+    expect(obsCodes).toEqual(['en', 'bho', 'hi'])
+    expect(obsCodes).not.toContain('es')
   })
 
-  test('helps mode + obsHelps keeps only OBS-helps languages', () => {
-    const codes = filterPickerLanguages(LANGS, {
-      searchQuery: '',
-      listMode: 'helps',
-      helpsFlag: 'obsHelps',
-    }).map((l) => l.code)
-    expect(codes).toEqual(['en', 'hi'])
-  })
-
-  test('helps/OBS keeps every obsHelps language, including those outside a 3-item cached subset', () => {
+  test('union includes OBS-only languages even without obsHelps', () => {
     const langs: ListedLanguage[] = [
       {
         code: 'en',
@@ -137,21 +137,15 @@ describe('filterPickerLanguages', () => {
         availability: { bible: false, obs: true, bibleHelps: false, obsHelps: false },
       },
     ]
-    const codes = filterPickerLanguages(langs, {
-      searchQuery: '',
-      listMode: 'helps',
-      helpsFlag: 'obsHelps',
-    }).map((l) => l.code)
-    expect(codes).toEqual(['en', 'es-419', 'id', 'hi', 'fr'])
-    expect(codes).not.toContain('bho')
+    const codes = filterPickerLanguages(langs, { searchQuery: '' }).map((l) => l.code)
+    expect(codes).toEqual(['en', 'es-419', 'id', 'hi', 'fr', 'bho'])
+    expect(codes).toContain('bho')
     expect(codes.length).toBeGreaterThan(3)
   })
 
-  test('search still applies after helps filter', () => {
+  test('search still applies after the union filter', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: 'esp',
-      listMode: 'helps',
-      helpsFlag: 'bibleHelps',
     }).map((l) => l.code)
     expect(codes).toEqual(['es'])
   })
@@ -159,7 +153,6 @@ describe('filterPickerLanguages', () => {
   test('search matches catalog anglicized_name (Spanish), not only the autonym', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: 'spanish',
-      listMode: 'text',
     }).map((l) => l.code)
     expect(codes).toEqual(['es'])
   })
@@ -167,7 +160,6 @@ describe('filterPickerLanguages', () => {
   test('search still applies after textKind filter', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: 'bho',
-      listMode: 'text',
       textKind: 'obs',
     }).map((l) => l.code)
     expect(codes).toEqual(['bho'])
@@ -182,13 +174,11 @@ describe('filterPickerLanguages', () => {
     expect(codes).toEqual(['fr'])
   })
 
-  test('helps mode ignores textKind (already filtered by bibleHelps/obsHelps)', () => {
+  test('textKind applies the same way for every picker (no helps-only list)', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: '',
-      listMode: 'helps',
-      helpsFlag: 'bibleHelps',
       textKind: 'obs',
     }).map((l) => l.code)
-    expect(codes).toEqual(['en', 'es'])
+    expect(codes).toEqual(['en', 'bho', 'hi'])
   })
 })

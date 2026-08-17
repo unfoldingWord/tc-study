@@ -2,7 +2,7 @@
  * Language Picker Component
  *
  * Modal for selecting a language on the Read page. Icon-first chrome: one
- * header icon + count badge, optional Bible/OBS filter (text mode only).
+ * header icon + count badge + Bible/OBS filter (same list for text and helps).
  * Uses Door43 API via useDoor43Data (same as LanguageSelectorStep).
  */
 
@@ -23,7 +23,6 @@ import {
   type LanguagePickerListMode,
   type TextKindFilter,
 } from '../features/read/filterPickerLanguages'
-import type { HelpsModeFlag } from '../features/read/helpsLanguagePolicy'
 import { fetchLanguageAvailabilityByCode } from '../features/read/languageAvailability'
 import {
   loadLanguagesCache,
@@ -43,10 +42,8 @@ interface LanguagePickerProps {
   autoOpen?: boolean
   /** When true, the dialog cannot be dismissed without choosing a language (Read page on /read). */
   required?: boolean
-  /** Default `'text'` so header / Studio pickers are unchanged. */
+  /** Label only (`Select language` vs `Select helps language`). List is always the Scripture/OBS union. */
   listMode?: LanguagePickerListMode
-  /** Helps-list filter only (`bibleHelps` vs `obsHelps`). Ignored in text mode. */
-  helpsFlag?: HelpsModeFlag
   /** Controlled open — empty-state CTA can open the same instance. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -60,7 +57,6 @@ export function LanguagePicker({
   autoOpen = false,
   required = false,
   listMode = 'text',
-  helpsFlag,
   open,
   onOpenChange,
   triggerClassName,
@@ -75,7 +71,6 @@ export function LanguagePicker({
   const [textKind, setTextKind] = useState<TextKindFilter>(DEFAULT_TEXT_KIND_FILTER)
   const triggerLabel =
     listMode === 'helps' ? 'Select helps language' : 'Select language'
-  const showTextKindFilter = listMode !== 'helps'
 
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
@@ -145,9 +140,7 @@ export function LanguagePicker({
 
   const filteredLanguages = filterPickerLanguages(languages, {
     searchQuery,
-    listMode,
-    helpsFlag,
-    textKind: showTextKindFilter ? textKind : undefined,
+    textKind,
   })
 
   const catalogLanguages = filteredLanguages.filter((l) => l.source === 'catalog')
@@ -211,9 +204,7 @@ export function LanguagePicker({
                 )}
               </div>
               <div className="ml-auto flex items-center gap-1.5">
-                {showTextKindFilter && (
-                  <LanguagePickerTextKindFilter value={textKind} onChange={setTextKind} />
-                )}
+                <LanguagePickerTextKindFilter value={textKind} onChange={setTextKind} />
                 {!required && (
                   <button
                     onClick={closeModal}

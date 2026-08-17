@@ -60,7 +60,6 @@ describe('mergePickerLanguages + textKind (issue: incomplete Bible list)', () =>
 
     const anyCodes = filterPickerLanguages(merged, {
       searchQuery: '',
-      listMode: 'text',
       textKind: 'both',
     }).map((lang) => lang.code)
     expect(anyCodes).toContain('fr')
@@ -70,7 +69,6 @@ describe('mergePickerLanguages + textKind (issue: incomplete Bible list)', () =>
 
     const bibleCodes = filterPickerLanguages(merged, {
       searchQuery: '',
-      listMode: 'text',
       textKind: 'bible',
     }).map((lang) => lang.code)
     expect(bibleCodes.sort()).toEqual(['en', 'ru'])
@@ -97,12 +95,10 @@ describe('mergePickerLanguages + textKind (issue: incomplete Bible list)', () =>
 
     const anyCodes = filterPickerLanguages(merged, {
       searchQuery: '',
-      listMode: 'text',
       textKind: 'both',
     }).map((lang) => lang.code)
     const bibleCodes = filterPickerLanguages(merged, {
       searchQuery: '',
-      listMode: 'text',
       textKind: 'bible',
     }).map((lang) => lang.code)
 
@@ -142,7 +138,7 @@ describe('mergePickerLanguages + textKind (issue: incomplete Bible list)', () =>
     expect(TC_READY_ALIGNED_BIBLE_CODES).toHaveLength(15)
   })
 
-  test('helps/OBS list unions every obsHelps code, not a 3-item cached GL subset', () => {
+  test('merged universe is larger than a 3-item cached GL subset; picker union is bible OR obs', () => {
     const cachedGls = ['en', 'es-419', 'id'] as const
     const obsHelps = [
       'en',
@@ -179,25 +175,31 @@ describe('mergePickerLanguages + textKind (issue: incomplete Bible list)', () =>
       availabilityByCode,
     })
 
-    const helpsObsCodes = filterPickerLanguages(merged, {
-      searchQuery: '',
-      listMode: 'helps',
-      helpsFlag: 'obsHelps',
-    }).map((lang) => lang.code)
-    expect(helpsObsCodes.sort()).toEqual([...obsHelps].sort())
-    expect(helpsObsCodes).toContain('hi')
-    expect(helpsObsCodes).toContain('fr')
-    expect(helpsObsCodes).not.toHaveLength(cachedGls.length)
-    expect(helpsObsCodes.length).toBeGreaterThan(cachedGls.length)
+    expect(merged.map((lang) => lang.code)).toContain('hi')
+    expect(merged.map((lang) => lang.code)).toContain('fr')
+    expect(merged.map((lang) => lang.code)).toContain('ar')
+    expect(merged.length).toBeGreaterThan(cachedGls.length)
 
-    const helpsBibleCodes = filterPickerLanguages(merged, {
+    const unionCodes = filterPickerLanguages(merged, { searchQuery: '' }).map(
+      (lang) => lang.code
+    )
+    expect(unionCodes).toContain('en')
+    expect(unionCodes).toContain('hi')
+    expect(unionCodes).toContain('fr')
+    expect(unionCodes).not.toContain('ar')
+    expect(unionCodes).not.toContain('sw')
+
+    const bibleCodes = filterPickerLanguages(merged, {
       searchQuery: '',
-      listMode: 'helps',
-      helpsFlag: 'bibleHelps',
+      textKind: 'bible',
     }).map((lang) => lang.code)
-    expect(helpsBibleCodes.sort()).toEqual([...bibleHelps].sort())
-    expect(helpsBibleCodes.length).toBeGreaterThan(cachedGls.length)
-    expect(helpsBibleCodes).toContain('ar')
-    expect(helpsBibleCodes).not.toContain('sw')
+    const obsCodes = filterPickerLanguages(merged, {
+      searchQuery: '',
+      textKind: 'obs',
+    }).map((lang) => lang.code)
+    expect(bibleCodes).toContain('en')
+    expect(bibleCodes).not.toContain('fr')
+    expect(obsCodes).toContain('fr')
+    expect(obsCodes).not.toContain('ar')
   })
 })

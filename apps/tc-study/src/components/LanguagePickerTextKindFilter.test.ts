@@ -100,10 +100,10 @@ describe('LanguagePickerTextKindFilter', () => {
 })
 
 describe('LanguagePicker text-kind filter wiring', () => {
-  test('helps mode does not show the Filter control', () => {
+  test('both pickers show the Filter control (not helps-only)', () => {
     expect(pickerSrc).toContain('LanguagePickerTextKindFilter')
-    expect(pickerSrc).toContain("listMode !== 'helps'")
-    expect(pickerSrc).toContain('showTextKindFilter &&')
+    expect(pickerSrc).not.toContain("listMode !== 'helps'")
+    expect(pickerSrc).not.toContain('showTextKindFilter')
     expect(pickerSrc).not.toContain('aria-label="Filter languages"')
     expect(filterSrc).toContain('aria-label="Filter languages"')
   })
