@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  canonicalReadLanguageCode,
+  DEFAULT_READ_LANGUAGE_CODE,
   door43LanguageQueryCode,
   languageCodesMatch,
   primaryLanguageSegment,
@@ -15,5 +17,7 @@ describe('languageCodeMatch', () => {
     expect(door43LanguageQueryCode('eng')).toBe('en')
     expect(door43LanguageQueryCode('en')).toBe('en')
     expect(door43LanguageQueryCode('tr')).toBe('tr')
+    expect(canonicalReadLanguageCode('eng')).toBe(DEFAULT_READ_LANGUAGE_CODE)
+    expect(DEFAULT_READ_LANGUAGE_CODE).toBe('en')
   })
 })

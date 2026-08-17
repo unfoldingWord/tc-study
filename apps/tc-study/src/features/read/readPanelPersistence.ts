@@ -4,6 +4,7 @@
  * and never a shared scripture language for both panels.
  */
 
+import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { inheritEmptyHelpsFromSession } from './readColdStartPolicy'
 import {
   DEFAULT_READ_PANEL_MODELS,
@@ -54,7 +55,7 @@ function parsePanels(raw: unknown): ReadPanelModels | null {
     const row = p as { mode?: unknown; languageCode?: unknown }
     if (isMode(row.mode)) next[id].mode = row.mode
     if (typeof row.languageCode === 'string' && row.languageCode.trim()) {
-      next[id].languageCode = row.languageCode.trim()
+      next[id].languageCode = canonicalReadLanguageCode(row.languageCode)
     } else if (row.languageCode === null) {
       next[id].languageCode = null
     }

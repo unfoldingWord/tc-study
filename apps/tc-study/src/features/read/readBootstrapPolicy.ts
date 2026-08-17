@@ -5,6 +5,11 @@
 
 import type { BCVReference, NavigationCatalogScope, NavigationMode, PassageSet } from '../../contexts/types'
 import {
+  canonicalReadLanguageCode,
+  DEFAULT_READ_LANGUAGE_CODE,
+  languageCodesMatch,
+} from '../../utils/languageCodeMatch'
+import {
   buildReadPath,
   buildReadRouteTailFromNavigation,
   navigationModeFromReadNav,
@@ -13,12 +18,12 @@ import {
 } from '../../utils/readRoutes'
 
 /**
- * Bare `/read` (no `:lang` in the URL) must only navigate after a language pick.
- * Catalog load runs on the remounted `/read/:lang` instance via auto-load.
- * When the URL already has a language, load in place.
+ * Catalog load runs in place for the resolved language (URL, cache, or default
+ * English). Do not wait for a `/read/:lang` remount — that skipped English
+ * scripture/helps on cold `/read/` and flashed false empties.
  */
-export function shouldDeferLanguageCatalogLoad(urlLanguage: string | null | undefined): boolean {
-  return !urlLanguage
+export function shouldDeferLanguageCatalogLoad(_urlLanguage: string | null | undefined): boolean {
+  return false
 }
 
 /** True for the language-picker landing path (`/read` or `/read/`). */
@@ -45,10 +50,24 @@ export function resolveReadLanguageFromUrlOrCache(options: {
   cachedLanguage?: string | null
 }): { language: string | null; source: 'url' | 'cache' | null } {
   const urlLang = languageCodeFromReadPathname(options.pathname)
-  if (urlLang) return { language: urlLang, source: 'url' }
+  if (urlLang) return { language: canonicalReadLanguageCode(urlLang), source: 'url' }
   const cached = options.cachedLanguage?.trim() || null
-  if (cached) return { language: cached, source: 'cache' }
+  if (cached) return { language: canonicalReadLanguageCode(cached), source: 'cache' }
   return { language: null, source: null }
+}
+
+/**
+ * Cold `/read/` always has a language: URL, then cache, then Door43 English.
+ */
+export function resolveColdStartReadLanguage(options: {
+  pathname: string
+  cachedLanguage?: string | null
+}): { language: string; source: 'url' | 'cache' | 'default' } {
+  const resolved = resolveReadLanguageFromUrlOrCache(options)
+  if (resolved.language && resolved.source) {
+    return { language: resolved.language, source: resolved.source }
+  }
+  return { language: DEFAULT_READ_LANGUAGE_CODE, source: 'default' }
 }
 
 /**
@@ -58,7 +77,8 @@ export function resolveReadLanguageFromUrlOrCache(options: {
  */
 export function shouldPushReadLanguageUrl(pathname: string, languageCode: string): boolean {
   const pathLang = languageCodeFromReadPathname(pathname)
-  return !pathLang || pathLang !== languageCode
+  if (!pathLang) return true
+  return canonicalReadLanguageCode(pathLang) !== canonicalReadLanguageCode(languageCode)
 }
 
 /**
@@ -80,7 +100,14 @@ export function shouldWriteBackReadUrl(options: {
   if (options.suppressUrlSync) return false
   if (options.deepLinkPending) return false
   const urlLang = options.pathname ? languageCodeFromReadPathname(options.pathname) : null
-  if (urlLang && urlLang !== options.currentLanguageCode) return false
+  if (
+    urlLang &&
+    options.currentLanguageCode &&
+    !languageCodesMatch(urlLang, options.currentLanguageCode) &&
+    urlLang !== options.currentLanguageCode
+  ) {
+    return false
+  }
   return true
 }
 
@@ -141,7 +168,8 @@ export function readUrlWriteBackAction(args: {
     return null
   }
   const urlLang = languageCodeFromReadPathname(args.pathname)
-  const language = urlLang || args.language
+  const rawLanguage = args.language || urlLang
+  const language = rawLanguage ? canonicalReadLanguageCode(rawLanguage) : null
   if (!language) return null
   const tail = buildReadRouteTailFromNavigation({
     scope: args.scope,

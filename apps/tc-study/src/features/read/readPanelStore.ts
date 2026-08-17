@@ -4,6 +4,7 @@
  */
 
 import { create } from 'zustand'
+import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
 import { hydrateReadLanguagesFromHint, inheritEmptyPanelLanguage } from './readColdStartPolicy'
 import {
@@ -49,19 +50,21 @@ const initial = readPersistedReadPanels()
 export const useReadPanelStore = create<ReadPanelStore>((set, get) => ({
   ...initial,
   seedBothLanguages: (languageCode) => {
+    const resolved = canonicalReadLanguageCode(languageCode)
     set((state) => ({
-      panels: applySeedBothLanguages(state.panels, languageCode),
+      panels: applySeedBothLanguages(state.panels, resolved),
       seededBoth: true,
     }))
-    writePersistedHelpsLanguage(languageCode)
+    writePersistedHelpsLanguage(resolved)
     persist(get())
   },
   setPanelLanguage: (panelId, languageCode) => {
+    const resolved = canonicalReadLanguageCode(languageCode)
     set((state) => ({
-      panels: applyPanelLanguage(state.panels, panelId, languageCode),
+      panels: applyPanelLanguage(state.panels, panelId, resolved),
     }))
     const { panels } = get()
-    if (panels[panelId].mode === 'helps') writePersistedHelpsLanguage(languageCode)
+    if (panels[panelId].mode === 'helps') writePersistedHelpsLanguage(resolved)
     persist(get())
   },
   inheritEmptyLanguage: () => {

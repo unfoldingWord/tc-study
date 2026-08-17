@@ -106,12 +106,31 @@ describe('inheritEmptyPanelLanguage', () => {
     const hydrated = hydrateReadLanguagesFromHint({
       panels: {
         'panel-1': { mode: 'scripture', languageCode: 'eng' },
-        'panel-2': { mode: 'helps', languageCode: 'en' },
+        'panel-2': { mode: 'helps', languageCode: 'fr' },
       },
       hintLanguage: 'tr',
     })
     expect(hydrated.panels['panel-1'].languageCode).toBe('tr')
+    expect(hydrated.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'fr' })
+  })
+
+  test('cached eng and URL en are the same English — both panes canonicalize to en', () => {
+    const hydrated = hydrateReadLanguagesFromHint({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'eng' },
+        'panel-2': { mode: 'helps', languageCode: 'eng' },
+      },
+      hintLanguage: 'en',
+    })
+    expect(hydrated.panels['panel-1'].languageCode).toBe('en')
     expect(hydrated.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'en' })
+    expect(coldStartCatalogLoads(hydrated.panels)).toEqual([
+      {
+        textLanguageCode: 'en',
+        helpsLanguageCode: 'en',
+        loadTarget: 'both',
+      },
+    ])
   })
 
   test('visit /read/tr/obs/ref/1.1 with empty panel-2 inherits tr and triggers helps load', () => {

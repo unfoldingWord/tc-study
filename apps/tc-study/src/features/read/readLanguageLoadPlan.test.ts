@@ -196,6 +196,7 @@ describe('availabilityLookupFromListed', () => {
   test('returns cached flags and undefined for unknown codes', () => {
     const lookup = availabilityLookupFromListed(langs)
     expect(lookup('en')?.bibleHelps).toBe(true)
+    expect(lookup('eng')?.bibleHelps).toBe(true)
     expect(lookup('bho')).toEqual(emptyLanguageAvailability())
     expect(lookup('fr')).toBeUndefined()
   })

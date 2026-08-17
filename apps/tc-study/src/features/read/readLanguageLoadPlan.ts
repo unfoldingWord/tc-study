@@ -2,6 +2,7 @@
  * Pure load-plan for Read text vs helps catalog bootstrap (issue #24).
  */
 
+import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import type { CatalogLoadTarget } from './readCatalogPanelPolicy'
 import {
   helpsFlagForNavigationScope,
@@ -23,9 +24,13 @@ export function availabilityLookupFromListed(
 ): (code: string) => LanguageAvailabilityFlags | undefined {
   const byCode = new Map<string, LanguageAvailabilityFlags>()
   for (const lang of languages ?? []) {
-    if (lang.code && lang.availability) byCode.set(lang.code, lang.availability)
+    if (lang.code && lang.availability) {
+      byCode.set(lang.code, lang.availability)
+      const canonical = canonicalReadLanguageCode(lang.code)
+      if (canonical !== lang.code) byCode.set(canonical, lang.availability)
+    }
   }
-  return (code) => byCode.get(code)
+  return (code) => byCode.get(code) ?? byCode.get(canonicalReadLanguageCode(code))
 }
 
 export function mergeExpectedResourceKeys(options: {

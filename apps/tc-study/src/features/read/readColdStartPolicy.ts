@@ -6,6 +6,7 @@
  * Both set → leave them; pickers may diverge after inherit.
  */
 
+import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import {
   applyPanelLanguage,
   type ReadPanelId,
@@ -21,7 +22,7 @@ export type InheritPanelLanguageSnapshot = Record<
 
 function trimmedPanelLanguage(code: string | null | undefined): string | null {
   const trimmed = code?.trim()
-  return trimmed || null
+  return trimmed ? canonicalReadLanguageCode(trimmed) : null
 }
 
 export interface InheritEmptyPanelLanguageResult {

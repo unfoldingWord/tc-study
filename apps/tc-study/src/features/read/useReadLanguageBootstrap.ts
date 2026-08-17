@@ -20,6 +20,7 @@ import {
 import { useAppStore } from '../../contexts/AppContext'
 import { useBackgroundDownload, useCatalogBackgroundDownload } from '../../hooks'
 import { usePackageStore } from '../../lib/stores/packageStore'
+import { canonicalReadLanguageCode, languageCodesMatch } from '../../utils/languageCodeMatch'
 import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
 import { pushReadLanguageUrl } from './pushReadLanguageUrl'
 import {
@@ -43,7 +44,7 @@ import {
 import { loadLanguagesCache } from './languagesCache'
 import {
   languageCodeFromReadPathname,
-  shouldDeferLanguageCatalogLoad,
+  resolveColdStartReadLanguage,
   shouldPushReadLanguageUrl,
 } from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
@@ -181,16 +182,13 @@ export function useReadLanguageBootstrap({
 
   const handleLanguageSelected = useCallback(
     async (languageCode: string, options?: { navigationScope?: 'scripture' | 'obs' }) => {
+      const resolvedCode = canonicalReadLanguageCode(languageCode)
       setShouldAutoOpenLanguagePicker(false)
       setIsLanguagePickerRequired(false)
-      const panelsBefore = useReadPanelStore.getState().panels
-      const hadLanguageBeforePick =
-        panelsBefore['panel-1'].languageCode === languageCode ||
-        panelsBefore['panel-2'].languageCode === languageCode
       if (canSeedBothPanelLanguages()) {
-        seedBothLanguages(languageCode)
-      } else if (useReadPanelStore.getState().panels['panel-1'].languageCode !== languageCode) {
-        setPanelLanguage('panel-1', languageCode)
+        seedBothLanguages(resolvedCode)
+      } else if (useReadPanelStore.getState().panels['panel-1'].languageCode !== resolvedCode) {
+        setPanelLanguage('panel-1', resolvedCode)
       }
       inheritEmptyLanguage()
       maybeCancelDownloads('text')
@@ -207,30 +205,25 @@ export function useReadLanguageBootstrap({
         explicitScope: options?.navigationScope,
       })
       const pick = resolveTextLanguagePickNavigation({
-        availability: availabilityFor(languageCode),
+        availability: availabilityFor(resolvedCode),
         currentScope: scopeFromUrl,
         explicitScope: options?.navigationScope,
       })
       applyTextLanguagePickNavigation(useNavigationStore.getState(), pick)
       const scope = catalogScopeAfterTextLanguagePick(scopeFromUrl, pick)
       const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
-      if (shouldPushReadLanguageUrl(pathname, languageCode)) {
-        pushReadLanguageUrl(navigate, languageCode)
+      if (shouldPushReadLanguageUrl(pathname, resolvedCode)) {
+        pushReadLanguageUrl(navigate, resolvedCode)
       }
 
-      if (shouldDeferLanguageCatalogLoad(initialLanguage) && !hadLanguageBeforePick) {
-        autoLoadedLanguageForUrlRef.current = null
-        return
-      }
-
-      if (textModeMismatchFromCache({ languageCode, navigationScope: scope, supportedSubjects: subjects })) {
+      if (textModeMismatchFromCache({ languageCode: resolvedCode, navigationScope: scope, supportedSubjects: subjects })) {
         textKeysRef.current = []
         setExpectedResources(helpsKeysRef.current)
         clearReadPanelsForLanguageSwitch(helpsLanguageCode ?? undefined, 'panel-1')
         return
       }
 
-      autoLoadedLanguageForUrlRef.current = languageCode
+      autoLoadedLanguageForUrlRef.current = resolvedCode
       const snapshot = useReadPanelStore.getState().panels
       const loads = coldStartCatalogLoads(snapshot)
       await Promise.all(loads.map((one) => runCatalogLoad({ ...one, navigationScope: scope })))
@@ -238,7 +231,6 @@ export function useReadLanguageBootstrap({
     [
       maybeCancelDownloads,
       navigate,
-      initialLanguage,
       resourceTypeRegistry,
       helpsLanguageCode,
       runCatalogLoad,
@@ -255,7 +247,7 @@ export function useReadLanguageBootstrap({
 
   const handlePanelLanguageSelected = useCallback(
     async (panelId: 'panel-1' | 'panel-2', languageCode: string) => {
-      setPanelLanguage(panelId, languageCode)
+      setPanelLanguage(panelId, canonicalReadLanguageCode(languageCode))
       const panel = useReadPanelStore.getState().panels[panelId]
       maybeCancelDownloads(panel.mode === 'helps' ? 'helps' : 'text')
       const navigationScope = useNavigationStore.getState().navigationScope
@@ -287,14 +279,20 @@ export function useReadLanguageBootstrap({
   )
 
   useEffect(() => {
-    const urlLang =
-      initialLanguage?.trim() ||
-      (typeof window !== 'undefined' ? languageCodeFromReadPathname(window.location.pathname) : null)
-    if (urlLang) hydrateLanguagesFromHint(urlLang)
+    const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
     const cached = navigationLanguageCode(useReadPanelStore.getState().panels)
-    const lang = urlLang || cached
-    if (!lang) return
-    if (autoLoadedLanguageForUrlRef.current === lang) return
+    const lang = canonicalReadLanguageCode(
+      initialLanguage?.trim() ||
+        languageCodeFromReadPathname(pathname) ||
+        resolveColdStartReadLanguage({ pathname, cachedLanguage: cached }).language
+    )
+    hydrateLanguagesFromHint(lang)
+    if (
+      autoLoadedLanguageForUrlRef.current &&
+      languageCodesMatch(autoLoadedLanguageForUrlRef.current, lang)
+    ) {
+      return
+    }
     autoLoadedLanguageForUrlRef.current = lang
     void handleLanguageSelected(lang)
   }, [initialLanguage, handleLanguageSelected, hydrateLanguagesFromHint])

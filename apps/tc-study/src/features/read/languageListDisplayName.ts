@@ -3,6 +3,8 @@
  * Catalog `ln` (`name`) is the autonym; `ang` (anglicized_name) is English copy.
  */
 
+import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
+
 export interface LanguageListNameFields {
   code?: string
   name?: string
@@ -70,6 +72,7 @@ export function languageEnglishCopyDisplayName(
 
 /**
  * Exact BCP-47 match against picker/list metadata. Never collapses `es-419` → `es`.
+ * English aliases `en` / `eng` resolve to the Door43 `en` row.
  */
 export function listedLanguageByCode<T extends LanguageListNameFields>(
   languages: readonly T[] | undefined | null,
@@ -77,7 +80,11 @@ export function listedLanguageByCode<T extends LanguageListNameFields>(
 ): T | undefined {
   const want = code.trim().toLowerCase()
   if (!want || !languages) return undefined
-  return languages.find((lang) => (lang.code || '').trim().toLowerCase() === want)
+  const exact = languages.find((lang) => (lang.code || '').trim().toLowerCase() === want)
+  if (exact) return exact
+  const canonical = canonicalReadLanguageCode(want)
+  if (canonical === want) return undefined
+  return languages.find((lang) => canonicalReadLanguageCode(lang.code || '') === canonical)
 }
 
 /** Card `title` / `aria-label`: native primary, anglicized in parentheses when it differs. */

@@ -67,6 +67,12 @@ describe('languageListDisplayName', () => {
     expect(listedLanguageByCode([ES_LISTED, es419], 'es')?.anglicizedName).toBe('Spanish')
   })
 
+  test('en and eng resolve to the same Door43 English list row', () => {
+    const english = { code: 'en', name: 'English', anglicizedName: 'English' } as const
+    expect(listedLanguageByCode([english, ES_LISTED], 'eng')).toEqual(english)
+    expect(listedLanguageByCode([english, ES_LISTED], 'en')).toEqual(english)
+  })
+
   test('English sentence copy is anglicized with native in parentheses when they differ', () => {
     const es419 = {
       code: 'es-419',

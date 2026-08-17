@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import {
   languageCodeFromReadPathname,
   readUrlWriteBackAction,
+  resolveColdStartReadLanguage,
   resolveReadLanguageFromUrlOrCache,
   resumeBareReadNavigation,
   shouldApplyDeepLinkTail,
@@ -21,10 +22,10 @@ describe('readBootstrapPolicy', () => {
     expect(languageCodeFromReadPathname('/read-v1/tr/obs/ref/1.1')).toBeNull()
   })
 
-  test('defers catalog load when URL has no language (await remount)', () => {
-    expect(shouldDeferLanguageCatalogLoad(null)).toBe(true)
-    expect(shouldDeferLanguageCatalogLoad(undefined)).toBe(true)
-    expect(shouldDeferLanguageCatalogLoad('')).toBe(true)
+  test('never defers catalog load — cold /read/ loads English in place', () => {
+    expect(shouldDeferLanguageCatalogLoad(null)).toBe(false)
+    expect(shouldDeferLanguageCatalogLoad(undefined)).toBe(false)
+    expect(shouldDeferLanguageCatalogLoad('')).toBe(false)
     expect(shouldDeferLanguageCatalogLoad('en')).toBe(false)
   })
 
@@ -61,7 +62,7 @@ describe('readBootstrapPolicy', () => {
         pathname: '/read',
         cachedLanguage: 'eng',
       })
-    ).toEqual({ language: 'eng', source: 'cache' })
+    ).toEqual({ language: 'en', source: 'cache' })
     expect(
       resolveReadLanguageFromUrlOrCache({
         pathname: '/read/',
@@ -170,7 +171,21 @@ describe('readBootstrapPolicy', () => {
         passageSet: null,
         section1Based: null,
       })
-    ).toEqual({ replace: '/read/eng/bible/ref/tit%201%3A1' })
+    ).toEqual({ replace: '/read/en/bible/ref/tit%201%3A1' })
+  })
+
+  test('cold /read/ with no cache defaults to Door43 en', () => {
+    expect(resolveColdStartReadLanguage({ pathname: '/read', cachedLanguage: null })).toEqual({
+      language: 'en',
+      source: 'default',
+    })
+    expect(resolveColdStartReadLanguage({ pathname: '/read/', cachedLanguage: 'eng' })).toEqual({
+      language: 'en',
+      source: 'cache',
+    })
+    expect(
+      resolveColdStartReadLanguage({ pathname: '/read/tr/obs/ref/1.1', cachedLanguage: 'eng' })
+    ).toEqual({ language: 'tr', source: 'url' })
   })
 
   test('useReadUrlSync replaces from write-back action (no bare-/read block)', () => {

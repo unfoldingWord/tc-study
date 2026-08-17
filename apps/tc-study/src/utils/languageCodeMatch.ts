@@ -5,6 +5,9 @@
 
 const ENGLISH_ALIASES = new Set(['en', 'eng'])
 
+/** Door43 / Read URL / panel language for English. Never persist or query `eng`. */
+export const DEFAULT_READ_LANGUAGE_CODE = 'en'
+
 export function primaryLanguageSegment(code: string | null | undefined): string {
   return String(code || '')
     .trim()
@@ -26,5 +29,10 @@ export function languageCodesMatch(
 /** Door43 catalog query uses `en`, not `eng`. */
 export function door43LanguageQueryCode(code: string): string {
   const trimmed = code.trim()
-  return primaryLanguageSegment(trimmed) === 'eng' ? 'en' : trimmed
+  return primaryLanguageSegment(trimmed) === 'eng' ? DEFAULT_READ_LANGUAGE_CODE : trimmed
+}
+
+/** Canonical Read/URL/panel code (`eng` → `en`). */
+export function canonicalReadLanguageCode(code: string): string {
+  return door43LanguageQueryCode(code)
 }

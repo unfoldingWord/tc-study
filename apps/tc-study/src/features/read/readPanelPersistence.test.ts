@@ -92,4 +92,21 @@ describe('readPanelPersistence', () => {
     expect(next.panels['panel-2'].languageCode).toBeNull()
     expect(next.seededBoth).toBe(false)
   })
+
+  test('persisted eng canonicalizes to Door43 en', () => {
+    writePersistedReadPanels({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'eng' },
+        'panel-2': { mode: 'helps', languageCode: 'eng' },
+      },
+      layout: 'two',
+      collapsedPanelId: null,
+      splitPercent: 50,
+      layoutUserChosen: false,
+      seededBoth: true,
+    })
+    const next = readPersistedReadPanels()
+    expect(next.panels['panel-1'].languageCode).toBe('en')
+    expect(next.panels['panel-2'].languageCode).toBe('en')
+  })
 })

@@ -18,9 +18,9 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
 
   test('URL stays on text language; first pick seeds both panels', () => {
     expect(src).toContain('shouldPushReadLanguageUrl')
-    expect(src).toContain('pushReadLanguageUrl(navigate, languageCode)')
+    expect(src).toContain('pushReadLanguageUrl(navigate, resolvedCode)')
     expect(src).toContain('canSeedBothPanelLanguages')
-    expect(src).toContain('seedBothLanguages(languageCode)')
+    expect(src).toContain('seedBothLanguages(resolvedCode)')
     expect(src).toContain('inheritEmptyLanguage')
     expect(src).toContain('coldStartCatalogLoads')
     expect(src).toContain('catalogLoadForSinglePanel')
@@ -56,7 +56,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   test('per-panel language change never seeds the other panel', () => {
     const panel = src.slice(src.indexOf('const handlePanelLanguageSelected'))
     const body = panel.slice(0, panel.indexOf('const handlePanelModeSwitch'))
-    expect(body).toContain('setPanelLanguage(panelId, languageCode)')
+    expect(body).toContain('setPanelLanguage(panelId, canonicalReadLanguageCode(languageCode))')
     expect(body).toContain('catalogLoadForSinglePanel')
     expect(body).not.toContain('seedBothLanguages')
     expect(body).not.toContain('pushReadLanguageUrl')
@@ -73,11 +73,13 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   test('URL/session hydrate applies path language then inherit before catalog load', () => {
     expect(src).toContain('languageCodeFromReadPathname')
     expect(src).toContain('hydrateLanguagesFromHint')
-    const urlEffect = src.slice(src.lastIndexOf('const urlLang'))
-    expect(urlEffect.indexOf('hydrateLanguagesFromHint(urlLang)')).toBeLessThan(
+    expect(src).toContain('resolveColdStartReadLanguage')
+    expect(src).toContain('canonicalReadLanguageCode')
+    expect(src).not.toContain('shouldDeferLanguageCatalogLoad')
+    const urlEffect = src.slice(src.lastIndexOf('const pathname = typeof window'))
+    expect(urlEffect.indexOf('hydrateLanguagesFromHint(lang)')).toBeLessThan(
       urlEffect.indexOf('handleLanguageSelected(lang)')
     )
-    expect(urlEffect).toContain('urlLang || cached')
   })
 
   test('cold-start catalog loads run in parallel so helps does not wait on scripture', () => {
