@@ -39,6 +39,7 @@ interface ReadLinkedPanelProps {
   dir: 'ltr' | 'rtl'
   mode: ReadPanelMode
   languageCode: string | null
+  otherLanguageCode?: string | null
   onModeSwitch: (mode: ReadPanelMode) => void
   onLanguageSelected: (languageCode: string) => void
   filteredKeys: string[]
@@ -74,6 +75,7 @@ function ReadPanelBody({
   placeholderIndex,
   mode,
   languageCode,
+  otherLanguageCode,
   onModeSwitch,
   onLanguageSelected,
   layout,
@@ -174,6 +176,8 @@ function ReadPanelBody({
         onModeSwitch={onModeSwitch}
         onLanguageSelected={onLanguageSelected}
         languageListMode={isHelps ? 'helps' : 'text'}
+        currentLanguageCode={languageCode}
+        otherLanguageCode={otherLanguageCode}
         languagePickerOpen={pickerOpen}
         onLanguagePickerOpenChange={setPickerOpen}
         showDropPlaceholder={showDropPlaceholder}

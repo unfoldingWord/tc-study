@@ -51,6 +51,10 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(viewSrc).toContain('handlePanelModeSwitch')
     expect(areaSrc).toContain('onPanelLanguageSelected')
     expect(areaSrc).toContain('onPanelModeSwitch')
+    expect(areaSrc).toContain("otherLanguageCode={panels['panel-2'].languageCode}")
+    expect(areaSrc).toContain("otherLanguageCode={panels['panel-1'].languageCode}")
+    expect(panelSrc).toContain('currentLanguageCode={languageCode}')
+    expect(panelSrc).toContain('otherLanguageCode={otherLanguageCode}')
   })
 
   test('two scripture panels are not clones — per-panel languageCode is SoT', () => {

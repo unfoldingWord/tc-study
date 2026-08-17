@@ -4,6 +4,7 @@
  */
 
 import { Globe, Wifi } from 'lucide-react'
+import { languagePickerCardRole } from '../features/read/languagePickerCardRole'
 import type { ListedLanguage } from '../features/read/languagesCache'
 import { LanguagePickerRow } from './LanguagePickerRow'
 
@@ -13,21 +14,33 @@ export interface LanguagePickerGridProps {
   catalogLanguages: ListedLanguage[]
   onlineLanguages: ListedLanguage[]
   onSelect: (code: string) => void
+  currentLanguageCode?: string | null
+  otherLanguageCode?: string | null
 }
 
 function LanguageCardGrid({
   items,
   status,
   onSelect,
+  currentLanguageCode,
+  otherLanguageCode,
 }: {
   items: ListedLanguage[]
   status: 'cached' | 'online'
   onSelect: (code: string) => void
+  currentLanguageCode?: string | null
+  otherLanguageCode?: string | null
 }) {
   return (
     <div className={GRID_CLASS}>
       {items.map((lang) => (
-        <LanguagePickerRow key={lang.code} lang={lang} status={status} onSelect={onSelect} />
+        <LanguagePickerRow
+          key={lang.code}
+          lang={lang}
+          status={status}
+          cardRole={languagePickerCardRole(lang.code, currentLanguageCode, otherLanguageCode)}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   )
@@ -37,6 +50,8 @@ export function LanguagePickerGrid({
   catalogLanguages,
   onlineLanguages,
   onSelect,
+  currentLanguageCode,
+  otherLanguageCode,
 }: LanguagePickerGridProps) {
   const hasCatalog = catalogLanguages.length > 0
   const hasOnline = onlineLanguages.length > 0
@@ -56,7 +71,13 @@ export function LanguagePickerGrid({
   return (
     <div className="flex flex-col gap-stack">
       {hasCatalog && (
-        <LanguageCardGrid items={catalogLanguages} status="cached" onSelect={onSelect} />
+        <LanguageCardGrid
+          items={catalogLanguages}
+          status="cached"
+          onSelect={onSelect}
+          currentLanguageCode={currentLanguageCode}
+          otherLanguageCode={otherLanguageCode}
+        />
       )}
       {hasCatalog && hasOnline && (
         <div className="flex items-center gap-chrome" role="separator">
@@ -66,7 +87,13 @@ export function LanguagePickerGrid({
         </div>
       )}
       {hasOnline && (
-        <LanguageCardGrid items={onlineLanguages} status="online" onSelect={onSelect} />
+        <LanguageCardGrid
+          items={onlineLanguages}
+          status="online"
+          onSelect={onSelect}
+          currentLanguageCode={currentLanguageCode}
+          otherLanguageCode={otherLanguageCode}
+        />
       )}
     </div>
   )

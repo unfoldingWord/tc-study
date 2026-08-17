@@ -78,4 +78,11 @@ describe('LanguagePicker chrome + text kind filter', () => {
     expect(pickerSrc).not.toContain('space-y-4')
     expect(pickerSrc).not.toContain('SelectableGridWithStatus')
   })
+
+  test('forwards this-pane and other-pane language codes to the grid', () => {
+    expect(pickerSrc).toContain('currentLanguageCode')
+    expect(pickerSrc).toContain('otherLanguageCode')
+    expect(pickerSrc).toContain('currentLanguageCode={currentLanguageCode}')
+    expect(pickerSrc).toContain('otherLanguageCode={otherLanguageCode}')
+  })
 })

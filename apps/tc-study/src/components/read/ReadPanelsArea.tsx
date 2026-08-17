@@ -125,6 +125,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         dir={p1Dir}
         mode={panels['panel-1'].mode}
         languageCode={panels['panel-1'].languageCode}
+        otherLanguageCode={panels['panel-2'].languageCode}
         onModeSwitch={(mode) => onPanelModeSwitch('panel-1', mode)}
         onLanguageSelected={(code) => onPanelLanguageSelected('panel-1', code)}
         filteredKeys={scriptureKeysForMismatchDisplay(filteredPanel1Keys, panel1Mismatch)}
@@ -169,6 +170,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         dir={p2Dir}
         mode={panels['panel-2'].mode}
         languageCode={panels['panel-2'].languageCode}
+        otherLanguageCode={panels['panel-1'].languageCode}
         onModeSwitch={(mode) => onPanelModeSwitch('panel-2', mode)}
         onLanguageSelected={(code) => onPanelLanguageSelected('panel-2', code)}
         filteredKeys={scriptureKeysForMismatchDisplay(filteredPanel2Keys, panel2Mismatch)}

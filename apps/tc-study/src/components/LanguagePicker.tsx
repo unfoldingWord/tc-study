@@ -49,6 +49,10 @@ interface LanguagePickerProps {
   onOpenChange?: (open: boolean) => void
   /** Extra classes on the trigger (Read panel chrome uses thumb-sized targets). */
   triggerClassName?: string
+  /** This pane's language — strong selected card. */
+  currentLanguageCode?: string | null
+  /** Sibling pane's language — softer selected card when different. */
+  otherLanguageCode?: string | null
 }
 
 export function LanguagePicker({
@@ -60,6 +64,8 @@ export function LanguagePicker({
   open,
   onOpenChange,
   triggerClassName,
+  currentLanguageCode,
+  otherLanguageCode,
 }: LanguagePickerProps) {
   const { isOpen, setOpen } = useLanguagePickerOpen({
     autoOpen,
@@ -256,6 +262,8 @@ export function LanguagePicker({
                     catalogLanguages={catalogLanguages}
                     onlineLanguages={onlineLanguages}
                     onSelect={handleSelect}
+                    currentLanguageCode={currentLanguageCode}
+                    otherLanguageCode={otherLanguageCode}
                   />
                 </div>
               )}

@@ -24,6 +24,8 @@ interface ReadPanelHeaderProps {
   onModeSwitch: (mode: ReadPanelMode) => void
   onLanguageSelected: (languageCode: string) => void
   languageListMode: 'text' | 'helps'
+  currentLanguageCode?: string | null
+  otherLanguageCode?: string | null
   languagePickerOpen?: boolean
   onLanguagePickerOpenChange?: (open: boolean) => void
   showDropPlaceholder?: boolean
@@ -42,6 +44,8 @@ export function ReadPanelHeader({
   onModeSwitch,
   onLanguageSelected,
   languageListMode,
+  currentLanguageCode,
+  otherLanguageCode,
   languagePickerOpen,
   onLanguagePickerOpenChange,
   showDropPlaceholder = false,
@@ -87,6 +91,8 @@ export function ReadPanelHeader({
               open={pickerOpen}
               onOpenChange={setPickerOpen}
               onLanguageSelected={onLanguageSelected}
+              currentLanguageCode={currentLanguageCode}
+              otherLanguageCode={otherLanguageCode}
               triggerClassName={READ_HEADER_ICON_BUTTON}
             />
             <ReadModeSwitch mode={mode} onModeSwitch={onModeSwitch} />

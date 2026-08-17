@@ -5,6 +5,10 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { emptyLanguageAvailability } from '../features/read/languageAvailability'
 import type { ListedLanguage } from '../features/read/languagesCache'
+import {
+  LANGUAGE_PICKER_CURRENT_CARD_CLASS,
+  LANGUAGE_PICKER_OTHER_CARD_CLASS,
+} from './LanguagePickerRow'
 import { LanguagePickerGrid } from './LanguagePickerGrid'
 
 function lang(extras: Partial<ListedLanguage> = {}): ListedLanguage {
@@ -53,6 +57,43 @@ describe('LanguagePickerGrid', () => {
     expect(html).toContain('Spanish')
     expect(html).not.toContain('Cached')
     expect(html).not.toContain('Online languages')
+  })
+
+  test('p1 es-419 / p2 mr marks this pane strong and sibling soft', () => {
+    const html = renderToStaticMarkup(
+      createElement(LanguagePickerGrid, {
+        catalogLanguages: [
+          lang({ code: 'es-419', name: 'español Latin America', source: 'catalog' }),
+          lang({ code: 'mr', name: 'मराठी', source: 'catalog' }),
+        ],
+        onlineLanguages: [],
+        onSelect: () => {},
+        currentLanguageCode: 'es-419',
+        otherLanguageCode: 'mr',
+      })
+    )
+    expect(html).toContain(LANGUAGE_PICKER_CURRENT_CARD_CLASS)
+    expect(html).toContain(LANGUAGE_PICKER_OTHER_CARD_CLASS)
+    expect(html).toContain('aria-current="true"')
+    expect(html).toContain('aria-pressed="true"')
+  })
+
+  test('same language both panes is one strong card', () => {
+    const html = renderToStaticMarkup(
+      createElement(LanguagePickerGrid, {
+        catalogLanguages: [
+          lang({ code: 'es-419', name: 'español Latin America', source: 'catalog' }),
+          lang({ code: 'mr', name: 'मराठी', source: 'catalog' }),
+        ],
+        onlineLanguages: [],
+        onSelect: () => {},
+        currentLanguageCode: 'es-419',
+        otherLanguageCode: 'es-419',
+      })
+    )
+    expect(html).toContain(LANGUAGE_PICKER_CURRENT_CARD_CLASS)
+    expect(html).not.toContain(LANGUAGE_PICKER_OTHER_CARD_CLASS)
+    expect(html).not.toContain('aria-pressed')
   })
 
   test('single group has no separator', () => {

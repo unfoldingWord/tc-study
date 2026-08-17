@@ -6,6 +6,8 @@ import { join } from 'node:path'
 import { emptyLanguageAvailability } from '../features/read/languageAvailability'
 import type { ListedLanguage } from '../features/read/languagesCache'
 import {
+  LANGUAGE_PICKER_CURRENT_CARD_CLASS,
+  LANGUAGE_PICKER_OTHER_CARD_CLASS,
   LanguagePickerRow,
   TEXT_LANGUAGE_BADGE_LABELS,
   textLanguageAvailabilityBadges,
@@ -164,7 +166,40 @@ describe('LanguagePickerRow', () => {
         selected: true,
       })
     )
-    expect(html).toContain('border-accent bg-accent-soft')
+    expect(html).toContain(LANGUAGE_PICKER_CURRENT_CARD_CLASS)
+    expect(html).toContain('aria-current="true"')
+  })
+
+  test('this pane is strong current; other pane is softer', () => {
+    const current = renderToStaticMarkup(
+      createElement(LanguagePickerRow, {
+        lang: lang(emptyLanguageAvailability(), {
+          code: 'es-419',
+          name: 'español Latin America',
+          anglicizedName: 'Spanish Latin America',
+        }),
+        status: 'online',
+        cardRole: 'current',
+      })
+    )
+    const other = renderToStaticMarkup(
+      createElement(LanguagePickerRow, {
+        lang: lang(emptyLanguageAvailability(), {
+          code: 'mr',
+          name: 'मराठी',
+        }),
+        status: 'online',
+        cardRole: 'other',
+      })
+    )
+    expect(current).toContain(LANGUAGE_PICKER_CURRENT_CARD_CLASS)
+    expect(current).toContain('aria-current="true"')
+    expect(current).not.toContain('aria-pressed')
+    expect(other).toContain(LANGUAGE_PICKER_OTHER_CARD_CLASS)
+    expect(other).toContain('aria-pressed="true"')
+    expect(other).not.toContain('aria-current')
+    expect(other).toContain('title="मराठी"')
+    expect(other).not.toContain(LANGUAGE_PICKER_CURRENT_CARD_CLASS)
   })
 
   test('neither degrades: row still renders, no Bible/OBS badges', () => {

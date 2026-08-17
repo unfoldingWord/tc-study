@@ -16,6 +16,8 @@ describe('ReadPanelHeader (issue #30)', () => {
     expect(modeSrc).not.toContain('Layers')
     expect(modeSrc).not.toContain('CircleHelp')
     expect(src).toContain('LanguagePicker')
+    expect(src).toContain('currentLanguageCode={currentLanguageCode}')
+    expect(src).toContain('otherLanguageCode={otherLanguageCode}')
     expect(src).toContain('ReadModeSwitch')
     expect(src).toContain('min-h-11')
     expect(src).toContain('read-panel-header')

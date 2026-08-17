@@ -6,11 +6,18 @@
 
 import { BookMarked, BookOpen, Database, Wifi, type LucideIcon } from 'lucide-react'
 import type { LanguageAvailabilityFlags } from '../features/read/languageAvailability'
+import type { LanguagePickerCardRole } from '../features/read/languagePickerCardRole'
 import {
   languageListDisplayName,
   languagePickerA11yLabel,
 } from '../features/read/languageListDisplayName'
 import type { ListedLanguage } from '../features/read/languagesCache'
+
+/** This pane: existing selected accent. Other pane: same hue, lower opacity. */
+export const LANGUAGE_PICKER_CURRENT_CARD_CLASS = 'border-accent bg-accent-soft'
+export const LANGUAGE_PICKER_OTHER_CARD_CLASS = 'border-accent/40 bg-accent-soft/30'
+export const LANGUAGE_PICKER_IDLE_CARD_CLASS =
+  'border-border-subtle bg-surface hover:border-accent/50 hover:bg-accent-soft'
 
 export type TextLanguageBadgeKind = 'bible' | 'obs'
 
@@ -51,6 +58,7 @@ export interface LanguagePickerRowProps {
   lang: ListedLanguage
   status: 'cached' | 'online'
   selected?: boolean
+  cardRole?: LanguagePickerCardRole
   onSelect?: (code: string) => void
 }
 
@@ -58,24 +66,32 @@ export function LanguagePickerRow({
   lang,
   status,
   selected = false,
+  cardRole,
   onSelect,
 }: LanguagePickerRowProps) {
   const badges = textLanguageAvailabilityBadges(lang.availability)
   const SourceIcon = status === 'cached' ? Database : Wifi
   const displayName = languageListDisplayName(lang, lang.code)
   const a11yLabel = languagePickerA11yLabel(lang, lang.code)
+  const role = cardRole ?? (selected ? 'current' : undefined)
+  const isCurrent = role === 'current'
+  const isOther = role === 'other'
+  const label = isOther ? displayName : a11yLabel
+  const cardClass = isCurrent
+    ? LANGUAGE_PICKER_CURRENT_CARD_CLASS
+    : isOther
+      ? LANGUAGE_PICKER_OTHER_CARD_CLASS
+      : LANGUAGE_PICKER_IDLE_CARD_CLASS
 
   return (
     <button
       type="button"
       onClick={() => onSelect?.(lang.code)}
-      className={`w-full min-w-0 text-left rounded-md p-content border transition-colors ${
-        selected
-          ? 'border-accent bg-accent-soft'
-          : 'border-border-subtle bg-surface hover:border-accent/50 hover:bg-accent-soft'
-      }`}
-      title={a11yLabel}
-      aria-label={a11yLabel}
+      className={`w-full min-w-0 text-left rounded-md p-content border transition-colors ${cardClass}`}
+      title={label}
+      aria-label={label}
+      aria-current={isCurrent ? 'true' : undefined}
+      aria-pressed={isOther ? true : undefined}
     >
       <div className="text-sm font-semibold text-fg truncate">{displayName}</div>
       <div className="mt-chrome-tight flex items-center gap-1 min-w-0">

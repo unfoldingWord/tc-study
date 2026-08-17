@@ -9,6 +9,8 @@ const headerSrc = readFileSync(join(import.meta.dir, 'ReadPanelHeader.tsx'), 'ut
 describe('helps picker wiring (issue #24 / #30)', () => {
   test('helps-mode chrome hosts LanguagePicker; empty CTA opens it', () => {
     expect(panelSrc).toContain("languageListMode={isHelps ? 'helps' : 'text'}")
+    expect(panelSrc).toContain('currentLanguageCode={languageCode}')
+    expect(panelSrc).toContain('otherLanguageCode={otherLanguageCode}')
     expect(panelSrc).not.toContain('helpsFlag')
     expect(panelSrc).not.toContain('helpsFlagForNavigationScope')
     expect(panelSrc).toContain('onLanguageSelected={onLanguageSelected}')
@@ -21,6 +23,8 @@ describe('helps picker wiring (issue #24 / #30)', () => {
   test('both panel pickers share LanguagePicker + LanguagePickerTextKindFilter', () => {
     expect(headerSrc).toContain('<LanguagePicker')
     expect(headerSrc).toContain('listMode={languageListMode}')
+    expect(headerSrc).toContain('currentLanguageCode={currentLanguageCode}')
+    expect(headerSrc).toContain('otherLanguageCode={otherLanguageCode}')
     expect(headerSrc).not.toContain('helpsFlag')
     const pickerSrc = readFileSync(
       join(import.meta.dir, '../LanguagePicker.tsx'),
