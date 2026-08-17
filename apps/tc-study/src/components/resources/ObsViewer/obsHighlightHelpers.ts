@@ -25,6 +25,47 @@ export function obsFrameVerseFilter(
   return { chapter: storyNumber, verse: frameNumber }
 }
 
+/** DOM id used on range/single frames (`data-obs-frame="1:1"`). */
+export function obsFrameAttr(storyNum: number, frameNum: number): string {
+  return `${storyNum}:${frameNum}`
+}
+
+export function obsFrameSelector(storyNum: number, frameNum: number): string {
+  return `[data-obs-frame="${obsFrameAttr(storyNum, frameNum)}"]`
+}
+
+/**
+ * CombinedHelps card/note click → OBS frame filter.
+ * Accepts highlight `{ storyNumber, frameNumber }` or verse-filter `{ chapter, verse }`.
+ */
+export function obsFrameFilterFromHelpsPayload(
+  payload:
+    | { storyNumber?: number; frameNumber?: number; chapter?: number; verse?: number }
+    | null
+    | undefined
+): ObsVerseFilterRef | null {
+  if (!payload) return null
+  const chapter = payload.storyNumber ?? payload.chapter
+  const verse = payload.frameNumber ?? payload.verse
+  if (chapter == null || verse == null) return null
+  return { chapter, verse }
+}
+
+export function scrollObsFrameIntoView(
+  root: ParentNode | null | undefined,
+  filter: ObsVerseFilterRef | null,
+  scrollIntoView: (el: Element) => void = (el) =>
+    el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+): boolean {
+  if (!filter || filter.verse === undefined) return false
+  const scope = root ?? (typeof document !== 'undefined' ? document : null)
+  if (!scope) return false
+  const el = scope.querySelector(obsFrameSelector(filter.chapter, filter.verse))
+  if (!el) return false
+  scrollIntoView(el)
+  return true
+}
+
 /** True when `story.frame` is the current CombinedHelps verse-filter (e.g. 1:7). */
 export function isObsFrameFilterActive(
   filter: ObsVerseFilterRef | null,

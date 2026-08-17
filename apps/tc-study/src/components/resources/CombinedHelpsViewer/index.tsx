@@ -261,6 +261,7 @@ export function CombinedHelpsViewer({
     onEntryLinkClick,
     sendTokenClick,
     sendEntryLinkClick,
+    sendVerseFilter,
     broadcastObsHighlight,
     setSelectedHelpsCard,
   })

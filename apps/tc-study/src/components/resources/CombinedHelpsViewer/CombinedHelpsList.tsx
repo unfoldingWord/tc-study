@@ -65,7 +65,7 @@ export interface CombinedHelpsListProps {
   onSupportReferenceClick: (supportRef: string) => void
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   onNoteQuoteClick: (note: NoteWithTokens) => void
-  onNoteSelect: (note: { id: string }) => void
+  onNoteSelect: (note: { id: string; reference?: string }) => void
   onTitleClick: (link: TranslationWordsLink) => void
   onLinkQuoteClick: (link: TranslationWordsLink) => void
 }

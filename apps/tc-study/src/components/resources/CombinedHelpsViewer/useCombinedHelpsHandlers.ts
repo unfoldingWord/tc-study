@@ -4,10 +4,11 @@
 
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useCallback } from 'react'
-import type { ObsFrameHighlightSignal, TokenClickSignal } from '../../../signals/studioSignals'
+import type { ObsFrameHighlightSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
 import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import type { NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
+import { helpsCardVerseFilter } from './combinedHelpsUtils'
 import type { HelpsCardSelection } from './helpsCardSelection'
 
 type SendTokenClick = (data: {
@@ -25,6 +26,11 @@ type BroadcastObsHighlight = (data: {
   highlight: ObsFrameHighlightSignal['highlight']
 }) => void
 
+type SendVerseFilter = (data: {
+  lifecycle: 'event'
+  filter: VerseFilterSignal['filter']
+}) => void
+
 export interface UseCombinedHelpsHandlersParams {
   helpsScope: 'scripture' | 'obs'
   bookCode?: string
@@ -34,6 +40,7 @@ export interface UseCombinedHelpsHandlersParams {
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   sendTokenClick: SendTokenClick
   sendEntryLinkClick: SendEntryLinkClick
+  sendVerseFilter: SendVerseFilter
   broadcastObsHighlight: BroadcastObsHighlight
   setSelectedHelpsCard: (selection: HelpsCardSelection) => void
 }
@@ -47,25 +54,34 @@ export function useCombinedHelpsHandlers({
   onEntryLinkClick,
   sendTokenClick,
   sendEntryLinkClick,
+  sendVerseFilter,
   broadcastObsHighlight,
   setSelectedHelpsCard,
 }: UseCombinedHelpsHandlersParams) {
-  const handleNoteSelect = useCallback(
-    (note: { id: string }) => {
-      setSelectedHelpsCard({ kind: 'tn', id: note.id })
+  const sendObsCardFrameFilter = useCallback(
+    (reference: string) => {
+      if (helpsScope !== 'obs') return
+      sendVerseFilter({ lifecycle: 'event', filter: helpsCardVerseFilter(reference) })
     },
-    [setSelectedHelpsCard]
+    [helpsScope, sendVerseFilter]
+  )
+
+  const handleNoteSelect = useCallback(
+    (note: { id: string; reference?: string }) => {
+      setSelectedHelpsCard({ kind: 'tn', id: note.id })
+      if (note.reference) sendObsCardFrameFilter(note.reference)
+    },
+    [sendObsCardFrameFilter, setSelectedHelpsCard]
   )
 
   const handleNoteQuoteClick = useCallback(
     (note: NoteWithTokens) => {
       setSelectedHelpsCard({ kind: 'tn', id: note.id })
       if (helpsScope === 'obs') {
+        sendObsCardFrameFilter(note.reference)
         const quote = note.quote?.trim()
         if (!quote) return
-        const refParts = note.reference.split(':')
-        const chapter = parseInt(refParts[0] || '1', 10)
-        const verse = parseInt(refParts[1] || '1', 10)
+        const { chapter, verse } = helpsCardVerseFilter(note.reference)
         const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
         const occurrence = Number.isFinite(occRaw) ? occRaw : 1
         broadcastObsHighlight({
@@ -119,7 +135,7 @@ export function useCombinedHelpsHandlers({
       if (!payload) return
       sendTokenClick({ lifecycle: 'event', token: payload })
     },
-    [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedHelpsCard]
+    [bookCode, helpsScope, broadcastObsHighlight, sendObsCardFrameFilter, sendTokenClick, setSelectedHelpsCard]
   )
 
   const handleSupportReferenceClick = useCallback(
@@ -164,11 +180,10 @@ export function useCombinedHelpsHandlers({
     (link: TranslationWordsLink) => {
       setSelectedHelpsCard({ kind: 'twl', id: link.id })
       if (helpsScope === 'obs') {
+        sendObsCardFrameFilter(link.reference)
         const quote = link.origWords?.trim()
         if (!quote) return
-        const refParts = link.reference.split(':')
-        const chapter = parseInt(refParts[0] || '1', 10)
-        const verse = parseInt(refParts[1] || '1', 10)
+        const { chapter, verse } = helpsCardVerseFilter(link.reference)
         const occRaw = Number.parseInt(String(link.occurrence ?? '1'), 10)
         const occurrence = Number.isFinite(occRaw) ? occRaw : 1
         broadcastObsHighlight({
@@ -224,7 +239,7 @@ export function useCombinedHelpsHandlers({
       if (!payload) return
       sendTokenClick({ lifecycle: 'event', token: payload })
     },
-    [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedHelpsCard]
+    [bookCode, helpsScope, broadcastObsHighlight, sendObsCardFrameFilter, sendTokenClick, setSelectedHelpsCard]
   )
 
   return {

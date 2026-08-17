@@ -83,6 +83,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
     activeHighlight,
     activeFrameFilter,
     frameTextRef,
+    paneRef,
     activateWordSpan,
     toggleHighlightEntry,
     toggleRangeHighlight,
@@ -128,7 +129,10 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
         direction={languageDirection}
         infoResource={resource}
       />
-      <div className="flex-1 min-h-0 overflow-auto p-content-lg bg-scripture text-scripture-fg">
+      <div
+        ref={paneRef}
+        className="flex-1 min-h-0 overflow-auto p-content-lg bg-scripture text-scripture-fg"
+      >
         <div className="max-w-2xl mx-auto w-full">
           {loading && (
             <LoadingSpinner

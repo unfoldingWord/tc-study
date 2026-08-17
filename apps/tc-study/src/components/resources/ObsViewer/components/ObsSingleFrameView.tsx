@@ -41,6 +41,7 @@ export function ObsSingleFrameView(props: {
     <div
       className="max-w-2xl mx-auto space-y-4 cursor-pointer"
       title={`Frame ${storyNum} · ${frameNum}`}
+      data-obs-frame={`${storyNum}:${frameNum}`}
       onClick={() => onFrameClick(storyNum, frameNum)}
     >
       <div

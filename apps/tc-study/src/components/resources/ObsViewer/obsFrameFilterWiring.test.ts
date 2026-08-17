@@ -6,6 +6,10 @@ const highlightSrc = readFileSync(join(import.meta.dir, 'hooks/useObsHighlight.t
 const viewerSrc = readFileSync(join(import.meta.dir, 'ObsViewer.tsx'), 'utf8')
 const rangeSrc = readFileSync(join(import.meta.dir, 'components/ObsRangeView.tsx'), 'utf8')
 const singleSrc = readFileSync(join(import.meta.dir, 'components/ObsSingleFrameView.tsx'), 'utf8')
+const handlersSrc = readFileSync(
+  join(import.meta.dir, '../CombinedHelpsViewer/useCombinedHelpsHandlers.ts'),
+  'utf8'
+)
 
 describe('OBS frame click → helps verse-filter', () => {
   test('useObsHighlight sends verse-filter via obsFrameVerseFilter', () => {
@@ -31,5 +35,16 @@ describe('OBS frame click → helps verse-filter', () => {
     expect(rangeSrc).toContain('obsFrameChromeClass')
     expect(rangeSrc).toContain('data-obs-frame-active')
     expect(rangeSrc).toContain('data-obs-frame=')
+  })
+
+  test('helps card click sends verse-filter and OBS scrolls the matching frame', () => {
+    expect(handlersSrc).toContain('sendObsCardFrameFilter')
+    expect(handlersSrc).toContain('helpsCardVerseFilter')
+    expect(handlersSrc).toContain('sendVerseFilter')
+    expect(highlightSrc).toContain('obsFrameFilterFromHelpsPayload')
+    expect(highlightSrc).toContain('scrollObsFrameIntoView')
+    expect(highlightSrc).toContain('pendingFrameScrollRef')
+    expect(viewerSrc).toContain('ref={paneRef}')
+    expect(singleSrc).toContain('data-obs-frame=')
   })
 })

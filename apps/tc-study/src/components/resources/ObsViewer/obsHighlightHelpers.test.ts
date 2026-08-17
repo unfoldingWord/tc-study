@@ -5,7 +5,10 @@ import {
   isObsFrameFilterActive,
   isPanel2KeyQuoteCapable,
   obsFrameChromeClass,
+  obsFrameFilterFromHelpsPayload,
+  obsFrameSelector,
   obsFrameVerseFilter,
+  scrollObsFrameIntoView,
   sortedSourceIdsKey,
 } from './obsHighlightHelpers'
 import type { ObsFrameQuoteEntry } from '../../../signals/studioSignals'
@@ -46,6 +49,33 @@ describe('obsHighlightHelpers', () => {
   test('frame click maps story/frame onto the verse-filter path', () => {
     expect(obsFrameVerseFilter(1, 3)).toEqual({ chapter: 1, verse: 3 })
     expect(obsFrameVerseFilter(12, 1)).toEqual({ chapter: 12, verse: 1 })
+  })
+
+  test('card/note for 1:1 activates OBS frame 1:1 and scrolls it into view', () => {
+    const fromHighlight = obsFrameFilterFromHelpsPayload({ storyNumber: 1, frameNumber: 1 })
+    const fromVerseFilter = obsFrameFilterFromHelpsPayload({ chapter: 1, verse: 1 })
+    expect(fromHighlight).toEqual({ chapter: 1, verse: 1 })
+    expect(fromVerseFilter).toEqual({ chapter: 1, verse: 1 })
+    expect(isObsFrameFilterActive(fromHighlight, 1, 1)).toBe(true)
+    expect(isObsFrameFilterActive(fromHighlight, 1, 7)).toBe(false)
+    expect(obsFrameChromeClass(fromHighlight, 1, 1)).toBe(OBS_FRAME_ACTIVE_CLASS)
+    expect(obsFrameChromeClass(fromHighlight, 1, 7)).not.toContain('bg-highlight')
+
+    const scrolled: string[] = []
+    const frameEl = { id: 'frame-1-1' } as unknown as Element
+    const root = {
+      querySelector(sel: string) {
+        return sel === obsFrameSelector(1, 1) ? frameEl : null
+      },
+    } as unknown as ParentNode
+    const ok = scrollObsFrameIntoView(root, fromHighlight, (el) => {
+      scrolled.push((el as { id: string }).id)
+    })
+    expect(ok).toBe(true)
+    expect(scrolled).toEqual(['frame-1-1'])
+    expect(scrollObsFrameIntoView(root, { chapter: 1, verse: 7 }, () => {
+      throw new Error('must not scroll a missing frame')
+    })).toBe(false)
   })
 
   test('verse-filter 1:7 marks only frame 1·7 active', () => {

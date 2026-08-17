@@ -10,7 +10,9 @@ import type {
 import type { ActiveHl } from '../types'
 import {
   isObsEntryActive,
+  obsFrameFilterFromHelpsPayload,
   obsFrameVerseFilter,
+  scrollObsFrameIntoView,
   sortedSourceIdsKey,
   type ObsVerseFilterRef,
 } from '../obsHighlightHelpers'
@@ -39,6 +41,8 @@ export function useObsHighlight(params: {
   const [activeHighlight, setActiveHighlight] = useState<ActiveHl | null>(null)
   const [activeFrameFilter, setActiveFrameFilter] = useState<ObsVerseFilterRef | null>(null)
   const frameTextRef = useRef<HTMLDivElement>(null)
+  const paneRef = useRef<HTMLDivElement>(null)
+  const pendingFrameScrollRef = useRef(false)
 
   const resourceMetadata = {
     type: 'obs' as const,
@@ -72,6 +76,11 @@ export function useObsHighlight(params: {
           return
         }
         const h = signal.highlight
+        const frameFilter = obsFrameFilterFromHelpsPayload(h)
+        if (frameFilter) {
+          pendingFrameScrollRef.current = true
+          setActiveFrameFilter(frameFilter)
+        }
         if (h.storyNumber !== storyNum) return
         if (!isRange && h.frameNumber !== frameNum) return
         if (h.overlappingSourceIds?.length) {
@@ -109,6 +118,7 @@ export function useObsHighlight(params: {
           setActiveFrameFilter(null)
           return
         }
+        pendingFrameScrollRef.current = true
         setActiveFrameFilter({
           chapter: signal.filter.chapter,
           verse: signal.filter.verse,
@@ -130,10 +140,16 @@ export function useObsHighlight(params: {
 
   useLayoutEffect(() => {
     if (!activeHighlight) return
-    const root = frameTextRef.current ?? document.documentElement
+    const root = frameTextRef.current ?? paneRef.current ?? document.documentElement
     const el = root.querySelector('[data-obs-quote-active="true"]')
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [activeHighlight])
+
+  useLayoutEffect(() => {
+    if (!activeFrameFilter || !pendingFrameScrollRef.current) return
+    pendingFrameScrollRef.current = false
+    scrollObsFrameIntoView(paneRef.current, activeFrameFilter)
+  }, [activeFrameFilter])
 
   const activateWordSpan = useCallback(
     (span: FrameSpan, sNum: number, fNum: number, enriched: ObsFrameQuoteEntry[]) => {
@@ -254,6 +270,7 @@ export function useObsHighlight(params: {
     activeHighlight,
     activeFrameFilter,
     frameTextRef,
+    paneRef,
     activateWordSpan,
     toggleHighlightEntry,
     toggleRangeHighlight,

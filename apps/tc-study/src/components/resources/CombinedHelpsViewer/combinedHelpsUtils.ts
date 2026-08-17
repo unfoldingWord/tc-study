@@ -34,3 +34,8 @@ export function refSortParts(ref: string): { chapter: number; verse: number } {
   const { chapter, verse } = parseLinkChapterVerse(ref)
   return { chapter, verse }
 }
+
+/** OBS CombinedHelps card → verse-filter (story:frame as chapter:verse). */
+export function helpsCardVerseFilter(reference: string): { chapter: number; verse: number } {
+  return parseLinkChapterVerse(reference)
+}
