@@ -6,6 +6,7 @@
 
 import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { inheritEmptyHelpsFromSession } from './readColdStartPolicy'
+import { hydratePersistedPanelChrome } from './readPanelLayout'
 import {
   DEFAULT_READ_PANEL_MODELS,
   type ReadPanelId,
@@ -87,11 +88,15 @@ export function readPersistedReadPanels(): PersistedReadPanels {
       typeof parsed.splitPercent === 'number' && Number.isFinite(parsed.splitPercent)
         ? parsed.splitPercent
         : fallback.splitPercent
-    return {
-      panels,
+    const chrome = hydratePersistedPanelChrome({
       layout,
+      layoutUserChosen: parsed.layoutUserChosen === true,
       collapsedPanelId,
       splitPercent,
+    })
+    return {
+      panels,
+      ...chrome,
       layoutUserChosen: parsed.layoutUserChosen === true,
       seededBoth: parsed.seededBoth === true || Boolean(panels['panel-1'].languageCode),
     }

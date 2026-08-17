@@ -7,10 +7,11 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import {
-  collapseAfterDragEnd,
+  collapseFromUserDragOnly,
   collapseTweenRange,
   displayedSplitFromPointer,
   edgeSplitPercent,
+  layoutAfterContainerMeasure,
   layoutRestoreTweenRange,
   restoreCollapsedDivider,
 } from './readPanelLayout'
@@ -31,6 +32,15 @@ export function useReadPanelLayout() {
   const { panel1Width, isResizingPanels } = resize
   const { runTween, tweenPercent } = useReadPanelCollapse({ isResizingPanels })
   const wasResizingRef = useRef(false)
+  const didMeasureRef = useRef(false)
+
+  useEffect(() => {
+    if (didMeasureRef.current) return
+    didMeasureRef.current = true
+    if (collapsedPanelId) return
+    const next = layoutAfterContainerMeasure(splitPercent)
+    if (next.splitPercent !== splitPercent) setSplitPercent(next.splitPercent)
+  }, [collapsedPanelId, setSplitPercent, splitPercent])
 
   useEffect(() => {
     if (isResizingPanels) {
@@ -39,7 +49,10 @@ export function useReadPanelLayout() {
     }
     if (!wasResizingRef.current) return
     wasResizingRef.current = false
-    const result = collapseAfterDragEnd(panel1Width)
+    const result = collapseFromUserDragOnly({
+      pointerPercent: panel1Width,
+      userDragged: true,
+    })
     if (result.collapsedPanelId) {
       previousSplitRef.current = splitPercent
       const { from, to } = collapseTweenRange(result.collapsedPanelId, result.splitPercent)

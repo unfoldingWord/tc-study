@@ -52,9 +52,13 @@ export function displayedSplitFromPointer(pointerPercent: number): {
   }
 }
 
-export function defaultLayoutForViewport(isNarrow: boolean, persisted?: ReadLayoutMode, userChosen?: boolean): ReadLayoutMode {
+export function defaultLayoutForViewport(
+  _isNarrow: boolean,
+  persisted?: ReadLayoutMode,
+  userChosen?: boolean
+): ReadLayoutMode {
   if (userChosen && persisted) return persisted
-  return isNarrow ? 'one' : 'two'
+  return 'two'
 }
 
 /** Pointer crossed detent ± DETENT_COMMIT_OFFSET_PERCENT (25% / 75%). */
@@ -161,6 +165,69 @@ export const COLLAPSE_MOTION_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)'
 /** Smaller pane goes to 0 width — same edge live drag would reach. */
 export function edgeSplitPercent(collapsedPanelId: ReadPanelId): number {
   return collapsedPanelId === 'panel-1' ? 0 : 100
+}
+
+/**
+ * First paint / orientation / container measure.
+ * Never commits collapse — clamp to the 30/70 detent so both panes stay open.
+ */
+export function layoutAfterContainerMeasure(pointerPercent: number): {
+  splitPercent: number
+  collapsedPanelId: null
+} {
+  const result = collapseAfterDragEnd(pointerPercent)
+  if (!result.collapsedPanelId) {
+    return { splitPercent: result.splitPercent, collapsedPanelId: null }
+  }
+  const detent =
+    pointerPercent <= 50 ? COLLAPSE_THRESHOLD_PERCENT : 100 - COLLAPSE_THRESHOLD_PERCENT
+  return { splitPercent: detent, collapsedPanelId: null }
+}
+
+/** Collapse only after a real divider drag. Measure/load always stays open. */
+export function collapseFromUserDragOnly(options: {
+  pointerPercent: number
+  userDragged: boolean
+}): { splitPercent: number; collapsedPanelId: ReadPanelId | null } {
+  if (!options.userDragged) return layoutAfterContainerMeasure(options.pointerPercent)
+  return collapseAfterDragEnd(options.pointerPercent)
+}
+
+/**
+ * Restore a saved collapse only when the user actually parked a pane
+ * (`collapsedPanelId` + split at/past that pane’s detent). Auto `layout: 'one'`
+ * from an older mobile default is treated as both panes open.
+ */
+export function hydratePersistedPanelChrome(options: {
+  layout: ReadLayoutMode
+  layoutUserChosen: boolean
+  collapsedPanelId: ReadPanelId | null
+  splitPercent: number
+}): {
+  layout: ReadLayoutMode
+  collapsedPanelId: ReadPanelId | null
+  splitPercent: number
+} {
+  const layout = options.layoutUserChosen ? options.layout : 'two'
+  const parked = options.collapsedPanelId
+  const splitLooksCollapsed =
+    parked === 'panel-1'
+      ? options.splitPercent <= COLLAPSE_THRESHOLD_PERCENT
+      : parked === 'panel-2'
+        ? options.splitPercent >= 100 - COLLAPSE_THRESHOLD_PERCENT
+        : false
+  if (parked && splitLooksCollapsed) {
+    return {
+      layout: 'two',
+      collapsedPanelId: parked,
+      splitPercent: edgeSplitPercent(parked),
+    }
+  }
+  return {
+    layout,
+    collapsedPanelId: null,
+    splitPercent: restoredSplitPercent(options.splitPercent),
+  }
 }
 
 export function collapseTweenRange(collapsedPanelId: ReadPanelId, fromPercent: number): {

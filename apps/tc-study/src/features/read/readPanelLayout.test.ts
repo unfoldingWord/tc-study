@@ -3,6 +3,7 @@ import {
   collapseAfterDragEnd,
   collapseCommitPanelId,
   collapseDuringDrag,
+  collapseFromUserDragOnly,
   collapsedDividerArrowDir,
   COLLAPSE_MOTION_EASING,
   COLLAPSE_MOTION_MS,
@@ -10,6 +11,8 @@ import {
   collapseEase,
   collapseTweenRange,
   defaultLayoutForViewport,
+  hydratePersistedPanelChrome,
+  layoutAfterContainerMeasure,
   DETENT_CAPTURE_PERCENT,
   DETENT_COMMIT_OFFSET_PERCENT,
   displayedSplitFromPointer,
@@ -25,12 +28,70 @@ import {
 } from './readPanelLayout'
 
 describe('readPanelLayout', () => {
-  test('mobile default is one panel; desktop default is two unless user chose', () => {
-    expect(defaultLayoutForViewport(true)).toBe('one')
+  test('mobile and desktop default to two open panels unless the user chose one', () => {
+    expect(defaultLayoutForViewport(true)).toBe('two')
     expect(defaultLayoutForViewport(false)).toBe('two')
     expect(defaultLayoutForViewport(true, 'two', true)).toBe('two')
     expect(defaultLayoutForViewport(false, 'one', true)).toBe('one')
-    expect(defaultLayoutForViewport(true, 'two', false)).toBe('one')
+    expect(defaultLayoutForViewport(true, 'two', false)).toBe('two')
+    expect(defaultLayoutForViewport(true, 'one', false)).toBe('two')
+  })
+
+  test('initial mobile/column layout stays open; first measure does not collapse', () => {
+    expect(defaultLayoutForViewport(true)).toBe('two')
+    expect(
+      isPanelOffFlow({ layout: 'two', panelId: 'panel-1', collapsedPanelId: null })
+    ).toBe(false)
+    expect(
+      isPanelOffFlow({ layout: 'two', panelId: 'panel-2', collapsedPanelId: null })
+    ).toBe(false)
+    expect(dividerCollapsedPanelId({ layout: 'two', collapsedPanelId: null })).toBeNull()
+
+    const stacked = layoutAfterContainerMeasure(50)
+    expect(stacked.collapsedPanelId).toBeNull()
+    expect(stacked.splitPercent).toBe(50)
+
+    const staleBottom = layoutAfterContainerMeasure(80)
+    expect(staleBottom.collapsedPanelId).toBeNull()
+    expect(staleBottom.splitPercent).toBe(100 - COLLAPSE_THRESHOLD_PERCENT)
+
+    const staleTop = layoutAfterContainerMeasure(20)
+    expect(staleTop.collapsedPanelId).toBeNull()
+    expect(staleTop.splitPercent).toBe(COLLAPSE_THRESHOLD_PERCENT)
+
+    expect(
+      collapseFromUserDragOnly({ pointerPercent: 90, userDragged: false }).collapsedPanelId
+    ).toBeNull()
+    expect(
+      collapseFromUserDragOnly({ pointerPercent: 90, userDragged: true }).collapsedPanelId
+    ).toBe('panel-2')
+  })
+
+  test('hydrate keeps a real user collapse and opens auto one-panel mobile saves', () => {
+    expect(
+      hydratePersistedPanelChrome({
+        layout: 'one',
+        layoutUserChosen: false,
+        collapsedPanelId: null,
+        splitPercent: 50,
+      })
+    ).toEqual({ layout: 'two', collapsedPanelId: null, splitPercent: 50 })
+    expect(
+      hydratePersistedPanelChrome({
+        layout: 'two',
+        layoutUserChosen: false,
+        collapsedPanelId: 'panel-2',
+        splitPercent: 50,
+      })
+    ).toEqual({ layout: 'two', collapsedPanelId: null, splitPercent: 50 })
+    expect(
+      hydratePersistedPanelChrome({
+        layout: 'two',
+        layoutUserChosen: false,
+        collapsedPanelId: 'panel-2',
+        splitPercent: 100,
+      })
+    ).toEqual({ layout: 'two', collapsedPanelId: 'panel-2', splitPercent: 100 })
   })
 
   test('live drag matches the pointer until the capture band', () => {

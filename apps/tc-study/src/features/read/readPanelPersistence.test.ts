@@ -93,6 +93,39 @@ describe('readPanelPersistence', () => {
     expect(next.seededBoth).toBe(false)
   })
 
+  test('auto mobile one-panel save opens both panes; real collapse is kept', () => {
+    writePersistedReadPanels({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'en' },
+        'panel-2': { mode: 'helps', languageCode: 'en' },
+      },
+      layout: 'one',
+      collapsedPanelId: null,
+      splitPercent: 50,
+      layoutUserChosen: false,
+      seededBoth: true,
+    })
+    const opened = readPersistedReadPanels()
+    expect(opened.layout).toBe('two')
+    expect(opened.collapsedPanelId).toBeNull()
+
+    writePersistedReadPanels({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'en' },
+        'panel-2': { mode: 'helps', languageCode: 'en' },
+      },
+      layout: 'two',
+      collapsedPanelId: 'panel-2',
+      splitPercent: 100,
+      layoutUserChosen: false,
+      seededBoth: true,
+    })
+    const parked = readPersistedReadPanels()
+    expect(parked.layout).toBe('two')
+    expect(parked.collapsedPanelId).toBe('panel-2')
+    expect(parked.splitPercent).toBe(100)
+  })
+
   test('persisted eng canonicalizes to Door43 en', () => {
     writePersistedReadPanels({
       panels: {

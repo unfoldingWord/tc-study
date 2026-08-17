@@ -90,6 +90,10 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(hookSrc).toContain('collapseTweenRange')
     expect(hookSrc).toContain('displayedSplitFromPointer')
     expect(hookSrc).toContain('edgeSplitPercent')
+    expect(hookSrc).toContain('layoutAfterContainerMeasure')
+    expect(hookSrc).toContain('collapseFromUserDragOnly')
+    expect(hookSrc).toContain('userDragged: true')
+    expect(hookSrc).not.toContain('collapseAfterDragEnd')
     expect(resizeHookSrc).toContain('collapseDuringDrag')
     expect(resizeHookSrc).toContain('draggingRef')
     const handleMove = resizeHookSrc.slice(
