@@ -11,6 +11,7 @@ import {
   resolveHelpsEmptyView,
   resolveHelpsLanguageCodeForCopy,
   resolveHelpsListEmptyReason,
+  resolveHelpsPaneNoSourcesView,
 } from './helpsEmptyCopy'
 
 /** Door43 list/languages: `ln` (autonym) vs `ang` (English display name). */
@@ -226,6 +227,65 @@ describe('resolveHelpsListEmptyReason', () => {
         hasActiveFilter: true,
       })
     ).toBe('filter-miss')
+  })
+})
+
+describe('resolveHelpsPaneNoSourcesView', () => {
+  const trListed = {
+    code: 'tr',
+    name: 'Türkçe',
+    anglicizedName: 'Turkish',
+  } as const
+
+  test('OBS language with empty helps catalog is no-sources, not spinner or select-language', () => {
+    const view = resolveHelpsPaneNoSourcesView({
+      mode: 'helps',
+      languageCode: 'tr',
+      isLoading: false,
+      hasResource: false,
+      languageName: trListed,
+    })
+    expect(view).not.toBeNull()
+    expect(view!.kind).toBe('no-sources')
+    expect(view!.message).toBe(HELPS_EMPTY_COPY.noSources('Turkish (Türkçe)'))
+    expect(view!.message).not.toContain('Select a language')
+    expect(view!.message).not.toContain('this passage')
+    expect(view!.message).not.toContain('resource not found')
+  })
+
+  test('catalog still loading does not flash the no-sources empty', () => {
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'tr',
+        isLoading: true,
+        hasResource: false,
+        languageName: trListed,
+      })
+    ).toBeNull()
+  })
+
+  test('language unset stays on the select-language path', () => {
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: null,
+        isLoading: false,
+        hasResource: false,
+      })
+    ).toBeNull()
+  })
+
+  test('CombinedHelps membership is not collapsed into no-sources', () => {
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'tr',
+        isLoading: false,
+        hasResource: true,
+        languageName: trListed,
+      })
+    ).toBeNull()
   })
 })
 

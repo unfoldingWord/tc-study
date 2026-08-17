@@ -7,11 +7,15 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigationScope } from '../../contexts'
 import type { ResourceInfo } from '../../contexts/types'
 import { HelpsLanguageActionsProvider } from '../../features/helps/HelpsLanguageActionsContext'
+import { resolveHelpsPaneNoSourcesView } from '../../features/helps/helpsEmptyCopy'
 import { helpsFlagForNavigationScope } from '../../features/read/helpsLanguagePolicy'
+import { listedLanguageByCode } from '../../features/read/languageListDisplayName'
 import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
 import type { ReadPanelId, ReadPanelMode } from '../../features/read/readPanelModel'
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
 import { useSwipeGesture } from '../../hooks'
+import { useWizardStore } from '../../lib/stores/wizardStore'
+import { CombinedHelpsEmptyState } from '../resources/CombinedHelpsViewer/CombinedHelpsEmptyState'
 import { DroppablePanel } from '../studio/DroppablePanel'
 import { EmptyPanelState, emptyPanelSelectLanguageCta } from '../studio/EmptyPanelState'
 import { LoadingSpinner } from '../../shared/LoadingSpinner'
@@ -103,6 +107,15 @@ function ReadPanelBody({
     [isHelps, languageCode, onLanguageSelected, catalogLoading]
   )
   const selectLanguageCta = emptyPanelSelectLanguageCta(languageCode)
+  const availableLanguages = useWizardStore((s) => s.availableLanguages)
+  const listedHelpsLang = listedLanguageByCode(availableLanguages, languageCode ?? '')
+  const helpsNoSourcesView = resolveHelpsPaneNoSourcesView({
+    mode,
+    languageCode,
+    isLoading: isLoadingResources,
+    hasResource: Boolean(current.resource?.component) || filteredKeys.length > 0,
+    languageName: listedHelpsLang ?? '',
+  })
   const scriptureMismatch = mode === 'scripture' ? textModeMismatch : null
   const mismatchScope = scriptureMismatch?.switchScope
   const mismatchAction =
@@ -187,6 +200,8 @@ function ReadPanelBody({
               label="Loading resources"
               containerClassName="h-full"
             />
+          ) : helpsNoSourcesView ? (
+            <CombinedHelpsEmptyState view={helpsNoSourcesView} />
           ) : (
             <EmptyPanelState
               panelId={panelId}

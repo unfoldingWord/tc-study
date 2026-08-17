@@ -152,6 +152,31 @@ export function helpsLanguageNameFromList(
   return helpsLanguageDisplayName(code, listedLanguageByCode(languages, code))
 }
 
+/**
+ * Helps pane after catalog hydrate: language is set, CombinedHelps was not
+ * injected (`shouldInjectCombinedHelps` is false — no TN/TWL for this
+ * mode/subject). Distinct from select-language, catalog spinner, and
+ * CombinedHelps “no notes for this story”.
+ */
+export function resolveHelpsPaneNoSourcesView(options: {
+  mode: string
+  languageCode: string | null | undefined
+  isLoading: boolean
+  hasResource: boolean
+  languageName?: string | LanguageListNameFields
+}): HelpsEmptyView | null {
+  if (options.mode !== 'helps') return null
+  if (options.isLoading || options.hasResource) return null
+  const languageCode = options.languageCode?.trim() || ''
+  if (!languageCode) return null
+  return resolveHelpsEmptyView({
+    kind: 'no-sources',
+    languageCode,
+    languageName: options.languageName ?? '',
+    passageLabel: '',
+  })
+}
+
 export function resolveHelpsEmptyView(options: {
   kind: HelpsEmptyKind
   languageCode: string

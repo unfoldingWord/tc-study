@@ -32,6 +32,8 @@ describe('helps empty copy wiring (issue #24)', () => {
     expect(panelSrc).toContain('isCatalogLoading: catalogLoading')
     expect(panelSrc).toContain('openHelpsPicker:')
     expect(panelSrc).toContain('setPickerOpen(true)')
+    expect(panelSrc).toContain('resolveHelpsPaneNoSourcesView')
+    expect(panelSrc).toContain('CombinedHelpsEmptyState')
   })
 
   test('English + Exodus still renders note cards when groups exist (no false empty)', () => {
