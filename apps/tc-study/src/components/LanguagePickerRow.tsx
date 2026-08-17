@@ -14,8 +14,10 @@ import {
 import type { ListedLanguage } from '../features/read/languagesCache'
 
 /** This pane: existing selected accent. Other pane: same hue, lower opacity. */
-export const LANGUAGE_PICKER_CURRENT_CARD_CLASS = 'border-accent bg-accent-soft'
-export const LANGUAGE_PICKER_OTHER_CARD_CLASS = 'border-accent/40 bg-accent-soft/30'
+export const LANGUAGE_PICKER_CURRENT_CARD_CLASS =
+  'border-accent bg-accent-soft hover:border-accent'
+export const LANGUAGE_PICKER_OTHER_CARD_CLASS =
+  'border-accent/40 bg-accent-soft/30 hover:bg-accent-soft/55 hover:border-accent/60'
 export const LANGUAGE_PICKER_IDLE_CARD_CLASS =
   'border-border-subtle bg-surface hover:border-accent/50 hover:bg-accent-soft'
 

@@ -196,6 +196,8 @@ describe('LanguagePickerRow', () => {
     expect(current).toContain('aria-current="true"')
     expect(current).not.toContain('aria-pressed')
     expect(other).toContain(LANGUAGE_PICKER_OTHER_CARD_CLASS)
+    expect(other).toContain('hover:bg-accent-soft/55')
+    expect(other).toContain('hover:border-accent/60')
     expect(other).toContain('aria-pressed="true"')
     expect(other).not.toContain('aria-current')
     expect(other).toContain('title="मराठी"')
