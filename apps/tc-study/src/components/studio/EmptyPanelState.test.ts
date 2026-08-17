@@ -1,11 +1,23 @@
 import { describe, expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { EmptyPanelState } from './EmptyPanelState'
+import {
+  EmptyPanelState,
+  emptyPanelSelectLanguageCta,
+  SELECT_LANGUAGE_TO_LOAD_RESOURCES,
+} from './EmptyPanelState'
 
-const HELPS_CTA = 'Select a language to load resources'
+const HELPS_CTA = SELECT_LANGUAGE_TO_LOAD_RESOURCES
 
 describe('EmptyPanelState', () => {
+  test('select-language CTA is omitted after inherit when the pane already has a language', () => {
+    expect(emptyPanelSelectLanguageCta(undefined)).toBe(HELPS_CTA)
+    expect(emptyPanelSelectLanguageCta(null)).toBe(HELPS_CTA)
+    expect(emptyPanelSelectLanguageCta('')).toBe(HELPS_CTA)
+    expect(emptyPanelSelectLanguageCta('tr')).toBeUndefined()
+    expect(emptyPanelSelectLanguageCta('ha')).toBeUndefined()
+  })
+
   test('message is a clickable CTA when onMessageClick is provided', () => {
     const html = renderToStaticMarkup(
       createElement(EmptyPanelState, {

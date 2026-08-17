@@ -68,6 +68,23 @@ describe('readPanelPersistence', () => {
     expect(next.panels['panel-2'].mode).toBe('scripture')
   })
 
+  test('session restore inherits empty panel-2 from panel-1', () => {
+    writePersistedReadPanels({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'tr' },
+        'panel-2': { mode: 'helps', languageCode: null },
+      },
+      layout: 'two',
+      collapsedPanelId: null,
+      splitPercent: 50,
+      layoutUserChosen: false,
+      seededBoth: true,
+    })
+    const next = readPersistedReadPanels()
+    expect(next.panels['panel-1'].languageCode).toBe('tr')
+    expect(next.panels['panel-2'].languageCode).toBe('tr')
+  })
+
   test('legacy helps key fills panel-2 only when the new store is empty', () => {
     g.localStorage?.setItem(HELPS_LANGUAGE_STORAGE_KEY, 'fr')
     const next = readPersistedReadPanels()

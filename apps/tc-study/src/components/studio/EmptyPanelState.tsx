@@ -14,6 +14,15 @@ import {
   EmptyStateMessage,
 } from '../shared/EmptyStateLayout'
 
+export const SELECT_LANGUAGE_TO_LOAD_RESOURCES = 'Select a language to load resources'
+
+/** After inherit/URL hydrate, a pane with a language must not show the pick-language CTA. */
+export function emptyPanelSelectLanguageCta(
+  languageCode: string | null | undefined
+): string | undefined {
+  return languageCode?.trim() ? undefined : SELECT_LANGUAGE_TO_LOAD_RESOURCES
+}
+
 export interface EmptyPanelStateProps {
   panelId: string
   panelName?: string

@@ -27,6 +27,16 @@ export function isBareReadPathname(pathname: string): boolean {
 }
 
 /**
+ * `:lang` from `/read/{lang}/…` (ignore `/read-v1`). Bare `/read` is null.
+ */
+export function languageCodeFromReadPathname(pathname: string): string | null {
+  if (isBareReadPathname(pathname) || pathname.includes('/read-v1/')) return null
+  const match = /(?:^|\/)read\/([^/]+)(?:\/|$)/.exec(pathname)
+  const code = match?.[1]?.trim()
+  return code || null
+}
+
+/**
  * Whether the Read URL write-back effect should replace the pathname with the
  * canonical `/read/{lang}/…` template.
  *

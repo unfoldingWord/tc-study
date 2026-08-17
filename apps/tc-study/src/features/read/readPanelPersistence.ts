@@ -5,6 +5,7 @@
  */
 
 import { readPersistedHelpsLanguage } from './defaultHelpsLanguage'
+import { inheritEmptyHelpsFromSession } from './readColdStartPolicy'
 import {
   DEFAULT_READ_PANEL_MODELS,
   type ReadPanelId,
@@ -80,7 +81,7 @@ export function readPersistedReadPanels(): PersistedReadPanels {
     const raw = localStorage.getItem(READ_PANELS_STORAGE_KEY)
     if (!raw) return fallback
     const parsed = JSON.parse(raw) as Partial<PersistedReadPanels>
-    const panels = parsePanels(parsed.panels) ?? fallback.panels
+    const panels = inheritEmptyHelpsFromSession(parsePanels(parsed.panels) ?? fallback.panels)
     const layout = parsed.layout === 'one' || parsed.layout === 'two' ? parsed.layout : fallback.layout
     const collapsedPanelId = isPanelId(parsed.collapsedPanelId) ? parsed.collapsedPanelId : null
     const splitPercent =

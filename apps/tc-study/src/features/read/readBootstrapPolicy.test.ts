@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  languageCodeFromReadPathname,
   resumeBareReadNavigation,
   shouldApplyDeepLinkTail,
   shouldDeferLanguageCatalogLoad,
@@ -9,6 +10,14 @@ import {
 } from './readBootstrapPolicy'
 
 describe('readBootstrapPolicy', () => {
+  test('parses :lang from /read/{lang}/obs/... and ignores bare /read', () => {
+    expect(languageCodeFromReadPathname('/read/tr/obs/ref/1.1')).toBe('tr')
+    expect(languageCodeFromReadPathname('/read/ha/bible/ref/tit%201:1')).toBe('ha')
+    expect(languageCodeFromReadPathname('/read')).toBeNull()
+    expect(languageCodeFromReadPathname('/read/')).toBeNull()
+    expect(languageCodeFromReadPathname('/read-v1/tr/obs/ref/1.1')).toBeNull()
+  })
+
   test('defers catalog load when URL has no language (await remount)', () => {
     expect(shouldDeferLanguageCatalogLoad(null)).toBe(true)
     expect(shouldDeferLanguageCatalogLoad(undefined)).toBe(true)

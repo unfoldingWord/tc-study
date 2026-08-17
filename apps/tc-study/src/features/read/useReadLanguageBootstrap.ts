@@ -41,7 +41,7 @@ import {
   type DownloadPane,
 } from './downloadIsolationPolicy'
 import { loadLanguagesCache } from './languagesCache'
-import { shouldDeferLanguageCatalogLoad } from './readBootstrapPolicy'
+import { languageCodeFromReadPathname, shouldDeferLanguageCatalogLoad } from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
 import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
@@ -91,6 +91,7 @@ export function useReadLanguageBootstrap({
   const seedBothLanguages = useReadPanelStore((s) => s.seedBothLanguages)
   const setPanelLanguage = useReadPanelStore((s) => s.setPanelLanguage)
   const inheritEmptyLanguage = useReadPanelStore((s) => s.inheritEmptyLanguage)
+  const hydrateLanguagesFromHint = useReadPanelStore((s) => s.hydrateLanguagesFromHint)
   const currentLanguageCode =
     navigationLanguageCode(panels) || initialLanguage || null
   const helpsLanguageCode = firstHelpsLanguageCode(panels)
@@ -272,11 +273,15 @@ export function useReadLanguageBootstrap({
   )
 
   useEffect(() => {
-    if (!initialLanguage) return
-    if (autoLoadedLanguageForUrlRef.current === initialLanguage) return
-    autoLoadedLanguageForUrlRef.current = initialLanguage
-    void handleLanguageSelected(initialLanguage)
-  }, [initialLanguage, handleLanguageSelected])
+    const urlLang =
+      initialLanguage?.trim() ||
+      (typeof window !== 'undefined' ? languageCodeFromReadPathname(window.location.pathname) : null)
+    if (urlLang) hydrateLanguagesFromHint(urlLang)
+    if (!urlLang) return
+    if (autoLoadedLanguageForUrlRef.current === urlLang) return
+    autoLoadedLanguageForUrlRef.current = urlLang
+    void handleLanguageSelected(urlLang)
+  }, [initialLanguage, handleLanguageSelected, hydrateLanguagesFromHint])
 
   useEffect(() => {
     const inheritedId = inheritEmptyLanguage()

@@ -13,7 +13,7 @@ import type { ReadPanelId, ReadPanelMode } from '../../features/read/readPanelMo
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
 import { useSwipeGesture } from '../../hooks'
 import { DroppablePanel } from '../studio/DroppablePanel'
-import { EmptyPanelState } from '../studio/EmptyPanelState'
+import { EmptyPanelState, emptyPanelSelectLanguageCta } from '../studio/EmptyPanelState'
 import { LoadingSpinner } from '../../shared/LoadingSpinner'
 import { ReadCrossPanelReopen } from './ReadCrossPanelReopen'
 import { ReadPanelHeader } from './ReadPanelHeader'
@@ -102,6 +102,7 @@ function ReadPanelBody({
         : null,
     [isHelps, languageCode, onLanguageSelected, catalogLoading]
   )
+  const selectLanguageCta = emptyPanelSelectLanguageCta(languageCode)
   const scriptureMismatch = mode === 'scripture' ? textModeMismatch : null
   const mismatchScope = scriptureMismatch?.switchScope
   const mismatchAction =
@@ -189,10 +190,8 @@ function ReadPanelBody({
           ) : (
             <EmptyPanelState
               panelId={panelId}
-              message={
-                scriptureMismatch?.message ?? 'Select a language to load resources'
-              }
-              onMessageClick={isHelps ? () => setPickerOpen(true) : undefined}
+              message={scriptureMismatch?.message ?? selectLanguageCta}
+              onMessageClick={isHelps && selectLanguageCta ? () => setPickerOpen(true) : undefined}
               actionLabel={scriptureMismatch?.actionLabel ?? undefined}
               actionShortLabel={scriptureMismatch?.actionShortLabel ?? undefined}
               emptyKind={scriptureMismatch?.kind}

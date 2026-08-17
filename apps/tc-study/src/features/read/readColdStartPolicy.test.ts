@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
+import { languageCodeFromReadPathname } from './readBootstrapPolicy'
 import { applyPanelLanguage, DEFAULT_READ_PANEL_MODELS } from './readPanelModel'
-import { inheritEmptyPanelLanguage } from './readColdStartPolicy'
+import {
+  hydrateReadLanguagesFromHint,
+  inheritEmptyHelpsFromSession,
+  inheritEmptyPanelLanguage,
+} from './readColdStartPolicy'
+import { coldStartCatalogLoads } from './runReadPanelCatalog'
 
 describe('inheritEmptyPanelLanguage', () => {
   test('p1=ha scripture, p2=undefined → p2 becomes ha (helps mode stays helps)', () => {
@@ -50,5 +56,43 @@ describe('inheritEmptyPanelLanguage', () => {
     const diverged = applyPanelLanguage(inherited!.panels, 'panel-1', 'en')
     expect(diverged['panel-1'].languageCode).toBe('en')
     expect(diverged['panel-2']).toEqual({ mode: 'helps', languageCode: 'ha' })
+  })
+
+  test('visit /read/tr/obs/ref/1.1 with empty panel-2 inherits tr and triggers helps load', () => {
+    const urlLang = languageCodeFromReadPathname('/read/tr/obs/ref/1.1')
+    expect(urlLang).toBe('tr')
+    const hydrated = hydrateReadLanguagesFromHint({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: null },
+        'panel-2': { mode: 'helps', languageCode: undefined },
+      },
+      hintLanguage: urlLang,
+    })
+    expect(hydrated.appliedHintTo).toBe('panel-1')
+    expect(hydrated.inheritedPanelId).toBe('panel-2')
+    expect(hydrated.panels['panel-1'].languageCode).toBe('tr')
+    expect(hydrated.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'tr' })
+    const loads = coldStartCatalogLoads(hydrated.panels)
+    expect(loads).toEqual([
+      {
+        textLanguageCode: 'tr',
+        helpsLanguageCode: 'tr',
+        loadTarget: 'both',
+      },
+    ])
+  })
+
+  test('session restore with p1 set and p2 empty copies helps language only', () => {
+    const next = inheritEmptyHelpsFromSession({
+      'panel-1': { mode: 'scripture', languageCode: 'tr' },
+      'panel-2': { mode: 'helps', languageCode: null },
+    })
+    expect(next['panel-2'].languageCode).toBe('tr')
+    expect(
+      inheritEmptyHelpsFromSession({
+        'panel-1': { mode: 'scripture', languageCode: null },
+        'panel-2': { mode: 'helps', languageCode: 'fr' },
+      })['panel-1'].languageCode
+    ).toBeNull()
   })
 })

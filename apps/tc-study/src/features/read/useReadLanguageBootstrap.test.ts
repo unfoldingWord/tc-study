@@ -67,6 +67,15 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(body.indexOf('inheritEmptyLanguage()')).toBeLessThan(body.indexOf('coldStartCatalogLoads'))
   })
 
+  test('URL/session hydrate applies path language then inherit before catalog load', () => {
+    expect(src).toContain('languageCodeFromReadPathname')
+    expect(src).toContain('hydrateLanguagesFromHint')
+    const urlEffect = src.slice(src.lastIndexOf('const urlLang'))
+    expect(urlEffect.indexOf('hydrateLanguagesFromHint(urlLang)')).toBeLessThan(
+      urlEffect.indexOf('handleLanguageSelected(urlLang)')
+    )
+  })
+
   test('cold-start catalog loads run in parallel so helps does not wait on scripture', () => {
     const handler = src.slice(src.indexOf('const handleLanguageSelected'))
     const body = handler.slice(0, handler.indexOf('const { handleSwitchTextMode'))

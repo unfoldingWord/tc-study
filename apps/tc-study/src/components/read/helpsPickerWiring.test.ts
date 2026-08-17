@@ -12,7 +12,10 @@ describe('helps picker wiring (issue #24 / #30)', () => {
     expect(panelSrc).toContain('helpsFlag={isHelps ? helpsFlag : undefined}')
     expect(panelSrc).toContain('helpsFlagForNavigationScope')
     expect(panelSrc).toContain('onLanguageSelected={onLanguageSelected}')
-    expect(panelSrc).toContain('onMessageClick={isHelps ? () => setPickerOpen(true) : undefined}')
+    expect(panelSrc).toContain('emptyPanelSelectLanguageCta(languageCode)')
+    expect(panelSrc).toContain(
+      'onMessageClick={isHelps && selectLanguageCta ? () => setPickerOpen(true) : undefined}'
+    )
   })
 
   test('LanguagePicker is trailing header chrome, not a left tab sibling', () => {

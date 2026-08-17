@@ -5,7 +5,7 @@
 
 import { create } from 'zustand'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
-import { inheritEmptyPanelLanguage } from './readColdStartPolicy'
+import { hydrateReadLanguagesFromHint, inheritEmptyPanelLanguage } from './readColdStartPolicy'
 import {
   applyPanelLanguage,
   applyPanelMode,
@@ -26,6 +26,7 @@ export interface ReadPanelStore extends PersistedReadPanels {
   seedBothLanguages: (languageCode: string) => void
   setPanelLanguage: (panelId: ReadPanelId, languageCode: string) => void
   inheritEmptyLanguage: () => ReadPanelId | null
+  hydrateLanguagesFromHint: (hintLanguage?: string | null) => ReadPanelId | null
   setPanelMode: (panelId: ReadPanelId, mode: ReadPanelMode) => void
   setLayout: (layout: ReadLayoutMode, userChosen?: boolean) => void
   setCollapsedPanelId: (panelId: ReadPanelId | null) => void
@@ -70,6 +71,20 @@ export const useReadPanelStore = create<ReadPanelStore>((set, get) => ({
     if (plan.panels[plan.inheritedPanelId].mode === 'helps') {
       writePersistedHelpsLanguage(plan.languageCode)
     }
+    persist(get())
+    return plan.inheritedPanelId
+  },
+  hydrateLanguagesFromHint: (hintLanguage) => {
+    const current = get().panels
+    const plan = hydrateReadLanguagesFromHint({ panels: current, hintLanguage })
+    const unchanged =
+      plan.panels['panel-1'].languageCode === current['panel-1'].languageCode &&
+      plan.panels['panel-2'].languageCode === current['panel-2'].languageCode
+    if (unchanged) return plan.inheritedPanelId
+    set({ panels: plan.panels })
+    const helpsCode =
+      plan.panels['panel-2'].mode === 'helps' ? plan.panels['panel-2'].languageCode : null
+    if (helpsCode) writePersistedHelpsLanguage(helpsCode)
     persist(get())
     return plan.inheritedPanelId
   },

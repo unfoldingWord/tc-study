@@ -28,6 +28,7 @@ describe('helps empty copy wiring (issue #24)', () => {
     expect(panelSrc).toContain('HelpsLanguageActionsProvider')
     expect(panelSrc).toContain('selectHelpsLanguage: onLanguageSelected')
     expect(panelSrc).toContain('selectedLanguageCode: languageCode')
+    expect(panelSrc).toContain('emptyPanelSelectLanguageCta(languageCode)')
     expect(panelSrc).toContain('isCatalogLoading: catalogLoading')
     expect(panelSrc).toContain('openHelpsPicker:')
     expect(panelSrc).toContain('setPickerOpen(true)')
