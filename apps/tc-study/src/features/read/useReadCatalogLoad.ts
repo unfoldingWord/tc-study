@@ -9,6 +9,7 @@ import { useResourceManagement } from '../../hooks'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
 import { shouldSkipHelpsCatalogLoad } from './helpsLanguagePolicy'
+import { shouldSkipTextCatalogForMismatch } from './scriptureLanguageMismatch'
 import { loadLanguagesCache } from './languagesCache'
 import {
   loadReadLanguageCatalog,
@@ -149,6 +150,22 @@ export function useReadCatalogLoad() {
           reconcileHelps: false,
         })
         helpsKeysRef.current = []
+        markCatalogSettled(destPanels)
+        return
+      }
+      if (
+        shouldSkipTextCatalogForMismatch({
+          loadTarget: options.loadTarget,
+          languageCode: options.textLanguageCode,
+          navigationScope: options.navigationScope,
+          supportedSubjects: subjects,
+        })
+      ) {
+        const panelTarget = destPanels.length > 1 ? 'both' : destPanels[0] ?? 'panel-1'
+        clearReadPanelsForLanguageSwitch(options.helpsLanguageCode, panelTarget, {
+          reconcileHelps: false,
+        })
+        textKeysRef.current = []
         markCatalogSettled(destPanels)
         return
       }

@@ -6,6 +6,7 @@ import {
 } from '../../features/read/readPanelLayout'
 import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
 import type { ReadPanelId, ReadPanelMode, ReadPanelModels } from '../../features/read/readPanelModel'
+import { scriptureKeysForMismatchDisplay } from '../../features/read/scriptureLanguageMismatch'
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
 import {
   hasNonOriginalMembership,
@@ -126,7 +127,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         languageCode={panels['panel-1'].languageCode}
         onModeSwitch={(mode) => onPanelModeSwitch('panel-1', mode)}
         onLanguageSelected={(code) => onPanelLanguageSelected('panel-1', code)}
-        filteredKeys={filteredPanel1Keys}
+        filteredKeys={scriptureKeysForMismatchDisplay(filteredPanel1Keys, panel1Mismatch)}
         filteredResources={filteredPanel1Resources}
         panelResources={panel1Resources}
         isLoadingResources={isPanelCatalogSpinner({
@@ -170,7 +171,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         languageCode={panels['panel-2'].languageCode}
         onModeSwitch={(mode) => onPanelModeSwitch('panel-2', mode)}
         onLanguageSelected={(code) => onPanelLanguageSelected('panel-2', code)}
-        filteredKeys={filteredPanel2Keys}
+        filteredKeys={scriptureKeysForMismatchDisplay(filteredPanel2Keys, panel2Mismatch)}
         filteredResources={filteredPanel2Resources}
         panelResources={panel2Resources}
         isLoadingResources={isPanelCatalogSpinner({

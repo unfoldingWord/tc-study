@@ -21,7 +21,6 @@ import { useAppStore } from '../../contexts/AppContext'
 import { useBackgroundDownload, useCatalogBackgroundDownload } from '../../hooks'
 import { usePackageStore } from '../../lib/stores/packageStore'
 import { canonicalReadLanguageCode, languageCodesMatch } from '../../utils/languageCodeMatch'
-import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
 import { pushReadLanguageUrl } from './pushReadLanguageUrl'
 import {
   applyTextLanguagePickNavigation,
@@ -29,9 +28,10 @@ import {
   resolveTextLanguagePickNavigation,
 } from './textLanguagePickNavigation'
 import {
-  resolveCatalogNavigationScope,
-  textModeMismatchFromCache,
-} from './textModeMismatch'
+  skipTextCatalogOnMismatch,
+  supportedSubjectsFromRegistry,
+} from './scriptureLanguageMismatch'
+import { resolveCatalogNavigationScope } from './textModeMismatch'
 import { useReadTextModeSwitch } from './useReadTextModeSwitch'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
 import { firstHelpsLanguageCode, navigationLanguageCode } from './readPanelModel'
@@ -48,6 +48,7 @@ import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanel
 import { useReadCatalogLoad } from './useReadCatalogLoad'
 import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
+import { useReadPanelLanguageHandlers } from './useReadPanelLanguageHandlers'
 
 /** Set to true to disable automatic background downloads (e.g. for debugging). */
 const DISABLE_BACKGROUND_DOWNLOAD = false
@@ -190,10 +191,7 @@ export function useReadLanguageBootstrap({
       inheritEmptyLanguage()
       maybeCancelDownloads('text')
 
-      const subjects =
-        typeof resourceTypeRegistry.getSupportedSubjects === 'function'
-          ? resourceTypeRegistry.getSupportedSubjects()
-          : []
+      const subjects = supportedSubjectsFromRegistry(resourceTypeRegistry)
       const listed = loadLanguagesCache(subjects)
       const availabilityFor = availabilityLookupFromListed(listed)
       const scopeFromUrl = resolveCatalogNavigationScope({
@@ -214,10 +212,18 @@ export function useReadLanguageBootstrap({
       }
 
       autoLoadedLanguageForUrlRef.current = resolvedCode
-      if (textModeMismatchFromCache({ languageCode: resolvedCode, navigationScope: scope, supportedSubjects: subjects })) {
-        textKeysRef.current = []
-        setExpectedResources(helpsKeysRef.current)
-        clearReadPanelsForLanguageSwitch(helpsLanguageCode ?? undefined, 'panel-1')
+      if (
+        skipTextCatalogOnMismatch({
+          languageCode: resolvedCode,
+          navigationScope: scope,
+          supportedSubjects: subjects,
+          panelId: 'panel-1',
+          helpsLanguageCode: helpsLanguageCode ?? undefined,
+          textKeysRef,
+          helpsKeysRef,
+          setExpectedResources,
+        })
+      ) {
         const helpsLoad = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, 'panel-2')
         if (helpsLoad) await runCatalogLoad({ ...helpsLoad, navigationScope: scope })
         markCatalogSettled(helpsLoad ? ['panel-1'] : ['panel-1', 'panel-2'])
@@ -245,38 +251,20 @@ export function useReadLanguageBootstrap({
     handleLanguageSelected
   )
 
-  const handlePanelLanguageSelected = useCallback(
-    async (panelId: 'panel-1' | 'panel-2', languageCode: string) => {
-      setPanelLanguage(panelId, canonicalReadLanguageCode(languageCode))
-      const panel = useReadPanelStore.getState().panels[panelId]
-      maybeCancelDownloads(panel.mode === 'helps' ? 'helps' : 'text')
-      const navigationScope = useNavigationStore.getState().navigationScope
-      const one = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, panelId)
-      if (!one) return
-      await runCatalogLoad({ ...one, navigationScope })
-    },
-    [maybeCancelDownloads, runCatalogLoad, setPanelLanguage]
-  )
-
-  const handlePanelModeSwitch = useCallback(
-    async (panelId: 'panel-1' | 'panel-2', mode: 'scripture' | 'helps') => {
-      useReadPanelStore.getState().setPanelMode(panelId, mode)
-      inheritEmptyLanguage()
-      const navigationScope = useNavigationStore.getState().navigationScope
-      const one = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, panelId)
-      if (!one) return
-      await runCatalogLoad({ ...one, navigationScope })
-    },
-    [inheritEmptyLanguage, runCatalogLoad]
-  )
-
-  const handleHelpsLanguageSelected = useCallback(
-    async (languageCode: string) => {
-      writePersistedHelpsLanguage(languageCode)
-      await handlePanelLanguageSelected('panel-2', languageCode)
-    },
-    [handlePanelLanguageSelected]
-  )
+  const {
+    handlePanelLanguageSelected,
+    handlePanelModeSwitch,
+    handleHelpsLanguageSelected,
+  } = useReadPanelLanguageHandlers({
+    maybeCancelDownloads,
+    runCatalogLoad,
+    markCatalogSettled,
+    setExpectedResources,
+    textKeysRef,
+    helpsKeysRef,
+    helpsLanguageCode,
+    inheritEmptyLanguage,
+  })
 
   useEffect(() => {
     const pathname = typeof window !== 'undefined' ? window.location.pathname : ''

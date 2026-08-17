@@ -19,7 +19,9 @@ describe('text-mode mismatch wiring (issue #25 / #30)', () => {
     expect(panelSrc).toContain('emptyKind={scriptureMismatch.kind}')
     expect(panelSrc).toContain("mode === 'scripture'")
     expect(panelSrc).toContain('flex-1 min-h-0 overflow-auto bg-surface')
-    expect(panelSrc.indexOf('scriptureMismatch ?')).toBeLessThan(panelSrc.indexOf('isLoadingResources ?'))
+    const body = panelSrc.slice(panelSrc.indexOf('{scriptureMismatch ?'))
+    expect(body.indexOf('scriptureMismatch ?')).toBeLessThan(body.indexOf('current.resource?.component'))
+    expect(body.indexOf('scriptureMismatch ?')).toBeLessThan(body.indexOf('isLoadingResources ?'))
   })
 
   test('helps mode keeps the language empty CTA', () => {
@@ -31,10 +33,12 @@ describe('text-mode mismatch wiring (issue #25 / #30)', () => {
   test('SimplifiedReadView computes mismatch per scripture panel language', () => {
     expect(viewSrc).toContain('panel1Mismatch')
     expect(viewSrc).toContain('panel2Mismatch')
+    expect(viewSrc).toContain('excludePanelIds')
     expect(viewSrc).toContain('onSwitchTextMode={handleSwitchTextMode}')
     expect(viewSrc).toContain('onNavigationScopeCommitted={handleNavigatorScopeCommitted}')
     expect(viewSrc).toContain('handlePanelLanguageSelected')
     const areaSrc = readFileSync(join(import.meta.dir, 'ReadPanelsArea.tsx'), 'utf8')
+    expect(areaSrc).toContain('scriptureKeysForMismatchDisplay')
     expect(areaSrc).toContain('isReadPanelCatalogSettled')
     expect(areaSrc).toContain('hasKnownMismatch: Boolean(panel1Mismatch)')
     expect(areaSrc).toContain('hasKnownMismatch: Boolean(panel2Mismatch)')

@@ -91,7 +91,6 @@ export function SimplifiedReadView({
   } = useReadLanguageBootstrap({ initialLanguage, requireLanguageInUrl })
 
   useReadGatewayBookCatalog(currentLanguageCode)
-  useSyncOriginalLanguageTabs(currentNavRef.book)
 
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const p1Dir = resolvePaneDirection({
@@ -126,6 +125,13 @@ export function SimplifiedReadView({
       supportedSubjects: subjects,
     })
   }, [panels, navigationScope, subjects])
+  const olExcludePanelIds = useMemo(() => {
+    const ids: Array<'panel-1' | 'panel-2'> = []
+    if (panel1Mismatch) ids.push('panel-1')
+    if (panel2Mismatch) ids.push('panel-2')
+    return ids
+  }, [panel1Mismatch, panel2Mismatch])
+  useSyncOriginalLanguageTabs(currentNavRef.book, { excludePanelIds: olExcludePanelIds })
   const panel1KnownNoHelps = useMemo(
     () =>
       helpsCatalogKnownEmptyFromCache({

@@ -34,13 +34,13 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(body.indexOf('applyTextLanguagePickNavigation')).toBeLessThan(body.indexOf('shouldPushReadLanguageUrl'))
     expect(body.indexOf('shouldPushReadLanguageUrl')).toBeLessThan(body.indexOf('pushReadLanguageUrl'))
     expect(body.indexOf('catalogScopeAfterTextLanguagePick')).toBeLessThan(
-      body.indexOf('textModeMismatchFromCache')
+      body.indexOf('skipTextCatalogOnMismatch')
     )
-    expect(body).toContain('textModeMismatchFromCache')
-    expect(body).toContain("clearReadPanelsForLanguageSwitch(helpsLanguageCode ?? undefined, 'panel-1')")
+    expect(body).toContain('skipTextCatalogOnMismatch')
+    expect(body).toContain("panelId: 'panel-1'")
     expect(body).toContain("catalogLoadForSinglePanel(useReadPanelStore.getState().panels, 'panel-2')")
     expect(body).toContain('markCatalogSettled')
-    const mismatchAt = body.indexOf('textModeMismatchFromCache')
+    const mismatchAt = body.indexOf('skipTextCatalogOnMismatch')
     const mismatchReturn = body.indexOf('return', mismatchAt)
     expect(mismatchReturn).toBeGreaterThan(mismatchAt)
     expect(mismatchReturn).toBeLessThan(body.indexOf('coldStartCatalogLoads'))
@@ -53,7 +53,8 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   })
 
   test('helps picker path does not apply text-language pick navigation', () => {
-    const helps = src.slice(src.indexOf('const handleHelpsLanguageSelected'))
+    const panelSrc = readFileSync(join(import.meta.dir, 'useReadPanelLanguageHandlers.ts'), 'utf8')
+    const helps = panelSrc.slice(panelSrc.indexOf('const handleHelpsLanguageSelected'))
     expect(helps).toContain('writePersistedHelpsLanguage')
     expect(helps).toContain("handlePanelLanguageSelected('panel-2'")
     expect(helps).not.toContain('resolveTextLanguagePickNavigation')
@@ -62,9 +63,13 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   })
 
   test('per-panel language change never seeds the other panel', () => {
-    const panel = src.slice(src.indexOf('const handlePanelLanguageSelected'))
+    expect(src).toContain('useReadPanelLanguageHandlers')
+    const panelSrc = readFileSync(join(import.meta.dir, 'useReadPanelLanguageHandlers.ts'), 'utf8')
+    const panel = panelSrc.slice(panelSrc.indexOf('const handlePanelLanguageSelected'))
     const body = panel.slice(0, panel.indexOf('const handlePanelModeSwitch'))
-    expect(body).toContain('setPanelLanguage(panelId, canonicalReadLanguageCode(languageCode))')
+    expect(body).toContain('setPanelLanguage(panelId, resolvedCode)')
+    expect(body).toContain('skipTextCatalogOnMismatch')
+    expect(body).toContain("panel.mode === 'scripture'")
     expect(body).toContain('catalogLoadForSinglePanel')
     expect(body).not.toContain('seedBothLanguages')
     expect(body).not.toContain('pushReadLanguageUrl')
@@ -109,6 +114,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(loadSrc).toContain('isLoadingByPanel')
     expect(loadSrc).toContain('markCatalogSettled')
     expect(loadSrc).toContain('shouldSkipHelpsCatalogLoad')
+    expect(loadSrc).toContain('shouldSkipTextCatalogForMismatch')
     expect(loadSrc).toContain('reconcileHelps: false')
   })
 

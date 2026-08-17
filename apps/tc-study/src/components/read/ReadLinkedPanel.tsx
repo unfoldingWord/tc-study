@@ -197,17 +197,17 @@ function ReadPanelBody({
         onMouseUp={swipeHandlers.onMouseUp}
         onMouseLeave={swipeHandlers.onMouseLeave}
       >
-        {current.resource?.component || (
-          scriptureMismatch ? (
-            <EmptyPanelState
-              panelId={panelId}
-              message={scriptureMismatch.message}
-              actionLabel={scriptureMismatch.actionLabel ?? undefined}
-              actionShortLabel={scriptureMismatch.actionShortLabel ?? undefined}
-              emptyKind={scriptureMismatch.kind}
-              onAction={mismatchAction}
-            />
-          ) : isLoadingResources ? (
+        {scriptureMismatch ? (
+          <EmptyPanelState
+            panelId={panelId}
+            message={scriptureMismatch.message}
+            actionLabel={scriptureMismatch.actionLabel ?? undefined}
+            actionShortLabel={scriptureMismatch.actionShortLabel ?? undefined}
+            emptyKind={scriptureMismatch.kind}
+            onAction={mismatchAction}
+          />
+        ) : current.resource?.component || (
+          isLoadingResources ? (
             <LoadingSpinner
               centered
               label="Loading resources"

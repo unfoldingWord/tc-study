@@ -24,7 +24,7 @@ describe('BCV navigator Read wiring (issue #25)', () => {
     const body = handler.slice(0, handler.indexOf('const { handleSwitchTextMode'))
     expect(body).toContain('resolveTextLanguagePickNavigation')
     expect(body).toContain('applyTextLanguagePickNavigation')
-    expect(body).toContain('textModeMismatchFromCache')
+    expect(body).toContain('skipTextCatalogOnMismatch')
     expect(body).not.toContain('handleHelpsLanguageSelected')
   })
 
