@@ -85,6 +85,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
     activateWordSpan,
     toggleHighlightEntry,
     toggleRangeHighlight,
+    selectFrame,
   } = useObsHighlight({
     resourceId,
     resourceKey,
@@ -161,6 +162,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
               activeHighlight={activeHighlight}
               activateWordSpan={activateWordSpan}
               toggleRangeHighlight={toggleRangeHighlight}
+              onFrameClick={selectFrame}
             />
           )}
 
@@ -176,6 +178,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
               frameTextRef={frameTextRef}
               activateWordSpan={activateWordSpan}
               toggleHighlightEntry={toggleHighlightEntry}
+              onFrameClick={selectFrame}
             />
           )}
 

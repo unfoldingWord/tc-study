@@ -21,6 +21,7 @@ export function ObsSingleFrameView(props: {
     enriched: ObsFrameQuoteEntry[]
   ) => void
   toggleHighlightEntry: (entry: ObsFrameQuoteEntry) => void
+  onFrameClick: (storyNum: number, frameNumber: number) => void
 }) {
   const {
     currentFrame,
@@ -33,10 +34,15 @@ export function ObsSingleFrameView(props: {
     frameTextRef,
     activateWordSpan,
     toggleHighlightEntry,
+    onFrameClick,
   } = props
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <div
+      className="max-w-2xl mx-auto space-y-4 cursor-pointer"
+      title={`Frame ${storyNum} · ${frameNum}`}
+      onClick={() => onFrameClick(storyNum, frameNum)}
+    >
       <div
         ref={frameTextRef}
         className="prose prose-base max-w-none text-scripture-fg prose-p:text-scripture-fg prose-headings:text-scripture-fg whitespace-pre-wrap leading-relaxed"

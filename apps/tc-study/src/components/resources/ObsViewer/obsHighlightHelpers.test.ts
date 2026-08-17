@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   isObsEntryActive,
   isPanel2KeyQuoteCapable,
+  obsFrameVerseFilter,
   sortedSourceIdsKey,
 } from './obsHighlightHelpers'
 import type { ObsFrameQuoteEntry } from '../../../signals/studioSignals'
@@ -37,6 +38,11 @@ describe('obsHighlightHelpers', () => {
     expect(
       isObsEntryActive({ overlappingSourceIds: ['twl-1'], frameNumber: 1 }, e, 1)
     ).toBe(false)
+  })
+
+  test('frame click maps story/frame onto the verse-filter path', () => {
+    expect(obsFrameVerseFilter(1, 3)).toEqual({ chapter: 1, verse: 3 })
+    expect(obsFrameVerseFilter(12, 1)).toEqual({ chapter: 12, verse: 1 })
   })
 
   test('isPanel2KeyQuoteCapable detects tn/twl/combined', () => {

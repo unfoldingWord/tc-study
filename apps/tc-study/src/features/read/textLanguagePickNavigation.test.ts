@@ -33,6 +33,7 @@ function navLog(current?: { book: string; chapter: number; verse: number }) {
     nav: {
       currentReference: current,
       setNavigationScope: (scope: 'scripture' | 'obs') => calls.push(`scope:${scope}`),
+      setNavigationMode: (mode: 'chapter' | 'verse') => calls.push(`mode:${mode}`),
       navigateToReference: (ref: { book: string; chapter: number; verse: number }) =>
         calls.push(`ref:${ref.book} ${ref.chapter}:${ref.verse}`),
     },
@@ -51,7 +52,15 @@ describe('resolveTextLanguagePickNavigation', () => {
   test('Switch from Bible with OBS-only → OBS 1:1', () => {
     const { calls, nav } = navLog({ book: 'exo', chapter: 1, verse: 1 })
     applyTextLanguagePickNavigation(nav, { action: 'switch', scope: 'obs' })
-    expect(calls).toEqual(['scope:obs', 'ref:obs 1:1'])
+    expect(calls).toEqual(['scope:obs', 'mode:chapter', 'ref:obs 1:1'])
+  })
+
+  test('Hausa OBS-only Switch lands on OBS story 1 chapter view', () => {
+    const decision = pick('scripture', 'bho')
+    expect(decision).toEqual({ action: 'mismatch' })
+    const { calls, nav } = navLog({ book: 'tit', chapter: 1, verse: 1 })
+    applyTextLanguagePickNavigation(nav, { action: 'switch', scope: 'obs' })
+    expect(calls).toEqual(['scope:obs', 'mode:chapter', 'ref:obs 1:1'])
   })
 
   test('OBS-only pick while on OBS 3:2 → stay on OBS (keep current ref, no empty)', () => {
@@ -62,10 +71,10 @@ describe('resolveTextLanguagePickNavigation', () => {
     expect(calls).toEqual([])
   })
 
-  test('Switch from Bible already on OBS ref → keep story/frame', () => {
+  test('Switch from Bible already on OBS ref → keep story, set chapter grain', () => {
     const { calls, nav } = navLog({ book: 'obs', chapter: 3, verse: 2 })
     applyTextLanguagePickNavigation(nav, { action: 'switch', scope: 'obs' })
-    expect(calls).toEqual(['scope:obs'])
+    expect(calls).toEqual(['scope:obs', 'mode:chapter'])
   })
 
   test('Bible-only pick while on OBS → mismatch empty, not auto scripture', () => {
@@ -79,7 +88,7 @@ describe('resolveTextLanguagePickNavigation', () => {
   test('Switch from OBS with Bible-only → default scripture', () => {
     const { calls, nav } = navLog({ book: 'obs', chapter: 3, verse: 2 })
     applyTextLanguagePickNavigation(nav, { action: 'switch', scope: 'scripture' })
-    expect(calls).toEqual(['scope:scripture', 'ref:tit 1:1'])
+    expect(calls).toEqual(['scope:scripture', 'mode:verse', 'ref:tit 1:1'])
   })
 
   test('Bible-only pick while on John 3:16 → stay scripture (keep current ref)', () => {
@@ -90,10 +99,10 @@ describe('resolveTextLanguagePickNavigation', () => {
     expect(calls).toEqual([])
   })
 
-  test('Switch from OBS already on a Bible ref → keep it', () => {
+  test('Switch from OBS already on a Bible ref → keep it, set verse grain', () => {
     const { calls, nav } = navLog({ book: 'jhn', chapter: 3, verse: 16 })
     applyTextLanguagePickNavigation(nav, { action: 'switch', scope: 'scripture' })
-    expect(calls).toEqual(['scope:scripture'])
+    expect(calls).toEqual(['scope:scripture', 'mode:verse'])
   })
 
   test('both-types language keeps current mode (Bible and OBS)', () => {

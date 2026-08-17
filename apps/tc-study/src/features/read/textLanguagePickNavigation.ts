@@ -7,7 +7,7 @@
  * target mode. Explicit BCV scope is never overridden.
  */
 
-import type { BCVReference, NavigationCatalogScope } from '../../contexts/types'
+import type { BCVReference, NavigationCatalogScope, NavigationMode } from '../../contexts/types'
 import type { LanguageAvailabilityFlags } from './languageAvailability'
 import { applyTextModeScopeSwitch } from './textModeMismatch'
 
@@ -18,6 +18,7 @@ export type TextLanguagePickDecision =
 
 export type TextLanguagePickNav = {
   setNavigationScope: (scope: NavigationCatalogScope) => void
+  setNavigationMode: (mode: NavigationMode) => void
   navigateToReference: (ref: BCVReference) => void
   currentReference?: BCVReference
 }

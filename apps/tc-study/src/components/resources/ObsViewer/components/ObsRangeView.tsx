@@ -24,6 +24,7 @@ export function ObsRangeView(props: {
     enriched: ObsFrameQuoteEntry[]
   ) => void
   toggleRangeHighlight: (sNum: number, frameNumber: number, entry: ObsFrameQuoteEntry) => void
+  onFrameClick: (storyNum: number, frameNumber: number) => void
 }) {
   const {
     storyNum,
@@ -37,6 +38,7 @@ export function ObsRangeView(props: {
     activeHighlight,
     activateWordSpan,
     toggleRangeHighlight,
+    onFrameClick,
   } = props
 
   return (
@@ -74,7 +76,12 @@ export function ObsRangeView(props: {
                     ? resolveObsHighlightSpans(frame.text, frameEntries)
                     : null
                 return (
-                  <div key={frame.frameNumber} className="space-y-3">
+                  <div
+                    key={frame.frameNumber}
+                    className="space-y-3 cursor-pointer"
+                    title={`Frame ${sNum} · ${frame.frameNumber}`}
+                    onClick={() => onFrameClick(sNum, frame.frameNumber)}
+                  >
                     <p className="text-xs text-scripture-muted font-medium">
                       {sNum} · {frame.frameNumber}
                     </p>

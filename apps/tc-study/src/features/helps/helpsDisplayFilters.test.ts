@@ -55,6 +55,22 @@ describe('filterDisplayNotes', () => {
     },
   ]
 
+  test('OBS verseFilter keeps notes for the clicked frame', () => {
+    const frameNotes = [
+      { id: 'n1', reference: '1:1', quote: 'first' },
+      { id: 'n2', reference: '1:3', quote: 'third' },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(frameNotes, {
+      helpsScope: 'obs',
+      obsQuoteFilter: null,
+      verseFilter: { chapter: 1, verse: 3, timestamp: 1 },
+      tokenFilter: null,
+      bookCodeLower: 'obs',
+    })
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['n2'])
+  })
+
   test('verseFilter keeps English tN for the clicked verse (language-agnostic)', () => {
     const verseNotes = [
       ...notes,

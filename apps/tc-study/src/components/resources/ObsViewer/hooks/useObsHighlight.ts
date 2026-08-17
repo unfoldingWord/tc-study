@@ -2,9 +2,13 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { FrameSpan } from '../../../../lib/obs/highlightFrameText'
 import { overlappingEntriesForWordRange } from '../../../../lib/obs/highlightFrameWords'
-import type { ObsFrameHighlightSignal, ObsFrameQuoteEntry } from '../../../../signals/studioSignals'
+import type {
+  ObsFrameHighlightSignal,
+  ObsFrameQuoteEntry,
+  VerseFilterSignal,
+} from '../../../../signals/studioSignals'
 import type { ActiveHl } from '../types'
-import { isObsEntryActive, sortedSourceIdsKey } from '../obsHighlightHelpers'
+import { isObsEntryActive, obsFrameVerseFilter, sortedSourceIdsKey } from '../obsHighlightHelpers'
 
 export function useObsHighlight(params: {
   resourceId: string
@@ -38,6 +42,11 @@ export function useObsHighlight(params: {
 
   const { sendToAll: sendObsHighlight } = useSignal<ObsFrameHighlightSignal>(
     'obs-frame-highlight',
+    resourceId,
+    resourceMetadata
+  )
+  const { sendToAll: sendVerseFilter } = useSignal<VerseFilterSignal>(
+    'verse-filter',
     resourceId,
     resourceMetadata
   )
@@ -205,11 +214,19 @@ export function useObsHighlight(params: {
     [activeHighlight, sendObsHighlight]
   )
 
+  const selectFrame = useCallback(
+    (sNum: number, fNum: number) => {
+      sendVerseFilter({ lifecycle: 'event', filter: obsFrameVerseFilter(sNum, fNum) })
+    },
+    [sendVerseFilter]
+  )
+
   return {
     activeHighlight,
     frameTextRef,
     activateWordSpan,
     toggleHighlightEntry,
     toggleRangeHighlight,
+    selectFrame,
   }
 }

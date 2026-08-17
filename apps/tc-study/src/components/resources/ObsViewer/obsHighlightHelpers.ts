@@ -10,6 +10,14 @@ export const QUOTE_BUTTON_ACTIVE_CLASS =
 export const QUOTE_BUTTON_IDLE_CLASS =
   'underline decoration-dotted decoration-underline decoration-1 underline-offset-2 hover:bg-muted rounded-sm'
 
+/** Frame click → CombinedHelps verse-filter (story:frame). */
+export function obsFrameVerseFilter(
+  storyNumber: number,
+  frameNumber: number
+): { chapter: number; verse: number } {
+  return { chapter: storyNumber, verse: frameNumber }
+}
+
 export function sortedSourceIdsKey(ids: string[]): string {
   return [...ids].sort().join('\0')
 }

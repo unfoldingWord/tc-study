@@ -3,6 +3,7 @@ import { emptyLanguageAvailability } from './languageAvailability'
 import {
   TEXT_MODE_MISMATCH_COPY,
   applyTextModeScopeSwitch,
+  defaultNavigationModeForScope,
   navigationScopeFromReadPath,
   resolveCatalogNavigationScope,
   resolveTextModeMismatch,
@@ -163,16 +164,22 @@ describe('navigationScopeFromReadPath', () => {
 })
 
 describe('applyTextModeScopeSwitch', () => {
+  test('Stories default grain is chapter (whole story); Bible is verse', () => {
+    expect(defaultNavigationModeForScope('obs')).toBe('chapter')
+    expect(defaultNavigationModeForScope('scripture')).toBe('verse')
+  })
+
   test('tap switches scope via existing nav APIs (OBS)', () => {
     const calls: string[] = []
     applyTextModeScopeSwitch(
       {
         setNavigationScope: (scope) => calls.push(`scope:${scope}`),
+        setNavigationMode: (mode) => calls.push(`mode:${mode}`),
         navigateToReference: (ref) => calls.push(`ref:${ref.book}`),
       },
       'obs'
     )
-    expect(calls).toEqual(['scope:obs', 'ref:obs'])
+    expect(calls).toEqual(['scope:obs', 'mode:chapter', 'ref:obs'])
   })
 
   test('tap switches scope via existing nav APIs (Bible)', () => {
@@ -180,24 +187,26 @@ describe('applyTextModeScopeSwitch', () => {
     applyTextModeScopeSwitch(
       {
         setNavigationScope: (scope) => calls.push(`scope:${scope}`),
+        setNavigationMode: (mode) => calls.push(`mode:${mode}`),
         navigateToReference: (ref) => calls.push(`ref:${ref.book}`),
       },
       'scripture'
     )
-    expect(calls).toEqual(['scope:scripture', 'ref:tit'])
+    expect(calls).toEqual(['scope:scripture', 'mode:verse', 'ref:tit'])
   })
 
-  test('already showing an OBS ref keeps story/frame instead of jumping to 1:1', () => {
+  test('already showing an OBS ref keeps story instead of jumping to 1:1', () => {
     const calls: string[] = []
     applyTextModeScopeSwitch(
       {
         currentReference: { book: 'obs', chapter: 3, verse: 2 },
         setNavigationScope: (scope) => calls.push(`scope:${scope}`),
+        setNavigationMode: (mode) => calls.push(`mode:${mode}`),
         navigateToReference: (ref) => calls.push(`ref:${ref.book} ${ref.chapter}:${ref.verse}`),
       },
       'obs'
     )
-    expect(calls).toEqual(['scope:obs'])
+    expect(calls).toEqual(['scope:obs', 'mode:chapter'])
   })
 
   test('already showing a Bible ref keeps it instead of jumping to Titus 1:1', () => {
@@ -206,10 +215,11 @@ describe('applyTextModeScopeSwitch', () => {
       {
         currentReference: { book: 'jhn', chapter: 3, verse: 16 },
         setNavigationScope: (scope) => calls.push(`scope:${scope}`),
+        setNavigationMode: (mode) => calls.push(`mode:${mode}`),
         navigateToReference: (ref) => calls.push(`ref:${ref.book}`),
       },
       'scripture'
     )
-    expect(calls).toEqual(['scope:scripture'])
+    expect(calls).toEqual(['scope:scripture', 'mode:verse'])
   })
 })

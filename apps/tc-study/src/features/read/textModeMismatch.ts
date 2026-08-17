@@ -7,7 +7,7 @@
  * language does not have.
  */
 
-import type { BCVReference, NavigationCatalogScope } from '../../contexts/types'
+import type { BCVReference, NavigationCatalogScope, NavigationMode } from '../../contexts/types'
 import type { LanguageAvailabilityFlags } from './languageAvailability'
 import { languageEnglishCopyDisplayName } from './languageListDisplayName'
 import { loadLanguagesCache } from './languagesCache'
@@ -109,15 +109,22 @@ export function textModeMismatchFromCache(options: {
   })
 }
 
+/** Stories → whole-story grain; Bible → verse/ref. */
+export function defaultNavigationModeForScope(scope: NavigationCatalogScope): NavigationMode {
+  return scope === 'obs' ? 'chapter' : 'verse'
+}
+
 export function applyTextModeScopeSwitch(
   nav: {
     setNavigationScope: (scope: NavigationCatalogScope) => void
+    setNavigationMode: (mode: NavigationMode) => void
     navigateToReference: (ref: BCVReference) => void
     currentReference?: BCVReference
   },
   scope: NavigationCatalogScope
 ): void {
   nav.setNavigationScope(scope)
+  nav.setNavigationMode(defaultNavigationModeForScope(scope))
   const current = nav.currentReference
   const alreadyOnTarget =
     scope === 'obs' ? current?.book === 'obs' : !!(current && current.book !== 'obs')
