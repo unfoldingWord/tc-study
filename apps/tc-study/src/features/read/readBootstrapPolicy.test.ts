@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import {
   languageCodeFromReadPathname,
   readUrlWriteBackAction,
-  resolveColdStartReadLanguage,
   resolveReadLanguageFromUrlOrCache,
   resumeBareReadNavigation,
   shouldApplyDeepLinkTail,
@@ -22,11 +21,12 @@ describe('readBootstrapPolicy', () => {
     expect(languageCodeFromReadPathname('/read-v1/tr/obs/ref/1.1')).toBeNull()
   })
 
-  test('never defers catalog load — cold /read/ loads English in place', () => {
-    expect(shouldDeferLanguageCatalogLoad(null)).toBe(false)
-    expect(shouldDeferLanguageCatalogLoad(undefined)).toBe(false)
-    expect(shouldDeferLanguageCatalogLoad('')).toBe(false)
+  test('defers catalog load only when no language is known', () => {
+    expect(shouldDeferLanguageCatalogLoad(null)).toBe(true)
+    expect(shouldDeferLanguageCatalogLoad(undefined)).toBe(true)
+    expect(shouldDeferLanguageCatalogLoad('')).toBe(true)
     expect(shouldDeferLanguageCatalogLoad('en')).toBe(false)
+    expect(shouldDeferLanguageCatalogLoad('tr')).toBe(false)
   })
 
   test('write-back skipped without language or while deep-link suppress is on', () => {
@@ -174,17 +174,17 @@ describe('readBootstrapPolicy', () => {
     ).toEqual({ replace: '/read/en/bible/ref/tit%201%3A1' })
   })
 
-  test('cold /read/ with no cache defaults to Door43 en', () => {
-    expect(resolveColdStartReadLanguage({ pathname: '/read', cachedLanguage: null })).toEqual({
-      language: 'en',
-      source: 'default',
+  test('cold /read/ with no cache has no language; cache and URL still resolve', () => {
+    expect(resolveReadLanguageFromUrlOrCache({ pathname: '/read', cachedLanguage: null })).toEqual({
+      language: null,
+      source: null,
     })
-    expect(resolveColdStartReadLanguage({ pathname: '/read/', cachedLanguage: 'eng' })).toEqual({
+    expect(resolveReadLanguageFromUrlOrCache({ pathname: '/read/', cachedLanguage: 'eng' })).toEqual({
       language: 'en',
       source: 'cache',
     })
     expect(
-      resolveColdStartReadLanguage({ pathname: '/read/tr/obs/ref/1.1', cachedLanguage: 'eng' })
+      resolveReadLanguageFromUrlOrCache({ pathname: '/read/tr/obs/ref/1.1', cachedLanguage: 'eng' })
     ).toEqual({ language: 'tr', source: 'url' })
   })
 

@@ -4,11 +4,7 @@
  */
 
 import type { BCVReference, NavigationCatalogScope, NavigationMode, PassageSet } from '../../contexts/types'
-import {
-  canonicalReadLanguageCode,
-  DEFAULT_READ_LANGUAGE_CODE,
-  languageCodesMatch,
-} from '../../utils/languageCodeMatch'
+import { canonicalReadLanguageCode, languageCodesMatch } from '../../utils/languageCodeMatch'
 import {
   buildReadPath,
   buildReadRouteTailFromNavigation,
@@ -18,12 +14,12 @@ import {
 } from '../../utils/readRoutes'
 
 /**
- * Catalog load runs in place for the resolved language (URL, cache, or default
- * English). Do not wait for a `/read/:lang` remount — that skipped English
- * scripture/helps on cold `/read/` and flashed false empties.
+ * Defer catalog load only when no language is known yet (picker still required).
+ * Once a language is known, always load in place — do not wait for a
+ * `/read/:lang` remount (that skipped scripture/helps after pick).
  */
-export function shouldDeferLanguageCatalogLoad(_urlLanguage: string | null | undefined): boolean {
-  return false
+export function shouldDeferLanguageCatalogLoad(urlLanguage: string | null | undefined): boolean {
+  return !urlLanguage?.trim()
 }
 
 /** True for the language-picker landing path (`/read` or `/read/`). */
@@ -54,20 +50,6 @@ export function resolveReadLanguageFromUrlOrCache(options: {
   const cached = options.cachedLanguage?.trim() || null
   if (cached) return { language: canonicalReadLanguageCode(cached), source: 'cache' }
   return { language: null, source: null }
-}
-
-/**
- * Cold `/read/` always has a language: URL, then cache, then Door43 English.
- */
-export function resolveColdStartReadLanguage(options: {
-  pathname: string
-  cachedLanguage?: string | null
-}): { language: string; source: 'url' | 'cache' | 'default' } {
-  const resolved = resolveReadLanguageFromUrlOrCache(options)
-  if (resolved.language && resolved.source) {
-    return { language: resolved.language, source: resolved.source }
-  }
-  return { language: DEFAULT_READ_LANGUAGE_CODE, source: 'default' }
 }
 
 /**

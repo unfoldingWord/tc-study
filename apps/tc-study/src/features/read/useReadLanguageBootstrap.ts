@@ -42,11 +42,7 @@ import {
   type DownloadPane,
 } from './downloadIsolationPolicy'
 import { loadLanguagesCache } from './languagesCache'
-import {
-  languageCodeFromReadPathname,
-  resolveColdStartReadLanguage,
-  shouldPushReadLanguageUrl,
-} from './readBootstrapPolicy'
+import { resolveReadLanguageFromUrlOrCache, shouldPushReadLanguageUrl } from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
 import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
@@ -281,11 +277,13 @@ export function useReadLanguageBootstrap({
   useEffect(() => {
     const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
     const cached = navigationLanguageCode(useReadPanelStore.getState().panels)
-    const lang = canonicalReadLanguageCode(
-      initialLanguage?.trim() ||
-        languageCodeFromReadPathname(pathname) ||
-        resolveColdStartReadLanguage({ pathname, cachedLanguage: cached }).language
-    )
+    const resolved = resolveReadLanguageFromUrlOrCache({
+      pathname,
+      cachedLanguage: cached,
+    })
+    const raw = initialLanguage?.trim() || resolved.language
+    if (!raw) return
+    const lang = canonicalReadLanguageCode(raw)
     hydrateLanguagesFromHint(lang)
     if (
       autoLoadedLanguageForUrlRef.current &&

@@ -6,7 +6,6 @@ import { resolveHelpsPaneNoSourcesView } from '../helps/helpsEmptyCopy'
 import { isScriptureBooksPending } from '../../components/resources/ScriptureViewer/hooks/scriptureContentLoad'
 import {
   languageCodeFromReadPathname,
-  resolveColdStartReadLanguage,
   resolveReadLanguageFromUrlOrCache,
   shouldDeferLanguageCatalogLoad,
   shouldWriteBackReadUrl,
@@ -21,39 +20,28 @@ import { isPanelCatalogSpinner } from './panelCatalogLoading'
 import { coldStartCatalogLoads } from './runReadPanelCatalog'
 
 describe('bare /read cold-start', () => {
-  test('no cache + /read defaults to Door43 en and requests scripture+helps catalog', () => {
+  test('no cache + /read does not auto-apply en/eng; picker stays required', () => {
     expect(languageCodeFromReadPathname('/read')).toBeNull()
     expect(languageCodeFromReadPathname('/read/')).toBeNull()
     expect(
       resolveReadLanguageFromUrlOrCache({ pathname: '/read', cachedLanguage: null })
     ).toEqual({ language: null, source: null })
-    expect(resolveColdStartReadLanguage({ pathname: '/read', cachedLanguage: null })).toEqual({
-      language: 'en',
-      source: 'default',
-    })
-    expect(shouldDeferLanguageCatalogLoad('en')).toBe(false)
-    const seeded = applySeedBothLanguages(DEFAULT_READ_PANEL_MODELS, 'en')
-    expect(needsReadLanguagePicker(seeded)).toBe(false)
-    expect(coldStartCatalogLoads(seeded)).toEqual([
-      {
-        textLanguageCode: 'en',
-        helpsLanguageCode: 'en',
-        loadTarget: 'both',
-      },
-    ])
+    expect(shouldDeferLanguageCatalogLoad(null)).toBe(true)
+    expect(shouldDeferLanguageCatalogLoad('')).toBe(true)
     expect(
       inheritEmptyPanelLanguage({
         'panel-1': { mode: 'scripture', languageCode: null },
         'panel-2': { mode: 'helps', languageCode: 'en' },
       })
     ).toBeNull()
+    expect(needsReadLanguagePicker(DEFAULT_READ_PANEL_MODELS)).toBe(true)
     expect(
       shouldWriteBackReadUrl({
-        currentLanguageCode: 'en',
+        currentLanguageCode: null,
         suppressUrlSync: false,
         pathname: '/read',
       })
-    ).toBe(true)
+    ).toBe(false)
   })
 
   test('cache tr + /read stays tr, not rewritten to en', () => {
@@ -88,6 +76,20 @@ describe('bare /read cold-start', () => {
         pathname: '/read/tr/bible/ref/tit%201%3A1',
       })
     ).toBe(false)
+  })
+
+  test('language known always requests scripture+helps catalog (no remount defer)', () => {
+    expect(shouldDeferLanguageCatalogLoad('en')).toBe(false)
+    expect(shouldDeferLanguageCatalogLoad('tr')).toBe(false)
+    const seeded = applySeedBothLanguages(DEFAULT_READ_PANEL_MODELS, 'en')
+    expect(needsReadLanguagePicker(seeded)).toBe(false)
+    expect(coldStartCatalogLoads(seeded)).toEqual([
+      {
+        textLanguageCode: 'en',
+        helpsLanguageCode: 'en',
+        loadTarget: 'both',
+      },
+    ])
   })
 
   test('English helps catalog pending is spinner, not no-sources empty', () => {
@@ -141,10 +143,12 @@ describe('bare /read cold-start', () => {
     ).toBe(false)
   })
 
-  test('Read page cold-starts English in place (no picker-required defer)', () => {
+  test('Read page requires picker on bare /read when no language is known', () => {
     const readPage = readFileSync(join(import.meta.dir, '../../pages/Read.tsx'), 'utf8')
-    expect(readPage).toContain('resolveColdStartReadLanguage')
-    expect(readPage).toContain('requireLanguageInUrl={false}')
+    expect(readPage).toContain('resolveReadLanguageFromUrlOrCache')
+    expect(readPage).toContain('requireLanguageInUrl = !languageCode')
     expect(readPage).toContain('initialLanguage={languageCode}')
+    expect(readPage).not.toContain('requireLanguageInUrl={false}')
+    expect(readPage).not.toContain('resolveColdStartReadLanguage')
   })
 })

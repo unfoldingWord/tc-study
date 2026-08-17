@@ -71,10 +71,10 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   })
 
   test('URL/session hydrate applies path language then inherit before catalog load', () => {
-    expect(src).toContain('languageCodeFromReadPathname')
+    expect(src).toContain('resolveReadLanguageFromUrlOrCache')
     expect(src).toContain('hydrateLanguagesFromHint')
-    expect(src).toContain('resolveColdStartReadLanguage')
     expect(src).toContain('canonicalReadLanguageCode')
+    expect(src).not.toContain('resolveColdStartReadLanguage')
     expect(src).not.toContain('shouldDeferLanguageCatalogLoad')
     const urlEffect = src.slice(src.lastIndexOf('const pathname = typeof window'))
     expect(urlEffect.indexOf('hydrateLanguagesFromHint(lang)')).toBeLessThan(

@@ -4,7 +4,7 @@
 
 import { useLocation, useParams } from 'react-router-dom'
 import { SimplifiedReadView } from '../components/read/SimplifiedReadView'
-import { resolveColdStartReadLanguage } from '../features/read/readBootstrapPolicy'
+import { resolveReadLanguageFromUrlOrCache } from '../features/read/readBootstrapPolicy'
 import { navigationLanguageCode } from '../features/read/readPanelModel'
 import { useReadPanelStore } from '../features/read/readPanelStore'
 import { resolveReadRouteFromParams } from '../utils/readRoutes'
@@ -18,10 +18,12 @@ export default function Read() {
     navRef?: string
   }>()
   const panels = useReadPanelStore((s) => s.panels)
-  const languageCode = resolveColdStartReadLanguage({
-    pathname: location.pathname,
-    cachedLanguage: navigationLanguageCode(panels),
-  }).language
+  const languageCode =
+    resolveReadLanguageFromUrlOrCache({
+      pathname: location.pathname,
+      cachedLanguage: navigationLanguageCode(panels),
+    }).language ?? undefined
+  const requireLanguageInUrl = !languageCode
 
   const { readRouteTail, partialRouteHint } = resolveReadRouteFromParams({
     languageCode,
@@ -33,7 +35,7 @@ export default function Read() {
   return (
     <SimplifiedReadView
       initialLanguage={languageCode}
-      requireLanguageInUrl={false}
+      requireLanguageInUrl={requireLanguageInUrl}
       readRouteTail={readRouteTail}
       partialRouteHint={partialRouteHint}
     />
