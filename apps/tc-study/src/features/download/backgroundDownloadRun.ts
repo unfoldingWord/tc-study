@@ -4,6 +4,11 @@
  * `progress` must not re-arm UI isDownloading after the active run ends.
  */
 
+/** In-flight run: later completeness check can enqueue; startDownload would reseed 1%. */
+export function shouldAcceptStartDownload(isDownloading: boolean): boolean {
+  return !isDownloading
+}
+
 /** True when the worker message belongs to the hook's current run. */
 export function shouldAcceptWorkerMessage(
   activeRunId: number,
@@ -93,6 +98,25 @@ export function displayDownloadPercent(input: {
     return STARTING_PROGRESS_PERCENT
   }
   return Math.min(100, Math.max(0, computed))
+}
+
+/**
+ * Re-emit a live run after React remount so the badge does not drop to 0
+ * while the worker is still fetching (no progress events until the next zip tick).
+ */
+export function pulseInFlightDownloadProgress<T extends { overallProgress?: number; currentResourceProgress?: number }>(
+  progress: T | null,
+  isDownloading: boolean
+): T | null {
+  if (!progress || !isDownloading) return progress
+  return {
+    ...progress,
+    overallProgress: Math.max(progress.overallProgress ?? 0, STARTING_PROGRESS_PERCENT),
+    currentResourceProgress: Math.max(
+      progress.currentResourceProgress ?? 0,
+      STARTING_PROGRESS_PERCENT
+    ),
+  }
 }
 
 /**

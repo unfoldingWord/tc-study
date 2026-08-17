@@ -4,13 +4,22 @@
  */
 
 import type { ResourceInfo } from '../../contexts/types'
+import { isCombinedHelpsId } from '../helps/combinedHelpsIds'
 import { applyDualScopeHelpsPolicy } from '../helps/helpsPanelPolicy'
+import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
+import { normalizeResourceTypeId } from '../../utils/normalizeResourceTypeId'
 import { originalLanguageBelongsOnBook } from './originalLanguageForBook'
 import { resolveLoadedPanelResource } from './resolveLoadedPanelResource'
 import {
   getResourceAppliesToScope,
   resourceSupportsBook,
 } from './resourcePanelHelpers'
+
+function isPrimaryScriptureType(type: string | undefined, key: string): boolean {
+  if (isCombinedHelpsId(key)) return false
+  const id = normalizeResourceTypeId(type)
+  return id === RESOURCE_TYPE_IDS.SCRIPTURE || id === RESOURCE_TYPE_IDS.OBS
+}
 
 type ResourceTypeRegistryLike = {
   getTypeForSubject: (s: string) => string | undefined
@@ -37,6 +46,9 @@ export function filterReadPanelKeysByMode(
     })
   }
   return args.resourceKeys.filter((key) => {
+    if (isCombinedHelpsId(key)) return false
+    const type = resolveLoadedPanelResource(args.loadedResources, key)?.type
+    if (type && !isPrimaryScriptureType(type, key)) return false
     if (!originalLanguageBelongsOnBook(key, args.currentBook)) return false
     const scope = getResourceAppliesToScope(key, args.loadedResources, args.resourceTypeRegistry)
     if (scope !== args.navigationScope && scope !== null) return false
@@ -60,6 +72,8 @@ export function filterReadPanel2Keys(args: {
   } = args
 
   const scoped = panel2ResourceKeys.filter((key) => {
+    const type = resolveLoadedPanelResource(loadedResources, key)?.type
+    if (type && isPrimaryScriptureType(type, key)) return false
     if (!originalLanguageBelongsOnBook(key, currentBook)) return false
     const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
     if (scope !== navigationScope && scope !== null) return false

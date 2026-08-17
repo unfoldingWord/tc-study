@@ -5,11 +5,18 @@ import {
   computeInFlightOverallProgress,
   createInitialDownloadProgress,
   displayDownloadPercent,
+  pulseInFlightDownloadProgress,
+  shouldAcceptStartDownload,
   shouldAcceptWorkerMessage,
   withResourceDownloadTimeout,
 } from './backgroundDownloadRun'
 
 describe('backgroundDownloadRun', () => {
+  test('busy run rejects a new start so percent is not reset to 1%', () => {
+    expect(shouldAcceptStartDownload(true)).toBe(false)
+    expect(shouldAcceptStartDownload(false)).toBe(true)
+  })
+
   test('rejects stale or missing run ids after stop invalidation', () => {
     const active = 3
     expect(shouldAcceptWorkerMessage(active, 3)).toBe(true)
@@ -67,6 +74,17 @@ describe('backgroundDownloadRun', () => {
         currentResourcePercent: 50,
       })
     ).toBe(25)
+  })
+
+  test('resume pulse keeps a live run at least at the starting percent', () => {
+    const mid = createInitialDownloadProgress(['a/b/c'], 10)
+    mid.overallProgress = 42
+    const pulsed = pulseInFlightDownloadProgress(mid, true)
+    expect(pulsed?.overallProgress).toBe(42)
+    expect(pulseInFlightDownloadProgress({ overallProgress: 0, currentResourceProgress: 0 }, true)?.overallProgress).toBe(
+      STARTING_PROGRESS_PERCENT
+    )
+    expect(pulseInFlightDownloadProgress(mid, false)?.overallProgress).toBe(42)
   })
 
   test('display percent pulses 1% while downloading at 0/N and honors zip overall', () => {

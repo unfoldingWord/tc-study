@@ -129,5 +129,17 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   test('download isolation uses both panel languages, not one shared scripture lang', () => {
     expect(src).toContain('shouldCancelDownloadsOnPaneSwitch')
     expect(src).toContain("downloadResetToken(panels['panel-1'].languageCode, panels['panel-2'].languageCode)")
+    expect(src).toContain('isBackgroundDownloading')
+    expect(src).toContain('!isCatalogLoadBusy || isBackgroundDownloading')
+  })
+
+  test('mode switch does not cancel or reseed the download queue', () => {
+    const panelSrc = readFileSync(join(import.meta.dir, 'useReadPanelLanguageHandlers.ts'), 'utf8')
+    const mode = panelSrc.slice(panelSrc.indexOf('const handlePanelModeSwitch'))
+    expect(mode).toContain('shouldLoadCatalogOnModeSwitch')
+    expect(mode).toContain('applyReadModeMembership')
+    expect(mode).not.toContain('maybeCancelDownloads')
+    expect(mode).not.toContain('stopDownload')
+    expect(mode).not.toContain('coldStartCatalogLoads')
   })
 })

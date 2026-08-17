@@ -16,6 +16,13 @@ describe('catalogBackgroundDownloadPolicy', () => {
     expect(shouldResetDownloadTracking('en', '')).toBe(false)
   })
 
+  test('filling an empty pane language does not reset in-flight tracking', () => {
+    expect(shouldResetDownloadTracking('en|', 'en|en')).toBe(false)
+    expect(shouldResetDownloadTracking('|en', 'es|en')).toBe(false)
+    expect(shouldResetDownloadTracking('en|en', 'es|en')).toBe(true)
+    expect(shouldResetDownloadTracking('bho|en', 'bho|es')).toBe(true)
+  })
+
   test('expected signature is order-independent (monitor wait key)', () => {
     expect(expectedResourcesSignature(['a/b/c', 'd/e/f'])).toBe(
       expectedResourcesSignature(['d/e/f', 'a/b/c'])

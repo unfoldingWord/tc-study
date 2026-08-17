@@ -156,7 +156,10 @@ export function useReadLanguageBootstrap({
     expectedResources,
     resetToken: downloadResetToken(panels['panel-1'].languageCode, panels['panel-2'].languageCode),
     isDownloading: isBackgroundDownloading,
-    enabled: !DISABLE_BACKGROUND_DOWNLOAD && !isCatalogLoadBusy && Object.keys(loadedResources).length > 0,
+    enabled:
+      !DISABLE_BACKGROUND_DOWNLOAD &&
+      Object.keys(loadedResources).length > 0 &&
+      (!isCatalogLoadBusy || isBackgroundDownloading),
     debug: true,
   })
 

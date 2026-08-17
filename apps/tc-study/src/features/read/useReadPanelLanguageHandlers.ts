@@ -7,7 +7,11 @@ import { useCallback } from 'react'
 import { useNavigationStore, useResourceTypeRegistry } from '../../contexts'
 import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
-import type { DownloadPane } from './downloadIsolationPolicy'
+import { applyReadModeMembership } from './applyReadModeMembership'
+import {
+  shouldLoadCatalogOnModeSwitch,
+  type DownloadPane,
+} from './downloadIsolationPolicy'
 import { catalogLoadForSinglePanel } from './runReadPanelCatalog'
 import {
   skipTextCatalogOnMismatch,
@@ -85,12 +89,26 @@ export function useReadPanelLanguageHandlers(deps: {
     async (panelId: ReadPanelId, mode: 'scripture' | 'helps') => {
       useReadPanelStore.getState().setPanelMode(panelId, mode)
       inheritEmptyLanguage()
+      const panels = useReadPanelStore.getState().panels
+      const panel = panels[panelId]
+      if (
+        !shouldLoadCatalogOnModeSwitch({
+          mode,
+          languageCode: panel.languageCode,
+          textKeys: textKeysRef.current,
+          helpsKeys: helpsKeysRef.current,
+        })
+      ) {
+        applyReadModeMembership(panelId, mode, panel.languageCode, textKeysRef.current)
+        markCatalogSettled([panelId])
+        return
+      }
       const navigationScope = useNavigationStore.getState().navigationScope
-      const one = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, panelId)
+      const one = catalogLoadForSinglePanel(panels, panelId)
       if (!one) return
       await runCatalogLoad({ ...one, navigationScope })
     },
-    [inheritEmptyLanguage, runCatalogLoad]
+    [inheritEmptyLanguage, markCatalogSettled, runCatalogLoad, textKeysRef, helpsKeysRef]
   )
 
   const handleHelpsLanguageSelected = useCallback(

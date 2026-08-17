@@ -36,3 +36,37 @@ export function downloadResetToken(
 ): string {
   return `${textLanguageCode || ''}|${helpsLanguageCode || ''}`
 }
+
+/** Mode flip must never wipe an in-flight zip/catalog queue. */
+export function shouldResetDownloadQueueOnModeSwitch(): false {
+  return false
+}
+
+/** Door43 keys are `owner/lang/id` (or `owner/lang/id#n`). CombinedHelps has no lang segment. */
+export function catalogKeysIncludeLanguage(
+  keys: readonly string[],
+  languageCode: string | null | undefined
+): boolean {
+  const lang = languageCode?.trim().toLowerCase()
+  if (!lang) return false
+  return keys.some((key) => {
+    const parts = key.split('/')
+    return parts.length >= 3 && parts[1]?.toLowerCase() === lang
+  })
+}
+
+/**
+ * First time this pane mode is needed for `languageCode` — load/enqueue that
+ * catalog. If keys for that lang+mode already exist, skip (membership only).
+ */
+export function shouldLoadCatalogOnModeSwitch(options: {
+  mode: 'scripture' | 'helps'
+  languageCode: string | null | undefined
+  textKeys: readonly string[]
+  helpsKeys: readonly string[]
+}): boolean {
+  const lang = options.languageCode?.trim()
+  if (!lang) return false
+  const existing = options.mode === 'scripture' ? options.textKeys : options.helpsKeys
+  return !catalogKeysIncludeLanguage(existing, lang)
+}

@@ -123,4 +123,39 @@ describe('filterReadPanelKeysByMode (original-language book scope)', () => {
     expect(keys).toEqual(['unfoldingWord/en/ult', 'unfoldingWord/el-x-koine/ugnt'])
     expect(keys).not.toContain('unfoldingWord/hbo/uhb')
   })
+
+  test('mode flip paints scripture vs CombinedHelps from mixed membership', () => {
+    const resourceKeys = [
+      'unfoldingWord/en/ult',
+      COMBINED_HELPS_RESOURCE_ID,
+      'uw/en/tq',
+    ]
+    const loadedResources = {
+      'unfoldingWord/en/ult': { id: 'unfoldingWord/en/ult', type: 'scripture' } as any,
+      [COMBINED_HELPS_RESOURCE_ID]: {
+        id: COMBINED_HELPS_RESOURCE_ID,
+        type: 'combined-helps',
+        appliesToScope: 'scripture',
+      } as any,
+      'uw/en/tq': { id: 'uw/en/tq', type: 'questions', appliesToScope: 'scripture' } as any,
+    }
+    expect(
+      filterReadPanelKeysByMode('scripture', {
+        resourceKeys,
+        loadedResources,
+        resourceTypeRegistry: registry,
+        navigationScope: 'scripture',
+        currentBook: 'tit',
+      })
+    ).toEqual(['unfoldingWord/en/ult'])
+    expect(
+      filterReadPanelKeysByMode('helps', {
+        resourceKeys,
+        loadedResources,
+        resourceTypeRegistry: registry,
+        navigationScope: 'scripture',
+        currentBook: 'tit',
+      })
+    ).toEqual([COMBINED_HELPS_RESOURCE_ID, 'uw/en/tq'])
+  })
 })

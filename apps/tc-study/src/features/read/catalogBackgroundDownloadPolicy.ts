@@ -21,7 +21,16 @@ export function shouldResetDownloadTracking(
   previousScope: string,
   nextScope: string
 ): boolean {
-  return nextScope !== '' && nextScope !== previousScope
+  if (nextScope === '' || nextScope === previousScope) return false
+  // `p1Lang|p2Lang` — inherit/fill of an empty pane is not a language switch.
+  if (previousScope.includes('|') && nextScope.includes('|')) {
+    const [prevA = '', prevB = ''] = previousScope.split('|')
+    const [nextA = '', nextB = ''] = nextScope.split('|')
+    const filledFirst = prevA === '' && nextA !== '' && prevB === nextB
+    const filledSecond = prevB === '' && nextB !== '' && prevA === nextA
+    if (filledFirst || filledSecond) return false
+  }
+  return true
 }
 
 export function findMissingExpectedResources(
