@@ -7,12 +7,16 @@ import { useCallback, useRef, useState } from 'react'
 import { useCatalogManager, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
 import { useResourceManagement } from '../../hooks'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
+import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
+import { shouldSkipHelpsCatalogLoad } from './helpsLanguagePolicy'
+import { loadLanguagesCache } from './languagesCache'
 import {
   loadReadLanguageCatalog,
   type LoadReadLanguageCatalogDeps,
 } from './loadReadLanguageCatalog'
 import { destPanelsForCatalogLoad } from './panelCatalogLoading'
 import type { CatalogLoadTarget } from './readCatalogPanelPolicy'
+import { availabilityLookupFromListed } from './readLanguageLoadPlan'
 import type { ReadPanelId } from './readPanelModel'
 
 export interface RunReadCatalogLoadOptions {
@@ -127,6 +131,27 @@ export function useReadCatalogLoad() {
   const runCatalogLoad = useCallback(
     async (options: RunReadCatalogLoadOptions) => {
       const destPanels = destPanelsForCatalogLoad(options)
+      const subjects =
+        typeof resourceTypeRegistry.getSupportedSubjects === 'function'
+          ? resourceTypeRegistry.getSupportedSubjects()
+          : []
+      const listed = loadLanguagesCache(subjects)
+      const availability = availabilityLookupFromListed(listed)(options.helpsLanguageCode)
+      if (
+        shouldSkipHelpsCatalogLoad({
+          loadTarget: options.loadTarget,
+          navigationScope: options.navigationScope,
+          availability,
+        })
+      ) {
+        const panelTarget = destPanels.length > 1 ? 'both' : destPanels[0] ?? 'panel-2'
+        clearReadPanelsForLanguageSwitch(options.helpsLanguageCode, panelTarget, {
+          reconcileHelps: false,
+        })
+        helpsKeysRef.current = []
+        markCatalogSettled(destPanels)
+        return
+      }
       beginCatalogLoad(destPanels, options.loadTarget)
       try {
         const result = await loadReadLanguageCatalog({
@@ -151,7 +176,7 @@ export function useReadCatalogLoad() {
         endCatalogLoad(destPanels, options.loadTarget)
       }
     },
-    [catalogLoadDeps]
+    [catalogLoadDeps, markCatalogSettled, resourceTypeRegistry]
   )
 
   return {

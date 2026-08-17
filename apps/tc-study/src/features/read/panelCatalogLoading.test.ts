@@ -56,6 +56,38 @@ describe('panel catalog spinner + instance lookup', () => {
     expect(hasNonOriginalMembership([UGNT_RESOURCE_KEY, 'unfoldingWord/en/ult'])).toBe(true)
   })
 
+  test('Bible mode + OBS-only language with no TN/TWL settles helps, not a spinner', () => {
+    expect(
+      isReadPanelCatalogSettled({
+        languageCode: 'fr',
+        catalogSettled: false,
+        hasKnownNoHelps: true,
+      })
+    ).toBe(true)
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: false,
+        hasMembership: false,
+        catalogSettled: isReadPanelCatalogSettled({
+          languageCode: 'fr',
+          catalogSettled: false,
+          hasKnownNoHelps: true,
+        }),
+      })
+    ).toBe(false)
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: true,
+        hasMembership: false,
+        catalogSettled: isReadPanelCatalogSettled({
+          languageCode: 'en',
+          catalogSettled: false,
+          hasKnownNoHelps: false,
+        }),
+      })
+    ).toBe(true)
+  })
+
   test('OBS-only Bible mode is settled empty, not a pending catalog spinner', () => {
     expect(
       isReadPanelCatalogSettled({

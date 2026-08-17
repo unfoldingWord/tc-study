@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { shouldInjectCombinedHelps, findHelpsKeysAmongResources } from '../helps/combinedHelpsInjection'
-import { resolveHelpsPaneNoSourcesView } from '../helps/helpsEmptyCopy'
+import { HELPS_EMPTY_COPY, resolveHelpsPaneNoSourcesView } from '../helps/helpsEmptyCopy'
+import { isHelpsCatalogKnownEmpty } from './helpsLanguagePolicy'
 import { isScriptureBooksPending } from '../../components/resources/ScriptureViewer/hooks/scriptureContentLoad'
 import {
   languageCodeFromReadPathname,
@@ -137,6 +138,45 @@ describe('bare /read cold-start', () => {
         catalogSettled: false,
       })
     ).toBeNull()
+  })
+
+  test('Bible mode + OBS-only language shows helps no-sources + language action, not spinner', () => {
+    const availability = { bible: false, obs: true, bibleHelps: false, obsHelps: false }
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'scripture',
+        availability,
+      })
+    ).toBe(true)
+
+    const helpsSettled = isReadPanelCatalogSettled({
+      languageCode: 'fr',
+      catalogSettled: false,
+      hasKnownNoHelps: true,
+    })
+    expect(helpsSettled).toBe(true)
+    expect(
+      isPanelCatalogSpinner({
+        catalogLoading: false,
+        hasMembership: false,
+        catalogSettled: helpsSettled,
+      })
+    ).toBe(false)
+
+    const view = resolveHelpsPaneNoSourcesView({
+      mode: 'helps',
+      languageCode: 'fr',
+      isLoading: false,
+      hasResource: false,
+      languageName: 'French',
+      catalogSettled: helpsSettled,
+    })
+    expect(view?.kind).toBe('no-sources')
+    expect(view?.message).toBe(HELPS_EMPTY_COPY.noSources('French'))
+    expect(view?.actionLabel).toBe(HELPS_EMPTY_COPY.switchToDefaultHelps('English'))
+    expect(view?.actionShortLabel).toBe('English')
+    expect(view?.defaultHelpsLanguageCode).toBe('en')
   })
 
   test('English helps catalog pending is spinner, not no-sources empty', () => {

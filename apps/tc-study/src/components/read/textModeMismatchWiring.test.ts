@@ -38,6 +38,11 @@ describe('text-mode mismatch wiring (issue #25 / #30)', () => {
     expect(areaSrc).toContain('isReadPanelCatalogSettled')
     expect(areaSrc).toContain('hasKnownMismatch: Boolean(panel1Mismatch)')
     expect(areaSrc).toContain('hasKnownMismatch: Boolean(panel2Mismatch)')
+    expect(areaSrc).toContain('hasKnownNoHelps: panel1KnownNoHelps')
+    expect(areaSrc).toContain('hasKnownNoHelps: panel2KnownNoHelps')
+    expect(viewSrc).toContain('helpsCatalogKnownEmptyFromCache')
+    expect(viewSrc).toContain('panel1KnownNoHelps')
+    expect(viewSrc).toContain('panel2KnownNoHelps')
   })
 
   test('mismatch empty copy uses anglicized English names, not autonyms', () => {

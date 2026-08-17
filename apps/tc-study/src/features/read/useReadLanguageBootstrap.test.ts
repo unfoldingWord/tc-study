@@ -108,6 +108,8 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(loadSrc).toContain('destPanelsForCatalogLoad')
     expect(loadSrc).toContain('isLoadingByPanel')
     expect(loadSrc).toContain('markCatalogSettled')
+    expect(loadSrc).toContain('shouldSkipHelpsCatalogLoad')
+    expect(loadSrc).toContain('reconcileHelps: false')
   })
 
   test('explicit switch and BCV commit go through useReadTextModeSwitch', () => {

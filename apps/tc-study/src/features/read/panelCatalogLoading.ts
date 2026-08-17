@@ -22,16 +22,18 @@ export function destPanelsForCatalogLoad(options: {
 }
 
 /**
- * Unset language, known Bible/OBS mismatch, or finished hydrate — not pending.
- * Empty Bible + OBS (or neither) is a settled empty, not an in-flight catalog.
+ * Unset language, known Bible/OBS mismatch, known no-helps, or finished hydrate.
+ * Empty Bible + OBS (or neither) and Bible-mode + no TN/TWL are settled empties,
+ * not an in-flight catalog.
  */
 export function isReadPanelCatalogSettled(options: {
   languageCode?: string | null
   catalogSettled: boolean
   hasKnownMismatch?: boolean
+  hasKnownNoHelps?: boolean
 }): boolean {
   if (!options.languageCode?.trim()) return true
-  if (options.hasKnownMismatch) return true
+  if (options.hasKnownMismatch || options.hasKnownNoHelps) return true
   return options.catalogSettled
 }
 

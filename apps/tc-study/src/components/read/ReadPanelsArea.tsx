@@ -46,6 +46,8 @@ interface ReadPanelsAreaProps {
   onPanelModeSwitch: (panelId: ReadPanelId, mode: ReadPanelMode) => void
   panel1Mismatch: TextModeMismatchView | null
   panel2Mismatch: TextModeMismatchView | null
+  panel1KnownNoHelps?: boolean
+  panel2KnownNoHelps?: boolean
   onSwitchTextMode: (scope: 'scripture' | 'obs') => void
 }
 
@@ -78,6 +80,8 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
     p2Dir,
     panel1Mismatch,
     panel2Mismatch,
+    panel1KnownNoHelps = false,
+    panel2KnownNoHelps = false,
     onSwitchTextMode,
   } = props
 
@@ -89,11 +93,13 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
     languageCode: panels['panel-1'].languageCode,
     catalogSettled: catalogSettledByPanel['panel-1'],
     hasKnownMismatch: Boolean(panel1Mismatch),
+    hasKnownNoHelps: panel1KnownNoHelps,
   })
   const panel2Settled = isReadPanelCatalogSettled({
     languageCode: panels['panel-2'].languageCode,
     catalogSettled: catalogSettledByPanel['panel-2'],
     hasKnownMismatch: Boolean(panel2Mismatch),
+    hasKnownNoHelps: panel2KnownNoHelps,
   })
 
   return (
@@ -124,7 +130,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         filteredResources={filteredPanel1Resources}
         panelResources={panel1Resources}
         isLoadingResources={isPanelCatalogSpinner({
-          catalogLoading: isLoadingByPanel['panel-1'],
+          catalogLoading: isLoadingByPanel['panel-1'] && !panel1KnownNoHelps,
           hasMembership: hasNonOriginalMembership(filteredPanel1Keys),
           catalogSettled: panel1Settled,
         })}
@@ -168,7 +174,7 @@ export function ReadPanelsArea(props: ReadPanelsAreaProps) {
         filteredResources={filteredPanel2Resources}
         panelResources={panel2Resources}
         isLoadingResources={isPanelCatalogSpinner({
-          catalogLoading: isLoadingByPanel['panel-2'],
+          catalogLoading: isLoadingByPanel['panel-2'] && !panel2KnownNoHelps,
           hasMembership: hasNonOriginalMembership(filteredPanel2Keys),
           catalogSettled: panel2Settled,
         })}

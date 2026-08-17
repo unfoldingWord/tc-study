@@ -19,6 +19,7 @@ import { resolvePaneDirection } from '../../features/read/paneDirection'
 import { defaultLayoutForViewport } from '../../features/read/readPanelLayout'
 import { needsReadLanguagePicker } from '../../features/read/readPanelModel'
 import { useReadPanelStore } from '../../features/read/readPanelStore'
+import { helpsCatalogKnownEmptyFromCache } from '../../features/read/helpsLanguagePolicy'
 import { textModeMismatchFromCache } from '../../features/read/textModeMismatch'
 import { useFilteredReadPanelKeys } from '../../features/read/useFilteredReadPanelKeys'
 import { useIsNarrowViewport } from '../../features/read/useIsNarrowViewport'
@@ -125,6 +126,26 @@ export function SimplifiedReadView({
       supportedSubjects: subjects,
     })
   }, [panels, navigationScope, subjects])
+  const panel1KnownNoHelps = useMemo(
+    () =>
+      helpsCatalogKnownEmptyFromCache({
+        mode: panels['panel-1'].mode,
+        languageCode: panels['panel-1'].languageCode,
+        navigationScope,
+        supportedSubjects: subjects,
+      }),
+    [panels, navigationScope, subjects]
+  )
+  const panel2KnownNoHelps = useMemo(
+    () =>
+      helpsCatalogKnownEmptyFromCache({
+        mode: panels['panel-2'].mode,
+        languageCode: panels['panel-2'].languageCode,
+        navigationScope,
+        supportedSubjects: subjects,
+      }),
+    [panels, navigationScope, subjects]
+  )
 
   useReadUrlSync({
     readRouteTail,
@@ -273,6 +294,8 @@ export function SimplifiedReadView({
               onPanelModeSwitch={handlePanelModeSwitch}
               panel1Mismatch={panel1Mismatch}
               panel2Mismatch={panel2Mismatch}
+              panel1KnownNoHelps={panel1KnownNoHelps}
+              panel2KnownNoHelps={panel2KnownNoHelps}
               onSwitchTextMode={handleSwitchTextMode}
             />
           </LinkedPanelsContainer>

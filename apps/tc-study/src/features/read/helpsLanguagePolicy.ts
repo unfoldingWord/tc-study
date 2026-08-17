@@ -8,7 +8,9 @@
 
 import type { LanguageAvailabilityFlags } from './languageAvailability'
 import { resolveHelpsLanguage } from './defaultHelpsLanguage'
-import type { ListedLanguage } from './languagesCache'
+import { listedLanguageByCode } from './languageListDisplayName'
+import { loadLanguagesCache, type ListedLanguage } from './languagesCache'
+import type { CatalogLoadTarget } from './readCatalogPanelPolicy'
 
 export type HelpsModeFlag = 'bibleHelps' | 'obsHelps'
 
@@ -21,6 +23,53 @@ export function languageHasHelpsFlag(
   flag: HelpsModeFlag
 ): boolean {
   return availability?.[flag] === true
+}
+
+/**
+ * Known-empty helps catalog for this Bible/OBS mode — not unknown, not in-flight.
+ * Missing availability stays pending so the first hydrate can still run.
+ */
+export function isHelpsCatalogKnownEmpty(options: {
+  mode?: string
+  navigationScope: string
+  availability: LanguageAvailabilityFlags | undefined | null
+}): boolean {
+  if (options.mode != null && options.mode !== 'helps') return false
+  if (!options.availability) return false
+  const flag = helpsFlagForNavigationScope(options.navigationScope)
+  return options.availability[flag] === false
+}
+
+/** Helps-only catalog job when the language has no TN/TWL for this mode. */
+export function shouldSkipHelpsCatalogLoad(options: {
+  loadTarget: CatalogLoadTarget
+  navigationScope: string
+  availability: LanguageAvailabilityFlags | undefined | null
+}): boolean {
+  if (options.loadTarget !== 'helps') return false
+  return isHelpsCatalogKnownEmpty({
+    mode: 'helps',
+    navigationScope: options.navigationScope,
+    availability: options.availability,
+  })
+}
+
+export function helpsCatalogKnownEmptyFromCache(options: {
+  mode: string
+  languageCode: string | null | undefined
+  navigationScope: string
+  supportedSubjects: string[]
+}): boolean {
+  if (options.mode !== 'helps') return false
+  const code = options.languageCode?.trim()
+  if (!code) return false
+  const listed = loadLanguagesCache(options.supportedSubjects)
+  const lang = listedLanguageByCode(listed, code)
+  return isHelpsCatalogKnownEmpty({
+    mode: 'helps',
+    navigationScope: options.navigationScope,
+    availability: lang?.availability,
+  })
 }
 
 /**

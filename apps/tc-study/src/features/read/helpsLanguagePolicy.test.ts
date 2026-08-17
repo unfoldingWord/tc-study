@@ -3,8 +3,10 @@ import { emptyLanguageAvailability } from './languageAvailability'
 import {
   filterLanguagesWithHelps,
   helpsFlagForNavigationScope,
+  isHelpsCatalogKnownEmpty,
   resolveHelpsLanguageForMode,
   shouldReloadHelpsOnTextSwitch,
+  shouldSkipHelpsCatalogLoad,
 } from './helpsLanguagePolicy'
 import type { ListedLanguage } from './languagesCache'
 
@@ -23,6 +25,83 @@ describe('helpsFlagForNavigationScope', () => {
   test('scripture → bibleHelps, obs → obsHelps', () => {
     expect(helpsFlagForNavigationScope('scripture')).toBe('bibleHelps')
     expect(helpsFlagForNavigationScope('obs')).toBe('obsHelps')
+  })
+})
+
+describe('isHelpsCatalogKnownEmpty', () => {
+  test('Bible mode + OBS-only language with no TN/TWL is known empty', () => {
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'scripture',
+        availability: AVAIL.bho,
+      })
+    ).toBe(true)
+    expect(
+      shouldSkipHelpsCatalogLoad({
+        loadTarget: 'helps',
+        navigationScope: 'scripture',
+        availability: AVAIL.bho,
+      })
+    ).toBe(true)
+  })
+
+  test('English Bible helps stay in-flight until hydrate, not skipped', () => {
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'scripture',
+        availability: AVAIL.en,
+      })
+    ).toBe(false)
+    expect(
+      shouldSkipHelpsCatalogLoad({
+        loadTarget: 'helps',
+        navigationScope: 'scripture',
+        availability: AVAIL.en,
+      })
+    ).toBe(false)
+  })
+
+  test('unknown availability and scripture panels are not treated as empty', () => {
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'scripture',
+        availability: undefined,
+      })
+    ).toBe(false)
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'scripture',
+        navigationScope: 'scripture',
+        availability: AVAIL.bho,
+      })
+    ).toBe(false)
+    expect(
+      shouldSkipHelpsCatalogLoad({
+        loadTarget: 'both',
+        navigationScope: 'scripture',
+        availability: AVAIL.bho,
+      })
+    ).toBe(false)
+  })
+
+  test('OBS mode + no OBS helps is known empty; OBS helps languages are not', () => {
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'obs',
+        availability: AVAIL.bho,
+      })
+    ).toBe(true)
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'obs',
+        availability: AVAIL.hi,
+      })
+    ).toBe(false)
   })
 })
 
