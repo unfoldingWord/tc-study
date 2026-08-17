@@ -5,7 +5,7 @@ import {
   OBS_COMBINED_HELPS_RESOURCE_ID,
 } from '../helps/combinedHelpsIds'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
-import { isCombinedHelpsResourceType, normalizeResourceTypeId } from '../../utils/normalizeResourceTypeId'
+import { normalizeResourceTypeId } from '../../utils/normalizeResourceTypeId'
 import { resolveLucideIconName } from './lucideIconRegistry'
 import { isTabIconComponent, type TabIcon } from './tabIcon'
 import { TAB_ICON_OVERRIDES } from './tabIconOverrides'
@@ -22,9 +22,9 @@ export interface TabPresentation {
   /** Always computed for fallback / primary disambiguation / DnD text */
   shortLabel: string
   /**
-   * Primary types show icon + abbrev. Combined Helps shows icon + "Helps"
-   * because the notes glyph is not self-explanatory. Other companions with
-   * an icon can be icon-only. Always true when Icon is null (text fallback).
+   * Primary (and shared scripture-like) types show icon + abbrev.
+   * Companions / shared with an icon can be icon-only.
+   * Always true when Icon is null (text fallback).
    */
   showShortLabel: boolean
   /** Full accessible name (resource.title) */
@@ -88,9 +88,8 @@ export function resolveTabPresentation(
   const contentRole = plugin?.contentRole ?? 'companion'
   const isPrimary = contentRole === 'primary'
   // Primary: icon + abbrev for disambiguation (GLT vs GST).
-  // Combined Helps: icon + "Helps" — notes glyph is not self-explanatory.
-  // Other non-primary with icon: icon-only. No icon: short text fallback.
-  const showShortLabel = !Icon || isPrimary || isCombinedHelpsResourceType(typeId)
+  // Non-primary with icon: icon-only. No icon: short text fallback.
+  const showShortLabel = !Icon || isPrimary
 
   return { Icon, shortLabel, showShortLabel, title }
 }

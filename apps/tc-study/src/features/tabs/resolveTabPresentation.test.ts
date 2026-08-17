@@ -78,7 +78,7 @@ describe('resolveTabPresentation', () => {
     expect(p.shortLabel).toBe('TPL')
   })
 
-  test('CombinedHelps special key resolves NotebookText and shows Helps label', () => {
+  test('CombinedHelps special key is icon-only NotebookText with Helps tooltip', () => {
     const p = resolveTabPresentation(
       {
         key: COMBINED_HELPS_RESOURCE_ID,
@@ -88,12 +88,12 @@ describe('resolveTabPresentation', () => {
       { getType }
     )
     expect(p.Icon).toBe(NotebookText)
-    expect(p.showShortLabel).toBe(true)
+    expect(p.showShortLabel).toBe(false)
     expect(p.shortLabel).toBe('Helps')
     expect(p.title).toBe('Helps')
   })
 
-  test('OBS CombinedHelps shows Helps label with OBS Helps accessible title', () => {
+  test('OBS CombinedHelps is icon-only with OBS Helps accessible title', () => {
     const p = resolveTabPresentation(
       {
         key: OBS_COMBINED_HELPS_RESOURCE_ID,
@@ -103,7 +103,7 @@ describe('resolveTabPresentation', () => {
       { getType }
     )
     expect(p.Icon).toBe(NotebookText)
-    expect(p.showShortLabel).toBe(true)
+    expect(p.showShortLabel).toBe(false)
     expect(p.shortLabel).toBe('Helps')
     expect(p.title).toBe('OBS Helps')
   })

@@ -21,7 +21,7 @@ describe('getTabShortLabel', () => {
     ).toBe('TPL')
   })
 
-  test('Combined Helps and OBS Helps share the compact Helps label', () => {
+  test('Combined Helps and OBS Helps share a fallback Helps short name (not shown on icon-only tabs)', () => {
     expect(
       getTabShortLabel({
         key: '__combined-helps__',
