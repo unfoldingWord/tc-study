@@ -12,7 +12,7 @@ import {
   navigationScopeFromResourceType,
   type ReadResourceType,
 } from '../../utils/readRoutes'
-import { parseReadUrl, readUrlLangsEqual } from './readUrlGrammar'
+import { parseReadUrl, readUrlLangsEqual, type ReadNavigationSource } from './readUrlGrammar'
 
 /**
  * Defer catalog load only when no language is known yet (picker still required).
@@ -29,7 +29,7 @@ export function isBareReadPathname(pathname: string): boolean {
 }
 
 /**
- * Panel-1 `:lang` from `/read/{lang}/…` or `/read/{lang}/{lang2}/…`.
+ * Panel-1 language from `/read/{lang}/…` or `/read/{lang1+lang2}/…`.
  * Reserved tokens (`bible`, `obs`, …) are never languages. Bare `/read` is null.
  */
 export function languageCodeFromReadPathname(pathname: string): string | null {
@@ -75,11 +75,12 @@ export function shouldPushReadLanguageUrl(
 }
 
 /**
- * Whether the Read URL write-back effect should replace the pathname with the
- * canonical `/read/{lang}/…` template.
+ * Whether the Read URL write-back effect should replace the pathname.
  *
- * An explicit `/read/{lang}/…` is authoritative: never replace that language
- * with a cached session language. Bare `/read` may write back from cache.
+ * Cache may write the route **only** on bare `/read` (restore last session).
+ * Any path that already has a language (`/read/en`, `/read/en/bible/…`,
+ * `/read/en+fr/obs/…`) is URL-authoritative: cache must not rewrite `:lang`
+ * or the tail. In-app UI may write via `navigationSource: 'internal'`.
  * `suppressUrlSync` / `deepLinkPending` block clobbering an incoming deep
  * link before (or while) it is applied.
  */
@@ -88,10 +89,14 @@ export function shouldWriteBackReadUrl(options: {
   suppressUrlSync: boolean
   pathname?: string
   deepLinkPending?: boolean
+  navigationSource?: ReadNavigationSource
 }): boolean {
   if (!options.currentLanguageCode) return false
   if (options.suppressUrlSync) return false
   if (options.deepLinkPending) return false
+  if (options.pathname != null && !isBareReadPathname(options.pathname)) {
+    if (options.navigationSource !== 'internal') return false
+  }
   const urlLang = options.pathname ? languageCodeFromReadPathname(options.pathname) : null
   if (
     urlLang &&
@@ -150,6 +155,7 @@ export function readUrlWriteBackAction(args: {
   passageSet: PassageSet | null
   section1Based: number | null
   deepLinkPending?: boolean
+  navigationSource?: ReadNavigationSource
 }): { replace: string } | null {
   if (
     !shouldWriteBackReadUrl({
@@ -157,6 +163,7 @@ export function readUrlWriteBackAction(args: {
       suppressUrlSync: args.suppressUrlSync,
       pathname: args.pathname,
       deepLinkPending: args.deepLinkPending,
+      navigationSource: args.navigationSource,
     })
   ) {
     return null

@@ -133,7 +133,7 @@ export function applyTextModeScopeSwitch(
   nav.navigateToReference(scope === 'obs' ? DEFAULT_OBS_REF : DEFAULT_BIBLE_REF)
 }
 
-/** `/read/{lang}[/{lang2}]/bible|obs/...` — ignore `/read-v1`. */
+/** `/read/{lang | lang1+lang2}/bible|obs/...` — ignore `/read-v1`. */
 export function navigationScopeFromReadPath(
   pathname: string,
   fallback: string

@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useNavigationStore } from '../../contexts'
+import { markReadNavigationInternal } from './replaceReadUrlFromUi'
 import { applyTextLanguagePickNavigation } from './textLanguagePickNavigation'
 
 export type TextModeScope = 'scripture' | 'obs'
@@ -22,6 +23,7 @@ export function useReadTextModeSwitch(
     (scope: TextModeScope) => {
       const code = currentLanguageCode
       if (!code) return
+      markReadNavigationInternal()
       applyTextLanguagePickNavigation(useNavigationStore.getState(), {
         action: 'switch',
         scope,
@@ -35,6 +37,7 @@ export function useReadTextModeSwitch(
     (scope: TextModeScope) => {
       const code = currentLanguageCode
       if (!code) return
+      markReadNavigationInternal()
       void handleLanguageSelected(code, { navigationScope: scope })
     },
     [currentLanguageCode, handleLanguageSelected]

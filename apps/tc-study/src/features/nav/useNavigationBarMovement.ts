@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import type { BCVReference, NavigationMode } from '../../contexts/types'
+import { markReadNavigationInternal } from '../read/replaceReadUrlFromUi'
 import { getNavigationModeLabel } from './navigationBarReferenceFormat'
 import type { NavigationActions } from './navigationTypes'
 
@@ -12,6 +13,7 @@ export function useNavigationBarMovement(
   const modeLabel = getNavigationModeLabel(currentRef, navigationMode)
 
   const handlePrevious = useCallback(() => {
+    markReadNavigationInternal()
     if (currentRef.book === 'obs') {
       if (navigationMode === 'chapter') {
         navigation.previousObsStory()
@@ -32,6 +34,7 @@ export function useNavigationBarMovement(
   }, [currentRef.book, hasPassageSet, navigation, navigationMode])
 
   const handleNext = useCallback(() => {
+    markReadNavigationInternal()
     if (currentRef.book === 'obs') {
       if (navigationMode === 'chapter') {
         navigation.nextObsStory()

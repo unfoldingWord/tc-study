@@ -28,6 +28,7 @@ describe('Read URL sync wiring (internal vs external)', () => {
   test('in-app URL write is replaceState, not React Router navigate', () => {
     const sync = readFileSync(join(import.meta.dir, 'useReadUrlSync.ts'), 'utf8')
     expect(sync).toContain('replaceReadUrlFromUi(action.replace)')
+    expect(sync).toContain('getReadNavigationSource()')
     expect(sync).toContain('subscribeReadPopstate')
     expect(sync).not.toContain('useNavigate')
     expect(sync).not.toContain('navigate(action.replace')

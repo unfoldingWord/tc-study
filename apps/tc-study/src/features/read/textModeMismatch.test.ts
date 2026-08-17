@@ -158,8 +158,8 @@ describe('navigationScopeFromReadPath', () => {
   test('reads bible/obs from /read URLs and ignores /read-v1', () => {
     expect(navigationScopeFromReadPath('/read/bho/obs/story/1', 'scripture')).toBe('obs')
     expect(navigationScopeFromReadPath('/read/es/bible/ref/tit%201:1', 'obs')).toBe('scripture')
-    expect(navigationScopeFromReadPath('/read/en/fr/bible/ref/tit%201:1', 'obs')).toBe('scripture')
-    expect(navigationScopeFromReadPath('/read/en/fr/obs/story/1', 'scripture')).toBe('obs')
+    expect(navigationScopeFromReadPath('/read/en+fr/bible/ref/tit%201:1', 'obs')).toBe('scripture')
+    expect(navigationScopeFromReadPath('/read/en+fr/obs/story/1', 'scripture')).toBe('obs')
     expect(navigationScopeFromReadPath('/read/en', 'obs')).toBe('obs')
     expect(navigationScopeFromReadPath('/read-v1/bho/obs/story/1', 'scripture')).toBe('scripture')
   })

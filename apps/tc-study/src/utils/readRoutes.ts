@@ -1,6 +1,6 @@
 /**
  * Read page URL template:
- *   /read/{lang1}[/{lang2}]/{resource_type}/{nav_type}/{nav_ref}
+ *   /read/{lang | lang1+lang2}/{resource_type}/{nav_type}/{nav_ref}
  *
  * Also accepts book-only / incomplete tails that complete to a default start:
  *   /read/{lang}/bible/{book}              → first ch:v (or first section) for current nav mode

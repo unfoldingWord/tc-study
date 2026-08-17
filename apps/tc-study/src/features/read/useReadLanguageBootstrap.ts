@@ -212,7 +212,7 @@ export function useReadLanguageBootstrap({
       const langs = readUrlLangsFromPanels(useReadPanelStore.getState().panels)
       if (langs.length && shouldPushReadLanguageUrl(pathname, langs)) {
         replaceReadLanguageUrlFromUi(langs)
-      } else {
+      } else if (options?.navigationScope) {
         markReadNavigationInternal()
       }
       if (

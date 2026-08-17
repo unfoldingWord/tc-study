@@ -168,7 +168,7 @@ describe('inheritEmptyPanelLanguage', () => {
     expect(hydrated.inheritedPanelId).toBe('panel-2')
   })
 
-  test('external /read/en/fr/bible sets p1=en and p2=fr', () => {
+  test('external /read/en+fr/bible sets p1=en and p2=fr', () => {
     const hydrated = hydrateReadLanguagesFromParsedUrl({
       panels: {
         'panel-1': { mode: 'scripture', languageCode: 'ha' },

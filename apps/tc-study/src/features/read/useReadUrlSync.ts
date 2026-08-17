@@ -28,6 +28,7 @@ import { readUrlLangsFromPanels } from './readUrlGrammar'
 import { useReadPanelStore } from './readPanelStore'
 import {
   getReadLocationPathname,
+  getReadNavigationSource,
   replaceReadUrlFromUi,
   subscribeReadPopstate,
 } from './replaceReadUrlFromUi'
@@ -252,8 +253,8 @@ export function useReadUrlSync({
     })
   }, [navigation, currentNavRef.book, currentSections])
 
-  // Keep URL in sync with navigation (canonical `/read/...` template), including
-  // resume from cache on bare `/read` (replace so back does not trap).
+  // Cache restore only on bare `/read`. Lang paths: URL wins unless this is
+  // an in-app UI write (internal replaceState).
   useEffect(() => {
     const deepLinkSig = readRouteTail
       ? `${readRouteTail.resourceType}|${readRouteTail.navType ?? ''}|${readRouteTail.navRef}`
@@ -265,6 +266,7 @@ export function useReadUrlSync({
       languages: readUrlLangsFromPanels(panels),
       suppressUrlSync: suppressUrlSyncRef.current,
       deepLinkPending: Boolean(deepLinkSig) && readRouteAppliedSigRef.current !== deepLinkSig,
+      navigationSource: getReadNavigationSource(),
       scope: navigationScope,
       mode: navigationMode,
       ref: currentNavRef,

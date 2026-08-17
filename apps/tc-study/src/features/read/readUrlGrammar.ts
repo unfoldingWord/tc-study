@@ -1,10 +1,14 @@
 /**
  * Unambiguous Read URL grammar:
- *   /read/{lang1}[/{lang2}]/{resourceType}/{navType}/{navRef}
+ *   /read/{lang | lang1+lang2}/{bible|obs}/{navType}/{navRef}
  *
- * First lang = panel-1, optional second = panel-2.
- * `bible` | `obs` (and other reserved tokens) never parse as a language, so
- * `/read/en/bible/...` and `/read/en/fr/bible/...` cannot collide.
+ * First path segment after `/read/` is the language field. Split that segment
+ * on `+` (max 2 langs). The next segment must be reserved mode (`bible`|`obs`).
+ * A second path segment is never a language — `/read/en/bible` is one lang.
+ * Hyphens stay inside a BCP-47 tag (`es-419+fr`).
+ *
+ * Legacy alias (parse only): `/read/{lang}/{lang2}/bible|obs/...` when lang2
+ * is not a reserved token. Serialize always writes plus form.
  */
 
 import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
@@ -47,6 +51,20 @@ function decodeSegment(raw: string): string {
   }
 }
 
+/** Canonical langs from one field (`en`, `en+fr`, `es-419+fr`). Drops reserved tokens and dupes. */
+export function langsFromReadLanguageField(field: string): string[] {
+  const langs: string[] = []
+  for (const raw of field.split('+')) {
+    const token = decodeSegment(raw).trim()
+    if (!token || isReservedReadToken(token)) continue
+    const code = canonicalReadLanguageCode(token)
+    if (!code || langs.includes(code)) continue
+    langs.push(code)
+    if (langs.length >= 2) break
+  }
+  return langs
+}
+
 export function parseReadUrl(pathname: string): ParsedReadUrl {
   if (pathname.includes('/read-v1/')) {
     return { langs: [], isBare: false }
@@ -56,17 +74,21 @@ export function parseReadUrl(pathname: string): ParsedReadUrl {
   const rest = parts.slice(1)
   if (rest.length === 0) return { langs: [], isBare: true }
 
-  const langs: string[] = []
   let i = 0
-  while (i < rest.length && langs.length < 2) {
-    const raw = decodeSegment(rest[i] ?? '').trim()
-    if (!raw) {
-      i += 1
-      continue
+  const langs: string[] = []
+  const firstRaw = decodeSegment(rest[0] ?? '').trim()
+  if (firstRaw && !isReservedReadToken(firstRaw)) {
+    langs.push(...langsFromReadLanguageField(firstRaw))
+    i = 1
+    // One-time external alias: /read/en/fr/bible/... (second segment is not mode)
+    if (!firstRaw.includes('+') && rest[1] && !isReservedReadToken(decodeSegment(rest[1]).trim())) {
+      const legacy = langsFromReadLanguageField(decodeSegment(rest[1]).trim())
+      for (const code of legacy) {
+        if (langs.length >= 2) break
+        if (!langs.includes(code)) langs.push(code)
+      }
+      if (legacy.length > 0) i = 2
     }
-    if (isReservedReadToken(raw)) break
-    langs.push(canonicalReadLanguageCode(raw))
-    i += 1
   }
 
   let resourceType: ReadResourceType | undefined
@@ -83,13 +105,16 @@ export function parseReadUrl(pathname: string): ParsedReadUrl {
 }
 
 export function serializeReadUrl(options: { langs: string[]; tail?: ReadRouteTail | null }): string {
-  const langs = options.langs
-    .map((code) => canonicalReadLanguageCode(String(code || '').trim()))
-    .filter(Boolean)
-    .slice(0, 2)
+  const langs: string[] = []
+  for (const raw of options.langs) {
+    const code = canonicalReadLanguageCode(String(raw || '').trim())
+    if (!code || langs.includes(code)) continue
+    langs.push(code)
+    if (langs.length >= 2) break
+  }
   if (langs.length === 0) return '/read'
-  const encoded = langs.map((code) => encodeURIComponent(code))
-  const prefix = `/read/${encoded.join('/')}`
+  const langField = langs.map((code) => encodeURIComponent(code)).join('+')
+  const prefix = `/read/${langField}`
   const tail = options.tail
   if (!tail) return prefix
   if (!tail.navType) {
@@ -109,9 +134,9 @@ type PanelLangSnapshot = {
 }
 
 /**
- * Scripture / OBS-content panes own the language segments.
- * Same code on both scripture panes → one lang (external inherit can fill an empty sibling).
- * Diverged scripture panes → two langs (shareable). Helps-only language is omitted.
+ * Scripture / OBS-content panes own the language field.
+ * Same code on both scripture panes → one lang (no `en+en`).
+ * Diverged scripture panes → `lang1+lang2`. Helps-only language is omitted.
  */
 export function readUrlLangsFromPanels(panels: Record<'panel-1' | 'panel-2', PanelLangSnapshot>): string[] {
   const c1 = panels['panel-1'].languageCode?.trim()

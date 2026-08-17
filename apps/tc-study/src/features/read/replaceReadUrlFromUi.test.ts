@@ -32,6 +32,27 @@ describe('replaceReadUrlFromUi + navigationSource', () => {
     expect(after.panels['panel-2'].languageCode).toBe('fr')
   })
 
+  test('in-app scripture pick updates en → en+fr via replaceState, no hydrate', () => {
+    replaceReadUrlFromUi('/read/en/bible/ref/tit%201%3A1')
+    expect(getReadNavigationSource()).toBe('internal')
+    expect(shouldHydrateReadLanguages()).toBe(false)
+    replaceReadUrlFromUi('/read/en+fr/bible/ref/tit%201%3A1')
+    expect(getReadNavigationSource()).toBe('internal')
+    expect(shouldHydrateReadLanguages()).toBe(false)
+    replaceReadUrlFromUi('/read/fr/bible/ref/tit%201%3A1')
+    expect(getReadNavigationSource()).toBe('internal')
+    expect(shouldHydrateReadLanguages()).toBe(false)
+    const after = hydrateReadLanguagesFromParsedUrl({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'en' },
+        'panel-2': { mode: 'scripture', languageCode: 'fr' },
+      },
+      langs: shouldHydrateReadLanguages() ? ['en'] : [],
+    })
+    expect(after.panels['panel-1'].languageCode).toBe('en')
+    expect(after.panels['panel-2'].languageCode).toBe('fr')
+  })
+
   test('write-back after hydrate does not re-enter hydrate', () => {
     const events: string[] = []
     expect(shouldHydrateReadLanguages('external')).toBe(true)

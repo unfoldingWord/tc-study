@@ -31,6 +31,7 @@ import {
 } from './verseSelectionUtils'
 import { useBcvNavigatorCatalog } from './useBcvNavigatorCatalog'
 import { useBcvNavigatorScroll } from './useBcvNavigatorScroll'
+import { markReadNavigationInternal } from '../read/replaceReadUrlFromUi'
 import { navigatorCommittedScope } from './bcvNavigatorModeSwitch'
 
 export function useBcvNavigatorController(options: {
@@ -67,6 +68,7 @@ export function useBcvNavigatorController(options: {
   )
 
   const commitPickerToNavigation = useCallback((): 'scripture' | 'obs' | null => {
+    markReadNavigationInternal()
     const switched = navigatorCommittedScope({
       previousScope: navigation.navigationScope,
       pickerScope,

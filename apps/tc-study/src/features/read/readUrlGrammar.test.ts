@@ -18,16 +18,63 @@ describe('readUrlGrammar', () => {
     expect(parseReadUrl('/read/en/obs/story/1').langs).toEqual(['en'])
   })
 
-  test('one vs two langs is unambiguous', () => {
-    expect(parseReadUrl('/read/en/bible/ref/tit%201:1')).toEqual({
+  test('/read/en/bible is one lang, not en+bible', () => {
+    expect(parseReadUrl('/read/en/bible')).toEqual({
       langs: ['en'],
+      resourceType: 'bible',
+      navType: undefined,
+      navRef: undefined,
+      isBare: false,
+    })
+    expect(parseReadUrl('/read/en/bible/ref/tit%201:1').langs).toEqual(['en'])
+    expect(parseReadUrl('/read/en/bible/ref/tit%201:1').resourceType).toBe('bible')
+  })
+
+  test('plus-separated pair: en+fr and es-419+fr', () => {
+    expect(parseReadUrl('/read/en+fr/bible/ref/tit%201:1')).toEqual({
+      langs: ['en', 'fr'],
       resourceType: 'bible',
       navType: 'ref',
       navRef: 'tit 1:1',
       isBare: false,
     })
+    expect(parseReadUrl('/read/es-419+fr/obs/story/1')).toEqual({
+      langs: ['es-419', 'fr'],
+      resourceType: 'obs',
+      navType: 'story',
+      navRef: '1',
+      isBare: false,
+    })
+    const tail = { resourceType: 'bible' as const, navType: 'ref', navRef: 'tit 1:1' }
+    expect(serializeReadUrl({ langs: ['en', 'fr'], tail })).toBe('/read/en+fr/bible/ref/tit%201%3A1')
+    expect(
+      serializeReadUrl({
+        langs: ['es-419', 'fr'],
+        tail: { resourceType: 'obs', navType: 'story', navRef: '1' },
+      })
+    ).toBe('/read/es-419+fr/obs/story/1')
+  })
+
+  test('legacy /read/en/fr/bible is a parse alias; serialize writes plus', () => {
     expect(parseReadUrl('/read/en/fr/bible/ref/tit%201:1')).toEqual({
       langs: ['en', 'fr'],
+      resourceType: 'bible',
+      navType: 'ref',
+      navRef: 'tit 1:1',
+      isBare: false,
+    })
+    expect(parseReadUrl('/read/en/fr').langs).toEqual(['en', 'fr'])
+    expect(
+      serializeReadUrl({
+        langs: ['en', 'fr'],
+        tail: { resourceType: 'bible', navType: 'ref', navRef: 'tit 1:1' },
+      })
+    ).toBe('/read/en+fr/bible/ref/tit%201%3A1')
+  })
+
+  test('one lang serialize and parse', () => {
+    expect(parseReadUrl('/read/en/bible/ref/tit%201:1')).toEqual({
+      langs: ['en'],
       resourceType: 'bible',
       navType: 'ref',
       navRef: 'tit 1:1',
@@ -40,11 +87,15 @@ describe('readUrlGrammar', () => {
       navRef: '1',
       isBare: false,
     })
+    const tail = { resourceType: 'bible' as const, navType: 'ref', navRef: 'tit 1:1' }
+    expect(serializeReadUrl({ langs: ['en'], tail })).toBe('/read/en/bible/ref/tit%201%3A1')
+    expect(serializeReadUrl({ langs: ['en', 'en'], tail })).toBe('/read/en/bible/ref/tit%201%3A1')
   })
 
   test('eng canonicalizes to Door43 en', () => {
     expect(parseReadUrl('/read/eng/bible/ref/tit%201:1').langs).toEqual(['en'])
-    expect(parseReadUrl('/read/eng/fr/obs/ref/1.1').langs).toEqual(['en', 'fr'])
+    expect(parseReadUrl('/read/eng+fr/obs/ref/1.1').langs).toEqual(['en', 'fr'])
+    expect(parseReadUrl('/read/en+en/bible/ref/tit%201:1').langs).toEqual(['en'])
     expect(
       serializeReadUrl({
         langs: ['eng'],
@@ -57,14 +108,8 @@ describe('readUrlGrammar', () => {
     expect(parseReadUrl('/read')).toEqual({ langs: [], isBare: true })
     expect(parseReadUrl('/read/')).toEqual({ langs: [], isBare: true })
     expect(parseReadUrl('/read/en').langs).toEqual(['en'])
-    expect(parseReadUrl('/read/en/fr').langs).toEqual(['en', 'fr'])
+    expect(parseReadUrl('/read/en+fr').langs).toEqual(['en', 'fr'])
     expect(parseReadUrl('/read-v1/en/bible/ref/tit%201:1').langs).toEqual([])
-  })
-
-  test('serialize one or two langs', () => {
-    const tail = { resourceType: 'bible' as const, navType: 'ref', navRef: 'tit 1:1' }
-    expect(serializeReadUrl({ langs: ['en'], tail })).toBe('/read/en/bible/ref/tit%201%3A1')
-    expect(serializeReadUrl({ langs: ['en', 'fr'], tail })).toBe('/read/en/fr/bible/ref/tit%201%3A1')
   })
 
   test('scripture panes own URL langs; helps-only is omitted', () => {
