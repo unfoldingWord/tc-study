@@ -58,6 +58,47 @@ describe('inheritEmptyPanelLanguage', () => {
     expect(diverged['panel-2']).toEqual({ mode: 'helps', languageCode: 'ha' })
   })
 
+  test('cached eng + visit /read/tr/obs/ref/1.1 applies tr to both synced panes', () => {
+    const urlLang = languageCodeFromReadPathname('/read/tr/obs/ref/1.1')
+    expect(urlLang).toBe('tr')
+    const hydrated = hydrateReadLanguagesFromHint({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'eng' },
+        'panel-2': { mode: 'helps', languageCode: 'eng' },
+      },
+      hintLanguage: urlLang,
+    })
+    expect(hydrated.appliedHintTo).toBe('panel-1')
+    expect(hydrated.inheritedPanelId).toBe('panel-2')
+    expect(hydrated.languageCode).toBe('tr')
+    expect(hydrated.panels['panel-1'].languageCode).toBe('tr')
+    expect(hydrated.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'tr' })
+  })
+
+  test('URL tr + empty panel-2 inherits tr, not a stale cached sibling', () => {
+    const hydrated = hydrateReadLanguagesFromHint({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'eng' },
+        'panel-2': { mode: 'helps', languageCode: null },
+      },
+      hintLanguage: 'tr',
+    })
+    expect(hydrated.panels['panel-1'].languageCode).toBe('tr')
+    expect(hydrated.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'tr' })
+  })
+
+  test('URL tr does not clobber a diverged helps language', () => {
+    const hydrated = hydrateReadLanguagesFromHint({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'eng' },
+        'panel-2': { mode: 'helps', languageCode: 'en' },
+      },
+      hintLanguage: 'tr',
+    })
+    expect(hydrated.panels['panel-1'].languageCode).toBe('tr')
+    expect(hydrated.panels['panel-2']).toEqual({ mode: 'helps', languageCode: 'en' })
+  })
+
   test('visit /read/tr/obs/ref/1.1 with empty panel-2 inherits tr and triggers helps load', () => {
     const urlLang = languageCodeFromReadPathname('/read/tr/obs/ref/1.1')
     expect(urlLang).toBe('tr')

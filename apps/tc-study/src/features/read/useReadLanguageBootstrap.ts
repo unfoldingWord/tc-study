@@ -41,7 +41,11 @@ import {
   type DownloadPane,
 } from './downloadIsolationPolicy'
 import { loadLanguagesCache } from './languagesCache'
-import { languageCodeFromReadPathname, shouldDeferLanguageCatalogLoad } from './readBootstrapPolicy'
+import {
+  languageCodeFromReadPathname,
+  shouldDeferLanguageCatalogLoad,
+  shouldPushReadLanguageUrl,
+} from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
 import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
@@ -179,7 +183,7 @@ export function useReadLanguageBootstrap({
       setIsLanguagePickerRequired(false)
       if (canSeedBothPanelLanguages()) {
         seedBothLanguages(languageCode)
-      } else if (!useReadPanelStore.getState().panels['panel-1'].languageCode) {
+      } else if (useReadPanelStore.getState().panels['panel-1'].languageCode !== languageCode) {
         setPanelLanguage('panel-1', languageCode)
       }
       inheritEmptyLanguage()
@@ -203,7 +207,10 @@ export function useReadLanguageBootstrap({
       })
       applyTextLanguagePickNavigation(useNavigationStore.getState(), pick)
       const scope = catalogScopeAfterTextLanguagePick(scopeFromUrl, pick)
-      pushReadLanguageUrl(navigate, languageCode)
+      const pathname = typeof window !== 'undefined' ? window.location.pathname : ''
+      if (shouldPushReadLanguageUrl(pathname, languageCode)) {
+        pushReadLanguageUrl(navigate, languageCode)
+      }
 
       if (shouldDeferLanguageCatalogLoad(initialLanguage)) {
         return

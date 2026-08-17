@@ -37,19 +37,50 @@ export function languageCodeFromReadPathname(pathname: string): string | null {
 }
 
 /**
+ * Explicit `/read/{lang}/…` wins over a persisted session language.
+ * Bare `/read` (no `:lang`) falls back to cache.
+ */
+export function resolveReadLanguageFromUrlOrCache(options: {
+  pathname: string
+  cachedLanguage?: string | null
+}): { language: string | null; source: 'url' | 'cache' | null } {
+  const urlLang = languageCodeFromReadPathname(options.pathname)
+  if (urlLang) return { language: urlLang, source: 'url' }
+  const cached = options.cachedLanguage?.trim() || null
+  if (cached) return { language: cached, source: 'cache' }
+  return { language: null, source: null }
+}
+
+/**
+ * Picker / language change may replace the path. Auto-load of a URL that
+ * already has this `:lang` must not — that would rewrite a deep link with
+ * cached nav (bible/tit instead of obs/1.1).
+ */
+export function shouldPushReadLanguageUrl(pathname: string, languageCode: string): boolean {
+  const pathLang = languageCodeFromReadPathname(pathname)
+  return !pathLang || pathLang !== languageCode
+}
+
+/**
  * Whether the Read URL write-back effect should replace the pathname with the
  * canonical `/read/{lang}/…` template.
  *
- * Language may come from the URL or a persisted session. Cold start with no
- * language stays on `/read`. `suppressUrlSync` blocks clobbering an incoming
- * deep link while it is being applied.
+ * An explicit `/read/{lang}/…` is authoritative: never replace that language
+ * with a cached session language. Bare `/read` may write back from cache.
+ * `suppressUrlSync` / `deepLinkPending` block clobbering an incoming deep
+ * link before (or while) it is applied.
  */
 export function shouldWriteBackReadUrl(options: {
   currentLanguageCode: string | null | undefined
   suppressUrlSync: boolean
+  pathname?: string
+  deepLinkPending?: boolean
 }): boolean {
   if (!options.currentLanguageCode) return false
   if (options.suppressUrlSync) return false
+  if (options.deepLinkPending) return false
+  const urlLang = options.pathname ? languageCodeFromReadPathname(options.pathname) : null
+  if (urlLang && urlLang !== options.currentLanguageCode) return false
   return true
 }
 
@@ -97,16 +128,20 @@ export function readUrlWriteBackAction(args: {
   ref: BCVReference
   passageSet: PassageSet | null
   section1Based: number | null
+  deepLinkPending?: boolean
 }): { replace: string } | null {
   if (
     !shouldWriteBackReadUrl({
       currentLanguageCode: args.language,
       suppressUrlSync: args.suppressUrlSync,
+      pathname: args.pathname,
+      deepLinkPending: args.deepLinkPending,
     })
   ) {
     return null
   }
-  const language = args.language
+  const urlLang = languageCodeFromReadPathname(args.pathname)
+  const language = urlLang || args.language
   if (!language) return null
   const tail = buildReadRouteTailFromNavigation({
     scope: args.scope,

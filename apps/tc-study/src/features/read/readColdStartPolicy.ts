@@ -78,9 +78,11 @@ function asReadPanelModels(panels: InheritPanelLanguageSnapshot): ReadPanelModel
 }
 
 /**
- * URL / session hydrate: apply a hint (URL `:lang` or nav/panel-1 language) to
- * an empty panel-1, then inherit the empty sibling. Does not clobber a pane
- * that already has a language.
+ * URL hydrate: an explicit `:lang` is authoritative over a persisted session.
+ * Apply it to panel-1 even when cache already has another language. An empty
+ * sibling inherits the URL language. Panes that still share the previous
+ * session language follow the URL (so cache `eng`/`eng` becomes `tr`/`tr`).
+ * A diverged other pane is left alone.
  */
 export function hydrateReadLanguagesFromHint(options: {
   panels: InheritPanelLanguageSnapshot
@@ -88,10 +90,21 @@ export function hydrateReadLanguagesFromHint(options: {
 }): HydrateReadLanguagesFromHintResult {
   let panels = asReadPanelModels(options.panels)
   const hint = trimmedPanelLanguage(options.hintLanguage)
+  const previousP1 = trimmedPanelLanguage(panels['panel-1'].languageCode)
+  const previousP2 = trimmedPanelLanguage(panels['panel-2'].languageCode)
   let appliedHintTo: ReadPanelId | null = null
-  if (hint && !trimmedPanelLanguage(panels['panel-1'].languageCode)) {
+  if (hint && previousP1 !== hint) {
     panels = applyPanelLanguage(panels, 'panel-1', hint)
     appliedHintTo = 'panel-1'
+    if (previousP2 && previousP2 === previousP1) {
+      panels = applyPanelLanguage(panels, 'panel-2', hint)
+      return {
+        panels,
+        appliedHintTo,
+        inheritedPanelId: 'panel-2',
+        languageCode: hint,
+      }
+    }
   }
   const inherited = inheritEmptyPanelLanguage(panels)
   if (inherited) {

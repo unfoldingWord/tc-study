@@ -16,6 +16,7 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   })
 
   test('URL stays on text language; first pick seeds both panels', () => {
+    expect(src).toContain('shouldPushReadLanguageUrl')
     expect(src).toContain('pushReadLanguageUrl(navigate, languageCode)')
     expect(src).toContain('canSeedBothPanelLanguages')
     expect(src).toContain('seedBothLanguages(languageCode)')
@@ -29,7 +30,8 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     const body = handler.slice(0, handler.indexOf('const { handleSwitchTextMode'))
     expect(body).toContain('resolveTextLanguagePickNavigation')
     expect(body).toContain('applyTextLanguagePickNavigation')
-    expect(body.indexOf('applyTextLanguagePickNavigation')).toBeLessThan(body.indexOf('pushReadLanguageUrl'))
+    expect(body.indexOf('applyTextLanguagePickNavigation')).toBeLessThan(body.indexOf('shouldPushReadLanguageUrl'))
+    expect(body.indexOf('shouldPushReadLanguageUrl')).toBeLessThan(body.indexOf('pushReadLanguageUrl'))
     expect(body.indexOf('catalogScopeAfterTextLanguagePick')).toBeLessThan(
       body.indexOf('textModeMismatchFromCache')
     )

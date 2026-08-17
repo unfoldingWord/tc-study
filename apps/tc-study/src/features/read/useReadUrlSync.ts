@@ -238,10 +238,14 @@ export function useReadUrlSync({
   // Keep URL in sync with navigation (canonical `/read/...` template), including
   // resume from cache on bare `/read` (replace so back does not trap).
   useEffect(() => {
+    const deepLinkSig = readRouteTail
+      ? `${readRouteTail.resourceType}|${readRouteTail.navType ?? ''}|${readRouteTail.navRef}`
+      : null
     const action = readUrlWriteBackAction({
       pathname: location.pathname,
       language: currentLanguageCode,
       suppressUrlSync: suppressUrlSyncRef.current,
+      deepLinkPending: Boolean(deepLinkSig) && readRouteAppliedSigRef.current !== deepLinkSig,
       scope: navigationScope,
       mode: navigationMode,
       ref: currentNavRef,
@@ -259,5 +263,6 @@ export function useReadUrlSync({
     currentSectionIndex,
     location.pathname,
     navigate,
+    readRouteTail,
   ])
 }
