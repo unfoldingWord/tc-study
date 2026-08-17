@@ -36,5 +36,7 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
     expect(src).toContain('panelClearTargetForLoad(loadTarget, destPanelId)')
     expect(src).toContain('shouldReconcileHelpsOnPanelClear')
     expect(src).toContain('clearReadPanelsForLanguageSwitch(helpsLanguageCode')
+    expect(src).toContain('skipPanelClear')
+    expect(src).toContain('forceHelpsPanel: loadTarget === \'helps\'')
   })
 })

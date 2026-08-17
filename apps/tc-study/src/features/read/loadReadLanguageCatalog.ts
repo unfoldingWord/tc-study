@@ -53,6 +53,8 @@ export interface LoadReadLanguageCatalogDeps {
   setActiveResourceInPanel: (panelId: string, index: number) => void
   setExpectedResources: (keys: string[]) => void
   onMetadataBatch: (count: number) => void
+  /** Mode switch: hydrate helps onto this pane without wiping scripture membership. */
+  skipPanelClear?: boolean
 }
 
 export interface LoadReadLanguageCatalogResult {
@@ -107,6 +109,7 @@ export async function loadReadLanguageCatalog(
     setActiveResourceInPanel,
     setExpectedResources,
     onMetadataBatch,
+    skipPanelClear = false,
   } = deps
   const existingTextKeys = deps.existingTextKeys ?? []
   const existingHelpsKeys = deps.existingHelpsKeys ?? []
@@ -121,9 +124,11 @@ export async function loadReadLanguageCatalog(
   setExpectedResources([...startExpected.textKeys, ...startExpected.helpsKeys])
 
   const panelTarget = panelClearTargetForLoad(loadTarget, destPanelId)
-  clearReadPanelsForLanguageSwitch(helpsLanguageCode, panelTarget, {
-    reconcileHelps: shouldReconcileHelpsOnPanelClear(loadTarget, panelTarget),
-  })
+  if (!skipPanelClear) {
+    clearReadPanelsForLanguageSwitch(helpsLanguageCode, panelTarget, {
+      reconcileHelps: shouldReconcileHelpsOnPanelClear(loadTarget, panelTarget),
+    })
+  }
 
   const door43Client = getDoor43ApiClient()
   const searches =
@@ -209,7 +214,9 @@ export async function loadReadLanguageCatalog(
   if (destPanelId && loadTarget === 'text') {
     /* scripture-only into one panel — do not inject CombinedHelps onto that panel */
   } else if (destPanelId) {
-    applyCombinedHelpsEnsure(helpsLanguageCode, destPanelId)
+    applyCombinedHelpsEnsure(helpsLanguageCode, destPanelId, {
+      forceHelpsPanel: loadTarget === 'helps',
+    })
   } else {
     applyCombinedHelpsEnsure(helpsLanguageCode)
   }

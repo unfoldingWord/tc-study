@@ -261,6 +261,7 @@ export function useReadLanguageBootstrap({
     maybeCancelDownloads,
     runCatalogLoad,
     markCatalogSettled,
+    resetCatalogSettled,
     setExpectedResources,
     textKeysRef,
     helpsKeysRef,

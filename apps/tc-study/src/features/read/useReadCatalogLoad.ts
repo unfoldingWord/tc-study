@@ -26,6 +26,8 @@ export interface RunReadCatalogLoadOptions {
   loadTarget: CatalogLoadTarget
   destPanelId?: ReadPanelId
   navigationScope: string
+  /** Mode switch: enqueue helps without clearing scripture membership. */
+  skipPanelClear?: boolean
 }
 
 export function useReadCatalogLoad() {
@@ -116,6 +118,7 @@ export function useReadCatalogLoad() {
       | 'navigationScope'
       | 'existingTextKeys'
       | 'existingHelpsKeys'
+      | 'skipPanelClear'
     > => ({
       catalogManager: catalogManager as LoadReadLanguageCatalogDeps['catalogManager'],
       resourceTypeRegistry: resourceTypeRegistry as LoadReadLanguageCatalogDeps['resourceTypeRegistry'],
@@ -146,9 +149,11 @@ export function useReadCatalogLoad() {
         })
       ) {
         const panelTarget = destPanels.length > 1 ? 'both' : destPanels[0] ?? 'panel-2'
-        clearReadPanelsForLanguageSwitch(options.helpsLanguageCode, panelTarget, {
-          reconcileHelps: false,
-        })
+        if (!options.skipPanelClear) {
+          clearReadPanelsForLanguageSwitch(options.helpsLanguageCode, panelTarget, {
+            reconcileHelps: false,
+          })
+        }
         helpsKeysRef.current = []
         markCatalogSettled(destPanels)
         return
@@ -162,9 +167,11 @@ export function useReadCatalogLoad() {
         })
       ) {
         const panelTarget = destPanels.length > 1 ? 'both' : destPanels[0] ?? 'panel-1'
-        clearReadPanelsForLanguageSwitch(options.helpsLanguageCode, panelTarget, {
-          reconcileHelps: false,
-        })
+        if (!options.skipPanelClear) {
+          clearReadPanelsForLanguageSwitch(options.helpsLanguageCode, panelTarget, {
+            reconcileHelps: false,
+          })
+        }
         textKeysRef.current = []
         markCatalogSettled(destPanels)
         return
@@ -180,6 +187,7 @@ export function useReadCatalogLoad() {
           navigationScope: options.navigationScope,
           existingTextKeys: textKeysRef.current,
           existingHelpsKeys: helpsKeysRef.current,
+          skipPanelClear: options.skipPanelClear,
         })
         if (options.loadTarget === 'text' || options.loadTarget === 'both') {
           textKeysRef.current = result.textKeys

@@ -133,4 +133,24 @@ describe('shouldLoadCatalogOnModeSwitch', () => {
     expect(catalogKeysIncludeLanguage(['unfoldingWord/en/ult'], 'es')).toBe(false)
     expect(catalogKeysIncludeLanguage(['__combined-helps__'], 'en')).toBe(false)
   })
+
+  test('en and eng are aliases for already-loaded helps', () => {
+    expect(catalogKeysIncludeLanguage(['u/en/tn', 'u/en/twl'], 'eng')).toBe(true)
+    expect(
+      shouldLoadCatalogOnModeSwitch({
+        mode: 'helps',
+        languageCode: 'eng',
+        textKeys: ['unfoldingWord/en/ult'],
+        helpsKeys: ['u/en/tn', 'u/en/twl'],
+      })
+    ).toBe(false)
+    expect(
+      shouldLoadCatalogOnModeSwitch({
+        mode: 'helps',
+        languageCode: 'en',
+        textKeys: ['unfoldingWord/en/ult'],
+        helpsKeys: [],
+      })
+    ).toBe(true)
+  })
 })

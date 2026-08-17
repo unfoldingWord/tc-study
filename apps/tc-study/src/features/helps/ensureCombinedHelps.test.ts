@@ -471,6 +471,39 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     expect(out.panels[1]!.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
   })
 
+  test('forceHelpsPanel injects CombinedHelps onto a scripture-keyed pane', () => {
+    const resources = new Map<string, ResourceInfo>([
+      ['u/en/ult', res({ key: 'u/en/ult', type: 'scripture' })],
+      ['u/en/tn', res({ key: 'u/en/tn', type: 'notes' })],
+      ['u/en/twl', res({ key: 'u/en/twl', type: 'words-links' })],
+    ])
+    const panels = [
+      { id: 'panel-1', resourceKeys: ['u/en/ult'], activeIndex: 0 },
+      { id: 'panel-2', resourceKeys: [COMBINED_HELPS_RESOURCE_ID], activeIndex: 0 },
+    ]
+    resources.set(
+      COMBINED_HELPS_RESOURCE_ID,
+      res({
+        key: COMBINED_HELPS_RESOURCE_ID,
+        type: 'combined-helps',
+        language: 'en',
+        languageCode: 'en',
+      })
+    )
+
+    const out = ensureCombinedHelpsInWorkspace({
+      resources,
+      panels,
+      languageCode: 'en',
+      panelId: 'panel-1',
+      forceHelpsPanel: true,
+    })
+    const scoped = `${COMBINED_HELPS_RESOURCE_ID}:panel-1`
+    expect(out.panels[0]!.resourceKeys).toContain('u/en/ult')
+    expect(out.panels[0]!.resourceKeys).toContain(scoped)
+    expect(out.panels[1]!.resourceKeys).toContain(COMBINED_HELPS_RESOURCE_ID)
+  })
+
   test('does not keep unscoped and :panel-N CombinedHelps on the same panel', () => {
     const resources = new Map<string, ResourceInfo>([
       ['u/en/tn', res({ key: 'u/en/tn', type: 'notes' })],

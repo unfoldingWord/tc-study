@@ -6,6 +6,8 @@
  * has in-flight keys and the other pane does not.
  */
 
+import { languageCodesMatch } from '../../utils/languageCodeMatch'
+
 export type DownloadPane = 'text' | 'helps'
 
 export function shouldCancelDownloadsOnPaneSwitch(options: {
@@ -47,11 +49,11 @@ export function catalogKeysIncludeLanguage(
   keys: readonly string[],
   languageCode: string | null | undefined
 ): boolean {
-  const lang = languageCode?.trim().toLowerCase()
+  const lang = languageCode?.trim()
   if (!lang) return false
   return keys.some((key) => {
     const parts = key.split('/')
-    return parts.length >= 3 && parts[1]?.toLowerCase() === lang
+    return parts.length >= 3 && languageCodesMatch(parts[1], lang)
   })
 }
 

@@ -51,6 +51,11 @@ export function ensureCombinedHelpsInWorkspace(options: {
   languageCode?: string
   /** Default panel-2 so existing bootstrap stays green. */
   panelId?: string
+  /**
+   * Mode switch onto a pane that still has scripture/OBS keys (mixed
+   * membership; the filter hides text). Inject CombinedHelps anyway.
+   */
+  forceHelpsPanel?: boolean
 }): {
   resources: Map<string, ResourceInfo>
   panels: WorkspacePanelLike[]
@@ -126,7 +131,12 @@ export function ensureCombinedHelpsInWorkspace(options: {
     }
 
     // Dual scripture (same lang): panel-2 is not always helps — never inject there.
-    if (helpsPanel && panelHasPrimaryText(helpsPanel, resourceMap)) {
+    // Mode switch to helps keeps scripture keys (filter hides them) — force inject.
+    if (
+      helpsPanel &&
+      panelHasPrimaryText(helpsPanel, resourceMap) &&
+      !options.forceHelpsPanel
+    ) {
       helpsPanel.resourceKeys = helpsPanel.resourceKeys.filter((k) => k !== id)
       stripScopedHelpsPeersFromPanels(panels, resourceMap, scope)
       continue
