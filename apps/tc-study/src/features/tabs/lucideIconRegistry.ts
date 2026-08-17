@@ -4,10 +4,10 @@ import {
   BookMarked,
   BookOpen,
   BookText,
-  CircleHelp,
   GraduationCap,
   Layers,
   LifeBuoy,
+  Lightbulb,
   Link,
   MessageCircleQuestion,
 } from 'lucide-react'
@@ -21,10 +21,10 @@ export const LUCIDE_ICON_REGISTRY: Record<string, LucideIcon> = {
   BookMarked,
   BookOpen,
   BookText,
-  CircleHelp,
   GraduationCap,
   Layers,
   LifeBuoy,
+  Lightbulb,
   Link,
   MessageCircleQuestion,
 }

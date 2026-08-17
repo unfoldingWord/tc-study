@@ -1,5 +1,5 @@
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
-import { BookOpen, CircleHelp } from 'lucide-react'
+import { BookOpen, Lightbulb } from 'lucide-react'
 import React, { useLayoutEffect, useRef } from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
@@ -137,7 +137,7 @@ export function CombinedHelpsList({
     <div ref={listPanelRef} className={HELPS_LIST_PANEL} dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
-        icon={CircleHelp}
+        icon={Lightbulb}
         direction={languageDirection}
         actions={
           // Sources stays visible even when token/verse/OBS filter replaces the kind menu.
