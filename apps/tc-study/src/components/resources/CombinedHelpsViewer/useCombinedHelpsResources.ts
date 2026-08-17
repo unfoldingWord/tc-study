@@ -10,6 +10,11 @@ import {
 
 export interface UseCombinedHelpsResourcesParams {
   loadedResources: Record<string, ResourceInfo | undefined>
+  /**
+   * Workspace package resources. Unlock 1 keeps TN/TWL here after stripping
+   * them from panel keys, so AppStore `loadedResources` often has CombinedHelps only.
+   */
+  packageResources?: Map<string, ResourceInfo> | Iterable<ResourceInfo | undefined>
   wantLang: string
   injectedTnKey?: string
   injectedTwlKey?: string
@@ -31,6 +36,7 @@ function injectedKeyMatchesLang(key: string | undefined, wantLang: string): stri
  */
 export function resolveCombinedHelpsResourceKeys({
   loadedResources,
+  packageResources,
   wantLang,
   injectedTnKey,
   injectedTwlKey,
@@ -38,7 +44,25 @@ export function resolveCombinedHelpsResourceKeys({
 }: UseCombinedHelpsResourcesParams): { tnKey: string; twlKey: string } {
   let tn: string | null = injectedKeyMatchesLang(injectedTnKey, wantLang)
   let twl: string | null = injectedKeyMatchesLang(injectedTwlKey, wantLang)
-  const list = Object.values(loadedResources).filter(Boolean) as ResourceInfo[]
+  const seen = new Set<string>()
+  const list: ResourceInfo[] = []
+  for (const r of Object.values(loadedResources)) {
+    if (!r) continue
+    const key = r.key || r.id || ''
+    if (key) seen.add(key)
+    list.push(r)
+  }
+  const packageList =
+    packageResources instanceof Map ? packageResources.values() : packageResources
+  if (packageList) {
+    for (const r of packageList) {
+      if (!r) continue
+      const key = r.key || r.id || ''
+      if (key && seen.has(key)) continue
+      if (key) seen.add(key)
+      list.push(r)
+    }
+  }
 
   const matchesLang = (r: ResourceInfo) => {
     if (!wantLang) return true
@@ -80,6 +104,7 @@ export function useCombinedHelpsResources(
     () => resolveCombinedHelpsResourceKeys(params),
     [
       params.loadedResources,
+      params.packageResources,
       params.wantLang,
       params.injectedTnKey,
       params.injectedTwlKey,

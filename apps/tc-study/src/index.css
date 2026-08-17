@@ -31,6 +31,8 @@
   --color-underline: var(--theme-underline);
   --color-danger: var(--theme-danger);
   --color-danger-soft: var(--theme-danger-soft);
+  --color-warning: var(--theme-warning);
+  --color-warning-fg: var(--theme-warning-fg);
   --color-panel-1-soft: var(--theme-panel-1-soft);
   --color-panel-1: var(--theme-panel-1);
   --color-panel-1-fg: var(--theme-panel-1-fg);
@@ -93,6 +95,10 @@
   --theme-danger: #dc2626;
   --theme-danger-soft: #fef2f2;
 
+  /* Amber — CVD-safe pair with accent blue (TW vs TA footers) */
+  --theme-warning: #d97706;
+  --theme-warning-fg: #92400e;
+
   --theme-panel-1-soft: #eff6ff;
   --theme-panel-1: #2563eb;
   --theme-panel-1-fg: #1d4ed8;
@@ -150,6 +156,9 @@
 
   --theme-danger: #f87171;
   --theme-danger-soft: #3f1d1d;
+
+  --theme-warning: #fbbf24;
+  --theme-warning-fg: #fde68a;
 
   --theme-panel-1-soft: #335578;
   --theme-panel-1: #7bb8ff;
@@ -242,5 +251,16 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+}
+
+/* Live drag + collapse/restore rAF write flex-basis each frame — never CSS-transition it. */
+.panels-resize-container > .read-panel-shell {
+  transition-property: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panels-resize-container > * {
+    transition: none !important;
   }
 }

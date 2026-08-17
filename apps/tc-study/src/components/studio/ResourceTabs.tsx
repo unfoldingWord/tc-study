@@ -104,16 +104,17 @@ export function ResourceTabs({
         aria-label="Resources"
       >
         {resources.map((resource, idx) => {
-          const key = resource.key || resource.id
+          // Instance id (ult#2) — never the base key, or dual-scripture tabs collide.
+          const tabId = resource.id || resource.key
           const presentation = getTabPresentation(resource)
           return (
-            <React.Fragment key={key}>
+            <React.Fragment key={tabId}>
               {showDropPlaceholder &&
                 !showPlaceholderAtEnd &&
                 placeholderIndex === idx &&
                 placeholderElement}
               <SortableTab
-                id={key}
+                id={tabId}
                 panelId={panelId}
                 isActive={idx === currentIndex}
                 label={presentation.shortLabel}

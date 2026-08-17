@@ -3,18 +3,20 @@
  */
 
 import { LinkedPanel } from '@bt-synergy/resource-panels'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigationScope } from '../../contexts'
 import type { ResourceInfo } from '../../contexts/types'
 import { HelpsLanguageActionsProvider } from '../../features/helps/HelpsLanguageActionsContext'
 import { helpsFlagForNavigationScope } from '../../features/read/helpsLanguagePolicy'
+import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
+import type { ReadPanelId, ReadPanelMode } from '../../features/read/readPanelModel'
 import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
 import { useSwipeGesture } from '../../hooks'
-import { LanguagePicker } from '../LanguagePicker'
 import { DroppablePanel } from '../studio/DroppablePanel'
 import { EmptyPanelState } from '../studio/EmptyPanelState'
-import { PanelHeader } from '../studio/PanelHeader'
 import { LoadingSpinner } from '../../shared/LoadingSpinner'
+import { ReadCrossPanelReopen } from './ReadCrossPanelReopen'
+import { ReadPanelHeader } from './ReadPanelHeader'
 
 type StudioPanelApi = {
   resourceKeys: string[]
@@ -28,46 +30,53 @@ type StudioPanelApi = {
 }
 
 interface ReadLinkedPanelProps {
-  panelId: 'panel-1' | 'panel-2'
-  otherPanelId: 'panel-1' | 'panel-2'
+  panelId: ReadPanelId
+  otherPanelId: ReadPanelId
   colorScheme: 'blue' | 'purple'
-  flexBasisPercent: number
-  /** Per-pane `dir` (text vs helps). Do not set `document.documentElement.dir`. */
+  mountStyle: CSSProperties
   dir: 'ltr' | 'rtl'
+  mode: ReadPanelMode
+  onModeSwitch: (mode: ReadPanelMode) => void
+  onLanguageSelected: (languageCode: string) => void
   filteredKeys: string[]
   filteredResources: ResourceInfo[]
   panelResources: StudioPanelApi
   isLoadingResources: boolean
+  /** Raw catalog fetch for this panel (not gated on membership). */
+  catalogLoading?: boolean
   showDropPlaceholder: boolean
   placeholderLabel: string
   placeholderIndex: number | undefined
-  /** Panel-2 only: opens helps language picker (does not change `/read/:textLang`). */
-  onHelpsLanguageSelected?: (languageCode: string) => void
-  /** Full selected helps BCP-47 code for empty copy (`es-419`, not collapsed `es`). */
-  helpsLanguageCode?: string | null
-  /** Panel-1 only: text language has no content for the current Bible/OBS mode. */
+  layout: ReadLayoutMode
+  collapsedPanelId: ReadPanelId | null
+  onReopenCollapsed: (panelId: ReadPanelId) => void
   textModeMismatch?: TextModeMismatchView | null
   onSwitchTextMode?: (scope: 'scripture' | 'obs') => void
 }
 
 function ReadPanelBody({
   panelId,
-  otherPanelId,
+  otherPanelId: _otherPanelId,
   colorScheme,
   filteredKeys,
   filteredResources,
   panelResources,
   isLoadingResources,
+  catalogLoading = false,
   showDropPlaceholder,
   placeholderLabel,
   placeholderIndex,
-  onHelpsLanguageSelected,
-  helpsLanguageCode,
+  mode,
+  onModeSwitch,
+  onLanguageSelected,
+  layout,
+  collapsedPanelId,
+  onReopenCollapsed,
   textModeMismatch,
   onSwitchTextMode,
   current,
   navigate,
-}: Omit<ReadLinkedPanelProps, 'flexBasisPercent' | 'dir'> & {
+}: Omit<ReadLinkedPanelProps, 'mountStyle' | 'dir'> & {
   current: { index: number; resource?: { component?: ReactNode } | null }
   navigate: {
     next: () => void
@@ -75,29 +84,28 @@ function ReadPanelBody({
     toIndex: (index: number) => void
   }
 }) {
-  const [helpsPickerOpen, setHelpsPickerOpen] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const navigationScope = useNavigationScope()
   const helpsFlag = helpsFlagForNavigationScope(navigationScope)
-  const showHelpsPicker = panelId === 'panel-2' && !!onHelpsLanguageSelected
+  const isHelps = mode === 'helps'
   const helpsLanguageActions = useMemo(
     () =>
-      showHelpsPicker && onHelpsLanguageSelected
+      isHelps
         ? {
-            openHelpsPicker: () => setHelpsPickerOpen(true),
-            selectHelpsLanguage: onHelpsLanguageSelected,
-            selectedLanguageCode: helpsLanguageCode ?? null,
+            openHelpsPicker: () => setPickerOpen(true),
+            selectHelpsLanguage: onLanguageSelected,
+            selectedLanguageCode: null,
+            isCatalogLoading: catalogLoading,
           }
         : null,
-    [showHelpsPicker, onHelpsLanguageSelected, helpsLanguageCode]
+    [isHelps, onLanguageSelected, catalogLoading]
   )
-  const panel1Mismatch = panelId === 'panel-1' ? textModeMismatch : null
-  const mismatchScope = panel1Mismatch?.switchScope
+  const scriptureMismatch = mode === 'scripture' ? textModeMismatch : null
+  const mismatchScope = scriptureMismatch?.switchScope
   const mismatchAction =
-    panel1Mismatch?.actionLabel && mismatchScope && onSwitchTextMode
+    scriptureMismatch?.actionLabel && mismatchScope && onSwitchTextMode
       ? () => onSwitchTextMode(mismatchScope)
       : undefined
-  // Single index owner: LinkedPanel filtered list drives swipe; workspace activeIndex
-  // follows by key (do not also advance unfiltered studio indices — that desyncs).
   const swipeHandlers = useSwipeGesture({
     onSwipeLeft: () => {
       if (current.index < filteredKeys.length - 1) {
@@ -119,15 +127,24 @@ function ReadPanelBody({
     },
     minSwipeDistance: 50,
   })
+  const sourceResourceId = filteredKeys[current.index]
 
   return (
     <HelpsLanguageActionsProvider value={helpsLanguageActions}>
     <div className="h-full flex flex-col">
-      <PanelHeader
+      {sourceResourceId ? (
+        <ReadCrossPanelReopen
+          sourceResourceId={sourceResourceId}
+          sourcePanelId={panelId}
+          layout={layout}
+          collapsedPanelId={collapsedPanelId}
+          onReopen={onReopenCollapsed}
+        />
+      ) : null}
+      <ReadPanelHeader
         panelId={panelId}
         resources={filteredResources}
         currentIndex={current.index}
-        currentResource={filteredResources[current.index] ?? null}
         onIndexChange={(newIndex) => {
           navigate.toIndex(newIndex)
           const filteredKey = filteredKeys[newIndex]
@@ -136,31 +153,17 @@ function ReadPanelBody({
             : -1
           if (unfilteredIdx >= 0) panelResources.goToIndex(unfilteredIdx)
         }}
-        onRemove={() => panelResources.removeResource()}
-        onMoveToOtherPanel={
-          filteredResources[current.index] && filteredKeys.length > 0
-            ? () => {
-                const key = filteredKeys[current.index]
-                if (key) panelResources.moveResource(key, otherPanelId)
-              }
-            : undefined
-        }
         colorScheme={colorScheme}
+        mode={mode}
+        onModeSwitch={onModeSwitch}
+        onLanguageSelected={onLanguageSelected}
+        languageListMode={isHelps ? 'helps' : 'text'}
+        helpsFlag={isHelps ? helpsFlag : undefined}
+        languagePickerOpen={pickerOpen}
+        onLanguagePickerOpenChange={setPickerOpen}
         showDropPlaceholder={showDropPlaceholder}
         placeholderLabel={placeholderLabel}
         placeholderIndex={placeholderIndex}
-        headerActions={
-          showHelpsPicker ? (
-            <LanguagePicker
-              compact
-              listMode="helps"
-              helpsFlag={helpsFlag}
-              open={helpsPickerOpen}
-              onOpenChange={setHelpsPickerOpen}
-              onLanguageSelected={onHelpsLanguageSelected}
-            />
-          ) : undefined
-        }
       />
 
       <div
@@ -185,14 +188,12 @@ function ReadPanelBody({
             <EmptyPanelState
               panelId={panelId}
               message={
-                panel1Mismatch?.message ?? 'Select a language to load resources'
+                scriptureMismatch?.message ?? 'Select a language to load resources'
               }
-              onMessageClick={
-                showHelpsPicker ? () => setHelpsPickerOpen(true) : undefined
-              }
-              actionLabel={panel1Mismatch?.actionLabel ?? undefined}
-              actionShortLabel={panel1Mismatch?.actionShortLabel ?? undefined}
-              emptyKind={panel1Mismatch?.kind}
+              onMessageClick={isHelps ? () => setPickerOpen(true) : undefined}
+              actionLabel={scriptureMismatch?.actionLabel ?? undefined}
+              actionShortLabel={scriptureMismatch?.actionShortLabel ?? undefined}
+              emptyKind={scriptureMismatch?.kind}
               onAction={mismatchAction}
             />
           )
@@ -204,13 +205,13 @@ function ReadPanelBody({
 }
 
 export function ReadLinkedPanel(props: ReadLinkedPanelProps) {
-  const { panelId, colorScheme, flexBasisPercent, dir, ...bodyProps } = props
+  const { panelId, colorScheme, mountStyle, dir, ...bodyProps } = props
 
   return (
     <DroppablePanel
       id={`${panelId}-droppable`}
-      className="min-h-0 overflow-hidden"
-      style={{ flexBasis: `${flexBasisPercent}%` }}
+      className="min-h-0 overflow-hidden read-panel-shell"
+      style={mountStyle}
       colorScheme={colorScheme}
     >
       <div className="h-full min-h-0 overflow-hidden" dir={dir}>

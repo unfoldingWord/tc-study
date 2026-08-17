@@ -4,16 +4,26 @@ import {
 } from '@bt-synergy/scripture-loader'
 import { useEffect, useMemo, useState } from 'react'
 import {
+  useCatalogManager,
   useCurrentReference,
   useLoaderRegistry,
   useNavigation,
 } from '../../../../contexts'
+import { useAppStore } from '../../../../contexts/AppContext'
 import type { BookInfo } from '../../../../contexts/types-only'
 import { defaultSectionsService } from '../../../../lib/services/default-sections'
 import { extractVerseCountsFromContent } from '../../../../lib/versification'
 import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
 import type { DisplayUsjVerse } from '../types'
 import { loadUsjViewModel } from '../utils/loadUsjViewModel'
+import {
+  applyScriptureContentLoadFailure,
+  scriptureContentLoadKey,
+  scriptureMetadataRevision,
+} from './scriptureContentLoad'
+
+const METADATA_POLL_MS = 250
+const HARD_MISS_POLLS = 12
 
 function chapterVerseMapFromViewModel(
   viewModel: UsjScriptureViewModel
@@ -31,13 +41,51 @@ export function useContent(
   _language?: string
 ) {
   const loaderRegistry = useLoaderRegistry()
+  const catalogManager = useCatalogManager()
   const currentRef = useCurrentReference()
   const navigation = useNavigation()
   const [viewModel, setViewModel] = useState<UsjScriptureViewModel | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [catalogReadyKey, setCatalogReadyKey] = useState<string | null>(null)
+  const [hardMissKey, setHardMissKey] = useState<string | null>(null)
+
+  const storeRevision = useAppStore((s) =>
+    scriptureMetadataRevision(s.loadedResources, resourceKey)
+  )
+  const catalogReady = catalogReadyKey === resourceKey || !!storeRevision
+  const allowHardMiss = hardMissKey === resourceKey
+  const metadataRevision = storeRevision || (catalogReady ? 'catalog' : '')
+  const loadKey = scriptureContentLoadKey(resourceKey, currentRef.book, metadataRevision)
 
   const availableBookCodesStr = availableBooks.map((b) => b.code.toLowerCase()).sort().join(',')
+
+  useEffect(() => {
+    if (storeRevision) {
+      setCatalogReadyKey(resourceKey)
+      return
+    }
+    let cancelled = false
+    let attempts = 0
+    const poll = async () => {
+      try {
+        const metadata = await catalogManager.getResourceMetadata(resourceKey)
+        if (!cancelled && metadata) setCatalogReadyKey(resourceKey)
+      } catch {
+        /* ignore */
+      }
+      attempts += 1
+      if (!cancelled && attempts >= HARD_MISS_POLLS) setHardMissKey(resourceKey)
+    }
+    void poll()
+    const id = window.setInterval(() => {
+      void poll()
+    }, METADATA_POLL_MS)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [resourceKey, catalogManager, storeRevision])
 
   useEffect(() => {
     let cancelled = false
@@ -77,13 +125,20 @@ export function useContent(
         }
 
         setViewModel(vm)
+        setIsLoading(false)
       } catch (err) {
         if (cancelled) return
+        const failure = applyScriptureContentLoadFailure(err, allowHardMiss)
+        if (failure.retryWhenMetadataArrives) {
+          setError(null)
+          setViewModel(null)
+          setIsLoading(true)
+          return
+        }
         console.error('❌ Error loading UsjScriptureViewModel:', err)
-        setError(err instanceof Error ? err.message : 'Unknown error')
+        setError(failure.error)
         setViewModel(null)
-      } finally {
-        if (!cancelled) setIsLoading(false)
+        setIsLoading(false)
       }
     }
 
@@ -91,7 +146,7 @@ export function useContent(
     return () => {
       cancelled = true
     }
-  }, [currentRef.book, resourceKey, loaderRegistry, availableBookCodesStr])
+  }, [loadKey, loaderRegistry, availableBookCodesStr, allowHardMiss])
 
   const relevantChapters = useMemo(() => {
     if (!viewModel) return []

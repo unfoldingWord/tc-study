@@ -1,6 +1,6 @@
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { BookOpen, Layers } from 'lucide-react'
-import React from 'react'
+import React, { useLayoutEffect, useRef } from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
 import type { ResourceInfo } from '../../../contexts/types'
@@ -24,7 +24,9 @@ import type { LanguageListNameFields } from '../../../features/read/languageList
 import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
-import type { HelpsKindFilter } from './types'
+import { helpsFilterIdentity, scrollHelpsToTop } from './scrollHelpsToTop'
+import { isHelpsCardSelected, type HelpsCardSelection } from './helpsCardSelection'
+import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
 export interface CombinedHelpsListProps {
@@ -41,7 +43,6 @@ export interface CombinedHelpsListProps {
   helpsLanguageName: string | LanguageListNameFields
   passageLabel: string
   noSources: boolean
-  depsOk: boolean
   loading: boolean
   tnError?: string | null
   twlError?: string | null
@@ -49,11 +50,12 @@ export interface CombinedHelpsListProps {
   twlKey: string
   resourceKey: string
   mergedGroups: { ref: string; items: MergedRow[] }[]
-  selectedNoteId: string | null
-  selectedLinkId: string | null
+  selectedHelpsCard: HelpsCardSelection
   targetSourceId: string | null | undefined
   helpsScope: 'scripture' | 'obs'
   tokenFilter: TokenFilter | null
+  verseFilter: VerseFilterState | null
+  obsQuoteFilter: ObsQuoteFilter | null
   loadingTitles: Set<string>
   twLoadingTitles: Set<string>
   getEntryTitle: (rc: string) => string | null
@@ -81,7 +83,6 @@ export function CombinedHelpsList({
   helpsLanguageName,
   passageLabel,
   noSources,
-  depsOk,
   loading,
   tnError,
   twlError,
@@ -89,11 +90,12 @@ export function CombinedHelpsList({
   twlKey,
   resourceKey,
   mergedGroups,
-  selectedNoteId,
-  selectedLinkId,
+  selectedHelpsCard,
   targetSourceId,
   helpsScope,
   tokenFilter,
+  verseFilter,
+  obsQuoteFilter,
   loadingTitles,
   twLoadingTitles,
   getEntryTitle,
@@ -107,10 +109,16 @@ export function CombinedHelpsList({
   onTitleClick,
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
+  const listPanelRef = useRef<HTMLDivElement>(null)
+  const filterIdentity = helpsFilterIdentity({ tokenFilter, verseFilter, obsQuoteFilter })
+  useLayoutEffect(() => {
+    scrollHelpsToTop(listPanelRef.current)
+  }, [filterIdentity])
+
   const emptyReason = resolveHelpsListEmptyReason({
     noSources,
     loading,
-    depsOk,
+    depsOk: true,
     mergedEmpty: mergedGroups.length === 0,
     hasLoadError: !!(tnError && tnKey) || !!(twlError && twlKey),
     hasActiveFilter: !!filterScopeBar,
@@ -126,7 +134,7 @@ export function CombinedHelpsList({
     : null
 
   return (
-    <div className={HELPS_LIST_PANEL} dir={languageDirection}>
+    <div ref={listPanelRef} className={HELPS_LIST_PANEL} dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
         icon={Layers}
@@ -141,16 +149,9 @@ export function CombinedHelpsList({
           </>
         }
       />
-      <div className="p-content">
+      <div className="p-content max-w-2xl mx-auto w-full">
         {explainedEmpty ? (
           <CombinedHelpsEmptyState view={explainedEmpty} />
-        ) : !depsOk ? (
-          <LoadingSpinner
-            centered
-            label="Loading dependencies"
-            className="text-helps"
-            containerClassName="py-8"
-          />
         ) : loading ? (
           <LoadingSpinner
             centered
@@ -217,7 +218,7 @@ export function CombinedHelpsList({
                             <div key={`tn-${note.id}-${idx}`}>
                               <TranslationNoteCard
                                 note={note as NoteWithTokens}
-                                isSelected={selectedNoteId === note.id}
+                                isSelected={isHelpsCardSelected(selectedHelpsCard, 'tn', note.id)}
                                 onSupportReferenceClick={onSupportReferenceClick}
                                 onEntryLinkClick={onEntryLinkClick}
                                 onQuoteClick={onNoteQuoteClick}
@@ -229,6 +230,7 @@ export function CombinedHelpsList({
                                 isLoadingTATitle={isLoadingTitle}
                                 getEntryTitle={getEntryTitle}
                                 obsMode={helpsScope === 'obs'}
+                                tokenFilter={tokenFilter}
                               />
                             </div>
                           )
@@ -242,7 +244,7 @@ export function CombinedHelpsList({
                           <div key={`twl-${link.id}-${idx}`}>
                             <WordLinkCard
                               link={link}
-                              isSelected={selectedLinkId === link.id}
+                              isSelected={isHelpsCardSelected(selectedHelpsCard, 'twl', link.id)}
                               twTitle={twTitle}
                               isLoadingTitle={isLoadingTwTitle}
                               twPreview={twPreview}

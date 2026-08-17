@@ -6,7 +6,7 @@
 import type { ResourceInfo } from '../../contexts/types'
 import { createResourceInfo } from '../../utils/resourceInfo'
 import { ensureCombinedHelpsInWorkspace } from '../helps/ensureCombinedHelps'
-import { getBaseResourceKey } from './projectPanelResourcesToAppStore'
+import { existingPanelInstanceId, getBaseResourceKey } from './projectPanelResourcesToAppStore'
 import { projectPanelsFromPackage } from './workspaceProjection'
 import type { PanelConfig, WorkspaceGet, WorkspaceSet, WorkspaceStore } from './workspaceTypes'
 
@@ -119,7 +119,11 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
       set((state) => {
         if (state.currentPackage) {
           const panel = state.currentPackage.panels.find((p) => p.id === panelId)
-          if (panel && !panel.resourceKeys.includes(resourceKey)) {
+          if (
+            panel &&
+            !panel.resourceKeys.includes(resourceKey) &&
+            !existingPanelInstanceId(panel.resourceKeys, resourceKey)
+          ) {
             if (index !== undefined && index >= 0 && index <= panel.resourceKeys.length) {
               panel.resourceKeys.splice(index, 0, resourceKey)
             } else {
@@ -158,7 +162,7 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
           const fromPanel = state.currentPackage.panels.find((p) => p.id === fromPanelId)
           const toPanel = state.currentPackage.panels.find((p) => p.id === toPanelId)
 
-          if (fromPanel && toPanel) {
+          if (fromPanel && toPanel && !existingPanelInstanceId(toPanel.resourceKeys, resourceKey)) {
             fromPanel.resourceKeys = fromPanel.resourceKeys.filter((k) => k !== resourceKey)
             if (fromPanel.activeIndex >= fromPanel.resourceKeys.length) {
               fromPanel.activeIndex = Math.max(0, fromPanel.resourceKeys.length - 1)

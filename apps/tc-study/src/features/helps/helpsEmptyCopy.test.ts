@@ -33,7 +33,7 @@ describe('resolveHelpsEmptyView', () => {
     expect(view.message).toContain('Spanish')
     expect(view.message).not.toContain('español')
     expect(view.message).toContain('Galatians')
-    expect(view.actionLabel).toBe(HELPS_EMPTY_COPY.useDefaultHelps('English'))
+    expect(view.actionLabel).toBe(HELPS_EMPTY_COPY.switchToDefaultHelps('English'))
     expect(view.actionShortLabel).toBe('English')
     expect(view.defaultHelpsLanguageCode).toBe(DEFAULT_HELPS_LANGUAGE_CODE)
     expect(view.defaultHelpsLanguageCode).toBe('en')
@@ -61,7 +61,7 @@ describe('resolveHelpsEmptyView', () => {
     expect(view.kind).toBe('no-sources')
     expect(view.message).toBe(HELPS_EMPTY_COPY.noSources('Spanish (Español)'))
     expect(view.message).not.toContain('Exodus')
-    expect(view.actionLabel).toBe(HELPS_EMPTY_COPY.useDefaultHelps('English'))
+    expect(view.actionLabel).toBe(HELPS_EMPTY_COPY.switchToDefaultHelps('English'))
     expect(view.actionShortLabel).toBe('English')
   })
 
@@ -177,6 +177,19 @@ describe('resolveHelpsListEmptyReason', () => {
         hasActiveFilter: false,
       })
     ).toBe('no-sources')
+  })
+
+  test('empty list is not shown while loading (even with no sources yet)', () => {
+    expect(
+      resolveHelpsListEmptyReason({
+        noSources: true,
+        loading: true,
+        depsOk: false,
+        mergedEmpty: true,
+        hasLoadError: false,
+        hasActiveFilter: false,
+      })
+    ).toBeNull()
   })
 
   test('English + Exodus with notes is not empty', () => {

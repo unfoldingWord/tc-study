@@ -5,11 +5,9 @@
 
 import { useMemo, useRef } from 'react'
 import type { ResourceInfo } from '../../contexts/types'
-import { filterReadPanel2Keys } from './filterReadPanelKeys'
-import {
-  getResourceAppliesToScope,
-  resourceSupportsBook,
-} from './resourcePanelHelpers'
+import { filterReadPanelKeysByMode } from './filterReadPanelKeys'
+import { resolveLoadedPanelResource } from './resolveLoadedPanelResource'
+import type { ReadPanelMode } from './readPanelModel'
 
 type ResourceTypeRegistryLike = {
   getTypeForSubject: (s: string) => string | undefined
@@ -26,6 +24,8 @@ function stabilizeKeys(next: string[], prevRef: { current: string[] }): string[]
 export function useFilteredReadPanelKeys(args: {
   panel1ResourceKeys: string[]
   panel2ResourceKeys: string[]
+  panel1Mode?: ReadPanelMode
+  panel2Mode?: ReadPanelMode
   loadedResources: Record<string, ResourceInfo | undefined>
   resourceTypeRegistry: ResourceTypeRegistryLike
   navigationScope: string
@@ -34,6 +34,8 @@ export function useFilteredReadPanelKeys(args: {
   const {
     panel1ResourceKeys,
     panel2ResourceKeys,
+    panel1Mode = 'scripture',
+    panel2Mode = 'helps',
     loadedResources,
     resourceTypeRegistry,
     navigationScope,
@@ -42,32 +44,40 @@ export function useFilteredReadPanelKeys(args: {
 
   const prev1KeysRef = useRef<string[]>([])
   const filteredPanel1Keys = useMemo(() => {
-    const next = panel1ResourceKeys.filter((key) => {
-      const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
-      if (scope !== navigationScope && scope !== null) return false
-      return resourceSupportsBook(key, loadedResources, currentBook)
+    const next = filterReadPanelKeysByMode(panel1Mode, {
+      resourceKeys: panel1ResourceKeys,
+      loadedResources,
+      resourceTypeRegistry,
+      navigationScope,
+      currentBook,
     })
     return stabilizeKeys(next, prev1KeysRef)
-  }, [panel1ResourceKeys, navigationScope, loadedResources, resourceTypeRegistry, currentBook])
+  }, [panel1ResourceKeys, panel1Mode, navigationScope, loadedResources, resourceTypeRegistry, currentBook])
 
   const prev2KeysRef = useRef<string[]>([])
   const filteredPanel2Keys = useMemo(() => {
-    const next = filterReadPanel2Keys({
-      panel2ResourceKeys,
+    const next = filterReadPanelKeysByMode(panel2Mode, {
+      resourceKeys: panel2ResourceKeys,
       loadedResources,
       resourceTypeRegistry,
       navigationScope,
       currentBook,
     })
     return stabilizeKeys(next, prev2KeysRef)
-  }, [panel2ResourceKeys, navigationScope, loadedResources, resourceTypeRegistry, currentBook])
+  }, [panel2ResourceKeys, panel2Mode, navigationScope, loadedResources, resourceTypeRegistry, currentBook])
 
   const filteredPanel1Resources = useMemo(
-    () => filteredPanel1Keys.map((key) => loadedResources[key]).filter(Boolean) as ResourceInfo[],
+    () =>
+      filteredPanel1Keys
+        .map((key) => resolveLoadedPanelResource(loadedResources, key))
+        .filter(Boolean) as ResourceInfo[],
     [filteredPanel1Keys, loadedResources]
   )
   const filteredPanel2Resources = useMemo(
-    () => filteredPanel2Keys.map((key) => loadedResources[key]).filter(Boolean) as ResourceInfo[],
+    () =>
+      filteredPanel2Keys
+        .map((key) => resolveLoadedPanelResource(loadedResources, key))
+        .filter(Boolean) as ResourceInfo[],
     [filteredPanel2Keys, loadedResources]
   )
 

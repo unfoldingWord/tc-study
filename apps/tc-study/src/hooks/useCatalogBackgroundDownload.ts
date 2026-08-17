@@ -25,6 +25,7 @@ import type { ResourceCompletenessChecker } from '../lib/services/ResourceComple
 import {
   filterUncheckedResourceKeys,
   findMissingExpectedResources,
+  keysToEnqueueForDownload,
   shouldResetDownloadTracking,
 } from '../features/read/catalogBackgroundDownloadPolicy'
 
@@ -140,45 +141,17 @@ export function useCatalogBackgroundDownload(
     setIsChecking(true)
 
     try {
-      // Get all resources currently in catalog
+      // Persistent catalog may still hold leftover languages. Queue only the
+      // resources for languages currently on the two Read panels.
       const allResourceKeys = await catalogManager.getAllResourceKeys()
+      const candidateKeys = keysToEnqueueForDownload(allResourceKeys, expectedResources)
 
-      // ✅ CRITICAL: Verify ALL resources have metadata loaded before proceeding
-      // This prevents starting downloads before UGNT/UHB metadata is available
-
-      // If expectedResources is provided, ensure ALL expected resources are in catalog and have metadata
+      // If expectedResources is provided, wait until those keys are in catalog
+      // (Phase 2 narrows keys that never arrive). Do not wait forever for
+      // contentMetadata on one hung OL/TA entry — completeness check skips those.
       if (expectedResources && expectedResources.length > 0) {
         const missing = findMissingExpectedResources(expectedResources, allResourceKeys)
         if (missing.length > 0) {
-          setIsChecking(false)
-          return
-        }
-
-        // Check that all expected resources have metadata
-        const missingMetadata: string[] = []
-        for (const resourceKey of expectedResources) {
-          const metadata = await catalogManager.getResourceMetadata(resourceKey)
-          if (!metadata || !metadata.contentMetadata) {
-            missingMetadata.push(resourceKey)
-          }
-        }
-
-        if (missingMetadata.length > 0) {
-          setIsChecking(false)
-          return
-        }
-      } else {
-        // Fallback: Check all resources in catalog if no expected list provided
-        let allMetadataLoaded = true
-        for (const resourceKey of allResourceKeys) {
-          const metadata = await catalogManager.getResourceMetadata(resourceKey)
-          if (!metadata || !metadata.contentMetadata) {
-            allMetadataLoaded = false
-            break
-          }
-        }
-
-        if (!allMetadataLoaded) {
           setIsChecking(false)
           return
         }
@@ -186,13 +159,13 @@ export function useCatalogBackgroundDownload(
 
       // Find resources we haven't checked yet
       const uncheckedResources = filterUncheckedResourceKeys(
-        allResourceKeys,
+        candidateKeys,
         processedResourcesRef.current,
         downloadingResourcesRef.current
       )
 
       if (uncheckedResources.length === 0) {
-        setMonitoredCount(allResourceKeys.length)
+        setMonitoredCount(candidateKeys.length)
         setIsChecking(false)
         return
       }
@@ -229,7 +202,7 @@ export function useCatalogBackgroundDownload(
       }
 
       // Update stats
-      setMonitoredCount(allResourceKeys.length)
+      setMonitoredCount(candidateKeys.length)
       setCachedCount(processedResourcesRef.current.size)
       setPendingCount(downloadingResourcesRef.current.size)
 

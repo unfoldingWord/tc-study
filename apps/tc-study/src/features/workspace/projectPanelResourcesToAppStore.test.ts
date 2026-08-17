@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { upsertLoadedResourceMembership } from './appStoreMembership'
 import {
   collectPanelResourceKeys,
+  existingPanelInstanceId,
   generateInstanceId,
   getBaseResourceKey,
   projectPanelResourcesToAppStore,
@@ -97,6 +98,9 @@ describe('projectPanelResourcesToAppStore', () => {
     expect(generateInstanceId('u/en/ult', [])).toBe('u/en/ult')
     expect(generateInstanceId('u/en/ult', ['u/en/ult'])).toBe('u/en/ult#2')
     expect(generateInstanceId('u/en/ult', ['u/en/ult', 'u/en/ult#2'])).toBe('u/en/ult#3')
+    expect(existingPanelInstanceId(['u/en/ult', 'u/en/tn'], 'u/en/ult#2')).toBe('u/en/ult')
+    expect(existingPanelInstanceId(['u/en/ult#2'], 'u/en/ult')).toBe('u/en/ult#2')
+    expect(existingPanelInstanceId(['u/en/tn'], 'u/en/ult')).toBeUndefined()
   })
 
   test('projector upserts every panel resourceKey into AppStore', () => {
@@ -133,15 +137,15 @@ describe('projectPanelResourcesToAppStore', () => {
       )
     ).toBe(true)
 
-    const tn = res({ key: 'u/en/tn', type: 'notes' })
+    const tq = res({ key: 'u/en/tq', type: 'questions' })
     // Package-only until assign — projector owns AppStore membership
-    addResource(tn)
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeUndefined()
-    assignResourceToPanel('u/en/tn', 'panel-2')
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeTruthy()
+    addResource(tq)
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeUndefined()
+    assignResourceToPanel('u/en/tq', 'panel-2')
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeTruthy()
 
-    removeResourceFromPanel('u/en/tn', 'panel-2')
-    expect(useAppStore.getState().loadedResources['u/en/tn']).toBeUndefined()
+    removeResourceFromPanel('u/en/tq', 'panel-2')
+    expect(useAppStore.getState().loadedResources['u/en/tq']).toBeUndefined()
     // Still on panel-1
     expect(useAppStore.getState().loadedResources['u/en/ult']).toBeTruthy()
   })
@@ -153,6 +157,59 @@ describe('projectPanelResourcesToAppStore', () => {
 
     removeResourceFromPanel('u/en/ult', 'panel-1')
     expect(useAppStore.getState().loadedResources['u/en/ult']).toBeTruthy()
+  })
+
+  test('second projection does not rewrite unchanged loadedResources', () => {
+    const ult = res({ key: 'u/en/ult' })
+    const resources = new Map([[ult.key, ult]])
+    const panels = [{ resourceKeys: ['u/en/ult', 'u/en/ult#2'] }]
+
+    projectPanelResourcesToAppStore({ panels, resources })
+    const first = useAppStore.getState().loadedResources
+    const firstUlt = first['u/en/ult']
+    const firstUlt2 = first['u/en/ult#2']
+
+    let writes = 0
+    const unsub = useAppStore.subscribe(() => {
+      writes++
+    })
+    try {
+      projectPanelResourcesToAppStore({ panels, resources })
+    } finally {
+      unsub()
+    }
+
+    expect(writes).toBe(0)
+    const second = useAppStore.getState().loadedResources
+    expect(second['u/en/ult']).toBe(firstUlt)
+    expect(second['u/en/ult#2']).toBe(firstUlt2)
+  })
+
+  test('projects CombinedHelps TN/TWL pointer updates after Unlock 1 strip', () => {
+    const combined = res({
+      key: '__combined-helps__',
+      type: 'combined-helps',
+      helpsTnResourceKey: 'u/en/tn',
+    })
+    const resources = new Map([[combined.key, combined]])
+    const panels = [{ resourceKeys: ['__combined-helps__'] }]
+
+    projectPanelResourcesToAppStore({ panels, resources })
+    expect(useAppStore.getState().loadedResources['__combined-helps__']?.helpsTwlResourceKey).toBeUndefined()
+
+    const withTwl = res({
+      key: '__combined-helps__',
+      type: 'combined-helps',
+      helpsTnResourceKey: 'u/en/tn',
+      helpsTwlResourceKey: 'u/en/twl',
+    })
+    projectPanelResourcesToAppStore({
+      panels,
+      resources: new Map([[withTwl.key, withTwl]]),
+    })
+    expect(useAppStore.getState().loadedResources['__combined-helps__']?.helpsTwlResourceKey).toBe(
+      'u/en/twl'
+    )
   })
 
   test('projector preserves runtime toc on upsert', () => {

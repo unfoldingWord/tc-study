@@ -139,4 +139,100 @@ describe('hydrateReadCatalogHits', () => {
       { key: 'unfoldingWord/en/twl', panelId: 'panel-2' },
     ])
   })
+
+  test('same-language dest panel-2 requests a new instance so LinkedPanels ids stay unique', () => {
+    const enUlt: CatalogEntry[] = [
+      {
+        name: 'en_ult',
+        owner: 'unfoldingWord',
+        language: 'en',
+        identifier: 'ult',
+        title: 'ULT',
+        subject: 'Aligned Bible',
+        release: { tag_name: 'v1' },
+      },
+    ]
+    const added: Array<{ key: string; panelId?: string; allowMultipleInstances?: boolean }> = []
+    hydrateReadCatalogHits({
+      catalogResults: enUlt,
+      languageCode: 'en',
+      target: 'text',
+      destPanelId: 'panel-2',
+      resourceTypeRegistry: registry(),
+      viewerRegistry: viewer(),
+      getPanel: (id) =>
+        id === 'panel-1'
+          ? { resourceKeys: ['unfoldingWord/en/ult'] }
+          : { resourceKeys: [] },
+      addResource: (resource, options) => {
+        added.push({
+          key: resource.key,
+          panelId: options?.panelId,
+          allowMultipleInstances: options?.allowMultipleInstances,
+        })
+      },
+      setActiveResourceInPanel: () => undefined,
+    })
+
+    expect(added).toEqual([
+      { key: 'unfoldingWord/en/ult', panelId: 'panel-2', allowMultipleInstances: true },
+    ])
+  })
+
+  test('duplicate catalog hits do not add a second instance to the same panel', () => {
+    const enUlt: CatalogEntry = {
+      name: 'en_ult',
+      owner: 'unfoldingWord',
+      language: 'en',
+      identifier: 'ult',
+      title: 'ULT',
+      subject: 'Aligned Bible',
+      release: { tag_name: 'v1' },
+    }
+    const added: Array<{ key: string; panelId?: string }> = []
+    const result = hydrateReadCatalogHits({
+      catalogResults: [enUlt, { ...enUlt, title: 'ULT (dup)' }],
+      languageCode: 'en',
+      target: 'text',
+      destPanelId: 'panel-1',
+      resourceTypeRegistry: registry(),
+      viewerRegistry: viewer(),
+      getPanel: () => ({ resourceKeys: [] }),
+      addResource: (resource, options) => {
+        added.push({ key: resource.key, panelId: options?.panelId })
+      },
+      setActiveResourceInPanel: () => undefined,
+    })
+
+    expect(result.expectedTextKeys).toEqual(['unfoldingWord/en/ult'])
+    expect(added).toEqual([{ key: 'unfoldingWord/en/ult', panelId: 'panel-1' }])
+  })
+
+  test('re-hydrate onto a panel that already has the resource does not mint #2 on that panel', () => {
+    const enUlt: CatalogEntry = {
+      name: 'en_ult',
+      owner: 'unfoldingWord',
+      language: 'en',
+      identifier: 'ult',
+      title: 'ULT',
+      subject: 'Aligned Bible',
+      release: { tag_name: 'v1' },
+    }
+    const added: Array<{ key: string; panelId?: string }> = []
+    hydrateReadCatalogHits({
+      catalogResults: [enUlt],
+      languageCode: 'en',
+      target: 'text',
+      destPanelId: 'panel-1',
+      resourceTypeRegistry: registry(),
+      viewerRegistry: viewer(),
+      getPanel: () => ({ resourceKeys: ['unfoldingWord/en/ult'] }),
+      addResource: (resource, options) => {
+        added.push({ key: resource.key, panelId: options?.panelId })
+      },
+      setActiveResourceInPanel: () => undefined,
+    })
+
+    expect(added).toEqual([])
+  })
 })

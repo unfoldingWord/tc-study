@@ -35,9 +35,10 @@ function fakeResource(partial: Partial<ResourceInfo> & { key: string; type: stri
 }
 
 describe('combinedHelpsInjection', () => {
-  test('shouldInjectCombinedHelps requires both keys', () => {
+  test('shouldInjectCombinedHelps injects when either side exists', () => {
     expect(shouldInjectCombinedHelps({ tnKey: 'a', twlKey: 'b' })).toBe(true)
-    expect(shouldInjectCombinedHelps({ tnKey: 'a' })).toBe(false)
+    expect(shouldInjectCombinedHelps({ tnKey: 'a' })).toBe(true)
+    expect(shouldInjectCombinedHelps({ twlKey: 'b' })).toBe(true)
     expect(shouldInjectCombinedHelps({})).toBe(false)
   })
 
@@ -58,10 +59,10 @@ describe('combinedHelpsInjection', () => {
     })
   })
 
-  test('does not inject when only one side present', () => {
+  test('injects when only one side present', () => {
     const resources = [fakeResource({ key: 'uw/en/tn', type: 'notes' })]
     const pair = findHelpsKeysAmongResources(resources, 'scripture', { langCode: 'en' })
-    expect(shouldInjectCombinedHelps(pair)).toBe(false)
+    expect(shouldInjectCombinedHelps(pair)).toBe(true)
   })
 
   test('buildCombinedHelpsResourceInfo sets ids and types', () => {

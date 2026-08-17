@@ -16,6 +16,7 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
     expect(src).toContain('applyCombinedHelpsEnsure(helpsLanguageCode)')
     expect(src).toContain('shouldHydrateOriginalLanguages(loadTarget)')
     expect(src).toContain('hydrateOriginalLanguageResources')
+    expect(src).toContain('currentBook:')
     expect(src).not.toMatch(/applyCombinedHelpsEnsure\(textLanguageCode\)/)
   })
 
@@ -26,8 +27,14 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
     expect(src).toContain('page.hydrateTarget')
   })
 
+  test('text and helps catalog searches run in parallel', () => {
+    expect(src).toContain('Promise.all')
+    expect(src).toContain('searchPages')
+  })
+
   test('clears only the switched pane', () => {
-    expect(src).toContain('panelClearTargetForLoad(loadTarget)')
+    expect(src).toContain('panelClearTargetForLoad(loadTarget, destPanelId)')
+    expect(src).toContain('shouldReconcileHelpsOnPanelClear')
     expect(src).toContain('clearReadPanelsForLanguageSwitch(helpsLanguageCode')
   })
 })

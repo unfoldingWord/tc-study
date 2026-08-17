@@ -113,7 +113,15 @@ export function useBackgroundDownload(
         }
 
         // Drop superseded runs (language-switch stop/start overlap, unmount).
-        if (!shouldAcceptWorkerMessage(runIdRef.current, runId)) {
+        // Errors without runId still clear a stuck spinner while a run is active
+        // (legacy worker onerror / init failures).
+        const accept =
+          shouldAcceptWorkerMessage(runIdRef.current, runId) ||
+          (type === 'error' &&
+            isDownloadingRef.current &&
+            runIdRef.current > 0 &&
+            (runId === undefined || runId === null))
+        if (!accept) {
           return
         }
 

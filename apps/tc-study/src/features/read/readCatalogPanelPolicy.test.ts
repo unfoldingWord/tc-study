@@ -43,6 +43,17 @@ describe('panelAssignmentForContentRole', () => {
     })
     expect(panelAssignmentForContentRole('primary', 'helps', false)).toEqual({ kind: 'skip' })
   })
+
+  test('destPanelId sends scripture to panel-2 (two scripture panels are not clones)', () => {
+    expect(panelAssignmentForContentRole('primary', 'text', true, 'panel-2')).toEqual({
+      kind: 'panel',
+      panelId: 'panel-2',
+    })
+    expect(panelAssignmentForContentRole('companion', 'helps', true, 'panel-1')).toEqual({
+      kind: 'panel',
+      panelId: 'panel-1',
+    })
+  })
 })
 
 describe('catalogTargetsForLoad', () => {

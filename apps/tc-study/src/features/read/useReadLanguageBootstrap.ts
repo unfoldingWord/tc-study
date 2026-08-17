@@ -32,11 +32,9 @@ import {
   textModeMismatchFromCache,
 } from './textModeMismatch'
 import { useReadTextModeSwitch } from './useReadTextModeSwitch'
-import {
-  readPersistedHelpsLanguage,
-  resolveAndPersistHelpsLanguage,
-  writePersistedHelpsLanguage,
-} from './defaultHelpsLanguage'
+import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
+import { firstHelpsLanguageCode, navigationLanguageCode } from './readPanelModel'
+import { canSeedBothPanelLanguages, useReadPanelStore } from './readPanelStore'
 import {
   downloadResetToken,
   shouldCancelDownloadsOnPaneSwitch,
@@ -44,10 +42,8 @@ import {
 } from './downloadIsolationPolicy'
 import { loadLanguagesCache } from './languagesCache'
 import { shouldDeferLanguageCatalogLoad } from './readBootstrapPolicy'
-import {
-  availabilityLookupFromListed,
-  resolveReadCatalogLoadPlan,
-} from './readLanguageLoadPlan'
+import { availabilityLookupFromListed } from './readLanguageLoadPlan'
+import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
 import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
@@ -80,19 +76,28 @@ export function useReadLanguageBootstrap({
   const [isLanguagePickerRequired, setIsLanguagePickerRequired] = useState(requireLanguageInUrl)
 
   useEffect(() => {
-    setShouldAutoOpenLanguagePicker(requireLanguageInUrl)
     setIsLanguagePickerRequired(requireLanguageInUrl)
+    if (requireLanguageInUrl) setShouldAutoOpenLanguagePicker(true)
   }, [requireLanguageInUrl])
 
+  useEffect(() => {
+    if (!shouldAutoOpenLanguagePicker) return
+    const id = window.setTimeout(() => setShouldAutoOpenLanguagePicker(false), 400)
+    return () => window.clearTimeout(id)
+  }, [shouldAutoOpenLanguagePicker])
+
   const autoLoadedLanguageForUrlRef = useRef<string | null>(null)
-  const [currentLanguageCode, setCurrentLanguageCode] = useState<string | null>(initialLanguage || null)
-  const [helpsLanguageCode, setHelpsLanguageCode] = useState<string | null>(() =>
-    readPersistedHelpsLanguage()
-  )
+  const panels = useReadPanelStore((s) => s.panels)
+  const seedBothLanguages = useReadPanelStore((s) => s.seedBothLanguages)
+  const setPanelLanguage = useReadPanelStore((s) => s.setPanelLanguage)
+  const currentLanguageCode =
+    navigationLanguageCode(panels) || initialLanguage || null
+  const helpsLanguageCode = firstHelpsLanguageCode(panels)
 
   const {
     isLoadingTextResources,
     isLoadingHelpsResources,
+    isLoadingByPanel,
     expectedResources,
     setExpectedResources,
     metadataUpdateCounter,
@@ -102,8 +107,9 @@ export function useReadLanguageBootstrap({
   } = useReadCatalogLoad()
 
   useEffect(() => {
-    resolveAndPersistHelpsLanguage(currentLanguageCode || initialLanguage || '')
-  }, [currentLanguageCode, initialLanguage])
+    const helps = firstHelpsLanguageCode(useReadPanelStore.getState().panels)
+    if (helps) writePersistedHelpsLanguage(helps)
+  }, [helpsLanguageCode])
 
   useReadIngredientHydration(loadedResources, catalogManager)
   const isCollectionFullyCached = useReadCollectionCompleteness(
@@ -141,7 +147,7 @@ export function useReadLanguageBootstrap({
     onStartDownload: startDownload,
     catalogTrigger: `${Object.keys(loadedResources).length}-${metadataUpdateCounter}`,
     expectedResources,
-    resetToken: downloadResetToken(currentLanguageCode, helpsLanguageCode),
+    resetToken: downloadResetToken(panels['panel-1'].languageCode, panels['panel-2'].languageCode),
     isDownloading: isBackgroundDownloading,
     enabled: !DISABLE_BACKGROUND_DOWNLOAD && !isCatalogLoadBusy && Object.keys(loadedResources).length > 0,
     debug: true,
@@ -169,7 +175,11 @@ export function useReadLanguageBootstrap({
     async (languageCode: string, options?: { navigationScope?: 'scripture' | 'obs' }) => {
       setShouldAutoOpenLanguagePicker(false)
       setIsLanguagePickerRequired(false)
-      setCurrentLanguageCode(languageCode)
+      if (canSeedBothPanelLanguages()) {
+        seedBothLanguages(languageCode)
+      } else if (!useReadPanelStore.getState().panels['panel-1'].languageCode) {
+        setPanelLanguage('panel-1', languageCode)
+      }
       maybeCancelDownloads('text')
 
       const subjects =
@@ -203,24 +213,10 @@ export function useReadLanguageBootstrap({
         return
       }
 
-      const persisted = resolveAndPersistHelpsLanguage(languageCode)
-      const plan = resolveReadCatalogLoadPlan({
-        switchedPane: 'text',
-        textLanguageCode: languageCode,
-        currentHelpsLanguage: helpsKeysRef.current.length === 0 ? null : helpsLanguageCode,
-        persistedHelpsLanguage: persisted,
-        navigationScope: scope,
-        availabilityFor,
-      })
-      setHelpsLanguageCode(plan.helpsLanguageCode)
-
       autoLoadedLanguageForUrlRef.current = languageCode
-      await runCatalogLoad({
-        textLanguageCode: languageCode,
-        helpsLanguageCode: plan.helpsLanguageCode,
-        loadTarget: plan.loadTarget,
-        navigationScope: scope,
-      })
+      const snapshot = useReadPanelStore.getState().panels
+      const loads = coldStartCatalogLoads(snapshot)
+      await Promise.all(loads.map((one) => runCatalogLoad({ ...one, navigationScope: scope })))
     },
     [
       maybeCancelDownloads,
@@ -229,6 +225,8 @@ export function useReadLanguageBootstrap({
       resourceTypeRegistry,
       helpsLanguageCode,
       runCatalogLoad,
+      seedBothLanguages,
+      setPanelLanguage,
     ]
   )
 
@@ -237,34 +235,36 @@ export function useReadLanguageBootstrap({
     handleLanguageSelected
   )
 
+  const handlePanelLanguageSelected = useCallback(
+    async (panelId: 'panel-1' | 'panel-2', languageCode: string) => {
+      setPanelLanguage(panelId, languageCode)
+      const panel = useReadPanelStore.getState().panels[panelId]
+      maybeCancelDownloads(panel.mode === 'helps' ? 'helps' : 'text')
+      const navigationScope = useNavigationStore.getState().navigationScope
+      const one = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, panelId)
+      if (!one) return
+      await runCatalogLoad({ ...one, navigationScope })
+    },
+    [maybeCancelDownloads, runCatalogLoad, setPanelLanguage]
+  )
+
+  const handlePanelModeSwitch = useCallback(
+    async (panelId: 'panel-1' | 'panel-2', mode: 'scripture' | 'helps') => {
+      useReadPanelStore.getState().setPanelMode(panelId, mode)
+      const navigationScope = useNavigationStore.getState().navigationScope
+      const one = catalogLoadForSinglePanel(useReadPanelStore.getState().panels, panelId)
+      if (!one) return
+      await runCatalogLoad({ ...one, navigationScope })
+    },
+    [runCatalogLoad]
+  )
+
   const handleHelpsLanguageSelected = useCallback(
     async (languageCode: string) => {
       writePersistedHelpsLanguage(languageCode)
-      setHelpsLanguageCode(languageCode)
-      maybeCancelDownloads('helps')
-
-      const textCode = currentLanguageCode || initialLanguage
-      if (!textCode) return
-
-      const navigationScope = useNavigationStore.getState().navigationScope
-      const plan = resolveReadCatalogLoadPlan({
-        switchedPane: 'helps',
-        textLanguageCode: textCode,
-        nextHelpsLanguageCode: languageCode,
-        currentHelpsLanguage: helpsLanguageCode,
-        persistedHelpsLanguage: languageCode,
-        navigationScope,
-        availabilityFor: () => undefined,
-      })
-
-      await runCatalogLoad({
-        textLanguageCode: textCode,
-        helpsLanguageCode: plan.helpsLanguageCode,
-        loadTarget: plan.loadTarget,
-        navigationScope,
-      })
+      await handlePanelLanguageSelected('panel-2', languageCode)
     },
-    [maybeCancelDownloads, currentLanguageCode, initialLanguage, helpsLanguageCode, runCatalogLoad]
+    [handlePanelLanguageSelected]
   )
 
   useEffect(() => {
@@ -283,6 +283,7 @@ export function useReadLanguageBootstrap({
     isLoadingResources,
     isLoadingTextResources,
     isLoadingHelpsResources,
+    isLoadingByPanel,
     currentLanguageCode,
     helpsLanguageCode,
     isCollectionFullyCached,
@@ -290,6 +291,8 @@ export function useReadLanguageBootstrap({
     isLanguagePickerRequired,
     handleLanguageSelected,
     handleHelpsLanguageSelected,
+    handlePanelLanguageSelected,
+    handlePanelModeSwitch,
     handleSwitchTextMode,
     handleNavigatorScopeCommitted,
     isBackgroundDownloading,

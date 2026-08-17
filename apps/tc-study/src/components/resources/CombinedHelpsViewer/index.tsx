@@ -8,6 +8,7 @@ import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceT
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
+import { useWorkspaceStore } from '../../../lib/stores/workspaceStore'
 import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
 import { useHelpsLanguageActions } from '../../../features/helps/HelpsLanguageActionsContext'
 import {
@@ -15,6 +16,7 @@ import {
   fullHelpsLangFromResourceKey,
   resolveHelpsLanguageCodeForCopy,
 } from '../../../features/helps/helpsEmptyCopy'
+import { isHelpsContentPending } from '../../../features/helps/helpsListLoading'
 import { listedLanguageByCode } from '../../../features/read/languageListDisplayName'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { useEntryTitles } from '../TranslationNotesViewer/hooks/useEntryTitles'
@@ -31,6 +33,7 @@ import type { TokenFilter } from '../WordsLinksViewer/types'
 import { HelpsFilterBanners } from '../shared/HelpsFilterBanners'
 import { CombinedHelpsList } from './CombinedHelpsList'
 import { primaryLangCode } from './combinedHelpsUtils'
+import type { HelpsCardSelection } from './helpsCardSelection'
 import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
 import { useCombinedHelpsDeps } from './useCombinedHelpsDeps'
 import { useCombinedHelpsHandlers } from './useCombinedHelpsHandlers'
@@ -64,18 +67,19 @@ export function CombinedHelpsViewer({
   const bookTitleSource = useBookTitleSource()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const loadedResources = useAppStore((s) => s.loadedResources)
+  const packageResources = useWorkspaceStore((s) => s.currentPackage?.resources)
   const helpsLanguageActions = useHelpsLanguageActions()
 
   const [kindFilter, setKindFilter] = useState<HelpsKindFilter>('all')
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
-  const [selectedLinkId, setSelectedLinkId] = useState<string | null>(null)
+  const [selectedHelpsCard, setSelectedHelpsCard] = useState<HelpsCardSelection>(null)
   const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
   const [verseFilter, setVerseFilter] = useState<VerseFilterState | null>(null)
   const [obsQuoteFilter, setObsQuoteFilter] = useState<ObsQuoteFilter | null>(null)
 
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
-  const effectiveResource = resourceFromStore ?? resource
-  // Prefer store projection (updated on language switch) over possibly-stale props
+  const workspaceHelps = packageResources?.get(resource?.id || resource?.key || '')
+  const effectiveResource = workspaceHelps ?? resourceFromStore ?? resource
+  // Prefer workspace pointers (SoT) — AppStore projection can lag after Unlock 1.
   const wantLang = primaryLangCode(
     effectiveResource.language ||
       effectiveResource.languageCode ||
@@ -83,12 +87,13 @@ export function CombinedHelpsViewer({
       resource.languageCode ||
       ''
   )
-  const injectedTnKey = effectiveResource.helpsTnResourceKey
-  const injectedTwlKey = effectiveResource.helpsTwlResourceKey
+  const injectedTnKey = workspaceHelps?.helpsTnResourceKey ?? effectiveResource.helpsTnResourceKey
+  const injectedTwlKey = workspaceHelps?.helpsTwlResourceKey ?? effectiveResource.helpsTwlResourceKey
   const helpsScope: 'scripture' | 'obs' = effectiveResource.appliesToScope === 'obs' ? 'obs' : 'scripture'
 
   const { tnKey, twlKey } = useCombinedHelpsResources({
     loadedResources,
+    packageResources,
     wantLang,
     injectedTnKey,
     injectedTwlKey,
@@ -116,11 +121,10 @@ export function CombinedHelpsViewer({
     setTokenFilter(null)
     setVerseFilter(null)
     setObsQuoteFilter(null)
-    setSelectedNoteId(null)
-    setSelectedLinkId(null)
+    setSelectedHelpsCard(null)
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
 
-  const { catalogMetadata, depsOk } = useCombinedHelpsDeps({
+  const { catalogMetadata } = useCombinedHelpsDeps({
     resourceKey,
     tnKey,
     twlKey,
@@ -197,8 +201,7 @@ export function CombinedHelpsViewer({
     setTokenFilter,
     setVerseFilter,
     setObsQuoteFilter,
-    setSelectedNoteId,
-    setSelectedLinkId,
+    setSelectedHelpsCard,
   })
 
   const hasMatches = obsQuoteFilter
@@ -259,11 +262,13 @@ export function CombinedHelpsViewer({
     sendTokenClick,
     sendEntryLinkClick,
     broadcastObsHighlight,
-    setSelectedNoteId,
-    setSelectedLinkId,
+    setSelectedHelpsCard,
   })
 
-  const loading = !!(tnKey && tnLoading) || !!(twlKey && twlLoading)
+  const loading = isHelpsContentPending({
+    tnKey, twlKey, tnLoading, twlLoading,
+    catalogLoading: Boolean(helpsLanguageActions?.isCatalogLoading),
+  })
   const noSources = !tnKey && !twlKey
   const helpsLanguageCodeForCopy = resolveHelpsLanguageCodeForCopy({
     selectedCode: helpsLanguageActions?.selectedLanguageCode,
@@ -290,8 +295,7 @@ export function CombinedHelpsViewer({
         hasMatches={hasMatches}
         onClearObsQuoteFilter={() => {
           setObsQuoteFilter(null)
-          setSelectedNoteId(null)
-          setSelectedLinkId(null)
+          setSelectedHelpsCard(null)
         }}
         onClearTokenFilter={() => setTokenFilter(null)}
         onClearVerseFilter={() => setVerseFilter(null)}
@@ -313,7 +317,6 @@ export function CombinedHelpsViewer({
         helpsLanguageName={helpsLanguageName}
         passageLabel={passageLabel}
         noSources={noSources}
-        depsOk={depsOk}
         loading={loading}
         tnError={tnError}
         twlError={twlError}
@@ -321,11 +324,12 @@ export function CombinedHelpsViewer({
         twlKey={twlKey}
         resourceKey={resourceKey}
         mergedGroups={mergedGroups}
-        selectedNoteId={selectedNoteId}
-        selectedLinkId={selectedLinkId}
+        selectedHelpsCard={selectedHelpsCard}
         targetSourceId={targetSourceId}
         helpsScope={helpsScope}
         tokenFilter={tokenFilter}
+        verseFilter={verseFilter}
+        obsQuoteFilter={obsQuoteFilter}
         loadingTitles={loadingTitles}
         twLoadingTitles={twLoadingTitles}
         getEntryTitle={getEntryTitle}

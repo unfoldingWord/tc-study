@@ -10,12 +10,15 @@ import {
   ScriptureLoader,
   viewModelToOptimizedChapters,
 } from '@bt-synergy/scripture-loader'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { shouldRetryOriginalLanguageLoad } from '../../../../features/helps/scriptureReadyUnderlineRebind'
 
 interface UseOriginalLanguageContentOptions {
   resourceKey: string // TWL resource key (e.g., "unfoldingWord/en/twl")
   resourceId: string // TWL viewer resource ID (not used but kept for API consistency)
+  /** Scripture content revision — retry UGNT/UHB load when USJ arrives after a miss. */
+  scriptureRevision?: string
 }
 
 interface OriginalLanguageResource {
@@ -24,7 +27,10 @@ interface OriginalLanguageResource {
   bookCode: string
 }
 
-export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageContentOptions) {
+export function useOriginalLanguageContent({
+  resourceKey,
+  scriptureRevision = '',
+}: UseOriginalLanguageContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
   const catalogManager = useCatalogManager()
@@ -35,6 +41,26 @@ export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageC
   const [originalContent, setOriginalContent] = useState<OptimizedChapter[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryTick, setRetryTick] = useState(0)
+  const lastAttemptedRevisionRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    lastAttemptedRevisionRef.current = null
+  }, [currentRef.book, currentRef.chapter])
+
+  useEffect(() => {
+    if (
+      !shouldRetryOriginalLanguageLoad({
+        hasOriginalContent: !!(originalContent && originalContent.length > 0),
+        scriptureRevision,
+        lastAttemptedRevision: lastAttemptedRevisionRef.current,
+      })
+    ) {
+      return
+    }
+    lastAttemptedRevisionRef.current = scriptureRevision
+    setRetryTick((n) => n + 1)
+  }, [scriptureRevision, originalContent])
 
   useEffect(() => {
     if (!currentRef.book || !currentRef.chapter || !catalogManager || !loaderRegistry) {
@@ -161,7 +187,7 @@ export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageC
     return () => {
       cancelled = true
     }
-  }, [currentRef.book, currentRef.chapter, catalogManager, loaderRegistry, resourceKey])
+  }, [currentRef.book, currentRef.chapter, catalogManager, loaderRegistry, resourceKey, retryTick])
 
   return {
     originalLanguageResources,

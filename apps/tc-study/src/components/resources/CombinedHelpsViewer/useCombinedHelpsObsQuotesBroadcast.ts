@@ -9,6 +9,7 @@ import {
 } from '@bt-synergy/resource-panels'
 import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { ObsFrameHighlightSignal, ObsFrameQuoteEntry, ObsFrameQuotesSignal } from '../../../signals/studioSignals'
+import { focusFirstOverlappingHelpsCard, type HelpsCardSelection } from './helpsCardSelection'
 import type { HelpsKindFilter, ObsQuoteFilter } from './types'
 import type { NoteWithAlignments, LinkWithAlignments } from './useCombinedHelpsMerge'
 
@@ -22,8 +23,7 @@ export interface UseCombinedHelpsObsQuotesBroadcastParams {
   filteredByReference: LinkWithAlignments[]
   resourceMetadata: Record<string, unknown>
   setObsQuoteFilter: Dispatch<SetStateAction<ObsQuoteFilter | null>>
-  setSelectedNoteId: Dispatch<SetStateAction<string | null>>
-  setSelectedLinkId: Dispatch<SetStateAction<string | null>>
+  setSelectedHelpsCard: Dispatch<SetStateAction<HelpsCardSelection>>
 }
 
 export function useCombinedHelpsObsQuotesBroadcast({
@@ -36,8 +36,7 @@ export function useCombinedHelpsObsQuotesBroadcast({
   filteredByReference,
   resourceMetadata,
   setObsQuoteFilter,
-  setSelectedNoteId,
-  setSelectedLinkId,
+  setSelectedHelpsCard,
 }: UseCombinedHelpsObsQuotesBroadcastParams) {
   // Per-publisher keys (same pattern as NOTES_TOKEN_GROUPS_TN/TWL) — ObsViewer merges.
   const { sendState: sendObsFrameQuotesTn } = useResourceStateSender<ObsFrameQuotesSignal>(
@@ -158,8 +157,7 @@ export function useCombinedHelpsObsQuotesBroadcast({
         if (helpsScope !== 'obs') return
         if (signal.highlight === null) {
           setObsQuoteFilter(null)
-          setSelectedNoteId(null)
-          setSelectedLinkId(null)
+          setSelectedHelpsCard(null)
           return
         }
         const h = signal.highlight
@@ -175,23 +173,25 @@ export function useCombinedHelpsObsQuotesBroadcast({
             rowId: h.rowId,
             kind: h.kind,
           })
-          const firstTn = notesWithAlignedTokens.find((n) => h.overlappingSourceIds!.includes(n.id))
-          const firstTwl = filteredByReference.find((l) => h.overlappingSourceIds!.includes(l.id))
-          setSelectedNoteId(firstTn?.id ?? null)
-          setSelectedLinkId(firstTwl?.id ?? null)
+          setSelectedHelpsCard(
+            focusFirstOverlappingHelpsCard(
+              h.overlappingSourceIds,
+              notesWithAlignedTokens,
+              filteredByReference,
+              kindFilter
+            )
+          )
           return
         }
         if (h.quote === undefined || h.occurrence === undefined) return
         setObsQuoteFilter({ quote: h.quote, occurrence: h.occurrence, rowId: h.rowId, kind: h.kind })
         if (h.rowId) {
           if (notesWithAlignedTokens.some((n) => n.id === h.rowId)) {
-            setSelectedNoteId(h.rowId)
-            setSelectedLinkId(null)
+            setSelectedHelpsCard({ kind: 'tn', id: h.rowId })
             return
           }
           if (filteredByReference.some((l) => l.id === h.rowId)) {
-            setSelectedLinkId(h.rowId)
-            setSelectedNoteId(null)
+            setSelectedHelpsCard({ kind: 'twl', id: h.rowId })
             return
           }
         }
@@ -200,8 +200,7 @@ export function useCombinedHelpsObsQuotesBroadcast({
           if ((note.quote || '').trim().toLowerCase() !== nq) continue
           const occ = Number.parseInt(String(note.occurrence ?? '1'), 10)
           if (occ === h.occurrence) {
-            setSelectedNoteId(note.id)
-            setSelectedLinkId(null)
+            setSelectedHelpsCard({ kind: 'tn', id: note.id })
             return
           }
         }
@@ -209,8 +208,7 @@ export function useCombinedHelpsObsQuotesBroadcast({
           if ((link.origWords || '').trim().toLowerCase() !== nq) continue
           const occ = Number.parseInt(String(link.occurrence ?? '1'), 10)
           if (occ === h.occurrence) {
-            setSelectedLinkId(link.id)
-            setSelectedNoteId(null)
+            setSelectedHelpsCard({ kind: 'twl', id: link.id })
             return
           }
         }
@@ -218,6 +216,7 @@ export function useCombinedHelpsObsQuotesBroadcast({
       [
         resourceId,
         helpsScope,
+        kindFilter,
         currentRef.book,
         currentRef.chapter,
         currentRef.verse,
@@ -225,8 +224,7 @@ export function useCombinedHelpsObsQuotesBroadcast({
         notesWithAlignedTokens,
         filteredByReference,
         setObsQuoteFilter,
-        setSelectedNoteId,
-        setSelectedLinkId,
+        setSelectedHelpsCard,
       ]
     ),
     { debug: false, resourceMetadata }

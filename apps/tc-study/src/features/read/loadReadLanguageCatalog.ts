@@ -13,16 +13,20 @@ import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
+import { useNavigationStore } from '../nav/navigationStore'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
+import { projectCurrentWorkspacePanels } from '../workspace/resourceMutations'
 import { narrowExpectedToCataloged } from './catalogBackgroundDownloadPolicy'
 import {
   clearReadPanelsForLanguageSwitch,
   panelClearTargetForLoad,
+  shouldReconcileHelpsOnPanelClear,
 } from './clearReadPanelsForLanguageSwitch'
 import { hydrateOriginalLanguageResources } from './hydrateOriginalLanguageResources'
 import { hydrateReadCatalogHits } from './hydrateReadCatalogHits'
 import { collectCatalogMetadataPromises } from './hydrateReadCatalogMetadata'
 import { catalogTargetsForLoad, type CatalogLoadTarget } from './readCatalogPanelPolicy'
+import type { ReadPanelId } from './readPanelModel'
 import { searchCatalogHitsForTarget } from './readCatalogSearch'
 import {
   mergeExpectedResourceKeys,
@@ -33,6 +37,8 @@ export interface LoadReadLanguageCatalogDeps {
   textLanguageCode: string
   helpsLanguageCode: string
   loadTarget: CatalogLoadTarget
+  /** Single-panel load so two scripture panes do not share one dest. */
+  destPanelId?: ReadPanelId
   navigationScope: string
   existingTextKeys?: string[]
   existingHelpsKeys?: string[]
@@ -57,8 +63,10 @@ export interface LoadReadLanguageCatalogResult {
 function activateGatewayScriptureTab(deps: {
   getPanel: LoadReadLanguageCatalogDeps['getPanel']
   setActiveResourceInPanel: LoadReadLanguageCatalogDeps['setActiveResourceInPanel']
+  destPanelId?: ReadPanelId
 }): void {
-  const panel1After = deps.getPanel('panel-1')
+  const dest = deps.destPanelId ?? 'panel-1'
+  const panel1After = deps.getPanel(dest)
   const pkgAfter = useWorkspaceStore.getState().currentPackage
   if (!panel1After || !pkgAfter) return
   const gatewayIdx = panel1After.resourceKeys.findIndex((key) => {
@@ -70,7 +78,7 @@ function activateGatewayScriptureTab(deps: {
     return !isOriginalLanguageResource(lang, r.subject || '')
   })
   if (gatewayIdx >= 0) {
-    deps.setActiveResourceInPanel('panel-1', gatewayIdx)
+    deps.setActiveResourceInPanel(dest, gatewayIdx)
   }
 }
 
@@ -89,6 +97,7 @@ export async function loadReadLanguageCatalog(
     textLanguageCode,
     helpsLanguageCode,
     loadTarget,
+    destPanelId,
     navigationScope,
     catalogManager,
     resourceTypeRegistry,
@@ -111,20 +120,37 @@ export async function loadReadLanguageCatalog(
   })
   setExpectedResources([...startExpected.textKeys, ...startExpected.helpsKeys])
 
-  clearReadPanelsForLanguageSwitch(helpsLanguageCode, panelClearTargetForLoad(loadTarget))
+  const panelTarget = panelClearTargetForLoad(loadTarget, destPanelId)
+  clearReadPanelsForLanguageSwitch(helpsLanguageCode, panelTarget, {
+    reconcileHelps: shouldReconcileHelpsOnPanelClear(loadTarget, panelTarget),
+  })
 
   const door43Client = getDoor43ApiClient()
-  const searches = catalogTargetsForLoad({ textLanguageCode, helpsLanguageCode, loadTarget })
+  const searches =
+    destPanelId && loadTarget !== 'both'
+      ? [
+          {
+            languageCode: loadTarget === 'helps' ? helpsLanguageCode : textLanguageCode,
+            target: loadTarget,
+          },
+        ]
+      : catalogTargetsForLoad({ textLanguageCode, helpsLanguageCode, loadTarget })
   const nextTextKeys: string[] = []
   const nextHelpsKeys: string[] = []
-  const metadataPromises: Array<Promise<ResourceInfo | null>> = []
+  const metadataPromises: Array<Promise<ResourceInfo[]>> = []
 
-  for (const search of searches) {
-    const pages = await searchCatalogHitsForTarget(door43Client, {
-      languageCode: search.languageCode,
-      target: search.target,
-      navigationScope,
-    })
+  const searchPages = await Promise.all(
+    searches.map(async (search) => ({
+      search,
+      pages: await searchCatalogHitsForTarget(door43Client, {
+        languageCode: search.languageCode,
+        target: search.target,
+        navigationScope,
+      }),
+    }))
+  )
+
+  for (const { search, pages } of searchPages) {
 
     if (pages.every((page) => page.catalogResults.length === 0)) {
       console.warn(
@@ -133,10 +159,18 @@ export async function loadReadLanguageCatalog(
     }
 
     for (const page of pages) {
+      const hitDest =
+        destPanelId ??
+        (page.hydrateTarget === 'helps'
+          ? 'panel-2'
+          : page.hydrateTarget === 'text'
+            ? 'panel-1'
+            : undefined)
       const hydrated = hydrateReadCatalogHits({
         catalogResults: page.catalogResults,
         languageCode: search.languageCode,
         target: page.hydrateTarget,
+        destPanelId: hitDest,
         resourceTypeRegistry,
         viewerRegistry,
         getPanel,
@@ -150,6 +184,7 @@ export async function loadReadLanguageCatalog(
           catalogResults: page.catalogResults,
           languageCode: search.languageCode,
           target: page.hydrateTarget,
+          destPanelId: hitDest,
           catalogManager,
           resourceTypeRegistry,
           viewerRegistry,
@@ -162,8 +197,8 @@ export async function loadReadLanguageCatalog(
     const orig = hydrateOriginalLanguageResources({
       catalogManager,
       resourceTypeRegistry,
-      getPanel,
-      addResource,
+      destPanelId: destPanelId ?? 'panel-1',
+      currentBook: useNavigationStore.getState().currentReference.book,
     })
     nextTextKeys.push(...orig.loadedKeys)
     metadataPromises.push(...orig.metadataPromises)
@@ -171,10 +206,16 @@ export async function loadReadLanguageCatalog(
 
   // CombinedHelps after GL + UGNT/UHB hydrate so original-lang adds cannot clobber
   // the gateway TN/TWL pair selected for `helpsLanguageCode`.
-  applyCombinedHelpsEnsure(helpsLanguageCode)
+  if (destPanelId && loadTarget === 'text') {
+    /* scripture-only into one panel — do not inject CombinedHelps onto that panel */
+  } else if (destPanelId) {
+    applyCombinedHelpsEnsure(helpsLanguageCode, destPanelId)
+  } else {
+    applyCombinedHelpsEnsure(helpsLanguageCode)
+  }
 
   if (loadTarget !== 'helps') {
-    activateGatewayScriptureTab({ getPanel, setActiveResourceInPanel })
+    activateGatewayScriptureTab({ getPanel, setActiveResourceInPanel, destPanelId })
   }
 
   const merged = mergeExpectedResourceKeys({
@@ -185,14 +226,17 @@ export async function loadReadLanguageCatalog(
     nextHelpsKeys,
   })
   setExpectedResources([...merged.textKeys, ...merged.helpsKeys])
+  // Skip-if-base-key hydrate still leaves instance ids on the dest panel —
+  // re-project so `ult#2` / `ugnt#2` exist in the AppStore read model.
+  projectCurrentWorkspacePanels()
 
   const collectionLangs = [...new Set(searches.map((s) => s.languageCode))]
 
   void Promise.allSettled(metadataPromises).then(async (results) => {
     const toAdd: ResourceInfo[] = []
     for (const result of results) {
-      if (result.status === 'fulfilled' && result.value) {
-        toAdd.push(result.value)
+      if (result.status === 'fulfilled') {
+        toAdd.push(...result.value)
       }
     }
     if (toAdd.length > 0) {

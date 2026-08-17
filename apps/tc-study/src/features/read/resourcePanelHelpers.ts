@@ -7,6 +7,7 @@ import {
 import { findHelpsKeysAmongResources } from '../helps/combinedHelpsInjection'
 import { getContentStructure, getIngredients } from '../../utils/resourceMetadataAccessors'
 import { useAppStore } from '../../contexts/AppContext'
+import { getBaseResourceKey } from '../workspace/projectPanelResourcesToAppStore'
 
 export function primaryLangSegment(code: string): string {
   return String(code || '')
@@ -48,7 +49,8 @@ export function getResourceAppliesToScope(
   if (resourceKey === COMBINED_HELPS_RESOURCE_ID) return 'scripture'
   if (resourceKey === OBS_COMBINED_HELPS_RESOURCE_ID) return 'obs'
 
-  const resource = loadedResources[resourceKey]
+  const resource =
+    loadedResources[resourceKey] ?? loadedResources[getBaseResourceKey(resourceKey)]
   if (!resource) return null
 
   if (resource.appliesToScope === 'shared') return null
@@ -99,7 +101,8 @@ export function resourceSupportsBook(
   }
   if (bookCode === 'obs') return true
 
-  const resource = loadedResources[resourceKey]
+  const resource =
+    loadedResources[resourceKey] ?? loadedResources[getBaseResourceKey(resourceKey)]
   if (!resource) return true
 
   const code = bookCode.toLowerCase()

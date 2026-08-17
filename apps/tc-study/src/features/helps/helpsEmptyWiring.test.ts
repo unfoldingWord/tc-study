@@ -26,10 +26,10 @@ describe('helps empty copy wiring (issue #24)', () => {
 
   test('ReadLinkedPanel provides helps-language actions to CombinedHelps', () => {
     expect(panelSrc).toContain('HelpsLanguageActionsProvider')
-    expect(panelSrc).toContain('selectHelpsLanguage: onHelpsLanguageSelected')
-    expect(panelSrc).toContain('selectedLanguageCode: helpsLanguageCode')
+    expect(panelSrc).toContain('selectHelpsLanguage: onLanguageSelected')
+    expect(panelSrc).toContain('isCatalogLoading: catalogLoading')
     expect(panelSrc).toContain('openHelpsPicker:')
-    expect(panelSrc).toContain('setHelpsPickerOpen(true)')
+    expect(panelSrc).toContain('setPickerOpen(true)')
   })
 
   test('English + Exodus still renders note cards when groups exist (no false empty)', () => {

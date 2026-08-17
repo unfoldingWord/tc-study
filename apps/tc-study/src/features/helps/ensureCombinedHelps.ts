@@ -7,6 +7,8 @@ import {
   COMBINED_HELPS_IDS,
   COMBINED_HELPS_RESOURCE_ID,
   OBS_COMBINED_HELPS_RESOURCE_ID,
+  combinedHelpsIdForPanel,
+  isCombinedHelpsId,
 } from './combinedHelpsIds'
 import {
   buildCombinedHelpsResourceInfo,
@@ -31,8 +33,8 @@ const SCOPE_IDS: Record<HelpsScope, string> = {
 const ORIGINAL_LANG_CODES = new Set(['el-x-koine', 'hbo', 'und', ''])
 
 /**
- * Ensure CombinedHelps synthetic resources exist when both TN and TWL (or OBS twins)
- * are present; remove/reconcile them when a side drops.
+ * Ensure CombinedHelps synthetic resources exist when TN and/or TWL (or OBS twins)
+ * are present; remove them only when both sides drop.
  *
  * Unlock 1 (single tab key space): when CombinedHelps is present for a scope,
  * strip that scope's raw TN/TWL from panel.resourceKeys. TN/TWL remain in the
@@ -47,6 +49,8 @@ export function ensureCombinedHelpsInWorkspace(options: {
   resources: Map<string, ResourceInfo> | Record<string, ResourceInfo>
   panels: WorkspacePanelLike[]
   languageCode?: string
+  /** Default panel-2 so existing bootstrap stays green. */
+  panelId?: string
 }): {
   resources: Map<string, ResourceInfo>
   panels: WorkspacePanelLike[]
@@ -68,16 +72,20 @@ export function ensureCombinedHelpsInWorkspace(options: {
   const injected: string[] = []
   const removed: string[] = []
 
-  const panel2 = panels.find((p) => p.id === 'panel-2') || panels[1]
+  const targetPanelId = options.panelId || 'panel-2'
+  const helpsPanel =
+    panels.find((p) => p.id === targetPanelId) ||
+    panels.find((p) => p.id === 'panel-2') ||
+    panels[1]
   const previousActiveKey =
-    panel2 && panel2.resourceKeys.length > 0
-      ? panel2.resourceKeys[
-          clampIndex(panel2.activeIndex, panel2.resourceKeys.length)
+    helpsPanel && helpsPanel.resourceKeys.length > 0
+      ? helpsPanel.resourceKeys[
+          clampIndex(helpsPanel.activeIndex, helpsPanel.resourceKeys.length)
         ]
       : null
 
   for (const scope of ['scripture', 'obs'] as HelpsScope[]) {
-    const id = SCOPE_IDS[scope]
+    const id = combinedHelpsIdForPanel(SCOPE_IDS[scope], targetPanelId)
     const pair = findHelpsKeysAmongResources(resourceMap.values(), scope, { langCode })
 
     if (!shouldInjectCombinedHelps(pair)) {
@@ -89,9 +97,8 @@ export function ensureCombinedHelpsInWorkspace(options: {
           panel.resourceKeys = panel.resourceKeys.filter((k) => k !== id)
         }
         removed.push(id)
-        // CombinedHelps dropped — restore remaining raw TN/TWL onto panel-2 tabs
-        if (panel2) {
-          restoreHelpsPairKeysToPanel(panel2, resourceMap, pair)
+        if (helpsPanel && !panelHasPrimaryText(helpsPanel, resourceMap)) {
+          restoreHelpsPairKeysToPanel(helpsPanel, resourceMap, pair)
         }
       }
       continue
@@ -102,6 +109,7 @@ export function ensureCombinedHelpsInWorkspace(options: {
       languageCode: langCode || 'und',
       tnKey: pair.tnKey,
       twlKey: pair.twlKey,
+      id,
     })
     if (!resourceMap.has(id)) {
       resourceMap.set(id, info)
@@ -117,26 +125,44 @@ export function ensureCombinedHelpsInWorkspace(options: {
       } as ResourceInfo)
     }
 
-    if (panel2 && !panel2.resourceKeys.includes(id)) {
-      const insertAt = scope === 'scripture' ? 0 : panel2.resourceKeys.length
-      panel2.resourceKeys.splice(insertAt, 0, id)
-      if (!injected.includes(id)) injected.push(id)
+    // Dual scripture (same lang): panel-2 is not always helps — never inject there.
+    if (helpsPanel && panelHasPrimaryText(helpsPanel, resourceMap)) {
+      helpsPanel.resourceKeys = helpsPanel.resourceKeys.filter((k) => k !== id)
+      stripScopedHelpsPeersFromPanels(panels, resourceMap, scope)
+      continue
+    }
+
+    if (helpsPanel) {
+      // Unscoped + `:panel-N` CombinedHelps must not both appear on one strip.
+      helpsPanel.resourceKeys = helpsPanel.resourceKeys.filter(
+        (k) => k === id || !isSameScopeCombinedHelpsId(k, scope)
+      )
+      if (!helpsPanel.resourceKeys.includes(id)) {
+        const insertAt = scope === 'scripture' ? 0 : helpsPanel.resourceKeys.length
+        helpsPanel.resourceKeys.splice(insertAt, 0, id)
+        if (!injected.includes(id)) injected.push(id)
+      }
     }
 
     // Single tab space: CombinedHelps owns the tab; TN/TWL stay in package only
     stripScopedHelpsPeersFromPanels(panels, resourceMap, scope)
   }
 
-  if (panel2) {
-    normalizePanel2HelpsOrder(panel2)
-    panel2.activeIndex = resolvePanel2ActiveIndex({
-      resourceKeys: panel2.resourceKeys,
+  if (helpsPanel && !panelHasPrimaryText(helpsPanel, resourceMap)) {
+    normalizePanel2HelpsOrder(helpsPanel)
+    helpsPanel.activeIndex = resolvePanel2ActiveIndex({
+      resourceKeys: helpsPanel.resourceKeys,
       resources: resourceMap,
       previousActiveKey,
     })
   }
 
   return { resources: resourceMap, panels, injected, removed }
+}
+
+function isSameScopeCombinedHelpsId(key: string, scope: HelpsScope): boolean {
+  const base = SCOPE_IDS[scope]
+  return key === base || key.startsWith(`${base}:`)
 }
 
 /** Keep CombinedHelps ids at the front of panel-2 so painted order === store order. */
@@ -218,6 +244,20 @@ function clampIndex(index: number, length: number): number {
   return index
 }
 
+/** Scripture/OBS on a panel means it is a text pane — CombinedHelps must not land there. */
+function panelHasPrimaryText(
+  panel: WorkspacePanelLike,
+  resources: Map<string, ResourceInfo>
+): boolean {
+  return panel.resourceKeys.some((key) => {
+    if (isCombinedHelpsId(key)) return false
+    const r = resources.get(key) || resources.get(baseKey(key))
+    if (!r) return false
+    const type = String(r.type || '')
+    return type === 'scripture' || type === 'obs'
+  })
+}
+
 function primaryLang(code: string | undefined | null): string {
   if (!code) return ''
   return String(code).trim().split(/[-_/]/)[0]!.toLowerCase()
@@ -260,7 +300,7 @@ export function guessGatewayLanguage(
       const r = resources.get(key) || resources.get(baseKey(key))
       if (!r) continue
       const id = r.key || r.id || ''
-      if (COMBINED_HELPS_IDS.has(id)) continue
+      if (isCombinedHelpsId(id) || COMBINED_HELPS_IDS.has(id)) continue
       const lang = resourceLang(r)
       if (!lang) continue
       const type = String(r.type || '')

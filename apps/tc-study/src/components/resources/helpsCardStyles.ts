@@ -21,3 +21,22 @@ export const HELPS_CARD_IDLE =
 
 /** Selected: light yellow highlight wash + even border (no left bar / ring / blue or purple wash). */
 export const HELPS_CARD_SELECTED = 'bg-highlight/15 border-border'
+
+/** Filter-word mark inside quote chips — same dotted underline as scripture tokens. */
+export const HELPS_QUOTE_FILTER_MARK =
+  'underline decoration-dotted decoration-underline decoration-1 underline-offset-2'
+
+/** Article / title footer on TN + TWL cards — middle density between the two. */
+export const HELPS_CARD_FOOTER = 'mt-2 pt-2 border-t border-border-subtle'
+
+/** Shared article-link row (layout only). Colors are per kind below. */
+export const HELPS_CARD_FOOTER_BUTTON =
+  'flex items-center gap-1.5 w-full text-left text-sm font-medium transition-colors'
+
+/** Translation Words — accent blue (CVD-safe vs TA amber). */
+export const HELPS_CARD_FOOTER_BUTTON_TW = `${HELPS_CARD_FOOTER_BUTTON} text-accent-fg hover:text-accent`
+
+/** Translation Academy — warning amber (not helps purple; blue/purple fails tritanopia). */
+export const HELPS_CARD_FOOTER_BUTTON_TA = `${HELPS_CARD_FOOTER_BUTTON} text-warning-fg hover:text-warning`
+
+export const HELPS_CARD_FOOTER_ICON = 'w-3.5 h-3.5 flex-shrink-0'

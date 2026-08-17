@@ -19,9 +19,10 @@
 
 import { useMemo } from 'react'
 import { useCurrentReference } from '../../../../contexts'
-import type { TranslationWordsLink } from '../types'
 import { buildQuoteTokens } from '../../../../features/helps/quoteTokens'
+import type { TranslationWordsLink } from '../types'
 import { useOriginalLanguageContent } from './useOriginalLanguageContent'
+import { useScriptureContentRevision } from './useScriptureTokens'
 
 interface UseQuoteTokensOptions {
   resourceKey: string
@@ -31,13 +32,13 @@ interface UseQuoteTokensOptions {
 
 export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteTokensOptions) {
   const currentRef = useCurrentReference()
-  
-  // Get original language content (now requests from other panels first)
+  const scriptureRevision = useScriptureContentRevision(resourceId)
+
   const {
     originalContent,
     loading: loadingOriginal,
     error: originalError,
-  } = useOriginalLanguageContent({ resourceKey, resourceId })
+  } = useOriginalLanguageContent({ resourceKey, resourceId, scriptureRevision })
   
   // Build quoteTokens for each link
   // Only process links in the current chapter range to optimize performance

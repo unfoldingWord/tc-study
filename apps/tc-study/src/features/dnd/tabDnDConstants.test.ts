@@ -23,6 +23,8 @@ describe('tabDnDConstants', () => {
     expect(src).toContain('SortableTab')
     expect(src).not.toMatch(/if\s*\(\s*resources\.length\s*===\s*1\s*\)/)
     expect(src).toContain('scrollLocked')
+    expect(src).toContain('resource.id || resource.key')
+    expect(src).not.toMatch(/const key = resource\.key \|\| resource\.id/)
   })
 
   test('Studio and Read wire TabDnDProvider (not @dnd-kit DndContext)', () => {

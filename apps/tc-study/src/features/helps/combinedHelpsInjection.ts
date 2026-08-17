@@ -17,8 +17,9 @@ export interface HelpsKeyPair {
   twlKey?: string
 }
 
+/** Inject when either TN or TWL exists so first-open is not blocked on both catalog hits. */
 export function shouldInjectCombinedHelps(pair: HelpsKeyPair): boolean {
-  return Boolean(pair.tnKey && pair.twlKey)
+  return Boolean(pair.tnKey || pair.twlKey)
 }
 
 export function findHelpsKeysAmongResources(
@@ -51,9 +52,12 @@ export function buildCombinedHelpsResourceInfo(options: {
   languageCode: string
   tnKey?: string
   twlKey?: string
+  /** Override resource key (per-panel CombinedHelps when both panes are helps). */
+  id?: string
 }): ResourceInfo {
   const isObs = options.scope === 'obs'
-  const id = isObs ? OBS_COMBINED_HELPS_RESOURCE_ID : COMBINED_HELPS_RESOURCE_ID
+  const id =
+    options.id || (isObs ? OBS_COMBINED_HELPS_RESOURCE_ID : COMBINED_HELPS_RESOURCE_ID)
   const type = isObs
     ? RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS
     : RESOURCE_TYPE_IDS.COMBINED_HELPS

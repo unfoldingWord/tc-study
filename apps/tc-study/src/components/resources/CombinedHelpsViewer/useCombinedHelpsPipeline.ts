@@ -4,7 +4,6 @@
 
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useMemo } from 'react'
-import { resolveQuoteSemanticIds } from '../../../features/helps/resolveQuoteSemanticIds'
 import {
   filterLinksByReferenceRange,
   filterNotesByReferenceRange,
@@ -12,7 +11,7 @@ import {
   type ObsQuoteFilter,
   type VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
-import { parseLinkChapterVerse } from '../../../features/helps/quoteTokens'
+import { underlineGroupsFromHelpsNotes } from '../../../features/helps/scriptureReadyUnderlineRebind'
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { useAlignedTokens, useQuoteTokens } from '../WordsLinksViewer/hooks'
 import {
@@ -181,27 +180,15 @@ export function useCombinedHelpsPipeline({
 
   const bookCodeLower = currentRef.book?.toLowerCase() || ''
 
-  const underlineTnGroups = useMemo(() => {
-    const groups: { sourceId: string; semanticIds: string[] }[] = []
-    for (const note of notesWithAlignedTokens) {
-      if (!note.quoteTokens?.length && !note.semanticIds?.length) continue
-      const { chapter, verse } = parseLinkChapterVerse(note.reference)
-      const semanticIds = resolveQuoteSemanticIds(note as never, bookCodeLower, chapter, verse)
-      if (semanticIds.length > 0) groups.push({ sourceId: note.id, semanticIds })
-    }
-    return groups
-  }, [notesWithAlignedTokens, bookCodeLower])
+  const underlineTnGroups = useMemo(
+    () => underlineGroupsFromHelpsNotes(notesWithAlignedTokens, bookCodeLower),
+    [notesWithAlignedTokens, bookCodeLower]
+  )
 
-  const underlineTwlGroups = useMemo(() => {
-    const groups: { sourceId: string; semanticIds: string[] }[] = []
-    for (const link of filteredByReference) {
-      if (!link.quoteTokens?.length && !link.semanticIds?.length) continue
-      const { chapter, verse } = parseLinkChapterVerse(link.reference)
-      const semanticIds = resolveQuoteSemanticIds(link as never, bookCodeLower, chapter, verse)
-      if (semanticIds.length > 0) groups.push({ sourceId: link.id, semanticIds })
-    }
-    return groups
-  }, [filteredByReference, bookCodeLower])
+  const underlineTwlGroups = useMemo(
+    () => underlineGroupsFromHelpsNotes(filteredByReference, bookCodeLower),
+    [filteredByReference, bookCodeLower]
+  )
 
   const { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches } = useCombinedHelpsDisplay({
     notesWithAlignedTokens,

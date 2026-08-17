@@ -14,6 +14,8 @@ import {
   catalogIdentity,
   type CatalogEntry,
 } from './readCatalogIdentity'
+import { existingPanelInstanceId } from '../workspace/projectPanelResourcesToAppStore'
+import type { ReadPanelId } from './readPanelModel'
 
 const BOOK_COMPANION_TYPES = new Set([
   'notes',
@@ -30,6 +32,8 @@ export interface HydrateReadCatalogHitsDeps {
   catalogResults: CatalogEntry[]
   languageCode: string
   target: CatalogLoadTarget
+  /** When set, primary/companion land on this panel (two scripture panes stay independent). */
+  destPanelId?: ReadPanelId
   resourceTypeRegistry: {
     getTypeForSubject: (subject: string) => string | undefined
     get: (typeId: string) => { contentRole?: string } | undefined
@@ -66,6 +70,7 @@ export function hydrateReadCatalogHits(
     catalogResults,
     languageCode,
     target,
+    destPanelId,
     resourceTypeRegistry,
     viewerRegistry,
     getPanel,
@@ -76,6 +81,7 @@ export function hydrateReadCatalogHits(
   const loadedKeys: string[] = []
   const expectedTextKeys: string[] = []
   const expectedHelpsKeys: string[] = []
+  const assignedThisPass = new Set<string>()
 
   for (const entry of catalogResults) {
     const id = catalogIdentity(entry, languageCode)
@@ -87,7 +93,12 @@ export function hydrateReadCatalogHits(
     const typeDef = resourceTypeRegistry.get(typeId)
     const isPrimary = typeDef?.contentRole === 'primary'
     const hasViewer = viewerRegistry.hasViewer(typeId)
-    const assignment = panelAssignmentForContentRole(typeDef?.contentRole, target, hasViewer)
+    const assignment = panelAssignmentForContentRole(
+      typeDef?.contentRole,
+      target,
+      hasViewer,
+      destPanelId
+    )
     if (assignment.kind === 'skip') continue
 
     const type = typeId as ResourceType
@@ -105,6 +116,17 @@ export function hydrateReadCatalogHits(
       BOOK_COMPANION_TYPES.has(typeId) || subject.toLowerCase().includes('bible')
         ? 'book'
         : 'entry'
+
+    if (assignment.kind === 'panel') {
+      const passKey = `${assignment.panelId}:${resourceKey}`
+      if (
+        assignedThisPass.has(passKey) ||
+        existingPanelInstanceId(getPanel(assignment.panelId)?.resourceKeys, resourceKey)
+      ) {
+        continue
+      }
+      assignedThisPass.add(passKey)
+    }
 
     const basicResourceInfo: ResourceInfo = {
       id: resourceKey,
@@ -144,7 +166,12 @@ export function hydrateReadCatalogHits(
     if (assignment.kind === 'panel') {
       const currentPanel = getPanel(assignment.panelId)
       const currentIndex = currentPanel?.resourceKeys.length || 0
-      addResource(basicResourceInfo, { panelId: assignment.panelId, index: currentIndex })
+      addResource(basicResourceInfo, {
+        panelId: assignment.panelId,
+        index: currentIndex,
+        // Same-language dual scripture: second pane gets ult#2 so LinkedPanels ids stay unique.
+        allowMultipleInstances: true,
+      })
       if (currentIndex === 0) {
         setActiveResourceInPanel(assignment.panelId, 0)
       }

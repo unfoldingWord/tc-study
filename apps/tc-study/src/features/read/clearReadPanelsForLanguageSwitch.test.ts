@@ -11,6 +11,7 @@ import { useNavigationStore } from '../nav/navigationStore'
 import {
   clearReadPanelsForLanguageSwitch,
   panelClearTargetForLoad,
+  shouldReconcileHelpsOnPanelClear,
 } from './clearReadPanelsForLanguageSwitch'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
 
@@ -264,6 +265,28 @@ describe('clearReadPanelsForLanguageSwitch', () => {
     expect(useAppStore.getState().loadedResources['u/bho/obs']).toBeTruthy()
     expect(useNavigationStore.getState().availableBooks).toHaveLength(1)
   })
+
+  test('text dest on panel-2 does not re-inject CombinedHelps when TN/TWL remain in package', () => {
+    addResource(res({ key: 'u/en/ult', type: 'scripture', language: 'en', languageCode: 'en' }), {
+      panelId: 'panel-1',
+    })
+    addResource(res({ key: 'u/en/tn', type: 'notes', language: 'en', languageCode: 'en' }), {
+      panelId: 'panel-2',
+    })
+    addResource(res({ key: 'u/en/twl', type: 'words-links', language: 'en', languageCode: 'en' }), {
+      panelId: 'panel-2',
+    })
+    applyCombinedHelpsEnsure('en')
+
+    clearReadPanelsForLanguageSwitch('en', 'panel-2', { reconcileHelps: false })
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    expect(pkg.panels.find((p) => p.id === 'panel-1')!.resourceKeys).toContain('u/en/ult')
+    expect(pkg.panels.find((p) => p.id === 'panel-2')!.resourceKeys).toEqual([])
+    expect(pkg.panels.find((p) => p.id === 'panel-2')!.resourceKeys).not.toContain(
+      COMBINED_HELPS_RESOURCE_ID
+    )
+  })
 })
 
 describe('panelClearTargetForLoad', () => {
@@ -271,5 +294,13 @@ describe('panelClearTargetForLoad', () => {
     expect(panelClearTargetForLoad('text')).toBe('panel-1')
     expect(panelClearTargetForLoad('helps')).toBe('panel-2')
     expect(panelClearTargetForLoad('both')).toBe('both')
+    expect(panelClearTargetForLoad('text', 'panel-2')).toBe('panel-2')
+  })
+
+  test('text dest never reconciles CombinedHelps (panel-2 scripture is valid)', () => {
+    expect(shouldReconcileHelpsOnPanelClear('text', 'panel-2')).toBe(false)
+    expect(shouldReconcileHelpsOnPanelClear('text', 'panel-1')).toBe(false)
+    expect(shouldReconcileHelpsOnPanelClear('helps', 'panel-2')).toBe(true)
+    expect(shouldReconcileHelpsOnPanelClear('both', 'both')).toBe(true)
   })
 })

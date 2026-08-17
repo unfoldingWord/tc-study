@@ -189,7 +189,7 @@ export class RemarkMarkdownRenderer {
             <blockquote
               {...props}
               // Prefer semantic tokens; avoid OS-only dark:text-* on themed surfaces.
-              className="border-l-4 border-blue-300 pl-4 italic mb-4 text-slate-900 [&_p]:text-slate-900 [&_em]:text-inherit [&_strong]:text-inherit [&_blockquote]:text-slate-900 [&_blockquote_p]:text-slate-900"
+              className="border-l-4 border-accent pl-4 italic mb-4 text-fg [&_p]:text-fg [&_em]:text-inherit [&_strong]:text-inherit [&_blockquote]:text-fg [&_blockquote_p]:text-fg"
             />
           ),
           strong: (props: MdElementProps) => <strong {...props} className="font-semibold" />,

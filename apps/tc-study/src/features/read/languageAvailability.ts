@@ -22,7 +22,7 @@
  *   helps flags use prod (no topic) so the picker is not stuck on those 3 GLs.
  *
  * A helps flag is true when the language has **either** side of the CombinedHelps
- * pair (TN or TWL). CombinedHelps injection still requires both at load time.
+ * pair (TN or TWL). Injection uses the same OR so first-open is not blocked.
  */
 
 export interface LanguageAvailabilityFlags {

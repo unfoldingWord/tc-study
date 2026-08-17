@@ -9,38 +9,30 @@ const mismatchSrc = readFileSync(
   'utf8'
 )
 
-describe('text-mode mismatch wiring (issue #25)', () => {
-  test('panel-1 empty state can show mismatch copy + switch action', () => {
+describe('text-mode mismatch wiring (issue #25 / #30)', () => {
+  test('scripture-mode empty state can show mismatch copy + switch action', () => {
     expect(panelSrc).toContain('textModeMismatch')
     expect(panelSrc).toContain('onSwitchTextMode')
-    expect(panelSrc).toContain('panel1Mismatch')
-    expect(panelSrc).toContain('actionLabel={panel1Mismatch?.actionLabel')
-    expect(panelSrc).toContain('actionShortLabel={panel1Mismatch?.actionShortLabel')
-    expect(panelSrc).toContain('emptyKind={panel1Mismatch?.kind}')
-    expect(panelSrc).toContain("panelId === 'panel-1'")
+    expect(panelSrc).toContain('scriptureMismatch')
+    expect(panelSrc).toContain('actionLabel={scriptureMismatch?.actionLabel')
+    expect(panelSrc).toContain('actionShortLabel={scriptureMismatch?.actionShortLabel')
+    expect(panelSrc).toContain('emptyKind={scriptureMismatch?.kind}')
+    expect(panelSrc).toContain("mode === 'scripture'")
     expect(panelSrc).toContain('flex-1 min-h-0 overflow-auto bg-surface')
   })
 
-  test('panel-2 keeps the helps empty CTA from A2', () => {
+  test('helps mode keeps the language empty CTA', () => {
     expect(panelSrc).toContain('onMessageClick')
-    expect(panelSrc).toContain('setHelpsPickerOpen(true)')
-    expect(panelSrc).toContain("panelId === 'panel-2'")
+    expect(panelSrc).toContain('setPickerOpen(true)')
+    expect(panelSrc).toContain("mode === 'helps'")
   })
 
-  test('SimplifiedReadView wires mismatch only to panel-1', () => {
-    expect(viewSrc).toContain('textModeMismatch={textPaneMismatch}')
+  test('SimplifiedReadView computes mismatch per scripture panel language', () => {
+    expect(viewSrc).toContain('panel1Mismatch')
+    expect(viewSrc).toContain('panel2Mismatch')
     expect(viewSrc).toContain('onSwitchTextMode={handleSwitchTextMode}')
     expect(viewSrc).toContain('onNavigationScopeCommitted={handleNavigatorScopeCommitted}')
-    expect(viewSrc).toContain('onHelpsLanguageSelected={handleHelpsLanguageSelected}')
-    const areaStart = viewSrc.indexOf('function ReadPanelsArea')
-    const areaEnd = viewSrc.indexOf('export function SimplifiedReadView')
-    const area = viewSrc.slice(areaStart, areaEnd)
-    const panel2 = area.slice(area.indexOf('panelId="panel-2"'), area.indexOf('EntryResourceModal'))
-    expect(panel2).not.toContain('textModeMismatch=')
-    expect(panel2).not.toContain('onSwitchTextMode=')
-    expect(area.slice(area.indexOf('panelId="panel-1"'), area.indexOf('panelId="panel-2"'))).toContain(
-      'textModeMismatch={textModeMismatch}'
-    )
+    expect(viewSrc).toContain('handlePanelLanguageSelected')
   })
 
   test('mismatch empty copy uses anglicized English names, not autonyms', () => {

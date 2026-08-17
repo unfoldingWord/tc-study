@@ -23,6 +23,14 @@ import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { CatalogManager } from '@bt-synergy/catalog-manager'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
 import { getDownloadPriority } from '../config/loaderConfig'
+import {
+  STARTING_PROGRESS_PERCENT,
+  advanceResourceIngredientProgress,
+  computeInFlightOverallProgress,
+  createInitialDownloadProgress,
+  RESOURCE_DOWNLOAD_TIMEOUT_MS,
+  withResourceDownloadTimeout,
+} from '../features/download/backgroundDownloadRun'
 import { registerWorkerLoaders } from '../features/download/workerLoaderRegistry'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
@@ -152,6 +160,7 @@ async function initialize() {
     console.error('[BG-DL] ⚙️ Worker Initialization failed:', error)
     postMessage({
       type: 'error',
+      runId: activeRunId,
       payload: {
         message: error instanceof Error ? error.message : String(error)
       }
@@ -175,6 +184,14 @@ self.onmessage = async (event: MessageEvent) => {
       case 'start': {
         const runId = typeof payload?.runId === 'number' ? payload.runId : 0
         activeRunId = runId
+        const { resourceKeys, skipExisting, totalIngredients } = payload
+
+        // Pulse before init/metadata so the badge leaves 0% immediately
+        postMessage({
+          type: 'progress',
+          runId,
+          payload: createInitialDownloadProgress(resourceKeys ?? [], totalIngredients),
+        })
 
         // Initialize if not already done
         if (!isInitialized) {
@@ -187,8 +204,6 @@ self.onmessage = async (event: MessageEvent) => {
         if (!downloadManager || !catalogManager) {
           throw new Error('Services not initialized')
         }
-
-        const { resourceKeys, skipExisting, totalIngredients } = payload
 
         // Update download manager config
         downloadManager['config'].skipExisting = skipExisting
@@ -280,7 +295,11 @@ async function downloadSpecificResources(
 
   for (const resourceKey of resourceKeys) {
     try {
-      const metadata = await catalogManager.getResourceMetadata(resourceKey)
+      const metadata = await withResourceDownloadTimeout(
+        catalogManager.getResourceMetadata(resourceKey),
+        RESOURCE_DOWNLOAD_TIMEOUT_MS,
+        resourceKey
+      )
       if (!metadata) {
         console.warn(`[BG-DL] ⚙️ Worker Metadata not found for ${resourceKey}`)
         continue
@@ -342,10 +361,58 @@ async function downloadSpecificResources(
     }
   })
 
+  // Seed progress so UI is not stuck at 0/N during long pre-download setup
+  postMessage({
+    type: 'progress',
+    runId,
+    payload: {
+      currentResource: resourcesWithPriority[0]?.resourceKey ?? null,
+      currentResourceProgress: STARTING_PROGRESS_PERCENT,
+      totalResources: resourcesWithPriority.length,
+      completedResources: 0,
+      failedResources: 0,
+      overallProgress: STARTING_PROGRESS_PERCENT,
+      totalIngredients,
+      completedIngredients: 0,
+      failedIngredients: 0,
+      currentIngredient: null,
+      tasks: [],
+    },
+  })
+
   // Download resources one at a time (sequential)
   // Benefits: simpler progress tracking, better for slow connections, no race conditions
   let completedResourceCount = 0
   let failedResourceCount = 0
+
+  const postIngredientProgress = (partial: {
+    currentResource: string | null
+    currentIngredient?: string | null
+    completedIngredients: number
+    failedIngredients: number
+    completedResources: number
+    failedResources: number
+    overallProgress: number
+  }) => {
+    if (runId !== activeRunId) return
+    postMessage({
+      type: 'progress',
+      runId,
+      payload: {
+        currentResource: partial.currentResource,
+        currentResourceProgress: 0,
+        totalResources: resourcesWithPriority.length,
+        completedResources: partial.completedResources,
+        failedResources: partial.failedResources,
+        overallProgress: partial.overallProgress,
+        totalIngredients,
+        completedIngredients: partial.completedIngredients,
+        failedIngredients: partial.failedIngredients,
+        currentIngredient: partial.currentIngredient ?? null,
+        tasks: [],
+      },
+    })
+  }
 
   // Process resources sequentially in priority order
   for (const { resourceKey, metadata, ingredientsCount } of resourcesWithPriority) {
@@ -355,6 +422,24 @@ async function downloadSpecificResources(
       // Determine download method: use zip if zipball_url is available
       const method = metadata.release?.zipball_url ? 'zip' : 'individual'
 
+      // Peak progress within this resource so zip-byte soft % does not regress when extraction starts
+      let currentResourcePeakCompleted = 0
+
+      // Announce resource start immediately (zip fetch can take minutes before loader callbacks)
+      postIngredientProgress({
+        currentResource: resourceKey,
+        currentIngredient: null,
+        completedIngredients,
+        failedIngredients,
+        completedResources: completedResourceCount,
+        failedResources: failedResourceCount,
+        overallProgress: computeInFlightOverallProgress({
+          completedIngredients,
+          totalIngredients,
+          currentResourceIngredients: ingredientsCount,
+          currentResourcePercent: STARTING_PROGRESS_PERCENT,
+        }),
+      })
 
       // Create a custom progress callback for ingredient-level updates
       const onProgress = (progress: {
@@ -366,24 +451,30 @@ async function downloadSpecificResources(
         if (runId !== activeRunId) return
 
         // Calculate how many ingredients completed for THIS resource so far
-        let currentResourceIngredientsCompleted = 0
-        if (progress.loaded !== undefined && progress.total !== undefined && progress.total > 0) {
-          // Use actual loaded/total counts, not percentage
-          currentResourceIngredientsCompleted = Math.floor((progress.loaded / progress.total) * ingredientsCount)
-        }
+        currentResourcePeakCompleted = advanceResourceIngredientProgress(
+          ingredientsCount,
+          currentResourcePeakCompleted,
+          progress
+        )
 
-        // Overall progress = all previously completed + current resource's partial progress
-        const currentTotalCompleted = completedIngredients + currentResourceIngredientsCompleted
+        // Overall progress = prior resources + this resource's zip/extract share
+        const currentTotalCompleted = completedIngredients + currentResourcePeakCompleted
+        const fromPeakPercent =
+          ingredientsCount > 0
+            ? (currentResourcePeakCompleted / ingredientsCount) * 100
+            : 0
 
-        // Calculate overall percentage based on TOTAL ingredients across ALL resources
-        const overallProgress = totalIngredients > 0
-          ? Math.round((currentTotalCompleted / totalIngredients) * 100)
-          : 0
+        const overallProgress = computeInFlightOverallProgress({
+          completedIngredients,
+          totalIngredients,
+          currentResourceIngredients: ingredientsCount,
+          currentResourcePercent: Math.max(progress.percentage ?? 0, fromPeakPercent),
+        })
 
         // Extract current ingredient name from progress callback
         // All loaders use 'message' field with formats like:
         // - "Processed Matthew", "Skipped ruth (already cached)"
-        // - "Extracting faith", "Downloading grace"
+        // - "Extracting faith", "Downloading grace", "Downloading zip"
         let currentIngredient: string | null = null
         if (progress.message) {
           // Extract just the ingredient name (after the verb)
@@ -396,24 +487,14 @@ async function downloadSpecificResources(
           }
         }
 
-        const progressPayload = {
+        postIngredientProgress({
           currentResource: resourceKey,
-          currentResourceProgress: 0, // Not used - we only show overall progress
-          totalResources: resourcesWithPriority.length,
+          currentIngredient,
+          completedIngredients: currentTotalCompleted,
+          failedIngredients,
           completedResources: completedResourceCount,
           failedResources: failedResourceCount,
-          overallProgress: overallProgress, // This is the main progress: 0-100% across ALL resources
-          totalIngredients: totalIngredients,
-          completedIngredients: currentTotalCompleted, // Running total of all ingredients
-          failedIngredients: failedIngredients,
-          currentIngredient: currentIngredient, // Current item being processed
-          tasks: []
-        }
-
-        postMessage({
-          type: 'progress',
-          runId,
-          payload: progressPayload
+          overallProgress,
         })
       }
 
@@ -424,20 +505,31 @@ async function downloadSpecificResources(
         throw new Error(`No loader available for ${resourceKey}`)
       }
 
-      // Mark as downloading
+      // Mark as downloading and pulse progress so the badge is not stuck on
+      // the previous % during a silent zipball fetch.
       const task = downloadManager['tasks'].get(resourceKey)
       if (task) {
         task.status = 'downloading'
       }
+      onProgress({
+        loaded: 0,
+        total: ingredientsCount,
+        percentage: STARTING_PROGRESS_PERCENT,
+        message: `Downloading ${resourceKey.split('/').pop() ?? resourceKey}`,
+      })
 
-      // Download the resource
-      await loader.downloadResource(
-        resourceKey,
-        {
-          method,
-          skipExisting
-        },
-        onProgress
+      // Download the resource — skip if zip/body hang exceeds the wall clock
+      await withResourceDownloadTimeout(
+        loader.downloadResource(
+          resourceKey,
+          {
+            method,
+            skipExisting
+          },
+          onProgress
+        ),
+        RESOURCE_DOWNLOAD_TIMEOUT_MS,
+        resourceKey
       )
 
       // ✅ IMPORTANT: Update counts BEFORE marking as completed
@@ -450,6 +542,18 @@ async function downloadSpecificResources(
         task.progress = 100
       }
 
+      postIngredientProgress({
+        currentResource: resourceKey,
+        currentIngredient: null,
+        completedIngredients,
+        failedIngredients,
+        completedResources: completedResourceCount,
+        failedResources: failedResourceCount,
+        overallProgress:
+          totalIngredients > 0
+            ? Math.round((completedIngredients / totalIngredients) * 100)
+            : 0,
+      })
 
       // ✅ Mark as complete in cache (so it won't be re-downloaded)
       if (completenessChecker) {
@@ -472,6 +576,19 @@ async function downloadSpecificResources(
         task.status = 'failed'
         task.error = error instanceof Error ? error.message : String(error)
       }
+
+      postIngredientProgress({
+        currentResource: resourceKey,
+        currentIngredient: null,
+        completedIngredients,
+        failedIngredients,
+        completedResources: completedResourceCount,
+        failedResources: failedResourceCount,
+        overallProgress:
+          totalIngredients > 0
+            ? Math.round(((completedIngredients + failedIngredients) / totalIngredients) * 100)
+            : 0,
+      })
 
       // ❌ Mark error in cache
       if (completenessChecker) {
@@ -521,14 +638,16 @@ self.onerror = (event: string | Event) => {
         : String(event)
   postMessage({
     type: 'error',
+    runId: activeRunId,
     payload: { message },
   })
 }
 
-self.onunhandledrejection = (event) => {
+self.onunhandledrejection = (event: PromiseRejectionEvent) => {
   console.error('[BG-DL] ⚙️ Worker Unhandled promise rejection:', event.reason)
   postMessage({
     type: 'error',
+    runId: activeRunId,
     payload: {
       message: event.reason?.message || String(event.reason)
     }

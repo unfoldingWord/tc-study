@@ -32,6 +32,15 @@ export function getBaseResourceKey(instanceId: string): string {
   return instanceId.replace(/#\d+$/, '')
 }
 
+/** Existing panel membership for this resource (base or `#N` instance). */
+export function existingPanelInstanceId(
+  resourceKeys: string[] | undefined,
+  resourceKey: string
+): string | undefined {
+  const base = getBaseResourceKey(resourceKey)
+  return (resourceKeys ?? []).find((k) => getBaseResourceKey(k) === base)
+}
+
 /**
  * Next instance id for a base key among existing ids (panel + AppStore).
  * First instance has no suffix; further instances use `#2`, `#3`, …
@@ -86,6 +95,27 @@ export function buildProjectedResourceInstance(
   }
 }
 
+/** Skip AppStore upsert when projection would not change membership/runtime fields. */
+export function membershipProjectionUnchanged(
+  existing: ResourceInfo | undefined,
+  instance: ResourceInfo
+): boolean {
+  if (!existing) return false
+  return (
+    existing.id === instance.id &&
+    existing.key === instance.key &&
+    existing.title === instance.title &&
+    existing.owner === instance.owner &&
+    existing.language === instance.language &&
+    existing.toc === instance.toc &&
+    existing.verifiedIngredients === instance.verifiedIngredients &&
+    existing.verifiedRef === instance.verifiedRef &&
+    // CombinedHelps TN/TWL pointers update after Unlock 1 strips raw tabs from the panel.
+    existing.helpsTnResourceKey === instance.helpsTnResourceKey &&
+    existing.helpsTwlResourceKey === instance.helpsTwlResourceKey
+  )
+}
+
 export interface ProjectPanelResourcesResult {
   projected: string[]
   missing: string[]
@@ -118,7 +148,9 @@ export function projectPanelResourcesToAppStore(options: {
       missing.push(panelKey)
       continue
     }
-    upsertLoadedResourceMembership(instance)
+    if (!membershipProjectionUnchanged(existing, instance)) {
+      upsertLoadedResourceMembership(instance)
+    }
     projected.push(panelKey)
   }
 

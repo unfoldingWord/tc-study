@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
-import { filterReadPanel2Keys } from './filterReadPanelKeys'
+import { filterReadPanel2Keys, filterReadPanelKeysByMode } from './filterReadPanelKeys'
 
 const registry = {
   getTypeForSubject: () => undefined,
@@ -92,5 +92,35 @@ describe('filterReadPanel2Keys', () => {
       currentBook: 'tit',
     })
     expect(keys).toEqual([COMBINED_HELPS_RESOURCE_ID])
+  })
+})
+
+describe('filterReadPanelKeysByMode (original-language book scope)', () => {
+  test('scripture mode hides leftover UHB on an NT book', () => {
+    const keys = filterReadPanelKeysByMode('scripture', {
+      resourceKeys: [
+        'unfoldingWord/en/ult',
+        'unfoldingWord/el-x-koine/ugnt',
+        'unfoldingWord/hbo/uhb',
+      ],
+      loadedResources: {
+        'unfoldingWord/en/ult': { id: 'unfoldingWord/en/ult', type: 'scripture' } as any,
+        'unfoldingWord/el-x-koine/ugnt': {
+          id: 'unfoldingWord/el-x-koine/ugnt',
+          type: 'scripture',
+          subject: 'Greek New Testament',
+        } as any,
+        'unfoldingWord/hbo/uhb': {
+          id: 'unfoldingWord/hbo/uhb',
+          type: 'scripture',
+          subject: 'Hebrew Old Testament',
+        } as any,
+      },
+      resourceTypeRegistry: registry,
+      navigationScope: 'scripture',
+      currentBook: 'tit',
+    })
+    expect(keys).toEqual(['unfoldingWord/en/ult', 'unfoldingWord/el-x-koine/ugnt'])
+    expect(keys).not.toContain('unfoldingWord/hbo/uhb')
   })
 })

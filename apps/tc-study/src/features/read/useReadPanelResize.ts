@@ -1,8 +1,11 @@
 /**
  * Two-panel split resize (mouse + touch) for SimplifiedReadView.
+ * Ends the pointer session mid-move once collapseDuringDrag commits —
+ * no mouseup/touchend required after that; further moves are ignored.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { collapseDuringDrag } from './readPanelLayout'
 
 const RESIZE_CONTAINER_SELECTOR = '.panels-resize-container'
 
@@ -18,10 +21,17 @@ export function useReadPanelResize(initialPercent = 50) {
   const [isResizingPanels, setIsResizingPanels] = useState(false)
   const [resizeStartLayout, setResizeStartLayout] = useState<'vertical' | 'horizontal'>('horizontal')
   const resizeContainerRef = useRef<HTMLDivElement>(null)
+  const draggingRef = useRef(false)
 
   const beginResize = useCallback(() => {
+    draggingRef.current = true
     setResizeStartLayout(detectLayoutOrientation())
     setIsResizingPanels(true)
+  }, [])
+
+  const endResize = useCallback(() => {
+    draggingRef.current = false
+    setIsResizingPanels(false)
   }, [])
 
   const handlePanelDividerMouseDown = useCallback(
@@ -49,11 +59,16 @@ export function useReadPanelResize(initialPercent = 50) {
     const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior
 
     const handleMove = (clientX: number, clientY: number) => {
+      if (!draggingRef.current) return
       const rect = container.getBoundingClientRect()
       const newPercent = isVertical
         ? ((clientY - rect.top) / rect.height) * 100
         : ((clientX - rect.left) / rect.width) * 100
-      setPanel1Width(Math.max(20, Math.min(80, newPercent)))
+      const pointerPercent = Math.max(0, Math.min(100, newPercent))
+      setPanel1Width(pointerPercent)
+      if (collapseDuringDrag(pointerPercent).collapsedPanelId) {
+        endResize()
+      }
     }
 
     const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY)
@@ -64,14 +79,13 @@ export function useReadPanelResize(initialPercent = 50) {
         handleMove(e.touches[0].clientX, e.touches[0].clientY)
       }
     }
-    const handleEnd = () => setIsResizingPanels(false)
 
     containerEl.style.overscrollBehavior = 'none'
     document.documentElement.style.overscrollBehavior = 'none'
     document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleEnd)
+    document.addEventListener('mouseup', endResize)
     document.addEventListener('touchmove', handleTouchMove, { passive: false })
-    document.addEventListener('touchend', handleEnd)
+    document.addEventListener('touchend', endResize)
     document.body.style.cursor = isVertical ? 'ns-resize' : 'ew-resize'
     document.body.style.userSelect = 'none'
     document.body.style.touchAction = 'none'
@@ -80,14 +94,14 @@ export function useReadPanelResize(initialPercent = 50) {
       containerEl.style.overscrollBehavior = prevContainerOverscroll
       document.documentElement.style.overscrollBehavior = prevHtmlOverscroll
       document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleEnd)
+      document.removeEventListener('mouseup', endResize)
       document.removeEventListener('touchmove', handleTouchMove)
-      document.removeEventListener('touchend', handleEnd)
+      document.removeEventListener('touchend', endResize)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
       document.body.style.touchAction = ''
     }
-  }, [isResizingPanels, resizeStartLayout])
+  }, [endResize, isResizingPanels, resizeStartLayout])
 
   return {
     panel1Width,

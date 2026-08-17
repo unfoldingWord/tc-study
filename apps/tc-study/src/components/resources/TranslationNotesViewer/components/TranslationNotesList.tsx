@@ -11,6 +11,7 @@ import {
 } from '../../helpsCardStyles'
 import { TranslationNoteCard, type NoteWithTokens } from './TranslationNoteCard'
 import type { ResourceInfo } from '../../../../contexts/types'
+import type { TokenFilter } from '../../WordsLinksViewer/types'
 
 export interface TranslationNotesListProps {
   resource: ResourceInfo
@@ -34,6 +35,7 @@ export interface TranslationNotesListProps {
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   onQuoteClick: (note: NoteWithTokens) => void
   onNoteSelect: (note: { id: string }) => void
+  tokenFilter?: TokenFilter | null
 }
 
 export function TranslationNotesList({
@@ -57,6 +59,7 @@ export function TranslationNotesList({
   onEntryLinkClick,
   onQuoteClick,
   onNoteSelect,
+  tokenFilter = null,
 }: TranslationNotesListProps) {
   return (
     <div className={HELPS_LIST_PANEL} dir={languageDirection}>
@@ -144,6 +147,7 @@ export function TranslationNotesList({
                         isLoadingTATitle={isLoadingTitle}
                         getEntryTitle={getEntryTitle}
                         obsMode={isObs}
+                        tokenFilter={tokenFilter}
                       />
                     )
                   })}

@@ -54,6 +54,31 @@ describe('resolveCombinedHelpsResourceKeys', () => {
     expect(result).toEqual({ tnKey: 'u/es/tn', twlKey: 'u/es/twl' })
   })
 
+  test('finds TWL in the workspace package when Unlock 1 left it off loadedResources', () => {
+    const loadedResources = {
+      '__combined-helps__': res({
+        key: '__combined-helps__',
+        type: 'combined-helps',
+        language: 'en',
+        languageCode: 'en',
+      }),
+    }
+    const packageResources = new Map<string, ResourceInfo>([
+      ['__combined-helps__', loadedResources['__combined-helps__']!],
+      ['u/en/tn', res({ key: 'u/en/tn', type: 'notes', language: 'en', languageCode: 'en' })],
+      ['u/en/twl', res({ key: 'u/en/twl', type: 'words-links', language: 'en', languageCode: 'en' })],
+    ])
+
+    const result = resolveCombinedHelpsResourceKeys({
+      loadedResources,
+      packageResources,
+      wantLang: 'en',
+      helpsScope: 'scripture',
+    })
+
+    expect(result).toEqual({ tnKey: 'u/en/tn', twlKey: 'u/en/twl' })
+  })
+
   test('keeps English helps keys when minority scripture is also loaded', () => {
     const loadedResources = {
       'u/bho/glt': res({ key: 'u/bho/glt', type: 'scripture', language: 'bho', languageCode: 'bho' }),

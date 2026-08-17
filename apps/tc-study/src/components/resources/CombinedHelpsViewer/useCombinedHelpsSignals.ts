@@ -12,6 +12,7 @@ import type {
   VerseFilterSignal,
 } from '../../../signals/studioSignals'
 import type { TokenFilter } from '../WordsLinksViewer/types'
+import { focusFirstMatchingHelpsCard, type HelpsCardSelection } from './helpsCardSelection'
 import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
 import type { NoteWithAlignments, LinkWithAlignments } from './useCombinedHelpsMerge'
 import { useCombinedHelpsObsQuotesBroadcast } from './useCombinedHelpsObsQuotesBroadcast'
@@ -36,8 +37,7 @@ export interface UseCombinedHelpsSignalsParams {
   setTokenFilter: Dispatch<SetStateAction<TokenFilter | null>>
   setVerseFilter: Dispatch<SetStateAction<VerseFilterState | null>>
   setObsQuoteFilter: Dispatch<SetStateAction<ObsQuoteFilter | null>>
-  setSelectedNoteId: Dispatch<SetStateAction<string | null>>
-  setSelectedLinkId: Dispatch<SetStateAction<string | null>>
+  setSelectedHelpsCard: Dispatch<SetStateAction<HelpsCardSelection>>
 }
 
 export function useCombinedHelpsSignals({
@@ -57,8 +57,7 @@ export function useCombinedHelpsSignals({
   setTokenFilter,
   setVerseFilter,
   setObsQuoteFilter,
-  setSelectedNoteId,
-  setSelectedLinkId,
+  setSelectedHelpsCard,
 }: UseCombinedHelpsSignalsParams) {
   const resourceMetadata = useMemo(
     () => {
@@ -96,24 +95,42 @@ export function useCombinedHelpsSignals({
         // Toggle-off: clear token filter owned by the scripture selection (keep OBS/underlines).
         if (signal.token === null) {
           setTokenFilter(null)
-          setSelectedNoteId(null)
-          setSelectedLinkId(null)
+          setSelectedHelpsCard(null)
           return
         }
         // Uncovered scripture clicks broadcast token-click for scripture highlighting
         // but also send verse-filter for helps — ignore the token filter here.
         if (signal.token.hasHelpsCoverage === false) return
-        setTokenFilter({
+        const nextFilter: TokenFilter = {
           semanticId: signal.token.semanticId,
           content: signal.token.content,
           alignedSemanticIds: signal.token.alignedSemanticIds || [],
           timestamp: signal.timestamp,
-        })
+        }
+        setTokenFilter(nextFilter)
         setVerseFilter(null)
-        setSelectedNoteId(null)
-        setSelectedLinkId(null)
+        setSelectedHelpsCard(
+          focusFirstMatchingHelpsCard({
+            notes: notesWithAlignedTokens,
+            links: filteredByReference,
+            kindFilter,
+            tokenFilter: nextFilter,
+            helpsScope,
+            bookCodeLower: currentRef.book?.toLowerCase() || '',
+          })
+        )
       },
-      [resourceId, setTokenFilter, setVerseFilter, setSelectedNoteId, setSelectedLinkId]
+      [
+        resourceId,
+        notesWithAlignedTokens,
+        filteredByReference,
+        kindFilter,
+        helpsScope,
+        currentRef.book,
+        setTokenFilter,
+        setVerseFilter,
+        setSelectedHelpsCard,
+      ]
     ),
     { debug: false, resourceMetadata }
   )
@@ -126,8 +143,7 @@ export function useCombinedHelpsSignals({
         if (signal.sourceResourceId === resourceId) return
         if (signal.filter === null) {
           setVerseFilter(null)
-          setSelectedNoteId(null)
-          setSelectedLinkId(null)
+          setSelectedHelpsCard(null)
           return
         }
         setVerseFilter({
@@ -136,10 +152,9 @@ export function useCombinedHelpsSignals({
           timestamp: signal.timestamp,
         })
         setTokenFilter(null)
-        setSelectedNoteId(null)
-        setSelectedLinkId(null)
+        setSelectedHelpsCard(null)
       },
-      [resourceId, setVerseFilter, setTokenFilter, setSelectedNoteId, setSelectedLinkId]
+      [resourceId, setVerseFilter, setTokenFilter, setSelectedHelpsCard]
     ),
     { debug: false, resourceMetadata }
   )
@@ -149,7 +164,7 @@ export function useCombinedHelpsSignals({
     resourceId,
     (signal: EntryLinkClickSignal) => {
       if (tnKey && signal.resourceKey === tnKey && signal.entryId) {
-        setSelectedNoteId(signal.entryId)
+        setSelectedHelpsCard({ kind: 'tn', id: signal.entryId })
       }
     }
   )
@@ -175,8 +190,7 @@ export function useCombinedHelpsSignals({
     filteredByReference,
     resourceMetadata,
     setObsQuoteFilter,
-    setSelectedNoteId,
-    setSelectedLinkId,
+    setSelectedHelpsCard,
   })
 
   return {

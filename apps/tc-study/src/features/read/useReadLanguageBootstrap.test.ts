@@ -8,16 +8,19 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
   test('exposes separate text and helps handlers plus split loading flags', () => {
     expect(src).toContain('handleLanguageSelected')
     expect(src).toContain('handleHelpsLanguageSelected')
+    expect(src).toContain('handlePanelLanguageSelected')
     expect(src).toContain('isLoadingTextResources')
     expect(src).toContain('isLoadingHelpsResources')
+    expect(src).toContain('isLoadingByPanel')
     expect(src).toContain('helpsLanguageCode')
   })
 
-  test('URL stays on text language; helps persist into the actual load', () => {
+  test('URL stays on text language; first pick seeds both panels', () => {
     expect(src).toContain('pushReadLanguageUrl(navigate, languageCode)')
-    expect(src).toContain('writePersistedHelpsLanguage')
-    expect(src).toContain('resolveAndPersistHelpsLanguage')
-    expect(src).toContain('resolveReadCatalogLoadPlan')
+    expect(src).toContain('canSeedBothPanelLanguages')
+    expect(src).toContain('seedBothLanguages(languageCode)')
+    expect(src).toContain('coldStartCatalogLoads')
+    expect(src).toContain('catalogLoadForSinglePanel')
   })
 
   test('OBS-only / Bible-only text pick stays in mode; mismatch empty before URL write', () => {
@@ -31,22 +34,36 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     )
     expect(body).toContain('textModeMismatchFromCache')
     expect(body).toContain("clearReadPanelsForLanguageSwitch(helpsLanguageCode ?? undefined, 'panel-1')")
-    expect(body).not.toContain('writePersistedHelpsLanguage')
-    expect(body).toContain('resolveAndPersistHelpsLanguage')
     const mismatchAt = body.indexOf('textModeMismatchFromCache')
     const mismatchReturn = body.indexOf('return', mismatchAt)
     expect(mismatchReturn).toBeGreaterThan(mismatchAt)
-    expect(mismatchReturn).toBeLessThan(body.indexOf('resolveAndPersistHelpsLanguage'))
-    expect(mismatchReturn).toBeLessThan(body.indexOf('setHelpsLanguageCode'))
+    expect(mismatchReturn).toBeLessThan(body.indexOf('coldStartCatalogLoads'))
   })
 
   test('helps picker path does not apply text-language pick navigation', () => {
     const helps = src.slice(src.indexOf('const handleHelpsLanguageSelected'))
     expect(helps).toContain('writePersistedHelpsLanguage')
+    expect(helps).toContain("handlePanelLanguageSelected('panel-2'")
     expect(helps).not.toContain('resolveTextLanguagePickNavigation')
     expect(helps).not.toContain('applyTextLanguagePickNavigation')
     expect(helps).not.toContain('pushReadLanguageUrl')
-    expect(helps).toContain('navigationScope')
+  })
+
+  test('per-panel language change never seeds the other panel', () => {
+    const panel = src.slice(src.indexOf('const handlePanelLanguageSelected'))
+    const body = panel.slice(0, panel.indexOf('const handlePanelModeSwitch'))
+    expect(body).toContain('setPanelLanguage(panelId, languageCode)')
+    expect(body).toContain('catalogLoadForSinglePanel')
+    expect(body).not.toContain('seedBothLanguages')
+    expect(body).not.toContain('pushReadLanguageUrl')
+  })
+
+  test('cold-start catalog loads run in parallel so helps does not wait on scripture', () => {
+    const handler = src.slice(src.indexOf('const handleLanguageSelected'))
+    const body = handler.slice(0, handler.indexOf('const { handleSwitchTextMode'))
+    expect(body).toContain('coldStartCatalogLoads')
+    expect(body).toContain('Promise.all')
+    expect(body).toContain('runCatalogLoad')
   })
 
   test('catalog load receives the resolved Bible/OBS scope', () => {
@@ -55,6 +72,9 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     const loadSrc = readFileSync(join(import.meta.dir, 'useReadCatalogLoad.ts'), 'utf8')
     expect(loadSrc).toContain('navigationScope: options.navigationScope')
     expect(loadSrc).toContain('loadReadLanguageCatalog')
+    expect(loadSrc).toContain('destPanelId')
+    expect(loadSrc).toContain('destPanelsForCatalogLoad')
+    expect(loadSrc).toContain('isLoadingByPanel')
   })
 
   test('explicit switch and BCV commit go through useReadTextModeSwitch', () => {
@@ -65,8 +85,8 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(src).toContain('explicitScope: options?.navigationScope')
   })
 
-  test('download isolation uses shouldCancelDownloadsOnPaneSwitch and downloadResetToken', () => {
+  test('download isolation uses both panel languages, not one shared scripture lang', () => {
     expect(src).toContain('shouldCancelDownloadsOnPaneSwitch')
-    expect(src).toContain('downloadResetToken(currentLanguageCode, helpsLanguageCode)')
+    expect(src).toContain("downloadResetToken(panels['panel-1'].languageCode, panels['panel-2'].languageCode)")
   })
 })

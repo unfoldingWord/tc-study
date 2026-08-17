@@ -5,7 +5,7 @@
  */
 
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
-import { Code, ExternalLink } from 'lucide-react'
+import { Code, GraduationCap } from 'lucide-react'
 import { memo, startTransition, useCallback, useState } from 'react'
 import { useNavigationStore } from '../../../../contexts'
 import { useAppStore } from '../../../../contexts/AppContext'
@@ -13,7 +13,15 @@ import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
-import { HELPS_CARD_IDLE, HELPS_CARD_SELECTED } from '../../helpsCardStyles'
+import {
+  HELPS_CARD_FOOTER,
+  HELPS_CARD_FOOTER_BUTTON_TA,
+  HELPS_CARD_FOOTER_ICON,
+  HELPS_CARD_IDLE,
+  HELPS_CARD_SELECTED,
+} from '../../helpsCardStyles'
+import { QuotedFilterText } from '../../shared/QuotedFilterText'
+import type { TokenFilter } from '../../WordsLinksViewer/types'
 import { parseScriptureLink } from '../utils/parseScriptureLink'
 
 interface AlignedToken {
@@ -47,6 +55,8 @@ interface TranslationNoteCardProps {
   getEntryTitle?: (rcLink: string) => string | null
   /** When true, clicking the literal quote broadcasts OBS frame highlight even without aligned tokens. */
   obsMode?: boolean
+  /** Active scripture token filter — underline that word in the quote chip. */
+  tokenFilter?: TokenFilter | null
 }
 
 const quoteChipClass =
@@ -68,12 +78,14 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   isLoadingTATitle = false,
   getEntryTitle,
   obsMode = false,
+  tokenFilter = null,
 }: TranslationNoteCardProps) {
   const [showRawMarkdown, setShowRawMarkdown] = useState(false)
   // Narrow selector: only re-render when the book changes (OBS↔scripture switch),
   // not on every chapter/verse navigation or obsFrameCountByStory update.
   const currentBook = useNavigationStore((s) => s.currentReference.book)
   const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
+  const filterText = tokenFilter?.content ?? null
 
   // DCS abbreviation from AppStore (e.g. glt key → TPL); fall back to key segment
   const targetScripture = useAppStore((s) =>
@@ -168,7 +180,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
                 if (token.type === 'whitespace' || token.type === 'text') {
                   return (
                     <span key={token.semanticId || index}>
-                      {token.content}
+                      <QuotedFilterText quote={token.content} filterText={filterText} />
                     </span>
                   )
                 }
@@ -188,7 +200,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
                 return (
                   <span key={token.semanticId || index}>
                     {needsSpace && ' '}
-                    {token.content}
+                    <QuotedFilterText quote={token.content} filterText={filterText} />
                   </span>
                 )
               })}
@@ -212,7 +224,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         >
           <div className="text-base leading-relaxed" dir={languageDirection}>
             <span className="italic text-fg-secondary">
-              &ldquo;{note.quote}&rdquo;
+              &ldquo;<QuotedFilterText quote={note.quote} filterText={filterText} />&rdquo;
             </span>
             {resourceAbbreviation && (
               <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
@@ -236,7 +248,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         >
           <div className="text-base leading-relaxed" dir={languageDirection}>
             <span className="italic text-fg-secondary">
-              &ldquo;{note.quote}&rdquo;
+              &ldquo;<QuotedFilterText quote={note.quote} filterText={filterText} />&rdquo;
             </span>
             {resourceAbbreviation && (
               <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
@@ -278,18 +290,20 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
 
       {/* Support Reference - Link to Translation Academy */}
       {note.supportReference && note.supportReference.startsWith('rc://') && (
-        <div className="mt-2.5 pt-2.5 border-t border-border-subtle" onClick={(e) => e.stopPropagation()}>
+        <div className={HELPS_CARD_FOOTER} onClick={(e) => e.stopPropagation()}>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation()
               if (onSupportReferenceClick) {
                 onSupportReferenceClick(note.supportReference)
               }
             }}
-            className="flex items-center gap-1.5 text-xs text-helps-fg hover:text-helps transition-colors"
+            className={HELPS_CARD_FOOTER_BUTTON_TA}
             title={`Learn more: ${taTitle}`}
+            aria-label={`Learn more: ${taTitle}`}
           >
-            <ExternalLink className="w-3 h-3" />
+            <GraduationCap className={HELPS_CARD_FOOTER_ICON} />
             {isLoadingTATitle ? (
               <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
             ) : (

@@ -30,8 +30,8 @@ describe('resourceTypePlugins', () => {
     expect(obsCombinedHelpsResourceType.id).toBe('obs-combined-helps')
     expect(combinedHelpsResourceType.viewer).toBeDefined()
     expect(obsCombinedHelpsResourceType.viewer).toBeDefined()
-    expect(combinedHelpsResourceType.icon).toBe('LifeBuoy')
-    expect(obsCombinedHelpsResourceType.icon).toBe('LifeBuoy')
+    expect(combinedHelpsResourceType.icon).toBe('Layers')
+    expect(obsCombinedHelpsResourceType.icon).toBe('Layers')
   })
 
   test('entry viewers register for words and academy', () => {

@@ -5,7 +5,7 @@
  * switch before catalog metadata is written (Phase 2).
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApp, useCatalogManager, useNavigation } from '../../../../contexts'
 import type { BookInfo, ResourceTOC } from '../../../../contexts/types-only'
 import { buildBookInfosFromIngredients } from '../../../../features/nav/bcvNavHelpers'
@@ -38,20 +38,44 @@ function hasGatewayScripture(
   })
 }
 
-function ingredientsFromLoadedResource(
+export function ingredientsFromLoadedResource(
   loaded: Record<string, { verifiedIngredients?: IngredientLike[]; ingredients?: IngredientLike[] } | undefined>,
   resourceId: string,
   resourceKey: string
 ): IngredientLike[] {
-  const self = loaded[resourceId] || loaded[resourceKey]
-  if (!self) return []
-  if (self.verifiedIngredients && self.verifiedIngredients.length > 0) {
-    return self.verifiedIngredients
-  }
-  if (self.ingredients && self.ingredients.length > 0) {
-    return self.ingredients
+  const baseKey = resourceId.replace(/#\d+$/, '')
+  for (const key of [resourceId, resourceKey, baseKey]) {
+    const self = loaded[key]
+    if (!self) continue
+    if (self.verifiedIngredients && self.verifiedIngredients.length > 0) {
+      return self.verifiedIngredients
+    }
+    if (self.ingredients && self.ingredients.length > 0) {
+      return self.ingredients
+    }
   }
   return []
+}
+
+/** Stable string so TOC effects do not depend on a new `loadedResources` object every render. */
+export function ingredientsFingerprint(
+  loaded: Record<string, { verifiedIngredients?: IngredientLike[]; ingredients?: IngredientLike[] } | undefined>,
+  resourceId: string,
+  resourceKey: string
+): string {
+  return ingredientsFromLoadedResource(loaded, resourceId, resourceKey)
+    .map((item) => item.identifier ?? '')
+    .join('\0')
+}
+
+export function tocBooksEqual(a: BookInfo[], b: BookInfo[]): boolean {
+  return a.length === b.length && a.every((book, i) => book.code === b[i]?.code)
+}
+
+export function loadedTocEqual(a: ResourceTOC | null, b: ResourceTOC | null): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  return a.resourceId === b.resourceId && a.resourceType === b.resourceType && tocBooksEqual(a.books, b.books)
 }
 
 function shouldBecomeAnchor(options: {
@@ -82,20 +106,37 @@ export function useTOC(resourceKey: string, resourceId: string, isAnchor?: boole
   const catalogManager = useCatalogManager()
   const app = useApp()
   const navigation = useNavigation()
+  const appRef = useRef(app)
+  appRef.current = app
+  const navigationRef = useRef(navigation)
+  navigationRef.current = navigation
   const [availableBooks, setAvailableBooks] = useState<BookInfo[]>([])
   const [loadedTOC, setLoadedTOC] = useState<ResourceTOC | null>(null)
   const [isLoadingTOC, setIsLoadingTOC] = useState(true)
+  const availableBooksRef = useRef(availableBooks)
+  availableBooksRef.current = availableBooks
+  const loadedTOCRef = useRef(loadedTOC)
+  loadedTOCRef.current = loadedTOC
   const tocSetRef = useRef(false)
   const [catalogCheckTrigger, setCatalogCheckTrigger] = useState(0)
+  const lastTriggeredFingerprintRef = useRef('')
   const metadataCheckIntervalRef = useRef<number | undefined>(undefined)
+  const ingredientKey = ingredientsFingerprint(app.loadedResources, resourceId, resourceKey)
 
   // Re-trigger TOC when Phase-1 ingredients appear or catalog metadata lands.
   useEffect(() => {
     const checkForMetadata = async () => {
       try {
-        const local = ingredientsFromLoadedResource(app.loadedResources, resourceId, resourceKey)
-        if (local.length > 0) {
-          setCatalogCheckTrigger((prev) => prev + 1)
+        const fingerprint = ingredientsFingerprint(
+          appRef.current.loadedResources,
+          resourceId,
+          resourceKey
+        )
+        if (fingerprint) {
+          if (lastTriggeredFingerprintRef.current !== fingerprint) {
+            lastTriggeredFingerprintRef.current = fingerprint
+            setCatalogCheckTrigger((prev) => prev + 1)
+          }
           if (metadataCheckIntervalRef.current) {
             clearInterval(metadataCheckIntervalRef.current)
             metadataCheckIntervalRef.current = undefined
@@ -104,7 +145,13 @@ export function useTOC(resourceKey: string, resourceId: string, isAnchor?: boole
         }
         const metadata = await catalogManager.getResourceMetadata(resourceKey)
         if (metadata?.contentMetadata?.ingredients && metadata.contentMetadata.ingredients.length > 0) {
-          setCatalogCheckTrigger((prev) => prev + 1)
+          const catalogFp = metadata.contentMetadata.ingredients
+            .map((item: IngredientLike) => item.identifier ?? '')
+            .join('\0')
+          if (lastTriggeredFingerprintRef.current !== catalogFp) {
+            lastTriggeredFingerprintRef.current = catalogFp
+            setCatalogCheckTrigger((prev) => prev + 1)
+          }
           if (metadataCheckIntervalRef.current) {
             clearInterval(metadataCheckIntervalRef.current)
             metadataCheckIntervalRef.current = undefined
@@ -125,14 +172,7 @@ export function useTOC(resourceKey: string, resourceId: string, isAnchor?: boole
         clearInterval(metadataCheckIntervalRef.current)
       }
     }
-  }, [
-    resourceKey,
-    resourceId,
-    catalogManager,
-    availableBooks.length,
-    isLoadingTOC,
-    app.loadedResources,
-  ])
+  }, [resourceKey, resourceId, catalogManager, availableBooks.length, isLoadingTOC, ingredientKey])
 
   useEffect(() => {
     let cancelled = false
@@ -141,16 +181,22 @@ export function useTOC(resourceKey: string, resourceId: string, isAnchor?: boole
       const books = buildBookInfosFromIngredients(ingredients)
       if (!books.length) return
 
-      setAvailableBooks(books)
+      if (!tocBooksEqual(availableBooksRef.current, books)) {
+        setAvailableBooks(books)
+      }
 
       const toc: ResourceTOC = {
         resourceId,
         resourceType: 'scripture',
         books,
       }
-      setLoadedTOC(toc)
+      if (!loadedTocEqual(loadedTOCRef.current, toc)) {
+        setLoadedTOC(toc)
+      }
 
-      const self = app.loadedResources[resourceId] || app.loadedResources[resourceKey]
+      const currentApp = appRef.current
+      const currentNav = navigationRef.current
+      const self = currentApp.loadedResources[resourceId] || currentApp.loadedResources[resourceKey]
       const selfLang = self?.languageCode || self?.language || ''
       const selfIsOriginal = isOriginalLanguageResource(selfLang, self?.subject || '')
 
@@ -159,28 +205,29 @@ export function useTOC(resourceKey: string, resourceId: string, isAnchor?: boole
         shouldBecomeAnchor({
           isAnchor,
           selfIsOriginal,
-          anchorResourceId: app.anchorResourceId,
-          loadedResources: app.loadedResources,
+          anchorResourceId: currentApp.anchorResourceId,
+          loadedResources: currentApp.loadedResources,
         })
       ) {
-        app.setAnchorResource(resourceId, toc)
-        if (!(selfIsOriginal && hasGatewayScripture(app.loadedResources))) {
-          navigation.setAvailableBooks(books)
+        currentApp.setAnchorResource(resourceId, toc)
+        if (!(selfIsOriginal && hasGatewayScripture(currentApp.loadedResources))) {
+          currentNav.setAvailableBooks(books)
         }
-        const currentBook = navigation.currentReference.book
+        const currentBook = currentNav.currentReference.book
         const sections = await defaultSectionsService.getDefaultSections(currentBook)
         if (!cancelled && sections.length > 0) {
-          navigation.setBookSections(currentBook, sections)
+          currentNav.setBookSections(currentBook, sections)
         }
         tocSetRef.current = true
       }
     }
 
     const loadTOC = async () => {
-      setIsLoadingTOC(true)
+      const alreadyLoaded = availableBooksRef.current.length > 0
+      if (!alreadyLoaded) setIsLoadingTOC(true)
       try {
         const localIngredients = ingredientsFromLoadedResource(
-          app.loadedResources,
+          appRef.current.loadedResources,
           resourceId,
           resourceKey
         )
@@ -197,13 +244,13 @@ export function useTOC(resourceKey: string, resourceId: string, isAnchor?: boole
           await applyBooks(catalogIngredients)
         } else {
           console.warn('⚠️ No ingredients found in metadata for resource:', resourceKey)
-          setAvailableBooks([])
-          setLoadedTOC(null)
+          if (availableBooksRef.current.length > 0) setAvailableBooks([])
+          if (loadedTOCRef.current) setLoadedTOC(null)
         }
       } catch (err) {
         console.error('❌ Error loading TOC:', err)
-        setAvailableBooks([])
-        setLoadedTOC(null)
+        if (availableBooksRef.current.length > 0) setAvailableBooks([])
+        if (loadedTOCRef.current) setLoadedTOC(null)
       } finally {
         if (!cancelled) setIsLoadingTOC(false)
       }
@@ -214,28 +261,31 @@ export function useTOC(resourceKey: string, resourceId: string, isAnchor?: boole
     return () => {
       cancelled = true
     }
-  }, [resourceKey, catalogManager, isAnchor, resourceId, app, navigation, catalogCheckTrigger])
+  }, [resourceKey, catalogManager, isAnchor, resourceId, catalogCheckTrigger, ingredientKey])
 
   useEffect(() => {
     tocSetRef.current = false
   }, [resourceId])
 
-  const setAsAnchor = async () => {
-    if (!loadedTOC) return
-    app.setAnchorResource(resourceId, loadedTOC)
-    const self = app.loadedResources[resourceId] || app.loadedResources[resourceKey]
+  const setAsAnchor = useCallback(async () => {
+    const toc = loadedTOCRef.current
+    if (!toc) return
+    const currentApp = appRef.current
+    const currentNav = navigationRef.current
+    currentApp.setAnchorResource(resourceId, toc)
+    const self = currentApp.loadedResources[resourceId] || currentApp.loadedResources[resourceKey]
     const selfLang = self?.languageCode || self?.language || ''
     const selfIsOriginal = isOriginalLanguageResource(selfLang, self?.subject || '')
-    if (!(selfIsOriginal && hasGatewayScripture(app.loadedResources))) {
-      navigation.setAvailableBooks(loadedTOC.books)
+    if (!(selfIsOriginal && hasGatewayScripture(currentApp.loadedResources))) {
+      currentNav.setAvailableBooks(toc.books)
     }
-    const currentBook = navigation.currentReference.book
+    const currentBook = currentNav.currentReference.book
     const sections = await defaultSectionsService.getDefaultSections(currentBook)
     if (sections.length > 0) {
-      navigation.setBookSections(currentBook, sections)
+      currentNav.setBookSections(currentBook, sections)
     }
     tocSetRef.current = true
-  }
+  }, [resourceId, resourceKey])
 
   return { availableBooks, isLoadingTOC, setAsAnchor }
 }

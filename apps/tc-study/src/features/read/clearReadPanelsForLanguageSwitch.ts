@@ -21,10 +21,23 @@ const READ_PANEL_IDS = new Set(['panel-1', 'panel-2'])
 
 export type ReadPanelClearTarget = 'panel-1' | 'panel-2' | 'both'
 
-export function panelClearTargetForLoad(loadTarget: CatalogLoadTarget): ReadPanelClearTarget {
+export function panelClearTargetForLoad(
+  loadTarget: CatalogLoadTarget,
+  destPanelId?: ReadPanelClearTarget
+): ReadPanelClearTarget {
+  if (destPanelId === 'panel-1' || destPanelId === 'panel-2') return destPanelId
   if (loadTarget === 'text') return 'panel-1'
   if (loadTarget === 'helps') return 'panel-2'
   return 'both'
+}
+
+/** Text dest (including panel-2 scripture) must not re-inject CombinedHelps onto that pane. */
+export function shouldReconcileHelpsOnPanelClear(
+  loadTarget: CatalogLoadTarget,
+  panelTarget: ReadPanelClearTarget
+): boolean {
+  if (loadTarget === 'text') return false
+  return panelTarget === 'panel-2' || panelTarget === 'both'
 }
 
 function panelsToClear(panelTarget: ReadPanelClearTarget): Set<string> {
@@ -38,7 +51,8 @@ function panelsToClear(panelTarget: ReadPanelClearTarget): Set<string> {
  */
 export function clearReadPanelsForLanguageSwitch(
   languageCode?: string,
-  panelTarget: ReadPanelClearTarget = 'both'
+  panelTarget: ReadPanelClearTarget = 'both',
+  options?: { reconcileHelps?: boolean }
 ): string[] {
   const pkg = useWorkspaceStore.getState().currentPackage
   if (!pkg) return []
@@ -58,7 +72,8 @@ export function clearReadPanelsForLanguageSwitch(
     }
   }
 
-  const shouldReconcileHelps = panelTarget === 'panel-2' || panelTarget === 'both'
+  const shouldReconcileHelps =
+    options?.reconcileHelps ?? (panelTarget === 'panel-2' || panelTarget === 'both')
 
   useWorkspaceStore.setState((state) => {
     if (!state.currentPackage) return

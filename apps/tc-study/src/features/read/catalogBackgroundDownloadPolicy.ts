@@ -53,3 +53,22 @@ export function filterUncheckedResourceKeys(
     (key) => !processed.has(key) && !downloading.has(key)
   )
 }
+
+/**
+ * Queue only resources for the languages currently on the two Read panels
+ * (`expectedResources` from catalog load). Persistent catalog leftovers from
+ * earlier sessions / other languages must not inflate the worker total or
+ * hang progress on a stale zip.
+ *
+ * When expected is empty, fall back to catalog keys (manual / debug paths).
+ */
+export function keysToEnqueueForDownload(
+  catalogKeys: readonly string[],
+  expectedResources?: readonly string[] | null
+): string[] {
+  if (!expectedResources || expectedResources.length === 0) {
+    return [...catalogKeys]
+  }
+  const catalog = new Set(catalogKeys)
+  return expectedResources.filter((key) => catalog.has(key))
+}

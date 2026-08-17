@@ -7,10 +7,11 @@
  * painted tabs should match store keys (single tab space).
  */
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useWorkspaceStore } from '../lib/stores/workspaceStore'
 import type { ResourceInfo } from '../contexts/types'
 import { applyDualScopeHelpsPolicy } from '../features/helps/helpsPanelPolicy'
+import { matchResourceForInstanceKey } from '../features/workspace/panelInstanceIds'
 import {
   assignResourceToPanel as assignResourceMutation,
   moveResourceBetweenPanels as moveResourceMutation,
@@ -27,6 +28,13 @@ export interface PanelResource {
 }
 
 const EMPTY_RESOURCE_KEYS: string[] = []
+
+function stabilizeKeys(next: string[], prevRef: { current: string[] }): string[] {
+  const prev = prevRef.current
+  if (next.length === prev.length && next.every((k, i) => k === prev[i])) return prev
+  prevRef.current = next
+  return next
+}
 
 export function useStudioResources(panelId: string) {
   const currentPackage = useWorkspaceStore((s) => s.currentPackage)
@@ -48,20 +56,21 @@ export function useStudioResources(panelId: string) {
         hiddenKeys: [] as string[],
       }
     }
-    const refs = rawResources.map((r) => ({
-      key: r.key || r.id,
-      type: r.type,
+    const refs = rawKeys.map((instanceKey, i) => ({
+      key: instanceKey,
+      type: rawResources[i]?.type,
     }))
     return applyDualScopeHelpsPolicy(refs)
   }, [panelId, rawKeys, rawResources, rawActiveIndex])
 
-  const resourceKeys = policy.visibleKeys
+  const visibleKeysRef = useRef<string[]>(EMPTY_RESOURCE_KEYS)
+  const resourceKeys = stabilizeKeys(policy.visibleKeys, visibleKeysRef)
   const resources = useMemo(
     () =>
       resourceKeys
-        .map((key) => rawResources.find((r) => (r.key || r.id) === key))
+        .map((instanceKey) => matchResourceForInstanceKey(instanceKey, rawKeys, rawResources))
         .filter(Boolean) as ResourceInfo[],
-    [resourceKeys, rawResources]
+    [resourceKeys, rawKeys, rawResources]
   )
 
   const rawActiveKey = rawKeys[rawActiveIndex]
