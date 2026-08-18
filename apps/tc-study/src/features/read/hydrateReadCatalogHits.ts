@@ -15,6 +15,7 @@ import {
   type CatalogEntry,
 } from './readCatalogIdentity'
 import { existingPanelInstanceId } from '../workspace/projectPanelResourcesToAppStore'
+import { CATALOG_HYDRATE_BATCH } from '../workspace/resourceWriteOptions'
 import type { ReadPanelId } from './readPanelModel'
 
 const BOOK_COMPANION_TYPES = new Set([
@@ -43,7 +44,13 @@ export interface HydrateReadCatalogHitsDeps {
   getPanel: (panelId: string) => { resourceKeys: string[] } | undefined
   addResource: (
     resource: ResourceInfo,
-    options?: { panelId?: string; index?: number; allowMultipleInstances?: boolean }
+    options?: {
+      panelId?: string
+      index?: number
+      allowMultipleInstances?: boolean
+      skipEnsure?: boolean
+      skipPersist?: boolean
+    }
   ) => void
   setActiveResourceInPanel: (panelId: string, index: number) => void
 }
@@ -171,12 +178,13 @@ export function hydrateReadCatalogHits(
         index: currentIndex,
         // Same-language dual scripture: second pane gets ult#2 so LinkedPanels ids stay unique.
         allowMultipleInstances: true,
+        ...CATALOG_HYDRATE_BATCH,
       })
       if (currentIndex === 0) {
         setActiveResourceInPanel(assignment.panelId, 0)
       }
     } else {
-      addResource(basicResourceInfo)
+      addResource(basicResourceInfo, CATALOG_HYDRATE_BATCH)
     }
   }
 

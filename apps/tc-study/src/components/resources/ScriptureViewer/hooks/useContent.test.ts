@@ -95,4 +95,28 @@ describe('scripture content load retry (language-switch race)', () => {
     expect(src).toContain('allowHardMiss')
     expect(src).toContain('getResourceMetadata(resourceKey)')
   })
+
+  test('useContent hides previous viewModel as soon as resourceKey/loadKey changes', () => {
+    const src = readFileSync(join(import.meta.dir, 'useContent.ts'), 'utf8')
+    expect(src).toContain('loaded.key === loadKey')
+    expect(src).toContain('attachFoldedMatchKeysToViewModel')
+    expect(src).toMatch(/const viewModel = loaded\.key === loadKey \? loaded\.viewModel : null/)
+    expect(src).toMatch(/setLoaded\(\{ key: loadKey, viewModel: null \}\)/)
+    expect(src).not.toContain('scriptureViewCache')
+    expect(src).not.toContain('peekScriptureViewCache')
+    expect(src).not.toContain('loadScriptureViewCached')
+  })
+
+  test('underline and highlight hooks fold locally (no session paint cache)', () => {
+    const underlines = readFileSync(join(import.meta.dir, 'useUnderlinedTokens.ts'), 'utf8')
+    const highlighting = readFileSync(join(import.meta.dir, 'useHighlighting.ts'), 'utf8')
+    expect(underlines).toContain('semanticIdKey')
+    expect(underlines).not.toContain('scripturePaintCache')
+    expect(highlighting).toContain('foldHighlightTarget')
+    expect(highlighting).toContain('setHighlightTarget')
+    expect(highlighting).toContain('debug: false')
+    expect(highlighting).not.toContain('applyHighlightSignal')
+    expect(highlighting).not.toContain('peekLastHighlight')
+    expect(highlighting).not.toContain('scripturePaintCache')
+  })
 })

@@ -8,6 +8,56 @@ export interface TokenVisualState {
   isUnderlined: boolean
 }
 
+type PaintTokenKeys = {
+  semanticId: string
+  alignedOriginalWordIds: readonly string[]
+}
+
+type PaintTargetKeys = {
+  semanticId: string
+  alignedSemanticIds: ReadonlySet<string>
+}
+
+/** Fold click/signal IDs once. Paint then uses === / Set.has only. */
+export function foldHighlightTarget(
+  target: OriginalLanguageToken | null
+): OriginalLanguageToken | null {
+  if (!target) return null
+  if (target.foldedSemanticId && target.foldedAlignedIdSet) return target
+  return {
+    ...target,
+    foldedSemanticId: semanticIdKey(target.semanticId),
+    foldedAlignedIdSet: new Set((target.alignedSemanticIds ?? []).map(semanticIdKey)),
+  }
+}
+
+function paintTokenKeys(token: ScriptureRenderToken): PaintTokenKeys {
+  if (token.foldedSemanticId !== undefined) {
+    return {
+      semanticId: token.foldedSemanticId,
+      alignedOriginalWordIds: token.foldedAlignedIds ?? [],
+    }
+  }
+  return {
+    semanticId: semanticIdKey(token.semanticId),
+    alignedOriginalWordIds: token.alignedOriginalWordIds.map(semanticIdKey),
+  }
+}
+
+function paintTargetKeys(target: OriginalLanguageToken | null): PaintTargetKeys | null {
+  if (!target) return null
+  if (target.foldedSemanticId !== undefined && target.foldedAlignedIdSet) {
+    return {
+      semanticId: target.foldedSemanticId,
+      alignedSemanticIds: target.foldedAlignedIdSet,
+    }
+  }
+  return {
+    semanticId: semanticIdKey(target.semanticId),
+    alignedSemanticIds: new Set((target.alignedSemanticIds ?? []).map(semanticIdKey)),
+  }
+}
+
 /**
  * True when `token` is part of the active click-highlight selection
  * (same semanticId or cross-pane alignment overlap). Used for toggle-off.
@@ -16,20 +66,16 @@ export function tokenMatchesHighlightTarget(
   token: ScriptureRenderToken,
   highlightTarget: OriginalLanguageToken | null
 ): boolean {
-  if (!highlightTarget) return false
-  const tokenKey = semanticIdKey(token.semanticId)
-  const targetKey = semanticIdKey(highlightTarget.semanticId)
-  if (tokenKey === targetKey) return true
-
-  const alignedTokenKeys = token.alignedOriginalWordIds.map(semanticIdKey)
-  const alignedTargetKeys = highlightTarget.alignedSemanticIds?.map(semanticIdKey) ?? []
-
-  if (alignedTokenKeys.includes(targetKey)) return true
-  if (alignedTargetKeys.includes(tokenKey)) return true
+  const target = paintTargetKeys(highlightTarget)
+  if (!target) return false
+  const tokenKeys = paintTokenKeys(token)
+  if (tokenKeys.semanticId === target.semanticId) return true
+  if (tokenKeys.alignedOriginalWordIds.includes(target.semanticId)) return true
+  if (target.alignedSemanticIds.has(tokenKeys.semanticId)) return true
   if (
-    alignedTokenKeys.length > 0 &&
-    alignedTargetKeys.length > 0 &&
-    alignedTargetKeys.some((id) => alignedTokenKeys.includes(id))
+    tokenKeys.alignedOriginalWordIds.length > 0 &&
+    target.alignedSemanticIds.size > 0 &&
+    tokenKeys.alignedOriginalWordIds.some((id) => target.alignedSemanticIds.has(id))
   ) {
     return true
   }
@@ -44,32 +90,31 @@ export function resolveTokenVisualState(
     isOriginalLanguage: boolean
   }
 ): TokenVisualState {
-  const tokenKey = semanticIdKey(token.semanticId)
-  const alignedKeys = token.alignedOriginalWordIds.map(semanticIdKey)
+  const tokenKeys = paintTokenKeys(token)
+  const target = paintTargetKeys(opts.highlightTarget)
   let isHighlighted = false
   let isSelected = false
-  const target = opts.highlightTarget
   if (target) {
-    const targetKey = semanticIdKey(target.semanticId)
-    const alignedTargetKeys = target.alignedSemanticIds?.map(semanticIdKey) ?? []
     if (opts.isOriginalLanguage) {
-      if (tokenKey === targetKey) {
+      if (tokenKeys.semanticId === target.semanticId) {
         isHighlighted = true
         isSelected = true
-      } else if (alignedTargetKeys.length > 0) {
-        isHighlighted = alignedTargetKeys.includes(tokenKey)
+      } else if (target.alignedSemanticIds.size > 0) {
+        isHighlighted = target.alignedSemanticIds.has(tokenKeys.semanticId)
       }
-    } else if (tokenKey === targetKey) {
+    } else if (tokenKeys.semanticId === target.semanticId) {
       isHighlighted = true
       isSelected = true
-    } else if (alignedKeys.length > 0) {
-      if (alignedKeys.includes(targetKey)) {
+    } else if (tokenKeys.alignedOriginalWordIds.length > 0) {
+      if (tokenKeys.alignedOriginalWordIds.includes(target.semanticId)) {
         isHighlighted = true
         isSelected = true
-      } else if (alignedTargetKeys.length > 0) {
-        isHighlighted = alignedTargetKeys.some((id) => alignedKeys.includes(id))
+      } else if (target.alignedSemanticIds.size > 0) {
+        isHighlighted = tokenKeys.alignedOriginalWordIds.some((id) =>
+          target.alignedSemanticIds.has(id)
+        )
       }
-    } else if (alignedTargetKeys.includes(tokenKey)) {
+    } else if (target.alignedSemanticIds.has(tokenKeys.semanticId)) {
       isHighlighted = true
     }
   }
@@ -77,7 +122,8 @@ export function resolveTokenVisualState(
   const underlines = opts.underlinedSemanticIds
   if (underlines && underlines.size > 0) {
     isUnderlined =
-      underlines.has(tokenKey) || alignedKeys.some((id) => underlines.has(id))
+      underlines.has(tokenKeys.semanticId) ||
+      tokenKeys.alignedOriginalWordIds.some((id) => underlines.has(id))
   }
   return { isHighlighted, isSelected, isUnderlined }
 }

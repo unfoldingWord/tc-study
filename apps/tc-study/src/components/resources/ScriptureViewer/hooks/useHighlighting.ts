@@ -4,8 +4,22 @@ import { useCallback, useRef, useState } from 'react'
 import { useCurrentReference } from '../../../../contexts'
 import type { TokenClickSignal, VerseFilterSignal } from '../../../../signals/studioSignals'
 import type { OriginalLanguageToken } from '../types'
-import { tokenMatchesHighlightTarget } from '../utils/tokenHighlight'
+import { foldHighlightTarget, tokenMatchesHighlightTarget } from '../utils/tokenHighlight'
 import { semanticIdKey } from '../utils/wordIdentity'
+
+function targetFromSignalToken(
+  token: NonNullable<TokenClickSignal['token']>
+): OriginalLanguageToken {
+  return foldHighlightTarget({
+    semanticId: token.semanticId,
+    alignedSemanticIds: token.alignedSemanticIds,
+    content: token.content,
+    verseRef: token.verseRef,
+    strong: token.strong,
+    lemma: token.lemma,
+    morph: token.morph,
+  })!
+}
 
 export function useHighlighting(
   resourceId: string,
@@ -43,21 +57,13 @@ export function useHighlighting(
     useCallback((signal) => {
       if (signal.sourceResourceId === resourceId) return
       if (signal.token === null) {
-        setHighlightTarget(null)
         ownsVerseFilterRef.current = false
+        setHighlightTarget(null)
         return
       }
-      setHighlightTarget({
-        semanticId: signal.token.semanticId,
-        alignedSemanticIds: signal.token.alignedSemanticIds,
-        content: signal.token.content,
-        verseRef: signal.token.verseRef,
-        strong: signal.token.strong,
-        lemma: signal.token.lemma,
-        morph: signal.token.morph,
-      })
+      setHighlightTarget(targetFromSignalToken(signal.token))
     }, [resourceId]),
-    { debug: true, resourceMetadata }
+    { debug: false, resourceMetadata }
   )
 
   const handleTokenClick = useCallback(
@@ -92,12 +98,14 @@ export function useHighlighting(
 
         const effectiveAlignedIds = alignedSemanticIds ?? [semanticId]
 
-        setHighlightTarget({
-          semanticId,
-          alignedSemanticIds: effectiveAlignedIds,
-          content: tokenContent,
-          verseRef,
-        })
+        setHighlightTarget(
+          foldHighlightTarget({
+            semanticId,
+            content: tokenContent,
+            verseRef,
+            alignedSemanticIds: effectiveAlignedIds,
+          })
+        )
 
         ownsVerseFilterRef.current = !hasCoverage
 

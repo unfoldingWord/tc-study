@@ -48,7 +48,13 @@ export interface LoadReadLanguageCatalogDeps {
   getPanel: (panelId: string) => { resourceKeys: string[] } | undefined
   addResource: (
     resource: ResourceInfo,
-    options?: { panelId?: string; index?: number; allowMultipleInstances?: boolean }
+    options?: {
+      panelId?: string
+      index?: number
+      allowMultipleInstances?: boolean
+      skipEnsure?: boolean
+      skipPersist?: boolean
+    }
   ) => void
   setActiveResourceInPanel: (panelId: string, index: number) => void
   setExpectedResources: (keys: string[]) => void
@@ -215,7 +221,8 @@ export async function loadReadLanguageCatalog(
   // CombinedHelps after GL + UGNT/UHB hydrate so original-lang adds cannot clobber
   // the gateway TN/TWL pair selected for `helpsLanguageCode`.
   if (destPanelId && loadTarget === 'text') {
-    /* scripture-only into one panel — do not inject CombinedHelps onto that panel */
+    /* scripture-only into dest — do not inject CombinedHelps onto that panel */
+    applyCombinedHelpsEnsure(helpsLanguageCode, 'panel-2')
   } else if (destPanelId) {
     applyCombinedHelpsEnsure(helpsLanguageCode, destPanelId, {
       forceHelpsPanel: loadTarget === 'helps',
@@ -223,6 +230,7 @@ export async function loadReadLanguageCatalog(
   } else {
     applyCombinedHelpsEnsure(helpsLanguageCode)
   }
+  useWorkspaceStore.getState().autoSaveWorkspace()
 
   if (loadTarget !== 'helps') {
     activateGatewayScriptureTab({ getPanel, setActiveResourceInPanel, destPanelId })

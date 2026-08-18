@@ -566,8 +566,7 @@ The registry logs important events:
 ## Related Documentation
 
 - **Entry Modal Data Flow**: `ENTRY_MODAL_DATA_FLOW.md`
-- **Resource Type Development**: `RESOURCE_TYPE_DEVELOPMENT.md`
-- **Adding New Resource Types**: `ADDING_NEW_RESOURCE_TYPES.md`
+- **Extending registries** (resource types + panel entries): `extending-registries.md`
 - **Viewer Registry** (for panels): `src/lib/viewers/ViewerRegistry.ts`
 
 ---

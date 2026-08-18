@@ -62,8 +62,8 @@ export class ResourceTypeRegistry {
       throw new Error(`Resource type '${id}' must have a loader`)
     }
     
-    // Viewer is optional - resources without viewers are modal-only
-    // (accessible via Entry Viewer Registry, not as panel tabs)
+    // Viewer is optional and is NOT a paint / switcher signal.
+    // Membership is PanelEntryRegistry + entry instances.
     
     // 2. Store definition
     this.types.set(id, definition)
@@ -148,7 +148,7 @@ export class ResourceTypeRegistry {
     // 6. Log success (simplified)
     console.log(`✅ Registered: ${id} (${subjects.length} subjects)${viewer ? '' : ' [modal-only]'}`)
   }
-  
+
   /**
    * Get all registered resource types
    */
@@ -207,7 +207,7 @@ export class ResourceTypeRegistry {
   helpsCatalogPaneTypeIds(scope: HelpsCatalogScope): string[] {
     return paneIdsFromTypes(this.getAll(), scope)
   }
-  
+
   /**
    * Get API filters for Door43 requests
    * Automatically includes all supported subjects

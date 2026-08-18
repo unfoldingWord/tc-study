@@ -17,13 +17,14 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
-import { useCatalogManager, useResourceTypeRegistry } from '../contexts'
+import { useCatalogManager, usePanelEntryRegistry, useResourceTypeRegistry } from '../contexts'
 import {
   DEFAULT_TEXT_KIND_FILTER,
   filterPickerLanguages,
   type LanguagePickerListMode,
   type TextKindFilter,
 } from '../features/read/filterPickerLanguages'
+import { availabilitySubjectSetsFromRegistry } from '../features/read/compositionAvailabilitySubjects'
 import { fetchLanguageAvailabilityByCode } from '../features/read/languageAvailability'
 import { resolveLanguageListKind } from '../features/read/languageListKind'
 import {
@@ -86,6 +87,7 @@ export function LanguagePicker({
 
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
+  const panelEntryRegistry = usePanelEntryRegistry()
   const setAvailableLanguages = useWizardStore((s) => s.setAvailableLanguages)
 
   const listKind = resolveLanguageListKind({ listMode })
@@ -105,7 +107,10 @@ export function LanguagePicker({
     try {
       const client = getDoor43ApiClient()
       const [availabilityByCode, catalogStats] = await Promise.all([
-        fetchLanguageAvailabilityByCode(client),
+        fetchLanguageAvailabilityByCode(
+          client,
+          availabilitySubjectSetsFromRegistry(resourceTypeRegistry, panelEntryRegistry)
+        ),
         catalogManager.getCatalogStats(),
       ])
       const { display, global } = await revalidatePickerLanguages({
@@ -125,7 +130,7 @@ export function LanguagePicker({
     } finally {
       setIsRevalidating(false)
     }
-  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager])
+  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager, resourceTypeRegistry, panelEntryRegistry])
 
   const revalidateRef = useRef(revalidate)
   revalidateRef.current = revalidate

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
 import { useScriptureDisplayStore } from '../../../../lib/stores/scriptureDisplayStore'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
+import { isOriginalLanguageCode } from '../../../../features/helps/resolveAlignedQuoteTokens'
 import { isScriptureBooksPending } from '../hooks/scriptureContentLoad'
 import type { DisplayUsjVerse, OriginalLanguageToken } from '../types'
 import { FormattedScriptureContent } from './FormattedScriptureContent'
@@ -144,7 +145,7 @@ export function ScriptureContent({
     )
   }
 
-  const isOriginalLanguage = language === 'el-x-koine' || language === 'hbo'
+  const isOriginalLanguage = isOriginalLanguageCode(language)
 
   return (
     <div ref={containerRef} className="space-y-6" dir={languageDirection}>

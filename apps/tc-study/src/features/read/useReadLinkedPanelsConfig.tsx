@@ -22,7 +22,7 @@ export function linkedPanelsConfigMembershipKey(config: {
     .sort()
     .map((pid) => {
       const panel = panels[pid]
-      return `${pid}:${(panel?.resourceIds ?? []).join('|')}:${panel?.initialIndex ?? 0}`
+      return `${pid}:${(panel?.resourceIds ?? []).join('|')}`
     })
     .join(';')
   return `${ids}#${panelPart}`

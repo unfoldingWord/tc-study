@@ -15,11 +15,13 @@ describe('languageDirection', () => {
   test('known RTL codes fallback when catalog/list absent', () => {
     expect(getLanguageDirection(null, null, 'ar')).toBe('rtl')
     expect(getLanguageDirection(undefined, undefined, 'he')).toBe('rtl')
+    expect(getLanguageDirection(null, null, 'hbo')).toBe('rtl')
     expect(getLanguageDirection(null, null, 'en')).toBe('ltr')
   })
 
   test('isRtlLanguageCode covers known RTL set', () => {
     expect(isRtlLanguageCode('ar')).toBe(true)
+    expect(isRtlLanguageCode('hbo')).toBe(true)
     expect(isRtlLanguageCode('fa')).toBe(true)
     expect(isRtlLanguageCode('en')).toBe(false)
     expect(isRtlLanguageCode(undefined)).toBe(false)

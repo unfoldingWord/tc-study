@@ -1,69 +1,94 @@
 import {
-  COMBINED_HELPS_RESOURCE_ID,
-  OBS_COMBINED_HELPS_RESOURCE_ID,
-} from './combinedHelpsIds'
+  compositionBaseKey,
+  resourceMatchesConsumedType,
+  type HelpsScope,
+} from './compositionInjection'
 import {
-  isCombinedHelpsResourceType,
-  isNotesResourceType,
-  isWordsLinksResourceType,
-  normalizeResourceTypeId,
-} from '../../utils/normalizeResourceTypeId'
-import type { HelpsScope } from './combinedHelpsInjection'
+  compositionsForEnsure,
+  matchesCompositionPersistId,
+  type CompositionEnsureSpec,
+} from './ensureCompositions'
 
 export interface PanelResourceRef {
   key: string
   type?: string
 }
 
+function compositionsForScope(
+  scope: HelpsScope,
+  compositions: CompositionEnsureSpec[]
+): CompositionEnsureSpec[] {
+  return compositions.filter((c) => (c.groupId ?? c.scope ?? 'scripture') === scope)
+}
+
+function presentCompositionKeys(
+  resources: PanelResourceRef[],
+  compositions: CompositionEnsureSpec[]
+): string[] {
+  const keys: string[] = []
+  for (const composition of compositions) {
+    if (!composition.persistId) continue
+    for (const r of resources) {
+      if (matchesCompositionPersistId(r.key, composition.persistId) && !keys.includes(r.key)) {
+        keys.push(r.key)
+      }
+    }
+  }
+  return keys
+}
+
 /**
- * Shared Read/Studio policy: when CombinedHelps is present for a scope,
- * prefer it as active and hide raw TN/TWL tabs for that scope.
+ * Shared Read/Studio policy: prefer composition persist ids and do not paint
+ * raw consumed resource keys when a composition instance is present.
  *
- * Unlock 1: ensureCombinedHelps strips TN/TWL from panel.resourceKeys so
- * painted tabs === store keys (single tab space). This hide path is a
- * defensive residual for stale membership only — do not add new permanent
- * coordinate-system / index-map layers on top of painted≠raw.
+ * hideConsumed is not ownership — this is a residual for stale membership only.
  */
 export function orderHelpsPanelKeys(
   resources: PanelResourceRef[],
-  scope: HelpsScope
+  scope: HelpsScope,
+  compositions: CompositionEnsureSpec[] = compositionsForEnsure()
 ): { visibleKeys: string[]; activeKey: string | null; hiddenKeys: string[] } {
-  const combinedId =
-    scope === 'obs' ? OBS_COMBINED_HELPS_RESOURCE_ID : COMBINED_HELPS_RESOURCE_ID
-
-  const hasCombined = resources.some(
-    (r) => r.key === combinedId || isCombinedHelpsResourceType(r.type)
-  )
+  const scoped = compositionsForScope(scope, compositions)
+  const preferred = presentCompositionKeys(resources, scoped)
+  const hideTypes = new Set<string>()
+  for (const composition of scoped) {
+    if (!preferred.some((key) => composition.persistId && matchesCompositionPersistId(key, composition.persistId))) {
+      continue
+    }
+    for (const typeId of composition.consumes) hideTypes.add(typeId)
+  }
 
   const hiddenKeys: string[] = []
   const visibleKeys: string[] = []
 
+  const typeByBase = new Map<string, string>()
   for (const r of resources) {
-    const isScopedNotes = isNotesResourceType(r.type, scope)
-    const isScopedTwl = isWordsLinksResourceType(r.type, scope)
-    const isCombined =
-      r.key === combinedId ||
-      (isCombinedHelpsResourceType(r.type) &&
-        (scope === 'obs'
-          ? r.key === OBS_COMBINED_HELPS_RESOURCE_ID ||
-            normalizeResourceTypeId(r.type) === 'obs-combined-helps'
-          : r.key === COMBINED_HELPS_RESOURCE_ID ||
-            normalizeResourceTypeId(r.type) === 'combined-helps'))
+    if (!r.type) continue
+    typeByBase.set(compositionBaseKey(r.key), r.type)
+  }
 
-    if (hasCombined && (isScopedNotes || isScopedTwl) && !isCombined) {
+  for (const r of resources) {
+    const isPreferred = preferred.includes(r.key)
+    const type = r.type ?? typeByBase.get(compositionBaseKey(r.key))
+    const isConsumed =
+      !isPreferred &&
+      [...hideTypes].some((typeId) => resourceMatchesConsumedType(type, typeId))
+    if (isConsumed) {
       hiddenKeys.push(r.key)
       continue
     }
     visibleKeys.push(r.key)
   }
 
-  // Prefer combined as first among helps-related keys
-  if (hasCombined && visibleKeys.includes(combinedId)) {
-    const rest = visibleKeys.filter((k) => k !== combinedId)
-    return {
-      visibleKeys: [combinedId, ...rest],
-      activeKey: combinedId,
-      hiddenKeys,
+  if (preferred.length > 0) {
+    const presentPreferred = preferred.filter((k) => visibleKeys.includes(k))
+    if (presentPreferred.length > 0) {
+      const rest = visibleKeys.filter((k) => !presentPreferred.includes(k))
+      return {
+        visibleKeys: [...presentPreferred, ...rest],
+        activeKey: presentPreferred[0] ?? null,
+        hiddenKeys,
+      }
     }
   }
 
@@ -74,27 +99,27 @@ export function orderHelpsPanelKeys(
   }
 }
 
-/**
- * Apply both scripture and OBS CombinedHelps visibility rules to a panel key list.
- */
-export function applyDualScopeHelpsPolicy(resources: PanelResourceRef[]): {
+export function applyDualScopeHelpsPolicy(
+  resources: PanelResourceRef[],
+  compositions: CompositionEnsureSpec[] = compositionsForEnsure()
+): {
   visibleKeys: string[]
   activeKey: string | null
   hiddenKeys: string[]
 } {
-  const scripture = orderHelpsPanelKeys(resources, 'scripture')
-  const obs = orderHelpsPanelKeys(resources, 'obs')
+  const scripture = orderHelpsPanelKeys(resources, 'scripture', compositions)
+  const obs = orderHelpsPanelKeys(resources, 'obs', compositions)
   const hidden = new Set([...scripture.hiddenKeys, ...obs.hiddenKeys])
-  const orderedCombined = [COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID].filter(
-    (id) => resources.some((r) => r.key === id) && !hidden.has(id)
+  const orderedPreferred = presentCompositionKeys(resources, compositions).filter(
+    (id) => !hidden.has(id)
   )
   const rest = resources
     .map((r) => r.key)
-    .filter((k) => !hidden.has(k) && !orderedCombined.includes(k))
-  const visibleKeys = [...orderedCombined, ...rest]
+    .filter((k) => !hidden.has(k) && !orderedPreferred.includes(k))
+  const visibleKeys = [...orderedPreferred, ...rest]
   return {
     visibleKeys,
-    activeKey: orderedCombined[0] ?? visibleKeys[0] ?? null,
+    activeKey: orderedPreferred[0] ?? visibleKeys[0] ?? null,
     hiddenKeys: [...hidden],
   }
 }

@@ -8,6 +8,8 @@ import { createResourceInfo } from '../../utils/resourceInfo'
 import { ensureCombinedHelpsInWorkspace } from '../helps/ensureCombinedHelps'
 import { existingPanelInstanceId, getBaseResourceKey } from './projectPanelResourcesToAppStore'
 import { projectPanelsFromPackage } from './workspaceProjection'
+import { scheduleWorkspacePersist } from './workspacePersistSchedule'
+import { finishResourceWrite, type ResourceWriteOptions } from './resourceWriteOptions'
 import type { PanelConfig, WorkspaceGet, WorkspaceSet, WorkspaceStore } from './workspaceTypes'
 
 export type ResourceSlice = Pick<
@@ -65,7 +67,7 @@ function reconcileCombinedHelps(
 
 export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): ResourceSlice {
   return {
-    addResourceToPackage: (resource) => {
+    addResourceToPackage: (resource, options?: ResourceWriteOptions) => {
       const resourceInfo =
         resource.resourceKey && resource.catalogedAt
           ? (resource as ResourceInfo)
@@ -75,13 +77,13 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
         if (state.currentPackage) {
           state.currentPackage.resources.set(resourceInfo.key, resourceInfo)
           // Only pass gateway langs — UGNT (el-x-koine) / UHB must not drop GL CombinedHelps
-          reconcileCombinedHelps(state.currentPackage, gatewayLanguageHint(resourceInfo))
+          if (!options?.skipEnsure) {
+            reconcileCombinedHelps(state.currentPackage, gatewayLanguageHint(resourceInfo))
+          }
           state.isPackageModified = true
         }
       })
-
-      projectPanelsFromPackage(get().currentPackage)
-      get().autoSaveWorkspace()
+      finishResourceWrite(get, options)
     },
 
     removeResourceFromPackage: (resourceKey) => {
@@ -103,6 +105,9 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
             panel.resourceKeys = panel.resourceKeys.filter(
               (k) => k !== resourceKey && extractBaseKey(k) !== resourceKey
             )
+            panel.entries = (panel.entries ?? []).filter(
+              (e) => e.instanceId !== resourceKey && extractBaseKey(e.instanceId) !== resourceKey
+            )
           }
           state.currentPackage.resources.delete(resourceKey)
           for (const id of reconcileCombinedHelps(state.currentPackage)) {
@@ -115,7 +120,7 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
       get().autoSaveWorkspace()
     },
 
-    assignResourceToPanel: (resourceKey, panelId, index) => {
+    assignResourceToPanel: (resourceKey, panelId, index, options?: ResourceWriteOptions) => {
       set((state) => {
         if (state.currentPackage) {
           const panel = state.currentPackage.panels.find((p) => p.id === panelId)
@@ -129,13 +134,12 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
             } else {
               panel.resourceKeys.push(resourceKey)
             }
-            reconcileCombinedHelps(state.currentPackage)
+            if (!options?.skipEnsure) reconcileCombinedHelps(state.currentPackage)
             state.isPackageModified = true
           }
         }
       })
-      projectPanelsFromPackage(get().currentPackage)
-      get().autoSaveWorkspace()
+      finishResourceWrite(get, options)
     },
 
     removeResourceFromPanel: (resourceKey, panelId) => {
@@ -145,6 +149,7 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
           const panel = state.currentPackage.panels.find((p) => p.id === panelId)
           if (panel) {
             panel.resourceKeys = panel.resourceKeys.filter((k) => k !== resourceKey)
+            panel.entries = (panel.entries ?? []).filter((e) => e.instanceId !== resourceKey)
             for (const id of reconcileCombinedHelps(state.currentPackage)) {
               pruneKeys.add(id)
             }
@@ -164,6 +169,7 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
 
           if (fromPanel && toPanel && !existingPanelInstanceId(toPanel.resourceKeys, resourceKey)) {
             fromPanel.resourceKeys = fromPanel.resourceKeys.filter((k) => k !== resourceKey)
+            fromPanel.entries = (fromPanel.entries ?? []).filter((e) => e.instanceId !== resourceKey)
             if (fromPanel.activeIndex >= fromPanel.resourceKeys.length) {
               fromPanel.activeIndex = Math.max(0, fromPanel.resourceKeys.length - 1)
             }
@@ -204,6 +210,14 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
               // Rightward: after remove, indices above currentIndex shift down by 1
               const insertAt = newIndex > currentIndex ? newIndex - 1 : newIndex
               panel.resourceKeys.splice(insertAt, 0, resourceKey)
+              if (panel.entries && panel.entries.length > 0) {
+                const byId = new Map(panel.entries.map((e) => [e.instanceId, e]))
+                const ordered = panel.resourceKeys
+                  .map((k) => byId.get(k))
+                  .filter((e): e is NonNullable<typeof e> => Boolean(e))
+                const rest = panel.entries.filter((e) => !panel.resourceKeys.includes(e.instanceId))
+                panel.entries = [...ordered, ...rest]
+              }
               // Active follows the dragged key
               panel.activeIndex = panel.resourceKeys.indexOf(resourceKey)
               state.isPackageModified = true
@@ -215,6 +229,8 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
     },
 
     setActiveResourceInPanel: (panelId, index) => {
+      const current = get().currentPackage?.panels.find((p) => p.id === panelId)
+      if (!current || current.activeIndex === index) return
       set((state) => {
         if (state.currentPackage) {
           const panel = state.currentPackage.panels.find((p) => p.id === panelId)
@@ -224,7 +240,7 @@ export function createResourceSlice(set: WorkspaceSet, get: WorkspaceGet): Resou
           }
         }
       })
-      get().autoSaveWorkspace()
+      scheduleWorkspacePersist(() => get().currentPackage)
     },
 
     hasResourceInPackage: (resourceKey) => {

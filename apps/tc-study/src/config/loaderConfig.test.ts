@@ -25,8 +25,6 @@ const PLUGIN_EXPORT_TO_ID: Record<(typeof RESOURCE_TYPE_PLUGIN_EXPORTS)[number],
   obsTranslationQuestionsResourceType: RESOURCE_TYPE_IDS.OBS_QUESTIONS,
   translationWordsResourceType: RESOURCE_TYPE_IDS.TRANSLATION_WORDS,
   translationAcademyResourceType: RESOURCE_TYPE_IDS.TRANSLATION_ACADEMY,
-  combinedHelpsResourceType: RESOURCE_TYPE_IDS.COMBINED_HELPS,
-  obsCombinedHelpsResourceType: RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS,
 }
 
 const RESOURCE_TYPES_DIR = join(import.meta.dir, '../resourceTypes')
@@ -67,22 +65,22 @@ describe('loaderConfig SoT', () => {
     }
   })
 
-  test('every workerDownload id is in LOADER_CONFIGS with non-composite factoryKey', () => {
+  test('every workerDownload id is in LOADER_CONFIGS', () => {
     const tableIds = new Set(LOADER_CONFIGS.map((c) => c.id))
     for (const cfg of getWorkerDownloadConfigs()) {
       expect(tableIds.has(cfg.id)).toBe(true)
       expect(cfg.surfaces.workerDownload).toBe(true)
-      expect(cfg.factoryKey).not.toBe('combined-helps')
     }
   })
 
-  test('combined-helps composites are mainPlugin only (no workerDownload)', () => {
-    const combined = LOADER_CONFIGS.find((c) => c.id === RESOURCE_TYPE_IDS.COMBINED_HELPS)
-    const obsCombined = LOADER_CONFIGS.find((c) => c.id === RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS)
-    expect(combined?.surfaces).toEqual({ mainPlugin: true, workerDownload: false })
-    expect(obsCombined?.surfaces).toEqual({ mainPlugin: true, workerDownload: false })
+  test('combined-helps compositions are not loader SoT rows', () => {
+    const ids = LOADER_CONFIGS.map((c) => c.id)
+    expect(ids).not.toContain(RESOURCE_TYPE_IDS.COMBINED_HELPS)
+    expect(ids).not.toContain(RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS)
     expect(getWorkerDownloadConfigs().map((c) => c.id)).not.toContain('combined-helps')
     expect(getWorkerDownloadConfigs().map((c) => c.id)).not.toContain('obs-combined-helps')
+    expect(getMainPluginConfigs().map((c) => c.id)).not.toContain('combined-helps')
+    expect(getMainPluginConfigs().map((c) => c.id)).not.toContain('obs-combined-helps')
   })
 
   test('plugin modules use getDownloadPriority SoT (no hardcoded numeric priorities)', () => {

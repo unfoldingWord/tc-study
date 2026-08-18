@@ -17,6 +17,7 @@ import { useMemo } from 'react'
 import { useCurrentReference } from '../../../../contexts'
 import {
   helpsLanguageFromResourceKey,
+  isOriginalLanguageCode,
   resolveAlignedQuoteTokens,
 } from '../../../../features/helps/resolveAlignedQuoteTokens'
 import { generateSemanticIdsForQuoteTokens } from '../../../../features/helps/quoteTokens'
@@ -64,7 +65,11 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     const currentChapter = currentRef.chapter || 1
     const refBookLower = tokenReference?.book?.toLowerCase() ?? ''
     const quoteLanguage = helpsLanguageFromResourceKey(resourceKey)
-    const textLanguage = resourceMetadata?.language
+    // Prefer an OL language/key when either field says UHB/UGNT. A defaulted
+    // `language` of `es`/`en` must not hide `unfoldingWord/hbo/uhb`.
+    const textLanguage =
+      [resourceMetadata?.language, resourceMetadata?.id].find((v) => isOriginalLanguageCode(v)) ||
+      resourceMetadata?.language
 
     return links.map((link) => {
       const refParts = link.reference.split(':')

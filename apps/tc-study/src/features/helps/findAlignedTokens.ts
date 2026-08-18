@@ -6,6 +6,7 @@
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import { semanticIdFor } from '@bt-synergy/scripture-loader'
+import { semanticIdMatchKey } from './semanticIdMatchKey'
 
 export interface AlignedToken {
   content: string
@@ -115,12 +116,12 @@ export function findAlignedTokens(
   verse: number
 ): AlignedToken[] {
   if (!originalSemanticIds.length) return []
-  const wanted = originalSemanticIds.map((id) => id.toLowerCase())
+  const wanted = originalSemanticIds.map((id) => semanticIdMatchKey(id))
   const matchedPositions: number[] = []
 
   targetTokens.forEach((token, index) => {
     if (token.type !== 'word') return
-    const hasMatch = tokenMatchIds(token).some((id) => wanted.includes(id.toLowerCase()))
+    const hasMatch = tokenMatchIds(token).some((id) => wanted.includes(semanticIdMatchKey(id)))
     if (hasMatch) matchedPositions.push(index)
   })
 

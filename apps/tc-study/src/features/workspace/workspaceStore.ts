@@ -9,12 +9,28 @@ import { immer } from 'zustand/middleware/immer'
 import { createPackageSlice } from './workspacePackageSlice'
 import { createPanelSlice } from './workspacePanelSlice'
 import { createResourceSlice } from './workspaceResourceSlice'
+import { loadPersistedWorkspacePackage } from './workspacePersistence'
 import {
   DEFAULT_PACKAGE,
   type WorkspaceGet,
   type WorkspaceSet,
+  type WorkspacePackage,
   type WorkspaceStore,
 } from './workspaceTypes'
+
+/**
+ * Persist may load before compositions register (ensure no-ops).
+ * ResourceTypeInitializer re-ensures after bind so CombinedHelps is injected.
+ */
+function initialPackage(): WorkspacePackage {
+  const persisted = loadPersistedWorkspacePackage()
+  if (persisted) return persisted
+  return {
+    ...DEFAULT_PACKAGE,
+    resources: new Map(),
+    panels: DEFAULT_PACKAGE.panels.map((p) => ({ ...p, resourceKeys: [...p.resourceKeys] })),
+  }
+}
 
 export type {
   PanelConfig,
@@ -28,11 +44,7 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
     const wsGet = get as WorkspaceGet
 
     return {
-      currentPackage: {
-        ...DEFAULT_PACKAGE,
-        resources: new Map(),
-        panels: DEFAULT_PACKAGE.panels.map((p) => ({ ...p, resourceKeys: [...p.resourceKeys] })),
-      },
+      currentPackage: initialPackage(),
       isPackageModified: false,
 
       ...createPackageSlice(wsSet, wsGet),

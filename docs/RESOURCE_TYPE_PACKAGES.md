@@ -23,12 +23,11 @@ Do **not** add new viewers under `packages/*-resource` unless an extraction is e
 
 ## Adding a resource type
 
-1. Define/register the plugin in `apps/tc-study/src/resourceTypes/`.
-2. Implement or reuse a loader package if needed.
-3. Implement the viewer under `apps/tc-study/src/components/resources/`.
-4. Ensure `ResourceTypeInitializer` / `RESOURCE_TYPE_PLUGIN_EXPORTS` includes the export (fail-closed ready gate).
+A resource type **loads**. A panel entry **paints**. Dual-register if the type should appear in a pane.
+
+See **[apps/tc-study/docs/extending-registries.md](../apps/tc-study/docs/extending-registries.md)**.
 
 ## Related
 
-- App resource-type development notes: `apps/tc-study/RESOURCE_TYPE_DEVELOPMENT.md` (if present)
+- Extending registries: `apps/tc-study/docs/extending-registries.md`
 - Catalog readiness guards: `apps/tc-study/src/utils/catalogReadiness.test.ts`

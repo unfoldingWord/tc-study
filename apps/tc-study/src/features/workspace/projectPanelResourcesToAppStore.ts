@@ -112,7 +112,8 @@ export function membershipProjectionUnchanged(
     existing.verifiedRef === instance.verifiedRef &&
     // CombinedHelps TN/TWL pointers update after Unlock 1 strips raw tabs from the panel.
     existing.helpsTnResourceKey === instance.helpsTnResourceKey &&
-    existing.helpsTwlResourceKey === instance.helpsTwlResourceKey
+    existing.helpsTwlResourceKey === instance.helpsTwlResourceKey &&
+    JSON.stringify(existing.consumedKeys) === JSON.stringify(instance.consumedKeys)
   )
 }
 

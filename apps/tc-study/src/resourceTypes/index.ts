@@ -4,7 +4,7 @@
  * All resource types supported by tc-study are defined here.
  * Each type is a self-contained plugin with loader and viewer.
  * 
- * @see RESOURCE_TYPE_DEVELOPMENT.md for guide on adding new resource types
+ * @see docs/extending-registries.md for resource types, panel entries, and modes
  */
 
 // ===== RESOURCE TYPE IDS (TYPE-SAFE CONSTANTS) =====
@@ -24,9 +24,19 @@ export { obsTranslationNotesResourceType } from './obsTranslationNotes'
 export { obsTranslationWordsLinksResourceType } from './obsTranslationWordsLinks'
 export { obsTranslationQuestionsResourceType } from './obsTranslationQuestions'
 export {
-  combinedHelpsResourceType,
-  obsCombinedHelpsResourceType,
+  combinedHelpsPanelEntry,
+  obsCombinedHelpsPanelEntry,
+  combinedHelpsComposition,
+  obsCombinedHelpsComposition,
 } from './combinedHelps'
+export {
+  scripturePanelEntry,
+  obsPanelEntry,
+  questionsPanelEntry,
+  obsQuestionsPanelEntry,
+} from './panelEntries'
+export { scripturePanelMode, helpsPanelMode } from './panelModes'
+export { scripturePanelGroup, obsPanelGroup } from './panelGroups'
 
 // ===== RESOURCE PANELS INTEGRATION =====
 // HOC for adding inter-panel communication to any viewer

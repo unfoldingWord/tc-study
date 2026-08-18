@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { resolveHelpsListEmptyReason } from './helpsEmptyCopy'
 import { isHelpsContentPending } from './helpsListLoading'
-import { shouldInjectCombinedHelps } from './combinedHelpsInjection'
+import { shouldInjectComposition } from './compositionInjection'
 import { coldStartCatalogLoads } from '../read/runReadPanelCatalog'
 import { isPanelCatalogSpinner } from '../read/panelCatalogLoading'
 
@@ -19,9 +19,11 @@ describe('CombinedHelps cold-start (empty cache)', () => {
   })
 
   test('inject CombinedHelps when either TN or TWL exists', () => {
-    expect(shouldInjectCombinedHelps({ tnKey: 'u/en/tn' })).toBe(true)
-    expect(shouldInjectCombinedHelps({ twlKey: 'u/en/twl' })).toBe(true)
-    expect(shouldInjectCombinedHelps({})).toBe(false)
+    expect(shouldInjectComposition({ notes: 'u/en/tn' }, ['notes', 'words-links'], 'any')).toBe(true)
+    expect(shouldInjectComposition({ 'words-links': 'u/en/twl' }, ['notes', 'words-links'], 'any')).toBe(
+      true
+    )
+    expect(shouldInjectComposition({}, ['notes', 'words-links'], 'any')).toBe(false)
   })
 
   test('empty CombinedHelps list is not shown while catalog or content is loading', () => {

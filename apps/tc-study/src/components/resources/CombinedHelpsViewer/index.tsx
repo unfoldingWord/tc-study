@@ -3,7 +3,7 @@
  * Pipeline / signals / deps / list / handlers live in sibling modules.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
@@ -41,6 +41,8 @@ import { useCombinedHelpsPipeline } from './useCombinedHelpsPipeline'
 import { useCombinedHelpsResources } from './useCombinedHelpsResources'
 import { useCombinedHelpsSignals } from './useCombinedHelpsSignals'
 import { useCombinedHelpsTitlePreload } from './useCombinedHelpsTitlePreload'
+import { RESOURCE_TYPE_IDS } from '../../../resourceTypes/resourceTypeIds'
+import { loadedResourcesMembershipKey } from '../../../features/read/loadedResourcesMembershipKey'
 
 export {
     COMBINED_HELPS_IDS, COMBINED_HELPS_RESOURCE_ID,
@@ -66,7 +68,11 @@ export function CombinedHelpsViewer({
   const resourceTypeRegistry = useResourceTypeRegistry()
   const bookTitleSource = useBookTitleSource()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
-  const loadedResources = useAppStore((s) => s.loadedResources)
+  const loadedMembership = useAppStore((s) => loadedResourcesMembershipKey(s.loadedResources))
+  const loadedResources = useMemo(
+    () => useAppStore.getState().loadedResources,
+    [loadedMembership]
+  )
   const packageResources = useWorkspaceStore((s) => s.currentPackage?.resources)
   const helpsLanguageActions = useHelpsLanguageActions()
 
@@ -87,9 +93,22 @@ export function CombinedHelpsViewer({
       resource.languageCode ||
       ''
   )
-  const injectedTnKey = workspaceHelps?.helpsTnResourceKey ?? effectiveResource.helpsTnResourceKey
-  const injectedTwlKey = workspaceHelps?.helpsTwlResourceKey ?? effectiveResource.helpsTwlResourceKey
   const helpsScope: 'scripture' | 'obs' = effectiveResource.appliesToScope === 'obs' ? 'obs' : 'scripture'
+  const consumed = workspaceHelps?.consumedKeys ?? effectiveResource.consumedKeys
+  const notesType =
+    helpsScope === 'obs' ? RESOURCE_TYPE_IDS.OBS_NOTES : RESOURCE_TYPE_IDS.TRANSLATION_NOTES
+  const twlType =
+    helpsScope === 'obs'
+      ? RESOURCE_TYPE_IDS.OBS_WORDS_LINKS
+      : RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS
+  const injectedTnKey =
+    workspaceHelps?.helpsTnResourceKey ??
+    effectiveResource.helpsTnResourceKey ??
+    consumed?.[notesType]
+  const injectedTwlKey =
+    workspaceHelps?.helpsTwlResourceKey ??
+    effectiveResource.helpsTwlResourceKey ??
+    consumed?.[twlType]
 
   const { tnKey, twlKey } = useCombinedHelpsResources({
     loadedResources,

@@ -3,7 +3,7 @@
  * Nav/URL can lag the visible OBS pane — also trust primary OBS keys.
  */
 
-import type { HelpsScope } from '../helps/combinedHelpsInjection'
+import type { HelpsScope } from '../helps/compositionInjection'
 import { resolveCatalogNavigationScope } from './textModeMismatch'
 
 export function panelHasObsPrimaryContent(

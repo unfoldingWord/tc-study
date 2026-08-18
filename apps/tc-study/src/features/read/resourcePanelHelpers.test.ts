@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import {
   getResourceAppliesToScope,
   primaryLangSegment,
@@ -8,6 +8,10 @@ import {
   COMBINED_HELPS_RESOURCE_ID,
   OBS_COMBINED_HELPS_RESOURCE_ID,
 } from '../helps/combinedHelpsIds'
+import { bindCombinedHelpsCompositionsForTest } from '../helps/testCompositionRegistry'
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 describe('resourcePanelHelpers', () => {
   test('primaryLangSegment strips region tags', () => {

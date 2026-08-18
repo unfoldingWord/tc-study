@@ -1,11 +1,12 @@
 /**
- * Pure Read panel-2 key filter: scope → book support → CombinedHelps policy.
- * Extracted for unit tests (hook wraps this with referential stability).
+ * Paint entry instances whose entry type is in the mode allowlist,
+ * plus existing book-scope on bound resources.
  */
 
 import type { ResourceInfo } from '../../contexts/types'
-import { isCombinedHelpsId } from '../helps/combinedHelpsIds'
+import { resolvePanelEntryForKey } from '../helps/resolveCompositionEntry'
 import { applyDualScopeHelpsPolicy } from '../helps/helpsPanelPolicy'
+import { getActivePanelModeRegistry } from '../../resourceTypes/activeRegistry'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
 import { normalizeResourceTypeId } from '../../utils/normalizeResourceTypeId'
 import { originalLanguageBelongsOnBook } from './originalLanguageForBook'
@@ -15,15 +16,34 @@ import {
   resourceSupportsBook,
 } from './resourcePanelHelpers'
 
-function isPrimaryScriptureType(type: string | undefined, key: string): boolean {
-  if (isCombinedHelpsId(key)) return false
-  const id = normalizeResourceTypeId(type)
-  return id === RESOURCE_TYPE_IDS.SCRIPTURE || id === RESOURCE_TYPE_IDS.OBS
-}
-
 type ResourceTypeRegistryLike = {
   getTypeForSubject: (s: string) => string | undefined
   getScopeForType: (id: string) => string | null
+}
+
+function entryTypeForPaintedKey(
+  key: string,
+  loadedResources: Record<string, ResourceInfo | undefined>
+): 'primary-text' | 'helps' | null {
+  const entry = resolvePanelEntryForKey(key)
+  if (entry) return entry.entryType
+
+  const type = resolveLoadedPanelResource(loadedResources, key)?.type
+  const id = normalizeResourceTypeId(type)
+  if (id === RESOURCE_TYPE_IDS.SCRIPTURE || id === RESOURCE_TYPE_IDS.OBS) return 'primary-text'
+  if (
+    id === RESOURCE_TYPE_IDS.TRANSLATION_QUESTIONS ||
+    id === RESOURCE_TYPE_IDS.OBS_QUESTIONS
+  ) {
+    return 'helps'
+  }
+  return null
+}
+
+function modeAllowsEntryType(mode: 'scripture' | 'helps', entryType: 'primary-text' | 'helps'): boolean {
+  const registry = getActivePanelModeRegistry()
+  if (registry?.has(mode)) return registry.allows(mode, entryType)
+  return mode === 'scripture' ? entryType === 'primary-text' : entryType === 'helps'
 }
 
 export function filterReadPanelKeysByMode(
@@ -46,9 +66,8 @@ export function filterReadPanelKeysByMode(
     })
   }
   return args.resourceKeys.filter((key) => {
-    if (isCombinedHelpsId(key)) return false
-    const type = resolveLoadedPanelResource(args.loadedResources, key)?.type
-    if (type && !isPrimaryScriptureType(type, key)) return false
+    const entryType = entryTypeForPaintedKey(key, args.loadedResources)
+    if (!entryType || !modeAllowsEntryType('scripture', entryType)) return false
     if (!originalLanguageBelongsOnBook(key, args.currentBook)) return false
     const scope = getResourceAppliesToScope(key, args.loadedResources, args.resourceTypeRegistry)
     if (scope !== args.navigationScope && scope !== null) return false
@@ -72,8 +91,8 @@ export function filterReadPanel2Keys(args: {
   } = args
 
   const scoped = panel2ResourceKeys.filter((key) => {
-    const type = resolveLoadedPanelResource(loadedResources, key)?.type
-    if (type && isPrimaryScriptureType(type, key)) return false
+    const entryType = entryTypeForPaintedKey(key, loadedResources)
+    if (!entryType || !modeAllowsEntryType('helps', entryType)) return false
     if (!originalLanguageBelongsOnBook(key, currentBook)) return false
     const scope = getResourceAppliesToScope(key, loadedResources, resourceTypeRegistry)
     if (scope !== navigationScope && scope !== null) return false

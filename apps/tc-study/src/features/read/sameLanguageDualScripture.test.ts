@@ -3,14 +3,19 @@
  * Mode switch p2 helps→scripture while both panels share languageCode.
  */
 
-import { beforeEach, describe, expect, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 import { enableMapSet } from 'immer'
 import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
-import { addResource, getBaseResourceKey } from '../workspace/resourceMutations'
+import { bindCombinedHelpsCompositionsForTest } from '../helps/testCompositionRegistry'
+import {
+  addResource,
+  getBaseResourceKey,
+  projectCurrentWorkspacePanels,
+} from '../workspace/resourceMutations'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
   applyPanelMode,
@@ -28,6 +33,9 @@ import type { CatalogEntry } from './readCatalogIdentity'
 import { catalogLoadForSinglePanel } from './runReadPanelCatalog'
 
 enableMapSet()
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 const WRITE_CAP = 80
 
@@ -171,6 +179,7 @@ describe('same-language dual scripture (no infinite loop)', () => {
           useWorkspaceStore.getState().setActiveResourceInPanel(panelId, index)
         },
       })
+      projectCurrentWorkspacePanels()
     } finally {
       unsub()
     }

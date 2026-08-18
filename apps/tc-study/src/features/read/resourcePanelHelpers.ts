@@ -1,10 +1,10 @@
 import type { ResourceInfo } from '../../contexts/types'
+import { findConsumedKeys, type HelpsScope } from '../helps/compositionInjection'
 import {
-  COMBINED_HELPS_IDS,
-  isCombinedHelpsId,
-  isObsCombinedHelpsId,
-} from '../helps/combinedHelpsIds'
-import { findHelpsKeysAmongResources } from '../helps/combinedHelpsInjection'
+  resolveCompositionForPersistId,
+  resolvePanelEntryForKey,
+} from '../helps/resolveCompositionEntry'
+import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
 import { getContentStructure, getIngredients } from '../../utils/resourceMetadataAccessors'
 import { useAppStore } from '../../contexts/AppContext'
 import { getBaseResourceKey } from '../workspace/projectPanelResourcesToAppStore'
@@ -23,13 +23,21 @@ export function primaryLangSegment(code: string): string {
  */
 export function findHelpsKeysForScope(
   langCode: string,
-  scope: 'scripture' | 'obs'
+  scope: HelpsScope
 ): { tnKey?: string; twlKey?: string } {
   const loaded = useAppStore.getState().loadedResources
-  return findHelpsKeysAmongResources(Object.values(loaded), scope, {
-    langCode,
-    skipKeys: COMBINED_HELPS_IDS,
-  })
+  const consumes =
+    scope === 'obs'
+      ? [RESOURCE_TYPE_IDS.OBS_NOTES, RESOURCE_TYPE_IDS.OBS_WORDS_LINKS]
+      : [RESOURCE_TYPE_IDS.TRANSLATION_NOTES, RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS]
+  const skipKeys = new Set(
+    Object.keys(loaded).filter((key) => resolveCompositionForPersistId(key))
+  )
+  const found = findConsumedKeys(Object.values(loaded), consumes, { langCode, skipKeys })
+  return {
+    tnKey: found[consumes[0]!],
+    twlKey: found[consumes[1]!],
+  }
 }
 
 /**
@@ -46,8 +54,8 @@ export function getResourceAppliesToScope(
     getScopeForType: (id: string) => string | null
   }
 ): string | null {
-  if (isObsCombinedHelpsId(resourceKey)) return 'obs'
-  if (isCombinedHelpsId(resourceKey)) return 'scripture'
+  const entry = resolvePanelEntryForKey(resourceKey)
+  if (entry) return entry.scope ?? entry.groupId ?? null
 
   const resource =
     loadedResources[resourceKey] ?? loadedResources[getBaseResourceKey(resourceKey)]
@@ -96,7 +104,7 @@ export function resourceSupportsBook(
   loadedResources: Record<string, ResourceInfo | undefined>,
   bookCode: string
 ): boolean {
-  if (isCombinedHelpsId(resourceKey)) {
+  if (resolveCompositionForPersistId(resourceKey)) {
     return true
   }
   if (bookCode === 'obs') return true

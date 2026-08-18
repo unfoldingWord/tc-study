@@ -234,7 +234,8 @@ export interface ResourceTypeDefinition {
 
   /**
    * When false, this type does not contribute subjects to language lists.
-   * Default true. Combined Helps uses synthetic subjects with no catalog rows.
+   * Default true. Use for catalog types that should stay registered but
+   * must not appear in language pickers.
    */
   includeInLanguageLists?: boolean
 

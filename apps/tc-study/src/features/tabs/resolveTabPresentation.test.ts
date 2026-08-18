@@ -1,9 +1,20 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import { Book, Layers, LifeBuoy, MessageCircleQuestion, NotebookText } from 'lucide-react'
+import { questionsPanelEntry } from '../../resourceTypes/panelEntries'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
 import { COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
+import {
+  bindCombinedHelpsCompositionsForTest,
+  bindFakeCompositionForTest,
+  FAKE_COMPOSITION_PERSIST_ID,
+} from '../helps/testCompositionRegistry'
+import { getActiveResourceTypeRegistry } from '../../resourceTypes/activeRegistry'
 import { resolveLucideIconName } from './lucideIconRegistry'
-import { resolveTabIcon, resolveTabPresentation } from './resolveTabPresentation'
+import {
+  resolveTabIcon,
+  resolveTabPresentation,
+  resolveTabPresentationFromRegistry,
+} from './resolveTabPresentation'
 import type { TabIcon } from './tabIcon'
 
 describe('resolveTabIcon', () => {
@@ -23,6 +34,9 @@ describe('resolveTabIcon', () => {
     expect(resolveTabIcon(null)).toBeNull()
   })
 })
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 describe('resolveTabPresentation', () => {
   const types: Record<string, { icon?: string; contentRole?: 'primary' | 'companion' | 'shared' }> =
@@ -104,7 +118,7 @@ describe('resolveTabPresentation', () => {
     )
     expect(p.Icon).toBe(NotebookText)
     expect(p.showShortLabel).toBe(false)
-    expect(p.shortLabel).toBe('Helps')
+    expect(p.shortLabel).toBe('OBS Helps')
     expect(p.title).toBe('OBS Helps')
   })
 
@@ -128,6 +142,51 @@ describe('resolveTabPresentation', () => {
       { getType, overrides }
     )
     expect(p.Icon).toBe(Book)
+  })
+
+  test('questions pane-member copies MessageCircleQuestion from the resource type', () => {
+    expect(questionsPanelEntry.icon).toBe('MessageCircleQuestion')
+  })
+
+  test('FromRegistry inherits questions icon for unfoldingWord/en/tq when pane-member has no icon', () => {
+    const p = resolveTabPresentationFromRegistry(
+      {
+        key: 'unfoldingWord/en/tq',
+        type: 'questions',
+        title: 'Translation Questions',
+      },
+      getActiveResourceTypeRegistry()
+    )
+    expect(p.Icon).toBe(MessageCircleQuestion)
+    expect(p.showShortLabel).toBe(false)
+    expect(p.shortLabel).toBe('TQ')
+  })
+
+  test('FromRegistry reads CombinedHelps icon + companion role from panel entry', () => {
+    const p = resolveTabPresentationFromRegistry(
+      {
+        key: COMBINED_HELPS_RESOURCE_ID,
+        type: 'combined-helps',
+        title: 'Helps',
+      },
+      getActiveResourceTypeRegistry()
+    )
+    expect(p.Icon).toBe(NotebookText)
+    expect(p.showShortLabel).toBe(false)
+  })
+
+  test('fake composition persist id resolves via resolvePanelEntry without RESOURCE_TYPE_IDS', () => {
+    const restore = bindFakeCompositionForTest()
+    try {
+      const p = resolveTabPresentationFromRegistry(
+        { key: `${FAKE_COMPOSITION_PERSIST_ID}:panel-1` },
+        getActiveResourceTypeRegistry()
+      )
+      expect(p.shortLabel).toBe('Fake Pair')
+      expect(p.title).toBe('Fake Pair')
+    } finally {
+      restore()
+    }
   })
 
   test('falls back to short label when no icon', () => {

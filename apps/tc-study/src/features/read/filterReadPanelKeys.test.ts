@@ -1,6 +1,14 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
+import {
+  bindCombinedHelpsCompositionsForTest,
+  bindFakeCompositionForTest,
+  FAKE_COMPOSITION_PERSIST_ID,
+} from '../helps/testCompositionRegistry'
 import { filterReadPanel2Keys, filterReadPanelKeysByMode } from './filterReadPanelKeys'
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 const registry = {
   getTypeForSubject: () => undefined,
@@ -157,5 +165,25 @@ describe('filterReadPanelKeysByMode (original-language book scope)', () => {
         currentBook: 'tit',
       })
     ).toEqual([COMBINED_HELPS_RESOURCE_ID, 'uw/en/tq'])
+  })
+
+  test('test-only fake composition persist id is dropped in scripture mode (not isCombinedHelpsId)', () => {
+    const unbind = bindFakeCompositionForTest()
+    try {
+      const scoped = `${FAKE_COMPOSITION_PERSIST_ID}:panel-1`
+      const keys = filterReadPanelKeysByMode('scripture', {
+        resourceKeys: ['unfoldingWord/en/ult', scoped],
+        loadedResources: {
+          'unfoldingWord/en/ult': { id: 'unfoldingWord/en/ult', type: 'scripture' } as any,
+        },
+        resourceTypeRegistry: registry,
+        navigationScope: 'scripture',
+        currentBook: 'tit',
+      })
+      expect(keys).toEqual(['unfoldingWord/en/ult'])
+      expect(keys).not.toContain(scoped)
+    } finally {
+      unbind()
+    }
   })
 })

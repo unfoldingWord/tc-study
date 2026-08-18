@@ -17,7 +17,12 @@ import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { CatalogManager, ViewerRegistry, type CatalogConfig } from '@bt-synergy/catalog-manager'
 import { getDoor43ApiClient, type Door43ApiClient } from '@bt-synergy/door43-api'
-import { ResourceTypeRegistry } from '@bt-synergy/resource-types'
+import {
+  PanelEntryRegistry,
+  PanelGroupRegistry,
+  PanelModeRegistry,
+  ResourceTypeRegistry,
+} from '@bt-synergy/resource-types'
 import {
   createContext,
   ReactNode,
@@ -28,6 +33,7 @@ import {
   useState,
 } from 'react'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
+import { setActiveRegistries } from '../resourceTypes/activeRegistry'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
 import { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
 import { ResourceLoadingService } from '../lib/services/ResourceLoadingService'
@@ -42,6 +48,9 @@ interface CatalogContextValue {
   catalogManager: CatalogManager
   viewerRegistry: ViewerRegistry
   resourceTypeRegistry: ResourceTypeRegistry
+  panelEntryRegistry: PanelEntryRegistry
+  panelModeRegistry: PanelModeRegistry
+  panelGroupRegistry: PanelGroupRegistry
   loaderRegistry: LoaderRegistry
   resourceLoadingService: ResourceLoadingService
   backgroundDownloadManager: BackgroundDownloadManager
@@ -114,6 +123,21 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       loaderRegistry,
       debug: false
     })
+    const panelGroupRegistry = new PanelGroupRegistry()
+    const panelModeRegistry = new PanelModeRegistry()
+    const panelEntryRegistry = new PanelEntryRegistry({
+      hasResourceType: (id) => resourceTypeRegistry.has(id),
+      getResourceType: (id) => resourceTypeRegistry.get(id),
+      getAllResourceTypes: () => resourceTypeRegistry.getAll(),
+      viewerRegistry,
+      debug: false,
+    })
+    setActiveRegistries({
+      resourceTypes: resourceTypeRegistry,
+      panelEntries: panelEntryRegistry,
+      panelModes: panelModeRegistry,
+      panelGroups: panelGroupRegistry,
+    })
     
     // 7. Register all resource types
     // This automatically:
@@ -154,6 +178,9 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       catalogManager,
       viewerRegistry,
       resourceTypeRegistry,
+      panelEntryRegistry,
+      panelModeRegistry,
+      panelGroupRegistry,
       loaderRegistry,
       resourceLoadingService,
       backgroundDownloadManager,
@@ -230,6 +257,18 @@ export function useViewerRegistry() {
 
 export function useResourceTypeRegistry() {
   return useCatalog().resourceTypeRegistry
+}
+
+export function usePanelEntryRegistry() {
+  return useCatalog().panelEntryRegistry
+}
+
+export function usePanelModeRegistry() {
+  return useCatalog().panelModeRegistry
+}
+
+export function usePanelGroupRegistry() {
+  return useCatalog().panelGroupRegistry
 }
 
 export function useLoaderRegistry() {

@@ -5,6 +5,11 @@ import { join } from 'node:path'
 describe('useReadLanguageBootstrap (split text vs helps)', () => {
   const src = readFileSync(join(import.meta.dir, 'useReadLanguageBootstrap.ts'), 'utf8')
 
+  test('subscribes via loadedResourcesMembershipKey, not the raw loadedResources object', () => {
+    expect(src).toContain('loadedResourcesMembershipKey')
+    expect(src).not.toMatch(/useAppStore\(\(s\)\s*=>\s*s\.loadedResources\)/)
+  })
+
   test('exposes separate text and helps handlers plus split loading flags', () => {
     expect(src).toContain('handleLanguageSelected')
     expect(src).toContain('handleHelpsLanguageSelected')

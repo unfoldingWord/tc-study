@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  assertAllCompositionsRegistered,
+  assertAllPanelEntriesRegistered,
   assertAllPluginsRegistered,
   collectRequiredPluginDefs,
 } from './assertAllPluginsRegistered'
@@ -20,6 +22,28 @@ describe('assertAllPluginsRegistered', () => {
   test('empty expected set always passes', () => {
     expect(() => assertAllPluginsRegistered([], [])).not.toThrow()
     expect(() => assertAllPluginsRegistered([], ['x'])).not.toThrow()
+  })
+})
+
+describe('assertAllCompositionsRegistered', () => {
+  test('passes when every expected composition id is registered', () => {
+    expect(() =>
+      assertAllCompositionsRegistered(['combined-helps'], ['combined-helps', 'extra'])
+    ).not.toThrow()
+  })
+
+  test('throws listing missing composition ids (fail-closed)', () => {
+    expect(() => assertAllCompositionsRegistered(['combined-helps', 'obs-combined-helps'], [])).toThrow(
+      /Composition registration incomplete; missing ids: combined-helps, obs-combined-helps/
+    )
+  })
+})
+
+describe('assertAllPanelEntriesRegistered', () => {
+  test('throws listing missing panel entry ids (fail-closed)', () => {
+    expect(() =>
+      assertAllPanelEntriesRegistered(['combined-helps', 'questions'], ['combined-helps'])
+    ).toThrow(/Panel entry registration incomplete; missing ids: questions/)
   })
 })
 

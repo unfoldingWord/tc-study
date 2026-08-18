@@ -4,9 +4,10 @@
  */
 
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
-import { isCombinedHelpsId, isObsCombinedHelpsId } from '../helps/combinedHelpsIds'
-import type { HelpsScope } from '../helps/combinedHelpsInjection'
+import type { HelpsScope } from '../helps/compositionInjection'
+import { resolveCompositionForPersistId } from '../helps/resolveCompositionEntry'
 import { addResource, getBaseResourceKey } from '../workspace/resourceMutations'
+import { CATALOG_HYDRATE_BATCH } from '../workspace/resourceWriteOptions'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { languageCodesMatch } from '../../utils/languageCodeMatch'
 import type { ReadPanelId, ReadPanelMode } from './readPanelModel'
@@ -26,6 +27,7 @@ export function applyReadModeMembership(
   if (mode === 'helps') {
     addHelpsCompanionMembership(panelId, lang, helpsPaneTypeIds)
     applyCombinedHelpsEnsure(lang, panelId, { forceHelpsPanel: true })
+    useWorkspaceStore.getState().autoSaveWorkspace()
     return
   }
   const pkg = useWorkspaceStore.getState().currentPackage
@@ -38,8 +40,10 @@ export function applyReadModeMembership(
     if (!resource) continue
     const type = String(resource.type || '')
     if (!SCRIPTURE_TYPES.has(type)) continue
-    addResource(resource, { panelId, allowMultipleInstances: true })
+    addResource(resource, { panelId, allowMultipleInstances: true, ...CATALOG_HYDRATE_BATCH })
   }
+  applyCombinedHelpsEnsure(lang, panelId)
+  useWorkspaceStore.getState().autoSaveWorkspace()
 }
 
 /** Companion / shared types already in the package — copy pane types onto this helps pane. */
@@ -54,13 +58,13 @@ function addHelpsCompanionMembership(
   if (!pkg) return
   for (const resource of pkg.resources.values()) {
     const key = resource.key || resource.id
-    if (!key || isCombinedHelpsId(key)) continue
+    if (!key || resolveCompositionForPersistId(key)) continue
     const keyLang = key.includes('/') ? key.split('/')[1] : ''
     const resourceLang = String(resource.languageCode || resource.language || '')
     if (!languageCodesMatch(keyLang || resourceLang, languageCode)) continue
     const type = String(resource.type || '')
     if (!paneTypes.has(type)) continue
-    addResource(resource, { panelId })
+    addResource(resource, { panelId, ...CATALOG_HYDRATE_BATCH })
   }
 }
 
@@ -97,8 +101,9 @@ function helpsMembershipMatchesScope(
   helpsScope: HelpsScope,
   helpsPaneTypeIds: readonly string[]
 ): boolean {
-  if (isCombinedHelpsId(key)) {
-    return helpsScope === 'obs' ? isObsCombinedHelpsId(key) : !isObsCombinedHelpsId(key)
+  const composition = resolveCompositionForPersistId(key)
+  if (composition) {
+    return (composition.scope ?? 'scripture') === helpsScope
   }
   if (helpsPaneTypeIds.length > 0) return helpsPaneTypeIds.includes(type)
   return false

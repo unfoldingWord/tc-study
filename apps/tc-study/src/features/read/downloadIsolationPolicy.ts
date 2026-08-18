@@ -8,7 +8,8 @@
 
 import { languageCodesMatch } from '../../utils/languageCodeMatch'
 import { isCombinedHelpsId, isObsCombinedHelpsId } from '../helps/combinedHelpsIds'
-import type { HelpsScope } from '../helps/combinedHelpsInjection'
+import type { HelpsScope } from '../helps/compositionInjection'
+import { resolveCompositionForPersistId } from '../helps/resolveCompositionEntry'
 
 export type DownloadPane = 'text' | 'helps'
 
@@ -61,9 +62,13 @@ export function catalogKeysIncludeLanguage(
 
 /** Door43 `owner/lang/id` — OBS helps ids start with `obs-`. */
 export function helpsCatalogKeyMatchesScope(key: string, scope: HelpsScope): boolean {
-  if (isCombinedHelpsId(key)) {
-    return scope === 'obs' ? isObsCombinedHelpsId(key) : !isObsCombinedHelpsId(key)
+  const composition = resolveCompositionForPersistId(key)
+  if (composition) {
+    return (composition.scope ?? 'scripture') === scope
   }
+  // Persist-time hole: registry may be unbound. OBS persist id first.
+  if (isObsCombinedHelpsId(key)) return scope === 'obs'
+  if (isCombinedHelpsId(key)) return scope === 'scripture'
   const id = (key.split('/')[2] || '').replace(/#\d+$/, '').toLowerCase()
   const isObsHelps = id.startsWith('obs-')
   return scope === 'obs' ? isObsHelps : !isObsHelps

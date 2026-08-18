@@ -10,8 +10,12 @@ import {
 } from '@bt-synergy/resource-catalog'
 import type { ResourceInfo, ResourceTOC } from '../../contexts/types'
 import { createResourceInfo } from '../../utils/resourceInfo'
+import { isObsCombinedHelpsId, isCombinedHelpsId } from '../helps/combinedHelpsIds'
+import { resolveCompositionForPersistId } from '../helps/resolveCompositionEntry'
 import { ensureCombinedHelpsInWorkspace } from '../helps/ensureCombinedHelps'
+import { resolvePanelEntryForKey } from '../helps/resolveCompositionEntry'
 import type { PanelConfig, WorkspacePackage } from './workspaceTypes'
+import { WORKSPACE_PERSIST_VERSION } from './workspaceTypes'
 
 export const WORKSPACE_STORAGE_KEY = 'tc-study-workspace'
 
@@ -21,9 +25,18 @@ function canUseLocalStorage(): boolean {
 
 /** Serialize package for localStorage (Map → entries). */
 export function serializeWorkspacePackage(pkg: WorkspacePackage) {
+  const catalogResources = [...pkg.resources.entries()].filter(([key]) => {
+    const entry = resolvePanelEntryForKey(key)
+    return entry?.kind !== 'composition'
+  })
   return {
     ...pkg,
-    resources: Array.from(pkg.resources.entries()),
+    persistVersion: pkg.persistVersion ?? WORKSPACE_PERSIST_VERSION,
+    resources: catalogResources,
+    panels: pkg.panels.map((panel) => ({
+      ...panel,
+      entries: panel.entries ?? [],
+    })),
   }
 }
 
@@ -69,9 +82,19 @@ function resourceFromSavedEntry(key: string, res: Record<string, unknown>): Reso
       urls: res.urls || (res.metadata_url ? { metadata: res.metadata_url } : undefined),
       catalogedAt: (res.catalogedAt as string) || new Date().toISOString(),
     } as ResourceMetadata
-    return createResourceInfo(metadata, {
+    const info = createResourceInfo(metadata, {
       toc: res.toc as ResourceTOC | undefined,
     })
+    return {
+      ...info,
+      appliesToScope:
+        (res.appliesToScope as ResourceInfo['appliesToScope']) ||
+        appliesToScopeFromPersistId(key),
+      helpsTnResourceKey: res.helpsTnResourceKey as string | undefined,
+      helpsTwlResourceKey: res.helpsTwlResourceKey as string | undefined,
+      consumedKeys: res.consumedKeys as ResourceInfo['consumedKeys'],
+      languageCode: (res.languageCode as string) || info.languageCode || info.language,
+    }
   } catch (error) {
     console.error(`❌ Failed to load resource ${key}:`, error)
     return createResourceInfo({
@@ -94,6 +117,19 @@ function resourceFromSavedEntry(key: string, res: Record<string, unknown>): Reso
   }
 }
 
+/**
+ * Reload hole: createResourceInfo drops appliesToScope. OBS Helps must not
+ * load scripture TN/TWL — restore scope from persist id (OBS before Bible prefix).
+ */
+function appliesToScopeFromPersistId(key: string): ResourceInfo['appliesToScope'] {
+  const composition = resolveCompositionForPersistId(key)
+  if (composition) return (composition.groupId ?? composition.scope) as ResourceInfo['appliesToScope']
+  // Persist-time hole: registry may be unbound. OBS persist id first.
+  if (isObsCombinedHelpsId(key)) return 'obs'
+  if (isCombinedHelpsId(key)) return 'scripture'
+  return undefined
+}
+
 /** Deserialize + CombinedHelps ensure. Returns null if nothing stored / invalid. */
 export function loadPersistedWorkspacePackage(): WorkspacePackage | null {
   if (!canUseLocalStorage()) return null
@@ -107,6 +143,7 @@ export function loadPersistedWorkspacePackage(): WorkspacePackage | null {
       id?: string
       name?: string
       version?: string
+      persistVersion?: number
       description?: string
     }
 
@@ -123,6 +160,7 @@ export function loadPersistedWorkspacePackage(): WorkspacePackage | null {
       id: data.id || 'default',
       name: data.name || 'My Workspace',
       version: data.version || '1.0.0',
+      persistVersion: WORKSPACE_PERSIST_VERSION,
       description: data.description,
       resources: ensured.resources,
       panels: (ensured.panels.length > 0 ? ensured.panels : data.panels || []) as PanelConfig[],

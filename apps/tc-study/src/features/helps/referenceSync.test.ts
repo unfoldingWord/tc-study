@@ -5,7 +5,7 @@
  * Sync keys on reference, not language. Frozen fixtures: minority-language
  * text + English helps still show tN for the same verse/frame.
  */
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
@@ -16,11 +16,15 @@ import {
   OBS_COMBINED_HELPS_RESOURCE_ID,
 } from './combinedHelpsIds'
 import { ensureCombinedHelpsInWorkspace } from './ensureCombinedHelps'
+import { bindCombinedHelpsCompositionsForTest } from './testCompositionRegistry'
 import {
   filterDisplayNotes,
   filterNotesByReferenceRange,
   resolveRangeEndVerse,
 } from './helpsDisplayFilters'
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 function res(partial: Partial<ResourceInfo> & { key: string; type: string }): ResourceInfo {
   return {

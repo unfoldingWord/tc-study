@@ -114,7 +114,6 @@ export function useCombinedHelpsSignals({
         }
         setTokenFilter(nextFilter)
         setVerseFilter(null)
-        sendVerseFilter({ lifecycle: 'event', filter: null })
         setSelectedHelpsCard(
           focusFirstMatchingHelpsCard({
             notes: notesWithAlignedTokens,
@@ -136,7 +135,6 @@ export function useCombinedHelpsSignals({
         setTokenFilter,
         setVerseFilter,
         setSelectedHelpsCard,
-        sendVerseFilter,
       ]
     ),
     { debug: false, resourceMetadata }

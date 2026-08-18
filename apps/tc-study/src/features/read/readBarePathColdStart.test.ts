@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { shouldInjectCombinedHelps, findHelpsKeysAmongResources } from '../helps/combinedHelpsInjection'
+import { findConsumedKeys, shouldInjectComposition } from '../helps/compositionInjection'
 import { HELPS_EMPTY_COPY, resolveHelpsPaneNoSourcesView } from '../helps/helpsEmptyCopy'
 import { isHelpsCatalogKnownEmpty } from './helpsLanguagePolicy'
 import { isScriptureBooksPending } from '../../components/resources/ScriptureViewer/hooks/scriptureContentLoad'
@@ -199,16 +199,16 @@ describe('bare /read cold-start', () => {
   })
 
   test('English helps under eng while URL is en still injects CombinedHelps', () => {
-    const pair = findHelpsKeysAmongResources(
+    const found = findConsumedKeys(
       [
         { key: 'unfoldingWord/eng/tn', type: 'notes' },
         { key: 'unfoldingWord/eng/twl', type: 'words-links' },
       ] as never,
-      'scripture',
+      ['notes', 'words-links'],
       { langCode: 'en' }
     )
-    expect(shouldInjectCombinedHelps(pair)).toBe(true)
-    expect(pair.tnKey).toBe('unfoldingWord/eng/tn')
+    expect(shouldInjectComposition(found, ['notes', 'words-links'], 'any')).toBe(true)
+    expect(found.notes).toBe('unfoldingWord/eng/tn')
   })
 
   test('scripture catalog empty then hydrated with TIT is not sticky no-content', () => {

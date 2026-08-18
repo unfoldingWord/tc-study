@@ -16,6 +16,7 @@ import { extractVerseCountsFromContent } from '../../../../lib/versification'
 import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
 import type { DisplayUsjVerse } from '../types'
 import { loadUsjViewModel } from '../utils/loadUsjViewModel'
+import { attachFoldedMatchKeysToViewModel } from '../utils/wordIdentity'
 import {
   applyScriptureContentLoadFailure,
   scriptureContentLoadKey,
@@ -44,15 +45,18 @@ export function useContent(
   const catalogManager = useCatalogManager()
   const currentRef = useCurrentReference()
   const navigation = useNavigation()
-  const [viewModel, setViewModel] = useState<UsjScriptureViewModel | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const storeRevision = useAppStore((s) =>
+    scriptureMetadataRevision(s.loadedResources, resourceKey)
+  )
+  const [loaded, setLoaded] = useState<{
+    key: string
+    viewModel: UsjScriptureViewModel | null
+  }>({ key: '', viewModel: null })
+  const [isLoadingRaw, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [catalogReadyKey, setCatalogReadyKey] = useState<string | null>(null)
   const [hardMissKey, setHardMissKey] = useState<string | null>(null)
 
-  const storeRevision = useAppStore((s) =>
-    scriptureMetadataRevision(s.loadedResources, resourceKey)
-  )
   const catalogReady = catalogReadyKey === resourceKey || !!storeRevision
   const allowHardMiss = hardMissKey === resourceKey
   const metadataRevision = storeRevision || (catalogReady ? 'catalog' : '')
@@ -97,47 +101,49 @@ export function useContent(
     if (!availableBookCodes.has(bookCode.toLowerCase())) {
       setIsLoading(false)
       setError('BOOK_NOT_AVAILABLE')
-      setViewModel(null)
+      setLoaded({ key: loadKey, viewModel: null })
       return
     }
 
-    const loadBookContent = async () => {
-      setIsLoading(true)
-      setError(null)
+    setLoaded({ key: loadKey, viewModel: null })
+    setIsLoading(true)
+    setError(null)
 
+    const loadBookContent = async () => {
       try {
         const loader = loaderRegistry.getLoader(RESOURCE_TYPE_IDS.SCRIPTURE) as
           | ScriptureLoader
           | undefined
 
-        const vm = await loadUsjViewModel(loader, resourceKey, bookCode)
+        const vm = attachFoldedMatchKeysToViewModel(
+          await loadUsjViewModel(loader, resourceKey, bookCode)
+        )
         if (cancelled) return
 
         navigation.updateBookVerseCount(
           bookCode,
           extractVerseCountsFromContent(chapterVerseMapFromViewModel(vm))
         )
-
-        // Sections come from default book data (view model has no section DTO).
         const sections = await defaultSectionsService.getDefaultSections(bookCode)
+        if (cancelled) return
         if (sections.length > 0) {
           navigation.setBookSections(bookCode, sections)
         }
 
-        setViewModel(vm)
+        setLoaded({ key: loadKey, viewModel: vm })
         setIsLoading(false)
       } catch (err) {
         if (cancelled) return
         const failure = applyScriptureContentLoadFailure(err, allowHardMiss)
         if (failure.retryWhenMetadataArrives) {
           setError(null)
-          setViewModel(null)
+          setLoaded({ key: loadKey, viewModel: null })
           setIsLoading(true)
           return
         }
         console.error('❌ Error loading UsjScriptureViewModel:', err)
         setError(failure.error)
-        setViewModel(null)
+        setLoaded({ key: loadKey, viewModel: null })
         setIsLoading(false)
       }
     }
@@ -147,6 +153,9 @@ export function useContent(
       cancelled = true
     }
   }, [loadKey, loaderRegistry, availableBookCodesStr, allowHardMiss])
+
+  const viewModel = loaded.key === loadKey ? loaded.viewModel : null
+  const isLoading = loaded.key !== loadKey || isLoadingRaw
 
   const relevantChapters = useMemo(() => {
     if (!viewModel) return []

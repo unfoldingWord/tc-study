@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 import { enableMapSet } from 'immer'
 import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 import { useAppStore } from '../../contexts/AppContext'
@@ -14,8 +14,12 @@ import {
   shouldReconcileHelpsOnPanelClear,
 } from './clearReadPanelsForLanguageSwitch'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
+import { bindCombinedHelpsCompositionsForTest } from '../helps/testCompositionRegistry'
 
 enableMapSet()
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 const g = globalThis as typeof globalThis & { localStorage?: Storage }
 if (!g.localStorage) {

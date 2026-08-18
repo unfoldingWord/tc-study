@@ -37,7 +37,7 @@ describe('linkedPanelsConfigMembershipKey', () => {
     expect(p1.filter((id) => p2.includes(id))).toEqual([])
   })
 
-  test('tab index or membership change produces a new key', () => {
+  test('tab index change does not produce a new key (setConfig must not remount)', () => {
     const base = {
       resources: five.map((id) => ({ id })),
       panels: {
@@ -52,6 +52,24 @@ describe('linkedPanelsConfigMembershipKey', () => {
         'panel-1': { resourceIds: five, initialIndex: 2 },
       },
     }
-    expect(linkedPanelsConfigMembershipKey(base)).not.toBe(linkedPanelsConfigMembershipKey(clickedUst))
+    expect(linkedPanelsConfigMembershipKey(base)).toBe(linkedPanelsConfigMembershipKey(clickedUst))
+  })
+
+  test('membership change produces a new key', () => {
+    const base = {
+      resources: five.map((id) => ({ id })),
+      panels: {
+        'panel-1': { resourceIds: five, initialIndex: 0 },
+        'panel-2': { resourceIds: five, initialIndex: 0 },
+      },
+    }
+    const droppedUgnt = {
+      resources: five.slice(0, 4).map((id) => ({ id })),
+      panels: {
+        'panel-1': { resourceIds: five.slice(0, 4), initialIndex: 0 },
+        'panel-2': { resourceIds: five, initialIndex: 0 },
+      },
+    }
+    expect(linkedPanelsConfigMembershipKey(base)).not.toBe(linkedPanelsConfigMembershipKey(droppedUgnt))
   })
 })

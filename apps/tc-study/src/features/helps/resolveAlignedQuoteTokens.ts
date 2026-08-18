@@ -24,9 +24,17 @@ export function quoteLanguageMatchesText(
   return q.length > 0 && q === t
 }
 
+/**
+ * True for UGNT/UHB language codes *or* painted resource keys
+ * (`unfoldingWord/hbo/uhb`, `…/el-x-koine/ugnt`).
+ * `primaryLanguageSegment('el-x-koine')` is `el` — never require that form.
+ */
 export function isOriginalLanguageCode(language: string | undefined): boolean {
-  const l = (language || '').toLowerCase()
-  return l === 'el-x-koine' || l === 'hbo'
+  const l = (language || '').trim().toLowerCase()
+  if (!l) return false
+  if (l === 'el-x-koine' || l === 'hbo' || l.startsWith('el-x-')) return true
+  if (l.includes('/el-x-koine/') || l.includes('/hbo/')) return true
+  return /(?:^|\/)(ugnt|uhb)(?:#\d+)?$/.test(l)
 }
 
 export function canFallbackToQuoteText(

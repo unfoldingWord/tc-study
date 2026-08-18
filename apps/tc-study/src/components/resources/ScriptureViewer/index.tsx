@@ -12,7 +12,7 @@
 
 import { useSignalHandler } from '@bt-synergy/resource-panels'
 import { Book } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
 import { useCatalogManager, useCurrentReference, useNavigation } from '../../../contexts'
 import type { ResourceMetadata } from '../../../contexts/types'
@@ -40,9 +40,6 @@ export function ScriptureViewer({
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const [catalogMetadata, setCatalogMetadata] = useState<ResourceMetadata | null>(null)
 
-  // Track if we've set this resource as anchor to prevent repeated calls
-  const anchorSetRef = useRef<string | null>(null)
-
   // Load catalog metadata
   useEffect(() => {
     let cancelled = false
@@ -68,8 +65,6 @@ export function ScriptureViewer({
   // Load TOC and available books
   const { availableBooks, isLoadingTOC, setAsAnchor } = useTOC(resourceKey, resourceId, isAnchor)
 
-  // Register as last active scripture when this viewer is mounted (so book titles use our ingredients).
-  // On leave: only clear if we still own lastActive; fall back to anchor so sibling scripture can publish tokens.
   useEffect(() => {
     useAppStore.getState().setLastActiveScriptureResource(resourceId)
     return () => {
@@ -80,17 +75,19 @@ export function ScriptureViewer({
     }
   }, [resourceId])
 
-  // Auto-set as anchor whenever this scripture resource becomes active (when user switches tabs)
   useEffect(() => {
-    if (availableBooks.length > 0 && anchorSetRef.current !== resourceId) {
-      setAsAnchor()
-      anchorSetRef.current = resourceId
-    }
+    if (availableBooks.length === 0) return
+    setAsAnchor()
   }, [resourceId, availableBooks.length, setAsAnchor])
 
-  // Prefer resource.language over the prop default ('es') so OL resources
-  // (el-x-koine / hbo) correctly detect isOriginalLanguage on /read.
-  const languageCode = resource?.language ?? language
+  // Prefer resource language fields over the prop default ('es') so OL
+  // resources (el-x-koine / hbo) detect as original language on /read.
+  // UHB often has languageCode only after catalog merge; also honor the key.
+  const languageCode =
+    resource?.language ||
+    resource?.languageCode ||
+    (resourceKey.includes('/hbo/') ? 'hbo' : resourceKey.includes('/el-x-koine/') ? 'el-x-koine' : '') ||
+    language
 
   const {
     viewModel,

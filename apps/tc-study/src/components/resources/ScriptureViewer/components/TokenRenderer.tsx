@@ -18,7 +18,8 @@ export const TokenRenderer = memo(function TokenRenderer({
   onTokenClick,
   isOriginalLanguage: _isOriginalLanguage,
 }: TokenDisplayProps) {
-  const handleClick = () => {
+  const handleClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
     onTokenClick(token)
   }
 

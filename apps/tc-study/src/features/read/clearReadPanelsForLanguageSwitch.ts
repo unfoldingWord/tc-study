@@ -80,6 +80,7 @@ export function clearReadPanelsForLanguageSwitch(
     for (const panel of state.currentPackage.panels) {
       if (!clearIds.has(panel.id)) continue
       panel.resourceKeys = []
+      panel.entries = []
       panel.activeIndex = 0
     }
 

@@ -13,6 +13,7 @@ import { findAlignedTokens } from './findAlignedTokens'
 import { findTokensByQuoteText } from './findTokensByQuoteText'
 import {
   canFallbackToQuoteText,
+  isOriginalLanguageCode,
   resolveAlignedQuoteTokens,
 } from './resolveAlignedQuoteTokens'
 import { filterNotesByReferenceRange } from './helpsDisplayFilters'
@@ -124,6 +125,59 @@ describe('minority text + English tN', () => {
       textLanguage: 'el-x-koine',
     })
     expect(result.alignedTokens.some((t) => t.content === 'Παῦλος')).toBe(true)
+  })
+
+  test('isOriginalLanguageCode recognizes UHB keys, not gateway codes', () => {
+    expect(isOriginalLanguageCode('hbo')).toBe(true)
+    expect(isOriginalLanguageCode('el-x-koine')).toBe(true)
+    expect(isOriginalLanguageCode('unfoldingWord/hbo/uhb')).toBe(true)
+    expect(isOriginalLanguageCode('unfoldingWord/hbo/uhb#2')).toBe(true)
+    expect(isOriginalLanguageCode('en')).toBe(false)
+    expect(isOriginalLanguageCode('es')).toBe(false)
+  })
+
+  test('OL bridge: UHB in the text pane highlights via own semanticId', () => {
+    const pointed = 'בְּרֵאשִׁית'
+    const olIds = [`rut 1:1:${pointed}:1`]
+    const uhb = [
+      word(pointed, { semanticId: `rut 1:1:${pointed}:1`, aligned: [] }),
+      word('הָיָה', { semanticId: 'rut 1:1:הָיָה:1', aligned: [] }),
+    ]
+    const result = resolveAlignedQuoteTokens({
+      targetTokens: uhb,
+      originalSemanticIds: olIds,
+      quoteText: pointed,
+      occurrence: 1,
+      bookCode: 'rut',
+      chapter: 1,
+      verse: 1,
+      quoteLanguage: 'en',
+      textLanguage: 'hbo',
+    })
+    expect(result.alignedTokens.some((t) => t.content === pointed)).toBe(true)
+  })
+
+  test('OL bridge: UHB resource key still enables quote-text fallback when language defaulted', () => {
+    expect(canFallbackToQuoteText('en', 'es')).toBe(false)
+    expect(canFallbackToQuoteText('en', 'hbo')).toBe(true)
+    expect(canFallbackToQuoteText('en', 'unfoldingWord/hbo/uhb')).toBe(true)
+    const unpointed = 'בראשית'
+    const pointed = 'בְּרֵאשִׁית'
+    const uhb = [
+      word(pointed, { semanticId: `rut 1:1:${pointed}:1`, aligned: [] }),
+    ]
+    const result = resolveAlignedQuoteTokens({
+      targetTokens: uhb,
+      originalSemanticIds: [`rut 1:1:${unpointed}:1`],
+      quoteText: unpointed,
+      occurrence: 1,
+      bookCode: 'rut',
+      chapter: 1,
+      verse: 1,
+      quoteLanguage: 'en',
+      textLanguage: 'unfoldingWord/hbo/uhb',
+    })
+    expect(result.alignedTokens.some((t) => t.content === pointed)).toBe(true)
   })
 
   test('English quote is not text-matched against minority tokens', () => {

@@ -205,7 +205,9 @@ function ReadPanelBody({
             emptyKind={scriptureMismatch.kind}
             onAction={mismatchAction}
           />
-        ) : current.resource?.component || (
+        ) : current.resource?.component ? (
+          current.resource.component
+        ) : (
           isLoadingResources ? (
             <LoadingSpinner
               centered

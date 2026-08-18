@@ -8,7 +8,7 @@
  * - readLanguageLoadPlan
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   useCatalogManager,
   useCompletenessChecker,
@@ -51,6 +51,7 @@ import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
 import { useReadPanelLanguageHandlers } from './useReadPanelLanguageHandlers'
 import { useReadUrlLanguageHydrate } from './useReadUrlLanguageHydrate'
+import { loadedResourcesMembershipKey } from './loadedResourcesMembershipKey'
 
 /** Set to true to disable automatic background downloads (e.g. for debugging). */
 const DISABLE_BACKGROUND_DOWNLOAD = false
@@ -73,7 +74,11 @@ export function useReadLanguageBootstrap({
   const resourceTypeRegistry = useResourceTypeRegistry()
   const completenessChecker = useCompletenessChecker()
   const packageStore = usePackageStore()
-  const loadedResources = useAppStore((s) => s.loadedResources)
+  const loadedMembership = useAppStore((s) => loadedResourcesMembershipKey(s.loadedResources))
+  const loadedResources = useMemo(
+    () => useAppStore.getState().loadedResources,
+    [loadedMembership]
+  )
 
   const [shouldAutoOpenLanguagePicker, setShouldAutoOpenLanguagePicker] = useState(requireLanguageInUrl)
   const [isLanguagePickerRequired, setIsLanguagePickerRequired] = useState(requireLanguageInUrl)

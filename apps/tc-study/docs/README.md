@@ -5,9 +5,9 @@ Welcome to the BT Synergy framework documentation! This framework enables you to
 ## 📚 Documentation Index
 
 ### Getting Started
-- **[Framework Guide](./FRAMEWORK_GUIDE.md)** - Complete guide to extending the framework
+- **[Extending registries](./extending-registries.md)** - Resource types, panel entries, panel modes
+- **[Framework Guide](./FRAMEWORK_GUIDE.md)** - Panels, custom sources, building apps
   - Architecture overview
-  - Adding new resource types
   - Creating custom panels
   - Building custom apps
 
@@ -23,7 +23,7 @@ Welcome to the BT Synergy framework documentation! This framework enables you to
 #### I want to...
 
 **Add a new resource type** (e.g., Translation Questions, Study Notes)
-- → See [Framework Guide - Adding New Resource Types](./FRAMEWORK_GUIDE.md#1-adding-new-resource-types)
+- → See [Extending registries](./extending-registries.md)
 - → See [Preloaded Resources - Supporting New Resource Types](./PRELOADED_RESOURCES.md#supporting-new-resource-types)
 
 **Add more preloaded resources** (e.g., French translations, Study helps)
@@ -51,10 +51,9 @@ BT Synergy is built on three core principles:
 Everything is a plugin - resource types, loaders, parsers, and viewers are all modular and replaceable.
 
 ```typescript
-// Add support for a new resource type
+// Resource types load. Panel entries paint. See extending-registries.md
 resourceTypeRegistry.register(myResourceType)
-loaderRegistry.register('myType', new MyLoader())
-viewerRegistry.register(myResourceType)
+panelEntryRegistry.register(myPaneMemberEntry)
 ```
 
 ### 2. **Extensibility**
@@ -95,29 +94,9 @@ function MyComponent() {
 
 ### Example 2: Add a New Resource Type
 
-```typescript
-// 1. Create a loader
-class NotesLoader implements ResourceLoader {
-  async loadContent(resourceKey: string, identifier: string) {
-    // Fetch and parse notes content
-    return parsedNotes
-  }
-}
+A resource type loads. A panel entry paints. Dual-register if the type should appear in a pane.
 
-// 2. Create a viewer
-function NotesViewer({ resourceKey }: ResourceViewerProps) {
-  const { notes, loading } = useNotes(resourceKey)
-  return <div>{/* Display notes */}</div>
-}
-
-// 3. Register
-resourceTypeRegistry.register({
-  id: 'notes',
-  name: 'Translation Notes',
-  loaderFactory: () => new NotesLoader(),
-  viewerComponent: NotesViewer,
-})
-```
+See **[extending-registries.md](./extending-registries.md)**.
 
 ### Example 3: Create a Custom Panel Layout
 

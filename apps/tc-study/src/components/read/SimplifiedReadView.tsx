@@ -10,7 +10,6 @@ import {
   useResourceTypeRegistry,
   useViewerRegistry,
 } from '../../contexts'
-import { useAppStore } from '../../contexts/AppContext'
 import { useStudioResources } from '../../hooks'
 import { useEntryModalStore } from '../../features/entries'
 import { CollectionImportDialog } from '../collections/CollectionImportDialog'
@@ -61,7 +60,6 @@ export function SimplifiedReadView({
   const resourceTypeRegistry = useResourceTypeRegistry()
   const navigationScope = useNavigationScope()
   const currentNavRef = useCurrentReference()
-  const loadedResources = useAppStore((s) => s.loadedResources)
   const isNarrow = useIsNarrowViewport()
   const panels = useReadPanelStore((s) => s.panels)
   const layout = useReadPanelStore((s) => s.layout)
@@ -75,6 +73,7 @@ export function SimplifiedReadView({
   }, [isNarrow, layout, layoutUserChosen, setLayout])
 
   const {
+    loadedResources,
     packageStore,
     isLoadingResources,
     isLoadingByPanel,

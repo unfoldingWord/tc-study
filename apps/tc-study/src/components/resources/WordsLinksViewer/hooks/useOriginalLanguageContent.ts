@@ -11,7 +11,7 @@ import {
   viewModelToOptimizedChapters,
 } from '@bt-synergy/scripture-loader'
 import { useEffect, useRef, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { useCurrentReference, useLoaderRegistry } from '../../../../contexts'
 import { shouldRetryOriginalLanguageLoad } from '../../../../features/helps/scriptureReadyUnderlineRebind'
 
 interface UseOriginalLanguageContentOptions {
@@ -33,7 +33,6 @@ export function useOriginalLanguageContent({
 }: UseOriginalLanguageContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
-  const catalogManager = useCatalogManager()
 
   const [originalLanguageResources, setOriginalLanguageResources] = useState<
     OriginalLanguageResource[]
@@ -63,7 +62,7 @@ export function useOriginalLanguageContent({
   }, [scriptureRevision, originalContent])
 
   useEffect(() => {
-    if (!currentRef.book || !currentRef.chapter || !catalogManager || !loaderRegistry) {
+    if (!currentRef.book || !currentRef.chapter || !loaderRegistry) {
       return
     }
 
@@ -117,26 +116,22 @@ export function useOriginalLanguageContent({
 
         const resources: OriginalLanguageResource[] = []
 
+        // Always try the painted OL key. Catalog metadata is a hint only —
+        // UHB is often in the workspace/loader cache before catalog get() lands.
         if (isNT) {
           const greekResourceKey = 'unfoldingWord/el-x-koine/ugnt'
-          const greekMetadata = await catalogManager.getResourceMetadata(greekResourceKey)
-          if (greekMetadata) {
-            resources.push({
-              resourceKey: greekResourceKey,
-              language: 'el-x-koine',
-              bookCode,
-            })
-          }
+          resources.push({
+            resourceKey: greekResourceKey,
+            language: 'el-x-koine',
+            bookCode,
+          })
         } else {
           const hebrewResourceKey = 'unfoldingWord/hbo/uhb'
-          const hebrewMetadata = await catalogManager.getResourceMetadata(hebrewResourceKey)
-          if (hebrewMetadata) {
-            resources.push({
-              resourceKey: hebrewResourceKey,
-              language: 'hbo',
-              bookCode,
-            })
-          }
+          resources.push({
+            resourceKey: hebrewResourceKey,
+            language: 'hbo',
+            bookCode,
+          })
         }
 
         if (cancelled) return
@@ -187,7 +182,7 @@ export function useOriginalLanguageContent({
     return () => {
       cancelled = true
     }
-  }, [currentRef.book, currentRef.chapter, catalogManager, loaderRegistry, resourceKey, retryTick])
+  }, [currentRef.book, currentRef.chapter, loaderRegistry, resourceKey, retryTick])
 
   return {
     originalLanguageResources,

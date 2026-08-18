@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { enableMapSet } from 'immer'
@@ -13,8 +13,14 @@ import type { ResourceInfo } from '../../contexts/types'
 import * as plugins from '../../resourceTypes'
 import { RESOURCE_TYPE_PLUGIN_EXPORTS } from '../../resourceTypes/pluginRegistry'
 import { COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
-import { shouldInjectCombinedHelps } from '../helps/combinedHelpsInjection'
+import { shouldInjectComposition } from '../helps/compositionInjection'
+import {
+  bindCombinedHelpsCompositionsForTest,
+  bindFakeCompositionForTest,
+  FAKE_COMPOSITION_PERSIST_ID,
+} from '../helps/testCompositionRegistry'
 import { HELPS_EMPTY_COPY, resolveHelpsPaneNoSourcesView } from '../helps/helpsEmptyCopy'
+import { resetApplyEnsureFingerprint } from '../helps/applyCombinedHelpsEnsure'
 import { addResource } from '../workspace/resourceMutations'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
@@ -45,6 +51,9 @@ const obsCompanionIds = registered
   .map((def) => def.id)
 
 enableMapSet()
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 const g = globalThis as typeof globalThis & { localStorage?: Storage }
 if (!g.localStorage) {
@@ -115,6 +124,7 @@ function resetStores() {
 describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () => {
   beforeEach(() => {
     resetStores()
+    resetApplyEnsureFingerprint()
   })
 
   test('en scripture with ULT and no CombinedHelps loads helps catalog; empty is pending not no-sources', () => {
@@ -138,7 +148,7 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'scripture', scripturePaneTypeIds)
     expect(panelHasHelpsMembership('panel-1', 'scripture', scripturePaneTypeIds)).toBe(false)
     expect(packageHasHelpsCatalogTypes('en', scriptureCatalogTypeIds)).toBe(false)
-    expect(shouldInjectCombinedHelps({})).toBe(false)
+    expect(shouldInjectComposition({}, ['notes', 'words-links'], 'any')).toBe(false)
 
     const pending = resolveHelpsPaneNoSourcesView({
       mode: 'helps',
@@ -185,9 +195,13 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
     const p2 = pkg.panels.find((p) => p.id === 'panel-2')!
     const scoped = `${COMBINED_HELPS_RESOURCE_ID}:panel-1`
-    expect(shouldInjectCombinedHelps({ tnKey: 'unfoldingWord/en/tn', twlKey: 'unfoldingWord/en/twl' })).toBe(
-      true
-    )
+    expect(
+      shouldInjectComposition(
+        { notes: 'unfoldingWord/en/tn', 'words-links': 'unfoldingWord/en/twl' },
+        ['notes', 'words-links'],
+        'any'
+      )
+    ).toBe(true)
     expect(p1.resourceKeys).toContain(scoped)
     expect(p1.resourceKeys).toContain('unfoldingWord/en/tq')
     expect(p1.resourceKeys).toContain('unfoldingWord/en/ult')
@@ -280,7 +294,7 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'obs', obsPaneTypeIds)
     expect(panelHasHelpsMembership('panel-1', 'obs', obsPaneTypeIds)).toBe(false)
     expect(packageHasHelpsCatalogTypes('en', obsCatalogTypeIds)).toBe(false)
-    expect(shouldInjectCombinedHelps({})).toBe(false)
+    expect(shouldInjectComposition({}, ['notes', 'words-links'], 'any')).toBe(false)
 
     const pending = resolveHelpsPaneNoSourcesView({
       mode: 'helps',
@@ -322,7 +336,9 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     const pkg = useWorkspaceStore.getState().currentPackage!
     const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
     const scopedObs = `${OBS_COMBINED_HELPS_RESOURCE_ID}:panel-1`
-    expect(shouldInjectCombinedHelps({ tnKey: 'unfoldingWord/en/obs-tn' })).toBe(true)
+    expect(
+      shouldInjectComposition({ 'obs-notes': 'unfoldingWord/en/obs-tn' }, ['obs-notes', 'obs-words-links'], 'any')
+    ).toBe(true)
     expect(p1.resourceKeys).toContain(scopedObs)
     expect(p1.resourceKeys).toContain('unfoldingWord/en/obs')
     expect(packageHasHelpsCatalogTypes('en', obsCatalogTypeIds)).toBe(false)
@@ -427,5 +443,26 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     const load = readFileSync(join(import.meta.dir, 'useReadCatalogLoad.ts'), 'utf8')
     expect(load).toContain('skipPanelClear')
     expect(load).toContain('skipPanelClear: options.skipPanelClear')
+  })
+})
+
+describe('fake composition membership (not isCombinedHelpsId)', () => {
+  test('test-only persist id is helps membership via resolvePanelEntry', () => {
+    const restore = bindFakeCompositionForTest()
+    try {
+      resetStores()
+      const pkg = useWorkspaceStore.getState().currentPackage!
+      pkg.resources.set(
+        FAKE_COMPOSITION_PERSIST_ID,
+        res({ key: FAKE_COMPOSITION_PERSIST_ID, type: 'fake-pair' })
+      )
+      const panel = pkg.panels.find((p) => p.id === 'panel-2')!
+      panel.resourceKeys = [FAKE_COMPOSITION_PERSIST_ID]
+      expect(panelHasHelpsMembership('panel-2', 'scripture', [])).toBe(true)
+      expect(panelHasHelpsMembership('panel-2', 'obs', [])).toBe(false)
+      expect(panelHasHelpsMembership('panel-2', 'scripture', scripturePaneTypeIds)).toBe(true)
+    } finally {
+      restore()
+    }
   })
 })

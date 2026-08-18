@@ -40,5 +40,16 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
     expect(src).toContain('clearReadPanelsForLanguageSwitch(helpsLanguageCode')
     expect(src).toContain('skipPanelClear')
     expect(src).toContain('forceHelpsPanel: loadTarget === \'helps\'')
+    expect(src).toContain('autoSaveWorkspace()')
+  })
+
+  test('text-only dest does not inject CombinedHelps onto that pane; still ensures panel-2', () => {
+    const skipStart = src.indexOf("if (destPanelId && loadTarget === 'text')")
+    const elseIf = src.indexOf('} else if (destPanelId)', skipStart)
+    expect(skipStart).toBeGreaterThan(-1)
+    expect(elseIf).toBeGreaterThan(skipStart)
+    const skipBlock = src.slice(skipStart, elseIf)
+    expect(skipBlock).toContain("applyCombinedHelpsEnsure(helpsLanguageCode, 'panel-2')")
+    expect(skipBlock).not.toContain('forceHelpsPanel')
   })
 })

@@ -251,6 +251,11 @@ describe('messagingGuards', () => {
     )
   })
 
+  test('Studio does not remount LinkedPanels when only activeIndex changes', () => {
+    const config = readFileSync(join(ROOT, 'features/studio/useStudioPanelConfig.ts'), 'utf8')
+    expect(config).toContain('linkedPanelsConfigMembershipKey')
+  })
+
   test('Studio keeps LinkedPanelsContainer mounted across wizard (store singleton)', () => {
     const studio = readFileSync(join(ROOT, 'components/studio/LinkedPanelsStudio.tsx'), 'utf8')
     // Container must wrap both wizard and panels — not only the non-wizard branch

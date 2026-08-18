@@ -1,9 +1,5 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  BIBLE_HELPS_SUBJECTS,
-  BIBLE_SUBJECTS,
-  OBS_HELPS_SUBJECTS,
-  OBS_SUBJECTS,
   availabilityForCode,
   availabilityIfPresent,
   availabilityFromSubjects,
@@ -13,7 +9,25 @@ import {
   mergeAvailabilityFromLanguageSets,
   type CatalogSubjectHit,
   type LanguageAvailabilityClient,
+  type LanguageAvailabilitySubjectSets,
 } from './languageAvailability'
+
+/**
+ * CombinedHelps-era fixtures (same Door43 subjects as today).
+ * Production lists come from compositions → plugin subjects; this file
+ * stays fail-closed for TQ-only (`sw`) and TN-alone → bibleHelps.
+ */
+const SUBJECT_SETS: LanguageAvailabilitySubjectSets = {
+  bible: ['Bible', 'Aligned Bible'],
+  obs: ['Open Bible Stories'],
+  bibleHelps: ['TSV Translation Notes', 'TSV Translation Words Links'],
+  obsHelps: [
+    'TSV OBS Translation Notes',
+    'OBS Translation Notes',
+    'TSV OBS Translation Words Links',
+    'OBS Translation Words Links',
+  ],
+}
 
 /** Frozen catalog hits — one language per DoD case, plus OBS+helps. */
 const CATALOG_HITS = Object.freeze([
@@ -27,7 +41,6 @@ const CATALOG_HITS = Object.freeze([
   Object.freeze({ languageCode: 'hi', subject: 'Open Bible Stories' }),
   Object.freeze({ languageCode: 'hi', subject: 'TSV OBS Translation Notes' }),
   Object.freeze({ languageCode: 'hi', subject: 'TSV OBS Translation Words Links' }),
-  // Must not count as gateway Bible / helps
   Object.freeze({ languageCode: 'el-x-koine', subject: 'Greek New Testament' }),
   Object.freeze({ languageCode: 'hbo', subject: 'Hebrew Old Testament' }),
   Object.freeze({ languageCode: 'sw', subject: 'Translation Academy' }),
@@ -37,7 +50,7 @@ const CATALOG_HITS = Object.freeze([
 
 describe('availabilityFromSubjects', () => {
   test('bible-only language', () => {
-    expect(availabilityFromSubjects(['Aligned Bible'])).toEqual({
+    expect(availabilityFromSubjects(['Aligned Bible'], SUBJECT_SETS)).toEqual({
       bible: true,
       obs: false,
       bibleHelps: false,
@@ -46,7 +59,7 @@ describe('availabilityFromSubjects', () => {
   })
 
   test('OBS-only language', () => {
-    expect(availabilityFromSubjects(['Open Bible Stories'])).toEqual({
+    expect(availabilityFromSubjects(['Open Bible Stories'], SUBJECT_SETS)).toEqual({
       bible: false,
       obs: true,
       bibleHelps: false,
@@ -55,7 +68,7 @@ describe('availabilityFromSubjects', () => {
   })
 
   test('Bible and OBS', () => {
-    expect(availabilityFromSubjects(['Bible', 'Open Bible Stories'])).toEqual({
+    expect(availabilityFromSubjects(['Bible', 'Open Bible Stories'], SUBJECT_SETS)).toEqual({
       bible: true,
       obs: true,
       bibleHelps: false,
@@ -65,11 +78,10 @@ describe('availabilityFromSubjects', () => {
 
   test('Bible + helps (TN/TWL)', () => {
     expect(
-      availabilityFromSubjects([
-        'Aligned Bible',
-        'TSV Translation Notes',
-        'TSV Translation Words Links',
-      ])
+      availabilityFromSubjects(
+        ['Aligned Bible', 'TSV Translation Notes', 'TSV Translation Words Links'],
+        SUBJECT_SETS
+      )
     ).toEqual({
       bible: true,
       obs: false,
@@ -80,11 +92,14 @@ describe('availabilityFromSubjects', () => {
 
   test('OBS + helps (OBS TN/TWL)', () => {
     expect(
-      availabilityFromSubjects([
-        'Open Bible Stories',
-        'TSV OBS Translation Notes',
-        'TSV OBS Translation Words Links',
-      ])
+      availabilityFromSubjects(
+        [
+          'Open Bible Stories',
+          'TSV OBS Translation Notes',
+          'TSV OBS Translation Words Links',
+        ],
+        SUBJECT_SETS
+      )
     ).toEqual({
       bible: false,
       obs: true,
@@ -94,25 +109,32 @@ describe('availabilityFromSubjects', () => {
   })
 
   test('bibleHelps is true with TN alone (either CombinedHelps side)', () => {
-    expect(availabilityFromSubjects(['TSV Translation Notes']).bibleHelps).toBe(true)
-    expect(availabilityFromSubjects(['TSV Translation Words Links']).bibleHelps).toBe(true)
+    expect(availabilityFromSubjects(['TSV Translation Notes'], SUBJECT_SETS).bibleHelps).toBe(
+      true
+    )
+    expect(
+      availabilityFromSubjects(['TSV Translation Words Links'], SUBJECT_SETS).bibleHelps
+    ).toBe(true)
   })
 
   test('TA / TW / TQ and original-language subjects do not set flags', () => {
     expect(
-      availabilityFromSubjects([
-        'Translation Academy',
-        'Translation Words',
-        'TSV Translation Questions',
-        'Greek New Testament',
-        'Hebrew Old Testament',
-      ])
+      availabilityFromSubjects(
+        [
+          'Translation Academy',
+          'Translation Words',
+          'TSV Translation Questions',
+          'Greek New Testament',
+          'Hebrew Old Testament',
+        ],
+        SUBJECT_SETS
+      )
     ).toEqual(emptyLanguageAvailability())
   })
 })
 
 describe('indexAvailabilityByLanguage', () => {
-  const byCode = indexAvailabilityByLanguage(CATALOG_HITS)
+  const byCode = indexAvailabilityByLanguage(CATALOG_HITS, SUBJECT_SETS)
 
   test('Bible-only language', () => {
     expect(byCode.get('pt')).toEqual({
@@ -194,17 +216,17 @@ describe('fetchLanguageAvailabilityByCode', () => {
             for (const code of langs) codes.add(code)
           }
         }
-        addIfOverlap(BIBLE_SUBJECTS, SETS.bible)
-        addIfOverlap(OBS_SUBJECTS, SETS.obs)
-        addIfOverlap(BIBLE_HELPS_SUBJECTS, SETS.bibleHelps)
-        addIfOverlap(OBS_HELPS_SUBJECTS, SETS.obsHelps)
+        addIfOverlap(SUBJECT_SETS.bible, SETS.bible)
+        addIfOverlap(SUBJECT_SETS.obs, SETS.obs)
+        addIfOverlap(SUBJECT_SETS.bibleHelps, SETS.bibleHelps)
+        addIfOverlap(SUBJECT_SETS.obsHelps, SETS.obsHelps)
         return [...codes].map((code) => ({ code }))
       },
     }
   }
 
   test('batched getLanguages derives the same DoD cases (no live Door43)', async () => {
-    const byCode = await fetchLanguageAvailabilityByCode(mockClient())
+    const byCode = await fetchLanguageAvailabilityByCode(mockClient(), SUBJECT_SETS)
     expect(byCode.get('pt')).toEqual({
       bible: true,
       obs: false,
@@ -260,7 +282,7 @@ describe('fetchLanguageAvailabilityByCode', () => {
           limit: filters?.limit,
         })
         const subject = filters?.subjects?.[0]
-        if (subject && OBS_HELPS_SUBJECTS.includes(subject as (typeof OBS_HELPS_SUBJECTS)[number])) {
+        if (subject && SUBJECT_SETS.obsHelps.includes(subject)) {
           if (subject === 'OBS Translation Notes') return [{ code: 'hi' }, { code: 'fr' }]
           if (subject === 'TSV OBS Translation Notes') return [{ code: 'en' }, { code: 'id' }]
           return [{ code: 'en' }]
@@ -268,13 +290,11 @@ describe('fetchLanguageAvailabilityByCode', () => {
         return []
       },
     }
-    const byCode = await fetchLanguageAvailabilityByCode(client)
+    const byCode = await fetchLanguageAvailabilityByCode(client, SUBJECT_SETS)
     const obsHelpsCalls = calls.filter((call) =>
-      (call.subjects ?? []).some((subject) =>
-        OBS_HELPS_SUBJECTS.includes(subject as (typeof OBS_HELPS_SUBJECTS)[number])
-      )
+      (call.subjects ?? []).some((subject) => SUBJECT_SETS.obsHelps.includes(subject))
     )
-    expect(obsHelpsCalls.length).toBe(OBS_HELPS_SUBJECTS.length)
+    expect(obsHelpsCalls.length).toBe(SUBJECT_SETS.obsHelps.length)
     expect(obsHelpsCalls.every((call) => call.subjects?.length === 1)).toBe(true)
     expect(obsHelpsCalls.every((call) => call.topic === undefined)).toBe(true)
     expect(obsHelpsCalls.every((call) => call.limit === 1000)).toBe(true)
@@ -303,7 +323,7 @@ describe('fetchLanguageAvailabilityByCode', () => {
         return []
       },
     }
-    const byCode = await fetchLanguageAvailabilityByCode(client)
+    const byCode = await fetchLanguageAvailabilityByCode(client, SUBJECT_SETS)
     for (const code of [...tsvGls, ...prodObsTn]) {
       expect(byCode.get(code)?.obsHelps).toBe(true)
     }

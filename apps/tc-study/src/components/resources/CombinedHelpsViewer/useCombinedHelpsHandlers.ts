@@ -212,23 +212,22 @@ export function useCombinedHelpsHandlers({
           verse,
           baseOccurrence
         )
-        link.quoteTokens.forEach((token, index) => {
-          const semanticId = semanticIds[index]
-          if (!semanticId) return
-          sendTokenClick({
-            lifecycle: 'event',
-            token: {
-              id: String(token.id),
-              content: token.text,
-              semanticId,
-              verseRef: `${book} ${chapter}:${verse}`,
-              position: index,
-              strong: token.strong,
-              lemma: token.lemma,
-              morph: token.morph,
-              alignedSemanticIds: [semanticId],
-            },
-          })
+        const firstToken = link.quoteTokens[0]
+        const firstId = semanticIds[0]
+        if (!firstToken || !firstId) return
+        sendTokenClick({
+          lifecycle: 'event',
+          token: {
+            id: String(firstToken.id),
+            content: firstToken.text,
+            semanticId: firstId,
+            verseRef: `${book} ${chapter}:${verse}`,
+            position: 0,
+            strong: firstToken.strong,
+            lemma: firstToken.lemma,
+            morph: firstToken.morph,
+            alignedSemanticIds: semanticIds,
+          },
         })
         return
       }

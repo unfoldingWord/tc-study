@@ -1,10 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
-import type { ResourceTypeDefinition, ResourceTypeRegistry } from '@bt-synergy/resource-types'
-import {
-  COMBINED_HELPS_RESOURCE_ID,
-  OBS_COMBINED_HELPS_RESOURCE_ID,
-} from '../helps/combinedHelpsIds'
-import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
+import type { ResourceTypeRegistry } from '@bt-synergy/resource-types'
+import { getActivePanelEntryRegistry } from '../../resourceTypes/activeRegistry'
+import { resolvePanelEntryForKey } from '../helps/resolveCompositionEntry'
 import { normalizeResourceTypeId } from '../../utils/normalizeResourceTypeId'
 import { resolveLucideIconName } from './lucideIconRegistry'
 import { isTabIconComponent, type TabIcon } from './tabIcon'
@@ -31,17 +28,23 @@ export interface TabPresentation {
   title: string
 }
 
+/** Chrome fields from a resource type or composition (compositions are companions). */
+export interface TabPresentationTypeFields {
+  icon?: string
+  contentRole?: 'primary' | 'companion' | 'shared'
+}
+
 export interface ResolveTabPresentationOptions {
-  /** Lookup plugin definition by canonical type id */
-  getType?: (typeId: string) => ResourceTypeDefinition | undefined
+  /** Lookup plugin/composition chrome by canonical type id */
+  getType?: (typeId: string) => TabPresentationTypeFields | undefined
   /** Tab-only overrides (string | component), merged over defaults */
   overrides?: Record<string, TabIcon>
 }
 
 function resolveTypeId(resource: TabPresentationResource): string | null {
   const key = resource.key || resource.id || ''
-  if (key === COMBINED_HELPS_RESOURCE_ID) return RESOURCE_TYPE_IDS.COMBINED_HELPS
-  if (key === OBS_COMBINED_HELPS_RESOURCE_ID) return RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS
+  const resolved = resolvePanelEntryForKey(key)
+  if (resolved?.kind === 'composition' || resolved?.kind === 'pane-member') return resolved.id
   return normalizeResourceTypeId(resource.type)
 }
 
@@ -55,7 +58,7 @@ export function resolveTabIcon(icon: TabIcon | undefined | null): LucideIcon | n
 function pickIconSource(
   typeId: string | null,
   resource: TabPresentationResource,
-  plugin: ResourceTypeDefinition | undefined,
+  plugin: TabPresentationTypeFields | undefined,
   overrides: Record<string, TabIcon>
 ): TabIcon | undefined {
   const key = resource.key || resource.id || ''
@@ -94,14 +97,29 @@ export function resolveTabPresentation(
   return { Icon, shortLabel, showShortLabel, title }
 }
 
-/** Convenience: bind a ResourceTypeRegistry as getType. */
+/** Convenience: bind a ResourceTypeRegistry as getType (resource, then composition). */
 export function resolveTabPresentationFromRegistry(
   resource: TabPresentationResource | null | undefined,
   registry: ResourceTypeRegistry | null | undefined,
   overrides?: Record<string, TabIcon>
 ): TabPresentation {
   return resolveTabPresentation(resource, {
-    getType: registry ? (id) => registry.get(id) : undefined,
+    getType: registry
+      ? (id) => {
+          const entry = getActivePanelEntryRegistry()?.resolve(id)
+          if (entry) {
+            const consumedIcon =
+              entry.kind === 'pane-member' && entry.consumes.length === 1
+                ? registry.get(entry.consumes[0])?.icon
+                : undefined
+            return {
+              icon: entry.icon ?? registry.get(id)?.icon ?? consumedIcon,
+              contentRole: entry.entryType === 'primary-text' ? 'primary' : 'companion',
+            }
+          }
+          return registry.get(id)
+        }
+      : undefined,
     overrides,
   })
 }

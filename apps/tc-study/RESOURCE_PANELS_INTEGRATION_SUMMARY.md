@@ -30,11 +30,7 @@ We've successfully integrated `@bt-synergy/resource-panels` into tc-study, creat
    - Demonstrates all features
    - Side-by-side comparison with low-level API
 
-6. **`RESOURCE_TYPE_DEVELOPMENT.md`** - Developer guide
-   - Step-by-step instructions
-   - Code examples
-   - Best practices
-   - Troubleshooting tips
+6. **`docs/extending-registries.md`** - Resource types, panel entries, panel modes
 
 7. **`RESOURCE_PANELS_INTEGRATION.md`** - Integration testing guide
    - How to test the Panel System Test page
@@ -239,7 +235,7 @@ Done! Your resource now has full inter-panel communication.
 
 ## 📚 Documentation
 
-- **`RESOURCE_TYPE_DEVELOPMENT.md`** - How to add new resource types
+- **`docs/extending-registries.md`** - Resource types, panel entries, panel modes
 - **`RESOURCE_PANELS_INTEGRATION.md`** - How to test the integration
 - **`packages/resource-panels/README.md`** - Full library docs
 - **`apps/resource-panels-spike/`** - Demo game application
@@ -270,4 +266,4 @@ Developers can:
 
 ---
 
-**Ready to use!** See `RESOURCE_TYPE_DEVELOPMENT.md` for step-by-step guide.
+**Ready to use!** See `docs/extending-registries.md` for resource types, panel entries, and modes.

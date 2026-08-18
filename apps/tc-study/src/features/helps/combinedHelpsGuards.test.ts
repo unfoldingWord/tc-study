@@ -10,6 +10,8 @@ describe('combinedHelpsGuards', () => {
     )
     expect(src).not.toContain("registerViewer({")
     expect(src).not.toContain("resourceType: 'combined-helps'")
+    expect(src).not.toMatch(/useAppStore\(\(s\)\s*=>\s*s\.loadedResources\)/)
+    expect(src).not.toContain('loadedResourcesMembershipKey')
   })
 
   test('Read bootstrap uses shared ensure adapter (not inline inject)', () => {
@@ -42,13 +44,14 @@ describe('combinedHelpsGuards', () => {
   })
 
   test('ensure does not unconditionally force panel-2 activeIndex onto CombinedHelps', () => {
-    const ensure = readFileSync(join(import.meta.dir, 'ensureCombinedHelps.ts'), 'utf8')
-    // Legacy clobber: if (scriptureIdx >= 0) panel2.activeIndex = scriptureIdx
-    expect(ensure).not.toMatch(/activeIndex\s*=\s*scriptureIdx/)
-    expect(ensure).not.toMatch(/activeIndex\s*=\s*obsIdx/)
-    expect(ensure).toContain('resolvePanel2ActiveIndex')
-    expect(ensure).toContain('applyDualScopeHelpsPolicy')
-    expect(ensure).toContain('removed')
+    const alias = readFileSync(join(import.meta.dir, 'ensureCombinedHelps.ts'), 'utf8')
+    const engine = readFileSync(join(import.meta.dir, 'ensureCompositions.ts'), 'utf8')
+    expect(alias).toContain('ensureCompositions')
+    expect(engine).not.toMatch(/activeIndex\s*=\s*scriptureIdx/)
+    expect(engine).not.toMatch(/activeIndex\s*=\s*obsIdx/)
+    expect(engine).toContain('resolvePanel2ActiveIndex')
+    expect(engine).toContain('applyDualScopeHelpsPolicy')
+    expect(engine).toContain('removed')
   })
 
   test('workspace membership mutations reconcile CombinedHelps (remove when TN/TWL drop)', () => {

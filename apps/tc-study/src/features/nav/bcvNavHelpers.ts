@@ -1,7 +1,7 @@
 import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 import type { BCVReference, BookInfo } from '../../contexts'
 import type { ResourceInfo } from '../../contexts/types'
-import { COMBINED_HELPS_IDS } from '../helps/combinedHelpsIds'
+import { isRegisteredCompositionPersistId } from '../helps/resolveCompositionEntry'
 import { getStandardBookOrderIndex, getStandardVerseCount } from '../../lib/versification'
 import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
 
@@ -60,7 +60,7 @@ export function findObsCatalogKey(
   for (const r of Object.values(loadedResources)) {
     if (!r) continue
     const rk = r.resourceKey ?? r.key
-    if (!rk || COMBINED_HELPS_IDS.has(rk)) continue
+    if (!rk || isRegisteredCompositionPersistId(rk)) continue
 
     const typeStr = String(r.type ?? '').toLowerCase().trim()
     if (typeStr === 'obs' || /open bible stories/i.test(r.subject ?? '')) {

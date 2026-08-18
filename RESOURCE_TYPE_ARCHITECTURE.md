@@ -257,7 +257,7 @@ See **[apps/tc-study/MIGRATING_TO_PACKAGES.md](./apps/tc-study/MIGRATING_TO_PACK
 
 - **[docs/RESOURCE_TYPE_PACKAGES.md](./docs/RESOURCE_TYPE_PACKAGES.md)** - Complete package creation guide
 - **[apps/tc-study/MIGRATING_TO_PACKAGES.md](./apps/tc-study/MIGRATING_TO_PACKAGES.md)** - Migration guide
-- **[apps/tc-study/RESOURCE_TYPE_DEVELOPMENT.md](./apps/tc-study/RESOURCE_TYPE_DEVELOPMENT.md)** - Current development guide
+- **[apps/tc-study/docs/extending-registries.md](./apps/tc-study/docs/extending-registries.md)** - Resource types, panel entries, panel modes
 - **[packages/resource-panels/README.md](./packages/resource-panels/README.md)** - Communication system docs
 
 ## 🎯 Best Practices

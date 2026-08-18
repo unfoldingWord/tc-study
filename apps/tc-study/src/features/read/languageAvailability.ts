@@ -2,27 +2,12 @@
  * Per-language content availability for Read (Epic #21 / issue #22).
  *
  * Flags are derived from Door43 catalog subjects already used by
- * `loadReadLanguageCatalog` and CombinedHelps — not a new network API.
+ * `loadReadLanguageCatalog` and compositions — not a new network API.
  *
- * Subject mapping (resource type plugins):
- * - bible: `Bible`, `Aligned Bible` (scripture.ts). Excludes original-language
- *   UGNT/UHB (`Greek New Testament`, `Hebrew Old Testament`) which are injected
- *   globally and must not count as a gateway Bible.
- *   French (`fr`) is not in the tc-ready Bible/Aligned Bible set (~15 GLs);
- *   its Bibles are stage=prod without topic=tc-ready. French tc-ready is OBS.
- * - obs: `Open Bible Stories` (obs.ts) — ~200 langs at tc-ready.
- * - bibleHelps: CombinedHelps scripture pair — `TSV Translation Notes` (TN) and
- *   `TSV Translation Words Links` (TWL). TA / TW / TQ do not count.
- *   ~14 langs at tc-ready; fetched per subject at tc-ready.
- * - obsHelps: CombinedHelps OBS pair — `TSV OBS Translation Notes` /
- *   `OBS Translation Notes` and `TSV OBS Translation Words Links` /
- *   `OBS Translation Words Links`.
- *   Door43 2026-08-12: only `en` / `es-419` / `id` at topic=tc-ready (TSV GLs).
- *   ~20 more langs have `OBS Translation Notes` at stage=prod without tc-ready;
- *   helps flags use prod (no topic) so the picker is not stuck on those 3 GLs.
- *
- * A helps flag is true when the language has **either** side of the CombinedHelps
- * pair (TN or TWL). Injection uses the same OR so first-open is not blocked.
+ * This module is pure: callers pass registry-derived subject lists.
+ * bibleHelps / obsHelps = union of composition `consumes` → plugin subjects
+ * for compositions whose scope matches. TQ does not light flags unless a
+ * composition consumes questions.
  */
 
 export interface LanguageAvailabilityFlags {
@@ -47,29 +32,19 @@ export interface LanguageAvailabilityClient {
   }): Promise<Array<{ code: string }>>
 }
 
-export const BIBLE_SUBJECTS = ['Bible', 'Aligned Bible'] as const
-export const OBS_SUBJECTS = ['Open Bible Stories'] as const
-export const BIBLE_HELPS_SUBJECTS = [
-  'TSV Translation Notes',
-  'TSV Translation Words Links',
-] as const
-export const OBS_HELPS_SUBJECTS = [
-  'TSV OBS Translation Notes',
-  'OBS Translation Notes',
-  'TSV OBS Translation Words Links',
-  'OBS Translation Words Links',
-] as const
+/** Subject lists the caller derives from plugins / compositions. */
+export interface LanguageAvailabilitySubjectSets {
+  bible: readonly string[]
+  obs: readonly string[]
+  bibleHelps: readonly string[]
+  obsHelps: readonly string[]
+}
 
 export const ORIGINAL_LANGUAGE_CODES = new Set(['el-x-koine', 'hbo'])
 const ORIGINAL_LANGUAGE_SUBJECTS = new Set([
   'Greek New Testament',
   'Hebrew Old Testament',
 ])
-
-const BIBLE_SUBJECT_SET = new Set<string>(BIBLE_SUBJECTS)
-const OBS_SUBJECT_SET = new Set<string>(OBS_SUBJECTS)
-const BIBLE_HELPS_SUBJECT_SET = new Set<string>(BIBLE_HELPS_SUBJECTS)
-const OBS_HELPS_SUBJECT_SET = new Set<string>(OBS_HELPS_SUBJECTS)
 
 const LIST_FILTER = { stage: 'prod', topic: 'tc-ready' } as const
 /** OBS TN/TWL are mostly prod without `topic=tc-ready` (only ~3 TSV GLs are tagged). */
@@ -81,16 +56,21 @@ export function emptyLanguageAvailability(): LanguageAvailabilityFlags {
 }
 
 export function availabilityFromSubjects(
-  subjects: Iterable<string>
+  subjects: Iterable<string>,
+  sets: LanguageAvailabilitySubjectSets
 ): LanguageAvailabilityFlags {
+  const bible = new Set(sets.bible)
+  const obs = new Set(sets.obs)
+  const bibleHelps = new Set(sets.bibleHelps)
+  const obsHelps = new Set(sets.obsHelps)
   const flags = emptyLanguageAvailability()
   for (const raw of subjects) {
     const subject = String(raw ?? '').trim()
     if (!subject || ORIGINAL_LANGUAGE_SUBJECTS.has(subject)) continue
-    if (BIBLE_SUBJECT_SET.has(subject)) flags.bible = true
-    else if (OBS_SUBJECT_SET.has(subject)) flags.obs = true
-    else if (BIBLE_HELPS_SUBJECT_SET.has(subject)) flags.bibleHelps = true
-    else if (OBS_HELPS_SUBJECT_SET.has(subject)) flags.obsHelps = true
+    if (bible.has(subject)) flags.bible = true
+    else if (obs.has(subject)) flags.obs = true
+    else if (bibleHelps.has(subject)) flags.bibleHelps = true
+    else if (obsHelps.has(subject)) flags.obsHelps = true
   }
   return flags
 }
@@ -100,7 +80,8 @@ export function availabilityFromSubjects(
  * Original-language codes (UGNT/UHB) are omitted.
  */
 export function indexAvailabilityByLanguage(
-  hits: readonly CatalogSubjectHit[]
+  hits: readonly CatalogSubjectHit[],
+  sets: LanguageAvailabilitySubjectSets
 ): Map<string, LanguageAvailabilityFlags> {
   const subjectsByLang = new Map<string, string[]>()
   for (const hit of hits) {
@@ -112,7 +93,7 @@ export function indexAvailabilityByLanguage(
   }
   const byCode = new Map<string, LanguageAvailabilityFlags>()
   for (const [code, subjects] of subjectsByLang) {
-    byCode.set(code, availabilityFromSubjects(subjects))
+    byCode.set(code, availabilityFromSubjects(subjects, sets))
   }
   return byCode
 }
@@ -168,13 +149,14 @@ async function languageCodesForSubjects(
  * Per-subject queries — not N+1 per language, no manifests.
  */
 export async function fetchLanguageAvailabilityByCode(
-  client: LanguageAvailabilityClient
+  client: LanguageAvailabilityClient,
+  sets: LanguageAvailabilitySubjectSets
 ): Promise<Map<string, LanguageAvailabilityFlags>> {
   const [bible, obs, bibleHelps, obsHelps] = await Promise.all([
-    languageCodesForSubjects(client, BIBLE_SUBJECTS, LIST_FILTER),
-    languageCodesForSubjects(client, OBS_SUBJECTS, LIST_FILTER),
-    languageCodesForSubjects(client, BIBLE_HELPS_SUBJECTS, LIST_FILTER),
-    languageCodesForSubjects(client, OBS_HELPS_SUBJECTS, HELPS_LIST_FILTER),
+    languageCodesForSubjects(client, sets.bible, LIST_FILTER),
+    languageCodesForSubjects(client, sets.obs, LIST_FILTER),
+    languageCodesForSubjects(client, sets.bibleHelps, LIST_FILTER),
+    languageCodesForSubjects(client, sets.obsHelps, HELPS_LIST_FILTER),
   ])
   return mergeAvailabilityFromLanguageSets({
     bible,
