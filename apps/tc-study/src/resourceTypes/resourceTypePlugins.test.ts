@@ -7,6 +7,8 @@ import { translationAcademyResourceType } from './translationAcademy'
 import { translationNotesResourceType } from './translationNotes'
 import { translationWordsLinksResourceType } from './translationWordsLinks'
 import { translationWordsResourceType } from './translationWords'
+import { translationQuestionsResourceType } from './translationQuestions'
+import { obsTranslationQuestionsResourceType } from './obsTranslationQuestions'
 import { RESOURCE_TYPE_IDS } from './resourceTypeIds'
 import { EntryViewerRegistry } from '../lib/viewers/EntryViewerRegistry'
 import { registerDefaultEntryViewers } from '../lib/viewers/registerEntryViewers'
@@ -23,6 +25,13 @@ describe('resourceTypePlugins', () => {
     expect(scriptureResourceType.viewer).toBeDefined()
     expect(translationNotesResourceType.viewer).toBeDefined()
     expect(translationWordsLinksResourceType.viewer).toBeDefined()
+  })
+
+  test('TQ plugins stay registered as tabs but omit language-list subjects', () => {
+    expect(translationQuestionsResourceType.viewer).toBeDefined()
+    expect(obsTranslationQuestionsResourceType.viewer).toBeDefined()
+    expect(translationQuestionsResourceType.includeInLanguageLists).toBe(false)
+    expect(obsTranslationQuestionsResourceType.includeInLanguageLists).toBe(false)
   })
 
   test('combined-helps plugins register CombinedHelpsViewer', () => {

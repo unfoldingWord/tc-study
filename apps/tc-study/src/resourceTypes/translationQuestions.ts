@@ -26,6 +26,9 @@ export const translationQuestionsResourceType: ResourceTypeDefinition = defineRe
   // ===== DOOR43 MAPPING =====
   subjects: ['TSV Translation Questions'],
   aliases: ['tq', 'questions'],
+  // CombinedHelps needs TN or TWL. TQ-only langs (and OBS-TQ-only, e.g. ilo)
+  // must not expand the helps language picker.
+  includeInLanguageLists: false,
   
   // ===== DATA LAYER =====
   loader: TranslationQuestionsLoader,
