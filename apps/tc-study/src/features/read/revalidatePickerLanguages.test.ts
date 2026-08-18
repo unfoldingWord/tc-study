@@ -102,31 +102,38 @@ describe('revalidatePickerLanguages', () => {
     expect(display.map((lang) => lang.code).sort()).toEqual(['en', 'fr', 'hi'])
   })
 
-  test('helps picker requests scripture + OBS helps and includes OBS-helps langs', async () => {
+  test('helps picker requests companion TN/TWL/TQ only and includes OBS-TN langs', async () => {
     const requested: Array<{ subject: string; topic?: string }> = []
     const client: LanguageListClient = {
       async getLanguages(filters) {
         const subject = filters?.subjects?.[0]
-        if (subject) requested.push({ subject, topic: filters?.topic })
+        if (!subject) return [{ code: 'xx', name: 'Global dump' }]
+        requested.push({ subject, topic: filters?.topic })
         if (subject === 'TSV Translation Notes') return [{ code: 'en', name: 'English' }]
         if (subject === 'TSV OBS Translation Notes') return [{ code: 'fr', name: 'français' }]
+        if (subject === 'Translation Words' || subject === 'Translation Academy') {
+          return [{ code: 'nag', name: 'Naga' }]
+        }
         return []
       },
     }
+    const companionHelps = [
+      'TSV Translation Notes',
+      'TSV Translation Words Links',
+      'TSV Translation Questions',
+      'TSV OBS Translation Notes',
+      'OBS Translation Notes',
+      'TSV OBS Translation Words Links',
+      'OBS Translation Words Links',
+      'TSV OBS Translation Questions',
+      'OBS Translation Questions',
+    ]
     const { display } = await revalidatePickerLanguages({
       client,
       kind: 'all-helps',
-      listSubjects: [
-        'TSV Translation Notes',
-        'TSV Translation Words Links',
-        'TSV Translation Questions',
-        'TSV OBS Translation Notes',
-        'OBS Translation Notes',
-        'Translation Words',
-        'Translation Academy',
-      ],
+      listSubjects: companionHelps,
       globalSubjects: ['Bible', 'Aligned Bible', 'Open Bible Stories'],
-      catalogCodes: [],
+      catalogCodes: ['xx'],
       availabilityByCode: mergeAvailabilityFromLanguageSets({
         bible: ['en'],
         obs: ['fr'],
@@ -135,16 +142,12 @@ describe('revalidatePickerLanguages', () => {
       }),
     })
     expect(requested.every((call) => call.topic === undefined)).toBe(true)
-    expect(requested.map((call) => call.subject)).toEqual([
-      'TSV Translation Notes',
-      'TSV Translation Words Links',
-      'TSV Translation Questions',
-      'TSV OBS Translation Notes',
-      'OBS Translation Notes',
-      'Translation Words',
-      'Translation Academy',
-    ])
+    expect(requested.map((call) => call.subject)).toEqual(companionHelps)
+    expect(requested.map((call) => call.subject)).not.toContain('Translation Words')
+    expect(requested.map((call) => call.subject)).not.toContain('Translation Academy')
     expect(display.map((lang) => lang.code).sort()).toEqual(['en', 'fr'])
+    expect(display.map((lang) => lang.code)).not.toContain('nag')
+    expect(display.map((lang) => lang.code)).not.toContain('xx')
   })
 
   test('helps picker in OBS mode requests OBS-helps subjects without topic', async () => {

@@ -142,31 +142,32 @@ describe('subjectsForLanguageList', () => {
     ])
   })
 
-  test('helps includes TN / TWL / TQ (and shared TA/TW), not OBS helps or Combined Helps', () => {
+  test('helps includes companion TN / TWL / TQ, not shared TW/TA or OBS helps', () => {
     const subjects = subjectsForLanguageList(ALL, 'helps')
     expect(subjects).toContain('TSV Translation Notes')
     expect(subjects).toContain('TSV Translation Words Links')
     expect(subjects).toContain('TSV Translation Questions')
-    expect(subjects).toContain('Translation Academy')
-    expect(subjects).toContain('Translation Words')
+    expect(subjects).not.toContain('Translation Academy')
+    expect(subjects).not.toContain('Translation Words')
     expect(subjects).not.toContain('Open Bible Stories')
     expect(subjects).not.toContain('TSV OBS Translation Notes')
     expect(subjects).not.toContain('Combined Helps')
   })
 
-  test('obs-helps includes OBS TN/TWL/TQ, not Bible content or Combined Helps', () => {
+  test('obs-helps includes OBS TN/TWL/TQ, not shared TW/TA or Bible content', () => {
     const subjects = subjectsForLanguageList(ALL, 'obs-helps')
     expect(subjects).toContain('TSV OBS Translation Notes')
     expect(subjects).toContain('OBS Translation Notes')
     expect(subjects).toContain('TSV OBS Translation Words Links')
     expect(subjects).toContain('TSV OBS Translation Questions')
-    expect(subjects).toContain('Translation Academy')
+    expect(subjects).not.toContain('Translation Academy')
+    expect(subjects).not.toContain('Translation Words')
     expect(subjects).not.toContain('TSV Translation Notes')
     expect(subjects).not.toContain('Bible')
     expect(subjects).not.toContain('OBS Combined Helps')
   })
 
-  test('all-helps is the union of scripture helps and OBS helps (plus shared TW/TA)', () => {
+  test('all-helps is companion scripture helps ∪ OBS helps (not shared TW/TA)', () => {
     const helps = subjectsForLanguageList(ALL, 'helps')
     const obsHelps = subjectsForLanguageList(ALL, 'obs-helps')
     const subjects = subjectsForLanguageList(ALL, 'all-helps')
@@ -177,12 +178,21 @@ describe('subjectsForLanguageList', () => {
     expect(subjects).toContain('TSV OBS Translation Notes')
     expect(subjects).toContain('TSV OBS Translation Words Links')
     expect(subjects).toContain('TSV OBS Translation Questions')
-    expect(subjects).toContain('Translation Academy')
-    expect(subjects).toContain('Translation Words')
+    expect(subjects).not.toContain('Translation Academy')
+    expect(subjects).not.toContain('Translation Words')
     expect(subjects).not.toContain('Bible')
     expect(subjects).not.toContain('Open Bible Stories')
     expect(subjects).not.toContain('Combined Helps')
     expect(subjects).not.toContain('OBS Combined Helps')
+  })
+
+  test('shared types stay out of language lists even with empty companionFor', () => {
+    expect(subjectsForLanguageList([TW, TA, NOTES], 'helps')).toEqual([
+      'TSV Translation Notes',
+    ])
+    expect(subjectsForLanguageList([TW, TA, NOTES], 'all-helps')).toEqual([
+      'TSV Translation Notes',
+    ])
   })
 
   test('a new primary plugin expands global and its mode list', () => {

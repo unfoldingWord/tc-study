@@ -34,7 +34,9 @@ export function panelModesForType(def: LanguageListTypeFields): ResourcePanelMod
     if (def.scope === 'scripture') return ['scripture']
     return []
   }
-  // companion (default) and shared → helps lists; obs vs bible via companionFor
+  // companion (default) → helps lists; obs vs bible via companionFor.
+  // shared (TW/TA) stays registered for articles after a lang is picked,
+  // but does not contribute language-list subjects.
   return ['helps']
 }
 
@@ -44,18 +46,19 @@ export function catalogLanguageListSubjects(def: LanguageListTypeFields): string
 }
 
 function typeMatchesKind(def: LanguageListTypeFields, kind: LanguageListKind): boolean {
+  // Shared article types (TW/TA) are not "has helps" — CombinedHelps inject
+  // needs TN / TWL / TQ. Querying them floods the picker with empty langs.
+  if (def.contentRole === 'shared') return false
   const modes = panelModesForType(def)
   if (kind === 'scripture') return modes.includes('scripture')
   if (kind === 'obs') return modes.includes('obs')
   if (kind === 'helps') {
     if (!modes.includes('helps')) return false
-    if (def.contentRole === 'shared') return true
     const forScopes = def.companionFor ?? []
     return forScopes.includes('scripture') || forScopes.length === 0
   }
   if (kind === 'obs-helps') {
     if (!modes.includes('helps')) return false
-    if (def.contentRole === 'shared') return true
     return (def.companionFor ?? []).includes('obs')
   }
   return false
@@ -65,8 +68,8 @@ function typeMatchesKind(def: LanguageListTypeFields, kind: LanguageListKind): b
  * Door43 subjects for one language list.
  * - `global` — union of scripture + OBS **content** subjects (text picker / cache)
  * - `scripture` / `obs` — primary content subjects for that mode
- * - `helps` / `obs-helps` — companion (+ shared) subjects for bible vs OBS
- * - `all-helps` — union of scripture + OBS companion (+ shared) subjects
+ * - `helps` / `obs-helps` — companion subjects for bible vs OBS (not shared TW/TA)
+ * - `all-helps` — union of scripture + OBS companion subjects (not shared TW/TA)
  */
 export function subjectsForLanguageList(
   types: readonly LanguageListTypeFields[],

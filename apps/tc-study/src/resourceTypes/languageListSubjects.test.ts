@@ -20,12 +20,14 @@ describe('registered plugin language-list subjects', () => {
     expect(subjectsForLanguageList(registered, 'obs')).toEqual(['Open Bible Stories'])
   })
 
-  test('helps include TN / TWL / TQ (registered names), not OBS-TN', () => {
+  test('helps include TN / TWL / TQ (registered names), not OBS-TN or TW/TA', () => {
     const subjects = subjectsForLanguageList(registered, 'helps')
     expect(subjects).toContain('TSV Translation Notes')
     expect(subjects).toContain('TSV Translation Words Links')
     expect(subjects).toContain('TSV Translation Questions')
     expect(subjects).not.toContain('TSV OBS Translation Notes')
+    expect(subjects).not.toContain('Translation Words')
+    expect(subjects).not.toContain('Translation Academy')
     expect(subjects).not.toContain('Combined Helps')
   })
 
@@ -43,6 +45,8 @@ describe('registered plugin language-list subjects', () => {
     expect(subjects).toContain('TSV OBS Translation Words Links')
     expect(subjects).toContain('TSV OBS Translation Questions')
     expect(subjects).not.toContain('TSV Translation Notes')
+    expect(subjects).not.toContain('Translation Words')
+    expect(subjects).not.toContain('Translation Academy')
   })
 
   test('OBS-nav text picker still fetches Bible + Aligned Bible + OBS', () => {
@@ -55,7 +59,7 @@ describe('registered plugin language-list subjects', () => {
     ])
   })
 
-  test('scripture-nav helps picker still fetches OBS-helps + scripture helps + TW/TA', () => {
+  test('helps picker fetches companion TN/TWL/TQ + OBS equivalents, not TW/TA', () => {
     const kind = resolveLanguageListKind({
       listMode: 'helps',
       navigationScope: 'scripture',
@@ -68,11 +72,11 @@ describe('registered plugin language-list subjects', () => {
     expect(subjects).toContain('TSV OBS Translation Notes')
     expect(subjects).toContain('TSV OBS Translation Words Links')
     expect(subjects).toContain('TSV OBS Translation Questions')
-    expect(subjects).toContain('Translation Words')
-    expect(subjects).toContain('Translation Academy')
+    expect(subjects).not.toContain('Translation Words')
+    expect(subjects).not.toContain('Translation Academy')
   })
 
-  test('all-helps is scripture helps ∪ OBS helps ∪ shared TW/TA', () => {
+  test('all-helps is companion scripture helps ∪ OBS helps (not shared TW/TA)', () => {
     const helps = subjectsForLanguageList(registered, 'helps')
     const obsHelps = subjectsForLanguageList(registered, 'obs-helps')
     const subjects = subjectsForLanguageList(registered, 'all-helps')
@@ -83,8 +87,8 @@ describe('registered plugin language-list subjects', () => {
     expect(subjects).toContain('TSV OBS Translation Notes')
     expect(subjects).toContain('TSV OBS Translation Words Links')
     expect(subjects).toContain('TSV OBS Translation Questions')
-    expect(subjects).toContain('Translation Words')
-    expect(subjects).toContain('Translation Academy')
+    expect(subjects).not.toContain('Translation Words')
+    expect(subjects).not.toContain('Translation Academy')
     expect(subjects).not.toContain('Bible')
     expect(subjects).not.toContain('Open Bible Stories')
   })
