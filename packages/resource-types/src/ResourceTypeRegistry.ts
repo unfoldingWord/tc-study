@@ -7,7 +7,11 @@
  */
 
 import {
+  paneTypeIdsForHelpsCatalogLoad as paneIdsFromTypes,
+  subjectsForHelpsCatalogLoad as helpsCatalogSubjectsFromTypes,
   subjectsForLanguageList as subjectsFromTypes,
+  typeIdsForHelpsCatalogLoad as helpsCatalogTypeIdsFromTypes,
+  type HelpsCatalogScope,
   type LanguageListKind,
 } from './subjectsForLanguageList'
 import type { APIFilters, ResourceTypeDefinition } from './types'
@@ -186,6 +190,22 @@ export class ResourceTypeRegistry {
    */
   subjectsForLanguageList(kind: LanguageListKind): string[] {
     return subjectsFromTypes(this.getAll(), kind)
+  }
+
+  /**
+   * Door43 subjects for hydrating a chosen helps language (companions + shared).
+   * Picker lists stay on `subjectsForLanguageList` and omit shared.
+   */
+  subjectsForHelpsCatalogLoad(scope: HelpsCatalogScope): string[] {
+    return helpsCatalogSubjectsFromTypes(this.getAll(), scope)
+  }
+
+  helpsCatalogTypeIds(scope: HelpsCatalogScope): string[] {
+    return helpsCatalogTypeIdsFromTypes(this.getAll(), scope)
+  }
+
+  helpsCatalogPaneTypeIds(scope: HelpsCatalogScope): string[] {
+    return paneIdsFromTypes(this.getAll(), scope)
   }
   
   /**

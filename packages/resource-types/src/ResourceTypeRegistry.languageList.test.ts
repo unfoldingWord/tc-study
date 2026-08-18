@@ -66,4 +66,37 @@ describe('ResourceTypeRegistry.subjectsForLanguageList', () => {
     expect(registry.subjectsForLanguageList('helps')).toEqual(['TSV Translation Notes'])
     expect(registry.subjectsForLanguageList('all-helps')).toEqual(['TSV Translation Notes'])
   })
+
+  test('helps catalog load includes a newly registered companion', () => {
+    const registry = registryWithContentPlugins()
+    registry.register(
+      defineResourceType({
+        id: 'study-notes',
+        displayName: 'Study Notes',
+        contentRole: 'companion',
+        companionFor: ['scripture'],
+        subjects: ['Study Notes'],
+        loader: DummyLoader,
+      })
+    )
+    registry.register(
+      defineResourceType({
+        id: 'words',
+        displayName: 'Words',
+        contentRole: 'shared',
+        subjects: ['Translation Words'],
+        loader: DummyLoader,
+      })
+    )
+    expect(registry.subjectsForHelpsCatalogLoad('scripture')).toEqual([
+      'TSV Translation Notes',
+      'Study Notes',
+      'Translation Words',
+    ])
+    expect(registry.helpsCatalogTypeIds('scripture')).toEqual(['notes', 'study-notes', 'words'])
+    expect(registry.subjectsForLanguageList('helps')).toEqual([
+      'TSV Translation Notes',
+      'Study Notes',
+    ])
+  })
 })

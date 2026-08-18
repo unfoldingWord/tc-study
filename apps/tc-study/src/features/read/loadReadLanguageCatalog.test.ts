@@ -23,6 +23,8 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
   test('OBS helps search is scoped via searchCatalogHitsForTarget (not a blanket tc-ready search)', () => {
     expect(src).toContain('searchCatalogHitsForTarget')
     expect(src).toContain('navigationScope')
+    expect(src).toContain('subjectsForHelpsCatalogLoad')
+    expect(src).toContain('helpsSubjects')
     expect(src).not.toMatch(/topic:\s*'tc-ready'/)
     expect(src).toContain('page.hydrateTarget')
   })

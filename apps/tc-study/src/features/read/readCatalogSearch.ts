@@ -7,7 +7,6 @@
  */
 
 import { door43LanguageQueryCode } from '../../utils/languageCodeMatch'
-import { OBS_HELPS_SUBJECTS } from './languageAvailability'
 import type { CatalogLoadTarget } from './readCatalogPanelPolicy'
 import type { CatalogEntry } from './readCatalogIdentity'
 
@@ -46,8 +45,11 @@ function tcReadyRequest(
   }
 }
 
-function obsHelpsRequests(languageCode: string): CatalogSearchRequest[] {
-  return OBS_HELPS_SUBJECTS.map((subject) => ({
+function obsHelpsRequests(
+  languageCode: string,
+  subjects: readonly string[]
+): CatalogSearchRequest[] {
+  return subjects.map((subject) => ({
     hydrateTarget: 'helps' as const,
     params: { language: languageCode, subject, ...OBS_HELPS_FILTER },
   }))
@@ -56,22 +58,27 @@ function obsHelpsRequests(languageCode: string): CatalogSearchRequest[] {
 /**
  * One Door43 search per request. OBS helps are one subject at a time so DCS
  * multi-subject AND cannot collapse the union (same as availability listing).
+ * `helpsSubjects` is the registry companion+shared list for this scope.
  */
 export function catalogSearchRequestsForTarget(options: {
   languageCode: string
   target: CatalogLoadTarget
   navigationScope: string
+  helpsSubjects?: readonly string[]
 }): CatalogSearchRequest[] {
   const { target, navigationScope } = options
   const languageCode = door43LanguageQueryCode(options.languageCode)
   const obsHelps = isObsScope(navigationScope) && target !== 'text'
+  const helpsSubjects = options.helpsSubjects ?? []
 
   if (target === 'text') return [tcReadyRequest(languageCode, 'text')]
   if (target === 'helps') {
-    return obsHelps ? obsHelpsRequests(languageCode) : [tcReadyRequest(languageCode, 'helps')]
+    return obsHelps
+      ? obsHelpsRequests(languageCode, helpsSubjects)
+      : [tcReadyRequest(languageCode, 'helps')]
   }
   if (obsHelps) {
-    return [tcReadyRequest(languageCode, 'text'), ...obsHelpsRequests(languageCode)]
+    return [tcReadyRequest(languageCode, 'text'), ...obsHelpsRequests(languageCode, helpsSubjects)]
   }
   return [tcReadyRequest(languageCode, 'both')]
 }
@@ -82,6 +89,7 @@ export async function searchCatalogHitsForTarget(
     languageCode: string
     target: CatalogLoadTarget
     navigationScope: string
+    helpsSubjects?: readonly string[]
   }
 ): Promise<Array<{ hydrateTarget: CatalogLoadTarget; catalogResults: CatalogEntry[] }>> {
   const requests = catalogSearchRequestsForTarget(options)

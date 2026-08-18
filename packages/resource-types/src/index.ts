@@ -12,10 +12,16 @@ export { ResourceTypeRegistry } from './ResourceTypeRegistry'
 export type { ResourceTypeRegistryConfig } from './ResourceTypeRegistry'
 export {
   catalogLanguageListSubjects,
+  paneTypeIdsForHelpsCatalogLoad,
   panelModesForType,
+  subjectsForHelpsCatalogLoad,
   subjectsForLanguageList,
+  typeIdsForHelpsCatalogLoad,
+  typeMatchesHelpsCatalogLoad,
 } from './subjectsForLanguageList'
 export type {
+  HelpsCatalogScope,
+  HelpsCatalogTypeFields,
   LanguageListKind,
   LanguageListTypeFields,
   ResourcePanelMode,

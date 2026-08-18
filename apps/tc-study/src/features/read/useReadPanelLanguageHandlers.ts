@@ -8,7 +8,7 @@ import { useNavigationStore, useResourceTypeRegistry } from '../../contexts'
 import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
-import { applyReadModeMembership, panelHasHelpsMembership } from './applyReadModeMembership'
+import { applyReadModeMembership, packageHasHelpsCatalogTypes } from './applyReadModeMembership'
 import {
   shouldLoadCatalogOnModeSwitch,
   type DownloadPane,
@@ -114,33 +114,51 @@ export function useReadPanelLanguageHandlers(deps: {
           ? panelHasObsPrimaryContent(siblingKeys, pkg.resources)
           : false,
       })
+      if (mode === 'helps') {
+        const paneTypeIds = resourceTypeRegistry.helpsCatalogPaneTypeIds(helpsScope)
+        applyReadModeMembership(
+          panelId,
+          mode,
+          panel.languageCode,
+          textKeysRef.current,
+          helpsScope,
+          paneTypeIds
+        )
+        if (
+          packageHasHelpsCatalogTypes(
+            panel.languageCode,
+            resourceTypeRegistry.helpsCatalogTypeIds(helpsScope)
+          )
+        ) {
+          markCatalogSettled([panelId])
+          return
+        }
+        const one = catalogLoadForSinglePanel(panels, panelId)
+        if (!one) return
+        resetCatalogSettled([panelId])
+        await runCatalogLoad({ ...one, navigationScope: helpsScope, skipPanelClear: true })
+        return
+      }
       const needsCatalog = shouldLoadCatalogOnModeSwitch({
         mode,
         languageCode: panel.languageCode,
         textKeys: textKeysRef.current,
         helpsKeys: helpsKeysRef.current,
-        helpsScope: mode === 'helps' ? helpsScope : undefined,
       })
       if (!needsCatalog) {
         applyReadModeMembership(panelId, mode, panel.languageCode, textKeysRef.current, helpsScope)
-        if (mode !== 'helps' || panelHasHelpsMembership(panelId, helpsScope)) {
-          markCatalogSettled([panelId])
-          return
-        }
+        markCatalogSettled([panelId])
+        return
       }
       const one = catalogLoadForSinglePanel(panels, panelId)
       if (!one) return
-      if (mode === 'helps') {
-        resetCatalogSettled([panelId])
-        await runCatalogLoad({ ...one, navigationScope: helpsScope, skipPanelClear: true })
-        return
-      }
       await runCatalogLoad({ ...one, navigationScope: nav.navigationScope })
     },
     [
       inheritEmptyLanguage,
       markCatalogSettled,
       resetCatalogSettled,
+      resourceTypeRegistry,
       runCatalogLoad,
       textKeysRef,
       helpsKeysRef,

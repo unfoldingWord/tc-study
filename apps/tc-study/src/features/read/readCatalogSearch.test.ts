@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { OBS_HELPS_SUBJECTS } from './languageAvailability'
+import { subjectsForHelpsCatalogLoad } from '@bt-synergy/resource-types'
+import * as plugins from '../../resourceTypes'
+import { RESOURCE_TYPE_PLUGIN_EXPORTS } from '../../resourceTypes/pluginRegistry'
 import { hydrateReadCatalogHits } from './hydrateReadCatalogHits'
 import {
   catalogSearchRequestsForTarget,
@@ -7,6 +9,9 @@ import {
   type CatalogSearchClient,
 } from './readCatalogSearch'
 import type { CatalogEntry } from './readCatalogIdentity'
+
+const registered = RESOURCE_TYPE_PLUGIN_EXPORTS.map((name) => plugins[name])
+const obsHelpsCatalogSubjects = subjectsForHelpsCatalogLoad(registered, 'obs')
 
 /** Hindi is in the prod OBS-helps set, not the 3-GL tc-ready TSV set (en / es-419 / id). */
 const HI_OBS_TN = Object.freeze({
@@ -87,8 +92,12 @@ describe('catalogSearchRequestsForTarget', () => {
       languageCode: 'hi',
       target: 'helps',
       navigationScope: 'obs',
+      helpsSubjects: obsHelpsCatalogSubjects,
     })
-    expect(requests.map((r) => r.params.subject)).toEqual([...OBS_HELPS_SUBJECTS])
+    expect(requests.map((r) => r.params.subject)).toEqual(obsHelpsCatalogSubjects)
+    expect(obsHelpsCatalogSubjects).toContain('TSV OBS Translation Questions')
+    expect(obsHelpsCatalogSubjects).toContain('Translation Words')
+    expect(obsHelpsCatalogSubjects).toContain('Translation Academy')
     expect(requests.every((r) => r.hydrateTarget === 'helps')).toBe(true)
     expect(requests.every((r) => r.params.topic === undefined)).toBe(true)
     expect(requests.every((r) => r.params.stage === 'prod')).toBe(true)
@@ -146,12 +155,13 @@ describe('catalogSearchRequestsForTarget', () => {
       languageCode: 'hi',
       target: 'both',
       navigationScope: 'obs',
+      helpsSubjects: obsHelpsCatalogSubjects,
     })
     expect(requests[0]).toEqual({
       hydrateTarget: 'text',
       params: { language: 'hi', topic: 'tc-ready', stage: 'prod', limit: 500 },
     })
-    expect(requests.slice(1).map((r) => r.params.subject)).toEqual([...OBS_HELPS_SUBJECTS])
+    expect(requests.slice(1).map((r) => r.params.subject)).toEqual(obsHelpsCatalogSubjects)
     expect(requests.slice(1).every((r) => r.params.topic === undefined)).toBe(true)
     expect(requests.slice(1).every((r) => r.hydrateTarget === 'helps')).toBe(true)
   })
@@ -182,12 +192,13 @@ describe('searchCatalogHitsForTarget (frozen Door43 fixtures)', () => {
       languageCode: 'hi',
       target: 'helps',
       navigationScope: 'obs',
+      helpsSubjects: obsHelpsCatalogSubjects,
     })
 
-    expect(calls).toHaveLength(OBS_HELPS_SUBJECTS.length)
+    expect(calls).toHaveLength(obsHelpsCatalogSubjects.length)
     expect(calls.every((call) => call.topic === undefined)).toBe(true)
     expect(calls.every((call) => call.stage === 'prod')).toBe(true)
-    expect(calls.map((call) => call.subject).sort()).toEqual([...OBS_HELPS_SUBJECTS].sort())
+    expect(calls.map((call) => call.subject).sort()).toEqual([...obsHelpsCatalogSubjects].sort())
     expect(calls.some((call) => call.topic === 'tc-ready')).toBe(false)
 
     const helps = pages.find((page) => page.hydrateTarget === 'helps')

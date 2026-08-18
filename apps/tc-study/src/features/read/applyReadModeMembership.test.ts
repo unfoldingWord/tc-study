@@ -2,9 +2,16 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { enableMapSet } from 'immer'
+import {
+  paneTypeIdsForHelpsCatalogLoad,
+  subjectsForHelpsCatalogLoad,
+  typeIdsForHelpsCatalogLoad,
+} from '@bt-synergy/resource-types'
 import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
+import * as plugins from '../../resourceTypes'
+import { RESOURCE_TYPE_PLUGIN_EXPORTS } from '../../resourceTypes/pluginRegistry'
 import { COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
 import { shouldInjectCombinedHelps } from '../helps/combinedHelpsInjection'
 import { HELPS_EMPTY_COPY, resolveHelpsPaneNoSourcesView } from '../helps/helpsEmptyCopy'
@@ -12,13 +19,30 @@ import { addResource } from '../workspace/resourceMutations'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
   applyReadModeMembership,
+  packageHasHelpsCatalogTypes,
   panelHasHelpsMembership,
 } from './applyReadModeMembership'
 import { shouldLoadCatalogOnModeSwitch } from './downloadIsolationPolicy'
-import { OBS_HELPS_SUBJECTS } from './languageAvailability'
 import { catalogSearchRequestsForTarget } from './readCatalogSearch'
 import { resolveHelpsCatalogScope } from './resolveHelpsCatalogScope'
 import { catalogLoadForSinglePanel } from './runReadPanelCatalog'
+
+const registered = RESOURCE_TYPE_PLUGIN_EXPORTS.map((name) => plugins[name])
+const scriptureCatalogTypeIds = typeIdsForHelpsCatalogLoad(registered, 'scripture')
+const scripturePaneTypeIds = paneTypeIdsForHelpsCatalogLoad(registered, 'scripture')
+const obsCatalogTypeIds = typeIdsForHelpsCatalogLoad(registered, 'obs')
+const obsPaneTypeIds = paneTypeIdsForHelpsCatalogLoad(registered, 'obs')
+const obsCatalogSubjects = subjectsForHelpsCatalogLoad(registered, 'obs')
+const scriptureCompanionIds = registered
+  .filter(
+    (def) =>
+      def.contentRole === 'companion' &&
+      scriptureCatalogTypeIds.includes(def.id)
+  )
+  .map((def) => def.id)
+const obsCompanionIds = registered
+  .filter((def) => def.contentRole === 'companion' && obsCatalogTypeIds.includes(def.id))
+  .map((def) => def.id)
 
 enableMapSet()
 
@@ -111,8 +135,9 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
       })
     ).toBe(true)
 
-    applyReadModeMembership('panel-1', 'helps', 'en', textKeys)
-    expect(panelHasHelpsMembership('panel-1')).toBe(false)
+    applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'scripture', scripturePaneTypeIds)
+    expect(panelHasHelpsMembership('panel-1', 'scripture', scripturePaneTypeIds)).toBe(false)
+    expect(packageHasHelpsCatalogTypes('en', scriptureCatalogTypeIds)).toBe(false)
     expect(shouldInjectCombinedHelps({})).toBe(false)
 
     const pending = resolveHelpsPaneNoSourcesView({
@@ -152,7 +177,9 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     addResource(res({ key: 'unfoldingWord/en/tn', type: 'notes' }))
     addResource(res({ key: 'unfoldingWord/en/twl', type: 'words-links' }))
     addResource(res({ key: 'unfoldingWord/en/tq', type: 'questions' }))
-    applyReadModeMembership('panel-1', 'helps', 'en', textKeys)
+    addResource(res({ key: 'unfoldingWord/en/tw', type: 'words' }))
+    addResource(res({ key: 'unfoldingWord/en/ta', type: 'academy' }))
+    applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'scripture', scripturePaneTypeIds)
 
     const pkg = useWorkspaceStore.getState().currentPackage!
     const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
@@ -164,7 +191,16 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     expect(p1.resourceKeys).toContain(scoped)
     expect(p1.resourceKeys).toContain('unfoldingWord/en/tq')
     expect(p1.resourceKeys).toContain('unfoldingWord/en/ult')
-    expect(panelHasHelpsMembership('panel-1')).toBe(true)
+    expect(packageHasHelpsCatalogTypes('en', scriptureCatalogTypeIds)).toBe(true)
+    for (const id of scriptureCompanionIds) {
+      expect([...pkg.resources.values()].some((r) => String(r.type) === id)).toBe(true)
+    }
+    expect(
+      scriptureCompanionIds.some((id) =>
+        p1.resourceKeys.some((key) => String(pkg.resources.get(key)?.type || '') === id)
+      )
+    ).toBe(true)
+    expect(panelHasHelpsMembership('panel-1', 'scripture', scripturePaneTypeIds)).toBe(true)
     expect(p2.resourceKeys).toContain('unfoldingWord/en/ult#2')
     expect(p2.resourceKeys).not.toContain(COMBINED_HELPS_RESOURCE_ID)
     expect(p2.resourceKeys).not.toContain(scoped)
@@ -186,19 +222,28 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     addResource(res({ key: 'unfoldingWord/en/tn', type: 'notes' }), { panelId: 'panel-2' })
     addResource(res({ key: 'unfoldingWord/en/twl', type: 'words-links' }), { panelId: 'panel-2' })
     addResource(res({ key: 'unfoldingWord/en/tq', type: 'questions' }), { panelId: 'panel-2' })
-    applyReadModeMembership('panel-2', 'helps', 'en', ['unfoldingWord/en/ult'])
+    addResource(res({ key: 'unfoldingWord/en/tw', type: 'words' }))
+    addResource(res({ key: 'unfoldingWord/en/ta', type: 'academy' }))
+    applyReadModeMembership(
+      'panel-2',
+      'helps',
+      'en',
+      ['unfoldingWord/en/ult'],
+      'scripture',
+      scripturePaneTypeIds
+    )
 
-    expect(
-      shouldLoadCatalogOnModeSwitch({
-        mode: 'helps',
-        languageCode: 'eng',
-        textKeys: ['unfoldingWord/en/ult'],
-        helpsKeys: ['unfoldingWord/en/tn', 'unfoldingWord/en/twl', 'unfoldingWord/en/tq'],
-      })
-    ).toBe(false)
+    expect(packageHasHelpsCatalogTypes('eng', scriptureCatalogTypeIds)).toBe(true)
 
     const p2Before = useWorkspaceStore.getState().currentPackage!.panels.find((p) => p.id === 'panel-2')!
-    applyReadModeMembership('panel-1', 'helps', 'eng', ['unfoldingWord/en/ult'])
+    applyReadModeMembership(
+      'panel-1',
+      'helps',
+      'eng',
+      ['unfoldingWord/en/ult'],
+      'scripture',
+      scripturePaneTypeIds
+    )
     const pkg = useWorkspaceStore.getState().currentPackage!
     const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
     const p2 = pkg.panels.find((p) => p.id === 'panel-2')!
@@ -232,8 +277,9 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
       })
     ).toBe(true)
 
-    applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'obs')
-    expect(panelHasHelpsMembership('panel-1', 'obs')).toBe(false)
+    applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'obs', obsPaneTypeIds)
+    expect(panelHasHelpsMembership('panel-1', 'obs', obsPaneTypeIds)).toBe(false)
+    expect(packageHasHelpsCatalogTypes('en', obsCatalogTypeIds)).toBe(false)
     expect(shouldInjectCombinedHelps({})).toBe(false)
 
     const pending = resolveHelpsPaneNoSourcesView({
@@ -264,11 +310,14 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
         languageCode: 'en',
         target: 'helps',
         navigationScope: 'obs',
+        helpsSubjects: obsCatalogSubjects,
       }).map((r) => r.params.subject)
-    ).toEqual([...OBS_HELPS_SUBJECTS])
+    ).toEqual(obsCatalogSubjects)
+    expect(obsCatalogSubjects).toContain('TSV OBS Translation Questions')
+    expect(obsCatalogSubjects).toContain('Translation Words')
 
     addResource(res({ key: 'unfoldingWord/en/obs-tn', type: 'obs-notes', subject: 'TSV OBS Translation Notes' }))
-    applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'obs')
+    applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'obs', obsPaneTypeIds)
 
     const pkg = useWorkspaceStore.getState().currentPackage!
     const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
@@ -276,7 +325,8 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     expect(shouldInjectCombinedHelps({ tnKey: 'unfoldingWord/en/obs-tn' })).toBe(true)
     expect(p1.resourceKeys).toContain(scopedObs)
     expect(p1.resourceKeys).toContain('unfoldingWord/en/obs')
-    expect(panelHasHelpsMembership('panel-1', 'obs')).toBe(true)
+    expect(packageHasHelpsCatalogTypes('en', obsCatalogTypeIds)).toBe(false)
+    expect(panelHasHelpsMembership('panel-1', 'obs', obsPaneTypeIds)).toBe(true)
     expect(
       resolveHelpsPaneNoSourcesView({
         mode: 'helps',
@@ -289,10 +339,81 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     ).toBeNull()
   })
 
+  test('OBS CombinedHelps only still hydrates every registered companion for obs', () => {
+    addResource(res({ key: 'unfoldingWord/en/obs', type: 'obs' }), { panelId: 'panel-1' })
+    addResource(res({ key: 'unfoldingWord/en/obs-tn', type: 'obs-notes' }))
+    applyReadModeMembership('panel-1', 'helps', 'en', ['unfoldingWord/en/obs'], 'obs', obsPaneTypeIds)
+    expect(packageHasHelpsCatalogTypes('en', obsCatalogTypeIds)).toBe(false)
+
+    for (const def of registered) {
+      if (!obsCatalogTypeIds.includes(def.id)) continue
+      addResource(res({ key: `unfoldingWord/en/${def.id}`, type: def.id }))
+    }
+    applyReadModeMembership('panel-1', 'helps', 'en', ['unfoldingWord/en/obs'], 'obs', obsPaneTypeIds)
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
+    expect(packageHasHelpsCatalogTypes('en', obsCatalogTypeIds)).toBe(true)
+    for (const id of obsCompanionIds) {
+      expect([...pkg.resources.values()].some((r) => String(r.type) === id)).toBe(true)
+    }
+    expect(
+      obsCompanionIds.some((id) =>
+        p1.resourceKeys.some((key) => String(pkg.resources.get(key)?.type || '') === id)
+      )
+    ).toBe(true)
+    expect(p1.resourceKeys).toContain(`${OBS_COMBINED_HELPS_RESOURCE_ID}:panel-1`)
+    expect(p1.resourceKeys.some((key) => key.includes('obs-questions') || key.endsWith('/obs-questions'))).toBe(
+      true
+    )
+  })
+
+  test('Bible CombinedHelps only still hydrates every registered companion for scripture', () => {
+    addResource(res({ key: 'unfoldingWord/en/ult', type: 'scripture' }), { panelId: 'panel-1' })
+    addResource(res({ key: 'unfoldingWord/en/tn', type: 'notes' }))
+    applyReadModeMembership(
+      'panel-1',
+      'helps',
+      'en',
+      ['unfoldingWord/en/ult'],
+      'scripture',
+      scripturePaneTypeIds
+    )
+    expect(packageHasHelpsCatalogTypes('en', scriptureCatalogTypeIds)).toBe(false)
+
+    for (const def of registered) {
+      if (!scriptureCatalogTypeIds.includes(def.id)) continue
+      addResource(res({ key: `unfoldingWord/en/${def.id}`, type: def.id }))
+    }
+    applyReadModeMembership(
+      'panel-1',
+      'helps',
+      'en',
+      ['unfoldingWord/en/ult'],
+      'scripture',
+      scripturePaneTypeIds
+    )
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
+    expect(packageHasHelpsCatalogTypes('en', scriptureCatalogTypeIds)).toBe(true)
+    for (const id of scriptureCompanionIds) {
+      expect([...pkg.resources.values()].some((r) => String(r.type) === id)).toBe(true)
+    }
+    expect(
+      scriptureCompanionIds.some((id) =>
+        p1.resourceKeys.some((key) => String(pkg.resources.get(key)?.type || '') === id)
+      )
+    ).toBe(true)
+    expect(p1.resourceKeys.some((key) => key.includes('/questions'))).toBe(true)
+  })
+
   test('mode-switch handler hydrates helps without scripture reclear or URL hydrate', () => {
     const handler = readFileSync(join(import.meta.dir, 'useReadPanelLanguageHandlers.ts'), 'utf8')
     const mode = handler.slice(handler.indexOf('const handlePanelModeSwitch'))
-    expect(mode).toContain('shouldLoadCatalogOnModeSwitch')
+    expect(mode).toContain('packageHasHelpsCatalogTypes')
+    expect(mode).toContain('helpsCatalogTypeIds')
+    expect(mode).toContain('helpsCatalogPaneTypeIds')
     expect(mode).toContain('resolveHelpsCatalogScope')
     expect(mode).toContain('navigationScope: helpsScope')
     expect(mode).toContain('resetCatalogSettled([panelId])')

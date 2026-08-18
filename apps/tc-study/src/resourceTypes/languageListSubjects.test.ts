@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { subjectsForLanguageList } from '@bt-synergy/resource-types'
+import { subjectsForHelpsCatalogLoad, subjectsForLanguageList } from '@bt-synergy/resource-types'
 import { resolveLanguageListKind } from '../features/read/languageListKind'
 import * as plugins from './index'
 import { RESOURCE_TYPE_PLUGIN_EXPORTS } from './pluginRegistry'
@@ -74,6 +74,22 @@ describe('registered plugin language-list subjects', () => {
     expect(subjects).toContain('TSV OBS Translation Questions')
     expect(subjects).not.toContain('Translation Words')
     expect(subjects).not.toContain('Translation Academy')
+  })
+
+  test('helps catalog load includes companions + shared for each scope', () => {
+    const scripture = subjectsForHelpsCatalogLoad(registered, 'scripture')
+    expect(scripture).toContain('TSV Translation Notes')
+    expect(scripture).toContain('TSV Translation Questions')
+    expect(scripture).toContain('Translation Words')
+    expect(scripture).toContain('Translation Academy')
+    expect(scripture).not.toContain('Combined Helps')
+
+    const obs = subjectsForHelpsCatalogLoad(registered, 'obs')
+    expect(obs).toContain('TSV OBS Translation Notes')
+    expect(obs).toContain('TSV OBS Translation Questions')
+    expect(obs).toContain('Translation Words')
+    expect(obs).toContain('Translation Academy')
+    expect(obs).not.toContain('OBS Combined Helps')
   })
 
   test('all-helps is companion scripture helps ∪ OBS helps (not shared TW/TA)', () => {

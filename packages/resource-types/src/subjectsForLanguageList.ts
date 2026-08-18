@@ -15,6 +15,7 @@ export type LanguageListKind =
   | 'obs-helps'
   | 'all-helps'
 export type ResourcePanelMode = 'scripture' | 'obs' | 'helps'
+export type HelpsCatalogScope = 'scripture' | 'obs'
 
 export type LanguageListTypeFields = Pick<
   ResourceTypeDefinition,
@@ -26,6 +27,9 @@ export type LanguageListTypeFields = Pick<
   | 'scope'
   | 'companionFor'
 >
+
+export type HelpsCatalogTypeFields = LanguageListTypeFields &
+  Pick<ResourceTypeDefinition, 'id' | 'viewer'>
 
 export function panelModesForType(def: LanguageListTypeFields): ResourcePanelMode[] {
   if (def.panelModes && def.panelModes.length > 0) return [...def.panelModes]
@@ -45,6 +49,61 @@ export function catalogLanguageListSubjects(def: LanguageListTypeFields): string
   return uniqueSubjects(def.languageListSubjects ?? def.subjects ?? [])
 }
 
+function companionMatchesScope(def: LanguageListTypeFields, scope: HelpsCatalogScope): boolean {
+  const forScopes = def.companionFor ?? []
+  if (scope === 'obs') return forScopes.includes('obs')
+  return forScopes.includes('scripture') || forScopes.length === 0
+}
+
+/**
+ * Catalog hydrate for a chosen helps language: every companion for `scope`
+ * plus every shared type. Synthetic aggregators (`includeInLanguageLists:
+ * false`) stay out — they are injected after companions exist.
+ * Picker kinds (`helps` / `all-helps`) still omit shared on purpose.
+ */
+export function typeMatchesHelpsCatalogLoad(
+  def: LanguageListTypeFields,
+  scope: HelpsCatalogScope
+): boolean {
+  if (def.includeInLanguageLists === false) return false
+  if (def.contentRole === 'primary') return false
+  if (def.contentRole === 'shared') return true
+  return companionMatchesScope(def, scope)
+}
+
+export function subjectsForHelpsCatalogLoad(
+  types: readonly LanguageListTypeFields[],
+  scope: HelpsCatalogScope
+): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const def of types) {
+    if (!typeMatchesHelpsCatalogLoad(def, scope)) continue
+    for (const subject of catalogLanguageListSubjects(def)) {
+      if (seen.has(subject)) continue
+      seen.add(subject)
+      out.push(subject)
+    }
+  }
+  return out
+}
+
+export function typeIdsForHelpsCatalogLoad(
+  types: readonly HelpsCatalogTypeFields[],
+  scope: HelpsCatalogScope
+): string[] {
+  return types.filter((def) => typeMatchesHelpsCatalogLoad(def, scope)).map((def) => def.id)
+}
+
+export function paneTypeIdsForHelpsCatalogLoad(
+  types: readonly HelpsCatalogTypeFields[],
+  scope: HelpsCatalogScope
+): string[] {
+  return types
+    .filter((def) => typeMatchesHelpsCatalogLoad(def, scope) && def.viewer)
+    .map((def) => def.id)
+}
+
 function typeMatchesKind(def: LanguageListTypeFields, kind: LanguageListKind): boolean {
   // Shared article types (TW/TA) are not "has helps" — CombinedHelps inject
   // needs TN / TWL / TQ. Querying them floods the picker with empty langs.
@@ -54,12 +113,11 @@ function typeMatchesKind(def: LanguageListTypeFields, kind: LanguageListKind): b
   if (kind === 'obs') return modes.includes('obs')
   if (kind === 'helps') {
     if (!modes.includes('helps')) return false
-    const forScopes = def.companionFor ?? []
-    return forScopes.includes('scripture') || forScopes.length === 0
+    return companionMatchesScope(def, 'scripture')
   }
   if (kind === 'obs-helps') {
     if (!modes.includes('helps')) return false
-    return (def.companionFor ?? []).includes('obs')
+    return companionMatchesScope(def, 'obs')
   }
   return false
 }

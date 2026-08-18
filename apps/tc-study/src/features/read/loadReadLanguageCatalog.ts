@@ -88,9 +88,9 @@ function activateGatewayScriptureTab(deps: {
  * Load catalog resources for text and/or helps language into workspace + panels,
  * then hydrate metadata and save `*_tc-helps` collection(s) in the background.
  *
- * Text (and Bible helps) use `topic=tc-ready`. OBS helps search prod OBS TN/TWL
- * subjects without requiring `topic=tc-ready`. CombinedHelps binds to
- * `helpsLanguageCode`.
+ * Text (and Bible helps) use `topic=tc-ready`. OBS helps search prod companion
+ * + shared subjects from the registry (not a TN/TWL allowlist) without
+ * requiring `topic=tc-ready`. CombinedHelps binds to `helpsLanguageCode`.
  */
 export async function loadReadLanguageCatalog(
   deps: LoadReadLanguageCatalogDeps
@@ -131,6 +131,8 @@ export async function loadReadLanguageCatalog(
   }
 
   const door43Client = getDoor43ApiClient()
+  const helpsScope = navigationScope === 'obs' ? 'obs' : 'scripture'
+  const helpsSubjects = resourceTypeRegistry.subjectsForHelpsCatalogLoad(helpsScope)
   const searches =
     destPanelId && loadTarget !== 'both'
       ? [
@@ -151,6 +153,7 @@ export async function loadReadLanguageCatalog(
         languageCode: search.languageCode,
         target: search.target,
         navigationScope,
+        helpsSubjects,
       }),
     }))
   )

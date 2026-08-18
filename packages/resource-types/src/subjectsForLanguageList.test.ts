@@ -1,8 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import {
   catalogLanguageListSubjects,
+  paneTypeIdsForHelpsCatalogLoad,
   panelModesForType,
+  subjectsForHelpsCatalogLoad,
   subjectsForLanguageList,
+  typeIdsForHelpsCatalogLoad,
+  typeMatchesHelpsCatalogLoad,
+  type HelpsCatalogTypeFields,
   type LanguageListTypeFields,
 } from './subjectsForLanguageList'
 
@@ -193,6 +198,57 @@ describe('subjectsForLanguageList', () => {
     expect(subjectsForLanguageList([TW, TA, NOTES], 'all-helps')).toEqual([
       'TSV Translation Notes',
     ])
+  })
+
+  test('helps catalog load includes companions + shared, not synthetic Combined Helps', () => {
+    const scripture = subjectsForHelpsCatalogLoad(ALL, 'scripture')
+    expect(scripture).toContain('TSV Translation Notes')
+    expect(scripture).toContain('TSV Translation Words Links')
+    expect(scripture).toContain('TSV Translation Questions')
+    expect(scripture).toContain('Translation Words')
+    expect(scripture).toContain('Translation Academy')
+    expect(scripture).not.toContain('Combined Helps')
+    expect(scripture).not.toContain('TSV OBS Translation Notes')
+
+    const obs = subjectsForHelpsCatalogLoad(ALL, 'obs')
+    expect(obs).toContain('TSV OBS Translation Notes')
+    expect(obs).toContain('OBS Translation Notes')
+    expect(obs).toContain('TSV OBS Translation Words Links')
+    expect(obs).toContain('TSV OBS Translation Questions')
+    expect(obs).toContain('Translation Words')
+    expect(obs).toContain('Translation Academy')
+    expect(obs).not.toContain('OBS Combined Helps')
+    expect(obs).not.toContain('TSV Translation Notes')
+    expect(obs).not.toContain('Bible')
+  })
+
+  test('a new companion plugin appears in the helps catalog load subject list', () => {
+    const extra = type({
+      contentRole: 'companion',
+      companionFor: ['obs'],
+      subjects: ['OBS Study Notes'],
+    })
+    expect(subjectsForHelpsCatalogLoad([...ALL, extra], 'obs')).toContain('OBS Study Notes')
+    expect(subjectsForHelpsCatalogLoad([...ALL, extra], 'scripture')).not.toContain(
+      'OBS Study Notes'
+    )
+    expect(subjectsForLanguageList([...ALL, extra], 'all-helps')).not.toContain('Translation Words')
+  })
+
+  test('catalog type ids follow contentRole + companionFor, not named types', () => {
+    const withIds: HelpsCatalogTypeFields[] = [
+      { ...NOTES, id: 'notes', viewer: { displayName: 'Notes' } },
+      { ...TQ, id: 'questions', viewer: { displayName: 'Questions' } },
+      { ...TW, id: 'words' },
+      { ...COMBINED, id: 'combined-helps', viewer: { displayName: 'Helps' } },
+      { ...OBS_TQ, id: 'obs-questions', viewer: { displayName: 'OBS Questions' } },
+    ]
+    expect(typeMatchesHelpsCatalogLoad(NOTES, 'scripture')).toBe(true)
+    expect(typeMatchesHelpsCatalogLoad(TW, 'scripture')).toBe(true)
+    expect(typeMatchesHelpsCatalogLoad(COMBINED, 'scripture')).toBe(false)
+    expect(typeIdsForHelpsCatalogLoad(withIds, 'scripture')).toEqual(['notes', 'questions', 'words'])
+    expect(paneTypeIdsForHelpsCatalogLoad(withIds, 'scripture')).toEqual(['notes', 'questions'])
+    expect(typeIdsForHelpsCatalogLoad(withIds, 'obs')).toEqual(['words', 'obs-questions'])
   })
 
   test('a new primary plugin expands global and its mode list', () => {
