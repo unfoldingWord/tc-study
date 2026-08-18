@@ -5,7 +5,7 @@ import { enableMapSet } from 'immer'
 import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
-import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
+import { COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
 import { shouldInjectCombinedHelps } from '../helps/combinedHelpsInjection'
 import { HELPS_EMPTY_COPY, resolveHelpsPaneNoSourcesView } from '../helps/helpsEmptyCopy'
 import { addResource } from '../workspace/resourceMutations'
@@ -15,6 +15,9 @@ import {
   panelHasHelpsMembership,
 } from './applyReadModeMembership'
 import { shouldLoadCatalogOnModeSwitch } from './downloadIsolationPolicy'
+import { OBS_HELPS_SUBJECTS } from './languageAvailability'
+import { catalogSearchRequestsForTarget } from './readCatalogSearch'
+import { resolveHelpsCatalogScope } from './resolveHelpsCatalogScope'
 import { catalogLoadForSinglePanel } from './runReadPanelCatalog'
 
 enableMapSet()
@@ -204,10 +207,94 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     expect(p2.resourceKeys).toEqual(p2Before.resourceKeys)
   })
 
+  test('en OBS + empty OBS membership loads OBS subjects; CombinedHelps OBS injects after OBS-TN', () => {
+    addResource(res({ key: 'unfoldingWord/en/obs', type: 'obs', subject: 'Open Bible Stories' }), {
+      panelId: 'panel-1',
+    })
+    addResource(res({ key: 'unfoldingWord/en/tn', type: 'notes' }))
+    addResource(res({ key: 'unfoldingWord/en/twl', type: 'words-links' }))
+
+    const textKeys = ['unfoldingWord/en/obs']
+    const helpsKeys = ['unfoldingWord/en/tn', 'unfoldingWord/en/twl']
+    expect(
+      resolveHelpsCatalogScope({
+        navigationScope: 'scripture',
+        thisPaneHasObsPrimary: true,
+      })
+    ).toBe('obs')
+    expect(
+      shouldLoadCatalogOnModeSwitch({
+        mode: 'helps',
+        languageCode: 'en',
+        textKeys,
+        helpsKeys,
+        helpsScope: 'obs',
+      })
+    ).toBe(true)
+
+    applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'obs')
+    expect(panelHasHelpsMembership('panel-1', 'obs')).toBe(false)
+    expect(shouldInjectCombinedHelps({})).toBe(false)
+
+    const pending = resolveHelpsPaneNoSourcesView({
+      mode: 'helps',
+      languageCode: 'en',
+      isLoading: false,
+      hasResource: false,
+      languageName: 'English',
+      catalogSettled: false,
+    })
+    expect(pending).toBeNull()
+
+    const load = catalogLoadForSinglePanel(
+      {
+        'panel-1': { mode: 'helps', languageCode: 'en' },
+        'panel-2': { mode: 'scripture', languageCode: 'en' },
+      },
+      'panel-1'
+    )
+    expect(load).toEqual({
+      textLanguageCode: 'en',
+      helpsLanguageCode: 'en',
+      loadTarget: 'helps',
+      destPanelId: 'panel-1',
+    })
+    expect(
+      catalogSearchRequestsForTarget({
+        languageCode: 'en',
+        target: 'helps',
+        navigationScope: 'obs',
+      }).map((r) => r.params.subject)
+    ).toEqual([...OBS_HELPS_SUBJECTS])
+
+    addResource(res({ key: 'unfoldingWord/en/obs-tn', type: 'obs-notes', subject: 'TSV OBS Translation Notes' }))
+    applyReadModeMembership('panel-1', 'helps', 'en', textKeys, 'obs')
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
+    const scopedObs = `${OBS_COMBINED_HELPS_RESOURCE_ID}:panel-1`
+    expect(shouldInjectCombinedHelps({ tnKey: 'unfoldingWord/en/obs-tn' })).toBe(true)
+    expect(p1.resourceKeys).toContain(scopedObs)
+    expect(p1.resourceKeys).toContain('unfoldingWord/en/obs')
+    expect(panelHasHelpsMembership('panel-1', 'obs')).toBe(true)
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'en',
+        isLoading: false,
+        hasResource: true,
+        languageName: 'English',
+        catalogSettled: true,
+      })
+    ).toBeNull()
+  })
+
   test('mode-switch handler hydrates helps without scripture reclear or URL hydrate', () => {
     const handler = readFileSync(join(import.meta.dir, 'useReadPanelLanguageHandlers.ts'), 'utf8')
     const mode = handler.slice(handler.indexOf('const handlePanelModeSwitch'))
     expect(mode).toContain('shouldLoadCatalogOnModeSwitch')
+    expect(mode).toContain('resolveHelpsCatalogScope')
+    expect(mode).toContain('navigationScope: helpsScope')
     expect(mode).toContain('resetCatalogSettled([panelId])')
     expect(mode).toContain('skipPanelClear: true')
     expect(mode).toContain('catalogLoadForSinglePanel')

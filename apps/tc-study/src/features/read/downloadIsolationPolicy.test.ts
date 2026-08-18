@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   catalogKeysIncludeLanguage,
   downloadResetToken,
+  helpsCatalogKeyMatchesScope,
   shouldCancelDownloadsOnPaneSwitch,
   shouldLoadCatalogOnModeSwitch,
   shouldResetDownloadQueueOnModeSwitch,
@@ -152,5 +153,28 @@ describe('shouldLoadCatalogOnModeSwitch', () => {
         helpsKeys: [],
       })
     ).toBe(true)
+  })
+
+  test('Bible TN/TWL do not skip an OBS helps catalog load', () => {
+    expect(helpsCatalogKeyMatchesScope('unfoldingWord/en/tn', 'obs')).toBe(false)
+    expect(helpsCatalogKeyMatchesScope('unfoldingWord/en/obs-tn', 'obs')).toBe(true)
+    expect(
+      shouldLoadCatalogOnModeSwitch({
+        mode: 'helps',
+        languageCode: 'en',
+        textKeys: ['unfoldingWord/en/obs'],
+        helpsKeys: ['unfoldingWord/en/tn', 'unfoldingWord/en/twl'],
+        helpsScope: 'obs',
+      })
+    ).toBe(true)
+    expect(
+      shouldLoadCatalogOnModeSwitch({
+        mode: 'helps',
+        languageCode: 'en',
+        textKeys: ['unfoldingWord/en/obs'],
+        helpsKeys: ['unfoldingWord/en/obs-tn'],
+        helpsScope: 'obs',
+      })
+    ).toBe(false)
   })
 })

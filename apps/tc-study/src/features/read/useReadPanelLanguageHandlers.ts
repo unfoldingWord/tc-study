@@ -7,11 +7,14 @@ import { useCallback } from 'react'
 import { useNavigationStore, useResourceTypeRegistry } from '../../contexts'
 import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
+import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { applyReadModeMembership, panelHasHelpsMembership } from './applyReadModeMembership'
 import {
   shouldLoadCatalogOnModeSwitch,
   type DownloadPane,
 } from './downloadIsolationPolicy'
+import { otherReadPanelId } from './readPanelModel'
+import { panelHasObsPrimaryContent, resolveHelpsCatalogScope } from './resolveHelpsCatalogScope'
 import { catalogLoadForSinglePanel } from './runReadPanelCatalog'
 import {
   skipTextCatalogOnMismatch,
@@ -97,28 +100,42 @@ export function useReadPanelLanguageHandlers(deps: {
       inheritEmptyLanguage()
       const panels = useReadPanelStore.getState().panels
       const panel = panels[panelId]
+      const nav = useNavigationStore.getState()
+      const pkg = useWorkspaceStore.getState().currentPackage
+      const thisKeys = pkg?.panels.find((p) => p.id === panelId)?.resourceKeys ?? []
+      const siblingKeys =
+        pkg?.panels.find((p) => p.id === otherReadPanelId(panelId))?.resourceKeys ?? []
+      const helpsScope = resolveHelpsCatalogScope({
+        navigationScope: nav.navigationScope,
+        pathname: typeof window !== 'undefined' ? window.location.pathname : '',
+        currentBook: nav.currentReference.book,
+        thisPaneHasObsPrimary: pkg ? panelHasObsPrimaryContent(thisKeys, pkg.resources) : false,
+        siblingPaneHasObsPrimary: pkg
+          ? panelHasObsPrimaryContent(siblingKeys, pkg.resources)
+          : false,
+      })
       const needsCatalog = shouldLoadCatalogOnModeSwitch({
         mode,
         languageCode: panel.languageCode,
         textKeys: textKeysRef.current,
         helpsKeys: helpsKeysRef.current,
+        helpsScope: mode === 'helps' ? helpsScope : undefined,
       })
       if (!needsCatalog) {
-        applyReadModeMembership(panelId, mode, panel.languageCode, textKeysRef.current)
-        if (mode !== 'helps' || panelHasHelpsMembership(panelId)) {
+        applyReadModeMembership(panelId, mode, panel.languageCode, textKeysRef.current, helpsScope)
+        if (mode !== 'helps' || panelHasHelpsMembership(panelId, helpsScope)) {
           markCatalogSettled([panelId])
           return
         }
       }
-      const navigationScope = useNavigationStore.getState().navigationScope
       const one = catalogLoadForSinglePanel(panels, panelId)
       if (!one) return
       if (mode === 'helps') {
         resetCatalogSettled([panelId])
-        await runCatalogLoad({ ...one, navigationScope, skipPanelClear: true })
+        await runCatalogLoad({ ...one, navigationScope: helpsScope, skipPanelClear: true })
         return
       }
-      await runCatalogLoad({ ...one, navigationScope })
+      await runCatalogLoad({ ...one, navigationScope: nav.navigationScope })
     },
     [
       inheritEmptyLanguage,

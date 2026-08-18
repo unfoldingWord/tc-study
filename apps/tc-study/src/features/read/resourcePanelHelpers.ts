@@ -1,8 +1,8 @@
 import type { ResourceInfo } from '../../contexts/types'
 import {
   COMBINED_HELPS_IDS,
-  COMBINED_HELPS_RESOURCE_ID,
-  OBS_COMBINED_HELPS_RESOURCE_ID,
+  isCombinedHelpsId,
+  isObsCombinedHelpsId,
 } from '../helps/combinedHelpsIds'
 import { findHelpsKeysAmongResources } from '../helps/combinedHelpsInjection'
 import { getContentStructure, getIngredients } from '../../utils/resourceMetadataAccessors'
@@ -46,8 +46,8 @@ export function getResourceAppliesToScope(
     getScopeForType: (id: string) => string | null
   }
 ): string | null {
-  if (resourceKey === COMBINED_HELPS_RESOURCE_ID) return 'scripture'
-  if (resourceKey === OBS_COMBINED_HELPS_RESOURCE_ID) return 'obs'
+  if (isObsCombinedHelpsId(resourceKey)) return 'obs'
+  if (isCombinedHelpsId(resourceKey)) return 'scripture'
 
   const resource =
     loadedResources[resourceKey] ?? loadedResources[getBaseResourceKey(resourceKey)]
@@ -96,7 +96,7 @@ export function resourceSupportsBook(
   loadedResources: Record<string, ResourceInfo | undefined>,
   bookCode: string
 ): boolean {
-  if (resourceKey === COMBINED_HELPS_RESOURCE_ID || resourceKey === OBS_COMBINED_HELPS_RESOURCE_ID) {
+  if (isCombinedHelpsId(resourceKey)) {
     return true
   }
   if (bookCode === 'obs') return true

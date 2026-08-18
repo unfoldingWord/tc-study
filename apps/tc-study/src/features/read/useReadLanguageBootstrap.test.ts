@@ -143,6 +143,8 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(mode).toContain('shouldLoadCatalogOnModeSwitch')
     expect(mode).toContain('applyReadModeMembership')
     expect(mode).toContain('panelHasHelpsMembership')
+    expect(mode).toContain('resolveHelpsCatalogScope')
+    expect(mode).toContain('navigationScope: helpsScope')
     expect(mode).toContain('resetCatalogSettled')
     expect(mode).toContain('skipPanelClear: true')
     expect(mode).not.toContain('maybeCancelDownloads')

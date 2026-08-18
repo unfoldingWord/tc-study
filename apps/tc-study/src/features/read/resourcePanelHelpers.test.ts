@@ -22,6 +22,12 @@ describe('resourcePanelHelpers', () => {
     }
     expect(getResourceAppliesToScope(COMBINED_HELPS_RESOURCE_ID, {}, registry)).toBe('scripture')
     expect(getResourceAppliesToScope(OBS_COMBINED_HELPS_RESOURCE_ID, {}, registry)).toBe('obs')
+    expect(getResourceAppliesToScope(`${COMBINED_HELPS_RESOURCE_ID}:panel-1`, {}, registry)).toBe(
+      'scripture'
+    )
+    expect(getResourceAppliesToScope(`${OBS_COMBINED_HELPS_RESOURCE_ID}:panel-1`, {}, registry)).toBe(
+      'obs'
+    )
   })
 
   test('resourceSupportsBook always shows CombinedHelps and OBS book code', () => {

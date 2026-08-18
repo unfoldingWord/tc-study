@@ -7,6 +7,8 @@
  */
 
 import { languageCodesMatch } from '../../utils/languageCodeMatch'
+import { isCombinedHelpsId, isObsCombinedHelpsId } from '../helps/combinedHelpsIds'
+import type { HelpsScope } from '../helps/combinedHelpsInjection'
 
 export type DownloadPane = 'text' | 'helps'
 
@@ -57,18 +59,34 @@ export function catalogKeysIncludeLanguage(
   })
 }
 
+/** Door43 `owner/lang/id` — OBS helps ids start with `obs-`. */
+export function helpsCatalogKeyMatchesScope(key: string, scope: HelpsScope): boolean {
+  if (isCombinedHelpsId(key)) {
+    return scope === 'obs' ? isObsCombinedHelpsId(key) : !isObsCombinedHelpsId(key)
+  }
+  const id = (key.split('/')[2] || '').replace(/#\d+$/, '').toLowerCase()
+  const isObsHelps = id.startsWith('obs-')
+  return scope === 'obs' ? isObsHelps : !isObsHelps
+}
+
 /**
  * First time this pane mode is needed for `languageCode` — load/enqueue that
  * catalog. If keys for that lang+mode already exist, skip (membership only).
+ * Helps is Bible vs OBS scoped so English TN does not skip an OBS-TN load.
  */
 export function shouldLoadCatalogOnModeSwitch(options: {
   mode: 'scripture' | 'helps'
   languageCode: string | null | undefined
   textKeys: readonly string[]
   helpsKeys: readonly string[]
+  helpsScope?: HelpsScope
 }): boolean {
   const lang = options.languageCode?.trim()
   if (!lang) return false
   const existing = options.mode === 'scripture' ? options.textKeys : options.helpsKeys
-  return !catalogKeysIncludeLanguage(existing, lang)
+  const scoped =
+    options.mode === 'helps' && options.helpsScope
+      ? existing.filter((key) => helpsCatalogKeyMatchesScope(key, options.helpsScope!))
+      : existing
+  return !catalogKeysIncludeLanguage(scoped, lang)
 }

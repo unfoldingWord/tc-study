@@ -4,7 +4,8 @@
  */
 
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
-import { isCombinedHelpsId } from '../helps/combinedHelpsIds'
+import { isCombinedHelpsId, isObsCombinedHelpsId } from '../helps/combinedHelpsIds'
+import type { HelpsScope } from '../helps/combinedHelpsInjection'
 import { addResource, getBaseResourceKey } from '../workspace/resourceMutations'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { languageCodesMatch } from '../../utils/languageCodeMatch'
@@ -21,12 +22,13 @@ export function applyReadModeMembership(
   panelId: ReadPanelId,
   mode: ReadPanelMode,
   languageCode: string | null | undefined,
-  textKeys: readonly string[]
+  textKeys: readonly string[],
+  helpsScope: HelpsScope = 'scripture'
 ): void {
   const lang = languageCode?.trim()
   if (!lang) return
   if (mode === 'helps') {
-    addHelpsCompanionMembership(panelId, lang)
+    addHelpsCompanionMembership(panelId, lang, helpsScope)
     applyCombinedHelpsEnsure(lang, panelId, { forceHelpsPanel: true })
     return
   }
@@ -45,7 +47,11 @@ export function applyReadModeMembership(
 }
 
 /** TQ (and leftover TN/TWL) already in the package — copy onto this helps pane. */
-function addHelpsCompanionMembership(panelId: ReadPanelId, languageCode: string): void {
+function addHelpsCompanionMembership(
+  panelId: ReadPanelId,
+  languageCode: string,
+  helpsScope: HelpsScope
+): void {
   const pkg = useWorkspaceStore.getState().currentPackage
   if (!pkg) return
   for (const resource of pkg.resources.values()) {
@@ -56,34 +62,36 @@ function addHelpsCompanionMembership(panelId: ReadPanelId, languageCode: string)
     if (!languageCodesMatch(keyLang || resourceLang, languageCode)) continue
     const type = String(resource.type || '')
     const isHelpsCompanion =
-      isQuestionsResourceType(type, 'scripture') ||
-      isQuestionsResourceType(type, 'obs') ||
-      isNotesResourceType(type, 'scripture') ||
-      isNotesResourceType(type, 'obs') ||
-      isWordsLinksResourceType(type, 'scripture') ||
-      isWordsLinksResourceType(type, 'obs')
+      isQuestionsResourceType(type, helpsScope) ||
+      isNotesResourceType(type, helpsScope) ||
+      isWordsLinksResourceType(type, helpsScope)
     if (!isHelpsCompanion) continue
     addResource(resource, { panelId })
   }
 }
 
+function helpsMembershipMatchesScope(key: string, type: string, helpsScope: HelpsScope): boolean {
+  if (isCombinedHelpsId(key)) {
+    return helpsScope === 'obs' ? isObsCombinedHelpsId(key) : !isObsCombinedHelpsId(key)
+  }
+  return (
+    isQuestionsResourceType(type, helpsScope) ||
+    isNotesResourceType(type, helpsScope) ||
+    isWordsLinksResourceType(type, helpsScope)
+  )
+}
+
 /** CombinedHelps / TQ / TN / TWL already on this pane (membership swap succeeded). */
-export function panelHasHelpsMembership(panelId: ReadPanelId): boolean {
+export function panelHasHelpsMembership(
+  panelId: ReadPanelId,
+  helpsScope: HelpsScope = 'scripture'
+): boolean {
   const pkg = useWorkspaceStore.getState().currentPackage
   const panel = pkg?.panels.find((p) => p.id === panelId)
   if (!pkg || !panel) return false
   return panel.resourceKeys.some((key) => {
-    if (isCombinedHelpsId(key)) return true
     const resource = pkg.resources.get(key) ?? pkg.resources.get(getBaseResourceKey(key))
-    if (!resource) return false
-    const type = String(resource.type || '')
-    return (
-      isQuestionsResourceType(type, 'scripture') ||
-      isQuestionsResourceType(type, 'obs') ||
-      isNotesResourceType(type, 'scripture') ||
-      isNotesResourceType(type, 'obs') ||
-      isWordsLinksResourceType(type, 'scripture') ||
-      isWordsLinksResourceType(type, 'obs')
-    )
+    const type = String(resource?.type || '')
+    return helpsMembershipMatchesScope(key, type, helpsScope)
   })
 }
