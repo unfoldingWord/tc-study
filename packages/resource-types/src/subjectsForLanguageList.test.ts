@@ -166,6 +166,25 @@ describe('subjectsForLanguageList', () => {
     expect(subjects).not.toContain('OBS Combined Helps')
   })
 
+  test('all-helps is the union of scripture helps and OBS helps (plus shared TW/TA)', () => {
+    const helps = subjectsForLanguageList(ALL, 'helps')
+    const obsHelps = subjectsForLanguageList(ALL, 'obs-helps')
+    const subjects = subjectsForLanguageList(ALL, 'all-helps')
+    expect(subjects).toEqual([...new Set([...helps, ...obsHelps])])
+    expect(subjects).toContain('TSV Translation Notes')
+    expect(subjects).toContain('TSV Translation Words Links')
+    expect(subjects).toContain('TSV Translation Questions')
+    expect(subjects).toContain('TSV OBS Translation Notes')
+    expect(subjects).toContain('TSV OBS Translation Words Links')
+    expect(subjects).toContain('TSV OBS Translation Questions')
+    expect(subjects).toContain('Translation Academy')
+    expect(subjects).toContain('Translation Words')
+    expect(subjects).not.toContain('Bible')
+    expect(subjects).not.toContain('Open Bible Stories')
+    expect(subjects).not.toContain('Combined Helps')
+    expect(subjects).not.toContain('OBS Combined Helps')
+  })
+
   test('a new primary plugin expands global and its mode list', () => {
     const extra = type({
       contentRole: 'primary',

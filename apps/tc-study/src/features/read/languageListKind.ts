@@ -1,10 +1,9 @@
 /**
  * Which Door43 subject set a Read language picker should request.
  *
- * listMode still shares filter chrome (Any / Bible / OBS). The **fetch**
- * is scoped so scripture panes do not ask for OBS-only subjects, and helps
- * panes follow bible vs OBS nav. Bootstrap (no scope) uses the global
- * content union — the shared cache / “200 languages” baseline.
+ * Fetch follows **panel type** only (`text` vs `helps`), not app nav
+ * (bible vs OBS). Any / Bible / OBS chips still narrow the fetched list.
+ * Bootstrap (no listMode) uses the global content union.
  */
 
 import type { LanguageListKind } from '@bt-synergy/resource-types'
@@ -16,15 +15,11 @@ export type LanguageListNavigationScope = 'scripture' | 'obs'
 
 export function resolveLanguageListKind(options: {
   listMode?: LanguagePickerListMode | null
+  /** Ignored — pickers do not discriminate bible vs OBS nav. */
   navigationScope?: LanguageListNavigationScope | null
 }): LanguageListKind {
   const listMode = options.listMode ?? 'text'
-  const scope = options.navigationScope
-  if (listMode === 'helps') {
-    return scope === 'obs' ? 'obs-helps' : 'helps'
-  }
-  if (scope === 'obs') return 'obs'
-  if (scope === 'scripture') return 'scripture'
+  if (listMode === 'helps') return 'all-helps'
   return 'global'
 }
 
@@ -33,6 +28,6 @@ export function languageListDoor43Filter(kind: LanguageListKind): {
   stage: string
   topic?: string
 } {
-  if (kind === 'obs-helps') return { stage: 'prod' }
+  if (kind === 'obs-helps' || kind === 'all-helps') return { stage: 'prod' }
   return { stage: 'prod', topic: 'tc-ready' }
 }

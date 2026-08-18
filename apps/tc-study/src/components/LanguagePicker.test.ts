@@ -19,6 +19,7 @@ describe('LanguagePicker (issue #24 helps list)', () => {
     expect(pickerSrc).toContain('resolveLanguageListKind')
     expect(pickerSrc).toContain('subjectsForLanguageList')
     expect(pickerSrc).not.toContain('subjects: supportedSubjects')
+    expect(pickerSrc).not.toContain('navigationScope')
   })
 
   test('header NavigationBar LanguagePicker stays on default text mode', () => {

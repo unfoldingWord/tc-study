@@ -64,5 +64,6 @@ describe('ResourceTypeRegistry.subjectsForLanguageList', () => {
       'Open Bible Stories',
     ])
     expect(registry.subjectsForLanguageList('helps')).toEqual(['TSV Translation Notes'])
+    expect(registry.subjectsForLanguageList('all-helps')).toEqual(['TSV Translation Notes'])
   })
 })

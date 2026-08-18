@@ -1,7 +1,7 @@
 /**
- * LanguagePicker list filtering. Fetch is scoped by listMode + nav scope;
- * chrome still shares Any / Bible / OBS. On a helps-scoped list, Any shows
- * the full fetched set (helps-only langs would otherwise vanish).
+ * LanguagePicker list filtering. Fetch is scoped by listMode (text vs helps),
+ * not app nav. Chrome still shares Any / Bible / OBS. On a helps-scoped list,
+ * Any shows the full fetched set (helps-only langs would otherwise vanish).
  */
 
 import type { ListedLanguage } from './languagesCache'

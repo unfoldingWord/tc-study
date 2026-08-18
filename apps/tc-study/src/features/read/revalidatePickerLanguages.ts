@@ -1,12 +1,10 @@
 /**
  * Build the picker display list + global cache payload for one open.
  *
- * Display is fetch-scoped (panel subjects only). The persisted cache stays
- * the global content-union universe so mismatch / helps policy still see
- * Bible vs OBS flags. Availability-only extras are applied to the cache,
- * not to a scoped panel list (so OBS-only langs stay off a scripture picker).
- * Switching to an OBS-only lang from scripture still uses the existing
- * switch-to-OBS empty — the scripture picker simply does not offer that lang.
+ * Display is fetch-scoped by panel type (`global` content vs `all-helps`).
+ * The persisted cache stays the global content-union universe so mismatch /
+ * helps policy still see Bible vs OBS flags. Availability-only extras are
+ * applied to the cache, not to a scoped helps list.
  */
 
 import type { LanguageListKind } from '@bt-synergy/resource-types'
@@ -18,6 +16,19 @@ import {
   mergePickerLanguages,
   type PickerDoor43Language,
 } from './mergePickerLanguages'
+
+function languageMatchesListKind(
+  flags: LanguageAvailabilityFlags | undefined,
+  kind: LanguageListKind
+): boolean {
+  if (kind === 'global') return true
+  if (!flags) return false
+  if (kind === 'scripture') return flags.bible
+  if (kind === 'obs') return flags.obs
+  if (kind === 'helps') return flags.bibleHelps
+  if (kind === 'all-helps') return flags.bibleHelps || flags.obsHelps
+  return flags.obsHelps
+}
 
 export function catalogCodesForLanguageList(options: {
   catalogCodes: readonly string[]
@@ -31,12 +42,7 @@ export function catalogCodesForLanguageList(options: {
     const code = String(raw ?? '').trim()
     if (!code) return false
     if (door43Codes.has(code)) return true
-    const flags = availabilityByCode.get(code)
-    if (!flags) return false
-    if (kind === 'scripture') return flags.bible
-    if (kind === 'obs') return flags.obs
-    if (kind === 'helps') return flags.bibleHelps
-    return flags.obsHelps
+    return languageMatchesListKind(availabilityByCode.get(code), kind)
   })
 }
 
@@ -45,14 +51,7 @@ export function filterCachedLanguagesForKind(
   kind: LanguageListKind
 ): ListedLanguage[] {
   if (kind === 'global') return [...languages]
-  return languages.filter((lang) => {
-    const flags = lang.availability
-    if (!flags) return false
-    if (kind === 'scripture') return flags.bible
-    if (kind === 'obs') return flags.obs
-    if (kind === 'helps') return flags.bibleHelps
-    return flags.obsHelps
-  })
+  return languages.filter((lang) => languageMatchesListKind(lang.availability, kind))
 }
 
 function asDoor43Lang(lang: ListedLanguage): PickerDoor43Language {

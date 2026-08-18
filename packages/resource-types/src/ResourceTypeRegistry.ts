@@ -181,7 +181,7 @@ export class ResourceTypeRegistry {
   }
 
   /**
-   * Door43 subjects for a Read language list (content vs helps, bible vs OBS).
+   * Door43 subjects for a Read language list (content vs helps).
    * See `subjectsForLanguageList` — synthetic Combined Helps subjects are omitted.
    */
   subjectsForLanguageList(kind: LanguageListKind): string[] {

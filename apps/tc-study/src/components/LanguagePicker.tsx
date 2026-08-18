@@ -3,7 +3,8 @@
  *
  * Modal for selecting a language on the Read page. Icon-first chrome: one
  * header icon + count badge + Bible/OBS filter. Fetch subjects follow
- * listMode + navigationScope (`subjectsForLanguageList`); chrome stays shared.
+ * listMode only (`text` → global content, `helps` → all-helps). Chrome
+ * chips still narrow the already-fetched list.
  */
 
 import {
@@ -49,8 +50,6 @@ interface LanguagePickerProps {
   required?: boolean
   /** Label + which subject set to fetch (`text` vs `helps`). */
   listMode?: LanguagePickerListMode
-  /** Nav text mode — scopes scripture/OBS vs bible/OBS-helps subjects. Omit on bootstrap → global. */
-  navigationScope?: 'scripture' | 'obs' | null
   /** Controlled open — empty-state CTA can open the same instance. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -68,7 +67,6 @@ export function LanguagePicker({
   autoOpen = false,
   required = false,
   listMode = 'text',
-  navigationScope = null,
   open,
   onOpenChange,
   triggerClassName,
@@ -90,7 +88,7 @@ export function LanguagePicker({
   const resourceTypeRegistry = useResourceTypeRegistry()
   const setAvailableLanguages = useWizardStore((s) => s.setAvailableLanguages)
 
-  const listKind = resolveLanguageListKind({ listMode, navigationScope })
+  const listKind = resolveLanguageListKind({ listMode })
   const listSubjects = resourceTypeRegistry.subjectsForLanguageList(listKind)
   const globalSubjects = supportedSubjectsFromRegistry(resourceTypeRegistry)
   const listSubjectsKey = listSubjects.join(',')

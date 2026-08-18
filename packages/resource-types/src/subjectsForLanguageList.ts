@@ -7,7 +7,13 @@
 
 import type { ResourceTypeDefinition } from './types'
 
-export type LanguageListKind = 'global' | 'scripture' | 'obs' | 'helps' | 'obs-helps'
+export type LanguageListKind =
+  | 'global'
+  | 'scripture'
+  | 'obs'
+  | 'helps'
+  | 'obs-helps'
+  | 'all-helps'
 export type ResourcePanelMode = 'scripture' | 'obs' | 'helps'
 
 export type LanguageListTypeFields = Pick<
@@ -57,9 +63,10 @@ function typeMatchesKind(def: LanguageListTypeFields, kind: LanguageListKind): b
 
 /**
  * Door43 subjects for one language list.
- * - `global` — union of scripture + OBS **content** subjects (Any-chip / cache key)
+ * - `global` — union of scripture + OBS **content** subjects (text picker / cache)
  * - `scripture` / `obs` — primary content subjects for that mode
- * - `helps` / `obs-helps` — companion (+ shared) subjects for bible vs OBS nav
+ * - `helps` / `obs-helps` — companion (+ shared) subjects for bible vs OBS
+ * - `all-helps` — union of scripture + OBS companion (+ shared) subjects
  */
 export function subjectsForLanguageList(
   types: readonly LanguageListTypeFields[],
@@ -69,6 +76,12 @@ export function subjectsForLanguageList(
     return uniqueConcat(
       subjectsForLanguageList(types, 'scripture'),
       subjectsForLanguageList(types, 'obs')
+    )
+  }
+  if (kind === 'all-helps') {
+    return uniqueConcat(
+      subjectsForLanguageList(types, 'helps'),
+      subjectsForLanguageList(types, 'obs-helps')
     )
   }
 

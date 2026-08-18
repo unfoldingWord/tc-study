@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { subjectsForLanguageList } from '@bt-synergy/resource-types'
+import { resolveLanguageListKind } from '../features/read/languageListKind'
 import * as plugins from './index'
 import { RESOURCE_TYPE_PLUGIN_EXPORTS } from './pluginRegistry'
 
@@ -42,5 +43,49 @@ describe('registered plugin language-list subjects', () => {
     expect(subjects).toContain('TSV OBS Translation Words Links')
     expect(subjects).toContain('TSV OBS Translation Questions')
     expect(subjects).not.toContain('TSV Translation Notes')
+  })
+
+  test('OBS-nav text picker still fetches Bible + Aligned Bible + OBS', () => {
+    const kind = resolveLanguageListKind({ listMode: 'text', navigationScope: 'obs' })
+    expect(kind).toBe('global')
+    expect(subjectsForLanguageList(registered, kind)).toEqual([
+      'Bible',
+      'Aligned Bible',
+      'Open Bible Stories',
+    ])
+  })
+
+  test('scripture-nav helps picker still fetches OBS-helps + scripture helps + TW/TA', () => {
+    const kind = resolveLanguageListKind({
+      listMode: 'helps',
+      navigationScope: 'scripture',
+    })
+    expect(kind).toBe('all-helps')
+    const subjects = subjectsForLanguageList(registered, kind)
+    expect(subjects).toContain('TSV Translation Notes')
+    expect(subjects).toContain('TSV Translation Words Links')
+    expect(subjects).toContain('TSV Translation Questions')
+    expect(subjects).toContain('TSV OBS Translation Notes')
+    expect(subjects).toContain('TSV OBS Translation Words Links')
+    expect(subjects).toContain('TSV OBS Translation Questions')
+    expect(subjects).toContain('Translation Words')
+    expect(subjects).toContain('Translation Academy')
+  })
+
+  test('all-helps is scripture helps ∪ OBS helps ∪ shared TW/TA', () => {
+    const helps = subjectsForLanguageList(registered, 'helps')
+    const obsHelps = subjectsForLanguageList(registered, 'obs-helps')
+    const subjects = subjectsForLanguageList(registered, 'all-helps')
+    expect(subjects).toEqual([...new Set([...helps, ...obsHelps])])
+    expect(subjects).toContain('TSV Translation Notes')
+    expect(subjects).toContain('TSV Translation Words Links')
+    expect(subjects).toContain('TSV Translation Questions')
+    expect(subjects).toContain('TSV OBS Translation Notes')
+    expect(subjects).toContain('TSV OBS Translation Words Links')
+    expect(subjects).toContain('TSV OBS Translation Questions')
+    expect(subjects).toContain('Translation Words')
+    expect(subjects).toContain('Translation Academy')
+    expect(subjects).not.toContain('Bible')
+    expect(subjects).not.toContain('Open Bible Stories')
   })
 })
