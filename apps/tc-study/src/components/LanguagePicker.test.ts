@@ -16,11 +16,10 @@ describe('LanguagePicker (issue #24 helps list)', () => {
     expect(pickerSrc).toContain('useLanguagePickerOpen')
     expect(pickerSrc).toContain('filterPickerLanguages')
     expect(pickerSrc).toContain('revalidatePickerLanguages')
-    expect(pickerSrc).toContain('resolvePickerLanguageList')
+    expect(pickerSrc).toContain('resolveLanguageListKind')
     expect(pickerSrc).toContain('subjectsForLanguageList')
     expect(pickerSrc).not.toContain('subjects: supportedSubjects')
-    expect(pickerSrc).toContain('navigationScope')
-    expect(pickerSrc).toContain('loadPickerDisplayCache')
+    expect(pickerSrc).not.toContain('navigationScope')
   })
 
   test('header NavigationBar LanguagePicker stays on default text mode', () => {

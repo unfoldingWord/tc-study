@@ -3,9 +3,7 @@ import {
   LANGUAGES_CACHE_KEY,
   LANGUAGES_CACHE_VERSION,
   loadLanguagesCache,
-  loadPickerDisplayCache,
   saveLanguagesCache,
-  savePickerDisplayCache,
   type ListedLanguage,
 } from './languagesCache'
 
@@ -51,9 +49,9 @@ describe('languagesCache', () => {
     g.localStorage?.removeItem(LANGUAGES_CACHE_KEY)
   })
 
-  test('round-trips availability flags at cache version 8', () => {
+  test('round-trips availability flags at cache version 7', () => {
     saveLanguagesCache(SAMPLE, SUBJECTS)
-    expect(LANGUAGES_CACHE_VERSION).toBe(8)
+    expect(LANGUAGES_CACHE_VERSION).toBe(7)
     expect(loadLanguagesCache(SUBJECTS)).toEqual(SAMPLE)
   })
 
@@ -78,30 +76,6 @@ describe('languagesCache', () => {
   test('invalidates when a newly registered content subject appears', () => {
     saveLanguagesCache(SAMPLE, SUBJECTS)
     expect(loadLanguagesCache([...SUBJECTS, 'Study Bible'])).toBeNull()
-  })
-
-  test('display cache is keyed by list kind so scripture is not reused for obs-helps', () => {
-    saveLanguagesCache(SAMPLE, SUBJECTS)
-    savePickerDisplayCache('scripture:Bible', SAMPLE, SUBJECTS)
-    savePickerDisplayCache(
-      'obs-helps:TSV OBS Translation Notes',
-      [
-        {
-          code: 'hi',
-          name: 'हिन्दी',
-          source: 'door43',
-          availability: { bible: false, obs: true, bibleHelps: false, obsHelps: true },
-        },
-      ],
-      SUBJECTS
-    )
-    expect(loadPickerDisplayCache('scripture:Bible', SUBJECTS)?.map((l) => l.code)).toEqual([
-      'es',
-    ])
-    expect(
-      loadPickerDisplayCache('obs-helps:TSV OBS Translation Notes', SUBJECTS)?.map((l) => l.code)
-    ).toEqual(['hi'])
-    expect(loadPickerDisplayCache('scripture:Bible', ['Bible'])).toBeNull()
   })
 
   test('does not invent empty flags for a v5 entry missing availability', () => {

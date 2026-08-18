@@ -23,7 +23,7 @@ describe('helps picker wiring (issue #24 / #30)', () => {
   test('both panel pickers share LanguagePicker + LanguagePickerTextKindFilter', () => {
     expect(headerSrc).toContain('<LanguagePicker')
     expect(headerSrc).toContain('listMode={languageListMode}')
-    expect(headerSrc).toContain('navigationScope={navigationScope}')
+    expect(headerSrc).not.toContain('navigationScope')
     expect(headerSrc).toContain('currentLanguageCode={currentLanguageCode}')
     expect(headerSrc).toContain('otherLanguageCode={otherLanguageCode}')
     expect(headerSrc).not.toContain('helpsFlag')

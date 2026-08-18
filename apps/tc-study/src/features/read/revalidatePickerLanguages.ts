@@ -1,10 +1,10 @@
 /**
  * Build the picker display list + global cache payload for one open.
  *
- * Display is fetch-scoped (panel subjects + nav kind). The persisted cache
- * stays the global content-union universe so mismatch / helps policy still
- * see Bible vs OBS flags. Availability-only extras are applied to the cache,
- * not to a scoped panel list.
+ * Display is fetch-scoped by panel type (`global` content vs `all-helps`).
+ * The persisted cache stays the global content-union universe so mismatch /
+ * helps policy still see Bible vs OBS flags. Availability-only extras are
+ * applied to the cache, not to a scoped helps list.
  */
 
 import type { LanguageListKind } from '@bt-synergy/resource-types'
