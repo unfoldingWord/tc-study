@@ -47,8 +47,7 @@ export function catalogLanguageListSubjects(def: LanguageListTypeFields): string
 
 function typeMatchesKind(def: LanguageListTypeFields, kind: LanguageListKind): boolean {
   // Shared article types (TW/TA) are not "has helps" — CombinedHelps inject
-  // needs TN or TWL. Querying TW/TA (or TQ via includeInLanguageLists: false)
-  // floods the picker with langs that have no CombinedHelps package.
+  // needs TN / TWL / TQ. Querying them floods the picker with empty langs.
   if (def.contentRole === 'shared') return false
   const modes = panelModesForType(def)
   if (kind === 'scripture') return modes.includes('scripture')
@@ -69,8 +68,8 @@ function typeMatchesKind(def: LanguageListTypeFields, kind: LanguageListKind): b
  * Door43 subjects for one language list.
  * - `global` — union of scripture + OBS **content** subjects (text picker / cache)
  * - `scripture` / `obs` — primary content subjects for that mode
- * - `helps` / `obs-helps` — CombinedHelps-injectable companions (TN / TWL)
- * - `all-helps` — union of scripture + OBS TN / TWL (not shared TW/TA or TQ)
+ * - `helps` / `obs-helps` — companion subjects for bible vs OBS (not shared TW/TA)
+ * - `all-helps` — union of scripture + OBS companion subjects (not shared TW/TA)
  */
 export function subjectsForLanguageList(
   types: readonly LanguageListTypeFields[],

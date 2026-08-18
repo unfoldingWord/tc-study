@@ -182,8 +182,7 @@ export class ResourceTypeRegistry {
 
   /**
    * Door43 subjects for a Read language list (content vs helps).
-   * See `subjectsForLanguageList` — synthetic Combined Helps and TQ list subjects
-   * are omitted (CombinedHelps injects TN or TWL only).
+   * See `subjectsForLanguageList` — synthetic Combined Helps subjects are omitted.
    */
   subjectsForLanguageList(kind: LanguageListKind): string[] {
     return subjectsFromTypes(this.getAll(), kind)

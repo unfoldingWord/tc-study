@@ -27,8 +27,6 @@ export const obsTranslationQuestionsResourceType: ResourceTypeDefinition = defin
   // ===== DOOR43 MAPPING =====
   subjects: ['TSV OBS Translation Questions', 'OBS Translation Questions'],
   aliases: ['obs-tq', 'obs-questions'],
-  // Still a tab; omit from helps language lists (TQ-only langs have no CombinedHelps).
-  includeInLanguageLists: false,
 
   // ===== DATA LAYER =====
   loader: TranslationQuestionsLoader,

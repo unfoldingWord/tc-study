@@ -102,7 +102,7 @@ describe('revalidatePickerLanguages', () => {
     expect(display.map((lang) => lang.code).sort()).toEqual(['en', 'fr', 'hi'])
   })
 
-  test('helps picker requests CombinedHelps TN/TWL only and includes OBS-TN langs', async () => {
+  test('helps picker requests companion TN/TWL/TQ only and includes OBS-TN langs', async () => {
     const requested: Array<{ subject: string; topic?: string }> = []
     const client: LanguageListClient = {
       async getLanguages(filters) {
@@ -111,9 +111,6 @@ describe('revalidatePickerLanguages', () => {
         requested.push({ subject, topic: filters?.topic })
         if (subject === 'TSV Translation Notes') return [{ code: 'en', name: 'English' }]
         if (subject === 'TSV OBS Translation Notes') return [{ code: 'fr', name: 'français' }]
-        if (subject === 'TSV Translation Questions' || subject === 'OBS Translation Questions') {
-          return [{ code: 'ilo', name: 'Iloko' }]
-        }
         if (subject === 'Translation Words' || subject === 'Translation Academy') {
           return [{ code: 'nag', name: 'Naga' }]
         }
@@ -123,10 +120,13 @@ describe('revalidatePickerLanguages', () => {
     const companionHelps = [
       'TSV Translation Notes',
       'TSV Translation Words Links',
+      'TSV Translation Questions',
       'TSV OBS Translation Notes',
       'OBS Translation Notes',
       'TSV OBS Translation Words Links',
       'OBS Translation Words Links',
+      'TSV OBS Translation Questions',
+      'OBS Translation Questions',
     ]
     const { display } = await revalidatePickerLanguages({
       client,
@@ -143,65 +143,11 @@ describe('revalidatePickerLanguages', () => {
     })
     expect(requested.every((call) => call.topic === undefined)).toBe(true)
     expect(requested.map((call) => call.subject)).toEqual(companionHelps)
-    expect(requested.map((call) => call.subject)).not.toContain('TSV Translation Questions')
-    expect(requested.map((call) => call.subject)).not.toContain('OBS Translation Questions')
     expect(requested.map((call) => call.subject)).not.toContain('Translation Words')
     expect(requested.map((call) => call.subject)).not.toContain('Translation Academy')
     expect(display.map((lang) => lang.code).sort()).toEqual(['en', 'fr'])
     expect(display.map((lang) => lang.code)).not.toContain('nag')
-    expect(display.map((lang) => lang.code)).not.toContain('ilo')
     expect(display.map((lang) => lang.code)).not.toContain('xx')
-  })
-
-  test('TQ-only Door43 lang and stale-cache lang without TN/TWL stay out of helps picker', async () => {
-    const { client, requested } = clientFor({
-      'TSV Translation Notes': [{ code: 'en', name: 'English' }],
-      'TSV Translation Questions': [{ code: 'ilo', name: 'Iloko' }],
-      'OBS Translation Questions': [{ code: 'ilo', name: 'Iloko' }],
-    })
-    const availabilityByCode = mergeAvailabilityFromLanguageSets({
-      bible: ['en', 'ilo'],
-      obs: [],
-      bibleHelps: ['en'],
-      obsHelps: [],
-    })
-    const { display } = await revalidatePickerLanguages({
-      client,
-      kind: 'all-helps',
-      listSubjects: ['TSV Translation Notes', 'TSV Translation Words Links'],
-      globalSubjects: ['Bible', 'Aligned Bible', 'Open Bible Stories'],
-      catalogCodes: ['ilo'],
-      availabilityByCode,
-    })
-    expect(requested).toEqual(['TSV Translation Notes', 'TSV Translation Words Links'])
-    expect(display.map((lang) => lang.code)).toEqual(['en'])
-    expect(display.map((lang) => lang.code)).not.toContain('ilo')
-
-    const cached = [
-      {
-        code: 'en',
-        name: 'English',
-        source: 'door43' as const,
-        availability: { bible: true, obs: false, bibleHelps: true, obsHelps: false },
-      },
-      {
-        code: 'ilo',
-        name: 'Iloko',
-        source: 'door43' as const,
-        availability: { bible: true, obs: false, bibleHelps: false, obsHelps: false },
-      },
-    ]
-    expect(filterCachedLanguagesForKind(cached, 'all-helps').map((l) => l.code)).toEqual([
-      'en',
-    ])
-    expect(
-      catalogCodesForLanguageList({
-        catalogCodes: ['en', 'ilo'],
-        door43Codes: new Set(['en']),
-        availabilityByCode,
-        kind: 'all-helps',
-      })
-    ).toEqual(['en'])
   })
 
   test('helps picker in OBS mode requests OBS-helps subjects without topic', async () => {

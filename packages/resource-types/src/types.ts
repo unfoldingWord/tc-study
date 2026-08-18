@@ -235,8 +235,6 @@ export interface ResourceTypeDefinition {
   /**
    * When false, this type does not contribute subjects to language lists.
    * Default true. Combined Helps uses synthetic subjects with no catalog rows.
-   * TQ stays registered as a tab but is omitted so TQ-only langs do not appear
-   * in the helps picker (CombinedHelps injects TN or TWL only).
    */
   includeInLanguageLists?: boolean
 
