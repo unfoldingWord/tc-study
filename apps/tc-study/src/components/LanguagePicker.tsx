@@ -3,8 +3,7 @@
  *
  * Modal for selecting a language on the Read page. Icon-first chrome: one
  * header icon + count badge + Bible/OBS filter. Fetch subjects follow
- * listMode only (`text` → global content, `helps` → all-helps). Chrome
- * chips still narrow the already-fetched list.
+ * listMode + navigationScope (`subjectsForLanguageList`); chrome stays shared.
  */
 
 import {
@@ -16,8 +15,13 @@ import {
     X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
-import { useCatalogManager, useResourceTypeRegistry } from '../contexts'
+import {
+  useCatalogManager,
+  useNavigationScope,
+  useResourceTypeRegistry,
+} from '../contexts'
 import {
   DEFAULT_TEXT_KIND_FILTER,
   filterPickerLanguages,
@@ -25,10 +29,12 @@ import {
   type TextKindFilter,
 } from '../features/read/filterPickerLanguages'
 import { fetchLanguageAvailabilityByCode } from '../features/read/languageAvailability'
-import { resolveLanguageListKind } from '../features/read/languageListKind'
+import { resolvePickerLanguageList } from '../features/read/languageListKind'
 import {
   loadLanguagesCache,
+  loadPickerDisplayCache,
   saveLanguagesCache,
+  savePickerDisplayCache,
   type ListedLanguage,
 } from '../features/read/languagesCache'
 import {
@@ -50,6 +56,8 @@ interface LanguagePickerProps {
   required?: boolean
   /** Label + which subject set to fetch (`text` vs `helps`). */
   listMode?: LanguagePickerListMode
+  /** Nav text mode — scopes scripture/OBS vs bible/OBS-helps subjects. Omit on bootstrap → global. */
+  navigationScope?: 'scripture' | 'obs' | null
   /** Controlled open — empty-state CTA can open the same instance. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -67,6 +75,7 @@ export function LanguagePicker({
   autoOpen = false,
   required = false,
   listMode = 'text',
+  navigationScope = null,
   open,
   onOpenChange,
   triggerClassName,
@@ -87,9 +96,17 @@ export function LanguagePicker({
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
   const setAvailableLanguages = useWizardStore((s) => s.setAvailableLanguages)
+  const storeScope = useNavigationScope()
+  const { pathname } = useLocation()
 
-  const listKind = resolveLanguageListKind({ listMode })
-  const listSubjects = resourceTypeRegistry.subjectsForLanguageList(listKind)
+  const { kind: listKind, subjects: listSubjects, cacheKey: listCacheKey } =
+    resolvePickerLanguageList({
+      listMode,
+      navigationScope,
+      pathname,
+      storeScope,
+      subjectsForKind: (kind) => resourceTypeRegistry.subjectsForLanguageList(kind),
+    })
   const globalSubjects = supportedSubjectsFromRegistry(resourceTypeRegistry)
   const listSubjectsKey = listSubjects.join(',')
   const globalSubjectsKey = globalSubjects.join(',')
@@ -117,6 +134,7 @@ export function LanguagePicker({
         availabilityByCode,
       })
       saveLanguagesCache(global, globalSubjects)
+      savePickerDisplayCache(listCacheKey, display, globalSubjects)
       setDisplayedLanguages(display)
       setAvailableLanguages(global)
     } catch (err) {
@@ -125,7 +143,7 @@ export function LanguagePicker({
     } finally {
       setIsRevalidating(false)
     }
-  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager])
+  }, [listKind, listSubjectsKey, listCacheKey, globalSubjectsKey, catalogManager])
 
   const revalidateRef = useRef(revalidate)
   revalidateRef.current = revalidate
@@ -134,17 +152,21 @@ export function LanguagePicker({
   useEffect(() => {
     if (!isOpen) return
 
-    const cached = loadLanguagesCache(globalSubjects)
-    if (cached?.length) {
-      const scoped = filterCachedLanguagesForKind(cached, listKind)
-      setDisplayedLanguages(scoped)
-      setAvailableLanguages(cached)
+    const fromDisplay = loadPickerDisplayCache(listCacheKey, globalSubjects)
+    if (fromDisplay?.length) {
+      setDisplayedLanguages(fromDisplay)
     } else {
-      setDisplayedLanguages([])
+      const cached = loadLanguagesCache(globalSubjects)
+      if (cached?.length) {
+        setDisplayedLanguages(filterCachedLanguagesForKind(cached, listKind))
+        setAvailableLanguages(cached)
+      } else {
+        setDisplayedLanguages([])
+      }
     }
     setError(null)
     revalidateRef.current()
-  }, [isOpen, listKind, globalSubjectsKey])
+  }, [isOpen, listKind, listCacheKey, globalSubjectsKey])
 
   const languages = displayedLanguages
   const isLoading = isRevalidating && displayedLanguages.length === 0

@@ -4,6 +4,7 @@
 
 import { LinkedPanel } from '@bt-synergy/resource-panels'
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { useNavigationScope } from '../../contexts'
 import type { ResourceInfo } from '../../contexts/types'
 import { HelpsLanguageActionsProvider } from '../../features/helps/HelpsLanguageActionsContext'
 import { resolveHelpsPaneNoSourcesView } from '../../features/helps/helpsEmptyCopy'
@@ -94,6 +95,7 @@ function ReadPanelBody({
   }
 }) {
   const [pickerOpen, setPickerOpen] = useState(false)
+  const navigationScope = useNavigationScope()
   const isHelps = mode === 'helps'
   const helpsLanguageActions = useMemo(
     () =>
@@ -176,6 +178,7 @@ function ReadPanelBody({
         onModeSwitch={onModeSwitch}
         onLanguageSelected={onLanguageSelected}
         languageListMode={isHelps ? 'helps' : 'text'}
+        navigationScope={navigationScope}
         currentLanguageCode={languageCode}
         otherLanguageCode={otherLanguageCode}
         languagePickerOpen={pickerOpen}

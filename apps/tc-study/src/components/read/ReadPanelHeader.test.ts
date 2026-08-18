@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import { subjectsForLanguageList } from '@bt-synergy/resource-types'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { resolvePickerLanguageList } from '../../features/read/languageListKind'
+import * as plugins from '../../resourceTypes'
+import { RESOURCE_TYPE_PLUGIN_EXPORTS } from '../../resourceTypes/pluginRegistry'
 
 const src = readFileSync(join(import.meta.dir, 'ReadPanelHeader.tsx'), 'utf8')
 const modeSrc = readFileSync(join(import.meta.dir, 'ReadModeSwitch.tsx'), 'utf8')
@@ -16,6 +20,7 @@ describe('ReadPanelHeader (issue #30)', () => {
     expect(modeSrc).not.toContain('Layers')
     expect(modeSrc).not.toContain('CircleHelp')
     expect(src).toContain('LanguagePicker')
+    expect(src).toContain('navigationScope={navigationScope}')
     expect(src).toContain('currentLanguageCode={currentLanguageCode}')
     expect(src).toContain('otherLanguageCode={otherLanguageCode}')
     expect(src).toContain('ReadModeSwitch')
@@ -49,5 +54,27 @@ describe('ReadPanelHeader (issue #30)', () => {
   test('does not edit studio PanelHeader', () => {
     expect(studio).toContain('title="Actions"')
     expect(studio).toContain('aria-label="Resource actions"')
+  })
+
+  test('obs + helps header requests obs-helps subjects; scripture text omits OBS', () => {
+    const registered = RESOURCE_TYPE_PLUGIN_EXPORTS.map((name) => plugins[name])
+    const subjectsForKind = (kind: Parameters<typeof subjectsForLanguageList>[1]) =>
+      subjectsForLanguageList(registered, kind)
+    const obsHelps = resolvePickerLanguageList({
+      listMode: 'helps',
+      navigationScope: 'obs',
+      subjectsForKind,
+    })
+    expect(obsHelps.kind).toBe('obs-helps')
+    expect(obsHelps.subjects).toContain('TSV OBS Translation Notes')
+    expect(obsHelps.subjects).not.toContain('TSV Translation Notes')
+    const scriptureText = resolvePickerLanguageList({
+      listMode: 'text',
+      navigationScope: 'scripture',
+      subjectsForKind,
+    })
+    expect(scriptureText.kind).toBe('scripture')
+    expect(scriptureText.subjects).not.toContain('Open Bible Stories')
+    expect(scriptureText.subjects).toContain('Bible')
   })
 })
