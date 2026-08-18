@@ -24,6 +24,7 @@ interface ReadPanelHeaderProps {
   onModeSwitch: (mode: ReadPanelMode) => void
   onLanguageSelected: (languageCode: string) => void
   languageListMode: 'text' | 'helps'
+  navigationScope?: 'scripture' | 'obs' | null
   currentLanguageCode?: string | null
   otherLanguageCode?: string | null
   languagePickerOpen?: boolean
@@ -44,6 +45,7 @@ export function ReadPanelHeader({
   onModeSwitch,
   onLanguageSelected,
   languageListMode,
+  navigationScope = null,
   currentLanguageCode,
   otherLanguageCode,
   languagePickerOpen,
@@ -88,6 +90,7 @@ export function ReadPanelHeader({
             <LanguagePicker
               compact
               listMode={languageListMode}
+              navigationScope={navigationScope}
               open={pickerOpen}
               onOpenChange={setPickerOpen}
               onLanguageSelected={onLanguageSelected}

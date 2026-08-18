@@ -52,6 +52,15 @@ describe('filterPickerLanguages', () => {
     expect(codes).toEqual(['en', 'es', 'bho', 'hi'])
   })
 
+  test('helps listMode Any keeps helps-only langs from a scoped fetch', () => {
+    const codes = filterPickerLanguages(LANGS, {
+      searchQuery: '',
+      listMode: 'helps',
+    }).map((l) => l.code)
+    expect(codes).toContain('sw')
+    expect(codes).toContain('en')
+  })
+
   test('textKind bible keeps languages with availability.bible', () => {
     const codes = filterPickerLanguages(LANGS, {
       searchQuery: '',

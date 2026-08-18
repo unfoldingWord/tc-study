@@ -6,6 +6,10 @@
  * when a resource type is registered.
  */
 
+import {
+  subjectsForLanguageList as subjectsFromTypes,
+  type LanguageListKind,
+} from './subjectsForLanguageList'
 import type { APIFilters, ResourceTypeDefinition } from './types'
 
 export interface ResourceTypeRegistryConfig {
@@ -174,6 +178,14 @@ export class ResourceTypeRegistry {
    */
   getSupportedSubjects(): string[] {
     return Array.from(this.subjectToTypeMap.keys())
+  }
+
+  /**
+   * Door43 subjects for a Read language list (content vs helps, bible vs OBS).
+   * See `subjectsForLanguageList` — synthetic Combined Helps subjects are omitted.
+   */
+  subjectsForLanguageList(kind: LanguageListKind): string[] {
+    return subjectsFromTypes(this.getAll(), kind)
   }
   
   /**

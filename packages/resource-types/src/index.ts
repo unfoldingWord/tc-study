@@ -10,6 +10,16 @@ export type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 
 export { ResourceTypeRegistry } from './ResourceTypeRegistry'
 export type { ResourceTypeRegistryConfig } from './ResourceTypeRegistry'
+export {
+  catalogLanguageListSubjects,
+  panelModesForType,
+  subjectsForLanguageList,
+} from './subjectsForLanguageList'
+export type {
+  LanguageListKind,
+  LanguageListTypeFields,
+  ResourcePanelMode,
+} from './subjectsForLanguageList'
 export { defineResourceType } from './types'
 export type {
   ResourceTypeDefinition,

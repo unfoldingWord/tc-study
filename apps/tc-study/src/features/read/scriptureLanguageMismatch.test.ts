@@ -17,6 +17,7 @@ import {
   applyScripturePanelMismatch,
   scriptureKeysForMismatchDisplay,
   shouldSkipTextCatalogForMismatch,
+  supportedSubjectsFromRegistry,
 } from './scriptureLanguageMismatch'
 import { TEXT_MODE_MISMATCH_COPY } from './textModeMismatch'
 
@@ -195,5 +196,14 @@ describe('scripture language change to OBS-only (mid-session)', () => {
         supportedSubjects: SUBJECTS,
       })
     ).toBe(false)
+  })
+
+  test('cache subjects prefer subjectsForLanguageList(global) over all plugins', () => {
+    expect(
+      supportedSubjectsFromRegistry({
+        subjectsForLanguageList: () => ['Bible', 'Open Bible Stories'],
+        getSupportedSubjects: () => ['Bible', 'Combined Helps'],
+      })
+    ).toEqual(['Bible', 'Open Bible Stories'])
   })
 })

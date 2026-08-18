@@ -2,8 +2,8 @@
  * Language Picker Component
  *
  * Modal for selecting a language on the Read page. Icon-first chrome: one
- * header icon + count badge + Bible/OBS filter (same list for text and helps).
- * Uses Door43 API via useDoor43Data (same as LanguageSelectorStep).
+ * header icon + count badge + Bible/OBS filter. Fetch subjects follow
+ * listMode + navigationScope (`subjectsForLanguageList`); chrome stays shared.
  */
 
 import {
@@ -24,12 +24,17 @@ import {
   type TextKindFilter,
 } from '../features/read/filterPickerLanguages'
 import { fetchLanguageAvailabilityByCode } from '../features/read/languageAvailability'
+import { resolveLanguageListKind } from '../features/read/languageListKind'
 import {
   loadLanguagesCache,
   saveLanguagesCache,
   type ListedLanguage,
 } from '../features/read/languagesCache'
-import { mergePickerLanguages } from '../features/read/mergePickerLanguages'
+import {
+  filterCachedLanguagesForKind,
+  revalidatePickerLanguages,
+} from '../features/read/revalidatePickerLanguages'
+import { supportedSubjectsFromRegistry } from '../features/read/scriptureLanguageMismatch'
 import { useWizardStore } from '../lib/stores/wizardStore'
 import { LanguagePickerGrid } from './LanguagePickerGrid'
 import { LanguagePickerTextKindFilter } from './LanguagePickerTextKindFilter'
@@ -42,8 +47,10 @@ interface LanguagePickerProps {
   autoOpen?: boolean
   /** When true, the dialog cannot be dismissed without choosing a language (Read page on /read). */
   required?: boolean
-  /** Label only (`Select language` vs `Select helps language`). List is always the Scripture/OBS union. */
+  /** Label + which subject set to fetch (`text` vs `helps`). */
   listMode?: LanguagePickerListMode
+  /** Nav text mode — scopes scripture/OBS vs bible/OBS-helps subjects. Omit on bootstrap → global. */
+  navigationScope?: 'scripture' | 'obs' | null
   /** Controlled open — empty-state CTA can open the same instance. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -61,6 +68,7 @@ export function LanguagePicker({
   autoOpen = false,
   required = false,
   listMode = 'text',
+  navigationScope = null,
   open,
   onOpenChange,
   triggerClassName,
@@ -82,9 +90,11 @@ export function LanguagePicker({
   const resourceTypeRegistry = useResourceTypeRegistry()
   const setAvailableLanguages = useWizardStore((s) => s.setAvailableLanguages)
 
-  // Get supported subjects for filtering (stable string for effect/callback deps)
-  const supportedSubjects = resourceTypeRegistry.getSupportedSubjects()
-  const supportedSubjectsKey = supportedSubjects.join(',')
+  const listKind = resolveLanguageListKind({ listMode, navigationScope })
+  const listSubjects = resourceTypeRegistry.subjectsForLanguageList(listKind)
+  const globalSubjects = supportedSubjectsFromRegistry(resourceTypeRegistry)
+  const listSubjectsKey = listSubjects.join(',')
+  const globalSubjectsKey = globalSubjects.join(',')
 
   // Displayed list: show cache immediately, then update when revalidation completes
   const [displayedLanguages, setDisplayedLanguages] = useState<ListedLanguage[]>([])
@@ -96,31 +106,28 @@ export function LanguagePicker({
     setError(null)
     try {
       const client = getDoor43ApiClient()
-      const [door43Langs, availabilityByCode] = await Promise.all([
-        // Full tc-ready list (no subject filter). Passing all plugin subjects
-        // can collapse to the ~15 Aligned Bible GLs when OBS is not registered yet.
-        client.getLanguages({
-          stage: 'prod',
-          topic: 'tc-ready',
-        }),
+      const [availabilityByCode, catalogStats] = await Promise.all([
         fetchLanguageAvailabilityByCode(client),
+        catalogManager.getCatalogStats(),
       ])
-      const catalogStats = await catalogManager.getCatalogStats()
-      const merged = mergePickerLanguages({
+      const { display, global } = await revalidatePickerLanguages({
+        client,
+        kind: listKind,
+        listSubjects,
+        globalSubjects,
         catalogCodes: Object.keys(catalogStats.byLanguage),
-        door43Langs,
         availabilityByCode,
       })
-      saveLanguagesCache(merged, supportedSubjects)
-      setDisplayedLanguages(merged)
-      setAvailableLanguages(merged)
+      saveLanguagesCache(global, globalSubjects)
+      setDisplayedLanguages(display)
+      setAvailableLanguages(global)
     } catch (err) {
       console.error('❌ Failed to revalidate languages:', err)
       setError(err as Error)
     } finally {
       setIsRevalidating(false)
     }
-  }, [supportedSubjectsKey, catalogManager])
+  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager])
 
   const revalidateRef = useRef(revalidate)
   revalidateRef.current = revalidate
@@ -129,16 +136,17 @@ export function LanguagePicker({
   useEffect(() => {
     if (!isOpen) return
 
-    const cached = loadLanguagesCache(supportedSubjects)
+    const cached = loadLanguagesCache(globalSubjects)
     if (cached?.length) {
-      setDisplayedLanguages(cached)
+      const scoped = filterCachedLanguagesForKind(cached, listKind)
+      setDisplayedLanguages(scoped)
       setAvailableLanguages(cached)
     } else {
       setDisplayedLanguages([])
     }
     setError(null)
     revalidateRef.current()
-  }, [isOpen])
+  }, [isOpen, listKind, globalSubjectsKey])
 
   const languages = displayedLanguages
   const isLoading = isRevalidating && displayedLanguages.length === 0
@@ -147,6 +155,7 @@ export function LanguagePicker({
   const filteredLanguages = filterPickerLanguages(languages, {
     searchQuery,
     textKind,
+    listMode,
   })
 
   const catalogLanguages = filteredLanguages.filter((l) => l.source === 'catalog')

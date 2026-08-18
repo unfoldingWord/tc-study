@@ -47,8 +47,18 @@ export function mergePickerLanguages(options: {
   catalogCodes: readonly string[]
   door43Langs: readonly PickerDoor43Language[]
   availabilityByCode: ReadonlyMap<string, LanguageAvailabilityFlags>
+  /**
+   * When false, do not add availability-only codes (scoped panel lists).
+   * Global / cache merges keep the default so OBS langs still fill the universe.
+   */
+  includeAvailabilityOnlyCodes?: boolean
 }): ListedLanguage[] {
-  const { catalogCodes, door43Langs, availabilityByCode } = options
+  const {
+    catalogCodes,
+    door43Langs,
+    availabilityByCode,
+    includeAvailabilityOnlyCodes = true,
+  } = options
   const door43ByCode = new Map<string, PickerDoor43Language>()
   for (const lang of door43Langs) {
     const code = String(lang.code ?? '').trim()
@@ -80,13 +90,15 @@ export function mergePickerLanguages(options: {
     )
   }
 
-  for (const [code, flags] of availabilityByCode) {
-    if (!code || isOriginalLanguageCode(code) || languageMap.has(code)) continue
-    const door43 = door43ByCode.get(code)
-    languageMap.set(
-      code,
-      listedFromDoor43(door43 ?? { code, name: code.toUpperCase() }, 'door43', flags)
-    )
+  if (includeAvailabilityOnlyCodes) {
+    for (const [code, flags] of availabilityByCode) {
+      if (!code || isOriginalLanguageCode(code) || languageMap.has(code)) continue
+      const door43 = door43ByCode.get(code)
+      languageMap.set(
+        code,
+        listedFromDoor43(door43 ?? { code, name: code.toUpperCase() }, 'door43', flags)
+      )
+    }
   }
 
   return Array.from(languageMap.values()).sort((a, b) => a.name.localeCompare(b.name))

@@ -15,7 +15,9 @@ describe('LanguagePicker (issue #24 helps list)', () => {
     expect(pickerSrc).toContain('onOpenChange')
     expect(pickerSrc).toContain('useLanguagePickerOpen')
     expect(pickerSrc).toContain('filterPickerLanguages')
-    expect(pickerSrc).toContain('mergePickerLanguages')
+    expect(pickerSrc).toContain('revalidatePickerLanguages')
+    expect(pickerSrc).toContain('resolveLanguageListKind')
+    expect(pickerSrc).toContain('subjectsForLanguageList')
     expect(pickerSrc).not.toContain('subjects: supportedSubjects')
   })
 
@@ -80,7 +82,7 @@ describe('LanguagePicker chrome + text kind filter', () => {
   })
 
   test('body uses LanguagePickerGrid with stack rhythm, not space-y-4', () => {
-    expect(pickerSrc).toContain("topic: 'tc-ready'")
+    expect(pickerSrc).toContain('revalidatePickerLanguages')
     expect(pickerSrc).toContain('LanguagePickerGrid')
     expect(pickerSrc).toContain('flex flex-col gap-stack')
     expect(pickerSrc).not.toContain('space-y-4')

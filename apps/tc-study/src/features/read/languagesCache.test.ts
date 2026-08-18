@@ -49,9 +49,9 @@ describe('languagesCache', () => {
     g.localStorage?.removeItem(LANGUAGES_CACHE_KEY)
   })
 
-  test('round-trips availability flags at cache version 6', () => {
+  test('round-trips availability flags at cache version 7', () => {
     saveLanguagesCache(SAMPLE, SUBJECTS)
-    expect(LANGUAGES_CACHE_VERSION).toBe(6)
+    expect(LANGUAGES_CACHE_VERSION).toBe(7)
     expect(loadLanguagesCache(SUBJECTS)).toEqual(SAMPLE)
   })
 
@@ -71,6 +71,11 @@ describe('languagesCache', () => {
   test('invalidates when supported subjects change', () => {
     saveLanguagesCache(SAMPLE, SUBJECTS)
     expect(loadLanguagesCache(['Bible'])).toBeNull()
+  })
+
+  test('invalidates when a newly registered content subject appears', () => {
+    saveLanguagesCache(SAMPLE, SUBJECTS)
+    expect(loadLanguagesCache([...SUBJECTS, 'Study Bible'])).toBeNull()
   })
 
   test('does not invent empty flags for a v5 entry missing availability', () => {

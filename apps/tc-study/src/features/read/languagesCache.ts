@@ -1,13 +1,14 @@
 /**
  * Language-list cache for Read / LanguagePicker.
- * v6: OBS-helps flags union prod subject lists (not the 3 tc-ready TSV GLs).
+ * v7: keyed by registry **content** subjects (`subjectsForLanguageList('global')`),
+ * not every plugin subject (Combined Helps synthetics, UGNT/UHB, helps).
  * Bump version to invalidate.
  */
 
 import { type LanguageAvailabilityFlags } from './languageAvailability'
 
 export const LANGUAGES_CACHE_KEY = 'tc-study:languages-cache'
-export const LANGUAGES_CACHE_VERSION = 6
+export const LANGUAGES_CACHE_VERSION = 7
 
 export interface ListedLanguage {
   code: string

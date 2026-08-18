@@ -1,0 +1,111 @@
+/**
+ * Registry-driven Door43 subjects for Read language lists.
+ *
+ * Panel modes default from contentRole + scope / companionFor so a new
+ * plugin expands the right list without picker hardcoding.
+ */
+
+import type { ResourceTypeDefinition } from './types'
+
+export type LanguageListKind = 'global' | 'scripture' | 'obs' | 'helps' | 'obs-helps'
+export type ResourcePanelMode = 'scripture' | 'obs' | 'helps'
+
+export type LanguageListTypeFields = Pick<
+  ResourceTypeDefinition,
+  | 'subjects'
+  | 'languageListSubjects'
+  | 'includeInLanguageLists'
+  | 'panelModes'
+  | 'contentRole'
+  | 'scope'
+  | 'companionFor'
+>
+
+export function panelModesForType(def: LanguageListTypeFields): ResourcePanelMode[] {
+  if (def.panelModes && def.panelModes.length > 0) return [...def.panelModes]
+  if (def.contentRole === 'primary') {
+    if (def.scope === 'obs') return ['obs']
+    if (def.scope === 'scripture') return ['scripture']
+    return []
+  }
+  // companion (default) and shared → helps lists; obs vs bible via companionFor
+  return ['helps']
+}
+
+export function catalogLanguageListSubjects(def: LanguageListTypeFields): string[] {
+  if (def.includeInLanguageLists === false) return []
+  return uniqueSubjects(def.languageListSubjects ?? def.subjects ?? [])
+}
+
+function typeMatchesKind(def: LanguageListTypeFields, kind: LanguageListKind): boolean {
+  const modes = panelModesForType(def)
+  if (kind === 'scripture') return modes.includes('scripture')
+  if (kind === 'obs') return modes.includes('obs')
+  if (kind === 'helps') {
+    if (!modes.includes('helps')) return false
+    if (def.contentRole === 'shared') return true
+    const forScopes = def.companionFor ?? []
+    return forScopes.includes('scripture') || forScopes.length === 0
+  }
+  if (kind === 'obs-helps') {
+    if (!modes.includes('helps')) return false
+    if (def.contentRole === 'shared') return true
+    return (def.companionFor ?? []).includes('obs')
+  }
+  return false
+}
+
+/**
+ * Door43 subjects for one language list.
+ * - `global` — union of scripture + OBS **content** subjects (Any-chip / cache key)
+ * - `scripture` / `obs` — primary content subjects for that mode
+ * - `helps` / `obs-helps` — companion (+ shared) subjects for bible vs OBS nav
+ */
+export function subjectsForLanguageList(
+  types: readonly LanguageListTypeFields[],
+  kind: LanguageListKind
+): string[] {
+  if (kind === 'global') {
+    return uniqueConcat(
+      subjectsForLanguageList(types, 'scripture'),
+      subjectsForLanguageList(types, 'obs')
+    )
+  }
+
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const def of types) {
+    if (!typeMatchesKind(def, kind)) continue
+    for (const subject of catalogLanguageListSubjects(def)) {
+      if (seen.has(subject)) continue
+      seen.add(subject)
+      out.push(subject)
+    }
+  }
+  return out
+}
+
+function uniqueSubjects(subjects: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of subjects) {
+    const subject = String(raw ?? '').trim()
+    if (!subject || seen.has(subject)) continue
+    seen.add(subject)
+    out.push(subject)
+  }
+  return out
+}
+
+function uniqueConcat(...lists: readonly string[][]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const list of lists) {
+    for (const subject of list) {
+      if (seen.has(subject)) continue
+      seen.add(subject)
+      out.push(subject)
+    }
+  }
+  return out
+}

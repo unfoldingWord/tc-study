@@ -15,8 +15,12 @@ import {
 } from './textModeMismatch'
 
 export function supportedSubjectsFromRegistry(registry: {
+  subjectsForLanguageList?: (kind: 'global') => string[]
   getSupportedSubjects?: () => string[]
 }): string[] {
+  if (typeof registry.subjectsForLanguageList === 'function') {
+    return registry.subjectsForLanguageList('global')
+  }
   return typeof registry.getSupportedSubjects === 'function'
     ? registry.getSupportedSubjects()
     : []

@@ -20,6 +20,7 @@ import { defaultLayoutForViewport } from '../../features/read/readPanelLayout'
 import { needsReadLanguagePicker } from '../../features/read/readPanelModel'
 import { useReadPanelStore } from '../../features/read/readPanelStore'
 import { helpsCatalogKnownEmptyFromCache } from '../../features/read/helpsLanguagePolicy'
+import { supportedSubjectsFromRegistry } from '../../features/read/scriptureLanguageMismatch'
 import { textModeMismatchFromCache } from '../../features/read/textModeMismatch'
 import { useFilteredReadPanelKeys } from '../../features/read/useFilteredReadPanelKeys'
 import { useIsNarrowViewport } from '../../features/read/useIsNarrowViewport'
@@ -103,10 +104,7 @@ export function SimplifiedReadView({
   })
 
   const subjects = useMemo(
-    () =>
-      typeof resourceTypeRegistry.getSupportedSubjects === 'function'
-        ? resourceTypeRegistry.getSupportedSubjects()
-        : [],
+    () => supportedSubjectsFromRegistry(resourceTypeRegistry),
     [resourceTypeRegistry]
   )
   const panel1Mismatch = useMemo(() => {

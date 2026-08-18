@@ -110,6 +110,22 @@ describe('mergePickerLanguages + textKind (issue: incomplete Bible list)', () =>
     expect(merged.find((lang) => lang.code === 'hi')?.source).toBe('catalog')
   })
 
+  test('scoped merge does not add availability-only OBS langs', () => {
+    const availabilityByCode = mergeAvailabilityFromLanguageSets({
+      bible: ['en'],
+      obs: ['en', 'fr'],
+      bibleHelps: [],
+      obsHelps: [],
+    })
+    const merged = mergePickerLanguages({
+      catalogCodes: ['en'],
+      door43Langs: [{ code: 'en', name: 'English' }],
+      availabilityByCode,
+      includeAvailabilityOnlyCodes: false,
+    })
+    expect(merged.map((lang) => lang.code)).toEqual(['en'])
+  })
+
   test('availability-only OBS language is added when missing from getLanguages', () => {
     const availabilityByCode = mergeAvailabilityFromLanguageSets({
       bible: ['en'],

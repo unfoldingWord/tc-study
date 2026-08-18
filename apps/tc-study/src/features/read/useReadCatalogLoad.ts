@@ -9,7 +9,10 @@ import { useResourceManagement } from '../../hooks'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
 import { shouldSkipHelpsCatalogLoad } from './helpsLanguagePolicy'
-import { shouldSkipTextCatalogForMismatch } from './scriptureLanguageMismatch'
+import {
+  shouldSkipTextCatalogForMismatch,
+  supportedSubjectsFromRegistry,
+} from './scriptureLanguageMismatch'
 import { loadLanguagesCache } from './languagesCache'
 import {
   loadReadLanguageCatalog,
@@ -135,10 +138,7 @@ export function useReadCatalogLoad() {
   const runCatalogLoad = useCallback(
     async (options: RunReadCatalogLoadOptions) => {
       const destPanels = destPanelsForCatalogLoad(options)
-      const subjects =
-        typeof resourceTypeRegistry.getSupportedSubjects === 'function'
-          ? resourceTypeRegistry.getSupportedSubjects()
-          : []
+      const subjects = supportedSubjectsFromRegistry(resourceTypeRegistry)
       const listed = loadLanguagesCache(subjects)
       const availability = availabilityLookupFromListed(listed)(options.helpsLanguageCode)
       if (
