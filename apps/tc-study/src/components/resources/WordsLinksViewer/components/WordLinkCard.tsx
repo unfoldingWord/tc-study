@@ -9,6 +9,10 @@
 import { BookText } from 'lucide-react'
 import { memo } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
+import {
+  resolveHelpsQuoteStatus,
+  type HelpsQuoteStatus,
+} from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
@@ -48,6 +52,8 @@ interface WordLinkCardProps {
 
 const quoteChipClass =
   'w-full text-start mb-stack px-chrome py-chrome-tight bg-chip-quote hover:bg-chip-quote-hover rounded-md transition-colors duration-150'
+const quoteChipStaticClass =
+  'w-full text-start mb-stack px-chrome py-chrome-tight bg-chip-quote rounded-md border border-border-subtle'
 
 export const WordLinkCard = memo(function WordLinkCard({
   link,
@@ -62,8 +68,19 @@ export const WordLinkCard = memo(function WordLinkCard({
   languageDirection = 'ltr',
   obsMode = false,
 }: WordLinkCardProps) {
-  const alignedTokens = (link as TranslationWordsLink & { alignedTokens?: AlignedToken[] }).alignedTokens
-  const hasAlignedTokens = alignedTokens && alignedTokens.length > 0
+  const linkWithQuote = link as TranslationWordsLink & {
+    alignedTokens?: AlignedToken[]
+    quoteStatus?: HelpsQuoteStatus
+  }
+  const alignedTokens = linkWithQuote.alignedTokens
+  const hasAlignedTokens = !!(alignedTokens && alignedTokens.length > 0)
+  const quoteStatus =
+    linkWithQuote.quoteStatus ??
+    resolveHelpsQuoteStatus({
+      hasAlignedTokens,
+      alignmentPending: false,
+      olQuote: link.origWords,
+    })
   const filterText = tokenFilter?.content ?? null
 
   // DCS abbreviation from AppStore (e.g. glt key → TPL); fall back to key segment
@@ -119,6 +136,36 @@ export const WordLinkCard = memo(function WordLinkCard({
             )}
           </div>
         </button>
+      )}
+
+      {!hasAlignedTokens && !obsMode && quoteStatus === 'pending' && (
+        <div
+          className={`${quoteChipStaticClass} animate-pulse`}
+          role="status"
+          title="Building quote"
+          aria-label="Building quote"
+        >
+          <LoadingSpinner size="sm" label="Building quote" className="text-fg-muted" />
+        </div>
+      )}
+
+      {!hasAlignedTokens && !obsMode && quoteStatus === 'ol-fallback' && link.origWords?.trim() && (
+        <div
+          className={quoteChipStaticClass}
+          title="Original language phrase (target language alignment not available)"
+          dir={languageDirection}
+        >
+          <div className="text-base leading-relaxed">
+            <span className="italic text-fg-secondary">
+              &ldquo;<QuotedFilterText quote={link.origWords} filterText={filterText} />&rdquo;
+            </span>
+            {resourceAbbreviation && (
+              <span className="ml-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
+                {resourceAbbreviation}
+              </span>
+            )}
+          </div>
+        </div>
       )}
 
       {!hasAlignedTokens && obsMode && link.origWords && link.origWords.trim().length > 0 && (

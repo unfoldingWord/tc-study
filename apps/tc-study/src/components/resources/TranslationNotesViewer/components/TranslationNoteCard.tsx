@@ -9,6 +9,10 @@ import { Code, GraduationCap } from 'lucide-react'
 import { memo, startTransition, useCallback, useState } from 'react'
 import { useNavigationStore } from '../../../../contexts'
 import { useAppStore } from '../../../../contexts/AppContext'
+import {
+  resolveHelpsQuoteStatus,
+  type HelpsQuoteStatus,
+} from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
@@ -36,6 +40,7 @@ export type NoteWithTokens = TranslationNote & {
   quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
   alignedTokens?: AlignedToken[]
   semanticIds?: string[]
+  quoteStatus?: HelpsQuoteStatus
 }
 
 interface TranslationNoteCardProps {
@@ -85,6 +90,13 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   // not on every chapter/verse navigation or obsFrameCountByStory update.
   const currentBook = useNavigationStore((s) => s.currentReference.book)
   const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
+  const quoteStatus =
+    note.quoteStatus ??
+    resolveHelpsQuoteStatus({
+      hasAlignedTokens,
+      alignmentPending: false,
+      olQuote: note.quote,
+    })
   const filterText = tokenFilter?.content ?? null
 
   // DCS abbreviation from AppStore (e.g. glt key → TPL); fall back to key segment
@@ -215,8 +227,19 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </button>
       )}
 
-      {/* Fallback: Original language quote when target alignment is missing (e.g. scripture has no \zaln) */}
-      {!hasAlignedTokens && note.quote && note.quote.trim().length > 0 && !obsMode && (
+      {!hasAlignedTokens && !obsMode && quoteStatus === 'pending' && (
+        <div
+          className={`${quoteChipStaticClass} animate-pulse`}
+          role="status"
+          title="Building quote"
+          aria-label="Building quote"
+        >
+          <LoadingSpinner size="sm" label="Building quote" className="text-fg-muted" />
+        </div>
+      )}
+
+      {/* Fallback: Original language quote only after a settled miss */}
+      {!hasAlignedTokens && !obsMode && quoteStatus === 'ol-fallback' && note.quote?.trim() && (
         <div
           className={quoteChipStaticClass}
           title="Original language phrase (target language alignment not available)"

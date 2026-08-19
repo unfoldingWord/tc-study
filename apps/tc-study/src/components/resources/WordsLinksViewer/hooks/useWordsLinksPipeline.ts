@@ -5,6 +5,7 @@
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useMemo } from 'react'
 import type { AlignedToken } from '../../../../features/helps/findAlignedTokens'
+import type { HelpsQuoteStatus } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import {
   filterDisplayLinks,
   filterLinksByReferenceRange,
@@ -24,6 +25,7 @@ export type LinkWithAlignments = TranslationWordsLink & {
   quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
   alignedTokens?: AlignedToken[]
   semanticIds?: string[]
+  quoteStatus?: HelpsQuoteStatus
 }
 
 export interface UseWordsLinksPipelineParams {
@@ -55,7 +57,7 @@ export function useWordsLinksPipeline({
   verseFilter,
   obsQuoteFilter,
 }: UseWordsLinksPipelineParams) {
-  const { linksWithQuotes } = useQuoteTokens({
+  const { linksWithQuotes, quoteBuildReady } = useQuoteTokens({
     resourceKey,
     resourceId,
     links,
@@ -65,6 +67,7 @@ export function useWordsLinksPipeline({
     resourceKey,
     resourceId,
     links: linksWithQuotes,
+    quoteBuildReady,
   })
 
   const processedLinks = useMemo(() => {

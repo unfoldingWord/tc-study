@@ -19,6 +19,7 @@
 
 import { useMemo } from 'react'
 import { useCurrentReference } from '../../../../contexts'
+import { isQuoteBuildReady } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { buildQuoteTokens } from '../../../../features/helps/quoteTokens'
 import type { TranslationWordsLink } from '../types'
 import { useOriginalLanguageContent } from './useOriginalLanguageContent'
@@ -83,10 +84,17 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
    
   }, [links, originalContent, currentRef.book, currentRef.chapter])
   
+  const quoteBuildReady = isQuoteBuildReady({
+    loadingOriginal,
+    originalContent,
+    originalError,
+  })
+
   return {
     linksWithQuotes,
     loadingOriginal,
     originalError,
     hasOriginalContent: !!originalContent && originalContent.length > 0,
+    quoteBuildReady,
   }
 }

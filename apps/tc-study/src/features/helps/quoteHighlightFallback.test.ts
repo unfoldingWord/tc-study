@@ -18,7 +18,7 @@ import {
 } from './resolveAlignedQuoteTokens'
 import { filterNotesByReferenceRange } from './helpsDisplayFilters'
 import { resolveQuoteSemanticIds } from './resolveQuoteSemanticIds'
-import { generateSemanticIdsForQuoteTokens } from './quoteTokens'
+import { buildQuoteTokens, generateSemanticIdsForQuoteTokens } from './quoteTokens'
 
 type BroadcastToken = OptimizedToken & {
   semanticId?: string
@@ -132,6 +132,9 @@ describe('minority text + English tN', () => {
     expect(isOriginalLanguageCode('el-x-koine')).toBe(true)
     expect(isOriginalLanguageCode('unfoldingWord/hbo/uhb')).toBe(true)
     expect(isOriginalLanguageCode('unfoldingWord/hbo/uhb#2')).toBe(true)
+    expect(isOriginalLanguageCode('unfoldingWord/el-x-koine/ugnt')).toBe(true)
+    expect(isOriginalLanguageCode('unfoldingWord/el-x-koine/ugnt#2')).toBe(true)
+    expect(isOriginalLanguageCode('ugnt')).toBe(true)
     expect(isOriginalLanguageCode('en')).toBe(false)
     expect(isOriginalLanguageCode('es')).toBe(false)
   })
@@ -161,6 +164,8 @@ describe('minority text + English tN', () => {
     expect(canFallbackToQuoteText('en', 'es')).toBe(false)
     expect(canFallbackToQuoteText('en', 'hbo')).toBe(true)
     expect(canFallbackToQuoteText('en', 'unfoldingWord/hbo/uhb')).toBe(true)
+    expect(canFallbackToQuoteText('en', 'el-x-koine')).toBe(true)
+    expect(canFallbackToQuoteText('en', 'unfoldingWord/el-x-koine/ugnt')).toBe(true)
     const unpointed = 'בראשית'
     const pointed = 'בְּרֵאשִׁית'
     const uhb = [
@@ -198,6 +203,135 @@ describe('minority text + English tN', () => {
       textLanguage: 'bho',
     })
     expect(result.alignedTokens).toEqual([])
+  })
+})
+
+describe('Greek CombinedHelps quote-build onto ULT', () => {
+  const TONOS = 'κακούς'
+  const OXIA = 'κακούς'
+  const REV_QUOTE = 'τάδε λέγει ὁ κρατῶν τοὺς ἑπτὰ ἀστέρας ἐν τῇ δεξιᾷ αὐτοῦ'
+
+  function ugntChapter(verse: number, words: string[]) {
+    return [
+      {
+        number: 2,
+        verseCount: 1,
+        paragraphCount: 1,
+        verses: [
+          {
+            number: verse,
+            text: words.join(' '),
+            tokens: words.map((text, i) => ({
+              id: i + 1,
+              text,
+              type: 'word' as const,
+              occurrence: 1,
+            })),
+          },
+        ],
+      },
+    ]
+  }
+
+  function ultWord(text: string, book: string, chapter: number, verse: number, aligned: string[]) {
+    return {
+      id: 1,
+      text,
+      type: 'word' as const,
+      occurrence: 1,
+      semanticId: semanticIdFor(`${book} ${chapter}:${verse}`, text, 1),
+      alignedOriginalWordIds: aligned,
+    }
+  }
+
+  test('κακούς (tonos TN) builds UGNT oxia tokens then maps onto ULT evil', () => {
+    const quoteTokens = buildQuoteTokens({
+      link: {
+        reference: '2:2',
+        id: 'tn-kakous',
+        tags: 'kt',
+        origWords: TONOS,
+        occurrence: '1',
+        articlePath: '',
+      },
+      originalChapters: ugntChapter(2, [OXIA, 'εἰσίν']),
+      bookCode: 'rev',
+    })
+    expect(quoteTokens.map((t) => t.text)).toEqual([OXIA])
+
+    const semanticIds = generateSemanticIdsForQuoteTokens(quoteTokens, 'rev', 2, 2, 1)
+    const ult = [
+      ultWord('evil', 'rev', 2, 2, [`rev 2:2:${OXIA}:1`]),
+      ultWord('people', 'rev', 2, 2, []),
+    ]
+    const result = resolveAlignedQuoteTokens({
+      targetTokens: ult,
+      originalSemanticIds: semanticIds,
+      quoteText: TONOS,
+      occurrence: 1,
+      bookCode: 'rev',
+      chapter: 2,
+      verse: 2,
+      quoteLanguage: 'en',
+      textLanguage: 'en',
+    })
+    expect(result.alignedTokens.map((t) => t.content)).toEqual(['evil'])
+    expect(result.alignedTokens[0]?.type).toBe('word')
+  })
+
+  test('long Rev quote builds UGNT tokens then maps the first ULT alignment', () => {
+    const ugntWords = REV_QUOTE.split(' ')
+    const quoteTokens = buildQuoteTokens({
+      link: {
+        reference: '2:1',
+        id: 'tn-tade',
+        tags: '',
+        origWords: REV_QUOTE,
+        occurrence: '1',
+        articlePath: '',
+      },
+      originalChapters: ugntChapter(1, ugntWords),
+      bookCode: 'rev',
+    })
+    expect(quoteTokens).toHaveLength(ugntWords.length)
+
+    const semanticIds = generateSemanticIdsForQuoteTokens(quoteTokens, 'rev', 2, 1)
+    const firstId = semanticIds[0]!
+    const ult = [
+      ultWord('These', 'rev', 2, 1, [firstId]),
+      ultWord('things', 'rev', 2, 1, [semanticIds[1]!]),
+    ]
+    const result = resolveAlignedQuoteTokens({
+      targetTokens: ult,
+      originalSemanticIds: semanticIds,
+      quoteText: REV_QUOTE,
+      occurrence: 1,
+      bookCode: 'rev',
+      chapter: 2,
+      verse: 1,
+      quoteLanguage: 'en',
+      textLanguage: 'en',
+    })
+    expect(result.alignedTokens.map((t) => t.content)).toEqual(['These', 'things'])
+  })
+
+  test('UGNT pane still quote-text-matches Greek when zaln ids are empty', () => {
+    const ugnt = [
+      word(OXIA, { semanticId: `rev 2:2:${OXIA}:1`, aligned: [] }),
+      word('εἰσίν', { semanticId: 'rev 2:2:εἰσίν:1', aligned: [] }),
+    ]
+    const result = resolveAlignedQuoteTokens({
+      targetTokens: ugnt,
+      originalSemanticIds: [`rev 2:2:${TONOS}:1`],
+      quoteText: TONOS,
+      occurrence: 1,
+      bookCode: 'rev',
+      chapter: 2,
+      verse: 2,
+      quoteLanguage: 'en',
+      textLanguage: 'unfoldingWord/el-x-koine/ugnt',
+    })
+    expect(result.alignedTokens.some((t) => t.content === OXIA)).toBe(true)
   })
 })
 

@@ -72,7 +72,7 @@ export function useTranslationNotesPipeline({
     [relevantNotes]
   )
 
-  const { linksWithQuotes } = useQuoteTokens({
+  const { linksWithQuotes, quoteBuildReady } = useQuoteTokens({
     resourceKey,
     resourceId,
     links: notesWithQuotes,
@@ -82,6 +82,7 @@ export function useTranslationNotesPipeline({
     resourceKey,
     resourceId,
     links: linksWithQuotes,
+    quoteBuildReady,
   })
 
   const notesWithAlignedTokens = useMemo(() => {
@@ -90,11 +91,13 @@ export function useTranslationNotesPipeline({
     const semanticIdsMap = new Map(
       linksWithAlignedTokens.map((link) => [link.id, (link as { semanticIds?: string[] }).semanticIds])
     )
+    const quoteStatusMap = new Map(linksWithAlignedTokens.map((link) => [link.id, link.quoteStatus]))
     return relevantNotes.map((note) => ({
       ...note,
       quoteTokens: quoteTokensMap.get(note.id),
       alignedTokens: alignedTokensMap.get(note.id),
       semanticIds: semanticIdsMap.get(note.id),
+      quoteStatus: quoteStatusMap.get(note.id),
     })) as NoteWithTokens[]
   }, [relevantNotes, linksWithQuotes, linksWithAlignedTokens])
 

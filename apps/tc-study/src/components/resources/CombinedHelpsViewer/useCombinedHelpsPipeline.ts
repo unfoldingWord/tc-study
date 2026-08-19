@@ -94,16 +94,18 @@ export function useCombinedHelpsPipeline({
   // SCRIPTURE_TOKENS is received on the mounted CombinedHelps resourceId.
   // TN/TWL keys are catalog sources only — they are not linked-panels resources
   // when CombinedHelps is injected into the panel.
-  const { linksWithQuotes: tnLinksWithQuotes } = useQuoteTokens({
-    resourceKey: tnKey || resourceKey,
-    resourceId,
-    links: notesWithQuotes,
-  })
+  const { linksWithQuotes: tnLinksWithQuotes, quoteBuildReady: tnQuoteBuildReady } =
+    useQuoteTokens({
+      resourceKey: tnKey || resourceKey,
+      resourceId,
+      links: notesWithQuotes,
+    })
 
   const { linksWithAlignedTokens: tnLinksAligned } = useAlignedTokens({
     resourceKey: tnKey || resourceKey,
     resourceId,
     links: tnLinksWithQuotes,
+    quoteBuildReady: tnQuoteBuildReady,
   })
 
   const notesWithAlignedTokens = useMemo(() => {
@@ -112,11 +114,13 @@ export function useCombinedHelpsPipeline({
     const semanticIdsMap = new Map(
       tnLinksAligned.map((l) => [l.id, (l as { semanticIds?: string[] }).semanticIds])
     )
+    const quoteStatusMap = new Map(tnLinksAligned.map((l) => [l.id, l.quoteStatus]))
     return relevantNotes.map((note) => ({
       ...note,
       quoteTokens: quoteMap.get(note.id),
       alignedTokens: alignedMap.get(note.id),
       semanticIds: semanticIdsMap.get(note.id),
+      quoteStatus: quoteStatusMap.get(note.id),
     })) as NoteWithAlignments[]
   }, [relevantNotes, tnLinksWithQuotes, tnLinksAligned])
 
@@ -134,16 +138,18 @@ export function useCombinedHelpsPipeline({
     }))
   }, [twlLinksRaw])
 
-  const { linksWithQuotes: twlLinksWithQuotes } = useQuoteTokens({
-    resourceKey: twlKey || resourceKey,
-    resourceId,
-    links,
-  })
+  const { linksWithQuotes: twlLinksWithQuotes, quoteBuildReady: twlQuoteBuildReady } =
+    useQuoteTokens({
+      resourceKey: twlKey || resourceKey,
+      resourceId,
+      links,
+    })
 
   const { linksWithAlignedTokens: twlLinksAligned } = useAlignedTokens({
     resourceKey: twlKey || resourceKey,
     resourceId,
     links: twlLinksWithQuotes,
+    quoteBuildReady: twlQuoteBuildReady,
   })
 
   const processedLinks = useMemo(() => {

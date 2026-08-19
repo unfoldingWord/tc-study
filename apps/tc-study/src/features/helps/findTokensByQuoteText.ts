@@ -3,14 +3,20 @@
  * Requires a full word-sequence hit; never matches inside a token.
  */
 
-import type { OptimizedToken } from '@bt-synergy/resource-parsers'
+import {
+  isHebrewText,
+  normalizeGreekText,
+  normalizeHebrewText,
+  type OptimizedToken,
+} from '@bt-synergy/resource-parsers'
 import { alignedTokensFromPositions, type AlignedToken } from './findAlignedTokens'
 
 const WORD_RE = /\p{L}[\p{L}\p{M}\p{N}'\u2019-]*|\p{N}+/gu
 const PART_SPLIT_RE = /\s*(?:&|…|\.{3})\s*/u
 
+/** Same Hebrew/Greek folds QuoteMatcher uses for quote-build. */
 function fold(s: string): string {
-  return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+  return isHebrewText(s) ? normalizeHebrewText(s) : normalizeGreekText(s)
 }
 
 function quotePartWords(quote: string): string[][] {

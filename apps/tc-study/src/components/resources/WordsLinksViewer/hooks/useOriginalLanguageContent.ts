@@ -157,6 +157,8 @@ export function useOriginalLanguageContent({
         const filteredChapters = optimizedChapters.filter((ch) => ch.number === chapter)
 
         if (filteredChapters.length === 0) {
+          // `[]` = attempted empty (distinct from first-paint `null`)
+          setOriginalContent([])
           setLoading(false)
           return
         }

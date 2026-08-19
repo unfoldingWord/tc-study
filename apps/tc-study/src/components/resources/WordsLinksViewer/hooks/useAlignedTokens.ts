@@ -20,6 +20,11 @@ import {
   isOriginalLanguageCode,
   resolveAlignedQuoteTokens,
 } from '../../../../features/helps/resolveAlignedQuoteTokens'
+import {
+  isHelpsQuoteAlignmentPending,
+  resolveHelpsQuoteStatus,
+  type HelpsQuoteStatus,
+} from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { generateSemanticIdsForQuoteTokens } from '../../../../features/helps/quoteTokens'
 import { useScriptureTokens } from './useScriptureTokens'
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
@@ -37,12 +42,19 @@ interface UseAlignedTokensOptions<TLink extends LinkQuotesInput> {
   resourceKey: string // TWL resource key (e.g., "unfoldingWord/en/twl")
   resourceId: string // TWL viewer resource ID
   links: TLink[]
+  /**
+   * OL quote-build settled (`useQuoteTokens.quoteBuildReady`).
+   * Default true only for callers that omit it; CombinedHelps TN/TWL and
+   * standalone TN/TWL pipelines pass the live flag so in-flight quotes stay pending.
+   */
+  quoteBuildReady?: boolean
 }
 
 export function useAlignedTokens<TLink extends LinkQuotesInput>({
   resourceKey,
   resourceId,
   links,
+  quoteBuildReady = true,
 }: UseAlignedTokensOptions<TLink>) {
   const currentRef = useCurrentReference()
 
@@ -53,12 +65,30 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     TLink & {
       alignedTokens: ReturnType<typeof resolveAlignedQuoteTokens>['alignedTokens'] | undefined
       semanticIds?: string[]
+      quoteStatus: HelpsQuoteStatus
     }
   > => {
-    if (!hasTokens || !links || links.length === 0) {
-      return links.map((link) => ({ ...link, alignedTokens: undefined })) as Array<
-        TLink & { alignedTokens: undefined }
-      >
+    const settledStatus = (link: TLink, hasAligned: boolean): HelpsQuoteStatus =>
+      resolveHelpsQuoteStatus({
+        hasAlignedTokens: hasAligned,
+        alignmentPending: false,
+        olQuote: link.origWords,
+      })
+
+    if (!links || links.length === 0) {
+      return []
+    }
+
+    if (!hasTokens) {
+      return links.map((link) => ({
+        ...link,
+        alignedTokens: undefined,
+        quoteStatus: resolveHelpsQuoteStatus({
+          hasAlignedTokens: false,
+          alignmentPending: true,
+          olQuote: link.origWords,
+        }),
+      }))
     }
 
     const bookCode = currentRef.book?.toLowerCase() || ''
@@ -77,22 +107,37 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       const linkVerse = parseInt(refParts[1] || '1', 10)
 
       if (linkChapter !== currentChapter) {
-        return { ...link, alignedTokens: undefined }
+        return { ...link, alignedTokens: undefined, quoteStatus: settledStatus(link, false) }
       }
 
-      if (
-        !tokenReference ||
-        refBookLower !== bookCode ||
-        tokenReference.chapter !== linkChapter
-      ) {
-        return { ...link, alignedTokens: undefined }
+      const tokensMatchPassage = !!(
+        tokenReference &&
+        refBookLower === bookCode &&
+        tokenReference.chapter === linkChapter
+      )
+      const alignmentPending = isHelpsQuoteAlignmentPending({
+        hasTargetTokens: hasTokens,
+        tokensMatchPassage,
+        quoteBuildReady,
+      })
+
+      if (!tokensMatchPassage) {
+        return {
+          ...link,
+          alignedTokens: undefined,
+          quoteStatus: resolveHelpsQuoteStatus({
+            hasAlignedTokens: false,
+            alignmentPending,
+            olQuote: link.origWords,
+          }),
+        }
       }
 
       const broadcastStartVerse = tokenReference.verse || 1
       const broadcastEndVerse = tokenReference.endVerse || broadcastStartVerse
 
       if (linkVerse < broadcastStartVerse || linkVerse > broadcastEndVerse) {
-        return { ...link, alignedTokens: undefined }
+        return { ...link, alignedTokens: undefined, quoteStatus: settledStatus(link, false) }
       }
 
       const linkOccurrence = parseInt(String(link.occurrence ?? '1'), 10)
@@ -118,10 +163,16 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         textLanguage,
       })
 
+      const hasAligned = alignedTokens.length > 0
       return {
         ...link,
-        alignedTokens: alignedTokens.length > 0 ? alignedTokens : undefined,
+        alignedTokens: hasAligned ? alignedTokens : undefined,
         semanticIds: semanticIds.length > 0 ? semanticIds : undefined,
+        quoteStatus: resolveHelpsQuoteStatus({
+          hasAlignedTokens: hasAligned,
+          alignmentPending: hasAligned ? false : alignmentPending,
+          olQuote: link.origWords,
+        }),
       }
     })
   }, [
@@ -133,6 +184,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     currentRef.chapter,
     resourceKey,
     resourceMetadata?.language,
+    resourceMetadata?.id,
+    quoteBuildReady,
   ])
 
   return {

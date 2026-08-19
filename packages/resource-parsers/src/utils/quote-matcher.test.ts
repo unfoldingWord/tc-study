@@ -49,4 +49,36 @@ describe('QuoteMatcher occurrence (USJ identity contract)', () => {
     expect(result.totalTokens.map((t) => t.text)).toEqual(['Παῦλος', 'θεοῦ'])
     expect(result.totalTokens.map((t) => t.occurrence)).toEqual([1, 1])
   })
+
+  test('Hebrew unpointed quote matches pointed UHB token (consonants only)', () => {
+    const pointedBereshit = 'בְּרֵאשִׁית'
+    const pointedErets = 'הָאָרֶץ'
+    const bereshit = matcher.findOriginalTokens(chapter([pointedBereshit]), 'בראשית', 1, {
+      book: 'gen',
+      startChapter: 1,
+      startVerse: 1,
+    })
+    expect(bereshit.success).toBe(true)
+    expect(bereshit.totalTokens[0]?.text).toBe(pointedBereshit)
+
+    const erets = matcher.findOriginalTokens(chapter([pointedErets]), 'הארץ', 1, {
+      book: 'gen',
+      startChapter: 1,
+      startVerse: 1,
+    })
+    expect(erets.success).toBe(true)
+    expect(erets.totalTokens[0]?.text).toBe(pointedErets)
+  })
+
+  test('Greek tonos quote matches oxia UGNT token', () => {
+    const oxia = 'κακούς'
+    const result = matcher.findOriginalTokens(chapter([oxia]), 'κακούς', 1, {
+      book: 'rev',
+      startChapter: 1,
+      startVerse: 1,
+    })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens).toHaveLength(1)
+    expect(result.totalTokens[0]?.text).toBe(oxia)
+  })
 })
