@@ -495,14 +495,14 @@ export function clipLayoutInlineToVerses(
 
     if (item.kind === 'text') {
       let chapter = currentChapter
-      let verse = currentVerse
+      let verse: number | null = currentVerse
       if (verse === null) {
         const peeked = peekNextVerse(inline, i + 1)
         if (!peeked) continue
         chapter = peeked.chapter
         verse = peeked.verse
       }
-      if (!inRange(chapter, verse)) continue
+      if (verse === null || !inRange(chapter, verse)) continue
       out.push(item)
     }
   }
@@ -555,14 +555,14 @@ export function collectVerseDisplayInline(
     out.push(...chunk)
   }
 
-  while (out.length > 0 && out[0]!.kind === 'text' && out[0]!.text.trim() === '') {
+  while (out.length > 0) {
+    const first = out[0]!
+    if (first.kind !== 'text' || first.text.trim() !== '') break
     out.shift()
   }
-  while (
-    out.length > 0 &&
-    out[out.length - 1]!.kind === 'text' &&
-    out[out.length - 1]!.text.trim() === ''
-  ) {
+  while (out.length > 0) {
+    const last = out[out.length - 1]!
+    if (last.kind !== 'text' || last.text.trim() !== '') break
     out.pop()
   }
 
