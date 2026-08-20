@@ -19,7 +19,8 @@ describe('LanguagePicker (issue #24 helps list)', () => {
     expect(pickerSrc).toContain('resolveLanguageListKind')
     expect(pickerSrc).toContain('subjectsForLanguageList')
     expect(pickerSrc).not.toContain('subjects: supportedSubjects')
-    expect(pickerSrc).not.toContain('navigationScope')
+    expect(pickerSrc).toContain('resolveLanguageListKind({ listMode })')
+    expect(pickerSrc).not.toContain('resolveLanguageListKind({ listMode, navigationScope')
   })
 
   test('header NavigationBar LanguagePicker stays on default text mode', () => {
@@ -72,6 +73,8 @@ describe('LanguagePicker chrome + text kind filter', () => {
     expect(pickerSrc).not.toContain("listMode !== 'helps'")
     expect(pickerSrc).not.toContain('showTextKindFilter')
     expect(pickerSrc).toContain('value={textKind} onChange={setTextKind}')
+    expect(pickerSrc).toContain('defaultTextKindForPicker(listMode, navigationScope)')
+    expect(pickerSrc).not.toMatch(/left[- ]pane/i)
   })
 
   test('search input uses Search... placeholder, not a visible label', () => {

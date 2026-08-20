@@ -5,6 +5,7 @@
 
 import { useState, type ReactNode } from 'react'
 import { useResourceTypeRegistry } from '../../contexts/CatalogContext'
+import { useNavigationScope } from '../../contexts/NavigationContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useTabDnDOptional } from '../../features/dnd/TabDnDContext'
 import type { ReadPanelMode } from '../../features/read/readPanelModel'
@@ -54,6 +55,8 @@ export function ReadPanelHeader({
   headerActions,
 }: ReadPanelHeaderProps) {
   const registry = useResourceTypeRegistry()
+  // Global Bible vs stories nav — not this panel's scripture/helps mode or resource.
+  const navigationScope = useNavigationScope()
   const { activeIcon } = useTabDnDOptional()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const pickerOpen = languagePickerOpen ?? uncontrolledOpen
@@ -88,6 +91,7 @@ export function ReadPanelHeader({
             <LanguagePicker
               compact
               listMode={languageListMode}
+              navigationScope={navigationScope}
               open={pickerOpen}
               onOpenChange={setPickerOpen}
               onLanguageSelected={onLanguageSelected}

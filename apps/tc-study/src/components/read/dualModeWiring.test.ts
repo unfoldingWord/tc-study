@@ -90,6 +90,8 @@ describe('dual-mode Read wiring (#29–#33 + independence)', () => {
     expect(dividerSrc).toContain('Show other panel')
     expect(dividerSrc).not.toContain('RAIL_PX')
     expect(hookSrc).toContain('restoreCollapsedDivider')
+    expect(hookSrc).toContain('defaultSplitPercent')
+    expect(hookSrc).toContain('splitUserChosen')
     expect(hookSrc).toContain('useReadPanelCollapse')
     expect(hookSrc).toContain('collapseTweenRange')
     expect(hookSrc).toContain('displayedSplitFromPointer')

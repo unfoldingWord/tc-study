@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react'
-import { NARROW_VIEWPORT_MQ } from './readPanelLayout'
+import { NARROW_VIEWPORT_MQ, viewportIsNarrow } from './readPanelLayout'
 
 /** Mobile-first: assume narrow until the matchMedia listener says otherwise. */
 export function useIsNarrowViewport(): boolean {
-  const [narrow, setNarrow] = useState(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true
-    return window.matchMedia(NARROW_VIEWPORT_MQ).matches
-  })
+  const [narrow, setNarrow] = useState(() => viewportIsNarrow())
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return

@@ -115,8 +115,20 @@ export type CachedReadSession = {
   book: string
   chapter: number
   verse: number
-  /** URL nav type (`ref` / `chapter` / `story` / …). Defaults: bible `ref`, obs `story`. */
+  /** URL nav type (`ref` / `chapter` / `story` / …). Defaults: bible `chapter`, obs `story`. */
   navigationType?: string
+}
+
+/** Cold-start URL grain when the user has not persisted a nav type. */
+export function defaultReadNavTypeForResource(resourceType: ReadResourceType): string {
+  return resourceType === 'obs' ? 'story' : 'chapter'
+}
+
+/** Honor a persisted nav type; otherwise Bible chapter / OBS story. */
+export function resolveCachedReadNavType(
+  session: Pick<CachedReadSession, 'mode' | 'navigationType'>
+): string {
+  return session.navigationType || defaultReadNavTypeForResource(session.mode)
 }
 
 /**
@@ -128,7 +140,7 @@ export function resumeBareReadNavigation(
   session: CachedReadSession | null | undefined
 ): { replace: string } | null {
   if (!isBareReadPathname(pathname) || !session) return null
-  const navType = session.navigationType || (session.mode === 'obs' ? 'story' : 'ref')
+  const navType = resolveCachedReadNavType(session)
   const mode = navigationModeFromReadNav(session.mode, navType)
   if (!mode) return null
   return readUrlWriteBackAction({

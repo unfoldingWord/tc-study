@@ -87,7 +87,7 @@ describe('revalidatePickerLanguages', () => {
     const availabilityByCode = mergeAvailabilityFromLanguageSets({
       bible: ['en', 'hi'],
       obs: ['fr', 'en'],
-      bibleHelps: ['en'],
+      bibleHelps: ['en', 'am'],
       obsHelps: ['fr'],
     })
     const { display } = await revalidatePickerLanguages({
@@ -95,11 +95,12 @@ describe('revalidatePickerLanguages', () => {
       kind: 'global',
       listSubjects: ['Bible', 'Aligned Bible', 'Open Bible Stories'],
       globalSubjects: ['Bible', 'Aligned Bible', 'Open Bible Stories'],
-      catalogCodes: ['en', 'fr'],
+      catalogCodes: ['en', 'fr', 'am'],
       availabilityByCode,
     })
     expect(requested).toEqual(['Bible', 'Aligned Bible', 'Open Bible Stories'])
     expect(display.map((lang) => lang.code).sort()).toEqual(['en', 'fr', 'hi'])
+    expect(display.map((lang) => lang.code)).not.toContain('am')
   })
 
   test('helps picker requests companion TN/TWL/TQ only and includes OBS-TN langs', async () => {
@@ -198,6 +199,23 @@ describe('revalidatePickerLanguages', () => {
     ).toEqual(['en'])
   })
 
+  test('global catalog merge drops helps-only langs and keeps unknown + primary', () => {
+    const availabilityByCode = mergeAvailabilityFromLanguageSets({
+      bible: ['en'],
+      obs: ['fr'],
+      bibleHelps: ['am'],
+      obsHelps: [],
+    })
+    expect(
+      catalogCodesForLanguageList({
+        catalogCodes: ['en', 'fr', 'am', 'xx'],
+        door43Codes: new Set(['en']),
+        availabilityByCode,
+        kind: 'global',
+      }).sort()
+    ).toEqual(['en', 'fr', 'xx'])
+  })
+
   test('optimistic cache filter keeps bible langs for scripture kind', () => {
     saveLanguagesCache(
       [
@@ -229,6 +247,12 @@ describe('revalidatePickerLanguages', () => {
         source: 'door43' as const,
         availability: { bible: false, obs: true, bibleHelps: false, obsHelps: false },
       },
+      {
+        code: 'am',
+        name: 'Amharic',
+        source: 'door43' as const,
+        availability: { bible: false, obs: false, bibleHelps: true, obsHelps: false },
+      },
     ]
     expect(filterCachedLanguagesForKind(cached, 'scripture').map((l) => l.code)).toEqual([
       'en',
@@ -240,8 +264,29 @@ describe('revalidatePickerLanguages', () => {
       ['en', 'fr']
     )
     expect(
-      filterCachedLanguagesForKind(cached, 'all-helps').map((l) => l.code)
-    ).toEqual(['en'])
+      filterCachedLanguagesForKind(cached, 'all-helps').map((l) => l.code).sort()
+    ).toEqual(['am', 'en'])
+  })
+
+  test('global cache filter fail-opens missing flags and hides helps-only', () => {
+    const cached = [
+      { code: 'fr', name: 'French', source: 'door43' as const },
+      {
+        code: 'am',
+        name: 'Amharic',
+        source: 'door43' as const,
+        availability: { bible: false, obs: false, bibleHelps: true, obsHelps: false },
+      },
+      {
+        code: 'en',
+        name: 'English',
+        source: 'door43' as const,
+        availability: { bible: true, obs: false, bibleHelps: true, obsHelps: false },
+      },
+    ]
+    expect(filterCachedLanguagesForKind(cached, 'global').map((l) => l.code).sort()).toEqual(
+      ['en', 'fr']
+    )
   })
 
   test('all-helps cache/catalog keep bible-helps or OBS-helps langs', () => {

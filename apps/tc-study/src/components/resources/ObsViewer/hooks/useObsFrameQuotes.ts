@@ -8,7 +8,7 @@ import { useAppStore } from '../../../../contexts/AppContext'
 import { useWorkspaceStore } from '../../../../lib/stores/workspaceStore'
 import { OBS_COMBINED_HELPS_RESOURCE_ID } from '../../../../features/helps/combinedHelpsIds'
 import type { ObsFrameQuoteEntry, ObsFrameQuotesSignal } from '../../../../signals/studioSignals'
-import { isPanel2KeyQuoteCapable } from '../obsHighlightHelpers'
+import { panelKeysAreObsQuoteCapable } from '../obsHighlightHelpers'
 
 /**
  * Per-publisher TN/TWL keys — merge so neither last-writer-wins the other.
@@ -21,21 +21,20 @@ export function useObsFrameQuotes(params: {
 }) {
   const { resourceId, storyNum, frameNum, isRange } = params
 
-  const panel2ActiveKey = useWorkspaceStore((s) => {
+  const panel2Keys = useWorkspaceStore((s) => {
     const panel = s.currentPackage?.panels.find((p) => p.id === 'panel-2')
-    if (!panel?.resourceKeys?.length) return null
-    return panel.resourceKeys[panel.activeIndex ?? 0] ?? null
+    return panel?.resourceKeys ?? []
   })
   const loadedResources = useAppStore((s) => s.loadedResources)
 
   const isPanel2QuoteCapable = useMemo(
     () =>
-      isPanel2KeyQuoteCapable(
-        panel2ActiveKey,
-        loadedResources[panel2ActiveKey ?? '']?.type,
+      panelKeysAreObsQuoteCapable(
+        panel2Keys,
+        (key) => loadedResources[key]?.type,
         OBS_COMBINED_HELPS_RESOURCE_ID
       ),
-    [panel2ActiveKey, loadedResources]
+    [panel2Keys, loadedResources]
   )
 
   const obsQuotesTn = useResourceState<ObsFrameQuotesSignal>(

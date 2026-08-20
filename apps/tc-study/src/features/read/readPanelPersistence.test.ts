@@ -41,6 +41,7 @@ describe('readPanelPersistence', () => {
       collapsedPanelId: null,
       splitPercent: 50,
       layoutUserChosen: true,
+      splitUserChosen: false,
       seededBoth: true,
     })
     const next = readPersistedReadPanels()
@@ -60,6 +61,7 @@ describe('readPanelPersistence', () => {
       collapsedPanelId: null,
       splitPercent: 50,
       layoutUserChosen: false,
+      splitUserChosen: false,
       seededBoth: true,
     })
     const next = readPersistedReadPanels()
@@ -78,6 +80,7 @@ describe('readPanelPersistence', () => {
       collapsedPanelId: null,
       splitPercent: 50,
       layoutUserChosen: false,
+      splitUserChosen: false,
       seededBoth: true,
     })
     const next = readPersistedReadPanels()
@@ -103,6 +106,7 @@ describe('readPanelPersistence', () => {
       collapsedPanelId: null,
       splitPercent: 50,
       layoutUserChosen: false,
+      splitUserChosen: false,
       seededBoth: true,
     })
     const opened = readPersistedReadPanels()
@@ -118,6 +122,7 @@ describe('readPanelPersistence', () => {
       collapsedPanelId: 'panel-2',
       splitPercent: 100,
       layoutUserChosen: false,
+      splitUserChosen: false,
       seededBoth: true,
     })
     const parked = readPersistedReadPanels()
@@ -136,10 +141,46 @@ describe('readPanelPersistence', () => {
       collapsedPanelId: null,
       splitPercent: 50,
       layoutUserChosen: false,
+      splitUserChosen: false,
       seededBoth: true,
     })
     const next = readPersistedReadPanels()
     expect(next.panels['panel-1'].languageCode).toBe('en')
     expect(next.panels['panel-2'].languageCode).toBe('en')
+  })
+
+  test('splitUserChosen survives reload; missing field is not user-sized', () => {
+    writePersistedReadPanels({
+      panels: {
+        'panel-1': { mode: 'scripture', languageCode: 'en' },
+        'panel-2': { mode: 'helps', languageCode: 'en' },
+      },
+      layout: 'two',
+      collapsedPanelId: null,
+      splitPercent: 42,
+      layoutUserChosen: false,
+      splitUserChosen: true,
+      seededBoth: true,
+    })
+    const sized = readPersistedReadPanels()
+    expect(sized.splitUserChosen).toBe(true)
+    expect(sized.splitPercent).toBe(42)
+
+    g.localStorage?.setItem(
+      READ_PANELS_STORAGE_KEY,
+      JSON.stringify({
+        panels: {
+          'panel-1': { mode: 'scripture', languageCode: 'en' },
+          'panel-2': { mode: 'helps', languageCode: 'en' },
+        },
+        layout: 'two',
+        collapsedPanelId: null,
+        splitPercent: 50,
+        layoutUserChosen: false,
+        seededBoth: true,
+      })
+    )
+    const legacy = readPersistedReadPanels()
+    expect(legacy.splitUserChosen).toBe(false)
   })
 })

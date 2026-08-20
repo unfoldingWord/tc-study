@@ -11,6 +11,8 @@ import {
   collapseEase,
   collapseTweenRange,
   defaultLayoutForViewport,
+  defaultSplitPercent,
+  HELPS_SIDEBAR_PERCENT,
   hydratePersistedPanelChrome,
   layoutAfterContainerMeasure,
   DETENT_CAPTURE_PERCENT,
@@ -21,6 +23,7 @@ import {
   isPanelOffFlow,
   layoutRestoreTweenRange,
   panelStayMountedStyle,
+  resolveOpenSplitPercent,
   restoreCollapsedDivider,
   restoreTweenRange,
   restoredSplitPercent,
@@ -75,7 +78,7 @@ describe('readPanelLayout', () => {
         collapsedPanelId: null,
         splitPercent: 50,
       })
-    ).toEqual({ layout: 'two', collapsedPanelId: null, splitPercent: 50 })
+    ).toEqual({ layout: 'two', collapsedPanelId: null, splitPercent: 50, splitUserChosen: false })
     expect(
       hydratePersistedPanelChrome({
         layout: 'two',
@@ -83,7 +86,7 @@ describe('readPanelLayout', () => {
         collapsedPanelId: 'panel-2',
         splitPercent: 50,
       })
-    ).toEqual({ layout: 'two', collapsedPanelId: null, splitPercent: 50 })
+    ).toEqual({ layout: 'two', collapsedPanelId: null, splitPercent: 50, splitUserChosen: false })
     expect(
       hydratePersistedPanelChrome({
         layout: 'two',
@@ -91,7 +94,97 @@ describe('readPanelLayout', () => {
         collapsedPanelId: 'panel-2',
         splitPercent: 100,
       })
-    ).toEqual({ layout: 'two', collapsedPanelId: 'panel-2', splitPercent: 100 })
+    ).toEqual({
+      layout: 'two',
+      collapsedPanelId: 'panel-2',
+      splitPercent: 100,
+      splitUserChosen: false,
+    })
+  })
+
+  test('hydrate keeps a user-dragged split, including the 30/70 detent', () => {
+    expect(
+      hydratePersistedPanelChrome({
+        layout: 'two',
+        layoutUserChosen: false,
+        collapsedPanelId: null,
+        splitPercent: 40,
+        splitUserChosen: true,
+      })
+    ).toEqual({ layout: 'two', collapsedPanelId: null, splitPercent: 40, splitUserChosen: true })
+    expect(
+      hydratePersistedPanelChrome({
+        layout: 'two',
+        layoutUserChosen: false,
+        collapsedPanelId: null,
+        splitPercent: 70,
+        splitUserChosen: true,
+      })
+    ).toEqual({ layout: 'two', collapsedPanelId: null, splitPercent: 70, splitUserChosen: true })
+  })
+
+  test('desktop mixed default is 70/30; same-mode and mobile stay 50/50', () => {
+    expect(HELPS_SIDEBAR_PERCENT).toBe(30)
+    expect(
+      defaultSplitPercent({ panel1Mode: 'scripture', panel2Mode: 'helps', isNarrow: false })
+    ).toBe(70)
+    expect(
+      defaultSplitPercent({ panel1Mode: 'helps', panel2Mode: 'scripture', isNarrow: false })
+    ).toBe(30)
+    expect(
+      defaultSplitPercent({ panel1Mode: 'scripture', panel2Mode: 'scripture', isNarrow: false })
+    ).toBe(50)
+    expect(
+      defaultSplitPercent({ panel1Mode: 'helps', panel2Mode: 'helps', isNarrow: false })
+    ).toBe(50)
+    expect(
+      defaultSplitPercent({ panel1Mode: 'scripture', panel2Mode: 'helps', isNarrow: true })
+    ).toBe(50)
+  })
+
+  test('user-chosen split is not replaced by the mode default', () => {
+    expect(
+      resolveOpenSplitPercent({
+        splitUserChosen: true,
+        persistedSplit: 42,
+        panel1Mode: 'scripture',
+        panel2Mode: 'helps',
+        isNarrow: false,
+      })
+    ).toBe(42)
+    expect(
+      resolveOpenSplitPercent({
+        splitUserChosen: false,
+        persistedSplit: 50,
+        panel1Mode: 'scripture',
+        panel2Mode: 'helps',
+        isNarrow: false,
+      })
+    ).toBe(70)
+  })
+
+  test('reopen from collapsed always applies the default, not a prior user size', () => {
+    expect(
+      restoreCollapsedDivider({
+        panel1Mode: 'scripture',
+        panel2Mode: 'helps',
+        isNarrow: false,
+      })
+    ).toEqual({ collapsedPanelId: null, splitPercent: 70 })
+    expect(
+      restoreCollapsedDivider({
+        panel1Mode: 'scripture',
+        panel2Mode: 'scripture',
+        isNarrow: false,
+      })
+    ).toEqual({ collapsedPanelId: null, splitPercent: 50 })
+    expect(
+      restoreCollapsedDivider({
+        panel1Mode: 'scripture',
+        panel2Mode: 'helps',
+        isNarrow: true,
+      })
+    ).toEqual({ collapsedPanelId: null, splitPercent: 50 })
   })
 
   test('live drag matches the pointer until the capture band', () => {
@@ -226,9 +319,7 @@ describe('readPanelLayout', () => {
     expect(collapseAfterDragEnd(100 - COLLAPSE_THRESHOLD_PERCENT).collapsedPanelId).toBeNull()
   })
 
-  test('click restore uses previous split or 50% and clears collapse', () => {
-    expect(restoreCollapsedDivider(40)).toEqual({ collapsedPanelId: null, splitPercent: 40 })
-    expect(restoreCollapsedDivider(5)).toEqual({ collapsedPanelId: null, splitPercent: 50 })
+  test('stale collapse-zone splits restore to 50% when not user-chosen', () => {
     expect(restoredSplitPercent(40)).toBe(40)
     expect(restoredSplitPercent(5)).toBe(50)
     expect(restoredSplitPercent(COLLAPSE_THRESHOLD_PERCENT)).toBe(50)
@@ -298,8 +389,9 @@ describe('readPanelLayout', () => {
     expect(collapseTweenRange('panel-2', 72)).toEqual({ from: 72, to: 100 })
     expect(collapseTweenRange('panel-1', 28)).toEqual({ from: 28, to: 0 })
     expect(restoreTweenRange('panel-2', 40)).toEqual({ from: 100, to: 40 })
-    expect(restoreTweenRange('panel-1', 5)).toEqual({ from: 0, to: 50 })
+    expect(restoreTweenRange('panel-1', 50)).toEqual({ from: 0, to: 50 })
     expect(layoutRestoreTweenRange(45)).toEqual({ from: 100, to: 45 })
+    expect(layoutRestoreTweenRange(70)).toEqual({ from: 100, to: 70 })
 
     const mid = panelStayMountedStyle({
       layout: 'two',

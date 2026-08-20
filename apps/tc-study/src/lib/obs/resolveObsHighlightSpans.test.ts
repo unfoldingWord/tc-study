@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import type { ObsFrameQuoteEntry } from '../../signals/studioSignals'
 import { resolveObsHighlightSpans } from './resolveObsHighlightSpans'
+import { obsFrameHighlightFromHelpsRow } from '../../components/resources/CombinedHelpsViewer/combinedHelpsUtils'
+import type { ObsFrameQuoteEntry } from '../../signals/studioSignals'
 
 function makeEntry(quote: string, occurrence = 1, sourceId = 's1'): ObsFrameQuoteEntry {
   return { sourceId, kind: 'tn', quote, occurrence }
@@ -37,5 +38,38 @@ describe('resolveObsHighlightSpans', () => {
     expect(useWordMode).toBe(true)
     expect(spans.some((s) => s.text === 'created' && s.quoteIndex === 0)).toBe(true)
     expect(spans.some((s) => s.quoteIndex === 1)).toBe(false)
+  })
+
+  test('OBS CombinedHelps TN card click underlines the matching quote on the OBS frame', () => {
+    const frameText =
+      'Then Abraham sent one of his servants back to the land where his relatives lived to find a wife for his son, Isaac.'
+    const highlight = obsFrameHighlightFromHelpsRow({
+      id: 'obs-tn-6-1',
+      reference: '6:1',
+      quote: 'sent one of his servants back',
+      occurrence: '1',
+      kind: 'tn',
+    })
+    expect(highlight).toEqual({
+      storyNumber: 6,
+      frameNumber: 1,
+      quote: 'sent one of his servants back',
+      occurrence: 1,
+      rowId: 'obs-tn-6-1',
+      kind: 'tn',
+    })
+    const entries: ObsFrameQuoteEntry[] = [
+      {
+        sourceId: highlight!.rowId,
+        kind: highlight!.kind,
+        quote: highlight!.quote,
+        occurrence: highlight!.occurrence,
+      },
+    ]
+    const { spans, useWordMode } = resolveObsHighlightSpans(frameText, entries)
+    expect(useWordMode).toBe(true)
+    expect(spans.some((s) => s.quoteIndex === 0 && s.text.includes('sent one of his servants'))).toBe(
+      true
+    )
   })
 })

@@ -166,9 +166,9 @@ describe('navigationScopeFromReadPath', () => {
 })
 
 describe('applyTextModeScopeSwitch', () => {
-  test('Stories default grain is chapter (whole story); Bible is verse', () => {
+  test('Stories default grain is chapter (whole story); Bible is chapter', () => {
     expect(defaultNavigationModeForScope('obs')).toBe('chapter')
-    expect(defaultNavigationModeForScope('scripture')).toBe('verse')
+    expect(defaultNavigationModeForScope('scripture')).toBe('chapter')
   })
 
   test('tap switches scope via existing nav APIs (OBS)', () => {
@@ -194,7 +194,7 @@ describe('applyTextModeScopeSwitch', () => {
       },
       'scripture'
     )
-    expect(calls).toEqual(['scope:scripture', 'mode:verse', 'ref:tit'])
+    expect(calls).toEqual(['scope:scripture', 'mode:chapter', 'ref:tit'])
   })
 
   test('already showing an OBS ref keeps story instead of jumping to 1:1', () => {
@@ -222,6 +222,6 @@ describe('applyTextModeScopeSwitch', () => {
       },
       'scripture'
     )
-    expect(calls).toEqual(['scope:scripture', 'mode:verse'])
+    expect(calls).toEqual(['scope:scripture', 'mode:chapter'])
   })
 })

@@ -8,7 +8,7 @@ import type { ObsFrameHighlightSignal, TokenClickSignal, VerseFilterSignal } fro
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
 import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import type { NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
-import { helpsCardVerseFilter } from './combinedHelpsUtils'
+import { helpsCardVerseFilter, obsFrameHighlightFromHelpsRow } from './combinedHelpsUtils'
 import type { HelpsCardSelection } from './helpsCardSelection'
 
 type SendTokenClick = (data: {
@@ -79,22 +79,15 @@ export function useCombinedHelpsHandlers({
       setSelectedHelpsCard({ kind: 'tn', id: note.id })
       if (helpsScope === 'obs') {
         sendObsCardFrameFilter(note.reference)
-        const quote = note.quote?.trim()
-        if (!quote) return
-        const { chapter, verse } = helpsCardVerseFilter(note.reference)
-        const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
-        const occurrence = Number.isFinite(occRaw) ? occRaw : 1
-        broadcastObsHighlight({
-          lifecycle: 'event',
-          highlight: {
-            storyNumber: chapter,
-            frameNumber: verse,
-            quote,
-            occurrence,
-            rowId: note.id,
-            kind: 'tn',
-          },
+        const highlight = obsFrameHighlightFromHelpsRow({
+          id: note.id,
+          reference: note.reference,
+          quote: note.quote,
+          occurrence: note.occurrence,
+          kind: 'tn',
         })
+        if (!highlight) return
+        broadcastObsHighlight({ lifecycle: 'event', highlight })
         return
       }
       if (note.quoteTokens?.length) {
@@ -181,22 +174,15 @@ export function useCombinedHelpsHandlers({
       setSelectedHelpsCard({ kind: 'twl', id: link.id })
       if (helpsScope === 'obs') {
         sendObsCardFrameFilter(link.reference)
-        const quote = link.origWords?.trim()
-        if (!quote) return
-        const { chapter, verse } = helpsCardVerseFilter(link.reference)
-        const occRaw = Number.parseInt(String(link.occurrence ?? '1'), 10)
-        const occurrence = Number.isFinite(occRaw) ? occRaw : 1
-        broadcastObsHighlight({
-          lifecycle: 'event',
-          highlight: {
-            storyNumber: chapter,
-            frameNumber: verse,
-            quote,
-            occurrence,
-            rowId: link.id,
-            kind: 'twl',
-          },
+        const highlight = obsFrameHighlightFromHelpsRow({
+          id: link.id,
+          reference: link.reference,
+          quote: link.origWords,
+          occurrence: link.occurrence,
+          kind: 'twl',
         })
+        if (!highlight) return
+        broadcastObsHighlight({ lifecycle: 'event', highlight })
         return
       }
       if (link.quoteTokens?.length) {

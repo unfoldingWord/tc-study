@@ -20,10 +20,18 @@ describe('helps picker wiring (issue #24 / #30)', () => {
     )
   })
 
+  test('helps chip default uses global navigationScope, not left-pane mode or resource', () => {
+    expect(headerSrc).toContain('const navigationScope = useNavigationScope()')
+    expect(headerSrc).toContain('navigationScope={navigationScope}')
+    expect(headerSrc).not.toContain('navigationScope={mode}')
+    expect(headerSrc).not.toContain('appliesToScope')
+    expect(headerSrc).not.toContain('getResourceAppliesToScope')
+  })
+
   test('both panel pickers share LanguagePicker + LanguagePickerTextKindFilter', () => {
     expect(headerSrc).toContain('<LanguagePicker')
     expect(headerSrc).toContain('listMode={languageListMode}')
-    expect(headerSrc).not.toContain('navigationScope')
+    expect(headerSrc).toContain('navigationScope={navigationScope}')
     expect(headerSrc).toContain('currentLanguageCode={currentLanguageCode}')
     expect(headerSrc).toContain('otherLanguageCode={otherLanguageCode}')
     expect(headerSrc).not.toContain('helpsFlag')

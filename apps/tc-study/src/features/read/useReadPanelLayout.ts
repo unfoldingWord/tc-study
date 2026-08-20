@@ -9,24 +9,39 @@ import { useCallback, useEffect, useRef } from 'react'
 import {
   collapseFromUserDragOnly,
   collapseTweenRange,
+  defaultSplitPercent,
   displayedSplitFromPointer,
   edgeSplitPercent,
   layoutAfterContainerMeasure,
   layoutRestoreTweenRange,
   restoreCollapsedDivider,
+  viewportIsNarrow,
 } from './readPanelLayout'
 import { useReadPanelCollapse } from './useReadPanelCollapse'
 import { useReadPanelResize } from './useReadPanelResize'
 import { useReadPanelStore } from './readPanelStore'
+import { useIsNarrowViewport } from './useIsNarrowViewport'
+
+function defaultSplitFromStore(): number {
+  const panels = useReadPanelStore.getState().panels
+  return defaultSplitPercent({
+    panel1Mode: panels['panel-1'].mode,
+    panel2Mode: panels['panel-2'].mode,
+    isNarrow: viewportIsNarrow(),
+  })
+}
 
 export function useReadPanelLayout() {
   const layout = useReadPanelStore((s) => s.layout)
   const splitPercent = useReadPanelStore((s) => s.splitPercent)
+  const splitUserChosen = useReadPanelStore((s) => s.splitUserChosen)
   const collapsedPanelId = useReadPanelStore((s) => s.collapsedPanelId)
+  const panel1Mode = useReadPanelStore((s) => s.panels['panel-1'].mode)
+  const panel2Mode = useReadPanelStore((s) => s.panels['panel-2'].mode)
   const setLayout = useReadPanelStore((s) => s.setLayout)
   const setSplitPercent = useReadPanelStore((s) => s.setSplitPercent)
   const setCollapsedPanelId = useReadPanelStore((s) => s.setCollapsedPanelId)
-  const previousSplitRef = useRef(splitPercent)
+  const isNarrow = useIsNarrowViewport()
 
   const resize = useReadPanelResize(splitPercent)
   const { panel1Width, isResizingPanels } = resize
@@ -43,6 +58,26 @@ export function useReadPanelLayout() {
   }, [collapsedPanelId, setSplitPercent, splitPercent])
 
   useEffect(() => {
+    if (splitUserChosen || collapsedPanelId || isResizingPanels || tweenPercent !== null) return
+    const next = defaultSplitPercent({
+      panel1Mode,
+      panel2Mode,
+      isNarrow: viewportIsNarrow(),
+    })
+    if (next !== splitPercent) setSplitPercent(next, false)
+  }, [
+    collapsedPanelId,
+    isNarrow,
+    isResizingPanels,
+    panel1Mode,
+    panel2Mode,
+    setSplitPercent,
+    splitPercent,
+    splitUserChosen,
+    tweenPercent,
+  ])
+
+  useEffect(() => {
     if (isResizingPanels) {
       wasResizingRef.current = true
       return
@@ -54,7 +89,6 @@ export function useReadPanelLayout() {
       userDragged: true,
     })
     if (result.collapsedPanelId) {
-      previousSplitRef.current = splitPercent
       const { from, to } = collapseTweenRange(result.collapsedPanelId, result.splitPercent)
       runTween(from, to, () => {
         setSplitPercent(to)
@@ -62,28 +96,34 @@ export function useReadPanelLayout() {
       })
     } else {
       setCollapsedPanelId(null)
-      setSplitPercent(result.splitPercent)
+      const userSized = result.splitPercent !== splitPercent
+      setSplitPercent(result.splitPercent, userSized ? true : undefined)
     }
   }, [isResizingPanels, panel1Width, runTween, setCollapsedPanelId, setSplitPercent, splitPercent])
 
   const expandPanel = useCallback(
     (panelId: 'panel-1' | 'panel-2') => {
       if (collapsedPanelId !== panelId) return
-      const next = restoreCollapsedDivider(previousSplitRef.current)
+      const next = restoreCollapsedDivider({
+        panel1Mode,
+        panel2Mode,
+        isNarrow: viewportIsNarrow(),
+      })
       setCollapsedPanelId(next.collapsedPanelId)
       runTween(edgeSplitPercent(panelId), next.splitPercent, () => {
-        setSplitPercent(next.splitPercent)
+        setSplitPercent(next.splitPercent, false)
       })
     },
-    [collapsedPanelId, runTween, setCollapsedPanelId, setSplitPercent]
+    [collapsedPanelId, panel1Mode, panel2Mode, runTween, setCollapsedPanelId, setSplitPercent]
   )
 
   const restoreCollapsed = useCallback(() => {
+    const to = defaultSplitFromStore()
     if (layout === 'one') {
-      const { from, to } = layoutRestoreTweenRange(previousSplitRef.current)
+      const { from } = layoutRestoreTweenRange(to)
       setLayout('two', true)
       runTween(from, to, () => {
-        setSplitPercent(to)
+        setSplitPercent(to, false)
       })
       return
     }

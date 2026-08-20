@@ -36,7 +36,7 @@ export interface ReadPanelStore extends PersistedReadPanels {
   setPanelMode: (panelId: ReadPanelId, mode: ReadPanelMode) => void
   setLayout: (layout: ReadLayoutMode, userChosen?: boolean) => void
   setCollapsedPanelId: (panelId: ReadPanelId | null) => void
-  setSplitPercent: (percent: number) => void
+  setSplitPercent: (percent: number, userChosen?: boolean) => void
 }
 
 function persist(state: ReadPanelStore): void {
@@ -46,6 +46,7 @@ function persist(state: ReadPanelStore): void {
     collapsedPanelId: state.collapsedPanelId,
     splitPercent: state.splitPercent,
     layoutUserChosen: state.layoutUserChosen,
+    splitUserChosen: state.splitUserChosen,
     seededBoth: state.seededBoth,
   })
 }
@@ -138,8 +139,12 @@ export const useReadPanelStore = create<ReadPanelStore>((set, get) => ({
     set({ collapsedPanelId: panelId })
     persist(get())
   },
-  setSplitPercent: (percent) => {
-    set({ splitPercent: percent })
+  setSplitPercent: (percent, userChosen) => {
+    set((state) => ({
+      splitPercent: percent,
+      splitUserChosen:
+        userChosen === true ? true : userChosen === false ? false : state.splitUserChosen,
+    }))
     persist(get())
   },
 }))

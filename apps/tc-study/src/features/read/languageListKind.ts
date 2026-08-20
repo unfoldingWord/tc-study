@@ -1,9 +1,10 @@
 /**
  * Which Door43 subject set a Read language picker should request.
  *
- * Fetch follows **panel type** only (`text` vs `helps`), not app nav
- * (bible vs OBS). Any / Bible / OBS chips still narrow the fetched list.
- * Bootstrap (no listMode) uses the global content union.
+ * Fetch follows **panel type** only (`text` → primary content `global`,
+ * `helps` → companion `all-helps`), not app nav (bible vs OBS). Any /
+ * Bible / OBS chips still narrow the fetched list. Bootstrap (no
+ * listMode) uses the global primary-content union.
  */
 
 import type { LanguageListKind } from '@bt-synergy/resource-types'

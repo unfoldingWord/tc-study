@@ -10,6 +10,11 @@ const handlersSrc = readFileSync(
   join(import.meta.dir, '../CombinedHelpsViewer/useCombinedHelpsHandlers.ts'),
   'utf8'
 )
+const quotesSrc = readFileSync(join(import.meta.dir, 'hooks/useObsFrameQuotes.ts'), 'utf8')
+const combinedSrc = readFileSync(
+  join(import.meta.dir, '../CombinedHelpsViewer/index.tsx'),
+  'utf8'
+)
 
 describe('OBS frame click → helps verse-filter', () => {
   test('useObsHighlight sends verse-filter via obsFrameVerseFilter', () => {
@@ -46,5 +51,15 @@ describe('OBS frame click → helps verse-filter', () => {
     expect(highlightSrc).toContain('pendingFrameScrollRef')
     expect(viewerSrc).toContain('ref={paneRef}')
     expect(singleSrc).toContain('data-obs-frame=')
+  })
+
+  test('OBS CombinedHelps TN quote click broadcasts obs-frame-highlight and OBS applies quotes from any panel-2 CombinedHelps key', () => {
+    expect(handlersSrc).toContain('obsFrameHighlightFromHelpsRow')
+    expect(handlersSrc).toContain("helpsScope === 'obs'")
+    expect(handlersSrc).toContain('broadcastObsHighlight')
+    expect(quotesSrc).toContain('panelKeysAreObsQuoteCapable')
+    expect(quotesSrc).not.toContain('panel.resourceKeys[panel.activeIndex')
+    expect(combinedSrc).toContain('resolveHelpsViewerScope')
+    expect(combinedSrc).not.toContain("effectiveResource.appliesToScope === 'obs' ? 'obs' : 'scripture'")
   })
 })

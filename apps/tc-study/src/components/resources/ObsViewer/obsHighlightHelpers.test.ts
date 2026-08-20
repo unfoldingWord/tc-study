@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  OBS_COMBINED_HELPS_RESOURCE_ID,
+  COMBINED_HELPS_RESOURCE_ID,
+} from '../../../features/helps/combinedHelpsIds'
+import {
   OBS_FRAME_ACTIVE_CLASS,
   isObsEntryActive,
   isObsFrameFilterActive,
@@ -8,6 +12,7 @@ import {
   obsFrameFilterFromHelpsPayload,
   obsFrameSelector,
   obsFrameVerseFilter,
+  panelKeysAreObsQuoteCapable,
   scrollObsFrameIntoView,
   sortedSourceIdsKey,
 } from './obsHighlightHelpers'
@@ -96,5 +101,41 @@ describe('obsHighlightHelpers', () => {
     expect(isPanel2KeyQuoteCapable('o/l/obs-tn', 'obs-notes', 'combined')).toBe(true)
     expect(isPanel2KeyQuoteCapable('o/l/obs-twl', undefined, 'combined')).toBe(true)
     expect(isPanel2KeyQuoteCapable('o/l/ult', 'scripture', 'combined')).toBe(false)
+  })
+
+  test('isPanel2KeyQuoteCapable treats OBS CombinedHelps persist id and type as capable', () => {
+    expect(
+      isPanel2KeyQuoteCapable(OBS_COMBINED_HELPS_RESOURCE_ID, 'obs-combined-helps', OBS_COMBINED_HELPS_RESOURCE_ID)
+    ).toBe(true)
+    expect(
+      isPanel2KeyQuoteCapable(
+        `${OBS_COMBINED_HELPS_RESOURCE_ID}:panel-1`,
+        'obs-combined-helps',
+        OBS_COMBINED_HELPS_RESOURCE_ID
+      )
+    ).toBe(true)
+    expect(
+      isPanel2KeyQuoteCapable(COMBINED_HELPS_RESOURCE_ID, 'combined-helps', OBS_COMBINED_HELPS_RESOURCE_ID)
+    ).toBe(true)
+  })
+
+  test('panelKeysAreObsQuoteCapable stays true when workspace active tab is scripture CombinedHelps', () => {
+    const types: Record<string, string> = {
+      [COMBINED_HELPS_RESOURCE_ID]: 'combined-helps',
+      [OBS_COMBINED_HELPS_RESOURCE_ID]: 'obs-combined-helps',
+    }
+    expect(
+      panelKeysAreObsQuoteCapable(
+        [COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID],
+        (key) => types[key],
+        OBS_COMBINED_HELPS_RESOURCE_ID
+      )
+    ).toBe(true)
+    expect(
+      isPanel2KeyQuoteCapable(COMBINED_HELPS_RESOURCE_ID, 'combined-helps', OBS_COMBINED_HELPS_RESOURCE_ID)
+    ).toBe(true)
+    expect(panelKeysAreObsQuoteCapable(['o/l/ult'], () => 'scripture', OBS_COMBINED_HELPS_RESOURCE_ID)).toBe(
+      false
+    )
   })
 })

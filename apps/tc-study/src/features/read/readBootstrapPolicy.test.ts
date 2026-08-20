@@ -2,8 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  defaultReadNavTypeForResource,
   languageCodeFromReadPathname,
   readUrlWriteBackAction,
+  resolveCachedReadNavType,
   resolveReadLanguageFromUrlOrCache,
   resumeBareReadNavigation,
   shouldApplyDeepLinkTail,
@@ -234,7 +236,13 @@ describe('readBootstrapPolicy', () => {
     ).toBeNull()
   })
 
-  test('cached bible session on /read replaces to canonical path', () => {
+  test('cold-start Bible with no persisted nav type uses chapter', () => {
+    expect(defaultReadNavTypeForResource('bible')).toBe('chapter')
+    expect(defaultReadNavTypeForResource('obs')).toBe('story')
+    expect(resolveCachedReadNavType({ mode: 'bible' })).toBe('chapter')
+    expect(resolveCachedReadNavType({ mode: 'bible', navigationType: 'ref' })).toBe('ref')
+    expect(resolveCachedReadNavType({ mode: 'obs' })).toBe('story')
+
     const session = {
       language: 'en',
       mode: 'bible' as const,
@@ -243,13 +251,29 @@ describe('readBootstrapPolicy', () => {
       verse: 1,
     }
     expect(resumeBareReadNavigation('/read', session)).toEqual({
-      replace: '/read/en/bible/ref/tit%201%3A1',
+      replace: '/read/en/bible/chapter/tit%201',
     })
     expect(resumeBareReadNavigation('/read/', session)).toEqual({
+      replace: '/read/en/bible/chapter/tit%201',
+    })
+    expect(
+      resumeBareReadNavigation('/read', { ...session, navigationType: 'ref' })
+    ).toEqual({
       replace: '/read/en/bible/ref/tit%201%3A1',
     })
+    expect(
+      resumeBareReadNavigation('/read', {
+        language: 'en',
+        mode: 'obs',
+        book: 'obs',
+        chapter: 1,
+        verse: 1,
+      })
+    ).toEqual({
+      replace: '/read/en/obs/story/1',
+    })
     expect(resumeBareReadNavigation('/read', null)).toBeNull()
-    expect(resumeBareReadNavigation('/read/en/bible/ref/tit%201%3A1', session)).toBeNull()
+    expect(resumeBareReadNavigation('/read/en/bible/chapter/tit%201', session)).toBeNull()
     expect(
       readUrlWriteBackAction({
         pathname: '/read',

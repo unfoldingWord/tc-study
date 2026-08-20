@@ -1,8 +1,14 @@
-import type { ActiveHl } from './types'
+import { isCombinedHelpsId, isObsCombinedHelpsId } from '../../../features/helps/combinedHelpsIds'
 import type { ObsFrameQuoteEntry } from '../../../signals/studioSignals'
+import type { ActiveHl } from './types'
 
 /** Types (by resource type string or key suffix) that broadcast obs-frame-quotes. */
-export const OBS_QUOTE_CAPABLE_TYPES = new Set(['obs-notes', 'obs-words-links'])
+export const OBS_QUOTE_CAPABLE_TYPES = new Set([
+  'obs-notes',
+  'obs-words-links',
+  'obs-combined-helps',
+  'combined-helps',
+])
 
 export const QUOTE_BUTTON_ACTIVE_CLASS =
   'bg-highlight underline decoration-dotted decoration-underline decoration-1 underline-offset-2 rounded-sm'
@@ -110,7 +116,12 @@ export function isPanel2KeyQuoteCapable(
   combinedHelpsId: string
 ): boolean {
   if (!panel2ActiveKey) return false
-  if (panel2ActiveKey === combinedHelpsId) return true
+  if (panel2ActiveKey === combinedHelpsId || panel2ActiveKey.startsWith(`${combinedHelpsId}:`)) {
+    return true
+  }
+  // Workspace activeIndex can stay on scripture CombinedHelps while OBS CombinedHelps
+  // is the painted tab after a Bible→OBS nav switch.
+  if (isObsCombinedHelpsId(panel2ActiveKey) || isCombinedHelpsId(panel2ActiveKey)) return true
   if (OBS_QUOTE_CAPABLE_TYPES.has(String(loadedType ?? ''))) return true
   const idSegment = panel2ActiveKey.split('/')[2] ?? ''
   return (
@@ -119,4 +130,13 @@ export function isPanel2KeyQuoteCapable(
     idSegment.startsWith('obs-tn') ||
     idSegment.startsWith('obs-twl')
   )
+}
+
+/** True when any painted/workspace helps key can publish OBS frame quotes. */
+export function panelKeysAreObsQuoteCapable(
+  panelKeys: readonly string[],
+  loadedTypeFor: (key: string) => string | undefined,
+  combinedHelpsId: string
+): boolean {
+  return panelKeys.some((key) => isPanel2KeyQuoteCapable(key, loadedTypeFor(key), combinedHelpsId))
 }

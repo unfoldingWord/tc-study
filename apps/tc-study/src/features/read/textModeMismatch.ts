@@ -110,9 +110,9 @@ export function textModeMismatchFromCache(options: {
   })
 }
 
-/** Stories → whole-story grain; Bible → verse/ref. */
-export function defaultNavigationModeForScope(scope: NavigationCatalogScope): NavigationMode {
-  return scope === 'obs' ? 'chapter' : 'verse'
+/** Stories → whole-story grain (URL `story`); Bible → chapter grain (URL `chapter`). */
+export function defaultNavigationModeForScope(_scope: NavigationCatalogScope): NavigationMode {
+  return 'chapter'
 }
 
 export function applyTextModeScopeSwitch(

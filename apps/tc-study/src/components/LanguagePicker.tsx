@@ -3,8 +3,10 @@
  *
  * Modal for selecting a language on the Read page. Icon-first chrome: one
  * header icon + count badge + Bible/OBS filter. Fetch subjects follow
- * listMode only (`text` → global content, `helps` → all-helps). Chrome
- * chips still narrow the already-fetched list.
+ * listMode only (`text` → primary content, `helps` → companion all-helps).
+ * Chips default from navigation scope (Bible vs stories). Helps chips
+ * filter companion flags (bibleHelps / obsHelps); text chips filter
+ * primary content flags (bible / obs).
  */
 
 import {
@@ -19,7 +21,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { useCatalogManager, usePanelEntryRegistry, useResourceTypeRegistry } from '../contexts'
 import {
-  DEFAULT_TEXT_KIND_FILTER,
+  defaultTextKindForPicker,
   filterPickerLanguages,
   type LanguagePickerListMode,
   type TextKindFilter,
@@ -51,6 +53,8 @@ interface LanguagePickerProps {
   required?: boolean
   /** Label + which subject set to fetch (`text` vs `helps`). */
   listMode?: LanguagePickerListMode
+  /** App Bible vs stories nav — defaults the Bible / OBS filter chip. */
+  navigationScope?: 'scripture' | 'obs' | null
   /** Controlled open — empty-state CTA can open the same instance. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -68,6 +72,7 @@ export function LanguagePicker({
   autoOpen = false,
   required = false,
   listMode = 'text',
+  navigationScope,
   open,
   onOpenChange,
   triggerClassName,
@@ -81,7 +86,9 @@ export function LanguagePicker({
     onOpenChange,
   })
   const [searchQuery, setSearchQuery] = useState('')
-  const [textKind, setTextKind] = useState<TextKindFilter>(DEFAULT_TEXT_KIND_FILTER)
+  const [textKind, setTextKind] = useState<TextKindFilter>(() =>
+    defaultTextKindForPicker(listMode, navigationScope)
+  )
   const triggerLabel =
     listMode === 'helps' ? 'Select helps language' : 'Select language'
 
@@ -135,6 +142,12 @@ export function LanguagePicker({
   const revalidateRef = useRef(revalidate)
   revalidateRef.current = revalidate
 
+  // Opens on Bible or OBS from navigation scope; user can still change the chip.
+  useEffect(() => {
+    if (!isOpen) return
+    setTextKind(defaultTextKindForPicker(listMode, navigationScope))
+  }, [isOpen, listMode, navigationScope])
+
   // When picker opens: show cache immediately (optimistic), then revalidate in background
   useEffect(() => {
     if (!isOpen) return
@@ -168,7 +181,7 @@ export function LanguagePicker({
   const resetAndClose = () => {
     setOpen(false)
     setSearchQuery('')
-    setTextKind(DEFAULT_TEXT_KIND_FILTER)
+    setTextKind(defaultTextKindForPicker(listMode, navigationScope))
   }
 
   const closeModal = () => {

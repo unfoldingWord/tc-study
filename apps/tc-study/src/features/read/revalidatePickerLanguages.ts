@@ -1,10 +1,12 @@
 /**
  * Build the picker display list + global cache payload for one open.
  *
- * Display is fetch-scoped by panel type (`global` content vs `all-helps`).
- * The persisted cache stays the global content-union universe so mismatch /
- * helps policy still see Bible vs OBS flags. Availability-only extras are
- * applied to the cache, not to a scoped helps list.
+ * Display is fetch-scoped by panel type (`global` primary content vs
+ * `all-helps` companions). Global keeps langs with bible/obs flags (or
+ * unknown); helps-only extras stay out. The persisted cache stays the
+ * content-union universe so mismatch / helps policy still see Bible vs
+ * OBS flags. Availability-only extras apply to that cache, not a scoped
+ * helps list.
  */
 
 import type { LanguageListKind } from '@bt-synergy/resource-types'
@@ -21,7 +23,10 @@ function languageMatchesListKind(
   flags: LanguageAvailabilityFlags | undefined,
   kind: LanguageListKind
 ): boolean {
-  if (kind === 'global') return true
+  if (kind === 'global') {
+    if (!flags) return true
+    return flags.bible || flags.obs
+  }
   if (!flags) return false
   if (kind === 'scripture') return flags.bible
   if (kind === 'obs') return flags.obs
@@ -37,7 +42,6 @@ export function catalogCodesForLanguageList(options: {
   kind: LanguageListKind
 }): string[] {
   const { catalogCodes, door43Codes, availabilityByCode, kind } = options
-  if (kind === 'global') return [...catalogCodes]
   return catalogCodes.filter((raw) => {
     const code = String(raw ?? '').trim()
     if (!code) return false
@@ -50,7 +54,6 @@ export function filterCachedLanguagesForKind(
   languages: readonly ListedLanguage[],
   kind: LanguageListKind
 ): ListedLanguage[] {
-  if (kind === 'global') return [...languages]
   return languages.filter((lang) => languageMatchesListKind(lang.availability, kind))
 }
 
@@ -88,7 +91,7 @@ export async function revalidatePickerLanguages(options: {
   const door43Codes = new Set(
     door43Langs.map((lang) => String(lang.code ?? '').trim()).filter(Boolean)
   )
-  const display = mergePickerLanguages({
+  const merged = mergePickerLanguages({
     catalogCodes: catalogCodesForLanguageList({
       catalogCodes,
       door43Codes,
@@ -99,6 +102,16 @@ export async function revalidatePickerLanguages(options: {
     availabilityByCode,
     includeAvailabilityOnlyCodes: kind === 'global',
   })
+  // Door43 primary-subject hits stay even without flags. Catalog /
+  // availability-only extras must have bible or obs — not helps-only.
+  const display =
+    kind === 'global'
+      ? merged.filter(
+          (lang) =>
+            door43Codes.has(lang.code) ||
+            languageMatchesListKind(lang.availability, kind)
+        )
+      : merged
 
   if (kind === 'global') {
     return { display, global: display }

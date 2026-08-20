@@ -6,7 +6,7 @@
  */
 
 import type { CSSProperties } from 'react'
-import type { ReadPanelId } from './readPanelModel'
+import type { ReadPanelId, ReadPanelMode } from './readPanelModel'
 import type { ReadLayoutMode } from './readPanelPersistence'
 
 /** Pane share of the panels container that is the magnetic collapse detent. */
@@ -23,7 +23,42 @@ export const DETENT_CAPTURE_PERCENT = 4
  */
 export const DETENT_COMMIT_OFFSET_PERCENT = 5
 export const DEFAULT_SPLIT_PERCENT = 50
+/** Helps pane share when the other pane is primary (Bible/OBS). md+ only. */
+export const HELPS_SIDEBAR_PERCENT = 30
 export const NARROW_VIEWPORT_MQ = '(max-width: 767px)'
+
+export function viewportIsNarrow(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true
+  return window.matchMedia(NARROW_VIEWPORT_MQ).matches
+}
+
+/**
+ * Default two-pane split. Mobile stays 50/50. On tablet/desktop, a mixed
+ * primary+helps pair gives the helps pane 30%; same-mode pairs stay 50/50.
+ */
+export function defaultSplitPercent(options: {
+  panel1Mode: ReadPanelMode
+  panel2Mode: ReadPanelMode
+  isNarrow: boolean
+}): number {
+  if (options.isNarrow) return DEFAULT_SPLIT_PERCENT
+  if (options.panel1Mode === options.panel2Mode) return DEFAULT_SPLIT_PERCENT
+  return options.panel1Mode === 'helps'
+    ? HELPS_SIDEBAR_PERCENT
+    : 100 - HELPS_SIDEBAR_PERCENT
+}
+
+/** User drag wins until collapse-reopen (which always reapplies the default). */
+export function resolveOpenSplitPercent(options: {
+  splitUserChosen: boolean
+  persistedSplit: number
+  panel1Mode: ReadPanelMode
+  panel2Mode: ReadPanelMode
+  isNarrow: boolean
+}): number {
+  if (options.splitUserChosen) return clampPercent(options.persistedSplit)
+  return defaultSplitPercent(options)
+}
 
 export type CollapsedDividerArrow = 'left' | 'right' | 'up' | 'down'
 export type DragSplitZone = 'live' | 'detent'
@@ -118,14 +153,18 @@ export function restoredSplitPercent(previous: number | null | undefined): numbe
   return DEFAULT_SPLIT_PERCENT
 }
 
-/** Click the collapsed divider: clear park, restore previous split or ~50%. */
-export function restoreCollapsedDivider(previousSplit: number | null | undefined): {
+/** Click the collapsed divider: clear park, apply the mode/viewport default. */
+export function restoreCollapsedDivider(options: {
+  panel1Mode: ReadPanelMode
+  panel2Mode: ReadPanelMode
+  isNarrow: boolean
+}): {
   collapsedPanelId: null
   splitPercent: number
 } {
   return {
     collapsedPanelId: null,
-    splitPercent: restoredSplitPercent(previousSplit),
+    splitPercent: defaultSplitPercent(options),
   }
 }
 
@@ -203,12 +242,15 @@ export function hydratePersistedPanelChrome(options: {
   layoutUserChosen: boolean
   collapsedPanelId: ReadPanelId | null
   splitPercent: number
+  splitUserChosen?: boolean
 }): {
   layout: ReadLayoutMode
   collapsedPanelId: ReadPanelId | null
   splitPercent: number
+  splitUserChosen: boolean
 } {
   const layout = options.layoutUserChosen ? options.layout : 'two'
+  const splitUserChosen = options.splitUserChosen === true
   const parked = options.collapsedPanelId
   const splitLooksCollapsed =
     parked === 'panel-1'
@@ -221,12 +263,16 @@ export function hydratePersistedPanelChrome(options: {
       layout: 'two',
       collapsedPanelId: parked,
       splitPercent: edgeSplitPercent(parked),
+      splitUserChosen,
     }
   }
   return {
     layout,
     collapsedPanelId: null,
-    splitPercent: restoredSplitPercent(options.splitPercent),
+    splitPercent: splitUserChosen
+      ? clampPercent(options.splitPercent)
+      : restoredSplitPercent(options.splitPercent),
+    splitUserChosen,
   }
 }
 
@@ -239,20 +285,20 @@ export function collapseTweenRange(collapsedPanelId: ReadPanelId, fromPercent: n
 
 export function restoreTweenRange(
   collapsedPanelId: ReadPanelId,
-  previousSplit: number | null | undefined
+  targetSplit: number
 ): { from: number; to: number } {
   return {
     from: edgeSplitPercent(collapsedPanelId),
-    to: restoredSplitPercent(previousSplit),
+    to: targetSplit,
   }
 }
 
 /** One-panel restore bar: panel-1 is full, then the divider drags back in. */
-export function layoutRestoreTweenRange(previousSplit: number | null | undefined): {
+export function layoutRestoreTweenRange(targetSplit: number): {
   from: number
   to: number
 } {
-  return { from: 100, to: restoredSplitPercent(previousSplit) }
+  return { from: 100, to: targetSplit }
 }
 
 const EASE_X1 = 0.4

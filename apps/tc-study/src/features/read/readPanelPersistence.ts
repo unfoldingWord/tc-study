@@ -23,6 +23,8 @@ export interface PersistedReadPanels {
   collapsedPanelId: ReadPanelId | null
   splitPercent: number
   layoutUserChosen: boolean
+  /** True after the user dragged the divider. Cleared on collapse-reopen. */
+  splitUserChosen: boolean
   seededBoth: boolean
 }
 
@@ -32,6 +34,7 @@ const DEFAULT_PERSISTED: PersistedReadPanels = {
   collapsedPanelId: null,
   splitPercent: 50,
   layoutUserChosen: false,
+  splitUserChosen: false,
   seededBoth: false,
 }
 
@@ -93,6 +96,7 @@ export function readPersistedReadPanels(): PersistedReadPanels {
       layoutUserChosen: parsed.layoutUserChosen === true,
       collapsedPanelId,
       splitPercent,
+      splitUserChosen: parsed.splitUserChosen === true,
     })
     return {
       panels,

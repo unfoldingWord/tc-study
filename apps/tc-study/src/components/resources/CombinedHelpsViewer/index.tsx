@@ -32,7 +32,7 @@ import {
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { HelpsFilterBanners } from '../shared/HelpsFilterBanners'
 import { CombinedHelpsList } from './CombinedHelpsList'
-import { primaryLangCode } from './combinedHelpsUtils'
+import { primaryLangCode, resolveHelpsViewerScope } from './combinedHelpsUtils'
 import type { HelpsCardSelection } from './helpsCardSelection'
 import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
 import { useCombinedHelpsDeps } from './useCombinedHelpsDeps'
@@ -93,7 +93,12 @@ export function CombinedHelpsViewer({
       resource.languageCode ||
       ''
   )
-  const helpsScope: 'scripture' | 'obs' = effectiveResource.appliesToScope === 'obs' ? 'obs' : 'scripture'
+  const helpsScope: 'scripture' | 'obs' = resolveHelpsViewerScope({
+    resourceId,
+    resourceKey,
+    type: effectiveResource.type,
+    appliesToScope: effectiveResource.appliesToScope,
+  })
   const consumed = workspaceHelps?.consumedKeys ?? effectiveResource.consumedKeys
   const notesType =
     helpsScope === 'obs' ? RESOURCE_TYPE_IDS.OBS_NOTES : RESOURCE_TYPE_IDS.TRANSLATION_NOTES
