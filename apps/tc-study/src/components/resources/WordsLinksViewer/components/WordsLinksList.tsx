@@ -33,6 +33,7 @@ export interface WordsLinksListProps {
   loadingTitles: Set<string>
   getTWTitle: (link: LinkWithAlignments) => string
   getTWPreview: (link: LinkWithAlignments) => string | null
+  isTWPreviewPending: (link: LinkWithAlignments) => boolean
   onTitleClick: (link: LinkWithAlignments) => void
   onQuoteClick: (link: LinkWithAlignments) => void
 }
@@ -55,6 +56,7 @@ export function WordsLinksList({
   loadingTitles,
   getTWTitle,
   getTWPreview,
+  isTWPreviewPending,
   onTitleClick,
   onQuoteClick,
 }: WordsLinksListProps) {
@@ -156,6 +158,7 @@ export function WordsLinksList({
                         const twTitle = getTWTitle(link)
                         const twPreview = getTWPreview(link)
                         const isLoadingTitle = loadingTitles.has(`${twInfo.category}/${twInfo.term}`)
+                        const isLoadingPreview = isTWPreviewPending(link)
                         return (
                           <WordLinkCard
                             key={link.id}
@@ -164,6 +167,7 @@ export function WordsLinksList({
                             twTitle={twTitle}
                             isLoadingTitle={isLoadingTitle}
                             twPreview={twPreview}
+                            isLoadingPreview={isLoadingPreview}
                             onTitleClick={onTitleClick}
                             onQuoteClick={onQuoteClick}
                             tokenFilter={tokenFilter}

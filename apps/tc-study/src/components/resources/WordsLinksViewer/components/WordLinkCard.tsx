@@ -9,13 +9,14 @@
 import { BookText } from 'lucide-react'
 import { memo } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
+import { shouldShowHelpsExcerptSkeleton } from '../../../../features/helps/helpsExcerptSkeleton'
 import {
   resolveHelpsQuoteStatus,
   type HelpsQuoteStatus,
 } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
-import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
+import { MarkdownRenderer, MarkdownSkeleton } from '../../../ui/MarkdownRenderer'
 import {
   HELPS_CARD_FOOTER,
   HELPS_CARD_FOOTER_BUTTON_TW,
@@ -40,6 +41,8 @@ interface WordLinkCardProps {
   isLoadingTitle: boolean
   /** First content paragraph of the TW article; omit/null when not loaded or empty */
   twPreview?: string | null
+  /** True when the TW article excerpt has no cache entry yet */
+  isLoadingPreview?: boolean
   onTitleClick: (link: TranslationWordsLink) => void  // Opens TW article modal
   onQuoteClick: (link: TranslationWordsLink) => void  // Broadcasts tokens for highlighting
   tokenFilter: TokenFilter | null
@@ -61,6 +64,7 @@ export const WordLinkCard = memo(function WordLinkCard({
   twTitle,
   isLoadingTitle,
   twPreview = null,
+  isLoadingPreview = false,
   onTitleClick,
   onQuoteClick,
   tokenFilter,
@@ -81,6 +85,12 @@ export const WordLinkCard = memo(function WordLinkCard({
       alignmentPending: false,
       olQuote: link.origWords,
     })
+  const excerptLoading = shouldShowHelpsExcerptSkeleton({
+    kind: 'twl',
+    obsMode,
+    twPreview,
+    twPreviewPending: isLoadingPreview,
+  })
   const filterText = tokenFilter?.content ?? null
 
   // DCS abbreviation from AppStore (e.g. glt key → TPL); fall back to key segment
@@ -193,7 +203,17 @@ export const WordLinkCard = memo(function WordLinkCard({
       )}
 
       {/* First-paragraph preview (mirrors TN note body — clicks bubble to card for quote highlight) */}
-      {twPreview ? (
+      {excerptLoading ? (
+        <div
+          className="mt-1.5"
+          dir={languageDirection}
+          role="status"
+          title="Loading excerpt"
+          aria-label="Loading excerpt"
+        >
+          <MarkdownSkeleton className="text-base leading-relaxed" />
+        </div>
+      ) : twPreview ? (
         <div className="mt-1.5" dir={languageDirection}>
           <MarkdownRenderer
             content={twPreview}

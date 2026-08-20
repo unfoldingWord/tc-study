@@ -9,6 +9,7 @@ import { Code, GraduationCap } from 'lucide-react'
 import { memo, startTransition, useCallback, useState } from 'react'
 import { useNavigationStore } from '../../../../contexts'
 import { useAppStore } from '../../../../contexts/AppContext'
+import { shouldShowHelpsExcerptSkeleton } from '../../../../features/helps/helpsExcerptSkeleton'
 import {
   resolveHelpsQuoteStatus,
   type HelpsQuoteStatus,
@@ -16,7 +17,7 @@ import {
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
-import { MarkdownRenderer } from '../../../ui/MarkdownRenderer'
+import { MarkdownRenderer, MarkdownSkeleton } from '../../../ui/MarkdownRenderer'
 import {
   HELPS_CARD_FOOTER,
   HELPS_CARD_FOOTER_BUTTON_TA,
@@ -97,6 +98,11 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       alignmentPending: false,
       olQuote: note.quote,
     })
+  const excerptLoading = shouldShowHelpsExcerptSkeleton({
+    kind: 'tn',
+    obsMode,
+    quoteStatus,
+  })
   const filterText = tokenFilter?.content ?? null
 
   // DCS abbreviation from AppStore (e.g. glt key → TPL); fall back to key segment
@@ -283,7 +289,17 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       )}
 
       {/* Note Content - Translation guidance (markdown) */}
-      {note.note && (
+      {excerptLoading ? (
+        <div
+          className="relative"
+          dir={languageDirection}
+          role="status"
+          title="Loading excerpt"
+          aria-label="Loading excerpt"
+        >
+          <MarkdownSkeleton className="text-base leading-relaxed" />
+        </div>
+      ) : note.note ? (
         <div className="relative" dir={languageDirection}>
           {showRawMarkdown ? (
             <pre className="text-xs text-fg-secondary leading-relaxed whitespace-pre-wrap font-mono bg-muted p-2.5 rounded-lg overflow-x-auto">
@@ -309,7 +325,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
             <Code className="w-3.5 h-3.5" />
           </button>
         </div>
-      )}
+      ) : null}
 
       {/* Support Reference - Link to Translation Academy */}
       {note.supportReference && note.supportReference.startsWith('rc://') && (

@@ -252,9 +252,13 @@ export function CombinedHelpsViewer({
         : displayLinks.length
 
   const { twTitles, loadingTitles: twLoadingTitles, fetchTWTitle, getTWTitle } = useTWTitles(twlKey || resourceKey)
-  const { twPreviews, loadingPreviews: twLoadingPreviews, fetchTWPreview, getTWPreview } = useTWPreviews(
-    twlKey || resourceKey
-  )
+  const {
+    twPreviews,
+    loadingPreviews: twLoadingPreviews,
+    fetchTWPreview,
+    getTWPreview,
+    isTWPreviewPending,
+  } = useTWPreviews(twlKey || resourceKey)
 
   useCombinedHelpsTitlePreload({
     displayNotes,
@@ -364,6 +368,7 @@ export function CombinedHelpsViewer({
         getTATitle={getTATitle}
         getTWTitle={getTWTitle}
         getTWPreview={getTWPreview}
+        isTWPreviewPending={isTWPreviewPending}
         onSupportReferenceClick={handleSupportReferenceClick}
         onEntryLinkClick={onEntryLinkClick}
         onNoteQuoteClick={handleNoteQuoteClick}

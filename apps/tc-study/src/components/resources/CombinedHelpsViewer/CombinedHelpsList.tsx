@@ -62,6 +62,7 @@ export interface CombinedHelpsListProps {
   getTATitle: (note: NoteWithTokens) => string
   getTWTitle: (link: TranslationWordsLink) => string
   getTWPreview: (link: TranslationWordsLink) => string | null
+  isTWPreviewPending: (link: TranslationWordsLink) => boolean
   onSupportReferenceClick: (supportRef: string) => void
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   onNoteQuoteClick: (note: NoteWithTokens) => void
@@ -102,6 +103,7 @@ export function CombinedHelpsList({
   getTATitle,
   getTWTitle,
   getTWPreview,
+  isTWPreviewPending,
   onSupportReferenceClick,
   onEntryLinkClick,
   onNoteQuoteClick,
@@ -240,6 +242,7 @@ export function CombinedHelpsList({
                         const twTitle = getTWTitle(link)
                         const twPreview = getTWPreview(link)
                         const isLoadingTwTitle = twLoadingTitles.has(`${twInfo.category}/${twInfo.term}`)
+                        const isLoadingPreview = isTWPreviewPending(link)
                         return (
                           <div key={`twl-${link.id}-${idx}`}>
                             <WordLinkCard
@@ -248,6 +251,7 @@ export function CombinedHelpsList({
                               twTitle={twTitle}
                               isLoadingTitle={isLoadingTwTitle}
                               twPreview={twPreview}
+                              isLoadingPreview={isLoadingPreview}
                               onTitleClick={onTitleClick}
                               onQuoteClick={onLinkQuoteClick}
                               tokenFilter={tokenFilter}

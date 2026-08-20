@@ -7,8 +7,21 @@ import {
   useResourceStateSender,
   useSignalHandler,
 } from '@bt-synergy/resource-panels'
-import { useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from 'react'
-import type { ObsFrameHighlightSignal, ObsFrameQuoteEntry, ObsFrameQuotesSignal } from '../../../signals/studioSignals'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+} from 'react'
+import {
+  buildObsFrameQuotes,
+  obsQuotesOfKind,
+} from '../../../lib/obs/buildObsFrameQuotes'
+import { publishObsFrameQuotes } from '../../../lib/obs/obsFrameQuotesStore'
+import type { ObsFrameHighlightSignal, ObsFrameQuotesSignal } from '../../../signals/studioSignals'
 import { focusFirstOverlappingHelpsCard, type HelpsCardSelection } from './helpsCardSelection'
 import type { HelpsKindFilter, ObsQuoteFilter } from './types'
 import type { NoteWithAlignments, LinkWithAlignments } from './useCombinedHelpsMerge'
@@ -54,66 +67,58 @@ export function useCombinedHelpsObsQuotesBroadcast({
   const lastObsQuotesKeyRef = useRef<string | null>(null)
 
   const splitObsQuotes = useMemo(() => {
-    if (helpsScope !== 'obs' || currentRef.book !== 'obs') {
-      return {
-        tnQuotes: [] as ObsFrameQuoteEntry[],
-        twlQuotes: [] as ObsFrameQuoteEntry[],
-        tnMap: {} as Record<number, ObsFrameQuoteEntry[]>,
-        twlMap: {} as Record<number, ObsFrameQuoteEntry[]>,
-      }
+    const rows = [
+      ...notesWithAlignedTokens.map((note) => ({
+        id: note.id,
+        reference: note.reference,
+        quote: note.quote,
+        occurrence: note.occurrence,
+        kind: 'tn' as const,
+      })),
+      ...filteredByReference.map((link) => ({
+        id: link.id,
+        reference: link.reference,
+        quote: link.origWords,
+        occurrence: link.occurrence,
+        kind: 'twl' as const,
+      })),
+    ]
+    const built = buildObsFrameQuotes({
+      book: helpsScope === 'obs' ? currentRef.book : undefined,
+      storyNumber: currentRef.chapter,
+      frameNumber: currentRef.verse,
+      rows,
+    })
+    const tn = obsQuotesOfKind(built, 'tn')
+    const twl = obsQuotesOfKind(built, 'twl')
+    return {
+      built,
+      tnQuotes: tn.quotes,
+      twlQuotes: twl.quotes,
+      tnMap: tn.frameQuoteMap,
+      twlMap: twl.frameQuoteMap,
     }
-    const story = currentRef.chapter
-    const frame = currentRef.verse
-    const refStr = `${story}:${frame}`
-    const tnQuotes: ObsFrameQuoteEntry[] = []
-    const twlQuotes: ObsFrameQuoteEntry[] = []
-    const tnMap: Record<number, ObsFrameQuoteEntry[]> = {}
-    const twlMap: Record<number, ObsFrameQuoteEntry[]> = {}
-
-    for (const note of notesWithAlignedTokens) {
-      const q = note.quote?.trim()
-      if (!q) continue
-      const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
-      const entry: ObsFrameQuoteEntry = {
-        sourceId: note.id,
-        kind: 'tn',
-        quote: q,
-        occurrence: Number.isFinite(occRaw) ? occRaw : 1,
-      }
-      const [chStr, frStr] = note.reference.split(':')
-      if (parseInt(chStr) !== story) continue
-      const fr = parseInt(frStr)
-      if (!tnMap[fr]) tnMap[fr] = []
-      tnMap[fr].push(entry)
-      if (note.reference === refStr) tnQuotes.push(entry)
-    }
-    for (const link of filteredByReference) {
-      const q = link.origWords?.trim()
-      if (!q) continue
-      const occRaw = Number.parseInt(String(link.occurrence ?? '1'), 10)
-      const entry: ObsFrameQuoteEntry = {
-        sourceId: link.id,
-        kind: 'twl',
-        quote: q,
-        occurrence: Number.isFinite(occRaw) ? occRaw : 1,
-      }
-      const [chStr, frStr] = link.reference.split(':')
-      if (parseInt(chStr) !== story) continue
-      const fr = parseInt(frStr)
-      if (!twlMap[fr]) twlMap[fr] = []
-      twlMap[fr].push(entry)
-      if (link.reference === refStr) twlQuotes.push(entry)
-    }
-    return { tnQuotes, twlQuotes, tnMap, twlMap }
   }, [helpsScope, currentRef.book, currentRef.chapter, currentRef.verse, notesWithAlignedTokens, filteredByReference])
 
   useEffect(() => {
     lastObsQuotesKeyRef.current = null
   }, [currentRef.book, currentRef.chapter, currentRef.verse, helpsScope])
 
+  useLayoutEffect(() => {
+    if (helpsScope !== 'obs') return
+    publishObsFrameQuotes(splitObsQuotes.built)
+  }, [helpsScope, splitObsQuotes.built])
+
+  useLayoutEffect(() => {
+    if (helpsScope !== 'obs') return
+    return () => {
+      publishObsFrameQuotes(null)
+    }
+  }, [helpsScope])
+
   useEffect(() => {
     if (helpsScope !== 'obs') return
-    const { tnQuotes, twlQuotes, tnMap, twlMap } = splitObsQuotes
+    const { tnQuotes, twlQuotes, tnMap, twlMap, built } = splitObsQuotes
     const key = `${currentRef.book}:${currentRef.chapter}:${currentRef.verse}:${kindFilter}:${[
       ...tnQuotes,
       ...twlQuotes,
@@ -122,18 +127,16 @@ export function useCombinedHelpsObsQuotesBroadcast({
       .join('|')}`
     if (key === lastObsQuotesKeyRef.current) return
     lastObsQuotesKeyRef.current = key
-    const storyNumber = currentRef.book === 'obs' ? currentRef.chapter : 0
-    const frameNumber = currentRef.book === 'obs' ? currentRef.verse : 0
     const onObs = currentRef.book === 'obs'
     sendObsFrameQuotesTn({
-      storyNumber,
-      frameNumber,
+      storyNumber: built.storyNumber,
+      frameNumber: built.frameNumber,
       quotes: onObs ? tnQuotes : [],
       frameQuoteMap: onObs ? tnMap : undefined,
     })
     sendObsFrameQuotesTwl({
-      storyNumber,
-      frameNumber,
+      storyNumber: built.storyNumber,
+      frameNumber: built.frameNumber,
       quotes: onObs ? twlQuotes : [],
       frameQuoteMap: onObs ? twlMap : undefined,
     })

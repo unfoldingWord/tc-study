@@ -12,6 +12,8 @@ import { RESOURCE_STATE_KEYS, useResourceState } from '@bt-synergy/resource-pane
 import { scriptureContentRevision } from '../../../../features/helps/scriptureReadyUnderlineRebind'
 import type { ScriptureTokensBroadcastSignal } from '../../../../signals/studioSignals'
 
+const EMPTY_SCRIPTURE_TOKENS: OptimizedToken[] = []
+
 interface UseScriptureTokensOptions {
   resourceId: string
 }
@@ -48,7 +50,7 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
 
   if (!scriptureTokensBroadcast || isClearMessage) {
     return {
-      tokens: [],
+      tokens: EMPTY_SCRIPTURE_TOKENS,
       reference: null,
       resourceMetadata: null,
       hasTokens: false,

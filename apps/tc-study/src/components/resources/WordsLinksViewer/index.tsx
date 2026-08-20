@@ -108,7 +108,8 @@ export function WordsLinksViewer({
   }, [content])
 
   const { twTitles, loadingTitles, fetchTWTitle, getTWTitle } = useTWTitles(resourceKey)
-  const { twPreviews, loadingPreviews, fetchTWPreview, getTWPreview } = useTWPreviews(resourceKey)
+  const { twPreviews, loadingPreviews, fetchTWPreview, getTWPreview, isTWPreviewPending } =
+    useTWPreviews(resourceKey)
 
   const { filteredByReference, underlineTokenGroups, displayLinks, hasMatches, linksByVerse } =
     useWordsLinksPipeline({
@@ -332,6 +333,7 @@ export function WordsLinksViewer({
         loadingTitles={loadingTitles}
         getTWTitle={getTWTitle}
         getTWPreview={getTWPreview}
+        isTWPreviewPending={isTWPreviewPending}
         onTitleClick={handleTitleClick}
         onQuoteClick={handleQuoteClick}
       />

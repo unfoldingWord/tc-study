@@ -24,7 +24,7 @@ function setCached(content: string, node: React.ReactNode): void {
   renderCache.set(content, node)
 }
 
-function MarkdownSkeleton({ className = '' }: { className?: string }) {
+export function MarkdownSkeleton({ className = '' }: { className?: string }) {
   return (
     <div className={`space-y-2 ${className}`} aria-hidden="true">
       <div className="h-3 w-full max-w-[100%] rounded bg-muted animate-pulse" />
