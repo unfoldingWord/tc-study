@@ -9,7 +9,13 @@
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import { RESOURCE_STATE_KEYS, useResourceState } from '@bt-synergy/resource-panels'
+import { useSyncExternalStore } from 'react'
 import { scriptureContentRevision } from '../../../../features/helps/scriptureReadyUnderlineRebind'
+import {
+  getScriptureTokensSnapshot,
+  preferHydratedScriptureTokens,
+  subscribeScriptureTokensSnapshot,
+} from '../../../../features/helps/scriptureTokensStore'
 import type { ScriptureTokensBroadcastSignal } from '../../../../signals/studioSignals'
 
 const EMPTY_SCRIPTURE_TOKENS: OptimizedToken[] = []
@@ -42,13 +48,30 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
     resourceId,
     RESOURCE_STATE_KEYS.SCRIPTURE_TOKENS
   )
+  const publishedTokens = useSyncExternalStore(
+    subscribeScriptureTokensSnapshot,
+    getScriptureTokensSnapshot,
+    getScriptureTokensSnapshot
+  )
 
   const isClearMessage =
     scriptureTokensBroadcast &&
     scriptureTokensBroadcast.tokens.length === 0 &&
     !scriptureTokensBroadcast.reference.book
 
-  if (!scriptureTokensBroadcast || isClearMessage) {
+  const messaging =
+    !scriptureTokensBroadcast || isClearMessage
+      ? null
+      : {
+          tokens: scriptureTokensBroadcast.tokens,
+          reference: scriptureTokensBroadcast.reference,
+          resourceMetadata: scriptureTokensBroadcast.resourceMetadata,
+          sourceResourceId: scriptureTokensBroadcast.sourceResourceId ?? null,
+        }
+
+  const resolved = preferHydratedScriptureTokens(messaging, publishedTokens)
+
+  if (!resolved) {
     return {
       tokens: EMPTY_SCRIPTURE_TOKENS,
       reference: null,
@@ -59,11 +82,11 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
   }
 
   return {
-    tokens: scriptureTokensBroadcast.tokens,
-    reference: scriptureTokensBroadcast.reference,
-    resourceMetadata: scriptureTokensBroadcast.resourceMetadata,
-    hasTokens: scriptureTokensBroadcast.tokens.length > 0,
-    sourceResourceId: scriptureTokensBroadcast.sourceResourceId,
+    tokens: resolved.tokens as OptimizedToken[],
+    reference: resolved.reference,
+    resourceMetadata: resolved.resourceMetadata,
+    hasTokens: resolved.tokens.length > 0,
+    sourceResourceId: resolved.sourceResourceId,
   }
 }
 

@@ -5,9 +5,8 @@
  * `loadReadLanguageCatalog` and compositions — not a new network API.
  *
  * This module is pure: callers pass registry-derived subject lists.
- * bibleHelps / obsHelps = union of composition `consumes` → plugin subjects
- * for compositions whose scope matches. TQ does not light flags unless a
- * composition consumes questions.
+ * bibleHelps / obsHelps = union of helps-mode panel-entry `consumes` →
+ * plugin subjects (compositions + pane-members) whose scope matches.
  */
 
 export interface LanguageAvailabilityFlags {

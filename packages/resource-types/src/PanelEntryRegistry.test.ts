@@ -238,6 +238,18 @@ describe('PanelEntryRegistry', () => {
       'TSV Translation Words Links',
     ])
     expect(registry.subjectsForCompositionAvailability('obs')).toEqual([])
+    registry.register(questionsEntry())
+    expect(registry.subjectsForCompositionAvailability('scripture')).toEqual([
+      'TSV Translation Notes',
+      'TSV Translation Words Links',
+      'TSV Translation Questions',
+    ])
+    expect(registry.consumedTypeIdsForHelpsMode('scripture')).toEqual([
+      'notes',
+      'words-links',
+      'questions',
+    ])
+    expect(registry.paneMemberConsumedTypeIdsForHelpsMode('scripture')).toEqual(['questions'])
   })
 
   test('TN has no 1:1 pane-member; TQ does', () => {

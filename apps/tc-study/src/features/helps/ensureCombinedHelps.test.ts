@@ -82,6 +82,55 @@ describe('ensureCombinedHelpsInWorkspace', () => {
     expect(out.panels[0]!.resourceKeys).not.toContain('u/en/obs-twl')
   })
 
+  test('injects questions pane-member from package when CombinedHelps is already consistent', () => {
+    const resources = new Map<string, ResourceInfo>([
+      ['u/en/tn', res({ key: 'u/en/tn', type: 'notes' })],
+      ['u/en/twl', res({ key: 'u/en/twl', type: 'words-links' })],
+      ['u/en/tq', res({ key: 'u/en/tq', type: 'questions' })],
+      [
+        COMBINED_HELPS_RESOURCE_ID,
+        res({ key: COMBINED_HELPS_RESOURCE_ID, type: 'combined-helps' }),
+      ],
+    ])
+    const panels = [
+      {
+        id: 'panel-2',
+        resourceKeys: [COMBINED_HELPS_RESOURCE_ID],
+        activeIndex: 0,
+        entries: [
+          {
+            instanceId: COMBINED_HELPS_RESOURCE_ID,
+            entryId: 'combined-helps',
+            bindings: { notes: 'u/en/tn', 'words-links': 'u/en/twl' },
+          },
+        ],
+      },
+    ]
+
+    const out = ensureCombinedHelpsInWorkspace({ resources, panels, languageCode: 'en' })
+    expect(out.injected).toContain('u/en/tq')
+    expect(out.panels[0]!.resourceKeys).toContain(COMBINED_HELPS_RESOURCE_ID)
+    expect(out.panels[0]!.resourceKeys).toContain('u/en/tq')
+    expect(out.panels[0]!.resourceKeys).not.toContain('u/en/tn')
+    expect(out.panels[0]!.resourceKeys).not.toContain('u/en/twl')
+  })
+
+  test('TQ-only package injects questions without CombinedHelps', () => {
+    const resources = new Map<string, ResourceInfo>([
+      ['u/en/tq', res({ key: 'u/en/tq', type: 'questions' })],
+    ])
+    const panels = [{ id: 'panel-2', resourceKeys: [], activeIndex: 0 }]
+    const out = ensureCombinedHelpsInWorkspace({
+      resources,
+      panels,
+      languageCode: 'en',
+      forceHelpsPanel: true,
+    })
+    expect(out.injected).toContain('u/en/tq')
+    expect(out.injected).not.toContain(COMBINED_HELPS_RESOURCE_ID)
+    expect(out.panels[0]!.resourceKeys).toEqual(['u/en/tq'])
+  })
+
   test('injects CombinedHelps when only one helps side present', () => {
     const resources = new Map<string, ResourceInfo>([
       ['u/en/tn', res({ key: 'u/en/tn', type: 'notes' })],

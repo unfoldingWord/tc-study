@@ -2,6 +2,7 @@ import { RESOURCE_STATE_KEYS, useResourceStateSender } from '@bt-synergy/resourc
 import type { UsjScriptureViewModel } from '@bt-synergy/scripture-loader'
 import { useEffect } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
+import { publishScriptureTokens } from '../../../../features/helps/scriptureTokensStore'
 import { isScriptureTokensOwner } from '../../../../features/messaging/scriptureTokensOwnership'
 import type { ScriptureTokensBroadcastSignal } from '../../../../signals/studioSignals'
 import { extractUsjBroadcastTokens } from '../utils/extractUsjBroadcastTokens'
@@ -64,28 +65,40 @@ export function useTokenBroadcast({
       return
     }
 
+    const tokens = extractUsjBroadcastTokens(
+      viewModel,
+      currentChapter,
+      currentVerse,
+      endChapter,
+      endVerse
+    )
+    const reference = {
+      book: bookCode,
+      chapter: currentChapter,
+      verse: currentVerse,
+      endChapter: endChapter || undefined,
+      endVerse: endVerse || undefined,
+    }
+    const resourceMetadata = {
+      id: resourceKey,
+      language,
+      languageDirection,
+      type: 'scripture',
+    }
     sendState({
-      reference: {
-        book: bookCode,
-        chapter: currentChapter,
-        verse: currentVerse,
-        endChapter: endChapter || undefined,
-        endVerse: endVerse || undefined,
-      },
-      tokens: extractUsjBroadcastTokens(
-        viewModel,
-        currentChapter,
-        currentVerse,
-        endChapter,
-        endVerse
-      ),
-      resourceMetadata: {
-        id: resourceKey,
-        language,
-        languageDirection,
-        type: 'scripture',
-      },
+      reference,
+      tokens,
+      resourceMetadata,
     })
+    // Keep last non-empty broadcast for CombinedHelps remount (helps-mode switch-back).
+    if (tokens.length > 0 && bookCode) {
+      publishScriptureTokens({
+        tokens,
+        reference,
+        resourceMetadata,
+        sourceResourceId: resourceId,
+      })
+    }
   }, [
     isOwner,
     resourceId,

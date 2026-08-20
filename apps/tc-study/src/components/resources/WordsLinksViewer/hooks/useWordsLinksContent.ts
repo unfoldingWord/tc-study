@@ -4,8 +4,12 @@
  * Loads Translation Words Links content for the current book
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import {
+  getHelpsContentHydrateTick,
+  subscribeHelpsContentHydrate,
+} from '../../../../features/helps/helpsContentHydrate'
 import type { ProcessedWordsLinks } from '../types'
 
 interface UseWordsLinksContentOptions {
@@ -22,6 +26,11 @@ export function useWordsLinksContent({
 }: UseWordsLinksContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
+  const hydrateTick = useSyncExternalStore(
+    subscribeHelpsContentHydrate,
+    getHelpsContentHydrateTick,
+    getHelpsContentHydrateTick
+  )
   
   const [content, setContent] = useState<ProcessedWordsLinks | null>(wordsLinksContent || null)
   const [loading, setLoading] = useState(() => Boolean(resourceKey) && !wordsLinksContent)
@@ -73,7 +82,7 @@ export function useWordsLinksContent({
     }
     
     loadContent()
-  }, [currentRef.book, currentRef.chapter, resourceKey, loaderRegistry, wordsLinksContent, loaderTypeId])
+  }, [currentRef.book, currentRef.chapter, resourceKey, loaderRegistry, wordsLinksContent, loaderTypeId, hydrateTick])
   
   return { content, loading, error }
 }

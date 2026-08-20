@@ -266,6 +266,43 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     expect(p2.resourceKeys).toEqual(p2Before.resourceKeys)
   })
 
+  test('switch-back to helps projects companion content (not settled-empty skip)', () => {
+    addResource(res({ key: 'unfoldingWord/en/ult', type: 'scripture' }), { panelId: 'panel-2' })
+    addResource(res({ key: 'unfoldingWord/en/tn', type: 'notes' }))
+    addResource(res({ key: 'unfoldingWord/en/twl', type: 'words-links' }))
+    addResource(res({ key: 'unfoldingWord/en/tq', type: 'questions' }))
+    addResource(res({ key: 'unfoldingWord/en/tw', type: 'words' }))
+    addResource(res({ key: 'unfoldingWord/en/ta', type: 'academy' }))
+    applyReadModeMembership(
+      'panel-2',
+      'helps',
+      'en',
+      ['unfoldingWord/en/ult'],
+      'scripture',
+      scripturePaneTypeIds
+    )
+    expect(packageHasHelpsCatalogTypes('en', scriptureCatalogTypeIds)).toBe(true)
+    expect(useAppStore.getState().loadedResources[COMBINED_HELPS_RESOURCE_ID]).toBeTruthy()
+    expect(useAppStore.getState().loadedResources['unfoldingWord/en/tq']).toBeTruthy()
+
+    applyReadModeMembership('panel-2', 'scripture', 'en', ['unfoldingWord/en/ult'], 'scripture')
+    expect(packageHasHelpsCatalogTypes('en', scriptureCatalogTypeIds)).toBe(true)
+
+    applyReadModeMembership(
+      'panel-2',
+      'helps',
+      'en',
+      ['unfoldingWord/en/ult'],
+      'scripture',
+      scripturePaneTypeIds
+    )
+    const loaded = useAppStore.getState().loadedResources
+    expect(loaded[COMBINED_HELPS_RESOURCE_ID]).toBeTruthy()
+    expect(loaded['unfoldingWord/en/tq']).toBeTruthy()
+    expect(loaded[COMBINED_HELPS_RESOURCE_ID]?.helpsTnResourceKey).toBe('unfoldingWord/en/tn')
+    expect(packageHasHelpsCatalogTypes('en', scriptureCatalogTypeIds)).toBe(true)
+  })
+
   test('en OBS + empty OBS membership loads OBS subjects; CombinedHelps OBS injects after OBS-TN', () => {
     addResource(res({ key: 'unfoldingWord/en/obs', type: 'obs', subject: 'Open Bible Stories' }), {
       panelId: 'panel-1',
@@ -424,12 +461,152 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     expect(p1.resourceKeys.some((key) => key.includes('/questions'))).toBe(true)
   })
 
+  test('TQ-only package injects questions without CombinedHelps; hideConsumed still hides TN/TWL', () => {
+    addResource(res({ key: 'unfoldingWord/en/ult', type: 'scripture' }), { panelId: 'panel-1' })
+    addResource(res({ key: 'unfoldingWord/en/tq', type: 'questions' }))
+
+    applyReadModeMembership(
+      'panel-1',
+      'helps',
+      'en',
+      ['unfoldingWord/en/ult'],
+      'scripture',
+      ['questions']
+    )
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    const p1 = pkg.panels.find((p) => p.id === 'panel-1')!
+    expect(p1.resourceKeys).toContain('unfoldingWord/en/tq')
+    expect(p1.resourceKeys.some((key) => key.includes('combined-helps'))).toBe(false)
+    expect(p1.resourceKeys).not.toContain('unfoldingWord/en/tn')
+
+    addResource(res({ key: 'unfoldingWord/en/tn', type: 'notes' }))
+    addResource(res({ key: 'unfoldingWord/en/twl', type: 'words-links' }))
+    applyReadModeMembership(
+      'panel-1',
+      'helps',
+      'en',
+      ['unfoldingWord/en/ult'],
+      'scripture',
+      ['questions']
+    )
+
+    const after = useWorkspaceStore.getState().currentPackage!
+    const p1After = after.panels.find((p) => p.id === 'panel-1')!
+    expect(p1After.resourceKeys).toContain(`${COMBINED_HELPS_RESOURCE_ID}:panel-1`)
+    expect(p1After.resourceKeys).toContain('unfoldingWord/en/tq')
+    expect(p1After.resourceKeys).not.toContain('unfoldingWord/en/tn')
+    expect(p1After.resourceKeys).not.toContain('unfoldingWord/en/twl')
+    expect(panelHasHelpsMembership('panel-1', 'scripture', ['questions'])).toBe(true)
+  })
+
+  test('es-419 scripture → helps uses companion membership, not no-sources empty', () => {
+    addResource(
+      res({
+        key: 'es-419_gl/es-419/glt',
+        type: 'scripture',
+        language: 'es-419',
+        languageCode: 'es-419',
+      }),
+      { panelId: 'panel-2' }
+    )
+    addResource(
+      res({
+        key: 'es-419_gl/es-419/tn',
+        type: 'notes',
+        language: 'es-419',
+        languageCode: 'es-419',
+      })
+    )
+    addResource(
+      res({
+        key: 'es-419_gl/es-419/twl',
+        type: 'words-links',
+        language: 'es-419',
+        languageCode: 'es-419',
+      })
+    )
+    addResource(
+      res({
+        key: 'es-419_gl/es-419/tq',
+        type: 'questions',
+        language: 'es-419',
+        languageCode: 'es-419',
+      })
+    )
+    addResource(
+      res({
+        key: 'es-419_gl/es-419/tw',
+        type: 'words',
+        language: 'es-419',
+        languageCode: 'es-419',
+      })
+    )
+    addResource(
+      res({
+        key: 'es-419_gl/es-419/ta',
+        type: 'academy',
+        language: 'es-419',
+        languageCode: 'es-419',
+      })
+    )
+
+    applyReadModeMembership(
+      'panel-2',
+      'helps',
+      'es-419',
+      ['es-419_gl/es-419/glt'],
+      'scripture',
+      scripturePaneTypeIds
+    )
+
+    const pkg = useWorkspaceStore.getState().currentPackage!
+    const p2 = pkg.panels.find((p) => p.id === 'panel-2')!
+    expect(
+      p2.resourceKeys.some(
+        (key) => key === COMBINED_HELPS_RESOURCE_ID || key.startsWith(`${COMBINED_HELPS_RESOURCE_ID}:`)
+      )
+    ).toBe(true)
+    expect(p2.resourceKeys).toContain('es-419_gl/es-419/tq')
+    expect(panelHasHelpsMembership('panel-2', 'scripture', scripturePaneTypeIds)).toBe(true)
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'es-419',
+        isLoading: false,
+        hasResource: true,
+        languageName: {
+          code: 'es-419',
+          name: 'Español Latin America',
+          anglicizedName: 'Latin American Spanish',
+        },
+        catalogSettled: true,
+      })
+    ).toBeNull()
+    expect(
+      resolveHelpsPaneNoSourcesView({
+        mode: 'helps',
+        languageCode: 'es-419',
+        isLoading: false,
+        hasResource: false,
+        languageName: {
+          code: 'es-419',
+          name: 'Español Latin America',
+          anglicizedName: 'Latin American Spanish',
+        },
+        catalogSettled: false,
+      })
+    ).toBeNull()
+  })
+
   test('mode-switch handler hydrates helps without scripture reclear or URL hydrate', () => {
     const handler = readFileSync(join(import.meta.dir, 'useReadPanelLanguageHandlers.ts'), 'utf8')
     const mode = handler.slice(handler.indexOf('const handlePanelModeSwitch'))
     expect(mode).toContain('packageHasHelpsCatalogTypes')
+    expect(mode).toContain('requestHelpsContentHydrate')
+    expect(mode).toContain('consumedTypeIdsForHelpsMode')
+    expect(mode).toContain('paneMemberConsumedTypeIdsForHelpsMode')
     expect(mode).toContain('helpsCatalogTypeIds')
-    expect(mode).toContain('helpsCatalogPaneTypeIds')
     expect(mode).toContain('resolveHelpsCatalogScope')
     expect(mode).toContain('navigationScope: helpsScope')
     expect(mode).toContain('resetCatalogSettled([panelId])')
@@ -443,6 +620,7 @@ describe('scripture → helps mode switch (helps catalog + CombinedHelps)', () =
     const load = readFileSync(join(import.meta.dir, 'useReadCatalogLoad.ts'), 'utf8')
     expect(load).toContain('skipPanelClear')
     expect(load).toContain('skipPanelClear: options.skipPanelClear')
+    expect(load).toContain('!options.skipPanelClear &&')
   })
 })
 

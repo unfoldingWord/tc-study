@@ -114,12 +114,13 @@ export function packageEnsureInputFingerprint(
   },
   options?: { languageCode?: string; panelId?: string; forceHelpsPanel?: boolean }
 ): string {
-  const compositionIds = compositionsForEnsure()
-    .map((c) => c.persistId ?? c.id)
+  const entryIds = panelEntriesForEnsure()
+    .filter((e) => e.entryType === 'helps')
+    .map((e) => `${e.kind}:${e.persistId ?? e.id}`)
     .sort()
     .join(',')
   return [
-    compositionIds,
+    entryIds,
     options?.languageCode ?? '',
     options?.panelId ?? '',
     options?.forceHelpsPanel ? '1' : '0',
@@ -147,7 +148,7 @@ function bindingsFingerprint(bindings: Record<string, string> | undefined): stri
 
 /**
  * Cheap "already consistent" check — no map clone / migrate / synthesize.
- * False when TN/TWL arrived and CombinedHelps is missing, or registry just bound.
+ * False when consumed types arrived and a helps-mode entry is missing.
  */
 export function compositionsAlreadyConsistent(options: {
   resources: Map<string, ResourceInfo> | Record<string, ResourceInfo>
@@ -226,6 +227,14 @@ export function compositionsAlreadyConsistent(options: {
     if (!helpsPanel || !existing) return false
     if (bindingsFingerprint(existing.bindings) !== bindingsFingerprint(consumed)) return false
     if (!resourceMap.has(id)) return false
+  }
+
+  if (
+    helpsPanel &&
+    !(hasPrimary && !options.forceHelpsPanel) &&
+    !helpsPaneMembersAlreadyConsistent(helpsPanel, resourceMap, allEntries, langCode)
+  ) {
+    return false
   }
 
   return true
@@ -355,6 +364,17 @@ export function ensureCompositions(options: {
     }
   }
 
+  if (helpsPanel) {
+    injectHelpsPaneMembers({
+      panel: helpsPanel,
+      resources: resourceMap,
+      allEntries,
+      langCode,
+      forceHelpsPanel: options.forceHelpsPanel,
+      injected,
+    })
+  }
+
   for (const panel of panels) {
     panel.entries = dropUnpaintableConsumedKeys(panel.entries ?? [], allEntries, resourceMap)
     syncResourceKeysFromEntries(panel)
@@ -414,6 +434,94 @@ export function isCompositionPersistId(
 
 function syncResourceKeysFromEntries(panel: WorkspacePanelLike): void {
   panel.resourceKeys = (panel.entries ?? []).map((e) => e.instanceId)
+}
+
+function helpsPaneMembers(allEntries: PanelEntryDefinition[]): PanelEntryDefinition[] {
+  return allEntries.filter((e) => e.kind === 'pane-member' && e.entryType === 'helps')
+}
+
+function hiddenByPresentComposition(
+  typeId: string,
+  panel: WorkspacePanelLike,
+  allEntries: PanelEntryDefinition[]
+): boolean {
+  return (panel.entries ?? []).some((instance) => {
+    const def = allEntries.find((e) => e.id === instance.entryId)
+    return def?.kind === 'composition' && def.consumes.includes(typeId)
+  })
+}
+
+function panelBindingKeys(panel: WorkspacePanelLike): Set<string> {
+  const keys = new Set<string>()
+  for (const instance of panel.entries ?? []) {
+    keys.add(instance.instanceId)
+    for (const bound of Object.values(instance.bindings ?? {})) {
+      if (bound) keys.add(bound)
+    }
+  }
+  return keys
+}
+
+/** False when a helps pane-member resource is in the package but missing from the pane. */
+function helpsPaneMembersAlreadyConsistent(
+  panel: WorkspacePanelLike,
+  resources: Map<string, ResourceInfo>,
+  allEntries: PanelEntryDefinition[],
+  langCode: string
+): boolean {
+  const members = helpsPaneMembers(allEntries)
+  if (members.length === 0) return true
+  const inventory = findConsumedKeys(
+    resources.values(),
+    [...new Set(members.flatMap((m) => m.consumes))],
+    { langCode }
+  )
+  const onPanel = panelBindingKeys(panel)
+  for (const member of members) {
+    for (const typeId of member.consumes) {
+      if (hiddenByPresentComposition(typeId, panel, allEntries)) continue
+      const key = inventory[typeId]
+      if (key && !onPanel.has(key)) return false
+    }
+  }
+  return true
+}
+
+function injectHelpsPaneMembers(options: {
+  panel: WorkspacePanelLike
+  resources: Map<string, ResourceInfo>
+  allEntries: PanelEntryDefinition[]
+  langCode: string
+  forceHelpsPanel?: boolean
+  injected: string[]
+}): void {
+  const { panel, resources, allEntries, langCode, injected } = options
+  if (panelHasPrimaryTextEntries(panel, resources, allEntries) && !options.forceHelpsPanel) {
+    return
+  }
+  const members = helpsPaneMembers(allEntries)
+  if (members.length === 0) return
+  const inventory = findConsumedKeys(
+    resources.values(),
+    [...new Set(members.flatMap((m) => m.consumes))],
+    { langCode }
+  )
+  panel.entries = panel.entries ?? []
+  const onPanel = panelBindingKeys(panel)
+  for (const member of members) {
+    for (const typeId of member.consumes) {
+      if (hiddenByPresentComposition(typeId, panel, allEntries)) continue
+      const key = inventory[typeId]
+      if (!key || onPanel.has(key)) continue
+      panel.entries.push({
+        instanceId: key,
+        entryId: member.id,
+        bindings: { [typeId]: key },
+      })
+      injected.push(key)
+      onPanel.add(key)
+    }
+  }
 }
 
 function dropUnpaintableConsumedKeys(

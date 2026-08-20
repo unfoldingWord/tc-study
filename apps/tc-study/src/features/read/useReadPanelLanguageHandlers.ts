@@ -4,10 +4,11 @@
  */
 
 import { useCallback } from 'react'
-import { useNavigationStore, useResourceTypeRegistry } from '../../contexts'
+import { useNavigationStore, usePanelEntryRegistry, useResourceTypeRegistry } from '../../contexts'
 import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { writePersistedHelpsLanguage } from './defaultHelpsLanguage'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
+import { requestHelpsContentHydrate } from '../helps/helpsContentHydrate'
 import { applyReadModeMembership, packageHasHelpsCatalogTypes } from './applyReadModeMembership'
 import {
   shouldLoadCatalogOnModeSwitch,
@@ -50,6 +51,7 @@ export function useReadPanelLanguageHandlers(deps: {
     inheritEmptyLanguage,
   } = deps
   const resourceTypeRegistry = useResourceTypeRegistry()
+  const panelEntryRegistry = usePanelEntryRegistry()
   const setPanelLanguage = useReadPanelStore((s) => s.setPanelLanguage)
 
   const handlePanelLanguageSelected = useCallback(
@@ -115,7 +117,8 @@ export function useReadPanelLanguageHandlers(deps: {
           : false,
       })
       if (mode === 'helps') {
-        const paneTypeIds = resourceTypeRegistry.helpsCatalogPaneTypeIds(helpsScope)
+        const paneTypeIds = panelEntryRegistry.paneMemberConsumedTypeIdsForHelpsMode(helpsScope)
+        const requiredTypeIds = panelEntryRegistry.consumedTypeIdsForHelpsMode(helpsScope)
         applyReadModeMembership(
           panelId,
           mode,
@@ -124,10 +127,14 @@ export function useReadPanelLanguageHandlers(deps: {
           helpsScope,
           paneTypeIds
         )
+        // Catalog types in the package skip Door43 search — not TN/TWL/TQ book content.
+        requestHelpsContentHydrate()
         if (
           packageHasHelpsCatalogTypes(
             panel.languageCode,
-            resourceTypeRegistry.helpsCatalogTypeIds(helpsScope)
+            requiredTypeIds.length > 0
+              ? requiredTypeIds
+              : resourceTypeRegistry.helpsCatalogTypeIds(helpsScope)
           )
         ) {
           markCatalogSettled([panelId])
@@ -158,6 +165,7 @@ export function useReadPanelLanguageHandlers(deps: {
       inheritEmptyLanguage,
       markCatalogSettled,
       resetCatalogSettled,
+      panelEntryRegistry,
       resourceTypeRegistry,
       runCatalogLoad,
       textKeysRef,

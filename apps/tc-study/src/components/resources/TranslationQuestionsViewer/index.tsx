@@ -9,11 +9,15 @@
 import type { ProcessedQuestions } from '@bt-synergy/resource-parsers'
 import type { ResourceViewerProps } from '@bt-synergy/resource-types'
 import { AlertCircle, BookOpen, CheckCircle, ChevronDown, ChevronUp, HelpCircle, MessageCircleQuestion } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { useCatalogManager, useCurrentReference } from '../../../contexts'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
+import {
+  getHelpsContentHydrateTick,
+  subscribeHelpsContentHydrate,
+} from '../../../features/helps/helpsContentHydrate'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { LoadingSpinner } from '../../../shared/LoadingSpinner'
@@ -60,6 +64,11 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
     return () => { cancelled = true }
   }, [resourceKey, catalogManager])
 
+  const hydrateTick = useSyncExternalStore(
+    subscribeHelpsContentHydrate,
+    getHelpsContentHydrateTick,
+    getHelpsContentHydrateTick
+  )
   const cached = resourceKey && bookCode ? questionsCache.get(tqCacheKey(resourceKey, bookCode)) : undefined
   const [questions, setQuestions] = useState<ProcessedQuestions | null>(cached ?? null)
   const [loading, setLoading] = useState(!cached)
@@ -107,7 +116,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
 
     loadQuestions()
     return () => { cancelled = true }
-  }, [resourceKey, bookCode, loaderRegistry])
+  }, [resourceKey, bookCode, loaderRegistry, hydrateTick])
 
   // Filter questions for current chapter/verse range
   const relevantQuestions = useMemo(() => {

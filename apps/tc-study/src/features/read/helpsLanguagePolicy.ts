@@ -28,6 +28,10 @@ export function languageHasHelpsFlag(
 /**
  * Known-empty helps catalog for this Bible/OBS mode — not unknown, not in-flight.
  * Missing availability stays pending so the first hydrate can still run.
+ *
+ * Companion flags default to `false` when a language is indexed from primary
+ * subjects (Bible/OBS picker). A content-true language may still have TN/TWL
+ * under the same BCP-47 tag (`es-419`); do not skip hydrate in that case.
  */
 export function isHelpsCatalogKnownEmpty(options: {
   mode?: string
@@ -37,7 +41,10 @@ export function isHelpsCatalogKnownEmpty(options: {
   if (options.mode != null && options.mode !== 'helps') return false
   if (!options.availability) return false
   const flag = helpsFlagForNavigationScope(options.navigationScope)
-  return options.availability[flag] === false
+  if (options.availability[flag] !== false) return false
+  const primary = options.navigationScope === 'obs' ? 'obs' : 'bible'
+  if (options.availability[primary] === true) return false
+  return true
 }
 
 /** Helps-only catalog job when the language has no TN/TWL for this mode. */

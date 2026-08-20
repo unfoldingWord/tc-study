@@ -4,8 +4,13 @@
  */
 
 import type { ProcessedNotes, TranslationNote } from '@bt-synergy/resource-parsers'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useLoaderRegistry } from '../../../../contexts/CatalogContext'
+import {
+  getHelpsContentHydrateTick,
+  shouldReuseHelpsContentCache,
+  subscribeHelpsContentHydrate,
+} from '../../../../features/helps/helpsContentHydrate'
 
 const CACHE_MAX = 50
 const notesCache = new Map<string, { notes: TranslationNote[]; error: string | null }>()
@@ -20,13 +25,19 @@ export function useTranslationNotesContent(
   loaderTypeId: string = 'notes'
 ) {
   const loaderRegistry = useLoaderRegistry()
+  const hydrateTick = useSyncExternalStore(
+    subscribeHelpsContentHydrate,
+    getHelpsContentHydrateTick,
+    getHelpsContentHydrateTick
+  )
   const cached =
     resourceKey && bookCode
       ? notesCache.get(cacheKey(resourceKey, bookCode, loaderTypeId))
       : undefined
-  const [notes, setNotes] = useState<TranslationNote[]>(cached?.notes ?? [])
-  const [loading, setLoading] = useState(!cached)
-  const [error, setError] = useState<string | null>(cached?.error ?? null)
+  const reuseCached = shouldReuseHelpsContentCache(cached)
+  const [notes, setNotes] = useState<TranslationNote[]>(reuseCached ? cached?.notes ?? [] : [])
+  const [loading, setLoading] = useState(!reuseCached)
+  const [error, setError] = useState<string | null>(reuseCached ? cached?.error ?? null : null)
 
   useEffect(() => {
     if (!resourceKey || !bookCode) {
@@ -38,7 +49,7 @@ export function useTranslationNotesContent(
 
     const key = cacheKey(resourceKey, bookCode, loaderTypeId)
     const hit = notesCache.get(key)
-    if (hit !== undefined) {
+    if (hit && shouldReuseHelpsContentCache(hit)) {
       setNotes(hit.notes)
       setError(hit.error)
       setLoading(false)
@@ -81,9 +92,7 @@ export function useTranslationNotesContent(
         const errMsg = err instanceof Error && err.message.includes('404')
           ? `Notes not available for ${bookCode.toUpperCase()}`
           : (err instanceof Error ? err.message : 'Failed to load notes')
-        const data = { notes: [] as TranslationNote[], error: errMsg }
-        if (notesCache.size >= CACHE_MAX) notesCache.delete(notesCache.keys().next().value!)
-        notesCache.set(key, data)
+        notesCache.delete(key)
         setError(errMsg)
         setNotes([])
       } finally {
@@ -93,7 +102,7 @@ export function useTranslationNotesContent(
 
     loadNotes()
     return () => { cancelled = true }
-  }, [resourceKey, bookCode, loaderTypeId, loaderRegistry])
+  }, [resourceKey, bookCode, loaderTypeId, loaderRegistry, hydrateTick])
 
   return { notes, loading, error }
 }

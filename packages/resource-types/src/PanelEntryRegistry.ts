@@ -5,7 +5,10 @@
  * Viewer registration is optional chrome. Viewer ≠ paint / membership.
  */
 
-import { subjectsForCompositionAvailability } from './subjectsForCompositionAvailability'
+import {
+  entryMatchesAvailabilityScope,
+  subjectsForCompositionAvailability,
+} from './subjectsForCompositionAvailability'
 import {
   definePanelEntry,
   matchesEntryPersistId,
@@ -147,8 +150,43 @@ export class PanelEntryRegistry {
 
   subjectsForCompositionAvailability(scope: PanelEntryScope): string[] {
     const types = this.getAllResourceTypes?.() ?? []
-    return subjectsForCompositionAvailability(this.getCompositions(), types, scope)
+    return subjectsForCompositionAvailability(this.getAll(), types, scope)
   }
+
+  /** Helps-mode entries whose group/scope matches (compositions + pane-members). */
+  helpsModeEntries(scope: PanelEntryScope): PanelEntryDefinition[] {
+    return this.getAll().filter(
+      (entry) => entry.entryType === 'helps' && entryMatchesAvailabilityScope(entry, scope)
+    )
+  }
+
+  /** Resource type ids consumed by any helps-mode entry for this scope. */
+  consumedTypeIdsForHelpsMode(scope: PanelEntryScope): string[] {
+    return uniqueIds(this.helpsModeEntries(scope).flatMap((entry) => entry.consumes))
+  }
+
+  /**
+   * Resource type ids consumed by helps-mode pane-members only.
+   * Composition consumes (TN/TWL) stay off this list so hideConsumed holds.
+   */
+  paneMemberConsumedTypeIdsForHelpsMode(scope: PanelEntryScope): string[] {
+    return uniqueIds(
+      this.helpsModeEntries(scope)
+        .filter((entry) => entry.kind === 'pane-member')
+        .flatMap((entry) => entry.consumes)
+    )
+  }
+}
+
+function uniqueIds(ids: readonly string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const id of ids) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
 }
 
 export function entryTypeOf(def: PanelEntryDefinition | undefined): PanelEntryType | undefined {

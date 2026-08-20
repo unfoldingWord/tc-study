@@ -142,6 +142,7 @@ export function useReadCatalogLoad() {
       const listed = loadLanguagesCache(subjects)
       const availability = availabilityLookupFromListed(listed)(options.helpsLanguageCode)
       if (
+        !options.skipPanelClear &&
         shouldSkipHelpsCatalogLoad({
           loadTarget: options.loadTarget,
           navigationScope: options.navigationScope,

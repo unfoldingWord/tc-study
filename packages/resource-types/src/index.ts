@@ -45,6 +45,7 @@ export { definePanelGroup } from './panelGroup'
 export type { PanelGroupDefinition } from './panelGroup'
 export {
   entryMatchesAvailabilityScope,
+  isHelpsModeAvailabilityEntry,
   subjectsForCompositionAvailability,
 } from './subjectsForCompositionAvailability'
 export type { CompositionAvailabilityEntry } from './subjectsForCompositionAvailability'

@@ -6,7 +6,8 @@
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
 import type { HelpsScope } from '../helps/compositionInjection'
 import { resolveCompositionForPersistId } from '../helps/resolveCompositionEntry'
-import { addResource, getBaseResourceKey } from '../workspace/resourceMutations'
+import { getActivePanelEntryRegistry } from '../../resourceTypes/activeRegistry'
+import { addResource, getBaseResourceKey, projectCurrentWorkspacePanels } from '../workspace/resourceMutations'
 import { CATALOG_HYDRATE_BATCH } from '../workspace/resourceWriteOptions'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { languageCodesMatch } from '../../utils/languageCodeMatch'
@@ -25,8 +26,13 @@ export function applyReadModeMembership(
   const lang = languageCode?.trim()
   if (!lang) return
   if (mode === 'helps') {
-    addHelpsCompanionMembership(panelId, lang, helpsPaneTypeIds)
+    addHelpsCompanionMembership(
+      panelId,
+      lang,
+      resolveHelpsPaneMemberTypeIds(helpsScope, helpsPaneTypeIds)
+    )
     applyCombinedHelpsEnsure(lang, panelId, { forceHelpsPanel: true })
+    projectCurrentWorkspacePanels()
     useWorkspaceStore.getState().autoSaveWorkspace()
     return
   }
@@ -43,10 +49,20 @@ export function applyReadModeMembership(
     addResource(resource, { panelId, allowMultipleInstances: true, ...CATALOG_HYDRATE_BATCH })
   }
   applyCombinedHelpsEnsure(lang, panelId)
+  projectCurrentWorkspacePanels()
   useWorkspaceStore.getState().autoSaveWorkspace()
 }
 
-/** Companion / shared types already in the package — copy pane types onto this helps pane. */
+/** Helps-mode pane-member consumes (TQ, OBS-TQ). Empty arg falls back to the registry. */
+function resolveHelpsPaneMemberTypeIds(
+  helpsScope: HelpsScope,
+  helpsPaneTypeIds: readonly string[]
+): readonly string[] {
+  if (helpsPaneTypeIds.length > 0) return helpsPaneTypeIds
+  return getActivePanelEntryRegistry()?.paneMemberConsumedTypeIdsForHelpsMode(helpsScope) ?? []
+}
+
+/** Companion types already in the package — copy helps pane-member types onto this pane. */
 function addHelpsCompanionMembership(
   panelId: ReadPanelId,
   languageCode: string,

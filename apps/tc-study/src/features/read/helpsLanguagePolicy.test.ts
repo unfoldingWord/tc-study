@@ -92,7 +92,7 @@ describe('isHelpsCatalogKnownEmpty', () => {
       isHelpsCatalogKnownEmpty({
         mode: 'helps',
         navigationScope: 'obs',
-        availability: AVAIL.bho,
+        availability: AVAIL.es,
       })
     ).toBe(true)
     expect(
@@ -100,6 +100,43 @@ describe('isHelpsCatalogKnownEmpty', () => {
         mode: 'helps',
         navigationScope: 'obs',
         availability: AVAIL.hi,
+      })
+    ).toBe(false)
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'obs',
+        availability: AVAIL.bho,
+      })
+    ).toBe(false)
+  })
+
+  test('content-true language with unpopulated companion flags is not known empty', () => {
+    const es419 = {
+      bible: true,
+      obs: true,
+      bibleHelps: false,
+      obsHelps: false,
+    }
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'scripture',
+        availability: es419,
+      })
+    ).toBe(false)
+    expect(
+      shouldSkipHelpsCatalogLoad({
+        loadTarget: 'helps',
+        navigationScope: 'scripture',
+        availability: es419,
+      })
+    ).toBe(false)
+    expect(
+      isHelpsCatalogKnownEmpty({
+        mode: 'helps',
+        navigationScope: 'obs',
+        availability: es419,
       })
     ).toBe(false)
   })

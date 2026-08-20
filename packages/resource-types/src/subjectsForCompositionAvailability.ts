@@ -1,9 +1,10 @@
 /**
- * Door43 subjects that light picker availability flags for composition entries.
+ * Door43 subjects that light picker availability flags for helps-mode
+ * panel entries (compositions and pane-members).
  *
  * bibleHelps / obsHelps = union of catalogLanguageListSubjects for each
- * consumed type on composition entries whose groupId/scope matches. TQ does
- * not light flags unless a composition consumes questions.
+ * consumed type on entries whose entryType is `helps` and whose
+ * groupId/scope matches. CombinedHelps lights TN/TWL; questions lights TQ.
  */
 
 import type { PanelEntryDefinition, PanelEntryScope } from './panelEntry'
@@ -14,7 +15,7 @@ import {
 
 export type CompositionAvailabilityEntry = Pick<
   PanelEntryDefinition,
-  'consumes' | 'scope' | 'groupId'
+  'consumes' | 'scope' | 'groupId' | 'entryType'
 >
 
 export function entryMatchesAvailabilityScope(
@@ -23,6 +24,10 @@ export function entryMatchesAvailabilityScope(
 ): boolean {
   const id = entry.groupId ?? entry.scope
   return id === scope
+}
+
+export function isHelpsModeAvailabilityEntry(entry: CompositionAvailabilityEntry): boolean {
+  return entry.entryType == null || entry.entryType === 'helps'
 }
 
 export function subjectsForCompositionAvailability(
@@ -35,6 +40,7 @@ export function subjectsForCompositionAvailability(
   const out: string[] = []
 
   for (const entry of entries) {
+    if (!isHelpsModeAvailabilityEntry(entry)) continue
     if (!entryMatchesAvailabilityScope(entry, scope)) continue
     for (const typeId of entry.consumes) {
       const def = typeById.get(typeId)
