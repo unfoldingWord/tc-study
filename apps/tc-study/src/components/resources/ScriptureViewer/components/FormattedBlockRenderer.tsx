@@ -1,5 +1,9 @@
 import { Fragment, memo } from 'react'
-import type { UsjLayoutBlock, UsjWordToken } from '@bt-synergy/scripture-loader'
+import {
+  shouldInsertSpaceBeforeInline,
+  type UsjLayoutBlock,
+  type UsjWordToken,
+} from '@bt-synergy/scripture-loader'
 import type { OriginalLanguageToken } from '../types'
 import { resolveTokenVisualState } from '../utils/tokenHighlight'
 import { blockClassForMarker } from '../utils/paraStyles'
@@ -36,19 +40,8 @@ export const FormattedBlockRenderer = memo(function FormattedBlockRenderer({
     )
   }
 
-  const needsSpaceBeforeToken = (index: number): boolean => {
-    if (index <= 0) return false
-    const prev = block.inline[index - 1]
-    if (!prev) return false
-    if (prev.kind === 'text') {
-      // Text already includes spacing/punctuation
-      return !/\s$/.test(prev.text)
-    }
-    if (prev.kind === 'verse' || prev.kind === 'token' || prev.kind === 'heading') {
-      return true
-    }
-    return false
-  }
+  const needsSpaceBeforeToken = (index: number): boolean =>
+    shouldInsertSpaceBeforeInline(block.inline[index - 1], block.inline[index]!)
 
   return (
     <div

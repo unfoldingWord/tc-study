@@ -1,4 +1,5 @@
 import type {
+  UsjLayoutInline,
   UsjScriptureViewModel,
   UsjVerseView,
   UsjWordToken,
@@ -42,6 +43,8 @@ export type DisplayUsjVerse = UsjVerseView & { chapterNumber: number }
 export interface VerseDisplayProps {
   verse: DisplayUsjVerse
   chapterNumber: number
+  /** Tokens + USJ punctuation text for this verse (verse-block display). */
+  displayInline?: UsjLayoutInline[]
   highlightTarget: OriginalLanguageToken | null
   underlinedSemanticIds?: Set<string>
   onTokenClick: (token: UsjWordToken) => void

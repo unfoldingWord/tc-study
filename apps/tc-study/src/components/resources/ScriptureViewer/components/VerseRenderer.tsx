@@ -1,3 +1,4 @@
+import { shouldInsertSpaceBeforeInline, type UsjLayoutInline } from '@bt-synergy/scripture-loader'
 import { Fragment, memo } from 'react'
 import type { OriginalLanguageToken, VerseDisplayProps } from '../types'
 import { resolveTokenVisualState } from '../utils/tokenHighlight'
@@ -19,9 +20,46 @@ function highlightAffectsVerse(
   return verseNumber === oldNum || verseNumber === newNum
 }
 
+function renderDisplayInline(
+  displayInline: UsjLayoutInline[],
+  highlightTarget: VerseDisplayProps['highlightTarget'],
+  underlinedSemanticIds: VerseDisplayProps['underlinedSemanticIds'],
+  onTokenClick: VerseDisplayProps['onTokenClick'],
+  isOriginalLanguage: boolean
+) {
+  return displayInline.map((item, index) => {
+    if (item.kind === 'text' || item.kind === 'heading') {
+      return <Fragment key={`t-${index}`}>{item.text}</Fragment>
+    }
+    if (item.kind !== 'token') return null
+
+    const { isHighlighted, isSelected, isUnderlined } = resolveTokenVisualState(item.token, {
+      highlightTarget,
+      underlinedSemanticIds,
+      isOriginalLanguage,
+    })
+
+    return (
+      <Fragment key={`token-${item.token.semanticId}-${index}`}>
+        {shouldInsertSpaceBeforeInline(displayInline[index - 1], item) ? ' ' : null}
+        <TokenRenderer
+          token={item.token}
+          index={index}
+          isHighlighted={isHighlighted}
+          isSelected={isSelected}
+          isUnderlined={isUnderlined}
+          onTokenClick={onTokenClick}
+          isOriginalLanguage={isOriginalLanguage}
+        />
+      </Fragment>
+    )
+  })
+}
+
 export const VerseRenderer = memo(function VerseRenderer({
   verse,
   chapterNumber,
+  displayInline,
   highlightTarget,
   underlinedSemanticIds,
   onTokenClick,
@@ -29,6 +67,16 @@ export const VerseRenderer = memo(function VerseRenderer({
   isOriginalLanguage,
 }: VerseDisplayProps) {
   const renderVerseContent = () => {
+    if (displayInline && displayInline.length > 0) {
+      return renderDisplayInline(
+        displayInline,
+        highlightTarget,
+        underlinedSemanticIds,
+        onTokenClick,
+        isOriginalLanguage
+      )
+    }
+
     if (!verse.tokens || verse.tokens.length === 0) {
       if (verse.text) {
         return <span className="text-scripture-muted italic">{verse.text}</span>
@@ -82,7 +130,7 @@ export const VerseRenderer = memo(function VerseRenderer({
         }}
         aria-label={`Verse ${verse.number}`}
       >
-        {verse.number}
+        {verse.number}{' '}
       </span>
       <span className="text-lg text-scripture-fg">{renderVerseContent()}</span>
     </div>
@@ -90,6 +138,7 @@ export const VerseRenderer = memo(function VerseRenderer({
 }, (prev, next) => {
   if (
     prev.verse !== next.verse ||
+    prev.displayInline !== next.displayInline ||
     prev.underlinedSemanticIds !== next.underlinedSemanticIds ||
     prev.onTokenClick !== next.onTokenClick ||
     prev.onVerseClick !== next.onVerseClick ||

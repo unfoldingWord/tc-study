@@ -390,8 +390,183 @@ export interface FilterUsjLayoutOptions {
   /**
    * When set, keep a block if it has no verses (heading/break in that chapter)
    * or if any of its verse numbers fall inside the predicate.
+   * Kept paragraph/poetry blocks are then clipped so out-of-range verses
+   * in the same USJ paragraph do not render.
    */
   includeVerse?: (chapter: number, verse: number) => boolean
+}
+
+function verseFromToken(token: UsjWordToken): { chapter: number; verse: number } | null {
+  return parseVerseSid(token.verseRef)
+}
+
+function peekNextVerse(
+  items: UsjLayoutInline[],
+  start: number
+): { chapter: number; verse: number } | null {
+  for (let i = start; i < items.length; i++) {
+    const item = items[i]!
+    if (item.kind === 'verse') {
+      return { chapter: item.chapterNumber, verse: item.verseNumber }
+    }
+    if (item.kind === 'token') {
+      const parsed = verseFromToken(item.token)
+      if (parsed) return parsed
+    }
+  }
+  return null
+}
+
+/** True when a token needs a separating space after the previous inline item. */
+export function shouldInsertSpaceBeforeInline(
+  prev: UsjLayoutInline | undefined,
+  next: UsjLayoutInline
+): boolean {
+  if (!prev || next.kind !== 'token') return false
+  if (prev.kind === 'text') return !/\s$/.test(prev.text)
+  return prev.kind === 'verse' || prev.kind === 'token' || prev.kind === 'heading'
+}
+
+/** Concatenate layout inline to a display string (tokens + punctuation text). */
+export function plainTextFromLayoutInline(inline: UsjLayoutInline[]): string {
+  let text = ''
+  for (let i = 0; i < inline.length; i++) {
+    const item = inline[i]!
+    if (item.kind === 'verse') {
+      if (text && !/\s$/.test(text)) text += ' '
+      text += String(item.verseNumber)
+      continue
+    }
+    if (item.kind === 'text' || item.kind === 'heading') {
+      text += item.text
+      continue
+    }
+    if (shouldInsertSpaceBeforeInline(inline[i - 1], item)) text += ' '
+    text += item.token.content
+  }
+  return text
+}
+
+/**
+ * Keep only inline that belongs to verses accepted by `includeVerse`.
+ * Word tokens stay punctuation-free; USJ text nodes (commas, periods, quotes) stay as `text`.
+ */
+export function clipLayoutInlineToVerses(
+  inline: UsjLayoutInline[],
+  chapterNumber: number,
+  includeVerse: (chapter: number, verse: number) => boolean
+): { inline: UsjLayoutInline[]; verseNumbers: number[] } {
+  const out: UsjLayoutInline[] = []
+  const verseNumbers: number[] = []
+  let currentChapter = chapterNumber
+  let currentVerse: number | null = null
+
+  const rememberVerse = (chapter: number, verse: number) => {
+    currentChapter = chapter
+    currentVerse = verse
+  }
+
+  const inRange = (chapter: number, verse: number) => includeVerse(chapter, verse)
+
+  for (let i = 0; i < inline.length; i++) {
+    const item = inline[i]!
+
+    if (item.kind === 'verse') {
+      rememberVerse(item.chapterNumber, item.verseNumber)
+      if (!inRange(item.chapterNumber, item.verseNumber)) continue
+      out.push(item)
+      if (!verseNumbers.includes(item.verseNumber)) verseNumbers.push(item.verseNumber)
+      continue
+    }
+
+    if (item.kind === 'token') {
+      const parsed = verseFromToken(item.token)
+      if (parsed) rememberVerse(parsed.chapter, parsed.verse)
+      if (currentVerse === null || !inRange(currentChapter, currentVerse)) continue
+      out.push(item)
+      if (!verseNumbers.includes(currentVerse)) verseNumbers.push(currentVerse)
+      continue
+    }
+
+    if (item.kind === 'heading') {
+      out.push(item)
+      continue
+    }
+
+    if (item.kind === 'text') {
+      let chapter = currentChapter
+      let verse = currentVerse
+      if (verse === null) {
+        const peeked = peekNextVerse(inline, i + 1)
+        if (!peeked) continue
+        chapter = peeked.chapter
+        verse = peeked.verse
+      }
+      if (!inRange(chapter, verse)) continue
+      out.push(item)
+    }
+  }
+
+  return { inline: out, verseNumbers }
+}
+
+function clipLayoutBlockToVerses(
+  block: UsjLayoutBlock,
+  includeVerse: (chapter: number, verse: number) => boolean
+): UsjLayoutBlock | null {
+  if (block.verseNumbers.length === 0) return block
+  if (block.verseNumbers.every((v) => includeVerse(block.chapterNumber, v))) {
+    return block
+  }
+
+  const clipped = clipLayoutInlineToVerses(block.inline, block.chapterNumber, includeVerse)
+  if (clipped.inline.length === 0 && block.role !== 'break' && block.marker !== 'b') {
+    return null
+  }
+  return {
+    ...block,
+    inline: clipped.inline,
+    verseNumbers: clipped.verseNumbers,
+  }
+}
+
+/**
+ * Flatten tokens + punctuation text for one verse across layout blocks.
+ * Verse markers are omitted (verse-block chrome draws its own number).
+ */
+export function collectVerseDisplayInline(
+  blocks: UsjLayoutBlock[],
+  chapter: number,
+  verse: number
+): UsjLayoutInline[] {
+  const out: UsjLayoutInline[] = []
+
+  for (const block of blocks) {
+    const clipped = clipLayoutInlineToVerses(
+      block.inline,
+      block.chapterNumber || chapter,
+      (ch, v) => ch === chapter && v === verse
+    )
+    const chunk = clipped.inline.filter((item) => item.kind !== 'verse')
+    if (chunk.length === 0) continue
+    if (out.length > 0 && shouldInsertSpaceBeforeInline(out[out.length - 1], chunk[0]!)) {
+      out.push({ kind: 'text', text: ' ' })
+    }
+    out.push(...chunk)
+  }
+
+  while (out.length > 0 && out[0]!.kind === 'text' && out[0]!.text.trim() === '') {
+    out.shift()
+  }
+  while (
+    out.length > 0 &&
+    out[out.length - 1]!.kind === 'text' &&
+    out[out.length - 1]!.text.trim() === ''
+  ) {
+    out.pop()
+  }
+
+  return out
 }
 
 /** Filter layout blocks to the active BCV window. */
@@ -436,5 +611,11 @@ export function filterUsjLayoutBlocks(
     }
   }
 
-  return blocks.filter((_, idx) => keep.has(idx))
+  const filtered: UsjLayoutBlock[] = []
+  blocks.forEach((block, idx) => {
+    if (!keep.has(idx)) return
+    const clipped = clipLayoutBlockToVerses(block, includeVerse)
+    if (clipped) filtered.push(clipped)
+  })
+  return filtered
 }

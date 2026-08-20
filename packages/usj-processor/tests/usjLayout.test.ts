@@ -1,10 +1,15 @@
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   buildUsjLayoutBlocks,
+  collectVerseDisplayInline,
   filterUsjLayoutBlocks,
   indentLevelForMarker,
+  plainTextFromLayoutInline,
   roleForMarker,
 } from '../src/usjLayout'
+import { USJProcessor } from '../src/USJProcessor'
 import { buildUsjViewModel, type UsjScriptureViewModel } from '../src/usjViewModel'
 import type { CachedUsjDocument } from '../src/usjCacheTypes'
 
@@ -150,5 +155,114 @@ describe('usjLayout helpers', () => {
     })
     expect(verse10Only.some((b) => b.marker === 'p')).toBe(true)
     expect(verse10Only.some((b) => b.marker === 'q1')).toBe(false)
+  })
+})
+
+/** Ruth-like prose paragraph spanning two verses (single `\p`). */
+function multiVerseParagraphUsj(): CachedUsjDocument {
+  return {
+    type: 'USJ',
+    version: '3.1',
+    content: [
+      { type: 'book', marker: 'id', content: 'RUT' },
+      { type: 'chapter', marker: 'c', number: '1', sid: 'RUT 1' },
+      {
+        type: 'para',
+        marker: 'p',
+        content: [
+          { type: 'verse', marker: 'v', number: '6', sid: 'RUT 1:6' },
+          { type: 'char', marker: 'w', content: ['Then'] },
+          ' ',
+          { type: 'char', marker: 'w', content: ['she'] },
+          ' ',
+          { type: 'char', marker: 'w', content: ['arose'] },
+          '.',
+          { type: 'verse', marker: 'v', number: '7', sid: 'RUT 1:7' },
+          ' ',
+          { type: 'char', marker: 'w', content: ['So'] },
+          ' ',
+          { type: 'char', marker: 'w', content: ['she'] },
+          ' ',
+          { type: 'char', marker: 'w', content: ['went'] },
+          '.',
+        ],
+      },
+    ],
+  }
+}
+
+function rutViewModel(usj: CachedUsjDocument): UsjScriptureViewModel {
+  return buildUsjViewModel({
+    usj,
+    alignmentMap: {},
+    bookCode: 'RUT',
+    bookName: 'Ruth',
+  })
+}
+
+describe('paragraph clip + verse-block punctuation', () => {
+  test('paragraph mode + verse-range nav keeps only in-range verse text', () => {
+    const usj = multiVerseParagraphUsj()
+    const viewModel = rutViewModel(usj)
+    const blocks = buildUsjLayoutBlocks(usj, viewModel)
+
+    const verse6Only = filterUsjLayoutBlocks(blocks, {
+      chapters: [1],
+      includeVerse: (_ch, v) => v === 6,
+    })
+    expect(verse6Only).toHaveLength(1)
+    const para = verse6Only[0]!
+    expect(para.marker).toBe('p')
+    expect(para.verseNumbers).toEqual([6])
+
+    const text = plainTextFromLayoutInline(para.inline)
+    expect(text).toContain('Then')
+    expect(text).toContain('arose.')
+    expect(text).not.toContain('So')
+    expect(text).not.toContain('went')
+    expect(para.inline.some((i) => i.kind === 'verse' && i.verseNumber === 7)).toBe(
+      false
+    )
+    expect(
+      para.inline.some((i) => i.kind === 'token' && i.token.content === 'So')
+    ).toBe(false)
+  })
+
+  test('verse-block display inline keeps punctuation without attaching it to word surfaces', () => {
+    const usj = multiVerseParagraphUsj()
+    const viewModel = rutViewModel(usj)
+    const blocks = buildUsjLayoutBlocks(usj, viewModel)
+
+    const v6 = collectVerseDisplayInline(blocks, 1, 6)
+    const v6Text = plainTextFromLayoutInline(v6)
+    expect(v6Text).toBe('Then she arose.')
+    expect(v6.some((i) => i.kind === 'text' && i.text.includes('.'))).toBe(true)
+    expect(
+      v6.filter((i) => i.kind === 'token').every((i) => i.kind === 'token' && !i.token.content.includes('.'))
+    ).toBe(true)
+    expect(v6.some((i) => i.kind === 'verse')).toBe(false)
+
+    const v7 = collectVerseDisplayInline(blocks, 1, 7)
+    expect(plainTextFromLayoutInline(v7)).toBe('So she went.')
+  })
+
+  test('ULT Titus 1:1 verse-block inline keeps commas without folding them into word tokens', async () => {
+    const ult = readFileSync(join(import.meta.dir, '..', 'fixtures', 'en_ult_TIT.usfm'), 'utf8')
+    const { viewModel } = await new USJProcessor().processUSFM(ult, 'TIT', 'Titus')
+    const blocks = buildUsjLayoutBlocks(viewModel.usj, viewModel)
+    const v1 = collectVerseDisplayInline(blocks, 1, 1)
+    const text = plainTextFromLayoutInline(v1)
+
+    expect(text).toContain('Paul,')
+    expect(text).toContain('Christ,')
+    expect(text).toContain('godliness,')
+    expect(
+      v1
+        .filter((i) => i.kind === 'token')
+        .every((i) => i.kind === 'token' && !i.token.content.includes(','))
+    ).toBe(true)
+    expect(viewModel.chapters[0]!.verses[0]!.tokens.some((t) => t.content === 'Paul,')).toBe(
+      false
+    )
   })
 })

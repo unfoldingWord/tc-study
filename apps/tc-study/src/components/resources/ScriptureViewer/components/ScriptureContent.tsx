@@ -1,4 +1,10 @@
-import type { UsjScriptureViewModel, UsjWordToken } from '@bt-synergy/scripture-loader'
+import {
+  buildUsjLayoutBlocks,
+  collectVerseDisplayInline,
+  type UsjLayoutInline,
+  type UsjScriptureViewModel,
+  type UsjWordToken,
+} from '@bt-synergy/scripture-loader'
 import { BookX } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
 import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
@@ -71,6 +77,26 @@ export function ScriptureContent({
   useEffect(() => {
     lastScrolledTokenRef.current = null
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
+
+  const layoutBlocks = useMemo(
+    () =>
+      viewModel && layoutMode === 'verse-block'
+        ? buildUsjLayoutBlocks(viewModel.usj, viewModel)
+        : [],
+    [viewModel, layoutMode]
+  )
+
+  const verseDisplayInline = useMemo(() => {
+    const map = new Map<string, UsjLayoutInline[]>()
+    for (const verse of displayVerses) {
+      const chapterNum = verse.chapterNumber || currentRef.chapter
+      map.set(
+        `${chapterNum}:${verse.number}`,
+        collectVerseDisplayInline(layoutBlocks, chapterNum, verse.number)
+      )
+    }
+    return map
+  }, [layoutBlocks, displayVerses, currentRef.chapter])
 
   const { versesByChapter, chapters } = useMemo(() => {
     const grouped = displayVerses.reduce((acc, verse) => {
@@ -178,6 +204,7 @@ export function ScriptureContent({
                 key={`${chapterNum}:${verse.number}`}
                 verse={verse}
                 chapterNumber={chapterNum}
+                displayInline={verseDisplayInline.get(`${chapterNum}:${verse.number}`)}
                 highlightTarget={highlightTarget}
                 underlinedSemanticIds={underlinedSemanticIds}
                 onTokenClick={onTokenClick}
