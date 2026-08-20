@@ -1,6 +1,6 @@
 import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useReadPathLanguageCode } from '../read/useReadPathLanguageCode'
 import {
   useAvailableBooks,
   useCatalogManager,
@@ -31,12 +31,15 @@ import {
 } from './verseSelectionUtils'
 import { useBcvNavigatorCatalog } from './useBcvNavigatorCatalog'
 import { useBcvNavigatorScroll } from './useBcvNavigatorScroll'
+import { markReadNavigationInternal } from '../read/replaceReadUrlFromUi'
+import { navigatorCommittedScope } from './bcvNavigatorModeSwitch'
 
 export function useBcvNavigatorController(options: {
   onClose: () => void
   mode?: 'verse' | 'section'
+  onNavigationScopeCommitted?: (scope: 'scripture' | 'obs') => void
 }) {
-  const { onClose, mode = 'verse' } = options
+  const { onClose, mode = 'verse', onNavigationScopeCommitted } = options
   const navigation = useNavigation()
   const navigationScope = useNavigationScope()
   const availableBooks = useAvailableBooks()
@@ -46,7 +49,7 @@ export function useBcvNavigatorController(options: {
   const currentRef = navigation.currentReference
   const bookTitleSource = useBookTitleSource()
 
-  const { languageCode: urlLanguageCode } = useParams<{ languageCode?: string }>()
+  const urlLanguageCode = useReadPathLanguageCode()
   const currentLanguage = (urlLanguageCode ?? '').toLowerCase()
 
   const obsCatalogKey = useMemo(
@@ -64,13 +67,19 @@ export function useBcvNavigatorController(options: {
     navigationScope === 'obs' ? (navigationMode === 'chapter' ? 'chapter' : 'verse') : 'chapter'
   )
 
-  const commitPickerToNavigation = useCallback(() => {
+  const commitPickerToNavigation = useCallback((): 'scripture' | 'obs' | null => {
+    markReadNavigationInternal()
+    const switched = navigatorCommittedScope({
+      previousScope: navigation.navigationScope,
+      pickerScope,
+    })
     if (pickerScope === 'obs') {
       navigation.setNavigationScope('obs')
       navigation.setNavigationMode(pickerObsMode)
     } else {
       navigation.setNavigationScope('scripture')
     }
+    return switched
   }, [navigation, pickerScope, pickerObsMode])
 
   const scripturePickerMode = mode || navigationMode
@@ -185,25 +194,28 @@ export function useBcvNavigatorController(options: {
     if (pickedSectionIdx == null) return
     const section = sections[pickedSectionIdx]
     if (!section) return
-    commitPickerToNavigation()
+    const switched = commitPickerToNavigation()
     navigation.setNavigationMode('section')
     navigation.setBookSections(selectedBook, sections)
     navigation.navigateToReference(buildSectionApplyRef(selectedBook, section))
+    if (switched) onNavigationScopeCommitted?.(switched)
     onClose()
   }
 
   const handleApply = () => {
     if (!startVerse) return
-    commitPickerToNavigation()
+    const switched = commitPickerToNavigation()
     navigation.setNavigationMode('verse')
     navigation.navigateToReference(buildVerseApplyRef(selectedBook, startVerse, endVerse))
+    if (switched) onNavigationScopeCommitted?.(switched)
     onClose()
   }
 
   const handleObsStoryApply = () => {
     if (selectedObsStory == null) return
-    commitPickerToNavigation()
+    const switched = commitPickerToNavigation()
     navigation.navigateToReference({ book: 'obs', chapter: selectedObsStory, verse: 1 })
+    if (switched) onNavigationScopeCommitted?.(switched)
     onClose()
   }
 
@@ -215,8 +227,9 @@ export function useBcvNavigatorController(options: {
 
   const handleObsRangeApply = () => {
     if (!obsRangeStart) return
-    commitPickerToNavigation()
+    const switched = commitPickerToNavigation()
     navigation.navigateToReference(buildObsRangeApplyRef(obsRangeStart, obsRangeEnd))
+    if (switched) onNavigationScopeCommitted?.(switched)
     onClose()
   }
 

@@ -63,4 +63,7 @@ export { JSONParser } from './parsers/json'
 export {
   QuoteMatcher,
   generateSemanticId,
+  isHebrewText,
+  normalizeGreekText,
+  normalizeHebrewText,
 } from './utils'

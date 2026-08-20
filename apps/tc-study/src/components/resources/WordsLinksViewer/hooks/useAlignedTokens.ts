@@ -8,21 +8,23 @@
  * STEP 1: TWL origWords → Original Language tokens (via QuoteMatcher in useQuoteTokens)
  * STEP 2: Extract semantic IDs from original tokens (e.g., "TIT 1:1:Παῦλος:1")
  * STEP 3: Find target tokens where alignedOriginalWordIds contains our semantic IDs
- *
- * Semantic ID Matching:
- * - Original token has: id = "TIT 1:1:Παῦλος:1"
- * - Target token has: alignedOriginalWordIds = ["TIT 1:1:Παῦλος:1"]
- * - When they match → target token is part of the aligned quote
- *
- * This same algorithm works for:
- * - Translation Words Links (TWL) - uses origWords field
- * - Translation Notes (TN) - uses quote field
- * - Any TSV resource with quote/origWords + occurrence + reference
+ *         (or the token's own semanticId when UGNT/UHB is the text pane).
+ * STEP 4: If still empty and quote language matches text language (or text is OL),
+ *         match quote text against text-pane word tokens.
  */
 
 import { useMemo } from 'react'
 import { useCurrentReference } from '../../../../contexts'
-import { findAlignedTokens } from '../../../../features/helps/findAlignedTokens'
+import {
+  helpsLanguageFromResourceKey,
+  isOriginalLanguageCode,
+  resolveAlignedQuoteTokens,
+} from '../../../../features/helps/resolveAlignedQuoteTokens'
+import {
+  isHelpsQuoteAlignmentPending,
+  resolveHelpsQuoteStatus,
+  type HelpsQuoteStatus,
+} from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { generateSemanticIdsForQuoteTokens } from '../../../../features/helps/quoteTokens'
 import { useScriptureTokens } from './useScriptureTokens'
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
@@ -40,87 +42,151 @@ interface UseAlignedTokensOptions<TLink extends LinkQuotesInput> {
   resourceKey: string // TWL resource key (e.g., "unfoldingWord/en/twl")
   resourceId: string // TWL viewer resource ID
   links: TLink[]
+  /**
+   * OL quote-build settled (`useQuoteTokens.quoteBuildReady`).
+   * Default true only for callers that omit it; CombinedHelps TN/TWL and
+   * standalone TN/TWL pipelines pass the live flag so in-flight quotes stay pending.
+   */
+  quoteBuildReady?: boolean
 }
 
 export function useAlignedTokens<TLink extends LinkQuotesInput>({
-  resourceKey: _resourceKey,
+  resourceKey,
   resourceId,
   links,
+  quoteBuildReady = true,
 }: UseAlignedTokensOptions<TLink>) {
   const currentRef = useCurrentReference()
 
-  // Listen for scripture token broadcasts (simple state listener!)
-  const { tokens: targetTokens, reference: tokenReference, hasTokens } = useScriptureTokens({ resourceId })
+  const { tokens: targetTokens, reference: tokenReference, hasTokens, resourceMetadata } =
+    useScriptureTokens({ resourceId })
 
-  // Build aligned tokens for each link
   const linksWithAlignedTokens = useMemo((): Array<
     TLink & {
-      alignedTokens: ReturnType<typeof findAlignedTokens> | undefined
+      alignedTokens: ReturnType<typeof resolveAlignedQuoteTokens>['alignedTokens'] | undefined
       semanticIds?: string[]
+      quoteStatus: HelpsQuoteStatus
     }
   > => {
-    if (!hasTokens || !links || links.length === 0) {
-      return links.map((link) => ({ ...link, alignedTokens: undefined })) as Array<
-        TLink & { alignedTokens: undefined }
-      >
+    const settledStatus = (link: TLink, hasAligned: boolean): HelpsQuoteStatus =>
+      resolveHelpsQuoteStatus({
+        hasAlignedTokens: hasAligned,
+        alignmentPending: false,
+        olQuote: link.origWords,
+      })
+
+    if (!links || links.length === 0) {
+      return []
+    }
+
+    if (!hasTokens) {
+      return links.map((link) => ({
+        ...link,
+        alignedTokens: undefined,
+        quoteStatus: resolveHelpsQuoteStatus({
+          hasAlignedTokens: false,
+          alignmentPending: true,
+          olQuote: link.origWords,
+        }),
+      }))
     }
 
     const bookCode = currentRef.book?.toLowerCase() || ''
     const currentChapter = currentRef.chapter || 1
     const refBookLower = tokenReference?.book?.toLowerCase() ?? ''
+    const quoteLanguage = helpsLanguageFromResourceKey(resourceKey)
+    // Prefer an OL language/key when either field says UHB/UGNT. A defaulted
+    // `language` of `es`/`en` must not hide `unfoldingWord/hbo/uhb`.
+    const textLanguage =
+      [resourceMetadata?.language, resourceMetadata?.id].find((v) => isOriginalLanguageCode(v)) ||
+      resourceMetadata?.language
 
     return links.map((link) => {
-      if (!link.quoteTokens || link.quoteTokens.length === 0) {
-        return { ...link, alignedTokens: undefined }
-      }
-
       const refParts = link.reference.split(':')
       const linkChapter = parseInt(refParts[0] || '1', 10)
       const linkVerse = parseInt(refParts[1] || '1', 10)
 
       if (linkChapter !== currentChapter) {
-        return { ...link, alignedTokens: undefined }
+        return { ...link, alignedTokens: undefined, quoteStatus: settledStatus(link, false) }
       }
 
-      if (
-        !tokenReference ||
-        refBookLower !== bookCode ||
-        tokenReference.chapter !== linkChapter
-      ) {
-        return { ...link, alignedTokens: undefined }
+      const tokensMatchPassage = !!(
+        tokenReference &&
+        refBookLower === bookCode &&
+        tokenReference.chapter === linkChapter
+      )
+      const alignmentPending = isHelpsQuoteAlignmentPending({
+        hasTargetTokens: hasTokens,
+        tokensMatchPassage,
+        quoteBuildReady,
+      })
+
+      if (!tokensMatchPassage) {
+        return {
+          ...link,
+          alignedTokens: undefined,
+          quoteStatus: resolveHelpsQuoteStatus({
+            hasAlignedTokens: false,
+            alignmentPending,
+            olQuote: link.origWords,
+          }),
+        }
       }
 
       const broadcastStartVerse = tokenReference.verse || 1
       const broadcastEndVerse = tokenReference.endVerse || broadcastStartVerse
 
       if (linkVerse < broadcastStartVerse || linkVerse > broadcastEndVerse) {
-        return { ...link, alignedTokens: undefined }
+        return { ...link, alignedTokens: undefined, quoteStatus: settledStatus(link, false) }
       }
 
       const linkOccurrence = parseInt(String(link.occurrence ?? '1'), 10)
-      const originalSemanticIds = generateSemanticIdsForQuoteTokens(
-        link.quoteTokens,
-        bookCode,
-        linkChapter,
-        linkVerse,
-        linkOccurrence
-      )
+      const originalSemanticIds = link.quoteTokens?.length
+        ? generateSemanticIdsForQuoteTokens(
+            link.quoteTokens,
+            bookCode,
+            linkChapter,
+            linkVerse,
+            linkOccurrence
+          )
+        : []
 
-      const alignedTokens = findAlignedTokens(
+      const { alignedTokens, semanticIds } = resolveAlignedQuoteTokens({
         targetTokens,
         originalSemanticIds,
+        quoteText: link.origWords,
+        occurrence: linkOccurrence,
         bookCode,
-        linkChapter,
-        linkVerse
-      )
+        chapter: linkChapter,
+        verse: linkVerse,
+        quoteLanguage,
+        textLanguage,
+      })
 
+      const hasAligned = alignedTokens.length > 0
       return {
         ...link,
-        alignedTokens: alignedTokens.length > 0 ? alignedTokens : undefined,
-        semanticIds: originalSemanticIds,
+        alignedTokens: hasAligned ? alignedTokens : undefined,
+        semanticIds: semanticIds.length > 0 ? semanticIds : undefined,
+        quoteStatus: resolveHelpsQuoteStatus({
+          hasAlignedTokens: hasAligned,
+          alignmentPending: hasAligned ? false : alignmentPending,
+          olQuote: link.origWords,
+        }),
       }
     })
-  }, [links, targetTokens, tokenReference, hasTokens, currentRef.book, currentRef.chapter])
+  }, [
+    links,
+    targetTokens,
+    tokenReference,
+    hasTokens,
+    currentRef.book,
+    currentRef.chapter,
+    resourceKey,
+    resourceMetadata?.language,
+    resourceMetadata?.id,
+    quoteBuildReady,
+  ])
 
   return {
     linksWithAlignedTokens,

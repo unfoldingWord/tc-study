@@ -6,7 +6,8 @@
 
 const KNOWN_RTL_CODES = new Set([
   'ar', // Arabic
-  'he', // Hebrew
+  'he', // Modern Hebrew
+  'hbo', // Ancient Hebrew (UHB)
   'fa', // Persian
   'ur', // Urdu
   'yi', // Yiddish

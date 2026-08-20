@@ -9,7 +9,10 @@
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import { RESOURCE_STATE_KEYS, useResourceState } from '@bt-synergy/resource-panels'
+import { scriptureContentRevision } from '../../../../features/helps/scriptureReadyUnderlineRebind'
 import type { ScriptureTokensBroadcastSignal } from '../../../../signals/studioSignals'
+
+const EMPTY_SCRIPTURE_TOKENS: OptimizedToken[] = []
 
 interface UseScriptureTokensOptions {
   resourceId: string
@@ -47,7 +50,7 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
 
   if (!scriptureTokensBroadcast || isClearMessage) {
     return {
-      tokens: [],
+      tokens: EMPTY_SCRIPTURE_TOKENS,
       reference: null,
       resourceMetadata: null,
       hasTokens: false,
@@ -62,4 +65,15 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
     hasTokens: scriptureTokensBroadcast.tokens.length > 0,
     sourceResourceId: scriptureTokensBroadcast.sourceResourceId,
   }
+}
+
+/** Owner-scripture USJ fingerprint for quote/underline rebind after helps-first load. */
+export function useScriptureContentRevision(resourceId: string): string {
+  const { hasTokens, tokens, reference, sourceResourceId } = useScriptureTokens({ resourceId })
+  return scriptureContentRevision({
+    sourceResourceId,
+    book: reference?.book,
+    chapter: reference?.chapter,
+    tokenCount: hasTokens ? tokens.length : 0,
+  })
 }

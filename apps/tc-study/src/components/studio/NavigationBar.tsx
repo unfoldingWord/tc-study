@@ -12,8 +12,10 @@ import {
   useNavigationMode,
 } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
+import { findObsCatalogKey } from '../../features/nav/bcvNavHelpers'
 import { useNavigationBarMovement } from '../../features/nav/useNavigationBarMovement'
 import { useNavigationBarRtl } from '../../features/nav/useNavigationBarRtl'
+import { useReadPathLanguageCode } from '../../features/read/useReadPathLanguageCode'
 import { useNavigationBarUiState } from '../../features/nav/useNavigationBarUiState'
 import { NavigationBarCompact } from './NavigationBarCompact'
 import { NavigationBarDisabled } from './NavigationBarDisabled'
@@ -28,6 +30,8 @@ export interface NavigationBarProps {
   downloadIndicator?: React.ReactNode
   onDownloadCollection?: () => void
   onLoadCollection?: () => void
+  /** Read: BCV Bible↔Stories apply reloads catalog without resetting helps language. */
+  onNavigationScopeCommitted?: (scope: 'scripture' | 'obs') => void
 }
 
 export function NavigationBar({
@@ -40,6 +44,7 @@ export function NavigationBar({
   downloadIndicator,
   onDownloadCollection,
   onLoadCollection,
+  onNavigationScopeCommitted,
 }: NavigationBarProps = {}) {
   const navigation = useNavigation()
   const currentRef = useCurrentReference()
@@ -49,6 +54,7 @@ export function NavigationBar({
   const storeHasNavigationSource = useHasNavigationSource()
   const anchorResourceId = useAppStore((s) => s.anchorResourceId)
   const loadedResources = useAppStore((s) => s.loadedResources)
+  const urlLanguageCode = useReadPathLanguageCode()
 
   const isRtl = useNavigationBarRtl()
   const ui = useNavigationBarUiState()
@@ -65,11 +71,7 @@ export function NavigationBar({
     }
   }, [autoOpenLanguagePicker])
 
-  const hasObsResource = Object.values(loadedResources).some(
-    (r) =>
-      r.resourceId?.toLowerCase() === 'obs' ||
-      (r.subject?.toLowerCase().includes('open bible stories') ?? false)
-  )
+  const hasObsResource = !!findObsCatalogKey(loadedResources, urlLanguageCode)
   const hasNavigationSource =
     storeHasNavigationSource || (!!anchorResourceId && hasObsResource && availableBooks.length === 0)
 
@@ -102,6 +104,7 @@ export function NavigationBar({
         languagePickerRequired={languagePickerRequired}
         onDownloadCollection={onDownloadCollection}
         onLoadCollection={onLoadCollection}
+        onNavigationScopeCommitted={onNavigationScopeCommitted}
         isNavigatorOpen={ui.isNavigatorOpen}
         setIsNavigatorOpen={ui.setIsNavigatorOpen}
         isHistoryOpen={ui.isHistoryOpen}

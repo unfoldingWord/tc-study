@@ -29,6 +29,8 @@ export const scriptureResourceType: ResourceTypeDefinition = defineResourceType(
     'Greek New Testament',
     'Hebrew Old Testament',
   ],
+  // UGNT/UHB are injected globally — not gateway language-list rows.
+  languageListSubjects: ['Bible', 'Aligned Bible'],
   aliases: ['bible', 'usfm', 'scripture', 'aligned-bible'],
   
   // ===== DATA LAYER =====

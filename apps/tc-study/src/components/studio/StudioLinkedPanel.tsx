@@ -95,7 +95,6 @@ function StudioPanelBody({
     },
     minSwipeDistance: 50,
   })
-
   return (
     <div className="h-full flex flex-col">
       <PanelHeader
@@ -132,7 +131,9 @@ function StudioPanelBody({
         onMouseUp={swipeHandlers.onMouseUp}
         onMouseLeave={swipeHandlers.onMouseLeave}
       >
-        {current.resource?.component || (
+        {current.resource?.component ? (
+          current.resource.component
+        ) : (
           <EmptyPanelState
             panelId={panelId}
             panelName={panelName}

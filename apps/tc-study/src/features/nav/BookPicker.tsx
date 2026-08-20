@@ -30,7 +30,7 @@ export function BookPicker({
 
   return (
     <div className="flex-1 overflow-auto p-4">
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
         {books.map((book) => {
           const isSelected = selectedBook === book.code
           const resolvedName = getBookTitle(bookTitleSource, book.code)
@@ -44,7 +44,7 @@ export function BookPicker({
               ref={isSelected ? selectedBookRef : null}
               onClick={() => onSelectBook(book.code)}
               className={`
-                p-3 rounded-lg border transition-all text-left hover:shadow-sm
+                min-w-0 w-full p-3 rounded-lg border transition-all text-left hover:shadow-sm
                 ${
                   isSelected
                     ? 'border-accent bg-accent-soft shadow-sm'
@@ -52,7 +52,7 @@ export function BookPicker({
                 }
               `}
             >
-              <div className="font-semibold text-fg">{fullBookName}</div>
+              <div className="font-semibold text-fg min-w-0 break-words">{fullBookName}</div>
               <div className="text-[10px] text-fg-muted uppercase tracking-wide mt-1">
                 {book.code}
               </div>

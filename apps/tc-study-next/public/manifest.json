@@ -1,0 +1,9 @@
+{
+  "name": "TC Study Next",
+  "short_name": "TC Study Next",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": []
+}

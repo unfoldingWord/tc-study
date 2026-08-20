@@ -3,13 +3,22 @@
  */
 
 import { LinkedPanel } from '@bt-synergy/resource-panels'
-import type { ReactNode } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import type { ResourceInfo } from '../../contexts/types'
+import { HelpsLanguageActionsProvider } from '../../features/helps/HelpsLanguageActionsContext'
+import { resolveHelpsPaneNoSourcesView } from '../../features/helps/helpsEmptyCopy'
+import { listedLanguageByCode } from '../../features/read/languageListDisplayName'
+import type { ReadLayoutMode } from '../../features/read/readPanelPersistence'
+import type { ReadPanelId, ReadPanelMode } from '../../features/read/readPanelModel'
+import type { TextModeMismatchView } from '../../features/read/textModeMismatch'
 import { useSwipeGesture } from '../../hooks'
+import { useWizardStore } from '../../lib/stores/wizardStore'
+import { CombinedHelpsEmptyState } from '../resources/CombinedHelpsViewer/CombinedHelpsEmptyState'
 import { DroppablePanel } from '../studio/DroppablePanel'
-import { EmptyPanelState } from '../studio/EmptyPanelState'
-import { PanelHeader } from '../studio/PanelHeader'
+import { EmptyPanelState, emptyPanelSelectLanguageCta } from '../studio/EmptyPanelState'
 import { LoadingSpinner } from '../../shared/LoadingSpinner'
+import { ReadCrossPanelReopen } from './ReadCrossPanelReopen'
+import { ReadPanelHeader } from './ReadPanelHeader'
 
 type StudioPanelApi = {
   resourceKeys: string[]
@@ -23,33 +32,60 @@ type StudioPanelApi = {
 }
 
 interface ReadLinkedPanelProps {
-  panelId: 'panel-1' | 'panel-2'
-  otherPanelId: 'panel-1' | 'panel-2'
+  panelId: ReadPanelId
+  otherPanelId: ReadPanelId
   colorScheme: 'blue' | 'purple'
-  flexBasisPercent: number
+  mountStyle: CSSProperties
+  dir: 'ltr' | 'rtl'
+  mode: ReadPanelMode
+  languageCode: string | null
+  otherLanguageCode?: string | null
+  onModeSwitch: (mode: ReadPanelMode) => void
+  onLanguageSelected: (languageCode: string) => void
   filteredKeys: string[]
   filteredResources: ResourceInfo[]
   panelResources: StudioPanelApi
   isLoadingResources: boolean
+  /** Raw catalog fetch for this panel (not gated on membership). */
+  catalogLoading?: boolean
+  /** False until the first catalog hydrate for this panel language finishes. */
+  catalogSettled?: boolean
   showDropPlaceholder: boolean
   placeholderLabel: string
   placeholderIndex: number | undefined
+  layout: ReadLayoutMode
+  collapsedPanelId: ReadPanelId | null
+  onReopenCollapsed: (panelId: ReadPanelId) => void
+  textModeMismatch?: TextModeMismatchView | null
+  onSwitchTextMode?: (scope: 'scripture' | 'obs') => void
 }
 
 function ReadPanelBody({
   panelId,
-  otherPanelId,
+  otherPanelId: _otherPanelId,
   colorScheme,
   filteredKeys,
   filteredResources,
   panelResources,
   isLoadingResources,
+  catalogLoading = false,
+  catalogSettled = true,
   showDropPlaceholder,
   placeholderLabel,
   placeholderIndex,
+  mode,
+  languageCode,
+  otherLanguageCode,
+  onModeSwitch,
+  onLanguageSelected,
+  layout,
+  collapsedPanelId,
+  onReopenCollapsed,
+  textModeMismatch,
+  onSwitchTextMode,
   current,
   navigate,
-}: Omit<ReadLinkedPanelProps, 'flexBasisPercent'> & {
+}: Omit<ReadLinkedPanelProps, 'mountStyle' | 'dir'> & {
   current: { index: number; resource?: { component?: ReactNode } | null }
   navigate: {
     next: () => void
@@ -57,8 +93,37 @@ function ReadPanelBody({
     toIndex: (index: number) => void
   }
 }) {
-  // Single index owner: LinkedPanel filtered list drives swipe; workspace activeIndex
-  // follows by key (do not also advance unfiltered studio indices — that desyncs).
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const isHelps = mode === 'helps'
+  const helpsLanguageActions = useMemo(
+    () =>
+      isHelps
+        ? {
+            openHelpsPicker: () => setPickerOpen(true),
+            selectHelpsLanguage: onLanguageSelected,
+            selectedLanguageCode: languageCode,
+            isCatalogLoading: catalogLoading,
+          }
+        : null,
+    [isHelps, languageCode, onLanguageSelected, catalogLoading]
+  )
+  const selectLanguageCta = emptyPanelSelectLanguageCta(languageCode)
+  const availableLanguages = useWizardStore((s) => s.availableLanguages)
+  const listedHelpsLang = listedLanguageByCode(availableLanguages, languageCode ?? '')
+  const helpsNoSourcesView = resolveHelpsPaneNoSourcesView({
+    mode,
+    languageCode,
+    isLoading: isLoadingResources || catalogLoading,
+    hasResource: Boolean(current.resource?.component) || filteredKeys.length > 0,
+    languageName: listedHelpsLang ?? '',
+    catalogSettled,
+  })
+  const scriptureMismatch = mode === 'scripture' ? textModeMismatch : null
+  const mismatchScope = scriptureMismatch?.switchScope
+  const mismatchAction =
+    scriptureMismatch?.actionLabel && mismatchScope && onSwitchTextMode
+      ? () => onSwitchTextMode(mismatchScope)
+      : undefined
   const swipeHandlers = useSwipeGesture({
     onSwipeLeft: () => {
       if (current.index < filteredKeys.length - 1) {
@@ -80,14 +145,24 @@ function ReadPanelBody({
     },
     minSwipeDistance: 50,
   })
+  const sourceResourceId = filteredKeys[current.index]
 
   return (
+    <HelpsLanguageActionsProvider value={helpsLanguageActions}>
     <div className="h-full flex flex-col">
-      <PanelHeader
+      {sourceResourceId ? (
+        <ReadCrossPanelReopen
+          sourceResourceId={sourceResourceId}
+          sourcePanelId={panelId}
+          layout={layout}
+          collapsedPanelId={collapsedPanelId}
+          onReopen={onReopenCollapsed}
+        />
+      ) : null}
+      <ReadPanelHeader
         panelId={panelId}
         resources={filteredResources}
         currentIndex={current.index}
-        currentResource={filteredResources[current.index] ?? null}
         onIndexChange={(newIndex) => {
           navigate.toIndex(newIndex)
           const filteredKey = filteredKeys[newIndex]
@@ -96,16 +171,15 @@ function ReadPanelBody({
             : -1
           if (unfilteredIdx >= 0) panelResources.goToIndex(unfilteredIdx)
         }}
-        onRemove={() => panelResources.removeResource()}
-        onMoveToOtherPanel={
-          filteredResources[current.index] && filteredKeys.length > 0
-            ? () => {
-                const key = filteredKeys[current.index]
-                if (key) panelResources.moveResource(key, otherPanelId)
-              }
-            : undefined
-        }
         colorScheme={colorScheme}
+        mode={mode}
+        onModeSwitch={onModeSwitch}
+        onLanguageSelected={onLanguageSelected}
+        languageListMode={isHelps ? 'helps' : 'text'}
+        currentLanguageCode={languageCode}
+        otherLanguageCode={otherLanguageCode}
+        languagePickerOpen={pickerOpen}
+        onLanguagePickerOpenChange={setPickerOpen}
         showDropPlaceholder={showDropPlaceholder}
         placeholderLabel={placeholderLabel}
         placeholderIndex={placeholderIndex}
@@ -113,7 +187,7 @@ function ReadPanelBody({
 
       <div
         ref={swipeHandlers.ref}
-        className="flex-1 min-h-0 overflow-auto"
+        className="flex-1 min-h-0 overflow-auto bg-surface"
         onTouchStart={swipeHandlers.onTouchStart}
         onTouchMove={swipeHandlers.onTouchMove}
         onTouchEnd={swipeHandlers.onTouchEnd}
@@ -122,46 +196,63 @@ function ReadPanelBody({
         onMouseUp={swipeHandlers.onMouseUp}
         onMouseLeave={swipeHandlers.onMouseLeave}
       >
-        {current.resource?.component || (
+        {scriptureMismatch ? (
+          <EmptyPanelState
+            panelId={panelId}
+            message={scriptureMismatch.message}
+            actionLabel={scriptureMismatch.actionLabel ?? undefined}
+            actionShortLabel={scriptureMismatch.actionShortLabel ?? undefined}
+            emptyKind={scriptureMismatch.kind}
+            onAction={mismatchAction}
+          />
+        ) : current.resource?.component ? (
+          current.resource.component
+        ) : (
           isLoadingResources ? (
             <LoadingSpinner
               centered
               label="Loading resources"
               containerClassName="h-full"
             />
+          ) : helpsNoSourcesView ? (
+            <CombinedHelpsEmptyState view={helpsNoSourcesView} />
           ) : (
             <EmptyPanelState
               panelId={panelId}
-              message="Select a language to load resources"
+              message={selectLanguageCta}
+              onMessageClick={isHelps && selectLanguageCta ? () => setPickerOpen(true) : undefined}
             />
           )
         )}
       </div>
     </div>
+    </HelpsLanguageActionsProvider>
   )
 }
 
 export function ReadLinkedPanel(props: ReadLinkedPanelProps) {
-  const { panelId, colorScheme, flexBasisPercent, ...bodyProps } = props
+  const { panelId, colorScheme, mountStyle, dir, ...bodyProps } = props
 
   return (
     <DroppablePanel
       id={`${panelId}-droppable`}
-      className="min-h-0 overflow-hidden"
-      style={{ flexBasis: `${flexBasisPercent}%` }}
+      className="min-h-0 overflow-hidden read-panel-shell"
+      style={mountStyle}
       colorScheme={colorScheme}
     >
-      <LinkedPanel id={panelId}>
-        {({ current, navigate }) => (
-          <ReadPanelBody
-            {...bodyProps}
-            panelId={panelId}
-            colorScheme={colorScheme}
-            current={current}
-            navigate={navigate}
-          />
-        )}
-      </LinkedPanel>
+      <div className="h-full min-h-0 overflow-hidden" dir={dir}>
+        <LinkedPanel id={panelId}>
+          {({ current, navigate }) => (
+            <ReadPanelBody
+              {...bodyProps}
+              panelId={panelId}
+              colorScheme={colorScheme}
+              current={current}
+              navigate={navigate}
+            />
+          )}
+        </LinkedPanel>
+      </div>
     </DroppablePanel>
   )
 }

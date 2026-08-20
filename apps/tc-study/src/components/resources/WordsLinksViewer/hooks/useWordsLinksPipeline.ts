@@ -4,6 +4,8 @@
 
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useMemo } from 'react'
+import type { AlignedToken } from '../../../../features/helps/findAlignedTokens'
+import type { HelpsQuoteStatus } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import {
   filterDisplayLinks,
   filterLinksByReferenceRange,
@@ -21,8 +23,9 @@ import { useQuoteTokens } from './useQuoteTokens'
 
 export type LinkWithAlignments = TranslationWordsLink & {
   quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
-  alignedTokens?: Array<{ position: number }>
+  alignedTokens?: AlignedToken[]
   semanticIds?: string[]
+  quoteStatus?: HelpsQuoteStatus
 }
 
 export interface UseWordsLinksPipelineParams {
@@ -54,7 +57,7 @@ export function useWordsLinksPipeline({
   verseFilter,
   obsQuoteFilter,
 }: UseWordsLinksPipelineParams) {
-  const { linksWithQuotes } = useQuoteTokens({
+  const { linksWithQuotes, quoteBuildReady } = useQuoteTokens({
     resourceKey,
     resourceId,
     links,
@@ -64,6 +67,7 @@ export function useWordsLinksPipeline({
     resourceKey,
     resourceId,
     links: linksWithQuotes,
+    quoteBuildReady,
   })
 
   const processedLinks = useMemo(() => {
@@ -102,7 +106,7 @@ export function useWordsLinksPipeline({
     const bookCode = currentRef.book?.toLowerCase() || ''
     const groups: { sourceId: string; semanticIds: string[] }[] = []
     for (const link of filteredByReference) {
-      if (!link.quoteTokens?.length) continue
+      if (!link.quoteTokens?.length && !link.semanticIds?.length) continue
       const cached = link.semanticIds
       const semanticIds =
         cached ??

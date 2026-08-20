@@ -1,10 +1,11 @@
 import type { LinkedPanelsConfig } from '@bt-synergy/resource-panels'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useViewerRegistry } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
 import { useEntryModalStore } from '../entries'
 import { resolveViewerForResource } from '../read/resolveViewerForResource'
+import { linkedPanelsConfigMembershipKey } from '../read/useReadLinkedPanelsConfig'
 import { createStudioPluginRegistry } from './createStudioPluginRegistry'
 
 /**
@@ -106,5 +107,13 @@ export function useStudioPanelConfig(options: {
     generateResourceComponent,
   ])
 
-  return { panelConfig, plugins, handleOpenEntry, loadedResources }
+  const prevRef = useRef<{ key: string; config: LinkedPanelsConfig } | null>(null)
+  const membershipKey = linkedPanelsConfigMembershipKey(panelConfig)
+  const stablePanelConfig =
+    prevRef.current?.key === membershipKey ? prevRef.current.config : panelConfig
+  if (prevRef.current?.key !== membershipKey) {
+    prevRef.current = { key: membershipKey, config: panelConfig }
+  }
+
+  return { panelConfig: stablePanelConfig, plugins, handleOpenEntry, loadedResources }
 }

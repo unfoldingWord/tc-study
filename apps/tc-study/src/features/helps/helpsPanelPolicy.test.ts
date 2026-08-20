@@ -1,9 +1,13 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import {
   COMBINED_HELPS_RESOURCE_ID,
   OBS_COMBINED_HELPS_RESOURCE_ID,
 } from './combinedHelpsIds'
 import { applyDualScopeHelpsPolicy, orderHelpsPanelKeys } from './helpsPanelPolicy'
+import { bindCombinedHelpsCompositionsForTest } from './testCompositionRegistry'
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 describe('helpsPanelPolicy', () => {
   test('scripture-only: no combined, no hidden', () => {
@@ -82,6 +86,20 @@ describe('helpsPanelPolicy', () => {
       expect.arrayContaining(['uw/en/tn', 'uw/en/twl', 'uw/en/obs-tn', 'uw/en/obs-twl'])
     )
     expect(result.visibleKeys).toContain('uw/en/tq')
+  })
+
+  test('hideConsumed resolves missing type via #N / :panel-N base key', () => {
+    const result = applyDualScopeHelpsPolicy([
+      { key: COMBINED_HELPS_RESOURCE_ID, type: 'combined-helps' },
+      { key: 'u/en/tn#2' },
+      { key: 'u/en/twl:panel-1' },
+      { key: 'u/en/tn', type: 'notes' },
+      { key: 'u/en/twl', type: 'words-links' },
+    ])
+    expect(result.visibleKeys).toEqual([COMBINED_HELPS_RESOURCE_ID])
+    expect(result.hiddenKeys).toEqual(
+      expect.arrayContaining(['u/en/tn#2', 'u/en/twl:panel-1', 'u/en/tn', 'u/en/twl'])
+    )
   })
 
   test('without CombinedHelps, TN/TWL remain visible owners of their tabs', () => {

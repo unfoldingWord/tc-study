@@ -50,7 +50,7 @@ function createNavigationStore() {
         currentPassageSet: null,
         currentPassageList: [] as BCVReference[],
         currentPassageIndex: -1,
-        navigationMode: persistedState.navigationMode || 'verse',
+        navigationMode: persistedState.navigationMode || 'chapter',
         navigationScope: persistedState.navigationScope || 'scripture',
         obsFrameCountByStory: persistedState.obsFrameCountByStory || {},
 

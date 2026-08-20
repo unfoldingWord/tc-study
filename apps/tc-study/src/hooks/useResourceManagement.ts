@@ -29,6 +29,8 @@ export function useResourceManagement() {
             allowMultipleInstances?: boolean
             panelId?: string
             index?: number
+            skipEnsure?: boolean
+            skipPersist?: boolean
           } = false
     ): string => {
       // Prefer options object with `{ panelId }` (atomic assign). Boolean overload is legacy.

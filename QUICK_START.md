@@ -206,7 +206,7 @@ open http://localhost:3000/test
 ## 📚 Full Documentation
 
 - **Plugin Packages**: `docs/RESOURCE_TYPE_PACKAGES.md`
-- **In-App Development**: `apps/tc-study/RESOURCE_TYPE_DEVELOPMENT.md`
+- **Extending registries**: `apps/tc-study/docs/extending-registries.md`
 - **Architecture**: `RESOURCE_TYPE_ARCHITECTURE.md`
 - **Migration**: `apps/tc-study/MIGRATING_TO_PACKAGES.md`
 - **Library**: `packages/resource-panels/README.md`

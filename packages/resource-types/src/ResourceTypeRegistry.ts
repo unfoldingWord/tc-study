@@ -6,6 +6,14 @@
  * when a resource type is registered.
  */
 
+import {
+  paneTypeIdsForHelpsCatalogLoad as paneIdsFromTypes,
+  subjectsForHelpsCatalogLoad as helpsCatalogSubjectsFromTypes,
+  subjectsForLanguageList as subjectsFromTypes,
+  typeIdsForHelpsCatalogLoad as helpsCatalogTypeIdsFromTypes,
+  type HelpsCatalogScope,
+  type LanguageListKind,
+} from './subjectsForLanguageList'
 import type { APIFilters, ResourceTypeDefinition } from './types'
 
 export interface ResourceTypeRegistryConfig {
@@ -54,8 +62,8 @@ export class ResourceTypeRegistry {
       throw new Error(`Resource type '${id}' must have a loader`)
     }
     
-    // Viewer is optional - resources without viewers are modal-only
-    // (accessible via Entry Viewer Registry, not as panel tabs)
+    // Viewer is optional and is NOT a paint / switcher signal.
+    // Membership is PanelEntryRegistry + entry instances.
     
     // 2. Store definition
     this.types.set(id, definition)
@@ -140,7 +148,7 @@ export class ResourceTypeRegistry {
     // 6. Log success (simplified)
     console.log(`✅ Registered: ${id} (${subjects.length} subjects)${viewer ? '' : ' [modal-only]'}`)
   }
-  
+
   /**
    * Get all registered resource types
    */
@@ -175,7 +183,31 @@ export class ResourceTypeRegistry {
   getSupportedSubjects(): string[] {
     return Array.from(this.subjectToTypeMap.keys())
   }
-  
+
+  /**
+   * Door43 subjects for a Read language list (content vs helps).
+   * See `subjectsForLanguageList` — synthetic Combined Helps subjects are omitted.
+   */
+  subjectsForLanguageList(kind: LanguageListKind): string[] {
+    return subjectsFromTypes(this.getAll(), kind)
+  }
+
+  /**
+   * Door43 subjects for hydrating a chosen helps language (companions + shared).
+   * Picker lists stay on `subjectsForLanguageList` and omit shared.
+   */
+  subjectsForHelpsCatalogLoad(scope: HelpsCatalogScope): string[] {
+    return helpsCatalogSubjectsFromTypes(this.getAll(), scope)
+  }
+
+  helpsCatalogTypeIds(scope: HelpsCatalogScope): string[] {
+    return helpsCatalogTypeIdsFromTypes(this.getAll(), scope)
+  }
+
+  helpsCatalogPaneTypeIds(scope: HelpsCatalogScope): string[] {
+    return paneIdsFromTypes(this.getAll(), scope)
+  }
+
   /**
    * Get API filters for Door43 requests
    * Automatically includes all supported subjects

@@ -1,6 +1,6 @@
 /**
  * Read page URL template:
- *   /read/{lang}/{resource_type}/{nav_type}/{nav_ref}
+ *   /read/{lang | lang1+lang2}/{resource_type}/{nav_type}/{nav_ref}
  *
  * Also accepts book-only / incomplete tails that complete to a default start:
  *   /read/{lang}/bible/{book}              → first ch:v (or first section) for current nav mode
@@ -20,6 +20,7 @@ import type {
   NavigationMode,
   PassageSet,
 } from '../contexts/types'
+import { serializeReadUrl } from '../features/read/readUrlGrammar'
 import { getStandardVerseCount } from '../lib/versification'
 
 export type ReadResourceType = 'bible' | 'obs'
@@ -179,14 +180,13 @@ export function slugifyReadNavSegment(s: string): string {
     .replace(/^-|-$/g, '')
 }
 
-export function buildReadPath(lang: string, tail: ReadRouteTail): string {
+export function buildReadPath(lang: string | string[], tail: ReadRouteTail): string {
   const navType = tail.navType
   if (!navType) {
     throw new Error('buildReadPath requires navType (canonical URL always includes it)')
   }
-  const l = encodeURIComponent(lang.trim())
-  const ref = encodeURIComponent(tail.navRef.trim())
-  return `/read/${l}/${tail.resourceType}/${navType}/${ref}`
+  const langs = Array.isArray(lang) ? lang : [lang]
+  return serializeReadUrl({ langs, tail })
 }
 
 export function navigationScopeFromResourceType(rt: ReadResourceType): NavigationCatalogScope {

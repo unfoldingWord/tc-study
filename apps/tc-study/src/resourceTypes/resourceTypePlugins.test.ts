@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { combinedHelpsResourceType, obsCombinedHelpsResourceType } from './combinedHelps'
+import { combinedHelpsPanelEntry, obsCombinedHelpsPanelEntry } from './combinedHelps'
 import { scriptureResourceType } from './scripture'
 import { translationAcademyResourceType } from './translationAcademy'
 import { translationNotesResourceType } from './translationNotes'
@@ -25,13 +25,25 @@ describe('resourceTypePlugins', () => {
     expect(translationWordsLinksResourceType.viewer).toBeDefined()
   })
 
-  test('combined-helps plugins register CombinedHelpsViewer', () => {
-    expect(combinedHelpsResourceType.id).toBe('combined-helps')
-    expect(obsCombinedHelpsResourceType.id).toBe('obs-combined-helps')
-    expect(combinedHelpsResourceType.viewer).toBeDefined()
-    expect(obsCombinedHelpsResourceType.viewer).toBeDefined()
-    expect(combinedHelpsResourceType.icon).toBe('LifeBuoy')
-    expect(obsCombinedHelpsResourceType.icon).toBe('LifeBuoy')
+  test('combined-helps compositions register CombinedHelpsViewer (no loader)', () => {
+    expect(combinedHelpsPanelEntry.id).toBe('combined-helps')
+    expect(obsCombinedHelpsPanelEntry.id).toBe('obs-combined-helps')
+    expect(combinedHelpsPanelEntry.kind).toBe('composition')
+    expect(combinedHelpsPanelEntry.entryType).toBe('helps')
+    expect(obsCombinedHelpsPanelEntry.entryType).toBe('helps')
+    expect(combinedHelpsPanelEntry.viewer).toBeDefined()
+    expect(obsCombinedHelpsPanelEntry.viewer).toBeDefined()
+    expect(combinedHelpsPanelEntry.icon).toBe('NotebookText')
+    expect(obsCombinedHelpsPanelEntry.icon).toBe('NotebookText')
+    expect(combinedHelpsPanelEntry.consumes).toEqual(['notes', 'words-links'])
+    expect(obsCombinedHelpsPanelEntry.consumes).toEqual(['obs-notes', 'obs-words-links'])
+    expect(combinedHelpsPanelEntry.persistId).toBe('__combined-helps__')
+    expect(obsCombinedHelpsPanelEntry.persistId).toBe('__combined-helps-obs__')
+    expect(combinedHelpsPanelEntry.injectWhen).toBe('any')
+    expect(obsCombinedHelpsPanelEntry.injectWhen).toBe('any')
+    expect('exclusive' in combinedHelpsPanelEntry).toBe(false)
+    expect('loader' in combinedHelpsPanelEntry).toBe(false)
+    expect('subjects' in combinedHelpsPanelEntry).toBe(false)
   })
 
   test('entry viewers register for words and academy', () => {

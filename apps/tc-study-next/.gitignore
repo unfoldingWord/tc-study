@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+
+# Generated at dev/build (scripts/write-app-version.cjs)
+src/generated/
+
+# Build output
+dist
+.turbo
+bundle-stats.json
+stats.html
+
+# Environment
+.env
+.env.local
+.env*.local
+.cloudflare-token
+wrangler.toml.backup
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Testing
+coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Misc
+.cache

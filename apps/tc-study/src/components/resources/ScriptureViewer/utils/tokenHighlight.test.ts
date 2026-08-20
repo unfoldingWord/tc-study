@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { UsjWordToken } from '@bt-synergy/scripture-loader'
-import { resolveTokenVisualState, tokenMatchesHighlightTarget } from './tokenHighlight'
-import { semanticIdFor, semanticIdKey } from './wordIdentity'
+import { foldHighlightTarget, resolveTokenVisualState, tokenMatchesHighlightTarget } from './tokenHighlight'
+import { attachFoldedMatchKeys, semanticIdFor, semanticIdKey } from './wordIdentity'
 
 function usjWord(
   partial: Pick<UsjWordToken, 'content' | 'verseRef'> & Partial<UsjWordToken>
@@ -78,6 +78,81 @@ describe('resolveTokenVisualState (Journey 4/8 contract)', () => {
       underlinedSemanticIds: new Set([semanticIdKey('tit 1:1:Θεοῦ:1')]),
     })
     expect(state.isUnderlined).toBe(true)
+  })
+
+  test('same-language no zaln: underline via token semanticId', () => {
+    const paul = usjWord({ content: 'Paul', verseRef: 'tit 1:1' })
+    const state = resolveTokenVisualState(paul, {
+      isOriginalLanguage: false,
+      highlightTarget: null,
+      underlinedSemanticIds: new Set([semanticIdKey(paul.semanticId)]),
+    })
+    expect(state.isUnderlined).toBe(true)
+  })
+
+  test('minority token is not underlined by English/Greek semantic IDs', () => {
+    const minority = usjWord({ content: 'पौलुस', verseRef: 'tit 1:1' })
+    const state = resolveTokenVisualState(minority, {
+      isOriginalLanguage: false,
+      highlightTarget: null,
+      underlinedSemanticIds: new Set([semanticIdKey('tit 1:1:Παῦλος:1')]),
+    })
+    expect(state.isUnderlined).toBe(false)
+  })
+
+  test('OL pane underlines via own semanticId', () => {
+    const paulos = usjWord({ content: 'Παῦλος', verseRef: 'tit 1:1' })
+    const state = resolveTokenVisualState(paulos, {
+      isOriginalLanguage: true,
+      highlightTarget: null,
+      underlinedSemanticIds: new Set([semanticIdKey(paulos.semanticId)]),
+    })
+    expect(state.isUnderlined).toBe(true)
+  })
+
+  test('does not NFD-fold per token when match keys are already folded', () => {
+    const folded = usjWord({
+      content: 'Paul',
+      verseRef: 'tit 1:1',
+      alignedOriginalWordIds: ['tit 1:1:Παῦλος:1'],
+    })
+    attachFoldedMatchKeys(folded)
+    const target = foldHighlightTarget({
+      semanticId: folded.semanticId,
+      alignedSemanticIds: folded.alignedOriginalWordIds,
+      content: 'Paul',
+      verseRef: 'tit 1:1',
+    })
+    const orig = String.prototype.normalize
+    let nfdCalls = 0
+    String.prototype.normalize = function (this: string, form?: string) {
+      nfdCalls += 1
+      return orig.call(this, form)
+    }
+    try {
+      const state = resolveTokenVisualState(folded, {
+        isOriginalLanguage: false,
+        highlightTarget: target,
+        underlinedSemanticIds: new Set([folded.foldedSemanticId!]),
+      })
+      expect(state.isHighlighted).toBe(true)
+      expect(state.isUnderlined).toBe(true)
+      expect(nfdCalls).toBe(0)
+    } finally {
+      String.prototype.normalize = orig
+    }
+  })
+
+  test('UHB pane underlines pointed Hebrew via folded semanticId', () => {
+    const pointed = usjWord({ content: 'בְּרֵאשִׁית', verseRef: 'rut 1:1' })
+    attachFoldedMatchKeys(pointed)
+    const state = resolveTokenVisualState(pointed, {
+      isOriginalLanguage: true,
+      highlightTarget: null,
+      underlinedSemanticIds: new Set([semanticIdKey('rut 1:1:בראשית:1')]),
+    })
+    expect(state.isUnderlined).toBe(true)
+    expect(pointed.foldedSemanticId).toBe(semanticIdKey('rut 1:1:בראשית:1'))
   })
 })
 

@@ -223,6 +223,30 @@ export interface ResourceTypeDefinition {
   // ===== DOOR43 MAPPING =====
   /** Door43 subjects this resource type handles (e.g., ['Bible', 'Aligned Bible']) */
   subjects: string[]
+
+  /**
+   * Door43 subjects used for language-list queries (`getLanguages`).
+   * Defaults to `subjects`. Use a subset to omit injected original-language
+   * catalog rows (UGNT/UHB). Synthetic aggregators should set
+   * `includeInLanguageLists: false` instead of inventing catalog subjects.
+   */
+  languageListSubjects?: string[]
+
+  /**
+   * When false, this type does not contribute subjects to language lists.
+   * Default true. Use for catalog types that should stay registered but
+   * must not appear in language pickers.
+   */
+  includeInLanguageLists?: boolean
+
+  /**
+   * Language-list panel modes this type contributes subjects to.
+   * Defaults from contentRole + scope / companionFor:
+   * - primary + scripture → `['scripture']`
+   * - primary + obs → `['obs']`
+   * - companion / shared → `['helps']`
+   */
+  panelModes?: Array<'scripture' | 'obs' | 'helps'>
   
   /** Alternative identifiers that map to this resource type */
   aliases?: string[]

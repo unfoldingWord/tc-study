@@ -1,5 +1,6 @@
 import { BookMarked, Library } from 'lucide-react'
 import { useNavigation, useNavigationMode } from '../../contexts'
+import { markReadNavigationInternal } from '../../features/read/replaceReadUrlFromUi'
 
 export function ObsNavigationTypeSelector({ onClose }: { onClose: () => void }) {
   const navigation = useNavigation()
@@ -21,6 +22,7 @@ export function ObsNavigationTypeSelector({ onClose }: { onClose: () => void }) 
           <button
             key={mode}
             onClick={() => {
+              markReadNavigationInternal()
               navigation.setNavigationMode(mode)
               onClose()
             }}

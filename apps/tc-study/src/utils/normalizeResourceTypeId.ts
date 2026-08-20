@@ -88,3 +88,13 @@ export function isCombinedHelpsResourceType(raw: string | null | undefined): boo
     id === RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS
   )
 }
+
+/** True when type is translation questions (or OBS questions) for the given scope. */
+export function isQuestionsResourceType(
+  raw: string | null | undefined,
+  scope: 'scripture' | 'obs' = 'scripture'
+): boolean {
+  const id = normalizeResourceTypeId(raw)
+  if (scope === 'obs') return id === RESOURCE_TYPE_IDS.OBS_QUESTIONS
+  return id === RESOURCE_TYPE_IDS.TRANSLATION_QUESTIONS
+}

@@ -1,4 +1,5 @@
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
+import type { HelpsQuoteStatus } from '../../../features/helps/resolveHelpsQuoteStatus'
 import { useMemo } from 'react'
 import {
   filterDisplayLinks,
@@ -22,12 +23,14 @@ export type NoteWithAlignments = TranslationNote & {
   quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
   alignedTokens?: Array<{ position: number }>
   semanticIds?: string[]
+  quoteStatus?: HelpsQuoteStatus
 }
 
 export type LinkWithAlignments = TranslationWordsLink & {
   quoteTokens?: Array<{ text: string }>
   alignedTokens?: Array<{ position: number }>
   semanticIds?: string[]
+  quoteStatus?: HelpsQuoteStatus
 }
 
 export type MergedRow =

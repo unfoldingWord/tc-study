@@ -1,0 +1,55 @@
+import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
+describe('loadReadLanguageCatalog (split text vs helps)', () => {
+  const src = readFileSync(join(import.meta.dir, 'loadReadLanguageCatalog.ts'), 'utf8')
+
+  test('accepts textLanguageCode, helpsLanguageCode, and loadTarget', () => {
+    expect(src).toContain('textLanguageCode: string')
+    expect(src).toContain('helpsLanguageCode: string')
+    expect(src).toContain('loadTarget: CatalogLoadTarget')
+    expect(src).toContain('catalogTargetsForLoad')
+  })
+
+  test('CombinedHelps uses helps language; UGNT/UHB stay on text side', () => {
+    expect(src).toContain('applyCombinedHelpsEnsure(helpsLanguageCode)')
+    expect(src).toContain('shouldHydrateOriginalLanguages(loadTarget)')
+    expect(src).toContain('hydrateOriginalLanguageResources')
+    expect(src).toContain('currentBook:')
+    expect(src).not.toMatch(/applyCombinedHelpsEnsure\(textLanguageCode\)/)
+  })
+
+  test('OBS helps search is scoped via searchCatalogHitsForTarget (not a blanket tc-ready search)', () => {
+    expect(src).toContain('searchCatalogHitsForTarget')
+    expect(src).toContain('navigationScope')
+    expect(src).toContain('subjectsForHelpsCatalogLoad')
+    expect(src).toContain('helpsSubjects')
+    expect(src).not.toMatch(/topic:\s*'tc-ready'/)
+    expect(src).toContain('page.hydrateTarget')
+  })
+
+  test('text and helps catalog searches run in parallel', () => {
+    expect(src).toContain('Promise.all')
+    expect(src).toContain('searchPages')
+  })
+
+  test('clears only the switched pane', () => {
+    expect(src).toContain('panelClearTargetForLoad(loadTarget, destPanelId)')
+    expect(src).toContain('shouldReconcileHelpsOnPanelClear')
+    expect(src).toContain('clearReadPanelsForLanguageSwitch(helpsLanguageCode')
+    expect(src).toContain('skipPanelClear')
+    expect(src).toContain('forceHelpsPanel: loadTarget === \'helps\'')
+    expect(src).toContain('autoSaveWorkspace()')
+  })
+
+  test('text-only dest does not inject CombinedHelps onto that pane; still ensures panel-2', () => {
+    const skipStart = src.indexOf("if (destPanelId && loadTarget === 'text')")
+    const elseIf = src.indexOf('} else if (destPanelId)', skipStart)
+    expect(skipStart).toBeGreaterThan(-1)
+    expect(elseIf).toBeGreaterThan(skipStart)
+    const skipBlock = src.slice(skipStart, elseIf)
+    expect(skipBlock).toContain("applyCombinedHelpsEnsure(helpsLanguageCode, 'panel-2')")
+    expect(skipBlock).not.toContain('forceHelpsPanel')
+  })
+})

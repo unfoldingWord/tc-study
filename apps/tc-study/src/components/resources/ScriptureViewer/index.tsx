@@ -12,13 +12,12 @@
 
 import { useSignalHandler } from '@bt-synergy/resource-panels'
 import { Book } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
 import { useCatalogManager, useCurrentReference, useNavigation } from '../../../contexts'
 import type { ResourceMetadata } from '../../../contexts/types'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
-import { getBookTitle } from '../../../utils/bookNames'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { ScriptureContent, ScriptureLayoutToggle } from './components'
@@ -40,9 +39,6 @@ export function ScriptureViewer({
   const catalogManager = useCatalogManager()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const [catalogMetadata, setCatalogMetadata] = useState<ResourceMetadata | null>(null)
-
-  // Track if we've set this resource as anchor to prevent repeated calls
-  const anchorSetRef = useRef<string | null>(null)
 
   // Load catalog metadata
   useEffect(() => {
@@ -69,8 +65,6 @@ export function ScriptureViewer({
   // Load TOC and available books
   const { availableBooks, isLoadingTOC, setAsAnchor } = useTOC(resourceKey, resourceId, isAnchor)
 
-  // Register as last active scripture when this viewer is mounted (so book titles use our ingredients).
-  // On leave: only clear if we still own lastActive; fall back to anchor so sibling scripture can publish tokens.
   useEffect(() => {
     useAppStore.getState().setLastActiveScriptureResource(resourceId)
     return () => {
@@ -81,17 +75,19 @@ export function ScriptureViewer({
     }
   }, [resourceId])
 
-  // Auto-set as anchor whenever this scripture resource becomes active (when user switches tabs)
   useEffect(() => {
-    if (availableBooks.length > 0 && anchorSetRef.current !== resourceId) {
-      setAsAnchor()
-      anchorSetRef.current = resourceId
-    }
+    if (availableBooks.length === 0) return
+    setAsAnchor()
   }, [resourceId, availableBooks.length, setAsAnchor])
 
-  // Prefer resource.language over the prop default ('es') so OL resources
-  // (el-x-koine / hbo) correctly detect isOriginalLanguage on /read.
-  const languageCode = resource?.language ?? language
+  // Prefer resource language fields over the prop default ('es') so OL
+  // resources (el-x-koine / hbo) detect as original language on /read.
+  // UHB often has languageCode only after catalog merge; also honor the key.
+  const languageCode =
+    resource?.language ||
+    resource?.languageCode ||
+    (resourceKey.includes('/hbo/') ? 'hbo' : resourceKey.includes('/el-x-koine/') ? 'el-x-koine' : '') ||
+    language
 
   const {
     viewModel,
@@ -108,18 +104,6 @@ export function ScriptureViewer({
     languageFromList?.direction ?? undefined,
     languageCode
   )
-
-  // Use latest resource from store so we get ingredients when Phase 2 metadata loads (localized book title)
-  const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
-  const effectiveResource = resourceFromStore ?? resource
-
-  // Language and book title from current scripture metadata (for header)
-  const languageDisplay =
-    effectiveResource.languageName ??
-    (catalogMetadata as ResourceMetadata & { language_title?: string })?.language_title ??
-    effectiveResource.language ??
-    languageCode
-  const currentBookTitle = getBookTitle(effectiveResource, currentRef.book)
 
   // Must come before useHighlighting so the coverage set is available for click decisions
   const underlinedSemanticIds = useUnderlinedTokens(resourceId)
@@ -180,7 +164,6 @@ export function ScriptureViewer({
     <div className="h-full flex flex-col" dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
-        subtitle={[languageDisplay, currentBookTitle].filter(Boolean).join(' · ')}
         icon={Book}
         direction={languageDirection}
         infoResource={resource}
@@ -200,7 +183,7 @@ export function ScriptureViewer({
         }}
       >
         {/* Content - scrolling handled by parent container */}
-        <div className="flex-1">
+        <div className="flex-1 max-w-2xl mx-auto w-full">
           <ScriptureContent
           isLoading={isLoading}
           isLoadingTOC={isLoadingTOC}

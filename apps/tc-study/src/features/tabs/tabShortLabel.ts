@@ -1,8 +1,4 @@
-import {
-  COMBINED_HELPS_IDS,
-  OBS_COMBINED_HELPS_RESOURCE_ID,
-} from '../helps/combinedHelpsIds'
-import { isCombinedHelpsResourceType } from '../../utils/normalizeResourceTypeId'
+import { resolveCompositionForPersistId } from '../helps/resolveCompositionEntry'
 
 export interface TabShortLabelResource {
   id?: string
@@ -13,15 +9,11 @@ export interface TabShortLabelResource {
   abbreviation?: string
 }
 
-/** Compact tab / DnD label (DCS abbrev, key segment, CombinedHelps specials, title heuristics). */
+/** Compact tab / DnD label (DCS abbrev, key segment, composition displayName, title heuristics). */
 export function getTabShortLabel(resource: TabShortLabelResource | null | undefined): string {
   const key = resource?.key || resource?.id || ''
-  if (key === OBS_COMBINED_HELPS_RESOURCE_ID) {
-    return 'OBS Helps'
-  }
-  if (COMBINED_HELPS_IDS.has(key) || isCombinedHelpsResourceType(resource?.type)) {
-    return key === OBS_COMBINED_HELPS_RESOURCE_ID ? 'OBS Helps' : 'Helps'
-  }
+  const composition = resolveCompositionForPersistId(key)
+  if (composition) return composition.displayName
   const abbrev = resource?.abbreviation?.trim()
   if (abbrev) return abbrev.toUpperCase()
   if (resource?.key) {

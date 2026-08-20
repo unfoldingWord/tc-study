@@ -1,9 +1,20 @@
-import { describe, expect, test } from 'bun:test'
-import { Book, LifeBuoy, MessageCircleQuestion } from 'lucide-react'
+import { afterAll, describe, expect, test } from 'bun:test'
+import { Book, Layers, LifeBuoy, MessageCircleQuestion, NotebookText } from 'lucide-react'
+import { questionsPanelEntry } from '../../resourceTypes/panelEntries'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
-import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
+import { COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
+import {
+  bindCombinedHelpsCompositionsForTest,
+  bindFakeCompositionForTest,
+  FAKE_COMPOSITION_PERSIST_ID,
+} from '../helps/testCompositionRegistry'
+import { getActiveResourceTypeRegistry } from '../../resourceTypes/activeRegistry'
 import { resolveLucideIconName } from './lucideIconRegistry'
-import { resolveTabIcon, resolveTabPresentation } from './resolveTabPresentation'
+import {
+  resolveTabIcon,
+  resolveTabPresentation,
+  resolveTabPresentationFromRegistry,
+} from './resolveTabPresentation'
 import type { TabIcon } from './tabIcon'
 
 describe('resolveTabIcon', () => {
@@ -24,6 +35,9 @@ describe('resolveTabIcon', () => {
   })
 })
 
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
+
 describe('resolveTabPresentation', () => {
   const types: Record<string, { icon?: string; contentRole?: 'primary' | 'companion' | 'shared' }> =
     {
@@ -32,7 +46,8 @@ describe('resolveTabPresentation', () => {
         icon: 'MessageCircleQuestion',
         contentRole: 'companion',
       },
-      [RESOURCE_TYPE_IDS.COMBINED_HELPS]: { icon: 'LifeBuoy', contentRole: 'companion' },
+      [RESOURCE_TYPE_IDS.COMBINED_HELPS]: { icon: 'NotebookText', contentRole: 'companion' },
+      [RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS]: { icon: 'NotebookText', contentRole: 'companion' },
     }
 
   const getType = (id: string) => types[id] as never
@@ -77,7 +92,7 @@ describe('resolveTabPresentation', () => {
     expect(p.shortLabel).toBe('TPL')
   })
 
-  test('CombinedHelps special key resolves LifeBuoy from plugin', () => {
+  test('CombinedHelps special key is icon-only NotebookText with Helps tooltip', () => {
     const p = resolveTabPresentation(
       {
         key: COMBINED_HELPS_RESOURCE_ID,
@@ -86,10 +101,25 @@ describe('resolveTabPresentation', () => {
       },
       { getType }
     )
-    expect(p.Icon).toBe(LifeBuoy)
+    expect(p.Icon).toBe(NotebookText)
     expect(p.showShortLabel).toBe(false)
     expect(p.shortLabel).toBe('Helps')
     expect(p.title).toBe('Helps')
+  })
+
+  test('OBS CombinedHelps is icon-only with OBS Helps accessible title', () => {
+    const p = resolveTabPresentation(
+      {
+        key: OBS_COMBINED_HELPS_RESOURCE_ID,
+        type: 'obs-combined-helps',
+        title: 'OBS Helps',
+      },
+      { getType }
+    )
+    expect(p.Icon).toBe(NotebookText)
+    expect(p.showShortLabel).toBe(false)
+    expect(p.shortLabel).toBe('OBS Helps')
+    expect(p.title).toBe('OBS Helps')
   })
 
   test('override string wins over plugin icon', () => {
@@ -114,6 +144,51 @@ describe('resolveTabPresentation', () => {
     expect(p.Icon).toBe(Book)
   })
 
+  test('questions pane-member copies MessageCircleQuestion from the resource type', () => {
+    expect(questionsPanelEntry.icon).toBe('MessageCircleQuestion')
+  })
+
+  test('FromRegistry inherits questions icon for unfoldingWord/en/tq when pane-member has no icon', () => {
+    const p = resolveTabPresentationFromRegistry(
+      {
+        key: 'unfoldingWord/en/tq',
+        type: 'questions',
+        title: 'Translation Questions',
+      },
+      getActiveResourceTypeRegistry()
+    )
+    expect(p.Icon).toBe(MessageCircleQuestion)
+    expect(p.showShortLabel).toBe(false)
+    expect(p.shortLabel).toBe('TQ')
+  })
+
+  test('FromRegistry reads CombinedHelps icon + companion role from panel entry', () => {
+    const p = resolveTabPresentationFromRegistry(
+      {
+        key: COMBINED_HELPS_RESOURCE_ID,
+        type: 'combined-helps',
+        title: 'Helps',
+      },
+      getActiveResourceTypeRegistry()
+    )
+    expect(p.Icon).toBe(NotebookText)
+    expect(p.showShortLabel).toBe(false)
+  })
+
+  test('fake composition persist id resolves via resolvePanelEntry without RESOURCE_TYPE_IDS', () => {
+    const restore = bindFakeCompositionForTest()
+    try {
+      const p = resolveTabPresentationFromRegistry(
+        { key: `${FAKE_COMPOSITION_PERSIST_ID}:panel-1` },
+        getActiveResourceTypeRegistry()
+      )
+      expect(p.shortLabel).toBe('Fake Pair')
+      expect(p.title).toBe('Fake Pair')
+    } finally {
+      restore()
+    }
+  })
+
   test('falls back to short label when no icon', () => {
     const p = resolveTabPresentation(
       { key: 'u/en/xyz', type: 'unknown-type', title: 'Mystery Resource' },
@@ -128,6 +203,8 @@ describe('resolveTabPresentation', () => {
 
 describe('lucideIconRegistry', () => {
   test('includes plugin icons used by tc-study', () => {
+    expect(resolveLucideIconName('NotebookText')).toBe(NotebookText)
+    expect(resolveLucideIconName('Layers')).toBe(Layers)
     expect(resolveLucideIconName('LifeBuoy')).toBe(LifeBuoy)
     expect(resolveLucideIconName('Book')).toBe(Book)
     expect(resolveLucideIconName('Missing')).toBeNull()

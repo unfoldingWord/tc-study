@@ -10,6 +10,8 @@ describe('combinedHelpsGuards', () => {
     )
     expect(src).not.toContain("registerViewer({")
     expect(src).not.toContain("resourceType: 'combined-helps'")
+    expect(src).not.toMatch(/useAppStore\(\(s\)\s*=>\s*s\.loadedResources\)/)
+    expect(src).not.toContain('loadedResourcesMembershipKey')
   })
 
   test('Read bootstrap uses shared ensure adapter (not inline inject)', () => {
@@ -23,9 +25,9 @@ describe('combinedHelpsGuards', () => {
     expect(catalogLoad).not.toContain('buildCombinedHelpsResourceInfo')
     expect(catalogLoad).not.toContain('shouldInjectCombinedHelps')
     expect(catalogLoad).not.toContain('findHelpsKeysForScope')
-    // Must run after ORIGINAL_RESOURCES hydrate so UGNT add cannot clobber GL helps
-    const ensureAt = catalogLoad.indexOf('applyCombinedHelpsEnsure(languageCode)')
-    const ugntHydrateAt = catalogLoad.indexOf('for (const orig of ORIGINAL_RESOURCES)')
+    // Must run after UGNT/UHB hydrate so original-lang adds cannot clobber GL helps
+    const ensureAt = catalogLoad.indexOf('applyCombinedHelpsEnsure(helpsLanguageCode)')
+    const ugntHydrateAt = catalogLoad.indexOf('hydrateOriginalLanguageResources')
     expect(ugntHydrateAt).toBeGreaterThan(-1)
     expect(ensureAt).toBeGreaterThan(ugntHydrateAt)
     // Atomic clear (not per-key remove) so English CombinedHelps cannot re-inject mid-switch
@@ -42,13 +44,14 @@ describe('combinedHelpsGuards', () => {
   })
 
   test('ensure does not unconditionally force panel-2 activeIndex onto CombinedHelps', () => {
-    const ensure = readFileSync(join(import.meta.dir, 'ensureCombinedHelps.ts'), 'utf8')
-    // Legacy clobber: if (scriptureIdx >= 0) panel2.activeIndex = scriptureIdx
-    expect(ensure).not.toMatch(/activeIndex\s*=\s*scriptureIdx/)
-    expect(ensure).not.toMatch(/activeIndex\s*=\s*obsIdx/)
-    expect(ensure).toContain('resolvePanel2ActiveIndex')
-    expect(ensure).toContain('applyDualScopeHelpsPolicy')
-    expect(ensure).toContain('removed')
+    const alias = readFileSync(join(import.meta.dir, 'ensureCombinedHelps.ts'), 'utf8')
+    const engine = readFileSync(join(import.meta.dir, 'ensureCompositions.ts'), 'utf8')
+    expect(alias).toContain('ensureCompositions')
+    expect(engine).not.toMatch(/activeIndex\s*=\s*scriptureIdx/)
+    expect(engine).not.toMatch(/activeIndex\s*=\s*obsIdx/)
+    expect(engine).toContain('resolvePanel2ActiveIndex')
+    expect(engine).toContain('applyDualScopeHelpsPolicy')
+    expect(engine).toContain('removed')
   })
 
   test('workspace membership mutations reconcile CombinedHelps (remove when TN/TWL drop)', () => {
@@ -63,5 +66,8 @@ describe('combinedHelpsGuards', () => {
     expect(slice).toMatch(/removeResourceFromPackage:[\s\S]*reconcileCombinedHelps/)
     expect(slice).toMatch(/assignResourceToPanel:[\s\S]*reconcileCombinedHelps/)
     expect(slice).toMatch(/removeResourceFromPanel:[\s\S]*reconcileCombinedHelps/)
+    // Text-pane scripture/OBS must not become the CombinedHelps language hint
+    expect(slice).toContain("if (type === 'scripture' || type === 'obs') return undefined")
   })
 })
+

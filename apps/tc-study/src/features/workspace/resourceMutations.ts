@@ -17,11 +17,19 @@ import type { ResourceInfo } from '../../contexts/types'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import {
   collectPanelResourceKeys,
+  existingPanelInstanceId,
   generateInstanceId,
   projectPanelResourcesToAppStore,
 } from './projectPanelResourcesToAppStore'
+import type { ResourceWriteOptions } from './resourceWriteOptions'
 
-export { generateInstanceId, getBaseResourceKey } from './projectPanelResourcesToAppStore'
+export { CATALOG_HYDRATE_BATCH, type ResourceWriteOptions } from './resourceWriteOptions'
+
+export {
+  existingPanelInstanceId,
+  generateInstanceId,
+  getBaseResourceKey,
+} from './projectPanelResourcesToAppStore'
 
 /** Project current workspace panels → AppStore (explicit restore / CombinedHelps sync). */
 export function projectCurrentWorkspacePanels(options?: {
@@ -40,8 +48,8 @@ export function projectCurrentWorkspacePanels(options?: {
  * Add resource metadata to the workspace package (sidebar / collection).
  * CombinedHelps ensure + panel projection run inside workspaceStore.
  */
-export function addResourceToPackage(resource: ResourceInfo): void {
-  useWorkspaceStore.getState().addResourceToPackage(resource)
+export function addResourceToPackage(resource: ResourceInfo, options?: ResourceWriteOptions): void {
+  useWorkspaceStore.getState().addResourceToPackage(resource, options)
 }
 
 /**
@@ -56,10 +64,27 @@ export function addResource(
     allowMultipleInstances?: boolean
     panelId?: string
     index?: number
+    skipEnsure?: boolean
+    skipPersist?: boolean
   } = {}
 ): string {
-  const { allowMultipleInstances = false, panelId, index } = options
+  const { allowMultipleInstances = false, panelId, index, skipEnsure, skipPersist } = options
+  const batch: ResourceWriteOptions | undefined =
+    skipEnsure || skipPersist ? { skipEnsure, skipPersist } : undefined
   const ws = useWorkspaceStore.getState()
+
+  if (panelId) {
+    const dest = ws.currentPackage?.panels.find((p) => p.id === panelId)
+    const already = existingPanelInstanceId(dest?.resourceKeys, resource.key)
+    if (already) {
+      if (!ws.hasResourceInPackage(resource.key)) {
+        ws.addResourceToPackage(resource, batch)
+      } else if (!skipEnsure) {
+        projectCurrentWorkspacePanels()
+      }
+      return already
+    }
+  }
 
   let instanceId = resource.key
   if (allowMultipleInstances) {
@@ -74,11 +99,11 @@ export function addResource(
   }
 
   if (!ws.hasResourceInPackage(resource.key)) {
-    ws.addResourceToPackage(resource)
+    ws.addResourceToPackage(resource, batch)
   }
 
   if (panelId) {
-    ws.assignResourceToPanel(instanceId, panelId, index)
+    ws.assignResourceToPanel(instanceId, panelId, index, batch)
   }
 
   return instanceId
@@ -87,9 +112,10 @@ export function addResource(
 export function assignResourceToPanel(
   resourceKey: string,
   panelId: string,
-  index?: number
+  index?: number,
+  options?: ResourceWriteOptions
 ): void {
-  useWorkspaceStore.getState().assignResourceToPanel(resourceKey, panelId, index)
+  useWorkspaceStore.getState().assignResourceToPanel(resourceKey, panelId, index, options)
 }
 
 export function removeResourceFromPanel(resourceKey: string, panelId: string): void {

@@ -11,6 +11,7 @@
 import { BookOpen, Library, List, ListOrdered } from 'lucide-react'
 import { useNavigation, useNavigationMode } from '../../contexts'
 import type { NavigationMode } from '../../contexts/types'
+import { markReadNavigationInternal } from '../../features/read/replaceReadUrlFromUi'
 
 interface NavigationTypeSelectorProps {
   onClose: () => void
@@ -44,6 +45,7 @@ export function NavigationTypeSelector({ onClose }: NavigationTypeSelectorProps)
   ]
 
   const handleSelect = (mode: NavigationMode) => {
+    markReadNavigationInternal()
     navigation.setNavigationMode(mode)
     onClose()
   }

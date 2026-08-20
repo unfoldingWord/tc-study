@@ -1,6 +1,6 @@
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
-import { BookOpen, FileText, Layers } from 'lucide-react'
-import React from 'react'
+import { BookOpen, NotebookText } from 'lucide-react'
+import React, { useLayoutEffect, useRef } from 'react'
 import { formatVerseRefParts, getBookTitleWithFallback } from '../../../utils/bookNames'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
 import type { ResourceInfo } from '../../../contexts/types'
@@ -15,9 +15,18 @@ import {
   HELPS_VERSE_HEADER,
   HELPS_VERSE_HEADER_ICON,
 } from '../helpsCardStyles'
+import {
+  explainedHelpsEmptyKind,
+  resolveHelpsEmptyView,
+  resolveHelpsListEmptyReason,
+} from '../../../features/helps/helpsEmptyCopy'
+import type { LanguageListNameFields } from '../../../features/read/languageListDisplayName'
 import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
-import type { HelpsKindFilter } from './types'
+import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
+import { helpsFilterIdentity, scrollHelpsToTop } from './scrollHelpsToTop'
+import { isHelpsCardSelected, type HelpsCardSelection } from './helpsCardSelection'
+import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
 export interface CombinedHelpsListProps {
@@ -25,13 +34,15 @@ export interface CombinedHelpsListProps {
   effectiveResource: ResourceInfo
   bookCode?: string
   bookTitleSource: unknown
-  targetLanguageDirection: 'ltr' | 'rtl'
+  languageDirection: 'ltr' | 'rtl'
   kindFilter: HelpsKindFilter
   setKindFilter: (v: HelpsKindFilter) => void
   /** Inline filter chip for header actions (no extra chrome row). */
   filterScopeBar?: React.ReactNode
+  helpsLanguageCode: string
+  helpsLanguageName: string | LanguageListNameFields
+  passageLabel: string
   noSources: boolean
-  depsOk: boolean
   loading: boolean
   tnError?: string | null
   twlError?: string | null
@@ -39,21 +50,23 @@ export interface CombinedHelpsListProps {
   twlKey: string
   resourceKey: string
   mergedGroups: { ref: string; items: MergedRow[] }[]
-  selectedNoteId: string | null
-  selectedLinkId: string | null
+  selectedHelpsCard: HelpsCardSelection
   targetSourceId: string | null | undefined
   helpsScope: 'scripture' | 'obs'
   tokenFilter: TokenFilter | null
+  verseFilter: VerseFilterState | null
+  obsQuoteFilter: ObsQuoteFilter | null
   loadingTitles: Set<string>
   twLoadingTitles: Set<string>
   getEntryTitle: (rc: string) => string | null
   getTATitle: (note: NoteWithTokens) => string
   getTWTitle: (link: TranslationWordsLink) => string
   getTWPreview: (link: TranslationWordsLink) => string | null
+  isTWPreviewPending: (link: TranslationWordsLink) => boolean
   onSupportReferenceClick: (supportRef: string) => void
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   onNoteQuoteClick: (note: NoteWithTokens) => void
-  onNoteSelect: (note: { id: string }) => void
+  onNoteSelect: (note: { id: string; reference?: string }) => void
   onTitleClick: (link: TranslationWordsLink) => void
   onLinkQuoteClick: (link: TranslationWordsLink) => void
 }
@@ -63,12 +76,14 @@ export function CombinedHelpsList({
   effectiveResource,
   bookCode,
   bookTitleSource,
-  targetLanguageDirection,
+  languageDirection,
   kindFilter,
   setKindFilter,
   filterScopeBar,
+  helpsLanguageCode,
+  helpsLanguageName,
+  passageLabel,
   noSources,
-  depsOk,
   loading,
   tnError,
   twlError,
@@ -76,17 +91,19 @@ export function CombinedHelpsList({
   twlKey,
   resourceKey,
   mergedGroups,
-  selectedNoteId,
-  selectedLinkId,
+  selectedHelpsCard,
   targetSourceId,
   helpsScope,
   tokenFilter,
+  verseFilter,
+  obsQuoteFilter,
   loadingTitles,
   twLoadingTitles,
   getEntryTitle,
   getTATitle,
   getTWTitle,
   getTWPreview,
+  isTWPreviewPending,
   onSupportReferenceClick,
   onEntryLinkClick,
   onNoteQuoteClick,
@@ -94,12 +111,36 @@ export function CombinedHelpsList({
   onTitleClick,
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
+  const listPanelRef = useRef<HTMLDivElement>(null)
+  const filterIdentity = helpsFilterIdentity({ tokenFilter, verseFilter, obsQuoteFilter })
+  useLayoutEffect(() => {
+    scrollHelpsToTop(listPanelRef.current)
+  }, [filterIdentity])
+
+  const emptyReason = resolveHelpsListEmptyReason({
+    noSources,
+    loading,
+    depsOk: true,
+    mergedEmpty: mergedGroups.length === 0,
+    hasLoadError: !!(tnError && tnKey) || !!(twlError && twlKey),
+    hasActiveFilter: !!filterScopeBar,
+  })
+  const emptyKind = explainedHelpsEmptyKind(emptyReason)
+  const explainedEmpty = emptyKind
+    ? resolveHelpsEmptyView({
+        kind: emptyKind,
+        languageCode: helpsLanguageCode,
+        languageName: helpsLanguageName,
+        passageLabel,
+      })
+    : null
+
   return (
-    <div className={HELPS_LIST_PANEL} dir={targetLanguageDirection}>
+    <div ref={listPanelRef} className={HELPS_LIST_PANEL} dir={languageDirection}>
       <ResourceViewerHeader
         title={resource.title}
-        icon={Layers}
-        direction={targetLanguageDirection}
+        icon={NotebookText}
+        direction={languageDirection}
         actions={
           // Sources stays visible even when token/verse/OBS filter replaces the kind menu.
           <>
@@ -110,19 +151,9 @@ export function CombinedHelpsList({
           </>
         }
       />
-      <div className="p-content">
-        {noSources ? (
-          <div className="text-center py-8 text-fg-muted text-sm">
-            <FileText className="w-8 h-8 mx-auto mb-2 text-fg-muted opacity-50" />
-            <p>No Translation Notes or Word Links found for this language.</p>
-          </div>
-        ) : !depsOk ? (
-          <LoadingSpinner
-            centered
-            label="Loading dependencies"
-            className="text-helps"
-            containerClassName="py-8"
-          />
+      <div className="p-content max-w-2xl mx-auto w-full">
+        {explainedEmpty ? (
+          <CombinedHelpsEmptyState view={explainedEmpty} />
         ) : loading ? (
           <LoadingSpinner
             centered
@@ -137,7 +168,6 @@ export function CombinedHelpsList({
             {mergedGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-fg-muted">
                 <BookOpen className="w-10 h-10 mb-2 opacity-70" />
-                <p className="text-sm">No entries for this passage.</p>
               </div>
             ) : (
               <div className="space-y-stack-lg">
@@ -149,16 +179,16 @@ export function CombinedHelpsList({
                   )
                   return (
                     <div key={group.ref} className="space-y-stack">
-                      <div className={HELPS_VERSE_HEADER} dir={targetLanguageDirection}>
+                      <div className={HELPS_VERSE_HEADER} dir={languageDirection}>
                         <BookOpen className={HELPS_VERSE_HEADER_ICON} />
                         <h3 className="text-chrome font-semibold text-fg-secondary">
                           {(() => {
                             const { bookPart, numberPart } = formatVerseRefParts(
                               resolved,
                               group.ref,
-                              targetLanguageDirection === 'rtl'
+                              languageDirection === 'rtl'
                             )
-                            return targetLanguageDirection === 'rtl' ? (
+                            return languageDirection === 'rtl' ? (
                               <span className="inline-flex flex-row-reverse gap-1" dir="rtl">
                                 <span>{numberPart}</span>
                                 <span>{bookPart}</span>
@@ -190,18 +220,19 @@ export function CombinedHelpsList({
                             <div key={`tn-${note.id}-${idx}`}>
                               <TranslationNoteCard
                                 note={note as NoteWithTokens}
-                                isSelected={selectedNoteId === note.id}
+                                isSelected={isHelpsCardSelected(selectedHelpsCard, 'tn', note.id)}
                                 onSupportReferenceClick={onSupportReferenceClick}
                                 onEntryLinkClick={onEntryLinkClick}
                                 onQuoteClick={onNoteQuoteClick}
                                 onClick={onNoteSelect}
                                 targetResourceId={targetSourceId || undefined}
                                 resourceKey={tnKey || resourceKey}
-                                languageDirection={targetLanguageDirection}
+                                languageDirection={languageDirection}
                                 taTitle={taTitle}
                                 isLoadingTATitle={isLoadingTitle}
                                 getEntryTitle={getEntryTitle}
                                 obsMode={helpsScope === 'obs'}
+                                tokenFilter={tokenFilter}
                               />
                             </div>
                           )
@@ -211,19 +242,21 @@ export function CombinedHelpsList({
                         const twTitle = getTWTitle(link)
                         const twPreview = getTWPreview(link)
                         const isLoadingTwTitle = twLoadingTitles.has(`${twInfo.category}/${twInfo.term}`)
+                        const isLoadingPreview = isTWPreviewPending(link)
                         return (
                           <div key={`twl-${link.id}-${idx}`}>
                             <WordLinkCard
                               link={link}
-                              isSelected={selectedLinkId === link.id}
+                              isSelected={isHelpsCardSelected(selectedHelpsCard, 'twl', link.id)}
                               twTitle={twTitle}
                               isLoadingTitle={isLoadingTwTitle}
                               twPreview={twPreview}
+                              isLoadingPreview={isLoadingPreview}
                               onTitleClick={onTitleClick}
                               onQuoteClick={onLinkQuoteClick}
                               tokenFilter={tokenFilter}
                               targetResourceId={targetSourceId}
-                              languageDirection={targetLanguageDirection}
+                              languageDirection={languageDirection}
                               obsMode={helpsScope === 'obs'}
                             />
                           </div>

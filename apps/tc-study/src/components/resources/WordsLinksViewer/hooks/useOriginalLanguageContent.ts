@@ -10,12 +10,15 @@ import {
   ScriptureLoader,
   viewModelToOptimizedChapters,
 } from '@bt-synergy/scripture-loader'
-import { useEffect, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { useEffect, useRef, useState } from 'react'
+import { useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { shouldRetryOriginalLanguageLoad } from '../../../../features/helps/scriptureReadyUnderlineRebind'
 
 interface UseOriginalLanguageContentOptions {
   resourceKey: string // TWL resource key (e.g., "unfoldingWord/en/twl")
   resourceId: string // TWL viewer resource ID (not used but kept for API consistency)
+  /** Scripture content revision — retry UGNT/UHB load when USJ arrives after a miss. */
+  scriptureRevision?: string
 }
 
 interface OriginalLanguageResource {
@@ -24,10 +27,12 @@ interface OriginalLanguageResource {
   bookCode: string
 }
 
-export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageContentOptions) {
+export function useOriginalLanguageContent({
+  resourceKey,
+  scriptureRevision = '',
+}: UseOriginalLanguageContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
-  const catalogManager = useCatalogManager()
 
   const [originalLanguageResources, setOriginalLanguageResources] = useState<
     OriginalLanguageResource[]
@@ -35,9 +40,29 @@ export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageC
   const [originalContent, setOriginalContent] = useState<OptimizedChapter[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [retryTick, setRetryTick] = useState(0)
+  const lastAttemptedRevisionRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!currentRef.book || !currentRef.chapter || !catalogManager || !loaderRegistry) {
+    lastAttemptedRevisionRef.current = null
+  }, [currentRef.book, currentRef.chapter])
+
+  useEffect(() => {
+    if (
+      !shouldRetryOriginalLanguageLoad({
+        hasOriginalContent: !!(originalContent && originalContent.length > 0),
+        scriptureRevision,
+        lastAttemptedRevision: lastAttemptedRevisionRef.current,
+      })
+    ) {
+      return
+    }
+    lastAttemptedRevisionRef.current = scriptureRevision
+    setRetryTick((n) => n + 1)
+  }, [scriptureRevision, originalContent])
+
+  useEffect(() => {
+    if (!currentRef.book || !currentRef.chapter || !loaderRegistry) {
       return
     }
 
@@ -91,26 +116,22 @@ export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageC
 
         const resources: OriginalLanguageResource[] = []
 
+        // Always try the painted OL key. Catalog metadata is a hint only —
+        // UHB is often in the workspace/loader cache before catalog get() lands.
         if (isNT) {
           const greekResourceKey = 'unfoldingWord/el-x-koine/ugnt'
-          const greekMetadata = await catalogManager.getResourceMetadata(greekResourceKey)
-          if (greekMetadata) {
-            resources.push({
-              resourceKey: greekResourceKey,
-              language: 'el-x-koine',
-              bookCode,
-            })
-          }
+          resources.push({
+            resourceKey: greekResourceKey,
+            language: 'el-x-koine',
+            bookCode,
+          })
         } else {
           const hebrewResourceKey = 'unfoldingWord/hbo/uhb'
-          const hebrewMetadata = await catalogManager.getResourceMetadata(hebrewResourceKey)
-          if (hebrewMetadata) {
-            resources.push({
-              resourceKey: hebrewResourceKey,
-              language: 'hbo',
-              bookCode,
-            })
-          }
+          resources.push({
+            resourceKey: hebrewResourceKey,
+            language: 'hbo',
+            bookCode,
+          })
         }
 
         if (cancelled) return
@@ -136,6 +157,8 @@ export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageC
         const filteredChapters = optimizedChapters.filter((ch) => ch.number === chapter)
 
         if (filteredChapters.length === 0) {
+          // `[]` = attempted empty (distinct from first-paint `null`)
+          setOriginalContent([])
           setLoading(false)
           return
         }
@@ -161,7 +184,7 @@ export function useOriginalLanguageContent({ resourceKey }: UseOriginalLanguageC
     return () => {
       cancelled = true
     }
-  }, [currentRef.book, currentRef.chapter, catalogManager, loaderRegistry, resourceKey])
+  }, [currentRef.book, currentRef.chapter, loaderRegistry, resourceKey, retryTick])
 
   return {
     originalLanguageResources,

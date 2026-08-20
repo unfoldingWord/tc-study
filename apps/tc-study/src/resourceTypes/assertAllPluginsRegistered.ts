@@ -4,17 +4,44 @@
  * Every id in `expectedIds` must appear in `registeredIds`. Incomplete
  * registration must throw so callers never mark `resourceTypesReady`.
  */
-export function assertAllPluginsRegistered(
+function assertExpectedIdsRegistered(
+  label: string,
   expectedIds: readonly string[],
   registeredIds: readonly string[]
 ): void {
   const registered = new Set(registeredIds)
   const missing = expectedIds.filter((id) => !registered.has(id))
   if (missing.length > 0) {
-    throw new Error(
-      `Resource type plugin registration incomplete; missing ids: ${missing.join(', ')}`
-    )
+    throw new Error(`${label} registration incomplete; missing ids: ${missing.join(', ')}`)
   }
+}
+
+export function assertAllPluginsRegistered(
+  expectedIds: readonly string[],
+  registeredIds: readonly string[]
+): void {
+  assertExpectedIdsRegistered('Resource type plugin', expectedIds, registeredIds)
+}
+
+export function assertAllCompositionsRegistered(
+  expectedIds: readonly string[],
+  registeredIds: readonly string[]
+): void {
+  assertExpectedIdsRegistered('Composition', expectedIds, registeredIds)
+}
+
+export function assertAllPanelEntriesRegistered(
+  expectedIds: readonly string[],
+  registeredIds: readonly string[]
+): void {
+  assertExpectedIdsRegistered('Panel entry', expectedIds, registeredIds)
+}
+
+export function assertAllPanelModesRegistered(
+  expectedIds: readonly string[],
+  registeredIds: readonly string[]
+): void {
+  assertExpectedIdsRegistered('Panel mode', expectedIds, registeredIds)
 }
 
 /**

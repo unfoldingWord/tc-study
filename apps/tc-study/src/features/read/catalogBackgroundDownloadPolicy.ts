@@ -21,7 +21,16 @@ export function shouldResetDownloadTracking(
   previousScope: string,
   nextScope: string
 ): boolean {
-  return nextScope !== '' && nextScope !== previousScope
+  if (nextScope === '' || nextScope === previousScope) return false
+  // `p1Lang|p2Lang` — inherit/fill of an empty pane is not a language switch.
+  if (previousScope.includes('|') && nextScope.includes('|')) {
+    const [prevA = '', prevB = ''] = previousScope.split('|')
+    const [nextA = '', nextB = ''] = nextScope.split('|')
+    const filledFirst = prevA === '' && nextA !== '' && prevB === nextB
+    const filledSecond = prevB === '' && nextB !== '' && prevA === nextA
+    if (filledFirst || filledSecond) return false
+  }
+  return true
 }
 
 export function findMissingExpectedResources(
@@ -52,4 +61,23 @@ export function filterUncheckedResourceKeys(
   return allResourceKeys.filter(
     (key) => !processed.has(key) && !downloading.has(key)
   )
+}
+
+/**
+ * Queue only resources for the languages currently on the two Read panels
+ * (`expectedResources` from catalog load). Persistent catalog leftovers from
+ * earlier sessions / other languages must not inflate the worker total or
+ * hang progress on a stale zip.
+ *
+ * When expected is empty, fall back to catalog keys (manual / debug paths).
+ */
+export function keysToEnqueueForDownload(
+  catalogKeys: readonly string[],
+  expectedResources?: readonly string[] | null
+): string[] {
+  if (!expectedResources || expectedResources.length === 0) {
+    return [...catalogKeys]
+  }
+  const catalog = new Set(catalogKeys)
+  return expectedResources.filter((key) => catalog.has(key))
 }

@@ -1,5 +1,13 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
+import {
+  bindCombinedHelpsCompositionsForTest,
+  bindFakeCompositionForTest,
+  FAKE_COMPOSITION_PERSIST_ID,
+} from '../helps/testCompositionRegistry'
 import { getResourceBadgeLabel, getTabShortLabel } from './tabShortLabel'
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 describe('getTabShortLabel', () => {
   test('uppercases key segment when no abbreviation', () => {
@@ -19,6 +27,36 @@ describe('getTabShortLabel', () => {
         abbreviation: 'tpl',
       })
     ).toBe('TPL')
+  })
+
+  test('composition persist ids use displayName (OBS Helps is not a generic Helps label)', () => {
+    expect(
+      getTabShortLabel({
+        key: '__combined-helps__',
+        type: 'combined-helps',
+        title: 'Helps',
+      })
+    ).toBe('Helps')
+    expect(
+      getTabShortLabel({
+        key: '__combined-helps-obs__',
+        type: 'obs-combined-helps',
+        title: 'OBS Helps',
+      })
+    ).toBe('OBS Helps')
+  })
+
+  test('fake composition persist id uses displayName without CombinedHelps-id checks', () => {
+    const restore = bindFakeCompositionForTest()
+    try {
+      expect(
+        getTabShortLabel({
+          key: `${FAKE_COMPOSITION_PERSIST_ID}:panel-1`,
+        })
+      ).toBe('Fake Pair')
+    } finally {
+      restore()
+    }
   })
 
   test('ignores blank abbreviation and falls back to key', () => {

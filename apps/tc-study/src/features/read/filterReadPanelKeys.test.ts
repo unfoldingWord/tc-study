@@ -1,6 +1,14 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
-import { filterReadPanel2Keys } from './filterReadPanelKeys'
+import {
+  bindCombinedHelpsCompositionsForTest,
+  bindFakeCompositionForTest,
+  FAKE_COMPOSITION_PERSIST_ID,
+} from '../helps/testCompositionRegistry'
+import { filterReadPanel2Keys, filterReadPanelKeysByMode } from './filterReadPanelKeys'
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 const registry = {
   getTypeForSubject: () => undefined,
@@ -92,5 +100,90 @@ describe('filterReadPanel2Keys', () => {
       currentBook: 'tit',
     })
     expect(keys).toEqual([COMBINED_HELPS_RESOURCE_ID])
+  })
+})
+
+describe('filterReadPanelKeysByMode (original-language book scope)', () => {
+  test('scripture mode hides leftover UHB on an NT book', () => {
+    const keys = filterReadPanelKeysByMode('scripture', {
+      resourceKeys: [
+        'unfoldingWord/en/ult',
+        'unfoldingWord/el-x-koine/ugnt',
+        'unfoldingWord/hbo/uhb',
+      ],
+      loadedResources: {
+        'unfoldingWord/en/ult': { id: 'unfoldingWord/en/ult', type: 'scripture' } as any,
+        'unfoldingWord/el-x-koine/ugnt': {
+          id: 'unfoldingWord/el-x-koine/ugnt',
+          type: 'scripture',
+          subject: 'Greek New Testament',
+        } as any,
+        'unfoldingWord/hbo/uhb': {
+          id: 'unfoldingWord/hbo/uhb',
+          type: 'scripture',
+          subject: 'Hebrew Old Testament',
+        } as any,
+      },
+      resourceTypeRegistry: registry,
+      navigationScope: 'scripture',
+      currentBook: 'tit',
+    })
+    expect(keys).toEqual(['unfoldingWord/en/ult', 'unfoldingWord/el-x-koine/ugnt'])
+    expect(keys).not.toContain('unfoldingWord/hbo/uhb')
+  })
+
+  test('mode flip paints scripture vs CombinedHelps from mixed membership', () => {
+    const resourceKeys = [
+      'unfoldingWord/en/ult',
+      COMBINED_HELPS_RESOURCE_ID,
+      'uw/en/tq',
+    ]
+    const loadedResources = {
+      'unfoldingWord/en/ult': { id: 'unfoldingWord/en/ult', type: 'scripture' } as any,
+      [COMBINED_HELPS_RESOURCE_ID]: {
+        id: COMBINED_HELPS_RESOURCE_ID,
+        type: 'combined-helps',
+        appliesToScope: 'scripture',
+      } as any,
+      'uw/en/tq': { id: 'uw/en/tq', type: 'questions', appliesToScope: 'scripture' } as any,
+    }
+    expect(
+      filterReadPanelKeysByMode('scripture', {
+        resourceKeys,
+        loadedResources,
+        resourceTypeRegistry: registry,
+        navigationScope: 'scripture',
+        currentBook: 'tit',
+      })
+    ).toEqual(['unfoldingWord/en/ult'])
+    expect(
+      filterReadPanelKeysByMode('helps', {
+        resourceKeys,
+        loadedResources,
+        resourceTypeRegistry: registry,
+        navigationScope: 'scripture',
+        currentBook: 'tit',
+      })
+    ).toEqual([COMBINED_HELPS_RESOURCE_ID, 'uw/en/tq'])
+  })
+
+  test('test-only fake composition persist id is dropped in scripture mode (not isCombinedHelpsId)', () => {
+    const unbind = bindFakeCompositionForTest()
+    try {
+      const scoped = `${FAKE_COMPOSITION_PERSIST_ID}:panel-1`
+      const keys = filterReadPanelKeysByMode('scripture', {
+        resourceKeys: ['unfoldingWord/en/ult', scoped],
+        loadedResources: {
+          'unfoldingWord/en/ult': { id: 'unfoldingWord/en/ult', type: 'scripture' } as any,
+        },
+        resourceTypeRegistry: registry,
+        navigationScope: 'scripture',
+        currentBook: 'tit',
+      })
+      expect(keys).toEqual(['unfoldingWord/en/ult'])
+      expect(keys).not.toContain(scoped)
+    } finally {
+      unbind()
+    }
   })
 })

@@ -1,7 +1,7 @@
 import type { TranslatorSection } from '@bt-synergy/scripture-loader'
 import type { BCVReference, BookInfo } from '../../contexts'
 import type { ResourceInfo } from '../../contexts/types'
-import { COMBINED_HELPS_IDS } from '../helps/combinedHelpsIds'
+import { isRegisteredCompositionPersistId } from '../helps/resolveCompositionEntry'
 import { getStandardBookOrderIndex, getStandardVerseCount } from '../../lib/versification'
 import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
 
@@ -56,15 +56,18 @@ export function findObsCatalogKey(
   preferLanguage?: string
 ): string | null {
   let fallback: string | null = null
-  const preferLang = preferLanguage?.toLowerCase()
+  const preferLang = preferLanguage?.trim()
   for (const r of Object.values(loadedResources)) {
     if (!r) continue
     const rk = r.resourceKey ?? r.key
-    if (!rk || COMBINED_HELPS_IDS.has(rk)) continue
+    if (!rk || isRegisteredCompositionPersistId(rk)) continue
 
     const typeStr = String(r.type ?? '').toLowerCase().trim()
     if (typeStr === 'obs' || /open bible stories/i.test(r.subject ?? '')) {
-      if (preferLang && resourceMatchesPreferLang(r, preferLang)) return rk
+      if (preferLang) {
+        if (resourceMatchesPreferLang(r, preferLang)) return rk
+        continue
+      }
       if (!fallback) fallback = rk
     }
   }
@@ -91,8 +94,7 @@ export function getScriptureResources(
     return !isOriginalLanguageResource(lang, subject)
   })
   if (!preferLanguage) return all
-  const matched = all.filter((r) => resourceMatchesPreferLang(r, preferLanguage))
-  return matched.length > 0 ? matched : all
+  return all.filter((r) => resourceMatchesPreferLang(r, preferLanguage))
 }
 
 /** Build navigation book list from scripture resource ingredients (same rules as ScriptureViewer useTOC). */

@@ -1,39 +1,49 @@
 /**
  * Language Picker Component
  *
- * Modal for selecting a language on the Read page. Styled like the resource
- * selection wizard in the Studio sidebar (header, progress strip, content, footer)
- * but with a single step: language selection only.
- * Uses Door43 API via useDoor43Data (same as LanguageSelectorStep).
+ * Modal for selecting a language on the Read page. Icon-first chrome: one
+ * header icon + count badge + Bible/OBS filter. Fetch subjects follow
+ * listMode only (`text` → primary content, `helps` → companion all-helps).
+ * Chips default from navigation scope (Bible vs stories). Helps chips
+ * filter companion flags (bibleHelps / obsHelps); text chips filter
+ * primary content flags (bible / obs).
  */
 
 import {
     AlertCircle,
-    Database,
     Globe,
     Languages,
     Loader2,
     RefreshCw,
-    Wifi,
     X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
-import { useCatalogManager, useResourceTypeRegistry } from '../contexts'
+import { useCatalogManager, usePanelEntryRegistry, useResourceTypeRegistry } from '../contexts'
+import {
+  defaultTextKindForPicker,
+  filterPickerLanguages,
+  type LanguagePickerListMode,
+  type TextKindFilter,
+} from '../features/read/filterPickerLanguages'
+import { availabilitySubjectSetsFromRegistry } from '../features/read/compositionAvailabilitySubjects'
+import { fetchLanguageAvailabilityByCode } from '../features/read/languageAvailability'
+import { resolveLanguageListKind } from '../features/read/languageListKind'
+import {
+  loadLanguagesCache,
+  saveLanguagesCache,
+  type ListedLanguage,
+} from '../features/read/languagesCache'
+import {
+  filterCachedLanguagesForKind,
+  revalidatePickerLanguages,
+} from '../features/read/revalidatePickerLanguages'
+import { supportedSubjectsFromRegistry } from '../features/read/scriptureLanguageMismatch'
 import { useWizardStore } from '../lib/stores/wizardStore'
+import { LanguagePickerGrid } from './LanguagePickerGrid'
+import { LanguagePickerTextKindFilter } from './LanguagePickerTextKindFilter'
 import { ModalPortal } from './shared/ModalPortal'
-import { SelectableGridWithStatus } from './shared/SelectableGrid'
-
-// Cache key for localStorage
-const LANGUAGES_CACHE_KEY = 'tc-study:languages-cache'
-const CACHE_VERSION = 2 // Increment to invalidate cache (v2: include direction from list/languages)
-
-interface CachedLanguages {
-  version: number
-  timestamp: number
-  subjects: string[]
-  languages: Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>
-}
+import { useLanguagePickerOpen } from './useLanguagePickerOpen'
 
 interface LanguagePickerProps {
   onLanguageSelected?: (languageCode: string) => void
@@ -41,6 +51,19 @@ interface LanguagePickerProps {
   autoOpen?: boolean
   /** When true, the dialog cannot be dismissed without choosing a language (Read page on /read). */
   required?: boolean
+  /** Label + which subject set to fetch (`text` vs `helps`). */
+  listMode?: LanguagePickerListMode
+  /** App Bible vs stories nav — defaults the Bible / OBS filter chip. */
+  navigationScope?: 'scripture' | 'obs' | null
+  /** Controlled open — empty-state CTA can open the same instance. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  /** Extra classes on the trigger (Read panel chrome uses thumb-sized targets). */
+  triggerClassName?: string
+  /** This pane's language — strong selected card. */
+  currentLanguageCode?: string | null
+  /** Sibling pane's language — softer selected card when different. */
+  otherLanguageCode?: string | null
 }
 
 export function LanguagePicker({
@@ -48,73 +71,40 @@ export function LanguagePicker({
   compact = false,
   autoOpen = false,
   required = false,
+  listMode = 'text',
+  navigationScope,
+  open,
+  onOpenChange,
+  triggerClassName,
+  currentLanguageCode,
+  otherLanguageCode,
 }: LanguagePickerProps) {
-  const [isOpen, setIsOpen] = useState(() => autoOpen || required)
-
-  // Re-open when autoOpen or required transitions false → true after mount.
-  // The parent (SimplifiedReadView) is responsible for setting both to false
-  // before any LanguagePicker instance remounts, so this effect only fires
-  // for intentional re-opens (e.g. user navigates back to /read).
-  useEffect(() => {
-    if (autoOpen || required) {
-      setIsOpen(true)
-    }
-  }, [autoOpen, required])
+  const { isOpen, setOpen } = useLanguagePickerOpen({
+    autoOpen,
+    required,
+    open,
+    onOpenChange,
+  })
   const [searchQuery, setSearchQuery] = useState('')
+  const [textKind, setTextKind] = useState<TextKindFilter>(() =>
+    defaultTextKindForPicker(listMode, navigationScope)
+  )
+  const triggerLabel =
+    listMode === 'helps' ? 'Select helps language' : 'Select language'
 
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
+  const panelEntryRegistry = usePanelEntryRegistry()
   const setAvailableLanguages = useWizardStore((s) => s.setAvailableLanguages)
 
-  // Get supported subjects for filtering (stable string for effect/callback deps)
-  const supportedSubjects = resourceTypeRegistry.getSupportedSubjects()
-  const supportedSubjectsKey = supportedSubjects.join(',')
-  
-  // Try to load from cache first
-  const loadFromCache = (): Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }> | null => {
-    try {
-      const cached = localStorage.getItem(LANGUAGES_CACHE_KEY)
-      if (!cached) return null
-      
-      const parsed: CachedLanguages = JSON.parse(cached)
-      
-      // Validate cache version and subjects match
-      if (parsed.version !== CACHE_VERSION) {
-        return null
-      }
-      
-      // Check if subjects match (order doesn't matter)
-      const cachedSubjects = new Set(parsed.subjects)
-      const currentSubjects = new Set(supportedSubjects)
-      if (cachedSubjects.size !== currentSubjects.size || 
-          !supportedSubjects.every(s => cachedSubjects.has(s))) {
-        return null
-      }
-      
-      return parsed.languages
-    } catch (error) {
-      console.warn('⚠️ Failed to load languages from cache:', error)
-      return null
-    }
-  }
-  
-  // Save to cache after successful fetch
-  const saveToCache = (languages: Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>) => {
-    try {
-      const cacheData: CachedLanguages = {
-        version: CACHE_VERSION,
-        timestamp: Date.now(),
-        subjects: supportedSubjects,
-        languages,
-      }
-      localStorage.setItem(LANGUAGES_CACHE_KEY, JSON.stringify(cacheData))
-    } catch (error) {
-      console.warn('⚠️ Failed to save languages to cache:', error)
-    }
-  }
+  const listKind = resolveLanguageListKind({ listMode })
+  const listSubjects = resourceTypeRegistry.subjectsForLanguageList(listKind)
+  const globalSubjects = supportedSubjectsFromRegistry(resourceTypeRegistry)
+  const listSubjectsKey = listSubjects.join(',')
+  const globalSubjectsKey = globalSubjects.join(',')
 
   // Displayed list: show cache immediately, then update when revalidation completes
-  const [displayedLanguages, setDisplayedLanguages] = useState<Array<{ code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }>>([])
+  const [displayedLanguages, setDisplayedLanguages] = useState<ListedLanguage[]>([])
   const [isRevalidating, setIsRevalidating] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
@@ -123,109 +113,96 @@ export function LanguagePicker({
     setError(null)
     try {
       const client = getDoor43ApiClient()
-      const door43Langs = await client.getLanguages({
-        subjects: supportedSubjects,
-        stage: 'prod',
-        topic: 'tc-ready',
+      const [availabilityByCode, catalogStats] = await Promise.all([
+        fetchLanguageAvailabilityByCode(
+          client,
+          availabilitySubjectSetsFromRegistry(resourceTypeRegistry, panelEntryRegistry)
+        ),
+        catalogManager.getCatalogStats(),
+      ])
+      const { display, global } = await revalidatePickerLanguages({
+        client,
+        kind: listKind,
+        listSubjects,
+        globalSubjects,
+        catalogCodes: Object.keys(catalogStats.byLanguage),
+        availabilityByCode,
       })
-      const door43NameMap = new Map<string, string>()
-      const door43DirectionMap = new Map<string, 'ltr' | 'rtl'>()
-      for (const lang of door43Langs) {
-        door43NameMap.set(lang.code, lang.name || lang.code.toUpperCase())
-        door43DirectionMap.set(lang.code, lang.direction)
-      }
-      const catalogStats = await catalogManager.getCatalogStats()
-      const catalogLanguageCodes = Object.keys(catalogStats.byLanguage)
-      const languageMap = new Map<
-        string,
-        { code: string; name: string; source: 'catalog' | 'door43'; direction?: 'ltr' | 'rtl' }
-      >()
-      for (const code of catalogLanguageCodes) {
-        languageMap.set(code, {
-          code,
-          name: door43NameMap.get(code) || code.toUpperCase(),
-          source: 'catalog',
-          direction: door43DirectionMap.get(code),
-        })
-      }
-      for (const lang of door43Langs) {
-        if (!languageMap.has(lang.code)) {
-          languageMap.set(lang.code, {
-            code: lang.code,
-            name: lang.name || lang.code.toUpperCase(),
-            source: 'door43',
-            direction: lang.direction,
-          })
-        }
-      }
-      const merged = Array.from(languageMap.values()).sort((a, b) =>
-        a.name.localeCompare(b.name)
-      )
-      saveToCache(merged)
-      setDisplayedLanguages(merged)
-      setAvailableLanguages(merged)
+      saveLanguagesCache(global, globalSubjects)
+      setDisplayedLanguages(display)
+      setAvailableLanguages(global)
     } catch (err) {
       console.error('❌ Failed to revalidate languages:', err)
       setError(err as Error)
     } finally {
       setIsRevalidating(false)
     }
-  }, [supportedSubjectsKey, catalogManager])
+  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager, resourceTypeRegistry, panelEntryRegistry])
 
   const revalidateRef = useRef(revalidate)
   revalidateRef.current = revalidate
+
+  // Opens on Bible or OBS from navigation scope; user can still change the chip.
+  useEffect(() => {
+    if (!isOpen) return
+    setTextKind(defaultTextKindForPicker(listMode, navigationScope))
+  }, [isOpen, listMode, navigationScope])
 
   // When picker opens: show cache immediately (optimistic), then revalidate in background
   useEffect(() => {
     if (!isOpen) return
 
-    const cached = loadFromCache()
+    const cached = loadLanguagesCache(globalSubjects)
     if (cached?.length) {
-      setDisplayedLanguages(cached)
+      const scoped = filterCachedLanguagesForKind(cached, listKind)
+      setDisplayedLanguages(scoped)
       setAvailableLanguages(cached)
     } else {
       setDisplayedLanguages([])
     }
     setError(null)
     revalidateRef.current()
-  }, [isOpen])
+  }, [isOpen, listKind, globalSubjectsKey])
 
   const languages = displayedLanguages
   const isLoading = isRevalidating && displayedLanguages.length === 0
   const retry = revalidate
 
-  const filteredLanguages = searchQuery
-    ? languages.filter(
-        (lang) =>
-          lang.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          lang.code.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : languages
+  const filteredLanguages = filterPickerLanguages(languages, {
+    searchQuery,
+    textKind,
+    listMode,
+  })
 
   const catalogLanguages = filteredLanguages.filter((l) => l.source === 'catalog')
   const onlineLanguages = filteredLanguages.filter((l) => l.source === 'door43')
+  const showCount = (!isLoading || displayedLanguages.length > 0) && !error
+
+  const resetAndClose = () => {
+    setOpen(false)
+    setSearchQuery('')
+    setTextKind(defaultTextKindForPicker(listMode, navigationScope))
+  }
 
   const closeModal = () => {
     if (required) return
-    setIsOpen(false)
-    setSearchQuery('')
+    resetAndClose()
   }
 
   const handleSelect = (code: string) => {
     onLanguageSelected?.(code)
-    setIsOpen(false)
-    setSearchQuery('')
+    resetAndClose()
   }
 
   return (
-    <div className="relative">
+    <div className="relative inline-flex shrink-0">
       <button
-        onClick={() => setIsOpen(true)}
-        className={`flex items-center gap-1.5 rounded transition-colors ${
+        onClick={() => setOpen(true)}
+        className={`flex items-center justify-center rounded transition-colors ${
           compact ? 'p-1 text-fg-secondary hover:bg-muted' : 'px-3 py-1.5 bg-accent text-white hover:bg-accent-hover shadow-md'
-        }`}
-        title="Select language"
-        aria-label="Select language"
+        } ${triggerClassName ?? ''}`}
+        title={triggerLabel}
+        aria-label={triggerLabel}
       >
         <Languages className="w-4 h-4" />
       </button>
@@ -239,57 +216,40 @@ export function LanguagePicker({
             aria-hidden="true"
           />
           <div
-            className="relative flex flex-col bg-surface border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden m-4"
+            className="relative flex flex-col bg-surface border border-border-subtle rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden m-4"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="language-picker-title"
+            aria-label={triggerLabel}
           >
-            {/* Header - matches wizard */}
-            <div className="px-4 py-2 border-b border-border flex items-center justify-between bg-muted flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <Languages className="w-5 h-5 text-accent" />
-              </div>
-              {!required && (
-                <button
-                  onClick={closeModal}
-                  className="p-1 hover:bg-surface rounded transition-colors text-fg-secondary"
-                  title="Close"
-                  aria-label="Close"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Progress strip - single step (wizard-style) */}
-            <div className="px-4 py-2 border-b border-border bg-surface flex-shrink-0">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <div
-                    className="p-1.5 rounded-full bg-accent text-white"
-                    title="Language selection"
-                    aria-label="Language selection"
-                  >
-                    <Languages className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-                {(!isLoading || displayedLanguages.length > 0) && !error && (
-                  <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-full">
+            <div className="px-chrome py-chrome-tight border-b border-border-subtle flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Languages className="w-5 h-5 text-accent shrink-0" aria-hidden />
+                {showCount && (
+                  <span className="inline-flex items-center gap-1 h-5 min-w-[1.25rem] px-1.5 rounded-full bg-accent-soft text-accent-fg text-micro font-semibold">
                     {isRevalidating && displayedLanguages.length > 0 && (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" aria-hidden />
+                      <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
                     )}
-                    <Globe className="w-3.5 h-3.5 text-fg-secondary" />
-                    <span className="text-xs font-medium text-fg">
-                      {filteredLanguages.length}
-                    </span>
-                  </div>
+                    {filteredLanguages.length}
+                  </span>
+                )}
+              </div>
+              <div className="ml-auto flex items-center gap-1.5">
+                <LanguagePickerTextKindFilter value={textKind} onChange={setTextKind} />
+                {!required && (
+                  <button
+                    onClick={closeModal}
+                    className="p-1 hover:bg-muted rounded transition-colors text-fg-secondary"
+                    title="Close"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 )}
               </div>
             </div>
 
-            {/* Content - matches wizard step layout */}
-            <div className="flex-1 overflow-auto p-4 min-h-0 bg-canvas">
+            <div className="flex-1 overflow-auto p-content min-h-0 bg-canvas">
               {isLoading && (
                 <div className="flex items-center justify-center py-20">
                   <Loader2 className="w-8 h-8 animate-spin text-accent" />
@@ -311,83 +271,28 @@ export function LanguagePicker({
               )}
 
               {!isLoading && !error && (
-                <div>
-                  <div className="mb-4">
-                    <div className="relative">
-                      <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-fg-muted" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-border rounded-lg focus:ring-2 focus:ring-accent focus:border-accent bg-surface text-fg placeholder:text-fg-muted"
-                        placeholder="..."
-                        aria-label="Search languages"
-                      />
-                    </div>
+                <div className="flex flex-col gap-stack">
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-fg-muted" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-chrome-tight border border-border-subtle rounded-md bg-surface text-fg placeholder:text-fg-muted focus:ring-2 focus:ring-accent focus:border-accent"
+                      placeholder="Search..."
+                      aria-label="Search languages"
+                    />
                   </div>
-
-                  <div className="space-y-4">
-                    {catalogLanguages.length > 0 && (
-                      <SelectableGridWithStatus
-                        items={catalogLanguages}
-                        selected={new Set<string>()}
-                        onToggle={handleSelect}
-                        getKey={(lang) => lang.code}
-                        getStatus={() => 'cached'}
-                        renderItem={(lang, _selected, _status) => (
-                          <>
-                            <div className="font-semibold text-fg mb-0.5">{lang.name}</div>
-                            <div className="text-sm text-fg-muted">{lang.code}</div>
-                            <div className="flex items-center gap-1 mt-1.5">
-                              <Database className="w-3 h-3 text-accent" />
-                            </div>
-                          </>
-                        )}
-                      />
-                    )}
-                    {onlineLanguages.length > 0 && (
-                      <SelectableGridWithStatus
-                        items={onlineLanguages}
-                        selected={new Set<string>()}
-                        onToggle={handleSelect}
-                        getKey={(lang) => lang.code}
-                        getStatus={() => 'online'}
-                        renderItem={(lang, _selected, _status) => (
-                          <>
-                            <div className="font-semibold text-fg mb-0.5">{lang.name}</div>
-                            <div className="text-sm text-fg-muted">{lang.code}</div>
-                            <div className="flex items-center gap-1 mt-1.5">
-                              <Wifi className="w-3 h-3 text-accent" />
-                            </div>
-                          </>
-                        )}
-                      />
-                    )}
-                    {filteredLanguages.length === 0 && (
-                      <div className="text-center py-12 text-fg-muted">
-                        <Globe className="w-12 h-12 mx-auto mb-3 text-fg-muted opacity-50" />
-                      </div>
-                    )}
-                  </div>
+                  <LanguagePickerGrid
+                    catalogLanguages={catalogLanguages}
+                    onlineLanguages={onlineLanguages}
+                    onSelect={handleSelect}
+                    currentLanguageCode={currentLanguageCode}
+                    otherLanguageCode={otherLanguageCode}
+                  />
                 </div>
               )}
             </div>
-
-            {/* Footer - matches wizard (Cancel only) */}
-            {!required && (
-              <div className="px-4 py-2 border-t border-border bg-muted flex-shrink-0">
-                <div className="flex items-center justify-end gap-1.5">
-                  <button
-                    onClick={closeModal}
-                    className="p-1.5 text-fg-secondary hover:bg-surface rounded transition-colors"
-                    title="Cancel"
-                    aria-label="Cancel"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
         </ModalPortal>

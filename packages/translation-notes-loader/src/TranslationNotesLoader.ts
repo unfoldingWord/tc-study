@@ -326,7 +326,29 @@ export class TranslationNotesLoader implements ResourceLoader {
     const ref = (metadata as any).release?.tag_name || 'master'
 
     console.log(`📦 [TN] Downloading zipball for ${resourceKey} (ref: ${ref})`)
-    const zipBuffer = await this.door43Client.downloadZipball(owner, repoName, ref)
+    if (onProgress) {
+      onProgress({
+        loaded: 0,
+        total: ingredients.length,
+        percentage: 0,
+        message: 'Downloading zip',
+      })
+    }
+    const zipBuffer = await this.door43Client.downloadZipball(
+      owner,
+      repoName,
+      ref,
+      onProgress
+        ? (p: { percentage: number }) => {
+            onProgress({
+              loaded: 0,
+              total: ingredients.length,
+              percentage: p.percentage,
+              message: 'Downloading zip',
+            })
+          }
+        : undefined
+    )
     console.log(`✅ [TN] Zipball downloaded: ${(zipBuffer.byteLength / 1024).toFixed(0)} KB`)
 
     const jszipMod = await import('jszip')

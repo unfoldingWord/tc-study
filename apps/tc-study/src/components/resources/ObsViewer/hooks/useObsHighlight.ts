@@ -2,9 +2,20 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { FrameSpan } from '../../../../lib/obs/highlightFrameText'
 import { overlappingEntriesForWordRange } from '../../../../lib/obs/highlightFrameWords'
-import type { ObsFrameHighlightSignal, ObsFrameQuoteEntry } from '../../../../signals/studioSignals'
+import type {
+  ObsFrameHighlightSignal,
+  ObsFrameQuoteEntry,
+  VerseFilterSignal,
+} from '../../../../signals/studioSignals'
 import type { ActiveHl } from '../types'
-import { isObsEntryActive, sortedSourceIdsKey } from '../obsHighlightHelpers'
+import {
+  isObsEntryActive,
+  obsFrameFilterFromHelpsPayload,
+  obsFrameVerseFilter,
+  scrollObsFrameIntoView,
+  sortedSourceIdsKey,
+  type ObsVerseFilterRef,
+} from '../obsHighlightHelpers'
 
 export function useObsHighlight(params: {
   resourceId: string
@@ -28,7 +39,10 @@ export function useObsHighlight(params: {
   } = params
 
   const [activeHighlight, setActiveHighlight] = useState<ActiveHl | null>(null)
+  const [activeFrameFilter, setActiveFrameFilter] = useState<ObsVerseFilterRef | null>(null)
   const frameTextRef = useRef<HTMLDivElement>(null)
+  const paneRef = useRef<HTMLDivElement>(null)
+  const pendingFrameScrollRef = useRef(false)
 
   const resourceMetadata = {
     type: 'obs' as const,
@@ -38,6 +52,11 @@ export function useObsHighlight(params: {
 
   const { sendToAll: sendObsHighlight } = useSignal<ObsFrameHighlightSignal>(
     'obs-frame-highlight',
+    resourceId,
+    resourceMetadata
+  )
+  const { sendToAll: sendVerseFilter } = useSignal<VerseFilterSignal>(
+    'verse-filter',
     resourceId,
     resourceMetadata
   )
@@ -57,6 +76,11 @@ export function useObsHighlight(params: {
           return
         }
         const h = signal.highlight
+        const frameFilter = obsFrameFilterFromHelpsPayload(h)
+        if (frameFilter) {
+          pendingFrameScrollRef.current = true
+          setActiveFrameFilter(frameFilter)
+        }
         if (h.storyNumber !== storyNum) return
         if (!isRange && h.frameNumber !== frameNum) return
         if (h.overlappingSourceIds?.length) {
@@ -84,8 +108,30 @@ export function useObsHighlight(params: {
     { debug: false, resourceMetadata }
   )
 
+  useSignalHandler<VerseFilterSignal>(
+    'verse-filter',
+    resourceId,
+    useCallback(
+      (signal) => {
+        if (signal.sourceResourceId === resourceId) return
+        if (signal.filter === null || signal.filter.verse === undefined) {
+          setActiveFrameFilter(null)
+          return
+        }
+        pendingFrameScrollRef.current = true
+        setActiveFrameFilter({
+          chapter: signal.filter.chapter,
+          verse: signal.filter.verse,
+        })
+      },
+      [resourceId]
+    ),
+    { debug: false, resourceMetadata }
+  )
+
   useEffect(() => {
     setActiveHighlight(null)
+    setActiveFrameFilter(null)
   }, [storyNum, frameNum, resourceKey])
 
   useEffect(() => {
@@ -94,10 +140,16 @@ export function useObsHighlight(params: {
 
   useLayoutEffect(() => {
     if (!activeHighlight) return
-    const root = frameTextRef.current ?? document.documentElement
+    const root = frameTextRef.current ?? paneRef.current ?? document.documentElement
     const el = root.querySelector('[data-obs-quote-active="true"]')
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }, [activeHighlight])
+
+  useLayoutEffect(() => {
+    if (!activeFrameFilter || !pendingFrameScrollRef.current) return
+    pendingFrameScrollRef.current = false
+    scrollObsFrameIntoView(paneRef.current, activeFrameFilter)
+  }, [activeFrameFilter])
 
   const activateWordSpan = useCallback(
     (span: FrameSpan, sNum: number, fNum: number, enriched: ObsFrameQuoteEntry[]) => {
@@ -205,11 +257,23 @@ export function useObsHighlight(params: {
     [activeHighlight, sendObsHighlight]
   )
 
+  const selectFrame = useCallback(
+    (sNum: number, fNum: number) => {
+      const filter = obsFrameVerseFilter(sNum, fNum)
+      sendVerseFilter({ lifecycle: 'event', filter })
+      setActiveFrameFilter(filter)
+    },
+    [sendVerseFilter]
+  )
+
   return {
     activeHighlight,
+    activeFrameFilter,
     frameTextRef,
+    paneRef,
     activateWordSpan,
     toggleHighlightEntry,
     toggleRangeHighlight,
+    selectFrame,
   }
 }

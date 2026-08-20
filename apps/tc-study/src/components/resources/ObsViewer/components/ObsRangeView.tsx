@@ -1,12 +1,15 @@
 import type { FrameSpan } from '../../../../lib/obs/highlightFrameText'
-import { enrichObsFrameQuoteEntries } from '../../../../lib/obs/enrichObsFrameQuotes'
-import { computeFrameSpans } from '../../../../lib/obs/highlightFrameText'
-import { computeFrameWordSpans } from '../../../../lib/obs/highlightFrameWords'
+import { resolveObsHighlightSpans } from '../../../../lib/obs/resolveObsHighlightSpans'
 import type { ObsFrame, ParsedObsStory } from '../../../../lib/obs/parseObsMarkdown'
 import type { MergedObsFrameQuotes } from '@bt-synergy/resource-panels'
 import type { ObsFrameQuoteEntry } from '../../../../signals/studioSignals'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import type { ActiveHl } from '../types'
+import {
+  isObsFrameFilterActive,
+  obsFrameChromeClass,
+  type ObsVerseFilterRef,
+} from '../obsHighlightHelpers'
 import { ObsQuoteSpans } from './ObsQuoteSpans'
 
 export function ObsRangeView(props: {
@@ -19,6 +22,7 @@ export function ObsRangeView(props: {
   isPanel2QuoteCapable: boolean
   obsQuotesState: MergedObsFrameQuotes | null | undefined
   activeHighlight: ActiveHl | null
+  activeFrameFilter: ObsVerseFilterRef | null
   activateWordSpan: (
     span: FrameSpan,
     sNum: number,
@@ -26,6 +30,7 @@ export function ObsRangeView(props: {
     enriched: ObsFrameQuoteEntry[]
   ) => void
   toggleRangeHighlight: (sNum: number, frameNumber: number, entry: ObsFrameQuoteEntry) => void
+  onFrameClick: (storyNum: number, frameNumber: number) => void
 }) {
   const {
     storyNum,
@@ -37,8 +42,10 @@ export function ObsRangeView(props: {
     isPanel2QuoteCapable,
     obsQuotesState,
     activeHighlight,
+    activeFrameFilter,
     activateWordSpan,
     toggleRangeHighlight,
+    onFrameClick,
   } = props
 
   return (
@@ -48,7 +55,7 @@ export function ObsRangeView(props: {
         if (!storyData) {
           return (
             <div key={sNum} className="flex items-center gap-2 py-2">
-              <LoadingSpinner size="sm" label={`Loading story ${sNum}`} className="text-blue-600" />
+              <LoadingSpinner size="sm" label={`Loading story ${sNum}`} className="text-accent" />
             </div>
           )
         }
@@ -63,7 +70,7 @@ export function ObsRangeView(props: {
 
         return (
           <div key={sNum}>
-            <h3 className="text-base font-bold text-gray-700 border-b border-gray-200 pb-1 mb-5">
+            <h3 className="text-base font-bold text-scripture-fg border-b border-border pb-1 mb-5">
               {storyData.title}
             </h3>
             <div className="space-y-8">
@@ -71,36 +78,35 @@ export function ObsRangeView(props: {
                 const frameEntries: ObsFrameQuoteEntry[] = isPanel2QuoteCapable
                   ? (obsQuotesState?.frameQuoteMap?.[frame.frameNumber] ?? [])
                   : []
-                const frameSpecs = frameEntries.map((q) => ({
-                  quote: q.quote,
-                  occurrence: q.occurrence,
-                }))
-                const frameEnriched =
+                const resolved =
                   frameEntries.length > 0
-                    ? enrichObsFrameQuoteEntries(frame.text, frameEntries)
-                    : frameEntries
-                const frameWordMode =
-                  frameEntries.length > 0 &&
-                  frameEnriched.every((e) => e.startWord != null && e.endWord != null)
-                const frameSpans =
-                  frameSpecs.length > 0
-                    ? frameWordMode
-                      ? computeFrameWordSpans(frame.text, frameEnriched)
-                      : computeFrameSpans(frame.text, frameSpecs)
+                    ? resolveObsHighlightSpans(frame.text, frameEntries)
                     : null
+                const isActive = isObsFrameFilterActive(
+                  activeFrameFilter,
+                  sNum,
+                  frame.frameNumber
+                )
                 return (
-                  <div key={frame.frameNumber} className="space-y-3">
-                    <p className="text-xs text-gray-400 font-medium">
+                  <div
+                    key={frame.frameNumber}
+                    className={`space-y-3 cursor-pointer rounded-lg border p-2 ${obsFrameChromeClass(activeFrameFilter, sNum, frame.frameNumber)}`}
+                    title={`Frame ${sNum} · ${frame.frameNumber}`}
+                    data-obs-frame={`${sNum}:${frame.frameNumber}`}
+                    data-obs-frame-active={isActive ? 'true' : undefined}
+                    onClick={() => onFrameClick(sNum, frame.frameNumber)}
+                  >
+                    <p className="text-xs text-scripture-muted font-medium">
                       {sNum} · {frame.frameNumber}
                     </p>
-                    {frameSpans ? (
-                      <div className="text-gray-900 leading-relaxed whitespace-pre-wrap">
+                    {resolved ? (
+                      <div className="text-scripture-fg leading-relaxed whitespace-pre-wrap">
                         <ObsQuoteSpans
-                          spans={frameSpans}
-                          enriched={frameEnriched}
+                          spans={resolved.spans}
+                          enriched={resolved.enriched}
                           activeHighlight={activeHighlight}
                           frameNumber={frame.frameNumber}
-                          useWordMode={frameWordMode}
+                          useWordMode={resolved.useWordMode}
                           storyNum={sNum}
                           onActivateWord={activateWordSpan}
                           onToggleEntry={(entry) =>
@@ -109,7 +115,7 @@ export function ObsRangeView(props: {
                         />
                       </div>
                     ) : (
-                      <p className="text-gray-900 leading-relaxed whitespace-pre-wrap">
+                      <p className="text-scripture-fg leading-relaxed whitespace-pre-wrap">
                         {frame.text}
                       </p>
                     )}
@@ -117,7 +123,7 @@ export function ObsRangeView(props: {
                       <img
                         src={frame.resolvedSrc || frame.imageUrl}
                         alt=""
-                        className="w-full rounded-lg border border-gray-200 shadow-sm bg-gray-50"
+                        className="w-full rounded-lg border border-border shadow-sm bg-muted"
                         loading="lazy"
                       />
                     )}

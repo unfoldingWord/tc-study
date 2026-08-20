@@ -103,10 +103,21 @@ export function useTWPreviews(resourceKey: string) {
     [twPreviews]
   )
 
+  const isTWPreviewPending = useCallback(
+    (link: TranslationWordsLink): boolean => {
+      const twInfo = parseTWLink(link.twLink || link.articlePath)
+      if (twInfo.category === 'unknown' || !twInfo.term) return false
+      const cacheKey = `${twInfo.category}/${twInfo.term}`
+      return !twPreviews.has(cacheKey)
+    },
+    [twPreviews]
+  )
+
   return {
     twPreviews,
     loadingPreviews,
     fetchTWPreview,
     getTWPreview,
+    isTWPreviewPending,
   }
 }

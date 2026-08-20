@@ -72,15 +72,7 @@ The system automatically:
   - Groups links by verse
   - Shows original words (Hebrew/Greek) and translations
 
-> **💡 Creating a New Viewer?**  
-> If you need to create a new viewer component, see the comprehensive guide in [`ADDING_NEW_RESOURCE_TYPES.md`](./ADDING_NEW_RESOURCE_TYPES.md#step-6-create-viewer-component-if-needed) for detailed instructions on:
->
-> - Viewer component structure and required props
-> - Using catalog hooks (`useCatalogManager`, `useCurrentReference`)
-> - Using linked-panels hooks (`useResourceAPI`, `useEvents`, `useCurrentState`)
-> - Fetching and displaying content
-> - Inter-panel communication patterns
-> - Real-world examples from existing viewers
+> **Registering a new type or tab?** See [`extending-registries.md`](./extending-registries.md). A viewer on a resource type does not paint a tab.
 
 ### Viewer Resolution
 

@@ -11,12 +11,14 @@ import { useCatalogReady, useResourceTypesError } from './contexts/CatalogContex
 import { NavigationProvider } from './contexts/NavigationContext'
 import { useWorkspaceStore } from './lib/stores/workspaceStore'
 import { useWizardStore } from './lib/stores/wizardStore'
+import { door43ToListNameFields } from './features/read/languageListDisplayName'
 
 const Home = lazy(() => import('./pages/Home'))
 const Library = lazy(() => import('./pages/Library'))
 const Collections = lazy(() => import('./pages/Collections'))
 const Studio = lazy(() => import('./pages/Studio'))
 const Read = lazy(() => import('./pages/Read'))
+const ReadV1 = lazy(() => import('./pages/ReadV1'))
 const DataManagement = lazy(() => import('./pages/DataManagement'))
 const Settings = lazy(() => import('./pages/Settings'))
 /** Panel system playground — DEV-only; must not ship as a prod route. */
@@ -49,12 +51,16 @@ function App() {
           const client = getDoor43ApiClient()
           const languages = await client.getLanguages({ stage: 'prod' })
 
-          const languageData = languages.map((lang) => ({
-            code: lang.code,
-            name: lang.name || lang.code.toUpperCase(),
-            source: 'door43' as const,
-            direction: lang.direction,
-          }))
+          const languageData = languages.map((lang) => {
+            const fields = door43ToListNameFields(lang)
+            return {
+              code: lang.code,
+              name: fields.name || lang.code.toUpperCase(),
+              anglicizedName: fields.anglicizedName,
+              source: 'door43' as const,
+              direction: lang.direction,
+            }
+          })
 
           setAvailableLanguages(languageData)
         } catch (error) {
@@ -64,7 +70,7 @@ function App() {
 
       loadLanguages()
 
-      const isReadWithLanguage = window.location.pathname.match(/^\/read\/[^/]+(\/|$)/)
+      const isReadWithLanguage = window.location.pathname.match(/^\/read(-v1)?\/[^/]+(\/|$)/)
       // Read deep-link owns bootstrap; otherwise restore last workspace package.
       if (!isReadWithLanguage) {
         await loadSavedWorkspace()
@@ -134,7 +140,7 @@ function App() {
                     }
                   />
                   <Route
-                    path="read"
+                    path="read/*"
                     element={
                       <Suspense fallback={<ReadPageSkeleton />}>
                         <Read />
@@ -142,34 +148,42 @@ function App() {
                     }
                   />
                   <Route
-                    path="read/:languageCode/:resourceType/:navType/:navRef"
+                    path="read-v1"
                     element={
                       <Suspense fallback={<ReadPageSkeleton />}>
-                        <Read />
+                        <ReadV1 />
                       </Suspense>
                     }
                   />
                   <Route
-                    path="read/:languageCode/:resourceType/:navType"
+                    path="read-v1/:languageCode/:resourceType/:navType/:navRef"
                     element={
                       <Suspense fallback={<ReadPageSkeleton />}>
-                        <Read />
+                        <ReadV1 />
                       </Suspense>
                     }
                   />
                   <Route
-                    path="read/:languageCode/:resourceType"
+                    path="read-v1/:languageCode/:resourceType/:navType"
                     element={
                       <Suspense fallback={<ReadPageSkeleton />}>
-                        <Read />
+                        <ReadV1 />
                       </Suspense>
                     }
                   />
                   <Route
-                    path="read/:languageCode"
+                    path="read-v1/:languageCode/:resourceType"
                     element={
                       <Suspense fallback={<ReadPageSkeleton />}>
-                        <Read />
+                        <ReadV1 />
+                      </Suspense>
+                    }
+                  />
+                  <Route
+                    path="read-v1/:languageCode"
+                    element={
+                      <Suspense fallback={<ReadPageSkeleton />}>
+                        <ReadV1 />
                       </Suspense>
                     }
                   />

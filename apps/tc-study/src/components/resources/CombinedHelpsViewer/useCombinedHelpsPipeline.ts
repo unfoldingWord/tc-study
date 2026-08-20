@@ -4,7 +4,6 @@
 
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useMemo } from 'react'
-import { resolveQuoteSemanticIds } from '../../../features/helps/resolveQuoteSemanticIds'
 import {
   filterLinksByReferenceRange,
   filterNotesByReferenceRange,
@@ -12,7 +11,7 @@ import {
   type ObsQuoteFilter,
   type VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
-import { parseLinkChapterVerse } from '../../../features/helps/quoteTokens'
+import { underlineGroupsFromHelpsNotes } from '../../../features/helps/scriptureReadyUnderlineRebind'
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { useAlignedTokens, useQuoteTokens } from '../WordsLinksViewer/hooks'
 import {
@@ -95,16 +94,18 @@ export function useCombinedHelpsPipeline({
   // SCRIPTURE_TOKENS is received on the mounted CombinedHelps resourceId.
   // TN/TWL keys are catalog sources only — they are not linked-panels resources
   // when CombinedHelps is injected into the panel.
-  const { linksWithQuotes: tnLinksWithQuotes } = useQuoteTokens({
-    resourceKey: tnKey || resourceKey,
-    resourceId,
-    links: notesWithQuotes,
-  })
+  const { linksWithQuotes: tnLinksWithQuotes, quoteBuildReady: tnQuoteBuildReady } =
+    useQuoteTokens({
+      resourceKey: tnKey || resourceKey,
+      resourceId,
+      links: notesWithQuotes,
+    })
 
   const { linksWithAlignedTokens: tnLinksAligned } = useAlignedTokens({
     resourceKey: tnKey || resourceKey,
     resourceId,
     links: tnLinksWithQuotes,
+    quoteBuildReady: tnQuoteBuildReady,
   })
 
   const notesWithAlignedTokens = useMemo(() => {
@@ -113,11 +114,13 @@ export function useCombinedHelpsPipeline({
     const semanticIdsMap = new Map(
       tnLinksAligned.map((l) => [l.id, (l as { semanticIds?: string[] }).semanticIds])
     )
+    const quoteStatusMap = new Map(tnLinksAligned.map((l) => [l.id, l.quoteStatus]))
     return relevantNotes.map((note) => ({
       ...note,
       quoteTokens: quoteMap.get(note.id),
       alignedTokens: alignedMap.get(note.id),
       semanticIds: semanticIdsMap.get(note.id),
+      quoteStatus: quoteStatusMap.get(note.id),
     })) as NoteWithAlignments[]
   }, [relevantNotes, tnLinksWithQuotes, tnLinksAligned])
 
@@ -135,16 +138,18 @@ export function useCombinedHelpsPipeline({
     }))
   }, [twlLinksRaw])
 
-  const { linksWithQuotes: twlLinksWithQuotes } = useQuoteTokens({
-    resourceKey: twlKey || resourceKey,
-    resourceId,
-    links,
-  })
+  const { linksWithQuotes: twlLinksWithQuotes, quoteBuildReady: twlQuoteBuildReady } =
+    useQuoteTokens({
+      resourceKey: twlKey || resourceKey,
+      resourceId,
+      links,
+    })
 
   const { linksWithAlignedTokens: twlLinksAligned } = useAlignedTokens({
     resourceKey: twlKey || resourceKey,
     resourceId,
     links: twlLinksWithQuotes,
+    quoteBuildReady: twlQuoteBuildReady,
   })
 
   const processedLinks = useMemo(() => {
@@ -181,27 +186,15 @@ export function useCombinedHelpsPipeline({
 
   const bookCodeLower = currentRef.book?.toLowerCase() || ''
 
-  const underlineTnGroups = useMemo(() => {
-    const groups: { sourceId: string; semanticIds: string[] }[] = []
-    for (const note of notesWithAlignedTokens) {
-      if (!note.quoteTokens?.length) continue
-      const { chapter, verse } = parseLinkChapterVerse(note.reference)
-      const semanticIds = resolveQuoteSemanticIds(note as never, bookCodeLower, chapter, verse)
-      if (semanticIds.length > 0) groups.push({ sourceId: note.id, semanticIds })
-    }
-    return groups
-  }, [notesWithAlignedTokens, bookCodeLower])
+  const underlineTnGroups = useMemo(
+    () => underlineGroupsFromHelpsNotes(notesWithAlignedTokens, bookCodeLower),
+    [notesWithAlignedTokens, bookCodeLower]
+  )
 
-  const underlineTwlGroups = useMemo(() => {
-    const groups: { sourceId: string; semanticIds: string[] }[] = []
-    for (const link of filteredByReference) {
-      if (!link.quoteTokens?.length) continue
-      const { chapter, verse } = parseLinkChapterVerse(link.reference)
-      const semanticIds = resolveQuoteSemanticIds(link as never, bookCodeLower, chapter, verse)
-      if (semanticIds.length > 0) groups.push({ sourceId: link.id, semanticIds })
-    }
-    return groups
-  }, [filteredByReference, bookCodeLower])
+  const underlineTwlGroups = useMemo(
+    () => underlineGroupsFromHelpsNotes(filteredByReference, bookCodeLower),
+    [filteredByReference, bookCodeLower]
+  )
 
   const { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches } = useCombinedHelpsDisplay({
     notesWithAlignedTokens,

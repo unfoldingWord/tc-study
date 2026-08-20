@@ -1,0 +1,6 @@
+# SPA fallback - all routes go to index.html
+# This enables client-side routing
+/*    /index.html   200
+
+# Legacy redirects if needed
+# /old-path    /new-path    301

@@ -4,9 +4,12 @@
 
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useCallback } from 'react'
-import type { ObsFrameHighlightSignal, TokenClickSignal } from '../../../signals/studioSignals'
+import type { ObsFrameHighlightSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
+import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import type { NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
+import { helpsCardVerseFilter, obsFrameHighlightFromHelpsRow } from './combinedHelpsUtils'
+import type { HelpsCardSelection } from './helpsCardSelection'
 
 type SendTokenClick = (data: {
   lifecycle: 'event'
@@ -23,6 +26,11 @@ type BroadcastObsHighlight = (data: {
   highlight: ObsFrameHighlightSignal['highlight']
 }) => void
 
+type SendVerseFilter = (data: {
+  lifecycle: 'event'
+  filter: VerseFilterSignal['filter']
+}) => void
+
 export interface UseCombinedHelpsHandlersParams {
   helpsScope: 'scripture' | 'obs'
   bookCode?: string
@@ -32,9 +40,9 @@ export interface UseCombinedHelpsHandlersParams {
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   sendTokenClick: SendTokenClick
   sendEntryLinkClick: SendEntryLinkClick
+  sendVerseFilter: SendVerseFilter
   broadcastObsHighlight: BroadcastObsHighlight
-  setSelectedNoteId: (id: string | null) => void
-  setSelectedLinkId: (id: string | null) => void
+  setSelectedHelpsCard: (selection: HelpsCardSelection) => void
 }
 
 export function useCombinedHelpsHandlers({
@@ -46,72 +54,81 @@ export function useCombinedHelpsHandlers({
   onEntryLinkClick,
   sendTokenClick,
   sendEntryLinkClick,
+  sendVerseFilter,
   broadcastObsHighlight,
-  setSelectedNoteId,
-  setSelectedLinkId,
+  setSelectedHelpsCard,
 }: UseCombinedHelpsHandlersParams) {
-  const handleNoteSelect = useCallback(
-    (note: { id: string }) => {
-      setSelectedNoteId(note.id)
+  const sendObsCardFrameFilter = useCallback(
+    (reference: string) => {
+      if (helpsScope !== 'obs') return
+      sendVerseFilter({ lifecycle: 'event', filter: helpsCardVerseFilter(reference) })
     },
-    [setSelectedNoteId]
+    [helpsScope, sendVerseFilter]
+  )
+
+  const handleNoteSelect = useCallback(
+    (note: { id: string; reference?: string }) => {
+      setSelectedHelpsCard({ kind: 'tn', id: note.id })
+      if (note.reference) sendObsCardFrameFilter(note.reference)
+    },
+    [sendObsCardFrameFilter, setSelectedHelpsCard]
   )
 
   const handleNoteQuoteClick = useCallback(
     (note: NoteWithTokens) => {
+      setSelectedHelpsCard({ kind: 'tn', id: note.id })
       if (helpsScope === 'obs') {
-        const quote = note.quote?.trim()
-        if (!quote) return
+        sendObsCardFrameFilter(note.reference)
+        const highlight = obsFrameHighlightFromHelpsRow({
+          id: note.id,
+          reference: note.reference,
+          quote: note.quote,
+          occurrence: note.occurrence,
+          kind: 'tn',
+        })
+        if (!highlight) return
+        broadcastObsHighlight({ lifecycle: 'event', highlight })
+        return
+      }
+      if (note.quoteTokens?.length) {
         const refParts = note.reference.split(':')
         const chapter = parseInt(refParts[0] || '1', 10)
         const verse = parseInt(refParts[1] || '1', 10)
-        const occRaw = Number.parseInt(String(note.occurrence ?? '1'), 10)
-        const occurrence = Number.isFinite(occRaw) ? occRaw : 1
-        setSelectedNoteId(note.id)
-        broadcastObsHighlight({
+        const book = bookCode?.toLowerCase() || ''
+        const baseOccurrence = parseInt(note.occurrence || '1', 10)
+        const semanticIds = generateSemanticIdsForQuoteTokens(
+          note.quoteTokens,
+          book,
+          chapter,
+          verse,
+          baseOccurrence
+        )
+        const firstToken = note.quoteTokens[0]
+        if (!firstToken) return
+        sendTokenClick({
           lifecycle: 'event',
-          highlight: {
-            storyNumber: chapter,
-            frameNumber: verse,
-            quote,
-            occurrence,
-            rowId: note.id,
-            kind: 'tn',
+          token: {
+            id: String(firstToken.id),
+            content: firstToken.text,
+            semanticId: semanticIds[0],
+            verseRef: `${book} ${chapter}:${verse}`,
+            position: 0,
+            strong: firstToken.strong,
+            lemma: firstToken.lemma,
+            morph: firstToken.morph,
+            alignedSemanticIds: semanticIds,
           },
         })
         return
       }
-      if (!note.quoteTokens?.length) return
       const refParts = note.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
       const verse = parseInt(refParts[1] || '1', 10)
-      const book = bookCode?.toLowerCase() || ''
-      const baseOccurrence = parseInt(note.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        note.quoteTokens,
-        book,
-        chapter,
-        verse,
-        baseOccurrence
-      )
-      const firstToken = note.quoteTokens[0]
-      if (!firstToken) return
-      sendTokenClick({
-        lifecycle: 'event',
-        token: {
-          id: String(firstToken.id),
-          content: firstToken.text,
-          semanticId: semanticIds[0],
-          verseRef: `${book} ${chapter}:${verse}`,
-          position: 0,
-          strong: firstToken.strong,
-          lemma: firstToken.lemma,
-          morph: firstToken.morph,
-          alignedSemanticIds: semanticIds,
-        },
-      })
+      const payload = buildQuoteClickPayload(note, bookCode?.toLowerCase() || '', chapter, verse)
+      if (!payload) return
+      sendTokenClick({ lifecycle: 'event', token: payload })
     },
-    [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedNoteId]
+    [bookCode, helpsScope, broadcastObsHighlight, sendObsCardFrameFilter, sendTokenClick, setSelectedHelpsCard]
   )
 
   const handleSupportReferenceClick = useCallback(
@@ -130,7 +147,7 @@ export function useCombinedHelpsHandlers({
 
   const handleTitleClick = useCallback(
     (link: TranslationWordsLink) => {
-      setSelectedLinkId(link.id)
+      setSelectedHelpsCard({ kind: 'twl', id: link.id })
       const twInfo = parseTWLink(link.twLink)
       const parts = (twlKey || resourceKey).split('/')
       if (parts.length < 2) return
@@ -149,66 +166,65 @@ export function useCombinedHelpsHandlers({
         },
       })
     },
-    [twlKey, resourceKey, onEntryLinkClick, sendEntryLinkClick, setSelectedLinkId]
+    [twlKey, resourceKey, onEntryLinkClick, sendEntryLinkClick, setSelectedHelpsCard]
   )
 
   const handleLinkQuoteClick = useCallback(
     (link: TranslationWordsLink) => {
-      setSelectedLinkId(link.id)
+      setSelectedHelpsCard({ kind: 'twl', id: link.id })
       if (helpsScope === 'obs') {
-        const quote = link.origWords?.trim()
-        if (!quote) return
+        sendObsCardFrameFilter(link.reference)
+        const highlight = obsFrameHighlightFromHelpsRow({
+          id: link.id,
+          reference: link.reference,
+          quote: link.origWords,
+          occurrence: link.occurrence,
+          kind: 'twl',
+        })
+        if (!highlight) return
+        broadcastObsHighlight({ lifecycle: 'event', highlight })
+        return
+      }
+      if (link.quoteTokens?.length) {
         const refParts = link.reference.split(':')
         const chapter = parseInt(refParts[0] || '1', 10)
         const verse = parseInt(refParts[1] || '1', 10)
-        const occRaw = Number.parseInt(String(link.occurrence ?? '1'), 10)
-        const occurrence = Number.isFinite(occRaw) ? occRaw : 1
-        broadcastObsHighlight({
+        const book = bookCode?.toLowerCase() || ''
+        const baseOccurrence = parseInt(link.occurrence || '1', 10)
+        const semanticIds = generateSemanticIdsForQuoteTokens(
+          link.quoteTokens,
+          book,
+          chapter,
+          verse,
+          baseOccurrence
+        )
+        const firstToken = link.quoteTokens[0]
+        const firstId = semanticIds[0]
+        if (!firstToken || !firstId) return
+        sendTokenClick({
           lifecycle: 'event',
-          highlight: {
-            storyNumber: chapter,
-            frameNumber: verse,
-            quote,
-            occurrence,
-            rowId: link.id,
-            kind: 'twl',
+          token: {
+            id: String(firstToken.id),
+            content: firstToken.text,
+            semanticId: firstId,
+            verseRef: `${book} ${chapter}:${verse}`,
+            position: 0,
+            strong: firstToken.strong,
+            lemma: firstToken.lemma,
+            morph: firstToken.morph,
+            alignedSemanticIds: semanticIds,
           },
         })
         return
       }
-      if (!link.quoteTokens?.length) return
       const refParts = link.reference.split(':')
       const chapter = parseInt(refParts[0] || '1', 10)
       const verse = parseInt(refParts[1] || '1', 10)
-      const book = bookCode?.toLowerCase() || ''
-      const baseOccurrence = parseInt(link.occurrence || '1', 10)
-      const semanticIds = generateSemanticIdsForQuoteTokens(
-        link.quoteTokens,
-        book,
-        chapter,
-        verse,
-        baseOccurrence
-      )
-      link.quoteTokens.forEach((token, index) => {
-        const semanticId = semanticIds[index]
-        if (!semanticId) return
-        sendTokenClick({
-          lifecycle: 'event',
-          token: {
-            id: String(token.id),
-            content: token.text,
-            semanticId,
-            verseRef: `${book} ${chapter}:${verse}`,
-            position: index,
-            strong: token.strong,
-            lemma: token.lemma,
-            morph: token.morph,
-            alignedSemanticIds: [semanticId],
-          },
-        })
-      })
+      const payload = buildQuoteClickPayload(link, bookCode?.toLowerCase() || '', chapter, verse)
+      if (!payload) return
+      sendTokenClick({ lifecycle: 'event', token: payload })
     },
-    [bookCode, helpsScope, broadcastObsHighlight, sendTokenClick, setSelectedLinkId]
+    [bookCode, helpsScope, broadcastObsHighlight, sendObsCardFrameFilter, sendTokenClick, setSelectedHelpsCard]
   )
 
   return {

@@ -1,19 +1,22 @@
 /**
  * Subscribes to TN and TWL broadcasts of original-language semantic IDs for passive underlining in scripture.
  * Separate state keys so both resources can contribute without overwriting.
+ *
+ * Fold IDs once when the helps signal changes. Paint is Set.has only.
  */
 
 import { RESOURCE_STATE_KEYS, useResourceState } from '@bt-synergy/resource-panels'
 import { useMemo } from 'react'
 import type { NotesTokenGroupsSignal } from '../../../../signals/studioSignals'
+import { semanticIdKey } from '../utils/wordIdentity'
 
-const EMPTY_SET = new Set<string>()
+const EMPTY_UNDERLINE_SET: Set<string> = new Set()
 
-function flattenGroups(state: NotesTokenGroupsSignal | null | undefined, into: Set<string>) {
+function foldUnderlineIds(state: NotesTokenGroupsSignal | null | undefined, into: Set<string>) {
   if (!state?.tokenGroups?.length) return
   for (const g of state.tokenGroups) {
     for (const id of g.semanticIds) {
-      into.add(id.toLowerCase())
+      into.add(semanticIdKey(id))
     }
   }
 }
@@ -30,9 +33,8 @@ export function useUnderlinedTokens(resourceId: string): Set<string> {
 
   return useMemo(() => {
     const next = new Set<string>()
-    flattenGroups(tnState, next)
-    flattenGroups(twlState, next)
-    if (next.size === 0) return EMPTY_SET
-    return next
+    foldUnderlineIds(tnState, next)
+    foldUnderlineIds(twlState, next)
+    return next.size === 0 ? EMPTY_UNDERLINE_SET : next
   }, [tnState, twlState])
 }

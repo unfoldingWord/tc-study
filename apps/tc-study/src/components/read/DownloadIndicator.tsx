@@ -1,13 +1,19 @@
-import { Download, CheckCircle2, Loader2 } from 'lucide-react'
+import { AlertCircle, Download, Loader2 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { displayDownloadPercent } from '../../features/download/backgroundDownloadRun'
 import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
+import {
+  formatDownloadCurrentItemLabel,
+  shouldShowDownloadIndicator,
+} from './downloadIndicatorVisibility'
 
 interface DownloadIndicatorProps {
   isDownloading: boolean
   progress?: DownloadProgress
+  error?: string | null
 }
 
-export function DownloadIndicator({ isDownloading, progress }: DownloadIndicatorProps) {
+export function DownloadIndicator({ isDownloading, progress, error }: DownloadIndicatorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -53,11 +59,12 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
   const failed = useIngredients
     ? (progress?.failedIngredients || 0)
     : (progress?.failedResources || 0)
-  // Prefer completed/total so badge matches detail when overallProgress lags at 0
-  const overallProgress =
-    total > 0
-      ? Math.round((completed / total) * 100)
-      : (progress?.overallProgress || 0)
+  const overallProgress = displayDownloadPercent({
+    isDownloading,
+    completed,
+    total,
+    reportedOverall: progress?.overallProgress,
+  })
 
   const elapsedMs = startedAt != null ? now - startedAt : 0
   const elapsedLabel = (() => {
@@ -74,7 +81,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
   }, [isDownloading, completed, total, failed, progress])
 
   // Conditional return AFTER all hooks
-  if (!isDownloading && !progress) {
+  if (!shouldShowDownloadIndicator({ isDownloading, progress, error })) {
     return null
   }
 
@@ -90,7 +97,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
         {isDownloading ? (
           <Loader2 className="w-5 h-5 text-accent animate-spin" />
         ) : (
-          <CheckCircle2 className="w-5 h-5 text-accent" />
+          <AlertCircle className="w-5 h-5 text-danger" />
         )}
 
         {/* Badge with percentage */}
@@ -118,7 +125,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
             {isDownloading ? (
               <Loader2 className="w-4 h-4 text-accent animate-spin" />
             ) : (
-              <CheckCircle2 className="w-4 h-4 text-accent" />
+              <AlertCircle className="w-4 h-4 text-danger" />
             )}
           </div>
 
@@ -147,7 +154,7 @@ export function DownloadIndicator({ isDownloading, progress }: DownloadIndicator
                 <div className="flex items-center gap-2 text-xs text-fg-secondary">
                   <div className="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" />
                   <span className="truncate font-medium">
-                    {progress.currentResource.split('/').pop()}
+                    {formatDownloadCurrentItemLabel(progress.currentResource)}
                   </span>
                 </div>
               )}

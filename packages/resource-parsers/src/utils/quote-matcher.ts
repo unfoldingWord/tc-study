@@ -68,6 +68,42 @@ export interface AlignmentMatchResult {
   error?: string;
 }
 
+/** Hebrew Unicode block: U+0590–U+05FF */
+export function isHebrewText(text: string): boolean {
+  return /[\u0590-\u05FF]/.test(text);
+}
+
+/**
+ * Hebrew quote fold: consonants only, without universal NFD.
+ * Keeps maqaf / sof pasuq / cantillation / word-joiner handling, and strips
+ * remaining nikkud QuoteMatcher used to keep (05B2, 05B3, 05B6, 05B7, 05BA).
+ */
+export function normalizeHebrewText(text: string): string {
+  return text
+    .replace(/־/g, ' ') // maqaf → space
+    .replace(/[׃׀]/g, '') // sof pasuq, paseq
+    .replace(/[\u0591-\u05AF\u05BD\u05BF\u05C1-\u05C2\u05C4-\u05C5\u05C7]/g, '')
+    .replace(/[\u05B0-\u05BC]/g, '') // all nikkud, including 05B2/05B3/05B6/05B7/05BA
+    .replace(/⁠/g, '') // word joiner U+2060
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Greek (and other non-Hebrew) quote fold.
+ * NFD + strip marks so modern tonos matches oxia (`κακούς` ≡ `κακούς`).
+ */
+export function normalizeGreekText(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export class QuoteMatcher {
   
   /**
@@ -331,7 +367,7 @@ export class QuoteMatcher {
     }
     
     // If no exact matches found and this is Hebrew text, try flexible matching
-    if (matches.length === 0 && this.isHebrewText(quote)) {
+    if (matches.length === 0 && isHebrewText(quote)) {
       const flexibleMatches = this.findFlexibleHebrewMatches(text, quote);
       matches.push(...flexibleMatches);
     }
@@ -558,57 +594,14 @@ export class QuoteMatcher {
   }
   
   /**
-   * Normalize text for comparison (handles Hebrew, Greek and other Unicode text)
-   * 
-   * Critical for matching TSV quotes to scripture tokens because:
-   * - Hebrew: Removes vowel points, cantillation marks, maqaf
-   * - Greek: Removes diacritics, normalizes case
-   * - All: Normalizes whitespace and punctuation
-   * 
-   * Example: "Παῦλος" → "παῦλος" (lowercase)
-   * Example: Hebrew with nikkud → consonants only
+   * Normalize text for comparison (Hebrew consonants vs Greek NFD).
+   * Dispatch stays `isHebrewText` so Hebrew never goes through universal NFD.
    */
   private normalizeText(text: string): string {
-    // Handle Hebrew text with special normalization
-    if (this.isHebrewText(text)) {
-      return this.normalizeHebrewText(text);
+    if (isHebrewText(text)) {
+      return normalizeHebrewText(text);
     }
-    
-    // Handle Greek and other texts
-    return text
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s]/gu, '') // Remove punctuation but keep Unicode letters and numbers
-      .replace(/\s+/g, ' ')             // Normalize whitespace
-      .trim();
-  }
-
-  /**
-   * Check if text contains Hebrew characters
-   */
-  private isHebrewText(text: string): boolean {
-    // Hebrew Unicode range: U+0590-U+05FF
-    return /[\u0590-\u05FF]/.test(text);
-  }
-
-  /**
-   * Normalize Hebrew text by removing diacritics and punctuation
-   */
-  private normalizeHebrewText(text: string): string {
-    return text
-      // Replace maqaf (־) with space to separate words properly
-      .replace(/־/g, ' ') // Convert maqaf to space
-      // Remove other Hebrew punctuation marks
-      .replace(/[׃׀]/g, '') // Remove sof pasuq (׃), paseq (׀)
-      // Remove cantillation marks (trope/teamim) - these cause most matching issues
-      .replace(/[\u0591-\u05AF\u05BD\u05BF\u05C1-\u05C2\u05C4-\u05C5\u05C7]/g, '')
-      // Remove some vowel points that cause issues, but keep others for accuracy
-      .replace(/[\u05B0\u05B1\u05B4\u05B5\u05B8\u05B9\u05BB\u05BC]/g, '')
-      // Remove USFM word separators
-      .replace(/⁠/g, '') // Remove word joiner characters (U+2060)
-      // Normalize whitespace
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
+    return normalizeGreekText(text);
   }
   
   /**

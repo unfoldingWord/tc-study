@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, describe, expect, test } from 'bun:test'
 import {
   getResourceAppliesToScope,
   primaryLangSegment,
@@ -8,6 +8,10 @@ import {
   COMBINED_HELPS_RESOURCE_ID,
   OBS_COMBINED_HELPS_RESOURCE_ID,
 } from '../helps/combinedHelpsIds'
+import { bindCombinedHelpsCompositionsForTest } from '../helps/testCompositionRegistry'
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 describe('resourcePanelHelpers', () => {
   test('primaryLangSegment strips region tags', () => {
@@ -22,6 +26,12 @@ describe('resourcePanelHelpers', () => {
     }
     expect(getResourceAppliesToScope(COMBINED_HELPS_RESOURCE_ID, {}, registry)).toBe('scripture')
     expect(getResourceAppliesToScope(OBS_COMBINED_HELPS_RESOURCE_ID, {}, registry)).toBe('obs')
+    expect(getResourceAppliesToScope(`${COMBINED_HELPS_RESOURCE_ID}:panel-1`, {}, registry)).toBe(
+      'scripture'
+    )
+    expect(getResourceAppliesToScope(`${OBS_COMBINED_HELPS_RESOURCE_ID}:panel-1`, {}, registry)).toBe(
+      'obs'
+    )
   })
 
   test('resourceSupportsBook always shows CombinedHelps and OBS book code', () => {

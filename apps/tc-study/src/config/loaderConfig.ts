@@ -25,7 +25,6 @@ export type LoaderFactoryKey =
   | 'notes'
   | 'questions'
   | 'obs'
-  | 'combined-helps'
 
 export interface LoaderSurfaces {
   /** Registered via ResourceTypeInitializer / RESOURCE_TYPE_PLUGIN_EXPORTS */
@@ -45,8 +44,8 @@ export interface LoaderConfig {
   downloadPriority: number
   /**
    * Shared factory key for worker instantiation.
-   * Required when `surfaces.workerDownload` is true; composites use
-   * `'combined-helps'` with workerDownload false.
+   * Required when `surfaces.workerDownload` is true.
+   * Compositions (CombinedHelps) are not loader SoT rows.
    */
   factoryKey: LoaderFactoryKey
   /** Where this entry is registered */
@@ -60,7 +59,6 @@ export interface LoaderConfig {
  * - obs-notes: 11 (was 3 in plugin / 11 in worker — keep worker band next to
  *   obs-words-links at 12)
  * - obs-questions: 26 (was 27 in plugin / 26 in worker — keep after questions=25)
- * - combined-helps / obs-combined-helps: mainPlugin only (no worker download)
  */
 export const LOADER_CONFIGS: LoaderConfig[] = [
   {
@@ -142,22 +140,6 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     downloadPriority: 26,
     factoryKey: 'questions',
     surfaces: { mainPlugin: true, workerDownload: true },
-  },
-  {
-    id: RESOURCE_TYPE_IDS.COMBINED_HELPS,
-    name: 'Helps',
-    loaderImport: 'src/lib/loaders/CombinedHelpsLoader',
-    downloadPriority: 99,
-    factoryKey: 'combined-helps',
-    surfaces: { mainPlugin: true, workerDownload: false },
-  },
-  {
-    id: RESOURCE_TYPE_IDS.OBS_COMBINED_HELPS,
-    name: 'OBS Helps',
-    loaderImport: 'src/lib/loaders/CombinedHelpsLoader',
-    downloadPriority: 99,
-    factoryKey: 'combined-helps',
-    surfaces: { mainPlugin: true, workerDownload: false },
   },
 ]
 

@@ -27,6 +27,9 @@ export interface ScriptureViewerState {
 export interface OriginalLanguageToken {
   semanticId: string
   alignedSemanticIds?: string[]
+  /** Folded once when the click is set. Paint uses these, not NFD. */
+  foldedSemanticId?: string
+  foldedAlignedIdSet?: Set<string>
   content: string
   verseRef: string
   strong?: string

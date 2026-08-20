@@ -9,6 +9,7 @@ import {
   LifeBuoy,
   Link,
   MessageCircleQuestion,
+  NotebookText,
 } from 'lucide-react'
 
 /**
@@ -25,6 +26,7 @@ export const LUCIDE_ICON_REGISTRY: Record<string, LucideIcon> = {
   LifeBuoy,
   Link,
   MessageCircleQuestion,
+  NotebookText,
 }
 
 export function resolveLucideIconName(name: string | undefined | null): LucideIcon | null {

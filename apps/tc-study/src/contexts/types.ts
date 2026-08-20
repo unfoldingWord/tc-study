@@ -111,6 +111,8 @@ export interface ResourceInfo extends ResourceMetadata {
   /** Synthetic combined TN+TWL row only — which TN/TWL resource keys backs this viewer. */
   helpsTnResourceKey?: string
   helpsTwlResourceKey?: string
+  /** Composition panel entry: consumed type id → package resource key. */
+  consumedKeys?: Partial<Record<string, string>>
 
   /** Wizard / selection UI flags (ephemeral; not catalog SoT). */
   isInWorkspace?: boolean

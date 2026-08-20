@@ -1,48 +1,43 @@
 /**
- * Simplified Read View
- *
- * A simplified version of the Studio for reading resources
- * - No sidebar
- * - Language picker to auto-load all tc-ready resources
- * - Two-panel layout with tab pointer DnD (same mutations as Studio)
+ * Simplified Read View — dual-mode panels, mobile-first layout.
  */
 
 import { LinkedPanelsContainer } from '@bt-synergy/resource-panels'
-import {
-  useCallback,
-  useMemo,
-  useState,
-  type MouseEvent,
-  type RefObject,
-} from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   useCurrentReference,
   useNavigationScope,
   useResourceTypeRegistry,
   useViewerRegistry,
 } from '../../contexts'
-import { useAppStore } from '../../contexts/AppContext'
 import { useStudioResources } from '../../hooks'
 import { useEntryModalStore } from '../../features/entries'
 import { CollectionImportDialog } from '../collections/CollectionImportDialog'
-import { EntryResourceModal } from '../common/EntryResourceModal'
-import { TabDnDProvider, useTabDnD } from '../../features/dnd/TabDnDContext'
+import { TabDnDProvider } from '../../features/dnd/TabDnDContext'
+import { resolvePaneDirection } from '../../features/read/paneDirection'
+import { defaultLayoutForViewport } from '../../features/read/readPanelLayout'
+import { needsReadLanguagePicker } from '../../features/read/readPanelModel'
+import { useReadPanelStore } from '../../features/read/readPanelStore'
+import { helpsCatalogKnownEmptyFromCache } from '../../features/read/helpsLanguagePolicy'
+import { supportedSubjectsFromRegistry } from '../../features/read/scriptureLanguageMismatch'
+import { textModeMismatchFromCache } from '../../features/read/textModeMismatch'
 import { useFilteredReadPanelKeys } from '../../features/read/useFilteredReadPanelKeys'
+import { useIsNarrowViewport } from '../../features/read/useIsNarrowViewport'
 import { useReadCollectionExport } from '../../features/read/useReadCollectionExport'
 import { useReadGatewayBookCatalog } from '../../features/read/useReadGatewayBookCatalog'
 import { useReadLanguageBootstrap } from '../../features/read/useReadLanguageBootstrap'
 import { useReadLinkedPanelsConfig } from '../../features/read/useReadLinkedPanelsConfig'
 import { useReadPanelDnD } from '../../features/read/useReadPanelDnD'
-import { useReadPanelResize } from '../../features/read/useReadPanelResize'
+import { useReadPanelLayout } from '../../features/read/useReadPanelLayout'
 import { useReadUrlSync } from '../../features/read/useReadUrlSync'
+import { useSyncOriginalLanguageTabs } from '../../features/read/useSyncOriginalLanguageTabs'
 import { createStudioPluginRegistry } from '../../features/studio/createStudioPluginRegistry'
 import { moveResourceBetweenPanels } from '../../features/workspace/resourceMutations'
-import { ThemeToggle } from '../../features/theme'
+import { useWizardStore } from '../../lib/stores/wizardStore'
 import { NavigationBar } from '../studio/NavigationBar'
 import { DownloadIndicator } from './DownloadIndicator'
 import { ExportProgressToast } from './ExportProgressToast'
-import { PanelResizeDivider } from '../shared/PanelResizeDivider'
-import { ReadLinkedPanel } from './ReadLinkedPanel'
+import { ReadPanelsArea } from './ReadPanelsArea'
 import {
   type PartialRouteHint,
   type ReadRouteTail,
@@ -50,97 +45,9 @@ import {
 
 interface SimplifiedReadViewProps {
   initialLanguage?: string
-  /** True when the URL is `/read` without `:languageCode` — language modal opens and cannot be skipped. */
   requireLanguageInUrl?: boolean
-  /** Deep link: `/read/{lang}/bible|obs/{navType}/{navRef}` */
   readRouteTail?: ReadRouteTail | null
-  /** Partial deep link: `/read/{lang}/bible|obs[/{navType}]` — sets scope (and mode when navType is present) without overriding the current reference. */
   partialRouteHint?: PartialRouteHint
-}
-
-function ReadPanelsArea(props: {
-  panel1Width: number
-  isResizingPanels: boolean
-  resizeContainerRef: RefObject<HTMLDivElement | null>
-  handlePanelDividerMouseDown: (e: MouseEvent) => void
-  handlePanelDividerTouchStart: () => void
-  filteredPanel1Keys: string[]
-  filteredPanel2Keys: string[]
-  filteredPanel1Resources: ReturnType<typeof useFilteredReadPanelKeys>['filteredPanel1Resources']
-  filteredPanel2Resources: ReturnType<typeof useFilteredReadPanelKeys>['filteredPanel2Resources']
-  panel1Resources: ReturnType<typeof useStudioResources>
-  panel2Resources: ReturnType<typeof useStudioResources>
-  isLoadingResources: boolean
-  onEntryLinkClick: (resourceId: string, entryId?: string) => void
-}) {
-  const { activeId, activeLabel, hoverPanelId, dropIndex } = useTabDnD()
-  const dragLabel =
-    activeId && activeLabel
-      ? activeLabel
-      : ''
-
-  const {
-    panel1Width,
-    isResizingPanels,
-    resizeContainerRef,
-    handlePanelDividerMouseDown,
-    handlePanelDividerTouchStart,
-    filteredPanel1Keys,
-    filteredPanel2Keys,
-    filteredPanel1Resources,
-    filteredPanel2Resources,
-    panel1Resources,
-    panel2Resources,
-    isLoadingResources,
-    onEntryLinkClick,
-  } = props
-
-  return (
-    <div
-      ref={resizeContainerRef}
-      className="h-full flex flex-col md:flex-row overflow-hidden panels-resize-container relative"
-    >
-      <ReadLinkedPanel
-        panelId="panel-1"
-        otherPanelId="panel-2"
-        colorScheme="blue"
-        flexBasisPercent={panel1Width}
-        filteredKeys={filteredPanel1Keys}
-        filteredResources={filteredPanel1Resources}
-        panelResources={panel1Resources}
-        isLoadingResources={isLoadingResources}
-        showDropPlaceholder={hoverPanelId === 'panel-1'}
-        placeholderLabel={dragLabel}
-        placeholderIndex={
-          hoverPanelId === 'panel-1' ? dropIndex ?? undefined : undefined
-        }
-      />
-
-      <PanelResizeDivider
-        isResizing={isResizingPanels}
-        onMouseDown={handlePanelDividerMouseDown}
-        onTouchStart={handlePanelDividerTouchStart}
-      />
-
-      <ReadLinkedPanel
-        panelId="panel-2"
-        otherPanelId="panel-1"
-        colorScheme="purple"
-        flexBasisPercent={100 - panel1Width}
-        filteredKeys={filteredPanel2Keys}
-        filteredResources={filteredPanel2Resources}
-        panelResources={panel2Resources}
-        isLoadingResources={isLoadingResources}
-        showDropPlaceholder={hoverPanelId === 'panel-2'}
-        placeholderLabel={dragLabel}
-        placeholderIndex={
-          hoverPanelId === 'panel-2' ? dropIndex ?? undefined : undefined
-        }
-      />
-
-      <EntryResourceModal onEntryLinkClick={onEntryLinkClick} />
-    </div>
-  )
 }
 
 export function SimplifiedReadView({
@@ -153,24 +60,97 @@ export function SimplifiedReadView({
   const resourceTypeRegistry = useResourceTypeRegistry()
   const navigationScope = useNavigationScope()
   const currentNavRef = useCurrentReference()
-  const loadedResources = useAppStore((s) => s.loadedResources)
+  const isNarrow = useIsNarrowViewport()
+  const panels = useReadPanelStore((s) => s.panels)
+  const layout = useReadPanelStore((s) => s.layout)
+  const layoutUserChosen = useReadPanelStore((s) => s.layoutUserChosen)
+  const setLayout = useReadPanelStore((s) => s.setLayout)
+
+  useEffect(() => {
+    if (layoutUserChosen) return
+    const next = defaultLayoutForViewport(isNarrow, layout, false)
+    if (next !== layout) setLayout(next, false)
+  }, [isNarrow, layout, layoutUserChosen, setLayout])
 
   const {
+    loadedResources,
     packageStore,
     isLoadingResources,
+    isLoadingByPanel,
+    catalogSettledByPanel,
     currentLanguageCode,
     isCollectionFullyCached,
     shouldAutoOpenLanguagePicker,
-    isLanguagePickerRequired,
     handleLanguageSelected,
+    handlePanelLanguageSelected,
+    handlePanelModeSwitch,
+    handleSwitchTextMode,
+    handleNavigatorScopeCommitted,
     isBackgroundDownloading,
     downloadStats,
   } = useReadLanguageBootstrap({ initialLanguage, requireLanguageInUrl })
 
   useReadGatewayBookCatalog(currentLanguageCode)
 
+  const availableLanguages = useWizardStore((s) => s.availableLanguages)
+  const p1Dir = resolvePaneDirection({
+    languageCode: panels['panel-1'].languageCode,
+    availableLanguages,
+  })
+  const p2Dir = resolvePaneDirection({
+    languageCode: panels['panel-2'].languageCode,
+    availableLanguages,
+  })
+
+  const subjects = useMemo(
+    () => supportedSubjectsFromRegistry(resourceTypeRegistry),
+    [resourceTypeRegistry]
+  )
+  const panel1Mismatch = useMemo(() => {
+    if (panels['panel-1'].mode !== 'scripture' || !panels['panel-1'].languageCode) return null
+    return textModeMismatchFromCache({
+      languageCode: panels['panel-1'].languageCode,
+      navigationScope,
+      supportedSubjects: subjects,
+    })
+  }, [panels, navigationScope, subjects])
+  const panel2Mismatch = useMemo(() => {
+    if (panels['panel-2'].mode !== 'scripture' || !panels['panel-2'].languageCode) return null
+    return textModeMismatchFromCache({
+      languageCode: panels['panel-2'].languageCode,
+      navigationScope,
+      supportedSubjects: subjects,
+    })
+  }, [panels, navigationScope, subjects])
+  const olExcludePanelIds = useMemo(() => {
+    const ids: Array<'panel-1' | 'panel-2'> = []
+    if (panel1Mismatch) ids.push('panel-1')
+    if (panel2Mismatch) ids.push('panel-2')
+    return ids
+  }, [panel1Mismatch, panel2Mismatch])
+  useSyncOriginalLanguageTabs(currentNavRef.book, { excludePanelIds: olExcludePanelIds })
+  const panel1KnownNoHelps = useMemo(
+    () =>
+      helpsCatalogKnownEmptyFromCache({
+        mode: panels['panel-1'].mode,
+        languageCode: panels['panel-1'].languageCode,
+        navigationScope,
+        supportedSubjects: subjects,
+      }),
+    [panels, navigationScope, subjects]
+  )
+  const panel2KnownNoHelps = useMemo(
+    () =>
+      helpsCatalogKnownEmptyFromCache({
+        mode: panels['panel-2'].mode,
+        languageCode: panels['panel-2'].languageCode,
+        navigationScope,
+        supportedSubjects: subjects,
+      }),
+    [panels, navigationScope, subjects]
+  )
+
   useReadUrlSync({
-    requireLanguageInUrl,
     readRouteTail,
     partialRouteHint,
     currentLanguageCode,
@@ -179,24 +159,23 @@ export function SimplifiedReadView({
 
   const panel1Resources = useStudioResources('panel-1')
   const panel2Resources = useStudioResources('panel-2')
-
   const { getResourceLabel } = useReadPanelDnD()
-
   const {
     panel1Width,
     isResizingPanels,
     resizeContainerRef,
     handlePanelDividerMouseDown,
     handlePanelDividerTouchStart,
-  } = useReadPanelResize(50)
+    collapsedPanelId,
+    expandPanel,
+    restoreCollapsed,
+  } = useReadPanelLayout()
 
   const [showLoadDialog, setShowLoadDialog] = useState(false)
-
   const { exportProgress, handleDirectDownloadCollection } = useReadCollectionExport(
     currentLanguageCode,
     packageStore.packages
   )
-
   const plugins = useMemo(() => createStudioPluginRegistry(), [])
 
   const {
@@ -207,6 +186,8 @@ export function SimplifiedReadView({
   } = useFilteredReadPanelKeys({
     panel1ResourceKeys: panel1Resources.resourceKeys ?? [],
     panel2ResourceKeys: panel2Resources.resourceKeys ?? [],
+    panel1Mode: panels['panel-1'].mode,
+    panel2Mode: panels['panel-2'].mode,
     loadedResources,
     resourceTypeRegistry,
     navigationScope,
@@ -230,18 +211,19 @@ export function SimplifiedReadView({
     onEntryLinkClick: handleOpenEntry,
   })
 
+  const needsBootstrap = needsReadLanguagePicker(panels)
+  const showBootstrapPicker = needsBootstrap
+
   return (
     <TabDnDProvider
       panel1Keys={filteredPanel1Keys}
       panel2Keys={filteredPanel2Keys}
       getLabel={getResourceLabel}
       onReorder={(resourceKey, panelId, paintedIndex) => {
-        // Book-filter paint space → store index via neighbor key (not a permanent map module)
         const painted = panelId === 'panel-1' ? filteredPanel1Keys : filteredPanel2Keys
         const resources = panelId === 'panel-1' ? panel1Resources : panel2Resources
         const storeKeys = resources.rawResourceKeys
-        const clamped =
-          paintedIndex >= painted.length ? painted.length - 1 : paintedIndex
+        const clamped = paintedIndex >= painted.length ? painted.length - 1 : paintedIndex
         const targetKey = painted[clamped]
         const storeIndex = targetKey ? storeKeys.indexOf(targetKey) : -1
         if (storeIndex < 0) return
@@ -262,47 +244,62 @@ export function SimplifiedReadView({
     >
       <div className="h-full flex flex-col overflow-hidden">
         <div className="relative z-30 flex-shrink-0 flex flex-col order-2 md:order-1 overflow-visible">
-          <div className="flex items-center gap-chrome-tight bg-surface/90 backdrop-blur-md border-border-subtle border-t md:border-t-0 md:border-b px-chrome py-chrome-tight overflow-visible">
-            <div className="flex-1 min-w-0">
-              <NavigationBar
-                isCompact={true}
-                onToggleCompact={undefined}
-                showLanguagePicker={true}
-                onLanguageSelected={handleLanguageSelected}
-                autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
-                languagePickerRequired={isLanguagePickerRequired}
-                downloadIndicator={
-                  <DownloadIndicator
-                    isDownloading={isBackgroundDownloading}
-                    progress={downloadStats.progress ?? undefined}
-                  />
-                }
-                onDownloadCollection={
-                  isCollectionFullyCached ? handleDirectDownloadCollection : undefined
-                }
-                onLoadCollection={() => setShowLoadDialog(true)}
-              />
-            </div>
-            <ThemeToggle size="sm" />
+          <div className="bg-surface/90 backdrop-blur-md border-border-subtle border-t md:border-t-0 md:border-b px-chrome py-chrome-tight overflow-visible">
+            <NavigationBar
+              isCompact={true}
+              onToggleCompact={undefined}
+              showLanguagePicker={showBootstrapPicker}
+              onLanguageSelected={handleLanguageSelected}
+              autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
+              languagePickerRequired={needsBootstrap}
+              onNavigationScopeCommitted={handleNavigatorScopeCommitted}
+              downloadIndicator={
+                <DownloadIndicator
+                  isDownloading={isBackgroundDownloading}
+                  progress={downloadStats.progress ?? undefined}
+                  error={downloadStats.error}
+                />
+              }
+              onDownloadCollection={
+                isCollectionFullyCached ? handleDirectDownloadCollection : undefined
+              }
+              onLoadCollection={() => setShowLoadDialog(true)}
+            />
           </div>
         </div>
 
         <div className="flex-1 overflow-hidden order-1 md:order-2 min-h-0">
           <LinkedPanelsContainer config={panelConfig} plugins={plugins}>
             <ReadPanelsArea
+              panels={panels}
+              layout={layout}
+              isNarrow={isNarrow}
               panel1Width={panel1Width}
+              collapsedPanelId={collapsedPanelId}
               isResizingPanels={isResizingPanels}
               resizeContainerRef={resizeContainerRef}
               handlePanelDividerMouseDown={handlePanelDividerMouseDown}
               handlePanelDividerTouchStart={handlePanelDividerTouchStart}
+              expandPanel={expandPanel}
+              restoreCollapsed={restoreCollapsed}
               filteredPanel1Keys={filteredPanel1Keys}
               filteredPanel2Keys={filteredPanel2Keys}
               filteredPanel1Resources={filteredPanel1Resources}
               filteredPanel2Resources={filteredPanel2Resources}
               panel1Resources={panel1Resources}
               panel2Resources={panel2Resources}
-              isLoadingResources={isLoadingResources}
+              isLoadingByPanel={isLoadingByPanel}
+              catalogSettledByPanel={catalogSettledByPanel}
               onEntryLinkClick={handleOpenEntry}
+              p1Dir={p1Dir}
+              p2Dir={p2Dir}
+              onPanelLanguageSelected={handlePanelLanguageSelected}
+              onPanelModeSwitch={handlePanelModeSwitch}
+              panel1Mismatch={panel1Mismatch}
+              panel2Mismatch={panel2Mismatch}
+              panel1KnownNoHelps={panel1KnownNoHelps}
+              panel2KnownNoHelps={panel2KnownNoHelps}
+              onSwitchTextMode={handleSwitchTextMode}
             />
           </LinkedPanelsContainer>
         </div>

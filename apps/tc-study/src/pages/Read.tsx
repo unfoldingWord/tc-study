@@ -2,25 +2,30 @@
  * Read Page - Simplified reading experience
  */
 
-import { useParams } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { SimplifiedReadView } from '../components/read/SimplifiedReadView'
+import { resolveReadLanguageFromUrlOrCache } from '../features/read/readBootstrapPolicy'
+import { navigationLanguageCode } from '../features/read/readPanelModel'
+import { useReadPanelStore } from '../features/read/readPanelStore'
+import { parseReadUrl } from '../features/read/readUrlGrammar'
 import { resolveReadRouteFromParams } from '../utils/readRoutes'
 
 export default function Read() {
-  const { languageCode: languageCodeParam, resourceType, navType, navRef } = useParams<{
-    languageCode?: string
-    resourceType?: string
-    navType?: string
-    navRef?: string
-  }>()
-  const languageCode = languageCodeParam?.trim() || undefined
+  const location = useLocation()
+  const parsed = parseReadUrl(location.pathname)
+  const panels = useReadPanelStore((s) => s.panels)
+  const languageCode =
+    resolveReadLanguageFromUrlOrCache({
+      pathname: location.pathname,
+      cachedLanguage: navigationLanguageCode(panels),
+    }).language ?? undefined
   const requireLanguageInUrl = !languageCode
 
   const { readRouteTail, partialRouteHint } = resolveReadRouteFromParams({
-    languageCode,
-    resourceType,
-    navType,
-    navRef,
+    languageCode: parsed.langs[0] || languageCode,
+    resourceType: parsed.resourceType,
+    navType: parsed.navType,
+    navRef: parsed.navRef,
   })
 
   return (

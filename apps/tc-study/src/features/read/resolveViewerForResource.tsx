@@ -5,6 +5,7 @@ import {
   isCombinedHelpsResourceType,
   normalizeResourceTypeId,
 } from '../../utils/normalizeResourceTypeId'
+import { resolvePanelEntryForKey } from '../helps/resolveCompositionEntry'
 import { FallbackViewer } from '../../components/resources'
 
 export interface ViewerRegistryLike {
@@ -31,6 +32,8 @@ export function resolveViewerForResource(options: {
     language: resource.language,
     owner: resource.owner,
     resourceId: resource.resourceId || resource.id,
+    resourceKey,
+    id: resource.id,
   }
 
   let ViewerComponent = viewerRegistry.getViewer(
@@ -38,6 +41,12 @@ export function resolveViewerForResource(options: {
   ) as ComponentType<Record<string, unknown>> | undefined | null
   if (!ViewerComponent && resource.type) {
     ViewerComponent = viewerRegistry.getViewerByType(resource.type) as
+      | ComponentType<Record<string, unknown>>
+      | undefined
+      | null
+  }
+  if (!ViewerComponent && resource.resourceId) {
+    ViewerComponent = viewerRegistry.getViewerByType(resource.resourceId) as
       | ComponentType<Record<string, unknown>>
       | undefined
       | null
@@ -53,6 +62,9 @@ export function resolveViewerForResource(options: {
     }
     const normalizedType = normalizeResourceTypeId(resource.type)
     const normalizedCategory = normalizeResourceTypeId(resource.category)
+    const compositionEntry =
+      resolvePanelEntryForKey(resourceKey) ?? resolvePanelEntryForKey(resource.type)
+    const isCompositionViewer = compositionEntry?.kind === 'composition'
     if (
       normalizedType === 'words' ||
       normalizedType === 'words-links' ||
@@ -60,6 +72,7 @@ export function resolveViewerForResource(options: {
       normalizedType === 'notes' ||
       normalizedType === 'obs-notes' ||
       normalizedType === 'obs-words-links' ||
+      isCompositionViewer ||
       isCombinedHelpsResourceType(resource.type) ||
       normalizedCategory === 'words-links'
     ) {

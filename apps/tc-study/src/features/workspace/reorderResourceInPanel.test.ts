@@ -1,12 +1,13 @@
 /**
  * Unlock 1: rightward splice adjust + activeIndex follows dragged key.
  */
-import { beforeEach, describe, expect, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
 import { enableMapSet } from 'immer'
 import { ResourceFormat, ResourceType } from '@bt-synergy/resource-catalog'
 import type { ResourceInfo } from '../../contexts/types'
 import { COMBINED_HELPS_RESOURCE_ID } from '../helps/combinedHelpsIds'
 import { ensureCombinedHelpsInWorkspace } from '../helps/ensureCombinedHelps'
+import { bindCombinedHelpsCompositionsForTest } from '../helps/testCompositionRegistry'
 import {
   moveResourceBetweenPanels,
   reorderResourceInPanel,
@@ -14,6 +15,9 @@ import {
 import { useWorkspaceStore } from './workspaceStore'
 
 enableMapSet()
+
+const unbindCompositions = bindCombinedHelpsCompositionsForTest()
+afterAll(() => unbindCompositions())
 
 function res(partial: Partial<ResourceInfo> & { key: string; type?: string }): ResourceInfo {
   return {

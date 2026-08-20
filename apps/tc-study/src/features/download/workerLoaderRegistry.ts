@@ -45,7 +45,7 @@ function toLoaderConfig(deps: WorkerLoaderDeps): LoaderConfig {
   }
 }
 
-/** Worker-download factories only (no combined-helps — mainPlugin only). */
+/** Worker-download factories only (compositions are not worker loaders). */
 const LOADER_FACTORIES: Partial<Record<LoaderFactoryKey, LoaderCtor>> = {
   scripture: (deps) => new ScriptureLoader(toLoaderConfig(deps)),
   words: (deps) => new TranslationWordsLoader(toLoaderConfig(deps)),

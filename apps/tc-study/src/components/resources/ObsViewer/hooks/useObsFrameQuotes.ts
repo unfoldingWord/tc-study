@@ -3,12 +3,20 @@ import {
   mergeObsFrameQuotesStates,
   useResourceState,
 } from '@bt-synergy/resource-panels'
-import { useMemo } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
-import { useWorkspaceStore } from '../../../../lib/stores/workspaceStore'
 import { OBS_COMBINED_HELPS_RESOURCE_ID } from '../../../../features/helps/combinedHelpsIds'
+import { preferHydratedObsQuotes } from '../../../../lib/obs/buildObsFrameQuotes'
+import {
+  getObsFrameQuotes,
+  subscribeObsFrameQuotes,
+} from '../../../../lib/obs/obsFrameQuotesStore'
+import { useWorkspaceStore } from '../../../../lib/stores/workspaceStore'
 import type { ObsFrameQuoteEntry, ObsFrameQuotesSignal } from '../../../../signals/studioSignals'
-import { isPanel2KeyQuoteCapable } from '../obsHighlightHelpers'
+import { panelKeysAreObsQuoteCapable } from '../obsHighlightHelpers'
+
+/** Zustand selectors must return a cached value — a fresh empty array every call loops. */
+const EMPTY_PANEL_KEYS: readonly string[] = []
 
 /**
  * Per-publisher TN/TWL keys — merge so neither last-writer-wins the other.
@@ -21,21 +29,20 @@ export function useObsFrameQuotes(params: {
 }) {
   const { resourceId, storyNum, frameNum, isRange } = params
 
-  const panel2ActiveKey = useWorkspaceStore((s) => {
+  const panel2Keys = useWorkspaceStore((s) => {
     const panel = s.currentPackage?.panels.find((p) => p.id === 'panel-2')
-    if (!panel?.resourceKeys?.length) return null
-    return panel.resourceKeys[panel.activeIndex ?? 0] ?? null
+    return panel?.resourceKeys ?? EMPTY_PANEL_KEYS
   })
   const loadedResources = useAppStore((s) => s.loadedResources)
 
   const isPanel2QuoteCapable = useMemo(
     () =>
-      isPanel2KeyQuoteCapable(
-        panel2ActiveKey,
-        loadedResources[panel2ActiveKey ?? '']?.type,
+      panelKeysAreObsQuoteCapable(
+        panel2Keys,
+        (key) => loadedResources[key]?.type,
         OBS_COMBINED_HELPS_RESOURCE_ID
       ),
-    [panel2ActiveKey, loadedResources]
+    [panel2Keys, loadedResources]
   )
 
   const obsQuotesTn = useResourceState<ObsFrameQuotesSignal>(
@@ -46,9 +53,18 @@ export function useObsFrameQuotes(params: {
     resourceId,
     RESOURCE_STATE_KEYS.OBS_FRAME_QUOTES_TWL
   )
+  const publishedQuotes = useSyncExternalStore(
+    subscribeObsFrameQuotes,
+    getObsFrameQuotes,
+    getObsFrameQuotes
+  )
   const obsQuotesState = useMemo(
-    () => mergeObsFrameQuotesStates(obsQuotesTn, obsQuotesTwl),
-    [obsQuotesTn, obsQuotesTwl]
+    () =>
+      preferHydratedObsQuotes(
+        mergeObsFrameQuotesStates(obsQuotesTn, obsQuotesTwl),
+        publishedQuotes
+      ),
+    [obsQuotesTn, obsQuotesTwl, publishedQuotes]
   )
 
   const quotesForFrame: ObsFrameQuoteEntry[] = useMemo(() => {

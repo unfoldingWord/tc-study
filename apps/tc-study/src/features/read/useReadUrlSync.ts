@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import {
   useCurrentPassageSet,
   useCurrentReference,
@@ -10,8 +10,6 @@ import {
   useNavigationScope,
 } from '../../contexts'
 import {
-  buildReadPath,
-  buildReadRouteTailFromNavigation,
   findPassageSetByNavSlug,
   navigationModeFromReadNav,
   navigationScopeFromResourceType,
@@ -25,10 +23,17 @@ import {
   type ReadRouteTail,
   type ResolvedBookStart,
 } from '../../utils/readRoutes'
-import { shouldApplyDeepLinkTail, shouldWriteBackReadUrl } from './readBootstrapPolicy'
+import { readUrlWriteBackAction, shouldApplyDeepLinkTail } from './readBootstrapPolicy'
+import { readUrlLangsFromPanels } from './readUrlGrammar'
+import { useReadPanelStore } from './readPanelStore'
+import {
+  getReadLocationPathname,
+  getReadNavigationSource,
+  replaceReadUrlFromUi,
+  subscribeReadPopstate,
+} from './replaceReadUrlFromUi'
 
 export interface UseReadUrlSyncOptions {
-  requireLanguageInUrl: boolean
   readRouteTail?: ReadRouteTail | null
   partialRouteHint?: PartialRouteHint
   currentLanguageCode: string | null
@@ -39,14 +44,16 @@ export interface UseReadUrlSyncOptions {
  * Deep-link apply + canonical URL write-back for `/read/...` routes.
  */
 export function useReadUrlSync({
-  requireLanguageInUrl,
   readRouteTail = null,
   partialRouteHint,
   currentLanguageCode,
   isLoadingResources,
 }: UseReadUrlSyncOptions) {
-  const navigate = useNavigate()
   const location = useLocation()
+  const panel1Lang = useReadPanelStore((s) => s.panels['panel-1'].languageCode)
+  const panel2Lang = useReadPanelStore((s) => s.panels['panel-2'].languageCode)
+  const panel1Mode = useReadPanelStore((s) => s.panels['panel-1'].mode)
+  const panel2Mode = useReadPanelStore((s) => s.panels['panel-2'].mode)
   const navigation = useNavigation()
   const navigationScope = useNavigationScope()
   const navigationMode = useNavigationMode()
@@ -63,6 +70,13 @@ export function useReadUrlSync({
   useEffect(() => {
     if (!readRouteTail) readRouteAppliedSigRef.current = null
   }, [readRouteTail])
+
+  useEffect(() => {
+    return subscribeReadPopstate(() => {
+      readRouteAppliedSigRef.current = null
+      partialHintAppliedRef.current = null
+    })
+  }, [])
 
   // Apply `/read/{lang}/bible|obs[/{navType}]` (no navRef) — switch scope and optionally mode.
   // The URL-sync effect will then rewrite the URL to the full canonical form.
@@ -239,42 +253,40 @@ export function useReadUrlSync({
     })
   }, [navigation, currentNavRef.book, currentSections])
 
-  // Keep URL in sync with navigation (canonical `/read/...` template)
+  // Cache restore only on bare `/read`. Lang paths: URL wins unless this is
+  // an in-app UI write (internal replaceState).
   useEffect(() => {
-    if (
-      !shouldWriteBackReadUrl({
-        requireLanguageInUrl,
-        currentLanguageCode,
-        suppressUrlSync: suppressUrlSyncRef.current,
-      })
-    ) {
-      return
-    }
-    // Narrowed by shouldWriteBackReadUrl
-    const lang = currentLanguageCode as string
-
-    const tail = buildReadRouteTailFromNavigation({
+    const deepLinkSig = readRouteTail
+      ? `${readRouteTail.resourceType}|${readRouteTail.navType ?? ''}|${readRouteTail.navRef}`
+      : null
+    const panels = useReadPanelStore.getState().panels
+    const action = readUrlWriteBackAction({
+      pathname: getReadLocationPathname() || location.pathname,
+      language: currentLanguageCode,
+      languages: readUrlLangsFromPanels(panels),
+      suppressUrlSync: suppressUrlSyncRef.current,
+      deepLinkPending: Boolean(deepLinkSig) && readRouteAppliedSigRef.current !== deepLinkSig,
+      navigationSource: getReadNavigationSource(),
       scope: navigationScope,
       mode: navigationMode,
       ref: currentNavRef,
       passageSet: currentPassageSet,
-      section1Based: navigationMode === 'section' && currentSectionIndex >= 0 ? currentSectionIndex + 1 : null,
+      section1Based:
+        navigationMode === 'section' && currentSectionIndex >= 0 ? currentSectionIndex + 1 : null,
     })
-    if (!tail) return
-
-    const path = buildReadPath(lang, tail)
-    if (location.pathname !== path) {
-      navigate(path, { replace: true })
-    }
+    if (action) replaceReadUrlFromUi(action.replace)
   }, [
-    requireLanguageInUrl,
     currentLanguageCode,
+    panel1Lang,
+    panel2Lang,
+    panel1Mode,
+    panel2Mode,
     navigationScope,
     navigationMode,
     currentNavRef,
     currentPassageSet,
     currentSectionIndex,
     location.pathname,
-    navigate,
+    readRouteTail,
   ])
 }
