@@ -244,7 +244,7 @@ export function SimplifiedReadView({
     >
       <div className="h-full flex flex-col overflow-hidden">
         <div className="relative z-30 flex-shrink-0 flex flex-col order-2 md:order-1 overflow-visible">
-          <div className="bg-surface/90 backdrop-blur-md border-border-subtle border-t md:border-t-0 md:border-b px-chrome py-chrome-tight overflow-visible">
+          <div className="flex items-center bg-surface/90 backdrop-blur-md border-border-subtle border-t md:border-t-0 md:border-b px-chrome py-chrome-tight overflow-visible">
             <NavigationBar
               isCompact={true}
               onToggleCompact={undefined}
@@ -253,6 +253,7 @@ export function SimplifiedReadView({
               autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
               languagePickerRequired={needsBootstrap}
               onNavigationScopeCommitted={handleNavigatorScopeCommitted}
+              onSwitchTextMode={handleSwitchTextMode}
               downloadIndicator={
                 <DownloadIndicator
                   isDownloading={isBackgroundDownloading}

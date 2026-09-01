@@ -2,7 +2,8 @@
  * EmptyPanelState - Minimalistic empty state for panels
  */
 
-import { BookMarked, BookOpen, Plus, type LucideIcon } from 'lucide-react'
+import { Plus, type LucideIcon } from 'lucide-react'
+import { TEXT_KIND_ICONS } from '../../features/read/textKindIcons'
 import {
   TEXT_MODE_MISMATCH_COPY,
   type TextModeMismatchKind,
@@ -36,7 +37,7 @@ export interface EmptyPanelStateProps {
   /** Compact visible action (e.g. `Stories` / `Bible`). */
   actionShortLabel?: string
   onAction?: () => void
-  /** Drives the large muted icon (BookOpen / BookMarked). */
+  /** Drives the large muted icon (shared Bible / OBS glyphs). */
   emptyKind?: TextModeMismatchKind
 }
 
@@ -47,22 +48,22 @@ function mismatchIcons(kind?: TextModeMismatchKind, actionLabel?: string): {
 } | null {
   if (kind === 'obs-only' || actionLabel === TEXT_MODE_MISMATCH_COPY.switchToStories) {
     return {
-      EmptyIcon: BookMarked,
-      ActionIcon: BookMarked,
+      EmptyIcon: TEXT_KIND_ICONS.obs,
+      ActionIcon: TEXT_KIND_ICONS.obs,
       shortLabel: TEXT_MODE_MISMATCH_COPY.stories,
     }
   }
   if (kind === 'bible-only' || actionLabel === TEXT_MODE_MISMATCH_COPY.switchToBible) {
     return {
-      EmptyIcon: BookOpen,
-      ActionIcon: BookOpen,
+      EmptyIcon: TEXT_KIND_ICONS.bible,
+      ActionIcon: TEXT_KIND_ICONS.bible,
       shortLabel: TEXT_MODE_MISMATCH_COPY.bible,
     }
   }
   if (kind === 'neither') {
     return {
-      EmptyIcon: BookOpen,
-      ActionIcon: BookOpen,
+      EmptyIcon: TEXT_KIND_ICONS.bible,
+      ActionIcon: TEXT_KIND_ICONS.bible,
       shortLabel: '',
     }
   }

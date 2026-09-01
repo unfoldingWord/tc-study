@@ -32,6 +32,8 @@ export interface NavigationBarProps {
   onLoadCollection?: () => void
   /** Read: BCV Bible↔Stories apply reloads catalog without resetting helps language. */
   onNavigationScopeCommitted?: (scope: 'scripture' | 'obs') => void
+  /** Read: compact Bible↔Stories tap — same path as mismatch Switch. */
+  onSwitchTextMode?: (scope: 'scripture' | 'obs') => void
 }
 
 export function NavigationBar({
@@ -45,6 +47,7 @@ export function NavigationBar({
   onDownloadCollection,
   onLoadCollection,
   onNavigationScopeCommitted,
+  onSwitchTextMode,
 }: NavigationBarProps = {}) {
   const navigation = useNavigation()
   const currentRef = useCurrentReference()
@@ -75,18 +78,8 @@ export function NavigationBar({
   const hasNavigationSource =
     storeHasNavigationSource || (!!anchorResourceId && hasObsResource && availableBooks.length === 0)
 
-  if (!hasNavigationSource) {
-    return (
-      <NavigationBarDisabled
-        isCompact={isCompact}
-        showLanguagePicker={showLanguagePicker}
-        onLanguageSelected={onLanguageSelected}
-        autoOpenLanguagePicker={autoOpenLanguagePicker}
-        languagePickerRequired={languagePickerRequired}
-      />
-    )
-  }
-
+  // Compact Read chrome must stay mounted when books are briefly empty (helps-only
+  // panes / language switch). The disabled skeleton is a 37px blank pill.
   if (isCompact) {
     return (
       <NavigationBarCompact
@@ -105,18 +98,28 @@ export function NavigationBar({
         onDownloadCollection={onDownloadCollection}
         onLoadCollection={onLoadCollection}
         onNavigationScopeCommitted={onNavigationScopeCommitted}
+        onSwitchTextMode={onSwitchTextMode}
         isNavigatorOpen={ui.isNavigatorOpen}
         setIsNavigatorOpen={ui.setIsNavigatorOpen}
         isHistoryOpen={ui.isHistoryOpen}
         setIsHistoryOpen={ui.setIsHistoryOpen}
-        isTypeSelectorOpen={ui.isTypeSelectorOpen}
-        setIsTypeSelectorOpen={ui.setIsTypeSelectorOpen}
         isMenuOpen={ui.isMenuOpen}
         setIsMenuOpen={ui.setIsMenuOpen}
         isVersionOpen={ui.isVersionOpen}
         setIsVersionOpen={ui.setIsVersionOpen}
         menuRef={ui.menuRef}
-        typeSelectorRef={ui.typeSelectorRef}
+      />
+    )
+  }
+
+  if (!hasNavigationSource) {
+    return (
+      <NavigationBarDisabled
+        isCompact={false}
+        showLanguagePicker={showLanguagePicker}
+        onLanguageSelected={onLanguageSelected}
+        autoOpenLanguagePicker={autoOpenLanguagePicker}
+        languagePickerRequired={languagePickerRequired}
       />
     )
   }
