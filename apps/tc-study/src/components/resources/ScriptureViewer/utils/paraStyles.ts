@@ -31,6 +31,9 @@ export function blockClassForMarker(
   }
 
   if (role === 'heading' || role === 'intro') {
+    if (marker === 'r' || marker === 'sr' || marker === 'mr') {
+      return `mt-0 mb-3 text-sm italic text-fg-secondary text-center ${indent}`
+    }
     if (marker === 's2' || marker === 's3' || marker === 's4') {
       return `mt-4 mb-2 text-base italic text-fg-secondary text-center ${indent}`
     }

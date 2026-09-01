@@ -198,6 +198,7 @@ export function ScriptureViewer({
           onTokenClick={handleTokenClick}
           onVerseClick={handleVerseClick}
           onChapterClick={handleChapterClick}
+          onScriptureRefClick={navigateToReference}
           language={languageCode}
           languageDirection={languageDirection}
         />

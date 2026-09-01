@@ -1,18 +1,20 @@
 import {
   buildUsjLayoutBlocks,
-  collectVerseDisplayInline,
-  type UsjLayoutInline,
+  collectVerseBlockSequence,
+  filterUsjLayoutBlocks,
   type UsjScriptureViewModel,
   type UsjWordToken,
 } from '@bt-synergy/scripture-loader'
 import { BookX } from 'lucide-react'
 import { useEffect, useMemo, useRef } from 'react'
-import type { BookInfo, ReferenceState } from '../../../../contexts/types-only'
+import type { BCVReference, BookInfo, ReferenceState } from '../../../../contexts/types-only'
 import { useScriptureDisplayStore } from '../../../../lib/stores/scriptureDisplayStore'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { isOriginalLanguageCode } from '../../../../features/helps/resolveAlignedQuoteTokens'
 import { isScriptureBooksPending } from '../hooks/scriptureContentLoad'
 import type { DisplayUsjVerse, OriginalLanguageToken } from '../types'
+import { chaptersForRef, includeVerseForRef } from '../utils/scriptureNavRange'
+import { FormattedBlockRenderer } from './FormattedBlockRenderer'
 import { FormattedScriptureContent } from './FormattedScriptureContent'
 import { VerseRenderer } from './VerseRenderer'
 
@@ -30,6 +32,7 @@ interface ScriptureContentProps {
   onTokenClick: (token: UsjWordToken) => void
   onVerseClick?: (chapter: number, verse: number) => void
   onChapterClick?: (chapter: number) => void
+  onScriptureRefClick?: (ref: BCVReference) => void
   language?: string
   languageDirection?: 'ltr' | 'rtl'
 }
@@ -48,6 +51,7 @@ export function ScriptureContent({
   onTokenClick,
   onVerseClick,
   onChapterClick,
+  onScriptureRefClick,
   language,
   languageDirection = 'ltr',
 }: ScriptureContentProps) {
@@ -78,25 +82,27 @@ export function ScriptureContent({
     lastScrolledTokenRef.current = null
   }, [currentRef.book, currentRef.chapter, currentRef.verse])
 
+  const includeVerse = useMemo(() => includeVerseForRef(currentRef), [currentRef])
+  const navChapters = useMemo(() => chaptersForRef(currentRef), [currentRef])
+
   const layoutBlocks = useMemo(
     () =>
       viewModel && layoutMode === 'verse-block'
-        ? buildUsjLayoutBlocks(viewModel.usj, viewModel)
+        ? filterUsjLayoutBlocks(buildUsjLayoutBlocks(viewModel.usj, viewModel), {
+            chapters: navChapters,
+            includeVerse,
+          })
         : [],
-    [viewModel, layoutMode]
+    [viewModel, layoutMode, navChapters, includeVerse]
   )
 
-  const verseDisplayInline = useMemo(() => {
-    const map = new Map<string, UsjLayoutInline[]>()
+  const verseByKey = useMemo(() => {
+    const map = new Map<string, DisplayUsjVerse>()
     for (const verse of displayVerses) {
-      const chapterNum = verse.chapterNumber || currentRef.chapter
-      map.set(
-        `${chapterNum}:${verse.number}`,
-        collectVerseDisplayInline(layoutBlocks, chapterNum, verse.number)
-      )
+      map.set(`${verse.chapterNumber || currentRef.chapter}:${verse.number}`, verse)
     }
     return map
-  }, [layoutBlocks, displayVerses, currentRef.chapter])
+  }, [displayVerses, currentRef.chapter])
 
   const { versesByChapter, chapters } = useMemo(() => {
     const grouped = displayVerses.reduce((acc, verse) => {
@@ -110,6 +116,26 @@ export function ScriptureContent({
       chapters: Object.keys(grouped).map(Number).sort((a, b) => a - b),
     }
   }, [displayVerses, currentRef.chapter])
+
+  const verseBlockItemsByChapter = useMemo(() => {
+    const grouped = new Map<number, ReturnType<typeof collectVerseBlockSequence>>()
+    for (const chapterNum of chapters) {
+      const chapterVerses = (versesByChapter[chapterNum] ?? []).map((verse) => ({
+        chapter: chapterNum,
+        verse: verse.number,
+      }))
+      const chapterBlocks = layoutBlocks.filter(
+        (block) =>
+          block.chapterNumber === chapterNum &&
+          (block.role === 'heading' ||
+            block.role === 'break' ||
+            block.marker === 'b' ||
+            block.verseNumbers.length > 0)
+      )
+      grouped.set(chapterNum, collectVerseBlockSequence(chapterBlocks, chapterVerses))
+    }
+    return grouped
+  }, [layoutBlocks, chapters, versesByChapter])
 
   const showFullScreenLoading = isScriptureBooksPending({
     isLoadingTOC,
@@ -184,6 +210,7 @@ export function ScriptureContent({
           onTokenClick={onTokenClick}
           onVerseClick={onVerseClick}
           onChapterClick={onChapterClick}
+          onScriptureRefClick={onScriptureRefClick}
           isOriginalLanguage={isOriginalLanguage}
         />
       ) : (
@@ -199,19 +226,41 @@ export function ScriptureContent({
               {chapterNum}
             </h2>
 
-            {versesByChapter[chapterNum]!.map((verse) => (
-              <VerseRenderer
-                key={`${chapterNum}:${verse.number}`}
-                verse={verse}
-                chapterNumber={chapterNum}
-                displayInline={verseDisplayInline.get(`${chapterNum}:${verse.number}`)}
-                highlightTarget={highlightTarget}
-                underlinedSemanticIds={underlinedSemanticIds}
-                onTokenClick={onTokenClick}
-                onVerseClick={onVerseClick}
-                isOriginalLanguage={isOriginalLanguage}
-              />
-            ))}
+            {(verseBlockItemsByChapter.get(chapterNum) ?? []).map((item, idx) => {
+              if (item.kind === 'chrome') {
+                return (
+                  <FormattedBlockRenderer
+                    key={`chrome-${chapterNum}-${item.block.marker}-${idx}`}
+                    block={item.block}
+                    blockIndex={idx}
+                    highlightTarget={highlightTarget}
+                    underlinedSemanticIds={underlinedSemanticIds}
+                    onTokenClick={onTokenClick}
+                    onVerseClick={onVerseClick}
+                    onScriptureRefClick={onScriptureRefClick}
+                    currentBook={currentRef.book}
+                    isOriginalLanguage={isOriginalLanguage}
+                  />
+                )
+              }
+              const verse = verseByKey.get(`${item.chapter}:${item.verse}`)
+              if (!verse) return null
+              return (
+                <VerseRenderer
+                  key={`${item.chapter}:${item.verse}`}
+                  verse={verse}
+                  chapterNumber={item.chapter}
+                  displayInline={item.displayInline}
+                  highlightTarget={highlightTarget}
+                  underlinedSemanticIds={underlinedSemanticIds}
+                  onTokenClick={onTokenClick}
+                  onVerseClick={onVerseClick}
+                  onScriptureRefClick={onScriptureRefClick}
+                  currentBook={currentRef.book}
+                  isOriginalLanguage={isOriginalLanguage}
+                />
+              )
+            })}
           </div>
         ))
       )}

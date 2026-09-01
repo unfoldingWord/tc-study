@@ -17,6 +17,19 @@ export function extractText(content: unknown): string {
   return s
 }
 
+/** Walk nested USJ char/note children (unlike `extractText`, which is shallow). */
+export function extractDeepText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) return content.map(extractDeepText).join('')
+  if (!isRecord(content)) return ''
+  if (content.type === 'text' && typeof content.content === 'string') {
+    return content.content
+  }
+  if (Array.isArray(content.content)) return extractDeepText(content.content)
+  if (typeof content.content === 'string') return content.content
+  return ''
+}
+
 export interface UsjWordHit {
   verseSid: string
   content: string

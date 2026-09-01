@@ -5,8 +5,9 @@ import {
   type UsjWordToken,
 } from '@bt-synergy/scripture-loader'
 import { useMemo } from 'react'
-import type { ReferenceState } from '../../../../contexts/types-only'
+import type { BCVReference, ReferenceState } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken } from '../types'
+import { chaptersForRef, includeVerseForRef } from '../utils/scriptureNavRange'
 import { FormattedBlockRenderer } from './FormattedBlockRenderer'
 
 interface FormattedScriptureContentProps {
@@ -17,6 +18,7 @@ interface FormattedScriptureContentProps {
   onTokenClick: (token: UsjWordToken) => void
   onVerseClick?: (chapter: number, verse: number) => void
   onChapterClick?: (chapter: number) => void
+  onScriptureRefClick?: (ref: BCVReference) => void
   isOriginalLanguage: boolean
 }
 
@@ -28,41 +30,27 @@ export function FormattedScriptureContent({
   onTokenClick,
   onVerseClick,
   onChapterClick,
+  onScriptureRefClick,
   isOriginalLanguage,
 }: FormattedScriptureContentProps) {
-  const startChapter = currentRef.chapter
-  const endChapter = currentRef.endChapter || startChapter
-  const startVerse = currentRef.verse
-  const endVerse =
-    currentRef.endVerse || (startChapter === endChapter ? startVerse : undefined)
-
-  const chapters = useMemo(() => {
-    const list: number[] = []
-    for (let c = startChapter; c <= endChapter; c++) list.push(c)
-    return list
-  }, [startChapter, endChapter])
+  const chapters = useMemo(() => chaptersForRef(currentRef), [currentRef])
+  const includeVerse = useMemo(() => includeVerseForRef(currentRef), [currentRef])
 
   const blocksByChapter = useMemo(() => {
     const all = buildUsjLayoutBlocks(viewModel.usj, viewModel)
     const filtered = filterUsjLayoutBlocks(all, {
       chapters,
-      includeVerse: (chapter, verse) => {
-        let chapterStart = 1
-        let chapterEnd = 999
-        if (chapter === startChapter) chapterStart = startVerse
-        if (chapter === endChapter && endVerse !== undefined) chapterEnd = endVerse
-        return verse >= chapterStart && verse <= chapterEnd
-      },
+      includeVerse,
     })
 
     const grouped = new Map<number, typeof filtered>()
     for (const block of filtered) {
-      const ch = block.chapterNumber || startChapter
+      const ch = block.chapterNumber || currentRef.chapter
       if (!grouped.has(ch)) grouped.set(ch, [])
       grouped.get(ch)!.push(block)
     }
     return grouped
-  }, [viewModel, chapters, startChapter, endChapter, startVerse, endVerse])
+  }, [viewModel, chapters, includeVerse, currentRef.chapter])
 
   return (
     <div className="space-y-6" data-scripture-layout="formatted">
@@ -89,6 +77,8 @@ export function FormattedScriptureContent({
                 underlinedSemanticIds={underlinedSemanticIds}
                 onTokenClick={onTokenClick}
                 onVerseClick={onVerseClick}
+                onScriptureRefClick={onScriptureRefClick}
+                currentBook={currentRef.book}
                 isOriginalLanguage={isOriginalLanguage}
               />
             ))}

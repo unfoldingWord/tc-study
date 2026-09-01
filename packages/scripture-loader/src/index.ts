@@ -59,6 +59,7 @@ export {
   filterUsjLayoutBlocks,
   clipLayoutInlineToVerses,
   collectVerseDisplayInline,
+  collectVerseBlockSequence,
   plainTextFromLayoutInline,
   shouldInsertSpaceBeforeInline,
   indentLevelForMarker,
@@ -70,6 +71,7 @@ export type {
   UsjLayoutBlock,
   UsjLayoutInline,
   UsjLayoutBlockRole,
+  UsjVerseBlockItem,
   FilterUsjLayoutOptions,
 } from '@bt-synergy/usj-processor'
 

@@ -4,9 +4,12 @@ import {
   type UsjLayoutBlock,
   type UsjWordToken,
 } from '@bt-synergy/scripture-loader'
+import type { BCVReference } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken } from '../types'
 import { resolveTokenVisualState } from '../utils/tokenHighlight'
 import { blockClassForMarker } from '../utils/paraStyles'
+import { ScriptureNoteMarker } from './ScriptureNoteMarker'
+import { ScriptureRefLinks } from './ScriptureRefLinks'
 import { TokenRenderer } from './TokenRenderer'
 
 interface FormattedBlockRendererProps {
@@ -16,6 +19,8 @@ interface FormattedBlockRendererProps {
   underlinedSemanticIds?: Set<string>
   onTokenClick: (token: UsjWordToken) => void
   onVerseClick?: (chapter: number, verse: number) => void
+  onScriptureRefClick?: (ref: BCVReference) => void
+  currentBook?: string
   isOriginalLanguage: boolean
 }
 
@@ -26,6 +31,8 @@ export const FormattedBlockRenderer = memo(function FormattedBlockRenderer({
   underlinedSemanticIds,
   onTokenClick,
   onVerseClick,
+  onScriptureRefClick,
+  currentBook = '',
   isOriginalLanguage,
 }: FormattedBlockRendererProps) {
   const className = blockClassForMarker(block.marker, block.role, block.indentLevel)
@@ -76,9 +83,25 @@ export const FormattedBlockRenderer = memo(function FormattedBlockRenderer({
 
         if (item.kind === 'heading') {
           return (
-            <span key={`h-${blockIndex}-${index}`} className="text-scripture-fg">
-              {item.text}
-            </span>
+            <ScriptureRefLinks
+              key={`h-${blockIndex}-${index}`}
+              text={item.text}
+              currentBook={currentBook}
+              onScriptureRefClick={onScriptureRefClick}
+            />
+          )
+        }
+
+        if (item.kind === 'note' || item.kind === 'xref') {
+          return (
+            <ScriptureNoteMarker
+              key={`${item.kind}-${blockIndex}-${index}`}
+              kind={item.kind}
+              caller={item.caller}
+              text={item.text}
+              currentBook={currentBook}
+              onScriptureRefClick={onScriptureRefClick}
+            />
           )
         }
 
