@@ -131,6 +131,25 @@ export class IndexedDBCacheAdapter {
     return reassembleBookEntry(key, result.entry, chapterRecords.map((r) => ({ key: r.key, entry: r.entry })))
   }
   
+  /**
+   * Return raw IndexedDB rows for keys in [prefix, prefix + '\uffff'].
+   * Does not reassemble chunked manifests — caller decides how to interpret rows.
+   */
+  async getByPrefix(prefix: string): Promise<Array<{ key: string; entry: CacheEntry }>> {
+    const db = await this.initDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.storeName, 'readonly')
+      const store = tx.objectStore(this.storeName)
+      const range = IDBKeyRange.bound(prefix, prefix + '\uffff')
+      const request = store.getAll(range)
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const rows = (request.result ?? []) as Array<{ key: string; entry: CacheEntry }>
+        resolve(rows)
+      }
+    })
+  }
+
   async has(key: string): Promise<boolean> {
     const entry = await this.get(key)
     return entry !== null

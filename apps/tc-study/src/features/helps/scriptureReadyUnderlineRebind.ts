@@ -78,3 +78,17 @@ export function shouldRetryOriginalLanguageLoad(opts: {
   if (!opts.scriptureRevision || opts.scriptureRevision === SCRIPTURE_EMPTY_REVISION) return false
   return opts.scriptureRevision !== opts.lastAttemptedRevision
 }
+
+/**
+ * When SCRIPTURE_TOKENS leaves `scripture:empty`, NOTES_TOKEN_GROUPS must
+ * rebroadcast even if group shape looked the same under the empty revision.
+ */
+export function shouldResetTokenGroupsDedupe(args: {
+  previousRevision: string | null
+  nextRevision: string
+}): boolean {
+  if (!args.nextRevision || args.nextRevision === SCRIPTURE_EMPTY_REVISION) return false
+  return (
+    args.previousRevision == null || args.previousRevision === SCRIPTURE_EMPTY_REVISION
+  )
+}

@@ -34,6 +34,7 @@ export {
 export type { ScriptureLoadResult } from './scriptureLoadResult'
 export {
   viewModelToOptimizedChapters,
+  viewModelChapterToOptimized,
   extractUsjBroadcastTokens,
   type BroadcastScriptureToken,
 } from './usjHelpsProjection'
@@ -56,6 +57,7 @@ export {
   viewModelFromProcessedScripture,
   usjTokensFromProcessedVerse,
   buildUsjLayoutBlocks,
+  buildUsjLayoutBlocksForChapter,
   filterUsjLayoutBlocks,
   clipLayoutInlineToVerses,
   collectVerseDisplayInline,

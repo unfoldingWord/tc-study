@@ -16,6 +16,7 @@ import {
   type UsjScriptureViewModel,
 } from '@bt-synergy/usj-processor'
 
+import { MemoryCache } from './MemoryCache'
 import { processUsfmToUsjResult } from './processUsfm'
 import type { ScriptureLoadResult } from './scriptureLoadResult'
 import {
@@ -74,12 +75,25 @@ export class ScriptureLoader implements ResourceLoader {
   private debug: boolean
   /** Lazy: constructed on first USJ process/cache read. */
   private usjProcessor: USJProcessor | null = null
+  private memoryCache: MemoryCache<ScriptureLoadResult> | null = null
+  private onBookCached?: ScriptureLoaderConfig['onBookCached']
+  private onContentCached?: ScriptureLoaderConfig['onContentCached']
 
   constructor(config: ScriptureLoaderConfig | any) {
     this.cacheAdapter = config.cacheAdapter
     this.catalogAdapter = config.catalogAdapter
     this.door43Client = config.door43Client
     this.debug = config.debug || false
+    this.onBookCached = typeof config.onBookCached === 'function' ? config.onBookCached : undefined
+    this.onContentCached =
+      typeof config.onContentCached === 'function' ? config.onContentCached : undefined
+    if (config.enableMemoryCache) {
+      this.memoryCache = new MemoryCache<ScriptureLoadResult>(
+        typeof config.memoryCacheSize === 'number' && config.memoryCacheSize > 0
+          ? Math.max(4, Math.floor(config.memoryCacheSize))
+          : 24
+      )
+    }
     if (this.debug) {
       console.log('[ScriptureLoader] pipeline=usj (USJ-only; scripture-usj: SoT)')
     }
@@ -127,6 +141,19 @@ export class ScriptureLoader implements ResourceLoader {
       }
     } catch (err) {
       console.warn('[ScriptureLoader] Failed to cache USJ SoT:', err)
+    }
+    if (this.onBookCached || this.onContentCached) {
+      const payload = {
+        resourceKey,
+        bookId,
+        viewModel: result.viewModel,
+      }
+      try {
+        if (this.onContentCached) await this.onContentCached(payload)
+        if (this.onBookCached) await this.onBookCached(payload)
+      } catch (err) {
+        console.warn('[ScriptureLoader] onContentCached/onBookCached failed:', err)
+      }
     }
     return {
       viewModel: result.viewModel,
@@ -313,8 +340,15 @@ export class ScriptureLoader implements ResourceLoader {
     resourceKey: string,
     bookId: string
   ): Promise<ScriptureLoadResult> {
+    const memKey = `${resourceKey}:${bookId.toLowerCase()}`
+    const fromMem = this.memoryCache?.get(memKey)
+    if (fromMem) return fromMem
+
     const { result: fromCache, hadLegacy } = await this.readCachedResult(resourceKey, bookId)
-    if (fromCache) return fromCache
+    if (fromCache) {
+      this.memoryCache?.set(memKey, fromCache)
+      return fromCache
+    }
 
     if (this.debug) {
       console.log(`Cache miss (scripture-usj:), fetching ${resourceKey}/${bookId} from Door43...`)
@@ -323,6 +357,7 @@ export class ScriptureLoader implements ResourceLoader {
     try {
       const usfmContent = await this.fetchUsfmText(resourceKey, bookId)
       const loaded = await this.processAndCacheResult(usfmContent, resourceKey, bookId)
+      this.memoryCache?.set(memKey, loaded)
 
       if (this.debug) {
         console.log('🔍 Step 6: Processed scripture', {
@@ -427,20 +462,60 @@ export class ScriptureLoader implements ResourceLoader {
 
     console.log(`📦 Found ${ingredients.length} books to download`)
 
+    let failedBooks: string[] = []
+
     if (method === 'zip') {
       try {
-        await this.downloadViaZip(resourceKey, metadata, ingredients, skipExisting, onProgress)
+        failedBooks = await this.downloadViaZip(
+          resourceKey,
+          metadata,
+          ingredients,
+          skipExisting,
+          onProgress
+        )
       } catch (zipError) {
         console.warn(`⚠️ ZIP download failed, falling back to individual downloads:`, zipError)
-        await this.downloadIndividual(resourceKey, metadata, ingredients, skipExisting, onProgress)
+        failedBooks = await this.downloadIndividual(
+          resourceKey,
+          metadata,
+          ingredients,
+          skipExisting,
+          onProgress
+        )
       }
     } else if (method === 'individual') {
-      await this.downloadIndividual(resourceKey, metadata, ingredients, skipExisting, onProgress)
+      failedBooks = await this.downloadIndividual(
+        resourceKey,
+        metadata,
+        ingredients,
+        skipExisting,
+        onProgress
+      )
     } else {
       throw new Error(`Download method '${method}' not yet implemented. Use 'zip' or 'individual'.`)
     }
 
     const resourceCacheKey = `resource:${resourceKey}`
+    const succeeded = ingredients.length - failedBooks.length
+
+    if (failedBooks.length > 0) {
+      // Do not mark downloadComplete — skipExisting can retry missing books later.
+      await this.cacheAdapter.set(resourceCacheKey, {
+        content: { downloaded: false, failedBooks },
+        metadata: {
+          downloadComplete: false,
+          downloadMethod: method,
+          entryCount: Math.max(0, succeeded),
+          expectedEntryCount: ingredients.length,
+          failedBooks,
+        },
+      })
+      console.warn(
+        `⚠️ [ScriptureLoader] Download incomplete for ${resourceKey}: ${failedBooks.length} book(s) failed (${failedBooks.join(', ')})`
+      )
+      return
+    }
+
     await this.cacheAdapter.set(resourceCacheKey, {
       content: { downloaded: true },
       metadata: {
@@ -461,7 +536,7 @@ export class ScriptureLoader implements ResourceLoader {
     ingredients: any[],
     skipExisting: boolean,
     onProgress?: ProgressCallback
-  ): Promise<void> {
+  ): Promise<string[]> {
     const zipUrl = metadata.release?.zipball_url
     if (!zipUrl) {
       throw new Error('No zipball URL available in metadata')
@@ -511,6 +586,7 @@ export class ScriptureLoader implements ResourceLoader {
     const total = ingredients.length
     let loaded = 0
     let processed = 0
+    const failedBooks: string[] = []
 
     for (const ingredient of ingredients) {
       const bookId = ingredient.identifier
@@ -558,6 +634,7 @@ export class ScriptureLoader implements ResourceLoader {
           if (this.debug) {
             console.warn(`⚠️ ${bookId} not found in ZIP (listed in ingredients but not in repo)`)
           }
+          failedBooks.push(bookId)
           loaded++
           if (onProgress) {
             onProgress({
@@ -592,6 +669,7 @@ export class ScriptureLoader implements ResourceLoader {
         }
       } catch (error) {
         console.error(`❌ Failed to process ${bookId} from ZIP:`, error)
+        failedBooks.push(bookId)
         loaded++
         if (onProgress) {
           onProgress({
@@ -604,18 +682,20 @@ export class ScriptureLoader implements ResourceLoader {
       }
     }
 
-    console.log(`✅ Processed ${processed}/${total} books from zipball`)
+    console.log(`✅ Processed ${processed}/${total} books from zipball (${failedBooks.length} failed)`)
+    return failedBooks
   }
 
   private async downloadIndividual(
     resourceKey: string,
-    metadata: ResourceMetadata,
+    _metadata: ResourceMetadata,
     ingredients: any[],
     skipExisting: boolean,
     onProgress?: ProgressCallback
-  ): Promise<void> {
+  ): Promise<string[]> {
     const total = ingredients.length
     let loaded = 0
+    const failedBooks: string[] = []
 
     for (const ingredient of ingredients) {
       const bookId = ingredient.identifier
@@ -659,6 +739,7 @@ export class ScriptureLoader implements ResourceLoader {
             ? msg
             : `${msg} ${STALE_SCRIPTURE_CACHE_HINT}`
         )
+        failedBooks.push(bookId)
         loaded++
         if (onProgress) {
           onProgress({
@@ -670,5 +751,7 @@ export class ScriptureLoader implements ResourceLoader {
         }
       }
     }
+
+    return failedBooks
   }
 }

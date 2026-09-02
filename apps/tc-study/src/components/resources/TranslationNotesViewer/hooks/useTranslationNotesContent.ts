@@ -13,7 +13,12 @@ import {
 } from '../../../../features/helps/helpsContentHydrate'
 
 const CACHE_MAX = 50
-const notesCache = new Map<string, { notes: TranslationNote[]; error: string | null }>()
+type NotesCacheEntry = {
+  notes: TranslationNote[]
+  notesByChapter: Record<string, TranslationNote[]>
+  error: string | null
+}
+const notesCache = new Map<string, NotesCacheEntry>()
 
 function cacheKey(resourceKey: string, bookCode: string, loaderTypeId: string) {
   return `notes:${loaderTypeId}:${resourceKey}:${bookCode}`
@@ -36,12 +41,16 @@ export function useTranslationNotesContent(
       : undefined
   const reuseCached = shouldReuseHelpsContentCache(cached)
   const [notes, setNotes] = useState<TranslationNote[]>(reuseCached ? cached?.notes ?? [] : [])
+  const [notesByChapter, setNotesByChapter] = useState<Record<string, TranslationNote[]>>(
+    reuseCached ? cached?.notesByChapter ?? {} : {}
+  )
   const [loading, setLoading] = useState(!reuseCached)
   const [error, setError] = useState<string | null>(reuseCached ? cached?.error ?? null : null)
 
   useEffect(() => {
     if (!resourceKey || !bookCode) {
       setNotes([])
+      setNotesByChapter({})
       setError(null)
       setLoading(false)
       return
@@ -51,6 +60,7 @@ export function useTranslationNotesContent(
     const hit = notesCache.get(key)
     if (hit && shouldReuseHelpsContentCache(hit)) {
       setNotes(hit.notes)
+      setNotesByChapter(hit.notesByChapter)
       setError(hit.error)
       setLoading(false)
       return
@@ -73,12 +83,18 @@ export function useTranslationNotesContent(
         if (cancelled) return
 
         if (processedNotes && processedNotes.notes) {
-          const data = { notes: processedNotes.notes, error: null }
+          const data: NotesCacheEntry = {
+            notes: processedNotes.notes,
+            notesByChapter: processedNotes.notesByChapter ?? {},
+            error: null,
+          }
           if (notesCache.size >= CACHE_MAX) notesCache.delete(notesCache.keys().next().value!)
           notesCache.set(key, data)
           setNotes(data.notes)
+          setNotesByChapter(data.notesByChapter)
         } else {
           setNotes([])
+          setNotesByChapter({})
         }
       } catch (err) {
         if (cancelled) return
@@ -89,20 +105,26 @@ export function useTranslationNotesContent(
           error: err instanceof Error ? err.message : String(err),
         })
 
-        const errMsg = err instanceof Error && err.message.includes('404')
-          ? `Notes not available for ${bookCode.toUpperCase()}`
-          : (err instanceof Error ? err.message : 'Failed to load notes')
+        const errMsg =
+          err instanceof Error && err.message.includes('404')
+            ? `Notes not available for ${bookCode.toUpperCase()}`
+            : err instanceof Error
+              ? err.message
+              : 'Failed to load notes'
         notesCache.delete(key)
         setError(errMsg)
         setNotes([])
+        setNotesByChapter({})
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
 
     loadNotes()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [resourceKey, bookCode, loaderTypeId, loaderRegistry, hydrateTick])
 
-  return { notes, loading, error }
+  return { notes, notesByChapter, loading, error }
 }

@@ -4,7 +4,12 @@
 
 import { RESOURCE_STATE_KEYS, useResourceStateSender } from '@bt-synergy/resource-panels'
 import { useEffect, useRef } from 'react'
-import { tokenGroupsBroadcastDedupeKey } from '../../../features/helps/scriptureReadyUnderlineRebind'
+import {
+  shouldResetTokenGroupsDedupe,
+  tokenGroupsBroadcastDedupeKey,
+} from '../../../features/helps/scriptureReadyUnderlineRebind'
+import { shouldEnqueueQuoteBuild } from '../../../features/nav/chapterScrollActivity'
+import { useChapterScrollActivity } from '../../../features/nav/usePinnedHelpsReference'
 import type { NotesTokenGroupsSignal } from '../../../signals/studioSignals'
 import { useScriptureContentRevision } from '../WordsLinksViewer/hooks'
 import type { HelpsKindFilter } from './types'
@@ -45,36 +50,67 @@ export function useCombinedHelpsTokenGroupsBroadcast({
   )
   const lastTnKeyRef = useRef<string | null>(null)
   const lastTwlKeyRef = useRef<string | null>(null)
+  const lastRevisionRef = useRef<string | null>(null)
+  const wasUnsettledRef = useRef(false)
   const scriptureRevision = useScriptureContentRevision(resourceId)
+  const scrollActivity = useChapterScrollActivity()
 
   useEffect(() => {
+    if (scrollActivity.unsettled) {
+      wasUnsettledRef.current = true
+      return
+    }
+    if (!shouldEnqueueQuoteBuild(scrollActivity.unsettled)) return
     if (helpsScope === 'obs') return
-    const activeGroups = kindFilter === 'twl' ? [] : underlineTnGroups
-    const key = tokenGroupsBroadcastDedupeKey(kindFilter, activeGroups, scriptureRevision)
-    if (key === lastTnKeyRef.current) return
-    lastTnKeyRef.current = key
-    const parts = (tnKey || resourceKey).split('/')
-    const language = parts[1]?.split('_')[0] || ''
-    sendTnTokenGroups({
-      tokenGroups: activeGroups,
-      resourceMetadata: { id: tnKey || resourceKey, language, type: 'tn' },
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- sendState ref is stable; key dedupes
-  }, [resourceId, tnKey, resourceKey, underlineTnGroups, kindFilter, helpsScope, scriptureRevision])
 
-  useEffect(() => {
-    if (helpsScope === 'obs') return
-    const activeGroups = kindFilter === 'notes' ? [] : underlineTwlGroups
-    const key = tokenGroupsBroadcastDedupeKey(kindFilter, activeGroups, scriptureRevision)
-    if (key === lastTwlKeyRef.current) return
-    lastTwlKeyRef.current = key
-    const parts = (twlKey || resourceKey).split('/')
-    const language = parts[1]?.split('_')[0] || ''
-    sendTwlTokenGroups({
-      tokenGroups: activeGroups,
-      resourceMetadata: { id: twlKey || resourceKey, language, type: 'words-links' },
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resourceId, twlKey, resourceKey, underlineTwlGroups, kindFilter, helpsScope, scriptureRevision])
+    // After settle or when leaving scripture:empty, force a fresh broadcast.
+    if (
+      wasUnsettledRef.current ||
+      shouldResetTokenGroupsDedupe({
+        previousRevision: lastRevisionRef.current,
+        nextRevision: scriptureRevision,
+      })
+    ) {
+      lastTnKeyRef.current = null
+      lastTwlKeyRef.current = null
+      wasUnsettledRef.current = false
+    }
+    lastRevisionRef.current = scriptureRevision
 
+    const activeTn = kindFilter === 'twl' ? [] : underlineTnGroups
+    const tnKeyDedupe = tokenGroupsBroadcastDedupeKey(kindFilter, activeTn, scriptureRevision)
+    if (tnKeyDedupe !== lastTnKeyRef.current) {
+      lastTnKeyRef.current = tnKeyDedupe
+      const parts = (tnKey || resourceKey).split('/')
+      const language = parts[1]?.split('_')[0] || ''
+      sendTnTokenGroups({
+        tokenGroups: activeTn,
+        resourceMetadata: { id: tnKey || resourceKey, language, type: 'tn' },
+      })
+    }
+
+    const activeTwl = kindFilter === 'notes' ? [] : underlineTwlGroups
+    const twlKeyDedupe = tokenGroupsBroadcastDedupeKey(kindFilter, activeTwl, scriptureRevision)
+    if (twlKeyDedupe !== lastTwlKeyRef.current) {
+      lastTwlKeyRef.current = twlKeyDedupe
+      const parts = (twlKey || resourceKey).split('/')
+      const language = parts[1]?.split('_')[0] || ''
+      sendTwlTokenGroups({
+        tokenGroups: activeTwl,
+        resourceMetadata: { id: twlKey || resourceKey, language, type: 'words-links' },
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sendState refs stable; keys dedupe
+  }, [
+    resourceId,
+    tnKey,
+    twlKey,
+    resourceKey,
+    underlineTnGroups,
+    underlineTwlGroups,
+    kindFilter,
+    helpsScope,
+    scriptureRevision,
+    scrollActivity.unsettled,
+  ])
 }

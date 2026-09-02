@@ -91,11 +91,13 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   // not on every chapter/verse navigation or obsFrameCountByStory update.
   const currentBook = useNavigationStore((s) => s.currentReference.book)
   const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
+  // Missing quoteStatus = pipeline has not attached a result yet — keep pending,
+  // never paint a finished OL-fallback (Greek/Hebrew + ULT with no chips).
   const quoteStatus =
     note.quoteStatus ??
     resolveHelpsQuoteStatus({
       hasAlignedTokens,
-      alignmentPending: false,
+      alignmentPending: !hasAlignedTokens,
       olQuote: note.quote,
     })
   const excerptLoading = shouldShowHelpsExcerptSkeleton({

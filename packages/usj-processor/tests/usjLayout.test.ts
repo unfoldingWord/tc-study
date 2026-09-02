@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   buildUsjLayoutBlocks,
+  buildUsjLayoutBlocksForChapter,
   collectVerseBlockSequence,
   collectVerseDisplayInline,
   filterUsjLayoutBlocks,
@@ -65,12 +66,12 @@ function poetryUsj(): CachedUsjDocument {
   }
 }
 
-function viewModelFor(usj: CachedUsjDocument): UsjScriptureViewModel {
+function viewModelFor(usj: CachedUsjDocument, bookCode = 'JON'): UsjScriptureViewModel {
   return buildUsjViewModel({
     usj,
     alignmentMap: {},
-    bookCode: 'JON',
-    bookName: 'Jonah',
+    bookCode,
+    bookName: bookCode,
   })
 }
 
@@ -132,6 +133,61 @@ describe('usjLayout helpers', () => {
     const prose = blocks.find((b) => b.marker === 'p')!
     expect(prose.indentLevel).toBe(0)
     expect(prose.verseNumbers).toEqual([10])
+  })
+
+  test('buildUsjLayoutBlocksForChapter matches full-book slice and stops early', () => {
+    const usj = {
+      type: 'USJ',
+      version: '3.1',
+      content: [
+        { type: 'book', marker: 'id', content: 'TIT' },
+        { type: 'chapter', marker: 'c', number: '1', sid: 'TIT 1' },
+        {
+          type: 'para',
+          marker: 'p',
+          content: [
+            { type: 'verse', marker: 'v', number: '1', sid: 'TIT 1:1' },
+            { type: 'char', marker: 'w', content: ['Paul'] },
+          ],
+        },
+        { type: 'chapter', marker: 'c', number: '2', sid: 'TIT 2' },
+        {
+          type: 'para',
+          marker: 'p',
+          content: [
+            { type: 'verse', marker: 'v', number: '1', sid: 'TIT 2:1' },
+            { type: 'char', marker: 'w', content: ['Teach'] },
+          ],
+        },
+      ],
+    } as CachedUsjDocument
+    const viewModel = viewModelFor(usj, 'TIT')
+    const full = buildUsjLayoutBlocks(usj, viewModel)
+    const ch1 = buildUsjLayoutBlocksForChapter(usj, viewModel, 1)
+    const ch2 = buildUsjLayoutBlocksForChapter(usj, viewModel, 2)
+    expect(viewModel.chapters.map((c) => c.number)).toEqual([1, 2])
+    expect(ch1.length).toBeGreaterThan(0)
+    expect(ch2.length).toBeGreaterThan(0)
+    expect(ch1.every((b) => b.chapterNumber === 1 || b.chapterNumber === 0)).toBe(true)
+    expect(ch2.every((b) => b.chapterNumber === 2)).toBe(true)
+    const ch1Text = ch1
+      .flatMap((b) => b.inline)
+      .map((i) =>
+        i.kind === 'token' ? i.token.content : i.kind === 'text' ? i.text : ''
+      )
+      .join('')
+    const ch2Text = ch2
+      .flatMap((b) => b.inline)
+      .map((i) =>
+        i.kind === 'token' ? i.token.content : i.kind === 'text' ? i.text : ''
+      )
+      .join('')
+    expect(ch1Text).toContain('Paul')
+    expect(ch2Text).toContain('Teach')
+    expect(ch1Text).not.toContain('Teach')
+    expect(full.filter((b) => b.chapterNumber === 1).length).toBe(
+      ch1.filter((b) => b.chapterNumber === 1).length
+    )
   })
 
   test('filterUsjLayoutBlocks respects chapter + verse window', () => {

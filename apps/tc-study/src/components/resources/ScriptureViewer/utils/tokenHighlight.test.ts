@@ -1,7 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 import type { UsjWordToken } from '@bt-synergy/scripture-loader'
-import { foldHighlightTarget, resolveTokenVisualState, tokenMatchesHighlightTarget } from './tokenHighlight'
-import { attachFoldedMatchKeys, semanticIdFor, semanticIdKey } from './wordIdentity'
+import { semanticIdFor } from '@bt-synergy/scripture-loader'
+import { semanticIdMatchKey } from '../../../../features/helps/semanticIdMatchKey'
+import { resolveMatchIndices } from '../../../../features/scripture/scripturePreparer'
+import {
+  foldHighlightTarget,
+  highlightIndicesFromTarget,
+  resolveTokenVisualState,
+  resolveTokenVisualStateInterned,
+  tokenMatchesHighlightTarget,
+} from './tokenHighlight'
+import { attachFoldedMatchKeys, semanticIdKey } from './wordIdentity'
 
 function usjWord(
   partial: Pick<UsjWordToken, 'content' | 'verseRef'> & Partial<UsjWordToken>
@@ -200,5 +209,34 @@ describe('tokenMatchesHighlightTarget (toggle-off)', () => {
 
   test('null highlight never matches', () => {
     expect(tokenMatchesHighlightTarget(paul, null)).toBe(false)
+  })
+})
+
+describe('resolveTokenVisualStateInterned', () => {
+  test('integer underline and highlight agree with folded string sets', () => {
+    const verseRef = 'tit 1:1'
+    const ownRaw = semanticIdFor(verseRef, 'Paul', 1)
+    const alignedRaw = semanticIdFor(verseRef, 'Παῦλος', 1)
+    const matchKeys = [semanticIdMatchKey(ownRaw), semanticIdMatchKey(alignedRaw)]
+    const token = { c: 'Paul', o: 1, k: 0, a: [1] }
+
+    const underlineIndices = resolveMatchIndices(matchKeys, [semanticIdMatchKey(alignedRaw)])
+    const hl = highlightIndicesFromTarget(matchKeys, {
+      semanticId: ownRaw,
+      alignedSemanticIds: [alignedRaw],
+      content: 'Paul',
+      verseRef,
+    })
+
+    const state = resolveTokenVisualStateInterned(token, {
+      underlineIndices,
+      highlightOwnIndex: hl.ownIndex,
+      highlightAlignedIndices: hl.alignedIndices,
+      isOriginalLanguage: false,
+    })
+    expect(hl.ownIndex).toBe(0)
+    expect(state.isHighlighted).toBe(true)
+    expect(state.isSelected).toBe(true)
+    expect(state.isUnderlined).toBe(true)
   })
 })

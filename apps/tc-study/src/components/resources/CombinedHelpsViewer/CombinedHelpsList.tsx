@@ -178,7 +178,11 @@ export function CombinedHelpsList({
                     bookCode || 'gen'
                   )
                   return (
-                    <div key={group.ref} className="space-y-stack">
+                    <div
+                      key={group.ref}
+                      className="space-y-stack"
+                      style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 320px' }}
+                    >
                       <div className={HELPS_VERSE_HEADER} dir={languageDirection}>
                         <BookOpen className={HELPS_VERSE_HEADER_ICON} />
                         <h3 className="text-chrome font-semibold text-fg-secondary">

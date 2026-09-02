@@ -2,6 +2,14 @@ import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import type { UsjWordToken } from '@bt-synergy/scripture-loader'
 import { useCallback, useRef, useState } from 'react'
 import { useCurrentReference } from '../../../../contexts'
+import {
+  markScripturePerfEnd,
+  markScripturePerfStart,
+} from '../../../../features/perf/scripturePerf'
+import {
+  rawSemanticIdForToken,
+  type InternedToken,
+} from '../../../../features/scripture/scripturePreparer'
 import type { TokenClickSignal, VerseFilterSignal } from '../../../../signals/studioSignals'
 import type { OriginalLanguageToken } from '../types'
 import { foldHighlightTarget, tokenMatchesHighlightTarget } from '../utils/tokenHighlight'
@@ -19,6 +27,24 @@ function targetFromSignalToken(
     lemma: token.lemma,
     morph: token.morph,
   })!
+}
+
+/** Rebuild a UsjWordToken from an InternedToken at click time. */
+export function usjWordFromInterned(
+  verseRef: string,
+  token: InternedToken,
+  matchKeys: readonly string[]
+): UsjWordToken {
+  return {
+    semanticId: rawSemanticIdForToken(verseRef, token),
+    content: token.c,
+    occurrence: token.o,
+    totalOccurrences: 1,
+    verseRef,
+    alignedOriginalWordIds: (token.a ?? [])
+      .map((i) => matchKeys[i])
+      .filter((id): id is string => typeof id === 'string'),
+  }
 }
 
 export function useHighlighting(
@@ -56,12 +82,15 @@ export function useHighlighting(
     resourceId,
     useCallback((signal) => {
       if (signal.sourceResourceId === resourceId) return
+      markScripturePerfStart('highlight-signal')
       if (signal.token === null) {
         ownsVerseFilterRef.current = false
         setHighlightTarget(null)
+        markScripturePerfEnd('highlight-signal')
         return
       }
       setHighlightTarget(targetFromSignalToken(signal.token))
+      markScripturePerfEnd('highlight-signal')
     }, [resourceId]),
     { debug: false, resourceMetadata }
   )
@@ -135,6 +164,13 @@ export function useHighlighting(
     [sendToAll, sendVerseFilter]
   )
 
+  const handleInternedTokenClick = useCallback(
+    (verseRef: string, token: InternedToken, matchKeys: readonly string[]) => {
+      handleTokenClick(usjWordFromInterned(verseRef, token, matchKeys))
+    },
+    [handleTokenClick]
+  )
+
   const handleVerseFilter = useCallback(
     (chapter: number, verse?: number) => {
       setHighlightTarget(null)
@@ -148,6 +184,7 @@ export function useHighlighting(
     highlightTarget,
     selectedTokenId: highlightTarget?.semanticId || null,
     handleTokenClick,
+    handleInternedTokenClick,
     handleVerseFilter,
   }
 }

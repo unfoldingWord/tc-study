@@ -82,7 +82,7 @@ export function useWordsLinksContent({
     }
     
     loadContent()
-  }, [currentRef.book, currentRef.chapter, resourceKey, loaderRegistry, wordsLinksContent, loaderTypeId, hydrateTick])
+  }, [currentRef.book, resourceKey, loaderRegistry, wordsLinksContent, loaderTypeId, hydrateTick])
   
   return { content, loading, error }
 }

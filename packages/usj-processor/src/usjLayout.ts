@@ -177,6 +177,10 @@ type WalkCtx = {
   verse: number
   queues: Map<string, UsjWordToken[]>
   noteOrdinal: number
+  /** When set, only emit segments for this chapter (plus intro before ch1). */
+  targetChapter?: number
+  /** Set when a chapter marker past targetChapter is seen — abort walk. */
+  stopped?: boolean
 }
 
 type FlatSeg =
@@ -187,6 +191,14 @@ type FlatSeg =
   | { kind: 'heading'; text: string; chapter: number }
   | { kind: 'note'; caller: string; text: string; chapter: number }
   | { kind: 'xref'; caller: string; text: string; chapter: number }
+
+function shouldEmitChapter(ctx: WalkCtx): boolean {
+  if (ctx.targetChapter == null) return true
+  if (ctx.chapter === ctx.targetChapter) return true
+  // Book intro (before first `\c`) paints with chapter 1.
+  if (ctx.targetChapter === 1 && ctx.chapter === 0) return true
+  return false
+}
 
 function nextDisplayCaller(rawCaller: string, ctx: WalkCtx): string {
   const caller = rawCaller.trim()
@@ -256,8 +268,12 @@ function takeNextToken(ctx: WalkCtx): UsjWordToken | undefined {
 
 function collectFlatSegments(nodes: unknown[], ctx: WalkCtx, out: FlatSeg[]): void {
   for (const raw of nodes) {
+    if (ctx.stopped) return
+
     if (typeof raw === 'string') {
-      if (raw.length > 0) out.push({ kind: 'text', text: raw, chapter: ctx.chapter })
+      if (raw.length > 0 && shouldEmitChapter(ctx)) {
+        out.push({ kind: 'text', text: raw, chapter: ctx.chapter })
+      }
       continue
     }
     if (!isRecord(raw)) continue
@@ -275,7 +291,29 @@ function collectFlatSegments(nodes: unknown[], ctx: WalkCtx, out: FlatSeg[]): vo
       if (Number.isFinite(n)) {
         ctx.chapter = n
         ctx.verse = 0
+        if (ctx.targetChapter != null && n > ctx.targetChapter) {
+          ctx.stopped = true
+          return
+        }
       }
+      continue
+    }
+
+    // Outside the target chapter: skip verse/para bodies (no word walk), but still
+    // recurse opaque wrappers so nested chapter markers remain discoverable.
+    if (ctx.targetChapter != null && !shouldEmitChapter(ctx)) {
+      const isBody =
+        type === 'para' ||
+        type === 'verse' ||
+        type === 'char' ||
+        type === 'note' ||
+        PARAGRAPH_MARKERS.has(marker) ||
+        HEADING_MARKERS.has(marker) ||
+        INTRO_HEADING_MARKERS.has(marker) ||
+        FOOTNOTE_MARKERS.has(marker) ||
+        XREF_MARKERS.has(marker)
+      if (isBody) continue
+      if (Array.isArray(raw.content)) collectFlatSegments(raw.content, ctx, out)
       continue
     }
 
@@ -470,6 +508,39 @@ export function buildUsjLayoutBlocks(
   const segments: FlatSeg[] = []
   collectFlatSegments(usj.content ?? [], ctx, segments)
   return groupSegments(segments)
+}
+
+/**
+ * Layout blocks for a single chapter. Skips other chapter bodies and stops at
+ * the next `\c`, so Psalms chapter 1 does not pay for chapters 2–150.
+ */
+export function buildUsjLayoutBlocksForChapter(
+  usj: CachedUsjDocument,
+  viewModel: UsjScriptureViewModel,
+  chapter: number
+): UsjLayoutBlock[] {
+  if (!Number.isFinite(chapter) || chapter < 1) return []
+  const queues = new Map<string, UsjWordToken[]>()
+  const chapterView = viewModel.chapters.find((ch) => ch.number === chapter)
+  if (chapterView) {
+    for (const v of chapterView.verses) {
+      queues.set(`${chapter}:${v.number}`, [...v.tokens])
+    }
+  }
+  const ctx: WalkCtx = {
+    chapter: 0,
+    verse: 0,
+    queues,
+    noteOrdinal: 0,
+    targetChapter: chapter,
+  }
+  const segments: FlatSeg[] = []
+  collectFlatSegments(usj.content ?? [], ctx, segments)
+  return groupSegments(segments).filter(
+    (block) =>
+      block.chapterNumber === chapter ||
+      (chapter === 1 && block.chapterNumber === 0)
+  )
 }
 
 export interface FilterUsjLayoutOptions {

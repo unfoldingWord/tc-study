@@ -4,7 +4,8 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { useCatalogManager, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { usePinnedHelpsReference } from '../../../features/nav/usePinnedHelpsReference'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/helpsDisplayFilters'
@@ -39,7 +40,7 @@ export function TranslationNotesViewer({
   resource,
   onEntryLinkClick,
 }: TranslationNotesViewerProps) {
-  const currentRef = useCurrentReference()
+  const currentRef = usePinnedHelpsReference()
   const navigationMode = useNavigationMode()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()

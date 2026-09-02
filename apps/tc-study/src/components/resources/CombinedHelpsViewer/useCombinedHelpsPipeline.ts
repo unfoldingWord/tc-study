@@ -12,6 +12,7 @@ import {
   type VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
 import { underlineGroupsFromHelpsNotes } from '../../../features/helps/scriptureReadyUnderlineRebind'
+import { measureScripturePerfSync } from '../../../features/perf/scripturePerf'
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { useAlignedTokens, useQuoteTokens } from '../WordsLinksViewer/hooks'
 import {
@@ -24,7 +25,10 @@ import type { HelpsKindFilter } from './types'
 
 export interface UseCombinedHelpsPipelineParams {
   tnNotes: TranslationNote[] | null | undefined
+  /** Prefer chapter map when available to avoid full-book scans. */
+  notesByChapter?: Record<string, TranslationNote[]> | null
   twlLinksRaw: TranslationWordsLink[] | null | undefined
+  linksByChapter?: Record<string, TranslationWordsLink[]> | null
   tnKey: string
   twlKey: string
   resourceKey: string
@@ -44,9 +48,28 @@ export interface UseCombinedHelpsPipelineParams {
   obsQuoteFilter: ObsQuoteFilter | null
 }
 
+function collectChapterSlice<T>(
+  byChapter: Record<string, T[]> | null | undefined,
+  fallback: T[] | null | undefined,
+  startChapter: number,
+  endChapter: number
+): T[] {
+  if (byChapter && Object.keys(byChapter).length > 0) {
+    const out: T[] = []
+    for (let c = startChapter; c <= endChapter; c++) {
+      const rows = byChapter[String(c)]
+      if (rows?.length) out.push(...rows)
+    }
+    return out
+  }
+  return fallback ?? []
+}
+
 export function useCombinedHelpsPipeline({
   tnNotes,
+  notesByChapter,
   twlLinksRaw,
+  linksByChapter,
   tnKey,
   twlKey,
   resourceKey,
@@ -60,14 +83,26 @@ export function useCombinedHelpsPipeline({
   obsQuoteFilter,
 }: UseCombinedHelpsPipelineParams) {
   const relevantNotes = useMemo(() => {
-    if (!tnNotes?.length) return []
     const startChapter = currentRef.chapter
     const startVerse = currentRef.verse
     const endChapter = currentRef.endChapter || startChapter
     const endVerse = resolveRangeEndVerse(currentRef, navigationMode)
-    return filterNotesByReferenceRange(tnNotes, { startChapter, startVerse, endChapter, endVerse })
+    const chapterScoped = collectChapterSlice(
+      notesByChapter,
+      tnNotes,
+      startChapter,
+      endChapter
+    )
+    if (!chapterScoped.length) return []
+    return filterNotesByReferenceRange(chapterScoped, {
+      startChapter,
+      startVerse,
+      endChapter,
+      endVerse,
+    })
   }, [
     tnNotes,
+    notesByChapter,
     currentRef.chapter,
     currentRef.verse,
     currentRef.endChapter,
@@ -125,8 +160,16 @@ export function useCombinedHelpsPipeline({
   }, [relevantNotes, tnLinksWithQuotes, tnLinksAligned])
 
   const links = useMemo(() => {
-    if (!twlLinksRaw?.length) return []
-    return twlLinksRaw.map((link) => ({
+    const startChapter = currentRef.chapter || 1
+    const endChapter = currentRef.endChapter || startChapter
+    const chapterScoped = collectChapterSlice(
+      linksByChapter,
+      twlLinksRaw,
+      startChapter,
+      endChapter
+    )
+    if (!chapterScoped.length) return []
+    return chapterScoped.map((link) => ({
       ...link,
       articlePath:
         link.articlePath ||
@@ -136,7 +179,7 @@ export function useCombinedHelpsPipeline({
           return m ? m[1] : ''
         })(),
     }))
-  }, [twlLinksRaw])
+  }, [twlLinksRaw, linksByChapter, currentRef.chapter, currentRef.endChapter])
 
   const { linksWithQuotes: twlLinksWithQuotes, quoteBuildReady: twlQuoteBuildReady } =
     useQuoteTokens({
@@ -187,12 +230,18 @@ export function useCombinedHelpsPipeline({
   const bookCodeLower = currentRef.book?.toLowerCase() || ''
 
   const underlineTnGroups = useMemo(
-    () => underlineGroupsFromHelpsNotes(notesWithAlignedTokens, bookCodeLower),
+    () =>
+      measureScripturePerfSync('underline-groups', 'tn', () =>
+        underlineGroupsFromHelpsNotes(notesWithAlignedTokens, bookCodeLower)
+      ),
     [notesWithAlignedTokens, bookCodeLower]
   )
 
   const underlineTwlGroups = useMemo(
-    () => underlineGroupsFromHelpsNotes(filteredByReference, bookCodeLower),
+    () =>
+      measureScripturePerfSync('underline-groups', 'twl', () =>
+        underlineGroupsFromHelpsNotes(filteredByReference, bookCodeLower)
+      ),
     [filteredByReference, bookCodeLower]
   )
 

@@ -16,12 +16,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
 import { useCatalogManager, useCurrentReference, useNavigation } from '../../../contexts'
 import type { ResourceMetadata } from '../../../contexts/types'
+import { usePreparedChapter } from '../../../features/scripture/usePreparedChapter'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { ScriptureContent, ScriptureLayoutToggle } from './components'
 import { useContent, useHighlighting, useTOC, useTokenBroadcast, useUnderlinedTokens } from './hooks'
+import {
+  lastChapterFromViewModel,
+  useChapterInfiniteScroll,
+} from './hooks/useChapterInfiniteScroll'
 import type { ScriptureViewerProps } from './types'
 
 export function ScriptureViewer({
@@ -91,11 +96,30 @@ export function ScriptureViewer({
 
   const {
     viewModel,
+    nav,
     isLoading,
     error,
     currentChapter: _currentChapter,
     displayVerses,
   } = useContent(resourceKey, availableBooks, languageCode)
+
+  const lastChapter =
+    lastChapterFromViewModel(viewModel?.chapters) ||
+    lastChapterFromViewModel(nav?.chapters)
+  const chapterScroll = useChapterInfiniteScroll(lastChapter, {
+    resourceKey,
+    bookId: currentRef.book,
+    // Verse/section already painted from USJ — when switching back to chapter
+    // mode, upgrade immediately and let VerseBlock cover until prepared-full lands.
+    canFallbackToUsjTokens: Boolean(viewModel),
+  })
+
+  const preparedOpen = usePreparedChapter({
+    resourceKey,
+    bookId: currentRef.book,
+    chapter: currentRef.chapter || 1,
+    enabled: Boolean(resourceKey && currentRef.book),
+  })
 
   // Language direction: catalog first, then list-languages, then known RTL codes (so /read/ar works before APIs load)
   const languageFromList = availableLanguages.find((l) => l.code === languageCode)
@@ -113,6 +137,7 @@ export function ScriptureViewer({
     highlightTarget,
     selectedTokenId,
     handleTokenClick,
+    handleInternedTokenClick,
     handleVerseFilter,
   } = useHighlighting(resourceId, languageCode, underlinedSemanticIds)
 
@@ -134,17 +159,20 @@ export function ScriptureViewer({
     handleVerseNavigation
   )
 
-  // SCRIPTURE_TOKENS from UsjWordToken[] — Helps keep semanticId + alignedOriginalWordIds
+  // SCRIPTURE_TOKENS — real BCV span for verse/section/custom-range.
+  // Missing endVerse ⇒ whole chapter(s) (chapter infinite scroll).
   useTokenBroadcast({
     resourceId,
     resourceKey,
     viewModel,
+    fullChapter: preparedOpen.full,
+    bookCode: nav?.bookId || viewModel?.bookCode || currentRef.book,
     language: languageCode,
     languageDirection,
     currentChapter: currentRef.chapter || 1,
-    currentVerse: 1,
-    endChapter: currentRef.chapter,
-    endVerse: 999,
+    currentVerse: currentRef.verse || 1,
+    endChapter: currentRef.endChapter || currentRef.chapter || 1,
+    endVerse: currentRef.endVerse ?? 999,
   })
 
   const handleVerseClick = useCallback((chapter: number, verse: number) => {
@@ -189,6 +217,8 @@ export function ScriptureViewer({
           isLoadingTOC={isLoadingTOC}
           error={error}
           viewModel={viewModel}
+          nav={nav}
+          resourceKey={resourceKey}
           availableBooks={availableBooks}
           displayVerses={displayVerses}
           currentRef={currentRef}
@@ -196,11 +226,18 @@ export function ScriptureViewer({
           underlinedSemanticIds={underlinedSemanticIds}
           selectedTokenId={selectedTokenId}
           onTokenClick={handleTokenClick}
+          onInternedTokenClick={handleInternedTokenClick}
           onVerseClick={handleVerseClick}
           onChapterClick={handleChapterClick}
           onScriptureRefClick={navigateToReference}
           language={languageCode}
           languageDirection={languageDirection}
+          displayChapters={chapterScroll.displayChapters}
+          chapterSlots={chapterScroll.chapterSlots}
+          registerChapter={chapterScroll.registerChapter}
+          contentRef={chapterScroll.contentRef}
+          tokenSourceFailed={chapterScroll.tokenSourceFailed}
+          onRetryTokenSource={chapterScroll.retryTokenSource}
         />
         </div>
       </div>

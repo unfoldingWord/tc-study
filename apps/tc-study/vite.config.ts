@@ -29,6 +29,42 @@ const linkedPanelsEntry = path.resolve(
 )
 const sharedBuild = getSharedBuildConfig()
 
+/**
+ * micromark's decode-named-character-reference ships index.dom.js (document.createElement)
+ * under the "browser" export. Vite optimizeDeps resolves that into prepare.worker →
+ * ReferenceError: document is not defined. Alias to the map-based entry.
+ */
+function resolveDecodeNamedCharRef(): string {
+  try {
+    const appRequire = createRequire(path.join(__dirname, 'package.json'))
+    const mdast = appRequire.resolve('mdast-util-from-markdown')
+    return createRequire(mdast).resolve('decode-named-character-reference/index.js')
+  } catch {
+    return path.resolve(
+      __dirname,
+      '../../node_modules/.bun/decode-named-character-reference@1.3.0/node_modules/decode-named-character-reference/index.js'
+    )
+  }
+}
+const decodeNamedCharRefEntry = resolveDecodeNamedCharRef()
+
+/** Also rewrite any lingering index.dom.js resolves (worker shared chunks). */
+function forceDecodeNamedCharRefNode() {
+  return {
+    name: 'force-decode-named-char-ref-node',
+    enforce: 'pre' as const,
+    resolveId(id: string) {
+      if (
+        id.includes('decode-named-character-reference') &&
+        (id.endsWith('index.dom.js') || id.endsWith('index.dom'))
+      ) {
+        return decodeNamedCharRefEntry
+      }
+      return null
+    },
+  }
+}
+
 export default defineConfig({
   define: {
     __DEPLOY_VERSION__: JSON.stringify(deployVersion),
@@ -36,6 +72,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    forceDecodeNamedCharRefNode(),
     // Run TypeScript in a worker; errors show in browser overlay + terminal and update on save (HMR)
     checker({
       typescript: true,
@@ -49,6 +86,7 @@ export default defineConfig({
       'linked-panels': linkedPanelsEntry,
       // Alias workspace packages to their source (so dev uses latest code without rebuilding packages)
       '@bt-synergy/navigation': path.resolve(__dirname, '../../packages/navigation/src/index.ts'),
+      'decode-named-character-reference': decodeNamedCharRefEntry,
       ...usfmTools.alias,
     },
     dedupe: ['react', 'react-dom', 'linked-panels'],
@@ -67,6 +105,11 @@ export default defineConfig({
   // code-split; ES matches `new Worker(..., { type: 'module' })` in hooks.
   worker: {
     format: 'es',
+    plugins: () => [forceDecodeNamedCharRefNode()],
+    resolve: {
+      // Prefer package.json "worker" / "default" over "browser" (DOM) exports.
+      conditions: ['worker', 'module', 'import', 'default'],
+    },
   },
   build: {
     ...sharedBuild.build,

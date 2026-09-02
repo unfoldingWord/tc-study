@@ -8,18 +8,41 @@
 
 export type HelpsQuoteStatus = 'pending' | 'aligned' | 'ol-fallback' | 'none'
 
+/** True when OptimizedChapter shells actually carry word tokens for QuoteMatcher. */
+export function originalChaptersHaveWordTokens(
+  chapters: readonly { verses?: readonly { tokens?: readonly unknown[] | null }[] | null }[] | null
+): boolean {
+  if (!chapters?.length) return false
+  for (const chapter of chapters) {
+    for (const verse of chapter.verses ?? []) {
+      if ((verse.tokens?.length ?? 0) > 0) return true
+    }
+  }
+  return false
+}
+
 export function isQuoteBuildReady(opts: {
   loadingOriginal: boolean
   /**
    * `null` = OL scripture not attempted yet (first paint).
    * `[]` = attempted but UGNT/UHB chapters are still empty — keep pending.
-   * Only non-empty chapters mean quote-build can settle.
+   * Only chapters with word tokens mean quote-build can settle.
    */
   originalContent: readonly unknown[] | null
   originalError?: string | null
+  /**
+   * When provided, also require the quote-build pass for the current links to
+   * have finished (async worker or sync). OL-loaded alone must not settle align
+   * as a finished miss while quoteTokens are still empty in-flight.
+   */
+  quotesSettled?: boolean
 }): boolean {
   if (opts.loadingOriginal) return false
-  return !!(opts.originalContent && opts.originalContent.length > 0)
+  if (opts.quotesSettled === false) return false
+  if (!opts.originalContent || opts.originalContent.length === 0) return false
+  return originalChaptersHaveWordTokens(
+    opts.originalContent as Parameters<typeof originalChaptersHaveWordTokens>[0]
+  )
 }
 
 /** True when scripture tokens / passage bind / OL quote-build are not settled. */

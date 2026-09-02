@@ -41,6 +41,7 @@ export {
   processUsfmToOptimizedScripture,
   viewModelToOptimizedScripture,
   viewModelToOptimizedChapters,
+  viewModelChapterToOptimized,
   extractUsjBroadcastTokens,
 } from './parsers/scripture'
 export type { OptimizedScripture, BroadcastScriptureToken } from './parsers/scripture'

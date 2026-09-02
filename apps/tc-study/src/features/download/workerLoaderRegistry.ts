@@ -2,6 +2,9 @@
  * Worker loader registration driven by loaderConfig SoT
  * (`getWorkerDownloadConfigs()` — surfaces.workerDownload only).
  * Factory keys dedupe shared loader instances (e.g. notes + obs-notes).
+ *
+ * Preparation: for factory keys whose SoT row has surfaces.prepare, wire
+ * onContentCached → prepareBookWithPreparer (generic, no resource-type literals).
  */
 
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
@@ -14,6 +17,7 @@ import { TranslationWordsLinksLoader } from '@bt-synergy/translation-words-links
 import { TranslationWordsLoader } from '@bt-synergy/translation-words-loader'
 import {
   getWorkerDownloadConfigs,
+  getWorkerPrepareConfigs,
   type LoaderFactoryKey,
 } from '../../config/loaderConfig'
 import { ObsLoader } from '../../lib/loaders/ObsLoader'
@@ -26,12 +30,20 @@ export interface WorkerLoaderDeps {
   debug?: boolean
 }
 
-/** Shared ctor shape across worker loaders (adapters typed loosely at the worker boundary). */
+type ContentCachedArgs = {
+  resourceKey: string
+  bookId: string
+  /** Scripture-only: pass as preparer source to skip readSource. */
+  viewModel?: import('@bt-synergy/scripture-loader').UsjScriptureViewModel
+}
+
 type LoaderConfig = {
   cacheAdapter: unknown
   catalogAdapter: unknown
   door43Client: unknown
   debug: boolean
+  enableMemoryCache?: boolean
+  onContentCached?: (args: ContentCachedArgs) => void | Promise<void>
 }
 
 type LoaderCtor = (deps: WorkerLoaderDeps) => ResourceLoader
@@ -45,13 +57,81 @@ function toLoaderConfig(deps: WorkerLoaderDeps): LoaderConfig {
   }
 }
 
+/** Factory keys that should run preparation after content is cached. */
+function prepareFactoryKeys(): Set<LoaderFactoryKey> {
+  return new Set(getWorkerPrepareConfigs().map((c) => c.factoryKey))
+}
+
+function prepareTypeIdForFactory(factoryKey: LoaderFactoryKey): string | null {
+  const row = getWorkerPrepareConfigs().find((c) => c.factoryKey === factoryKey)
+  return row?.id ?? null
+}
+
+async function persistPreparedOnContentCached(args: {
+  typeId: string
+  cacheAdapter: WorkerLoaderDeps['cacheAdapter']
+  resourceKey: string
+  bookId: string
+  /** When provided (scripture), skip readSource. */
+  source?: unknown
+}): Promise<void> {
+  // Side-effect import registers preparers in the worker bundle.
+  await import('../prepare/registerPreparers')
+  const { prepareBookWithPreparer } = await import('../prepare/runPrepare')
+  await prepareBookWithPreparer({
+    typeId: args.typeId,
+    resourceKey: args.resourceKey,
+    bookId: args.bookId,
+    cacheAdapter: args.cacheAdapter as {
+      get: (key: string) => Promise<unknown>
+      set: (key: string, entry: unknown) => Promise<void>
+    },
+    source: args.source,
+  })
+}
+
+function withPrepareHook(
+  deps: WorkerLoaderDeps,
+  factoryKey: LoaderFactoryKey,
+  base: LoaderConfig
+): LoaderConfig {
+  if (!prepareFactoryKeys().has(factoryKey)) return base
+  const typeId = prepareTypeIdForFactory(factoryKey)
+  if (!typeId) return base
+  return {
+    ...base,
+    onContentCached: (args) =>
+      persistPreparedOnContentCached({
+        typeId,
+        cacheAdapter: deps.cacheAdapter,
+        resourceKey: args.resourceKey,
+        bookId: args.bookId,
+        source:
+          args.viewModel != null
+            ? {
+                resourceKey: args.resourceKey,
+                bookId: args.bookId,
+                viewModel: args.viewModel,
+              }
+            : undefined,
+      }),
+  }
+}
+
 /** Worker-download factories only (compositions are not worker loaders). */
 const LOADER_FACTORIES: Partial<Record<LoaderFactoryKey, LoaderCtor>> = {
-  scripture: (deps) => new ScriptureLoader(toLoaderConfig(deps)),
+  scripture: (deps) =>
+    new ScriptureLoader({
+      ...withPrepareHook(deps, 'scripture', {
+        ...toLoaderConfig(deps),
+        enableMemoryCache: true,
+      }),
+    }),
   words: (deps) => new TranslationWordsLoader(toLoaderConfig(deps)),
   'words-links': (deps) => new TranslationWordsLinksLoader(toLoaderConfig(deps)),
   academy: (deps) => new TranslationAcademyLoader(toLoaderConfig(deps)),
-  notes: (deps) => new TranslationNotesLoader(toLoaderConfig(deps)),
+  notes: (deps) =>
+    new TranslationNotesLoader(withPrepareHook(deps, 'notes', toLoaderConfig(deps))),
   questions: (deps) => new TranslationQuestionsLoader(toLoaderConfig(deps)),
   obs: (deps) => new ObsLoader(toLoaderConfig(deps)),
 }

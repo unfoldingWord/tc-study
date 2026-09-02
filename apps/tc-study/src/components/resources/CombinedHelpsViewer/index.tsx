@@ -4,7 +4,8 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { useCatalogManager, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { usePinnedHelpsReference } from '../../../features/nav/usePinnedHelpsReference'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
@@ -62,7 +63,7 @@ export function CombinedHelpsViewer({
   resource,
   onEntryLinkClick,
 }: CombinedHelpsViewerProps) {
-  const currentRef = useCurrentReference()
+  const currentRef = usePinnedHelpsReference()
   const navigationMode = useNavigationMode()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
@@ -127,11 +128,8 @@ export function CombinedHelpsViewer({
   const tnLoaderId = helpsScope === 'obs' ? 'obs-notes' : 'notes'
   const twlLoaderId = helpsScope === 'obs' ? 'obs-words-links' : 'words-links'
 
-  const { notes: tnNotes, loading: tnLoading, error: tnError } = useTranslationNotesContent(
-    tnKey,
-    currentRef.book || '',
-    tnLoaderId
-  )
+  const { notes: tnNotes, notesByChapter, loading: tnLoading, error: tnError } =
+    useTranslationNotesContent(tnKey, currentRef.book || '', tnLoaderId)
 
   const { content: twlContent, loading: twlLoading, error: twlError } = useWordsLinksContent({
     resourceKey: twlKey,
@@ -190,7 +188,9 @@ export function CombinedHelpsViewer({
     mergedGroups,
   } = useCombinedHelpsPipeline({
     tnNotes,
+    notesByChapter,
     twlLinksRaw: twlContent?.links,
+    linksByChapter: twlContent?.linksByChapter,
     tnKey,
     twlKey,
     resourceKey,

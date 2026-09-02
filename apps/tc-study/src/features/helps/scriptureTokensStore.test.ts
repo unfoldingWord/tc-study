@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   getScriptureTokensSnapshot,
+  invalidatePublishedScriptureTokensForPassage,
   preferHydratedScriptureTokens,
   publishScriptureTokens,
   resetScriptureTokensStore,
@@ -41,6 +42,28 @@ describe('preferHydratedScriptureTokens', () => {
   test('live STATE wins once CombinedHelps is linked again', () => {
     const messaging = snapshot({ sourceResourceId: 'unfoldingWord/en/ult' })
     expect(preferHydratedScriptureTokens(messaging, snapshot())).toBe(messaging)
+  })
+
+  test('empty live STATE for a new chapter does not resurrect previous-chapter hydrate', () => {
+    const published = snapshot({ reference: { book: 'psa', chapter: 113, verse: 1 } })
+    const waiting = {
+      ...snapshot(),
+      tokens: [],
+      reference: { book: 'psa', chapter: 125, verse: 1 },
+    }
+    expect(preferHydratedScriptureTokens(waiting, published)).toBe(waiting)
+    expect(scriptureTokensHaveEntries(preferHydratedScriptureTokens(waiting, published))).toBe(
+      false
+    )
+  })
+
+  test('invalidate drops hydrate when passage changes', () => {
+    publishScriptureTokens(snapshot({ reference: { book: 'psa', chapter: 113, verse: 1 } }))
+    invalidatePublishedScriptureTokensForPassage('psa', 125)
+    expect(getScriptureTokensSnapshot()).toBeNull()
+    publishScriptureTokens(snapshot({ reference: { book: 'psa', chapter: 125, verse: 1 } }))
+    invalidatePublishedScriptureTokensForPassage('psa', 125)
+    expect(getScriptureTokensSnapshot()?.reference.chapter).toBe(125)
   })
 })
 
@@ -87,6 +110,8 @@ describe('SCRIPTURE_TOKENS late-subscriber wiring', () => {
 
   test('ScriptureViewer publishes the hydrate snapshot; CombinedHelps prefers it on remount', () => {
     expect(broadcast).toContain('publishScriptureTokens')
+    expect(broadcast).toContain('invalidatePublishedScriptureTokensForPassage')
+    expect(broadcast).toContain('extractPreparedBroadcastTokens')
     expect(tokensHook).toContain('preferHydratedScriptureTokens')
     expect(tokensHook).toContain('subscribeScriptureTokensSnapshot')
     expect(tokensHook).toContain('useSyncExternalStore')

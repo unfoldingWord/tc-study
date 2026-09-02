@@ -31,6 +31,11 @@ export interface LoaderSurfaces {
   mainPlugin: boolean
   /** Registered on the worker LoaderRegistry for background download */
   workerDownload: boolean
+  /**
+   * Worker-side light/full preparation (prepared:{typeId}:... rows).
+   * Must have a matching ResourcePreparer in features/prepare.
+   */
+  prepare?: boolean
 }
 
 export interface LoaderConfig {
@@ -67,7 +72,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/scripture-loader',
     downloadPriority: 2,
     factoryKey: 'scripture',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.TRANSLATION_NOTES,
@@ -75,7 +80,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-notes-loader',
     downloadPriority: 1,
     factoryKey: 'notes',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.TRANSLATION_QUESTIONS,
@@ -151,6 +156,11 @@ export function getWorkerDownloadConfigs(): LoaderConfig[] {
 /** Entries that must have a main-thread resource type plugin. */
 export function getMainPluginConfigs(): LoaderConfig[] {
   return LOADER_CONFIGS.filter((c) => c.surfaces.mainPlugin)
+}
+
+/** Entries that register a worker-side ResourcePreparer. */
+export function getWorkerPrepareConfigs(): LoaderConfig[] {
+  return LOADER_CONFIGS.filter((c) => c.surfaces.prepare)
 }
 
 /**

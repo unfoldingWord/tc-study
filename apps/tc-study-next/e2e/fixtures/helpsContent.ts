@@ -144,7 +144,7 @@ export function buildE2ECatalogEntries() {
 }
 
 /** Must match `@bt-synergy/usj-processor` USJ_PROCESSING_VERSION / USJ_TOOL_VERSIONS. */
-const E2E_USJ_PROCESSING_VERSION = '2.0.0-usj'
+const E2E_USJ_PROCESSING_VERSION = '2.1.0-usj'
 const E2E_USJ_TOOL_VERSIONS = { parser: '0.1.1', usjCore: '0.1.1' } as const
 
 function usjWord(content: string) {

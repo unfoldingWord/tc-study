@@ -56,14 +56,55 @@ export function scriptureTokensHaveEntries(
 /**
  * Prefer live STATE when it has tokens; otherwise the hydrate snapshot
  * (CombinedHelps remounted after scripture already broadcast).
+ *
+ * When live STATE announces the current passage with empty tokens (full tier
+ * still loading), never resurrect a published snapshot from another book/chapter.
  */
 export function preferHydratedScriptureTokens(
   messaging: ScriptureTokensSnapshot | null | undefined,
   published: ScriptureTokensSnapshot | null | undefined
 ): ScriptureTokensSnapshot | null {
   if (scriptureTokensHaveEntries(messaging)) return messaging ?? null
-  if (scriptureTokensHaveEntries(published)) return published ?? null
+  if (scriptureTokensHaveEntries(published)) {
+    if (
+      messaging &&
+      messaging.reference.book &&
+      messaging.reference.chapter > 0 &&
+      (published!.reference.book.toLowerCase() !== messaging.reference.book.toLowerCase() ||
+        published!.reference.chapter !== messaging.reference.chapter)
+    ) {
+      return messaging
+    }
+    return published ?? null
+  }
   return messaging ?? published ?? null
+}
+
+/** True when the hydrate snapshot matches the open scripture passage. */
+export function publishedScriptureTokensMatchPassage(
+  published: ScriptureTokensSnapshot | null | undefined,
+  book: string,
+  chapter: number
+): boolean {
+  if (!scriptureTokensHaveEntries(published)) return false
+  return (
+    published!.reference.book.toLowerCase() === book.toLowerCase() &&
+    published!.reference.chapter === chapter
+  )
+}
+
+/**
+ * Drop the late-subscriber snapshot when nav moved to another passage so helps
+ * cannot align against the previous chapter while full tokens load.
+ */
+export function invalidatePublishedScriptureTokensForPassage(
+  book: string,
+  chapter: number
+): void {
+  const pub = current
+  if (!pub) return
+  if (publishedScriptureTokensMatchPassage(pub, book, chapter)) return
+  publishScriptureTokens(null)
 }
 
 export function getScriptureTokensSnapshot(): ScriptureTokensSnapshot | null {

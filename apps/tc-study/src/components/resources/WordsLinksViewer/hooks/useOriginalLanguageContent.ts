@@ -8,11 +8,16 @@
 import type { OptimizedChapter } from '@bt-synergy/resource-parsers'
 import {
   ScriptureLoader,
-  viewModelToOptimizedChapters,
+  viewModelChapterToOptimized,
 } from '@bt-synergy/scripture-loader'
 import { useEffect, useRef, useState } from 'react'
 import { useCurrentReference, useLoaderRegistry } from '../../../../contexts'
 import { shouldRetryOriginalLanguageLoad } from '../../../../features/helps/scriptureReadyUnderlineRebind'
+import {
+  pinReferenceWhileScrolling,
+  shouldHydrateHelpsForChapter,
+} from '../../../../features/nav/chapterScrollActivity'
+import { useChapterScrollActivity } from '../../../../features/nav/usePinnedHelpsReference'
 
 interface UseOriginalLanguageContentOptions {
   resourceKey: string // TWL resource key (e.g., "unfoldingWord/en/twl")
@@ -33,6 +38,13 @@ export function useOriginalLanguageContent({
 }: UseOriginalLanguageContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
+  const scrollActivity = useChapterScrollActivity()
+  const helpsRef = pinReferenceWhileScrolling(currentRef, scrollActivity)
+  const allowChapterHydrate = shouldHydrateHelpsForChapter({
+    unsettled: scrollActivity.unsettled,
+    requestedChapter: helpsRef.chapter,
+    settledChapter: scrollActivity.settledChapter,
+  })
 
   const [originalLanguageResources, setOriginalLanguageResources] = useState<
     OriginalLanguageResource[]
@@ -45,7 +57,7 @@ export function useOriginalLanguageContent({
 
   useEffect(() => {
     lastAttemptedRevisionRef.current = null
-  }, [currentRef.book, currentRef.chapter])
+  }, [helpsRef.book, helpsRef.chapter, helpsRef.endChapter])
 
   useEffect(() => {
     if (
@@ -62,12 +74,13 @@ export function useOriginalLanguageContent({
   }, [scriptureRevision, originalContent])
 
   useEffect(() => {
-    if (!currentRef.book || !currentRef.chapter || !loaderRegistry) {
+    if (!allowChapterHydrate) return
+    if (!helpsRef.book || !helpsRef.chapter || !loaderRegistry) {
       return
     }
 
     // OBS is not a biblical book — it has no Hebrew/Greek original language
-    if (currentRef.book.toLowerCase() === 'obs') {
+    if (helpsRef.book.toLowerCase() === 'obs') {
       setLoading(false)
       setOriginalContent(null)
       return
@@ -81,7 +94,7 @@ export function useOriginalLanguageContent({
         setError(null)
         setOriginalContent(null)
 
-        const bookCode = currentRef.book?.toUpperCase() || ''
+        const bookCode = helpsRef.book?.toUpperCase() || ''
 
         const ntBooks = [
           'MAT',
@@ -143,27 +156,31 @@ export function useOriginalLanguageContent({
         }
 
         const resource = resources[0]
-        const chapter = currentRef.chapter
+        const startChapter = helpsRef.chapter
+        const endChapter = helpsRef.endChapter || startChapter
 
         const loader = loaderRegistry.getLoader('scripture') as ScriptureLoader | undefined
         if (!loader || typeof loader.loadViewModel !== 'function') {
           throw new Error('Scripture loader with loadViewModel not found')
         }
 
-        const viewModel = await loader.loadViewModel(resource.resourceKey, currentRef.book)
+        const viewModel = await loader.loadViewModel(resource.resourceKey, helpsRef.book)
         if (cancelled) return
 
-        const optimizedChapters = viewModelToOptimizedChapters(viewModel)
-        const filteredChapters = optimizedChapters.filter((ch) => ch.number === chapter)
+        const optimized: OptimizedChapter[] = []
+        for (let chapter = startChapter; chapter <= endChapter; chapter++) {
+          const row = viewModelChapterToOptimized(viewModel, chapter)
+          if (row) optimized.push(row)
+        }
 
-        if (filteredChapters.length === 0) {
+        if (optimized.length === 0) {
           // `[]` = attempted empty (distinct from first-paint `null`)
           setOriginalContent([])
           setLoading(false)
           return
         }
 
-        setOriginalContent(filteredChapters)
+        setOriginalContent(optimized)
       } catch (err) {
         if (cancelled) return
         console.error('❌ [useOriginalLanguageContent] Failed to load original language content:', err)
@@ -184,7 +201,15 @@ export function useOriginalLanguageContent({
     return () => {
       cancelled = true
     }
-  }, [currentRef.book, currentRef.chapter, loaderRegistry, resourceKey, retryTick])
+  }, [
+    allowChapterHydrate,
+    helpsRef.book,
+    helpsRef.chapter,
+    helpsRef.endChapter,
+    loaderRegistry,
+    resourceKey,
+    retryTick,
+  ])
 
   return {
     originalLanguageResources,

@@ -7,6 +7,7 @@
 
 export {
   viewModelToOptimizedChapters,
+  viewModelChapterToOptimized,
   extractUsjBroadcastTokens,
   type BroadcastScriptureToken,
 } from '@bt-synergy/resource-parsers'

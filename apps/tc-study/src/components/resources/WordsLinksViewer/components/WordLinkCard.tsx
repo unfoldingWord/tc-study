@@ -78,11 +78,13 @@ export const WordLinkCard = memo(function WordLinkCard({
   }
   const alignedTokens = linkWithQuote.alignedTokens
   const hasAlignedTokens = !!(alignedTokens && alignedTokens.length > 0)
+  // Missing quoteStatus = pipeline has not attached a result yet — keep pending,
+  // never paint a finished OL-fallback (Greek/Hebrew + target badge with no chips).
   const quoteStatus =
     linkWithQuote.quoteStatus ??
     resolveHelpsQuoteStatus({
       hasAlignedTokens,
-      alignmentPending: false,
+      alignmentPending: !hasAlignedTokens,
       olQuote: link.origWords,
     })
   const excerptLoading = shouldShowHelpsExcerptSkeleton({

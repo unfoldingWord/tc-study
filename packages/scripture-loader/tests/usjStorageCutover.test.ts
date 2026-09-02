@@ -69,7 +69,7 @@ function chapterRecordsFor(adapter: MemoryCacheAdapter, key: string) {
 }
 
 describe('USJ storage cutover (scripture-usj: only)', () => {
-  test('writes scripture-usj SoT with 2.0.0-usj + tool versions', async () => {
+  test('writes scripture-usj SoT with USJ_PROCESSING_VERSION + tool versions', async () => {
     const cache = new MemoryCacheAdapter()
     const ult = readFileSync(join(FIXTURES, 'en_ult_TIT.usfm'), 'utf8')
     const loader = new ScriptureLoader({

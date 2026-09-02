@@ -40,6 +40,7 @@ export {
 export { collectUsjWords, parseVerseSid, extractText, extractDeepText } from './usjWalk'
 export {
   buildUsjLayoutBlocks,
+  buildUsjLayoutBlocksForChapter,
   buildTokenQueuesFromViewModel,
   filterUsjLayoutBlocks,
   clipLayoutInlineToVerses,

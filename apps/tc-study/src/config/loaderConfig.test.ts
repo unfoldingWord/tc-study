@@ -143,6 +143,19 @@ describe('loaderConfig SoT', () => {
     }
   })
 
+  test('surfaces.prepare ids match registered preparers (both directions)', async () => {
+    const { ensurePreparersRegistered } = await import('../features/prepare/registerPreparers')
+    const { getWorkerPrepareConfigs } = await import('./loaderConfig')
+    const registered = new Set(ensurePreparersRegistered())
+    const soT = new Set(getWorkerPrepareConfigs().map((c) => c.id))
+    for (const id of soT) {
+      expect(registered.has(id)).toBe(true)
+    }
+    for (const id of registered) {
+      expect(soT.has(id)).toBe(true)
+    }
+  })
+
   test('AdminPanel and BackgroundDownloadManager read getDownloadPriority SoT', () => {
     const adminSrc = readFileSync(
       join(import.meta.dir, '../components/dev/AdminPanel.tsx'),

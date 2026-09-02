@@ -83,6 +83,77 @@ export const CACHE_METADATA_KEYS = {
   DOWNLOAD_ERROR: 'downloadError',
 } as const
 
+/** Ingredient cache key prefix by catalog resource type. */
+export function ingredientCacheKeyFor(
+  resourceType: string,
+  resourceKey: string,
+  ingredientId: string
+): string | null {
+  switch (resourceType) {
+    case 'scripture':
+      return `scripture-usj:${resourceKey}:${ingredientId}`
+    case 'notes':
+      return `tn:${resourceKey}:${ingredientId}`
+    case 'words-links':
+      return `twl:${resourceKey}:${ingredientId}`
+    case 'questions':
+      return `tq:${resourceKey}:${ingredientId}`
+    default:
+      return null
+  }
+}
+
+/**
+ * True when a cached ingredient entry has usable payload (not just a stub).
+ * Handles both CacheEntry wrappers ({ content }) and loader-native shapes (notes/links/…).
+ */
+export function hasIngredientPayload(
+  entry: unknown,
+  resourceType: string
+): boolean {
+  if (!entry || typeof entry !== 'object') return false
+  const e = entry as Record<string, unknown>
+  const payload =
+    e.content && typeof e.content === 'object' && !Array.isArray(e.content)
+      ? (e.content as Record<string, unknown>)
+      : e
+
+  switch (resourceType) {
+    case 'scripture': {
+      const chapters = payload.chapters
+      const hasChapters = Array.isArray(chapters) && chapters.length > 0
+      const hasUsj =
+        payload.usj != null &&
+        typeof payload.usj === 'object' &&
+        Array.isArray((payload.usj as { content?: unknown }).content)
+      return hasUsj || hasChapters
+    }
+    case 'notes':
+      return (
+        payload.notes != null ||
+        (typeof payload.notesByChapter === 'object' &&
+          payload.notesByChapter != null &&
+          Object.keys(payload.notesByChapter as object).length > 0)
+      )
+    case 'words-links':
+      return (
+        payload.links != null ||
+        (typeof payload.linksByChapter === 'object' &&
+          payload.linksByChapter != null &&
+          Object.keys(payload.linksByChapter as object).length > 0)
+      )
+    case 'questions':
+      return (
+        payload.questions != null ||
+        (typeof payload.questionsByChapter === 'object' &&
+          payload.questionsByChapter != null &&
+          Object.keys(payload.questionsByChapter as object).length > 0)
+      )
+    default:
+      return Object.keys(payload).length > 0
+  }
+}
+
 export interface ResourceCompletenessCheckerOptions {
   /** Catalog manager */
   catalogManager: CatalogManager
@@ -154,6 +225,36 @@ export class ResourceCompletenessChecker {
   }
 
   /**
+   * Count how many catalog ingredients are present in cache with usable payload.
+   * Returns null when the resource type has no per-ingredient keys to verify.
+   */
+  private async countCachedIngredients(
+    resourceKey: string,
+    resourceType: string,
+    ingredients: Array<{ identifier?: string }>
+  ): Promise<{ cachedCount: number; checkableCount: number } | null> {
+    let cachedCount = 0
+    let checkableCount = 0
+
+    for (const ingredient of ingredients) {
+      const ingredientId = ingredient.identifier
+      if (!ingredientId) continue
+
+      const ingredientCacheKey = ingredientCacheKeyFor(resourceType, resourceKey, ingredientId)
+      if (!ingredientCacheKey) continue
+
+      checkableCount++
+      const ingredientCache = await this.cacheAdapter.get(ingredientCacheKey)
+      if (hasIngredientPayload(ingredientCache, resourceType)) {
+        cachedCount++
+      }
+    }
+
+    if (checkableCount === 0) return null
+    return { cachedCount, checkableCount }
+  }
+
+  /**
    * Check completeness for a specific resource
    */
   async checkResource(resourceKey: string): Promise<ResourceCompletenessStatus> {
@@ -173,23 +274,19 @@ export class ResourceCompletenessChecker {
       const cacheKey = `resource:${resourceKey}`
       const cacheEntry = await this.cacheAdapter.get(cacheKey)
 
+      const ingredients = metadata.contentMetadata?.ingredients
+      const resourceType = metadata.type
+      const ingredientStats =
+        ingredients && ingredients.length > 0
+          ? await this.countCachedIngredients(resourceKey, resourceType, ingredients)
+          : null
+
       // Check completion metadata if marker exists
       if (cacheEntry) {
         const downloadComplete = cacheEntry.metadata?.[CACHE_METADATA_KEYS.DOWNLOAD_COMPLETE]
         const downloadCompletedAt = cacheEntry.metadata?.[CACHE_METADATA_KEYS.DOWNLOAD_COMPLETED_AT]
         const downloadError = cacheEntry.metadata?.[CACHE_METADATA_KEYS.DOWNLOAD_ERROR]
         const size = cacheEntry.metadata?.[CACHE_METADATA_KEYS.RESOURCE_SIZE]
-
-        // If marked as complete
-        if (downloadComplete === true) {
-          return {
-            resourceKey,
-            isComplete: true,
-            status: 'complete',
-            lastDownloadedAt: downloadCompletedAt,
-            size
-          }
-        }
 
         // If has error
         if (downloadError) {
@@ -198,6 +295,26 @@ export class ResourceCompletenessChecker {
             isComplete: false,
             status: 'error',
             error: downloadError
+          }
+        }
+
+        // Marker alone is not enough — verify ingredient / chapter payloads when possible
+        if (downloadComplete === true) {
+          if (ingredientStats && ingredientStats.cachedCount < ingredientStats.checkableCount) {
+            return {
+              resourceKey,
+              isComplete: false,
+              status: ingredientStats.cachedCount > 0 ? 'partial' : 'missing',
+              lastDownloadedAt: downloadCompletedAt,
+              size
+            }
+          }
+          return {
+            resourceKey,
+            isComplete: true,
+            status: 'complete',
+            lastDownloadedAt: downloadCompletedAt,
+            size
           }
         }
 
@@ -215,39 +332,12 @@ export class ResourceCompletenessChecker {
         }
       }
 
-      // No completion marker - check if ingredients are actually cached
-      // This handles resources downloaded before completion markers were implemented
-      const ingredients = metadata.contentMetadata?.ingredients
-      if (ingredients && ingredients.length > 0) {
-        let cachedCount = 0
-        const resourceType = metadata.type
-
-        // Check each ingredient to see if it's cached
-        for (const ingredient of ingredients) {
-          const ingredientId = ingredient.identifier
-          if (!ingredientId) continue
-
-          // Construct cache key based on resource type
-          let ingredientCacheKey: string
-          if (resourceType === 'scripture') {
-            ingredientCacheKey = `scripture:${resourceKey}:${ingredientId}`
-          } else if (resourceType === 'notes') {
-            ingredientCacheKey = `notes:${resourceKey}:${ingredientId}`
-          } else if (resourceType === 'words-links') {
-            ingredientCacheKey = `words-links:${resourceKey}:${ingredientId}`
-          } else {
-            // For other types (words, academy), skip ingredient checking
-            continue
-          }
-
-          const ingredientCache = await this.cacheAdapter.get(ingredientCacheKey)
-          if (ingredientCache && ingredientCache.content) {
-            cachedCount++
-          }
-        }
-
-        // If all ingredients are cached, mark as complete
-        if (cachedCount === ingredients.length && ingredients.length > 0) {
+      // No completion marker (or inconclusive) — check ingredients directly
+      if (ingredientStats) {
+        if (
+          ingredientStats.cachedCount === ingredientStats.checkableCount &&
+          ingredientStats.checkableCount > 0
+        ) {
           return {
             resourceKey,
             isComplete: true,
@@ -255,8 +345,7 @@ export class ResourceCompletenessChecker {
           }
         }
 
-        // Partially downloaded
-        if (cachedCount > 0) {
+        if (ingredientStats.cachedCount > 0) {
           return {
             resourceKey,
             isComplete: false,

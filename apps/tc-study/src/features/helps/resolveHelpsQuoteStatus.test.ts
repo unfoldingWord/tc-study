@@ -19,8 +19,33 @@ describe('isQuoteBuildReady', () => {
     expect(isQuoteBuildReady({ loadingOriginal: true, originalContent: [{ n: 1 }] })).toBe(false)
   })
 
-  test('non-empty UGNT/UHB chapters are ready', () => {
-    expect(isQuoteBuildReady({ loadingOriginal: false, originalContent: [{ n: 1 }] })).toBe(true)
+  test('UGNT/UHB chapters with word tokens are ready', () => {
+    expect(
+      isQuoteBuildReady({
+        loadingOriginal: false,
+        originalContent: [{ verses: [{ tokens: [{ text: 'Παῦλος' }] }] }],
+      })
+    ).toBe(true)
+  })
+
+  test('chapter shells without word tokens stay pending', () => {
+    expect(isQuoteBuildReady({ loadingOriginal: false, originalContent: [{ n: 1 }] })).toBe(false)
+    expect(
+      isQuoteBuildReady({
+        loadingOriginal: false,
+        originalContent: [{ verses: [{ tokens: [] }] }],
+      })
+    ).toBe(false)
+  })
+
+  test('quotesSettled false keeps align pending even when OL chapters exist', () => {
+    expect(
+      isQuoteBuildReady({
+        loadingOriginal: false,
+        originalContent: [{ verses: [{ tokens: [{ text: 'Παῦλος' }] }] }],
+        quotesSettled: false,
+      })
+    ).toBe(false)
   })
 
   test('empty UGNT/UHB attempt stays pending (do not settle Greek/Hebrew as OL-fallback)', () => {
@@ -171,6 +196,7 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
     expect(tnCardSrc).toContain("quoteStatus === 'ol-fallback'")
     expect(tnCardSrc).toContain('Building quote')
     expect(tnCardSrc).toContain('olQuote: note.quote')
+    expect(tnCardSrc).toContain('alignmentPending: !hasAlignedTokens')
     expect(tnCardSrc).not.toMatch(
       /!hasAlignedTokens && note\.quote && note\.quote\.trim\(\)\.length > 0 && !obsMode/
     )
@@ -182,6 +208,7 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
     expect(twlCardSrc).toContain("quoteStatus === 'ol-fallback'")
     expect(twlCardSrc).toContain('Building quote')
     expect(twlCardSrc).toContain('olQuote: link.origWords')
+    expect(twlCardSrc).toContain('alignmentPending: !hasAlignedTokens')
   })
 
   test('CombinedHelps TN half passes quoteBuildReady and copies quoteStatus', () => {
@@ -190,8 +217,17 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
     expect(combinedPipelineSrc).toContain('quoteStatus: quoteStatusMap.get(note.id)')
   })
 
-  test('standalone TN pipeline also threads quoteBuildReady and quoteStatus', () => {
-    expect(tnPipelineSrc).toContain('quoteBuildReady')
-    expect(tnPipelineSrc).toContain('quoteStatus: quoteStatusMap.get(note.id)')
+  test('useQuoteTokens gates quoteBuildReady on settled request key', () => {
+    const src = readFileSync(
+      join(
+        import.meta.dir,
+        '../../components/resources/WordsLinksViewer/hooks/useQuoteTokens.ts'
+      ),
+      'utf8'
+    )
+    expect(src).toContain('quotesSettled')
+    expect(src).toContain('settledRequestKey')
+    expect(src).toContain('buildQuotesSync')
+    expect(src).toContain('WORKER_QUOTE_MIN_LINKS')
   })
 })

@@ -131,9 +131,9 @@ export class USJProcessor {
     bookName: string
   ): UsjScriptureCacheContent {
     const slices = splitUsjByChapter(result.usj)
-    const chapters = slices
-      .filter((s) => s.chapter > 0)
-      .map((s) => ({ number: s.chapter, content: s.nodes }))
+    // Include chapter 0 (book intro / pre-chapter content) — filtering it out
+    // caused intro loss on cache reassemble from chapter slices.
+    const chapters = slices.map((s) => ({ number: s.chapter, content: s.nodes }))
 
     return {
       book: bookName,

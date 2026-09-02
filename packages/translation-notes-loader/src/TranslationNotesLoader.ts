@@ -28,6 +28,7 @@ export class TranslationNotesLoader implements ResourceLoader {
   private debug: boolean
   private serverAdapter: Door43ServerAdapter
   private processor: NotesProcessor
+  private onContentCached?: TranslationNotesLoaderConfig['onContentCached']
 
   constructor(config: TranslationNotesLoaderConfig) {
     this.cacheAdapter = config.cacheAdapter
@@ -36,6 +37,8 @@ export class TranslationNotesLoader implements ResourceLoader {
     this.debug = config.debug ?? false
     this.serverAdapter = new Door43ServerAdapter()
     this.processor = new NotesProcessor()
+    this.onContentCached =
+      typeof config.onContentCached === 'function' ? config.onContentCached : undefined
   }
 
   /**
@@ -117,6 +120,15 @@ export class TranslationNotesLoader implements ResourceLoader {
     }
   }
 
+  private async notifyContentCached(resourceKey: string, bookId: string): Promise<void> {
+    if (!this.onContentCached) return
+    try {
+      await this.onContentCached({ resourceKey, bookId })
+    } catch (err) {
+      console.warn('[TranslationNotesLoader] onContentCached failed:', err)
+    }
+  }
+
   /**
    * Load Translation Notes content for a specific book
    */
@@ -187,6 +199,7 @@ export class TranslationNotesLoader implements ResourceLoader {
       const tsvContent = await response.text()
       const processed = await this.processor.processNotes(tsvContent, bookCode, bookCode)
       await this.cacheAdapter.set(cacheKey, processed)
+      await this.notifyContentCached(resourceKey, bookCode)
       return processed
     } catch (error) {
       if (this.debug) {
@@ -257,10 +270,16 @@ export class TranslationNotesLoader implements ResourceLoader {
     console.log(`📦 Found ${ingredients.length} books to download`)
 
     const zipUrl = (metadata as any).release?.zipball_url
+    let failedBooks: string[] = []
+
     if (method === 'zip' && zipUrl) {
       try {
-        await this.downloadViaZip(resourceKey, metadata, ingredients, skipExisting, onProgress)
-        await this.markComplete(resourceKey, ingredients.length, 'zip')
+        failedBooks = await this.downloadViaZip(resourceKey, metadata, ingredients, skipExisting, onProgress)
+        if (failedBooks.length === 0) {
+          await this.markComplete(resourceKey, ingredients.length, 'zip')
+        } else {
+          await this.markIncomplete(resourceKey, ingredients.length, failedBooks, 'zip')
+        }
         return
       } catch (zipError) {
         console.warn(`⚠️ [TN] ZIP download failed, falling back to per-book fetch:`, zipError)
@@ -270,6 +289,7 @@ export class TranslationNotesLoader implements ResourceLoader {
     // Per-book fallback
     const total = ingredients.length
     let loaded = 0
+    failedBooks = []
 
     for (const ingredient of ingredients) {
       const bookId = ingredient.identifier
@@ -300,6 +320,7 @@ export class TranslationNotesLoader implements ResourceLoader {
         }
       } catch (error) {
         if (this.debug) console.warn(`⚠️ Failed to download TN for ${bookId}:`, error)
+        failedBooks.push(bookId)
         loaded++
         if (onProgress) {
           onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (not in repo)` })
@@ -307,8 +328,12 @@ export class TranslationNotesLoader implements ResourceLoader {
       }
     }
 
-    await this.markComplete(resourceKey, ingredients.length, 'individual')
-    if (this.debug) console.log(`✅ [TranslationNotesLoader] Download complete for ${resourceKey}`)
+    if (failedBooks.length === 0) {
+      await this.markComplete(resourceKey, ingredients.length, 'individual')
+      if (this.debug) console.log(`✅ [TranslationNotesLoader] Download complete for ${resourceKey}`)
+    } else {
+      await this.markIncomplete(resourceKey, ingredients.length, failedBooks, 'individual')
+    }
   }
 
   /**
@@ -320,7 +345,7 @@ export class TranslationNotesLoader implements ResourceLoader {
     ingredients: any[],
     skipExisting: boolean,
     onProgress?: ProgressCallback
-  ): Promise<void> {
+  ): Promise<string[]> {
     const [owner, language, resourceId] = resourceKey.split('/')
     const repoName = `${language}_${resourceId}`
     const ref = (metadata as any).release?.tag_name || 'master'
@@ -357,6 +382,7 @@ export class TranslationNotesLoader implements ResourceLoader {
 
     const total = ingredients.length
     let loaded = 0
+    const failedBooks: string[] = []
 
     for (const ingredient of ingredients) {
       const bookId = ingredient.identifier
@@ -387,6 +413,7 @@ export class TranslationNotesLoader implements ResourceLoader {
 
         if (!zipFile) {
           if (this.debug) console.warn(`⚠️ [TN] ${bookId} not found in ZIP`)
+          failedBooks.push(bookId)
           loaded++
           if (onProgress) {
             onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (not in repo)` })
@@ -397,6 +424,7 @@ export class TranslationNotesLoader implements ResourceLoader {
         const tsv = await zipFile.async('string')
         const processed = await this.processor.processNotes(tsv, bookId, bookId)
         await this.cacheAdapter.set(cacheKey, processed)
+        await this.notifyContentCached(resourceKey, bookId)
 
         loaded++
         if (onProgress) {
@@ -404,6 +432,7 @@ export class TranslationNotesLoader implements ResourceLoader {
         }
       } catch (error) {
         if (this.debug) console.warn(`⚠️ [TN] Failed to process ${bookId} from ZIP:`, error)
+        failedBooks.push(bookId)
         loaded++
         if (onProgress) {
           onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Failed: ${bookId}` })
@@ -411,7 +440,8 @@ export class TranslationNotesLoader implements ResourceLoader {
       }
     }
 
-    console.log(`✅ [TN] ZIP extraction complete for ${resourceKey}`)
+    console.log(`✅ [TN] ZIP extraction complete for ${resourceKey} (${failedBooks.length} failed)`)
+    return failedBooks
   }
 
   private async markComplete(resourceKey: string, entryCount: number, method: string): Promise<void> {
@@ -426,5 +456,27 @@ export class TranslationNotesLoader implements ResourceLoader {
         expectedEntryCount: entryCount
       }
     })
+  }
+
+  private async markIncomplete(
+    resourceKey: string,
+    expectedEntryCount: number,
+    failedBooks: string[],
+    method: string
+  ): Promise<void> {
+    const resourceCacheKey = `resource:${resourceKey}`
+    await this.cacheAdapter.set(resourceCacheKey, {
+      content: { downloaded: false, failedBooks },
+      metadata: {
+        downloadComplete: false,
+        downloadMethod: method,
+        entryCount: Math.max(0, expectedEntryCount - failedBooks.length),
+        expectedEntryCount,
+        failedBooks,
+      }
+    })
+    console.warn(
+      `⚠️ [TranslationNotesLoader] Download incomplete for ${resourceKey}: ${failedBooks.length} book(s) failed`
+    )
   }
 }

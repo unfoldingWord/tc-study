@@ -52,6 +52,8 @@ export interface VerseDisplayProps {
   onScriptureRefClick?: (ref: BCVReference) => void
   currentBook?: string
   isOriginalLanguage: boolean
+  /** Skip footnote/xref/heading extras on a chapter that is still first-painting. */
+  cheapPaint?: boolean
 }
 
 export interface TokenDisplayProps {

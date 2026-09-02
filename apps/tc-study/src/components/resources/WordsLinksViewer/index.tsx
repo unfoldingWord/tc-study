@@ -4,7 +4,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { useCatalogManager, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { usePinnedHelpsReference } from '../../../features/nav/usePinnedHelpsReference'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { RESOURCE_TYPE_IDS } from '../../../resourceTypes/resourceTypeIds'
@@ -34,7 +35,7 @@ export function WordsLinksViewer({
   wordsLinksContent,
   onEntryLinkClick,
 }: WordsLinksViewerProps) {
-  const currentRef = useCurrentReference()
+  const currentRef = usePinnedHelpsReference()
   const navigationMode = useNavigationMode()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
