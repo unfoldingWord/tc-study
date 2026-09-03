@@ -96,7 +96,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-words-links-loader',
     downloadPriority: 10,
     factoryKey: 'words-links',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.OBS_WORDS_LINKS,

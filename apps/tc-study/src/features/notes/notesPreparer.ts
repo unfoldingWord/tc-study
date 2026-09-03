@@ -17,7 +17,8 @@ import {
   type ResourcePreparer,
 } from '../prepare/prepareRegistry'
 
-export const NOTES_PREPARE_VERSION = 1
+/** Bump when light/full row shape changes (invalidates prepared: rows). */
+export const NOTES_PREPARE_VERSION = 2
 
 export function tnCacheKey(resourceKey: string, bookId: string): string {
   return `tn:${resourceKey}:${bookId}`
@@ -28,6 +29,10 @@ export interface NotesLightRow {
   reference: string
   quote: string
   body: string
+  note: string
+  supportReference: string
+  tags: string
+  occurrence: string
 }
 
 export interface NotesFullRow {
@@ -37,6 +42,11 @@ export interface NotesFullRow {
   /** Folded quote surface for cheap matching. */
   quoteFolded?: string
   bodyHast: HastRoot
+  /** Raw markdown — card toggle + fallback when hast missing. */
+  note: string
+  supportReference: string
+  tags: string
+  occurrence: string
 }
 
 export interface NotesNavRecord {
@@ -59,7 +69,7 @@ export interface NotesFullChapter {
   notes: NotesFullRow[]
 }
 
-type NotesSource = {
+export type NotesSource = {
   resourceKey: string
   bookId: string
   notes: ProcessedNotes
@@ -125,6 +135,10 @@ export function buildNotesLight(source: NotesSource, unit: number): NotesLightCh
     reference: n.reference,
     quote: n.quote || '',
     body: stripMarkdownLight(n.note || ''),
+    note: n.note || '',
+    supportReference: n.supportReference || '',
+    tags: n.tags || '',
+    occurrence: n.occurrence || '1',
   }))
   return { version: NOTES_PREPARE_VERSION, unit, notes }
 }
@@ -132,12 +146,17 @@ export function buildNotesLight(source: NotesSource, unit: number): NotesLightCh
 export function buildNotesFull(source: NotesSource, unit: number): NotesFullChapter {
   const notes = notesForUnit(source, unit).map((n) => {
     const quote = n.quote || ''
+    const note = n.note || ''
     return {
       id: n.id,
       reference: n.reference,
       quote,
       quoteFolded: quote ? semanticIdMatchKey(quote) : undefined,
-      bodyHast: markdownToHastSync(n.note || ''),
+      bodyHast: markdownToHastSync(note),
+      note,
+      supportReference: n.supportReference || '',
+      tags: n.tags || '',
+      occurrence: n.occurrence || '1',
     }
   })
   return { version: NOTES_PREPARE_VERSION, unit, notes }

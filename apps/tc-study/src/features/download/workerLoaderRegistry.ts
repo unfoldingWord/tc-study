@@ -128,7 +128,10 @@ const LOADER_FACTORIES: Partial<Record<LoaderFactoryKey, LoaderCtor>> = {
       }),
     }),
   words: (deps) => new TranslationWordsLoader(toLoaderConfig(deps)),
-  'words-links': (deps) => new TranslationWordsLinksLoader(toLoaderConfig(deps)),
+  'words-links': (deps) =>
+    new TranslationWordsLinksLoader(
+      withPrepareHook(deps, 'words-links', toLoaderConfig(deps))
+    ),
   academy: (deps) => new TranslationAcademyLoader(toLoaderConfig(deps)),
   notes: (deps) =>
     new TranslationNotesLoader(withPrepareHook(deps, 'notes', toLoaderConfig(deps))),

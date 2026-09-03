@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
   BOOK_SPACER_CHAPTER_THRESHOLD,
+  canRevealChapterAtEdge,
+  CHAPTER_EDGE_SWAP_MODE,
   FAST_SCROLL_PX_PER_MS,
   MAX_MOUNTED_CHAPTERS,
   PHASE_UPGRADE_HOLD_MS,
@@ -17,6 +19,7 @@ import {
   chapterToStitch,
   chapterWindowAround,
   contentChaptersFromSlots,
+  edgeRevealTargetChapter,
   effectiveScrollVelocity,
   ensureChapterPainted,
   measureScrollVelocity,
@@ -27,6 +30,7 @@ import {
   renderedChaptersFromSlots,
   resetChapterSlots,
   resetMountedChapters,
+  revealChapterInWindow,
   settleViewportChapter,
   settledCommitMode,
   settledNavChapter,
@@ -34,6 +38,7 @@ import {
   shouldPromotePlaceholderOnSettle,
   shouldResetWindowOnNavChange,
   shouldStitchAtDocumentEdge,
+  singlePaintedChapterSlots,
   spacerHeightPx,
   stitchMountedChapters,
   trimMountedToWindow,
@@ -50,6 +55,42 @@ describe('chapterInfiniteScroll mode gate', () => {
     expect(isChapterInfiniteScrollEnabled('section', 'tit')).toBe(false)
     expect(isChapterInfiniteScrollEnabled('passage-set', 'tit')).toBe(false)
     expect(isChapterInfiniteScrollEnabled('chapter', 'obs')).toBe(false)
+  })
+})
+
+describe('chapter edge-reveal stack', () => {
+  test('defaults to edge-reveal and paints a single chapter slot initially', () => {
+    expect(CHAPTER_EDGE_SWAP_MODE).toBe(true)
+    expect(singlePaintedChapterSlots(3)).toEqual([{ chapter: 3, kind: 'paragraph' }])
+    expect(chapterWindowAround(3, 5)).toEqual([2, 3, 4])
+  })
+
+  test('revealChapterInWindow appends next and trims to three', () => {
+    let slots = singlePaintedChapterSlots(1)
+    slots = revealChapterInWindow(slots, 2, 'next', 10)
+    expect(slots.map((s) => s.chapter)).toEqual([1, 2])
+    slots = revealChapterInWindow(slots, 3, 'next', 10)
+    expect(slots.map((s) => s.chapter)).toEqual([1, 2, 3])
+    slots = revealChapterInWindow(slots, 4, 'next', 10)
+    expect(slots.map((s) => s.chapter)).toEqual([2, 3, 4])
+  })
+
+  test('revealChapterInWindow prepends previous and trims to three', () => {
+    let slots = singlePaintedChapterSlots(5)
+    slots = revealChapterInWindow(slots, 4, 'previous', 10)
+    expect(slots.map((s) => s.chapter)).toEqual([4, 5])
+    slots = revealChapterInWindow(slots, 3, 'previous', 10)
+    expect(slots.map((s) => s.chapter)).toEqual([3, 4, 5])
+    slots = revealChapterInWindow(slots, 2, 'previous', 10)
+    expect(slots.map((s) => s.chapter)).toEqual([2, 3, 4])
+  })
+
+  test('edgeRevealTargetChapter finds the next unpainted neighbor', () => {
+    const slots = revealChapterInWindow(singlePaintedChapterSlots(2), 3, 'next', 10)
+    expect(edgeRevealTargetChapter(slots, 'next', 10)).toBe(4)
+    expect(edgeRevealTargetChapter(slots, 'previous', 10)).toBe(1)
+    expect(canRevealChapterAtEdge(slots, 'next', 10)).toBe(true)
+    expect(canRevealChapterAtEdge(revealChapterInWindow(slots, 4, 'next', 4), 'next', 4)).toBe(false)
   })
 })
 

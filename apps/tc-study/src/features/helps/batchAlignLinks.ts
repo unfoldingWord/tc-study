@@ -23,6 +23,12 @@ export interface AlignLinkInput {
   origWords?: string
   quoteTokens?: OptimizedToken[]
   occurrence?: string
+  /**
+   * Per-link quote-build readiness. When false, stay pending and skip the
+   * expensive align path so staged/partial quote builds do not paint ol-fallback.
+   * Undefined means ready (legacy / sync-full callers).
+   */
+  quoteReady?: boolean
 }
 
 export interface AlignLinkResult {
@@ -102,6 +108,21 @@ export function batchAlignLinks(args: BatchAlignLinksArgs): AlignLinkResult[] {
   }
 
   return links.map((link, index) => {
+    // Staged quote-build: unready links stay pending and skip resolveAlignedQuoteTokens.
+    if (link.quoteReady === false) {
+      return {
+        index,
+        id: link.id,
+        alignedTokens: undefined,
+        semanticIds: undefined,
+        quoteStatus: resolveHelpsQuoteStatus({
+          hasAlignedTokens: false,
+          alignmentPending: true,
+          olQuote: link.origWords,
+        }),
+      }
+    }
+
     const refParts = link.reference.split(':')
     const linkChapter = parseInt(refParts[0] || '1', 10)
     const linkVerse = parseInt(refParts[1] || '1', 10)
@@ -121,10 +142,11 @@ export function batchAlignLinks(args: BatchAlignLinksArgs): AlignLinkResult[] {
       linkChapter >= tokenChapter &&
       linkChapter <= tokenEndChapter
     )
+    const linkQuoteReady = quoteBuildReady && (link.quoteReady ?? true)
     const alignmentPending = isHelpsQuoteAlignmentPending({
       hasTargetTokens: hasTokens,
       tokensMatchPassage,
-      quoteBuildReady,
+      quoteBuildReady: linkQuoteReady,
     })
 
     if (!tokensMatchPassage) {

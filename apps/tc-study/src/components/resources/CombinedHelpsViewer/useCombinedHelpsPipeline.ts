@@ -11,8 +11,16 @@ import {
   type ObsQuoteFilter,
   type VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
+import {
+  preparedLinkToTranslationWordsLink,
+  preparedNoteToTranslationNote,
+  type PreparedTranslationNote,
+} from '../../../features/helps/preparedHelpsRows'
 import { underlineGroupsFromHelpsNotes } from '../../../features/helps/scriptureReadyUnderlineRebind'
 import { measureScripturePerfSync } from '../../../features/perf/scripturePerf'
+import type { NotesFullRow } from '../../../features/notes/notesPreparer'
+import type { WordsLinksFullRow } from '../../../features/wordsLinks/wordsLinksPreparer'
+import { articlePathFromTwLink } from '../../../features/wordsLinks/wordsLinksPreparer'
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { useAlignedTokens, useQuoteTokens } from '../WordsLinksViewer/hooks'
 import {
@@ -27,8 +35,12 @@ export interface UseCombinedHelpsPipelineParams {
   tnNotes: TranslationNote[] | null | undefined
   /** Prefer chapter map when available to avoid full-book scans. */
   notesByChapter?: Record<string, TranslationNote[]> | null
+  /** Prepared TN rows (preferred over loader slice when present). */
+  preparedNotes?: NotesFullRow[] | null
   twlLinksRaw: TranslationWordsLink[] | null | undefined
   linksByChapter?: Record<string, TranslationWordsLink[]> | null
+  /** Prepared TWL rows (preferred over loader slice when present). */
+  preparedLinks?: WordsLinksFullRow[] | null
   tnKey: string
   twlKey: string
   resourceKey: string
@@ -65,11 +77,22 @@ function collectChapterSlice<T>(
   return fallback ?? []
 }
 
+function withArticlePath(link: TranslationWordsLink & { articlePath?: string }): TranslationWordsLink & {
+  articlePath: string
+} {
+  return {
+    ...link,
+    articlePath: link.articlePath || articlePathFromTwLink(link.twLink),
+  }
+}
+
 export function useCombinedHelpsPipeline({
   tnNotes,
   notesByChapter,
+  preparedNotes,
   twlLinksRaw,
   linksByChapter,
+  preparedLinks,
   tnKey,
   twlKey,
   resourceKey,
@@ -82,25 +105,26 @@ export function useCombinedHelpsPipeline({
   verseFilter,
   obsQuoteFilter,
 }: UseCombinedHelpsPipelineParams) {
-  const relevantNotes = useMemo(() => {
+  const relevantNotes = useMemo((): PreparedTranslationNote[] => {
     const startChapter = currentRef.chapter
     const startVerse = currentRef.verse
     const endChapter = currentRef.endChapter || startChapter
     const endVerse = resolveRangeEndVerse(currentRef, navigationMode)
-    const chapterScoped = collectChapterSlice(
-      notesByChapter,
-      tnNotes,
-      startChapter,
-      endChapter
-    )
+
+    const chapterScoped: PreparedTranslationNote[] =
+      preparedNotes != null
+        ? preparedNotes.map(preparedNoteToTranslationNote)
+        : collectChapterSlice(notesByChapter, tnNotes, startChapter, endChapter)
+
     if (!chapterScoped.length) return []
     return filterNotesByReferenceRange(chapterScoped, {
       startChapter,
       startVerse,
       endChapter,
       endVerse,
-    })
+    }) as PreparedTranslationNote[]
   }, [
+    preparedNotes,
     tnNotes,
     notesByChapter,
     currentRef.chapter,
@@ -155,13 +179,19 @@ export function useCombinedHelpsPipeline({
       quoteTokens: quoteMap.get(note.id),
       alignedTokens: alignedMap.get(note.id),
       semanticIds: semanticIdsMap.get(note.id),
-      quoteStatus: quoteStatusMap.get(note.id),
+      // Empty-quote notes skip quote-build; settle immediately so cards paint prose.
+      quoteStatus:
+        quoteStatusMap.get(note.id) ??
+        (note.quote?.trim() ? undefined : 'none'),
     })) as NoteWithAlignments[]
   }, [relevantNotes, tnLinksWithQuotes, tnLinksAligned])
 
   const links = useMemo(() => {
     const startChapter = currentRef.chapter || 1
     const endChapter = currentRef.endChapter || startChapter
+    if (preparedLinks != null) {
+      return preparedLinks.map(preparedLinkToTranslationWordsLink)
+    }
     const chapterScoped = collectChapterSlice(
       linksByChapter,
       twlLinksRaw,
@@ -169,17 +199,8 @@ export function useCombinedHelpsPipeline({
       endChapter
     )
     if (!chapterScoped.length) return []
-    return chapterScoped.map((link) => ({
-      ...link,
-      articlePath:
-        link.articlePath ||
-        (() => {
-          if (!link.twLink) return ''
-          const m = link.twLink.match(/rc:\/\/\*\/tw\/dict\/(.+)$/)
-          return m ? m[1] : ''
-        })(),
-    }))
-  }, [twlLinksRaw, linksByChapter, currentRef.chapter, currentRef.endChapter])
+    return chapterScoped.map(withArticlePath)
+  }, [preparedLinks, twlLinksRaw, linksByChapter, currentRef.chapter, currentRef.endChapter])
 
   const { linksWithQuotes: twlLinksWithQuotes, quoteBuildReady: twlQuoteBuildReady } =
     useQuoteTokens({

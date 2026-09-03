@@ -11,18 +11,42 @@
  */
 
 import { useSignalHandler } from '@bt-synergy/resource-panels'
-import { Book } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Book, ChevronDown, ChevronUp } from 'lucide-react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
-import { useCatalogManager, useCurrentReference, useNavigation } from '../../../contexts'
+import {
+  useCatalogManager,
+  useCurrentPassageSet,
+  useCurrentReference,
+  useNavigation,
+  useNavigationMode,
+} from '../../../contexts'
 import type { ResourceMetadata } from '../../../contexts/types'
+import {
+  advanceNavigationUnit,
+  canAdvanceNavigationUnit,
+} from '../../../features/nav/advanceNavigationUnit'
+import {
+  EDGE_NAV_THRESHOLD_PX,
+  isPastCommitThreshold,
+} from '../../../features/nav/scriptureEdgeNavigate'
+import { markReadNavigationInternal } from '../../../features/read/replaceReadUrlFromUi'
 import { usePreparedChapter } from '../../../features/scripture/usePreparedChapter'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
+import { LoadingSpinner } from '../../../shared/LoadingSpinner'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { ScriptureContent, ScriptureLayoutToggle } from './components'
-import { useContent, useHighlighting, useTOC, useTokenBroadcast, useUnderlinedTokens } from './hooks'
+import {
+  resolveScriptureScrollParent,
+  useContent,
+  useHighlighting,
+  useScriptureEdgeNavigate,
+  useTOC,
+  useTokenBroadcast,
+  useUnderlinedTokens,
+} from './hooks'
 import {
   lastChapterFromViewModel,
   useChapterInfiniteScroll,
@@ -40,10 +64,21 @@ export function ScriptureViewer({
   isAnchor,
 }: ScriptureViewerProps) {
   const currentRef = useCurrentReference()
-  const { navigateToReference } = useNavigation()
+  const navigation = useNavigation()
+  const { navigateToReference } = navigation
+  const navigationMode = useNavigationMode()
+  const passageSet = useCurrentPassageSet()
+  const hasPassageSet = !!passageSet
   const catalogManager = useCatalogManager()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const [catalogMetadata, setCatalogMetadata] = useState<ResourceMetadata | null>(null)
+
+  const contentRootRef = useRef<HTMLDivElement>(null)
+  const [elasticContentEl, setElasticContentEl] = useState<HTMLDivElement | null>(null)
+  const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null)
+  const pendingScrollAlignRef = useRef<'start' | 'end' | null>(null)
+  const [isUnitTransitioning, setIsUnitTransitioning] = useState(false)
+  const unitTransitionStartedAtRef = useRef(0)
 
   // Load catalog metadata
   useEffect(() => {
@@ -188,6 +223,151 @@ export function ScriptureViewer({
     setAsAnchor()
   }
 
+  useLayoutEffect(() => {
+    setScrollParent(
+      resolveScriptureScrollParent(contentRootRef.current) ??
+        resolveScriptureScrollParent(chapterScroll.contentRef.current)
+    )
+  }, [
+    isLoading,
+    displayVerses,
+    currentRef.book,
+    currentRef.chapter,
+    currentRef.verse,
+    chapterScroll.chapterSlots,
+  ])
+
+  const unitArgs = {
+    navigationMode,
+    currentRef,
+    navigation,
+    hasPassageSet,
+  }
+
+  const beginUnitTransition = useCallback(() => {
+    unitTransitionStartedAtRef.current = Date.now()
+    setIsUnitTransitioning(true)
+  }, [])
+
+  const handleEdgeNext = useCallback(() => {
+    if (chapterScroll.enabled) {
+      chapterScroll.revealChapterAtEdge('next')
+      return
+    }
+    markReadNavigationInternal()
+    const ok = advanceNavigationUnit({ ...unitArgs, direction: 'next' })
+    if (ok) {
+      pendingScrollAlignRef.current = 'start'
+      beginUnitTransition()
+    }
+  }, [chapterScroll.enabled, chapterScroll.revealChapterAtEdge, navigationMode, currentRef, navigation, hasPassageSet, beginUnitTransition])
+
+  const handleEdgePrev = useCallback(() => {
+    if (chapterScroll.enabled) {
+      chapterScroll.revealChapterAtEdge('previous')
+      return
+    }
+    markReadNavigationInternal()
+    const ok = advanceNavigationUnit({ ...unitArgs, direction: 'previous' })
+    if (ok) {
+      pendingScrollAlignRef.current = 'end'
+      beginUnitTransition()
+    }
+  }, [chapterScroll.enabled, chapterScroll.revealChapterAtEdge, navigationMode, currentRef, navigation, hasPassageSet, beginUnitTransition])
+
+  const canEdgeNext = useCallback(
+    () =>
+      chapterScroll.enabled
+        ? chapterScroll.canRevealChapterAtEdge('next')
+        : !isUnitTransitioning &&
+          canAdvanceNavigationUnit({ ...unitArgs, direction: 'next' }),
+    [
+      chapterScroll.enabled,
+      chapterScroll.canRevealChapterAtEdge,
+      navigationMode,
+      currentRef,
+      navigation,
+      hasPassageSet,
+      isUnitTransitioning,
+    ]
+  )
+
+  const canEdgePrev = useCallback(
+    () =>
+      chapterScroll.enabled
+        ? chapterScroll.canRevealChapterAtEdge('previous')
+        : !isUnitTransitioning &&
+          canAdvanceNavigationUnit({ ...unitArgs, direction: 'previous' }),
+    [
+      chapterScroll.enabled,
+      chapterScroll.canRevealChapterAtEdge,
+      navigationMode,
+      currentRef,
+      navigation,
+      hasPassageSet,
+      isUnitTransitioning,
+    ]
+  )
+
+  const { pullPx, rawPullPx, edge } = useScriptureEdgeNavigate({
+    scrollParent,
+    contentEl: elasticContentEl,
+    onNext: handleEdgeNext,
+    onPrev: handleEdgePrev,
+    canNext: canEdgeNext,
+    canPrev: canEdgePrev,
+    enabled: !isLoading && !(isUnitTransitioning && !chapterScroll.enabled) && !error,
+  })
+
+  // After unit change (non-chapter modes): land at start (next) or end (prev).
+  useLayoutEffect(() => {
+    if (chapterScroll.enabled) return
+    const align = pendingScrollAlignRef.current
+    if (!align || !scrollParent) return
+    pendingScrollAlignRef.current = null
+    if (align === 'start') {
+      scrollParent.scrollTop = 0
+    } else {
+      scrollParent.scrollTop = scrollParent.scrollHeight
+    }
+  }, [
+    chapterScroll.enabled,
+    currentRef.book,
+    currentRef.chapter,
+    currentRef.verse,
+    currentRef.endChapter,
+    currentRef.endVerse,
+    displayVerses,
+    chapterScroll.chapterSlots,
+    scrollParent,
+  ])
+
+  // Brief spinner for non-chapter unit swaps only.
+  useEffect(() => {
+    if (chapterScroll.enabled || !isUnitTransitioning) return
+    if (isLoading) return
+    const elapsed = Date.now() - unitTransitionStartedAtRef.current
+    const remaining = Math.max(0, 180 - elapsed)
+    const timer = window.setTimeout(() => setIsUnitTransitioning(false), remaining)
+    return () => window.clearTimeout(timer)
+  }, [
+    chapterScroll.enabled,
+    isUnitTransitioning,
+    isLoading,
+    currentRef.book,
+    currentRef.chapter,
+    currentRef.verse,
+    currentRef.endChapter,
+    currentRef.endVerse,
+    displayVerses,
+    chapterScroll.chapterSlots,
+  ])
+
+  const showContentLoading = isLoading || (isUnitTransitioning && !chapterScroll.enabled)
+  const armedToCommit = isPastCommitThreshold(rawPullPx, EDGE_NAV_THRESHOLD_PX)
+  const showTopCue = edge === 'top' && Math.abs(pullPx) > 8
+  const showBottomCue = edge === 'bottom' && Math.abs(pullPx) > 8
+
   return (
     <div className="h-full flex flex-col" dir={languageDirection}>
       <ResourceViewerHeader
@@ -199,6 +379,7 @@ export function ScriptureViewer({
       />
 
       <div
+        ref={contentRootRef}
         className="flex-1 p-content-lg relative cursor-pointer bg-scripture text-scripture-fg"
         onClick={handleViewerClick}
         role="button"
@@ -210,35 +391,63 @@ export function ScriptureViewer({
           }
         }}
       >
-        {/* Content - scrolling handled by parent container */}
-        <div className="flex-1 max-w-2xl mx-auto w-full">
+        {showTopCue && (
+          <div
+            className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center text-fg-muted"
+            title={armedToCommit ? 'Loading previous' : 'Previous'}
+            aria-hidden
+          >
+            {armedToCommit ? (
+              <LoadingSpinner size="sm" label="Loading previous" className="text-accent opacity-90" />
+            ) : (
+              <ChevronUp className="w-5 h-5 opacity-70" />
+            )}
+          </div>
+        )}
+        {showBottomCue && (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center text-fg-muted"
+            title={armedToCommit ? 'Loading next' : 'Next'}
+            aria-hidden
+          >
+            {armedToCommit ? (
+              <LoadingSpinner size="sm" label="Loading next" className="text-accent opacity-90" />
+            ) : (
+              <ChevronDown className="w-5 h-5 opacity-70" />
+            )}
+          </div>
+        )}
+        <div
+          ref={setElasticContentEl}
+          className="flex-1 max-w-2xl mx-auto w-full will-change-transform"
+        >
           <ScriptureContent
-          isLoading={isLoading}
-          isLoadingTOC={isLoadingTOC}
-          error={error}
-          viewModel={viewModel}
-          nav={nav}
-          resourceKey={resourceKey}
-          availableBooks={availableBooks}
-          displayVerses={displayVerses}
-          currentRef={currentRef}
-          highlightTarget={highlightTarget}
-          underlinedSemanticIds={underlinedSemanticIds}
-          selectedTokenId={selectedTokenId}
-          onTokenClick={handleTokenClick}
-          onInternedTokenClick={handleInternedTokenClick}
-          onVerseClick={handleVerseClick}
-          onChapterClick={handleChapterClick}
-          onScriptureRefClick={navigateToReference}
-          language={languageCode}
-          languageDirection={languageDirection}
-          displayChapters={chapterScroll.displayChapters}
-          chapterSlots={chapterScroll.chapterSlots}
-          registerChapter={chapterScroll.registerChapter}
-          contentRef={chapterScroll.contentRef}
-          tokenSourceFailed={chapterScroll.tokenSourceFailed}
-          onRetryTokenSource={chapterScroll.retryTokenSource}
-        />
+            isLoading={showContentLoading}
+            isLoadingTOC={isLoadingTOC}
+            error={error}
+            viewModel={viewModel}
+            nav={nav}
+            resourceKey={resourceKey}
+            availableBooks={availableBooks}
+            displayVerses={displayVerses}
+            currentRef={currentRef}
+            highlightTarget={highlightTarget}
+            underlinedSemanticIds={underlinedSemanticIds}
+            selectedTokenId={selectedTokenId}
+            onTokenClick={handleTokenClick}
+            onInternedTokenClick={handleInternedTokenClick}
+            onVerseClick={handleVerseClick}
+            onChapterClick={handleChapterClick}
+            onScriptureRefClick={navigateToReference}
+            language={languageCode}
+            languageDirection={languageDirection}
+            displayChapters={chapterScroll.displayChapters}
+            chapterSlots={chapterScroll.chapterSlots}
+            registerChapter={chapterScroll.registerChapter}
+            contentRef={chapterScroll.contentRef}
+            tokenSourceFailed={chapterScroll.tokenSourceFailed}
+            onRetryTokenSource={chapterScroll.retryTokenSource}
+          />
         </div>
       </div>
     </div>

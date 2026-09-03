@@ -18,6 +18,11 @@ import {
   resolveHelpsLanguageCodeForCopy,
 } from '../../../features/helps/helpsEmptyCopy'
 import { isHelpsContentPending } from '../../../features/helps/helpsListLoading'
+import {
+  usePreparedNotesChapter,
+  usePreparedWordsLinksChapter,
+} from '../../../features/helps/usePreparedHelpsChapter'
+import { useWarmAdjacentHelpsQuotes } from '../../../features/helps/useWarmAdjacentHelpsQuotes'
 import { listedLanguageByCode } from '../../../features/read/languageListDisplayName'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { useEntryTitles } from '../TranslationNotesViewer/hooks/useEntryTitles'
@@ -136,6 +141,60 @@ export function CombinedHelpsViewer({
     loaderTypeId: twlLoaderId,
   })
 
+  const startChapter = currentRef.chapter || 1
+  const endChapter = currentRef.endChapter || startChapter
+  const bookId = currentRef.book || ''
+
+  const processedNotesForHeal = useMemo(() => {
+    if (!tnNotes?.length && (!notesByChapter || Object.keys(notesByChapter).length === 0)) {
+      return null
+    }
+    return {
+      bookCode: bookId,
+      bookName: bookId,
+      notes: tnNotes ?? [],
+      notesByChapter: notesByChapter ?? {},
+      metadata: {
+        bookCode: bookId,
+        bookName: bookId,
+        processingDate: '',
+        totalNotes: tnNotes?.length ?? 0,
+        chaptersWithNotes: Object.keys(notesByChapter ?? {})
+          .map((k) => parseInt(k, 10))
+          .filter((n) => Number.isFinite(n)),
+        statistics: {
+          totalNotes: tnNotes?.length ?? 0,
+          notesPerChapter: {},
+        },
+      },
+    }
+  }, [tnNotes, notesByChapter, bookId])
+
+  const { preparedNotes } = usePreparedNotesChapter({
+    resourceKey: tnKey,
+    bookId,
+    startChapter,
+    endChapter,
+    processedNotes: processedNotesForHeal,
+  })
+
+  const { preparedLinks } = usePreparedWordsLinksChapter({
+    resourceKey: twlKey,
+    bookId,
+    startChapter,
+    endChapter,
+    processedLinks: twlContent,
+  })
+
+  useWarmAdjacentHelpsQuotes({
+    tnKey,
+    twlKey,
+    bookId,
+    chapter: startChapter,
+    notesByChapter,
+    linksByChapter: twlContent?.linksByChapter,
+  })
+
   // Listen on the mounted CombinedHelps id (not TN/TWL catalog keys)
   const scriptureTokenListenerId = resourceId
 
@@ -189,8 +248,10 @@ export function CombinedHelpsViewer({
   } = useCombinedHelpsPipeline({
     tnNotes,
     notesByChapter,
+    preparedNotes,
     twlLinksRaw: twlContent?.links,
     linksByChapter: twlContent?.linksByChapter,
+    preparedLinks,
     tnKey,
     twlKey,
     resourceKey,

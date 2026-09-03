@@ -7,6 +7,7 @@ import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource
 import { useEffect, useState } from 'react'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
 import { markScripturePerfEnd, markScripturePerfStart } from '../../../features/perf/scripturePerf'
+import { scheduleIdle } from '../../../utils/scheduleIdle'
 import type { LinkWithAlignments, NoteWithAlignments } from './useCombinedHelpsMerge'
 
 export interface UseCombinedHelpsTitlePreloadParams {
@@ -24,15 +25,6 @@ export interface UseCombinedHelpsTitlePreloadParams {
 }
 
 const TITLE_PRELOAD_CONCURRENCY = 4
-
-function scheduleIdle(run: () => void): () => void {
-  if (typeof requestIdleCallback === 'function') {
-    const id = requestIdleCallback(() => run(), { timeout: 1200 })
-    return () => cancelIdleCallback(id)
-  }
-  const t = window.setTimeout(run, 32)
-  return () => window.clearTimeout(t)
-}
 
 export function useCombinedHelpsTitlePreload({
   displayNotes,
@@ -106,7 +98,7 @@ export function useCombinedHelpsTitlePreload({
       } finally {
         markScripturePerfEnd('title-preload', String(displayNotes.length + displayLinks.length))
       }
-    })
+    }, 1200)
 
     return () => {
       cancelled = true

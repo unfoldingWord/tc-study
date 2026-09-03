@@ -7,7 +7,7 @@ import {
 import type { BCVReference } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken } from '../types'
 import { resolveTokenVisualState } from '../utils/tokenHighlight'
-import { blockClassForMarker } from '../utils/paraStyles'
+import { blockClassForMarker, SCRIPTURE_VERSE_NUMBER_CLASS } from '../utils/paraStyles'
 import { ScriptureNoteMarker } from './ScriptureNoteMarker'
 import { ScriptureRefLinks } from './ScriptureRefLinks'
 import { TokenRenderer } from './TokenRenderer'
@@ -61,7 +61,7 @@ export const FormattedBlockRenderer = memo(function FormattedBlockRenderer({
           return (
             <span
               key={`v-${blockIndex}-${item.chapterNumber}:${item.verseNumber}-${index}`}
-              className="text-sm font-bold text-blue-600 mr-1.5 select-none cursor-pointer hover:text-blue-700 align-super"
+              className={SCRIPTURE_VERSE_NUMBER_CLASS}
               onClick={(e) => {
                 e.stopPropagation()
                 onVerseClick?.(item.chapterNumber, item.verseNumber)

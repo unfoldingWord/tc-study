@@ -14,6 +14,7 @@ import {
   type UsjVerseBlockItem,
 } from '@bt-synergy/scripture-loader'
 import { measureScripturePerfSync } from '../../../../features/perf/scripturePerf'
+import { scheduleIdle } from '../../../../utils/scheduleIdle'
 import type { DisplayUsjVerse } from '../types'
 import { extractBookParagraphs } from './chapterParagraphs'
 
@@ -233,29 +234,17 @@ export function resetChapterLayoutHeights(): void {
   layoutHeights.clear()
 }
 
-function scheduleIdleWarm(warm: () => void): void {
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(warm, { timeout: 400 })
-    return
-  }
-  if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(warm)
-    return
-  }
-  warm()
-}
-
 /** Idle-warm specific chapters (placeholders) without mounting token trees. */
 export function prefetchChapterLayouts(
   viewModel: UsjScriptureViewModel,
   chapters: readonly number[]
 ): void {
   if (chapters.length === 0) return
-  scheduleIdleWarm(() => {
+  scheduleIdle(() => {
     for (const chapter of chapters) {
       getChapterVerseBlockItems(viewModel, chapter)
     }
-  })
+  }, 400)
 }
 
 /** Idle-warm paragraph strings only — no layout token trees. */
@@ -264,11 +253,11 @@ export function prefetchChapterParagraphs(
   chapters: readonly number[]
 ): void {
   if (chapters.length === 0) return
-  scheduleIdleWarm(() => {
+  scheduleIdle(() => {
     for (const chapter of chapters) {
       getChapterParagraphs(viewModel, chapter)
     }
-  })
+  }, 400)
 }
 
 /** Warm the next/prev chapter off the stitch/paint path. */

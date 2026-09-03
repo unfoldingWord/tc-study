@@ -18,6 +18,10 @@ import type {
   ScriptureFullChapter,
 } from '../../../../features/scripture/scripturePreparer'
 import { ChapterScrollSection } from './ChapterScrollSection'
+import {
+  blockClassForMarker,
+  SCRIPTURE_VERSE_NUMBER_CLASS,
+} from '../utils/paraStyles'
 
 interface PreparedFullChapterPaneProps {
   chapterNum: number
@@ -111,7 +115,7 @@ function renderInline(
       return (
         <span
           key={`v-${item.chapterNumber}-${item.verseNumber}`}
-          className="text-sm font-bold text-accent mr-2 select-none cursor-pointer hover:text-accent-hover"
+          className={SCRIPTURE_VERSE_NUMBER_CLASS}
           onClick={(e) => {
             e.stopPropagation()
             ctx.onVerseClick?.(item.chapterNumber, item.verseNumber)
@@ -186,6 +190,12 @@ function BlockView({
   onVerseClick?: (chapter: number, verse: number) => void
 }) {
   let currentVerse = block.verseNumbers[0] ?? 1
+  const className = blockClassForMarker(block.marker, block.role, block.indentLevel)
+
+  if (block.role === 'break' || block.marker === 'b') {
+    return <div className={className} data-usj-marker={block.marker} aria-hidden />
+  }
+
   const nodes: React.ReactNode[] = []
   block.inline.forEach((item, idx) => {
     if (item.kind === 'verse') currentVerse = item.verseNumber
@@ -209,15 +219,12 @@ function BlockView({
     )
   })
 
-  const Tag = block.role === 'heading' ? 'h3' : 'p'
+  const Tag = block.role === 'heading' || block.role === 'intro' ? 'h3' : 'p'
   return (
     <Tag
-      className={
-        block.role === 'heading'
-          ? 'font-bold text-scripture-fg mt-3 mb-1'
-          : 'leading-relaxed text-scripture-fg'
-      }
-      style={block.indentLevel ? { marginInlineStart: `${block.indentLevel * 1.25}rem` } : undefined}
+      className={className}
+      data-usj-marker={block.marker}
+      data-usj-role={block.role}
     >
       {nodes}
     </Tag>
@@ -250,6 +257,7 @@ export const PreparedFullChapterPane = memo(function PreparedFullChapterPane({
       chapter={chapterNum}
       kind="rendered"
       register={registerChapter}
+      layout="paragraph"
     >
       <h2
         className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
@@ -260,7 +268,7 @@ export const PreparedFullChapterPane = memo(function PreparedFullChapterPane({
       >
         {chapterNum}
       </h2>
-      <div className="space-y-1" data-scripture-layout="prepared-full">
+      <div className="space-y-0.5" data-scripture-layout="prepared-full">
         {full.blocks.map((block, idx) => (
           <BlockView
             key={`${chapterNum}-${block.marker}-${idx}`}

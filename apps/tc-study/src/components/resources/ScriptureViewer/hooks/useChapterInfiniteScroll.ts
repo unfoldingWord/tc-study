@@ -12,10 +12,14 @@ import {
   SETTLE_HOLD_MS,
   PREFETCH_DISTANCE_PX,
   approachingNeighborChapter,
+  canRevealChapterAtEdge,
+  CHAPTER_EDGE_SWAP_MODE,
+  chapterWindowAround,
   contentChaptersFromSlots,
   effectiveScrollVelocity,
   ensureChapterPainted,
   entryCoversReadLine,
+  edgeRevealTargetChapter,
   isChapterInfiniteScrollEnabled,
   isSpacerEntry,
   lastChapterNumber,
@@ -23,12 +27,14 @@ import {
   neighborChapterToPaint,
   recenterSlots,
   resetChapterSlots,
+  revealChapterInWindow,
   settledCommitMode,
   settledNavChapter,
   shouldAllowChapterStitch,
   shouldPromotePlaceholderOnSettle,
   shouldResetWindowOnNavChange,
   settleViewportChapter,
+  singlePaintedChapterSlots,
   slotsEqual,
   upgradeSlot,
   type ChapterSlot,
@@ -102,13 +108,16 @@ export function useChapterInfiniteScroll(
   const cache = useCacheAdapter()
   const loaderRegistry = useLoaderRegistry()
   const [fullReadyTick, setFullReadyTick] = useState(0)
+  const [settleKick, setSettleKick] = useState(0)
   const [tokenSourceFailed, setTokenSourceFailed] = useState(false)
   const ensureAttemptsRef = useRef<Map<number, number>>(new Map())
   const healingRef = useRef(false)
   const prevEnabledRef = useRef(enabled)
 
   const [slots, setSlots] = useState<ChapterSlot[]>(() =>
-    resetChapterSlots(currentRef.chapter, lastChapter)
+    CHAPTER_EDGE_SWAP_MODE
+      ? singlePaintedChapterSlots(currentRef.chapter, 'paragraph')
+      : resetChapterSlots(currentRef.chapter, lastChapter)
   )
   const slotsRef = useRef(slots)
   slotsRef.current = slots
@@ -145,18 +154,96 @@ export function useChapterInfiniteScroll(
     [currentRef.book, currentRef.chapter, navigateToReference]
   )
 
+  const revealChapterAtEdge = useCallback(
+    (direction: 'next' | 'previous'): boolean => {
+      if (!enabled || !CHAPTER_EDGE_SWAP_MODE || lastChapter < 1) return false
+      const target = edgeRevealTargetChapter(slotsRef.current, direction, lastChapter)
+      if (target == null) return false
+
+      if (direction === 'previous') {
+        const parent = scrollParentRef.current ?? findOverflowParent(contentRef.current)
+        if (parent) {
+          scrollParentRef.current = parent
+          prependAdjustRef.current = {
+            height: parent.scrollHeight,
+            top: parent.scrollTop,
+          }
+        }
+      }
+
+      setSlots((prev) => {
+        const next = revealChapterInWindow(prev, target, direction, lastChapter)
+        return slotsEqual(prev, next) ? prev : next
+      })
+      // Reveal often grows content without a scroll event — kick settle so
+      // paragraph→rendered upgrade is not stuck behind unsettled forever.
+      markChapterScrollUnsettled()
+      setSettleKick((n) => n + 1)
+      return true
+    },
+    [enabled, lastChapter]
+  )
+
+  const canRevealAtEdge = useCallback(
+    (direction: 'next' | 'previous') => {
+      if (!enabled || !CHAPTER_EDGE_SWAP_MODE || lastChapter < 1) return false
+      return canRevealChapterAtEdge(slotsRef.current, direction, lastChapter)
+    },
+    [enabled, lastChapter]
+  )
+
   useEffect(() => {
     const justEnabled = enabled && !prevEnabledRef.current
     prevEnabledRef.current = enabled
 
     if (!enabled) {
-      setSlots(resetChapterSlots(currentRef.chapter, lastChapter))
+      setSlots(
+        CHAPTER_EDGE_SWAP_MODE
+          ? singlePaintedChapterSlots(currentRef.chapter, 'paragraph')
+          : resetChapterSlots(currentRef.chapter, lastChapter)
+      )
       navBookRef.current = currentRef.book
       navChapterRef.current = currentRef.chapter
       committedByUsRef.current = null
       // Verse / section / custom-range: do not pin settledChapter — helps must
       // cover the full currentRef span, not only the start chapter.
       clearChapterScrollActivity()
+      return
+    }
+
+    // Edge-reveal: stack up to 3 chapters; neighbors warm in cache until pull.
+    if (CHAPTER_EDGE_SWAP_MODE) {
+      const bookChanged = currentRef.book !== navBookRef.current
+      if (justEnabled || bookChanged) {
+        ensureAttemptsRef.current.clear()
+        setTokenSourceFailed(false)
+        healingRef.current = false
+        setSlots(singlePaintedChapterSlots(currentRef.chapter, 'paragraph'))
+        alignToChapterRef.current = currentRef.chapter
+        committedByUsRef.current = null
+      } else if (currentRef.chapter !== navChapterRef.current) {
+        const fromOurCommit = committedByUsRef.current === currentRef.chapter
+        if (fromOurCommit) {
+          // Scroll settle advanced nav — keep the stacked window.
+          committedByUsRef.current = null
+        } else {
+          // Picker / bar jump: reset to one chapter.
+          ensureAttemptsRef.current.clear()
+          setTokenSourceFailed(false)
+          healingRef.current = false
+          setSlots((prev) => {
+            const existing = prev.find((s) => s.chapter === currentRef.chapter)
+            const kind = existing?.kind === 'rendered' ? 'rendered' : 'paragraph'
+            const next = singlePaintedChapterSlots(currentRef.chapter, kind)
+            return slotsEqual(prev, next) ? prev : next
+          })
+          alignToChapterRef.current = currentRef.chapter
+          committedByUsRef.current = null
+        }
+      }
+      markChapterScrollSettled(currentRef.chapter)
+      navBookRef.current = currentRef.book
+      navChapterRef.current = currentRef.chapter
       return
     }
 
@@ -274,6 +361,8 @@ export function useChapterInfiniteScroll(
   }, [slots, currentRef.book])
 
   useEffect(() => {
+    // Edge-swap paints one chapter; elastic overscroll advances units — no stitch.
+    if (CHAPTER_EDGE_SWAP_MODE) return
     if (!enabled || lastChapter < 1) return
     const content = contentRef.current
     if (!content) return
@@ -598,6 +687,94 @@ export function useChapterInfiniteScroll(
     canFallbackToUsjTokens,
   ])
 
+  // Edge-reveal: keep prev/current/next full tiers warm beyond the painted stack.
+  useEffect(() => {
+    if (!CHAPTER_EDGE_SWAP_MODE || !enabled || !resourceKey || !bookId || lastChapter < 1) return
+    const warm = new Set<number>(chapterWindowAround(currentRef.chapter, lastChapter))
+    for (const chapter of contentChaptersFromSlots(slots)) {
+      warm.add(chapter)
+    }
+    const painted = contentChaptersFromSlots(slots)
+    if (painted.length > 0) {
+      const lo = Math.min(...painted)
+      const hi = Math.max(...painted)
+      const prev = lo > 1 ? lo - 1 : null
+      const next = hi < lastChapter ? hi + 1 : null
+      if (prev != null) warm.add(prev)
+      if (next != null) warm.add(next)
+    }
+    let cancelled = false
+    for (const chapter of warm) {
+      if (hasPreparedFullChapter(resourceKey, bookId, chapter)) continue
+      void ensurePreparedFullChapter(cache, resourceKey, bookId, chapter).then((result) => {
+        if (cancelled) return
+        if (result.status === 'ready' && result.full) {
+          setFullReadyTick((n) => n + 1)
+        }
+      })
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, resourceKey, bookId, lastChapter, currentRef.chapter, slots, cache])
+
+  // Edge-reveal: sync nav when the user scrolls between painted chapters (no stitch).
+  useEffect(() => {
+    if (!CHAPTER_EDGE_SWAP_MODE || !enabled || lastChapter < 1) return
+    const content = contentRef.current
+    if (!content) return
+    const parent = findOverflowParent(content)
+    if (!parent) return
+    scrollParentRef.current = parent
+
+    let settleTimer: number | null = null
+
+    const scheduleSettle = () => {
+      if (settleTimer != null) window.clearTimeout(settleTimer)
+      settleTimer = window.setTimeout(() => {
+        settleTimer = null
+        const root = parent.getBoundingClientRect()
+        const painted = new Set(contentChaptersFromSlots(slotsRef.current))
+        const entries: Array<{ chapter: number; top: number; bottom: number }> = []
+        for (const [chapter, el] of chapterElsRef.current) {
+          if (!painted.has(chapter)) continue
+          const rect = el.getBoundingClientRect()
+          entries.push({ chapter, top: rect.top, bottom: rect.bottom })
+        }
+        if (entries.length === 0) {
+          // Always clear unsettled so paragraph→rendered upgrades can run.
+          markChapterScrollSettled(navChapterRef.current)
+          return
+        }
+        const parked = settleViewportChapter({
+          entries,
+          rootTop: root.top,
+          rootBottom: root.bottom,
+          nearEnd: false,
+        })
+        if (parked != null && painted.has(parked) && parked !== navChapterRef.current) {
+          commitChapter(parked)
+        }
+        // Match legacy stitch settle: always re-settle, even when parked === nav
+        // (post-commit scroll adjust / reveal-without-scroll would otherwise stick unsettled).
+        markChapterScrollSettled(parked ?? navChapterRef.current)
+      }, SETTLE_HOLD_MS)
+    }
+
+    const onScroll = () => {
+      markChapterScrollUnsettled()
+      scheduleSettle()
+    }
+
+    parent.addEventListener('scroll', onScroll, { passive: true })
+    scheduleSettle()
+
+    return () => {
+      parent.removeEventListener('scroll', onScroll)
+      if (settleTimer != null) window.clearTimeout(settleTimer)
+    }
+  }, [enabled, lastChapter, commitChapter, settleKick])
+
   const retryTokenSource = useCallback(() => {
     if (!resourceKey || !bookId) return
     ensureAttemptsRef.current.clear()
@@ -614,5 +791,7 @@ export function useChapterInfiniteScroll(
     registerChapter,
     tokenSourceFailed,
     retryTokenSource,
+    revealChapterAtEdge,
+    canRevealChapterAtEdge: canRevealAtEdge,
   }
 }

@@ -3,6 +3,7 @@ import { Fragment, memo } from 'react'
 import type { BCVReference } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken, VerseDisplayProps } from '../types'
 import { resolveTokenVisualState } from '../utils/tokenHighlight'
+import { SCRIPTURE_VERSE_NUMBER_CLASS } from '../utils/paraStyles'
 import { ScriptureNoteMarker } from './ScriptureNoteMarker'
 import { ScriptureRefLinks } from './ScriptureRefLinks'
 import { TokenRenderer } from './TokenRenderer'
@@ -146,7 +147,7 @@ export const VerseRenderer = memo(function VerseRenderer({
   return (
     <div className="mb-2 leading-relaxed">
       <span
-        className="text-sm font-bold text-accent mr-2 select-none cursor-pointer hover:text-accent-hover"
+        className={SCRIPTURE_VERSE_NUMBER_CLASS}
         onClick={(e) => {
           e.stopPropagation()
           onVerseClick?.(chapterNumber, verse.number)

@@ -13,6 +13,7 @@ import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/h
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
 import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
+import { articlePathFromTwLink } from '../../../features/wordsLinks/wordsLinksPreparer'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { HelpsFilterBanners } from '../shared/HelpsFilterBanners'
@@ -98,13 +99,7 @@ export function WordsLinksViewer({
     if (!content?.links) return []
     return content.links.map((link) => ({
       ...link,
-      articlePath:
-        link.articlePath ||
-        (() => {
-          if (!link.twLink) return ''
-          const match = link.twLink.match(/rc:\/\/\*\/tw\/dict\/(.+)$/)
-          return match ? match[1] : ''
-        })(),
+      articlePath: link.articlePath || articlePathFromTwLink(link.twLink),
     }))
   }, [content])
 

@@ -15,7 +15,9 @@ import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { isOriginalLanguageCode } from '../../../../features/helps/resolveAlignedQuoteTokens'
 import type { ChapterSlot } from '../../../../features/nav/chapterInfiniteScroll'
 import {
+  chapterWindowAround,
   contentChaptersFromSlots,
+  lastChapterNumber,
   paragraphChaptersFromSlots,
 } from '../../../../features/nav/chapterInfiniteScroll'
 import {
@@ -210,15 +212,33 @@ export function ScriptureContent({
   const slotsActive = slots != null
 
   const warmChapters = useMemo(() => {
-    if (!slots) return displayChapters ?? []
-    const set = new Set<number>()
-    for (const slot of slots) {
-      if (slot.kind === 'paragraph' || slot.kind === 'rendered' || slot.kind === 'placeholder') {
-        set.add(slot.chapter)
+    const last =
+      (nav?.chapters?.length
+        ? lastChapterNumber(nav.chapters.map((c) => c.number))
+        : 0) ||
+      (viewModel?.chapters?.length
+        ? lastChapterNumber(viewModel.chapters.map((c) => c.number))
+        : 0) ||
+      currentRef.chapter
+    const around = chapterWindowAround(currentRef.chapter || 1, last)
+    const set = new Set<number>(around)
+    if (slots) {
+      const painted = contentChaptersFromSlots(slots)
+      for (const chapter of painted) set.add(chapter)
+      if (painted.length > 0) {
+        const lo = Math.min(...painted)
+        const hi = Math.max(...painted)
+        if (lo > 1) set.add(lo - 1)
+        if (hi < last) set.add(hi + 1)
       }
+      for (const slot of slots) {
+        if (slot.kind === 'placeholder') set.add(slot.chapter)
+      }
+    } else if (displayChapters?.length) {
+      for (const chapter of displayChapters) set.add(chapter)
     }
-    return [...set]
-  }, [slots, displayChapters])
+    return [...set].sort((a, b) => a - b)
+  }, [slots, displayChapters, nav, viewModel, currentRef.chapter])
 
   const allBookChapters = useMemo(() => {
     if (nav?.chapters?.length) {
@@ -411,13 +431,15 @@ export function ScriptureContent({
     return grouped
   }, [slotsActive, layoutMode, layoutBlocks, chapters, versesByChapter])
 
-  const showFullScreenLoading = isScriptureBooksPending({
-    isLoadingTOC,
-    isLoading,
-    availableBookCount: availableBooks.length,
-    hasViewModel: Boolean(viewModel),
-    hasNav: Boolean(nav),
-  })
+  const showFullScreenLoading =
+    isLoading ||
+    isScriptureBooksPending({
+      isLoadingTOC,
+      isLoading: false,
+      availableBookCount: availableBooks.length,
+      hasViewModel: Boolean(viewModel),
+      hasNav: Boolean(nav),
+    })
   if (showFullScreenLoading) {
     return (
       <LoadingSpinner

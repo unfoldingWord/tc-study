@@ -80,7 +80,7 @@ describe('notesPreparer', () => {
     expect(notesPreparer.unitsFor(source)).toEqual([1, 2])
   })
 
-  test('prepareLight strips markdown in body', () => {
+  test('prepareLight strips markdown in body and keeps render fields', () => {
     const source = {
       resourceKey: 'unfoldingWord/en/tn',
       bookId: 'tit',
@@ -91,18 +91,25 @@ describe('notesPreparer', () => {
     expect(light.notes[0]!.body).toContain('apostle')
     expect(light.notes[0]!.body).not.toContain('**')
     expect(light.notes[0]!.quote).toBe('Παῦλος')
+    expect(light.notes[0]!.note).toContain('**apostle**')
+    expect(light.notes[0]!.occurrence).toBe('1')
   })
 
-  test('prepareFull includes hast + folded quote', () => {
+  test('prepareFull includes hast + folded quote + render-complete fields', () => {
     const source = {
       resourceKey: 'unfoldingWord/en/tn',
       bookId: 'tit',
       notes: sampleNotes,
     }
     const full = buildNotesFull(source, 1)
+    expect(full.version).toBe(2)
     expect(full.notes).toHaveLength(1)
     expect(full.notes[0]!.bodyHast.type).toBe('root')
     expect(full.notes[0]!.quoteFolded).toBeTruthy()
+    expect(full.notes[0]!.note).toContain('**apostle**')
+    expect(full.notes[0]!.supportReference).toBe('')
+    expect(full.notes[0]!.tags).toBe('')
+    expect(full.notes[0]!.occurrence).toBe('1')
   })
 
   test('readSource loads tn: cache', async () => {

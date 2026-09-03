@@ -11,10 +11,11 @@ import { useNavigationStore } from '../../../../contexts'
 import { useAppStore } from '../../../../contexts/AppContext'
 import { shouldShowHelpsExcerptSkeleton } from '../../../../features/helps/helpsExcerptSkeleton'
 import {
-  resolveHelpsQuoteStatus,
+  resolveHelpsQuoteStatusForNote,
   type HelpsQuoteStatus,
 } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
+import type { HastRoot } from '../../../../lib/markdown/markdownToHast'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer, MarkdownSkeleton } from '../../../ui/MarkdownRenderer'
@@ -42,6 +43,8 @@ export type NoteWithTokens = TranslationNote & {
   alignedTokens?: AlignedToken[]
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
+  /** Precomputed markdown AST — skips remark parse when present. */
+  bodyHast?: HastRoot
 }
 
 interface TranslationNoteCardProps {
@@ -91,15 +94,13 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   // not on every chapter/verse navigation or obsFrameCountByStory update.
   const currentBook = useNavigationStore((s) => s.currentReference.book)
   const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
-  // Missing quoteStatus = pipeline has not attached a result yet — keep pending,
-  // never paint a finished OL-fallback (Greek/Hebrew + ULT with no chips).
-  const quoteStatus =
-    note.quoteStatus ??
-    resolveHelpsQuoteStatus({
-      hasAlignedTokens,
-      alignmentPending: !hasAlignedTokens,
-      olQuote: note.quote,
-    })
+  // Missing quoteStatus: wait only when there is a Quote to align. Empty-quote
+  // notes (often chapter intros) never enter quote-build — settle to `none`.
+  const quoteStatus = resolveHelpsQuoteStatusForNote({
+    quoteStatus: note.quoteStatus,
+    hasAlignedTokens,
+    quote: note.quote,
+  })
   const excerptLoading = shouldShowHelpsExcerptSkeleton({
     kind: 'tn',
     obsMode,
@@ -310,6 +311,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
           ) : (
             <MarkdownRenderer
               content={note.note}
+              hast={note.bodyHast}
               className="text-base text-fg-secondary leading-relaxed prose prose-base max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent"
               onInternalLinkClick={handleInternalLinkClick}
               getEntryTitle={getEntryTitle}

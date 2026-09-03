@@ -13,6 +13,10 @@ const INDENT_CLASSES = [
   'pl-16', // q4
 ] as const
 
+/** Shared verse-number chrome for prepared light + full (and formatted). */
+export const SCRIPTURE_VERSE_NUMBER_CLASS =
+  'text-sm font-bold text-accent mr-2 select-none cursor-pointer hover:text-accent-hover'
+
 export function indentClassForLevel(level: number): string {
   if (level <= 0) return ''
   return INDENT_CLASSES[Math.min(level, INDENT_CLASSES.length - 1)] ?? 'pl-16'
@@ -20,7 +24,7 @@ export function indentClassForLevel(level: number): string {
 
 export function blockClassForMarker(
   marker: string,
-  role: UsjLayoutBlockRole,
+  role: UsjLayoutBlockRole | string,
   indentLevel: number
 ): string {
   const indent = indentClassForLevel(indentLevel)

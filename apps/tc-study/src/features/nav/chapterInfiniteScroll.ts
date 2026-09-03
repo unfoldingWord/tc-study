@@ -1,13 +1,12 @@
 /**
- * Chapter-mode infinite scroll decisions.
+ * Chapter-mode scroll decisions.
  *
- * Content (paragraph text or token trees) stays a 3-chapter window — never the
- * whole book as tokens. The slot list covers chapter 1…last so the scrollbar
- * matches the book: near gaps are light/placeholder chapters; far gaps are one
- * spacer whose height equals remaining chapters × estimated chapter height.
+ * Edge-reveal mode (default): paint only revealed chapters (max 3). Intentional
+ * elastic overscroll appends the next chapter underneath (or previous above),
+ * then unloads the farthest chapter to keep performance. Neighbors stay warm in
+ * the prepared cache before they are revealed.
  *
- * Newly chosen chapters paint paragraph/light text first, then upgrade to tokens
- * after settle + upgrade hold. Already-tokenized chapters are not downgraded.
+ * Legacy infinite-scroll helpers (spacers, settle→commit stitch) remain for tests.
  */
 
 export type ChapterSlotKind = 'rendered' | 'paragraph' | 'placeholder' | 'spacer'
@@ -18,6 +17,12 @@ export interface ChapterSlot {
   /** Inclusive end chapter when `kind === 'spacer'`. */
   toChapter?: number
 }
+
+/**
+ * Gate chapter expansion behind intentional edge overscroll (not continuous stitch).
+ * Painted content is a stack of up to {@link MAX_MOUNTED_CHAPTERS} chapters.
+ */
+export const CHAPTER_EDGE_SWAP_MODE = true
 
 /** Short-chapter floor so the scrollbar thumb shows “more above/below.” */
 export const PLACEHOLDER_MIN_HEIGHT_PX = 280
@@ -52,6 +57,85 @@ export function isChapterInfiniteScrollEnabled(
   book: string
 ): boolean {
   return navigationMode === 'chapter' && book !== 'obs'
+}
+
+/** Open chapter only — neighbors warm in cache until edge reveal. */
+export function singlePaintedChapterSlots(
+  chapter: number,
+  kind: 'paragraph' | 'rendered' = 'paragraph'
+): ChapterSlot[] {
+  return [{ chapter: Math.max(1, chapter), kind }]
+}
+
+/**
+ * Append/prepend a revealed chapter under/above the stack, then unload from the
+ * opposite end so at most `maxMounted` content chapters stay painted.
+ */
+export function revealChapterInWindow(
+  prev: readonly ChapterSlot[],
+  target: number,
+  direction: 'next' | 'previous',
+  lastChapter: number,
+  maxMounted = MAX_MOUNTED_CHAPTERS
+): ChapterSlot[] {
+  if (!chapterInBook(target, lastChapter)) {
+    return prev.filter((slot) => slot.kind === 'rendered' || slot.kind === 'paragraph')
+  }
+
+  const painted = new Map<number, 'rendered' | 'paragraph'>()
+  for (const slot of prev) {
+    if (slot.kind === 'rendered' || slot.kind === 'paragraph') {
+      painted.set(slot.chapter, slot.kind)
+    }
+  }
+  const existing = painted.get(target)
+  painted.set(target, existing === 'rendered' ? 'rendered' : 'paragraph')
+
+  const chapters = [...painted.keys()]
+    .filter((chapter) => chapterInBook(chapter, lastChapter))
+    .sort((a, b) => a - b)
+
+  while (chapters.length > maxMounted) {
+    if (direction === 'next') chapters.shift()
+    else chapters.pop()
+  }
+
+  return chapters.map((chapter) => ({
+    chapter,
+    kind: painted.get(chapter) === 'rendered' ? 'rendered' : 'paragraph',
+  }))
+}
+
+/** Chapter at the low or high edge of the painted stack. */
+export function paintedStackEdgeChapter(
+  slots: readonly ChapterSlot[],
+  edge: 'min' | 'max'
+): number | null {
+  const chapters = contentChaptersFromSlots(slots)
+  if (chapters.length === 0) return null
+  return edge === 'min' ? Math.min(...chapters) : Math.max(...chapters)
+}
+
+/** Next chapter to reveal via elastic overscroll at the stack edge. */
+export function edgeRevealTargetChapter(
+  slots: readonly ChapterSlot[],
+  direction: 'next' | 'previous',
+  lastChapter: number
+): number | null {
+  const from = paintedStackEdgeChapter(slots, direction === 'next' ? 'max' : 'min')
+  if (from == null) return null
+  const target = adjacentChapterToRequest(from, direction === 'next' ? 'next' : 'prev', lastChapter)
+  if (target == null) return null
+  if (contentChaptersFromSlots(slots).includes(target)) return null
+  return target
+}
+
+export function canRevealChapterAtEdge(
+  slots: readonly ChapterSlot[],
+  direction: 'next' | 'previous',
+  lastChapter: number
+): boolean {
+  return edgeRevealTargetChapter(slots, direction, lastChapter) != null
 }
 
 export function lastChapterNumber(chapterNumbers: readonly number[]): number {

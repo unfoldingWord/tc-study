@@ -2,8 +2,9 @@
  * useAlignedTokens Hook - STEP 3 of TSV Alignment Algorithm
  *
  * Aligns OL quote tokens to target-language scripture tokens.
- * Sync `batchAlignLinks` first (correctness), then optional worker refresh.
+ * Worker-first (sync only for tiny batches or worker failure).
  * Uses a generation counter so rapid dep churn cannot cancel the last good apply.
+ * Per-link `quoteReady` keeps deferred quote-build rows pending without ol-fallback.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -14,6 +15,7 @@ import {
   type AlignLinkInput,
   type AlignLinkResult,
 } from '../../../../features/helps/batchAlignLinks'
+import { HELPS_SYNC_MAX_LINKS } from '../../../../features/helps/helpsWorkStaging'
 import { isOriginalLanguageCode } from '../../../../features/helps/resolveAlignedQuoteTokens'
 import {
   resolveHelpsQuoteStatus,
@@ -35,6 +37,7 @@ type LinkQuotesInput = {
   origWords?: string
   quoteTokens?: OptimizedToken[]
   occurrence?: string
+  quoteReady?: boolean
 }
 
 interface UseAlignedTokensOptions<TLink extends LinkQuotesInput> {
@@ -49,8 +52,6 @@ type AlignedLink<TLink extends LinkQuotesInput> = TLink & {
   semanticIds?: string[]
   quoteStatus: HelpsQuoteStatus
 }
-
-const WORKER_ALIGN_MIN_LINKS = 24
 
 function mergeAlignResults<TLink extends LinkQuotesInput>(
   links: TLink[],
@@ -86,6 +87,7 @@ function toAlignInputs(links: readonly LinkQuotesInput[]): AlignLinkInput[] {
     reference: link.reference,
     origWords: link.origWords,
     occurrence: link.occurrence,
+    quoteReady: link.quoteReady,
     quoteTokens: link.quoteTokens?.map((t) => ({
       id: t.id,
       text: t.text,
@@ -189,7 +191,10 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     const tokenStartVerse = tokenReference?.verse || 1
     const tokenEndVerse = tokenReference?.endVerse ?? 999
 
-    const linkIds = links.map((l) => `${l.id}:${l.quoteTokens?.length ?? 0}`).join(',')
+    // Include quoteReady so pass-2 quote builds re-align (zero tokens would not change length).
+    const linkIds = links
+      .map((l) => `${l.id}:${l.quoteTokens?.length ?? 0}:${l.quoteReady === false ? 0 : 1}`)
+      .join(',')
     const fingerprint = alignFingerprint({
       book: bookCode,
       chapter: currentChapter,
@@ -235,19 +240,25 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       setLoadingAligned(false)
     }
 
-    // Sync first so quote chips / underlines never stay pending behind a cancelled worker.
     setLoadingAligned(true)
-    const syncResults = measureScripturePerfSync('align-tokens', bookCode, () =>
-      batchAlignLinks(args)
-    )
-    apply(syncResults)
 
-    if (links.length < WORKER_ALIGN_MIN_LINKS) return
+    // Tiny batches: sync is cheaper than a worker round-trip.
+    if (links.length <= HELPS_SYNC_MAX_LINKS) {
+      const syncResults = measureScripturePerfSync('align-tokens', bookCode, () =>
+        batchAlignLinks(args)
+      )
+      apply(syncResults)
+      return
+    }
 
     void batchAlignInWorker(args)
       .then((results) => apply(results))
       .catch(() => {
-        /* sync already applied */
+        if (gen !== genRef.current) return
+        const syncResults = measureScripturePerfSync('align-tokens', bookCode, () =>
+          batchAlignLinks(args)
+        )
+        apply(syncResults)
       })
   }, [
     links,

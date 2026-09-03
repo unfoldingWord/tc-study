@@ -42,6 +42,26 @@ export {
   shrinkRangeFromStart,
 } from './navigationBarRangeActions'
 export { useNavigationBarMovement } from './useNavigationBarMovement'
+export {
+  advanceNavigationUnit,
+  canAdvanceNavigationUnit,
+  isMultiVerseSpan,
+  verseAfterRef,
+  verseBeforeRef,
+} from './advanceNavigationUnit'
+export {
+  accumulateEdgeOverscroll,
+  commitEdgeNavigation,
+  elasticPullPx,
+  isEdgeGestureArmed,
+  isPastCommitThreshold,
+  scaleWheelOverscrollDelta,
+  scrollEdgeState,
+  EDGE_NAV_THRESHOLD_PX,
+  EDGE_NAV_MAX_PULL_PX,
+  EDGE_NAV_MIN_DWELL_MS,
+  EDGE_NAV_WHEEL_SCALE,
+} from './scriptureEdgeNavigate'
 export { useNavigationBarRtl } from './useNavigationBarRtl'
 export {
   dirFromResource,

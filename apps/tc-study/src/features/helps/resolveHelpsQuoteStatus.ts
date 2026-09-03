@@ -64,3 +64,22 @@ export function resolveHelpsQuoteStatus(opts: {
   if (opts.olQuote?.trim()) return 'ol-fallback'
   return 'none'
 }
+
+/**
+ * Notes with an empty Quote never enter quote-build/align. Without an explicit
+ * status they used to fall back to perpetual `pending` and hide note prose.
+ */
+export function resolveHelpsQuoteStatusForNote(opts: {
+  quoteStatus?: HelpsQuoteStatus
+  hasAlignedTokens: boolean
+  quote?: string | null
+}): HelpsQuoteStatus {
+  if (opts.quoteStatus) return opts.quoteStatus
+  const hasQuote = Boolean(opts.quote?.trim())
+  return resolveHelpsQuoteStatus({
+    hasAlignedTokens: opts.hasAlignedTokens,
+    // Only wait on alignment when there is a quote to align.
+    alignmentPending: !opts.hasAlignedTokens && hasQuote,
+    olQuote: opts.quote,
+  })
+}

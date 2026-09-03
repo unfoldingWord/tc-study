@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { useCacheAdapter } from '../../contexts'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
+import { scheduleIdle } from '../../utils/scheduleIdle'
 import { subscribePrepareReady } from '../../workers/prepareClient'
 import {
   fetchPreparedChapterTiers,
@@ -149,15 +150,6 @@ export function usePreparedChapterWindow(args: {
   }, [cache, resourceKey, bookId, chaptersKey, enabled])
 
   return revision
-}
-
-function scheduleIdle(run: () => void): () => void {
-  if (typeof requestIdleCallback === 'function') {
-    const id = requestIdleCallback(() => run(), { timeout: 1500 })
-    return () => cancelIdleCallback(id)
-  }
-  const id = setTimeout(run, 0)
-  return () => clearTimeout(id)
 }
 
 /**

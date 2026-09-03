@@ -8,6 +8,10 @@ import type {
   LightInline,
   ScriptureLightChapter,
 } from '../../../../features/scripture/scripturePreparer'
+import {
+  blockClassForMarker,
+  SCRIPTURE_VERSE_NUMBER_CLASS,
+} from '../utils/paraStyles'
 import { ChapterScrollSection } from './ChapterScrollSection'
 
 interface PreparedLightChapterPaneProps {
@@ -28,7 +32,7 @@ function renderInline(
     case 'verse':
       return (
         <span
-          className="text-sm font-bold text-accent mr-2 select-none cursor-pointer hover:text-accent-hover"
+          className={SCRIPTURE_VERSE_NUMBER_CLASS}
           onClick={(e) => {
             e.stopPropagation()
             onVerseClick?.(item.chapterNumber, item.verseNumber)
@@ -69,22 +73,23 @@ function BlockView({
   block: LightBlock
   onVerseClick?: (chapter: number, verse: number) => void
 }) {
+  const className = blockClassForMarker(block.marker, block.role, block.indentLevel)
+
+  if (block.role === 'break' || block.marker === 'b') {
+    return <div className={className} data-usj-marker={block.marker} aria-hidden />
+  }
+
   const nodes: React.ReactNode[] = []
   block.inline.forEach((item, idx) => {
-    nodes.push(
-      <span key={idx}>{renderInline(item, onVerseClick)}</span>
-    )
+    nodes.push(<span key={idx}>{renderInline(item, onVerseClick)}</span>)
   })
 
-  const Tag = block.role === 'heading' ? 'h3' : 'p'
+  const Tag = block.role === 'heading' || block.role === 'intro' ? 'h3' : 'p'
   return (
     <Tag
-      className={
-        block.role === 'heading'
-          ? 'font-bold text-scripture-fg mt-3 mb-1'
-          : 'leading-relaxed text-lg text-scripture-fg mb-3'
-      }
-      style={block.indentLevel ? { marginInlineStart: `${block.indentLevel * 1.25}rem` } : undefined}
+      className={className}
+      data-usj-marker={block.marker}
+      data-usj-role={block.role}
     >
       {nodes}
     </Tag>

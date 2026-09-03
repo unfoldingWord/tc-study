@@ -1,5 +1,6 @@
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import type { HelpsQuoteStatus } from '../../../features/helps/resolveHelpsQuoteStatus'
+import type { HastRoot } from '../../../lib/markdown/markdownToHast'
 import { useMemo } from 'react'
 import {
   filterDisplayLinks,
@@ -24,6 +25,8 @@ export type NoteWithAlignments = TranslationNote & {
   alignedTokens?: Array<{ position: number }>
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
+  /** Precomputed markdown AST from prepared notes rows. */
+  bodyHast?: HastRoot
 }
 
 export type LinkWithAlignments = TranslationWordsLink & {

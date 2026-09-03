@@ -5,6 +5,7 @@ import {
   isHelpsQuoteAlignmentPending,
   isQuoteBuildReady,
   resolveHelpsQuoteStatus,
+  resolveHelpsQuoteStatusForNote,
 } from './resolveHelpsQuoteStatus'
 
 describe('isQuoteBuildReady', () => {
@@ -159,6 +160,42 @@ describe('resolveHelpsQuoteStatus', () => {
   })
 })
 
+describe('resolveHelpsQuoteStatusForNote', () => {
+  test('empty-quote notes settle to none instead of perpetual pending', () => {
+    expect(
+      resolveHelpsQuoteStatusForNote({
+        hasAlignedTokens: false,
+        quote: '',
+      })
+    ).toBe('none')
+    expect(
+      resolveHelpsQuoteStatusForNote({
+        hasAlignedTokens: false,
+        quote: '   ',
+      })
+    ).toBe('none')
+  })
+
+  test('quoted notes without pipeline status stay pending until aligned', () => {
+    expect(
+      resolveHelpsQuoteStatusForNote({
+        hasAlignedTokens: false,
+        quote: 'But you',
+      })
+    ).toBe('pending')
+  })
+
+  test('explicit pipeline status wins', () => {
+    expect(
+      resolveHelpsQuoteStatusForNote({
+        quoteStatus: 'ol-fallback',
+        hasAlignedTokens: false,
+        quote: 'But you',
+      })
+    ).toBe('ol-fallback')
+  })
+})
+
 describe('TN quote-status wiring (same helper as TWL)', () => {
   const tnCardSrc = readFileSync(
     join(
@@ -190,13 +227,13 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
   )
 
   test('TranslationNoteCard reuses resolveHelpsQuoteStatus and pending spinner', () => {
-    expect(tnCardSrc).toContain('resolveHelpsQuoteStatus')
+    expect(tnCardSrc).toContain('resolveHelpsQuoteStatusForNote')
     expect(tnCardSrc).toContain('quoteStatus')
     expect(tnCardSrc).toContain("quoteStatus === 'pending'")
     expect(tnCardSrc).toContain("quoteStatus === 'ol-fallback'")
     expect(tnCardSrc).toContain('Building quote')
-    expect(tnCardSrc).toContain('olQuote: note.quote')
-    expect(tnCardSrc).toContain('alignmentPending: !hasAlignedTokens')
+    expect(tnCardSrc).toContain('quote: note.quote')
+    expect(tnCardSrc).not.toContain('alignmentPending: !hasAlignedTokens')
     expect(tnCardSrc).not.toMatch(
       /!hasAlignedTokens && note\.quote && note\.quote\.trim\(\)\.length > 0 && !obsMode/
     )
@@ -214,7 +251,8 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
   test('CombinedHelps TN half passes quoteBuildReady and copies quoteStatus', () => {
     expect(combinedPipelineSrc).toContain('quoteBuildReady: tnQuoteBuildReady')
     expect(combinedPipelineSrc).toContain('quoteBuildReady: twlQuoteBuildReady')
-    expect(combinedPipelineSrc).toContain('quoteStatus: quoteStatusMap.get(note.id)')
+    expect(combinedPipelineSrc).toContain('quoteStatusMap.get(note.id)')
+    expect(combinedPipelineSrc).toContain("note.quote?.trim() ? undefined : 'none'")
   })
 
   test('useQuoteTokens gates quoteBuildReady on settled request key', () => {
@@ -228,6 +266,10 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
     expect(src).toContain('quotesSettled')
     expect(src).toContain('settledRequestKey')
     expect(src).toContain('buildQuotesSync')
-    expect(src).toContain('WORKER_QUOTE_MIN_LINKS')
+    expect(src).toContain('HELPS_SYNC_MAX_LINKS')
+    expect(src).toContain('partitionHelpsWork')
+    expect(src).toContain('quoteReady')
+    expect(src).toContain('readCachedQuoteTokensForSpan')
+    expect(src).toContain('mergeAndWriteCachedQuoteTokens')
   })
 })

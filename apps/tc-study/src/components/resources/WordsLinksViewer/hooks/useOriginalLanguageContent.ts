@@ -3,15 +3,18 @@
  *
  * Loads original-language scripture (UGNT/UHB) as OptimizedChapter[] for QuoteMatcher.
  * Primary path: ScriptureLoader.loadViewModel → viewModelToOptimizedChapters.
+ * Concurrent TN/TWL mounts share one load via olLoadCache.
  */
 
 import type { OptimizedChapter } from '@bt-synergy/resource-parsers'
-import {
-  ScriptureLoader,
-  viewModelChapterToOptimized,
-} from '@bt-synergy/scripture-loader'
+import { ScriptureLoader } from '@bt-synergy/scripture-loader'
 import { useEffect, useRef, useState } from 'react'
 import { useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import {
+  loadOriginalLanguageChapters,
+  resolveOriginalLanguageKey,
+  type OriginalLanguageResource,
+} from '../../../../features/helps/olLoadCache'
 import { shouldRetryOriginalLanguageLoad } from '../../../../features/helps/scriptureReadyUnderlineRebind'
 import {
   pinReferenceWhileScrolling,
@@ -26,14 +29,9 @@ interface UseOriginalLanguageContentOptions {
   scriptureRevision?: string
 }
 
-interface OriginalLanguageResource {
-  resourceKey: string
-  language: string
-  bookCode: string
-}
+export { resolveOriginalLanguageKey } from '../../../../features/helps/olLoadCache'
 
 export function useOriginalLanguageContent({
-  resourceKey,
   scriptureRevision = '',
 }: UseOriginalLanguageContentOptions) {
   const currentRef = useCurrentReference()
@@ -95,67 +93,15 @@ export function useOriginalLanguageContent({
         setOriginalContent(null)
 
         const bookCode = helpsRef.book?.toUpperCase() || ''
-
-        const ntBooks = [
-          'MAT',
-          'MRK',
-          'LUK',
-          'JHN',
-          'ACT',
-          'ROM',
-          '1CO',
-          '2CO',
-          'GAL',
-          'EPH',
-          'PHP',
-          'COL',
-          '1TH',
-          '2TH',
-          '1TI',
-          '2TI',
-          'TIT',
-          'PHM',
-          'HEB',
-          'JAS',
-          '1PE',
-          '2PE',
-          '1JN',
-          '2JN',
-          '3JN',
-          'JUD',
-          'REV',
-        ]
-        const isNT = ntBooks.includes(bookCode)
-
-        const resources: OriginalLanguageResource[] = []
-
-        // Always try the painted OL key. Catalog metadata is a hint only —
-        // UHB is often in the workspace/loader cache before catalog get() lands.
-        if (isNT) {
-          const greekResourceKey = 'unfoldingWord/el-x-koine/ugnt'
-          resources.push({
-            resourceKey: greekResourceKey,
-            language: 'el-x-koine',
-            bookCode,
-          })
-        } else {
-          const hebrewResourceKey = 'unfoldingWord/hbo/uhb'
-          resources.push({
-            resourceKey: hebrewResourceKey,
-            language: 'hbo',
-            bookCode,
-          })
-        }
-
-        if (cancelled) return
-        setOriginalLanguageResources(resources)
-
-        if (resources.length === 0) {
+        const resource = resolveOriginalLanguageKey(bookCode)
+        if (!resource) {
           setLoading(false)
           return
         }
 
-        const resource = resources[0]
+        if (cancelled) return
+        setOriginalLanguageResources([resource])
+
         const startChapter = helpsRef.chapter
         const endChapter = helpsRef.endChapter || startChapter
 
@@ -164,22 +110,16 @@ export function useOriginalLanguageContent({
           throw new Error('Scripture loader with loadViewModel not found')
         }
 
-        const viewModel = await loader.loadViewModel(resource.resourceKey, helpsRef.book)
+        const optimized = await loadOriginalLanguageChapters({
+          loader,
+          olKey: resource.resourceKey,
+          bookId: helpsRef.book,
+          startChapter,
+          endChapter,
+        })
         if (cancelled) return
 
-        const optimized: OptimizedChapter[] = []
-        for (let chapter = startChapter; chapter <= endChapter; chapter++) {
-          const row = viewModelChapterToOptimized(viewModel, chapter)
-          if (row) optimized.push(row)
-        }
-
-        if (optimized.length === 0) {
-          // `[]` = attempted empty (distinct from first-paint `null`)
-          setOriginalContent([])
-          setLoading(false)
-          return
-        }
-
+        // `[]` = attempted empty (distinct from first-paint `null`)
         setOriginalContent(optimized)
       } catch (err) {
         if (cancelled) return
@@ -196,7 +136,7 @@ export function useOriginalLanguageContent({
       }
     }
 
-    loadOriginalContent()
+    void loadOriginalContent()
 
     return () => {
       cancelled = true
@@ -207,7 +147,6 @@ export function useOriginalLanguageContent({
     helpsRef.chapter,
     helpsRef.endChapter,
     loaderRegistry,
-    resourceKey,
     retryTick,
   ])
 

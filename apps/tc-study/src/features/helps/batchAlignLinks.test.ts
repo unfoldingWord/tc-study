@@ -77,6 +77,45 @@ describe('batchAlignLinks', () => {
     expect(results[0]!.quoteStatus).toBe('pending')
   })
 
+  test('quoteReady false stays pending and never paints ol-fallback', () => {
+    const targetTokens = [
+      {
+        id: 1,
+        text: 'Paul',
+        type: 'word' as const,
+        content: 'Paul',
+        occurrence: 1,
+        semanticId: semanticIdFor('tit 1:1', 'Paul', 1),
+        alignedOriginalWordIds: ['tit 1:1:Παῦλος:1'],
+      },
+    ]
+    const results = batchAlignLinks({
+      links: [
+        {
+          id: 'deferred',
+          reference: '1:1',
+          origWords: 'Παῦλος',
+          occurrence: '1',
+          quoteReady: false,
+        },
+      ],
+      targetTokens: targetTokens as never,
+      bookCode: 'tit',
+      currentChapter: 1,
+      tokenBook: 'tit',
+      tokenChapter: 1,
+      tokenStartVerse: 1,
+      tokenEndVerse: 999,
+      hasTokens: true,
+      quoteBuildReady: true,
+      resourceKey: 'unfoldingWord/en/tn',
+      textLanguage: 'en',
+    })
+    expect(results[0]!.alignedTokens).toBeUndefined()
+    expect(results[0]!.quoteStatus).toBe('pending')
+    expect(results[0]!.quoteStatus).not.toBe('ol-fallback')
+  })
+
   test('verse-range broadcast aligns only links inside the token verse span', () => {
     const targetTokens = [
       {
