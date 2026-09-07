@@ -8,7 +8,7 @@ import {
   shouldResetTokenGroupsDedupe,
   tokenGroupsBroadcastDedupeKey,
 } from '../../../features/helps/scriptureReadyUnderlineRebind'
-import { shouldEnqueueQuoteBuild } from '../../../features/nav/chapterScrollActivity'
+import { shouldBroadcastUnderlineGroups } from '../../../features/nav/chapterScrollActivity'
 import { useChapterScrollActivity } from '../../../features/nav/usePinnedHelpsReference'
 import type { NotesTokenGroupsSignal } from '../../../signals/studioSignals'
 import { useScriptureContentRevision } from '../WordsLinksViewer/hooks'
@@ -56,16 +56,31 @@ export function useCombinedHelpsTokenGroupsBroadcast({
   const scrollActivity = useChapterScrollActivity()
 
   useEffect(() => {
-    if (scrollActivity.unsettled) {
-      wasUnsettledRef.current = true
-      return
-    }
-    if (!shouldEnqueueQuoteBuild(scrollActivity.unsettled)) return
     if (helpsScope === 'obs') return
 
-    // After settle or when leaving scripture:empty, force a fresh broadcast.
+    const activeTn = kindFilter === 'twl' ? [] : underlineTnGroups
+    const activeTwl = kindFilter === 'notes' ? [] : underlineTwlGroups
+    const groupCount = activeTn.length + activeTwl.length
+
+    if (scrollActivity.unsettled) {
+      wasUnsettledRef.current = true
+      // Keep non-empty quote underlines painted while scrolling; never flash empty.
+      if (
+        !shouldBroadcastUnderlineGroups({
+          unsettled: true,
+          groupCount,
+        })
+      ) {
+        return
+      }
+    } else if (wasUnsettledRef.current) {
+      // After settle, force a fresh broadcast so scripture rebinds.
+      lastTnKeyRef.current = null
+      lastTwlKeyRef.current = null
+      wasUnsettledRef.current = false
+    }
+
     if (
-      wasUnsettledRef.current ||
       shouldResetTokenGroupsDedupe({
         previousRevision: lastRevisionRef.current,
         nextRevision: scriptureRevision,
@@ -73,11 +88,9 @@ export function useCombinedHelpsTokenGroupsBroadcast({
     ) {
       lastTnKeyRef.current = null
       lastTwlKeyRef.current = null
-      wasUnsettledRef.current = false
     }
     lastRevisionRef.current = scriptureRevision
 
-    const activeTn = kindFilter === 'twl' ? [] : underlineTnGroups
     const tnKeyDedupe = tokenGroupsBroadcastDedupeKey(kindFilter, activeTn, scriptureRevision)
     if (tnKeyDedupe !== lastTnKeyRef.current) {
       lastTnKeyRef.current = tnKeyDedupe
@@ -89,7 +102,6 @@ export function useCombinedHelpsTokenGroupsBroadcast({
       })
     }
 
-    const activeTwl = kindFilter === 'notes' ? [] : underlineTwlGroups
     const twlKeyDedupe = tokenGroupsBroadcastDedupeKey(kindFilter, activeTwl, scriptureRevision)
     if (twlKeyDedupe !== lastTwlKeyRef.current) {
       lastTwlKeyRef.current = twlKeyDedupe

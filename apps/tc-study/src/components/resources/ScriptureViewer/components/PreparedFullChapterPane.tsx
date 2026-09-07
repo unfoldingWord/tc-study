@@ -83,7 +83,7 @@ const InternedTokenSpan = memo(function InternedTokenSpan({
       data-highlighted={visual.isHighlighted || visual.isSelected ? 'true' : undefined}
       data-underlined={visual.isUnderlined ? 'true' : undefined}
       className={`rounded cursor-pointer hover:bg-muted text-scripture-fg${
-        visual.isHighlighted || visual.isSelected ? ' bg-highlight highlighted-token' : ''
+        visual.isHighlighted || visual.isSelected ? ' bg-highlight highlighted-token scroll-mt-12' : ''
       }${
         visual.isUnderlined
           ? ' underline decoration-dotted decoration-underline decoration-1 underline-offset-3'

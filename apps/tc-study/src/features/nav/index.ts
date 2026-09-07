@@ -55,12 +55,14 @@ export {
   elasticPullPx,
   isEdgeGestureArmed,
   isPastCommitThreshold,
+  isVerticalScrollbarHit,
   scaleWheelOverscrollDelta,
   scrollEdgeState,
   EDGE_NAV_THRESHOLD_PX,
   EDGE_NAV_MAX_PULL_PX,
   EDGE_NAV_MIN_DWELL_MS,
   EDGE_NAV_WHEEL_SCALE,
+  SCROLLBAR_HIT_FALLBACK_PX,
 } from './scriptureEdgeNavigate'
 export { useNavigationBarRtl } from './useNavigationBarRtl'
 export {

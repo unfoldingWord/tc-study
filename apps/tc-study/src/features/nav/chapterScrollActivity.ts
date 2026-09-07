@@ -26,6 +26,8 @@ const EMPTY_ACTIVITY: ChapterScrollActivity = {
 
 let activity: ChapterScrollActivity = EMPTY_ACTIVITY
 const listeners = new Set<() => void>()
+/** Ignore scroll events caused by edge-pad peek/hide `scrollTop` adjusts. */
+let suppressUnsettledUntilMs = 0
 
 function notify(): void {
   for (const listener of listeners) listener()
@@ -42,8 +44,18 @@ export function subscribeChapterScrollActivity(onStoreChange: () => void): () =>
   }
 }
 
+/**
+ * Programmatic `scrollTop` writes (edge travel pad peek/hide) must not pause
+ * quote-build / underline broadcast for a full settle hold.
+ */
+export function beginProgrammaticScrollSuppress(durationMs = 120): void {
+  const until = Date.now() + Math.max(0, durationMs)
+  if (until > suppressUnsettledUntilMs) suppressUnsettledUntilMs = until
+}
+
 /** First scroll event / stitch: one notify. Later events are silent while already unsettled. */
 export function markChapterScrollUnsettled(): void {
+  if (Date.now() < suppressUnsettledUntilMs) return
   if (activity.unsettled) return
   activity = { ...activity, unsettled: true }
   notify()
@@ -70,6 +82,7 @@ export function clearChapterScrollActivity(): void {
 export function resetChapterScrollActivity(): void {
   activity = EMPTY_ACTIVITY
   listeners.clear()
+  suppressUnsettledUntilMs = 0
 }
 
 /** Quote-build / align — only when scroll is settled. */
@@ -80,6 +93,18 @@ export function shouldEnqueueQuoteBuild(unsettled: boolean): boolean {
 /** Scripture token broadcast that rebinds CombinedHelps — only when settled. */
 export function shouldBroadcastScriptureTokens(unsettled: boolean): boolean {
   return !unsettled
+}
+
+/**
+ * Underline groups from quoteTokens may broadcast while scrolling.
+ * Skip only when groups are empty while unsettled (avoid flash-empty).
+ */
+export function shouldBroadcastUnderlineGroups(args: {
+  unsettled: boolean
+  groupCount: number
+}): boolean {
+  if (args.groupCount > 0) return true
+  return !args.unsettled
 }
 
 /**

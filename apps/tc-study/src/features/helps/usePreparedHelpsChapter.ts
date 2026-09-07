@@ -40,6 +40,7 @@ export function usePreparedNotesChapter(args: {
   const [preparedNotes, setPreparedNotes] = useState<NotesFullRow[] | null>(null)
   const [status, setStatus] = useState<PreparedHelpsStatus>('pending')
   const genRef = useRef(0)
+  const spanRef = useRef('')
 
   const processedNotesRef = useRef(processedNotes)
   processedNotesRef.current = processedNotes
@@ -57,6 +58,11 @@ export function usePreparedNotesChapter(args: {
 
     const gen = ++genRef.current
     let cancelled = false
+    const span = `${bookId}:${startChapter}:${endChapter}`
+    if (spanRef.current && spanRef.current !== span) {
+      setPreparedNotes(null)
+    }
+    spanRef.current = span
 
     void (async () => {
       setStatus('pending')
@@ -75,8 +81,8 @@ export function usePreparedNotesChapter(args: {
         return
       }
 
-      // Miss — serve loader fallback immediately; heal in background.
-      setPreparedNotes(null)
+      // Miss — keep the last span so a token filter does not flash empty
+      // while heal/loader catch up. First paint stays null → loader fallback.
       setStatus('miss')
 
       const source = processedNotesRef.current
@@ -118,6 +124,7 @@ export function usePreparedWordsLinksChapter(args: {
   const [preparedLinks, setPreparedLinks] = useState<WordsLinksFullRow[] | null>(null)
   const [status, setStatus] = useState<PreparedHelpsStatus>('pending')
   const genRef = useRef(0)
+  const spanRef = useRef('')
 
   const processedLinksRef = useRef(processedLinks)
   processedLinksRef.current = processedLinks
@@ -135,6 +142,11 @@ export function usePreparedWordsLinksChapter(args: {
 
     const gen = ++genRef.current
     let cancelled = false
+    const span = `${bookId}:${startChapter}:${endChapter}`
+    if (spanRef.current && spanRef.current !== span) {
+      setPreparedLinks(null)
+    }
+    spanRef.current = span
 
     void (async () => {
       setStatus('pending')
@@ -153,7 +165,6 @@ export function usePreparedWordsLinksChapter(args: {
         return
       }
 
-      setPreparedLinks(null)
       setStatus('miss')
 
       const source = processedLinksRef.current

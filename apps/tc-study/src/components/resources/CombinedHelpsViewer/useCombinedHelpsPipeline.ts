@@ -250,20 +250,61 @@ export function useCombinedHelpsPipeline({
 
   const bookCodeLower = currentRef.book?.toLowerCase() || ''
 
+  // Underlines come from quoteTokens (cache/worker) — do not wait on align settle.
   const underlineTnGroups = useMemo(
     () =>
-      measureScripturePerfSync('underline-groups', 'tn', () =>
-        underlineGroupsFromHelpsNotes(notesWithAlignedTokens, bookCodeLower)
-      ),
-    [notesWithAlignedTokens, bookCodeLower]
+      measureScripturePerfSync('underline-groups', 'tn', () => {
+        const quoteMap = new Map(tnLinksWithQuotes.map((l) => [l.id, l.quoteTokens]))
+        const semanticIdsMap = new Map(
+          tnLinksAligned.map((l) => [l.id, (l as { semanticIds?: string[] }).semanticIds])
+        )
+        const notesForUnderline = relevantNotes.map((note) => ({
+          id: note.id,
+          reference: note.reference,
+          occurrence: note.occurrence,
+          quoteTokens: quoteMap.get(note.id),
+          semanticIds: semanticIdsMap.get(note.id),
+        }))
+        return underlineGroupsFromHelpsNotes(notesForUnderline, bookCodeLower)
+      }),
+    [relevantNotes, tnLinksWithQuotes, tnLinksAligned, bookCodeLower]
   )
 
   const underlineTwlGroups = useMemo(
     () =>
-      measureScripturePerfSync('underline-groups', 'twl', () =>
-        underlineGroupsFromHelpsNotes(filteredByReference, bookCodeLower)
-      ),
-    [filteredByReference, bookCodeLower]
+      measureScripturePerfSync('underline-groups', 'twl', () => {
+        const startChapter = currentRef.chapter || 1
+        const endChapter = currentRef.endChapter || startChapter
+        const startVerse = currentRef.verse || 1
+        const endVerse = resolveRangeEndVerse(
+          { book: currentRef.book, verse: startVerse, endVerse: currentRef.endVerse },
+          navigationMode
+        )
+        // Prefer quote-bearing rows; fall back to aligned/processed for semanticIds.
+        const quoteSource =
+          twlLinksWithQuotes.length === links.length && links.length > 0
+            ? twlLinksWithQuotes
+            : processedLinks
+        const ranged = filterLinksByReferenceRange(quoteSource, {
+          startChapter,
+          startVerse,
+          endChapter,
+          endVerse,
+        })
+        return underlineGroupsFromHelpsNotes(ranged, bookCodeLower)
+      }),
+    [
+      twlLinksWithQuotes,
+      processedLinks,
+      links.length,
+      currentRef.chapter,
+      currentRef.verse,
+      currentRef.endChapter,
+      currentRef.endVerse,
+      currentRef.book,
+      navigationMode,
+      bookCodeLower,
+    ]
   )
 
   const { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches } = useCombinedHelpsDisplay({

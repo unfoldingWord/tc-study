@@ -11,6 +11,7 @@ import {
   PHASE_UPGRADE_HOLD_MS,
   SETTLE_HOLD_MS,
   PREFETCH_DISTANCE_PX,
+  CHAPTER_REVEAL_TOP_OFFSET_PX,
   approachingNeighborChapter,
   canRevealChapterAtEdge,
   CHAPTER_EDGE_SWAP_MODE,
@@ -36,10 +37,12 @@ import {
   settleViewportChapter,
   singlePaintedChapterSlots,
   slotsEqual,
+  scrollTopForElementAtTop,
   upgradeSlot,
   type ChapterSlot,
 } from '../../../../features/nav/chapterInfiniteScroll'
 import {
+  beginProgrammaticScrollSuppress,
   getChapterScrollActivity,
   markChapterScrollSettled,
   markChapterScrollUnsettled,
@@ -133,6 +136,8 @@ export function useChapterInfiniteScroll(
   const prependAdjustRef = useRef<{ height: number; top: number } | null>(null)
   const preserveAlignRef = useRef<{ chapter: number; viewportOffset: number } | null>(null)
   const alignToChapterRef = useRef<number | null>(currentRef.chapter)
+  /** After next-edge reveal: scroll the new chapter heading to the top with offset. */
+  const pendingRevealTopAlignRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
 
   const registerChapter = useCallback((chapter: number, el: HTMLElement | null) => {
@@ -170,6 +175,8 @@ export function useChapterInfiniteScroll(
           }
         }
       }
+      // After paint (and prepend adjust), land the revealed chapter heading near the top.
+      pendingRevealTopAlignRef.current = target
 
       setSlots((prev) => {
         const next = revealChapterInWindow(prev, target, direction, lastChapter)
@@ -182,6 +189,18 @@ export function useChapterInfiniteScroll(
       return true
     },
     [enabled, lastChapter]
+  )
+
+  const warmChapterAtEdge = useCallback(
+    (direction: 'next' | 'previous') => {
+      if (!enabled || !CHAPTER_EDGE_SWAP_MODE || !resourceKey || !bookId || lastChapter < 1) return
+      const target = edgeRevealTargetChapter(slotsRef.current, direction, lastChapter)
+      if (target == null || hasPreparedFullChapter(resourceKey, bookId, target)) return
+      void ensurePreparedFullChapter(cache, resourceKey, bookId, target).then((result) => {
+        if (result.status === 'ready' && result.full) setFullReadyTick((n) => n + 1)
+      })
+    },
+    [enabled, resourceKey, bookId, lastChapter, cache]
   )
 
   const canRevealAtEdge = useCallback(
@@ -350,6 +369,24 @@ export function useChapterInfiniteScroll(
           }
           alignToChapterRef.current = null
         }
+      }
+    }
+
+    const revealChapter = pendingRevealTopAlignRef.current
+    if (revealChapter != null && parent) {
+      const section = chapterElsRef.current.get(revealChapter)
+      const heading =
+        (section?.querySelector('h2') as HTMLElement | null) ?? section ?? null
+      if (heading) {
+        beginProgrammaticScrollSuppress(500)
+        const elementOffsetFromParentTop =
+          heading.getBoundingClientRect().top - parent.getBoundingClientRect().top
+        parent.scrollTop = scrollTopForElementAtTop({
+          parentScrollTop: parent.scrollTop,
+          elementOffsetFromParentTop,
+          offsetPx: CHAPTER_REVEAL_TOP_OFFSET_PX,
+        })
+        pendingRevealTopAlignRef.current = null
       }
     }
 
@@ -793,5 +830,6 @@ export function useChapterInfiniteScroll(
     retryTokenSource,
     revealChapterAtEdge,
     canRevealChapterAtEdge: canRevealAtEdge,
+    warmChapterAtEdge,
   }
 }

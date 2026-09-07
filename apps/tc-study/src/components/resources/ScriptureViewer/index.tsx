@@ -11,7 +11,7 @@
  */
 
 import { useSignalHandler } from '@bt-synergy/resource-panels'
-import { Book, ChevronDown, ChevronUp } from 'lucide-react'
+import { Book } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
 import {
@@ -33,11 +33,11 @@ import {
 import { markReadNavigationInternal } from '../../../features/read/replaceReadUrlFromUi'
 import { usePreparedChapter } from '../../../features/scripture/usePreparedChapter'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
-import { LoadingSpinner } from '../../../shared/LoadingSpinner'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { ResourceViewerHeader } from '../common/ResourceViewerHeader'
 import { ScriptureContent, ScriptureLayoutToggle } from './components'
+import { ScriptureEdgeCue } from './components/ScriptureEdgeCue'
 import {
   resolveScriptureScrollParent,
   useContent,
@@ -309,15 +309,19 @@ export function ScriptureViewer({
     ]
   )
 
-  const { pullPx, rawPullPx, edge } = useScriptureEdgeNavigate({
-    scrollParent,
-    contentEl: elasticContentEl,
-    onNext: handleEdgeNext,
-    onPrev: handleEdgePrev,
-    canNext: canEdgeNext,
-    canPrev: canEdgePrev,
-    enabled: !isLoading && !(isUnitTransitioning && !chapterScroll.enabled) && !error,
-  })
+  const { pullPx, rawPullPx, edge, showTopPad, showBottomPad, clickPrev, clickNext } =
+    useScriptureEdgeNavigate({
+      scrollParent,
+      contentEl: elasticContentEl,
+      onNext: handleEdgeNext,
+      onPrev: handleEdgePrev,
+      canNext: canEdgeNext,
+      canPrev: canEdgePrev,
+      onArmed: (armedEdge) => {
+        chapterScroll.warmChapterAtEdge(armedEdge === 'top' ? 'previous' : 'next')
+      },
+      enabled: !isLoading && !(isUnitTransitioning && !chapterScroll.enabled) && !error,
+    })
 
   // After unit change (non-chapter modes): land at start (next) or end (prev).
   useLayoutEffect(() => {
@@ -365,8 +369,8 @@ export function ScriptureViewer({
 
   const showContentLoading = isLoading || (isUnitTransitioning && !chapterScroll.enabled)
   const armedToCommit = isPastCommitThreshold(rawPullPx, EDGE_NAV_THRESHOLD_PX)
-  const showTopCue = edge === 'top' && Math.abs(pullPx) > 8
-  const showBottomCue = edge === 'bottom' && Math.abs(pullPx) > 8
+  const pullingTop = edge === 'top' && Math.abs(pullPx) > 8
+  const pullingBottom = edge === 'bottom' && Math.abs(pullPx) > 8
 
   return (
     <div className="h-full flex flex-col" dir={languageDirection}>
@@ -391,32 +395,13 @@ export function ScriptureViewer({
           }
         }}
       >
-        {showTopCue && (
-          <div
-            className="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center text-fg-muted"
-            title={armedToCommit ? 'Loading previous' : 'Previous'}
-            aria-hidden
-          >
-            {armedToCommit ? (
-              <LoadingSpinner size="sm" label="Loading previous" className="text-accent opacity-90" />
-            ) : (
-              <ChevronUp className="w-5 h-5 opacity-70" />
-            )}
-          </div>
-        )}
-        {showBottomCue && (
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-2 z-10 flex justify-center text-fg-muted"
-            title={armedToCommit ? 'Loading next' : 'Next'}
-            aria-hidden
-          >
-            {armedToCommit ? (
-              <LoadingSpinner size="sm" label="Loading next" className="text-accent opacity-90" />
-            ) : (
-              <ChevronDown className="w-5 h-5 opacity-70" />
-            )}
-          </div>
-        )}
+        <ScriptureEdgeCue
+          edge="top"
+          visible={showTopPad}
+          pulling={pullingTop}
+          armedToCommit={armedToCommit}
+          onClick={clickPrev}
+        />
         <div
           ref={setElasticContentEl}
           className="flex-1 max-w-2xl mx-auto w-full will-change-transform"
@@ -449,6 +434,13 @@ export function ScriptureViewer({
             onRetryTokenSource={chapterScroll.retryTokenSource}
           />
         </div>
+        <ScriptureEdgeCue
+          edge="bottom"
+          visible={showBottomPad}
+          pulling={pullingBottom}
+          armedToCommit={armedToCommit}
+          onClick={clickNext}
+        />
       </div>
     </div>
   )

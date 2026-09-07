@@ -30,7 +30,7 @@ export const TokenRenderer = memo(function TokenRenderer({
       data-highlighted={isHighlighted || isSelected ? 'true' : undefined}
       data-underlined={isUnderlined ? 'true' : undefined}
       className={`rounded cursor-pointer hover:bg-muted text-scripture-fg${
-        isHighlighted || isSelected ? ' bg-highlight highlighted-token' : ''
+        isHighlighted || isSelected ? ' bg-highlight highlighted-token scroll-mt-12' : ''
       }${
         isUnderlined
           ? ' underline decoration-dotted decoration-underline decoration-1 underline-offset-3'

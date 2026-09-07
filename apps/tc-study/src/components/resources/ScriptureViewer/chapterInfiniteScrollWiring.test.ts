@@ -9,19 +9,37 @@ describe('chapter edge-reveal + warm wiring', () => {
       join(import.meta.dir, 'hooks/useChapterInfiniteScroll.ts'),
       'utf8'
     )
+    const edgeSrc = readFileSync(
+      join(import.meta.dir, 'hooks/useScriptureEdgeNavigate.ts'),
+      'utf8'
+    )
     expect(viewerSrc).toContain('useChapterInfiniteScroll')
     expect(viewerSrc).toContain('useScriptureEdgeNavigate')
     expect(viewerSrc).toContain('revealChapterAtEdge')
     expect(viewerSrc).toContain('canRevealChapterAtEdge')
+    expect(viewerSrc).toContain('ScriptureEdgeCue')
+    expect(viewerSrc).toContain('showTopPad')
+    expect(viewerSrc).toContain('showBottomPad')
+    expect(viewerSrc).toContain('onClick={clickPrev}')
+    expect(viewerSrc).toContain('onClick={clickNext}')
+    expect(viewerSrc).toContain('warmChapterAtEdge')
+    expect(hookSrc).toContain('warmChapterAtEdge')
     expect(viewerSrc).toContain('displayChapters={chapterScroll.displayChapters}')
     expect(viewerSrc).toContain('chapterSlots={chapterScroll.chapterSlots}')
     expect(hookSrc).toContain('CHAPTER_EDGE_SWAP_MODE')
     expect(hookSrc).toContain('revealChapterInWindow')
     expect(hookSrc).toContain('revealChapterAtEdge')
     expect(hookSrc).toContain('ensurePreparedFullChapter')
+    expect(hookSrc).toContain('warmChapterAtEdge')
     expect(hookSrc).toContain('markChapterScrollSettled(parked ?? navChapterRef.current)')
     expect(hookSrc).toContain('fromOurCommit')
     expect(hookSrc).toContain('settleKick')
+    expect(hookSrc).toContain('pendingRevealTopAlignRef')
+    expect(hookSrc).toContain('scrollTopForElementAtTop')
+    expect(hookSrc).toContain('CHAPTER_REVEAL_TOP_OFFSET_PX')
+    expect(hookSrc).toContain('pendingRevealTopAlignRef.current = target')
+    expect(edgeSrc).toContain('beginProgrammaticScrollSuppress')
+    expect(edgeSrc).toContain('EDGE_PAD_PEEK_PX')
   })
 
   test('ScriptureViewer broadcasts the live BCV span (not hardcoded whole-chapter)', () => {
@@ -40,6 +58,21 @@ describe('chapter edge-reveal + warm wiring', () => {
     expect(contentSrc).toContain('usePreparedChapterWindow')
     expect(contentSrc).toContain('PreparedFullChapterPane')
     expect(contentSrc).toContain('PreparedLightChapterPane')
+    // Token highlight scroll must not center — that pulls the previous chapter
+    // into the settle band when the token is near the start of a chapter.
+    expect(contentSrc).toContain("block: 'start'")
+    expect(contentSrc).toContain('beginProgrammaticScrollSuppress')
+    expect(contentSrc).not.toContain("block: 'center'")
+    const tokenSrc = readFileSync(
+      join(import.meta.dir, 'components/TokenRenderer.tsx'),
+      'utf8'
+    )
+    const preparedSrc = readFileSync(
+      join(import.meta.dir, 'components/PreparedFullChapterPane.tsx'),
+      'utf8'
+    )
+    expect(tokenSrc).toContain('scroll-mt-12')
+    expect(preparedSrc).toContain('scroll-mt-12')
   })
 
   test('edge-reveal mode stacks up to three chapters', () => {

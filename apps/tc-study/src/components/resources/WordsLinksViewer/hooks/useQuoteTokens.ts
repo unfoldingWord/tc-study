@@ -16,6 +16,10 @@ import {
   shouldEnqueueQuoteBuild,
 } from '../../../../features/nav/chapterScrollActivity'
 import { useChapterScrollActivity } from '../../../../features/nav/usePinnedHelpsReference'
+import {
+  shouldKeepStaleHelpsRows,
+  staleQuotesAreUnderlineReady,
+} from '../../../../features/helps/helpsListLoading'
 import { isQuoteBuildReady } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { buildQuoteTokens } from '../../../../features/helps/quoteTokens'
 import {
@@ -272,21 +276,6 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
   const quotesSettled = settledRequestKey === requestKey
 
   useEffect(() => {
-    if (!shouldEnqueueQuoteBuild(scrollActivity.unsettled)) {
-      setLinksWithQuotes(
-        lastQuotesRef.current.length > 0 ? lastQuotesRef.current : links
-      )
-      setSettledRequestKey('')
-      return
-    }
-
-    if (!originalContent || originalContent.length === 0 || links.length === 0) {
-      setLinksWithQuotes(links)
-      lastQuotesRef.current = links
-      setSettledRequestKey('')
-      return
-    }
-
     const bookCode = helpsRef.book?.toUpperCase() || ''
     const gen = ++runGenRef.current
     const lifecycle = {
@@ -294,18 +283,129 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
       cancelIdle: undefined as (() => void) | undefined,
     }
 
-    const needsBuild = links.filter(
-      (link) =>
-        !(link.quoteTokens && link.quoteTokens.length > 0) &&
-        chapterInSpan(chapterOfLink(link), startChapter, endChapter)
-    )
-
     const apply = (next: LinkWithQuoteReady[], settle: boolean) => {
       if (gen !== runGenRef.current) return
       lastQuotesRef.current = next
       setLinksWithQuotes(next)
       if (settle) setSettledRequestKey(requestKey)
     }
+
+    /** Read-only cache hydrate — paints underlines before settle / OL reload. */
+    const hydrateFromCache = async (settleOnFullHit: boolean) => {
+      if (!cacheAdapter || !catalogManager || !bookCode || links.length === 0) return false
+
+      // Always keyed by current links; pull tokens from lastQuotes when ids match.
+      const baseLinks: LinkWithQuoteReady[] = links.map((incoming) => {
+        const prev = lastQuotesRef.current.find((r) => r.id === incoming.id)
+        if (incoming.quoteTokens?.length) return { ...incoming, quoteReady: true }
+        if (prev?.quoteTokens?.length) {
+          return { ...incoming, quoteTokens: prev.quoteTokens, quoteReady: true }
+        }
+        return {
+          ...incoming,
+          quoteTokens: prev?.quoteTokens,
+          quoteReady: prev?.quoteReady,
+        }
+      })
+
+      const stillNeed = baseLinks.filter(
+        (link) =>
+          !(link.quoteTokens && link.quoteTokens.length > 0) &&
+          chapterInSpan(chapterOfLink(link), startChapter, endChapter)
+      )
+      if (stillNeed.length === 0 && staleQuotesAreUnderlineReady(baseLinks)) {
+        apply(
+          baseLinks.map((l) => (l.quoteTokens?.length ? { ...l, quoteReady: true } : l)),
+          settleOnFullHit
+        )
+        return true
+      }
+      if (stillNeed.length === 0) return false
+
+      try {
+        const cacheCtx = await resolveQuoteCacheContext({
+          catalogManager,
+          helpsKey: resourceKey,
+          bookCode,
+        })
+        if (!cacheCtx || lifecycle.cancelled || gen !== runGenRef.current) return false
+        const cached = await readCachedQuoteTokensForSpan(cacheAdapter, {
+          helpsKey: resourceKey,
+          helpsStamp: cacheCtx.helpsStamp,
+          olKey: cacheCtx.olKey,
+          olStamp: cacheCtx.olStamp,
+          book: bookCode,
+          startChapter,
+          endChapter,
+        })
+        if (lifecycle.cancelled || gen !== runGenRef.current) return false
+        const { hits, misses } = subtractCachedQuoteHits(stillNeed, cached)
+        if (hits.size === 0) return false
+        const hitById = new Map<string, TranslationWordsLink['quoteTokens']>()
+        for (const [id, tokens] of hits) {
+          hitById.set(id, cachedToQuoteTokens(tokens))
+        }
+        const merged = mergeQuotePass({
+          links: baseLinks,
+          byId: hitById,
+          readyIds: new Set(hitById.keys()),
+          deferredIds: new Set(misses.map((l) => l.id)),
+          startChapter,
+          endChapter,
+        })
+        const fullHit = misses.length === 0
+        apply(merged, settleOnFullHit && fullHit)
+        return fullHit
+      } catch {
+        return false
+      }
+    }
+
+    // While scrolling: keep last quotes ready and hydrate from cache (no worker).
+    if (!shouldEnqueueQuoteBuild(scrollActivity.unsettled)) {
+      const kept =
+        lastQuotesRef.current.length > 0 ? lastQuotesRef.current : links
+      setLinksWithQuotes(kept)
+      if (!staleQuotesAreUnderlineReady(kept)) {
+        setSettledRequestKey('')
+      }
+      void hydrateFromCache(false)
+      return () => {
+        lifecycle.cancelled = true
+      }
+    }
+
+    if (!originalContent || originalContent.length === 0 || links.length === 0) {
+      if (
+        shouldKeepStaleHelpsRows({
+          staleCount: lastQuotesRef.current.length,
+          incomingCount: links.length,
+          originalContentMissing: !originalContent || originalContent.length === 0,
+        })
+      ) {
+        setLinksWithQuotes(lastQuotesRef.current)
+        if (staleQuotesAreUnderlineReady(lastQuotesRef.current)) {
+          setSettledRequestKey(requestKey)
+        }
+        void hydrateFromCache(true)
+        return () => {
+          lifecycle.cancelled = true
+        }
+      }
+      setLinksWithQuotes(links)
+      lastQuotesRef.current = links
+      setSettledRequestKey('')
+      void hydrateFromCache(true)
+      return () => {
+        lifecycle.cancelled = true
+      }
+    }
+
+    const needsBuild = links.filter(
+      (link) =>
+        !(link.quoteTokens && link.quoteTokens.length > 0) &&
+        chapterInSpan(chapterOfLink(link), startChapter, endChapter)
+    )
 
     // Nothing to build — settle immediately (already have quoteTokens or out of span).
     if (needsBuild.length === 0) {
@@ -396,6 +496,21 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
           true
         )
         return
+      }
+
+      // Paint cache hits immediately; finish misses via worker/sync.
+      if (hitById.size > 0) {
+        apply(
+          mergeQuotePass({
+            links,
+            byId: hitById,
+            readyIds: new Set(hitById.keys()),
+            deferredIds: new Set(remaining.map((l) => l.id)),
+            startChapter,
+            endChapter,
+          }),
+          false
+        )
       }
 
       // Tiny remaining batches: sync is cheaper than a worker round-trip.
@@ -500,12 +615,14 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
     catalogManager,
   ])
 
-  const quoteBuildReady = isQuoteBuildReady({
-    loadingOriginal,
-    originalContent,
-    originalError,
-    quotesSettled,
-  })
+  const quoteBuildReady =
+    isQuoteBuildReady({
+      loadingOriginal,
+      originalContent,
+      originalError,
+      quotesSettled,
+    }) ||
+    (quotesSettled && staleQuotesAreUnderlineReady(linksWithQuotes))
 
   return {
     linksWithQuotes,

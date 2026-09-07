@@ -20,6 +20,7 @@ import {
   lastChapterNumber,
   paragraphChaptersFromSlots,
 } from '../../../../features/nav/chapterInfiniteScroll'
+import { beginProgrammaticScrollSuppress } from '../../../../features/nav/chapterScrollActivity'
 import {
   ensurePreparedFullChapter,
   isPreparedSourceMissing,
@@ -351,9 +352,13 @@ export function ScriptureContent({
     const timer = setTimeout(() => {
       const highlightedElements = containerRef.current?.querySelectorAll('[data-highlighted="true"]')
       if (highlightedElements && highlightedElements.length > 0) {
+        // Top of the scrollport with scroll-mt on highlighted tokens (not center):
+        // centering early-chapter tokens pulls the previous chapter into the
+        // settle band and flips nav back.
+        beginProgrammaticScrollSuppress(500)
         ;(highlightedElements[0] as HTMLElement).scrollIntoView({
           behavior: 'smooth',
-          block: 'center',
+          block: 'start',
           inline: 'nearest',
         })
         lastScrolledTokenRef.current = selectedTokenId

@@ -292,7 +292,7 @@ export function TranslationNotesViewer({
     ) : null
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 overflow-hidden flex flex-col">
       <TranslationNotesList
         resource={resource}
         effectiveResource={effectiveResource}

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  beginProgrammaticScrollSuppress,
   clearChapterScrollActivity,
   getChapterScrollActivity,
   markChapterScrollSettled,
@@ -9,6 +10,7 @@ import {
   pinReferenceWhileScrolling,
   resetChapterScrollActivity,
   shouldBroadcastScriptureTokens,
+  shouldBroadcastUnderlineGroups,
   shouldEnqueueQuoteBuild,
   shouldHydrateHelpsForChapter,
   shouldPaintScriptureChromeExtras,
@@ -130,6 +132,19 @@ describe('chapterScrollActivity gates', () => {
     const live = { book: 'tit', chapter: 1, verse: 7, endChapter: 1, endVerse: 8 }
     expect(pinReferenceWhileScrolling(live, next)).toBe(live)
   })
+
+  test('programmatic scroll suppress skips unsettle', () => {
+    markChapterScrollSettled(2)
+    beginProgrammaticScrollSuppress(200)
+    markChapterScrollUnsettled()
+    expect(getChapterScrollActivity().unsettled).toBe(false)
+  })
+
+  test('non-empty underline groups broadcast while unsettled; empty do not', () => {
+    expect(shouldBroadcastUnderlineGroups({ unsettled: true, groupCount: 3 })).toBe(true)
+    expect(shouldBroadcastUnderlineGroups({ unsettled: true, groupCount: 0 })).toBe(false)
+    expect(shouldBroadcastUnderlineGroups({ unsettled: false, groupCount: 0 })).toBe(true)
+  })
 })
 
 describe('chapter scroll activity wiring', () => {
@@ -159,6 +174,9 @@ describe('chapter scroll activity wiring', () => {
       'utf8'
     )
     expect(quotes).toContain('shouldEnqueueQuoteBuild')
+    expect(quotes).toContain('shouldKeepStaleHelpsRows')
+    expect(quotes).toContain('staleQuotesAreUnderlineReady')
+    expect(quotes).toContain('hydrateFromCache')
     expect(quotes).toContain('pinReferenceWhileScrolling')
     expect(aligned).toContain('shouldEnqueueQuoteBuild')
     expect(aligned).toContain('pinReferenceWhileScrolling')
@@ -166,6 +184,7 @@ describe('chapter scroll activity wiring', () => {
     expect(aligned).toContain('batchAlignLinks')
     expect(aligned).toContain('HELPS_SYNC_MAX_LINKS')
     expect(aligned).toContain('quoteReady')
+    expect(aligned).toContain('lastAlignedRef.current.length > 0')
     expect(ol).toContain('shouldHydrateHelpsForChapter')
     expect(ol).toContain('pinReferenceWhileScrolling')
   })
@@ -210,8 +229,9 @@ describe('chapter scroll activity wiring', () => {
       join(root, 'components/resources/CombinedHelpsViewer/CombinedHelpsList.tsx'),
       'utf8'
     )
-    expect(tokenGroups).toContain('shouldEnqueueQuoteBuild')
+    expect(tokenGroups).toContain('shouldBroadcastUnderlineGroups')
     expect(tokenGroups).toContain('shouldResetTokenGroupsDedupe')
+    expect(tokenGroups).not.toContain('shouldEnqueueQuoteBuild')
     expect(listSrc).toContain('contentVisibility')
   })
 })

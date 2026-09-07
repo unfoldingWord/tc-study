@@ -8,6 +8,8 @@ import {
   PHASE_UPGRADE_HOLD_MS,
   PLACEHOLDER_MIN_HEIGHT_PX,
   SETTLE_HOLD_MS,
+  CHAPTER_REVEAL_TOP_OFFSET_PX,
+  scrollTopForElementAtTop,
   adjacentChapterToRequest,
   adjacentSlotKindAfterSettle,
   approachingNeighborChapter,
@@ -91,6 +93,24 @@ describe('chapter edge-reveal stack', () => {
     expect(edgeRevealTargetChapter(slots, 'previous', 10)).toBe(1)
     expect(canRevealChapterAtEdge(slots, 'next', 10)).toBe(true)
     expect(canRevealChapterAtEdge(revealChapterInWindow(slots, 4, 'next', 4), 'next', 4)).toBe(false)
+  })
+
+  test('scrollTopForElementAtTop leaves a top offset under the scrollport', () => {
+    expect(
+      scrollTopForElementAtTop({
+        parentScrollTop: 1000,
+        elementOffsetFromParentTop: 200,
+        offsetPx: 48,
+      })
+    ).toBe(1152)
+    expect(
+      scrollTopForElementAtTop({
+        parentScrollTop: 0,
+        elementOffsetFromParentTop: 20,
+        offsetPx: 48,
+      })
+    ).toBe(0)
+    expect(CHAPTER_REVEAL_TOP_OFFSET_PX).toBe(48)
   })
 })
 

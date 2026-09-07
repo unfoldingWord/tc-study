@@ -173,6 +173,10 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     }
 
     if (!links || links.length === 0) {
+      if (lastAlignedRef.current.length > 0) {
+        setLinksWithAlignedTokens(lastAlignedRef.current)
+        return
+      }
       lastAlignedRef.current = []
       fingerprintRef.current = ''
       setLinksWithAlignedTokens([])

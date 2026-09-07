@@ -271,5 +271,13 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
     expect(src).toContain('quoteReady')
     expect(src).toContain('readCachedQuoteTokensForSpan')
     expect(src).toContain('mergeAndWriteCachedQuoteTokens')
+    expect(src).toContain('staleQuotesAreUnderlineReady')
+    expect(src).toContain('hydrateFromCache')
+  })
+
+  test('CombinedHelps underlines prefer quoteTokens over align settle', () => {
+    expect(combinedPipelineSrc).toContain('notesForUnderline')
+    expect(combinedPipelineSrc).toContain('twlLinksWithQuotes')
+    expect(combinedPipelineSrc).toContain('underlineGroupsFromHelpsNotes')
   })
 })

@@ -3,7 +3,7 @@
  */
 
 /** Scrollable helps content (under ResourceViewerHeader). */
-export const HELPS_LIST_PANEL = 'flex-1 overflow-y-auto bg-surface'
+export const HELPS_LIST_PANEL = 'flex-1 min-h-0 overflow-y-auto bg-surface'
 
 /** Verse / ref group header — lighter than full muted so chips sit softly on surface. */
 export const HELPS_VERSE_HEADER =

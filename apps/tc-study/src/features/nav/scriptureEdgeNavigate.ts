@@ -109,6 +109,94 @@ export function accumulateEdgeOverscroll(args: {
   return { raw: currentRaw, edge: currentEdge }
 }
 
+/**
+ * Extra scroll range inserted when the reader parks at a content edge.
+ * Lets the scrollbar thumb travel past the text to commit next/prev.
+ */
+export const EDGE_TRAVEL_PAD_PX = 168
+/** How much of the pad to reveal so the arrow sits in view. */
+export const EDGE_PAD_PEEK_PX = 40
+/** Stay armed until the user scrolls this far back into the text. */
+export const EDGE_PAD_HIDE_SLOP_PX = 32
+
+/** Overlay scrollbars report 0 gutter; still hit-test a thin inline-end strip. */
+export const SCROLLBAR_HIT_FALLBACK_PX = 14
+/** Synthetic raw overscroll per hold tick while the thumb stays pinned at an edge. */
+export const SCROLLBAR_HOLD_DELTA_PX = 8
+export const SCROLLBAR_HOLD_TICK_MS = 16
+
+export function edgeTravelFromPads(args: {
+  scrollTop: number
+  scrollHeight: number
+  clientHeight: number
+  topPadPx: number
+  bottomPadPx: number
+  slopPx?: number
+}): {
+  topRaw: number
+  bottomRaw: number
+  atContentTop: boolean
+  atContentBottom: boolean
+  contentMin: number
+  contentMax: number
+} {
+  const slopPx = args.slopPx ?? EDGE_NAV_EDGE_SLOP_PX
+  const maxScroll = Math.max(0, args.scrollHeight - args.clientHeight)
+  const contentMin = Math.max(0, args.topPadPx)
+  const contentMax = Math.max(contentMin, maxScroll - Math.max(0, args.bottomPadPx))
+  const topRaw = args.topPadPx > 0 ? Math.max(0, contentMin - args.scrollTop) : 0
+  const bottomRaw = args.bottomPadPx > 0 ? Math.max(0, args.scrollTop - contentMax) : 0
+  return {
+    topRaw,
+    bottomRaw,
+    atContentTop: args.scrollTop <= contentMin + slopPx,
+    atContentBottom: args.scrollTop >= contentMax - slopPx,
+    contentMin,
+    contentMax,
+  }
+}
+
+export function nextEdgePadVisibility(args: {
+  showTop: boolean
+  showBottom: boolean
+  scrollTop: number
+  contentMin: number
+  contentMax: number
+  topRaw: number
+  bottomRaw: number
+  canPrev: boolean
+  canNext: boolean
+  hideSlopPx?: number
+}): { showTop: boolean; showBottom: boolean } {
+  const hideSlop = args.hideSlopPx ?? EDGE_PAD_HIDE_SLOP_PX
+  const appearTop = args.scrollTop <= args.contentMin + EDGE_NAV_EDGE_SLOP_PX
+  const appearBottom = args.scrollTop >= args.contentMax - EDGE_NAV_EDGE_SLOP_PX
+  const keepTop = args.topRaw > 0 || args.scrollTop <= args.contentMin + hideSlop
+  const keepBottom = args.bottomRaw > 0 || args.scrollTop >= args.contentMax - hideSlop
+  return {
+    showTop: Boolean(args.canPrev && (args.showTop ? keepTop : appearTop)),
+    showBottom: Boolean(args.canNext && (args.showBottom ? keepBottom : appearBottom)),
+  }
+}
+
+/**
+ * True when a pointer is on the vertical scrollbar (classic gutter or overlay strip).
+ * Used so mouse thumb-drag can accumulate the same edge overscroll as wheel/touch.
+ */
+export function isVerticalScrollbarHit(
+  el: Pick<HTMLElement, 'getBoundingClientRect' | 'offsetWidth' | 'clientWidth'>,
+  clientX: number,
+  direction: 'ltr' | 'rtl' = 'ltr'
+): boolean {
+  const rect = el.getBoundingClientRect()
+  const gutter = Math.max(el.offsetWidth - el.clientWidth, 0)
+  const hitWidth = Math.max(gutter, SCROLLBAR_HIT_FALLBACK_PX)
+  if (direction === 'rtl') {
+    return clientX <= rect.left + hitWidth
+  }
+  return clientX >= rect.right - hitWidth
+}
+
 export function commitEdgeNavigation(args: {
   edge: ScriptureEdge | null
   rawOverscrollPx: number

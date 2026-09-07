@@ -52,6 +52,9 @@ export function useOriginalLanguageContent({
   const [error, setError] = useState<string | null>(null)
   const [retryTick, setRetryTick] = useState(0)
   const lastAttemptedRevisionRef = useRef<string | null>(null)
+  const loadedSpanRef = useRef('')
+  const contentRef = useRef(originalContent)
+  contentRef.current = originalContent
 
   useEffect(() => {
     lastAttemptedRevisionRef.current = null
@@ -90,7 +93,10 @@ export function useOriginalLanguageContent({
       try {
         setLoading(true)
         setError(null)
-        setOriginalContent(null)
+        const spanKey = `${helpsRef.book}:${helpsRef.chapter}:${helpsRef.endChapter || helpsRef.chapter}`
+        const keepStale =
+          loadedSpanRef.current === spanKey && (contentRef.current?.length ?? 0) > 0
+        if (!keepStale) setOriginalContent(null)
 
         const bookCode = helpsRef.book?.toUpperCase() || ''
         const resource = resolveOriginalLanguageKey(bookCode)
@@ -120,6 +126,7 @@ export function useOriginalLanguageContent({
         if (cancelled) return
 
         // `[]` = attempted empty (distinct from first-paint `null`)
+        loadedSpanRef.current = `${helpsRef.book}:${helpsRef.chapter}:${helpsRef.endChapter || helpsRef.chapter}`
         setOriginalContent(optimized)
       } catch (err) {
         if (cancelled) return

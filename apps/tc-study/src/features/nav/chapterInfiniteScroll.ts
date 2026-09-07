@@ -35,6 +35,11 @@ export const PREFETCH_DISTANCE_PX = 120
 /** Long enough that a continuous slow scroll stays “scrolling”, not a chain of settles. */
 export const SETTLE_HOLD_MS = 280
 /**
+ * After edge-reveal appends the next chapter, land its heading this far below
+ * the scrollport top (matches token highlight `scroll-mt-12`).
+ */
+export const CHAPTER_REVEAL_TOP_OFFSET_PX = 48
+/**
  * Extra hold after settle before mounting token trees / swapping light→full.
  * Settle already waited {@link SETTLE_HOLD_MS}; keep this at 0 so helps
  * underlines/highlights can paint on the settled chapter immediately.
@@ -760,4 +765,17 @@ export function wouldEnqueueWholeBook(
   lastChapter: number
 ): boolean {
   return lastChapter > MAX_MOUNTED_CHAPTERS && mounted.length > MAX_MOUNTED_CHAPTERS
+}
+
+/**
+ * ScrollTop that places an element near the top of its overflow parent,
+ * leaving {@link CHAPTER_REVEAL_TOP_OFFSET_PX} (or `offsetPx`) of breathing room.
+ */
+export function scrollTopForElementAtTop(args: {
+  parentScrollTop: number
+  elementOffsetFromParentTop: number
+  offsetPx?: number
+}): number {
+  const offset = args.offsetPx ?? CHAPTER_REVEAL_TOP_OFFSET_PX
+  return Math.max(0, args.parentScrollTop + args.elementOffsetFromParentTop - offset)
 }

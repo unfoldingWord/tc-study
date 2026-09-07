@@ -229,7 +229,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 overflow-hidden flex flex-col">
       <div className={HELPS_LIST_PANEL} dir={languageDirection}>
         <ResourceViewerHeader
           title={resource.title}

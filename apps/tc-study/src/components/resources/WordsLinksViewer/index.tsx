@@ -310,7 +310,7 @@ export function WordsLinksViewer({
     ) : null
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 overflow-hidden flex flex-col">
       <WordsLinksList
         resource={resource}
         effectiveResource={effectiveResource}

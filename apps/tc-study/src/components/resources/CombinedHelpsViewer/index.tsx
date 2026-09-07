@@ -170,7 +170,7 @@ export function CombinedHelpsViewer({
     }
   }, [tnNotes, notesByChapter, bookId])
 
-  const { preparedNotes } = usePreparedNotesChapter({
+  const { preparedNotes, status: notesPrepareStatus } = usePreparedNotesChapter({
     resourceKey: tnKey,
     bookId,
     startChapter,
@@ -178,7 +178,7 @@ export function CombinedHelpsViewer({
     processedNotes: processedNotesForHeal,
   })
 
-  const { preparedLinks } = usePreparedWordsLinksChapter({
+  const { preparedLinks, status: linksPrepareStatus } = usePreparedWordsLinksChapter({
     resourceKey: twlKey,
     bookId,
     startChapter,
@@ -198,12 +198,17 @@ export function CombinedHelpsViewer({
   // Listen on the mounted CombinedHelps id (not TN/TWL catalog keys)
   const scriptureTokenListenerId = resourceId
 
+  const filterResetKey =
+    navigationMode === 'chapter'
+      ? `${currentRef.book}:${currentRef.chapter}`
+      : `${currentRef.book}:${currentRef.chapter}:${currentRef.verse}:${currentRef.endVerse ?? ''}`
+
   useEffect(() => {
     setTokenFilter(null)
     setVerseFilter(null)
     setObsQuoteFilter(null)
     setSelectedHelpsCard(null)
-  }, [currentRef.book, currentRef.chapter, currentRef.verse])
+  }, [filterResetKey])
 
   const { catalogMetadata } = useCombinedHelpsDeps({
     resourceKey,
@@ -358,6 +363,8 @@ export function CombinedHelpsViewer({
   const loading = isHelpsContentPending({
     tnKey, twlKey, tnLoading, twlLoading,
     catalogLoading: Boolean(helpsLanguageActions?.isCatalogLoading),
+    preparePending: notesPrepareStatus === 'pending' || linksPrepareStatus === 'pending',
+    hasVisibleRows: mergedGroups.length > 0,
   })
   const noSources = !tnKey && !twlKey
   const helpsLanguageCodeForCopy = resolveHelpsLanguageCodeForCopy({
@@ -396,7 +403,7 @@ export function CombinedHelpsViewer({
     ) : null
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 overflow-hidden flex flex-col">
       <CombinedHelpsList
         resource={resource}
         effectiveResource={effectiveResource}
