@@ -149,19 +149,19 @@ export function resolveTokenVisualStateInterned(
   const hlOwn = opts.highlightOwnIndex
   const hlAligned = opts.highlightAlignedIndices
 
-  if (hlOwn != null) {
+  if (hlOwn != null || hlAligned.size > 0) {
     if (opts.isOriginalLanguage) {
-      if (own === hlOwn) {
+      if (hlOwn != null && own === hlOwn) {
         isHighlighted = true
         isSelected = true
       } else if (hlAligned.size > 0) {
         isHighlighted = hlAligned.has(own)
       }
-    } else if (own === hlOwn) {
+    } else if (hlOwn != null && own === hlOwn) {
       isHighlighted = true
       isSelected = true
     } else if (aligned.length > 0) {
-      if (aligned.includes(hlOwn)) {
+      if (hlOwn != null && aligned.includes(hlOwn)) {
         isHighlighted = true
         isSelected = true
       } else if (hlAligned.size > 0) {

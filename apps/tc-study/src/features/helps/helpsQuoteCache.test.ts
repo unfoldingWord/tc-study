@@ -5,6 +5,7 @@ import {
   mergeAndWriteCachedQuoteTokens,
   olContentStamp,
   readCachedQuoteTokens,
+  readCachedQuoteTokensForChapters,
   subtractCachedQuoteHits,
   toCachedQuoteTokens,
   writeCachedQuoteTokens,
@@ -116,5 +117,27 @@ describe('helpsQuoteCache', () => {
     )
     const row = await readCachedQuoteTokens(cache, { ...base, chapter: 1 })
     expect(Object.keys(row ?? {}).sort()).toEqual(['a', 'b'])
+  })
+
+  test('readCachedQuoteTokensForChapters merges sparse chapters', async () => {
+    const cache = createFakeAdapter()
+    const base = {
+      helpsKey: 'owner/en/tn',
+      helpsStamp: 'v1',
+      olKey: 'owner/el/ugnt',
+      olStamp: 'v1+usj',
+      book: 'tit',
+    }
+    await writeCachedQuoteTokens(cache, { ...base, chapter: 1 }, {
+      a: toCachedQuoteTokens([{ id: 1, text: 'a', type: 'word', occurrence: 1, content: 'a' }]),
+    })
+    await writeCachedQuoteTokens(cache, { ...base, chapter: 3 }, {
+      c: toCachedQuoteTokens([{ id: 3, text: 'c', type: 'word', occurrence: 1, content: 'c' }]),
+    })
+    const merged = await readCachedQuoteTokensForChapters(cache, {
+      ...base,
+      chapters: [1, 3],
+    })
+    expect(Object.keys(merged).sort()).toEqual(['a', 'c'])
   })
 })

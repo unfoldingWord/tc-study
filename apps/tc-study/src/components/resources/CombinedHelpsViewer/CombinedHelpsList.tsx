@@ -26,7 +26,7 @@ import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
 import { helpsFilterIdentity, scrollHelpsToTop } from './scrollHelpsToTop'
 import { isHelpsCardSelected, type HelpsCardSelection } from './helpsCardSelection'
-import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
+import type { HelpsKindFilter, ObsQuoteFilter, SupportRefFilter, VerseFilterState } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
 export interface CombinedHelpsListProps {
@@ -56,6 +56,7 @@ export interface CombinedHelpsListProps {
   tokenFilter: TokenFilter | null
   verseFilter: VerseFilterState | null
   obsQuoteFilter: ObsQuoteFilter | null
+  supportRefFilter?: SupportRefFilter | null
   loadingTitles: Set<string>
   twLoadingTitles: Set<string>
   getEntryTitle: (rc: string) => string | null
@@ -63,10 +64,11 @@ export interface CombinedHelpsListProps {
   getTWTitle: (link: TranslationWordsLink) => string
   getTWPreview: (link: TranslationWordsLink) => string | null
   isTWPreviewPending: (link: TranslationWordsLink) => boolean
-  onSupportReferenceClick: (supportRef: string) => void
+  onSupportReferenceClick: (supportRef: string, title?: string) => void
+  onFilterBySupportReference?: (supportRef: string, title?: string) => void
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   onNoteQuoteClick: (note: NoteWithTokens) => void
-  onNoteSelect: (note: { id: string; reference?: string }) => void
+  onNoteSelect: (note: NoteWithTokens) => void
   onTitleClick: (link: TranslationWordsLink) => void
   onLinkQuoteClick: (link: TranslationWordsLink) => void
 }
@@ -97,6 +99,7 @@ export function CombinedHelpsList({
   tokenFilter,
   verseFilter,
   obsQuoteFilter,
+  supportRefFilter = null,
   loadingTitles,
   twLoadingTitles,
   getEntryTitle,
@@ -105,6 +108,7 @@ export function CombinedHelpsList({
   getTWPreview,
   isTWPreviewPending,
   onSupportReferenceClick,
+  onFilterBySupportReference,
   onEntryLinkClick,
   onNoteQuoteClick,
   onNoteSelect,
@@ -112,7 +116,12 @@ export function CombinedHelpsList({
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
   const listPanelRef = useRef<HTMLDivElement>(null)
-  const filterIdentity = helpsFilterIdentity({ tokenFilter, verseFilter, obsQuoteFilter })
+  const filterIdentity = helpsFilterIdentity({
+    tokenFilter,
+    verseFilter,
+    obsQuoteFilter,
+    supportRefFilter,
+  })
   useLayoutEffect(() => {
     scrollHelpsToTop(listPanelRef.current)
   }, [filterIdentity])
@@ -208,7 +217,7 @@ export function CombinedHelpsList({
                         <span className={HELPS_VERSE_COUNT}>{group.items.length}</span>
                       </div>
 
-                      {group.items.map((item, idx) => {
+                      {group.items.map((item) => {
                         if (item.kind === 'tn') {
                           const note = item.note
                           const entryTitle = note.supportReference?.startsWith('rc://')
@@ -221,11 +230,12 @@ export function CombinedHelpsList({
                               )
                             : false
                           return (
-                            <div key={`tn-${note.id}-${idx}`}>
+                            <div key={`tn-${note.id}`}>
                               <TranslationNoteCard
                                 note={note as NoteWithTokens}
                                 isSelected={isHelpsCardSelected(selectedHelpsCard, 'tn', note.id)}
                                 onSupportReferenceClick={onSupportReferenceClick}
+                                onFilterBySupportReference={onFilterBySupportReference}
                                 onEntryLinkClick={onEntryLinkClick}
                                 onQuoteClick={onNoteQuoteClick}
                                 onClick={onNoteSelect}
@@ -248,7 +258,7 @@ export function CombinedHelpsList({
                         const isLoadingTwTitle = twLoadingTitles.has(`${twInfo.category}/${twInfo.term}`)
                         const isLoadingPreview = isTWPreviewPending(link)
                         return (
-                          <div key={`twl-${link.id}-${idx}`}>
+                          <div key={`twl-${link.id}`}>
                             <WordLinkCard
                               link={link}
                               isSelected={isHelpsCardSelected(selectedHelpsCard, 'twl', link.id)}

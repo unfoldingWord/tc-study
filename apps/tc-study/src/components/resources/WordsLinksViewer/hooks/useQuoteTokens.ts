@@ -20,6 +20,11 @@ import {
   shouldKeepStaleHelpsRows,
   staleQuotesAreUnderlineReady,
 } from '../../../../features/helps/helpsListLoading'
+import {
+  reuseHelpsQuoteRows,
+  shouldSkipHelpsQuoteRebuild,
+  type HelpsTokenCacheRow,
+} from '../../../../features/helps/helpsTokenReuse'
 import { isQuoteBuildReady } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { buildQuoteTokens } from '../../../../features/helps/quoteTokens'
 import {
@@ -248,6 +253,22 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
   const scrollActivity = useChapterScrollActivity()
   const helpsRef = pinReferenceWhileScrolling(currentRef, scrollActivity)
   const lastQuotesRef = useRef<LinkWithQuoteReady[]>(links)
+  const lastQuotesByIdRef = useRef<Map<string, HelpsTokenCacheRow>>(new Map())
+  const lastQuoteBookRef = useRef(helpsRef.book)
+  if (lastQuoteBookRef.current !== helpsRef.book) {
+    lastQuoteBookRef.current = helpsRef.book
+    lastQuotesByIdRef.current = new Map()
+  }
+  for (const link of links) {
+    if (link.quoteTokens && link.quoteTokens.length > 0) {
+      lastQuotesByIdRef.current.set(link.id, {
+        quoteTokens: link.quoteTokens,
+        alignedTokens: (link as HelpsTokenCacheRow).alignedTokens,
+        semanticIds: (link as HelpsTokenCacheRow).semanticIds,
+        quoteStatus: (link as HelpsTokenCacheRow).quoteStatus,
+      })
+    }
+  }
   const scriptureRevision = useScriptureContentRevision(resourceId)
   const cacheAdapter = useCacheAdapter() as HelpsQuoteCacheAdapter | null
   const catalogManager = useCatalogManager()
@@ -274,6 +295,10 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
     originalContent
   )
   const quotesSettled = settledRequestKey === requestKey
+  const skipQuoteRebuild = shouldSkipHelpsQuoteRebuild({
+    links,
+    lastById: lastQuotesByIdRef.current,
+  })
 
   useEffect(() => {
     const bookCode = helpsRef.book?.toUpperCase() || ''
@@ -283,11 +308,32 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
       cancelIdle: undefined as (() => void) | undefined,
     }
 
+    const rememberQuotes = (next: LinkWithQuoteReady[]) => {
+      lastQuotesRef.current = next
+      for (const row of next) {
+        if (row.quoteTokens && row.quoteTokens.length > 0) {
+          lastQuotesByIdRef.current.set(row.id, {
+            quoteTokens: row.quoteTokens,
+            alignedTokens: (row as HelpsTokenCacheRow).alignedTokens,
+            semanticIds: (row as HelpsTokenCacheRow).semanticIds,
+            quoteStatus: (row as HelpsTokenCacheRow).quoteStatus,
+          })
+        }
+      }
+    }
+
     const apply = (next: LinkWithQuoteReady[], settle: boolean) => {
       if (gen !== runGenRef.current) return
-      lastQuotesRef.current = next
+      rememberQuotes(next)
       setLinksWithQuotes(next)
       if (settle) setSettledRequestKey(requestKey)
+    }
+
+    if (shouldSkipHelpsQuoteRebuild({ links, lastById: lastQuotesByIdRef.current })) {
+      apply(reuseHelpsQuoteRows(links, lastQuotesByIdRef.current), true)
+      return () => {
+        lifecycle.cancelled = true
+      }
     }
 
     /** Read-only cache hydrate — paints underlines before settle / OL reload. */
@@ -616,6 +662,7 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
   ])
 
   const quoteBuildReady =
+    skipQuoteRebuild ||
     isQuoteBuildReady({
       loadingOriginal,
       originalContent,

@@ -37,6 +37,7 @@ import {
   settledCommitMode,
   settledNavChapter,
   shouldAllowChapterStitch,
+  shouldCommitSettledChapter,
   shouldPromotePlaceholderOnSettle,
   shouldResetWindowOnNavChange,
   shouldStitchAtDocumentEdge,
@@ -301,6 +302,33 @@ describe('chapterInfiniteScroll nav settle', () => {
         prevNavChapter: 3,
         prevNavBook: 'tit',
         committedByUs: 3,
+      })
+    ).toBe(true)
+  })
+
+  test('helps/picker jump does not settle-commit back to the previous chapter', () => {
+    expect(
+      shouldCommitSettledChapter({
+        parked: 1,
+        navChapter: 2,
+        paintedHasParked: true,
+        blockSnapBackTo: 1,
+      })
+    ).toBe(false)
+    expect(
+      shouldCommitSettledChapter({
+        parked: 2,
+        navChapter: 2,
+        paintedHasParked: true,
+        blockSnapBackTo: 1,
+      })
+    ).toBe(false)
+    expect(
+      shouldCommitSettledChapter({
+        parked: 3,
+        navChapter: 2,
+        paintedHasParked: true,
+        blockSnapBackTo: 1,
       })
     ).toBe(true)
   })

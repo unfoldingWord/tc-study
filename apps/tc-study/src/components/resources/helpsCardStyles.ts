@@ -39,4 +39,8 @@ export const HELPS_CARD_FOOTER_BUTTON_TW = `${HELPS_CARD_FOOTER_BUTTON} text-acc
 /** Translation Academy — warning amber (not helps purple; blue/purple fails tritanopia). */
 export const HELPS_CARD_FOOTER_BUTTON_TA = `${HELPS_CARD_FOOTER_BUTTON} text-warning-fg hover:text-warning`
 
+/** Icon-only action beside TA title (e.g. book-wide support-ref filter). */
+export const HELPS_CARD_FOOTER_ICON_BUTTON =
+  'p-1 rounded-md text-warning-fg hover:text-warning hover:bg-warning/10 transition-colors shrink-0'
+
 export const HELPS_CARD_FOOTER_ICON = 'w-3.5 h-3.5 flex-shrink-0'

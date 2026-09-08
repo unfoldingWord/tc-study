@@ -24,6 +24,32 @@ function chapterList(start: number, end: number): number[] {
   return out
 }
 
+/**
+ * Chapter BCV change must not refetch/rebuild book notes already in memory.
+ * First-load (no prior span) still hydrates prepared cache; no-payload stays pending.
+ */
+export function resolvePreparedHelpsReload(args: {
+  hasBookPayload: boolean
+  spanChanged: boolean
+  hadPreviousSpan: boolean
+}): {
+  clearRows: boolean
+  pending: boolean
+  skipFetch: boolean
+} {
+  if (args.hasBookPayload && args.spanChanged && args.hadPreviousSpan) {
+    return { clearRows: false, pending: false, skipFetch: true }
+  }
+  if (args.hasBookPayload) {
+    return { clearRows: args.spanChanged, pending: false, skipFetch: false }
+  }
+  return {
+    clearRows: args.spanChanged,
+    pending: true,
+    skipFetch: false,
+  }
+}
+
 export function usePreparedNotesChapter(args: {
   resourceKey: string
   bookId: string
@@ -59,13 +85,22 @@ export function usePreparedNotesChapter(args: {
     const gen = ++genRef.current
     let cancelled = false
     const span = `${bookId}:${startChapter}:${endChapter}`
-    if (spanRef.current && spanRef.current !== span) {
+    const spanChanged = spanRef.current !== span
+    const reload = resolvePreparedHelpsReload({
+      hasBookPayload: processedNotesRef.current != null,
+      spanChanged,
+      hadPreviousSpan: Boolean(spanRef.current),
+    })
+    if (reload.clearRows) {
       setPreparedNotes(null)
     }
     spanRef.current = span
+    if (reload.skipFetch) {
+      return
+    }
 
     void (async () => {
-      setStatus('pending')
+      if (reload.pending) setStatus('pending')
       const hit = await readPreparedNotesSpan(
         cache,
         resourceKey,
@@ -143,13 +178,22 @@ export function usePreparedWordsLinksChapter(args: {
     const gen = ++genRef.current
     let cancelled = false
     const span = `${bookId}:${startChapter}:${endChapter}`
-    if (spanRef.current && spanRef.current !== span) {
+    const spanChanged = spanRef.current !== span
+    const reload = resolvePreparedHelpsReload({
+      hasBookPayload: processedLinksRef.current != null,
+      spanChanged,
+      hadPreviousSpan: Boolean(spanRef.current),
+    })
+    if (reload.clearRows) {
       setPreparedLinks(null)
     }
     spanRef.current = span
+    if (reload.skipFetch) {
+      return
+    }
 
     void (async () => {
-      setStatus('pending')
+      if (reload.pending) setStatus('pending')
       const hit = await readPreparedWordsLinksSpan(
         cache,
         resourceKey,

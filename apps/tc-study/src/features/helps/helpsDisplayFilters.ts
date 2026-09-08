@@ -19,6 +19,15 @@ export interface VerseFilterState {
   timestamp: number
 }
 
+/** Book-wide TN filter: same Translation Academy support-reference. */
+export interface SupportRefFilter {
+  /** Raw `rc://…/ta/man/…` from the note. */
+  supportReference: string
+  /** Resolved TA title for the chip (e.g. "Doublet"). */
+  title: string
+  timestamp: number
+}
+
 export interface TokenFilterLike {
   semanticId: string
   content: string
@@ -38,6 +47,7 @@ export interface DisplayFilterParams {
   obsQuoteFilter: ObsQuoteFilter | null
   verseFilter: VerseFilterState | null
   tokenFilter: TokenFilterLike | null
+  supportRefFilter?: SupportRefFilter | null
   bookCodeLower: string
   /** When true, empty token/verse filters fall back to the unfiltered list (standalone TN/TWL). */
   fallbackWhenEmpty?: boolean
@@ -48,6 +58,7 @@ export type NoteForDisplay = {
   reference: string
   quote?: string
   occurrence?: string
+  supportReference?: string
   quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
   semanticIds?: string[]
 }
@@ -113,12 +124,128 @@ function withFallback<T>(filtered: T[], source: T[], fallbackWhenEmpty?: boolean
   return filtered
 }
 
-/** Apply OBS quote / verse / token filters to aligned notes. */
+/** Stable key for comparing TA support-references across note rows. */
+export function supportReferenceKey(ref: string | null | undefined): string {
+  if (!ref?.trim()) return ''
+  const trimmed = ref.trim()
+  const match = trimmed.match(/ta\/man\/(.+)$/i)
+  return (match?.[1] ?? trimmed).toLowerCase().replace(/\/+$/, '')
+}
+
+export function supportReferencesMatch(
+  a: string | null | undefined,
+  b: string | null | undefined
+): boolean {
+  const ka = supportReferenceKey(a)
+  const kb = supportReferenceKey(b)
+  return Boolean(ka) && ka === kb
+}
+
+/**
+ * Prefer the larger of chapter-map vs flat notes — chunked cache can leave the
+ * map incomplete while `notes` already holds the full book.
+ */
+export function flattenBookNotes<T>(
+  byChapter: Record<string, T[]> | null | undefined,
+  fallback: T[] | null | undefined
+): T[] {
+  const fromChapters =
+    byChapter && Object.keys(byChapter).length > 0 ? Object.values(byChapter).flat() : []
+  const fromFallback = fallback ?? []
+  if (fromFallback.length > fromChapters.length) return fromFallback
+  if (fromChapters.length > 0) return fromChapters
+  return fromFallback
+}
+
+type SupportRefDisplayNote = {
+  id: string
+  supportReference?: string
+  quote?: string
+  quoteTokens?: unknown
+  alignedTokens?: unknown
+  semanticIds?: unknown
+  quoteStatus?: string
+}
+
+export type SupportRefNoteEnrichment = {
+  quoteTokens?: unknown
+  alignedTokens?: unknown
+  semanticIds?: unknown
+  quoteStatus?: string
+}
+
+function hasUsableHelpsAlign(
+  note: SupportRefDisplayNote | SupportRefNoteEnrichment | undefined
+): boolean {
+  if (!note) return false
+  if (Array.isArray(note.semanticIds) && note.semanticIds.length > 0) return true
+  if (Array.isArray(note.alignedTokens) && note.alignedTokens.length > 0) return true
+  if (Array.isArray(note.quoteTokens) && note.quoteTokens.length > 0) return true
+  return false
+}
+
+/**
+ * Book-wide support-ref matches. Prefer passage-aligned rows, then IndexedDB /
+ * align enrichment, else settle so cards are not stuck pending.
+ * Mid-flight chapter quote rebuild must not overwrite usable off-passage align.
+ */
+export function settleSupportRefDisplayNotes<T extends SupportRefDisplayNote>(
+  bookNotes: T[],
+  supportReference: string,
+  alignedById: Map<string, T>,
+  enrichmentById?: Map<string, SupportRefNoteEnrichment>
+): T[] {
+  return bookNotes
+    .filter((note) => supportReferencesMatch(note.supportReference, supportReference))
+    .map((note) => {
+      const aligned = alignedById.get(note.id)
+      const enriched = enrichmentById?.get(note.id)
+      if (hasUsableHelpsAlign(aligned)) return aligned!
+      if (hasUsableHelpsAlign(enriched)) {
+        return {
+          ...note,
+          ...enriched,
+        }
+      }
+      if (aligned) return aligned
+      if (enriched) {
+        return {
+          ...note,
+          ...enriched,
+        }
+      }
+      const hasQuote = Boolean(note.quote?.trim())
+      return {
+        ...note,
+        quoteStatus: hasQuote ? 'ol-fallback' : 'none',
+      }
+    })
+}
+
+/** Apply OBS quote / verse / token / support-ref filters to aligned notes. */
 export function filterDisplayNotes<T extends NoteForDisplay>(
   notesWithAlignedTokens: T[],
   params: DisplayFilterParams
 ): { displayNotes: T[]; hasNoteMatches: boolean } {
-  const { helpsScope, obsQuoteFilter, verseFilter, tokenFilter, bookCodeLower, fallbackWhenEmpty } = params
+  const {
+    helpsScope,
+    obsQuoteFilter,
+    verseFilter,
+    tokenFilter,
+    supportRefFilter = null,
+    bookCodeLower,
+    fallbackWhenEmpty,
+  } = params
+
+  if (supportRefFilter) {
+    const filtered = notesWithAlignedTokens.filter((note) =>
+      supportReferencesMatch(note.supportReference, supportRefFilter.supportReference)
+    )
+    return {
+      displayNotes: withFallback(filtered, notesWithAlignedTokens, fallbackWhenEmpty),
+      hasNoteMatches: filtered.length > 0,
+    }
+  }
 
   if (helpsScope === 'obs' && obsQuoteFilter) {
     if (obsQuoteFilter.sourceIds?.length) {
@@ -161,6 +288,7 @@ export function filterDisplayNotes<T extends NoteForDisplay>(
   }
 
   const cleanToken = tokenFilter.content.toLowerCase().trim()
+  // ... rest continues in file
   const filtered = notesWithAlignedTokens.filter((note) => {
     if (note.quoteTokens && note.quoteTokens.length > 0) {
       const cached = note.semanticIds
@@ -200,7 +328,20 @@ export function filterDisplayLinks<T extends LinkForDisplay>(
   filteredByReference: T[],
   params: DisplayFilterParams
 ): { displayLinks: T[]; hasLinkMatches: boolean } {
-  const { helpsScope, obsQuoteFilter, verseFilter, tokenFilter, bookCodeLower, fallbackWhenEmpty } = params
+  const {
+    helpsScope,
+    obsQuoteFilter,
+    verseFilter,
+    tokenFilter,
+    supportRefFilter = null,
+    bookCodeLower,
+    fallbackWhenEmpty,
+  } = params
+
+  // Support-ref filter is TN-only (TA articles).
+  if (supportRefFilter) {
+    return { displayLinks: [], hasLinkMatches: false }
+  }
 
   if (helpsScope === 'obs' && obsQuoteFilter) {
     if (obsQuoteFilter.sourceIds?.length) {

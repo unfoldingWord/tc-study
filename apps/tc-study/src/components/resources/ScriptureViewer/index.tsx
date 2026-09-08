@@ -31,6 +31,10 @@ import {
   isPastCommitThreshold,
 } from '../../../features/nav/scriptureEdgeNavigate'
 import { markReadNavigationInternal } from '../../../features/read/replaceReadUrlFromUi'
+import {
+  scriptureChapterTokensReady,
+  usjDisplayTokensReady,
+} from '../../../features/helps/helpsCardScriptureNav'
 import { usePreparedChapter } from '../../../features/scripture/usePreparedChapter'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import type { VerseNavigationSignal } from '../../../signals/studioSignals'
@@ -166,6 +170,11 @@ export function ScriptureViewer({
 
   // Must come before useHighlighting so the coverage set is available for click decisions
   const underlinedSemanticIds = useUnderlinedTokens(resourceId)
+  const tokensReady = scriptureChapterTokensReady({
+    visibleChapter: currentRef.chapter || 1,
+    matchKeys: preparedOpen.matchKeys,
+    hasUsjTokens: usjDisplayTokensReady(displayVerses, currentRef.chapter || 1),
+  })
 
   // Handle highlighting and token clicks (using resource-panels signal API)
   const {
@@ -174,19 +183,20 @@ export function ScriptureViewer({
     handleTokenClick,
     handleInternedTokenClick,
     handleVerseFilter,
-  } = useHighlighting(resourceId, languageCode, underlinedSemanticIds)
+  } = useHighlighting(resourceId, languageCode, underlinedSemanticIds, tokensReady)
 
   // Listen for verse-navigation signals (from modals, other panels, etc.)
   const handleVerseNavigation = useCallback((signal: VerseNavigationSignal) => {
     const { book, chapter, verse, endChapter, endVerse } = signal.verse
+    markReadNavigationInternal()
     navigateToReference({
       book: book || currentRef.book,
       chapter: chapter ?? currentRef.chapter,
       verse: verse ?? currentRef.verse,
-      endChapter: endChapter ?? currentRef.endChapter,
-      endVerse: endVerse ?? currentRef.endVerse,
+      ...(endChapter != null ? { endChapter } : {}),
+      ...(endVerse != null ? { endVerse } : {}),
     })
-  }, [navigateToReference, currentRef.book, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse])
+  }, [navigateToReference, currentRef.book, currentRef.chapter, currentRef.verse])
 
   useSignalHandler<VerseNavigationSignal>(
     'verse-navigation',
@@ -418,6 +428,7 @@ export function ScriptureViewer({
             currentRef={currentRef}
             highlightTarget={highlightTarget}
             underlinedSemanticIds={underlinedSemanticIds}
+            tokensReady={tokensReady}
             selectedTokenId={selectedTokenId}
             onTokenClick={handleTokenClick}
             onInternedTokenClick={handleInternedTokenClick}

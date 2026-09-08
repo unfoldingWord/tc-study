@@ -3,14 +3,25 @@
  */
 
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import {
   filterLinksByReferenceRange,
   filterNotesByReferenceRange,
+  flattenBookNotes,
   resolveRangeEndVerse,
+  settleSupportRefDisplayNotes,
+  supportReferencesMatch,
   type ObsQuoteFilter,
+  type SupportRefFilter,
   type VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
+import { useSupportRefQuotes } from '../../../features/helps/useSupportRefQuotes'
+import {
+  attachHelpsTokenCache,
+  mergeHelpsTokenCache,
+  preparedRowsCoverChapterSpan,
+  type HelpsTokenCacheRow,
+} from '../../../features/helps/helpsTokenReuse'
 import {
   preparedLinkToTranslationWordsLink,
   preparedNoteToTranslationNote,
@@ -22,7 +33,8 @@ import type { NotesFullRow } from '../../../features/notes/notesPreparer'
 import type { WordsLinksFullRow } from '../../../features/wordsLinks/wordsLinksPreparer'
 import { articlePathFromTwLink } from '../../../features/wordsLinks/wordsLinksPreparer'
 import type { TokenFilter } from '../WordsLinksViewer/types'
-import { useAlignedTokens, useQuoteTokens } from '../WordsLinksViewer/hooks'
+import { useAlignedTokens, useQuoteTokens, useScriptureTokens } from '../WordsLinksViewer/hooks'
+import { useAppStore } from '../../../contexts/AppContext'
 import {
   useCombinedHelpsDisplay,
   useCombinedHelpsMergedRows,
@@ -58,6 +70,7 @@ export interface UseCombinedHelpsPipelineParams {
   tokenFilter: TokenFilter | null
   verseFilter: VerseFilterState | null
   obsQuoteFilter: ObsQuoteFilter | null
+  supportRefFilter?: SupportRefFilter | null
 }
 
 function collectChapterSlice<T>(
@@ -104,7 +117,9 @@ export function useCombinedHelpsPipeline({
   tokenFilter,
   verseFilter,
   obsQuoteFilter,
+  supportRefFilter = null,
 }: UseCombinedHelpsPipelineParams) {
+  // Chapter-scoped notes drive underlines + quote/align for the current passage.
   const relevantNotes = useMemo((): PreparedTranslationNote[] => {
     const startChapter = currentRef.chapter
     const startVerse = currentRef.verse
@@ -112,7 +127,7 @@ export function useCombinedHelpsPipeline({
     const endVerse = resolveRangeEndVerse(currentRef, navigationMode)
 
     const chapterScoped: PreparedTranslationNote[] =
-      preparedNotes != null
+      preparedRowsCoverChapterSpan(preparedNotes, startChapter, endChapter) && preparedNotes
         ? preparedNotes.map(preparedNoteToTranslationNote)
         : collectChapterSlice(notesByChapter, tnNotes, startChapter, endChapter)
 
@@ -135,9 +150,58 @@ export function useCombinedHelpsPipeline({
     navigationMode,
   ])
 
+  // Book-wide TN rows for support-ref filter (no quote/align — display filter only).
+  const bookNotesForSupportRef = useMemo((): PreparedTranslationNote[] => {
+    if (!supportRefFilter) return []
+    return flattenBookNotes(notesByChapter, tnNotes) as PreparedTranslationNote[]
+  }, [supportRefFilter, notesByChapter, tnNotes])
+
+  const supportRefMatchList = useMemo(() => {
+    if (!supportRefFilter) return [] as PreparedTranslationNote[]
+    return bookNotesForSupportRef.filter((n) =>
+      supportReferencesMatch(n.supportReference, supportRefFilter.supportReference)
+    )
+  }, [supportRefFilter, bookNotesForSupportRef])
+
+  const { sourceResourceId } = useScriptureTokens({ resourceId })
+  const targetScriptureKey = useAppStore((s) => {
+    if (!sourceResourceId) return ''
+    const r = s.loadedResources[sourceResourceId]
+    return r?.key || ''
+  })
+
+  const supportRefQuoteEnrichment = useSupportRefQuotes({
+    enabled: Boolean(supportRefFilter),
+    notes: supportRefMatchList,
+    tnKey: tnKey || resourceKey,
+    bookId: currentRef.book || '',
+    targetScriptureKey,
+  })
+
+  const helpsTokenCacheRef = useRef(new Map<string, HelpsTokenCacheRow>())
+  const helpsTokenBookRef = useRef(currentRef.book)
+  if (helpsTokenBookRef.current !== currentRef.book) {
+    helpsTokenBookRef.current = currentRef.book
+    helpsTokenCacheRef.current = new Map()
+  }
+  if (supportRefQuoteEnrichment.size) {
+    mergeHelpsTokenCache(
+      helpsTokenCacheRef.current,
+      [...supportRefQuoteEnrichment.entries()].map(([id, row]) => ({ id, ...row }))
+    )
+  }
+
+  const relevantNotesHydrated = useMemo(
+    () =>
+      attachHelpsTokenCache(relevantNotes, helpsTokenCacheRef.current) as Array<
+        PreparedTranslationNote & HelpsTokenCacheRow
+      >,
+    [relevantNotes, supportRefQuoteEnrichment]
+  )
+
   const notesWithQuotes = useMemo(
     () =>
-      relevantNotes
+      relevantNotesHydrated
         .filter((note) => note.quote && note.quote.trim().length > 0)
         .map((note) => ({
           id: note.id,
@@ -146,8 +210,12 @@ export function useCombinedHelpsPipeline({
           occurrence: note.occurrence || '1',
           origWords: note.quote!,
           articlePath: '',
+          quoteTokens: note.quoteTokens,
+          alignedTokens: note.alignedTokens,
+          semanticIds: note.semanticIds,
+          quoteStatus: note.quoteStatus,
         })),
-    [relevantNotes]
+    [relevantNotesHydrated]
   )
 
   // SCRIPTURE_TOKENS is received on the mounted CombinedHelps resourceId.
@@ -174,32 +242,66 @@ export function useCombinedHelpsPipeline({
       tnLinksAligned.map((l) => [l.id, (l as { semanticIds?: string[] }).semanticIds])
     )
     const quoteStatusMap = new Map(tnLinksAligned.map((l) => [l.id, l.quoteStatus]))
-    return relevantNotes.map((note) => ({
-      ...note,
-      quoteTokens: quoteMap.get(note.id),
-      alignedTokens: alignedMap.get(note.id),
-      semanticIds: semanticIdsMap.get(note.id),
-      // Empty-quote notes skip quote-build; settle immediately so cards paint prose.
-      quoteStatus:
-        quoteStatusMap.get(note.id) ??
-        (note.quote?.trim() ? undefined : 'none'),
-    })) as NoteWithAlignments[]
-  }, [relevantNotes, tnLinksWithQuotes, tnLinksAligned])
+    return relevantNotesHydrated.map((note) => {
+      const quoteTokens = quoteMap.get(note.id)
+      const alignedTokens = alignedMap.get(note.id)
+      const semanticIds = semanticIdsMap.get(note.id)
+      const fromAlignUsable =
+        (Array.isArray(alignedTokens) && alignedTokens.length > 0) ||
+        (Array.isArray(semanticIds) && semanticIds.length > 0)
+      return {
+        ...note,
+        quoteTokens: quoteTokens?.length ? quoteTokens : note.quoteTokens,
+        alignedTokens: alignedTokens?.length ? alignedTokens : note.alignedTokens,
+        semanticIds: semanticIds?.length ? semanticIds : note.semanticIds,
+        // Empty-quote notes skip quote-build; settle immediately so cards paint prose.
+        quoteStatus: fromAlignUsable
+          ? quoteStatusMap.get(note.id) ?? note.quoteStatus
+          : note.quoteStatus ??
+            quoteStatusMap.get(note.id) ??
+            (note.quote?.trim() ? undefined : 'none'),
+      }
+    }) as NoteWithAlignments[]
+  }, [relevantNotesHydrated, tnLinksWithQuotes, tnLinksAligned])
+
+  // When support-ref filter is on, show matching TN notes across the whole book.
+  // Passage-aligned rows win; otherwise merge IndexedDB quote cache + off-passage align.
+  const notesForDisplay = useMemo((): NoteWithAlignments[] => {
+    if (!supportRefFilter) return notesWithAlignedTokens
+    const alignById = new Map(notesWithAlignedTokens.map((n) => [n.id, n]))
+    return settleSupportRefDisplayNotes(
+      bookNotesForSupportRef,
+      supportRefFilter.supportReference,
+      alignById,
+      supportRefQuoteEnrichment
+    ) as NoteWithAlignments[]
+  }, [
+    supportRefFilter,
+    notesWithAlignedTokens,
+    bookNotesForSupportRef,
+    supportRefQuoteEnrichment,
+  ])
+
+  mergeHelpsTokenCache(helpsTokenCacheRef.current, notesWithAlignedTokens)
+  mergeHelpsTokenCache(helpsTokenCacheRef.current, notesForDisplay)
 
   const links = useMemo(() => {
     const startChapter = currentRef.chapter || 1
     const endChapter = currentRef.endChapter || startChapter
-    if (preparedLinks != null) {
-      return preparedLinks.map(preparedLinkToTranslationWordsLink)
-    }
-    const chapterScoped = collectChapterSlice(
-      linksByChapter,
-      twlLinksRaw,
-      startChapter,
-      endChapter
-    )
-    if (!chapterScoped.length) return []
-    return chapterScoped.map(withArticlePath)
+    const raw =
+      preparedRowsCoverChapterSpan(preparedLinks, startChapter, endChapter) && preparedLinks
+        ? preparedLinks.map(preparedLinkToTranslationWordsLink)
+        : (() => {
+            const chapterScoped = collectChapterSlice(
+              linksByChapter,
+              twlLinksRaw,
+              startChapter,
+              endChapter
+            )
+            if (!chapterScoped.length) return []
+            return chapterScoped.map(withArticlePath)
+          })()
+    return attachHelpsTokenCache(raw, helpsTokenCacheRef.current)
   }, [preparedLinks, twlLinksRaw, linksByChapter, currentRef.chapter, currentRef.endChapter])
 
   const { linksWithQuotes: twlLinksWithQuotes, quoteBuildReady: twlQuoteBuildReady } =
@@ -222,6 +324,7 @@ export function useCombinedHelpsPipeline({
     if (twlLinksWithQuotes.length === links.length && twlLinksWithQuotes.length > 0) return twlLinksWithQuotes
     return links
   }, [links, twlLinksWithQuotes, twlLinksAligned]) as LinkWithAlignments[]
+  mergeHelpsTokenCache(helpsTokenCacheRef.current, processedLinks)
 
   const filteredByReference = useMemo(() => {
     if (!processedLinks.length) return []
@@ -258,16 +361,18 @@ export function useCombinedHelpsPipeline({
         const semanticIdsMap = new Map(
           tnLinksAligned.map((l) => [l.id, (l as { semanticIds?: string[] }).semanticIds])
         )
-        const notesForUnderline = relevantNotes.map((note) => ({
+        const notesForUnderline = relevantNotesHydrated.map((note) => ({
           id: note.id,
           reference: note.reference,
           occurrence: note.occurrence,
-          quoteTokens: quoteMap.get(note.id),
-          semanticIds: semanticIdsMap.get(note.id),
+          quoteTokens: quoteMap.get(note.id) ?? note.quoteTokens,
+          semanticIds:
+            semanticIdsMap.get(note.id) ??
+            (Array.isArray(note.semanticIds) ? (note.semanticIds as string[]) : undefined),
         }))
         return underlineGroupsFromHelpsNotes(notesForUnderline, bookCodeLower)
       }),
-    [relevantNotes, tnLinksWithQuotes, tnLinksAligned, bookCodeLower]
+    [relevantNotesHydrated, tnLinksWithQuotes, tnLinksAligned, bookCodeLower]
   )
 
   const underlineTwlGroups = useMemo(
@@ -308,12 +413,13 @@ export function useCombinedHelpsPipeline({
   )
 
   const { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches } = useCombinedHelpsDisplay({
-    notesWithAlignedTokens,
-    filteredByReference,
+    notesWithAlignedTokens: notesForDisplay,
+    filteredByReference: supportRefFilter ? [] : filteredByReference,
     helpsScope,
     obsQuoteFilter,
     verseFilter,
     tokenFilter,
+    supportRefFilter,
     bookCodeLower,
   })
 

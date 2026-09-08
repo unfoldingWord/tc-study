@@ -5,6 +5,7 @@
 
 import type {
   ObsQuoteFilter,
+  SupportRefFilter,
   TokenFilterLike,
   VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
@@ -13,6 +14,7 @@ export interface HelpsFilterIdentityInput {
   tokenFilter: TokenFilterLike | null
   verseFilter: VerseFilterState | null
   obsQuoteFilter: ObsQuoteFilter | null
+  supportRefFilter?: SupportRefFilter | null
 }
 
 /** Stable key for the active filter scope. Omits timestamps. */
@@ -20,6 +22,7 @@ export function helpsFilterIdentity({
   tokenFilter,
   verseFilter,
   obsQuoteFilter,
+  supportRefFilter = null,
 }: HelpsFilterIdentityInput): string {
   return JSON.stringify({
     t: tokenFilter
@@ -38,6 +41,12 @@ export function helpsFilterIdentity({
           k: obsQuoteFilter.kind ?? null,
           s: [...(obsQuoteFilter.sourceIds ?? [])].sort(),
           w: obsQuoteFilter.wordIndex ?? null,
+        }
+      : null,
+    s: supportRefFilter
+      ? {
+          r: supportRefFilter.supportReference,
+          t: supportRefFilter.title,
         }
       : null,
   })

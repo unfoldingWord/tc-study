@@ -32,6 +32,7 @@ import {
   settledCommitMode,
   settledNavChapter,
   shouldAllowChapterStitch,
+  shouldCommitSettledChapter,
   shouldPromotePlaceholderOnSettle,
   shouldResetWindowOnNavChange,
   settleViewportChapter,
@@ -138,6 +139,8 @@ export function useChapterInfiniteScroll(
   const alignToChapterRef = useRef<number | null>(currentRef.chapter)
   /** After next-edge reveal: scroll the new chapter heading to the top with offset. */
   const pendingRevealTopAlignRef = useRef<number | null>(null)
+  /** Previous chapter after a picker/helps jump — settle must not snap back. */
+  const blockSnapBackToRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
 
   const registerChapter = useCallback((chapter: number, el: HTMLElement | null) => {
@@ -246,7 +249,10 @@ export function useChapterInfiniteScroll(
           // Scroll settle advanced nav — keep the stacked window.
           committedByUsRef.current = null
         } else {
-          // Picker / bar jump: reset to one chapter.
+          // Picker / helps jump: reset to one chapter. Do not let align-scroll
+          // settle snap back to the previous chapter or block tokenize.
+          blockSnapBackToRef.current = navChapterRef.current
+          beginProgrammaticScrollSuppress(800)
           ensureAttemptsRef.current.clear()
           setTokenSourceFailed(false)
           healingRef.current = false
@@ -364,6 +370,7 @@ export function useChapterInfiniteScroll(
         if (align != null && parent) {
           const el = chapterElsRef.current.get(align)
           if (el) {
+            beginProgrammaticScrollSuppress(500)
             parent.scrollTop =
               el.getBoundingClientRect().top - parent.getBoundingClientRect().top + parent.scrollTop
           }
@@ -789,12 +796,21 @@ export function useChapterInfiniteScroll(
           rootBottom: root.bottom,
           nearEnd: false,
         })
-        if (parked != null && painted.has(parked) && parked !== navChapterRef.current) {
-          commitChapter(parked)
+        const commitSettled = shouldCommitSettledChapter({
+          parked,
+          navChapter: navChapterRef.current,
+          paintedHasParked: parked != null && painted.has(parked),
+          blockSnapBackTo: blockSnapBackToRef.current,
+        })
+        if (commitSettled) {
+          commitChapter(parked!)
+          blockSnapBackToRef.current = null
+        } else if (parked === navChapterRef.current) {
+          blockSnapBackToRef.current = null
         }
         // Match legacy stitch settle: always re-settle, even when parked === nav
         // (post-commit scroll adjust / reveal-without-scroll would otherwise stick unsettled).
-        markChapterScrollSettled(parked ?? navChapterRef.current)
+        markChapterScrollSettled(commitSettled ? parked! : navChapterRef.current)
       }, SETTLE_HOLD_MS)
     }
 

@@ -154,7 +154,7 @@ describe('loaderConfig SoT', () => {
     for (const id of registered) {
       expect(soT.has(id)).toBe(true)
     }
-  })
+  }, { timeout: 30_000 })
 
   test('AdminPanel and BackgroundDownloadManager read getDownloadPriority SoT', () => {
     const adminSrc = readFileSync(

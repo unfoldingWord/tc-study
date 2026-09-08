@@ -91,12 +91,9 @@ export function useOriginalLanguageContent({
 
     const loadOriginalContent = async () => {
       try {
-        setLoading(true)
+        const hasStale = (contentRef.current?.length ?? 0) > 0
+        if (!hasStale) setLoading(true)
         setError(null)
-        const spanKey = `${helpsRef.book}:${helpsRef.chapter}:${helpsRef.endChapter || helpsRef.chapter}`
-        const keepStale =
-          loadedSpanRef.current === spanKey && (contentRef.current?.length ?? 0) > 0
-        if (!keepStale) setOriginalContent(null)
 
         const bookCode = helpsRef.book?.toUpperCase() || ''
         const resource = resolveOriginalLanguageKey(bookCode)

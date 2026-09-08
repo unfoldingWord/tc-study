@@ -90,6 +90,36 @@ describe('helpsFilterIdentity', () => {
     expect(a).toBe(b)
     expect(c).not.toBe(a)
   })
+  test('support-ref filter changes identity', () => {
+    const none = helpsFilterIdentity({
+      tokenFilter: null,
+      verseFilter: null,
+      obsQuoteFilter: null,
+      supportRefFilter: null,
+    })
+    const active = helpsFilterIdentity({
+      tokenFilter: null,
+      verseFilter: null,
+      obsQuoteFilter: null,
+      supportRefFilter: {
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        title: 'Doublet',
+        timestamp: 1,
+      },
+    })
+    const same = helpsFilterIdentity({
+      tokenFilter: null,
+      verseFilter: null,
+      obsQuoteFilter: null,
+      supportRefFilter: {
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        title: 'Doublet',
+        timestamp: 99,
+      },
+    })
+    expect(active).not.toBe(none)
+    expect(active).toBe(same)
+  })
 })
 
 describe('scrollHelpsToTop', () => {

@@ -1,6 +1,9 @@
 /**
  * Idle-warm helps-quote: cache rows for adjacent chapters once the current
  * chapter settles — so elastic edge reveal lands on already-built quotes.
+ *
+ * Seeds lane 2 via warmScheduler when available; falls back to direct
+ * warmChapterQuotes idle work.
  */
 
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
@@ -27,8 +30,9 @@ import {
 } from './helpsQuoteCache'
 import { resourceContentStamp } from './resourceContentStamp'
 import { useChapterScrollActivity } from '../nav/usePinnedHelpsReference'
+import { warmScheduler } from '../warm/warmScheduler'
 
-function noteToPseudoLink(note: TranslationNote): TranslationWordsLink {
+export function noteToPseudoLink(note: TranslationNote): TranslationWordsLink {
   return {
     id: note.id,
     reference: note.reference,
@@ -36,10 +40,11 @@ function noteToPseudoLink(note: TranslationNote): TranslationWordsLink {
     occurrence: note.occurrence || '1',
     origWords: note.quote || '',
     twLink: '',
+    articlePath: '',
   }
 }
 
-async function resolveCacheCtx(
+export async function resolveHelpsQuoteCacheCtx(
   catalogManager: { getResourceMetadata: (key: string) => Promise<unknown> },
   helpsKey: string,
   bookCode: string
@@ -63,7 +68,8 @@ async function resolveCacheCtx(
   }
 }
 
-async function warmChapterQuotes(args: {
+/** Build + persist quote tokens for one chapter (cache miss warm). */
+export async function warmChapterQuotes(args: {
   cache: HelpsQuoteCacheAdapter
   catalogManager: { getResourceMetadata: (key: string) => Promise<unknown> }
   loader: ScriptureLoader
@@ -76,7 +82,7 @@ async function warmChapterQuotes(args: {
   if (!helpsKey || links.length === 0) return
 
   const bookCode = bookId.toUpperCase()
-  const cacheCtx = await resolveCacheCtx(catalogManager, helpsKey, bookCode)
+  const cacheCtx = await resolveHelpsQuoteCacheCtx(catalogManager, helpsKey, bookCode)
   if (!cacheCtx) return
 
   const existing = await readCachedQuoteTokens(cache, {
@@ -114,7 +120,15 @@ async function warmChapterQuotes(args: {
   for (const row of results) {
     const link = needsBuild[row.index]
     if (!link) continue
-    built[link.id] = toCachedQuoteTokens(row.tokens as Array<{ id?: number; text?: string; type?: string; occurrence?: number; content?: string }>)
+    built[link.id] = toCachedQuoteTokens(
+      row.tokens as Array<{
+        id?: number
+        text?: string
+        type?: string
+        occurrence?: number
+        content?: string
+      }>
+    )
   }
   if (Object.keys(built).length === 0) return
 
@@ -165,9 +179,6 @@ export function useWarmAdjacentHelpsQuotes(args: {
     const warmKey = `${tnKey}|${twlKey}|${bookId}|${chapter}`
     if (warmedRef.current === warmKey) return
 
-    const loader = loaderRegistry.getLoader('scripture') as ScriptureLoader | undefined
-    if (!loader || typeof loader.loadViewModel !== 'function') return
-
     const neighbors = [chapter - 1, chapter + 1].filter(
       (c) => c >= 1 && c <= lastChapter && c !== chapter
     )
@@ -176,37 +187,67 @@ export function useWarmAdjacentHelpsQuotes(args: {
     const cancel = scheduleIdle(() => {
       warmedRef.current = warmKey
       void (async () => {
-        for (const ch of neighbors) {
-          const notes = notesByChapter?.[String(ch)] ?? []
-          const links = linksByChapter?.[String(ch)] ?? []
-          const tnLinks = notes
-            .filter((n) => n.quote?.trim())
-            .map(noteToPseudoLink)
-          try {
-            if (tnKey && tnLinks.length) {
-              await warmChapterQuotes({
-                cache,
-                catalogManager,
-                loader,
-                helpsKey: tnKey,
-                bookId,
-                chapter: ch,
-                links: tnLinks,
-              })
+        const bookCode = bookId.toUpperCase()
+        const seedViaScheduler = async (helpsKey: string, helpsType: 'notes' | 'words-links') => {
+          if (!helpsKey) return
+          const ctx = await resolveHelpsQuoteCacheCtx(catalogManager, helpsKey, bookCode)
+          if (!ctx) return
+          const lang = helpsKey.split('/')[1]?.split('_')[0] ?? ''
+          for (const ch of neighbors) {
+            await warmScheduler.enqueue({
+              jobKey: `quote:${helpsKey}:${bookId}:${ch}`,
+              lane: 2,
+              kind: 'quote-chapter',
+              languageCode: lang,
+              resourceKey: helpsKey,
+              bookId,
+              chapter: ch,
+              helpsStamp: ctx.helpsStamp,
+              olKey: ctx.olKey,
+              olStamp: ctx.olStamp,
+              helpsType,
+            })
+          }
+        }
+
+        try {
+          warmScheduler.notifyLane1Drained()
+          await seedViaScheduler(tnKey, 'notes')
+          await seedViaScheduler(twlKey, 'words-links')
+        } catch {
+          // Fallback: direct warm when scheduler enqueue fails.
+          const loader = loaderRegistry.getLoader('scripture') as ScriptureLoader | undefined
+          if (!loader || typeof loader.loadViewModel !== 'function') return
+          for (const ch of neighbors) {
+            const notes = notesByChapter?.[String(ch)] ?? []
+            const links = linksByChapter?.[String(ch)] ?? []
+            const tnLinks = notes.filter((n) => n.quote?.trim()).map(noteToPseudoLink)
+            try {
+              if (tnKey && tnLinks.length) {
+                await warmChapterQuotes({
+                  cache,
+                  catalogManager,
+                  loader,
+                  helpsKey: tnKey,
+                  bookId,
+                  chapter: ch,
+                  links: tnLinks,
+                })
+              }
+              if (twlKey && links.length) {
+                await warmChapterQuotes({
+                  cache,
+                  catalogManager,
+                  loader,
+                  helpsKey: twlKey,
+                  bookId,
+                  chapter: ch,
+                  links,
+                })
+              }
+            } catch {
+              /* non-fatal warm */
             }
-            if (twlKey && links.length) {
-              await warmChapterQuotes({
-                cache,
-                catalogManager,
-                loader,
-                helpsKey: twlKey,
-                bookId,
-                chapter: ch,
-                links,
-              })
-            }
-          } catch {
-            /* non-fatal warm */
           }
         }
       })()

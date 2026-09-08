@@ -66,6 +66,8 @@ interface ScriptureContentProps {
   currentRef: ReferenceState
   highlightTarget: OriginalLanguageToken | null
   underlinedSemanticIds?: Set<string>
+  /** Destination chapter tokens have painted (prepared-full or USJ). */
+  tokensReady?: boolean
   selectedTokenId: string | null
   onTokenClick: (token: UsjWordToken) => void
   onInternedTokenClick?: (
@@ -189,6 +191,7 @@ export function ScriptureContent({
   currentRef,
   highlightTarget,
   underlinedSemanticIds,
+  tokensReady = false,
   selectedTokenId,
   onTokenClick,
   onInternedTokenClick,
@@ -347,9 +350,11 @@ export function ScriptureContent({
 
   useEffect(() => {
     if (!highlightTarget || !selectedTokenId) return
-    if (lastScrolledTokenRef.current === selectedTokenId) return
 
-    const timer = setTimeout(() => {
+    let cancelled = false
+    const tryScroll = (attempt: number) => {
+      if (cancelled) return
+      if (lastScrolledTokenRef.current === selectedTokenId) return
       const highlightedElements = containerRef.current?.querySelectorAll('[data-highlighted="true"]')
       if (highlightedElements && highlightedElements.length > 0) {
         // Top of the scrollport with scroll-mt on highlighted tokens (not center):
@@ -362,15 +367,30 @@ export function ScriptureContent({
           inline: 'nearest',
         })
         lastScrolledTokenRef.current = selectedTokenId
+        return
       }
-    }, 100)
+      if (attempt < 16) {
+        window.setTimeout(() => tryScroll(attempt + 1), 80)
+      }
+    }
 
-    return () => clearTimeout(timer)
-  }, [highlightTarget, selectedTokenId, containerRef])
+    const timer = window.setTimeout(() => tryScroll(0), tokensReady ? 40 : 100)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [
+    highlightTarget,
+    selectedTokenId,
+    containerRef,
+    currentRef.book,
+    currentRef.chapter,
+    tokensReady,
+  ])
 
   useEffect(() => {
     lastScrolledTokenRef.current = null
-  }, [currentRef.book, currentRef.chapter, currentRef.verse])
+  }, [currentRef.book, currentRef.chapter, currentRef.verse, tokensReady])
 
   const includeVerse = useMemo(() => includeVerseForRef(currentRef), [currentRef])
   const navChapters = useMemo(() => chaptersForRef(currentRef), [currentRef])

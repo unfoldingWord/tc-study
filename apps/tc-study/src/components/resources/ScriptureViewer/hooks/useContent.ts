@@ -25,6 +25,7 @@ import {
   SCRIPTURE_PREPARE_VERSION,
   type ScriptureNavRecord,
 } from '../../../../features/scripture/scripturePreparer'
+import { useWarmLanes } from '../../../../features/warm/useWarmLanes'
 import { enqueueScriptureBookPriority } from '../../../../workers/prepareClient'
 import type { DisplayUsjVerse } from '../types'
 import { loadUsjViewModel } from '../utils/loadUsjViewModel'
@@ -301,6 +302,34 @@ export function useContent(
   const viewModel = loaded.key === loadKey ? loaded.viewModel : null
   const nav = loaded.key === loadKey ? loaded.nav : null
   const isLoading = loaded.key !== loadKey || isLoadingRaw
+
+  const lastChapterForWarm = useMemo(() => {
+    if (nav && nav.chapters.length > 0) return lastChapterFromNav(nav)
+    if (viewModel) return Math.max(...viewModel.chapters.map((c) => c.number), 1)
+    return 0
+  }, [nav, viewModel])
+
+  const warmVisibleResources = useMemo(
+    () => [
+      {
+        typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
+        resourceKey,
+        role: 'scripture' as const,
+      },
+    ],
+    [resourceKey]
+  )
+
+  useWarmLanes({
+    owner: 'scripture',
+    visibleResources: warmVisibleResources,
+    sourceResourceId: resourceKey,
+    textLanguageCode:
+      _language || resourceKey.split('/')[1]?.split('_')[0] || '',
+    helpsLanguageCode: '',
+    lastChapter: lastChapterForWarm || undefined,
+    lane1Ready: !isLoading && (!!nav || !!viewModel),
+  })
 
   // Re-prioritize prepare jobs when the open chapter changes within the same book.
   useEffect(() => {

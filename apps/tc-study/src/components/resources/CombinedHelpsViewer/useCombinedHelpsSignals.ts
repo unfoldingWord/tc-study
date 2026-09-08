@@ -5,15 +5,17 @@
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
+import { shouldClearHelpsHighlightOnTokenNull } from '../../../features/helps/helpsCardScriptureNav'
 import type {
   EntryLinkClickSignal,
   ObsFrameHighlightSignal,
   TokenClickSignal,
   VerseFilterSignal,
+  VerseNavigationSignal,
 } from '../../../signals/studioSignals'
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { focusFirstMatchingHelpsCard, type HelpsCardSelection } from './helpsCardSelection'
-import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
+import type { HelpsKindFilter, ObsQuoteFilter, SupportRefFilter, VerseFilterState } from './types'
 import type { NoteWithAlignments, LinkWithAlignments } from './useCombinedHelpsMerge'
 import { useCombinedHelpsObsQuotesBroadcast } from './useCombinedHelpsObsQuotesBroadcast'
 import { useCombinedHelpsTokenGroupsBroadcast } from './useCombinedHelpsTokenGroupsBroadcast'
@@ -37,6 +39,7 @@ export interface UseCombinedHelpsSignalsParams {
   setTokenFilter: Dispatch<SetStateAction<TokenFilter | null>>
   setVerseFilter: Dispatch<SetStateAction<VerseFilterState | null>>
   setObsQuoteFilter: Dispatch<SetStateAction<ObsQuoteFilter | null>>
+  setSupportRefFilter?: Dispatch<SetStateAction<SupportRefFilter | null>>
   setSelectedHelpsCard: Dispatch<SetStateAction<HelpsCardSelection>>
 }
 
@@ -57,6 +60,7 @@ export function useCombinedHelpsSignals({
   setTokenFilter,
   setVerseFilter,
   setObsQuoteFilter,
+  setSupportRefFilter,
   setSelectedHelpsCard,
 }: UseCombinedHelpsSignalsParams) {
   const resourceMetadata = useMemo(
@@ -85,6 +89,11 @@ export function useCombinedHelpsSignals({
     resourceId,
     resourceMetadata
   )
+  const { sendToAll: sendVerseNavigation } = useSignal<VerseNavigationSignal>(
+    'verse-navigation',
+    resourceId,
+    resourceMetadata
+  )
   const { sendToAll: broadcastObsHighlight } = useSignal<ObsFrameHighlightSignal>(
     'obs-frame-highlight',
     resourceId,
@@ -98,9 +107,10 @@ export function useCombinedHelpsSignals({
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
         // Toggle-off: clear token filter owned by the scripture selection (keep OBS/underlines).
+        // Persist still owning a click means remount/reload null — keep the card.
         if (signal.token === null) {
           setTokenFilter(null)
-          setSelectedHelpsCard(null)
+          if (shouldClearHelpsHighlightOnTokenNull()) setSelectedHelpsCard(null)
           return
         }
         // Uncovered scripture clicks broadcast token-click for scripture highlighting
@@ -114,6 +124,7 @@ export function useCombinedHelpsSignals({
         }
         setTokenFilter(nextFilter)
         setVerseFilter(null)
+        setSupportRefFilter?.(null)
         setSelectedHelpsCard(
           focusFirstMatchingHelpsCard({
             notes: notesWithAlignedTokens,
@@ -134,6 +145,7 @@ export function useCombinedHelpsSignals({
         currentRef.book,
         setTokenFilter,
         setVerseFilter,
+        setSupportRefFilter,
         setSelectedHelpsCard,
       ]
     ),
@@ -157,9 +169,10 @@ export function useCombinedHelpsSignals({
           timestamp: signal.timestamp,
         })
         setTokenFilter(null)
+        setSupportRefFilter?.(null)
         setSelectedHelpsCard(null)
       },
-      [resourceId, setVerseFilter, setTokenFilter, setSelectedHelpsCard]
+      [resourceId, setVerseFilter, setTokenFilter, setSupportRefFilter, setSelectedHelpsCard]
     ),
     { debug: false, resourceMetadata }
   )
@@ -194,7 +207,10 @@ export function useCombinedHelpsSignals({
     notesWithAlignedTokens,
     filteredByReference,
     resourceMetadata,
-    setObsQuoteFilter,
+    setObsQuoteFilter: ((action) => {
+      if (typeof action !== 'function' && action) setSupportRefFilter?.(null)
+      setObsQuoteFilter(action)
+    }) as Dispatch<SetStateAction<ObsQuoteFilter | null>>,
     setSelectedHelpsCard,
   })
 
@@ -203,6 +219,7 @@ export function useCombinedHelpsSignals({
     sendTokenClick,
     sendEntryLinkClick,
     sendVerseFilter,
+    sendVerseNavigation,
     broadcastObsHighlight,
   }
 }

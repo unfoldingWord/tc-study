@@ -168,6 +168,7 @@ export function useCombinedHelpsDisplay({
   obsQuoteFilter,
   verseFilter,
   tokenFilter,
+  supportRefFilter = null,
   bookCodeLower,
 }: UseCombinedHelpsDisplayParams) {
   const params: DisplayFilterParams = {
@@ -175,19 +176,36 @@ export function useCombinedHelpsDisplay({
     obsQuoteFilter,
     verseFilter,
     tokenFilter,
+    supportRefFilter,
     bookCodeLower,
   }
 
   const { displayNotes, hasNoteMatches } = useMemo(
     () => filterDisplayNotes(notesWithAlignedTokens, params),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- params fields listed explicitly
-    [notesWithAlignedTokens, helpsScope, obsQuoteFilter, verseFilter, tokenFilter, bookCodeLower]
+    [
+      notesWithAlignedTokens,
+      helpsScope,
+      obsQuoteFilter,
+      verseFilter,
+      tokenFilter,
+      supportRefFilter,
+      bookCodeLower,
+    ]
   )
 
   const { displayLinks, hasLinkMatches } = useMemo(
     () => filterDisplayLinks(filteredByReference, params),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredByReference, helpsScope, obsQuoteFilter, verseFilter, tokenFilter, bookCodeLower]
+    [
+      filteredByReference,
+      helpsScope,
+      obsQuoteFilter,
+      verseFilter,
+      tokenFilter,
+      supportRefFilter,
+      bookCodeLower,
+    ]
   )
 
   return { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches }

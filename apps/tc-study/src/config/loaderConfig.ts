@@ -88,7 +88,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-questions-loader',
     downloadPriority: 25,
     factoryKey: 'questions',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS,
@@ -112,7 +112,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-words-loader',
     downloadPriority: 20,
     factoryKey: 'words',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.TRANSLATION_ACADEMY,
@@ -120,7 +120,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-academy-loader',
     downloadPriority: 30,
     factoryKey: 'academy',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.OBS,
@@ -128,7 +128,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: 'src/lib/loaders/ObsLoader',
     downloadPriority: 5,
     factoryKey: 'obs',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.OBS_NOTES,
@@ -136,7 +136,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-notes-loader',
     downloadPriority: 11,
     factoryKey: 'notes',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.OBS_QUESTIONS,
@@ -144,7 +144,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-questions-loader',
     downloadPriority: 26,
     factoryKey: 'questions',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
 ]
 

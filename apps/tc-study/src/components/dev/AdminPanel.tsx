@@ -32,6 +32,7 @@ import {
   setScripturePerfEnabled,
   subscribeScripturePerf,
 } from '../../features/perf/scripturePerf'
+import { warmScheduler } from '../../features/warm/warmScheduler'
 
 interface ResourceWithStatus {
   metadata: ResourceMetadata
@@ -190,6 +191,7 @@ export function AdminPanel() {
         </div>
 
         <ScripturePerfSection />
+        <WarmLaneSection />
 
         {/* Stats Bar */}
         <div className="grid grid-cols-4 gap-4 p-4 bg-muted border-b border-border">
@@ -503,6 +505,25 @@ function ScripturePerfSection() {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function WarmLaneSection() {
+  const stats = useSyncExternalStore(
+    warmScheduler.subscribe,
+    () => warmScheduler.getStats(),
+    () => warmScheduler.getStats()
+  )
+  return (
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/40 text-[10px] font-mono text-fg-secondary">
+      <span title="Warm lane scheduler" aria-label="Warm lane scheduler">
+        Warm
+      </span>
+      <span>pending={stats.pendingJobKeys}</span>
+      <span>lane1={stats.lane1Drained ? 'drained' : 'busy'}</span>
+      <span>scroll={stats.scrollUnsettled ? 'unsettled' : 'settled'}</span>
+      <span>worker={stats.dedicatedWorker ? 'dedicated' : 'prepare'}</span>
     </div>
   )
 }

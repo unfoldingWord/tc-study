@@ -4,6 +4,7 @@
 
 import type { OptimizedChapter, TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { markScripturePerfEnd, markScripturePerfStart } from '../features/perf/scripturePerf'
+import type { WarmJobOutcome } from '../features/warm/warmTypes'
 import type { PrepareJob, PreparePriority } from './prepare.worker'
 import type { PrepareTier } from '../features/prepare/prepareKeys'
 
@@ -31,6 +32,14 @@ type ReadyFailedMsg = {
 
 export type PrepareReadyListener = (msg: ReadyMsg) => void
 export type PrepareReadyFailedListener = (msg: ReadyFailedMsg) => void
+export type PrepareWarmDoneListener = (msg: {
+  id: string
+  type: 'done'
+  jobKey: string
+  kind: string
+  lane: 1 | 2 | 3
+  outcome?: WarmJobOutcome
+}) => void
 
 let worker: Worker | null = null
 let seq = 0
@@ -40,6 +49,7 @@ const pending = new Map<
 >()
 const readyListeners = new Set<PrepareReadyListener>()
 const readyFailedListeners = new Set<PrepareReadyFailedListener>()
+const warmDoneListeners = new Set<PrepareWarmDoneListener>()
 
 function getWorker(): Worker | null {
   if (typeof Worker === 'undefined') return null
@@ -48,7 +58,22 @@ function getWorker(): Worker | null {
     worker = new Worker(new URL('./prepare.worker.ts', import.meta.url), {
       type: 'module',
     })
-    worker.onmessage = (event: MessageEvent<OkMsg | ErrMsg | ReadyMsg | ReadyFailedMsg>) => {
+    worker.onmessage = (
+      event: MessageEvent<
+        | OkMsg
+        | ErrMsg
+        | ReadyMsg
+        | ReadyFailedMsg
+        | {
+            id: string
+            type: 'done'
+            jobKey: string
+            kind: string
+            lane: 1 | 2 | 3
+            outcome?: WarmJobOutcome
+          }
+      >
+    ) => {
       const msg = event.data
       if (msg.type === 'ready') {
         for (const listener of readyListeners) listener(msg)
@@ -56,6 +81,10 @@ function getWorker(): Worker | null {
       }
       if (msg.type === 'ready-failed') {
         for (const listener of readyFailedListeners) listener(msg)
+        return
+      }
+      if (msg.type === 'done') {
+        for (const listener of warmDoneListeners) listener(msg)
         return
       }
       const entry = pending.get(msg.id)
@@ -102,6 +131,14 @@ export function subscribePrepareReadyFailed(
   getWorker()
   return () => {
     readyFailedListeners.delete(listener)
+  }
+}
+
+export function subscribePrepareWarmDone(listener: PrepareWarmDoneListener): () => void {
+  warmDoneListeners.add(listener)
+  getWorker()
+  return () => {
+    warmDoneListeners.delete(listener)
   }
 }
 
@@ -191,6 +228,21 @@ export async function batchAlignInWorker(
   } finally {
     markScripturePerfEnd('align-tokens', args.bookCode)
   }
+}
+
+/** Fallback path when dedicated warm.worker is unavailable (hardwareConcurrency < 4). */
+export async function enqueueWarmJobOnPrepareWorker(
+  job: import('../features/warm/warmTypes').WarmJob
+): Promise<void> {
+  await callWorker({ type: 'warm-job', job })
+}
+
+export async function cancelWarmJobsOnPrepareWorker(args: {
+  resourceKey?: string
+  bookId?: string
+  languageCode?: string
+}): Promise<void> {
+  await callWorker({ type: 'warm-cancel', ...args })
 }
 
 // Backward-compatible re-exports for any leftover scripturePrepClient imports.

@@ -8,11 +8,14 @@
  *  { id, type: 'cancel-book', typeId, resourceKey, bookId }
  *  { id, type: 'batch-quotes', bookCode, links, originalChapters }
  *  { id, type: 'batch-align', …BatchAlignLinksArgs }
+ *  { id, type: 'warm-job', job: WarmJob }
+ *  { id, type: 'warm-cancel', resourceKey?, bookId?, languageCode? }
  *
  * OUT:
  *  { id, type: 'ok', result }
  *  { id, type: 'ready', typeId, resourceKey, bookId, unit, tier }
  *  { id, type: 'ready-failed', typeId, resourceKey, bookId, unit, tier, reason }
+ *  { id, type: 'done', jobKey, kind, lane }  // warm job complete
  *  { id, type: 'error', message }
  */
 
@@ -23,6 +26,8 @@ import '../features/prepare/registerPreparers'
 import { writePreparedUnit } from '../features/prepare/prepareCache'
 import { getPreparer } from '../features/prepare/prepareRegistry'
 import type { PrepareTier } from '../features/prepare/prepareKeys'
+import { runWarmJob } from '../features/warm/warmJobs'
+import type { WarmJob } from '../features/warm/warmTypes'
 
 const WorkerScope = (globalThis as typeof globalThis & {
   WorkerGlobalScope?: new () => object
@@ -59,6 +64,14 @@ type InMsg =
       originalChapters: Parameters<typeof batchBuildQuoteTokens>[0]['originalChapters']
     }
   | ({ id: string; type: 'batch-align' } & BatchAlignLinksArgs)
+  | { id: string; type: 'warm-job'; job: WarmJob }
+  | {
+      id: string
+      type: 'warm-cancel'
+      resourceKey?: string
+      bookId?: string
+      languageCode?: string
+    }
 
 const cacheAdapter = new IndexedDBCacheAdapter({
   dbName: 'tc-study-cache',
@@ -67,8 +80,27 @@ const cacheAdapter = new IndexedDBCacheAdapter({
 })
 
 const queue: PrepareJob[] = []
+const warmQueue: WarmJob[] = []
 let running = false
 let cancelToken = 0
+let warmCancelToken = 0
+let currentWarmJob: WarmJob | null = null
+
+function warmJobMatchesCancel(
+  j: WarmJob,
+  args: { resourceKey?: string; bookId?: string; languageCode?: string }
+): boolean {
+  if (!args.resourceKey && !args.bookId && !args.languageCode) return false
+  if (args.resourceKey && j.resourceKey !== args.resourceKey) return false
+  if (args.bookId && j.bookId.toLowerCase() !== args.bookId.toLowerCase()) return false
+  if (
+    args.languageCode &&
+    j.languageCode?.toLowerCase() !== args.languageCode.toLowerCase()
+  ) {
+    return false
+  }
+  return true
+}
 
 function reply(payload: Record<string, unknown>) {
   ;(self as unknown as { postMessage: (data: unknown) => void }).postMessage(payload)
@@ -181,17 +213,45 @@ async function pump() {
   if (running) return
   running = true
   try {
-    while (queue.length > 0) {
-      const job = queue.shift()!
-      const token = cancelToken
+    while (queue.length > 0 || warmQueue.length > 0) {
+      // Prefer interactive prepare jobs over warm fallbacks.
+      if (queue.length > 0) {
+        const job = queue.shift()!
+        const token = cancelToken
+        try {
+          await runOne(job, token)
+        } catch (err) {
+          reply({
+            id: 'prep',
+            type: 'error',
+            message: err instanceof Error ? err.message : String(err),
+          })
+        }
+        continue
+      }
+      const warmJob = warmQueue.shift()!
+      currentWarmJob = warmJob
+      const token = warmCancelToken
       try {
-        await runOne(job, token)
+        const outcome = await runWarmJob(cacheAdapter, warmJob, () => token !== warmCancelToken)
+        if (token === warmCancelToken) {
+          reply({
+            id: 'warm',
+            type: 'done',
+            jobKey: warmJob.jobKey,
+            kind: warmJob.kind,
+            lane: warmJob.lane,
+            outcome,
+          })
+        }
       } catch (err) {
         reply({
           id: 'prep',
           type: 'error',
           message: err instanceof Error ? err.message : String(err),
         })
+      } finally {
+        currentWarmJob = null
       }
     }
   } finally {
@@ -226,6 +286,30 @@ self.onmessage = (event: MessageEvent<InMsg>) => {
       const { id: _id, type: _type, ...args } = msg
       const result = batchAlignLinks(args)
       reply({ id: msg.id, type: 'ok', result })
+      return
+    }
+    if (msg.type === 'warm-job') {
+      warmQueue.push(msg.job)
+      warmQueue.sort((a, b) => a.lane - b.lane)
+      reply({ id: msg.id, type: 'ok', result: { queued: true } })
+      void pump()
+      return
+    }
+    if (msg.type === 'warm-cancel') {
+      const filter = {
+        resourceKey: msg.resourceKey,
+        bookId: msg.bookId,
+        languageCode: msg.languageCode,
+      }
+      for (let i = warmQueue.length - 1; i >= 0; i--) {
+        if (!warmJobMatchesCancel(warmQueue[i]!, filter)) continue
+        warmQueue.splice(i, 1)
+      }
+      // Only abort in-flight warm when it matches the filter.
+      if (currentWarmJob && warmJobMatchesCancel(currentWarmJob, filter)) {
+        warmCancelToken += 1
+      }
+      reply({ id: msg.id, type: 'ok', result: { cancelled: true } })
       return
     }
     reply({

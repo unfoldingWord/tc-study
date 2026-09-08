@@ -102,6 +102,7 @@ describe('scripture content load retry (language-switch race)', () => {
     expect(src).toContain('attachFoldedMatchKeysToChapter')
     expect(src).toContain('readPreparedNav')
     expect(src).toContain('enqueueScriptureBookPriority')
+    expect(src).toContain('useWarmLanes')
     expect(src).not.toContain('readScripturePrepCache')
     expect(src).toMatch(/const viewModel = loaded\.key === loadKey \? loaded\.viewModel : null/)
     expect(src).toMatch(/setLoaded\(\{ key: loadKey, viewModel: null, nav: null \}\)/)

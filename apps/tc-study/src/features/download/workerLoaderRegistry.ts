@@ -127,16 +127,21 @@ const LOADER_FACTORIES: Partial<Record<LoaderFactoryKey, LoaderCtor>> = {
         enableMemoryCache: true,
       }),
     }),
-  words: (deps) => new TranslationWordsLoader(toLoaderConfig(deps)),
+  words: (deps) =>
+    new TranslationWordsLoader(withPrepareHook(deps, 'words', toLoaderConfig(deps))),
   'words-links': (deps) =>
     new TranslationWordsLinksLoader(
       withPrepareHook(deps, 'words-links', toLoaderConfig(deps))
     ),
-  academy: (deps) => new TranslationAcademyLoader(toLoaderConfig(deps)),
+  academy: (deps) =>
+    new TranslationAcademyLoader(withPrepareHook(deps, 'academy', toLoaderConfig(deps))),
   notes: (deps) =>
     new TranslationNotesLoader(withPrepareHook(deps, 'notes', toLoaderConfig(deps))),
-  questions: (deps) => new TranslationQuestionsLoader(toLoaderConfig(deps)),
-  obs: (deps) => new ObsLoader(toLoaderConfig(deps)),
+  questions: (deps) =>
+    new TranslationQuestionsLoader(
+      withPrepareHook(deps, 'questions', toLoaderConfig(deps))
+    ),
+  obs: (deps) => new ObsLoader(withPrepareHook(deps, 'obs', toLoaderConfig(deps))),
 }
 
 /**

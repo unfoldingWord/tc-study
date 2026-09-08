@@ -16,6 +16,7 @@ export type ScripturePerfPhase =
   | 'align-tokens'
   | 'underline-groups'
   | 'title-preload'
+  | 'warm-lane'
 
 export interface ScripturePerfSample {
   phase: ScripturePerfPhase | 'longtask'

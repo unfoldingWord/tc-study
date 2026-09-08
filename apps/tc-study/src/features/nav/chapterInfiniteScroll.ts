@@ -760,6 +760,22 @@ export function shouldResetWindowOnNavChange(args: {
   return args.navChapter !== args.prevNavChapter
 }
 
+/**
+ * After a CombinedHelps / picker jump, ignore settle that would commit the
+ * previous chapter (align scroll still sees the old pane for one frame).
+ */
+export function shouldCommitSettledChapter(args: {
+  parked: number | null
+  navChapter: number
+  paintedHasParked: boolean
+  blockSnapBackTo: number | null
+}): boolean {
+  if (args.parked == null || !args.paintedHasParked) return false
+  if (args.parked === args.navChapter) return false
+  if (args.blockSnapBackTo != null && args.parked === args.blockSnapBackTo) return false
+  return true
+}
+
 export function wouldEnqueueWholeBook(
   mounted: readonly number[],
   lastChapter: number

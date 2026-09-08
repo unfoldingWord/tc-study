@@ -4,7 +4,8 @@
  * helps-quote:{helpsKey}@{helpsStamp}:{olKey}@{olStamp}:{book}:{chapter}
  *
  * OL stamp includes USJ_PROCESSING_VERSION so processing bumps invalidate.
- * Align results stay memory-only — this stores only the clone-safe quote token subset.
+ * This stores only the clone-safe quote token subset (helps × OL).
+ * Align positions live in helps-align: (helps × OL × target scripture).
  */
 
 import { USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
@@ -139,8 +140,30 @@ export async function readCachedQuoteTokensForSpan(
     endChapter: number
   }
 ): Promise<CachedQuoteTokens> {
-  const merged: CachedQuoteTokens = {}
+  const chapters: number[] = []
   for (let chapter = args.startChapter; chapter <= args.endChapter; chapter++) {
+    chapters.push(chapter)
+  }
+  return readCachedQuoteTokensForChapters(cache, { ...args, chapters })
+}
+
+/** Merge quote-token rows for an arbitrary (sparse) chapter set. */
+export async function readCachedQuoteTokensForChapters(
+  cache: HelpsQuoteCacheAdapter,
+  args: {
+    helpsKey: string
+    helpsStamp: string
+    olKey: string
+    olStamp: string
+    book: string
+    chapters: readonly number[]
+  }
+): Promise<CachedQuoteTokens> {
+  const merged: CachedQuoteTokens = {}
+  const seen = new Set<number>()
+  for (const chapter of args.chapters) {
+    if (!Number.isFinite(chapter) || chapter < 1 || seen.has(chapter)) continue
+    seen.add(chapter)
     const row = await readCachedQuoteTokens(cache, { ...args, chapter })
     if (!row) continue
     Object.assign(merged, row)
