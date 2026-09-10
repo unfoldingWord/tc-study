@@ -18,12 +18,26 @@ export {
 export {
   legacyScriptureKey,
   usjScriptureKey,
+  usjScriptureChapterKey,
   LEGACY_SCRIPTURE_PREFIX,
   USJ_SCRIPTURE_PREFIX,
   STALE_SCRIPTURE_CACHE_HINT,
   isUsjScriptureKey,
+  isUsjScriptureChapterKey,
   isLegacyScriptureKey,
 } from './scriptureCacheKeys'
+export {
+  buildUsjChapterContent,
+  buildUsjBookIndex,
+  writeUsjChapters,
+  readUsjChapter,
+  readUsjBook,
+  hasUsjChapterOrBook,
+  unwrapUsjEntry,
+  isUsjBookIndex,
+  type UsjChapterCache,
+  type UsjScriptureBookIndex,
+} from './usjChapterStore'
 export {
   isUsjScriptureCacheContent,
   isProcessedScriptureContent,

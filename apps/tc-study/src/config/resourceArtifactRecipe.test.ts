@@ -32,6 +32,7 @@ describe('resourceArtifactRecipe', () => {
 
   test('scripture has prepare only — no quotes', () => {
     const s = getArtifactRecipe(RESOURCE_TYPE_IDS.SCRIPTURE)
+    expect(s!.sotGrain).toBe('chapter')
     expect(s!.artifacts).toEqual(['prepare'])
     expect(s!.needs).toEqual([])
     expect(recipeHasQuotes(RESOURCE_TYPE_IDS.SCRIPTURE)).toBe(false)

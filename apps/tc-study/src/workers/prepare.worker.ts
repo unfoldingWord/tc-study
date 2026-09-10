@@ -145,9 +145,12 @@ async function runOne(job: PrepareJob, token: number): Promise<void> {
     return
   }
   const ctx = { cacheAdapter }
-  const source = await preparer.readSource(ctx, job.resourceKey, job.bookId)
+  const scripturePerUnit = job.typeId === 'scripture'
+  const bookSource = scripturePerUnit
+    ? null
+    : await preparer.readSource(ctx, job.resourceKey, job.bookId)
   if (token !== cancelToken) return
-  if (source == null) {
+  if (!scripturePerUnit && bookSource == null) {
     // Never silently no-op — main thread must heal scripture-usj: (or other SoT)
     // before enqueueing again. Without this, light/nav stay warm and full never lands.
     reply({
@@ -194,6 +197,26 @@ async function runOne(job: PrepareJob, token: number): Promise<void> {
     )
     if (already) {
       for (const tier of tiers) replyReady(unit, tier)
+      continue
+    }
+    const source = scripturePerUnit
+      ? await preparer.readSource(
+          { cacheAdapter, chapter: unit },
+          job.resourceKey,
+          job.bookId
+        )
+      : bookSource
+    if (source == null) {
+      reply({
+        id: 'prep',
+        type: 'ready-failed',
+        typeId: job.typeId,
+        resourceKey: job.resourceKey,
+        bookId: job.bookId,
+        unit,
+        tier: job.tier === 'both' ? 'full' : job.tier,
+        reason: 'source-missing',
+      })
       continue
     }
     if (!wroteNav && preparer.prepareNav) {

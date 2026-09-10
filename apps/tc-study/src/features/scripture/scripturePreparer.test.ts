@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   buildUsjLayoutBlocksForChapter,
   semanticIdFor,
+  usjScriptureChapterKey,
   type UsjScriptureViewModel,
   type UsjWordToken,
 } from '@bt-synergy/scripture-loader'
@@ -19,6 +20,7 @@ import {
   SCRIPTURE_PREPARE_SCHEMA,
   SCRIPTURE_PREPARE_VERSION,
   scripturePrepareVersionFor,
+  scripturePreparer,
 } from './scripturePreparer'
 
 function token(
@@ -196,5 +198,33 @@ describe('scripturePreparer', () => {
     console.log(
       `[scripturePreparer] tit 1 light=${lightBytes}B full=${fullBytes}B matchKeys=${full.matchKeys.length}`
     )
+  })
+
+  test('readSource({ chapter: 119 }) issues one chapter get', async () => {
+    const resourceKey = 'unfoldingWord/en/ult'
+    const chapterKey = usjScriptureChapterKey(resourceKey, 'psa', 119)
+    const gets: string[] = []
+    const cacheAdapter = {
+      async get(key: string) {
+        gets.push(key)
+        if (key !== chapterKey) return null
+        return {
+          content: {
+            book: 'Psalms',
+            bookCode: 'psa',
+            metadata: { version: '2.1.0-usj' },
+            usj: { type: 'USJ', version: '3.0', content: [] },
+            chapters: [{ number: 119, content: [] }],
+          },
+        }
+      },
+      async set() {},
+    }
+    await scripturePreparer.readSource(
+      { cacheAdapter, chapter: 119 },
+      resourceKey,
+      'psa'
+    )
+    expect(gets).toEqual([chapterKey])
   })
 })

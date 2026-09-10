@@ -96,7 +96,8 @@ function isUsjScriptureEntry(entry: CacheEntry | Record<string, unknown>): boole
 }
 
 export function canSplitUsjScripture(key: string, entry: CacheEntry): boolean {
-  return key.startsWith('scripture-usj:') && isUsjScriptureEntry(entry)
+  // First-class chapter keys (`…:{book}:{ch}`) must not be split again.
+  return key.startsWith('scripture-usj:') && !isChapterSubKey(key) && isUsjScriptureEntry(entry)
 }
 
 /** WordAlignment has verseRef e.g. "TIT 1:1"; we split by chapter using bookCode + " " + ch + ":". */

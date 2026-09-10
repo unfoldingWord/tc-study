@@ -91,7 +91,7 @@ async function loadOlChapter(
   const resourceKey = olKey || resolved?.resourceKey
   if (!resourceKey) return { status: 'missing-usfm' }
   const source = await scripturePreparer.readSource(
-    { cacheAdapter: cache },
+    { cacheAdapter: cache, chapter },
     resourceKey,
     bookId
   )
@@ -111,7 +111,7 @@ async function olUsfmMissing(
   const resourceKey = olKey || resolved?.resourceKey
   if (!resourceKey) return true
   const source = await scripturePreparer.readSource(
-    { cacheAdapter: cache },
+    { cacheAdapter: cache, chapter: 1 },
     resourceKey,
     bookId
   )
@@ -188,7 +188,14 @@ export async function runWarmPrepareUnit(
     cache,
   })
   if (sot.status === 'missing') return 'blocked'
-  const source = await preparer.readSource({ cacheAdapter: cache }, job.resourceKey, job.bookId)
+  const source = await preparer.readSource(
+    {
+      cacheAdapter: cache,
+      chapter: typeof job.unit === 'number' ? job.unit : undefined,
+    },
+    job.resourceKey,
+    job.bookId
+  )
   if (cancelled()) return 'noop'
   if (source == null) return 'blocked'
 

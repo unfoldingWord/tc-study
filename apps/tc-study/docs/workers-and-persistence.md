@@ -31,7 +31,7 @@ Main-thread singletons (`backgroundDownloadSession`, `warmScheduler`) survive Re
 
 Both the main thread (`CatalogContext`) and the download worker construct the same names. Catalog is a **separate** DB — do not look for `unfoldingWord/en/tn` metadata rows inside `tc-study-cache`.
 
-Book-sized SoT rows (`scripture-usj:`, `tn:`, `tq:`) are **chunked** by the adapter into a manifest + one record per chapter (plus `:alignments` for USJ). Callers still `get('scripture-usj:…:tit')` and get a reassembled book. `prepared:`, `helps-quote:`, and `helps-align:` are **not** in `BOOK_ORGANIZED_PREFIXES` — one IDB row per key.
+Scripture SoT is **chapter-grained**: `scripture-usj:{resourceKey}:{book}:{chapter}` is one IDB get (Psa 119 does not hydrate chapter 1). A thin book index at `scripture-usj:{resourceKey}:{book}` lists `chapterNumbers` without USJ. Legacy whole-book blobs migrate lazily on first chapter read. `tn:` / `tq:` stay book keys with adapter chapter chunks. `prepared:`, `helps-quote:`, and `helps-align:` are **not** in `BOOK_ORGANIZED_PREFIXES` — one IDB row per key.
 
 ---
 
@@ -45,7 +45,7 @@ Prepared / quote / align rows use a versioned envelope `{ content, timestamp, ve
 
 | Prefix / key | Shape | Value | Writes | Reads | TTL / version |
 | --- | --- | --- | --- | --- | --- |
-| `scripture-usj:` | `scripture-usj:{resourceKey}:{book}` e.g. `scripture-usj:unfoldingWord/en/ult:tit` | USJ SoT: `usj` + per-chapter nodes + `alignmentMap`. Adapter may split to `{key}:{ch}` and `{key}:{ch}:alignments`. | Download worker (`ScriptureLoader`); main-thread heal via `loadViewModel` | Prepare/warm (`scripturePreparer.readSource`); ScriptureViewer | Gated by `USJ_PROCESSING_VERSION` / tool versions. Legacy `scripture:` is **never** served. |
+| `scripture-usj:` | `scripture-usj:{resourceKey}:{book}:{chapter}` e.g. `scripture-usj:unfoldingWord/en/ult:tit:1` | Per-chapter USJ SoT: `usj` + `alignmentMap` + one `chapters[]` slice. Book key is a thin `{ chapterNumbers }` index. | Download worker (`ScriptureLoader`) writes each chapter as processed; lane-1 DCS writes needed chapter first | `getSoT` / `readUsjChapter`; prepare/warm `readSource({ chapter })` | Gated by `USJ_PROCESSING_VERSION` / tool versions. Legacy book blobs migrate on read. |
 | `tn:` / `twl:` / `tq:` | `tn:unfoldingWord/en/tn:tit` · `twl:unfoldingWord/en/twl:tit` · `tq:unfoldingWord/en/tq:tit` | Processed notes / links / questions (`notesByChapter`, `linksByChapter`, …). `tn:` and `tq:` are chunked. | Download worker loaders | Notes/TWL/TQ preparers + CombinedHelps fallback | No envelope TTL. Completeness is `resource:…`. |
 | `prepared:` | `prepared:{typeId}:{resourceKey}:{book}:nav` · `prepared:{typeId}:{resourceKey}:{book}:{unit}:{tier}` | Versioned light / full / nav payload | `prepare.worker` and warm `prepare-unit` / `prepare-article` | ScriptureViewer, CombinedHelps, `useAlignedTokens` reconstruct, warm skip-if-exists | `SCRIPTURE_PREPARE_VERSION` / `NOTES_PREPARE_VERSION` (2) / `WORDS_LINKS_PREPARE_VERSION` (1). No TTL. |
 | `helps-quote:` | `helps-quote:{helps}@{hs}:{ol}@{os}:{book}:{ch}` | `Record<linkId, CachedQuoteToken[]>` (empty array = settled miss) | Lane-1 `useQuoteTokens`; warm `quote-chapter` | Same + warm align (needs quotes first) | Version `1`. TTL **30 days** (`expiresAt`). |
@@ -244,7 +244,7 @@ Prepared SoT rows are not stamp-GC’d here; they invalidate via prepare **versi
 
 1. `IndexedDB` → **`tc-study-cache`** → **`cache-entries`**.
 2. Filter keys:
-   - `scripture-usj:unfoldingWord/` — SoT (plus `:1`, `:1:alignments` chunks)
+   - `scripture-usj:unfoldingWord/…:{book}:{chapter}` — chapter SoT (legacy book blobs migrate)
    - `prepared:scripture:` / `prepared:notes:` — light/full/nav
    - `helps-quote:` / `helps-align:` — warmed underlines
    - `warm-coverage:v1` — one JSON map

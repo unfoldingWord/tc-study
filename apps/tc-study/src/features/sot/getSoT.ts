@@ -5,6 +5,11 @@
  * Lanes 2–3 must omit DCS — missing local SoT is `missing` (warm → blocked).
  */
 
+import {
+  isUsjScriptureCacheContent,
+  readUsjChapter,
+  writeUsjChapters,
+} from '@bt-synergy/scripture-loader'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
 import { typeIdFromCatalogId } from '../warm/warmResourceClass'
 import { isUsjViewModel, unwrapSoTPayload } from './sotDebug'
@@ -72,6 +77,33 @@ function shouldPersistDcsSoT(typeId: string, payload: unknown): boolean {
  * IDB first. On miss, optionally hydrate one DCS file and write the same SoT key
  * so a later zip pass skip-if-exists.
  */
+async function persistSoTPayload(
+  args: GetSoTArgs,
+  typeId: string,
+  key: string,
+  payload: unknown
+): Promise<void> {
+  if (!args.cache.set || !shouldPersistDcsSoT(typeId, payload)) return
+  const unwrapped = unwrapSoTPayload(payload)
+  if (typeId === RESOURCE_TYPE_IDS.SCRIPTURE && isUsjScriptureCacheContent(unwrapped)) {
+    const already = await readUsjChapter(
+      args.cache,
+      args.resourceKey,
+      args.book,
+      args.chapter ?? 1
+    )
+    if (already) return
+    await writeUsjChapters(args.cache, args.resourceKey, args.book, unwrapped, {
+      prioritize: args.chapter != null ? [args.chapter] : [],
+    })
+    return
+  }
+  const already = await args.cache.get(key)
+  if (!isPresent(already)) {
+    await args.cache.set(key, payload)
+  }
+}
+
 export async function getSoT(args: GetSoTArgs): Promise<SoTResult> {
   const typeId = args.typeId ?? typeIdFromResourceKey(args.resourceKey)
   const key = sotCacheKey({
@@ -80,9 +112,22 @@ export async function getSoT(args: GetSoTArgs): Promise<SoTResult> {
     book: args.book,
     chapter: args.chapter,
   })
-  const cached = await args.cache.get(key)
-  if (isPresent(cached)) {
-    return { status: 'hit', source: 'idb', payload: cached, key, typeId }
+
+  if (typeId === RESOURCE_TYPE_IDS.SCRIPTURE && args.chapter != null) {
+    const chapterPayload = await readUsjChapter(
+      args.cache,
+      args.resourceKey,
+      args.book,
+      args.chapter
+    )
+    if (chapterPayload) {
+      return { status: 'hit', source: 'idb', payload: { content: chapterPayload }, key, typeId }
+    }
+  } else {
+    const cached = await args.cache.get(key)
+    if (isPresent(cached)) {
+      return { status: 'hit', source: 'idb', payload: cached, key, typeId }
+    }
   }
 
   const allowDcs = args.allowDcs === true && typeof args.fetchDcs === 'function'
@@ -100,13 +145,7 @@ export async function getSoT(args: GetSoTArgs): Promise<SoTResult> {
     return { status: 'missing', key, typeId }
   }
 
-  if (args.cache.set && shouldPersistDcsSoT(typeId, payload)) {
-    const already = await args.cache.get(key)
-    if (!isPresent(already)) {
-      await args.cache.set(key, payload)
-    }
-  }
-
+  await persistSoTPayload(args, typeId, key, payload)
   return { status: 'hit', source: 'dcs', payload, key, typeId }
 }
 

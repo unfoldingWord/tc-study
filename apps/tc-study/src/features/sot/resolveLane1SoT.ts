@@ -3,10 +3,14 @@
  * Publishes `__sotDebug` for e2e (source + book).
  */
 
+import { viewModelFromUsjCache } from '@bt-synergy/scripture-loader'
+import { USJProcessor } from '@bt-synergy/usj-processor'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
 import { fetchDcsViaLoader, type DcsLoader } from './fetchDcsSoT'
 import { getSoT, type SoTCache, type SoTResult } from './getSoT'
 import { isUsjViewModel, publishSoTDebug, unwrapSoTPayload } from './sotDebug'
+
+const usjProcessor = new USJProcessor()
 
 export async function resolveLane1SoT(args: {
   resourceKey: string
@@ -59,6 +63,14 @@ export async function resolveLane1ScriptureViewModel(args: {
   })
   if (sot.status === 'hit' && isUsjViewModel(sot.payload)) {
     return sot.payload
+  }
+  if (sot.status === 'hit') {
+    const fromCache = viewModelFromUsjCache(
+      unwrapSoTPayload(sot.payload),
+      args.book,
+      usjProcessor
+    )
+    if (fromCache) return fromCache
   }
   return args.loadViewModel(args.loader, args.resourceKey, args.book)
 }

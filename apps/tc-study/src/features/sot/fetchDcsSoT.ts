@@ -15,7 +15,8 @@ export type DcsLoader = {
 }
 
 /**
- * One book file (USFM / TSV / article). Chapter-split of whole-book USJ is deferred.
+ * One book file (USFM / TSV / article). Door43 has no single-chapter USFM HTTP.
+ * ScriptureLoader writes chapter keys as soon as the book file is processed.
  */
 export function fetchDcsViaLoader(loader: DcsLoader | null | undefined): FetchDcsFile {
   return async ({ resourceKey, book }) => {

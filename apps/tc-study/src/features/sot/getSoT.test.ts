@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
-import { usjScriptureKey } from '@bt-synergy/scripture-loader'
+import { usjScriptureChapterKey, usjScriptureKey } from '@bt-synergy/scripture-loader'
 import { getLocalSoT, getSoT } from './getSoT'
 import { isUsjViewModel } from './sotDebug'
 import { sotCacheKey } from './sotCacheKey'
@@ -34,14 +34,29 @@ describe('isUsjViewModel', () => {
 })
 
 describe('getSoT', () => {
-  test('IDB hit does not call DCS', async () => {
+  test('IDB hit for ult:tit:1 uses the chapter key and does not call DCS', async () => {
     const key = sotCacheKey({
       typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
       resourceKey: 'unfoldingWord/en/ult',
       book: 'tit',
+      chapter: 1,
     })
-    expect(key).toBe(usjScriptureKey('unfoldingWord/en/ult', 'tit'))
-    const cache = createFakeCache({ [key]: { usj: true } })
+    expect(key).toBe(usjScriptureChapterKey('unfoldingWord/en/ult', 'tit', 1))
+    expect(key).not.toBe(usjScriptureKey('unfoldingWord/en/ult', 'tit'))
+    const chapterContent = {
+      book: 'Titus',
+      bookCode: 'tit',
+      metadata: {
+        version: '2.1.0-usj',
+        toolVersions: { parser: '0.1.1', usjCore: '0.1.1' },
+        processingDate: '2026-01-01T00:00:00.000Z',
+        bookCode: 'tit',
+        bookName: 'Titus',
+      },
+      usj: { type: 'USJ', version: '3.0', content: [{ c: 1 }] },
+      chapters: [{ number: 1, content: [{ c: 1 }] }],
+    }
+    const cache = createFakeCache({ [key]: { content: chapterContent } })
     let dcsCalls = 0
     const result = await getSoT({
       resourceKey: 'unfoldingWord/en/ult',
@@ -58,7 +73,8 @@ describe('getSoT', () => {
     expect(result.status).toBe('hit')
     if (result.status === 'hit') {
       expect(result.source).toBe('idb')
-      expect(result.payload).toEqual({ usj: true })
+      expect(result.key).toBe(key)
+      expect(result.payload).toEqual({ content: chapterContent })
     }
     expect(dcsCalls).toBe(0)
   })
@@ -137,8 +153,59 @@ describe('getSoT', () => {
         typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
         resourceKey: 'unfoldingWord/en/ult',
         book: 'tit',
+        chapter: 1,
       })
     )
     expect(stored).toBeNull()
+    expect(await cache.get(usjScriptureKey('unfoldingWord/en/ult', 'tit'))).toBeNull()
+  })
+
+  test('DCS UsjScriptureCacheContent persists chapter keys with prioritize', async () => {
+    const cache = createFakeCache()
+    const cacheContent = {
+      book: 'Titus',
+      bookCode: 'tit',
+      metadata: {
+        version: '2.1.0-usj',
+        toolVersions: { parser: '0.1.1', usjCore: '0.1.1' },
+        processingDate: '2026-01-01T00:00:00.000Z',
+        bookCode: 'tit',
+        bookName: 'Titus',
+      },
+      usj: { type: 'USJ', version: '3.0', content: [{ c: 1 }, { c: 2 }] },
+      alignmentMap: { 'TIT 1:1': [], 'TIT 2:1': [] },
+      chapters: [
+        { number: 1, content: [{ c: 1 }] },
+        { number: 2, content: [{ c: 2 }] },
+      ],
+    }
+    const viewModel = { chapters: [{ number: 1, verses: [{ number: 1 }] }] }
+    const result = await getSoT({
+      resourceKey: 'unfoldingWord/en/ult',
+      book: 'tit',
+      chapter: 1,
+      typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
+      cache,
+      allowDcs: true,
+      fetchDcs: async () => cacheContent,
+    })
+    expect(result.status).toBe('hit')
+    if (result.status === 'hit') expect(result.source).toBe('dcs')
+
+    const chapter1 = await cache.get(usjScriptureChapterKey('unfoldingWord/en/ult', 'tit', 1))
+    expect(chapter1).toBeTruthy()
+    const chapter1Content = (chapter1 as { content: { chapters?: Array<{ verses?: unknown }> } })
+      .content
+    expect(chapter1Content.chapters?.[0]?.verses).toBeUndefined()
+
+    const index = await cache.get(usjScriptureKey('unfoldingWord/en/ult', 'tit'))
+    expect(index).toBeTruthy()
+    const indexContent = (index as { content: { chapterNumbers?: number[]; usj?: unknown } }).content
+    expect(indexContent.chapterNumbers).toEqual([1, 2])
+    expect(indexContent.usj).toBeUndefined()
+
+    expect(isUsjViewModel(indexContent)).toBe(false)
+    expect(isUsjViewModel(chapter1Content)).toBe(false)
+    expect(isUsjViewModel(viewModel)).toBe(true)
   })
 })

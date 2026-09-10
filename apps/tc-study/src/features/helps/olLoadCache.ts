@@ -7,11 +7,15 @@ import type { OptimizedChapter } from '@bt-synergy/resource-parsers'
 import {
   ScriptureLoader,
   viewModelChapterToOptimized,
+  viewModelFromUsjCache,
 } from '@bt-synergy/scripture-loader'
+import { USJProcessor } from '@bt-synergy/usj-processor'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
 import { getSoT, type SoTCache } from '../sot/getSoT'
 import { fetchDcsViaLoader } from '../sot/fetchDcsSoT'
-import { isUsjViewModel, publishSoTDebug } from '../sot/sotDebug'
+import { isUsjViewModel, publishSoTDebug, unwrapSoTPayload } from '../sot/sotDebug'
+
+const usjProcessor = new USJProcessor()
 
 const inflight = new Map<string, Promise<OptimizedChapter[]>>()
 
@@ -102,12 +106,29 @@ export function loadOriginalLanguageChapters(args: {
   if (existing) return existing
 
   const promise = (async (): Promise<OptimizedChapter[]> => {
-    let viewModel: Parameters<typeof viewModelChapterToOptimized>[0] | null = null
-    if (cache) {
+    type ViewModel = Parameters<typeof viewModelChapterToOptimized>[0]
+    const optimized: OptimizedChapter[] = []
+
+    const viewModelFromHit = (payload: unknown): ViewModel | null => {
+      if (isUsjViewModel(payload)) return payload as ViewModel
+      return viewModelFromUsjCache(unwrapSoTPayload(payload), bookId, usjProcessor)
+    }
+
+    if (!cache) {
+      const viewModel = await loader.loadViewModel(olKey, bookId)
+      if (!viewModel) return []
+      for (let chapter = startChapter; chapter <= endChapter; chapter++) {
+        const row = viewModelChapterToOptimized(viewModel, chapter)
+        if (row) optimized.push(row)
+      }
+      return optimized
+    }
+
+    for (let chapter = startChapter; chapter <= endChapter; chapter++) {
       const sot = await getSoT({
         resourceKey: olKey,
         book: bookId,
-        chapter: startChapter,
+        chapter,
         typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
         cache,
         allowDcs: allowDcs === true,
@@ -117,21 +138,18 @@ export function loadOriginalLanguageChapters(args: {
         source: sot.status === 'hit' ? sot.source : 'missing',
         typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
         book: bookId,
-        chapter: startChapter,
+        chapter,
       })
-      if (sot.status === 'hit' && isUsjViewModel(sot.payload)) {
-        viewModel = sot.payload as Parameters<typeof viewModelChapterToOptimized>[0]
-      } else if (sot.status === 'hit') {
-        viewModel = await loader.loadViewModel(olKey, bookId)
+      let viewModel: ViewModel | null = null
+      if (sot.status === 'hit') {
+        viewModel = viewModelFromHit(sot.payload)
+        if (!viewModel && allowDcs) {
+          viewModel = await loader.loadViewModel(olKey, bookId)
+        }
       } else if (allowDcs) {
         viewModel = await loader.loadViewModel(olKey, bookId)
       }
-    } else {
-      viewModel = await loader.loadViewModel(olKey, bookId)
-    }
-    if (!viewModel) return []
-    const optimized: OptimizedChapter[] = []
-    for (let chapter = startChapter; chapter <= endChapter; chapter++) {
+      if (!viewModel) continue
       const row = viewModelChapterToOptimized(viewModel, chapter)
       if (row) optimized.push(row)
     }

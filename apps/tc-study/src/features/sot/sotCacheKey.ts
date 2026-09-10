@@ -3,7 +3,7 @@
  * DCS hydrate (backend B) writes the same keys so the zip pass skip-if-exists.
  */
 
-import { usjScriptureKey } from '@bt-synergy/scripture-loader'
+import { usjScriptureChapterKey, usjScriptureKey } from '@bt-synergy/scripture-loader'
 import { getArtifactRecipe } from '../../config/resourceArtifactRecipe'
 import { tnCacheKey } from '../notes/notesPreparer'
 import { obsCacheKey } from '../obs/obsPreparer'
@@ -28,7 +28,12 @@ export function sotCacheKey(args: {
     const n = args.chapter ?? parseInt(book, 10)
     return obsCacheKey(args.resourceKey, Number.isFinite(n) && n > 0 ? n : 1)
   }
-  if (prefix === 'scripture-usj:') return usjScriptureKey(args.resourceKey, book)
+  if (prefix === 'scripture-usj:') {
+    if (args.chapter != null && Number.isFinite(args.chapter)) {
+      return usjScriptureChapterKey(args.resourceKey, book, args.chapter)
+    }
+    return usjScriptureKey(args.resourceKey, book)
+  }
   if (prefix === 'tn:') return tnCacheKey(args.resourceKey, book)
   if (prefix === 'twl:') return twlCacheKey(args.resourceKey, book)
   if (prefix === 'tq:') return tqCacheKey(args.resourceKey, book)

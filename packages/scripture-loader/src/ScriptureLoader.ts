@@ -22,10 +22,18 @@ import type { ScriptureLoadResult } from './scriptureLoadResult'
 import {
   legacyScriptureKey,
   STALE_SCRIPTURE_CACHE_HINT,
+  usjScriptureChapterKey,
   usjScriptureKey,
 } from './scriptureCacheKeys'
 import type { ScriptureLoaderConfig } from './types'
 import { processedFromUsjCache, usjResultFromCache } from './usjCache'
+import {
+  isUsjBookIndex,
+  readUsjBook,
+  unwrapUsjEntry,
+  writeUsjChapters,
+} from './usjChapterStore'
+import { usjScriptureChapterKey } from './scriptureCacheKeys'
 
 /**
  * Produce a human-readable description from any thrown value, including
@@ -128,16 +136,12 @@ export class ScriptureLoader implements ResourceLoader {
       usjProcessor: this.getUsjProcessor(),
       debug: this.debug,
     })
-    const usjKey = usjScriptureKey(resourceKey, bookId)
     try {
-      await this.cacheAdapter.set(usjKey, {
-        content: result.cacheContent,
-        timestamp: Date.now(),
-        resourceKey,
-        bookId,
-      })
+      await writeUsjChapters(this.cacheAdapter, resourceKey, bookId, result.cacheContent)
       if (this.debug) {
-        console.log(`[ScriptureLoader] Cached USJ SoT ${usjKey}`)
+        console.log(
+          `[ScriptureLoader] Cached USJ SoT chapters ${usjScriptureKey(resourceKey, bookId)}:{ch}`
+        )
       }
     } catch (err) {
       console.warn('[ScriptureLoader] Failed to cache USJ SoT:', err)
@@ -185,13 +189,9 @@ export class ScriptureLoader implements ResourceLoader {
   ): Promise<{ result: ScriptureLoadResult | null; hadLegacy: boolean }> {
     const usjKey = usjScriptureKey(resourceKey, bookId)
     try {
-      const usjCached = await this.cacheAdapter.get(usjKey)
-      if (usjCached?.content) {
-        const full = usjResultFromCache(
-          usjCached.content,
-          bookId,
-          this.getUsjProcessor()
-        )
+      const bookContent = await readUsjBook(this.cacheAdapter, resourceKey, bookId)
+      if (bookContent) {
+        const full = usjResultFromCache(bookContent, bookId, this.getUsjProcessor())
         if (full) {
           if (this.debug) {
             console.log(`Cache hit (USJ SoT) for ${usjKey}`)
@@ -238,16 +238,32 @@ export class ScriptureLoader implements ResourceLoader {
     return false
   }
 
-  /** Offline skip / download: only scripture-usj: with compatible version counts. */
+  /** Offline skip / download: chapter 1 or book index — never assemble all chapters. */
   private async hasUsableCache(resourceKey: string, bookId: string): Promise<boolean> {
     try {
-      const usjCached = await this.cacheAdapter.get(usjScriptureKey(resourceKey, bookId))
+      const bookHit = unwrapUsjEntry(
+        await this.cacheAdapter.get(usjScriptureKey(resourceKey, bookId))
+      )
       if (
-        usjCached?.content &&
-        processedFromUsjCache(usjCached.content, bookId, this.getUsjProcessor())
+        bookHit &&
+        typeof bookHit === 'object' &&
+        processedFromUsjCache(bookHit, bookId, this.getUsjProcessor())
       ) {
         return true
       }
+      if (isUsjBookIndex(bookHit) && bookHit.chapterNumbers.length > 0) {
+        const ch1 = unwrapUsjEntry(
+          await this.cacheAdapter.get(usjScriptureChapterKey(resourceKey, bookId, 1))
+        )
+        if (ch1 && processedFromUsjCache(ch1, bookId, this.getUsjProcessor())) {
+          return true
+        }
+        return bookHit.metadata?.version != null
+      }
+      const ch1 = unwrapUsjEntry(
+        await this.cacheAdapter.get(usjScriptureChapterKey(resourceKey, bookId, 1))
+      )
+      return Boolean(ch1 && processedFromUsjCache(ch1, bookId, this.getUsjProcessor()))
     } catch {
       /* ignore */
     }

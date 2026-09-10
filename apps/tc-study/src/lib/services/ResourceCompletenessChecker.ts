@@ -126,7 +126,9 @@ export function hasIngredientPayload(
         payload.usj != null &&
         typeof payload.usj === 'object' &&
         Array.isArray((payload.usj as { content?: unknown }).content)
-      return hasUsj || hasChapters
+      const hasIndex =
+        Array.isArray(payload.chapterNumbers) && payload.chapterNumbers.length > 0
+      return hasUsj || hasChapters || hasIndex
     }
     case 'notes':
       return (
@@ -247,6 +249,13 @@ export class ResourceCompletenessChecker {
       const ingredientCache = await this.cacheAdapter.get(ingredientCacheKey)
       if (hasIngredientPayload(ingredientCache, resourceType)) {
         cachedCount++
+        continue
+      }
+      if (resourceType === 'scripture') {
+        const chapterOne = await this.cacheAdapter.get(`${ingredientCacheKey}:1`)
+        if (hasIngredientPayload(chapterOne, resourceType)) {
+          cachedCount++
+        }
       }
     }
 

@@ -12,7 +12,7 @@ import {
   type UsjScriptureViewModel,
   type UsjWordToken,
 } from '@bt-synergy/scripture-loader'
-import { usjScriptureKey } from '@bt-synergy/scripture-loader'
+import { readUsjBook, readUsjChapter } from '@bt-synergy/scripture-loader'
 import {
   USJ_PROCESSING_VERSION,
   USJProcessor,
@@ -439,21 +439,22 @@ export const scripturePreparer: ResourcePreparer<ScriptureSource, number> = {
   version: SCRIPTURE_PREPARE_VERSION,
 
   async readSource(ctx: PrepareContext, resourceKey: string, bookId: string) {
-    const key = usjScriptureKey(resourceKey, bookId)
-    const entry = await ctx.cacheAdapter.get(key)
-    if (!entry) {
-      logReadSourceMiss(resourceKey, bookId, 'no scripture-usj entry')
-      return null
-    }
-    const content =
-      entry && typeof entry === 'object' && 'content' in entry
-        ? (entry as { content: unknown }).content
-        : entry
     try {
-      const result = usjProcessor.fromUsjCacheContentFull(
-        content as Parameters<USJProcessor['fromUsjCacheContentFull']>[0],
-        bookId
-      )
+      const content =
+        ctx.chapter != null
+          ? await readUsjChapter(ctx.cacheAdapter, resourceKey, bookId, ctx.chapter)
+          : await readUsjBook(ctx.cacheAdapter, resourceKey, bookId)
+      if (!content) {
+        logReadSourceMiss(
+          resourceKey,
+          bookId,
+          ctx.chapter != null
+            ? `no scripture-usj chapter ${ctx.chapter}`
+            : 'no scripture-usj entry'
+        )
+        return null
+      }
+      const result = usjProcessor.fromUsjCacheContentFull(content, bookId)
       return { resourceKey, bookId, viewModel: result.viewModel }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)

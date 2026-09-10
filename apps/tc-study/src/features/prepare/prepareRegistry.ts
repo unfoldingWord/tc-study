@@ -18,6 +18,8 @@ export interface PrepareCacheAdapter {
 
 export interface PrepareContext {
   cacheAdapter: PrepareCacheAdapter
+  /** Scripture SoT is chapter-grained — pass the unit so readSource is one IDB get. */
+  chapter?: number
 }
 
 export interface ResourcePreparer<TSource = unknown, TUnit = number> {

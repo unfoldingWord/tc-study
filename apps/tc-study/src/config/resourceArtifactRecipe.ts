@@ -58,7 +58,7 @@ const PREPARE_ARTICLE_PREVIEW: Pick<
 export const ARTIFACT_RECIPES: ResourceArtifactRecipe[] = [
   {
     typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
-    sotGrain: 'book',
+    sotGrain: 'chapter',
     sotPrefix: 'scripture-usj:',
     ...PREPARE_ONLY,
   },
