@@ -25,7 +25,10 @@ import {
   shouldSkipHelpsQuoteRebuild,
   type HelpsTokenCacheRow,
 } from '../../../../features/helps/helpsTokenReuse'
-import { isQuoteBuildReady } from '../../../../features/helps/resolveHelpsQuoteStatus'
+import {
+  isOriginalLanguageQuoteBlocked,
+  isQuoteBuildReady,
+} from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { buildQuoteTokens } from '../../../../features/helps/quoteTokens'
 import {
   HELPS_SYNC_MAX_LINKS,
@@ -277,6 +280,7 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
     originalContent,
     loading: loadingOriginal,
     error: originalError,
+    olBlocked,
   } = useOriginalLanguageContent({ resourceKey, resourceId, scriptureRevision })
 
   const [linksWithQuotes, setLinksWithQuotes] = useState<LinkWithQuoteReady[]>(() =>
@@ -421,6 +425,14 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
       }
     }
 
+    // IDB cache-first: a warmed chapter (e.g. Psa 119) must paint without
+    // waiting on OL load or a main-thread rebuild of every note.
+    const runCacheFirstThenBuild = async () => {
+      const fullHit = await hydrateFromCache(true)
+      if (fullHit || lifecycle.cancelled || gen !== runGenRef.current) return false
+      return true
+    }
+
     if (!originalContent || originalContent.length === 0 || links.length === 0) {
       if (
         shouldKeepStaleHelpsRows({
@@ -433,7 +445,7 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
         if (staleQuotesAreUnderlineReady(lastQuotesRef.current)) {
           setSettledRequestKey(requestKey)
         }
-        void hydrateFromCache(true)
+        void runCacheFirstThenBuild()
         return () => {
           lifecycle.cancelled = true
         }
@@ -441,7 +453,7 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
       setLinksWithQuotes(links)
       lastQuotesRef.current = links
       setSettledRequestKey('')
-      void hydrateFromCache(true)
+      void runCacheFirstThenBuild()
       return () => {
         lifecycle.cancelled = true
       }
@@ -663,6 +675,7 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
 
   const quoteBuildReady =
     skipQuoteRebuild ||
+    olBlocked ||
     isQuoteBuildReady({
       loadingOriginal,
       originalContent,
@@ -676,6 +689,13 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
     loadingOriginal,
     originalError,
     hasOriginalContent: !!originalContent && originalContent.length > 0,
+    olBlocked:
+      olBlocked ||
+      isOriginalLanguageQuoteBlocked({
+        loadingOriginal,
+        originalContent,
+        originalError,
+      }),
     quoteBuildReady,
   }
 }

@@ -1,4 +1,4 @@
-import { AlertCircle, Download, Loader2 } from 'lucide-react'
+import { AlertCircle, Download, Loader2, RotateCcw } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { displayDownloadPercent } from '../../features/download/backgroundDownloadRun'
 import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
@@ -11,9 +11,10 @@ interface DownloadIndicatorProps {
   isDownloading: boolean
   progress?: DownloadProgress
   error?: string | null
+  onRetry?: () => void
 }
 
-export function DownloadIndicator({ isDownloading, progress, error }: DownloadIndicatorProps) {
+export function DownloadIndicator({ isDownloading, progress, error, onRetry }: DownloadIndicatorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -125,7 +126,25 @@ export function DownloadIndicator({ isDownloading, progress, error }: DownloadIn
             {isDownloading ? (
               <Loader2 className="w-4 h-4 text-accent animate-spin" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-danger" />
+              <AlertCircle
+                className="w-4 h-4 text-danger"
+                title={error || 'Download failed'}
+                aria-label={error || 'Download failed'}
+              />
+            )}
+            {onRetry && (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onRetry()
+                }}
+                className="p-1 hover:bg-muted rounded-md"
+                title="Retry download"
+                aria-label="Retry download"
+              >
+                <RotateCcw className="w-4 h-4 text-fg-secondary" />
+              </button>
             )}
           </div>
 
@@ -148,7 +167,7 @@ export function DownloadIndicator({ isDownloading, progress, error }: DownloadIn
           )}
 
           {/* Current Resource & Ingredient */}
-          {isDownloading && (progress?.currentResource || progress?.currentIngredient) && (
+          {(isDownloading || error) && (progress?.currentResource || progress?.currentIngredient) && (
             <div className="mt-3 pt-2 border-t border-border-subtle space-y-1">
               {progress.currentResource && (
                 <div className="flex items-center gap-2 text-xs text-fg-secondary">

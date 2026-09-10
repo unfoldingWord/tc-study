@@ -19,6 +19,8 @@ export interface UseBackgroundDownloadReturn {
   startDownload: (resourceKeys: string[], totalIngredients?: number) => boolean
   /** Stop all downloads */
   stopDownload: () => void
+  /** Recreate the worker and restart the last queue / current key after an error */
+  retryLastRun: () => boolean
   /** Current download statistics */
   stats: BackgroundDownloadStats
   /** Whether downloads are currently active */
@@ -68,6 +70,7 @@ export function useBackgroundDownload(
   return {
     startDownload: backgroundDownloadSession.startDownload,
     stopDownload: backgroundDownloadSession.stopDownload,
+    retryLastRun: backgroundDownloadSession.retryLastRun,
     stats,
     isDownloading: stats.isDownloading,
     queue: stats.queue,

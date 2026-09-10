@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   isHelpsQuoteAlignmentPending,
+  isOriginalLanguageQuoteBlocked,
   isQuoteBuildReady,
   resolveHelpsQuoteStatus,
   resolveHelpsQuoteStatusForNote,
@@ -54,6 +55,39 @@ describe('isQuoteBuildReady', () => {
     expect(
       isQuoteBuildReady({ loadingOriginal: false, originalContent: null, originalError: 'fail' })
     ).toBe(false)
+  })
+})
+
+describe('isOriginalLanguageQuoteBlocked', () => {
+  test('first paint and in-flight load are not blocked', () => {
+    expect(
+      isOriginalLanguageQuoteBlocked({
+        loadingOriginal: false,
+        originalContent: null,
+      })
+    ).toBe(false)
+    expect(
+      isOriginalLanguageQuoteBlocked({
+        loadingOriginal: true,
+        originalContent: [],
+      })
+    ).toBe(false)
+  })
+
+  test('attempted empty or error is blocked so notes can paint', () => {
+    expect(
+      isOriginalLanguageQuoteBlocked({
+        loadingOriginal: false,
+        originalContent: [],
+      })
+    ).toBe(true)
+    expect(
+      isOriginalLanguageQuoteBlocked({
+        loadingOriginal: false,
+        originalContent: null,
+        originalError: 'missing usfm',
+      })
+    ).toBe(true)
   })
 })
 

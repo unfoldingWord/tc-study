@@ -5,9 +5,11 @@ import {
   computeInFlightOverallProgress,
   createInitialDownloadProgress,
   displayDownloadPercent,
+  keysForDownloadRetry,
   pulseInFlightDownloadProgress,
   shouldAcceptStartDownload,
   shouldAcceptWorkerMessage,
+  shouldRecreateWorkerBeforeStart,
   withResourceDownloadTimeout,
 } from './backgroundDownloadRun'
 
@@ -15,6 +17,30 @@ describe('backgroundDownloadRun', () => {
   test('busy run rejects a new start so percent is not reset to 1%', () => {
     expect(shouldAcceptStartDownload(true)).toBe(false)
     expect(shouldAcceptStartDownload(false)).toBe(true)
+  })
+
+  test('recreates the worker after an idle error so retry is not posted to a dead isolate', () => {
+    expect(shouldRecreateWorkerBeforeStart({ error: 'window is not defined', isDownloading: false })).toBe(
+      true
+    )
+    expect(shouldRecreateWorkerBeforeStart({ error: null, isDownloading: false })).toBe(false)
+    expect(shouldRecreateWorkerBeforeStart({ error: 'x', isDownloading: true })).toBe(false)
+  })
+
+  test('retry keys prefer the queue, then the in-flight resource', () => {
+    expect(
+      keysForDownloadRetry({
+        queue: ['unfoldingWord/hbo/uhb'],
+        currentResource: 'unfoldingWord/hbo/uhb',
+      })
+    ).toEqual(['unfoldingWord/hbo/uhb'])
+    expect(
+      keysForDownloadRetry({
+        queue: [],
+        currentResource: 'unfoldingWord/hbo/uhb',
+      })
+    ).toEqual(['unfoldingWord/hbo/uhb'])
+    expect(keysForDownloadRetry({ queue: [], currentResource: null })).toEqual([])
   })
 
   test('rejects stale or missing run ids after stop invalidation', () => {

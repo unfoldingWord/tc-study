@@ -5,7 +5,9 @@
  */
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { useCacheAdapter, useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
+import { processedFromSoT, resolveLane1SoT } from '../../../../features/sot/resolveLane1SoT'
 import {
   getHelpsContentHydrateTick,
   subscribeHelpsContentHydrate,
@@ -26,6 +28,7 @@ export function useWordsLinksContent({
 }: UseWordsLinksContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
+  const cacheAdapter = useCacheAdapter()
   const hydrateTick = useSyncExternalStore(
     subscribeHelpsContentHydrate,
     getHelpsContentHydrateTick,
@@ -64,9 +67,27 @@ export function useWordsLinksContent({
           throw new Error('Words Links loader not found')
         }
         
-        // Load content for current book
-        const loadedContent = await loader.loadContent(resourceKey, currentRef.book)
-        const content = loadedContent as ProcessedWordsLinks | null
+        const typeId =
+          loaderTypeId === 'obs-words-links'
+            ? RESOURCE_TYPE_IDS.OBS_WORDS_LINKS
+            : RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS
+        const sot = cacheAdapter
+          ? await resolveLane1SoT({
+              resourceKey,
+              book: currentRef.book,
+              typeId,
+              cache: cacheAdapter,
+              loader,
+            })
+          : null
+        const fromSoT = sot ? processedFromSoT<ProcessedWordsLinks>(sot) : null
+        const loadedContent = (fromSoT && 'links' in fromSoT
+          ? fromSoT
+          : ((await loader.loadContent(
+              resourceKey,
+              currentRef.book
+            )) as ProcessedWordsLinks | null))
+        const content = loadedContent
         
         if (loadedContent && typeof loadedContent === 'object') {
           setContent(content)
@@ -82,7 +103,15 @@ export function useWordsLinksContent({
     }
     
     loadContent()
-  }, [currentRef.book, resourceKey, loaderRegistry, wordsLinksContent, loaderTypeId, hydrateTick])
+  }, [
+    currentRef.book,
+    resourceKey,
+    loaderRegistry,
+    cacheAdapter,
+    wordsLinksContent,
+    loaderTypeId,
+    hydrateTick,
+  ])
   
   return { content, loading, error }
 }

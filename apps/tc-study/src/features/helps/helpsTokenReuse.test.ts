@@ -98,6 +98,20 @@ describe('shouldSkipHelpsQuoteRebuild / shouldSkipHelpsAlignRebuild', () => {
     ).toBe(false)
   })
 
+  test('skips quote and align rebuild for a large chapter when IDB/memory cache hits', () => {
+    const links = Array.from({ length: 176 }, (_, i) => ({
+      id: `psa-119-${i + 1}`,
+      origWords: 'אמר',
+      quoteTokens: [{ text: 'said' }],
+      alignedTokens: [{ position: i, content: 'said' }],
+      semanticIds: [`psa 119:${i + 1}:said:1`],
+    }))
+    const lastById = new Map(links.map((l) => [l.id, l]))
+    const incoming = links.map(({ quoteTokens: _q, alignedTokens: _a, semanticIds: _s, ...rest }) => rest)
+    expect(shouldSkipHelpsQuoteRebuild({ links: incoming, lastById })).toBe(true)
+    expect(shouldSkipHelpsAlignRebuild({ links: incoming, lastById })).toBe(true)
+  })
+
   test('skips align rebuild when dest chips are already cached', () => {
     expect(
       shouldSkipHelpsAlignRebuild({
@@ -162,6 +176,8 @@ describe('hooks honor cache-first chapter change', () => {
     expect(src).toContain('shouldSkipHelpsQuoteRebuild')
     expect(src).toContain('reuseHelpsQuoteRows')
     expect(src).toContain('lastQuotesByIdRef')
+    expect(src).toContain('runCacheFirstThenBuild')
+    expect(src).toContain('hydrateFromCache(true)')
   })
 
   test('CombinedHelps pipeline reuses book-wide tokens and ignores stale prepared rows', () => {

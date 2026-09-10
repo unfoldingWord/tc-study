@@ -68,13 +68,22 @@ export function underlineGroupsFromHelpsNotes(
   return groups
 }
 
-/** Retry UGNT/UHB quote match only after scripture hydrates and originals are still missing. */
+/** Retry UGNT/UHB quote match after scripture hydrates or OL zip lands. */
 export function shouldRetryOriginalLanguageLoad(opts: {
   hasOriginalContent: boolean
   scriptureRevision: string
   lastAttemptedRevision: string | null
+  olDownloadTick?: number
+  lastAttemptedDownloadTick?: number | null
 }): boolean {
   if (opts.hasOriginalContent) return false
+  if (
+    opts.olDownloadTick != null &&
+    opts.olDownloadTick > 0 &&
+    opts.olDownloadTick !== (opts.lastAttemptedDownloadTick ?? 0)
+  ) {
+    return true
+  }
   if (!opts.scriptureRevision || opts.scriptureRevision === SCRIPTURE_EMPTY_REVISION) return false
   return opts.scriptureRevision !== opts.lastAttemptedRevision
 }

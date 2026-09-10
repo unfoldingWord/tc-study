@@ -14,6 +14,7 @@
  * - IN: { type: 'stop' }
  * - OUT: { type: 'progress', payload: DownloadProgress }
  * - OUT: { type: 'complete', payload: DownloadProgress }
+ * - OUT: { type: 'resource-complete', payload: { resourceKey } }
  * - OUT: { type: 'error', payload: { message: string } }
  * - OUT: { type: 'queue-updated', payload: { queue: string[] } }
  */
@@ -23,6 +24,7 @@ import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { CatalogManager } from '@bt-synergy/catalog-manager'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
 import { getDownloadPriority } from '../config/loaderConfig'
+import { compareDownloadBatchOrder } from '../features/download/downloadBatchOrder'
 import {
   STARTING_PROGRESS_PERCENT,
   advanceResourceIngredientProgress,
@@ -329,8 +331,21 @@ async function downloadSpecificResources(
     }
   }
 
-  // Sort by priority (lower = higher priority = downloads first)
-  resourcesWithPriority.sort((a, b) => a.priority - b.priority)
+  // OL scripture (UGNT/UHB) before TN (priority 1), then SoT priority
+  resourcesWithPriority.sort((a, b) =>
+    compareDownloadBatchOrder(
+      {
+        resourceKey: a.resourceKey,
+        priority: a.priority,
+        language: a.metadata.language,
+      },
+      {
+        resourceKey: b.resourceKey,
+        priority: b.priority,
+        language: b.metadata.language,
+      }
+    )
+  )
 
   const _ingredientsSource = providedTotalIngredients ? 'pre-calculated' : 'calculated in worker'
 
@@ -562,6 +577,13 @@ async function downloadSpecificResources(
         })
       }
 
+      if (runId === activeRunId) {
+        postMessage({
+          type: 'resource-complete',
+          runId,
+          payload: { resourceKey },
+        })
+      }
 
     } catch (error) {
       console.error(`[BG-DL] ⚙️ Worker Failed to download ${resourceKey}:`, error)

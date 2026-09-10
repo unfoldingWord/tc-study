@@ -66,6 +66,31 @@ export async function readPreparedUnit<T>(
   return unwrapVersioned<T>(entry, version)
 }
 
+/** True when every requested tier already has a matching versioned row. */
+export async function preparedTiersExist(
+  cache: PrepareCacheAdapter,
+  typeId: string,
+  resourceKey: string,
+  bookId: string,
+  unit: string | number,
+  tiers: readonly PrepareTier[],
+  version: number
+): Promise<boolean> {
+  for (const tier of tiers) {
+    const existing = await readPreparedUnit(
+      cache,
+      typeId,
+      resourceKey,
+      bookId,
+      unit,
+      tier,
+      version
+    )
+    if (!existing) return false
+  }
+  return tiers.length > 0
+}
+
 export async function listPreparedKeysForBook(
   cache: PrepareCacheAdapter,
   typeId: string,

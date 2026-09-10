@@ -13,6 +13,7 @@ describe('bookChapterCounts', () => {
     expect(resolveLastChapter({ bookId: 'tit', explicit: 3 })).toBe(3)
     expect(resolveLastChapter({ bookId: 'mat', tocChapters: 28 })).toBe(28)
     expect(resolveLastChapter({ bookId: 'jhn' })).toBe(21)
+    expect(resolveLastChapter({ bookId: 'psa' })).toBe(150)
     expect(resolveLastChapter({ bookId: 'tit', explicit: 0, tocChapters: 0 })).toBe(3)
   })
 })

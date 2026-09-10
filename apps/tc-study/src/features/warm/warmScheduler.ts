@@ -1,15 +1,34 @@
 /**
  * Main-thread warm scheduler singleton — survives React remounts.
- * Three lanes; lane 3 fills the union of both on-screen languages.
+ *
+ * Now  = lane 1 (visible owners): current chapter prepare + live quote/align.
+ * Soon = lane 2: rest of current book for all downloaded keys in {text,helps}
+ *        languages that share Bible vs OBS mode.
+ * Later = lane 3: full-canon / OBS-story / article fill for every downloaded
+ *        key in those languages (32-job slices, coverage resume).
  *
  * Multiple owners (helps / scripture) merge complementary visible context
  * so scripture+scripture and helps layouts both feed the same queue.
  */
 
-import { getDownloadPriority } from '../../config/loaderConfig'
-import { alignRelationId, quoteRelationId } from '../helps/helpsAlignCache'
+import { isResourceMarkedComplete } from '../download/resourceDownloadComplete'
 import { resolveOriginalLanguageKey } from '../helps/olLoadCache'
 import { knownChapterCount } from '../nav/bookChapterCounts'
+import { collectLane2Groups, collectLane3Groups } from './warmAdmitPlan'
+import { shouldCancelWarmJobsForLanguage } from './warmCancelPolicy'
+import {
+  applyCoverageOutcome,
+  createCoverageSettleState,
+  type CoverageSettleState,
+} from './warmCoverageSettle'
+import { LANE3_JOBS_PER_PASS } from './warmBookOrder'
+import {
+  LANE2_JOBS_PER_PASS,
+  LANE3_ADMIT_COOLDOWN_MS,
+  LANE3_MAX_PENDING,
+  canAdmitBackgroundLanes,
+} from './warmLanePolicy'
+import { classifyWarmResource, languageFromKey } from './warmResourceClass'
 import {
   cancelWarmJobs,
   enqueueWarmJob,
@@ -18,11 +37,7 @@ import {
   subscribeWarmDone,
 } from '../../workers/warmClient'
 import { subscribePrepareWarmDone } from '../../workers/prepareClient'
-import {
-  isRelationCovered,
-  markRelationCovered,
-  prepareRelationId,
-} from './warmCoverage'
+import { markRelationCovered, readWarmCoverage } from './warmCoverage'
 import { runWarmGc, type WarmGcCacheAdapter } from './warmGc'
 import type { WarmJob, WarmJobOutcome } from './warmTypes'
 
@@ -51,11 +66,17 @@ export type WarmVisibleContext = {
     olStamp?: string
     targetStampByKey: Record<string, string>
     textLanguageByTarget?: Record<string, string>
+    /** UGNT + UHB stamps so lane 3 can quote/align OT and NT books. */
+    olStampByKey?: Record<string, string>
   }
+  /** TA/TW entry ids from catalog ingredients (lane 3 prepare-article). */
+  articleIdsByKey?: Record<string, string[]>
   /** Downloaded catalog keys for lane 3 (owner/lang/id). */
   downloadedKeys?: string[]
-  /** Bumps when a download session finishes so no-op admits can retry. */
+  /** Bumps when a download session finishes or a resource zip completes. */
   downloadGeneration?: number
+  /** OL keys whose zip is marked complete — quote/align admit waits for these. */
+  readyOlKeys?: string[]
   cacheAdapter?: WarmGcCacheAdapter | null
 }
 
@@ -69,20 +90,7 @@ export type WarmSchedulerStats = {
   context: WarmVisibleContext | null
 }
 
-type CoverageBatch = {
-  stamp: string
-  succeeded: number
-  remaining: Set<string>
-}
-
-const NT_ORDER = [
-  'mat','mrk','luk','jhn','act','rom','1co','2co','gal','eph','php','col',
-  '1th','2th','1ti','2ti','tit','phm','heb','jas','1pe','2pe','1jn','2jn','3jn','jud','rev',
-]
-
-const HELPS_CATALOG_IDS = new Set([
-  'tn', 'twl', 'tq', 'tw', 'ta', 'tn-obs', 'twl-obs', 'tq-obs', 'obs',
-])
+type CoverageBatch = CoverageSettleState
 
 const ownerContexts = new Map<WarmContextOwner, WarmVisibleContext>()
 let context: WarmVisibleContext | null = null
@@ -95,9 +103,13 @@ const coverageByJob = new Map<string, string>()
 const coverageBatches = new Map<string, CoverageBatch>()
 const listeners = new Set<StatsListener>()
 let seededBookKey = ''
+const admittedLane2Keys = new Set<string>()
+let admittedLane2Seed = ''
 const admittedLane3Keys = new Set<string>()
 let admittedLane3Seed = ''
 let gcScheduled = false
+let lastLane3AdmitAt = 0
+let lane3AdmitTimer: ReturnType<typeof setTimeout> | null = null
 
 function emit() {
   const stats: WarmSchedulerStats = {
@@ -113,23 +125,8 @@ function emit() {
   }
 }
 
-function languageFromKey(key: string): string {
-  return key.split('/')[1]?.split('_')[0]?.toLowerCase() ?? ''
-}
-
-function catalogIdFromKey(key: string): string {
-  return key.split('/')[2]?.split('#')[0] ?? ''
-}
-
 function downloadedKeysHash(keys: string[] | undefined): string {
   return (keys ?? []).slice().sort().join(',')
-}
-
-function nextBooks(fromBook: string): string[] {
-  const cur = fromBook.toLowerCase()
-  const idx = NT_ORDER.indexOf(cur)
-  if (idx < 0) return [cur]
-  return [...NT_ORDER.slice(idx), ...NT_ORDER.slice(0, idx)]
 }
 
 function langChanged(prev: string, next: string): boolean {
@@ -145,6 +142,8 @@ function mergeOwnerContexts(
   const helpsStampByKey: Record<string, string> = {}
   const targetStampByKey: Record<string, string> = {}
   const textLanguageByTarget: Record<string, string> = {}
+  const olStampByKey: Record<string, string> = {}
+  const articleIdsByKey: Record<string, string[]> = {}
   const downloaded = new Set<string>()
   let bookId = ''
   let chapter = 1
@@ -155,6 +154,7 @@ function mergeOwnerContexts(
   let scrollUnsettled = false
   let olKey: string | undefined
   let olStamp: string | undefined
+  const readyOl = new Set<string>()
   let cacheAdapter: WarmGcCacheAdapter | null | undefined
 
   for (const c of list) {
@@ -170,8 +170,14 @@ function mergeOwnerContexts(
     Object.assign(helpsStampByKey, c.stamps?.helpsStampByKey)
     Object.assign(targetStampByKey, c.stamps?.targetStampByKey)
     Object.assign(textLanguageByTarget, c.stamps?.textLanguageByTarget)
+    Object.assign(olStampByKey, c.stamps?.olStampByKey)
     if (c.stamps?.olKey) olKey = c.stamps.olKey
     if (c.stamps?.olStamp) olStamp = c.stamps.olStamp
+    for (const k of c.readyOlKeys ?? []) readyOl.add(k)
+    for (const [k, ids] of Object.entries(c.articleIdsByKey ?? {})) {
+      const prev = articleIdsByKey[k] ?? []
+      articleIdsByKey[k] = [...new Set([...prev, ...ids])]
+    }
     for (const k of c.downloadedKeys ?? []) downloaded.add(k)
   }
 
@@ -190,9 +196,12 @@ function mergeOwnerContexts(
       olStamp,
       targetStampByKey,
       textLanguageByTarget,
+      olStampByKey,
     },
+    articleIdsByKey,
     downloadedKeys: [...downloaded],
     downloadGeneration: Math.max(0, ...list.map((c) => c.downloadGeneration ?? 0)),
+    readyOlKeys: [...readyOl],
     cacheAdapter,
   }
 }
@@ -201,7 +210,7 @@ function registerCoverageJobs(relationId: string, stamp: string, jobKeys: string
   if (jobKeys.length === 0) return
   let batch = coverageBatches.get(relationId)
   if (!batch || batch.stamp !== stamp) {
-    batch = { stamp, succeeded: 0, remaining: new Set() }
+    batch = createCoverageSettleState(stamp)
     coverageBatches.set(relationId, batch)
   }
   for (const key of jobKeys) {
@@ -216,13 +225,12 @@ function settleCoverage(jobKey: string, outcome: WarmJobOutcome): void {
   if (!relationId) return
   const batch = coverageBatches.get(relationId)
   if (!batch) return
-  batch.remaining.delete(jobKey)
-  if (outcome === 'finished' || outcome === 'cached') batch.succeeded += 1
+  const { shouldMark, succeeded } = applyCoverageOutcome(batch, jobKey, outcome)
   if (batch.remaining.size > 0) return
   coverageBatches.delete(relationId)
   const cache = context?.cacheAdapter
-  if (!cache || batch.succeeded < 1) return
-  void markRelationCovered(cache, relationId, batch.stamp, batch.succeeded)
+  if (!cache || !shouldMark) return
+  void markRelationCovered(cache, relationId, batch.stamp, succeeded)
 }
 
 async function enqueue(job: WarmJob): Promise<boolean> {
@@ -262,21 +270,62 @@ function onJobDone(jobKey: string, outcome: WarmJobOutcome = 'noop') {
   pendingLangByKey.delete(jobKey)
   settleCoverage(jobKey, outcome)
   emit()
-  void maybeAdmitLane3()
+  if (canAdmitLane2()) void seedLane2()
+  scheduleMaybeAdmitLane3()
 }
 
 // Subscribe once at module load.
 subscribeWarmDone((msg) => onJobDone(msg.jobKey, msg.outcome ?? 'noop'))
 subscribePrepareWarmDone((msg) => onJobDone(msg.jobKey, msg.outcome ?? 'noop'))
 
+function documentIsVisible(): boolean {
+  return typeof document === 'undefined' || document.visibilityState === 'visible'
+}
+
 function canAdmitLane2(): boolean {
-  return Boolean(context && lane1Drained && !context.scrollUnsettled)
+  return canAdmitBackgroundLanes({
+    lane1Drained: Boolean(context && lane1Drained),
+    scrollUnsettled: context?.scrollUnsettled,
+    documentVisible: documentIsVisible(),
+    lane: 2,
+  })
 }
 
 function canAdmitLane3(): boolean {
-  if (!canAdmitLane2()) return false
-  if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return false
-  return true
+  return canAdmitBackgroundLanes({
+    lane1Drained: Boolean(context && lane1Drained),
+    scrollUnsettled: context?.scrollUnsettled,
+    documentVisible: documentIsVisible(),
+    pendingJobKeys: pendingKeys.size,
+    maxPending: LANE3_MAX_PENDING,
+    lastAdmitAt: lastLane3AdmitAt,
+    now: Date.now(),
+    cooldownMs: LANE3_ADMIT_COOLDOWN_MS,
+    lane: 3,
+  })
+}
+
+function scheduleMaybeAdmitLane3(): void {
+  if (canAdmitLane3()) {
+    void maybeAdmitLane3()
+    return
+  }
+  if (!canAdmitLane2()) return
+  if (pendingKeys.size >= LANE3_MAX_PENDING) return
+  if (lane3AdmitTimer != null) return
+  const elapsed = Date.now() - lastLane3AdmitAt
+  const wait = Math.max(0, LANE3_ADMIT_COOLDOWN_MS - elapsed)
+  lane3AdmitTimer = setTimeout(() => {
+    lane3AdmitTimer = null
+    if (canAdmitLane3()) void maybeAdmitLane3()
+  }, wait)
+}
+
+function articleIdsHash(map: Record<string, string[]> | undefined): string {
+  return Object.entries(map ?? {})
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, ids]) => `${k}:${ids.length}`)
+    .join(',')
 }
 
 function seedKeyFor(ctx: WarmVisibleContext): string {
@@ -285,6 +334,7 @@ function seedKeyFor(ctx: WarmVisibleContext): string {
     ctx.visibleResources.map((r) => r.resourceKey).join(','),
     ctx.sourceResourceId ?? '',
     downloadedKeysHash(ctx.downloadedKeys),
+    articleIdsHash(ctx.articleIdsByKey),
     String(ctx.downloadGeneration ?? 0),
   ].join('|')
 }
@@ -296,113 +346,94 @@ function resetLane3AdmitsIfNeeded(ctx: WarmVisibleContext): void {
   admittedLane3Keys.clear()
 }
 
+function resetLane2AdmitsIfNeeded(ctx: WarmVisibleContext): void {
+  const seed = seedKeyFor(ctx)
+  if (seed === admittedLane2Seed) return
+  admittedLane2Seed = seed
+  admittedLane2Keys.clear()
+  seededBookKey = seed
+}
+
 async function seedLane2(): Promise<void> {
   if (!context || !canAdmitLane2()) return
-  const { bookId, chapter, lastChapter, visibleResources, sourceResourceId, stamps } = context
-  const seedKey = seedKeyFor(context)
-  if (seededBookKey === seedKey) return
-  seededBookKey = seedKey
+  if (pendingKeys.size >= LANE3_MAX_PENDING) return
+  const { bookId, chapter, lastChapter, visibleResources, sourceResourceId, stamps, downloadedKeys } =
+    context
+  resetLane2AdmitsIfNeeded(context)
 
   const ol = resolveOriginalLanguageKey(bookId)
   const olKey = stamps?.olKey ?? ol?.resourceKey ?? ''
   const olStamp = stamps?.olStamp ?? 'nostamp'
   const bookLast = lastChapter > 0 ? lastChapter : knownChapterCount(bookId)
 
-  for (const res of visibleResources) {
-    const lang = languageFromKey(res.resourceKey)
-    // Scripture rest-of-book is already enqueued by enqueueScriptureBookPriority.
-    if (res.role !== 'scripture') {
-      const pRel = prepareRelationId({
-        typeId: res.typeId,
-        resourceKey: res.resourceKey,
-        book: bookId,
-      })
-      const pStamp =
-        (res.role === 'helps'
-          ? stamps?.helpsStampByKey[res.resourceKey]
-          : stamps?.targetStampByKey[res.resourceKey]) ?? 'nostamp'
-      const prepJobs: WarmJob[] = []
-      for (let ch = 1; ch <= bookLast; ch++) {
-        if (ch === chapter || ch === chapter - 1 || ch === chapter + 1) continue
-        prepJobs.push({
-          jobKey: `prep:${res.typeId}:${res.resourceKey}:${bookId}:${ch}`,
-          lane: 2,
-          kind: 'prepare-unit',
-          languageCode: lang,
-          resourceKey: res.resourceKey,
-          bookId,
-          typeId: res.typeId,
-          unit: ch,
-          tier: 'both',
-        })
-      }
-      await enqueueCoveredGroup(pRel, pStamp, prepJobs)
-    }
+  const visibleKeyList = visibleResources.map((r) => r.resourceKey)
+  const readyOlKeys = await resolveReadyOlKeys(context)
+  const groups = collectLane2Groups({
+    bookId,
+    chapter,
+    lastChapter: bookLast,
+    downloadedKeys: [
+      ...new Set([
+        ...(downloadedKeys ?? []),
+        ...visibleKeyList,
+        ...(sourceResourceId ? [sourceResourceId] : []),
+      ]),
+    ],
+    visibleKeys: visibleKeyList,
+    sourceResourceId,
+    textLanguageCode: context.textLanguageCode,
+    helpsLanguageCode: context.helpsLanguageCode,
+    stamps,
+    olKey,
+    olStamp,
+    readyOlKeys,
+    admittedKeys: [...admittedLane2Keys, ...pendingKeys],
+    budget: LANE2_JOBS_PER_PASS,
+  })
+  for (const g of groups) {
+    for (const job of g.jobs) admittedLane2Keys.add(job.jobKey)
+    await enqueueCoveredGroup(g.relationId, g.stamp, g.jobs)
+  }
+}
 
-    if (res.role === 'helps' && res.helpsType && olKey) {
-      const helpsStamp = stamps?.helpsStampByKey[res.resourceKey] ?? 'nostamp'
-      const qRel = quoteRelationId({ helpsKey: res.resourceKey, olKey, book: bookId })
-      const qStamp = `${helpsStamp}|${olStamp}`
-      const quoteJobs: WarmJob[] = []
-      for (let ch = 1; ch <= bookLast; ch++) {
-        quoteJobs.push({
-          jobKey: `quote:${res.resourceKey}:${bookId}:${ch}`,
-          lane: 2,
-          kind: 'quote-chapter',
-          languageCode: lang,
-          resourceKey: res.resourceKey,
-          bookId,
-          chapter: ch,
-          helpsStamp,
-          olKey,
-          olStamp,
-          helpsType: res.helpsType,
-        })
-      }
-      await enqueueCoveredGroup(qRel, qStamp, quoteJobs)
-
-      if (sourceResourceId) {
-        const targetStamp = stamps?.targetStampByKey[sourceResourceId] ?? 'nostamp'
-        const aRel = alignRelationId({
-          helpsKey: res.resourceKey,
-          olKey,
-          targetKey: sourceResourceId,
-          book: bookId,
-        })
-        const aStamp = `${helpsStamp}|${olStamp}|${targetStamp}`
-        const alignJobs: WarmJob[] = []
-        for (let ch = 1; ch <= bookLast; ch++) {
-          alignJobs.push({
-            jobKey: `align:${res.resourceKey}:${sourceResourceId}:${bookId}:${ch}`,
-            lane: 2,
-            kind: 'align-chapter',
-            languageCode: lang,
-            resourceKey: res.resourceKey,
-            bookId,
-            chapter: ch,
-            helpsStamp,
-            olKey,
-            olStamp,
-            targetKey: sourceResourceId,
-            targetStamp,
-            helpsType: res.helpsType,
-            textLanguage: stamps?.textLanguageByTarget?.[sourceResourceId],
-          })
-        }
-        await enqueueCoveredGroup(aRel, aStamp, alignJobs)
-      }
+async function resolveReadyOlKeys(ctx: WarmVisibleContext): Promise<string[] | undefined> {
+  const fromOwners = ctx.readyOlKeys ?? []
+  const cache = ctx.cacheAdapter
+  if (!cache) return fromOwners.length > 0 ? [...new Set(fromOwners)] : undefined
+  const candidates = new Set<string>(fromOwners)
+  if (ctx.stamps?.olKey) candidates.add(ctx.stamps.olKey)
+  for (const k of Object.keys(ctx.stamps?.olStampByKey ?? {})) candidates.add(k)
+  const ready: string[] = []
+  for (const key of candidates) {
+    if (fromOwners.includes(key) || (await isResourceMarkedComplete(cache, key))) {
+      ready.push(key)
     }
   }
+  // No confirmed-complete OL → unknown (older zips may lack the flag). Let jobs probe USFM.
+  if (ready.length === 0) return undefined
+  return ready
+}
+
+function olStampForBook(
+  book: string,
+  stamps: WarmVisibleContext['stamps']
+): { olKey: string; olStamp: string } {
+  const ol = resolveOriginalLanguageKey(book)
+  const olKey = ol?.resourceKey ?? ''
+  const fromMap = olKey ? stamps?.olStampByKey?.[olKey] : undefined
+  const olStamp =
+    fromMap ?? (olKey && olKey === stamps?.olKey ? stamps.olStamp : undefined) ?? 'nostamp'
+  return { olKey, olStamp }
 }
 
 async function maybeAdmitLane3(): Promise<void> {
   if (!context || !canAdmitLane3()) return
   const {
     bookId,
-    lastChapter,
     textLanguageCode,
     helpsLanguageCode,
     downloadedKeys = [],
+    articleIdsByKey = {},
     stamps,
     cacheAdapter,
   } = context
@@ -414,129 +445,53 @@ async function maybeAdmitLane3(): Promise<void> {
   if (inLang.length === 0) return
   resetLane3AdmitsIfNeeded(context)
 
-  const helpsOnly = inLang.filter((k) => {
-    const id = catalogIdFromKey(k)
-    return id === 'tn' || id === 'twl'
-  })
-  const scriptureOnly = inLang.filter((k) => {
-    const id = catalogIdFromKey(k)
-    return !HELPS_CATALOG_IDS.has(id)
-  })
-
-  const books = nextBooks(bookId)
-  const ol = resolveOriginalLanguageKey(bookId)
-  const olKey = stamps?.olKey ?? ol?.resourceKey ?? ''
-  const olStamp = stamps?.olStamp ?? 'nostamp'
-  const currentLast = lastChapter > 0 ? lastChapter : knownChapterCount(bookId)
-
-  const priorityOf = (key: string) => {
-    const id = catalogIdFromKey(key)
-    if (id === 'tn') return getDownloadPriority('notes')
-    if (id === 'twl') return getDownloadPriority('words-links')
-    return getDownloadPriority('scripture')
+  const coverage = cacheAdapter ? await readWarmCoverage(cacheAdapter) : {}
+  const skipRelation = (relationId: string, stamp: string, minUnitCount: number) => {
+    const entry = coverage[relationId]
+    return Boolean(entry && entry.stamp === stamp && entry.unitCount >= minUnitCount)
   }
-  const sortedScripture = [...scriptureOnly].sort((a, b) => priorityOf(a) - priorityOf(b))
-  const sortedHelps = [...helpsOnly].sort((a, b) => priorityOf(a) - priorityOf(b))
 
-  for (const book of books.slice(0, 5)) {
-    const maxCh = book === bookId.toLowerCase() ? currentLast : 3
-
-    for (const sk of sortedScripture) {
-      const lang = languageFromKey(sk)
-      const pRel = prepareRelationId({ typeId: 'scripture', resourceKey: sk, book })
-      const pStamp = stamps?.targetStampByKey[sk] ?? 'nostamp'
-      if (cacheAdapter && (await isRelationCovered(cacheAdapter, pRel, pStamp, maxCh))) {
-        continue
-      }
-      const prepJobs: WarmJob[] = []
-      for (let ch = 1; ch <= maxCh; ch++) {
-        const jobKey = `prep:scripture:${sk}:${book}:${ch}`
-        if (pendingKeys.has(jobKey) || admittedLane3Keys.has(jobKey)) continue
-        admittedLane3Keys.add(jobKey)
-        prepJobs.push({
-          jobKey,
-          lane: 3,
-          kind: 'prepare-unit',
-          languageCode: lang,
-          resourceKey: sk,
-          bookId: book,
-          typeId: 'scripture',
-          unit: ch,
-          tier: 'both',
-        })
-      }
-      await enqueueCoveredGroup(pRel, pStamp, prepJobs)
-    }
-
-    if (!olKey) continue
-    for (const hk of sortedHelps) {
-      const lang = languageFromKey(hk)
-      const helpsStamp = stamps?.helpsStampByKey[hk] ?? 'nostamp'
-      const helpsType = (catalogIdFromKey(hk) === 'twl'
-        ? 'words-links'
-        : 'notes') as 'notes' | 'words-links'
-      const qRel = quoteRelationId({ helpsKey: hk, olKey, book })
-      const qStamp = `${helpsStamp}|${olStamp}`
-      if (!(cacheAdapter && (await isRelationCovered(cacheAdapter, qRel, qStamp, maxCh)))) {
-        const quoteJobs: WarmJob[] = []
-        for (let ch = 1; ch <= maxCh; ch++) {
-          const jobKey = `quote:${hk}:${book}:${ch}`
-          if (pendingKeys.has(jobKey) || admittedLane3Keys.has(jobKey)) continue
-          admittedLane3Keys.add(jobKey)
-          quoteJobs.push({
-            jobKey,
-            lane: 3,
-            kind: 'quote-chapter',
-            languageCode: lang,
-            resourceKey: hk,
-            bookId: book,
-            chapter: ch,
-            helpsStamp,
-            olKey,
-            olStamp,
-            helpsType,
-          })
-        }
-        await enqueueCoveredGroup(qRel, qStamp, quoteJobs)
-      }
-
-      for (const sk of sortedScripture) {
-        const targetStamp = stamps?.targetStampByKey[sk] ?? 'nostamp'
-        const aRel = alignRelationId({
-          helpsKey: hk,
-          olKey,
-          targetKey: sk,
-          book,
-        })
-        const aStamp = `${helpsStamp}|${olStamp}|${targetStamp}`
-        if (cacheAdapter && (await isRelationCovered(cacheAdapter, aRel, aStamp, maxCh))) {
-          continue
-        }
-        const alignJobs: WarmJob[] = []
-        for (let ch = 1; ch <= maxCh; ch++) {
-          const jobKey = `align:${hk}:${sk}:${book}:${ch}`
-          if (pendingKeys.has(jobKey) || admittedLane3Keys.has(jobKey)) continue
-          admittedLane3Keys.add(jobKey)
-          alignJobs.push({
-            jobKey,
-            lane: 3,
-            kind: 'align-chapter',
-            languageCode: lang,
-            resourceKey: hk,
-            bookId: book,
-            chapter: ch,
-            helpsStamp,
-            olKey,
-            olStamp,
-            targetKey: sk,
-            targetStamp,
-            helpsType,
-            textLanguage: stamps?.textLanguageByTarget?.[sk],
-          })
-        }
-        await enqueueCoveredGroup(aRel, aStamp, alignJobs)
+  const articles = { ...articleIdsByKey }
+  if (cacheAdapter?.getByPrefix) {
+    for (const key of inLang) {
+      if (articles[key]?.length) continue
+      const classified = classifyWarmResource(key)
+      if (!classified.isArticle) continue
+      try {
+        const rows = await cacheAdapter.getByPrefix(`${key}/`)
+        const ids = rows
+          .map((r) => (r.key.startsWith(`${key}/`) ? r.key.slice(key.length + 1) : ''))
+          .filter((id) => id && !id.includes(':'))
+        if (ids.length) articles[key] = ids
+      } catch {
+        /* prefix scan is best-effort */
       }
     }
+  }
+
+  const readyOlKeys = await resolveReadyOlKeys(context)
+  // Dedicated warm.worker can take a slice; folded prepare.worker gets 1 job
+  // so batch-align / batch-quotes stay interactive.
+  const budget = isDedicatedWarmWorkerActive() ? LANE3_JOBS_PER_PASS : 1
+  const groups = collectLane3Groups({
+    bookId,
+    downloadedKeys,
+    textLanguageCode,
+    helpsLanguageCode,
+    stamps,
+    articleIdsByKey: articles,
+    admittedKeys: [...admittedLane3Keys, ...pendingKeys],
+    budget,
+    olStampForBook: (book) => olStampForBook(book, stamps),
+    skipRelation,
+    readyOlKeys,
+  })
+  if (groups.some((g) => g.jobs.length > 0)) {
+    lastLane3AdmitAt = Date.now()
+  }
+  for (const g of groups) {
+    for (const job of g.jobs) admittedLane3Keys.add(job.jobKey)
+    await enqueueCoveredGroup(g.relationId, g.stamp, g.jobs)
   }
 
   scheduleGc()
@@ -568,19 +523,35 @@ function applyMergedContext(): void {
   const prev = context
   context = mergeOwnerContexts(ownerContexts)
   if (prev && context) {
-    if (langChanged(prev.textLanguageCode, context.textLanguageCode)) {
+    if (
+      langChanged(prev.textLanguageCode, context.textLanguageCode) &&
+      shouldCancelWarmJobsForLanguage({
+        previousLanguage: prev.textLanguageCode,
+        nextTextLanguage: context.textLanguageCode,
+        nextHelpsLanguage: context.helpsLanguageCode,
+      })
+    ) {
       void warmScheduler.cancelJobsForLanguage(prev.textLanguageCode)
     }
-    if (langChanged(prev.helpsLanguageCode, context.helpsLanguageCode)) {
+    if (
+      langChanged(prev.helpsLanguageCode, context.helpsLanguageCode) &&
+      shouldCancelWarmJobsForLanguage({
+        previousLanguage: prev.helpsLanguageCode,
+        nextTextLanguage: context.textLanguageCode,
+        nextHelpsLanguage: context.helpsLanguageCode,
+      })
+    ) {
       void warmScheduler.cancelJobsForLanguage(prev.helpsLanguageCode)
     }
     if (prev.bookId !== context.bookId) {
       seededBookKey = ''
+      admittedLane2Seed = ''
+      admittedLane2Keys.clear()
     }
   }
   emit()
   if (canAdmitLane2()) void seedLane2()
-  if (canAdmitLane3()) void maybeAdmitLane3()
+  scheduleMaybeAdmitLane3()
 }
 
 export const warmScheduler = {
@@ -602,7 +573,7 @@ export const warmScheduler = {
     lane1Drained = lane1BusyOwners.size === 0
     emit()
     if (canAdmitLane2()) void seedLane2()
-    if (canAdmitLane3()) void maybeAdmitLane3()
+    scheduleMaybeAdmitLane3()
   },
 
   notifyLane1Busy(owner: WarmContextOwner = 'default') {

@@ -25,6 +25,7 @@ import { useFilteredReadPanelKeys } from '../../features/read/useFilteredReadPan
 import { useIsNarrowViewport } from '../../features/read/useIsNarrowViewport'
 import { useReadCollectionExport } from '../../features/read/useReadCollectionExport'
 import { useReadGatewayBookCatalog } from '../../features/read/useReadGatewayBookCatalog'
+import { backgroundDownloadSession } from '../../features/download/backgroundDownloadSession'
 import { useReadLanguageBootstrap } from '../../features/read/useReadLanguageBootstrap'
 import { useReadLinkedPanelsConfig } from '../../features/read/useReadLinkedPanelsConfig'
 import { useReadPanelDnD } from '../../features/read/useReadPanelDnD'
@@ -259,6 +260,9 @@ export function SimplifiedReadView({
                   isDownloading={isBackgroundDownloading}
                   progress={downloadStats.progress ?? undefined}
                   error={downloadStats.error}
+                  onRetry={() => {
+                    backgroundDownloadSession.retryLastRun()
+                  }}
                 />
               }
               onDownloadCollection={

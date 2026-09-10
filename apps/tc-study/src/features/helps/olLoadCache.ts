@@ -8,6 +8,10 @@ import {
   ScriptureLoader,
   viewModelChapterToOptimized,
 } from '@bt-synergy/scripture-loader'
+import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
+import { getSoT, type SoTCache } from '../sot/getSoT'
+import { fetchDcsViaLoader } from '../sot/fetchDcsSoT'
+import { isUsjViewModel, publishSoTDebug } from '../sot/sotDebug'
 
 const inflight = new Map<string, Promise<OptimizedChapter[]>>()
 
@@ -88,14 +92,44 @@ export function loadOriginalLanguageChapters(args: {
   bookId: string
   startChapter: number
   endChapter: number
+  /** Lane 1: IDB first, else one DCS book file. Warm must omit this + allowDcs. */
+  cache?: SoTCache
+  allowDcs?: boolean
 }): Promise<OptimizedChapter[]> {
-  const { loader, olKey, bookId, startChapter, endChapter } = args
+  const { loader, olKey, bookId, startChapter, endChapter, cache, allowDcs } = args
   const key = olLoadCacheKey(olKey, bookId, startChapter, endChapter)
   const existing = inflight.get(key)
   if (existing) return existing
 
   const promise = (async (): Promise<OptimizedChapter[]> => {
-    const viewModel = await loader.loadViewModel(olKey, bookId)
+    let viewModel: Parameters<typeof viewModelChapterToOptimized>[0] | null = null
+    if (cache) {
+      const sot = await getSoT({
+        resourceKey: olKey,
+        book: bookId,
+        chapter: startChapter,
+        typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
+        cache,
+        allowDcs: allowDcs === true,
+        fetchDcs: fetchDcsViaLoader(loader),
+      })
+      publishSoTDebug({
+        source: sot.status === 'hit' ? sot.source : 'missing',
+        typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
+        book: bookId,
+        chapter: startChapter,
+      })
+      if (sot.status === 'hit' && isUsjViewModel(sot.payload)) {
+        viewModel = sot.payload as Parameters<typeof viewModelChapterToOptimized>[0]
+      } else if (sot.status === 'hit') {
+        viewModel = await loader.loadViewModel(olKey, bookId)
+      } else if (allowDcs) {
+        viewModel = await loader.loadViewModel(olKey, bookId)
+      }
+    } else {
+      viewModel = await loader.loadViewModel(olKey, bookId)
+    }
+    if (!viewModel) return []
     const optimized: OptimizedChapter[] = []
     for (let chapter = startChapter; chapter <= endChapter; chapter++) {
       const row = viewModelChapterToOptimized(viewModel, chapter)

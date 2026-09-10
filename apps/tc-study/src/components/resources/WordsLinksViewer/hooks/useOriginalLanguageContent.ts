@@ -9,12 +9,15 @@
 import type { OptimizedChapter } from '@bt-synergy/resource-parsers'
 import { ScriptureLoader } from '@bt-synergy/scripture-loader'
 import { useEffect, useRef, useState } from 'react'
-import { useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { useCacheAdapter, useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { backgroundDownloadSession } from '../../../../features/download/backgroundDownloadSession'
+import { enqueueOriginalLanguageDownload } from '../../../../features/download/ensureOriginalLanguageDownload'
 import {
   loadOriginalLanguageChapters,
   resolveOriginalLanguageKey,
   type OriginalLanguageResource,
 } from '../../../../features/helps/olLoadCache'
+import { isOriginalLanguageQuoteBlocked } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { shouldRetryOriginalLanguageLoad } from '../../../../features/helps/scriptureReadyUnderlineRebind'
 import {
   pinReferenceWhileScrolling,
@@ -31,11 +34,16 @@ interface UseOriginalLanguageContentOptions {
 
 export { resolveOriginalLanguageKey } from '../../../../features/helps/olLoadCache'
 
+function olSpanKey(book: string, chapter: number, endChapter: number): string {
+  return `${book}:${chapter}:${endChapter}`
+}
+
 export function useOriginalLanguageContent({
   scriptureRevision = '',
 }: UseOriginalLanguageContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
+  const cacheAdapter = useCacheAdapter()
   const scrollActivity = useChapterScrollActivity()
   const helpsRef = pinReferenceWhileScrolling(currentRef, scrollActivity)
   const allowChapterHydrate = shouldHydrateHelpsForChapter({
@@ -48,17 +56,32 @@ export function useOriginalLanguageContent({
     OriginalLanguageResource[]
   >([])
   const [originalContent, setOriginalContent] = useState<OptimizedChapter[] | null>(null)
+  const [loadedSpan, setLoadedSpan] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [retryTick, setRetryTick] = useState(0)
+  const [olDownloadTick, setOlDownloadTick] = useState(0)
   const lastAttemptedRevisionRef = useRef<string | null>(null)
+  const lastAttemptedDownloadTickRef = useRef<number | null>(null)
   const loadedSpanRef = useRef('')
+  const enqueuedOlKeyRef = useRef('')
   const contentRef = useRef(originalContent)
   contentRef.current = originalContent
 
+  const startChapter = helpsRef.chapter || 1
+  const endChapter = helpsRef.endChapter || startChapter
+  const nextSpan = olSpanKey(helpsRef.book || '', startChapter, endChapter)
+
   useEffect(() => {
     lastAttemptedRevisionRef.current = null
-  }, [helpsRef.book, helpsRef.chapter, helpsRef.endChapter])
+    lastAttemptedDownloadTickRef.current = null
+    enqueuedOlKeyRef.current = ''
+    loadedSpanRef.current = ''
+    // Wrong-testament OL must not keep quote-build "ready" (UGNT ≠ UHB).
+    setOriginalContent(null)
+    setLoadedSpan('')
+    setError(null)
+  }, [helpsRef.book])
 
   useEffect(() => {
     if (
@@ -66,13 +89,30 @@ export function useOriginalLanguageContent({
         hasOriginalContent: !!(originalContent && originalContent.length > 0),
         scriptureRevision,
         lastAttemptedRevision: lastAttemptedRevisionRef.current,
+        olDownloadTick,
+        lastAttemptedDownloadTick: lastAttemptedDownloadTickRef.current,
       })
     ) {
       return
     }
     lastAttemptedRevisionRef.current = scriptureRevision
+    lastAttemptedDownloadTickRef.current = olDownloadTick
     setRetryTick((n) => n + 1)
-  }, [scriptureRevision, originalContent])
+  }, [scriptureRevision, originalContent, olDownloadTick])
+
+  useEffect(() => {
+    const book = helpsRef.book || ''
+    const olKey = resolveOriginalLanguageKey(book)?.resourceKey
+    if (!olKey) return
+    return backgroundDownloadSession.subscribe((s) => {
+      if (s.error) {
+        enqueuedOlKeyRef.current = ''
+      }
+      if (!s.completedResourceKeys.includes(olKey)) return
+      if (contentRef.current && contentRef.current.length > 0) return
+      setOlDownloadTick((n) => n + 1)
+    })
+  }, [helpsRef.book])
 
   useEffect(() => {
     if (!allowChapterHydrate) return
@@ -91,8 +131,7 @@ export function useOriginalLanguageContent({
 
     const loadOriginalContent = async () => {
       try {
-        const hasStale = (contentRef.current?.length ?? 0) > 0
-        if (!hasStale) setLoading(true)
+        setLoading(true)
         setError(null)
 
         const bookCode = helpsRef.book?.toUpperCase() || ''
@@ -105,9 +144,6 @@ export function useOriginalLanguageContent({
         if (cancelled) return
         setOriginalLanguageResources([resource])
 
-        const startChapter = helpsRef.chapter
-        const endChapter = helpsRef.endChapter || startChapter
-
         const loader = loaderRegistry.getLoader('scripture') as ScriptureLoader | undefined
         if (!loader || typeof loader.loadViewModel !== 'function') {
           throw new Error('Scripture loader with loadViewModel not found')
@@ -119,12 +155,22 @@ export function useOriginalLanguageContent({
           bookId: helpsRef.book,
           startChapter,
           endChapter,
+          cache: cacheAdapter,
+          allowDcs: true,
         })
         if (cancelled) return
 
         // `[]` = attempted empty (distinct from first-paint `null`)
-        loadedSpanRef.current = `${helpsRef.book}:${helpsRef.chapter}:${helpsRef.endChapter || helpsRef.chapter}`
+        loadedSpanRef.current = nextSpan
+        setLoadedSpan(nextSpan)
         setOriginalContent(optimized)
+
+        if (optimized.length === 0) {
+          if (enqueuedOlKeyRef.current !== resource.resourceKey) {
+            enqueuedOlKeyRef.current = resource.resourceKey
+            enqueueOriginalLanguageDownload(resource.resourceKey)
+          }
+        }
       } catch (err) {
         if (cancelled) return
         console.error('❌ [useOriginalLanguageContent] Failed to load original language content:', err)
@@ -132,7 +178,15 @@ export function useOriginalLanguageContent({
           message: err instanceof Error ? err.message : String(err),
           stack: err instanceof Error ? err.stack : undefined,
         })
+        loadedSpanRef.current = nextSpan
+        setLoadedSpan(nextSpan)
+        setOriginalContent([])
         setError(err instanceof Error ? err.message : 'Failed to load original language content')
+        const olKey = resolveOriginalLanguageKey(helpsRef.book || '')?.resourceKey
+        if (olKey && enqueuedOlKeyRef.current !== olKey) {
+          enqueuedOlKeyRef.current = olKey
+          enqueueOriginalLanguageDownload(olKey)
+        }
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -150,14 +204,26 @@ export function useOriginalLanguageContent({
     helpsRef.book,
     helpsRef.chapter,
     helpsRef.endChapter,
+    startChapter,
+    endChapter,
+    nextSpan,
     loaderRegistry,
+    cacheAdapter,
     retryTick,
   ])
 
+  const spanMatches = loadedSpan === nextSpan
+  const spanContent = spanMatches ? originalContent : null
+
   return {
     originalLanguageResources,
-    originalContent,
-    loading,
-    error,
+    originalContent: spanContent,
+    loading: loading || !spanMatches,
+    error: spanMatches ? error : null,
+    olBlocked: isOriginalLanguageQuoteBlocked({
+      loadingOriginal: loading || !spanMatches,
+      originalContent: spanContent,
+      originalError: spanMatches ? error : null,
+    }),
   }
 }

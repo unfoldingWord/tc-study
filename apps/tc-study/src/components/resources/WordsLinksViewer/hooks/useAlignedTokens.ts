@@ -444,6 +444,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         return
       }
 
+      setLoadingAligned(true)
+
       if (alignLinks.length <= HELPS_SYNC_MAX_LINKS) {
         const syncResults = measureScripturePerfSync('align-tokens', bookCode, () =>
           batchAlignLinks(args)
@@ -462,8 +464,6 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
           finish(syncResults)
         })
     }
-
-    setLoadingAligned(true)
 
     const tryCacheFirst = async () => {
       // No scripture owner → same as today (pending / live with empty tokens).
@@ -668,6 +668,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
           apply(ordered)
           void persistAlignResults(missResults, flatTokens)
         }
+
+        setLoadingAligned(true)
 
         if (missInputs.length <= HELPS_SYNC_MAX_LINKS) {
           const syncResults = measureScripturePerfSync('align-tokens', bookCode, () =>

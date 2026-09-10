@@ -54,7 +54,12 @@ export function mergeHelpsTokenCache(
       semanticIds: Array.isArray(row.semanticIds) && row.semanticIds.length
         ? row.semanticIds
         : prev?.semanticIds,
-      quoteStatus: row.quoteStatus ?? prev?.quoteStatus,
+      quoteStatus:
+        row.quoteStatus && row.quoteStatus !== 'pending'
+          ? row.quoteStatus
+          : prev?.quoteStatus === 'pending'
+            ? undefined
+            : prev?.quoteStatus,
     })
   }
   return cache

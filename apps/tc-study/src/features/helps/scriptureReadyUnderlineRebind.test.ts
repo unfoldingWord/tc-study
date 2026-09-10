@@ -140,4 +140,25 @@ describe('helps-first then scripture hydrates', () => {
       })
     ).toBe(false)
   })
+
+  test('OL download tick retries when originals are still missing', () => {
+    expect(
+      shouldRetryOriginalLanguageLoad({
+        hasOriginalContent: false,
+        scriptureRevision: SCRIPTURE_EMPTY_REVISION,
+        lastAttemptedRevision: null,
+        olDownloadTick: 1,
+        lastAttemptedDownloadTick: 0,
+      })
+    ).toBe(true)
+    expect(
+      shouldRetryOriginalLanguageLoad({
+        hasOriginalContent: true,
+        scriptureRevision: SCRIPTURE_EMPTY_REVISION,
+        lastAttemptedRevision: null,
+        olDownloadTick: 1,
+        lastAttemptedDownloadTick: 0,
+      })
+    ).toBe(false)
+  })
 })

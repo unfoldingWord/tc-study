@@ -20,6 +20,9 @@ Welcome to the BT Synergy framework documentation! This framework enables you to
 
 ### For Developers
 
+- **[Workers and persistence](./workers-and-persistence.md)** — IndexedDB key families, download/prepare/warm workers, lanes vs the download badge
+- **[App lifecycle and data flow](./app-lifecycle-data-flow.md)** — process start → providers → Read → IndexedDB writes (boot order and mermaid)
+
 #### I want to...
 
 **Add a new resource type** (e.g., Translation Questions, Study Notes)

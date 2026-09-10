@@ -148,12 +148,16 @@ export class ScriptureLoader implements ResourceLoader {
         bookId,
         viewModel: result.viewModel,
       }
-      try {
-        if (this.onContentCached) await this.onContentCached(payload)
-        if (this.onBookCached) await this.onBookCached(payload)
-      } catch (err) {
-        console.warn('[ScriptureLoader] onContentCached/onBookCached failed:', err)
-      }
+      // Fire after USJ cache write; do not await. Full-book prepare must not
+      // block zip extract progress (Psalms UHB would look stuck at 1%).
+      void Promise.resolve()
+        .then(async () => {
+          if (this.onContentCached) await this.onContentCached(payload)
+          if (this.onBookCached) await this.onBookCached(payload)
+        })
+        .catch((err) => {
+          console.warn('[ScriptureLoader] onContentCached/onBookCached failed:', err)
+        })
     }
     return {
       viewModel: result.viewModel,
@@ -652,6 +656,15 @@ export class ScriptureLoader implements ResourceLoader {
 
         if (this.debug) {
           console.log(`📖 Processing ${bookId} from ZIP (${usfmContent.length} bytes)`)
+        }
+
+        if (onProgress) {
+          onProgress({
+            loaded,
+            total,
+            percentage: Math.round((loaded / total) * 100),
+            message: `Extracting ${bookId}`,
+          })
         }
 
         await this.processAndCache(usfmContent, resourceKey, bookId)

@@ -51,8 +51,10 @@ export async function markRelationCovered(
 ): Promise<void> {
   const map = await readWarmCoverage(cache)
   const prev = map[relationId]
+  // Accumulate across throttled lane-3 passes so a 24-chapter slice plus
+  // later slices can reach Psalms' 150 (Math.max would stall at the slice size).
   const nextCount =
-    prev && prev.stamp === stamp ? Math.max(prev.unitCount, unitCount) : unitCount
+    prev && prev.stamp === stamp ? prev.unitCount + unitCount : unitCount
   map[relationId] = { stamp, unitCount: nextCount, updatedAt: Date.now() }
   await writeWarmCoverage(cache, map)
 }

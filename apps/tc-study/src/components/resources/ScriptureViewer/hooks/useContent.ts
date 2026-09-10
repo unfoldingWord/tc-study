@@ -25,10 +25,13 @@ import {
   SCRIPTURE_PREPARE_VERSION,
   type ScriptureNavRecord,
 } from '../../../../features/scripture/scripturePreparer'
+import { peekPreparedChapter } from '../../../../features/scripture/preparedChapterCache'
 import { useWarmLanes } from '../../../../features/warm/useWarmLanes'
+import { scriptureLane1Ready } from '../../../../features/warm/warmLanePolicy'
 import { enqueueScriptureBookPriority } from '../../../../workers/prepareClient'
 import type { DisplayUsjVerse } from '../types'
 import { loadUsjViewModel } from '../utils/loadUsjViewModel'
+import { resolveLane1ScriptureViewModel } from '../../../../features/sot/resolveLane1SoT'
 import {
   getChapterLayoutBlocks,
   getChapterVerseBlockItems,
@@ -178,7 +181,14 @@ export function useContent(
       // Outer effect already started `book-load` for the nav-miss path.
       if (reason === 'deferred') markScripturePerfStart(perfLabel, bookCode)
       try {
-        const rawVm = await loadUsjViewModel(loader, resourceKey, bookCode)
+        const rawVm = (await resolveLane1ScriptureViewModel({
+          resourceKey,
+          book: bookCode,
+          chapter: openChapter,
+          cache: cacheAdapter,
+          loader,
+          loadViewModel: loadUsjViewModel,
+        })) as UsjScriptureViewModel
         if (cancelled) return null
         navigation.updateBookVerseCount(
           bookCode,
@@ -200,6 +210,7 @@ export function useContent(
           openChapter,
           lastChapter,
           typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
+          includeRest: false,
         }).catch(() => undefined)
         return rawVm
       } catch (err) {
@@ -241,6 +252,7 @@ export function useContent(
             openChapter,
             lastChapter,
             typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
+            includeRest: false,
           }).catch(() => undefined)
 
           // Defer whole-book viewModel so nav + light chrome can paint first.
@@ -320,6 +332,17 @@ export function useContent(
     [resourceKey]
   )
 
+  const openChapter = currentRef.chapter || 1
+  const openChapterInViewModel = Boolean(
+    viewModel?.chapters.some(
+      (c) => c.number === openChapter && (c.verses?.length ?? 0) > 0
+    )
+  )
+  const openChapterPreparedFull = Boolean(
+    currentRef.book &&
+      peekPreparedChapter(resourceKey, currentRef.book, openChapter)?.full
+  )
+
   useWarmLanes({
     owner: 'scripture',
     visibleResources: warmVisibleResources,
@@ -328,7 +351,11 @@ export function useContent(
       _language || resourceKey.split('/')[1]?.split('_')[0] || '',
     helpsLanguageCode: '',
     lastChapter: lastChapterForWarm || undefined,
-    lane1Ready: !isLoading && (!!nav || !!viewModel),
+    lane1Ready: scriptureLane1Ready({
+      isLoading,
+      hasViewModel: Boolean(viewModel),
+      openChapterReady: openChapterInViewModel || openChapterPreparedFull,
+    }),
   })
 
   // Re-prioritize prepare jobs when the open chapter changes within the same book.
@@ -346,6 +373,7 @@ export function useContent(
       openChapter,
       lastChapter: last,
       typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
+      includeRest: false,
     }).catch(() => undefined)
   }, [
     currentRef.chapter,

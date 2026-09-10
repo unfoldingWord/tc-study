@@ -45,6 +45,22 @@ export function isQuoteBuildReady(opts: {
   )
 }
 
+/**
+ * UGNT/UHB load was attempted and produced no usable chapters (missing zip /
+ * empty USFM). Notes should paint (ol-fallback) and lane 1 must drain so a
+ * later download can retry — do not wait forever on quote-build.
+ */
+export function isOriginalLanguageQuoteBlocked(opts: {
+  loadingOriginal: boolean
+  originalContent: readonly unknown[] | null
+  originalError?: string | null
+}): boolean {
+  if (opts.loadingOriginal) return false
+  if (opts.originalError) return true
+  if (opts.originalContent === null) return false
+  return opts.originalContent.length === 0
+}
+
 /** True when scripture tokens / passage bind / OL quote-build are not settled. */
 export function isHelpsQuoteAlignmentPending(opts: {
   hasTargetTokens: boolean

@@ -176,6 +176,7 @@ export function useCombinedHelpsPipeline({
     tnKey: tnKey || resourceKey,
     bookId: currentRef.book || '',
     targetScriptureKey,
+    focusChapter: currentRef.chapter,
   })
 
   const helpsTokenCacheRef = useRef(new Map<string, HelpsTokenCacheRow>())
@@ -221,8 +222,11 @@ export function useCombinedHelpsPipeline({
   // SCRIPTURE_TOKENS is received on the mounted CombinedHelps resourceId.
   // TN/TWL keys are catalog sources only — they are not linked-panels resources
   // when CombinedHelps is injected into the panel.
-  const { linksWithQuotes: tnLinksWithQuotes, quoteBuildReady: tnQuoteBuildReady } =
-    useQuoteTokens({
+  const {
+    linksWithQuotes: tnLinksWithQuotes,
+    quoteBuildReady: tnQuoteBuildReady,
+    olBlocked: tnOlBlocked,
+  } = useQuoteTokens({
       resourceKey: tnKey || resourceKey,
       resourceId,
       links: notesWithQuotes,
@@ -255,10 +259,11 @@ export function useCombinedHelpsPipeline({
         alignedTokens: alignedTokens?.length ? alignedTokens : note.alignedTokens,
         semanticIds: semanticIds?.length ? semanticIds : note.semanticIds,
         // Empty-quote notes skip quote-build; settle immediately so cards paint prose.
+        // Live align status wins over a cached `pending` so chips can become ULT/OL.
         quoteStatus: fromAlignUsable
           ? quoteStatusMap.get(note.id) ?? note.quoteStatus
-          : note.quoteStatus ??
-            quoteStatusMap.get(note.id) ??
+          : quoteStatusMap.get(note.id) ??
+            (note.quoteStatus === 'pending' ? undefined : note.quoteStatus) ??
             (note.quote?.trim() ? undefined : 'none'),
       }
     }) as NoteWithAlignments[]
@@ -304,8 +309,11 @@ export function useCombinedHelpsPipeline({
     return attachHelpsTokenCache(raw, helpsTokenCacheRef.current)
   }, [preparedLinks, twlLinksRaw, linksByChapter, currentRef.chapter, currentRef.endChapter])
 
-  const { linksWithQuotes: twlLinksWithQuotes, quoteBuildReady: twlQuoteBuildReady } =
-    useQuoteTokens({
+  const {
+    linksWithQuotes: twlLinksWithQuotes,
+    quoteBuildReady: twlQuoteBuildReady,
+    olBlocked: twlOlBlocked,
+  } = useQuoteTokens({
       resourceKey: twlKey || resourceKey,
       resourceId,
       links,
@@ -440,5 +448,8 @@ export function useCombinedHelpsPipeline({
     hasLinkMatches,
     mergedGroups,
     bookCodeLower,
+    tnQuoteBuildReady,
+    twlQuoteBuildReady,
+    quotesBlocked: tnOlBlocked || twlOlBlocked,
   }
 }

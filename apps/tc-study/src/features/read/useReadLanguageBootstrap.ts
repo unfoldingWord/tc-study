@@ -46,6 +46,7 @@ import { loadLanguagesCache } from './languagesCache'
 import { shouldPushReadLanguageUrl } from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
 import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
+import { useEnsureCurrentBookOriginalLanguage } from './useEnsureCurrentBookOriginalLanguage'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
 import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
@@ -116,6 +117,12 @@ export function useReadLanguageBootstrap({
     helpsKeysRef,
     runCatalogLoad,
   } = useReadCatalogLoad()
+
+  useEnsureCurrentBookOriginalLanguage({
+    catalogManager,
+    resourceTypeRegistry,
+    setExpectedResources,
+  })
 
   useEffect(() => {
     const helps = firstHelpsLanguageCode(useReadPanelStore.getState().panels)

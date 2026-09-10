@@ -8,6 +8,7 @@ describe('useBackgroundDownload (session singleton)', () => {
   test('subscribes to the module session and does not terminate the worker on unmount', () => {
     expect(src).toContain('backgroundDownloadSession')
     expect(src).toContain('backgroundDownloadSession.subscribe')
+    expect(src).toContain('retryLastRun')
     expect(src).not.toContain('terminate()')
     expect(src).not.toContain('createInitialDownloadProgress')
     expect(src).not.toContain('new Worker')

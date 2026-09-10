@@ -9,6 +9,24 @@ export function shouldAcceptStartDownload(isDownloading: boolean): boolean {
   return !isDownloading
 }
 
+/** Recreate the worker after a crash so start/retry is not posted to a dead isolate. */
+export function shouldRecreateWorkerBeforeStart(input: {
+  error: string | null | undefined
+  isDownloading: boolean
+}): boolean {
+  return Boolean(input.error) && !input.isDownloading
+}
+
+/** Queue first, then the in-flight key — used to retry a failed 0/N run. */
+export function keysForDownloadRetry(input: {
+  queue?: readonly string[] | null
+  currentResource?: string | null
+}): string[] {
+  if (input.queue && input.queue.length > 0) return [...input.queue]
+  if (input.currentResource) return [input.currentResource]
+  return []
+}
+
 /** True when the worker message belongs to the hook's current run. */
 export function shouldAcceptWorkerMessage(
   activeRunId: number,

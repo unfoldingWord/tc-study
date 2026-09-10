@@ -23,7 +23,7 @@ import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { batchAlignLinks, type BatchAlignLinksArgs } from '../features/helps/batchAlignLinks'
 import { batchBuildQuoteTokens } from '../features/scripture/scripturePrepCore'
 import '../features/prepare/registerPreparers'
-import { writePreparedUnit } from '../features/prepare/prepareCache'
+import { preparedTiersExist, writePreparedUnit } from '../features/prepare/prepareCache'
 import { getPreparer } from '../features/prepare/prepareRegistry'
 import type { PrepareTier } from '../features/prepare/prepareKeys'
 import { runWarmJob } from '../features/warm/warmJobs'
@@ -163,23 +163,51 @@ async function runOne(job: PrepareJob, token: number): Promise<void> {
     return
   }
 
-  if (preparer.prepareNav) {
-    const { writePreparedNav } = await import('../features/prepare/prepareCache')
-    await writePreparedNav(
+  const tiers: PrepareTier[] =
+    job.tier === 'both' ? ['light', 'full'] : [job.tier]
+
+  const replyReady = (unit: number, tier: PrepareTier) => {
+    reply({
+      id: 'prep',
+      type: 'ready',
+      typeId: job.typeId,
+      resourceKey: job.resourceKey,
+      bookId: job.bookId,
+      unit,
+      tier,
+    })
+  }
+
+  let wroteNav = false
+  for (const unit of job.units) {
+    if (token !== cancelToken) return
+    // Macrotask yield so live batch-align / batch-quotes can interleave.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    const already = await preparedTiersExist(
       cacheAdapter,
       job.typeId,
       job.resourceKey,
       job.bookId,
-      preparer.version,
-      preparer.prepareNav(source)
+      unit,
+      tiers,
+      preparer.version
     )
-  }
-
-  const tiers: PrepareTier[] =
-    job.tier === 'both' ? ['light', 'full'] : [job.tier]
-
-  for (const unit of job.units) {
-    if (token !== cancelToken) return
+    if (already) {
+      for (const tier of tiers) replyReady(unit, tier)
+      continue
+    }
+    if (!wroteNav && preparer.prepareNav) {
+      const { writePreparedNav } = await import('../features/prepare/prepareCache')
+      await writePreparedNav(
+        cacheAdapter,
+        job.typeId,
+        job.resourceKey,
+        job.bookId,
+        preparer.version,
+        preparer.prepareNav(source)
+      )
+      wroteNav = true
+    }
     for (const tier of tiers) {
       if (token !== cancelToken) return
       const payload =
@@ -196,15 +224,7 @@ async function runOne(job: PrepareJob, token: number): Promise<void> {
         preparer.version,
         payload
       )
-      reply({
-        id: 'prep',
-        type: 'ready',
-        typeId: job.typeId,
-        resourceKey: job.resourceKey,
-        bookId: job.bookId,
-        unit,
-        tier,
-      })
+      replyReady(unit, tier)
     }
   }
 }
@@ -229,6 +249,10 @@ async function pump() {
         }
         continue
       }
+      // Only one warm job per pump turn; macrotask yield so interactive
+      // batch-align / batch-quotes posted while we were busy get handled.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+      if (queue.length > 0) continue
       const warmJob = warmQueue.shift()!
       currentWarmJob = warmJob
       const token = warmCancelToken
@@ -253,6 +277,7 @@ async function pump() {
       } finally {
         currentWarmJob = null
       }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
     }
   } finally {
     running = false

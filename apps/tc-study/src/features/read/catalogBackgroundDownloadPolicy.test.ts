@@ -65,6 +65,16 @@ describe('catalogBackgroundDownloadPolicy', () => {
     expect(keysToEnqueueForDownload(catalog, null)).toEqual(catalog)
   })
 
+  test('English expected still pulls cataloged UHB for OT quote-build', () => {
+    const expected = ['unfoldingWord/en/ult', 'unfoldingWord/en/tn']
+    const catalog = [...expected, 'unfoldingWord/hbo/uhb', 'unfoldingWord/fr/ult']
+    const queued = keysToEnqueueForDownload(catalog, expected)
+    expect(queued).toContain('unfoldingWord/en/ult')
+    expect(queued).toContain('unfoldingWord/en/tn')
+    expect(queued).toContain('unfoldingWord/hbo/uhb')
+    expect(queued).not.toContain('unfoldingWord/fr/ult')
+  })
+
   test('narrowExpectedToCataloged drops keys that never got metadata', () => {
     const expected = [
       'es-419_gl/es-419/glt',

@@ -41,9 +41,9 @@ describe('warmCoverage', () => {
     expect(await isRelationCovered(cache, 'quote:a|b|mat', 's1', 3)).toBe(true)
     expect(await isRelationCovered(cache, 'quote:a|b|mat', 's1', 28)).toBe(false)
     await markRelationCovered(cache, 'quote:a|b|mat', 's1', 10)
-    expect((await readWarmCoverage(cache))['quote:a|b|mat']?.unitCount).toBe(10)
+    expect((await readWarmCoverage(cache))['quote:a|b|mat']?.unitCount).toBe(13)
     expect(await isRelationCovered(cache, 'quote:a|b|mat', 's1', 28)).toBe(false)
-    await markRelationCovered(cache, 'quote:a|b|mat', 's1', 28)
+    await markRelationCovered(cache, 'quote:a|b|mat', 's1', 15)
     expect(await isRelationCovered(cache, 'quote:a|b|mat', 's1', 28)).toBe(true)
   })
 

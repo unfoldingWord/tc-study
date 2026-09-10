@@ -32,6 +32,8 @@ import {
 import { batchBuildQuoteTokens } from '../scripture/scripturePrepCore'
 import { notesPreparer, type NotesSource } from '../notes/notesPreparer'
 import { wordsLinksPreparer, type WordsLinksSource } from '../wordsLinks/wordsLinksPreparer'
+import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
+import { getLocalSoT } from '../sot/getSoT'
 import type {
   WarmAlignChapterJob,
   WarmJob,
@@ -75,54 +77,99 @@ function noteToPseudoLink(note: {
   }
 }
 
+type OlChapterLoad =
+  | { status: 'missing-usfm' }
+  | { status: 'ready'; chapter: OptimizedChapter | null }
+
 async function loadOlChapter(
   cache: PrepareCacheAdapter,
   bookId: string,
-  chapter: number
-): Promise<OptimizedChapter | null> {
-  const ol = resolveOriginalLanguageKey(bookId)
-  if (!ol) return null
+  chapter: number,
+  olKey?: string
+): Promise<OlChapterLoad> {
+  const resolved = resolveOriginalLanguageKey(bookId)
+  const resourceKey = olKey || resolved?.resourceKey
+  if (!resourceKey) return { status: 'missing-usfm' }
   const source = await scripturePreparer.readSource(
     { cacheAdapter: cache },
-    ol.resourceKey,
+    resourceKey,
     bookId
   )
-  if (!source) return null
-  return viewModelChapterToOptimized(source.viewModel, chapter)
+  if (!source) return { status: 'missing-usfm' }
+  return {
+    status: 'ready',
+    chapter: viewModelChapterToOptimized(source.viewModel, chapter),
+  }
 }
+
+async function olUsfmMissing(
+  cache: PrepareCacheAdapter,
+  bookId: string,
+  olKey?: string
+): Promise<boolean> {
+  const resolved = resolveOriginalLanguageKey(bookId)
+  const resourceKey = olKey || resolved?.resourceKey
+  if (!resourceKey) return true
+  const source = await scripturePreparer.readSource(
+    { cacheAdapter: cache },
+    resourceKey,
+    bookId
+  )
+  return source == null
+}
+
+type HelpsChapterLinks =
+  | { status: 'missing' }
+  | { status: 'ready'; links: TranslationWordsLink[] }
 
 async function readHelpsLinksForChapter(
   cache: PrepareCacheAdapter,
   job: WarmQuoteChapterJob | WarmAlignChapterJob
-): Promise<TranslationWordsLink[]> {
+): Promise<HelpsChapterLinks> {
+  const typeId =
+    job.helpsType === 'notes'
+      ? RESOURCE_TYPE_IDS.TRANSLATION_NOTES
+      : RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS
+  const sot = await getLocalSoT({
+    resourceKey: job.resourceKey,
+    book: job.bookId,
+    chapter: job.chapter,
+    typeId,
+    cache,
+  })
+  if (sot.status === 'missing') return { status: 'missing' }
+
   if (job.helpsType === 'notes') {
     const source = (await notesPreparer.readSource(
       { cacheAdapter: cache },
       job.resourceKey,
       job.bookId
     )) as NotesSource | null
-    if (!source) return []
+    if (!source) return { status: 'missing' }
     const byChapter = source.notes.notesByChapter
     const notes =
       byChapter?.[String(job.chapter)] ??
       (source.notes.notes ?? []).filter(
         (n) => parseInt(n.reference.split(':')[0] || '0', 10) === job.chapter
       )
-    return notes.filter((n) => n.quote?.trim()).map(noteToPseudoLink)
+    return {
+      status: 'ready',
+      links: notes.filter((n) => n.quote?.trim()).map(noteToPseudoLink),
+    }
   }
   const source = (await wordsLinksPreparer.readSource(
     { cacheAdapter: cache },
     job.resourceKey,
     job.bookId
   )) as WordsLinksSource | null
-  if (!source) return []
+  if (!source) return { status: 'missing' }
   const byChapter = source.links.linksByChapter
   const links =
     byChapter?.[String(job.chapter)] ??
     (source.links.links ?? []).filter(
       (l) => parseInt(l.reference.split(':')[0] || '0', 10) === job.chapter
     )
-  return links.filter((l) => l.origWords?.trim())
+  return { status: 'ready', links: links.filter((l) => l.origWords?.trim()) }
 }
 
 export async function runWarmPrepareUnit(
@@ -133,8 +180,17 @@ export async function runWarmPrepareUnit(
   const preparer = getPreparer(job.typeId)
   if (!preparer) return 'noop'
   if (cancelled()) return 'noop'
+  const sot = await getLocalSoT({
+    resourceKey: job.resourceKey,
+    book: job.bookId,
+    chapter: typeof job.unit === 'number' ? job.unit : undefined,
+    typeId: job.typeId,
+    cache,
+  })
+  if (sot.status === 'missing') return 'blocked'
   const source = await preparer.readSource({ cacheAdapter: cache }, job.resourceKey, job.bookId)
-  if (cancelled() || source == null) return 'noop'
+  if (cancelled()) return 'noop'
+  if (source == null) return 'blocked'
 
   const tiers = job.tier === 'both' ? (['light', 'full'] as const) : [job.tier]
   let already = true
@@ -192,8 +248,10 @@ export async function runWarmQuoteChapter(
   cancelled: () => boolean
 ): Promise<WarmJobOutcome> {
   if (cancelled()) return 'noop'
-  const links = await readHelpsLinksForChapter(cache, job)
+  const helps = await readHelpsLinksForChapter(cache, job)
   if (cancelled()) return 'noop'
+  if (helps.status === 'missing') return 'blocked'
+  const links = helps.links
   if (!links.length) return 'cached'
 
   const existing = await readCachedQuoteTokens(cache, {
@@ -209,8 +267,11 @@ export async function runWarmQuoteChapter(
   )
   if (!needsBuild.length) return 'cached'
 
-  const olChapter = await loadOlChapter(cache, job.bookId, job.chapter)
-  if (!olChapter || cancelled()) return 'noop'
+  const ol = await loadOlChapter(cache, job.bookId, job.chapter, job.olKey)
+  if (cancelled()) return 'noop'
+  if (ol.status === 'missing-usfm') return 'blocked'
+  if (!ol.chapter) return 'cached'
+  const olChapter = ol.chapter
 
   const built: CachedQuoteTokens = {}
   await forSlices(needsBuild, async (slice, offset) => {
@@ -258,19 +319,11 @@ export async function runWarmAlignChapter(
   cancelled: () => boolean
 ): Promise<WarmJobOutcome> {
   if (cancelled()) return 'noop'
-  const links = await readHelpsLinksForChapter(cache, job)
+  const helps = await readHelpsLinksForChapter(cache, job)
   if (cancelled()) return 'noop'
+  if (helps.status === 'missing') return 'blocked'
+  const links = helps.links
   if (!links.length) return 'cached'
-
-  const quoteRow = await readCachedQuoteTokens(cache, {
-    helpsKey: job.resourceKey,
-    helpsStamp: job.helpsStamp,
-    olKey: job.olKey,
-    olStamp: job.olStamp,
-    book: job.bookId,
-    chapter: job.chapter,
-  })
-  if (!quoteRow) return 'noop'
 
   const existingAlign = await readCachedAlignments(cache, {
     helpsKey: job.resourceKey,
@@ -288,6 +341,19 @@ export async function runWarmAlignChapter(
   ) {
     return 'cached'
   }
+
+  if (await olUsfmMissing(cache, job.bookId, job.olKey)) return 'blocked'
+  if (cancelled()) return 'noop'
+
+  const quoteRow = await readCachedQuoteTokens(cache, {
+    helpsKey: job.resourceKey,
+    helpsStamp: job.helpsStamp,
+    olKey: job.olKey,
+    olStamp: job.olStamp,
+    book: job.bookId,
+    chapter: job.chapter,
+  })
+  if (!quoteRow) return 'noop'
 
   const full = await readPreparedUnit<ScriptureFullChapter>(
     cache,
@@ -389,12 +455,20 @@ export async function runWarmPrepareArticle(
   const preparer = getPreparer(job.typeId)
   if (!preparer) return 'noop'
   // Article entry id is the unit; pass it as readSource bookId.
+  const sot = await getLocalSoT({
+    resourceKey: job.resourceKey,
+    book: String(job.unit),
+    typeId: job.typeId,
+    cache,
+  })
+  if (sot.status === 'missing') return 'blocked'
   const source = await preparer.readSource(
     { cacheAdapter: cache },
     job.resourceKey,
     String(job.unit)
   )
-  if (cancelled() || source == null) return 'noop'
+  if (cancelled()) return 'noop'
+  if (source == null) return 'blocked'
   const tiers = job.tier === 'both' ? (['light', 'full'] as const) : [job.tier]
   let already = true
   for (const tier of tiers) {

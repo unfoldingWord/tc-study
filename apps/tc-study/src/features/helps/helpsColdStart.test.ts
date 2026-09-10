@@ -138,7 +138,17 @@ describe('CombinedHelps cold-start (empty cache)', () => {
     )
     expect(bootstrap).toContain('coldStartCatalogLoads')
     expect(bootstrap).toContain('Promise.all')
+    expect(bootstrap).toContain('useEnsureCurrentBookOriginalLanguage')
     expect(viewer).toContain('isHelpsContentPending')
+    expect(viewer).toContain('helpsLane1Ready')
+    expect(viewer).toContain('quotesBlocked')
+    expect(viewer).not.toMatch(/lane1Ready:\s*true/)
+    const pipeline = readFileSync(
+      join(import.meta.dir, '../../components/resources/CombinedHelpsViewer/useCombinedHelpsPipeline.ts'),
+      'utf8'
+    )
+    expect(pipeline).toContain('focusChapter: currentRef.chapter')
+    expect(pipeline).toContain('tnQuoteBuildReady')
     expect(viewer).toContain('filterResetKey')
     expect(viewer).toContain('preparePending')
     expect(list).toContain('loading ?')

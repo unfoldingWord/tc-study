@@ -161,16 +161,21 @@ export async function enqueueScriptureBookPriority(args: {
   openChapter: number
   lastChapter: number
   typeId?: string
+  /** When false, only open + adjacent (chapter change). Rest waits for lane 2. */
+  includeRest?: boolean
 }): Promise<void> {
   const typeId = args.typeId ?? 'scripture'
   const { openChapter, lastChapter } = args
+  const includeRest = args.includeRest !== false
   const neighbors = [openChapter - 1, openChapter + 1].filter(
     (c) => c >= 1 && c <= lastChapter
   )
   const rest: number[] = []
-  for (let c = 1; c <= lastChapter; c++) {
-    if (c === openChapter || neighbors.includes(c)) continue
-    rest.push(c)
+  if (includeRest) {
+    for (let c = 1; c <= lastChapter; c++) {
+      if (c === openChapter || neighbors.includes(c)) continue
+      rest.push(c)
+    }
   }
 
   const jobs: Array<{ units: number[]; priority: PreparePriority }> = [

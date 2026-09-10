@@ -6,8 +6,12 @@ import type { PrepareTier } from '../prepare/prepareKeys'
 
 export type WarmLane = 1 | 2 | 3
 
-/** finished = wrote; cached = already present / empty-true-skip; noop = missing inputs. */
-export type WarmJobOutcome = 'finished' | 'cached' | 'noop'
+/**
+ * finished = wrote; cached = already present or true empty-chapter;
+ * blocked = local SoT or UHB/UGNT USFM missing (retry after download; no DCS);
+ * noop = cancelled / other missing inputs (do not mark coverage).
+ */
+export type WarmJobOutcome = 'finished' | 'cached' | 'blocked' | 'noop'
 
 export type WarmJobKind =
   | 'prepare-unit'

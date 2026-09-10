@@ -23,4 +23,9 @@ describe('backgroundDownloadSession', () => {
     // Worker is not constructed by subscribe/remount — only by an accepted start.
     expect(getBackgroundDownloadWorkerConstructCount()).toBe(0)
   })
+
+  test('session can retry the last key after an error (recreates worker)', () => {
+    expect(typeof backgroundDownloadSession.retryLastRun).toBe('function')
+    expect(backgroundDownloadSession.retryLastRun()).toBe(false)
+  })
 })

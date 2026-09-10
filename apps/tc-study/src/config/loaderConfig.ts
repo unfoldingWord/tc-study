@@ -1,6 +1,9 @@
 /**
  * Loader registration + download-priority Source of Truth (SoT)
  *
+ * Artifact recipes (SoT grain, prepare tiers, quotes/align/preview) live in
+ * `resourceArtifactRecipe.ts` and are re-exported below.
+ *
  * THIS FILE IS THE SINGLE SOURCE OF TRUTH for:
  * - Which resource types register as main-thread plugins (`surfaces.mainPlugin`)
  * - Which resource types register loaders in the background download worker
@@ -176,3 +179,11 @@ export function getDownloadPriority(resourceType: string): number {
 export function getAllLoaderIds(): string[] {
   return LOADER_CONFIGS.map((c) => c.id)
 }
+
+export {
+  ARTIFACT_RECIPES,
+  getArtifactRecipe,
+  recipeHasAlign,
+  recipeHasQuotes,
+  recipeNeedsOlByBook,
+} from './resourceArtifactRecipe'

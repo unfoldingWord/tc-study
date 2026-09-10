@@ -67,8 +67,10 @@ export function useSupportRefQuotes(args: {
   bookId: string
   /** Catalog key for the target scripture (e.g. unfoldingWord/en/ult). */
   targetScriptureKey?: string
+  /** Align this chapter first; other match chapters wait for idle. */
+  focusChapter?: number
 }): Map<string, SupportRefQuoteEnrichment> {
-  const { enabled, notes, tnKey, bookId, targetScriptureKey = '' } = args
+  const { enabled, notes, tnKey, bookId, targetScriptureKey = '', focusChapter } = args
   const cache = useCacheAdapter() as HelpsQuoteCacheAdapter | null
   const catalogManager = useCatalogManager()
   const loaderRegistry = useLoaderRegistry()
@@ -101,6 +103,7 @@ export function useSupportRefQuotes(args: {
     const bookCode = bookId.toUpperCase()
     const chapters = chaptersOfNotes(notes)
     let cancelIdle: (() => void) | undefined
+    let cancelAlignIdle: (() => void) | undefined
 
     void (async () => {
       const cacheCtx = await resolveHelpsQuoteCacheCtx(catalogManager, tnKey, bookCode)
@@ -140,53 +143,51 @@ export function useSupportRefQuotes(args: {
         }
         setEnrichment(new Map(next))
 
-        // Align against target scripture spanning all match chapters.
+        // First paint is titles + cached quotes. Align only the focus chapter
+        // now; remaining Psalms-scale chapters wait for idle so lane 1 wins.
         const loader = loaderRegistry?.getLoader('scripture') as ScriptureLoader | undefined
         const scriptureKey = String(targetScriptureKey || '')
         if (!loader || typeof loader.loadViewModel !== 'function' || !scriptureKey) return
 
-        try {
+        const focus = focusChapter && focusChapter > 0 ? focusChapter : (chapters[0] ?? 1)
+        const alignChapter = async (ch: number, base: Map<string, SupportRefQuoteEnrichment>) => {
+          const chapterNotes = notes.filter(
+            (n) => n.quote?.trim() && chapterOfReference(n.reference) === ch
+          )
+          if (chapterNotes.length === 0) return base
           const viewModel = await loader.loadViewModel(scriptureKey, bookId)
-          if (gen !== genRef.current || !viewModel) return
-          const minCh = chapters[0] ?? 1
-          const maxCh = chapters[chapters.length - 1] ?? minCh
+          if (gen !== genRef.current || !viewModel) return base
           const targetTokens = extractUsjBroadcastTokens(
             viewModel,
-            minCh,
+            ch,
             1,
-            maxCh,
+            ch,
             999
           ) as OptimizedToken[]
-
-          const alignInputs = notes
-            .filter((n) => n.quote?.trim())
-            .map((n) => ({
+          const results = batchAlignLinks({
+            links: chapterNotes.map((n) => ({
               id: n.id,
               reference: n.reference,
               origWords: n.quote,
               occurrence: n.occurrence || '1',
               quoteReady: true as const,
               quoteTokens: quoteMap.get(n.id),
-            }))
-
-          const results = batchAlignLinks({
-            links: alignInputs,
+            })),
             targetTokens,
             bookCode,
-            currentChapter: minCh,
-            endChapter: maxCh,
+            currentChapter: ch,
+            endChapter: ch,
             tokenBook: bookCode,
-            tokenChapter: minCh,
-            tokenEndChapter: maxCh,
+            tokenChapter: ch,
+            tokenEndChapter: ch,
             tokenStartVerse: 1,
             tokenEndVerse: 999,
             hasTokens: targetTokens.length > 0,
             quoteBuildReady: true,
             resourceKey: tnKey,
           })
-
-          if (gen !== genRef.current) return
-          const aligned = new Map(next)
+          if (gen !== genRef.current) return base
+          const aligned = new Map(base)
           for (const row of results) {
             const prev = aligned.get(row.id) ?? { quoteStatus: 'ol-fallback' as HelpsQuoteStatus }
             aligned.set(row.id, {
@@ -198,6 +199,22 @@ export function useSupportRefQuotes(args: {
             })
           }
           setEnrichment(aligned)
+          return aligned
+        }
+
+        try {
+          let painted = await alignChapter(focus, next)
+          const rest = chapters.filter((c) => c !== focus)
+          if (rest.length === 0) return
+          cancelAlignIdle?.()
+          cancelAlignIdle = scheduleIdle(() => {
+            void (async () => {
+              for (const ch of rest) {
+                if (gen !== genRef.current) return
+                painted = await alignChapter(ch, painted)
+              }
+            })()
+          }, 200)
         } catch {
           /* non-fatal align */
         }
@@ -255,6 +272,7 @@ export function useSupportRefQuotes(args: {
 
     return () => {
       cancelIdle?.()
+      cancelAlignIdle?.()
     }
   }, [
     enabled,
@@ -265,6 +283,7 @@ export function useSupportRefQuotes(args: {
     catalogManager,
     loaderRegistry,
     targetScriptureKey,
+    focusChapter,
   ])
 
   return enrichment

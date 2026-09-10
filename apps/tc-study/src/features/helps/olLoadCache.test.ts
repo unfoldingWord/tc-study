@@ -14,6 +14,7 @@ describe('olLoadCache', () => {
   test('resolveOriginalLanguageKey picks UGNT for NT', () => {
     expect(resolveOriginalLanguageKey('tit')?.resourceKey).toContain('ugnt')
     expect(resolveOriginalLanguageKey('gen')?.resourceKey).toContain('uhb')
+    expect(resolveOriginalLanguageKey('psa')?.resourceKey).toBe('unfoldingWord/hbo/uhb')
     expect(resolveOriginalLanguageKey('obs')).toBeNull()
   })
 

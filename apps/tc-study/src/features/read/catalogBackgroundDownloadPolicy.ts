@@ -3,6 +3,8 @@
  * Kept free of React so language-switch / deep-link regressions stay unit-testable.
  */
 
+import { isOriginalLanguageDownloadTarget } from '../download/downloadBatchOrder'
+
 /** Stable signature for an expected-resource set (order-independent). */
 export function expectedResourcesSignature(keys: string[] | undefined | null): string {
   if (!keys || keys.length === 0) return ''
@@ -69,6 +71,9 @@ export function filterUncheckedResourceKeys(
  * earlier sessions / other languages must not inflate the worker total or
  * hang progress on a stale zip.
  *
+ * Cataloged UGNT/UHB are always included: they are quote-build dependencies
+ * and are not in `{textLang, helpsLang}` (hbo / el-x-koine).
+ *
  * When expected is empty, fall back to catalog keys (manual / debug paths).
  */
 export function keysToEnqueueForDownload(
@@ -79,5 +84,10 @@ export function keysToEnqueueForDownload(
     return [...catalogKeys]
   }
   const catalog = new Set(catalogKeys)
-  return expectedResources.filter((key) => catalog.has(key))
+  const expected = expectedResources.filter((key) => catalog.has(key))
+  const extraOl = catalogKeys.filter(
+    (key) =>
+      isOriginalLanguageDownloadTarget({ resourceKey: key }) && !expected.includes(key)
+  )
+  return extraOl.length === 0 ? expected : [...expected, ...extraOl]
 }

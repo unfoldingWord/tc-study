@@ -5,7 +5,9 @@
 
 import type { ProcessedNotes, TranslationNote } from '@bt-synergy/resource-parsers'
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { useLoaderRegistry } from '../../../../contexts/CatalogContext'
+import { useCacheAdapter, useLoaderRegistry } from '../../../../contexts/CatalogContext'
+import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
+import { processedFromSoT, resolveLane1SoT } from '../../../../features/sot/resolveLane1SoT'
 import {
   getHelpsContentHydrateTick,
   shouldReuseHelpsContentCache,
@@ -30,6 +32,7 @@ export function useTranslationNotesContent(
   loaderTypeId: string = 'notes'
 ) {
   const loaderRegistry = useLoaderRegistry()
+  const cacheAdapter = useCacheAdapter()
   const hydrateTick = useSyncExternalStore(
     subscribeHelpsContentHydrate,
     getHelpsContentHydrateTick,
@@ -78,7 +81,23 @@ export function useTranslationNotesContent(
           throw new Error('Translation Notes loader not found')
         }
 
-        const processedNotes = (await loader.loadContent(resourceKey, bookCode)) as ProcessedNotes | null
+        const typeId =
+          loaderTypeId === 'obs-notes'
+            ? RESOURCE_TYPE_IDS.OBS_NOTES
+            : RESOURCE_TYPE_IDS.TRANSLATION_NOTES
+        const sot = cacheAdapter
+          ? await resolveLane1SoT({
+              resourceKey,
+              book: bookCode,
+              typeId,
+              cache: cacheAdapter,
+              loader,
+            })
+          : null
+        const fromSoT = sot ? processedFromSoT<ProcessedNotes>(sot) : null
+        const processedNotes = (fromSoT?.notes
+          ? fromSoT
+          : ((await loader.loadContent(resourceKey, bookCode)) as ProcessedNotes | null))
 
         if (cancelled) return
 
@@ -124,7 +143,7 @@ export function useTranslationNotesContent(
     return () => {
       cancelled = true
     }
-  }, [resourceKey, bookCode, loaderTypeId, loaderRegistry, hydrateTick])
+  }, [resourceKey, bookCode, loaderTypeId, loaderRegistry, cacheAdapter, hydrateTick])
 
   return { notes, notesByChapter, loading, error }
 }

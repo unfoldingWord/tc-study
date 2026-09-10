@@ -133,6 +133,8 @@ describe('loaderConfig SoT', () => {
     )
     expect(registrySrc).toContain('getWorkerDownloadConfigs')
     expect(registrySrc).toContain('loaderRegistry.registerLoader(cfg.id')
+    expect(registrySrc).not.toContain("import('../prepare/registerPreparers')")
+    expect(registrySrc).not.toContain('persistPreparedOnContentCached')
     expect(registrySrc).not.toMatch(/for\s*\(\s*const\s+cfg\s+of\s+LOADER_CONFIGS\s*\)/)
 
     const factoryKeys = new Set(getWorkerDownloadConfigs().map((c) => c.factoryKey))

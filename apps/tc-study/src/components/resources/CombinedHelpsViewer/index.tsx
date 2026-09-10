@@ -21,12 +21,16 @@ import {
   getPersistedHelpsHighlight,
   shouldKeepSelectedHelpsCardOnPassageChange,
 } from '../../../features/helps/helpsCardScriptureNav'
-import { isHelpsContentPending } from '../../../features/helps/helpsListLoading'
+import {
+  isHelpsContentPending,
+  staleQuotesAreUnderlineReady,
+} from '../../../features/helps/helpsListLoading'
 import {
   usePreparedNotesChapter,
   usePreparedWordsLinksChapter,
 } from '../../../features/helps/usePreparedHelpsChapter'
 import { useWarmAdjacentHelpsQuotes } from '../../../features/helps/useWarmAdjacentHelpsQuotes'
+import { helpsLane1Ready } from '../../../features/warm/warmLanePolicy'
 import { useWarmLanes } from '../../../features/warm/useWarmLanes'
 import { listedLanguageByCode } from '../../../features/read/languageListDisplayName'
 import { getLanguageDirection } from '../../../utils/languageDirection'
@@ -286,14 +290,6 @@ export function CombinedHelpsViewer({
     }
     return rows
   }, [targetSourceId, tnKey, twlKey])
-  useWarmLanes({
-    owner: 'helps',
-    visibleResources: warmVisibleResources,
-    sourceResourceId: targetSourceId,
-    textLanguageCode: textLangForWarm,
-    helpsLanguageCode: helpsLangForWarm,
-    lane1Ready: true,
-  })
 
   const languageCode =
     resource?.language ?? tnKey.split('/')[1]?.split('_')[0] ?? twlKey.split('/')[1]?.split('_')[0] ?? ''
@@ -322,6 +318,9 @@ export function CombinedHelpsViewer({
     displayLinks,
     hasLinkMatches,
     mergedGroups,
+    tnQuoteBuildReady,
+    twlQuoteBuildReady,
+    quotesBlocked,
   } = useCombinedHelpsPipeline({
     tnNotes,
     notesByChapter,
@@ -451,6 +450,22 @@ export function CombinedHelpsViewer({
     catalogLoading: Boolean(helpsLanguageActions?.isCatalogLoading),
     preparePending: notesPrepareStatus === 'pending' || linksPrepareStatus === 'pending',
     hasVisibleRows: mergedGroups.length > 0,
+  })
+  useWarmLanes({
+    owner: 'helps',
+    visibleResources: warmVisibleResources,
+    sourceResourceId: targetSourceId,
+    textLanguageCode: textLangForWarm,
+    helpsLanguageCode: helpsLangForWarm,
+    lane1Ready: helpsLane1Ready({
+      contentPending: loading,
+      quoteReady:
+        tnQuoteBuildReady ||
+        twlQuoteBuildReady ||
+        (mergedGroups.length > 0 && !displayNotes.some((n) => n.quote?.trim())),
+      cacheHit: staleQuotesAreUnderlineReady(displayNotes),
+      quotesBlocked: quotesBlocked && mergedGroups.length > 0,
+    }),
   })
   const noSources = !tnKey && !twlKey
   const helpsLanguageCodeForCopy = resolveHelpsLanguageCodeForCopy({

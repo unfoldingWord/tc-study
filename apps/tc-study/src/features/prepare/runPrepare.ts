@@ -3,6 +3,7 @@
  */
 
 import {
+  preparedTiersExist,
   writePreparedNav,
   writePreparedUnit,
 } from './prepareCache'
@@ -34,22 +35,31 @@ export async function prepareBookWithPreparer(args: {
     return { unitsWritten: 0 }
   }
 
-  if (preparer.prepareNav) {
-    const nav = preparer.prepareNav(source)
-    await writePreparedNav(
-      args.cacheAdapter,
-      args.typeId,
-      args.resourceKey,
-      args.bookId,
-      preparer.version,
-      nav
-    )
-  }
-
   const units = args.units ?? preparer.unitsFor(source)
   const tiers = args.tiers ?? (['light', 'full'] as const)
   let unitsWritten = 0
   for (const unit of units) {
+    const already = await preparedTiersExist(
+      args.cacheAdapter,
+      args.typeId,
+      args.resourceKey,
+      args.bookId,
+      unit,
+      tiers,
+      preparer.version
+    )
+    if (already) continue
+    if (unitsWritten === 0 && preparer.prepareNav) {
+      const nav = preparer.prepareNav(source)
+      await writePreparedNav(
+        args.cacheAdapter,
+        args.typeId,
+        args.resourceKey,
+        args.bookId,
+        preparer.version,
+        nav
+      )
+    }
     for (const tier of tiers) {
       const payload =
         tier === 'light'

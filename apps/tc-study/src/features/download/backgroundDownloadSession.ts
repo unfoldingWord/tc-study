@@ -6,9 +6,11 @@
 
 import {
   createInitialDownloadProgress,
+  keysForDownloadRetry,
   pulseInFlightDownloadProgress,
   shouldAcceptStartDownload,
   shouldAcceptWorkerMessage,
+  shouldRecreateWorkerBeforeStart,
 } from './backgroundDownloadRun'
 import type { DownloadProgress } from '../../lib/services/BackgroundDownloadManager'
 
@@ -17,6 +19,8 @@ export interface BackgroundDownloadStats {
   progress: DownloadProgress | null
   queue: string[]
   error: string | null
+  /** Keys whose zip finished extracting in the current/last run (warm handoff). */
+  completedResourceKeys: string[]
 }
 
 type StatsListener = (stats: BackgroundDownloadStats) => void
@@ -26,6 +30,7 @@ const IDLE_STATS: BackgroundDownloadStats = {
   progress: null,
   queue: [],
   error: null,
+  completedResourceKeys: [],
 }
 
 let worker: Worker | null = null
@@ -77,17 +82,28 @@ function handleWorkerMessage(event: MessageEvent): void {
       })
       break
     case 'error':
-      isDownloading = false
-      emit({
-        ...stats,
-        isDownloading: false,
-        error:
-          payload && typeof payload === 'object' && 'message' in payload
-            ? String((payload as { message?: string }).message ?? 'Worker error')
-            : 'Worker error',
-      })
+      failSession(
+        payload && typeof payload === 'object' && 'message' in payload
+          ? String((payload as { message?: string }).message ?? 'Worker error')
+          : 'Worker error'
+      )
       console.error('[BG-DL] 🔌 Session Worker error:', payload)
       break
+    case 'resource-complete': {
+      const key =
+        payload && typeof payload === 'object' && 'resourceKey' in payload
+          ? String((payload as { resourceKey?: string }).resourceKey ?? '')
+          : ''
+      if (!key) break
+      const nextKeys = stats.completedResourceKeys.includes(key)
+        ? stats.completedResourceKeys
+        : [...stats.completedResourceKeys, key]
+      emit({
+        ...stats,
+        completedResourceKeys: nextKeys,
+      })
+      break
+    }
     case 'queue-updated':
       emit({
         ...stats,
@@ -102,6 +118,30 @@ function handleWorkerMessage(event: MessageEvent): void {
   }
 }
 
+function disposeWorker(): void {
+  if (!worker) return
+  worker.onmessage = null
+  worker.onerror = null
+  try {
+    worker.terminate()
+  } catch {
+    /* already dead */
+  }
+  worker = null
+}
+
+function failSession(message: string): void {
+  runId += 1
+  isDownloading = false
+  disposeWorker()
+  emit({
+    ...stats,
+    isDownloading: false,
+    queue: [],
+    error: message,
+  })
+}
+
 function ensureWorker(): Worker | null {
   if (worker) return worker
   try {
@@ -112,13 +152,7 @@ function ensureWorker(): Worker | null {
     worker.onmessage = handleWorkerMessage
     worker.onerror = (error) => {
       console.error('[BG-DL] 🔌 Session Worker error:', error)
-      runId += 1
-      isDownloading = false
-      emit({
-        ...stats,
-        isDownloading: false,
-        error: error.message,
-      })
+      failSession(error.message || 'Worker error')
     }
     return worker
   } catch (error) {
@@ -154,6 +188,9 @@ export const backgroundDownloadSession = {
   },
 
   startDownload(resourceKeys: string[], totalIngredients?: number): boolean {
+    if (shouldRecreateWorkerBeforeStart({ error: stats.error, isDownloading })) {
+      disposeWorker()
+    }
     if (!shouldAcceptStartDownload(isDownloading)) return false
     const nextWorker = ensureWorker()
     if (!nextWorker) {
@@ -176,8 +213,24 @@ export const backgroundDownloadSession = {
       progress: createInitialDownloadProgress(resourceKeys, totalIngredients),
       queue: resourceKeys,
       error: null,
+      completedResourceKeys: [],
     })
     return true
+  },
+
+  retryLastRun(): boolean {
+    const keys = keysForDownloadRetry({
+      queue: stats.queue,
+      currentResource: stats.progress?.currentResource,
+    })
+    if (keys.length === 0) return false
+    disposeWorker()
+    isDownloading = false
+    const total = stats.progress?.totalIngredients
+    return backgroundDownloadSession.startDownload(
+      keys,
+      typeof total === 'number' && total > 0 ? total : undefined
+    )
   },
 
   stopDownload(): void {
@@ -194,6 +247,7 @@ export const backgroundDownloadSession = {
       progress: null,
       queue: [],
       error: null,
+      completedResourceKeys: stats.completedResourceKeys,
     })
   },
 
