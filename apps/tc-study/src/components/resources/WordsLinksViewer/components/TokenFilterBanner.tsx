@@ -14,6 +14,8 @@ interface TokenFilterBannerProps {
   displayLinksCount: number
   hasMatches: boolean
   onClearFilter: () => void
+  /** CombinedHelps compact chrome hides the match count (still in aria-label). */
+  hideCount?: boolean
 }
 
 export function TokenFilterBanner({
@@ -21,6 +23,7 @@ export function TokenFilterBanner({
   displayLinksCount,
   hasMatches,
   onClearFilter,
+  hideCount = false,
 }: TokenFilterBannerProps) {
   const filterValue = tokenFilter.content
   // On 0-match fallback, displayLinksCount is the unfiltered length — show 0 instead.
@@ -41,7 +44,9 @@ export function TokenFilterBanner({
 
       {/* Same highlight wash as scripture tokens (TokenRenderer) so filter ↔ selection feel related. */}
       <span
-        className="inline-flex items-center gap-0.5 min-w-0 max-w-[10rem] h-7 rounded-full bg-highlight pl-2.5 pr-1 text-chrome font-medium text-scripture-fg"
+        className={`inline-flex items-center gap-0.5 min-w-0 max-w-[10rem] rounded-full bg-highlight pl-2.5 pr-1 text-chrome font-medium text-scripture-fg ${
+          hideCount ? 'h-6' : 'h-7'
+        }`}
         title={filterValue}
       >
         <span className="min-w-0 truncate leading-none">{filterValue}</span>
@@ -57,23 +62,25 @@ export function TokenFilterBanner({
         </button>
       </span>
 
-      <span
-        className={`shrink-0 text-chrome tabular-nums ${
-          hasMatches ? 'text-fg-secondary' : 'text-fg-muted'
-        }`}
-        title={hasMatches ? `${matchCount} matches` : 'No matches — showing all'}
-        aria-hidden
-      >
-        {hasMatches ? (
-          matchCount
-        ) : (
-          <>
-            <span>0</span>
-            <span className="mx-0.5 opacity-50">·</span>
-            <span>all</span>
-          </>
-        )}
-      </span>
+      {hideCount ? null : (
+        <span
+          className={`shrink-0 text-chrome tabular-nums ${
+            hasMatches ? 'text-fg-secondary' : 'text-fg-muted'
+          }`}
+          title={hasMatches ? `${matchCount} matches` : 'No matches — showing all'}
+          aria-hidden
+        >
+          {hasMatches ? (
+            matchCount
+          ) : (
+            <>
+              <span>0</span>
+              <span className="mx-0.5 opacity-50">·</span>
+              <span>all</span>
+            </>
+          )}
+        </span>
+      )}
     </div>
   )
 }

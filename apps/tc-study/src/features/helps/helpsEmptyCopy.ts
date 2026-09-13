@@ -63,21 +63,31 @@ export function resolveHelpsListEmptyReason(options: {
   mergedEmpty: boolean
   hasLoadError: boolean
   hasActiveFilter: boolean
+  /** Unfiltered chapter/book rows exist (token chip must not claim “no helps for this chapter”). */
+  chapterHasHelps?: boolean
 }): HelpsListEmptyReason {
   // Loading wins — never paint the empty well while TN/TWL or catalog is in flight.
   if (options.loading) return null
   if (options.noSources) return 'no-sources'
   if (!options.mergedEmpty) return null
   if (options.hasLoadError) return null
-  if (options.hasActiveFilter) return 'filter-miss'
+  if (options.hasActiveFilter) {
+    // Chip stays visible either way. Only use filter-empty when the chapter has rows.
+    if (options.chapterHasHelps === false) return 'no-passage'
+    return 'filter-miss'
+  }
   return 'no-passage'
 }
 
-/** Filter-miss uses the same explained empty as no-passage (not a crash sentence). */
+/** Explained copy for language/passage gaps. Filter-miss is icon + clear-filter, not this copy. */
 export function explainedHelpsEmptyKind(reason: HelpsListEmptyReason): HelpsEmptyKind | null {
   if (reason === 'no-sources') return 'no-sources'
-  if (reason === 'no-passage' || reason === 'filter-miss') return 'no-passage'
+  if (reason === 'no-passage') return 'no-passage'
   return null
+}
+
+export function shouldShowHelpsFilterEmpty(reason: HelpsListEmptyReason): boolean {
+  return reason === 'filter-miss'
 }
 
 /** Language segment from `owner/lang/id` — keep region (`es-419`), do not collapse to `es`. */

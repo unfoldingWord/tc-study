@@ -25,7 +25,6 @@ import { useFilteredReadPanelKeys } from '../../features/read/useFilteredReadPan
 import { useIsNarrowViewport } from '../../features/read/useIsNarrowViewport'
 import { useReadCollectionExport } from '../../features/read/useReadCollectionExport'
 import { useReadGatewayBookCatalog } from '../../features/read/useReadGatewayBookCatalog'
-import { backgroundDownloadSession } from '../../features/download/backgroundDownloadSession'
 import { useReadLanguageBootstrap } from '../../features/read/useReadLanguageBootstrap'
 import { useReadLinkedPanelsConfig } from '../../features/read/useReadLinkedPanelsConfig'
 import { useReadPanelDnD } from '../../features/read/useReadPanelDnD'
@@ -87,8 +86,6 @@ export function SimplifiedReadView({
     handlePanelModeSwitch,
     handleSwitchTextMode,
     handleNavigatorScopeCommitted,
-    isBackgroundDownloading,
-    downloadStats,
   } = useReadLanguageBootstrap({ initialLanguage, requireLanguageInUrl })
 
   useReadGatewayBookCatalog(currentLanguageCode)
@@ -255,16 +252,7 @@ export function SimplifiedReadView({
               languagePickerRequired={needsBootstrap}
               onNavigationScopeCommitted={handleNavigatorScopeCommitted}
               onSwitchTextMode={handleSwitchTextMode}
-              downloadIndicator={
-                <DownloadIndicator
-                  isDownloading={isBackgroundDownloading}
-                  progress={downloadStats.progress ?? undefined}
-                  error={downloadStats.error}
-                  onRetry={() => {
-                    backgroundDownloadSession.retryLastRun()
-                  }}
-                />
-              }
+              downloadIndicator={<DownloadIndicator />}
               onDownloadCollection={
                 isCollectionFullyCached ? handleDirectDownloadCollection : undefined
               }

@@ -3,6 +3,7 @@
  */
 
 import { generateSemanticIdsForQuoteTokens } from './quoteTokens'
+import { semanticIdMatchKey } from './semanticIdMatchKey'
 
 export interface ObsQuoteFilter {
   quote?: string
@@ -61,6 +62,7 @@ export type NoteForDisplay = {
   supportReference?: string
   quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
   semanticIds?: string[]
+  alignedTokens?: Array<{ semanticId?: string; content?: string; text?: string }>
 }
 
 export type LinkForDisplay = {
@@ -70,6 +72,103 @@ export type LinkForDisplay = {
   occurrence?: string
   quoteTokens?: Array<{ text: string }>
   semanticIds?: string[]
+  alignedTokens?: Array<{ semanticId?: string; content?: string; text?: string }>
+}
+
+type HelpsTokenClickPayload = {
+  semanticId: string
+  content: string
+  alignedSemanticIds?: string[]
+  hasHelpsCoverage?: boolean
+}
+
+/**
+ * Scripture token-click → CombinedHelps / TN / TWL filter.
+ * `undefined` = uncovered click (verse-filter owns helps; ignore token).
+ * `null` = clear. Object = apply these filter ids.
+ */
+export function resolveHelpsTokenClickFilter(
+  token: HelpsTokenClickPayload | null,
+  timestamp: number
+): TokenFilterLike | null | undefined {
+  if (token === null) return null
+  if (token.hasHelpsCoverage === false) return undefined
+  return {
+    semanticId: token.semanticId,
+    content: token.content,
+    alignedSemanticIds: token.alignedSemanticIds || [],
+    timestamp,
+  }
+}
+
+function tokenFilterMatchKeys(tokenFilter: TokenFilterLike): Set<string> {
+  const ids = [tokenFilter.semanticId, ...(tokenFilter.alignedSemanticIds ?? [])]
+  return new Set(ids.filter((id) => Boolean(id)).map(semanticIdMatchKey))
+}
+
+function generatedQuoteSemanticIds(
+  item: { reference: string; occurrence?: string; quoteTokens?: Array<{ text: string }> },
+  bookCodeLower: string
+): string[] {
+  if (!item.quoteTokens?.length) return []
+  const refParts = item.reference.split(':')
+  const ch = parseInt(refParts[0] || '1', 10)
+  const vs = parseInt(refParts[1] || '1', 10)
+  return generateSemanticIdsForQuoteTokens(
+    item.quoteTokens as Parameters<typeof generateSemanticIdsForQuoteTokens>[0],
+    bookCodeLower,
+    ch,
+    vs,
+    parseInt(item.occurrence || '1', 10)
+  )
+}
+
+function itemMatchKeys(
+  item: {
+    reference: string
+    occurrence?: string
+    quoteTokens?: Array<{ text: string }>
+    semanticIds?: string[]
+    alignedTokens?: Array<{ semanticId?: string }>
+  },
+  bookCodeLower: string
+): string[] {
+  const raw =
+    Array.isArray(item.semanticIds) && item.semanticIds.length > 0
+      ? item.semanticIds
+      : generatedQuoteSemanticIds(item, bookCodeLower)
+  const aligned = (item.alignedTokens ?? [])
+    .map((token) => token.semanticId)
+    .filter((id): id is string => Boolean(id))
+  return [...raw, ...aligned].map(semanticIdMatchKey)
+}
+
+function itemMatchesTokenFilter(
+  item: {
+    reference: string
+    occurrence?: string
+    quote?: string
+    origWords?: string
+    quoteTokens?: Array<{ text: string }>
+    semanticIds?: string[]
+    alignedTokens?: Array<{ semanticId?: string; content?: string; text?: string }>
+  },
+  tokenFilter: TokenFilterLike,
+  bookCodeLower: string,
+  extraText: string
+): boolean {
+  const wanted = tokenFilterMatchKeys(tokenFilter)
+  if (wanted.size > 0 && itemMatchKeys(item, bookCodeLower).some((id) => wanted.has(id))) {
+    return true
+  }
+  const cleanToken = tokenFilter.content.toLowerCase().trim()
+  if (!cleanToken) return false
+  if (extraText.includes(cleanToken)) return true
+  if (item.quoteTokens?.some((tok) => tok.text.toLowerCase().includes(cleanToken))) return true
+  return (item.alignedTokens ?? []).some((token) => {
+    const surface = (token.content || token.text || '').toLowerCase()
+    return surface.includes(cleanToken)
+  })
 }
 
 /** Filter translation notes whose reference overlaps the given chapter/verse range. */
@@ -157,6 +256,84 @@ export function flattenBookNotes<T>(
   return fromFallback
 }
 
+export function chapterOfHelpsReference(reference: string): number {
+  const n = parseInt(String(reference).split(':')[0] || '1', 10)
+  return Number.isFinite(n) && n > 0 ? n : 1
+}
+
+/**
+ * Current-chapter support-ref matches from already-aligned passage notes.
+ * First paint must not flatten the book or require quote/align rebuild.
+ */
+export function supportRefFirstPaintNotes<T extends {
+  reference: string
+  supportReference?: string
+}>(
+  passageNotes: readonly T[],
+  supportReference: string,
+  focusChapter: number
+): T[] {
+  if (!supportReference || !passageNotes.length) return []
+  return passageNotes.filter(
+    (note) =>
+      chapterOfHelpsReference(note.reference) === focusChapter &&
+      supportReferencesMatch(note.supportReference, supportReference)
+  )
+}
+
+export function supportRefNotesForChapter<T extends { supportReference?: string }>(
+  notes: readonly T[],
+  supportReference: string
+): T[] {
+  if (!supportReference || !notes.length) return []
+  return notes.filter((note) => supportReferencesMatch(note.supportReference, supportReference))
+}
+
+/** Other chapter keys in the map — keys only, no note walk. */
+export function planSupportRefStreamChapters(
+  byChapter: Record<string, unknown[]> | null | undefined,
+  focusChapter: number
+): number[] {
+  if (!byChapter) return []
+  return Object.keys(byChapter)
+    .map((key) => parseInt(key, 10))
+    .filter((chapter) => Number.isFinite(chapter) && chapter > 0 && chapter !== focusChapter)
+    .sort((a, b) => a - b)
+}
+
+export const SUPPORT_REF_STREAM_FALLBACK_CHUNK = 40
+
+/** Idle-chunk filter for a flat fallback list (skip focus chapter + already streamed). */
+export function filterSupportRefFallbackChunk<T extends {
+  id: string
+  reference: string
+  supportReference?: string
+}>(
+  chunk: readonly T[],
+  supportReference: string,
+  skipChapter: number,
+  seenIds: ReadonlySet<string>
+): T[] {
+  if (!supportReference || !chunk.length) return []
+  const out: T[] = []
+  for (const note of chunk) {
+    if (seenIds.has(note.id)) continue
+    if (chapterOfHelpsReference(note.reference) === skipChapter) continue
+    if (!supportReferencesMatch(note.supportReference, supportReference)) continue
+    out.push(note)
+  }
+  return out
+}
+
+export function chapterMapNoteCount(
+  byChapter: Record<string, unknown[]> | null | undefined
+): number {
+  if (!byChapter) return 0
+  let total = 0
+  for (const rows of Object.values(byChapter)) total += rows.length
+  return total
+}
+
 type SupportRefDisplayNote = {
   id: string
   supportReference?: string
@@ -165,6 +342,7 @@ type SupportRefDisplayNote = {
   alignedTokens?: unknown
   semanticIds?: unknown
   quoteStatus?: string
+  quoteWarmPending?: boolean
 }
 
 export type SupportRefNoteEnrichment = {
@@ -172,15 +350,15 @@ export type SupportRefNoteEnrichment = {
   alignedTokens?: unknown
   semanticIds?: unknown
   quoteStatus?: string
+  quoteWarmPending?: boolean
 }
 
-function hasUsableHelpsAlign(
+function hasUsableAlignedQuote(
   note: SupportRefDisplayNote | SupportRefNoteEnrichment | undefined
 ): boolean {
   if (!note) return false
   if (Array.isArray(note.semanticIds) && note.semanticIds.length > 0) return true
   if (Array.isArray(note.alignedTokens) && note.alignedTokens.length > 0) return true
-  if (Array.isArray(note.quoteTokens) && note.quoteTokens.length > 0) return true
   return false
 }
 
@@ -200,26 +378,52 @@ export function settleSupportRefDisplayNotes<T extends SupportRefDisplayNote>(
     .map((note) => {
       const aligned = alignedById.get(note.id)
       const enriched = enrichmentById?.get(note.id)
-      if (hasUsableHelpsAlign(aligned)) return aligned!
-      if (hasUsableHelpsAlign(enriched)) {
+      // ULT tokens win. Quote-token-only OL rows must not overwrite a live pending align.
+      if (hasUsableAlignedQuote(aligned)) return aligned!
+      if (hasUsableAlignedQuote(enriched)) {
         return {
           ...note,
           ...enriched,
         }
       }
-      if (aligned) return aligned
+      if (aligned?.quoteStatus === 'pending') return aligned
       if (enriched) {
         return {
           ...note,
           ...enriched,
         }
       }
+      if (aligned) return aligned
       const hasQuote = Boolean(note.quote?.trim())
       return {
         ...note,
         quoteStatus: hasQuote ? 'ol-fallback' : 'none',
+        quoteWarmPending: hasQuote,
       }
     })
+}
+
+/** Keep prior note object identity when quote/align fields did not change. */
+export function reuseUnchangedSupportRefNotes<T extends SupportRefDisplayNote>(
+  next: T[],
+  prev: readonly T[]
+): T[] {
+  if (prev.length === 0) return next
+  const prevById = new Map(prev.map((note) => [note.id, note]))
+  return next.map((note) => {
+    const old = prevById.get(note.id)
+    if (
+      old &&
+      old.quoteStatus === note.quoteStatus &&
+      old.quoteWarmPending === note.quoteWarmPending &&
+      old.quoteTokens === note.quoteTokens &&
+      old.alignedTokens === note.alignedTokens &&
+      old.semanticIds === note.semanticIds
+    ) {
+      return old
+    }
+    return note
+  })
 }
 
 /** Apply OBS quote / verse / token / support-ref filters to aligned notes. */
@@ -287,36 +491,9 @@ export function filterDisplayNotes<T extends NoteForDisplay>(
     return { displayNotes: notesWithAlignedTokens, hasNoteMatches: true }
   }
 
-  const cleanToken = tokenFilter.content.toLowerCase().trim()
-  // ... rest continues in file
-  const filtered = notesWithAlignedTokens.filter((note) => {
-    if (note.quoteTokens && note.quoteTokens.length > 0) {
-      const cached = note.semanticIds
-      const noteSemanticIds =
-        cached ??
-        (() => {
-          const refParts = note.reference.split(':')
-          const ch = parseInt(refParts[0] || '1', 10)
-          const vs = parseInt(refParts[1] || '1', 10)
-          return generateSemanticIdsForQuoteTokens(
-            note.quoteTokens! as Parameters<typeof generateSemanticIdsForQuoteTokens>[0],
-            bookCodeLower,
-            ch,
-            vs,
-            parseInt(note.occurrence || '1', 10)
-          )
-        })()
-      const hasAligned = tokenFilter.alignedSemanticIds?.some((alignedId) => {
-        const al = alignedId.toLowerCase()
-        return noteSemanticIds.some((id) => id.toLowerCase() === al)
-      })
-      if (hasAligned) return true
-    }
-    const quoteLower = note.quote?.toLowerCase() || ''
-    const hasText = quoteLower.includes(cleanToken)
-    const hasQt = note.quoteTokens?.some((tok) => tok.text.toLowerCase().includes(cleanToken))
-    return hasText || !!hasQt
-  })
+  const filtered = notesWithAlignedTokens.filter((note) =>
+    itemMatchesTokenFilter(note, tokenFilter, bookCodeLower, note.quote?.toLowerCase() || '')
+  )
   return {
     displayNotes: withFallback(filtered, notesWithAlignedTokens, fallbackWhenEmpty),
     hasNoteMatches: filtered.length > 0,
@@ -383,35 +560,9 @@ export function filterDisplayLinks<T extends LinkForDisplay>(
     return { displayLinks: filteredByReference, hasLinkMatches: true }
   }
 
-  const cleanToken = tokenFilter.content.toLowerCase().trim()
-  const filtered = filteredByReference.filter((link) => {
-    if (link.quoteTokens && link.quoteTokens.length > 0) {
-      const cached = link.semanticIds
-      const linkSemanticIds =
-        cached ??
-        (() => {
-          const refParts = link.reference.split(':')
-          const ch = parseInt(refParts[0] || '1', 10)
-          const vs = parseInt(refParts[1] || '1', 10)
-          return generateSemanticIdsForQuoteTokens(
-            link.quoteTokens! as Parameters<typeof generateSemanticIdsForQuoteTokens>[0],
-            bookCodeLower,
-            ch,
-            vs,
-            parseInt(link.occurrence || '1', 10)
-          )
-        })()
-      const hasAligned = tokenFilter.alignedSemanticIds?.some((alignedId) => {
-        const al = alignedId.toLowerCase()
-        return linkSemanticIds.some((id) => id.toLowerCase() === al)
-      })
-      if (hasAligned) return true
-    }
-    const ow = link.origWords?.toLowerCase() || ''
-    const hasText = ow.includes(cleanToken)
-    const hasQt = link.quoteTokens?.some((tok) => tok.text.toLowerCase().includes(cleanToken))
-    return hasText || !!hasQt
-  })
+  const filtered = filteredByReference.filter((link) =>
+    itemMatchesTokenFilter(link, tokenFilter, bookCodeLower, link.origWords?.toLowerCase() || '')
+  )
   return {
     displayLinks: withFallback(filtered, filteredByReference, fallbackWhenEmpty),
     hasLinkMatches: filtered.length > 0,

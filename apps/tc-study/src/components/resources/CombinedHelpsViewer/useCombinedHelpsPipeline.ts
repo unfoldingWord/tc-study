@@ -7,14 +7,15 @@ import { useMemo, useRef } from 'react'
 import {
   filterLinksByReferenceRange,
   filterNotesByReferenceRange,
-  flattenBookNotes,
   resolveRangeEndVerse,
+  reuseUnchangedSupportRefNotes,
   settleSupportRefDisplayNotes,
-  supportReferencesMatch,
+  supportRefFirstPaintNotes,
   type ObsQuoteFilter,
   type SupportRefFilter,
   type VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
+import { useSupportRefBookStream } from '../../../features/helps/useSupportRefBookStream'
 import { useSupportRefQuotes } from '../../../features/helps/useSupportRefQuotes'
 import {
   attachHelpsTokenCache,
@@ -33,8 +34,7 @@ import type { NotesFullRow } from '../../../features/notes/notesPreparer'
 import type { WordsLinksFullRow } from '../../../features/wordsLinks/wordsLinksPreparer'
 import { articlePathFromTwLink } from '../../../features/wordsLinks/wordsLinksPreparer'
 import type { TokenFilter } from '../WordsLinksViewer/types'
-import { useAlignedTokens, useQuoteTokens, useScriptureTokens } from '../WordsLinksViewer/hooks'
-import { useAppStore } from '../../../contexts/AppContext'
+import { useAlignedTokens, useQuoteTokens } from '../WordsLinksViewer/hooks'
 import {
   useCombinedHelpsDisplay,
   useCombinedHelpsMergedRows,
@@ -71,6 +71,8 @@ export interface UseCombinedHelpsPipelineParams {
   verseFilter: VerseFilterState | null
   obsQuoteFilter: ObsQuoteFilter | null
   supportRefFilter?: SupportRefFilter | null
+  /** Target scripture key for align-cache hydrate + lane 2 align jobs. */
+  targetKey?: string | null
 }
 
 function collectChapterSlice<T>(
@@ -118,6 +120,7 @@ export function useCombinedHelpsPipeline({
   verseFilter,
   obsQuoteFilter,
   supportRefFilter = null,
+  targetKey = '',
 }: UseCombinedHelpsPipelineParams) {
   // Chapter-scoped notes drive underlines + quote/align for the current passage.
   const relevantNotes = useMemo((): PreparedTranslationNote[] => {
@@ -150,34 +153,24 @@ export function useCombinedHelpsPipeline({
     navigationMode,
   ])
 
-  // Book-wide TN rows for support-ref filter (no quote/align — display filter only).
-  const bookNotesForSupportRef = useMemo((): PreparedTranslationNote[] => {
-    if (!supportRefFilter) return []
-    return flattenBookNotes(notesByChapter, tnNotes) as PreparedTranslationNote[]
-  }, [supportRefFilter, notesByChapter, tnNotes])
-
-  const supportRefMatchList = useMemo(() => {
-    if (!supportRefFilter) return [] as PreparedTranslationNote[]
-    return bookNotesForSupportRef.filter((n) =>
-      supportReferencesMatch(n.supportReference, supportRefFilter.supportReference)
-    )
-  }, [supportRefFilter, bookNotesForSupportRef])
-
-  const { sourceResourceId } = useScriptureTokens({ resourceId })
-  const targetScriptureKey = useAppStore((s) => {
-    if (!sourceResourceId) return ''
-    const r = s.loadedResources[sourceResourceId]
-    return r?.key || ''
-  })
-
   const supportRefQuoteEnrichment = useSupportRefQuotes({
     enabled: Boolean(supportRefFilter),
-    notes: supportRefMatchList,
+    notesByChapter,
+    supportReference: supportRefFilter?.supportReference ?? '',
     tnKey: tnKey || resourceKey,
     bookId: currentRef.book || '',
-    targetScriptureKey,
     focusChapter: currentRef.chapter,
+    targetKey,
   })
+
+  const { streamedNotes: streamedSupportRefNotes, streamPending: supportRefStreamPending } =
+    useSupportRefBookStream({
+      enabled: Boolean(supportRefFilter),
+      notesByChapter,
+      fallbackNotes: tnNotes,
+      supportReference: supportRefFilter?.supportReference ?? '',
+      focusChapter: currentRef.chapter,
+    })
 
   const helpsTokenCacheRef = useRef(new Map<string, HelpsTokenCacheRow>())
   const helpsTokenBookRef = useRef(currentRef.book)
@@ -265,26 +258,39 @@ export function useCombinedHelpsPipeline({
           : quoteStatusMap.get(note.id) ??
             (note.quoteStatus === 'pending' ? undefined : note.quoteStatus) ??
             (note.quote?.trim() ? undefined : 'none'),
+        quoteWarmPending: fromAlignUsable ? undefined : note.quoteWarmPending,
       }
     }) as NoteWithAlignments[]
   }, [relevantNotesHydrated, tnLinksWithQuotes, tnLinksAligned])
 
-  // When support-ref filter is on, show matching TN notes across the whole book.
-  // Passage-aligned rows win; otherwise merge IndexedDB quote cache + off-passage align.
+  const supportRefDisplayPrevRef = useRef<NoteWithAlignments[]>([])
+  // Support-ref: current-chapter matches first (already quote/aligned), then streamed book.
   const notesForDisplay = useMemo((): NoteWithAlignments[] => {
-    if (!supportRefFilter) return notesWithAlignedTokens
+    if (!supportRefFilter) {
+      supportRefDisplayPrevRef.current = []
+      return notesWithAlignedTokens
+    }
+    const firstPaint = supportRefFirstPaintNotes(
+      notesWithAlignedTokens,
+      supportRefFilter.supportReference,
+      currentRef.chapter
+    )
     const alignById = new Map(notesWithAlignedTokens.map((n) => [n.id, n]))
-    return settleSupportRefDisplayNotes(
-      bookNotesForSupportRef,
+    const settled = settleSupportRefDisplayNotes(
+      [...firstPaint, ...streamedSupportRefNotes],
       supportRefFilter.supportReference,
       alignById,
       supportRefQuoteEnrichment
     ) as NoteWithAlignments[]
+    const reused = reuseUnchangedSupportRefNotes(settled, supportRefDisplayPrevRef.current)
+    supportRefDisplayPrevRef.current = reused
+    return reused
   }, [
     supportRefFilter,
     notesWithAlignedTokens,
-    bookNotesForSupportRef,
+    streamedSupportRefNotes,
     supportRefQuoteEnrichment,
+    currentRef.chapter,
   ])
 
   mergeHelpsTokenCache(helpsTokenCacheRef.current, notesWithAlignedTokens)
@@ -451,5 +457,6 @@ export function useCombinedHelpsPipeline({
     tnQuoteBuildReady,
     twlQuoteBuildReady,
     quotesBlocked: tnOlBlocked || twlOlBlocked,
+    supportRefStreamPending,
   }
 }

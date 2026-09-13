@@ -6,6 +6,7 @@ describe('warm lane wiring', () => {
   test('useWarmLanes loads catalog keys and real lastChapter', () => {
     const src = readFileSync(join(import.meta.dir, 'useWarmLanes.ts'), 'utf8')
     expect(src).toContain('getAllResourceKeys')
+    expect(src).toContain('!backgroundDownloadSession.isBusy()')
     expect(src).toContain('stampsTick')
     expect(src).toContain('stampsRef')
     expect(src).toContain('resolveLastChapter')

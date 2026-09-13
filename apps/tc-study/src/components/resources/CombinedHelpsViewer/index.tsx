@@ -321,6 +321,7 @@ export function CombinedHelpsViewer({
     tnQuoteBuildReady,
     twlQuoteBuildReady,
     quotesBlocked,
+    supportRefStreamPending,
   } = useCombinedHelpsPipeline({
     tnNotes,
     notesByChapter,
@@ -340,6 +341,7 @@ export function CombinedHelpsViewer({
     verseFilter,
     obsQuoteFilter,
     supportRefFilter,
+    targetKey: targetSourceId,
   })
 
   const { sendTokenClick, sendEntryLinkClick, sendVerseFilter, sendVerseNavigation, broadcastObsHighlight } =
@@ -450,7 +452,7 @@ export function CombinedHelpsViewer({
     catalogLoading: Boolean(helpsLanguageActions?.isCatalogLoading),
     preparePending: notesPrepareStatus === 'pending' || linksPrepareStatus === 'pending',
     hasVisibleRows: mergedGroups.length > 0,
-  })
+  }) || Boolean(supportRefFilter && supportRefStreamPending && mergedGroups.length === 0)
   useWarmLanes({
     owner: 'helps',
     visibleResources: warmVisibleResources,
@@ -492,6 +494,7 @@ export function CombinedHelpsViewer({
         supportRefFilter={supportRefFilter}
         displayCount={displayCount}
         hasMatches={hasMatches}
+        hideCount
         onClearObsQuoteFilter={() => {
           setObsQuoteFilter(null)
           setSelectedHelpsCard(null)
@@ -523,6 +526,27 @@ export function CombinedHelpsViewer({
         helpsLanguageName={helpsLanguageName}
         passageLabel={passageLabel}
         noSources={noSources}
+        chapterHasHelps={notesWithAlignedTokens.length > 0 || filteredByReference.length > 0}
+        onClearActiveFilter={() => {
+          if (obsQuoteFilter) {
+            setObsQuoteFilter(null)
+            setSelectedHelpsCard(null)
+            return
+          }
+          if (supportRefFilter) {
+            setSupportRefFilter(null)
+            setSelectedHelpsCard(null)
+            return
+          }
+          if (tokenFilter) {
+            setTokenFilter(null)
+            return
+          }
+          if (verseFilter) {
+            setVerseFilter(null)
+            sendVerseFilter({ lifecycle: 'event', filter: null })
+          }
+        }}
         loading={loading}
         tnError={tnError}
         twlError={twlError}

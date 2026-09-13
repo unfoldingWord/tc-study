@@ -20,7 +20,18 @@ import {
   lastChapterNumber,
   paragraphChaptersFromSlots,
 } from '../../../../features/nav/chapterInfiniteScroll'
-import { beginProgrammaticScrollSuppress } from '../../../../features/nav/chapterScrollActivity'
+import {
+  beginProgrammaticScrollSuppress,
+  getChapterScrollActivity,
+} from '../../../../features/nav/chapterScrollActivity'
+import {
+  getHelpsHighlightEpoch,
+  getPersistedHelpsHighlight,
+  isHelpsHighlightApplied,
+  markHelpsHighlightApplied,
+  parseTokenVerseRef,
+  shouldScrollToQuoteHighlight,
+} from '../../../../features/helps/helpsCardScriptureNav'
 import {
   ensurePreparedFullChapter,
   isPreparedSourceMissing,
@@ -212,6 +223,7 @@ export function ScriptureContent({
   const localContainerRef = useRef<HTMLDivElement>(null)
   const containerRef = contentRef ?? localContainerRef
   const lastScrolledTokenRef = useRef<string | null>(null)
+  const lastScrolledEpochRef = useRef(-1)
   const slots = chapterSlots && chapterSlots.length > 0 ? chapterSlots : null
   const slotsActive = slots != null
 
@@ -349,12 +361,48 @@ export function ScriptureContent({
   }, [cache, resourceKey, currentRef.book, slots, preparedRevision])
 
   useEffect(() => {
-    if (!highlightTarget || !selectedTokenId) return
+    if (!highlightTarget || !selectedTokenId) {
+      lastScrolledTokenRef.current = null
+      lastScrolledEpochRef.current = -1
+      return
+    }
+
+    const persist = getPersistedHelpsHighlight()
+    const highlightChapter =
+      persist?.chapter || parseTokenVerseRef(highlightTarget.verseRef)?.chapter || null
+    const highlightEpoch = getHelpsHighlightEpoch()
+    if (
+      !shouldScrollToQuoteHighlight({
+        selectedTokenId,
+        lastScrolledTokenId: lastScrolledTokenRef.current,
+        lastScrolledEpoch: lastScrolledEpochRef.current,
+        highlightEpoch,
+        userScrolling: getChapterScrollActivity().unsettled,
+        highlightChapter,
+        visibleChapter: currentRef.chapter,
+        highlightApplied: isHelpsHighlightApplied(),
+      })
+    ) {
+      return
+    }
 
     let cancelled = false
     const tryScroll = (attempt: number) => {
       if (cancelled) return
-      if (lastScrolledTokenRef.current === selectedTokenId) return
+      if (
+        !shouldScrollToQuoteHighlight({
+          selectedTokenId,
+          lastScrolledTokenId: lastScrolledTokenRef.current,
+          lastScrolledEpoch: lastScrolledEpochRef.current,
+          highlightEpoch,
+          userScrolling: getChapterScrollActivity().unsettled,
+          highlightChapter,
+          visibleChapter: currentRef.chapter,
+          highlightApplied: isHelpsHighlightApplied(),
+        })
+      ) {
+        return
+      }
       const highlightedElements = containerRef.current?.querySelectorAll('[data-highlighted="true"]')
       if (highlightedElements && highlightedElements.length > 0) {
         // Top of the scrollport with scroll-mt on highlighted tokens (not center):
@@ -367,6 +415,8 @@ export function ScriptureContent({
           inline: 'nearest',
         })
         lastScrolledTokenRef.current = selectedTokenId
+        lastScrolledEpochRef.current = highlightEpoch
+        markHelpsHighlightApplied(currentRef.book, highlightChapter ?? currentRef.chapter)
         return
       }
       if (attempt < 16) {
@@ -379,18 +429,7 @@ export function ScriptureContent({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [
-    highlightTarget,
-    selectedTokenId,
-    containerRef,
-    currentRef.book,
-    currentRef.chapter,
-    tokensReady,
-  ])
-
-  useEffect(() => {
-    lastScrolledTokenRef.current = null
-  }, [currentRef.book, currentRef.chapter, currentRef.verse, tokensReady])
+  }, [highlightTarget, selectedTokenId, tokensReady, currentRef.book, currentRef.chapter])
 
   const includeVerse = useMemo(() => includeVerseForRef(currentRef), [currentRef])
   const navChapters = useMemo(() => chaptersForRef(currentRef), [currentRef])

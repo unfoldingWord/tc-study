@@ -82,6 +82,10 @@ export default defineConfig({
       'linked-panels': linkedPanelsEntry,
       // Alias workspace packages to their source
       '@bt-synergy/navigation': path.resolve(__dirname, '../../packages/navigation/src/index.ts'),
+      '@bt-synergy/catalog-manager/core': path.resolve(
+        __dirname,
+        '../../packages/catalog-manager/src/core.ts'
+      ),
       'decode-named-character-reference': decodeNamedCharRefEntry,
       ...usfmTools.alias,
     },

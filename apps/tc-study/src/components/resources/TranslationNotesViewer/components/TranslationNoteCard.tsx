@@ -14,6 +14,7 @@ import {
   resolveHelpsQuoteStatusForNote,
   type HelpsQuoteStatus,
 } from '../../../../features/helps/resolveHelpsQuoteStatus'
+import { supportRefQuoteChipKind } from '../../../../features/helps/supportRefQuotePaint'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import type { HastRoot } from '../../../../lib/markdown/markdownToHast'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
@@ -44,6 +45,7 @@ export type NoteWithTokens = TranslationNote & {
   alignedTokens?: AlignedToken[]
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
+  quoteWarmPending?: boolean
   /** Precomputed markdown AST — skips remark parse when present. */
   bodyHast?: HastRoot
 }
@@ -104,6 +106,12 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
     quoteStatus: note.quoteStatus,
     hasAlignedTokens,
     quote: note.quote,
+  })
+  const quoteChipKind = supportRefQuoteChipKind({
+    hasAlignedTokens,
+    quoteStatus,
+    olQuote: note.quote,
+    quoteWarmPending: note.quoteWarmPending,
   })
   const excerptLoading = shouldShowHelpsExcerptSkeleton({
     kind: 'tn',
@@ -239,7 +247,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </button>
       )}
 
-      {!hasAlignedTokens && !obsMode && quoteStatus === 'pending' && (
+      {quoteChipKind === 'placeholder' && !obsMode && (
         <div
           className={`${quoteChipStaticClass} animate-pulse`}
           role="status"
@@ -250,20 +258,33 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </div>
       )}
 
-      {/* Fallback: Original language quote only after a settled miss */}
-      {!hasAlignedTokens && !obsMode && quoteStatus === 'ol-fallback' && note.quote?.trim() && (
+      {(quoteChipKind === 'ol' || quoteChipKind === 'ol-pending') && !obsMode && note.quote?.trim() && (
         <div
           className={quoteChipStaticClass}
-          title="Original language phrase (target language alignment not available)"
+          title={
+            quoteChipKind === 'ol-pending'
+              ? 'Building quote'
+              : 'Original language phrase (target language alignment not available)'
+          }
           dir={languageDirection}
         >
-          <div className="text-base leading-relaxed" dir={languageDirection}>
-            <span className="italic text-fg-secondary">
+          <div className="flex items-center gap-2 text-base leading-relaxed" dir={languageDirection}>
+            <span className="italic text-fg-secondary min-w-0">
               &ldquo;<QuotedFilterText quote={note.quote} filterText={filterText} />&rdquo;
             </span>
             {resourceAbbreviation && (
-              <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
+              <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium shrink-0">
                 {resourceAbbreviation}
+              </span>
+            )}
+            {quoteChipKind === 'ol-pending' && (
+              <span
+                className="shrink-0 inline-flex"
+                role="status"
+                title="Building quote"
+                aria-label="Building quote"
+              >
+                <LoadingSpinner size="sm" label="Building quote" className="text-fg-muted" />
               </span>
             )}
           </div>

@@ -231,7 +231,7 @@ export class TranslationAcademyLoader implements ResourceLoader {
     const method = options?.method || 'zip'
 
     if (method === 'zip') {
-      await this.downloadViaZip(resourceKey, onProgress)
+      await this.downloadViaZip(resourceKey, onProgress, options?.skipExisting)
     } else {
       await this.downloadIndividual(resourceKey, options?.skipExisting, onProgress)
     }
@@ -534,7 +534,11 @@ export class TranslationAcademyLoader implements ResourceLoader {
   /**
    * Download via ZIP
    */
-  private async downloadViaZip(resourceKey: string, onProgress?: ProgressCallback): Promise<void> {
+  private async downloadViaZip(
+    resourceKey: string,
+    onProgress?: ProgressCallback,
+    skipExisting?: boolean
+  ): Promise<void> {
     const parts = resourceKey.split('/')
     const [owner, language, resourceId] = parts
 
@@ -610,11 +614,28 @@ export class TranslationAcademyLoader implements ResourceLoader {
       console.log(`📚 Found ${entryDirArray.length} TA entry directories`)
     }
     
+    const pending: Array<{ key: string; entry: unknown }> = []
     // Process each entry directory
     for (let i = 0; i < entryDirArray.length; i++) {
       const entryId = entryDirArray[i]
       
       try {
+        const cacheKey = `${resourceKey}/${entryId}`
+        if (skipExisting) {
+          const existing = await this.cacheAdapter.get(cacheKey)
+          if (existing) {
+            if (onProgress) {
+              onProgress({
+                loaded: i + 1,
+                total: entryDirArray.length,
+                percentage: ((i + 1) / entryDirArray.length) * 100,
+                message: `Processing ${entryId}`
+              })
+            }
+            continue
+          }
+        }
+
         // Fetch the 3 files for this entry
         const titlePath = repoPrefix + `${entryId}/title.md`
         const subtitlePath = repoPrefix + `${entryId}/sub-title.md`
@@ -637,9 +658,7 @@ export class TranslationAcademyLoader implements ResourceLoader {
           }
           combinedContent += mainContent
           
-          // Cache the combined article
-          const cacheKey = `${resourceKey}/${entryId}`
-          await this.cacheAdapter.set(cacheKey, combinedContent)
+          pending.push({ key: cacheKey, entry: combinedContent })
           
           if (i < 3) {
             console.log(`✅ [BG-DL] Cached TA entry: ${cacheKey}`)
@@ -658,6 +677,16 @@ export class TranslationAcademyLoader implements ResourceLoader {
           percentage: ((i + 1) / entryDirArray.length) * 100,
           message: `Processing ${entryId}`
         })
+      }
+    }
+
+    if (pending.length > 0) {
+      if (typeof this.cacheAdapter.setMany === 'function') {
+        await this.cacheAdapter.setMany(pending)
+      } else {
+        for (const item of pending) {
+          await this.cacheAdapter.set(item.key, item.entry)
+        }
       }
     }
     

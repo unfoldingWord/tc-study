@@ -8,6 +8,7 @@ export type HelpsTokenCacheRow = {
   alignedTokens?: unknown
   semanticIds?: unknown
   quoteStatus?: string
+  quoteWarmPending?: boolean
 }
 
 export function hasUsableHelpsQuoteTokens(
@@ -60,6 +61,7 @@ export function mergeHelpsTokenCache(
           : prev?.quoteStatus === 'pending'
             ? undefined
             : prev?.quoteStatus,
+      quoteWarmPending: row.quoteWarmPending ?? prev?.quoteWarmPending,
     })
   }
   return cache

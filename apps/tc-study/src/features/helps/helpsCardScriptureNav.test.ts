@@ -22,7 +22,9 @@ import {
   shouldClearHelpsHighlightOnVerseFilter,
   shouldKeepSelectedHelpsCardOnPassageChange,
   shouldNavigateScriptureToRef,
+  shouldNavigateToHelpsHighlight,
   shouldRetainHelpsHighlight,
+  shouldScrollToQuoteHighlight,
   subscribeHelpsHighlightPersist,
   usjDisplayTokensReady,
 } from './helpsCardScriptureNav'
@@ -56,6 +58,123 @@ describe('shouldNavigateScriptureToRef', () => {
   test('book change navigates even when chapter numbers match', () => {
     expect(
       shouldNavigateScriptureToRef({ book: 'tit', chapter: 1 }, { book: '1ti', chapter: 1 })
+    ).toBe(true)
+  })
+})
+
+describe('shouldNavigateToHelpsHighlight', () => {
+  test('user scroll / already-applied persist does not snap BCV back', () => {
+    const viewingCh3 = { book: 'psa', chapter: 3 }
+    const highlightCh2 = { book: 'psa', chapter: 2 }
+    expect(
+      shouldNavigateToHelpsHighlight({
+        current: viewingCh3,
+        target: highlightCh2,
+      })
+    ).toBe(true)
+    expect(
+      shouldNavigateToHelpsHighlight({
+        current: viewingCh3,
+        target: highlightCh2,
+        userScrolling: true,
+      })
+    ).toBe(false)
+    expect(
+      shouldNavigateToHelpsHighlight({
+        current: viewingCh3,
+        target: highlightCh2,
+        highlightAlreadyApplied: true,
+      })
+    ).toBe(false)
+  })
+
+  test('fresh off-chapter click still navigates once', () => {
+    expect(
+      shouldNavigateToHelpsHighlight({
+        current: { book: 'tit', chapter: 1 },
+        target: { book: 'tit', chapter: 2 },
+        userScrolling: false,
+        highlightAlreadyApplied: false,
+      })
+    ).toBe(true)
+  })
+})
+
+describe('shouldScrollToQuoteHighlight', () => {
+  const base = {
+    selectedTokenId: 'psa 119:1:blessed:1',
+    lastScrolledTokenId: null as string | null,
+    lastScrolledEpoch: -1,
+    highlightEpoch: 4,
+    userScrolling: false,
+    highlightChapter: 119,
+    visibleChapter: 119,
+    highlightApplied: false,
+  }
+
+  test('scrolls once for a new click on the highlight chapter', () => {
+    expect(shouldScrollToQuoteHighlight(base)).toBe(true)
+  })
+
+  test('does not re-scroll the same persist after a successful scroll', () => {
+    expect(
+      shouldScrollToQuoteHighlight({
+        ...base,
+        lastScrolledTokenId: base.selectedTokenId,
+        lastScrolledEpoch: 4,
+      })
+    ).toBe(false)
+  })
+
+  test('does not snap back when the user scrolls to another chapter', () => {
+    expect(
+      shouldScrollToQuoteHighlight({
+        ...base,
+        visibleChapter: 120,
+        userScrolling: true,
+      })
+    ).toBe(false)
+    expect(
+      shouldScrollToQuoteHighlight({
+        ...base,
+        lastScrolledTokenId: null,
+        highlightApplied: false,
+        visibleChapter: 120,
+        userScrolling: false,
+      })
+    ).toBe(false)
+  })
+
+  test('does not re-scroll when adjacent-chapter tokensReady churns after apply', () => {
+    expect(
+      shouldScrollToQuoteHighlight({
+        ...base,
+        lastScrolledTokenId: base.selectedTokenId,
+        lastScrolledEpoch: 7,
+        highlightEpoch: 8,
+        highlightApplied: true,
+        visibleChapter: 119,
+      })
+    ).toBe(false)
+  })
+
+  test('off-chapter land still scrolls once dest chapter is visible', () => {
+    expect(
+      shouldScrollToQuoteHighlight({
+        ...base,
+        highlightChapter: 5,
+        visibleChapter: 2,
+        lastScrolledTokenId: null,
+      })
+    ).toBe(false)
+    expect(
+      shouldScrollToQuoteHighlight({
+        ...base,
+        highlightChapter: 5,
+        visibleChapter: 5,
+        lastScrolledTokenId: null,
+        highlightApplied: false,
+      })
     ).toBe(true)
   })
 })
@@ -498,7 +617,25 @@ describe('handler wiring uses the store, not pinned chapter', () => {
     expect(highlighting).toContain('shouldApplyHelpsHighlightOnTokensReady')
     expect(highlighting).toContain('setHighlightTarget(targetFromSignalToken(signal.token))')
     expect(highlighting).toContain('subscribeHelpsHighlightPersist')
+    expect(highlighting).toContain('shouldNavigateToHelpsHighlight')
+    expect(highlighting).toContain('getChapterScrollActivity')
     expect(highlighting).not.toMatch(/useEffect\(\(\) => \{\s*setHighlightTarget\(null\)/)
+  })
+
+  test('ScriptureContent scroll-to-quote is one-shot and ignores user chapter scroll', () => {
+    const content = readFileSync(
+      join(
+        import.meta.dir,
+        '../../components/resources/ScriptureViewer/components/ScriptureContent.tsx'
+      ),
+      'utf8'
+    )
+    expect(content).toContain('shouldScrollToQuoteHighlight')
+    expect(content).toContain('lastScrolledEpochRef')
+    expect(content).toContain('getChapterScrollActivity()')
+    expect(content).not.toMatch(
+      /lastScrolledTokenRef\.current = null\s*\}, \[currentRef\.book, currentRef\.chapter/
+    )
   })
 
   test('CombinedHelps keeps selected card across chapter change when persist matches', () => {

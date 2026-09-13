@@ -115,7 +115,7 @@ export function useWarmLanes(args: {
       const articleIdsByKey: Record<string, string[]> = {}
 
       let downloadedKeys = downloadedKeysArg ?? []
-      if (!downloadedKeysArg && catalogManager) {
+      if (!downloadedKeysArg && catalogManager && !backgroundDownloadSession.isBusy()) {
         try {
           downloadedKeys = await catalogManager.getAllResourceKeys()
         } catch {

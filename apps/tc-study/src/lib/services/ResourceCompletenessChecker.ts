@@ -13,6 +13,12 @@
 
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import type { CacheStorageAdapter } from '@bt-synergy/resource-cache'
+import {
+  hasScripturePayload,
+  isCachedScriptureBookComplete,
+  isScriptureBookComplete as isScriptureBookCompleteShared,
+  scriptureChapterNumbers as scriptureChapterNumbersShared,
+} from '@bt-synergy/scripture-loader'
 
 export interface ResourceCompletenessStatus {
   /** Resource key */
@@ -91,7 +97,7 @@ export function ingredientCacheKeyFor(
 ): string | null {
   switch (resourceType) {
     case 'scripture':
-      return `scripture-usj:${resourceKey}:${ingredientId}`
+      return `scripture-usj:${resourceKey}:${ingredientId.toLowerCase()}`
     case 'notes':
       return `tn:${resourceKey}:${ingredientId}`
     case 'words-links':
@@ -103,33 +109,47 @@ export function ingredientCacheKeyFor(
   }
 }
 
-/**
- * True when a cached ingredient entry has usable payload (not just a stub).
- * Handles both CacheEntry wrappers ({ content }) and loader-native shapes (notes/links/…).
- */
-export function hasIngredientPayload(
-  entry: unknown,
-  resourceType: string
-): boolean {
-  if (!entry || typeof entry !== 'object') return false
+function unwrapCachePayload(entry: unknown): Record<string, unknown> | null {
+  if (!entry || typeof entry !== 'object') return null
   const e = entry as Record<string, unknown>
   const payload =
     e.content && typeof e.content === 'object' && !Array.isArray(e.content)
       ? (e.content as Record<string, unknown>)
       : e
+  return payload
+}
+
+/** Thin book index written next to chapter keys — not a downloaded book blob. */
+export const scriptureChapterNumbers = scriptureChapterNumbersShared
+
+/** Macrotask yield so UI-thread completeness does not hold IDB against worker setMany. */
+export function yieldBetweenCompletenessBooks(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
+}
+
+/**
+ * True when a book is fully cached: USJ/chapters blob, or a thin index whose
+ * first and last chapter keys have real payloads. Same rule as ScriptureLoader skip.
+ */
+export const isScriptureBookComplete = isScriptureBookCompleteShared
+
+/**
+ * True when a cached ingredient entry has usable payload (not just a stub).
+ * Handles both CacheEntry wrappers ({ content }) and loader-native shapes (notes/links/…).
+ * Thin `{ chapterNumbers }` indexes are not payload — they only list chapter keys.
+ */
+export function hasIngredientPayload(
+  entry: unknown,
+  resourceType: string
+): boolean {
+  const payload = unwrapCachePayload(entry)
+  if (!payload) return false
 
   switch (resourceType) {
-    case 'scripture': {
-      const chapters = payload.chapters
-      const hasChapters = Array.isArray(chapters) && chapters.length > 0
-      const hasUsj =
-        payload.usj != null &&
-        typeof payload.usj === 'object' &&
-        Array.isArray((payload.usj as { content?: unknown }).content)
-      const hasIndex =
-        Array.isArray(payload.chapterNumbers) && payload.chapterNumbers.length > 0
-      return hasUsj || hasChapters || hasIndex
-    }
+    case 'scripture':
+      return hasScripturePayload(entry)
     case 'notes':
       return (
         payload.notes != null ||
@@ -233,12 +253,14 @@ export class ResourceCompletenessChecker {
   private async countCachedIngredients(
     resourceKey: string,
     resourceType: string,
-    ingredients: Array<{ identifier?: string }>
+    ingredients: Array<{ identifier?: string }>,
+    failFast = false
   ): Promise<{ cachedCount: number; checkableCount: number } | null> {
     let cachedCount = 0
     let checkableCount = 0
 
-    for (const ingredient of ingredients) {
+    for (let i = 0; i < ingredients.length; i++) {
+      const ingredient = ingredients[i]
       const ingredientId = ingredient.identifier
       if (!ingredientId) continue
 
@@ -246,16 +268,22 @@ export class ResourceCompletenessChecker {
       if (!ingredientCacheKey) continue
 
       checkableCount++
-      const ingredientCache = await this.cacheAdapter.get(ingredientCacheKey)
-      if (hasIngredientPayload(ingredientCache, resourceType)) {
-        cachedCount++
-        continue
-      }
       if (resourceType === 'scripture') {
-        const chapterOne = await this.cacheAdapter.get(`${ingredientCacheKey}:1`)
-        if (hasIngredientPayload(chapterOne, resourceType)) {
+        if (await isCachedScriptureBookComplete(this.cacheAdapter, resourceKey, ingredientId)) {
           cachedCount++
+        } else if (failFast) {
+          return { cachedCount, checkableCount }
         }
+      } else {
+        const ingredientCache = await this.cacheAdapter.get(ingredientCacheKey)
+        if (hasIngredientPayload(ingredientCache, resourceType)) {
+          cachedCount++
+        } else if (failFast) {
+          return { cachedCount, checkableCount }
+        }
+      }
+      if (i + 1 < ingredients.length) {
+        await yieldBetweenCompletenessBooks()
       }
     }
 
@@ -266,7 +294,10 @@ export class ResourceCompletenessChecker {
   /**
    * Check completeness for a specific resource
    */
-  async checkResource(resourceKey: string): Promise<ResourceCompletenessStatus> {
+  async checkResource(
+    resourceKey: string,
+    options?: { failFast?: boolean }
+  ): Promise<ResourceCompletenessStatus> {
     try {
       // Check if resource metadata exists in catalog
       const metadata = await this.catalogManager.getResourceMetadata(resourceKey)
@@ -287,7 +318,12 @@ export class ResourceCompletenessChecker {
       const resourceType = metadata.type
       const ingredientStats =
         ingredients && ingredients.length > 0
-          ? await this.countCachedIngredients(resourceKey, resourceType, ingredients)
+          ? await this.countCachedIngredients(
+              resourceKey,
+              resourceType,
+              ingredients,
+              options?.failFast === true
+            )
           : null
 
       // Check completion metadata if marker exists
@@ -426,6 +462,25 @@ export class ResourceCompletenessChecker {
   /**
    * Mark a resource as fully downloaded and cached
    */
+  /**
+   * Persist the complete marker only when a fresh checkResource agrees.
+   * Loader return-without-throw is not enough (partial extract / skipExisting).
+   */
+  async markCompleteIfVerified(
+    resourceKey: string,
+    metadata?: {
+      size?: number
+      entryCount?: number
+      expectedEntryCount?: number
+      downloadMethod?: 'zip' | 'individual'
+    }
+  ): Promise<boolean> {
+    const status = await this.checkResource(resourceKey)
+    if (!status.isComplete) return false
+    await this.markComplete(resourceKey, metadata)
+    return true
+  }
+
   async markComplete(
     resourceKey: string,
     metadata?: {

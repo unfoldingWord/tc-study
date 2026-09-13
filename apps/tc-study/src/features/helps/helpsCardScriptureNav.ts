@@ -50,6 +50,55 @@ export function shouldNavigateScriptureToRef(
 }
 
 /**
+ * Token-click / persist replay must not snap BCV back after the user left
+ * the highlighted chapter (or while they are still scrolling).
+ * A fresh click resets persist (`highlightAlreadyApplied` is then false).
+ */
+export function shouldNavigateToHelpsHighlight(args: {
+  current: { book?: string; chapter: number }
+  target: Pick<HelpsScriptureRef, 'book' | 'chapter'>
+  userScrolling?: boolean
+  highlightAlreadyApplied?: boolean
+}): boolean {
+  if (args.userScrolling) return false
+  if (args.highlightAlreadyApplied) return false
+  return shouldNavigateScriptureToRef(args.current, args.target)
+}
+
+/**
+ * Scroll-into-view for a quote highlight is one-shot per persist click.
+ * Adjacent-chapter load / user scroll must not snap back to the highlight.
+ */
+export function shouldScrollToQuoteHighlight(args: {
+  selectedTokenId: string | null
+  lastScrolledTokenId: string | null
+  lastScrolledEpoch: number
+  highlightEpoch: number
+  userScrolling: boolean
+  highlightChapter?: number | null
+  visibleChapter: number
+  highlightApplied: boolean
+}): boolean {
+  if (!args.selectedTokenId) return false
+  if (args.userScrolling) return false
+  if (
+    args.lastScrolledTokenId === args.selectedTokenId &&
+    (args.lastScrolledEpoch === args.highlightEpoch || args.highlightApplied)
+  ) {
+    return false
+  }
+  // Only chase the highlight on its own chapter. A still-mounted prior
+  // chapter in the infinite-scroll stack must not pull the viewport back.
+  if (
+    args.highlightChapter != null &&
+    args.highlightChapter !== args.visibleChapter
+  ) {
+    return false
+  }
+  return true
+}
+
+/**
  * Plan a CombinedHelps card/quote click.
  * Uses the live scripture chapter (not the scroll-pinned helps chapter) so an
  * off-chapter TN still emits BCV + token-click for that note’s reference.

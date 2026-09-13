@@ -123,6 +123,94 @@ describe('usj chapter store', () => {
     expect((index.content as { usj?: unknown }).usj).toBeUndefined()
   })
 
+  test('writeUsjChapters skipExisting writes only missing chapters', async () => {
+    const resourceKey = 'unfoldingWord/en/ult'
+    const existingKey = usjScriptureChapterKey(resourceKey, 'psa', 1)
+    const store = new Map<string, unknown>([
+      [existingKey, { content: chapterPayload(1, 'keep-ch1') }],
+    ])
+    const written: string[] = []
+    const cache = {
+      async get(key: string) {
+        return store.get(key) ?? null
+      },
+      async getMany(keys: string[]) {
+        const out = new Map<string, unknown>()
+        for (const key of keys) {
+          if (store.has(key)) out.set(key, store.get(key))
+        }
+        return out
+      },
+      async setMany(items: Array<{ key: string; entry: unknown }>) {
+        written.push(...items.map((item) => item.key))
+        for (const item of items) store.set(item.key, item.entry)
+      },
+    }
+
+    await writeUsjChapters(cache, resourceKey, 'psa', bookBlob(), { skipExisting: true })
+
+    expect(written).toEqual([
+      usjScriptureChapterKey(resourceKey, 'psa', 119),
+      usjScriptureKey(resourceKey, 'psa'),
+    ])
+    const kept = store.get(existingKey) as { content: UsjScriptureCacheContent }
+    expect(kept.content.usj?.content).toEqual([{ marker: 'keep-ch1', chapter: 1 }])
+  })
+
+  test('writeUsjChapters batches chapter puts into one setMany (plus index)', async () => {
+    const store = new Map<string, unknown>()
+    const setCalls: string[] = []
+    const setManyCalls: string[][] = []
+    const resourceKey = 'unfoldingWord/en/ult'
+    const cache = {
+      async get(key: string) {
+        return store.get(key) ?? null
+      },
+      async set(key: string, entry: unknown) {
+        setCalls.push(key)
+        store.set(key, entry)
+      },
+      async setMany(items: Array<{ key: string; entry: unknown }>) {
+        setManyCalls.push(items.map((item) => item.key))
+        for (const item of items) store.set(item.key, item.entry)
+      },
+    }
+
+    await writeUsjChapters(cache, resourceKey, 'psa', bookBlob())
+
+    expect(setCalls).toEqual([])
+    expect(setManyCalls).toHaveLength(1)
+    expect(setManyCalls[0]).toEqual([
+      usjScriptureChapterKey(resourceKey, 'psa', 1),
+      usjScriptureChapterKey(resourceKey, 'psa', 119),
+      usjScriptureKey(resourceKey, 'psa'),
+    ])
+  })
+
+  test('writeUsjChapters prioritize+deferRest writes priority batch then rest', async () => {
+    const setManyCalls: string[][] = []
+    const resourceKey = 'unfoldingWord/en/ult'
+    const cache = {
+      async get() {
+        return null
+      },
+      async setMany(items: Array<{ key: string; entry: unknown }>) {
+        setManyCalls.push(items.map((item) => item.key))
+      },
+    }
+
+    await writeUsjChapters(cache, resourceKey, 'psa', bookBlob(), {
+      prioritize: [119],
+      deferRest: true,
+    })
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    expect(setManyCalls[0]).toEqual([usjScriptureChapterKey(resourceKey, 'psa', 119)])
+    expect(setManyCalls[1]).toEqual([
+      usjScriptureChapterKey(resourceKey, 'psa', 1),
+      usjScriptureKey(resourceKey, 'psa'),
+    ])
+  })
+
   test('readUsjBook assembles a full book from thin index + chapter keys', async () => {
     const resourceKey = 'unfoldingWord/en/ult'
     const cache = createTrackingCache()

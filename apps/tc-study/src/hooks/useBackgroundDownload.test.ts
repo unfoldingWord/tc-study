@@ -9,6 +9,8 @@ describe('useBackgroundDownload (session singleton)', () => {
     expect(src).toContain('backgroundDownloadSession')
     expect(src).toContain('backgroundDownloadSession.subscribe')
     expect(src).toContain('retryLastRun')
+    expect(src).toContain('controlOnly')
+    expect(src).toContain('downloadControlSnapshotEqual')
     expect(src).not.toContain('terminate()')
     expect(src).not.toContain('createInitialDownloadProgress')
     expect(src).not.toContain('new Worker')

@@ -39,6 +39,15 @@ export {
   type UsjScriptureBookIndex,
 } from './usjChapterStore'
 export {
+  scriptureChapterNumbers,
+  hasScripturePayload,
+  hasUsableScriptureChapter,
+  isScriptureBookComplete,
+  readScriptureBookCompleteInputs,
+  isCachedScriptureBookComplete,
+  type ScriptureBookCache,
+} from './scriptureBookComplete'
+export {
   isUsjScriptureCacheContent,
   isProcessedScriptureContent,
   usjResultFromCache,

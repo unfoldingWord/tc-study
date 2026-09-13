@@ -6,9 +6,15 @@ import {
   keysToEnqueueForDownload,
   narrowExpectedToCataloged,
   shouldResetDownloadTracking,
+  shouldWalkUiIdbDuringExtract,
 } from './catalogBackgroundDownloadPolicy'
 
 describe('catalogBackgroundDownloadPolicy', () => {
+  test('UI IDB walks skip while extract is writing', () => {
+    expect(shouldWalkUiIdbDuringExtract(true)).toBe(false)
+    expect(shouldWalkUiIdbDuringExtract(false)).toBe(true)
+  })
+
   test('language switch / deep-link scope resets download tracking', () => {
     expect(shouldResetDownloadTracking('', 'en')).toBe(true)
     expect(shouldResetDownloadTracking('en', 'es-419')).toBe(true)

@@ -233,5 +233,7 @@ describe('chapter scroll activity wiring', () => {
     expect(tokenGroups).toContain('shouldResetTokenGroupsDedupe')
     expect(tokenGroups).not.toContain('shouldEnqueueQuoteBuild')
     expect(listSrc).toContain('contentVisibility')
+    expect(listSrc).toContain('windowMergedGroups')
+    expect(listSrc).toContain('helps-list-window-sentinel')
   })
 })

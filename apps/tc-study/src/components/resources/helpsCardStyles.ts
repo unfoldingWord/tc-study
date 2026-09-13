@@ -2,12 +2,23 @@
  * Shared chrome for TN / TWL / Combined Helps / TQ lists and cards.
  */
 
-/** Scrollable helps content (under ResourceViewerHeader). */
+/** CombinedHelps shell: compact sticky chrome above the scrollport. */
+export const HELPS_LIST_SHELL = 'flex flex-col flex-1 h-full min-h-0 bg-surface'
+
+/** Always-visible CombinedHelps chrome: current ref + optional filter + icon actions. */
+export const HELPS_COMPACT_STICKY_BAR =
+  'flex-shrink-0 sticky top-0 z-20 bg-surface px-content py-1 border-b border-border-subtle/80'
+
+/** Scrollable helps content (under compact sticky chrome). */
 export const HELPS_LIST_PANEL = 'flex-1 min-h-0 overflow-y-auto bg-surface'
 
 /** Verse / ref group header — lighter than full muted so chips sit softly on surface. */
 export const HELPS_VERSE_HEADER =
   'flex items-center gap-chrome-tight px-chrome py-chrome-tight bg-muted/50 rounded-md'
+
+/** In-list sticky section header — solid fill so cards do not show through. */
+export const HELPS_VERSE_HEADER_STICKY =
+  'flex items-center gap-chrome-tight px-chrome py-chrome-tight bg-muted rounded-md sticky top-0 z-10'
 
 export const HELPS_VERSE_HEADER_ICON = 'w-3.5 h-3.5 text-fg-secondary'
 

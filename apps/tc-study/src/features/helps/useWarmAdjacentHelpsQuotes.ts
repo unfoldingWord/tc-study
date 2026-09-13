@@ -20,6 +20,7 @@ import {
   loadOriginalLanguageChapters,
   resolveOriginalLanguageKey,
 } from './olLoadCache'
+import { targetContentStamp } from './helpsAlignCache'
 import {
   mergeAndWriteCachedQuoteTokens,
   olContentStamp,
@@ -63,6 +64,25 @@ export async function resolveHelpsQuoteCacheCtx(
       olKey: ol.resourceKey,
       olStamp: olContentStamp(olMeta),
     }
+  } catch {
+    return null
+  }
+}
+
+export async function resolveHelpsAlignCacheCtx(
+  catalogManager: { getResourceMetadata: (key: string) => Promise<unknown> },
+  helpsKey: string,
+  targetKey: string,
+  bookCode: string
+): Promise<{ helpsStamp: string; olKey: string; olStamp: string; targetStamp: string } | null> {
+  if (!targetKey) return null
+  const base = await resolveHelpsQuoteCacheCtx(catalogManager, helpsKey, bookCode)
+  if (!base) return null
+  try {
+    const targetMeta = (await catalogManager.getResourceMetadata(targetKey)) as
+      | { version?: string; release?: { tag_name?: string; published_at?: string } }
+      | null
+    return { ...base, targetStamp: targetContentStamp(targetMeta) }
   } catch {
     return null
   }

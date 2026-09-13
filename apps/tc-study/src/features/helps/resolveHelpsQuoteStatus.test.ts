@@ -262,9 +262,9 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
 
   test('TranslationNoteCard reuses resolveHelpsQuoteStatus and pending spinner', () => {
     expect(tnCardSrc).toContain('resolveHelpsQuoteStatusForNote')
-    expect(tnCardSrc).toContain('quoteStatus')
-    expect(tnCardSrc).toContain("quoteStatus === 'pending'")
-    expect(tnCardSrc).toContain("quoteStatus === 'ol-fallback'")
+    expect(tnCardSrc).toContain('supportRefQuoteChipKind')
+    expect(tnCardSrc).toContain('quoteWarmPending')
+    expect(tnCardSrc).toContain("quoteChipKind === 'ol-pending'")
     expect(tnCardSrc).toContain('Building quote')
     expect(tnCardSrc).toContain('quote: note.quote')
     expect(tnCardSrc).not.toContain('alignmentPending: !hasAlignedTokens')

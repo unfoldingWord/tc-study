@@ -24,9 +24,12 @@ describe('Read nav chrome: DownloadIndicator + ThemeToggle', () => {
     expect(indicatorSrc).toContain('RotateCcw')
     expect(indicatorSrc).not.toContain('!isDownloading && !progress')
     expect(indicatorSrc).not.toContain('CheckCircle2')
-    expect(viewSrc).toContain('error={downloadStats.error}')
-    expect(viewSrc).toContain('onRetry')
-    expect(viewSrc).toContain('retryLastRun')
+    expect(indicatorSrc).toContain('backgroundDownloadSession.subscribe')
+    expect(indicatorSrc).toContain('displayIngredientCounts')
+    expect(indicatorSrc).toContain('retryLastRun')
+    expect(viewSrc).toContain('<DownloadIndicator />')
+    expect(viewSrc).not.toContain('downloadStats')
+    expect(viewSrc).not.toContain('isBackgroundDownloading')
   })
 
   test('ThemeToggle lives in NavigationBarCompact overflow, not beside the Read bar', () => {

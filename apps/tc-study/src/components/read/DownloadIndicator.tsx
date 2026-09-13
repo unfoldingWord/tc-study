@@ -1,20 +1,26 @@
 import { AlertCircle, Download, Loader2, RotateCcw } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
-import { displayDownloadPercent } from '../../features/download/backgroundDownloadRun'
-import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
+import {
+  displayDownloadPercent,
+  displayIngredientCounts,
+} from '../../features/download/backgroundDownloadRun'
+import { backgroundDownloadSession } from '../../features/download/backgroundDownloadSession'
 import {
   formatDownloadCurrentItemLabel,
   shouldShowDownloadIndicator,
 } from './downloadIndicatorVisibility'
 
-interface DownloadIndicatorProps {
-  isDownloading: boolean
-  progress?: DownloadProgress
-  error?: string | null
-  onRetry?: () => void
-}
+/** Leaf subscribe — progress pulses must not re-render Scripture / CombinedHelps. */
+export function DownloadIndicator() {
+  const [stats, setStats] = useState(() => backgroundDownloadSession.getStats())
+  useEffect(() => backgroundDownloadSession.subscribe(setStats), [])
 
-export function DownloadIndicator({ isDownloading, progress, error, onRetry }: DownloadIndicatorProps) {
+  const isDownloading = stats.isDownloading
+  const progress = stats.progress ?? undefined
+  const error = stats.error
+  const onRetry = () => {
+    backgroundDownloadSession.retryLastRun()
+  }
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -51,12 +57,16 @@ export function DownloadIndicator({ isDownloading, progress, error, onRetry }: D
 
   // Calculate progress values BEFORE conditional return (for useEffect dependencies)
   const useIngredients = progress?.totalIngredients !== undefined && progress.totalIngredients > 0
-  const completed = useIngredients
+  const rawCompleted = useIngredients
     ? (progress?.completedIngredients || 0)
     : (progress?.completedResources || 0)
-  const total = useIngredients
+  const rawTotal = useIngredients
     ? (progress?.totalIngredients || 0)
     : (progress?.totalResources || 0)
+  const { completed, total } = displayIngredientCounts({
+    completed: rawCompleted,
+    total: rawTotal,
+  })
   const failed = useIngredients
     ? (progress?.failedIngredients || 0)
     : (progress?.failedResources || 0)
@@ -65,6 +75,7 @@ export function DownloadIndicator({ isDownloading, progress, error, onRetry }: D
     completed,
     total,
     reportedOverall: progress?.overallProgress,
+    currentIngredient: progress?.currentIngredient,
   })
 
   const elapsedMs = startedAt != null ? now - startedAt : 0

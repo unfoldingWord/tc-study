@@ -8,6 +8,8 @@
 
 import type { AlignmentMap, UsjScriptureCacheContent } from '@bt-synergy/usj-processor'
 
+import { isUsjCacheVersionCompatible } from '@bt-synergy/usj-processor'
+
 import {
   usjScriptureChapterKey,
   usjScriptureKey,
@@ -16,7 +18,10 @@ import { isUsjScriptureCacheContent } from './usjCache'
 
 export type UsjChapterCache = {
   get(key: string): Promise<unknown>
+  getMany?(keys: string[]): Promise<Map<string, unknown>>
   set?(key: string, entry: unknown): Promise<void>
+  /** One IDB transaction for many keys (chapter SoT + thin book index). */
+  setMany?(items: Array<{ key: string; entry: unknown }>): Promise<void>
 }
 
 export type UsjScriptureBookIndex = {
@@ -63,6 +68,47 @@ function alignmentsForChapter(
   return subset
 }
 
+/** One scan of the book alignment map — not once per chapter. */
+function alignmentsByChapter(
+  alignmentMap: AlignmentMap | undefined,
+  bookCode: string
+): Map<number, AlignmentMap> {
+  const out = new Map<number, AlignmentMap>()
+  if (!alignmentMap) return out
+  const bookPrefix = `${bookCode} `.toLowerCase()
+  for (const [verseRef, groups] of Object.entries(alignmentMap)) {
+    const lower = verseRef.toLowerCase()
+    if (!lower.startsWith(bookPrefix)) continue
+    const rest = lower.slice(bookPrefix.length)
+    const colon = rest.indexOf(':')
+    if (colon <= 0) continue
+    const chapter = Number(rest.slice(0, colon))
+    if (!Number.isFinite(chapter)) continue
+    let subset = out.get(chapter)
+    if (!subset) {
+      subset = {}
+      out.set(chapter, subset)
+    }
+    subset[verseRef] = groups
+  }
+  return out
+}
+
+async function writeCacheEntries(
+  cache: UsjChapterCache,
+  items: Array<{ key: string; entry: unknown }>
+): Promise<void> {
+  if (items.length === 0) return
+  if (cache.setMany) {
+    await cache.setMany(items)
+    return
+  }
+  if (!cache.set) return
+  for (const item of items) {
+    await cache.set(item.key, item.entry)
+  }
+}
+
 function chapterNumbersFromBook(book: UsjScriptureCacheContent): number[] {
   if (book.chapters?.length) {
     return book.chapters.map((ch, i) => ch.number ?? i + 1)
@@ -72,7 +118,8 @@ function chapterNumbersFromBook(book: UsjScriptureCacheContent): number[] {
 
 export function buildUsjChapterContent(
   book: UsjScriptureCacheContent,
-  chapter: number
+  chapter: number,
+  alignmentSubset?: AlignmentMap
 ): UsjScriptureCacheContent | null {
   const slice = book.chapters?.find((ch) => (ch.number ?? 0) === chapter)
   if (!slice) return null
@@ -86,7 +133,8 @@ export function buildUsjChapterContent(
       version: book.usj?.version ?? '3.0',
       content: nodes,
     },
-    alignmentMap: alignmentsForChapter(book.alignmentMap, book.bookCode, chapter),
+    alignmentMap:
+      alignmentSubset ?? alignmentsForChapter(book.alignmentMap, book.bookCode, chapter),
     chapters: [{ number: chapter, content: nodes }],
   }
 }
@@ -129,36 +177,117 @@ function mergeChapterContents(
   }
 }
 
+async function existingChapterMap(
+  cache: UsjChapterCache,
+  keys: string[]
+): Promise<Map<string, unknown>> {
+  if (keys.length === 0) return new Map()
+  if (cache.getMany) return cache.getMany(keys)
+  const out = new Map<string, unknown>()
+  for (const key of keys) {
+    out.set(key, await cache.get(key))
+  }
+  return out
+}
+
+function existingChapterIsReusable(entry: unknown): boolean {
+  const hit = unwrapUsjEntry(entry)
+  if (!isUsjScriptureCacheContent(hit) || !(hit.usj || hit.chapters?.length)) return false
+  return isUsjCacheVersionCompatible(hit.metadata)
+}
+
 export async function writeUsjChapters(
   cache: UsjChapterCache,
   resourceKey: string,
   bookId: string,
   book: UsjScriptureCacheContent,
-  options?: { prioritize?: number[] }
+  options?: {
+    prioritize?: number[]
+    /** Write prioritize chapters, return; finish the rest without blocking first paint. */
+    deferRest?: boolean
+    onChapter?: (info: { chapter: number; written: number; total: number }) => void
+    /** Keep chapters that already have usable, version-compatible USJ. */
+    skipExisting?: boolean
+  }
 ): Promise<void> {
-  if (!cache.set) return
+  if (!cache.set && !cache.setMany) return
   const bookCode = bookId.toLowerCase()
   const numbers = chapterNumbersFromBook(book)
   const prioritize = options?.prioritize ?? []
+  const prioritySet = new Set(prioritize.filter((n) => numbers.includes(n)))
   const ordered = [
     ...prioritize.filter((n) => numbers.includes(n)),
     ...numbers.filter((n) => !prioritize.includes(n)),
   ]
+  const alignmentIndex = alignmentsByChapter(book.alignmentMap, book.bookCode)
+  const total = ordered.length
 
-  for (const chapter of ordered) {
-    const content = buildUsjChapterContent(book, chapter)
-    if (!content) continue
-    await cache.set(usjScriptureChapterKey(resourceKey, bookCode, chapter), wrapEntry(content, {
-      resourceKey,
-      bookId: bookCode,
-      chapter,
-    }))
+  const reusable = new Set<string>()
+  if (options?.skipExisting) {
+    const chapterKeys = ordered.map((chapter) =>
+      usjScriptureChapterKey(resourceKey, bookCode, chapter)
+    )
+    const existing = await existingChapterMap(cache, chapterKeys)
+    for (const key of chapterKeys) {
+      if (existingChapterIsReusable(existing.get(key))) reusable.add(key)
+    }
   }
 
-  await cache.set(
-    usjScriptureKey(resourceKey, bookCode),
-    wrapEntry(buildUsjBookIndex(book), { resourceKey, bookId: bookCode })
-  )
+  const entryFor = (chapter: number) => {
+    const content = buildUsjChapterContent(book, chapter, alignmentIndex.get(chapter))
+    if (!content) return null
+    const key = usjScriptureChapterKey(resourceKey, bookCode, chapter)
+    if (reusable.has(key)) return null
+    return {
+      key,
+      entry: wrapEntry(content, {
+        resourceKey,
+        bookId: bookCode,
+        chapter,
+      }),
+    }
+  }
+
+  const priorityItems: Array<{ key: string; entry: unknown }> = []
+  const restItems: Array<{ key: string; entry: unknown }> = []
+  for (const chapter of ordered) {
+    const item = entryFor(chapter)
+    if (!item) continue
+    if (prioritySet.has(chapter)) priorityItems.push(item)
+    else restItems.push(item)
+  }
+  restItems.push({
+    key: usjScriptureKey(resourceKey, bookCode),
+    entry: wrapEntry(buildUsjBookIndex(book), { resourceKey, bookId: bookCode }),
+  })
+
+  const notify = (chapters: number[], writtenBefore: number) => {
+    for (let i = 0; i < chapters.length; i++) {
+      options?.onChapter?.({
+        chapter: chapters[i]!,
+        written: writtenBefore + i + 1,
+        total,
+      })
+    }
+  }
+
+  const priorityChapters = ordered.filter((n) => prioritySet.has(n))
+  await writeCacheEntries(cache, priorityItems)
+  notify(priorityChapters, 0)
+
+  const writeRemaining = async (): Promise<void> => {
+    await writeCacheEntries(cache, restItems)
+    notify(
+      ordered.filter((n) => !prioritySet.has(n)),
+      priorityItems.length
+    )
+  }
+
+  if (options?.deferRest) {
+    void writeRemaining()
+    return
+  }
+  await writeRemaining()
 }
 
 async function migrateBookBlobToChapters(

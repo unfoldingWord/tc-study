@@ -288,7 +288,7 @@ export class BackgroundDownloadManager {
 
       // ✅ Mark resource as complete in cache metadata
       if (this.completenessChecker) {
-        await this.completenessChecker.markComplete(resourceKey, {
+        await this.completenessChecker.markCompleteIfVerified(resourceKey, {
           downloadMethod: method,
         })
       }

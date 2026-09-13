@@ -55,6 +55,14 @@ export function narrowExpectedToCataloged(
   return expectedResources.filter((key) => catalog.has(key))
 }
 
+/**
+ * Catalog getAll / completeness walks share IDB with worker `setMany`.
+ * Skip UI-thread walks while extract is in flight — enqueue waits until idle.
+ */
+export function shouldWalkUiIdbDuringExtract(isDownloading: boolean): boolean {
+  return !isDownloading
+}
+
 export function filterUncheckedResourceKeys(
   allResourceKeys: string[],
   processed: ReadonlySet<string>,

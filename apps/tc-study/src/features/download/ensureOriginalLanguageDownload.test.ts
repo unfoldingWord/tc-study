@@ -10,6 +10,8 @@ describe('shouldEnqueueOriginalLanguageDownload', () => {
         resourceKey: 'unfoldingWord/hbo/uhb',
       })
     ).toBe(true)
+    const src = readFileSync(join(import.meta.dir, 'ensureOriginalLanguageDownload.ts'), 'utf8')
+    expect(src).toContain('fallbackIngredientCount')
   })
 
   test('does not re-enqueue when already queued, complete, or busy', () => {

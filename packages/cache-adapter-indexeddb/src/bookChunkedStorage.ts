@@ -96,8 +96,13 @@ function isUsjScriptureEntry(entry: CacheEntry | Record<string, unknown>): boole
 }
 
 export function canSplitUsjScripture(key: string, entry: CacheEntry): boolean {
-  // First-class chapter keys (`…:{book}:{ch}`) must not be split again.
-  return key.startsWith('scripture-usj:') && !isChapterSubKey(key) && isUsjScriptureEntry(entry)
+  if (!key.startsWith('scripture-usj:')) return false
+  // First-class chapter keys (`…:{book}:{ch}`) and already-split rows must not
+  // be split again. A single-chapter payload is the chapter SoT, not a book blob.
+  if (isChapterSubKey(key)) return false
+  if (!isUsjScriptureEntry(entry)) return false
+  const chapters = ((entry.content ?? entry) as { chapters?: unknown[] }).chapters
+  return (chapters?.length ?? 0) > 1
 }
 
 /** WordAlignment has verseRef e.g. "TIT 1:1"; we split by chapter using bookCode + " " + ch + ":". */

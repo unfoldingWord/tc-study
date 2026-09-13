@@ -179,9 +179,30 @@ export class IndexedDBCacheAdapter {
   }
 
   async setMany(items: Array<{ key: string; entry: CacheEntry }>): Promise<void> {
-    for (const item of items) {
-      await this.set(item.key, item.entry)
-    }
+    if (items.length === 0) return
+    const db = await this.initDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.storeName, 'readwrite')
+      const store = tx.objectStore(this.storeName)
+      for (const { key, entry } of items) {
+        if (canSplitBookEntry(key, entry)) {
+          const { manifestEntry, chapterEntries, alignmentEntries } = splitBookEntry(key, entry)
+          store.put({ key, entry: manifestEntry })
+          for (const { key: chKey, entry: chEntry } of chapterEntries) {
+            store.put({ key: chKey, entry: chEntry })
+          }
+          if (alignmentEntries?.length) {
+            for (const { key: aKey, entry: aEntry } of alignmentEntries) {
+              store.put({ key: aKey, entry: aEntry })
+            }
+          }
+        } else {
+          store.put({ key, entry })
+        }
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
   }
   
   async getMany(keys: string[]): Promise<Map<string, CacheEntry>> {

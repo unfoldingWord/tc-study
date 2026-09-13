@@ -1,7 +1,7 @@
 /**
  * Shared TN / TWL / CombinedHelps filter scope chrome (token, verse, OBS quote, TA support-ref).
  * Renders TokenFilterBanner whenever a filter is active (including 0 matches).
- * Inline chip for ResourceViewerHeader actions — not a stacked extra row.
+ * Inline chip for compact CombinedHelps chrome / other viewer header actions.
  */
 
 import type {
@@ -23,6 +23,8 @@ export interface HelpsFilterBannersProps {
   onClearTokenFilter: () => void
   onClearVerseFilter: () => void
   onClearSupportRefFilter?: () => void
+  /** CombinedHelps compact chrome: chip only, no match count. */
+  hideCount?: boolean
 }
 
 export function HelpsFilterBanners({
@@ -36,6 +38,7 @@ export function HelpsFilterBanners({
   onClearTokenFilter,
   onClearVerseFilter,
   onClearSupportRefFilter,
+  hideCount = false,
 }: HelpsFilterBannersProps) {
   if (obsQuoteFilter) {
     return (
@@ -50,6 +53,7 @@ export function HelpsFilterBanners({
         }}
         displayLinksCount={displayCount}
         hasMatches={hasMatches}
+        hideCount={hideCount}
         onClearFilter={onClearObsQuoteFilter}
       />
     )
@@ -66,6 +70,7 @@ export function HelpsFilterBanners({
         }}
         displayLinksCount={displayCount}
         hasMatches={hasMatches}
+        hideCount={hideCount}
         onClearFilter={onClearSupportRefFilter ?? (() => undefined)}
       />
     )
@@ -77,6 +82,7 @@ export function HelpsFilterBanners({
         tokenFilter={tokenFilter}
         displayLinksCount={displayCount}
         hasMatches={hasMatches}
+        hideCount={hideCount}
         onClearFilter={onClearTokenFilter}
       />
     )
@@ -96,6 +102,7 @@ export function HelpsFilterBanners({
         }}
         displayLinksCount={displayCount}
         hasMatches={hasMatches}
+        hideCount={hideCount}
         onClearFilter={onClearVerseFilter}
       />
     )

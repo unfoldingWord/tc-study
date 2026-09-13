@@ -4,11 +4,17 @@ import {
   filterDisplayNotes,
   filterLinksByReferenceRange,
   filterNotesByReferenceRange,
+  filterSupportRefFallbackChunk,
   flattenBookNotes,
+  planSupportRefStreamChapters,
+  resolveHelpsTokenClickFilter,
   resolveRangeEndVerse,
+  reuseUnchangedSupportRefNotes,
   settleSupportRefDisplayNotes,
+  supportRefFirstPaintNotes,
   supportReferenceKey,
   supportReferencesMatch,
+  supportRefNotesForChapter,
 } from './helpsDisplayFilters'
 
 describe('filterNotesByReferenceRange', () => {
@@ -108,6 +114,72 @@ describe('filterDisplayNotes', () => {
     })
     expect(hasNoteMatches).toBe(false)
     expect(displayNotes).toHaveLength(1)
+  })
+
+  test('ULT English token matches Hebrew quote via folded aligned ids (Psalms)', () => {
+    const pointed = 'יִדֳּפֶנּוּ'
+    const unpointed = pointed.normalize('NFD').replace(/\p{M}/gu, '')
+    const psaNotes = [
+      {
+        id: 'psa-1-4-chaff',
+        reference: '1:4',
+        quote: pointed,
+        occurrence: '1',
+        quoteTokens: [{ text: unpointed }],
+        semanticIds: [`psa 1:4:${unpointed}:1`],
+      },
+      {
+        id: 'psa-1-1-blessed',
+        reference: '1:1',
+        quote: 'אַשְׁרֵי',
+        occurrence: '1',
+        quoteTokens: [{ text: 'אַשְׁרֵי' }],
+        semanticIds: ['psa 1:1:אשרי:1'],
+      },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(psaNotes, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: {
+        semanticId: 'psa 1:4:chasses:1',
+        content: 'chasses',
+        alignedSemanticIds: [`psa 1:4:${pointed}:1`],
+        timestamp: 1,
+      },
+      bookCodeLower: 'psa',
+    })
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['psa-1-4-chaff'])
+  })
+
+  test('token click ids match notes that only have cached semanticIds (no quoteTokens)', () => {
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(
+      [
+        {
+          id: 'n-align',
+          reference: '1:4',
+          quote: 'כַּמֹּץ',
+          occurrence: '1',
+          semanticIds: ['psa 1:4:כמץ:1'],
+          alignedTokens: [{ semanticId: 'psa 1:4:chasses:1', content: 'chasses' }],
+        },
+      ],
+      {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: null,
+        tokenFilter: {
+          semanticId: 'psa 1:4:chasses:1',
+          content: 'chasses',
+          alignedSemanticIds: ['psa 1:4:כמץ:1'],
+          timestamp: 1,
+        },
+        bookCodeLower: 'psa',
+      }
+    )
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['n-align'])
   })
 
   test('token filter without fallback returns empty when no match', () => {
@@ -216,6 +288,51 @@ describe('supportReferenceKey', () => {
   })
 })
 
+describe('supportRefFirstPaintNotes', () => {
+  const metaphor = 'rc://*/ta/man/translate/figs-metaphor'
+  const bookNotes = [
+    { id: 'psa-1', reference: '1:3', supportReference: metaphor, quote: 'like a tree' },
+    { id: 'psa-2', reference: '2:1', supportReference: metaphor, quote: 'why rage' },
+    { id: 'psa-150', reference: '150:1', supportReference: metaphor, quote: 'praise' },
+    { id: 'other', reference: '1:4', supportReference: 'rc://*/ta/man/translate/figs-doublet' },
+  ]
+
+  test('first paint is current-chapter matches only — no book flatten', () => {
+    const first = supportRefFirstPaintNotes(bookNotes, metaphor, 1)
+    expect(first.map((n) => n.id)).toEqual(['psa-1'])
+    expect(planSupportRefStreamChapters({ '1': [bookNotes[0]], '2': [bookNotes[1]], '150': [bookNotes[2]] }, 1)).toEqual([
+      2, 150,
+    ])
+  })
+
+  test('current-chapter notes settle from passage align without book quotes', () => {
+    const first = supportRefFirstPaintNotes(bookNotes, metaphor, 1)
+    const aligned = new Map([
+      [
+        'psa-1',
+        {
+          ...first[0]!,
+          quoteTokens: [{ text: 'like', id: 1 }],
+          quoteStatus: 'aligned',
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(first, metaphor, aligned)
+    expect(settled).toHaveLength(1)
+    expect(settled[0]!.quoteStatus).toBe('aligned')
+    expect(settled[0]!.quoteTokens).toEqual([{ text: 'like', id: 1 }])
+  })
+
+  test('chapter notes filter does not require other chapters', () => {
+    expect(
+      supportRefNotesForChapter([{ id: 'a', supportReference: metaphor }], metaphor).map((n) => n.id)
+    ).toEqual(['a'])
+    expect(
+      filterSupportRefFallbackChunk(bookNotes, metaphor, 1, new Set(['psa-1'])).map((n) => n.id)
+    ).toEqual(['psa-2', 'psa-150'])
+  })
+})
+
 describe('flattenBookNotes', () => {
   test('prefers the longer flat notes array when chapter map is incomplete', () => {
     const byChapter = { '1': [{ id: 'a' }, { id: 'b' }] }
@@ -261,7 +378,7 @@ describe('settleSupportRefDisplayNotes', () => {
     expect(settled[1]!.quoteStatus).toBe('none')
   })
 
-  test('uses ol-fallback for quoted notes that are not in the passage align set', () => {
+  test('quoted notes without enrichment show OL fallback with warm-pending icon', () => {
     const book = [
       {
         id: 'n2',
@@ -275,6 +392,7 @@ describe('settleSupportRefDisplayNotes', () => {
       new Map()
     )
     expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBe(true)
   })
 
   test('merges IndexedDB / align enrichment when passage align is missing', () => {
@@ -344,6 +462,59 @@ describe('settleSupportRefDisplayNotes', () => {
     )
     expect(settled[0]!.semanticIds).toEqual(['tit 2:11:men:1'])
     expect(settled[0]!.quoteStatus).toBe('aligned')
+  })
+})
+
+describe('reuseUnchangedSupportRefNotes', () => {
+  test('keeps object identity when quote fields are unchanged', () => {
+    const first = {
+      id: 'n1',
+      supportReference: 'rc://*/ta/man/translate/figs-metaphor',
+      quote: 'a',
+      quoteStatus: 'ol-fallback',
+    }
+    const next = [{ ...first }, { id: 'n2', quote: 'b', quoteStatus: 'ol-fallback' }]
+    const reused = reuseUnchangedSupportRefNotes(next, [first])
+    expect(reused[0]).toBe(first)
+    expect(reused[1]).toBe(next[1])
+  })
+})
+
+describe('resolveHelpsTokenClickFilter', () => {
+  test('covered scripture click sets semantic + aligned filter ids', () => {
+    const filter = resolveHelpsTokenClickFilter(
+      {
+        semanticId: 'psa 1:4:chasses:1',
+        content: 'chasses',
+        alignedSemanticIds: ['psa 1:4:יִדֳּפֶנּוּ:1'],
+        hasHelpsCoverage: true,
+      },
+      42
+    )
+    expect(filter).toEqual({
+      semanticId: 'psa 1:4:chasses:1',
+      content: 'chasses',
+      alignedSemanticIds: ['psa 1:4:יִדֳּפֶנּוּ:1'],
+      timestamp: 42,
+    })
+  })
+
+  test('uncovered click does not set a token filter', () => {
+    expect(
+      resolveHelpsTokenClickFilter(
+        {
+          semanticId: 'psa 1:1:the:1',
+          content: 'the',
+          alignedSemanticIds: [],
+          hasHelpsCoverage: false,
+        },
+        1
+      )
+    ).toBeUndefined()
+  })
+
+  test('null token clears the filter', () => {
+    expect(resolveHelpsTokenClickFilter(null, 1)).toBeNull()
   })
 })
 

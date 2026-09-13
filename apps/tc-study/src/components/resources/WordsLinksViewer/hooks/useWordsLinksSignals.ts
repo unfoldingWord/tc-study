@@ -13,7 +13,11 @@ import type {
   TokenClickSignal,
   VerseFilterSignal,
 } from '../../../../signals/studioSignals'
-import type { ObsQuoteFilter, VerseFilterState } from '../../../../features/helps/helpsDisplayFilters'
+import {
+  resolveHelpsTokenClickFilter,
+  type ObsQuoteFilter,
+  type VerseFilterState,
+} from '../../../../features/helps/helpsDisplayFilters'
 import type { TokenFilter } from '../types'
 import type { LinkWithAlignments } from './useWordsLinksPipeline'
 
@@ -82,18 +86,14 @@ export function useWordsLinksSignals({
     useCallback(
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
-        if (signal.token === null) {
+        const nextFilter = resolveHelpsTokenClickFilter(signal.token, signal.timestamp)
+        if (nextFilter === undefined) return
+        if (nextFilter === null) {
           setTokenFilter(null)
           setSelectedLink(null)
           return
         }
-        if (signal.token.hasHelpsCoverage === false) return
-        setTokenFilter({
-          semanticId: signal.token.semanticId,
-          content: signal.token.content,
-          alignedSemanticIds: signal.token.alignedSemanticIds || [],
-          timestamp: signal.timestamp,
-        })
+        setTokenFilter(nextFilter)
         setVerseFilter(null)
         setSelectedLink(null)
       },

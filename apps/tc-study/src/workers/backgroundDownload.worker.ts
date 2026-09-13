@@ -21,16 +21,20 @@
 
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
-import { CatalogManager } from '@bt-synergy/catalog-manager'
+import { CatalogManager } from '@bt-synergy/catalog-manager/core'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { compareDownloadBatchOrder } from '../features/download/downloadBatchOrder'
 import {
   STARTING_PROGRESS_PERCENT,
-  advanceResourceIngredientProgress,
   computeInFlightOverallProgress,
   createInitialDownloadProgress,
+  fallbackIngredientCount,
+  mapLoaderProgressToResource,
   RESOURCE_DOWNLOAD_TIMEOUT_MS,
+  resolveRunIngredientTotal,
+  shouldSkipCompleteResourceDownload,
+  skippedCompleteResourceProgress,
   withResourceDownloadTimeout,
 } from '../features/download/backgroundDownloadRun'
 import { registerWorkerLoaders } from '../features/download/workerLoaderRegistry'
@@ -291,9 +295,10 @@ async function downloadSpecificResources(
     ingredientsCount: number
   }> = []
 
-  // Use provided total if available, otherwise calculate it
-  let totalIngredients = providedTotalIngredients || 0
-  const needsCalculation = !providedTotalIngredients
+  // Catalog estimate (UHB 39 + 1 per unknown resource) is a floor only.
+  // Always sum discovered metadata counts so skip/extract cannot climb past
+  // a frozen 50 while ULT/UST/UHB credit real books.
+  const discoveredCounts: number[] = []
 
   for (const resourceKey of resourceKeys) {
     try {
@@ -311,14 +316,10 @@ async function downloadSpecificResources(
       const resourceType = downloadManager['resourceTypeRegistry'].get(metadata.type)
       const priority = resourceType?.downloadPriority ?? 50
 
-      // Count ingredients (books/entries) for this resource
+      // Count ingredients (books/entries). UHB/UGNT fall back to 39/27, not 1.
       const ingredients = metadata.contentMetadata?.ingredients || []
-      const ingredientsCount = ingredients.length || 1 // Default to 1 if no ingredients
-
-      // Only calculate if not provided from main thread
-      if (needsCalculation) {
-        totalIngredients += ingredientsCount
-      }
+      const ingredientsCount = fallbackIngredientCount(resourceKey, ingredients.length)
+      discoveredCounts.push(ingredientsCount)
 
       resourcesWithPriority.push({
         resourceKey,
@@ -330,6 +331,11 @@ async function downloadSpecificResources(
       console.error(`[BG-DL] ⚙️ Worker Failed to get metadata for ${resourceKey}:`, error)
     }
   }
+
+  const totalIngredients = resolveRunIngredientTotal({
+    providedTotal: providedTotalIngredients,
+    discoveredCounts,
+  })
 
   // OL scripture (UGNT/UHB) before TN (priority 1), then SoT priority
   resourcesWithPriority.sort((a, b) =>
@@ -346,8 +352,6 @@ async function downloadSpecificResources(
       }
     )
   )
-
-  const _ingredientsSource = providedTotalIngredients ? 'pre-calculated' : 'calculated in worker'
 
   // Track ingredient-level progress
   let completedIngredients = 0
@@ -465,25 +469,21 @@ async function downloadSpecificResources(
       }) => {
         if (runId !== activeRunId) return
 
-        // Calculate how many ingredients completed for THIS resource so far
-        currentResourcePeakCompleted = advanceResourceIngredientProgress(
+        // Zip bytes move current-resource % only. Written books increment the count.
+        const mapped = mapLoaderProgressToResource({
           ingredientsCount,
-          currentResourcePeakCompleted,
-          progress
-        )
+          peakCompleted: currentResourcePeakCompleted,
+          progress,
+        })
+        currentResourcePeakCompleted = mapped.writtenInResource
 
-        // Overall progress = prior resources + this resource's zip/extract share
         const currentTotalCompleted = completedIngredients + currentResourcePeakCompleted
-        const fromPeakPercent =
-          ingredientsCount > 0
-            ? (currentResourcePeakCompleted / ingredientsCount) * 100
-            : 0
 
         const overallProgress = computeInFlightOverallProgress({
           completedIngredients,
           totalIngredients,
           currentResourceIngredients: ingredientsCount,
-          currentResourcePercent: Math.max(progress.percentage ?? 0, fromPeakPercent),
+          currentResourcePercent: mapped.currentResourcePercent,
         })
 
         // Extract current ingredient name from progress callback
@@ -513,6 +513,41 @@ async function downloadSpecificResources(
         })
       }
 
+      if (skipExisting && completenessChecker) {
+        const status = await completenessChecker.checkResource(resourceKey)
+        if (shouldSkipCompleteResourceDownload(skipExisting, status.isComplete)) {
+          const skipped = skippedCompleteResourceProgress(ingredientsCount, resourceKey)
+          onProgress(skipped)
+          completedIngredients += ingredientsCount
+          completedResourceCount++
+          const task = downloadManager['tasks'].get(resourceKey)
+          if (task) {
+            task.status = 'completed'
+            task.progress = 100
+          }
+          postIngredientProgress({
+            currentResource: resourceKey,
+            currentIngredient: null,
+            completedIngredients,
+            failedIngredients,
+            completedResources: completedResourceCount,
+            failedResources: failedResourceCount,
+            overallProgress:
+              totalIngredients > 0
+                ? Math.round((completedIngredients / totalIngredients) * 100)
+                : 0,
+          })
+          if (runId === activeRunId) {
+            postMessage({
+              type: 'resource-complete',
+              runId,
+              payload: { resourceKey },
+            })
+          }
+          continue
+        }
+      }
+
       // Get the loader for this resource
       const loader = downloadManager['loaderRegistry'].getLoaderForResource(metadata)
 
@@ -533,18 +568,16 @@ async function downloadSpecificResources(
         message: `Downloading ${resourceKey.split('/').pop() ?? resourceKey}`,
       })
 
-      // Download the resource — skip if zip/body hang exceeds the wall clock
-      await withResourceDownloadTimeout(
-        loader.downloadResource(
-          resourceKey,
-          {
-            method,
-            skipExisting
-          },
-          onProgress
-        ),
-        RESOURCE_DOWNLOAD_TIMEOUT_MS,
-        resourceKey
+      // Zip+USJ of UHB can exceed RESOURCE_DOWNLOAD_TIMEOUT_MS; zip idle
+      // abort + main-thread stall watchdog cover hangs. Do not wall-clock
+      // the whole resource (that killed in-flight Hebrew books at 1%).
+      await loader.downloadResource(
+        resourceKey,
+        {
+          method,
+          skipExisting
+        },
+        onProgress
       )
 
       // ✅ IMPORTANT: Update counts BEFORE marking as completed
@@ -572,7 +605,7 @@ async function downloadSpecificResources(
 
       // ✅ Mark as complete in cache (so it won't be re-downloaded)
       if (completenessChecker) {
-        await completenessChecker.markComplete(resourceKey, {
+        await completenessChecker.markCompleteIfVerified(resourceKey, {
           downloadMethod: method
         })
       }
@@ -649,6 +682,14 @@ async function downloadSpecificResources(
 // ============================================================================
 // ERROR HANDLING
 // ============================================================================
+
+// Isolate is alive (imports finished). Main thread cancels the 12s
+// ready fallback so we do not double-download on this thread.
+try {
+  postMessage({ type: 'ready', runId: 0 })
+} catch {
+  /* ignore */
+}
 
 self.onerror = (event: string | Event) => {
   console.error('[BG-DL] ⚙️ Worker Unhandled error:', event)

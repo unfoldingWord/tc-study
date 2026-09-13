@@ -18,6 +18,14 @@ describe('IndexedDBCacheAdapter.getByPrefix', () => {
     expect(typeof adapter.getByPrefix).toBe('function')
   })
 
+  test('setMany is a single-transaction batch (not a loop of set)', () => {
+    const adapter = new IndexedDBCacheAdapter({ dbName: 'test-setMany' })
+    expect(typeof adapter.setMany).toBe('function')
+    const src = adapter.setMany.toString()
+    expect(src).toContain('transaction')
+    expect(src).not.toContain('await this.set')
+  })
+
   test('prefix range includes logical key and chapter sub-keys', () => {
     const keys = [
       'scripture-usj:u/en/ult:tit',

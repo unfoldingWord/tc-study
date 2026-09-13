@@ -166,7 +166,7 @@ Warm is CPU against **already downloaded** SoT. Download is network. They share 
 
 Lane 2 skips the current chapter of **visible** TN/TWL (lane 1 owns it) and skips open+adjacent prepare for visible scripture. Visible-first, then other text-lang scripture, then helps-lang TN/TWL.
 
-**Download badge ≠ warm.** `DownloadIndicator` reads `backgroundDownloadSession` progress (zip %). A 100% badge means SoT is on disk, not that `prepared:` / `helps-quote:` / `helps-align:` exist.
+**Download badge ≠ warm.** `DownloadIndicator` reads `backgroundDownloadSession` progress. `N / total` is books (ingredients) written this run, not zip bytes. A 100% badge means this run’s extract+cache is on disk, not that `prepared:` / `helps-quote:` / `helps-align:` exist. Zip-byte % may move the current-resource bar while the count stays below the resource’s book total.
 
 ### Admission (`canAdmitBackgroundLanes`)
 
@@ -271,7 +271,7 @@ If `dedicatedWorker` is false, lane 2/3 jobs are on prepare.worker (`warm-job`).
 
 ### DownloadIndicator
 
-Header download icon + percent. It is **only** zip progress (`isDownloading`, `overallProgress`, current resource/ingredient). It does not move when warm writes `helps-quote:` or `prepared:`. After 100%, expect `resource-complete` → warm admission (once lane 1 is drained and scroll is settled).
+Header download icon + percent. Zip-byte % can move the bar for the current resource; `completedIngredients` increments when a book is written. It does not move when warm writes `helps-quote:` or `prepared:`. After 100%, expect `resource-complete` → warm admission (once lane 1 is drained and scroll is settled).
 
 ---
 

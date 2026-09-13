@@ -3,6 +3,7 @@
  * Completeness for gateway panes often omits hbo / el-x-koine.
  */
 
+import { fallbackIngredientCount } from './backgroundDownloadRun'
 import { backgroundDownloadSession } from './backgroundDownloadSession'
 
 export function shouldEnqueueOriginalLanguageDownload(args: {
@@ -34,5 +35,8 @@ export function enqueueOriginalLanguageDownload(resourceKey: string): boolean {
   ) {
     return false
   }
-  return backgroundDownloadSession.startDownload([resourceKey])
+  return backgroundDownloadSession.startDownload(
+    [resourceKey],
+    fallbackIngredientCount(resourceKey)
+  )
 }

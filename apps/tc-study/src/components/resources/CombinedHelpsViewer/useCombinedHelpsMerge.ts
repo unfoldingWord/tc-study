@@ -25,6 +25,7 @@ export type NoteWithAlignments = TranslationNote & {
   alignedTokens?: Array<{ position: number }>
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
+  quoteWarmPending?: boolean
   /** Precomputed markdown AST from prepared notes rows. */
   bodyHast?: HastRoot
 }

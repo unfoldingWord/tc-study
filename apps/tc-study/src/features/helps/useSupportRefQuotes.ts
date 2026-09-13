@@ -1,289 +1,359 @@
 /**
- * Support-ref book filter: hydrate quote tokens from IndexedDB, warm misses,
- * then align against target scripture for the chapters in the match set.
+ * Support-ref book filter: hydrate quote + align from IndexedDB, chapter-first.
+ * First paint is cache-only for the focus chapter. Misses enqueue quote-chapter
+ * and align-chapter on prepare/warm lane 2 — no main-thread batchAlign.
  */
 
-import type { OptimizedToken, TranslationNote } from '@bt-synergy/resource-parsers'
-import type { ScriptureLoader } from '@bt-synergy/scripture-loader'
-import { extractUsjBroadcastTokens } from '@bt-synergy/scripture-loader'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import type { TranslationNote } from '@bt-synergy/resource-parsers'
+import { useEffect, useRef, useState } from 'react'
 import {
   useCacheAdapter,
   useCatalogManager,
-  useLoaderRegistry,
 } from '../../contexts'
 import { scheduleIdle } from '../../utils/scheduleIdle'
-import { batchAlignLinks } from './batchAlignLinks'
-import type { HelpsQuoteStatus } from './resolveHelpsQuoteStatus'
+import { subscribePrepareWarmDone } from '../../workers/prepareClient'
+import { subscribeWarmDone } from '../../workers/warmClient'
 import {
-  readCachedQuoteTokensForChapters,
+  readCachedAlignments,
+  subtractCachedAlignHits,
+  type CachedAlignments,
+  type HelpsAlignCacheAdapter,
+} from './helpsAlignCache'
+import {
+  readCachedQuoteTokens,
   subtractCachedQuoteHits,
-  type CachedQuoteToken,
   type HelpsQuoteCacheAdapter,
 } from './helpsQuoteCache'
 import {
-  noteToPseudoLink,
+  planSupportRefStreamChapters,
+  supportRefNotesForChapter,
+} from './helpsDisplayFilters'
+import { readPreparedUnit } from '../prepare/prepareCache'
+import { extractPreparedBroadcastTokens } from '../scripture/extractPreparedBroadcastTokens'
+import {
+  SCRIPTURE_PREPARE_VERSION,
+  type ScriptureFullChapter,
+} from '../scripture/scripturePreparer'
+import { reconstructAlignFromPositions } from './reconstructAlignFromPositions'
+import { languageFromKey } from '../warm/warmResourceClass'
+import { warmScheduler } from '../warm/warmScheduler'
+import type { WarmJob } from '../warm/warmTypes'
+import {
+  cachedQuoteTokensToOptimized,
+  enrichmentFromCachedQuotes,
+  isSupportRefPrepareJobFor,
+  isSupportRefWarmJobFor,
+  paintSupportRefQuoteEnrichment,
+  planSupportRefQuoteWarmJobs,
+  supportRefWarmJobChapter,
+  type SupportRefQuoteEnrichment,
+} from './supportRefQuotePaint'
+import {
+  resolveHelpsAlignCacheCtx,
   resolveHelpsQuoteCacheCtx,
-  warmChapterQuotes,
 } from './useWarmAdjacentHelpsQuotes'
 
-export type SupportRefQuoteEnrichment = {
-  quoteTokens?: OptimizedToken[]
-  alignedTokens?: Array<{
-    position: number
-    content: string
-    type?: string
-    semanticId?: string
-  }>
-  semanticIds?: string[]
-  quoteStatus: HelpsQuoteStatus
+export type { SupportRefQuoteEnrichment } from './supportRefQuotePaint'
+export { enrichmentFromCachedQuotes }
+
+export function supportRefQuoteSessionKey(args: {
+  enabled: boolean
+  tnKey: string
+  bookId: string
+  supportReference: string
+  focusChapter: number
+}): string {
+  if (!args.enabled) return ''
+  return [args.tnKey, args.bookId, args.supportReference, args.focusChapter].join('|')
 }
 
-function chapterOfReference(reference: string): number {
-  const n = parseInt(reference.split(':')[0] || '1', 10)
-  return Number.isFinite(n) && n > 0 ? n : 1
-}
+type QuoteAlignCache = HelpsQuoteCacheAdapter & HelpsAlignCacheAdapter
 
-function chaptersOfNotes(notes: readonly { reference: string }[]): number[] {
-  const set = new Set<number>()
-  for (const note of notes) set.add(chapterOfReference(note.reference))
-  return [...set].sort((a, b) => a - b)
-}
-
-function cachedToOptimized(tokens: CachedQuoteToken[]): OptimizedToken[] {
-  return tokens.map((t) => ({
-    id: t.id,
-    text: t.text,
-    type: t.type,
-    occurrence: t.occurrence,
-    content: t.content,
-  })) as OptimizedToken[]
+function chapterNotes(
+  notesByChapter: Record<string, TranslationNote[]> | null | undefined,
+  chapter: number,
+  supportReference: string
+): TranslationNote[] {
+  return supportRefNotesForChapter(notesByChapter?.[String(chapter)] ?? [], supportReference)
 }
 
 export function useSupportRefQuotes(args: {
   enabled: boolean
-  notes: TranslationNote[]
+  notesByChapter?: Record<string, TranslationNote[]> | null
+  supportReference: string
   tnKey: string
   bookId: string
-  /** Catalog key for the target scripture (e.g. unfoldingWord/en/ult). */
-  targetScriptureKey?: string
-  /** Align this chapter first; other match chapters wait for idle. */
   focusChapter?: number
+  targetKey?: string | null
 }): Map<string, SupportRefQuoteEnrichment> {
-  const { enabled, notes, tnKey, bookId, targetScriptureKey = '', focusChapter } = args
-  const cache = useCacheAdapter() as HelpsQuoteCacheAdapter | null
+  const {
+    enabled,
+    notesByChapter,
+    supportReference,
+    tnKey,
+    bookId,
+    focusChapter = 1,
+    targetKey = '',
+  } = args
+  const cache = useCacheAdapter() as QuoteAlignCache | null
   const catalogManager = useCatalogManager()
-  const loaderRegistry = useLoaderRegistry()
 
-  const notesKey = useMemo(
-    () =>
-      enabled && notes.length
-        ? notes
-            .map((n) => n.id)
-            .sort()
-            .join(',')
-        : '',
-    [enabled, notes]
-  )
+  const sessionKey = supportRefQuoteSessionKey({
+    enabled,
+    tnKey,
+    bookId,
+    supportReference,
+    focusChapter,
+  })
 
   const [enrichment, setEnrichment] = useState<Map<string, SupportRefQuoteEnrichment>>(
     () => new Map()
   )
   const genRef = useRef(0)
-  const notesRef = useRef(notes)
-  notesRef.current = notes
+  const paintedSessionRef = useRef('')
+  const plannedJobsRef = useRef(new Map<string, WarmJob>())
+  const pendingByChapterRef = useRef(new Map<number, Set<string>>())
+  const notesByChapterRef = useRef(notesByChapter)
+  notesByChapterRef.current = notesByChapter
 
   useEffect(() => {
-    if (!enabled || !notesKey || !tnKey || !bookId || !cache || !catalogManager) {
+    if (!enabled || !sessionKey || !tnKey || !bookId || !cache || !catalogManager || !supportReference) {
       return
     }
-    const notes = notesRef.current
 
     const gen = ++genRef.current
     const bookCode = bookId.toUpperCase()
-    const chapters = chaptersOfNotes(notes)
+    const bookIdNorm = bookId.toLowerCase()
+    const focus = focusChapter > 0 ? focusChapter : 1
+    const target = targetKey || ''
+    const isNewSession = paintedSessionRef.current !== sessionKey
+    paintedSessionRef.current = sessionKey
     let cancelIdle: (() => void) | undefined
-    let cancelAlignIdle: (() => void) | undefined
+    let unsubWarm: (() => void) | undefined
+    let unsubPrepare: (() => void) | undefined
+    let unsubSched: (() => void) | undefined
+
+    const markJobs = (jobs: WarmJob[]) => {
+      for (const job of jobs) {
+        plannedJobsRef.current.set(job.jobKey, job)
+        const chapter = supportRefWarmJobChapter(job.jobKey)
+        if (!chapter) continue
+        const set = pendingByChapterRef.current.get(chapter) ?? new Set<string>()
+        set.add(job.jobKey)
+        pendingByChapterRef.current.set(chapter, set)
+      }
+    }
+
+    const flushPlanned = async () => {
+      if (plannedJobsRef.current.size === 0) return
+      warmScheduler.notifyLane1Drained()
+      for (const job of plannedJobsRef.current.values()) {
+        try {
+          await warmScheduler.enqueue(job)
+        } catch {
+          /* lane 2 may defer until drained */
+        }
+      }
+    }
+
+    const hydrateChapter = async (chapter: number, merge: boolean) => {
+      const notes = chapterNotes(notesByChapterRef.current, chapter, supportReference)
+      const quoteCtx = await resolveHelpsQuoteCacheCtx(catalogManager, tnKey, bookCode)
+      if (gen !== genRef.current || !quoteCtx) return { quoteMisses: [] as TranslationNote[], alignMisses: [] as TranslationNote[] }
+
+      const alignCtx = target
+        ? await resolveHelpsAlignCacheCtx(catalogManager, tnKey, target, bookCode)
+        : null
+
+      const cachedQuotes = await readCachedQuoteTokens(cache, {
+        helpsKey: tnKey,
+        helpsStamp: quoteCtx.helpsStamp,
+        olKey: quoteCtx.olKey,
+        olStamp: quoteCtx.olStamp,
+        book: bookCode,
+        chapter,
+      })
+      const quoted = notes.filter((n) => n.quote?.trim())
+      const { hits: quoteHits, misses: quoteMisses } = subtractCachedQuoteHits(
+        quoted,
+        cachedQuotes ?? {}
+      )
+
+      let cachedAlign: CachedAlignments | null = null
+      let alignMisses: TranslationNote[] = target ? quoted : []
+      const reconstructed = new Map<
+        string,
+        {
+          alignedTokens?: SupportRefQuoteEnrichment['alignedTokens']
+          semanticIds?: string[]
+        }
+      >()
+
+      if (alignCtx && target) {
+        cachedAlign = await readCachedAlignments(cache, {
+          helpsKey: tnKey,
+          helpsStamp: alignCtx.helpsStamp,
+          olKey: alignCtx.olKey,
+          olStamp: alignCtx.olStamp,
+          targetKey: target,
+          targetStamp: alignCtx.targetStamp,
+          book: bookCode,
+          chapter,
+        })
+        const sub = subtractCachedAlignHits(quoted, cachedAlign ?? {})
+        alignMisses = sub.misses
+        if (sub.hits.size) {
+          const full = await readPreparedUnit<ScriptureFullChapter>(
+            cache,
+            'scripture',
+            target,
+            bookCode,
+            chapter,
+            'full',
+            SCRIPTURE_PREPARE_VERSION
+          )
+          if (full && gen === genRef.current) {
+            const tokens = extractPreparedBroadcastTokens(
+              bookCode.toLowerCase(),
+              chapter,
+              full,
+              1,
+              999
+            )
+            for (const note of quoted) {
+              const row = sub.hits.get(note.id)
+              if (!row) continue
+              const verse = parseInt(String(note.reference).split(':')[1] || '1', 10)
+              const qt = quoteHits.get(note.id)
+              const result = reconstructAlignFromPositions({
+                targetTokens: tokens as never,
+                quoteTokens: qt?.length ? cachedQuoteTokensToOptimized(qt) : undefined,
+                origWords: note.quote,
+                occurrence: note.occurrence,
+                bookCode: bookCode.toLowerCase(),
+                chapter,
+                verse,
+                row,
+              })
+              reconstructed.set(note.id, {
+                alignedTokens: result.alignedTokens,
+                semanticIds: result.semanticIds,
+              })
+            }
+          }
+        }
+      }
+
+      const jobsPending = (pendingByChapterRef.current.get(chapter)?.size ?? 0) > 0
+      const painted = paintSupportRefQuoteEnrichment({
+        notes,
+        quoteHits,
+        reconstructedById: reconstructed,
+        alignCacheKnown: cachedAlign !== null,
+        warmInFlight:
+          jobsPending || quoteMisses.length > 0 || (Boolean(target) && alignMisses.length > 0),
+      })
+      if (gen !== genRef.current) return { quoteMisses, alignMisses }
+      setEnrichment((prev) => {
+        if (!merge || prev.size === 0) return painted
+        const next = new Map(prev)
+        for (const [id, row] of painted) next.set(id, row)
+        return next
+      })
+      return { quoteMisses, alignMisses }
+    }
+
+    const enqueueChapterMisses = async (
+      chapter: number,
+      quoteMisses: TranslationNote[],
+      alignMisses: TranslationNote[]
+    ) => {
+      const quoteCtx = await resolveHelpsQuoteCacheCtx(catalogManager, tnKey, bookCode)
+      if (gen !== genRef.current || !quoteCtx) return
+      const alignCtx = target
+        ? await resolveHelpsAlignCacheCtx(catalogManager, tnKey, target, bookCode)
+        : null
+      const jobs = planSupportRefQuoteWarmJobs({
+        helpsKey: tnKey,
+        bookId: bookIdNorm,
+        languageCode: languageFromKey(tnKey),
+        quoteMissChapters: quoteMisses.length ? [chapter] : [],
+        alignMissChapters: alignMisses.length ? [chapter] : [],
+        helpsStamp: quoteCtx.helpsStamp,
+        olKey: quoteCtx.olKey,
+        olStamp: quoteCtx.olStamp,
+        targetKey: target || undefined,
+        targetStamp: alignCtx?.targetStamp,
+        textLanguage: target ? languageFromKey(target) : undefined,
+      })
+      if (jobs.length === 0) return
+      markJobs(jobs)
+      await flushPlanned()
+    }
 
     void (async () => {
-      const cacheCtx = await resolveHelpsQuoteCacheCtx(catalogManager, tnKey, bookCode)
-      if (gen !== genRef.current || !cacheCtx) return
+      const focusResult = await hydrateChapter(focus, !isNewSession)
+      if (gen !== genRef.current) return
+      if (focusResult) {
+        await enqueueChapterMisses(focus, focusResult.quoteMisses, focusResult.alignMisses)
+      }
 
-      const cached = await readCachedQuoteTokensForChapters(cache, {
-        helpsKey: tnKey,
-        helpsStamp: cacheCtx.helpsStamp,
-        olKey: cacheCtx.olKey,
-        olStamp: cacheCtx.olStamp,
-        book: bookCode,
-        chapters,
-      })
-
-      const quoted = notes.filter((n) => n.quote?.trim())
-      const { hits, misses } = subtractCachedQuoteHits(quoted, cached)
-
-      const applyQuotes = async (tokensById: Map<string, CachedQuoteToken[]>) => {
-        if (gen !== genRef.current) return
-
-        const quoteMap = new Map<string, OptimizedToken[]>()
-        for (const [id, toks] of tokensById) {
-          if (toks.length) quoteMap.set(id, cachedToOptimized(toks))
-        }
-
-        // Immediate paint: cached quotes → ol-fallback until align finishes.
-        const next = new Map<string, SupportRefQuoteEnrichment>()
-        for (const note of notes) {
-          const qt = quoteMap.get(note.id)
-          if (qt?.length) {
-            next.set(note.id, { quoteTokens: qt, quoteStatus: 'ol-fallback' })
-          } else if (!note.quote?.trim()) {
-            next.set(note.id, { quoteStatus: 'none' })
-          } else {
-            next.set(note.id, { quoteStatus: 'ol-fallback' })
-          }
-        }
-        setEnrichment(new Map(next))
-
-        // First paint is titles + cached quotes. Align only the focus chapter
-        // now; remaining Psalms-scale chapters wait for idle so lane 1 wins.
-        const loader = loaderRegistry?.getLoader('scripture') as ScriptureLoader | undefined
-        const scriptureKey = String(targetScriptureKey || '')
-        if (!loader || typeof loader.loadViewModel !== 'function' || !scriptureKey) return
-
-        const focus = focusChapter && focusChapter > 0 ? focusChapter : (chapters[0] ?? 1)
-        const alignChapter = async (ch: number, base: Map<string, SupportRefQuoteEnrichment>) => {
-          const chapterNotes = notes.filter(
-            (n) => n.quote?.trim() && chapterOfReference(n.reference) === ch
-          )
-          if (chapterNotes.length === 0) return base
-          const viewModel = await loader.loadViewModel(scriptureKey, bookId)
-          if (gen !== genRef.current || !viewModel) return base
-          const targetTokens = extractUsjBroadcastTokens(
-            viewModel,
-            ch,
-            1,
-            ch,
-            999
-          ) as OptimizedToken[]
-          const results = batchAlignLinks({
-            links: chapterNotes.map((n) => ({
-              id: n.id,
-              reference: n.reference,
-              origWords: n.quote,
-              occurrence: n.occurrence || '1',
-              quoteReady: true as const,
-              quoteTokens: quoteMap.get(n.id),
-            })),
-            targetTokens,
-            bookCode,
-            currentChapter: ch,
-            endChapter: ch,
-            tokenBook: bookCode,
-            tokenChapter: ch,
-            tokenEndChapter: ch,
-            tokenStartVerse: 1,
-            tokenEndVerse: 999,
-            hasTokens: targetTokens.length > 0,
-            quoteBuildReady: true,
-            resourceKey: tnKey,
-          })
-          if (gen !== genRef.current) return base
-          const aligned = new Map(base)
-          for (const row of results) {
-            const prev = aligned.get(row.id) ?? { quoteStatus: 'ol-fallback' as HelpsQuoteStatus }
-            aligned.set(row.id, {
-              ...prev,
-              quoteTokens: prev.quoteTokens ?? quoteMap.get(row.id),
-              alignedTokens: row.alignedTokens,
-              semanticIds: row.semanticIds,
-              quoteStatus: row.quoteStatus,
+      cancelIdle = scheduleIdle(() => {
+        void (async () => {
+          const rest = planSupportRefStreamChapters(notesByChapterRef.current, focus)
+          const yieldSlice = () =>
+            new Promise<void>((resolve) => {
+              scheduleIdle(() => resolve(), 50)
             })
+
+          for (const chapter of rest) {
+            if (gen !== genRef.current) return
+            const result = await hydrateChapter(chapter, true)
+            if (result && (result.quoteMisses.length || result.alignMisses.length)) {
+              await enqueueChapterMisses(chapter, result.quoteMisses, result.alignMisses)
+            }
+            await yieldSlice()
           }
-          setEnrichment(aligned)
-          return aligned
-        }
-
-        try {
-          let painted = await alignChapter(focus, next)
-          const rest = chapters.filter((c) => c !== focus)
-          if (rest.length === 0) return
-          cancelAlignIdle?.()
-          cancelAlignIdle = scheduleIdle(() => {
-            void (async () => {
-              for (const ch of rest) {
-                if (gen !== genRef.current) return
-                painted = await alignChapter(ch, painted)
-              }
-            })()
-          }, 200)
-        } catch {
-          /* non-fatal align */
-        }
-      }
-
-      await applyQuotes(hits)
-
-      // Warm cache misses for chapters that still need builds, then re-hydrate.
-      if (misses.length > 0 && loaderRegistry) {
-        const loader = loaderRegistry.getLoader('scripture') as ScriptureLoader | undefined
-        if (loader && typeof loader.loadViewModel === 'function') {
-          const missChapters = chaptersOfNotes(misses)
-          cancelIdle = scheduleIdle(() => {
-            void (async () => {
-              for (const ch of missChapters) {
-                if (gen !== genRef.current) return
-                const chapterNotes = misses.filter((n) => chapterOfReference(n.reference) === ch)
-                try {
-                  await warmChapterQuotes({
-                    cache,
-                    catalogManager,
-                    loader,
-                    helpsKey: tnKey,
-                    bookId,
-                    chapter: ch,
-                    links: chapterNotes.map(noteToPseudoLink),
-                  })
-                } catch {
-                  /* non-fatal */
-                }
-              }
-              if (gen !== genRef.current) return
-              const refreshed = await readCachedQuoteTokensForChapters(cache, {
-                helpsKey: tnKey,
-                helpsStamp: cacheCtx.helpsStamp,
-                olKey: cacheCtx.olKey,
-                olStamp: cacheCtx.olStamp,
-                book: bookCode,
-                chapters,
-              })
-              const allHits = new Map<string, CachedQuoteToken[]>()
-              for (const note of quoted) {
-                if (Object.prototype.hasOwnProperty.call(refreshed, note.id)) {
-                  allHits.set(note.id, refreshed[note.id]!)
-                }
-              }
-              // Keep prior hits too.
-              for (const [id, toks] of hits) allHits.set(id, toks)
-              await applyQuotes(allHits)
-            })()
-          }, 100)
-        }
-      }
+        })()
+      }, 120)
     })()
+
+    const onWarmDone = (msg: { jobKey: string }) => {
+      if (gen !== genRef.current) return
+      const ours =
+        isSupportRefWarmJobFor(msg.jobKey, tnKey, bookIdNorm) ||
+        isSupportRefPrepareJobFor(msg.jobKey, target, bookIdNorm)
+      if (!ours) return
+      plannedJobsRef.current.delete(msg.jobKey)
+      const chapter = supportRefWarmJobChapter(msg.jobKey)
+      if (!chapter) return
+      pendingByChapterRef.current.get(chapter)?.delete(msg.jobKey)
+      void hydrateChapter(chapter, true)
+    }
+
+    unsubWarm = subscribeWarmDone(onWarmDone)
+    unsubPrepare = subscribePrepareWarmDone(onWarmDone)
+    unsubSched = warmScheduler.subscribe((stats) => {
+      if (stats.lane1Drained && !stats.scrollUnsettled) void flushPlanned()
+    })
 
     return () => {
       cancelIdle?.()
-      cancelAlignIdle?.()
+      unsubWarm?.()
+      unsubPrepare?.()
+      unsubSched?.()
     }
   }, [
     enabled,
-    notesKey,
+    sessionKey,
     tnKey,
     bookId,
     cache,
     catalogManager,
-    loaderRegistry,
-    targetScriptureKey,
+    supportReference,
     focusChapter,
+    targetKey,
+    notesByChapter,
   ])
 
   return enrichment

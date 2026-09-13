@@ -9,7 +9,8 @@ export type DcsLoader = {
   loadViewModel?: (resourceKey: string, bookId: string) => Promise<unknown>
   loadScriptureResult?: (
     resourceKey: string,
-    bookId: string
+    bookId: string,
+    options?: { prioritizeChapter?: number; deferRest?: boolean }
   ) => Promise<{ viewModel?: unknown }>
   loadContent?: (resourceKey: string, bookId: string) => Promise<unknown>
 }
@@ -19,14 +20,17 @@ export type DcsLoader = {
  * ScriptureLoader writes chapter keys as soon as the book file is processed.
  */
 export function fetchDcsViaLoader(loader: DcsLoader | null | undefined): FetchDcsFile {
-  return async ({ resourceKey, book }) => {
+  return async ({ resourceKey, book, chapter }) => {
     if (!loader) return null
+    if (typeof loader.loadScriptureResult === 'function') {
+      const result = await loader.loadScriptureResult(resourceKey, book, {
+        prioritizeChapter: chapter,
+        deferRest: typeof chapter === 'number',
+      })
+      return result?.viewModel ?? result
+    }
     if (typeof loader.loadViewModel === 'function') {
       return loader.loadViewModel(resourceKey, book)
-    }
-    if (typeof loader.loadScriptureResult === 'function') {
-      const result = await loader.loadScriptureResult(resourceKey, book)
-      return result?.viewModel ?? result
     }
     if (typeof loader.loadContent === 'function') {
       return loader.loadContent(resourceKey, book)

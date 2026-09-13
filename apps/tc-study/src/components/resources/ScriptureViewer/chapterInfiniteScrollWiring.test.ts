@@ -64,6 +64,7 @@ describe('chapter edge-reveal + warm wiring', () => {
     // into the settle band when the token is near the start of a chapter.
     expect(contentSrc).toContain("block: 'start'")
     expect(contentSrc).toContain('beginProgrammaticScrollSuppress')
+    expect(contentSrc).toContain('shouldScrollToQuoteHighlight')
     expect(contentSrc).not.toContain("block: 'center'")
     const tokenSrc = readFileSync(
       join(import.meta.dir, 'components/TokenRenderer.tsx'),

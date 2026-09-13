@@ -26,6 +26,16 @@ describe('downloadBatchOrder', () => {
     expect(isOriginalLanguageDownloadTarget({ resourceKey: 'unfoldingWord/en/ult' })).toBe(
       false
     )
+    expect(
+      isOriginalLanguageDownloadTarget({ resourceKey: 'unfoldingWord/hbo/uhb#1' })
+    ).toBe(true)
+  })
+
+  test('does not import Read/React store modules (worker-safe)', () => {
+    const src = readFileSync(join(import.meta.dir, 'downloadBatchOrder.ts'), 'utf8')
+    expect(src).not.toContain('originalLanguageForBook')
+    expect(src).not.toContain('projectPanelResourcesToAppStore')
+    expect(src).not.toContain('AppContext')
   })
 
   test('OL scripture sorts before TN in a mixed batch', () => {
@@ -65,6 +75,12 @@ describe('downloadBatchOrder', () => {
     )
     expect(src).toContain('compareDownloadBatchOrder')
     expect(src).toContain("type: 'resource-complete'")
+    expect(src).toContain('fallbackIngredientCount')
+    expect(src).toContain('resolveRunIngredientTotal')
+    expect(src).not.toContain('needsCalculation')
     expect(src).not.toContain('registerPreparers')
+    expect(src).not.toMatch(
+      /withResourceDownloadTimeout\(\s*loader\.downloadResource/
+    )
   })
 })

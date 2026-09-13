@@ -233,7 +233,7 @@ export class TranslationWordsLoader implements ResourceLoader {
     const method = options?.method || 'zip'
 
     if (method === 'zip') {
-      await this.downloadViaZip(resourceKey, onProgress)
+      await this.downloadViaZip(resourceKey, onProgress, options?.skipExisting)
     } else {
       await this.downloadIndividual(resourceKey, options?.skipExisting, onProgress)
     }
@@ -491,7 +491,11 @@ export class TranslationWordsLoader implements ResourceLoader {
   /**
    * Download via ZIP
    */
-  private async downloadViaZip(resourceKey: string, onProgress?: ProgressCallback): Promise<void> {
+  private async downloadViaZip(
+    resourceKey: string,
+    onProgress?: ProgressCallback,
+    skipExisting?: boolean
+  ): Promise<void> {
     const parts = resourceKey.split('/')
     const [owner, language, resourceId] = parts
 
@@ -535,21 +539,35 @@ export class TranslationWordsLoader implements ResourceLoader {
       name.includes('/bible/') && name.endsWith('.md')
     )
 
+    const pending: Array<{ key: string; entry: unknown }> = []
     for (let i = 0; i < files.length; i++) {
       const fileName = files[i]
       const file = zip.files[fileName]
 
       if (!file.dir) {
-        const content = await file.async('string')
-        
-        // Extract entry ID from path
         const match = fileName.match(/bible\/(kt|names|other)\/(.+)\.md$/)
         if (match) {
           const [, category, termId] = match
           const entryId = `bible/${category}/${termId}`
           const cacheKey = `${resourceKey}/${entryId}`
 
-          await this.cacheAdapter.set(cacheKey, content)
+          if (skipExisting) {
+            const existing = await this.cacheAdapter.get(cacheKey)
+            if (existing) {
+              if (onProgress) {
+                onProgress({
+                  loaded: i + 1,
+                  total: files.length,
+                  percentage: ((i + 1) / files.length) * 100,
+                  message: `Extracting ${fileName}`
+                })
+              }
+              continue
+            }
+          }
+
+          const content = await file.async('string')
+          pending.push({ key: cacheKey, entry: content })
         }
       }
 
@@ -560,6 +578,16 @@ export class TranslationWordsLoader implements ResourceLoader {
           percentage: ((i + 1) / files.length) * 100,
           message: `Extracting ${fileName}`
         })
+      }
+    }
+
+    if (pending.length > 0) {
+      if (typeof this.cacheAdapter.setMany === 'function') {
+        await this.cacheAdapter.setMany(pending)
+      } else {
+        for (const item of pending) {
+          await this.cacheAdapter.set(item.key, item.entry)
+        }
       }
     }
 

@@ -4,8 +4,6 @@
  * once the helps zip lands.
  */
 
-import { specForOriginalLanguageKey } from '../read/originalLanguageForBook'
-
 const OL_LANGS = new Set(['el-x-koine', 'hbo'])
 const OL_IDS = new Set(['ugnt', 'uhb'])
 
@@ -24,7 +22,6 @@ export function isOriginalLanguageDownloadTarget(args: {
   language?: string
   identifier?: string
 }): boolean {
-  if (specForOriginalLanguageKey(args.resourceKey)) return true
   const language = (args.language ?? languageFromResourceKey(args.resourceKey)).toLowerCase()
   if (OL_LANGS.has(language)) return true
   const identifier = (args.identifier ?? identifierFromResourceKey(args.resourceKey)).toLowerCase()

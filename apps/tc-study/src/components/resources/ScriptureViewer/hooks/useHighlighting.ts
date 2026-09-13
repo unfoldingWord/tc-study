@@ -13,9 +13,10 @@ import {
   shouldApplyHelpsHighlightOnTokensReady,
   shouldClearHelpsHighlightOnTokenNull,
   shouldClearHelpsHighlightOnVerseFilter,
-  shouldNavigateScriptureToRef,
+  shouldNavigateToHelpsHighlight,
   subscribeHelpsHighlightPersist,
 } from '../../../../features/helps/helpsCardScriptureNav'
+import { getChapterScrollActivity } from '../../../../features/nav/chapterScrollActivity'
 import {
   markScripturePerfEnd,
   markScripturePerfStart,
@@ -122,7 +123,21 @@ export function useHighlighting(
       }
       const live = currentRefRef.current
       const target = parseTokenVerseRef(signal.token.verseRef)
-      const needsNav = Boolean(target && shouldNavigateScriptureToRef(live, target))
+      const pending = getPersistedHelpsHighlight()
+      const samePending =
+        Boolean(pending) &&
+        pending!.verseRef === signal.token.verseRef &&
+        pending!.semanticId === signal.token.semanticId
+      const alreadyApplied = isHelpsHighlightApplied()
+      const needsNav = Boolean(
+        target &&
+          shouldNavigateToHelpsHighlight({
+            current: live,
+            target,
+            userScrolling: getChapterScrollActivity().unsettled,
+            highlightAlreadyApplied: alreadyApplied && samePending,
+          })
+      )
       if (target && needsNav) {
         markReadNavigationInternal()
         useNavigationStore.getState().navigateToReference({
@@ -131,7 +146,9 @@ export function useHighlighting(
           verse: target.verse,
         })
       }
-      persistHelpsHighlight(signal.token)
+      // Same persist click already wrote the row — do not bump epoch / un-apply
+      // (that would look like a new click and re-scroll).
+      if (!samePending) persistHelpsHighlight(signal.token)
       // Same-chapter: paint now. Off-chapter: keep IDs in state; replay when tokens land.
       setHighlightTarget(targetFromSignalToken(signal.token))
       markScripturePerfEnd('highlight-signal')

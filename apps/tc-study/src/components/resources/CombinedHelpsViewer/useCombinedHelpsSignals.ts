@@ -6,6 +6,7 @@
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
 import { shouldClearHelpsHighlightOnTokenNull } from '../../../features/helps/helpsCardScriptureNav'
+import { resolveHelpsTokenClickFilter } from '../../../features/helps/helpsDisplayFilters'
 import type {
   EntryLinkClickSignal,
   ObsFrameHighlightSignal,
@@ -108,19 +109,12 @@ export function useCombinedHelpsSignals({
         if (signal.sourceResourceId === resourceId) return
         // Toggle-off: clear token filter owned by the scripture selection (keep OBS/underlines).
         // Persist still owning a click means remount/reload null — keep the card.
-        if (signal.token === null) {
+        const nextFilter = resolveHelpsTokenClickFilter(signal.token, signal.timestamp)
+        if (nextFilter === undefined) return
+        if (nextFilter === null) {
           setTokenFilter(null)
           if (shouldClearHelpsHighlightOnTokenNull()) setSelectedHelpsCard(null)
           return
-        }
-        // Uncovered scripture clicks broadcast token-click for scripture highlighting
-        // but also send verse-filter for helps — ignore the token filter here.
-        if (signal.token.hasHelpsCoverage === false) return
-        const nextFilter: TokenFilter = {
-          semanticId: signal.token.semanticId,
-          content: signal.token.content,
-          alignedSemanticIds: signal.token.alignedSemanticIds || [],
-          timestamp: signal.timestamp,
         }
         setTokenFilter(nextFilter)
         setVerseFilter(null)
