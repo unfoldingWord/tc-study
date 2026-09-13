@@ -63,6 +63,33 @@ export function shouldWalkUiIdbDuringExtract(isDownloading: boolean): boolean {
   return !isDownloading
 }
 
+export const CATALOG_KEYS_TIMEOUT = 'catalog-keys-timeout'
+export const COMPLETE_CHECK_TIMEOUT = 'complete-check-timeout'
+export const CATALOG_KEYS_TIMEOUT_MS = 2500
+export const COMPLETE_CHECK_TIMEOUT_MS = 1500
+
+export function isExpectedDownloadMonitorTimeout(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message === CATALOG_KEYS_TIMEOUT || message === COMPLETE_CHECK_TIMEOUT
+}
+
+/** Timeout must not reject after `work` wins — leftover `Promise.race` timers become unhandled. */
+export function raceWithTimeout<T>(work: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const id = setTimeout(() => reject(new Error(message)), ms)
+    work.then(
+      (value) => {
+        clearTimeout(id)
+        resolve(value)
+      },
+      (err) => {
+        clearTimeout(id)
+        reject(err)
+      }
+    )
+  })
+}
+
 export function filterUncheckedResourceKeys(
   allResourceKeys: string[],
   processed: ReadonlySet<string>,

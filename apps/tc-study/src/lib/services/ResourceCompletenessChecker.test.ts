@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   hasIngredientPayload,
   ingredientCacheKeyFor,
@@ -135,6 +137,11 @@ describe('checkResource failFast', () => {
     const status = await checker.checkResource('unfoldingWord/en/tn', { failFast: true })
     expect(status.isComplete).toBe(false)
     expect(gets.filter((k) => k.startsWith('tn:'))).toEqual(['tn:unfoldingWord/en/tn:tit'])
+  })
+
+  test('failFast does not yield between complete books', () => {
+    const src = readFileSync(join(import.meta.dir, 'ResourceCompletenessChecker.ts'), 'utf8')
+    expect(src).toContain('if (!failFast && i + 1 < ingredients.length)')
   })
 
   test('full check walks every ingredient when failFast is off', async () => {

@@ -1,15 +1,37 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  CATALOG_KEYS_TIMEOUT,
+  COMPLETE_CHECK_TIMEOUT,
   expectedResourcesSignature,
   filterUncheckedResourceKeys,
   findMissingExpectedResources,
+  isExpectedDownloadMonitorTimeout,
   keysToEnqueueForDownload,
   narrowExpectedToCataloged,
+  raceWithTimeout,
   shouldResetDownloadTracking,
   shouldWalkUiIdbDuringExtract,
 } from './catalogBackgroundDownloadPolicy'
 
 describe('catalogBackgroundDownloadPolicy', () => {
+  test('monitor timeouts are expected, not console-error / enqueue', () => {
+    expect(isExpectedDownloadMonitorTimeout(new Error(COMPLETE_CHECK_TIMEOUT))).toBe(true)
+    expect(isExpectedDownloadMonitorTimeout(new Error(CATALOG_KEYS_TIMEOUT))).toBe(true)
+    expect(isExpectedDownloadMonitorTimeout(new Error('IDB transaction inactive'))).toBe(false)
+  })
+
+  test('raceWithTimeout clears the timer so a late reject is not unhandled', async () => {
+    const result = await raceWithTimeout(Promise.resolve('ok'), 20, COMPLETE_CHECK_TIMEOUT)
+    expect(result).toBe('ok')
+    await new Promise((resolve) => setTimeout(resolve, 30))
+  })
+
+  test('raceWithTimeout rejects with the timeout message', async () => {
+    await expect(
+      raceWithTimeout(new Promise(() => {}), 10, COMPLETE_CHECK_TIMEOUT)
+    ).rejects.toThrow(COMPLETE_CHECK_TIMEOUT)
+  })
+
   test('UI IDB walks skip while extract is writing', () => {
     expect(shouldWalkUiIdbDuringExtract(true)).toBe(false)
     expect(shouldWalkUiIdbDuringExtract(false)).toBe(true)

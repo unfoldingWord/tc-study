@@ -7,6 +7,8 @@ describe('useCatalogBackgroundDownload', () => {
     const src = readFileSync(join(import.meta.dir, 'useCatalogBackgroundDownload.ts'), 'utf8')
     expect(src).toContain('shouldWalkUiIdbDuringExtract')
     expect(src).toContain('failFast: true')
+    expect(src).toContain('raceWithTimeout')
+    expect(src).toContain('isExpectedDownloadMonitorTimeout')
     expect(src).toContain('totalIngredientsForResourceKeys')
     expect(src).toContain('listedCountByKey')
   })

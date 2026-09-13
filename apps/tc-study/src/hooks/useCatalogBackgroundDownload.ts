@@ -24,8 +24,14 @@ import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import type { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
 import { totalIngredientsForResourceKeys } from '../features/download/backgroundDownloadRun'
 import {
+  CATALOG_KEYS_TIMEOUT,
+  CATALOG_KEYS_TIMEOUT_MS,
+  COMPLETE_CHECK_TIMEOUT,
+  COMPLETE_CHECK_TIMEOUT_MS,
   filterUncheckedResourceKeys,
+  isExpectedDownloadMonitorTimeout,
   keysToEnqueueForDownload,
+  raceWithTimeout,
   shouldResetDownloadTracking,
   shouldWalkUiIdbDuringExtract,
 } from '../features/read/catalogBackgroundDownloadPolicy'
@@ -158,12 +164,11 @@ export function useCatalogBackgroundDownload(
       // block enqueue forever; fall back to expected keys.
       let allResourceKeys: string[] = []
       try {
-        allResourceKeys = await Promise.race([
+        allResourceKeys = await raceWithTimeout(
           catalogManager.getAllResourceKeys(),
-          new Promise<string[]>((_, reject) => {
-            window.setTimeout(() => reject(new Error('catalog-keys-timeout')), 2500)
-          }),
-        ])
+          CATALOG_KEYS_TIMEOUT_MS,
+          CATALOG_KEYS_TIMEOUT
+        )
       } catch {
         allResourceKeys = []
       }
@@ -229,12 +234,11 @@ export function useCatalogBackgroundDownload(
       } else {
       for (const resourceKey of uncheckedResources) {
         try {
-          const status = await Promise.race([
+          const status = await raceWithTimeout(
             completenessChecker.checkResource(resourceKey, { failFast: true }),
-            new Promise<never>((_, reject) => {
-              window.setTimeout(() => reject(new Error('complete-check-timeout')), 1500)
-            }),
-          ])
+            COMPLETE_CHECK_TIMEOUT_MS,
+            COMPLETE_CHECK_TIMEOUT
+          )
 
           if (status.isComplete) {
             completeResources.push(resourceKey)
@@ -244,6 +248,9 @@ export function useCatalogBackgroundDownload(
             await rememberListedCount(resourceKey)
           }
         } catch (error) {
+          // Timeout = unknown, not incomplete. Leave unchecked for the next idle pass
+          // so a hung IDB walk does not re-queue already-cached scripture/helps.
+          if (isExpectedDownloadMonitorTimeout(error)) continue
           console.error(`[BG-DL] 🔍 Monitor Error checking ${resourceKey}:`, error)
           incompleteResources.push(resourceKey)
         }

@@ -282,7 +282,7 @@ export class ResourceCompletenessChecker {
           return { cachedCount, checkableCount }
         }
       }
-      if (i + 1 < ingredients.length) {
+      if (!failFast && i + 1 < ingredients.length) {
         await yieldBetweenCompletenessBooks()
       }
     }
