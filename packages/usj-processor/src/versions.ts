@@ -2,7 +2,7 @@
  * P2 content processing version for USJ SoT cache entries.
  * Refuse mismatched versions on read (treat as cache miss / reprocess).
  */
-export const USJ_PROCESSING_VERSION = '2.1.0-usj'
+export const USJ_PROCESSING_VERSION = '2.2.0-usj'
 
 /** Embedded tool versions written into USJ cache metadata (match package.json deps). */
 export const USJ_TOOL_VERSIONS = {

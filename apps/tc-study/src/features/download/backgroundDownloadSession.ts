@@ -9,18 +9,28 @@ import {
   DOWNLOAD_STALL_TIMEOUT_MS,
   DOWNLOAD_WORKER_READY_TIMEOUT_MS,
   DOWNLOAD_WORKER_SILENCE_MESSAGE,
+  DOWNLOAD_WORKER_STUCK_STARTING_MESSAGE,
   createInitialDownloadProgress,
+  downloadBlockedReason,
+  inferDownloadPhase,
   keysForDownloadRetry,
   pulseInFlightDownloadProgress,
   shouldAcceptStartDownload,
   shouldAcceptWorkerMessage,
   shouldFallbackOnWorkerError,
+  shouldFallbackStuckStarting,
   shouldRecreateWorkerBeforeStart,
   shouldRunExtractOnThisThread,
   applyDiscoveredIngredientTotal,
   totalIngredientsForResourceKeys,
 } from './backgroundDownloadRun'
 import type { DownloadProgress } from '../../lib/services/BackgroundDownloadManager'
+import {
+  createProcessStepRing,
+  listProcessSteps,
+  pushProcessStep,
+  type ProcessStepEvent,
+} from '../debug/processStepRing'
 
 export interface BackgroundDownloadStats {
   isDownloading: boolean
@@ -29,6 +39,12 @@ export interface BackgroundDownloadStats {
   error: string | null
   /** Keys whose zip finished extracting in the current/last run (warm handoff). */
   completedResourceKeys: string[]
+  /** Epoch ms of last accepted progress/ready/queue pulse. */
+  lastActivityAt: number | null
+  /** Why the UI may look frozen (error, stall, or quiet phase). */
+  blockedReason: string | null
+  /** Recent step events for the process debug console (newest last). */
+  recentSteps: ProcessStepEvent[]
 }
 
 type StatsListener = (stats: BackgroundDownloadStats) => void
@@ -39,6 +55,9 @@ const IDLE_STATS: BackgroundDownloadStats = {
   queue: [],
   error: null,
   completedResourceKeys: [],
+  lastActivityAt: null,
+  blockedReason: null,
+  recentSteps: [],
 }
 
 let worker: Worker | null = null
@@ -51,9 +70,58 @@ let stats: BackgroundDownloadStats = IDLE_STATS
 let stallTimer: ReturnType<typeof setTimeout> | null = null
 let readyTimer: ReturnType<typeof setTimeout> | null = null
 let workerMessageCount = 0
+/** Progress / queue / resource-complete / step — excludes `ready`. */
+let workerProgressCount = 0
+let runStartedAt = 0
 let lastResourceKeys: string[] = []
 let lastTotalIngredients: number | undefined
+let lastActivityAt: number | null = null
+const stepRing = createProcessStepRing()
 const listeners = new Set<StatsListener>()
+
+function touchActivity(): void {
+  lastActivityAt = Date.now()
+}
+
+function recordStep(
+  step: string,
+  detail?: string,
+  workerId: ProcessStepEvent['worker'] = 'catalog-download'
+): void {
+  pushProcessStep(stepRing, { worker: workerId, step, detail })
+}
+
+function withDebugFields(
+  next: Omit<BackgroundDownloadStats, 'lastActivityAt' | 'blockedReason' | 'recentSteps'> &
+    Partial<Pick<BackgroundDownloadStats, 'lastActivityAt' | 'blockedReason' | 'recentSteps'>>
+): BackgroundDownloadStats {
+  const activity = next.lastActivityAt ?? lastActivityAt
+  const progress = next.progress
+    ? {
+        ...next.progress,
+        phase: inferDownloadPhase({
+          phase: next.progress.phase,
+          isDownloading: next.isDownloading,
+          error: next.error,
+          currentIngredient: next.progress.currentIngredient,
+        }),
+        lastActivityAt: activity ?? next.progress.lastActivityAt,
+      }
+    : next.progress
+  return {
+    ...next,
+    progress,
+    lastActivityAt: activity,
+    blockedReason: downloadBlockedReason({
+      isDownloading: next.isDownloading,
+      error: next.error,
+      phase: progress?.phase,
+      lastActivityAt: activity,
+      now: Date.now(),
+    }),
+    recentSteps: next.recentSteps ?? listProcessSteps(stepRing),
+  }
+}
 
 function clearStallWatchdog(): void {
   if (stallTimer == null) return
@@ -72,11 +140,15 @@ function bumpStallWatchdog(): void {
   clearStallWatchdog()
   stallTimer = setTimeout(() => {
     if (!isDownloading) return
+    recordStep('stall-timeout', DOWNLOAD_STALL_MESSAGE, 'session')
     failSession(DOWNLOAD_STALL_MESSAGE)
   }, DOWNLOAD_STALL_TIMEOUT_MS)
 }
 
-/** Worker never posted — run extract on this thread instead of sitting at 1%. */
+/**
+ * No progress after start — fall back even if the isolate posted `ready`.
+ * Ready alone used to clear this timer and leave phase at `starting` for minutes.
+ */
 function bumpReadyWatchdog(
   startedRunId: number,
   resourceKeys: string[],
@@ -85,10 +157,23 @@ function bumpReadyWatchdog(
   clearReadyWatchdog()
   readyTimer = setTimeout(() => {
     if (!isDownloading || startedRunId !== runId) return
-    if (workerMessageCount > 0) return
-    // Chrome: isolate is alive — do not kill it for a slow first post.
-    // Embedded browsers that never construct a worker already fail in startDownload.
-    if (worker) return
+    const phase = stats.progress?.phase ?? 'starting'
+    if (
+      !shouldFallbackStuckStarting({
+        isDownloading: true,
+        workerProgressCount,
+        phase,
+        startedAt: runStartedAt,
+        now: Date.now(),
+      })
+    ) {
+      return
+    }
+    const detail =
+      workerMessageCount > 0
+        ? `ready+no-progress · ${phase}`
+        : `no-worker-messages · ${phase}`
+    recordStep('worker-silent-fallback', detail, 'session')
     void startMainThreadFallback(startedRunId, resourceKeys, totalIngredients)
   }, DOWNLOAD_WORKER_READY_TIMEOUT_MS)
 }
@@ -100,10 +185,15 @@ async function startMainThreadFallback(
 ): Promise<void> {
   if (!isDownloading || startedRunId !== runId) return
   disposeWorker()
+  const silenceMsg =
+    workerProgressCount === 0 && workerMessageCount > 0
+      ? DOWNLOAD_WORKER_STUCK_STARTING_MESSAGE
+      : DOWNLOAD_WORKER_SILENCE_MESSAGE
+  recordStep('main-thread-fallback', silenceMsg, 'session')
   emit({
     ...stats,
     isDownloading: true,
-    error: DOWNLOAD_WORKER_SILENCE_MESSAGE,
+    error: silenceMsg,
   })
   try {
     const { runBackgroundDownloadOnThisThread } = await import(
@@ -125,21 +215,28 @@ async function startMainThreadFallback(
   }
 }
 
-function emit(next: BackgroundDownloadStats): void {
-  stats = next
+function emit(
+  next: Omit<BackgroundDownloadStats, 'lastActivityAt' | 'blockedReason' | 'recentSteps'> &
+    Partial<Pick<BackgroundDownloadStats, 'lastActivityAt' | 'blockedReason' | 'recentSteps'>>
+): void {
+  stats = withDebugFields(next)
   for (const listener of listeners) listener(stats)
 }
 
 function handleWorkerMessage(event: MessageEvent): void {
   const { type, payload, runId: messageRunId } = event.data as {
     type: string
-    payload: DownloadProgress | { message?: string; queue?: string[] } | null
+    payload:
+      | DownloadProgress
+      | { message?: string; queue?: string[]; step?: string; detail?: string }
+      | null
     runId?: unknown
   }
 
   const accept =
     shouldAcceptWorkerMessage(runId, messageRunId) ||
     (type === 'ready' && isDownloading) ||
+    (type === 'step' && isDownloading) ||
     (type === 'error' &&
       isDownloading &&
       runId > 0 &&
@@ -149,30 +246,72 @@ function handleWorkerMessage(event: MessageEvent): void {
   switch (type) {
     case 'ready':
       workerMessageCount += 1
-      clearReadyWatchdog()
+      touchActivity()
+      // Do NOT clear ready watchdog — wait for first progress (see stuck-starting).
+      recordStep('worker-ready', `msgs=${workerMessageCount}`)
       bumpStallWatchdog()
       break
+    case 'step': {
+      workerMessageCount += 1
+      workerProgressCount += 1
+      touchActivity()
+      clearReadyWatchdog()
+      bumpStallWatchdog()
+      const stepPayload =
+        payload && typeof payload === 'object'
+          ? (payload as { step?: string; detail?: string })
+          : {}
+      if (stepPayload.step) {
+        recordStep(stepPayload.step, stepPayload.detail)
+        emit({ ...stats, lastActivityAt })
+      }
+      break
+    }
     case 'progress':
       if (!isDownloading) return
       workerMessageCount += 1
+      workerProgressCount += 1
+      touchActivity()
       clearReadyWatchdog()
       bumpStallWatchdog()
-      emit({
-        ...stats,
-        isDownloading: true,
-        progress: payload as DownloadProgress,
-        error: null,
-      })
+      {
+        const progress = payload as DownloadProgress
+        const phase = inferDownloadPhase({
+          phase: progress?.phase,
+          isDownloading: true,
+          currentIngredient: progress?.currentIngredient,
+        })
+        const detailParts = [
+          phase,
+          progress?.currentResource,
+          progress?.currentIngredient,
+          typeof progress?.completedIngredients === 'number' &&
+          typeof progress?.totalIngredients === 'number'
+            ? `${progress.completedIngredients}/${progress.totalIngredients}`
+            : null,
+        ].filter(Boolean)
+        recordStep('progress', detailParts.join(' · ') || undefined)
+        emit({
+          ...stats,
+          isDownloading: true,
+          progress,
+          error: null,
+          lastActivityAt,
+        })
+      }
       break
     case 'complete':
       isDownloading = false
+      touchActivity()
       clearReadyWatchdog()
       clearStallWatchdog()
+      recordStep('complete')
       emit({
         ...stats,
         isDownloading: false,
         progress: (payload as DownloadProgress | null) ?? null,
         queue: [],
+        lastActivityAt,
       })
       break
     case 'error': {
@@ -180,6 +319,7 @@ function handleWorkerMessage(event: MessageEvent): void {
         payload && typeof payload === 'object' && 'message' in payload
           ? String((payload as { message?: string }).message ?? 'Worker error')
           : 'Worker error'
+      recordStep('error', message)
       if (
         shouldFallbackOnWorkerError({ isDownloading, message }) &&
         lastResourceKeys.length > 0
@@ -193,23 +333,29 @@ function handleWorkerMessage(event: MessageEvent): void {
     }
     case 'resource-complete': {
       workerMessageCount += 1
+      workerProgressCount += 1
+      touchActivity()
       clearReadyWatchdog()
       const key =
         payload && typeof payload === 'object' && 'resourceKey' in payload
           ? String((payload as { resourceKey?: string }).resourceKey ?? '')
           : ''
       if (!key) break
+      recordStep('resource-complete', key)
       const nextKeys = stats.completedResourceKeys.includes(key)
         ? stats.completedResourceKeys
         : [...stats.completedResourceKeys, key]
       emit({
         ...stats,
         completedResourceKeys: nextKeys,
+        lastActivityAt,
       })
       break
     }
     case 'queue-updated': {
       workerMessageCount += 1
+      workerProgressCount += 1
+      touchActivity()
       clearReadyWatchdog()
       const q =
         payload && typeof payload === 'object'
@@ -219,12 +365,17 @@ function handleWorkerMessage(event: MessageEvent): void {
         stats.progress?.totalIngredients,
         q.totalIngredients
       )
+      recordStep(
+        'queue-updated',
+        `${(q.queue ?? []).length} keys · ingredients=${discoveredTotal}`
+      )
       emit({
         ...stats,
         queue: q.queue ?? stats.queue,
         progress: stats.progress
           ? { ...stats.progress, totalIngredients: discoveredTotal }
           : stats.progress,
+        lastActivityAt,
       })
       break
     }
@@ -255,6 +406,7 @@ function failSession(message: string): void {
     ...stats,
     isDownloading: false,
     error: message,
+    lastActivityAt,
   })
 }
 
@@ -332,14 +484,23 @@ export const backgroundDownloadSession = {
     runId += 1
     isDownloading = true
     workerMessageCount = 0
+    workerProgressCount = 0
+    runStartedAt = Date.now()
     lastResourceKeys = [...resourceKeys]
     lastTotalIngredients = totalIngredients
+    touchActivity()
+    recordStep(
+      'start',
+      `${resourceKeys.length} keys · seedIngredients=${totalIngredients ?? '?'}`,
+      'session'
+    )
     emit({
       isDownloading: true,
       progress: createInitialDownloadProgress(resourceKeys, totalIngredients),
       queue: resourceKeys,
       error: null,
       completedResourceKeys: [],
+      lastActivityAt,
     })
     bumpStallWatchdog()
     // Always try a Worker first. A prior isolate `window` crash must not
@@ -362,6 +523,7 @@ export const backgroundDownloadSession = {
         runId,
       },
     })
+    recordStep('post-start', `runId=${runId}`, 'session')
     bumpReadyWatchdog(runId, resourceKeys, totalIngredients)
     return true
   },
@@ -387,6 +549,7 @@ export const backgroundDownloadSession = {
     isDownloading = false
     clearReadyWatchdog()
     clearStallWatchdog()
+    recordStep('stop', undefined, 'session')
     if (worker) {
       worker.postMessage({
         type: 'stop',
@@ -399,17 +562,19 @@ export const backgroundDownloadSession = {
       queue: [],
       error: null,
       completedResourceKeys: stats.completedResourceKeys,
+      lastActivityAt,
     })
   },
 
   subscribe(listener: StatsListener): () => void {
     listeners.add(listener)
     const live = isDownloading
-      ? {
+      ? withDebugFields({
           ...stats,
           progress: pulseInFlightDownloadProgress(stats.progress, true),
-        }
-      : stats
+          lastActivityAt,
+        })
+      : withDebugFields({ ...stats, lastActivityAt })
     listener(live)
     return () => {
       listeners.delete(listener)

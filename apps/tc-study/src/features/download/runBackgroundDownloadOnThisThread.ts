@@ -16,7 +16,7 @@ import { registerWorkerLoaders } from './workerLoaderRegistry'
 import {
   STARTING_PROGRESS_PERCENT,
   computeInFlightOverallProgress,
-  fallbackIngredientCount,
+  discoveredIngredientCount,
   mapLoaderProgressToResource,
   RESOURCE_DOWNLOAD_TIMEOUT_MS,
   resolveRunIngredientTotal,
@@ -100,7 +100,11 @@ export async function runBackgroundDownloadOnThisThread(args: {
     )
     if (!metadata) continue
     const ingredients = metadata.contentMetadata?.ingredients || []
-    const ingredientsCount = fallbackIngredientCount(resourceKey, ingredients.length)
+    const ingredientsCount = discoveredIngredientCount(
+      resourceKey,
+      ingredients,
+      metadata.type
+    )
     discoveredCounts.push(ingredientsCount)
     resources.push({ resourceKey, metadata, ingredientsCount })
   }
@@ -133,14 +137,27 @@ export async function runBackgroundDownloadOnThisThread(args: {
     completedResources: number
     failedResources: number
     overallProgress: number
+    phase?: import('./backgroundDownloadRun').DownloadRunPhase
+    currentResourceProgress?: number
   }) => {
     if (!isCurrentRun()) return
+    const msg = (partial.currentIngredient ?? '').toLowerCase()
+    const phase =
+      partial.phase ??
+      (msg.includes('zip') || msg.startsWith('downloading')
+        ? 'downloading'
+        : msg.includes('extract') || msg.startsWith('processed') || msg.startsWith('skipped')
+          ? 'extracting'
+          : 'downloading')
     post({
       type: 'progress',
       runId,
       payload: {
         currentResource: partial.currentResource,
-        currentResourceProgress: 0,
+        currentResourceProgress:
+          typeof partial.currentResourceProgress === 'number'
+            ? partial.currentResourceProgress
+            : 0,
         totalResources: resources.length,
         completedResources: partial.completedResources,
         failedResources: partial.failedResources,
@@ -149,6 +166,8 @@ export async function runBackgroundDownloadOnThisThread(args: {
         completedIngredients: partial.completedIngredients,
         failedIngredients: partial.failedIngredients,
         currentIngredient: partial.currentIngredient ?? null,
+        phase,
+        lastActivityAt: Date.now(),
         tasks: [],
       },
     })
@@ -173,6 +192,22 @@ export async function runBackgroundDownloadOnThisThread(args: {
     })
     try {
       if (skipExisting) {
+        postProgress({
+          currentResource: resourceKey,
+          currentIngredient: 'completeness check',
+          completedIngredients,
+          failedIngredients,
+          completedResources: completedResourceCount,
+          failedResources: failedResourceCount,
+          overallProgress: computeInFlightOverallProgress({
+            completedIngredients,
+            totalIngredients,
+            currentResourceIngredients: ingredientsCount,
+            currentResourcePercent: STARTING_PROGRESS_PERCENT,
+          }),
+          phase: 'checking',
+          currentResourceProgress: STARTING_PROGRESS_PERCENT,
+        })
         const status = await completenessChecker.checkResource(resourceKey)
         if (shouldSkipCompleteResourceDownload(skipExisting, status.isComplete)) {
           const skipped = skippedCompleteResourceProgress(ingredientsCount, resourceKey)
@@ -190,6 +225,7 @@ export async function runBackgroundDownloadOnThisThread(args: {
               currentResourceIngredients: ingredientsCount,
               currentResourcePercent: 100,
             }),
+            phase: 'completing',
           })
           completedIngredients += ingredientsCount
           completedResourceCount += 1
@@ -208,6 +244,7 @@ export async function runBackgroundDownloadOnThisThread(args: {
                     ((completedIngredients + failedIngredients) / totalIngredients) * 100
                   )
                 : 0,
+            phase: 'completing',
           })
           continue
         }

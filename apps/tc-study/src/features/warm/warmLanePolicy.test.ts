@@ -7,9 +7,25 @@ import {
   canAdmitBackgroundLanes,
   helpsLane1Ready,
   scriptureLane1Ready,
+  warmLaneBlockedReason,
 } from './warmLanePolicy'
 
 describe('warmLanePolicy', () => {
+  test('warmLaneBlockedReason names the gate', () => {
+    expect(warmLaneBlockedReason({ lane1Drained: false, lane: 2 })).toBe('lane1-busy')
+    expect(
+      warmLaneBlockedReason({ lane1Drained: true, scrollUnsettled: true, lane: 2 })
+    ).toBe('scroll-unsettled')
+    expect(
+      warmLaneBlockedReason({
+        lane1Drained: true,
+        pendingJobKeys: LANE3_MAX_PENDING,
+        lane: 3,
+      })
+    ).toBe(`pending>=${LANE3_MAX_PENDING}`)
+    expect(warmLaneBlockedReason({ lane1Drained: true, lane: 2 })).toBeNull()
+  })
+
   test('lane 2/3 are not admitted while lane1Drained is false', () => {
     expect(
       canAdmitBackgroundLanes({ lane1Drained: false, scrollUnsettled: false, lane: 2 })
@@ -100,6 +116,25 @@ describe('warmLanePolicy', () => {
         quoteReady: false,
         cacheHit: false,
         quotesBlocked: true,
+      })
+    ).toBe(false)
+  })
+
+  test('helpsLane1Ready drains on book-filter first paint without chapter quote settle', () => {
+    expect(
+      helpsLane1Ready({
+        contentPending: false,
+        quoteReady: false,
+        cacheHit: false,
+        bookFilterRowsReady: true,
+      })
+    ).toBe(true)
+    expect(
+      helpsLane1Ready({
+        contentPending: true,
+        quoteReady: false,
+        cacheHit: false,
+        bookFilterRowsReady: true,
       })
     ).toBe(false)
   })

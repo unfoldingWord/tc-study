@@ -1,6 +1,7 @@
 /**
  * Pure chapter-scoped quote → target-token alignment (TN / TWL).
- * Runs on the main thread or in prepare.worker via batch-align.
+ * Runs on warm.worker (preferred) or prepare.worker via batch-align; sync
+ * only for tiny batches / worker unavailable.
  */
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
@@ -16,6 +17,29 @@ import {
 } from './resolveHelpsQuoteStatus'
 import { generateSemanticIdsForQuoteTokens } from './quoteTokens'
 import type { AlignedToken } from './findAlignedTokens'
+
+type AlignReadyToken = OptimizedToken & { alignedOriginalWordIds?: unknown[] }
+
+/**
+ * True when target tokens can participate in zaln / semantic-id align.
+ * Word tokens with empty alignedOriginalWordIds (pre-align hydrate, light extract)
+ * must not settle ol-fallback — stay pending until alignments exist.
+ * Original-language panes match on the token's own semanticId, so words alone suffice.
+ */
+export function targetTokensAreAlignReady(
+  tokens: readonly OptimizedToken[],
+  textLanguage?: string
+): boolean {
+  if (!tokens.length) return false
+  if (isOriginalLanguageCode(textLanguage)) {
+    return tokens.some((t) => t.type === 'word')
+  }
+  return tokens.some((t) => {
+    if (t.type !== 'word') return false
+    const ids = (t as AlignReadyToken).alignedOriginalWordIds
+    return Array.isArray(ids) && ids.length > 0
+  })
+}
 
 export interface AlignLinkInput {
   id: string
@@ -93,7 +117,11 @@ export function batchAlignLinks(args: BatchAlignLinksArgs): AlignLinkResult[] {
 
   if (!links.length) return []
 
-  if (!hasTokens) {
+  // Missing tokens OR tokens without zaln/align ids: stay pending. Never paint
+  // ol-fallback here — fingerprint + cache retry re-run when align-ready tokens arrive.
+  // (Settling early wrote permanent helps-align m:0 and stuck TN chips on OL.)
+  const alignReady = hasTokens && targetTokensAreAlignReady(targetTokens, textLanguage)
+  if (!alignReady) {
     return links.map((link, index) => ({
       index,
       id: link.id,
@@ -144,7 +172,7 @@ export function batchAlignLinks(args: BatchAlignLinksArgs): AlignLinkResult[] {
     )
     const linkQuoteReady = quoteBuildReady && (link.quoteReady ?? true)
     const alignmentPending = isHelpsQuoteAlignmentPending({
-      hasTargetTokens: hasTokens,
+      hasTargetTokens: alignReady,
       tokensMatchPassage,
       quoteBuildReady: linkQuoteReady,
     })

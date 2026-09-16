@@ -60,7 +60,7 @@ export function supportRefQuoteChipKind(args: {
 }): SupportRefQuoteChipKind {
   if (args.hasAlignedTokens) return 'aligned'
   const hasOl = Boolean(args.olQuote?.trim())
-  if (args.quoteWarmPending && hasOl) return 'ol-pending'
+  if ((args.quoteWarmPending || args.quoteStatus === 'pending') && hasOl) return 'ol-pending'
   if (args.quoteStatus === 'pending') return 'placeholder'
   if (args.quoteStatus === 'ol-fallback' && hasOl) return 'ol'
   return 'none'
@@ -104,16 +104,15 @@ export function paintSupportRefQuoteEnrichment(args: {
       continue
     }
 
-    const hasReconstructPass = reconstructed !== undefined
-    const noteAlignSettled = hasReconstructPass && args.alignCacheKnown && reconstructed.has(note.id)
-    const pending = hasReconstructPass
-      ? args.warmInFlight || !args.alignCacheKnown || !noteAlignSettled
-      : args.warmInFlight || !args.alignCacheKnown
+    // Cache hits upgrade to aligned above. Misses (not in `reconstructed`) must
+    // still settle once the align cache is known and warm is idle — otherwise
+    // chips spin forever on "Building quote".
+    const isPending = args.warmInFlight || !args.alignCacheKnown
     next.set(note.id, {
       quoteTokens,
       semanticIds,
       quoteStatus: 'ol-fallback',
-      quoteWarmPending: pending || undefined,
+      quoteWarmPending: isPending || undefined,
     })
   }
   return next
@@ -144,8 +143,11 @@ export function planSupportRefQuoteWarmJobs(args: {
   targetKey?: string
   targetStamp?: string
   textLanguage?: string
+  /** Default notes. TWL book-article filter uses words-links (same job keys). */
+  helpsType?: 'notes' | 'words-links'
 }): WarmJob[] {
   const bookId = args.bookId.toLowerCase()
+  const helpsType = args.helpsType ?? 'notes'
   const jobs: WarmJob[] = []
   const seen = new Set<string>()
 
@@ -168,13 +170,26 @@ export function planSupportRefQuoteWarmJobs(args: {
       helpsStamp: args.helpsStamp,
       olKey: args.olKey,
       olStamp: args.olStamp,
-      helpsType: 'notes',
+      helpsType,
     })
   }
 
   if (args.targetKey && args.targetStamp) {
     for (const chapter of args.alignMissChapters) {
       if (!Number.isFinite(chapter) || chapter < 1) continue
+      // Align needs prepared full scripture; enqueue prepare first or align noops
+      // and chips stay on Building quote until a full page refresh.
+      push({
+        jobKey: `prep:scripture:${args.targetKey}:${bookId}:${chapter}`,
+        lane: 2,
+        kind: 'prepare-unit',
+        languageCode: args.textLanguage ?? args.languageCode,
+        resourceKey: args.targetKey,
+        bookId,
+        typeId: 'scripture',
+        unit: chapter,
+        tier: 'both',
+      })
       push({
         jobKey: `align:${args.helpsKey}:${args.targetKey}:${bookId}:${chapter}`,
         lane: 2,
@@ -188,7 +203,7 @@ export function planSupportRefQuoteWarmJobs(args: {
         olStamp: args.olStamp,
         targetKey: args.targetKey,
         targetStamp: args.targetStamp,
-        helpsType: 'notes',
+        helpsType,
         textLanguage: args.textLanguage,
       })
     }

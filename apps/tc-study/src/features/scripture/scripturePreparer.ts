@@ -41,7 +41,7 @@ export const SCRIPTURE_PREPARE_SCHEMA = 2
  * invalidate whenever scripture-usj: is rewritten for a processing-version bump
  * (stale derivatives must not mask a missing token source).
  *
- * Example: schema 2 + `2.1.0-usj` → 2_000_000 + 210 = 2_000_210
+ * Example: schema 2 + `2.2.0-usj` → 2_000_000 + 220 = 2_000_220
  */
 export function scripturePrepareVersionFor(
   usjProcessingVersion: string = USJ_PROCESSING_VERSION

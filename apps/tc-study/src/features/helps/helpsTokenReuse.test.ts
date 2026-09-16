@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { resolvePreparedHelpsReload } from './usePreparedHelpsChapter'
 import {
   attachHelpsTokenCache,
+  helpsAlignRowsStillPending,
   mergeHelpsTokenCache,
   preparedRowsCoverChapterSpan,
   resolveHelpsChapterChangeWork,
@@ -98,6 +99,28 @@ describe('shouldSkipHelpsQuoteRebuild / shouldSkipHelpsAlignRebuild', () => {
     ).toBe(false)
   })
 
+  test('helpsAlignRowsStillPending detects frozen pending fingerprint rows', () => {
+    expect(
+      helpsAlignRowsStillPending([
+        { origWords: 'הִשְׁחִיתוּ', quoteStatus: 'pending' },
+        { origWords: 'כְּעֵץ', quoteStatus: 'ol-fallback', alignedTokens: [] },
+      ])
+    ).toBe(true)
+    expect(
+      helpsAlignRowsStillPending([
+        {
+          origWords: 'הִשְׁחִיתוּ',
+          quoteStatus: 'aligned',
+          alignedTokens: [{ position: 0 }],
+        },
+      ])
+    ).toBe(false)
+    // Premature ol-fallback without chips must keep retrying (not freeze fingerprint).
+    expect(
+      helpsAlignRowsStillPending([{ origWords: 'הִשְׁחִיתוּ', quoteStatus: 'ol-fallback' }])
+    ).toBe(true)
+  })
+
   test('skips quote and align rebuild for a large chapter when IDB/memory cache hits', () => {
     const links = Array.from({ length: 176 }, (_, i) => ({
       id: `psa-119-${i + 1}`,
@@ -146,6 +169,48 @@ describe('shouldSkipHelpsQuoteRebuild / shouldSkipHelpsAlignRebuild', () => {
       alignedTokens: [{ position: 0, content: 'men' }],
       quoteStatus: 'aligned',
     })
+  })
+
+  test('mergeHelpsTokenCache clears sticky quoteWarmPending when align settles', () => {
+    const cache = mergeHelpsTokenCache(new Map(), [
+      {
+        id: 'n1',
+        quoteTokens: [{ text: 'x' }],
+        quoteStatus: 'ol-fallback',
+        quoteWarmPending: true,
+      },
+    ])
+    expect(cache.get('n1')?.quoteWarmPending).toBe(true)
+    mergeHelpsTokenCache(cache, [
+      {
+        id: 'n1',
+        quoteTokens: [{ text: 'x' }],
+        alignedTokens: [{ position: 0, content: 'y' }],
+        quoteStatus: 'aligned',
+      },
+    ])
+    expect(cache.get('n1')?.quoteWarmPending).toBeUndefined()
+    expect(cache.get('n1')?.quoteStatus).toBe('aligned')
+  })
+
+  test('mergeHelpsTokenCache clears warm pending on settled OL without sticky ?? prev', () => {
+    const cache = mergeHelpsTokenCache(new Map(), [
+      {
+        id: 'n1',
+        quoteTokens: [{ text: 'x' }],
+        quoteStatus: 'ol-fallback',
+        quoteWarmPending: true,
+      },
+    ])
+    mergeHelpsTokenCache(cache, [
+      {
+        id: 'n1',
+        quoteTokens: [{ text: 'x' }],
+        quoteStatus: 'ol-fallback',
+        quoteWarmPending: undefined,
+      },
+    ])
+    expect(cache.get('n1')?.quoteWarmPending).toBeUndefined()
   })
 
   test('prepared rows from another chapter do not cover the destination span', () => {
@@ -200,6 +265,7 @@ describe('hooks honor cache-first chapter change', () => {
     )
     expect(src).toContain('shouldSkipHelpsAlignRebuild')
     expect(src).toContain('reuseHelpsAlignRows')
+    expect(src).toContain('helpsAlignRowsStillPending')
     expect(src).toContain('lastAlignedByIdRef')
     expect(src).toMatch(/shouldSkipHelpsAlignRebuild[\s\S]*setLoadingAligned\(true\)/)
   })

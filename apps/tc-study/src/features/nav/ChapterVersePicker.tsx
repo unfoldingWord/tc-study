@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import type { ResourceInfo } from '../../contexts/types'
 import { getBookTitle, getBookTitleStatic } from '../../utils/bookNames'
 import { ApplyFooter } from './ApplyFooter'
+import { selectedChapterFromVerseRange } from './bcvNavigatorActions'
 import {
   isVerseSelected,
   type VerseEntry,
@@ -17,6 +18,8 @@ interface ChapterVersePickerProps {
   endVerse: string | null
   selectionCount: number
   startVerseRef: RefObject<HTMLButtonElement | null>
+  /** Chapter grain: chapter numbers only. Verse grain: chapters + verse chips. */
+  grain?: 'chapter' | 'verse'
   onBack: () => void
   onChapterClick: (chapter: number) => void
   onVerseClick: (verseKey: string) => void
@@ -32,6 +35,7 @@ export function ChapterVersePicker({
   endVerse,
   selectionCount,
   startVerseRef,
+  grain = 'verse',
   onBack,
   onChapterClick,
   onVerseClick,
@@ -41,6 +45,8 @@ export function ChapterVersePicker({
     const n = getBookTitle(bookTitleSource, selectedBook)
     return n !== selectedBook.toUpperCase() ? n : getBookTitleStatic(selectedBook) || n
   })()
+  const selectedChapter = selectedChapterFromVerseRange(startVerse, endVerse)
+  const chapterOnly = grain === 'chapter'
 
   return (
     <>
@@ -61,38 +67,66 @@ export function ChapterVersePicker({
           <div className="text-sm text-fg-secondary flex items-center gap-2">
             <strong>{title}</strong>
             <span className="px-2 py-0.5 bg-muted text-fg-secondary rounded text-xs font-medium">
-              {selectionCount}
+              {chapterOnly ? (selectedChapter ?? 0) : selectionCount}
             </span>
           </div>
         </div>
 
         <div className="flex-1 overflow-auto p-6">
-          <div className="space-y-6">
-            {chapters.map((chapter) => (
-              <div key={chapter}>
-                <button
-                  type="button"
-                  onClick={() => onChapterClick(chapter)}
-                  className="mb-3 px-3 py-1.5 bg-muted hover:bg-muted rounded-lg font-bold text-fg-secondary text-sm transition-colors"
-                  title={`${chapter}`}
-                  aria-label={`Chapter ${chapter}`}
-                >
-                  {chapter}
-                </button>
+          {chapterOnly ? (
+            <div className="flex flex-wrap gap-2">
+              {chapters.map((chapter) => {
+                const selected = selectedChapter === chapter
+                return (
+                  <button
+                    key={chapter}
+                    ref={selected ? startVerseRef : null}
+                    type="button"
+                    onClick={() => onChapterClick(chapter)}
+                    className={`
+                      w-10 h-10 text-sm font-medium rounded transition-all
+                      ${
+                        selected
+                          ? 'bg-accent text-white ring-2 ring-accent font-bold'
+                          : 'bg-muted text-fg-secondary hover:bg-muted'
+                      }
+                    `}
+                    title={`Chapter ${chapter}`}
+                    aria-label={`Chapter ${chapter}`}
+                    aria-pressed={selected}
+                  >
+                    {chapter}
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {chapters.map((chapter) => (
+                <div key={chapter}>
+                  <button
+                    type="button"
+                    onClick={() => onChapterClick(chapter)}
+                    className="mb-3 px-3 py-1.5 bg-muted hover:bg-muted rounded-lg font-bold text-fg-secondary text-sm transition-colors"
+                    title={`${chapter}`}
+                    aria-label={`Chapter ${chapter}`}
+                  >
+                    {chapter}
+                  </button>
 
-                <div className="flex flex-wrap gap-1">
-                  {versesByChapter[chapter]?.map((v) => {
-                    const selected = isVerseSelected(v.key, startVerse, endVerse)
-                    const isStart = v.key === startVerse
-                    const isEnd = v.key === endVerse
+                  <div className="flex flex-wrap gap-1">
+                    {versesByChapter[chapter]?.map((v) => {
+                      const selected = isVerseSelected(v.key, startVerse, endVerse)
+                      const isStart = v.key === startVerse
+                      const isEnd = v.key === endVerse
 
-                    return (
-                      <button
-                        key={v.key}
-                        ref={isStart ? startVerseRef : null}
-                        type="button"
-                        onClick={() => onVerseClick(v.key)}
-                        className={`
+                      return (
+                        <button
+                          key={v.key}
+                          ref={isStart ? startVerseRef : null}
+                          type="button"
+                          onClick={() => onVerseClick(v.key)}
+                          className={`
                           w-8 h-8 text-xs font-medium rounded transition-all
                           ${
                             isStart || isEnd
@@ -102,15 +136,16 @@ export function ChapterVersePicker({
                                 : 'bg-muted text-fg-secondary hover:bg-muted'
                           }
                         `}
-                      >
-                        {v.verse}
-                      </button>
-                    )
-                  })}
+                        >
+                          {v.verse}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
       <ApplyFooter onApply={onApply} disabled={!startVerse} />

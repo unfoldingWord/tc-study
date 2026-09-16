@@ -2,7 +2,7 @@
 
 Process start → first paint → IndexedDB writes. This is the **current boot order**, read from the files named below — not a proposal.
 
-Companion: [workers-and-persistence.md](./workers-and-persistence.md) (key families, worker message types, lanes). Interactive map: open the Cursor canvas `tc-study-lifecycle-data-flow.canvas.tsx` beside chat.
+Companions: [workers-and-persistence.md](./workers-and-persistence.md) (key families, worker message types, lanes) · [helps-quote-flow.md](./helps-quote-flow.md) (TN/TWL chips without ScriptureViewer). Interactive map: open the Cursor canvas `tc-study-lifecycle-data-flow.canvas.tsx` beside chat.
 
 ---
 
@@ -35,11 +35,11 @@ Numbered as the browser executes them. “Constructs” ≠ “opens IndexedDB.�
     - `useReadCatalogLoad` (flags + `loadReadLanguageCatalog`)
     - `useEnsureCurrentBookOriginalLanguage` — `catalogAdapter.get` for UGNT/UHB (this can be the **first `tc-study-catalog` open**)
     - `useBackgroundDownload({ autoStart: false })` — session singleton, **no worker yet**
-    - `useCatalogBackgroundDownload` — **disabled** until `loadedResources` is non-empty and catalog load is not busy
+    - `useCatalogBackgroundDownload` — always armed (`enabled: !DISABLE_BACKGROUND_DOWNLOAD`); completeness uses stamped ingest receipts when present so matching releases skip zip + ingredient walks
     - `useReadUrlLanguageHydrate` — URL or persisted panel language → `handleLanguageSelected`
 17. Empty first visit (`/read`, no `tc-study:read-panels` language): `needsReadLanguagePicker` → header `LanguagePicker`. No Door43 catalog search, no download worker, **`tc-study-cache` typically still closed**.
 18. Language selected (picker or hydrate): `handleLanguageSelected` → `coldStartCatalogLoads` → `runCatalogLoad` → `src/features/read/loadReadLanguageCatalog.ts`.
-19. After Phase 1 membership + `loadedResources`, the download monitor enables (`requestIdleCallback`, 1s timeout). It waits until every `expectedResources` key is in the catalog DB, then `completenessChecker.checkResource` (first typical **`tc-study-cache` read**), then `backgroundDownloadSession.startDownload` (constructs `backgroundDownload.worker.ts`).
+19. After Phase 1 membership + `loadedResources`, the download monitor runs (500ms schedule). It checks stamped ingest receipts first (O(1) skip when release+schema match); otherwise `checkResource` walks ingredients. Incomplete keys call `backgroundDownloadSession.startDownload` (constructs `backgroundDownload.worker.ts`). Catalog `getAll` / completeness timeouts are treated as unknown — not false-incomplete enqueue.
 20. Scripture tab paints → `ScriptureViewer` → `useContent` → `readPreparedNav` / `loadUsjViewModel` → `enqueueScriptureBookPriority` (`prepare.worker.ts`).
 21. CombinedHelps mounts → `useCombinedHelpsPipeline` (`useQuoteTokens`, `useAlignedTokens`) + `useWarmLanes`. Lanes 2/3 admit only after both scripture and helps report lane-1 drained.
 

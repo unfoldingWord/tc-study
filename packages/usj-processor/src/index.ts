@@ -39,6 +39,10 @@ export {
 } from './viewModelFromProcessed'
 export { collectUsjWords, parseVerseSid, extractText, extractDeepText } from './usjWalk'
 export {
+  harvestPreVerseAlignments,
+  mergePreVerseAlignments,
+} from './preVerseAlignments'
+export {
   buildUsjLayoutBlocks,
   buildUsjLayoutBlocksForChapter,
   buildTokenQueuesFromViewModel,

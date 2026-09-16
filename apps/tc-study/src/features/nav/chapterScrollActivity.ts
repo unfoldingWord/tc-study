@@ -26,7 +26,7 @@ const EMPTY_ACTIVITY: ChapterScrollActivity = {
 
 let activity: ChapterScrollActivity = EMPTY_ACTIVITY
 const listeners = new Set<() => void>()
-/** Ignore scroll events caused by edge-pad peek/hide `scrollTop` adjusts. */
+/** Ignore scroll events caused by programmatic `scrollTop` adjusts. */
 let suppressUnsettledUntilMs = 0
 
 function notify(): void {
@@ -45,7 +45,7 @@ export function subscribeChapterScrollActivity(onStoreChange: () => void): () =>
 }
 
 /**
- * Programmatic `scrollTop` writes (edge travel pad peek/hide) must not pause
+ * Programmatic `scrollTop` writes (align / reveal) must not pause
  * quote-build / underline broadcast for a full settle hold.
  */
 export function beginProgrammaticScrollSuppress(durationMs = 120): void {

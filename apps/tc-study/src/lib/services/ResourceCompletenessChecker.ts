@@ -12,6 +12,13 @@
  */
 
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
+import {
+  buildIngestReceiptMetadata,
+  expectedIngestReleaseStamp,
+  ingestSchemaForResourceType,
+  isMatchingIngestReceipt,
+  INGEST_RECEIPT_KEYS,
+} from '@bt-synergy/resource-catalog'
 import type { CacheStorageAdapter } from '@bt-synergy/resource-cache'
 import {
   hasScripturePayload,
@@ -19,6 +26,9 @@ import {
   isScriptureBookComplete as isScriptureBookCompleteShared,
   scriptureChapterNumbers as scriptureChapterNumbersShared,
 } from '@bt-synergy/scripture-loader'
+import { ABSENT_FROM_RELEASE_KEY } from '@bt-synergy/resource-catalog'
+import { USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
+import { obsStoryCacheKey, resolveObsStoryIds } from '../obs/obsStoryIds'
 
 export interface ResourceCompletenessStatus {
   /** Resource key */
@@ -87,6 +97,18 @@ export const CACHE_METADATA_KEYS = {
 
   /** Download error (if any) */
   DOWNLOAD_ERROR: 'downloadError',
+
+  /** Door43 release identity (`resourceContentStamp`) at ingest time */
+  RELEASE_STAMP: INGEST_RECEIPT_KEYS.RELEASE_STAMP,
+
+  /** SoT processor schema at ingest time (e.g. usj:2.1.0-usj) */
+  INGEST_SCHEMA: INGEST_RECEIPT_KEYS.INGEST_SCHEMA,
+
+  /** Catalog ingredient count recorded at ingest time */
+  INGREDIENT_COUNT: INGEST_RECEIPT_KEYS.INGREDIENT_COUNT,
+
+  /** Books listed in catalog but absent from this release tag/zip */
+  ABSENT_FROM_RELEASE: ABSENT_FROM_RELEASE_KEY,
 } as const
 
 /** Ingredient cache key prefix by catalog resource type. */
@@ -99,14 +121,32 @@ export function ingredientCacheKeyFor(
     case 'scripture':
       return `scripture-usj:${resourceKey}:${ingredientId.toLowerCase()}`
     case 'notes':
+    case 'obs-notes':
       return `tn:${resourceKey}:${ingredientId}`
     case 'words-links':
+    case 'obs-words-links':
       return `twl:${resourceKey}:${ingredientId}`
     case 'questions':
+    case 'obs-questions':
       return `tq:${resourceKey}:${ingredientId}`
+    case 'obs':
+      return obsStoryCacheKey(resourceKey, ingredientId)
     default:
       return null
   }
+}
+
+/**
+ * Ingredients to walk for completeness. OBS directory-only manifests expand to
+ * story 01..50 (same as ObsLoader prefetch); other types pass through.
+ */
+export function ingredientsForCompletenessCheck(
+  resourceType: string,
+  ingredients: Array<{ identifier?: string }> | null | undefined
+): Array<{ identifier?: string }> | null | undefined {
+  if (resourceType !== 'obs') return ingredients
+  if (!ingredients) return ingredients
+  return resolveObsStoryIds(ingredients).map((identifier) => ({ identifier }))
 }
 
 function unwrapCachePayload(entry: unknown): Record<string, unknown> | null {
@@ -151,6 +191,7 @@ export function hasIngredientPayload(
     case 'scripture':
       return hasScripturePayload(entry)
     case 'notes':
+    case 'obs-notes':
       return (
         payload.notes != null ||
         (typeof payload.notesByChapter === 'object' &&
@@ -158,6 +199,7 @@ export function hasIngredientPayload(
           Object.keys(payload.notesByChapter as object).length > 0)
       )
     case 'words-links':
+    case 'obs-words-links':
       return (
         payload.links != null ||
         (typeof payload.linksByChapter === 'object' &&
@@ -165,11 +207,18 @@ export function hasIngredientPayload(
           Object.keys(payload.linksByChapter as object).length > 0)
       )
     case 'questions':
+    case 'obs-questions':
       return (
         payload.questions != null ||
         (typeof payload.questionsByChapter === 'object' &&
           payload.questionsByChapter != null &&
           Object.keys(payload.questionsByChapter as object).length > 0)
+      )
+    case 'obs':
+      return (
+        typeof payload.storyNumber === 'number' ||
+        (Array.isArray(payload.frames) && payload.frames.length > 0) ||
+        (typeof payload.title === 'string' && payload.title.length > 0)
       )
     default:
       return Object.keys(payload).length > 0
@@ -314,8 +363,54 @@ export class ResourceCompletenessChecker {
       const cacheKey = `resource:${resourceKey}`
       const cacheEntry = await this.cacheAdapter.get(cacheKey)
 
-      const ingredients = metadata.contentMetadata?.ingredients
+      const allIngredients = metadata.contentMetadata?.ingredients
       const resourceType = metadata.type
+      const expectedStamp = expectedIngestReleaseStamp(metadata)
+      const expectedSchema = ingestSchemaForResourceType(
+        resourceType,
+        USJ_PROCESSING_VERSION
+      )
+
+      // Catalog phantoms recorded after a zip/tree pass — exclude from expected set
+      const absentRaw = cacheEntry?.metadata?.[ABSENT_FROM_RELEASE_KEY]
+      const absentIds = new Set<string>(
+        Array.isArray(absentRaw)
+          ? absentRaw
+              .filter((id): id is string => typeof id === 'string')
+              .map((id) => id.toLowerCase())
+          : []
+      )
+      const filteredIngredients =
+        allIngredients && absentIds.size > 0
+          ? allIngredients.filter((ing) => {
+              const id = ing.identifier?.toLowerCase()
+              return !id || !absentIds.has(id)
+            })
+          : allIngredients
+      // OBS: expand directory-only `obs` ingredient → story 01..50 cache keys
+      const ingredients = ingredientsForCompletenessCheck(
+        resourceType,
+        filteredIngredients
+      )
+
+      // Stamped receipt match → O(1) complete, no ingredient walk
+      if (
+        cacheEntry &&
+        isMatchingIngestReceipt(cacheEntry, expectedStamp, expectedSchema)
+      ) {
+        const downloadCompletedAt =
+          cacheEntry.metadata?.[CACHE_METADATA_KEYS.DOWNLOAD_COMPLETED_AT]
+        const size = cacheEntry.metadata?.[CACHE_METADATA_KEYS.RESOURCE_SIZE]
+        return {
+          resourceKey,
+          isComplete: true,
+          status: 'complete',
+          lastDownloadedAt:
+            typeof downloadCompletedAt === 'string' ? downloadCompletedAt : undefined,
+          size: typeof size === 'number' ? size : undefined,
+        }
+      }
+
       const ingredientStats =
         ingredients && ingredients.length > 0
           ? await this.countCachedIngredients(
@@ -343,7 +438,7 @@ export class ResourceCompletenessChecker {
           }
         }
 
-        // Marker alone is not enough — verify ingredient / chapter payloads when possible
+        // Legacy / stamp-mismatch flag — still verify ingredient payloads when listed
         if (downloadComplete === true) {
           if (ingredientStats && ingredientStats.cachedCount < ingredientStats.checkableCount) {
             return {
@@ -352,6 +447,37 @@ export class ResourceCompletenessChecker {
               status: ingredientStats.cachedCount > 0 ? 'partial' : 'missing',
               lastDownloadedAt: downloadCompletedAt,
               size
+            }
+          }
+          // Stamp mismatch with empty ingredient list (TW/TA): treat incomplete so new release re-downloads
+          if (
+            !ingredientStats &&
+            expectedStamp &&
+            cacheEntry.metadata?.[CACHE_METADATA_KEYS.RELEASE_STAMP] !== expectedStamp
+          ) {
+            const existingStamp = cacheEntry.metadata?.[CACHE_METADATA_KEYS.RELEASE_STAMP]
+            if (typeof existingStamp === 'string' && existingStamp.length > 0) {
+              return {
+                resourceKey,
+                isComplete: false,
+                status: 'partial',
+                lastDownloadedAt: downloadCompletedAt,
+                size,
+              }
+            }
+          }
+          // Schema mismatch (e.g. USJ bump) with empty ingredient list
+          if (
+            !ingredientStats &&
+            cacheEntry.metadata?.[CACHE_METADATA_KEYS.INGEST_SCHEMA] &&
+            cacheEntry.metadata?.[CACHE_METADATA_KEYS.INGEST_SCHEMA] !== expectedSchema
+          ) {
+            return {
+              resourceKey,
+              isComplete: false,
+              status: 'partial',
+              lastDownloadedAt: downloadCompletedAt,
+              size,
             }
           }
           return {
@@ -366,8 +492,16 @@ export class ResourceCompletenessChecker {
         // Check entry count vs expected (for partially downloaded)
         const entryCount = cacheEntry.metadata?.[CACHE_METADATA_KEYS.ENTRY_COUNT]
         const expectedCount = cacheEntry.metadata?.[CACHE_METADATA_KEYS.EXPECTED_ENTRY_COUNT]
+        const adjustedExpected =
+          typeof expectedCount === 'number'
+            ? Math.max(0, expectedCount - absentIds.size)
+            : expectedCount
 
-        if (entryCount && expectedCount && entryCount < expectedCount) {
+        if (
+          typeof entryCount === 'number' &&
+          typeof adjustedExpected === 'number' &&
+          entryCount < adjustedExpected
+        ) {
           return {
             resourceKey,
             isComplete: false,
@@ -488,38 +622,82 @@ export class ResourceCompletenessChecker {
       entryCount?: number
       expectedEntryCount?: number
       downloadMethod?: 'zip' | 'individual'
+      releaseStamp?: string
+      ingestSchema?: string
+      ingredientCount?: number
     }
   ): Promise<void> {
     try {
       const cacheKey = `resource:${resourceKey}`
       const cacheEntry = await this.cacheAdapter.get(cacheKey)
 
+      // Prefer explicit stamp fields; otherwise derive from current catalog metadata
+      let releaseStamp = metadata?.releaseStamp
+      let ingestSchema = metadata?.ingestSchema
+      let ingredientCount = metadata?.ingredientCount
+      if (!releaseStamp || !ingestSchema) {
+        try {
+          const catalogMeta = await this.catalogManager.getResourceMetadata(resourceKey)
+          if (catalogMeta) {
+            releaseStamp =
+              releaseStamp ?? expectedIngestReleaseStamp(catalogMeta) ?? undefined
+            ingestSchema =
+              ingestSchema ??
+              ingestSchemaForResourceType(catalogMeta.type, USJ_PROCESSING_VERSION)
+            if (ingredientCount == null) {
+              const n = catalogMeta.contentMetadata?.ingredients?.length
+              if (typeof n === 'number') ingredientCount = n
+            }
+          }
+        } catch {
+          /* keep partial metadata */
+        }
+      }
+
+      const receiptMeta =
+        releaseStamp && ingestSchema
+          ? buildIngestReceiptMetadata({
+              releaseStamp,
+              ingestSchema,
+              ingredientCount,
+              downloadMethod: metadata?.downloadMethod,
+              size: metadata?.size,
+              entryCount: metadata?.entryCount,
+              expectedEntryCount: metadata?.expectedEntryCount,
+            })
+          : {
+              [CACHE_METADATA_KEYS.DOWNLOAD_COMPLETE]: true,
+              [CACHE_METADATA_KEYS.DOWNLOAD_COMPLETED_AT]: new Date().toISOString(),
+              ...(metadata?.downloadMethod
+                ? { [CACHE_METADATA_KEYS.DOWNLOAD_METHOD]: metadata.downloadMethod }
+                : {}),
+              ...(typeof metadata?.size === 'number'
+                ? { [CACHE_METADATA_KEYS.RESOURCE_SIZE]: metadata.size }
+                : {}),
+              ...(typeof metadata?.entryCount === 'number'
+                ? { [CACHE_METADATA_KEYS.ENTRY_COUNT]: metadata.entryCount }
+                : {}),
+              ...(typeof metadata?.expectedEntryCount === 'number'
+                ? { [CACHE_METADATA_KEYS.EXPECTED_ENTRY_COUNT]: metadata.expectedEntryCount }
+                : {}),
+            }
+
       if (!cacheEntry) {
-        // Create minimal cache entry if doesn't exist
         await this.cacheAdapter.set(cacheKey, {
           type: 'json',
           content: {},
           cachedAt: new Date().toISOString(),
-          metadata: {
-            [CACHE_METADATA_KEYS.DOWNLOAD_COMPLETE]: true,
-            [CACHE_METADATA_KEYS.DOWNLOAD_COMPLETED_AT]: new Date().toISOString(),
-            ...metadata
-          }
+          metadata: receiptMeta,
         })
       } else {
-        // Update existing entry
         await this.cacheAdapter.set(cacheKey, {
           ...cacheEntry,
           metadata: {
             ...cacheEntry.metadata,
-            [CACHE_METADATA_KEYS.DOWNLOAD_COMPLETE]: true,
-            [CACHE_METADATA_KEYS.DOWNLOAD_COMPLETED_AT]: new Date().toISOString(),
-            ...metadata
-          }
+            ...receiptMeta,
+          },
         })
       }
-
-
     } catch (error) {
       console.error(`[BG-DL] 📦 Cache Error marking ${resourceKey} complete:`, error)
       throw error
@@ -574,6 +752,10 @@ export class ResourceCompletenessChecker {
         delete cacheEntry.metadata[CACHE_METADATA_KEYS.DOWNLOAD_COMPLETE]
         delete cacheEntry.metadata[CACHE_METADATA_KEYS.DOWNLOAD_COMPLETED_AT]
         delete cacheEntry.metadata[CACHE_METADATA_KEYS.DOWNLOAD_ERROR]
+        delete cacheEntry.metadata[CACHE_METADATA_KEYS.RELEASE_STAMP]
+        delete cacheEntry.metadata[CACHE_METADATA_KEYS.INGEST_SCHEMA]
+        delete cacheEntry.metadata[CACHE_METADATA_KEYS.INGREDIENT_COUNT]
+        delete cacheEntry.metadata[CACHE_METADATA_KEYS.ABSENT_FROM_RELEASE]
 
         await this.cacheAdapter.set(cacheKey, cacheEntry)
 

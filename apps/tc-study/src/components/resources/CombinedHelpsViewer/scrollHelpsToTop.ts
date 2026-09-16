@@ -7,6 +7,7 @@ import type {
   ObsQuoteFilter,
   SupportRefFilter,
   TokenFilterLike,
+  TwlArticleFilter,
   VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
 
@@ -15,6 +16,7 @@ export interface HelpsFilterIdentityInput {
   verseFilter: VerseFilterState | null
   obsQuoteFilter: ObsQuoteFilter | null
   supportRefFilter?: SupportRefFilter | null
+  twlArticleFilter?: TwlArticleFilter | null
 }
 
 /** Stable key for the active filter scope. Omits timestamps. */
@@ -23,6 +25,7 @@ export function helpsFilterIdentity({
   verseFilter,
   obsQuoteFilter,
   supportRefFilter = null,
+  twlArticleFilter = null,
 }: HelpsFilterIdentityInput): string {
   return JSON.stringify({
     t: tokenFilter
@@ -47,6 +50,12 @@ export function helpsFilterIdentity({
       ? {
           r: supportRefFilter.supportReference,
           t: supportRefFilter.title,
+        }
+      : null,
+    w: twlArticleFilter
+      ? {
+          a: twlArticleFilter.articlePath,
+          t: twlArticleFilter.title,
         }
       : null,
   })

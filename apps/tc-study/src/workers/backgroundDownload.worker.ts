@@ -29,13 +29,14 @@ import {
   STARTING_PROGRESS_PERCENT,
   computeInFlightOverallProgress,
   createInitialDownloadProgress,
-  fallbackIngredientCount,
+  discoveredIngredientCount,
   mapLoaderProgressToResource,
   RESOURCE_DOWNLOAD_TIMEOUT_MS,
   resolveRunIngredientTotal,
   shouldSkipCompleteResourceDownload,
   skippedCompleteResourceProgress,
   withResourceDownloadTimeout,
+  type DownloadRunPhase,
 } from '../features/download/backgroundDownloadRun'
 import { registerWorkerLoaders } from '../features/download/workerLoaderRegistry'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
@@ -45,6 +46,19 @@ import { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenes
 // NOTE: We don't import ResourceTypeRegistry or resource type definitions here
 // because they include React components (viewers) which try to access window/document
 // in HMR code. Workers don't need viewers - only loaders!
+
+function postStep(runId: number, step: string, detail?: string): void {
+  if (runId <= 0) return
+  postMessage({
+    type: 'step',
+    runId,
+    payload: { step, detail },
+  })
+}
+
+function isZipByteProgressMessage(msg: string): boolean {
+  return msg === 'downloading zip' || msg.startsWith('downloading zip')
+}
 
 // ============================================================================
 // WORKER CONTEXT CHECK
@@ -192,16 +206,25 @@ self.onmessage = async (event: MessageEvent) => {
         activeRunId = runId
         const { resourceKeys, skipExisting, totalIngredients } = payload
 
+        postStep(runId, 'start-received', `${(resourceKeys ?? []).length} keys`)
+
         // Pulse before init/metadata so the badge leaves 0% immediately
         postMessage({
           type: 'progress',
           runId,
-          payload: createInitialDownloadProgress(resourceKeys ?? [], totalIngredients),
+          payload: {
+            ...createInitialDownloadProgress(resourceKeys ?? [], totalIngredients),
+            phase: 'init' as DownloadRunPhase,
+            lastActivityAt: Date.now(),
+          },
         })
+        postStep(runId, 'phase-init')
 
         // Initialize if not already done
         if (!isInitialized) {
+          postStep(runId, 'initialize-begin')
           await initialize()
+          postStep(runId, 'initialize-done')
         }
 
         // Superseded during init (language switch stop)
@@ -300,14 +323,30 @@ async function downloadSpecificResources(
   // a frozen 50 while ULT/UST/UHB credit real books.
   const discoveredCounts: number[] = []
 
+  if (runId === activeRunId) {
+    postMessage({
+      type: 'progress',
+      runId,
+      payload: {
+        ...createInitialDownloadProgress(resourceKeys, providedTotalIngredients),
+        phase: 'metadata' as DownloadRunPhase,
+        lastActivityAt: Date.now(),
+        currentIngredient: 'metadata',
+      },
+    })
+    postStep(runId, 'phase-metadata', `${resourceKeys.length} keys`)
+  }
+
   for (const resourceKey of resourceKeys) {
     try {
+      postStep(runId, 'fetch-manifest', resourceKey)
       const metadata = await withResourceDownloadTimeout(
         catalogManager.getResourceMetadata(resourceKey),
         RESOURCE_DOWNLOAD_TIMEOUT_MS,
         resourceKey
       )
       if (!metadata) {
+        postStep(runId, 'manifest-missing', resourceKey)
         console.warn(`[BG-DL] ⚙️ Worker Metadata not found for ${resourceKey}`)
         continue
       }
@@ -316,10 +355,20 @@ async function downloadSpecificResources(
       const resourceType = downloadManager['resourceTypeRegistry'].get(metadata.type)
       const priority = resourceType?.downloadPriority ?? 50
 
-      // Count ingredients (books/entries). UHB/UGNT fall back to 39/27, not 1.
+      // Count ingredients (books/entries). UHB/UGNT/OBS fall back to 39/27/50, not 1.
       const ingredients = metadata.contentMetadata?.ingredients || []
-      const ingredientsCount = fallbackIngredientCount(resourceKey, ingredients.length)
+      const ingredientsCount = discoveredIngredientCount(
+        resourceKey,
+        ingredients,
+        metadata.type
+      )
       discoveredCounts.push(ingredientsCount)
+      const zipUrl = metadata.release?.zipball_url
+      postStep(
+        runId,
+        'manifest-ok',
+        `${resourceKey} · ingredients=${ingredientsCount}${zipUrl ? ` · zip=${zipUrl.slice(0, 96)}` : ''}`
+      )
 
       resourcesWithPriority.push({
         resourceKey,
@@ -328,6 +377,11 @@ async function downloadSpecificResources(
         ingredientsCount
       })
     } catch (error) {
+      postStep(
+        runId,
+        'manifest-error',
+        `${resourceKey} · ${error instanceof Error ? error.message : String(error)}`
+      )
       console.error(`[BG-DL] ⚙️ Worker Failed to get metadata for ${resourceKey}:`, error)
     }
   }
@@ -395,14 +449,23 @@ async function downloadSpecificResources(
       completedIngredients: 0,
       failedIngredients: 0,
       currentIngredient: null,
+      phase: 'checking' as DownloadRunPhase,
+      lastActivityAt: Date.now(),
       tasks: [],
     },
   })
+  postStep(
+    runId,
+    'phase-checking',
+    `queue=${resourcesWithPriority.length} · ingredients=${totalIngredients}`
+  )
 
   // Download resources one at a time (sequential)
   // Benefits: simpler progress tracking, better for slow connections, no race conditions
   let completedResourceCount = 0
   let failedResourceCount = 0
+
+  let activePhase: DownloadRunPhase = 'checking'
 
   const postIngredientProgress = (partial: {
     currentResource: string | null
@@ -412,14 +475,20 @@ async function downloadSpecificResources(
     completedResources: number
     failedResources: number
     overallProgress: number
+    phase?: DownloadRunPhase
+    currentResourceProgress?: number
   }) => {
     if (runId !== activeRunId) return
+    if (partial.phase) activePhase = partial.phase
     postMessage({
       type: 'progress',
       runId,
       payload: {
         currentResource: partial.currentResource,
-        currentResourceProgress: 0,
+        currentResourceProgress:
+          typeof partial.currentResourceProgress === 'number'
+            ? partial.currentResourceProgress
+            : 0,
         totalResources: resourcesWithPriority.length,
         completedResources: partial.completedResources,
         failedResources: partial.failedResources,
@@ -428,6 +497,8 @@ async function downloadSpecificResources(
         completedIngredients: partial.completedIngredients,
         failedIngredients: partial.failedIngredients,
         currentIngredient: partial.currentIngredient ?? null,
+        phase: activePhase,
+        lastActivityAt: Date.now(),
         tasks: [],
       },
     })
@@ -458,9 +529,18 @@ async function downloadSpecificResources(
           currentResourceIngredients: ingredientsCount,
           currentResourcePercent: STARTING_PROGRESS_PERCENT,
         }),
+        phase: 'checking',
+        currentResourceProgress: STARTING_PROGRESS_PERCENT,
       })
+      const zipUrl = metadata.release?.zipball_url
+      postStep(
+        runId,
+        'resource-begin',
+        `${resourceKey} · method=${method}${zipUrl ? ` · ${zipUrl.slice(0, 80)}` : ''}`
+      )
 
       // Create a custom progress callback for ingredient-level updates
+      let lastStepMessage = ''
       const onProgress = (progress: {
         loaded?: number
         total?: number
@@ -502,6 +582,34 @@ async function downloadSpecificResources(
           }
         }
 
+        const msg = (progress.message ?? '').toLowerCase()
+        const phase: DownloadRunPhase =
+          msg.includes('zip') || msg.startsWith('downloading')
+            ? 'downloading'
+            : msg.includes('extract') ||
+                msg.startsWith('processed') ||
+                msg.startsWith('skipped')
+              ? 'extracting'
+              : activePhase
+
+        if (progress.message && progress.message !== lastStepMessage) {
+          lastStepMessage = progress.message
+          const stepName = isZipByteProgressMessage(msg)
+            ? 'download-file'
+            : msg.startsWith('extract')
+              ? 'extract'
+              : msg.startsWith('processed') || msg.startsWith('skipped')
+                ? 'write-idb'
+                : 'loader'
+          postStep(
+            runId,
+            stepName,
+            `${resourceKey} · ${progress.message}${
+              typeof progress.percentage === 'number' ? ` · ${Math.round(progress.percentage)}%` : ''
+            }`
+          )
+        }
+
         postIngredientProgress({
           currentResource: resourceKey,
           currentIngredient,
@@ -510,12 +618,32 @@ async function downloadSpecificResources(
           completedResources: completedResourceCount,
           failedResources: failedResourceCount,
           overallProgress,
+          phase,
+          currentResourceProgress: mapped.currentResourcePercent,
         })
       }
 
       if (skipExisting && completenessChecker) {
-        const status = await completenessChecker.checkResource(resourceKey)
-        if (shouldSkipCompleteResourceDownload(skipExisting, status.isComplete)) {
+        let isComplete = false
+        try {
+          postStep(runId, 'completeness-check', resourceKey)
+          // failFast + timeout: a hung IDB walk must not leave the UI at 1%.
+          const status = await withResourceDownloadTimeout(
+            completenessChecker.checkResource(resourceKey, { failFast: true }),
+            30_000,
+            resourceKey
+          )
+          isComplete = status.isComplete
+          postStep(runId, 'completeness-result', `${resourceKey} · complete=${isComplete}`)
+        } catch (err) {
+          postStep(
+            runId,
+            'completeness-error',
+            `${resourceKey} · ${err instanceof Error ? err.message : String(err)}`
+          )
+          isComplete = false
+        }
+        if (shouldSkipCompleteResourceDownload(skipExisting, isComplete)) {
           const skipped = skippedCompleteResourceProgress(ingredientsCount, resourceKey)
           onProgress(skipped)
           completedIngredients += ingredientsCount
@@ -536,6 +664,7 @@ async function downloadSpecificResources(
               totalIngredients > 0
                 ? Math.round((completedIngredients / totalIngredients) * 100)
                 : 0,
+            phase: 'completing',
           })
           if (runId === activeRunId) {
             postMessage({

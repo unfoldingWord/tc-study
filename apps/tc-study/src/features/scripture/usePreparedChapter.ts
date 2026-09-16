@@ -2,7 +2,7 @@
  * Read light/full prepared scripture for one chapter; refresh on prepare ready.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { useCacheAdapter } from '../../contexts'
 import { RESOURCE_TYPE_IDS } from '../../resourceTypes/resourceTypeIds'
 import { scheduleIdle } from '../../utils/scheduleIdle'
@@ -14,6 +14,7 @@ import {
   prefetchPreparedBookLight,
   seedPreparedChapter,
 } from './preparedChapterCache'
+import { preparedChapterStateAfterNavPeek } from './scriptureTokensBookNav'
 import type { ScriptureFullChapter, ScriptureLightChapter } from './scripturePreparer'
 
 export interface PreparedChapterState {
@@ -30,6 +31,18 @@ const EMPTY: PreparedChapterState = {
   paragraphs: [],
 }
 
+function stateFromTiers(entry: {
+  light: ScriptureLightChapter | null
+  full: ScriptureFullChapter | null
+}): PreparedChapterState {
+  return {
+    light: entry.light,
+    full: entry.full,
+    matchKeys: entry.full?.matchKeys ?? null,
+    paragraphs: paragraphsFromLightChapter(entry.light),
+  }
+}
+
 export function usePreparedChapter(args: {
   resourceKey: string
   bookId: string
@@ -40,19 +53,28 @@ export function usePreparedChapter(args: {
   const cache = useCacheAdapter()
   const [state, setState] = useState<PreparedChapterState>(() => {
     if (!enabled || !resourceKey || !bookId || chapter < 1) return EMPTY
-    const peeked = peekPreparedChapter(resourceKey, bookId, chapter)
-    if (!peeked) return EMPTY
-    return {
-      light: peeked.light,
-      full: peeked.full,
-      matchKeys: peeked.full?.matchKeys ?? null,
-      paragraphs: paragraphsFromLightChapter(peeked.light),
-    }
+    const peeked = preparedChapterStateAfterNavPeek(
+      peekPreparedChapter(resourceKey, bookId, chapter)
+    )
+    return stateFromTiers(peeked)
   })
+
+  // Before paint: swap to this passage's peek (or empty). Prevents one-frame
+  // SCRIPTURE_TOKENS publish of the previous book's prepared full on book nav.
+  useLayoutEffect(() => {
+    if (!enabled || !resourceKey || !bookId || chapter < 1) {
+      setState(EMPTY)
+      return
+    }
+    setState(
+      stateFromTiers(
+        preparedChapterStateAfterNavPeek(peekPreparedChapter(resourceKey, bookId, chapter))
+      )
+    )
+  }, [resourceKey, bookId, chapter, enabled])
 
   useEffect(() => {
     if (!enabled || !resourceKey || !bookId || chapter < 1) {
-      setState(EMPTY)
       return
     }
     let cancelled = false
@@ -62,16 +84,8 @@ export function usePreparedChapter(args: {
       full: ScriptureFullChapter | null
     }) => {
       if (cancelled) return
-      setState({
-        light: entry.light,
-        full: entry.full,
-        matchKeys: entry.full?.matchKeys ?? null,
-        paragraphs: paragraphsFromLightChapter(entry.light),
-      })
+      setState(stateFromTiers(entry))
     }
-
-    const peeked = peekPreparedChapter(resourceKey, bookId, chapter)
-    if (peeked && (peeked.light || peeked.full)) apply(peeked)
 
     void fetchPreparedChapterTiers(cache, resourceKey, bookId, chapter).then((entry) => {
       apply(entry)

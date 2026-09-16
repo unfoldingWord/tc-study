@@ -8,14 +8,23 @@ import {
   filterLinksByReferenceRange,
   filterNotesByReferenceRange,
   resolveRangeEndVerse,
+  mergeFocusChapterBookMatches,
   reuseUnchangedSupportRefNotes,
   settleSupportRefDisplayNotes,
+  settleTwlArticleDisplayLinks,
+  streamRowsForChapter,
   supportRefFirstPaintNotes,
+  supportRefNotesForChapter,
+  twlArticleFirstPaintLinks,
+  twlArticleLinksForChapter,
   type ObsQuoteFilter,
   type SupportRefFilter,
+  type TwlArticleFilter,
   type VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
 import { useSupportRefBookStream } from '../../../features/helps/useSupportRefBookStream'
+import { useTwlArticleBookStream } from '../../../features/helps/useTwlArticleBookStream'
+import { useTwlArticleQuotes } from '../../../features/helps/useTwlArticleQuotes'
 import { useSupportRefQuotes } from '../../../features/helps/useSupportRefQuotes'
 import {
   attachHelpsTokenCache,
@@ -28,7 +37,7 @@ import {
   preparedNoteToTranslationNote,
   type PreparedTranslationNote,
 } from '../../../features/helps/preparedHelpsRows'
-import { underlineGroupsFromHelpsNotes } from '../../../features/helps/scriptureReadyUnderlineRebind'
+import { underlineGroupsFromHelpsNotes, chapterHelpsRowsForUnderlines } from '../../../features/helps/scriptureReadyUnderlineRebind'
 import { measureScripturePerfSync } from '../../../features/perf/scripturePerf'
 import type { NotesFullRow } from '../../../features/notes/notesPreparer'
 import type { WordsLinksFullRow } from '../../../features/wordsLinks/wordsLinksPreparer'
@@ -71,6 +80,7 @@ export interface UseCombinedHelpsPipelineParams {
   verseFilter: VerseFilterState | null
   obsQuoteFilter: ObsQuoteFilter | null
   supportRefFilter?: SupportRefFilter | null
+  twlArticleFilter?: TwlArticleFilter | null
   /** Target scripture key for align-cache hydrate + lane 2 align jobs. */
   targetKey?: string | null
 }
@@ -120,6 +130,7 @@ export function useCombinedHelpsPipeline({
   verseFilter,
   obsQuoteFilter,
   supportRefFilter = null,
+  twlArticleFilter = null,
   targetKey = '',
 }: UseCombinedHelpsPipelineParams) {
   // Chapter-scoped notes drive underlines + quote/align for the current passage.
@@ -156,6 +167,7 @@ export function useCombinedHelpsPipeline({
   const supportRefQuoteEnrichment = useSupportRefQuotes({
     enabled: Boolean(supportRefFilter),
     notesByChapter,
+    fallbackNotes: tnNotes,
     supportReference: supportRefFilter?.supportReference ?? '',
     tnKey: tnKey || resourceKey,
     bookId: currentRef.book || '',
@@ -172,6 +184,26 @@ export function useCombinedHelpsPipeline({
       focusChapter: currentRef.chapter,
     })
 
+  const { streamedLinks: streamedTwlArticleLinks, streamPending: twlArticleStreamPending } =
+    useTwlArticleBookStream({
+      enabled: Boolean(twlArticleFilter),
+      linksByChapter,
+      fallbackLinks: twlLinksRaw,
+      articlePath: twlArticleFilter?.articlePath ?? '',
+      focusChapter: currentRef.chapter,
+    })
+
+  const twlArticleQuoteEnrichment = useTwlArticleQuotes({
+    enabled: Boolean(twlArticleFilter),
+    linksByChapter,
+    fallbackLinks: twlLinksRaw,
+    articlePath: twlArticleFilter?.articlePath ?? '',
+    twlKey: twlKey || resourceKey,
+    bookId: currentRef.book || '',
+    focusChapter: currentRef.chapter,
+    targetKey,
+  })
+
   const helpsTokenCacheRef = useRef(new Map<string, HelpsTokenCacheRow>())
   const helpsTokenBookRef = useRef(currentRef.book)
   if (helpsTokenBookRef.current !== currentRef.book) {
@@ -184,13 +216,22 @@ export function useCombinedHelpsPipeline({
       [...supportRefQuoteEnrichment.entries()].map(([id, row]) => ({ id, ...row }))
     )
   }
+  if (twlArticleQuoteEnrichment.size) {
+    mergeHelpsTokenCache(
+      helpsTokenCacheRef.current,
+      [...twlArticleQuoteEnrichment.entries()].map(([id, row]) => ({ id, ...row }))
+    )
+  }
 
+  // Chapter quote/align (useQuoteTokens) must not restart when book-filter
+  // enrichment paints off-chapter rows — that cancel thrash left quotes stuck.
+  // Book-filter display attaches enrichment via settle* below.
   const relevantNotesHydrated = useMemo(
     () =>
       attachHelpsTokenCache(relevantNotes, helpsTokenCacheRef.current) as Array<
         PreparedTranslationNote & HelpsTokenCacheRow
       >,
-    [relevantNotes, supportRefQuoteEnrichment]
+    [relevantNotes]
   )
 
   const notesWithQuotes = useMemo(
@@ -270,10 +311,16 @@ export function useCombinedHelpsPipeline({
       supportRefDisplayPrevRef.current = []
       return notesWithAlignedTokens
     }
-    const firstPaint = supportRefFirstPaintNotes(
-      notesWithAlignedTokens,
-      supportRefFilter.supportReference,
-      currentRef.chapter
+    const firstPaint = mergeFocusChapterBookMatches(
+      supportRefFirstPaintNotes(
+        notesWithAlignedTokens,
+        supportRefFilter.supportReference,
+        currentRef.chapter
+      ),
+      supportRefNotesForChapter(
+        notesByChapter?.[String(currentRef.chapter)] ?? [],
+        supportRefFilter.supportReference
+      )
     )
     const alignById = new Map(notesWithAlignedTokens.map((n) => [n.id, n]))
     const settled = settleSupportRefDisplayNotes(
@@ -291,6 +338,7 @@ export function useCombinedHelpsPipeline({
     streamedSupportRefNotes,
     supportRefQuoteEnrichment,
     currentRef.chapter,
+    notesByChapter,
   ])
 
   mergeHelpsTokenCache(helpsTokenCacheRef.current, notesWithAlignedTokens)
@@ -340,6 +388,47 @@ export function useCombinedHelpsPipeline({
   }, [links, twlLinksWithQuotes, twlLinksAligned]) as LinkWithAlignments[]
   mergeHelpsTokenCache(helpsTokenCacheRef.current, processedLinks)
 
+  const twlArticleDisplayPrevRef = useRef<LinkWithAlignments[]>([])
+  // TWL article: current-chapter matches first (already quote/aligned), then streamed book.
+  const linksForDisplay = useMemo((): LinkWithAlignments[] => {
+    if (!twlArticleFilter) {
+      twlArticleDisplayPrevRef.current = []
+      return processedLinks
+    }
+    const firstPaint = mergeFocusChapterBookMatches(
+      twlArticleFirstPaintLinks(
+        processedLinks,
+        twlArticleFilter.articlePath,
+        currentRef.chapter
+      ),
+      twlArticleLinksForChapter(
+        streamRowsForChapter(linksByChapter, twlLinksRaw, currentRef.chapter),
+        twlArticleFilter.articlePath
+      )
+    )
+    const alignById = new Map(processedLinks.map((link) => [link.id, link]))
+    const streamed = streamedTwlArticleLinks.map(withArticlePath)
+    const cacheHits = attachHelpsTokenCache(streamed, helpsTokenCacheRef.current)
+    const settled = settleTwlArticleDisplayLinks(
+      [...firstPaint, ...cacheHits],
+      twlArticleFilter.articlePath,
+      alignById,
+      twlArticleQuoteEnrichment
+    ) as LinkWithAlignments[]
+    const reused = reuseUnchangedSupportRefNotes(settled, twlArticleDisplayPrevRef.current)
+    twlArticleDisplayPrevRef.current = reused
+    return reused
+  }, [
+    twlArticleFilter,
+    processedLinks,
+    streamedTwlArticleLinks,
+    twlArticleQuoteEnrichment,
+    currentRef.chapter,
+    linksByChapter,
+    twlLinksRaw,
+  ])
+  mergeHelpsTokenCache(helpsTokenCacheRef.current, linksForDisplay)
+
   const filteredByReference = useMemo(() => {
     if (!processedLinks.length) return []
     const startChapter = currentRef.chapter || 1
@@ -368,6 +457,8 @@ export function useCombinedHelpsPipeline({
   const bookCodeLower = currentRef.book?.toLowerCase() || ''
 
   // Underlines come from quoteTokens (cache/worker) — do not wait on align settle.
+  // Book filters: use current-chapter display rows (enrichment tokens), not the
+  // unfiltered chapter slice — otherwise only the first already-built note underlines.
   const underlineTnGroups = useMemo(
     () =>
       measureScripturePerfSync('underline-groups', 'tn', () => {
@@ -375,7 +466,10 @@ export function useCombinedHelpsPipeline({
         const semanticIdsMap = new Map(
           tnLinksAligned.map((l) => [l.id, (l as { semanticIds?: string[] }).semanticIds])
         )
-        const notesForUnderline = relevantNotesHydrated.map((note) => ({
+        const sourceNotes = supportRefFilter
+          ? chapterHelpsRowsForUnderlines(notesForDisplay, currentRef.chapter)
+          : relevantNotesHydrated
+        const notesForUnderline = sourceNotes.map((note) => ({
           id: note.id,
           reference: note.reference,
           occurrence: note.occurrence,
@@ -386,7 +480,15 @@ export function useCombinedHelpsPipeline({
         }))
         return underlineGroupsFromHelpsNotes(notesForUnderline, bookCodeLower)
       }),
-    [relevantNotesHydrated, tnLinksWithQuotes, tnLinksAligned, bookCodeLower]
+    [
+      relevantNotesHydrated,
+      notesForDisplay,
+      supportRefFilter,
+      tnLinksWithQuotes,
+      tnLinksAligned,
+      bookCodeLower,
+      currentRef.chapter,
+    ]
   )
 
   const underlineTwlGroups = useMemo(
@@ -399,6 +501,14 @@ export function useCombinedHelpsPipeline({
           { book: currentRef.book, verse: startVerse, endVerse: currentRef.endVerse },
           navigationMode
         )
+        if (twlArticleFilter) {
+          const chapterLinks = chapterHelpsRowsForUnderlines(
+            linksForDisplay,
+            startChapter,
+            endChapter
+          )
+          return underlineGroupsFromHelpsNotes(chapterLinks, bookCodeLower)
+        }
         // Prefer quote-bearing rows; fall back to aligned/processed for semanticIds.
         const quoteSource =
           twlLinksWithQuotes.length === links.length && links.length > 0
@@ -415,6 +525,8 @@ export function useCombinedHelpsPipeline({
     [
       twlLinksWithQuotes,
       processedLinks,
+      linksForDisplay,
+      twlArticleFilter,
       links.length,
       currentRef.chapter,
       currentRef.verse,
@@ -427,13 +539,14 @@ export function useCombinedHelpsPipeline({
   )
 
   const { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches } = useCombinedHelpsDisplay({
-    notesWithAlignedTokens: notesForDisplay,
-    filteredByReference: supportRefFilter ? [] : filteredByReference,
+    notesWithAlignedTokens: twlArticleFilter ? [] : notesForDisplay,
+    filteredByReference: supportRefFilter ? [] : twlArticleFilter ? linksForDisplay : filteredByReference,
     helpsScope,
     obsQuoteFilter,
     verseFilter,
     tokenFilter,
     supportRefFilter,
+    twlArticleFilter,
     bookCodeLower,
   })
 
@@ -458,5 +571,6 @@ export function useCombinedHelpsPipeline({
     twlQuoteBuildReady,
     quotesBlocked: tnOlBlocked || twlOlBlocked,
     supportRefStreamPending,
+    twlArticleStreamPending,
   }
 }

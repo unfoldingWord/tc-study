@@ -138,6 +138,51 @@ describe('CombinedHelpsList token filter empty', () => {
     expect(html).not.toContain('sticky top-0 z-10')
   })
 
+  test('book-wide apply-anchor keeps a later clicked group in the window', () => {
+    const mergedGroups = Array.from({ length: 40 }, (_, i) => ({
+      ref: `${i + 1}:1`,
+      items: [
+        {
+          kind: 'tn' as const,
+          ref: `${i + 1}:1`,
+          sortChapter: i + 1,
+          sortVerse: 1,
+          sortPosition: 0,
+          note: {
+            id: `n${i + 1}`,
+            reference: `${i + 1}:1`,
+            tags: '',
+            quote: 'q',
+            occurrence: '1',
+            note: 'body',
+            supportReference: 'rc://*/ta/man/translate/figs-metaphor',
+          },
+        },
+      ],
+    }))
+    const html = renderToStaticMarkup(
+      createElement(
+        CombinedHelpsList,
+        listProps({
+          tokenFilter: null,
+          supportRefFilter: {
+            supportReference: 'rc://*/ta/man/translate/figs-metaphor',
+            title: 'Metaphor',
+            timestamp: 1,
+            anchor: { kind: 'tn', id: 'n30', ref: '30:1' },
+          },
+          mergedGroups,
+          filterScopeBar: createElement('span', { 'data-testid': 'helps-filter-scope-bar' }, 'Metaphor'),
+        })
+      )
+    )
+    expect(html).toContain('helps-row-tn-n30')
+    expect(html).toContain('30:1')
+    expect(html).toContain('1:1')
+    expect(html).not.toContain('40:1')
+    expect(html).toContain('helps-verse-group-header')
+  })
+
   test('compact sticky chrome is current ref + filter chip, not Helps title or match count', () => {
     const html = renderToStaticMarkup(
       createElement(
@@ -317,6 +362,67 @@ describe('CombinedHelpsList token filter empty', () => {
     expect(html).toContain('3:7')
     expect(html).toContain('Filter kinds')
     expect(html).not.toContain('helps-filter-scope-bar')
+  })
+
+  test('book-wide TWL article filter uses filter-empty, not no-helps, when the chapter has rows', () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        CombinedHelpsList,
+        listProps({
+          tokenFilter: null,
+          kindFilter: 'twl',
+          twlArticleFilter: {
+            articlePath: 'bible/kt/sin',
+            title: 'Sin',
+            timestamp: 1,
+          },
+          filterScopeBar: createElement(HelpsFilterBanners, {
+            obsQuoteFilter: null,
+            tokenFilter: null,
+            verseFilter: null,
+            twlArticleFilter: {
+              articlePath: 'bible/kt/sin',
+              title: 'Sin',
+              timestamp: 1,
+            },
+            displayCount: 0,
+            hasMatches: false,
+            hideCount: true,
+            onClearObsQuoteFilter: () => undefined,
+            onClearTokenFilter: () => undefined,
+            onClearVerseFilter: () => undefined,
+            onClearTwlArticleFilter: () => undefined,
+          }),
+          mergedGroups: [],
+          chapterHasHelps: true,
+        })
+      )
+    )
+    expect(html).toContain('helps-filter-empty')
+    expect(html).toContain('Sin')
+    expect(html).toContain('helps-filter-clear')
+    expect(html).not.toContain(HELPS_EMPTY_COPY.noPassage('English', 'Psalms 1'))
+  })
+
+  test('TWL article chip on a chapter with no rows still uses no-passage copy', () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        CombinedHelpsList,
+        listProps({
+          tokenFilter: null,
+          kindFilter: 'twl',
+          chapterHasHelps: false,
+          twlArticleFilter: {
+            articlePath: 'bible/kt/sin',
+            title: 'Sin',
+            timestamp: 1,
+          },
+          filterScopeBar: createElement('span', { 'data-testid': 'helps-filter-scope-bar' }, 'Sin'),
+        })
+      )
+    )
+    expect(html).toMatch(/English doesn(?:'|&#x27;)t have helps for Psalms 1 yet/)
+    expect(html).not.toContain('helps-filter-empty')
   })
 
   test('token chip on a chapter with no rows still uses no-passage copy', () => {

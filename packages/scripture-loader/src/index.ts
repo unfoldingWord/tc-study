@@ -48,6 +48,20 @@ export {
   type ScriptureBookCache,
 } from './scriptureBookComplete'
 export {
+  ABSENT_FROM_RELEASE_KEY,
+  normalizeIngredientPath,
+  ingredientPresentInPathSet,
+  partitionIngredientsByReleasePaths,
+  pathSetFromZipFileNames,
+  omitAbsentIngredients,
+  readAbsentFromRelease,
+  mergeAbsentFromReleaseIds,
+  presentIngredientCount,
+  persistAbsentFromRelease,
+  fetchReleasePathSet,
+  type IngredientPathRef,
+} from './releaseIngredientPresence'
+export {
   isUsjScriptureCacheContent,
   isProcessedScriptureContent,
   usjResultFromCache,

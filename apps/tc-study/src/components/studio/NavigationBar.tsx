@@ -27,7 +27,6 @@ export interface NavigationBarProps {
   showLanguagePicker?: boolean
   autoOpenLanguagePicker?: boolean
   languagePickerRequired?: boolean
-  downloadIndicator?: React.ReactNode
   onDownloadCollection?: () => void
   onLoadCollection?: () => void
   /** Read: BCV Bible↔Stories apply reloads catalog without resetting helps language. */
@@ -43,7 +42,6 @@ export function NavigationBar({
   showLanguagePicker = false,
   autoOpenLanguagePicker = false,
   languagePickerRequired = false,
-  downloadIndicator,
   onDownloadCollection,
   onLoadCollection,
   onNavigationScopeCommitted,
@@ -90,7 +88,6 @@ export function NavigationBar({
         handleNext={movement.handleNext}
         canGoPrevious={movement.canGoPrevious}
         canGoNext={movement.canGoNext}
-        downloadIndicator={downloadIndicator}
         showLanguagePicker={showLanguagePicker}
         onLanguageSelected={onLanguageSelected}
         autoOpenLanguagePicker={autoOpenLanguagePicker}

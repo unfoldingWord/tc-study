@@ -2,6 +2,7 @@ import { RESOURCE_STATE_KEYS, useResourceStateSender } from '@bt-synergy/resourc
 import type { UsjScriptureViewModel } from '@bt-synergy/scripture-loader'
 import { useEffect } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
+import { setHelpsTargetScriptureKey } from '../../../../features/helps/helpsTargetScripture'
 import {
   invalidatePublishedScriptureTokensForPassage,
   publishScriptureTokens,
@@ -10,6 +11,10 @@ import { isScriptureTokensOwner } from '../../../../features/messaging/scripture
 import { shouldBroadcastScriptureTokens } from '../../../../features/nav/chapterScrollActivity'
 import { useChapterScrollActivity } from '../../../../features/nav/usePinnedHelpsReference'
 import { extractPreparedBroadcastTokens } from '../../../../features/scripture/extractPreparedBroadcastTokens'
+import {
+  fullChapterForScriptureBroadcast,
+  viewModelForScriptureBroadcast,
+} from '../../../../features/scripture/scriptureTokensBookNav'
 import type { ScriptureFullChapter } from '../../../../features/scripture/scripturePreparer'
 import type { ScriptureTokensBroadcastSignal } from '../../../../signals/studioSignals'
 import { extractUsjBroadcastTokens } from '../utils/extractUsjBroadcastTokens'
@@ -61,9 +66,16 @@ export function useTokenBroadcast({
 
   useEffect(() => {
     if (!isOwner) return
+    // Identity for helps quote/align — catalog key, not tokens. Set even when
+    // USJ/prepared are still loading so CombinedHelps can hit cache without
+    // waiting for SCRIPTURE_TOKENS.
+    setHelpsTargetScriptureKey(resourceKey)
     if (!shouldBroadcastScriptureTokens(scrollActivity.unsettled)) return
 
     const bookCode = bookCodeProp || viewModel?.bookCode || ''
+    // Ignore lingering previous-book USJ / prepared full during BCV book switches.
+    const broadcastViewModel = viewModelForScriptureBroadcast(viewModel, bookCode)
+    const broadcastFull = fullChapterForScriptureBroadcast(fullChapter, currentChapter)
     const resourceMetadata = {
       id: resourceKey,
       language,
@@ -82,7 +94,7 @@ export function useTokenBroadcast({
 
     // Passage known but full/USJ not ready — announce empty for this chapter and
     // drop hydrate from another passage so helps does not align against stale tokens.
-    if (!viewModel && !fullChapter) {
+    if (!broadcastViewModel && !broadcastFull) {
       invalidatePublishedScriptureTokensForPassage(bookCode, currentChapter)
       sendState({
         reference: {
@@ -101,37 +113,37 @@ export function useTokenBroadcast({
     const actualEndChapter = endChapter || currentChapter
     const actualEndVerse = endVerse || currentVerse
 
-    // Prefer prepared full only for a single-chapter whole-unit extract.
-    // Verse/section ranges (and multi-chapter) must walk viewModel so bounds match.
+    // Prefer prepared full for a single-chapter whole-unit extract.
+    // Nav resolves endVerse to the real last verse (e.g. Psa 14 → 7), not 999 —
+    // treat verse 1→chapter-end as whole-chapter when prepared full is present.
     const wholeSingleChapter =
       actualEndChapter === currentChapter &&
       currentVerse <= 1 &&
-      actualEndVerse >= 999
+      (actualEndVerse >= 999 ||
+        (broadcastFull != null && actualEndVerse > currentVerse))
 
     const tokens =
-      wholeSingleChapter &&
-      fullChapter &&
-      fullChapter.unit === currentChapter
+      wholeSingleChapter && broadcastFull
         ? extractPreparedBroadcastTokens(
             bookCode,
             currentChapter,
-            fullChapter,
+            broadcastFull,
             1,
             999
           )
-        : viewModel
+        : broadcastViewModel
           ? extractUsjBroadcastTokens(
-              viewModel,
+              broadcastViewModel,
               currentChapter,
               currentVerse,
               endChapter,
               endVerse
             )
-          : fullChapter && fullChapter.unit === currentChapter && actualEndChapter === currentChapter
+          : broadcastFull && actualEndChapter === currentChapter
             ? extractPreparedBroadcastTokens(
                 bookCode,
                 currentChapter,
-                fullChapter,
+                broadcastFull,
                 currentVerse,
                 actualEndVerse
               )
@@ -150,11 +162,13 @@ export function useTokenBroadcast({
       resourceMetadata,
     })
     if (tokens.length > 0) {
+      // Catalog key (not panel instance id) so helps warm/align cache hits
+      // prepared:scripture after dual-scripture mode-switch (#2 suffix).
       publishScriptureTokens({
         tokens,
         reference,
         resourceMetadata,
-        sourceResourceId: resourceId,
+        sourceResourceId: resourceKey,
       })
     } else {
       invalidatePublishedScriptureTokensForPassage(bookCode, currentChapter)

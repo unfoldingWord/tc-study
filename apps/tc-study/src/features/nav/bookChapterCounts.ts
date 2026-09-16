@@ -23,13 +23,18 @@ export function knownChapterCount(bookCode: string): number {
   return BOOK_CHAPTER_COUNTS[bookCode.toLowerCase()] ?? 1
 }
 
-/** Prefer explicit (nav/viewModel), then TOC, then the known map. */
+/**
+ * Book last chapter for nav/scroll/warm.
+ * Takes the max of explicit (loaded nav/VM), TOC, and the known map so a
+ * chapter-grained SoT that only has chapters 1–2 loaded cannot clamp scroll
+ * at 2 when Psalms has 150 chapters.
+ */
 export function resolveLastChapter(args: {
   bookId: string
   explicit?: number
   tocChapters?: number
 }): number {
-  if (args.explicit && args.explicit > 0) return args.explicit
-  if (args.tocChapters && args.tocChapters > 0) return args.tocChapters
-  return knownChapterCount(args.bookId)
+  const explicit = args.explicit && args.explicit > 0 ? args.explicit : 0
+  const toc = args.tocChapters && args.tocChapters > 0 ? args.tocChapters : 0
+  return Math.max(explicit, toc, knownChapterCount(args.bookId))
 }

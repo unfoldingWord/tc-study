@@ -35,6 +35,8 @@ export type LinkWithAlignments = TranslationWordsLink & {
   alignedTokens?: Array<{ position: number }>
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
+  quoteWarmPending?: boolean
+  articlePath?: string
 }
 
 export type MergedRow =
@@ -170,6 +172,7 @@ export function useCombinedHelpsDisplay({
   verseFilter,
   tokenFilter,
   supportRefFilter = null,
+  twlArticleFilter = null,
   bookCodeLower,
 }: UseCombinedHelpsDisplayParams) {
   const params: DisplayFilterParams = {
@@ -178,6 +181,7 @@ export function useCombinedHelpsDisplay({
     verseFilter,
     tokenFilter,
     supportRefFilter,
+    twlArticleFilter,
     bookCodeLower,
   }
 
@@ -191,6 +195,7 @@ export function useCombinedHelpsDisplay({
       verseFilter,
       tokenFilter,
       supportRefFilter,
+      twlArticleFilter,
       bookCodeLower,
     ]
   )
@@ -205,6 +210,7 @@ export function useCombinedHelpsDisplay({
       verseFilter,
       tokenFilter,
       supportRefFilter,
+      twlArticleFilter,
       bookCodeLower,
     ]
   )

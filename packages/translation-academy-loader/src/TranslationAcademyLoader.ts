@@ -8,7 +8,7 @@ import type {
   ResourceLoader,
   ResourceMetadata
 } from '@bt-synergy/catalog-manager'
-import { Door43ServerAdapter, RESOURCE_TYPE_IDS } from '@bt-synergy/resource-catalog'
+import { Door43ServerAdapter, RESOURCE_TYPE_IDS, buildIngestReceiptFromCatalog, helpsIngestSchema } from '@bt-synergy/resource-catalog'
 import JSZip from 'jszip'
 import { generateTAIngredients } from './ingredients-generator'
 import type {
@@ -236,15 +236,24 @@ export class TranslationAcademyLoader implements ResourceLoader {
       await this.downloadIndividual(resourceKey, options?.skipExisting, onProgress)
     }
 
-    // Mark resource as fully downloaded
+    const metadata = await this.getMetadata(resourceKey)
+    const ingredientCount = metadata?.contentMetadata?.ingredients?.length
+    const receipt = buildIngestReceiptFromCatalog(metadata, {
+      ingestSchema: helpsIngestSchema(),
+      ingredientCount: typeof ingredientCount === 'number' ? ingredientCount : undefined,
+      downloadMethod: method,
+      entryCount: typeof ingredientCount === 'number' ? ingredientCount : undefined,
+      expectedEntryCount: typeof ingredientCount === 'number' ? ingredientCount : undefined,
+    })
     const resourceCacheKey = `resource:${resourceKey}`
     await this.cacheAdapter.set(resourceCacheKey, {
       content: { downloaded: true },
-      metadata: {
-        downloadComplete: true,
-        downloadCompletedAt: new Date().toISOString(),
-        downloadMethod: method
-      }
+      metadata:
+        receipt ?? {
+          downloadComplete: true,
+          downloadCompletedAt: new Date().toISOString(),
+          downloadMethod: method,
+        },
     })
   }
 

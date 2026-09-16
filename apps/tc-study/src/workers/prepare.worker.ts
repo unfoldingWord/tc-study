@@ -72,6 +72,7 @@ type InMsg =
       bookId?: string
       languageCode?: string
     }
+  | { id: string; type: 'stats' }
 
 const cacheAdapter = new IndexedDBCacheAdapter({
   dbName: 'tc-study-cache',
@@ -85,6 +86,53 @@ let running = false
 let cancelToken = 0
 let warmCancelToken = 0
 let currentWarmJob: WarmJob | null = null
+let currentPrepareJob: PrepareJob | null = null
+
+function prepareQueueStats() {
+  const preparePending = queue.slice(0, 12).map((j) => ({
+    typeId: j.typeId,
+    resourceKey: j.resourceKey,
+    bookId: j.bookId,
+    units: j.units.slice(0, 8),
+    priority: j.priority,
+    tier: j.tier,
+  }))
+  const warmPending = warmQueue.slice(0, 12).map((j) => ({
+    jobKey: j.jobKey,
+    kind: j.kind,
+    lane: j.lane,
+    resourceKey: j.resourceKey,
+    bookId: j.bookId,
+  }))
+  return {
+    prepareDepth: queue.length,
+    warmDepth: warmQueue.length,
+    currentPrepare:
+      currentPrepareJob == null
+        ? null
+        : {
+            typeId: currentPrepareJob.typeId,
+            resourceKey: currentPrepareJob.resourceKey,
+            bookId: currentPrepareJob.bookId,
+            units: currentPrepareJob.units.slice(0, 8),
+            priority: currentPrepareJob.priority,
+            tier: currentPrepareJob.tier,
+          },
+    currentWarmJobKey: currentWarmJob?.jobKey ?? null,
+    currentWarmKind: currentWarmJob?.kind ?? null,
+    currentWarmLane: currentWarmJob?.lane ?? null,
+    preparePending,
+    warmPending,
+    recentOutcomes: [...recentPrepareOutcomes],
+  }
+}
+
+const recentPrepareOutcomes: Array<{ t: number; step: string; detail: string }> = []
+
+function pushPrepareOutcome(step: string, detail: string): void {
+  recentPrepareOutcomes.push({ t: Date.now(), step, detail })
+  while (recentPrepareOutcomes.length > 24) recentPrepareOutcomes.shift()
+}
 
 function warmJobMatchesCancel(
   j: WarmJob,
@@ -260,15 +308,26 @@ async function pump() {
       // Prefer interactive prepare jobs over warm fallbacks.
       if (queue.length > 0) {
         const job = queue.shift()!
+        currentPrepareJob = job
         const token = cancelToken
         try {
           await runOne(job, token)
+          pushPrepareOutcome(
+            'prepare-done',
+            `${job.priority} ${job.typeId} ${job.resourceKey} ${job.bookId}`
+          )
         } catch (err) {
+          pushPrepareOutcome(
+            'prepare-error',
+            err instanceof Error ? err.message : String(err)
+          )
           reply({
             id: 'prep',
             type: 'error',
             message: err instanceof Error ? err.message : String(err),
           })
+        } finally {
+          currentPrepareJob = null
         }
         continue
       }
@@ -282,6 +341,7 @@ async function pump() {
       try {
         const outcome = await runWarmJob(cacheAdapter, warmJob, () => token !== warmCancelToken)
         if (token === warmCancelToken) {
+          pushPrepareOutcome('warm-done', `${outcome} ${warmJob.jobKey}`)
           reply({
             id: 'warm',
             type: 'done',
@@ -358,6 +418,10 @@ self.onmessage = (event: MessageEvent<InMsg>) => {
         warmCancelToken += 1
       }
       reply({ id: msg.id, type: 'ok', result: { cancelled: true } })
+      return
+    }
+    if (msg.type === 'stats') {
+      reply({ id: msg.id, type: 'stats', ...prepareQueueStats() })
       return
     }
     reply({

@@ -47,6 +47,27 @@ export function mergeHelpsTokenCache(
   for (const row of rows) {
     if (!hasUsableHelpsTokens(row)) continue
     const prev = cache.get(row.id)
+    const nextAlign = hasUsableHelpsAlign(row)
+    const quoteStatus =
+      row.quoteStatus && row.quoteStatus !== 'pending'
+        ? row.quoteStatus
+        : prev?.quoteStatus === 'pending'
+          ? undefined
+          : prev?.quoteStatus
+    // Warm-pending must not stick forever via `?? prev`. Clear when ULT chips
+    // land or when this row explicitly settles (aligned / ol / none).
+    let quoteWarmPending: boolean | undefined
+    if (nextAlign || quoteStatus === 'aligned' || quoteStatus === 'none') {
+      quoteWarmPending = undefined
+    } else if (row.quoteWarmPending === true) {
+      quoteWarmPending = true
+    } else if ('quoteWarmPending' in row) {
+      quoteWarmPending = undefined
+    } else if (quoteStatus === 'ol-fallback' && row.quoteStatus === 'ol-fallback') {
+      quoteWarmPending = undefined
+    } else {
+      quoteWarmPending = prev?.quoteWarmPending
+    }
     cache.set(row.id, {
       quoteTokens: hasUsableHelpsQuoteTokens(row) ? row.quoteTokens : prev?.quoteTokens,
       alignedTokens: Array.isArray(row.alignedTokens) && row.alignedTokens.length
@@ -55,13 +76,8 @@ export function mergeHelpsTokenCache(
       semanticIds: Array.isArray(row.semanticIds) && row.semanticIds.length
         ? row.semanticIds
         : prev?.semanticIds,
-      quoteStatus:
-        row.quoteStatus && row.quoteStatus !== 'pending'
-          ? row.quoteStatus
-          : prev?.quoteStatus === 'pending'
-            ? undefined
-            : prev?.quoteStatus,
-      quoteWarmPending: row.quoteWarmPending ?? prev?.quoteWarmPending,
+      quoteStatus,
+      quoteWarmPending,
     })
   }
   return cache
@@ -112,6 +128,29 @@ export function shouldSkipHelpsAlignRebuild(args: {
     if (!link.origWords?.trim()) return true
     if (hasUsableHelpsAlign(link)) return true
     return hasUsableHelpsAlign(args.lastById.get(link.id))
+  })
+}
+
+/**
+ * True when prior align results still look in-flight (no chips yet). Fingerprint
+ * early-return must not freeze these forever when tokens arrive without a new fp.
+ */
+export function helpsAlignRowsStillPending(
+  rows: ReadonlyArray<
+    {
+      origWords?: string | null
+      quoteStatus?: string
+      alignedTokens?: unknown
+      semanticIds?: unknown
+    }
+  >
+): boolean {
+  return rows.some((row) => {
+    if (!row.origWords?.trim()) return false
+    if (hasUsableHelpsAlign(row)) return false
+    // pending = in flight; ol-fallback without chips may be a premature settle
+    // (empty/no-zaln tokens) — keep retrying when the align fingerprint is unchanged.
+    return row.quoteStatus === 'pending' || row.quoteStatus === 'ol-fallback'
   })
 }
 

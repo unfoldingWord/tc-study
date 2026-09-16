@@ -28,8 +28,15 @@ import {
   visibleGroupCountForSelection,
   windowMergedGroups,
 } from './helpsListWindow'
+import {
+  helpsAnchorRowId,
+  helpsAnchorSelection,
+  nextHelpsAnchorPin,
+  scrollTopToKeepAnchorInView,
+  shouldScrollHelpsListToTop,
+} from './helpsFilterAnchorPin'
 import { currentHelpsGroupFromBounds } from './helpsStickyCurrentRef'
-import type { HelpsKindFilter, ObsQuoteFilter, SupportRefFilter, VerseFilterState } from './types'
+import type { HelpsKindFilter, ObsQuoteFilter, SupportRefFilter, TwlArticleFilter, VerseFilterState } from './types'
 import type { MergedRow } from './useCombinedHelpsMerge'
 
 export interface CombinedHelpsListProps {
@@ -63,6 +70,7 @@ export interface CombinedHelpsListProps {
   verseFilter: VerseFilterState | null
   obsQuoteFilter: ObsQuoteFilter | null
   supportRefFilter?: SupportRefFilter | null
+  twlArticleFilter?: TwlArticleFilter | null
   loadingTitles: Set<string>
   twLoadingTitles: Set<string>
   getEntryTitle: (rc: string) => string | null
@@ -71,7 +79,12 @@ export interface CombinedHelpsListProps {
   getTWPreview: (link: TranslationWordsLink) => string | null
   isTWPreviewPending: (link: TranslationWordsLink) => boolean
   onSupportReferenceClick: (supportRef: string, title?: string) => void
-  onFilterBySupportReference?: (supportRef: string, title?: string) => void
+  onFilterBySupportReference?: (
+    supportRef: string,
+    title?: string,
+    source?: { id: string; reference: string }
+  ) => void
+  onFilterByTwlArticle?: (link: TranslationWordsLink, title?: string) => void
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   onNoteQuoteClick: (note: NoteWithTokens) => void
   onNoteSelect: (note: NoteWithTokens) => void
@@ -107,6 +120,7 @@ export function CombinedHelpsList({
   verseFilter,
   obsQuoteFilter,
   supportRefFilter = null,
+  twlArticleFilter = null,
   loadingTitles,
   twLoadingTitles,
   getEntryTitle,
@@ -116,6 +130,7 @@ export function CombinedHelpsList({
   isTWPreviewPending,
   onSupportReferenceClick,
   onFilterBySupportReference,
+  onFilterByTwlArticle,
   onEntryLinkClick,
   onNoteQuoteClick,
   onNoteSelect,
@@ -125,33 +140,109 @@ export function CombinedHelpsList({
   const listPanelRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const groupElsRef = useRef(new Map<string, HTMLElement>())
+  const pinReleasedRef = useRef(false)
+  const prevGroupRefsRef = useRef<string[]>([])
+  const pinApplyPassRef = useRef(false)
   const [stickyRef, setStickyRef] = useState<string | null>(null)
+  const [pinStickyRef, setPinStickyRef] = useState<string | null>(null)
+  const filterAnchor = supportRefFilter?.anchor ?? twlArticleFilter?.anchor ?? null
+  const pinSelection = helpsAnchorSelection(filterAnchor) ?? selectedHelpsCard
+  const bookWideFilter = Boolean(supportRefFilter || twlArticleFilter)
   const filterIdentity = helpsFilterIdentity({
     tokenFilter,
     verseFilter,
     obsQuoteFilter,
     supportRefFilter,
+    twlArticleFilter,
   })
   useLayoutEffect(() => {
-    scrollHelpsToTop(listPanelRef.current)
+    pinReleasedRef.current = false
+    prevGroupRefsRef.current = []
+    pinApplyPassRef.current = Boolean(bookWideFilter && filterAnchor)
+    setPinStickyRef(bookWideFilter && filterAnchor ? filterAnchor.ref : null)
+    if (
+      shouldScrollHelpsListToTop({
+        bookWideFilter,
+        hasApplyAnchor: Boolean(filterAnchor),
+      })
+    ) {
+      scrollHelpsToTop(listPanelRef.current)
+    }
   }, [filterIdentity])
 
   const [visibleCount, setVisibleCount] = useState(() =>
-    visibleGroupCountForSelection(mergedGroups, selectedHelpsCard)
+    visibleGroupCountForSelection(mergedGroups, pinSelection)
   )
   useEffect(() => {
-    setVisibleCount(visibleGroupCountForSelection(mergedGroups, selectedHelpsCard))
+    setVisibleCount(visibleGroupCountForSelection(mergedGroups, pinSelection))
   }, [filterIdentity])
   useEffect(() => {
     setVisibleCount((n) =>
-      Math.max(n, visibleGroupCountForSelection(mergedGroups, selectedHelpsCard))
+      Math.max(n, visibleGroupCountForSelection(mergedGroups, pinSelection))
     )
-  }, [mergedGroups, selectedHelpsCard])
+  }, [mergedGroups, pinSelection])
 
-  const windowedGroups = useMemo(
-    () => windowMergedGroups(mergedGroups, visibleCount),
-    [mergedGroups, visibleCount]
-  )
+  const windowedGroups = useMemo(() => {
+    const needed = visibleGroupCountForSelection(mergedGroups, pinSelection)
+    return windowMergedGroups(mergedGroups, Math.max(visibleCount, needed))
+  }, [mergedGroups, visibleCount, pinSelection])
+
+  useLayoutEffect(() => {
+    const root = listPanelRef.current
+    if (!root || !filterAnchor) return
+    const nextRefs = mergedGroups.map((group) => group.ref)
+    const heights: Record<string, number> = {}
+    for (const [ref, el] of groupElsRef.current) {
+      heights[ref] = el.offsetHeight
+    }
+    const next = nextHelpsAnchorPin({
+      pinned: !pinReleasedRef.current,
+      userScrolled: pinReleasedRef.current,
+      scrollTop: root.scrollTop,
+      prevGroupRefs: prevGroupRefsRef.current,
+      nextGroupRefs: nextRefs,
+      groupHeights: heights,
+      isApplyPass: pinApplyPassRef.current,
+      anchorRef: filterAnchor.ref,
+    })
+    pinApplyPassRef.current = false
+    prevGroupRefsRef.current = nextRefs
+    if (!next.pinned) return
+    if (next.scrollTop !== root.scrollTop) {
+      root.scrollTop = next.scrollTop
+    }
+    if (next.scrollAnchorIntoView) {
+      const row = document.getElementById(helpsAnchorRowId(filterAnchor))
+      if (row) {
+        const rootRect = root.getBoundingClientRect()
+        const rowRect = row.getBoundingClientRect()
+        const kept = scrollTopToKeepAnchorInView({
+          scrollTop: root.scrollTop,
+          viewportHeight: root.clientHeight,
+          anchorOffsetTop: rowRect.top - rootRect.top,
+          anchorHeight: rowRect.height || 120,
+        })
+        if (kept !== root.scrollTop) root.scrollTop = kept
+      }
+    }
+  }, [mergedGroups, windowedGroups, filterAnchor])
+
+  useEffect(() => {
+    const root = listPanelRef.current
+    if (!root || !filterAnchor) return
+    const releasePin = () => {
+      if (pinReleasedRef.current) return
+      pinReleasedRef.current = true
+      setPinStickyRef(null)
+    }
+    // Programmatic scrollTop (prepend compensation) must not release the pin.
+    root.addEventListener('wheel', releasePin, { passive: true })
+    root.addEventListener('touchmove', releasePin, { passive: true })
+    return () => {
+      root.removeEventListener('wheel', releasePin)
+      root.removeEventListener('touchmove', releasePin)
+    }
+  }, [filterIdentity, filterAnchor])
   useEffect(() => {
     const el = sentinelRef.current
     if (!el || windowedGroups.length >= mergedGroups.length) return
@@ -212,9 +303,13 @@ export function CombinedHelpsList({
   }, [windowedGroups])
 
   const stickyGroup = useMemo(() => {
+    const forced = pinStickyRef
+    if (forced) {
+      return mergedGroups.find((group) => group.ref === forced) ?? windowedGroups[0] ?? null
+    }
     if (!stickyRef) return windowedGroups[0] ?? null
     return mergedGroups.find((group) => group.ref === stickyRef) ?? windowedGroups[0] ?? null
-  }, [stickyRef, mergedGroups, windowedGroups])
+  }, [pinStickyRef, stickyRef, mergedGroups, windowedGroups])
 
   const emptyReason = resolveHelpsListEmptyReason({
     noSources,
@@ -337,13 +432,23 @@ export function CombinedHelpsList({
                           return (
                             <div
                               key={`tn-${note.id}`}
+                              id={helpsAnchorRowId({ kind: 'tn', id: note.id, ref: note.reference })}
+                              data-helps-row={`tn:${note.id}`}
                               style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' }}
                             >
                               <TranslationNoteCard
                                 note={note as NoteWithTokens}
                                 isSelected={isHelpsCardSelected(selectedHelpsCard, 'tn', note.id)}
                                 onSupportReferenceClick={onSupportReferenceClick}
-                                onFilterBySupportReference={onFilterBySupportReference}
+                                onFilterBySupportReference={
+                                  onFilterBySupportReference
+                                    ? (supportRef, title) =>
+                                        onFilterBySupportReference(supportRef, title, {
+                                          id: note.id,
+                                          reference: note.reference,
+                                        })
+                                    : undefined
+                                }
                                 onEntryLinkClick={onEntryLinkClick}
                                 onQuoteClick={onNoteQuoteClick}
                                 onClick={onNoteSelect}
@@ -368,6 +473,8 @@ export function CombinedHelpsList({
                         return (
                           <div
                             key={`twl-${link.id}`}
+                            id={helpsAnchorRowId({ kind: 'twl', id: link.id, ref: link.reference })}
+                            data-helps-row={`twl:${link.id}`}
                             style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' }}
                           >
                             <WordLinkCard
@@ -379,6 +486,7 @@ export function CombinedHelpsList({
                               isLoadingPreview={isLoadingPreview}
                               onTitleClick={onTitleClick}
                               onQuoteClick={onLinkQuoteClick}
+                              onFilterByTwlArticle={onFilterByTwlArticle}
                               tokenFilter={tokenFilter}
                               targetResourceId={targetSourceId}
                               languageDirection={languageDirection}

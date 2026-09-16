@@ -524,6 +524,8 @@ function WarmLaneSection() {
       <span>lane1={stats.lane1Drained ? 'drained' : 'busy'}</span>
       <span>scroll={stats.scrollUnsettled ? 'unsettled' : 'settled'}</span>
       <span>worker={stats.dedicatedWorker ? 'dedicated' : 'prepare'}</span>
+      {stats.lane2Blocked ? <span>L2={stats.lane2Blocked}</span> : null}
+      {stats.lane3Blocked ? <span>L3={stats.lane3Blocked}</span> : null}
     </div>
   )
 }

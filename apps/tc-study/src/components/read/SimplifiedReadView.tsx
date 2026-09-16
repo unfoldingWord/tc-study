@@ -35,8 +35,8 @@ import { createStudioPluginRegistry } from '../../features/studio/createStudioPl
 import { moveResourceBetweenPanels } from '../../features/workspace/resourceMutations'
 import { useWizardStore } from '../../lib/stores/wizardStore'
 import { NavigationBar } from '../studio/NavigationBar'
-import { DownloadIndicator } from './DownloadIndicator'
 import { ExportProgressToast } from './ExportProgressToast'
+import { ProcessDebugHost } from './ProcessDebugHost'
 import { ReadPanelsArea } from './ReadPanelsArea'
 import {
   type PartialRouteHint,
@@ -240,7 +240,8 @@ export function SimplifiedReadView({
         moveResourceBetweenPanels(resourceKey, from, to, storeInsert)
       }}
     >
-      <div className="h-full flex flex-col overflow-hidden">
+      {/* VS Code-style shell: [nav] [panels flex-1] [process debug dock] */}
+      <div className="h-full min-h-0 flex flex-col overflow-hidden">
         <div className="relative z-30 flex-shrink-0 flex flex-col order-2 md:order-1 overflow-visible">
           <div className="flex items-center bg-surface/90 backdrop-blur-md border-border-subtle border-t md:border-t-0 md:border-b px-chrome py-chrome-tight overflow-visible">
             <NavigationBar
@@ -252,7 +253,6 @@ export function SimplifiedReadView({
               languagePickerRequired={needsBootstrap}
               onNavigationScopeCommitted={handleNavigatorScopeCommitted}
               onSwitchTextMode={handleSwitchTextMode}
-              downloadIndicator={<DownloadIndicator />}
               onDownloadCollection={
                 isCollectionFullyCached ? handleDirectDownloadCollection : undefined
               }
@@ -295,6 +295,11 @@ export function SimplifiedReadView({
               onSwitchTextMode={handleSwitchTextMode}
             />
           </LinkedPanelsContainer>
+        </div>
+
+        {/* order-3: always below nav+panels on mobile reorder; docked is in-flow */}
+        <div className="order-3 flex-shrink-0 min-h-0">
+          <ProcessDebugHost />
         </div>
 
         <CollectionImportDialog

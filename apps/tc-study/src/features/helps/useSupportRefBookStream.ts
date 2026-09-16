@@ -4,12 +4,14 @@
  * the whole book on the main thread.
  */
 
-import { startTransition, useEffect, useState } from 'react'
+import { startTransition, useEffect, useRef, useState } from 'react'
 import { scheduleIdle } from '../../utils/scheduleIdle'
+import { bookFilterContentReady } from './bookFilterQuoteWarm'
 import {
   chapterMapNoteCount,
   filterSupportRefFallbackChunk,
   planSupportRefStreamChapters,
+  streamRowsForChapter,
   SUPPORT_REF_STREAM_FALLBACK_CHUNK,
   supportRefNotesForChapter,
 } from './helpsDisplayFilters'
@@ -28,9 +30,14 @@ export function useSupportRefBookStream<
   const { enabled, notesByChapter, fallbackNotes, supportReference, focusChapter } = args
   const [streamedNotes, setStreamedNotes] = useState<T[]>([])
   const [streamPending, setStreamPending] = useState(false)
+  const notesByChapterRef = useRef(notesByChapter)
+  notesByChapterRef.current = notesByChapter
+  const fallbackNotesRef = useRef(fallbackNotes)
+  fallbackNotesRef.current = fallbackNotes
+  const contentReady = bookFilterContentReady(notesByChapter, fallbackNotes)
 
   useEffect(() => {
-    if (!enabled || !supportReference) {
+    if (!enabled || !supportReference || !contentReady) {
       setStreamedNotes([])
       setStreamPending(false)
       return
@@ -38,8 +45,11 @@ export function useSupportRefBookStream<
 
     let cancelled = false
     const seen = new Set<string>()
+    // Only clear/restart when the filter identity changes — chapter jumps must
+    // not wipe already-streamed off-focus rows (leaves cards stuck pending).
     setStreamedNotes([])
     setStreamPending(true)
+    const focusAtStart = focusChapter
 
     const flush = (batch: T[]) => {
       if (cancelled || batch.length === 0) return
@@ -51,7 +61,11 @@ export function useSupportRefBookStream<
 
     const cancelIdle = scheduleIdle(() => {
       void (async () => {
-        const chapters = planSupportRefStreamChapters(notesByChapter, focusChapter)
+        const chapters = planSupportRefStreamChapters(
+          notesByChapterRef.current,
+          focusAtStart,
+          fallbackNotesRef.current
+        )
         let slice: T[] = []
         let chaptersInSlice = 0
         const yieldSlice = () =>
@@ -62,7 +76,7 @@ export function useSupportRefBookStream<
         for (const chapter of chapters) {
           if (cancelled) return
           const matches = supportRefNotesForChapter(
-            notesByChapter?.[String(chapter)] ?? [],
+            streamRowsForChapter(notesByChapterRef.current, fallbackNotesRef.current, chapter),
             supportReference
           )
           if (matches.length) slice.push(...matches)
@@ -79,15 +93,15 @@ export function useSupportRefBookStream<
         }
         if (slice.length) flush(slice)
 
-        const fallback = fallbackNotes ?? []
-        const mapCount = chapterMapNoteCount(notesByChapter)
+        const fallback = fallbackNotesRef.current ?? []
+        const mapCount = chapterMapNoteCount(notesByChapterRef.current)
         if (!cancelled && fallback.length > mapCount) {
           for (let i = 0; i < fallback.length; i += SUPPORT_REF_STREAM_FALLBACK_CHUNK) {
             if (cancelled) return
             const extra = filterSupportRefFallbackChunk(
               fallback.slice(i, i + SUPPORT_REF_STREAM_FALLBACK_CHUNK),
               supportReference,
-              focusChapter,
+              focusAtStart,
               seen
             )
             flush(extra)
@@ -103,7 +117,7 @@ export function useSupportRefBookStream<
       cancelled = true
       cancelIdle()
     }
-  }, [enabled, notesByChapter, fallbackNotes, supportReference, focusChapter])
+  }, [enabled, supportReference, contentReady])
 
   return { streamedNotes, streamPending }
 }

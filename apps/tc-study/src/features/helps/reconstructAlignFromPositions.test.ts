@@ -125,6 +125,34 @@ describe('reconstructAlignFromPositions', () => {
     expect(reconstructed.quoteStatus).toBe('ol-fallback')
   })
 
+  test('stores display texts so refresh can paint without target tokens', () => {
+    const row = compactAlignRow({
+      alignedTokens: [
+        {
+          content: 'Paul',
+          semanticId: semanticIdFor('tit 1:1', 'Paul', 1),
+          verseRef: 'tit 1:1',
+          position: 0,
+          type: 'word',
+        },
+      ],
+      method: 1,
+    })
+    expect(row.t).toEqual(['Paul'])
+    const painted = reconstructAlignFromPositions({
+      targetTokens: [],
+      quoteTokens: quoteTokens as never,
+      origWords: 'Παῦλος',
+      occurrence: '1',
+      bookCode: 'tit',
+      chapter: 1,
+      verse: 1,
+      row,
+    })
+    expect(painted.alignedTokens?.[0]?.content).toBe('Paul')
+    expect(painted.quoteStatus).toBe('aligned')
+  })
+
   test('text-fallback method stores m=2 and rebuilds chip tokens', () => {
     const enTokens = [
       {

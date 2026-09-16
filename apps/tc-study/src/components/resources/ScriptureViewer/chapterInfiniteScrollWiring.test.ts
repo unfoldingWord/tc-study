@@ -14,14 +14,22 @@ describe('chapter edge-reveal + warm wiring', () => {
       'utf8'
     )
     expect(viewerSrc).toContain('useChapterInfiniteScroll')
+    expect(viewerSrc).toContain('resolveLastChapter')
     expect(viewerSrc).toContain('useScriptureEdgeNavigate')
     expect(viewerSrc).toContain('revealChapterAtEdge')
     expect(viewerSrc).toContain('canRevealChapterAtEdge')
     expect(viewerSrc).toContain('ScriptureEdgeCue')
-    expect(viewerSrc).toContain('showTopPad')
-    expect(viewerSrc).toContain('showBottomPad')
+    expect(viewerSrc).toContain('showTopCue')
+    expect(viewerSrc).toContain('showBottomCue')
     expect(viewerSrc).toContain('onClick={clickPrev}')
     expect(viewerSrc).toContain('onClick={clickNext}')
+    // Owned scrollport; cues sit at content start/end inside the elastic wrapper.
+    expect(viewerSrc).toContain('flex-1 min-h-0 bg-scripture')
+    expect(viewerSrc).not.toContain('flex-1 min-h-0 relative')
+    expect(viewerSrc).toContain('h-full overflow-auto')
+    expect(viewerSrc).toMatch(
+      /will-change-transform[\s\S]*ScriptureEdgeCue[\s\S]*edge="top"[\s\S]*ScriptureContent[\s\S]*ScriptureEdgeCue[\s\S]*edge="bottom"/
+    )
     expect(viewerSrc).toContain('warmChapterAtEdge')
     expect(hookSrc).toContain('warmChapterAtEdge')
     expect(viewerSrc).toContain('displayChapters={chapterScroll.displayChapters}')
@@ -40,8 +48,32 @@ describe('chapter edge-reveal + warm wiring', () => {
     expect(hookSrc).toContain('scrollTopForElementAtTop')
     expect(hookSrc).toContain('CHAPTER_REVEAL_TOP_OFFSET_PX')
     expect(hookSrc).toContain('pendingRevealTopAlignRef.current = target')
-    expect(edgeSrc).toContain('beginProgrammaticScrollSuppress')
-    expect(edgeSrc).toContain('EDGE_PAD_PEEK_PX')
+    expect(edgeSrc).toContain('nextEdgeCueVisibility')
+    expect(edgeSrc).toContain('showTopCue')
+    expect(edgeSrc).toContain('showBottomCue')
+    expect(edgeSrc).toContain('resolveScriptureScrollParent')
+    expect(edgeSrc).not.toContain('EDGE_TRAVEL_PAD_PX')
+    const cueSrc = readFileSync(
+      join(import.meta.dir, 'components/ScriptureEdgeCue.tsx'),
+      'utf8'
+    )
+    expect(cueSrc).toContain('data-scripture-edge-cue')
+    expect(cueSrc).not.toContain('absolute')
+    expect(cueSrc).not.toContain('data-scripture-edge-pad')
+    expect(cueSrc).not.toContain('EDGE_TRAVEL_PAD_PX')
+    const edgeNavSrc = readFileSync(
+      join(import.meta.dir, '../../../features/nav/scriptureEdgeNavigate.ts'),
+      'utf8'
+    )
+    // Content-edge cues when adjacent unit exists — no empty scroll runway / sticky host.
+    expect(edgeNavSrc).toContain('nextEdgeCueVisibility')
+    expect(edgeNavSrc).toContain('canPrev')
+    expect(edgeNavSrc).toContain('canNext')
+    expect(edgeNavSrc).not.toContain('EDGE_TRAVEL_PAD_PX')
+    expect(edgeNavSrc).not.toContain('edgeTravelFromPads')
+    expect(edgeNavSrc).not.toContain('EDGE_CUE_HIDE_SLOP_PX')
+    // Cue visibility no longer gates on park-at-edge scroll position.
+    expect(edgeNavSrc).toMatch(/showBottom:\s*Boolean\(args\.canNext\)/)
   })
 
   test('ScriptureViewer broadcasts the live BCV span (not hardcoded whole-chapter)', () => {

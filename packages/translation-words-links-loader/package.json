@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "node -e \"console.error('ERROR: translation-words-links-loader has no real tests'); process.exit(1)\""
+    "test": "bun test"
   },
   "keywords": [
     "translation",

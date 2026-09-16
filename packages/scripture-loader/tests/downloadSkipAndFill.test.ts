@@ -167,4 +167,163 @@ describe('ScriptureLoader zip skip vs fill', () => {
     const loader = createLoader(cache, door43)
     await loader.downloadResource(resourceKey, { method: 'zip', skipExisting: true })
   })
+
+  test('phantom catalog books absent from release skip zip and mark complete', async () => {
+    const resourceKey = 'unfoldingWord/en/ult'
+    const cache = createCache({
+      [usjScriptureKey(resourceKey, 'psa')]: {
+        content: { chapterNumbers: [1, 2], bookCode: 'psa' },
+      },
+      [usjScriptureChapterKey(resourceKey, 'psa', 1)]: stampedChapter(1, 'a'),
+      [usjScriptureChapterKey(resourceKey, 'psa', 2)]: stampedChapter(2, 'b'),
+    })
+    let zipCalls = 0
+    const catalogStore = new Map<string, unknown>([
+      [
+        resourceKey,
+        {
+          ...metadata(),
+          contentMetadata: {
+            ingredients: [
+              { identifier: 'psa', path: './19-PSA.usfm' },
+              { identifier: 'num', path: './04-NUM.usfm' },
+            ],
+          },
+        },
+      ],
+    ])
+    const loader = new ScriptureLoader({
+      cacheAdapter: cache,
+      catalogAdapter: {
+        get: async (key: string) => catalogStore.get(key) ?? null,
+        set: async (key: string, entry: unknown) => {
+          catalogStore.set(key, entry)
+        },
+      },
+      door43Client: {
+        async downloadZipball() {
+          zipCalls += 1
+          return zipWithPsalms()
+        },
+        async fetchRepoTreePaths() {
+          return new Set(['19-PSA.usfm'])
+        },
+      },
+      debug: false,
+    })
+
+    await loader.downloadResource(resourceKey, { method: 'zip', skipExisting: true })
+
+    expect(zipCalls).toBe(0)
+    const receipt = cache.store.get(`resource:${resourceKey}`) as {
+      metadata: Record<string, unknown>
+    }
+    expect(receipt.metadata.downloadComplete).toBe(true)
+    expect(receipt.metadata.absentFromRelease).toEqual(['num'])
+    const pruned = catalogStore.get(resourceKey) as {
+      contentMetadata: { ingredients: Array<{ identifier: string }> }
+    }
+    expect(pruned.contentMetadata.ingredients.map((i) => i.identifier)).toEqual(['psa'])
+  })
+
+  test('zip extract does not treat missing-from-zip books as failedBooks', async () => {
+    const resourceKey = 'unfoldingWord/en/ult'
+    const cache = createCache()
+    const catalogMeta = {
+      ...metadata(),
+      contentMetadata: {
+        ingredients: [
+          { identifier: 'psa', path: './19-PSA.usfm' },
+          { identifier: 'num', path: './04-NUM.usfm' },
+        ],
+      },
+    }
+    let zipCalls = 0
+    const loader = new ScriptureLoader({
+      cacheAdapter: cache,
+      catalogAdapter: {
+        get: async () => catalogMeta,
+        set: async () => {},
+      },
+      door43Client: {
+        async downloadZipball() {
+          zipCalls += 1
+          return zipWithPsalms()
+        },
+        // No tree API — force zip path
+      },
+      debug: false,
+    })
+
+    await loader.downloadResource(resourceKey, { method: 'zip', skipExisting: true })
+
+    expect(zipCalls).toBe(1)
+    const receipt = cache.store.get(`resource:${resourceKey}`) as {
+      metadata: Record<string, unknown>
+      content: { downloaded?: boolean; failedBooks?: string[] }
+    }
+    expect(receipt.metadata.downloadComplete).toBe(true)
+    expect(receipt.content.failedBooks).toBeUndefined()
+    expect(receipt.metadata.absentFromRelease).toEqual(['num'])
+    expect(cache.store.has(usjScriptureKey(resourceKey, 'psa'))).toBe(true)
+  })
+
+  test('partial cache fills remaining books individually without zip', async () => {
+    const resourceKey = 'unfoldingWord/en/ult'
+    const cache = createCache({
+      [usjScriptureKey(resourceKey, 'psa')]: {
+        content: { chapterNumbers: [1, 2], bookCode: 'psa' },
+      },
+      [usjScriptureChapterKey(resourceKey, 'psa', 1)]: stampedChapter(1, 'a'),
+      [usjScriptureChapterKey(resourceKey, 'psa', 2)]: stampedChapter(2, 'b'),
+    })
+    const catalogMeta = {
+      ...metadata(),
+      contentMetadata: {
+        ingredients: [
+          { identifier: 'psa', path: './19-PSA.usfm' },
+          { identifier: 'tit', path: './57-TIT.usfm' },
+        ],
+      },
+    }
+    let zipCalls = 0
+    let fetchTextCalls = 0
+    const loader = new ScriptureLoader({
+      cacheAdapter: cache,
+      catalogAdapter: {
+        get: async () => catalogMeta,
+        set: async () => {},
+      },
+      door43Client: {
+        async downloadZipball() {
+          zipCalls += 1
+          return zipWithPsalms()
+        },
+        async fetchRepoTreePaths() {
+          return new Set(['19-PSA.usfm', '57-TIT.usfm'])
+        },
+        async findRepository() {
+          return { release: { tag_name: 'v1' }, default_branch: 'master' }
+        },
+        async fetchTextContent(_owner: string, _repo: string, bookPath: string) {
+          fetchTextCalls += 1
+          if (bookPath.includes('TIT') || bookPath.includes('tit')) {
+            return `\\id TIT\n\\h Titus\n\\c 1\n\\p\n\\v 1 Paul\n\\c 2\n\\p\n\\v 1 Speak\n`
+          }
+          throw new Error(`unexpected path ${bookPath}`)
+        },
+      },
+      debug: false,
+    })
+
+    await loader.downloadResource(resourceKey, { method: 'zip', skipExisting: true })
+
+    expect(zipCalls).toBe(0)
+    expect(fetchTextCalls).toBe(1)
+    expect(cache.store.has(usjScriptureKey(resourceKey, 'tit'))).toBe(true)
+    const receipt = cache.store.get(`resource:${resourceKey}`) as {
+      metadata: Record<string, unknown>
+    }
+    expect(receipt.metadata.downloadComplete).toBe(true)
+  })
 })

@@ -31,11 +31,14 @@ export function compactAlignRow(args: {
   if (!alignedTokens?.length || method === 0) {
     return { p: [], m: 0 }
   }
-  const positions = alignedTokens
-    .filter((t) => t.type === 'word' || t.type == null)
+  const words = alignedTokens.filter((t) => t.type === 'word' || t.type == null)
+  const positions = words
     .map((t) => t.position)
     .filter((p) => Number.isFinite(p))
-  return { p: positions, m: method }
+  const texts = words.map((t) => t.content).filter((c) => typeof c === 'string' && c.length > 0)
+  const row: CachedAlignRow = { p: positions, m: method }
+  if (texts.length > 0) row.t = texts
+  return row
 }
 
 /**
@@ -161,7 +164,7 @@ export function reconstructAlignFromPositions(args: {
     ? generateSemanticIdsForQuoteTokens(quoteTokens, bookCode, chapter, verse, occ)
     : []
 
-  if (row.m === 0 || row.p.length === 0) {
+  if (row.m === 0 || (row.p.length === 0 && !(row.t && row.t.length > 0))) {
     return {
       alignedTokens: undefined,
       semanticIds: originalSemanticIds.length > 0 ? originalSemanticIds : undefined,
@@ -173,39 +176,64 @@ export function reconstructAlignFromPositions(args: {
     }
   }
 
-  const alignedTokens = alignedTokensFromPositions(
-    targetTokens,
-    row.p,
-    bookCode,
-    chapter,
-    verse
-  )
-  if (!alignedTokens.length) {
+  // Prefer position→token reconstruct when prepared/broadcast tokens exist.
+  if (targetTokens.length > 0 && row.p.length > 0) {
+    const alignedTokens = alignedTokensFromPositions(
+      targetTokens,
+      row.p,
+      bookCode,
+      chapter,
+      verse
+    )
+    if (alignedTokens.length) {
+      let semanticIds: string[] | undefined
+      if (row.m === 1) {
+        semanticIds = originalSemanticIds.length > 0 ? originalSemanticIds : undefined
+      } else {
+        semanticIds = alignedTokens
+          .filter((t) => t.type === 'word' || t.type == null)
+          .map((t) => t.semanticId)
+      }
+
+      return {
+        alignedTokens,
+        semanticIds,
+        quoteStatus: resolveHelpsQuoteStatus({
+          hasAlignedTokens: true,
+          alignmentPending: false,
+          olQuote: origWords,
+        }),
+      }
+    }
+  }
+
+  // Refresh / early hydrate: paint ULT chip text from stored display words
+  // without waiting for SCRIPTURE_TOKENS or prepared:full.
+  if (row.t && row.t.length > 0) {
+    const verseRef = `${bookCode.toLowerCase()} ${chapter}:${verse}`
+    const alignedTokens: AlignedToken[] = row.t.map((content, i) => ({
+      content,
+      semanticId: originalSemanticIds[i] ?? '',
+      verseRef,
+      position: row.p[i] ?? i,
+      type: 'word' as const,
+    }))
     return {
-      alignedTokens: undefined,
+      alignedTokens,
       semanticIds: originalSemanticIds.length > 0 ? originalSemanticIds : undefined,
       quoteStatus: resolveHelpsQuoteStatus({
-        hasAlignedTokens: false,
+        hasAlignedTokens: true,
         alignmentPending: false,
         olQuote: origWords,
       }),
     }
-  }
-
-  let semanticIds: string[] | undefined
-  if (row.m === 1) {
-    semanticIds = originalSemanticIds.length > 0 ? originalSemanticIds : undefined
-  } else {
-    semanticIds = alignedTokens
-      .filter((t) => t.type === 'word' || t.type == null)
-      .map((t) => t.semanticId)
   }
 
   return {
-    alignedTokens,
-    semanticIds,
+    alignedTokens: undefined,
+    semanticIds: originalSemanticIds.length > 0 ? originalSemanticIds : undefined,
     quoteStatus: resolveHelpsQuoteStatus({
-      hasAlignedTokens: true,
+      hasAlignedTokens: false,
       alignmentPending: false,
       olQuote: origWords,
     }),

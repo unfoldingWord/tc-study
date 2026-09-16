@@ -20,6 +20,14 @@ export interface VerseFilterState {
   timestamp: number
 }
 
+/** Clicked card to keep in view while earlier book chapters stream in. */
+export type HelpsFilterAnchor = {
+  kind: 'tn' | 'twl'
+  id: string
+  /** Group ref (chapter:verse), e.g. "119:105". */
+  ref: string
+}
+
 /** Book-wide TN filter: same Translation Academy support-reference. */
 export interface SupportRefFilter {
   /** Raw `rc://…/ta/man/…` from the note. */
@@ -27,6 +35,19 @@ export interface SupportRefFilter {
   /** Resolved TA title for the chip (e.g. "Doublet"). */
   title: string
   timestamp: number
+  /** Clicked note — pin this row while earlier chapters prepend. */
+  anchor?: HelpsFilterAnchor
+}
+
+/** Book-wide TWL filter: same Translation Words article (not TN↔TW join). */
+export interface TwlArticleFilter {
+  /** Normalized `bible/kt/sin` (from articlePath or twLink). */
+  articlePath: string
+  /** Resolved TW title for the chip (e.g. "Sin"), not origWords. */
+  title: string
+  timestamp: number
+  /** Clicked link — pin this row while earlier chapters prepend. */
+  anchor?: HelpsFilterAnchor
 }
 
 export interface TokenFilterLike {
@@ -49,6 +70,7 @@ export interface DisplayFilterParams {
   verseFilter: VerseFilterState | null
   tokenFilter: TokenFilterLike | null
   supportRefFilter?: SupportRefFilter | null
+  twlArticleFilter?: TwlArticleFilter | null
   bookCodeLower: string
   /** When true, empty token/verse filters fall back to the unfiltered list (standalone TN/TWL). */
   fallbackWhenEmpty?: boolean
@@ -70,6 +92,8 @@ export type LinkForDisplay = {
   reference: string
   origWords?: string
   occurrence?: string
+  articlePath?: string
+  twLink?: string
   quoteTokens?: Array<{ text: string }>
   semanticIds?: string[]
   alignedTokens?: Array<{ semanticId?: string; content?: string; text?: string }>
@@ -240,6 +264,53 @@ export function supportReferencesMatch(
   return Boolean(ka) && ka === kb
 }
 
+/** Stable key for comparing TWL articlePath / twLink across rows. */
+export function twlArticleKey(
+  articlePath?: string | null,
+  twLink?: string | null
+): string {
+  const fromPath = articlePath?.trim()
+  if (fromPath) {
+    const dict = fromPath.match(/tw\/dict\/(.+)$/i)
+    return (dict?.[1] ?? fromPath).toLowerCase().replace(/\/+$/, '')
+  }
+  const fromLink = twLink?.trim()
+  if (!fromLink) return ''
+  const dict = fromLink.match(/tw\/dict\/(.+)$/i)
+  if (dict?.[1]) return dict[1].toLowerCase().replace(/\/+$/, '')
+  const bible = fromLink.match(/bible\/[^/]+\/[^/]+/i)
+  return (bible?.[0] ?? fromLink).toLowerCase().replace(/\/+$/, '')
+}
+
+/** Chip / aria label: first TW gloss, titled (e.g. "Sin"), not "sin, sinful…". */
+export function twlArticleChipTitle(
+  title?: string | null,
+  articlePath?: string | null
+): string {
+  const raw = (title || '').trim()
+  const first = raw.split(',')[0]?.trim()
+  if (first) {
+    return first.charAt(0).toUpperCase() + first.slice(1)
+  }
+  const slug = (articlePath || '').split('/').filter(Boolean).pop() || ''
+  return slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : ''
+}
+
+export function twlArticlesMatch(
+  left: { articlePath?: string; twLink?: string } | string | null | undefined,
+  right: { articlePath?: string; twLink?: string } | string | null | undefined
+): boolean {
+  const keyOf = (
+    value: { articlePath?: string; twLink?: string } | string | null | undefined
+  ) =>
+    typeof value === 'string'
+      ? twlArticleKey(value, value)
+      : twlArticleKey(value?.articlePath, value?.twLink)
+  const ka = keyOf(left)
+  const kb = keyOf(right)
+  return Boolean(ka) && ka === kb
+}
+
 /**
  * Prefer the larger of chapter-map vs flat notes — chunked cache can leave the
  * map incomplete while `notes` already holds the full book.
@@ -289,16 +360,98 @@ export function supportRefNotesForChapter<T extends { supportReference?: string 
   return notes.filter((note) => supportReferencesMatch(note.supportReference, supportReference))
 }
 
-/** Other chapter keys in the map — keys only, no note walk. */
+/**
+ * Current-chapter TWL article matches from already-aligned passage links.
+ * First paint must not flatten the book or require quote/align rebuild.
+ */
+export function twlArticleFirstPaintLinks<T extends {
+  reference: string
+  articlePath?: string
+  twLink?: string
+}>(
+  passageLinks: readonly T[],
+  articlePath: string,
+  focusChapter: number
+): T[] {
+  if (!articlePath || !passageLinks.length) return []
+  return passageLinks.filter(
+    (link) =>
+      chapterOfHelpsReference(link.reference) === focusChapter &&
+      twlArticlesMatch(link, articlePath)
+  )
+}
+
+export function twlArticleLinksForChapter<T extends {
+  articlePath?: string
+  twLink?: string
+}>(
+  links: readonly T[],
+  articlePath: string
+): T[] {
+  if (!articlePath || !links.length) return []
+  return links.filter((link) => twlArticlesMatch(link, articlePath))
+}
+
+/**
+ * Other book chapters to stream — 1 → last, skip focus.
+ * Last is the max of map keys, fallback refs, and optional lastChapter.
+ * Does not flatten notes/links; callers read one chapter per idle slice.
+ */
 export function planSupportRefStreamChapters(
   byChapter: Record<string, unknown[]> | null | undefined,
-  focusChapter: number
+  focusChapter: number,
+  fallback?: ReadonlyArray<{ reference: string }> | null,
+  lastChapter?: number
 ): number[] {
-  if (!byChapter) return []
-  return Object.keys(byChapter)
-    .map((key) => parseInt(key, 10))
-    .filter((chapter) => Number.isFinite(chapter) && chapter > 0 && chapter !== focusChapter)
-    .sort((a, b) => a - b)
+  let last = Number.isFinite(lastChapter) && (lastChapter as number) >= 1 ? (lastChapter as number) : 0
+  if (byChapter) {
+    for (const key of Object.keys(byChapter)) {
+      const n = parseInt(key, 10)
+      if (Number.isFinite(n) && n > last) last = n
+    }
+  }
+  if (fallback?.length) {
+    for (const row of fallback) {
+      const n = chapterOfHelpsReference(row.reference)
+      if (n > last) last = n
+    }
+  }
+  if (last < 1) return []
+  const out: number[] = []
+  for (let chapter = 1; chapter <= last; chapter++) {
+    if (chapter !== focusChapter) out.push(chapter)
+  }
+  return out
+}
+
+/**
+ * Prefer the chapter map; if that key is missing (chunked / current→end map),
+ * take that chapter from the flat fallback. Idle-only — not a book flatten.
+ */
+export function streamRowsForChapter<T extends { reference: string }>(
+  byChapter: Record<string, T[]> | null | undefined,
+  fallback: readonly T[] | null | undefined,
+  chapter: number
+): T[] {
+  const fromMap = byChapter?.[String(chapter)]
+  if (fromMap?.length) return fromMap
+  if (!fallback?.length) return []
+  return fallback.filter((row) => chapterOfHelpsReference(row.reference) === chapter)
+}
+
+/**
+ * Passage-aligned current-chapter matches first, then the rest of that chapter
+ * from the map (earlier verses the passage slice dropped). Still one chapter.
+ */
+export function mergeFocusChapterBookMatches<T extends { id: string }>(
+  passageMatches: readonly T[],
+  chapterMatches: readonly T[]
+): T[] {
+  if (!chapterMatches.length) return passageMatches.slice()
+  if (!passageMatches.length) return chapterMatches.slice()
+  const seen = new Set(passageMatches.map((row) => row.id))
+  const extra = chapterMatches.filter((row) => !seen.has(row.id))
+  return extra.length === 0 ? passageMatches.slice() : passageMatches.concat(extra)
 }
 
 export const SUPPORT_REF_STREAM_FALLBACK_CHUNK = 40
@@ -321,6 +474,29 @@ export function filterSupportRefFallbackChunk<T extends {
     if (chapterOfHelpsReference(note.reference) === skipChapter) continue
     if (!supportReferencesMatch(note.supportReference, supportReference)) continue
     out.push(note)
+  }
+  return out
+}
+
+/** Idle-chunk filter for a flat TWL fallback list (skip focus chapter + already streamed). */
+export function filterTwlArticleFallbackChunk<T extends {
+  id: string
+  reference: string
+  articlePath?: string
+  twLink?: string
+}>(
+  chunk: readonly T[],
+  articlePath: string,
+  skipChapter: number,
+  seenIds: ReadonlySet<string>
+): T[] {
+  if (!articlePath || !chunk.length) return []
+  const out: T[] = []
+  for (const link of chunk) {
+    if (seenIds.has(link.id)) continue
+    if (chapterOfHelpsReference(link.reference) === skipChapter) continue
+    if (!twlArticlesMatch(link, articlePath)) continue
+    out.push(link)
   }
   return out
 }
@@ -366,6 +542,8 @@ function hasUsableAlignedQuote(
  * Book-wide support-ref matches. Prefer passage-aligned rows, then IndexedDB /
  * align enrichment, else settle so cards are not stuck pending.
  * Mid-flight chapter quote rebuild must not overwrite usable off-passage align.
+ * Hard `pending` from a chapter remount must not hide OL fallback / note body —
+ * demote to ol-fallback + quoteWarmPending so chips keep a spinner.
  */
 export function settleSupportRefDisplayNotes<T extends SupportRefDisplayNote>(
   bookNotes: T[],
@@ -386,7 +564,25 @@ export function settleSupportRefDisplayNotes<T extends SupportRefDisplayNote>(
           ...enriched,
         }
       }
-      if (aligned?.quoteStatus === 'pending') return aligned
+      if (aligned?.quoteStatus === 'pending') {
+        if (enriched) {
+          return {
+            ...note,
+            ...enriched,
+            // Keep enrichment's warm flag as-is — do not force true or chips
+            // stay on "Building quote" after OL/align already settled.
+            quoteWarmPending: enriched.quoteWarmPending,
+          }
+        }
+        const hasQuote = Boolean(note.quote?.trim() || aligned.quote?.trim())
+        return {
+          ...aligned,
+          quoteStatus: hasQuote ? 'ol-fallback' : 'none',
+          // Do not force a perpetual spinner — chapter align may be stuck pending
+          // while book-filter enrichment / OL fallback is already enough to paint.
+          quoteWarmPending: undefined,
+        }
+      }
       if (enriched) {
         return {
           ...note,
@@ -397,6 +593,67 @@ export function settleSupportRefDisplayNotes<T extends SupportRefDisplayNote>(
       const hasQuote = Boolean(note.quote?.trim())
       return {
         ...note,
+        quoteStatus: hasQuote ? 'ol-fallback' : 'none',
+        quoteWarmPending: hasQuote || undefined,
+      }
+    })
+}
+
+/**
+ * Book-wide TWL article matches. Prefer passage-aligned rows, then in-memory
+ * quote/align cache, else OL fallback so cards are not stuck pending.
+ */
+export function settleTwlArticleDisplayLinks<T extends SupportRefDisplayNote & {
+  origWords?: string
+  articlePath?: string
+  twLink?: string
+}>(
+  bookLinks: T[],
+  articlePath: string,
+  alignedById: Map<string, T>,
+  enrichmentById?: Map<string, SupportRefNoteEnrichment>
+): T[] {
+  return bookLinks
+    .filter((link) => twlArticlesMatch(link, articlePath))
+    .map((link) => {
+      const aligned = alignedById.get(link.id)
+      const enriched = enrichmentById?.get(link.id)
+      if (hasUsableAlignedQuote(aligned)) return aligned!
+      if (hasUsableAlignedQuote(enriched)) {
+        return {
+          ...link,
+          ...enriched,
+        }
+      }
+      if (aligned?.quoteStatus === 'pending') {
+        if (enriched) {
+          return {
+            ...link,
+            ...enriched,
+            quoteWarmPending: enriched.quoteWarmPending,
+          }
+        }
+        const hasQuote = Boolean(
+          link.origWords?.trim() ||
+            (aligned as { origWords?: string }).origWords?.trim() ||
+            link.quote?.trim()
+        )
+        return {
+          ...aligned,
+          quoteStatus: hasQuote ? 'ol-fallback' : 'none',
+          quoteWarmPending: undefined,
+        }
+      }
+      if (enriched) {
+        return {
+          ...link,
+          ...enriched,
+        }
+      }
+      if (aligned) return aligned
+      const hasQuote = Boolean(link.origWords?.trim())
+      return {
+        ...link,
         quoteStatus: hasQuote ? 'ol-fallback' : 'none',
         quoteWarmPending: hasQuote,
       }
@@ -437,6 +694,7 @@ export function filterDisplayNotes<T extends NoteForDisplay>(
     verseFilter,
     tokenFilter,
     supportRefFilter = null,
+    twlArticleFilter = null,
     bookCodeLower,
     fallbackWhenEmpty,
   } = params
@@ -449,6 +707,11 @@ export function filterDisplayNotes<T extends NoteForDisplay>(
       displayNotes: withFallback(filtered, notesWithAlignedTokens, fallbackWhenEmpty),
       hasNoteMatches: filtered.length > 0,
     }
+  }
+
+  // TWL article filter is TWL-only — hide TN rows (do not join TN↔TW).
+  if (twlArticleFilter) {
+    return { displayNotes: [], hasNoteMatches: false }
   }
 
   if (helpsScope === 'obs' && obsQuoteFilter) {
@@ -511,6 +774,7 @@ export function filterDisplayLinks<T extends LinkForDisplay>(
     verseFilter,
     tokenFilter,
     supportRefFilter = null,
+    twlArticleFilter = null,
     bookCodeLower,
     fallbackWhenEmpty,
   } = params
@@ -518,6 +782,16 @@ export function filterDisplayLinks<T extends LinkForDisplay>(
   // Support-ref filter is TN-only (TA articles).
   if (supportRefFilter) {
     return { displayLinks: [], hasLinkMatches: false }
+  }
+
+  if (twlArticleFilter) {
+    const filtered = filteredByReference.filter((link) =>
+      twlArticlesMatch(link, twlArticleFilter.articlePath)
+    )
+    return {
+      displayLinks: withFallback(filtered, filteredByReference, fallbackWhenEmpty),
+      hasLinkMatches: filtered.length > 0,
+    }
   }
 
   if (helpsScope === 'obs' && obsQuoteFilter) {

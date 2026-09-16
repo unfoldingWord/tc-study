@@ -4,7 +4,7 @@ How `apps/tc-study` stores data, what each Web Worker does, and how caching / wa
 
 This is the current code, not a proposal. Key prefixes and job types are taken from the workers, cache modules, and `features/warm/*`.
 
-**Boot order and when each DB opens:** [App lifecycle and data flow](./app-lifecycle-data-flow.md).
+**Boot order and when each DB opens:** [App lifecycle and data flow](./app-lifecycle-data-flow.md). **Helps ULT chips (quote → align, decoupled from ScriptureViewer):** [Helps quote / align flow](./helps-quote-flow.md).
 
 ---
 
@@ -15,8 +15,8 @@ tc-study is an **in-tab** job system. There is no background service worker “m
 | Worker | File | Role |
 | --- | --- | --- |
 | Download | `src/workers/backgroundDownload.worker.ts` | Network zip extract → source-of-truth (SoT) cache |
-| Prepare | `src/workers/prepare.worker.ts` | Lane-1 prepare + live `batch-quotes` / `batch-align`; warm fallback on small CPUs |
-| Warm | `src/workers/warm.worker.ts` | Lanes 2/3 (rest of book / rest of canon) when `hardwareConcurrency >= 4` |
+| Prepare | `src/workers/prepare.worker.ts` | Lane-1 prepare; warm fallback on small CPUs; live `batch-*` only if warm Worker fails |
+| Warm | `src/workers/warm.worker.ts` | Live lane-1 `batch-quotes` / `batch-align`; lanes 2/3 when `hardwareConcurrency >= 4` |
 
 **Closing the tab kills the workers.** Queues, in-flight zip extracts, and in-memory highlights die with the page. IndexedDB survives.
 
@@ -51,7 +51,7 @@ Prepared / quote / align rows use a versioned envelope `{ content, timestamp, ve
 | `helps-quote:` | `helps-quote:{helps}@{hs}:{ol}@{os}:{book}:{ch}` | `Record<linkId, CachedQuoteToken[]>` (empty array = settled miss) | Lane-1 `useQuoteTokens`; warm `quote-chapter` | Same + warm align (needs quotes first) | Version `1`. TTL **30 days** (`expiresAt`). |
 | `helps-align:` | `helps-align:{helps}@{hs}:{ol}@{os}:{target}@{ts}:{book}:{ch}` | `Record<linkId, { p: number[]; m: 0\|1\|2 }>` | Lane-1 `useAlignedTokens`; warm `align-chapter` | `useAlignedTokens` reconstruct | Version `1`. TTL **30 days**. `m`: 0 miss, 1 semantic/zaln, 2 quote-text fallback. |
 | `warm-coverage:v1` | Single key | `Record<relationId, { stamp, unitCount, updatedAt }>` | Scheduler after a batch of `finished`/`cached` jobs | Lane 3 `skipRelation` | Version `1`. No TTL. GC drops stale-stamp / other-language relations. |
-| `resource:` | `resource:{resourceKey}` e.g. `resource:unfoldingWord/hbo/uhb` | Cache entry whose `metadata.downloadComplete === true` (also `downloadCompletedAt`, `downloadMethod`) | Download worker `completenessChecker.markComplete` | `isResourceMarkedComplete` (quote/align admit); completeness UI | Same DB. Not a prefix family — one row per resource. |
+| `resource:` | `resource:{resourceKey}` e.g. `resource:unfoldingWord/hbo/uhb` | Cache entry with stamped ingest receipt: `metadata.downloadComplete === true`, `releaseStamp` (`resourceContentStamp`), `ingestSchema` (e.g. `usj:2.1.0-usj` / `helps:1`), optional `ingredientCount` / `downloadMethod` / `downloadCompletedAt` | Download worker loaders + `completenessChecker.markComplete` after a full extract | `checkResource` O(1) when stamp+schema match; `isResourceMarkedComplete` (warm admit); completeness UI | Same DB. Matching receipt skips zip fetch and ingredient walks. Stamp mismatch or USJ schema bump invalidates. Legacy unstamped `downloadComplete` still walks once. |
 | `helps-text:` | `helps-text:{kind}:{resourceKey}@{stamp}:{entryId}` | Title / preview strings (`ta-title`, `tw-title`, `tw-preview`) | Helps text cache | TA/TW card chrome | Version `1`. Stamp-swept, not book-chunked. |
 | `{resourceKey}/{entryId}` | `unfoldingWord/en/tw/kt/god` · `unfoldingWord/en/ta/translate/figs-metaphor` | TW/TA article body | Download / article loaders | Lane 3 `prepare-article`; entry viewers | One row per article. Lane 3 can prefix-scan `{key}/`. |
 
@@ -112,7 +112,7 @@ Per resource: pick zip vs individual, `loader.downloadResource`, then `completen
 
 ### 3.2 `prepare.worker.ts`
 
-Lane-1 CPU. Reads SoT from IndexedDB — no large book payloads on `postMessage` except live `batch-quotes` / `batch-align` (those still send links + chapters for the open passage).
+Lane-1 CPU for **scripture / helps prepare**. Reads SoT from IndexedDB — no large book payloads on `postMessage` for prepare jobs. Live `batch-quotes` / `batch-align` remain as a **fallback** when dedicated warm.worker cannot start.
 
 **IN**
 
@@ -120,8 +120,8 @@ Lane-1 CPU. Reads SoT from IndexedDB — no large book payloads on `postMessage`
 | --- | --- |
 | `enqueue` | `PrepareJob`: `{ typeId, resourceKey, bookId, units, tier: 'light'\|'full'\|'both', priority: 'interactive'\|'background' }` |
 | `cancel-book` | Drop queued jobs for that type/resource/book; bump cancel token |
-| `batch-quotes` | Live quote build (`bookCode`, `links`, `originalChapters`) |
-| `batch-align` | Live align (`BatchAlignLinksArgs`) |
+| `batch-quotes` | Live quote build fallback (`bookCode`, `links`, `originalChapters`) |
+| `batch-align` | Live align fallback (`BatchAlignLinksArgs`) |
 | `warm-job` | Fallback when dedicated warm worker is off (`hardwareConcurrency < 4`) |
 | `warm-cancel` | Cancel matching warm fallback jobs |
 
@@ -133,13 +133,15 @@ Lane-1 CPU. Reads SoT from IndexedDB — no large book payloads on `postMessage`
 
 ### 3.3 `warm.worker.ts`
 
-Dedicated only when `navigator.hardwareConcurrency >= 4` (`warmClient.ts`). Otherwise `enqueueWarmJob` posts `warm-job` to prepare.worker.
+Dedicated for lanes 2/3 when `navigator.hardwareConcurrency >= 4` (`warmClient.ts` enqueue path). Otherwise `enqueueWarmJob` posts `warm-job` to prepare.worker.
 
-**IN:** `enqueue` `{ job: WarmJob }` · `cancel` `{ resourceKey?, bookId?, languageCode? }` · `stats`
+**Live lane-1 quote/align always prefers this worker** (`batchQuotesOnWarmWorker` / `batchAlignOnWarmWorker`) so scripture prepare on prepare.worker cannot starve on-screen TN/TWL chips. The dedicated worker is started for live batch even when lane 2/3 still fold onto prepare (low concurrency). Fallback to prepare.worker only if Worker construction fails.
+
+**IN:** `enqueue` `{ job: WarmJob }` · `cancel` `{ resourceKey?, bookId?, languageCode? }` · `stats` · `batch-quotes` · `batch-align`
 
 **OUT:** `ok` / `error` · `done` `{ jobKey, kind, lane, outcome }` · `stats` `{ queueDepth, byLane }`
 
-Dedupe by `jobKey` (keep the lower lane). Queue sorts lane 1 → 2 → 3. Cancel matches resource / book / language; in-flight abort only if the current job matches (so a pane switch does not kill the other language).
+Dedupe by `jobKey` (keep the lower lane). Queue sorts lane 1 → 2 → 3. Cancel matches resource / book / language; in-flight abort only if the current job matches (so a pane switch does not kill the other language). Live `batch-*` replies immediately in `onmessage` (not queued behind lane 2/3); the pump yields between warm jobs so batch messages can interleave.
 
 **Job kinds** (`warmTypes.ts`):
 
@@ -160,7 +162,7 @@ Warm is CPU against **already downloaded** SoT. Download is network. They share 
 
 | Lane | Nickname | What | Where it runs |
 | --- | --- | --- | --- |
-| **1** | Now | Visible current chapter: prepare open+adjacent; live quote/align for on-screen TN/TWL | `prepare.worker` (`enqueue` + `batch-*`) |
+| **1** | Now | Visible current chapter: prepare open+adjacent on prepare.worker; live quote/align for on-screen TN/TWL on **warm.worker** (prepare.worker fallback) | warm `batch-*` + prepare `enqueue` |
 | **2** | Soon | Rest of the **current book** for downloaded keys in `{textLang, helpsLang}` that share Bible vs OBS mode | `warm.worker` (or prepare fallback) |
 | **3** | Later | Full canon / OBS stories / TA·TW articles, 32-job slices (1 job if folded onto prepare) | same |
 
@@ -204,8 +206,8 @@ Quotes wait until the OL key is in `readyOlKeys` (zip `resource:…` marked comp
 ### CombinedHelps
 
 1. Prefer `prepared:notes` / `prepared:words-links` full rows for the chapter span; else loader `tn:` / `twl:` slices.
-2. **`useQuoteTokens` is cache-first:** `readCachedQuoteTokensForSpan` before worker/sync rebuild. Hits skip OL load. While scrolling, hydrate from IDB only (no worker).
-3. **`useAlignedTokens` is cache-first:** `readCachedAlignmentsForSpan`, reconstruct `{p,m}` against `prepared:scripture` **full** (`extractPreparedBroadcastTokens`). Live-align only misses. If prepared full is absent, fall back to broadcast `SCRIPTURE_TOKENS` (not written as the durable reconstruct path).
+2. **`useQuoteTokens` is cache-first:** `readCachedQuoteTokensForSpan` before worker/sync rebuild. Hits skip OL load. While scrolling, hydrate from IDB only (no worker). Soft catalog-stamp budget skips cache read only — live rebuild stays on warm.worker (prepare.worker fallback), not the main thread.
+3. **`useAlignedTokens` is cache-first:** `readCachedAlignmentsForSpan`, reconstruct `{p,m}` against `prepared:scripture` **full** (`extractPreparedBroadcastTokens`), or paint from stored display texts (`t`) with **zero** `SCRIPTURE_TOKENS` dependency. Target scripture identity comes from the shared helps target catalog key (written when a scripture panel selects a resource) — not from panel-published tokens. Live-align only misses (warm.worker), preferring prepared full over broadcast. Broadcast `SCRIPTURE_TOKENS` may still help underlines when a panel is mounted, but must not gate chip paint or quote build.
 4. **Token reuse across chapter:** `helpsTokenReuse` keeps a module `Map<linkId, {quoteTokens, alignedTokens, …}>` for the current book so an off-chapter card click does not rebuild tokens already in memory. The map clears on book change.
 5. **Highlight persist is module memory, not IDB.** `persistHelpsHighlight` in `helpsCardScriptureNav.ts` stores `pendingHelpsHighlight` in module scope so ScriptureViewer remount / chapter reload can replay the underline. Tab close or refresh loses it.
 

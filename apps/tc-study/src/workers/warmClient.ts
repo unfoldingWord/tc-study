@@ -20,9 +20,25 @@ type StatsMsg = {
   type: 'stats'
   queueDepth: number
   byLane: { 1: number; 2: number; 3: number }
+  currentJobKey?: string | null
+  currentKind?: string | null
+  currentLane?: WarmLane | null
+  currentResourceKey?: string | null
+  currentBookId?: string | null
+  pending?: Array<{
+    jobKey: string
+    kind: string
+    lane: WarmLane
+    resourceKey: string
+    bookId: string
+    chapter?: number
+  }>
 }
 
 export type WarmDoneListener = (msg: DoneMsg) => void
+
+/** Live batch-quotes/align must not hang forever if the worker wedges. */
+export const WARM_RPC_TIMEOUT_MS = 8_000
 
 let worker: Worker | null = null
 let useDedicated = false
@@ -36,6 +52,24 @@ const doneListeners = new Set<WarmDoneListener>()
 function hardwareOk(): boolean {
   if (typeof navigator === 'undefined') return false
   return (navigator.hardwareConcurrency ?? 0) >= 4
+}
+
+function rejectAllPending(reason: string) {
+  const err = new Error(reason)
+  for (const [, entry] of pending) entry.reject(err)
+  pending.clear()
+}
+
+/** Terminate a wedged worker so the next RPC can construct a fresh one. */
+function recycleDedicatedWorker(reason: string) {
+  rejectAllPending(reason)
+  try {
+    worker?.terminate()
+  } catch {
+    /* ignore */
+  }
+  worker = null
+  useDedicated = false
 }
 
 function getDedicatedWorker(): Worker | null {
@@ -66,6 +100,7 @@ function getDedicatedWorker(): Worker | null {
     }
     worker.onerror = (err) => {
       console.warn('[warmClient] worker error', err)
+      recycleDedicatedWorker('Warm worker error')
     }
     useDedicated = true
   } catch (err) {
@@ -76,16 +111,37 @@ function getDedicatedWorker(): Worker | null {
   return worker
 }
 
-async function callDedicated<T>(payload: Record<string, unknown>): Promise<T> {
+async function callDedicated<T>(
+  payload: Record<string, unknown>,
+  timeoutMs: number = WARM_RPC_TIMEOUT_MS
+): Promise<T> {
   const w = getDedicatedWorker()
   if (!w) return Promise.reject(new Error('Warm worker unavailable'))
   const id = `warm-${++seq}`
   return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (!pending.has(id)) return
+      // Rejects this RPC (and any siblings), then terminates the wedged worker.
+      recycleDedicatedWorker(`Warm worker RPC timeout (${timeoutMs}ms)`)
+    }, timeoutMs)
     pending.set(id, {
-      resolve: (v) => resolve(v as T),
-      reject,
+      resolve: (v) => {
+        clearTimeout(timer)
+        resolve(v as T)
+      },
+      reject: (err) => {
+        clearTimeout(timer)
+        reject(err)
+      },
     })
-    w.postMessage({ ...payload, id })
+    try {
+      w.postMessage({ ...payload, id })
+    } catch (err) {
+      clearTimeout(timer)
+      pending.delete(id)
+      recycleDedicatedWorker('Warm worker postMessage failed')
+      reject(err instanceof Error ? err : new Error(String(err)))
+    }
   })
 }
 
@@ -110,6 +166,38 @@ export function subscribeWarmDone(listener: WarmDoneListener): () => void {
   return () => {
     doneListeners.delete(listener)
   }
+}
+
+/**
+ * Live lane-1 quote build — always prefers dedicated warm.worker so scripture
+ * prepare on prepare.worker cannot starve chips. Falls back only if Worker
+ * construction fails (caller may then use prepare.worker).
+ */
+export async function batchQuotesOnWarmWorker(args: {
+  bookCode: string
+  links: unknown[]
+  originalChapters: unknown[]
+}): Promise<Array<{ index: number; tokens: unknown[] }>> {
+  const w = getDedicatedWorker()
+  if (!w || !useDedicated) throw new Error('Warm worker unavailable')
+  return callDedicated({
+    type: 'batch-quotes',
+    bookCode: args.bookCode,
+    links: args.links,
+    originalChapters: args.originalChapters,
+  })
+}
+
+/** Live lane-1 align — same dedicated-warm preference as batchQuotesOnWarmWorker. */
+export async function batchAlignOnWarmWorker(
+  args: import('../features/helps/batchAlignLinks').BatchAlignLinksArgs
+): Promise<import('../features/helps/batchAlignLinks').AlignLinkResult[]> {
+  const w = getDedicatedWorker()
+  if (!w || !useDedicated) throw new Error('Warm worker unavailable')
+  return callDedicated({
+    type: 'batch-align',
+    ...args,
+  })
 }
 
 export async function enqueueWarmJob(job: WarmJob): Promise<void> {
@@ -138,11 +226,33 @@ export async function cancelWarmJobs(args: {
 export async function getWarmQueueStats(): Promise<{
   queueDepth: number
   byLane: { 1: number; 2: number; 3: number }
+  currentJobKey?: string | null
+  currentKind?: string | null
+  currentLane?: WarmLane | null
+  currentResourceKey?: string | null
+  currentBookId?: string | null
+  pending?: Array<{
+    jobKey: string
+    kind: string
+    lane: WarmLane
+    resourceKey: string
+    bookId: string
+    chapter?: number
+  }>
 } | null> {
   if (hardwareOk() && useDedicated && worker) {
     try {
       const stats = await callDedicated<StatsMsg>({ type: 'stats' })
-      return { queueDepth: stats.queueDepth, byLane: stats.byLane }
+      return {
+        queueDepth: stats.queueDepth,
+        byLane: stats.byLane,
+        currentJobKey: stats.currentJobKey ?? null,
+        currentKind: stats.currentKind ?? null,
+        currentLane: stats.currentLane ?? null,
+        currentResourceKey: stats.currentResourceKey ?? null,
+        currentBookId: stats.currentBookId ?? null,
+        pending: stats.pending ?? [],
+      }
     } catch {
       return null
     }

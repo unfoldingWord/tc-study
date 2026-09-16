@@ -273,13 +273,21 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
     )
   })
 
-  test('WordLinkCard pending treatment is unchanged', () => {
+  test('WordLinkCard reuses supportRefQuoteChipKind and ol-pending spinner', () => {
     expect(twlCardSrc).toContain('resolveHelpsQuoteStatus')
-    expect(twlCardSrc).toContain("quoteStatus === 'pending'")
-    expect(twlCardSrc).toContain("quoteStatus === 'ol-fallback'")
+    expect(twlCardSrc).toContain('supportRefQuoteChipKind')
+    expect(twlCardSrc).toContain('quoteWarmPending')
+    expect(twlCardSrc).toContain("quoteChipKind === 'ol-pending'")
     expect(twlCardSrc).toContain('Building quote')
     expect(twlCardSrc).toContain('olQuote: link.origWords')
     expect(twlCardSrc).toContain('alignmentPending: !hasAlignedTokens')
+  })
+
+  test('WordLinkCard exposes a book-article filter icon without changing quote click', () => {
+    expect(twlCardSrc).toContain('onFilterByTwlArticle')
+    expect(twlCardSrc).toContain('Filter book links:')
+    expect(twlCardSrc).toContain('onFilterByTwlArticle(link, twTitle)')
+    expect(twlCardSrc).toContain('onQuoteClick(link)')
   })
 
   test('CombinedHelps TN half passes quoteBuildReady and copies quoteStatus', () => {

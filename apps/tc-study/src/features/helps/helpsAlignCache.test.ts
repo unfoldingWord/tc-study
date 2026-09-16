@@ -141,6 +141,19 @@ describe('helpsAlignCache', () => {
     expect(misses.map((m) => m.id)).toEqual(['b'])
   })
 
+  test('subtractCachedAlignHits can retry settled misses', () => {
+    const needs = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
+    const cached = {
+      a: { p: [], m: 0 as const },
+      c: { p: [1], m: 1 as const },
+    }
+    const { hits, misses } = subtractCachedAlignHits(needs, cached, {
+      retrySettledMisses: true,
+    })
+    expect([...hits.keys()]).toEqual(['c'])
+    expect(misses.map((m) => m.id).sort()).toEqual(['a', 'b'])
+  })
+
   test('mergeAndWrite merges into existing chapter rows', async () => {
     const cache = createFakeAdapter()
     const base = {

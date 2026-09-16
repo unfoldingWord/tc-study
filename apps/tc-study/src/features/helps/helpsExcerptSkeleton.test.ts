@@ -4,10 +4,10 @@ import { join } from 'node:path'
 import { shouldShowHelpsExcerptSkeleton } from './helpsExcerptSkeleton'
 
 describe('shouldShowHelpsExcerptSkeleton', () => {
-  test('TN Bible card skeletons the note body while the quote excerpt is pending', () => {
+  test('TN never skeletons the note body on quote status (TSV prose is ready)', () => {
     expect(
       shouldShowHelpsExcerptSkeleton({ kind: 'tn', quoteStatus: 'pending' })
-    ).toBe(true)
+    ).toBe(false)
     expect(
       shouldShowHelpsExcerptSkeleton({ kind: 'tn', quoteStatus: 'aligned' })
     ).toBe(false)
@@ -86,7 +86,7 @@ describe('card wiring reuses MarkdownSkeleton', () => {
     'utf8'
   )
 
-  test('TranslationNoteCard hides finished note prose while excerpt is loading', () => {
+  test('TranslationNoteCard paints note prose even while quote is loading', () => {
     expect(tnCardSrc).toContain('shouldShowHelpsExcerptSkeleton')
     expect(tnCardSrc).toContain('MarkdownSkeleton')
     expect(tnCardSrc).toContain('excerptLoading')
@@ -108,9 +108,9 @@ describe('card wiring reuses MarkdownSkeleton', () => {
   })
 
   test('pending-quote spinner stays a later, separate state on both cards', () => {
-    expect(tnCardSrc).toContain("quoteStatus === 'pending'")
+    expect(tnCardSrc).toContain('supportRefQuoteChipKind')
     expect(tnCardSrc).toContain('Building quote')
-    expect(twlCardSrc).toContain("quoteStatus === 'pending'")
+    expect(twlCardSrc).toContain('supportRefQuoteChipKind')
     expect(twlCardSrc).toContain('Building quote')
   })
 })

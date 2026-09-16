@@ -259,8 +259,10 @@ export function buildTokenQueuesFromViewModel(
 }
 
 function takeNextToken(ctx: WalkCtx): UsjWordToken | undefined {
-  if (ctx.verse <= 0) return undefined
-  const key = queueKey(ctx.chapter, ctx.verse)
+  if (ctx.chapter <= 0) return undefined
+  // Pre-verse chapter content (`\d` superscriptions) binds to verse 1 tokens.
+  const verse = ctx.verse > 0 ? ctx.verse : 1
+  const key = queueKey(ctx.chapter, verse)
   const q = ctx.queues.get(key)
   if (!q || q.length === 0) return undefined
   return q.shift()
@@ -380,9 +382,12 @@ function collectFlatSegments(nodes: unknown[], ctx: WalkCtx, out: FlatSeg[]): vo
       if (Array.isArray(raw.content)) collectFlatSegments(raw.content, ctx, child)
       for (const s of child) {
         if (s.kind === 'text') {
+          // Drop pure whitespace — shouldInsertSpaceBeforeInline spaces tokens.
+          if (s.text.trim().length === 0) continue
           out.push({ kind: 'heading', text: s.text, chapter: s.chapter })
         } else if (s.kind === 'token') {
-          out.push({ kind: 'heading', text: s.token.content, chapter: s.chapter })
+          // Keep token identity for aligned superscriptions (`\d`, etc.).
+          out.push(s)
         } else if (s.kind !== 'para-break') {
           out.push(s)
         }
@@ -582,11 +587,10 @@ export function shouldInsertSpaceBeforeInline(
   next: UsjLayoutInline
 ): boolean {
   if (!prev || next.kind !== 'token') return false
-  if (prev.kind === 'text') return !/\s$/.test(prev.text)
+  if (prev.kind === 'text' || prev.kind === 'heading') return !/\s$/.test(prev.text)
   return (
     prev.kind === 'verse' ||
     prev.kind === 'token' ||
-    prev.kind === 'heading' ||
     prev.kind === 'note' ||
     prev.kind === 'xref'
   )
@@ -721,6 +725,8 @@ export function collectVerseDisplayInline(
   const out: UsjLayoutInline[] = []
 
   for (const block of blocks) {
+    // Heading / intro chrome (incl. tokenized `\d`) stays out of verse-body inline.
+    if (block.role === 'heading' || block.role === 'intro') continue
     const clipped = clipLayoutInlineToVerses(
       block.inline,
       block.chapterNumber || chapter,

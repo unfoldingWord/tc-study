@@ -24,19 +24,34 @@ export function canAdmitBackgroundLanes(args: {
   cooldownMs?: number
   lane?: 2 | 3
 }): boolean {
-  if (!args.lane1Drained) return false
-  if (args.scrollUnsettled) return false
-  if (args.documentVisible === false) return false
+  return warmLaneBlockedReason(args) == null
+}
+
+/** Debug: why lane 2/3 admit is gated (null = open). */
+export function warmLaneBlockedReason(args: {
+  lane1Drained: boolean
+  scrollUnsettled?: boolean
+  documentVisible?: boolean
+  pendingJobKeys?: number
+  maxPending?: number
+  lastAdmitAt?: number
+  now?: number
+  cooldownMs?: number
+  lane?: 2 | 3
+}): string | null {
+  if (!args.lane1Drained) return 'lane1-busy'
+  if (args.scrollUnsettled) return 'scroll-unsettled'
+  if (args.documentVisible === false) return 'document-hidden'
   if (args.lane === 3) {
     const pending = args.pendingJobKeys ?? 0
     const max = args.maxPending ?? LANE3_MAX_PENDING
-    if (pending >= max) return false
+    if (pending >= max) return `pending>=${max}`
     const last = args.lastAdmitAt ?? 0
     const now = args.now ?? 0
     const cool = args.cooldownMs ?? LANE3_ADMIT_COOLDOWN_MS
-    if (last > 0 && now > 0 && now - last < cool) return false
+    if (last > 0 && now > 0 && now - last < cool) return 'admit-cooldown'
   }
-  return true
+  return null
 }
 
 /** CombinedHelps: stay busy until current-chapter notes/quotes exist or cache-hit. */
@@ -46,8 +61,15 @@ export function helpsLane1Ready(args: {
   cacheHit: boolean
   /** OL zip missing — show notes and drain so download/retry is not deadlocked. */
   quotesBlocked?: boolean
+  /**
+   * Book-wide Metaphor / TWL article filter: first list paint is enough to drain.
+   * Off-chapter quote/align warm is lane 2 — must not keep helps busy or those jobs
+   * never admit (silent enqueue drop while lane1Drained is false).
+   */
+  bookFilterRowsReady?: boolean
 }): boolean {
   if (args.contentPending) return false
+  if (args.bookFilterRowsReady) return true
   return args.quoteReady || args.cacheHit || Boolean(args.quotesBlocked)
 }
 

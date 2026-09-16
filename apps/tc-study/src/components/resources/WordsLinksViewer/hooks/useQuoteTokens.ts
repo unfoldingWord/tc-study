@@ -2,7 +2,7 @@
  * useQuoteTokens Hook - STEP 2 of TSV Alignment Algorithm
  *
  * Builds quoteTokens for TWL links by matching origWords to original language tokens.
- * Worker-first for larger batches: priority rows (from current verse) first, then
+ * Worker-first (warm.worker preferred): priority rows (from current verse) first, then
  * deferred rows on idle. Sync only for tiny batches or when the worker is unavailable.
  *
  * Persistent chapter-scoped quote cache (IndexedDB) is checked before worker/sync
@@ -29,6 +29,12 @@ import {
   isOriginalLanguageQuoteBlocked,
   isQuoteBuildReady,
 } from '../../../../features/helps/resolveHelpsQuoteStatus'
+import { logHelpsQuoteBuildMiss } from '../../../../features/helps/helpsQuoteBuildDebug'
+import {
+  HELPS_CACHE_HYDRATE_BUDGET_MS,
+  settleHelpsCacheContext,
+  settleHelpsWorkerOrSync,
+} from '../../../../features/helps/helpsCacheContextBudget'
 import { buildQuoteTokens } from '../../../../features/helps/quoteTokens'
 import {
   HELPS_SYNC_MAX_LINKS,
@@ -197,30 +203,45 @@ async function buildQuotesViaWorkerOrSync(args: {
   endChapter: number
 }): Promise<Map<string, TranslationWordsLink['quoteTokens']>> {
   const { bookCode, links, originalContent, startChapter, endChapter } = args
-  const byId = new Map<string, TranslationWordsLink['quoteTokens']>()
-  if (links.length === 0) return byId
+  if (links.length === 0) return new Map()
 
-  try {
-    const results = await batchQuotesInWorker({
-      bookCode,
-      links,
-      originalChapters: originalContent,
-    })
-    for (const row of results) {
-      const link = links[row.index]
-      if (!link) continue
-      const tokens = row.tokens as TranslationWordsLink['quoteTokens']
-      if (tokens && tokens.length > 0) byId.set(link.id, tokens)
-      else byId.set(link.id, undefined)
-    }
-    return byId
-  } catch {
+  const applySync = () => {
+    const next = new Map<string, TranslationWordsLink['quoteTokens']>()
     const sync = buildQuotesSync(links, originalContent, bookCode, startChapter, endChapter)
     for (const link of sync) {
       if (!chapterInSpan(chapterOfLink(link), startChapter, endChapter)) continue
-      byId.set(link.id, link.quoteTokens)
+      next.set(link.id, link.quoteTokens)
     }
-    return byId
+    return next
+  }
+
+  // Tiny batches: sync is cheaper than a worker round-trip.
+  // Chapter-sized work stays on warm.worker (via prepareClient) — never main.
+  if (links.length <= HELPS_SYNC_MAX_LINKS) {
+    return applySync()
+  }
+
+  try {
+    return await settleHelpsWorkerOrSync(
+      batchQuotesInWorker({
+        bookCode,
+        links,
+        originalChapters: originalContent,
+      }).then((results) => {
+        const byId = new Map<string, TranslationWordsLink['quoteTokens']>()
+        for (const row of results) {
+          const link = links[row.index]
+          if (!link) continue
+          const tokens = row.tokens as TranslationWordsLink['quoteTokens']
+          if (tokens && tokens.length > 0) byId.set(link.id, tokens)
+          else byId.set(link.id, undefined)
+        }
+        return byId
+      }),
+      applySync
+    )
+  } catch {
+    return applySync()
   }
 }
 
@@ -330,7 +351,31 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
       if (gen !== runGenRef.current) return
       rememberQuotes(next)
       setLinksWithQuotes(next)
-      if (settle) setSettledRequestKey(requestKey)
+      if (settle) {
+        setSettledRequestKey(requestKey)
+        for (const row of next) {
+          if (!row.origWords?.trim()) continue
+          if (row.quoteTokens && row.quoteTokens.length > 0) continue
+          const refParts = String(row.reference || '1:1').split(':')
+          const chapter = parseInt(refParts[0] || '1', 10)
+          logHelpsQuoteBuildMiss({
+            stage: 'quote-tokens',
+            reason: olBlocked || originalError ? 'ol_content_blocked' : 'quote_tokens_empty',
+            linkId: row.id,
+            reference: row.reference,
+            resourceKey,
+            bookId: bookCode,
+            chapter,
+            detail: {
+              quoteReady: row.quoteReady,
+              loadingOriginal,
+              originalError: originalError ?? undefined,
+              originalChapterCount: originalContent?.length ?? 0,
+              olBlocked,
+            },
+          })
+        }
+      }
     }
 
     if (shouldSkipHelpsQuoteRebuild({ links, lastById: lastQuotesByIdRef.current })) {
@@ -373,11 +418,15 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
       if (stillNeed.length === 0) return false
 
       try {
-        const cacheCtx = await resolveQuoteCacheContext({
-          catalogManager,
-          helpsKey: resourceKey,
-          bookCode,
-        })
+        // Hydrate budget: soft 250ms skip forced rebuilds on refresh under IDB load.
+        const cacheCtx = await settleHelpsCacheContext(
+          resolveQuoteCacheContext({
+            catalogManager,
+            helpsKey: resourceKey,
+            bookCode,
+          }),
+          HELPS_CACHE_HYDRATE_BUDGET_MS
+        )
         if (!cacheCtx || lifecycle.cancelled || gen !== runGenRef.current) return false
         const cached = await readCachedQuoteTokensForSpan(cacheAdapter, {
           helpsKey: resourceKey,
@@ -450,9 +499,21 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
           lifecycle.cancelled = true
         }
       }
-      setLinksWithQuotes(links)
-      lastQuotesRef.current = links
-      setSettledRequestKey('')
+      // OL finished empty/blocked for this span: settle so align leaves "Building quote".
+      // While OL is still loading, keep unsettled and try IDB cache only.
+      if (!loadingOriginal && links.length > 0) {
+        apply(
+          links.map((link) => ({
+            ...link,
+            quoteReady: true as const,
+          })),
+          true
+        )
+      } else {
+        setLinksWithQuotes(links)
+        lastQuotesRef.current = links
+        setSettledRequestKey('')
+      }
       void runCacheFirstThenBuild()
       return () => {
         lifecycle.cancelled = true
@@ -505,13 +566,18 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
     }
 
     void (async () => {
+      // Cache-first hydrate gets the longer budget; after a miss, live build
+      // still proceeds even if stamps never settle (persist may be skipped).
       const cacheCtx =
         cacheAdapter && catalogManager
-          ? await resolveQuoteCacheContext({
-              catalogManager,
-              helpsKey: resourceKey,
-              bookCode,
-            })
+          ? await settleHelpsCacheContext(
+              resolveQuoteCacheContext({
+                catalogManager,
+                helpsKey: resourceKey,
+                bookCode,
+              }),
+              HELPS_CACHE_HYDRATE_BUDGET_MS
+            )
           : null
 
       let remaining = needsBuild
@@ -662,6 +728,7 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
   }, [
     links,
     originalContent,
+    loadingOriginal,
     helpsRef.book,
     helpsRef.verse,
     startChapter,
@@ -676,6 +743,9 @@ export function useQuoteTokens({ resourceKey, resourceId, links }: UseQuoteToken
   const quoteBuildReady =
     skipQuoteRebuild ||
     olBlocked ||
+    // A finished quote pass (even with empty tokens) must unblock align / lane1.
+    // Waiting on OL word-tokens forever left TN+TWL chips on "Building quote".
+    quotesSettled ||
     isQuoteBuildReady({
       loadingOriginal,
       originalContent,

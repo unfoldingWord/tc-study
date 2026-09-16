@@ -73,10 +73,26 @@ export type WarmJob =
   | WarmAlignChapterJob
   | WarmPrepareArticleJob
 
+/** Live lane-1 quote/align payloads (same shape as prepare.worker batch-*). */
+export type WarmBatchQuotesMsg = {
+  id: string
+  type: 'batch-quotes'
+  bookCode: string
+  links: unknown[]
+  originalChapters: unknown[]
+}
+
+export type WarmBatchAlignMsg = {
+  id: string
+  type: 'batch-align'
+} & Record<string, unknown>
+
 export type WarmInMsg =
   | { id: string; type: 'enqueue'; job: WarmJob }
   | { id: string; type: 'cancel'; resourceKey?: string; bookId?: string; languageCode?: string }
   | { id: string; type: 'stats' }
+  | WarmBatchQuotesMsg
+  | WarmBatchAlignMsg
 
 export type WarmOutMsg =
   | { id: string; type: 'ok'; result?: unknown }
@@ -94,4 +110,17 @@ export type WarmOutMsg =
       type: 'stats'
       queueDepth: number
       byLane: { 1: number; 2: number; 3: number }
+      currentJobKey?: string | null
+      currentKind?: string | null
+      currentLane?: WarmLane | null
+      currentResourceKey?: string | null
+      currentBookId?: string | null
+      pending?: Array<{
+        jobKey: string
+        kind: string
+        lane: WarmLane
+        resourceKey: string
+        bookId: string
+        chapter?: number
+      }>
     }

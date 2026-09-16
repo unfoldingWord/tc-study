@@ -39,14 +39,18 @@ export function helpsRowScriptureRef(
   return { book, chapter, verse }
 }
 
-/** Navigate when the card/token is in another book or chapter. Same-chapter is already on screen. */
+/** Navigate when the card/token is in another book, chapter, or verse. */
 export function shouldNavigateScriptureToRef(
-  current: { book?: string; chapter: number },
-  target: Pick<HelpsScriptureRef, 'book' | 'chapter'>
+  current: { book?: string; chapter: number; verse?: number },
+  target: Pick<HelpsScriptureRef, 'book' | 'chapter'> & { verse?: number }
 ): boolean {
   const currentBook = current.book?.toLowerCase()
   if (target.book && currentBook && target.book !== currentBook) return true
-  return target.chapter !== current.chapter
+  if (target.chapter !== current.chapter) return true
+  if (typeof target.verse === 'number') {
+    return target.verse !== (current.verse ?? 1)
+  }
+  return false
 }
 
 /**
@@ -55,8 +59,8 @@ export function shouldNavigateScriptureToRef(
  * A fresh click resets persist (`highlightAlreadyApplied` is then false).
  */
 export function shouldNavigateToHelpsHighlight(args: {
-  current: { book?: string; chapter: number }
-  target: Pick<HelpsScriptureRef, 'book' | 'chapter'>
+  current: { book?: string; chapter: number; verse?: number }
+  target: Pick<HelpsScriptureRef, 'book' | 'chapter' | 'verse'>
   userScrolling?: boolean
   highlightAlreadyApplied?: boolean
 }): boolean {
@@ -106,7 +110,7 @@ export function shouldScrollToQuoteHighlight(args: {
 export function planHelpsCardScriptureAction(args: {
   bookCode?: string
   reference?: string
-  current: { book?: string; chapter: number }
+  current: { book?: string; chapter: number; verse?: number }
   item?: HelpsQuoteClickItem | null
 }): {
   navigate: HelpsScriptureRef | null
@@ -114,6 +118,8 @@ export function planHelpsCardScriptureAction(args: {
 } {
   const book = args.bookCode || args.current.book
   const target = helpsRowScriptureRef(book, args.reference)
+  // Always jump to the note BCV when chapter/verse differs — even if quote
+  // chips are still building (no semanticIds / alignedTokens yet).
   const navigate =
     target && shouldNavigateScriptureToRef(args.current, target) ? target : null
   const token = target

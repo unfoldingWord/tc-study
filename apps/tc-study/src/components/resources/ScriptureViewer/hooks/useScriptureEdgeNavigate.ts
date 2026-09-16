@@ -1,27 +1,23 @@
 /**
- * Edge travel pads + elastic overscroll → next/prev navigation unit.
- * Pads appear only after the reader parks at a content edge, giving the
- * scrollbar extra range. Wheel/touch still rubber-band at the far edge.
+ * Content-edge chevrons + elastic overscroll → next/prev navigation unit.
+ * Chevrons mount at document start/end when an adjacent unit exists (click to
+ * commit). No travel pad / scrollbar runway — further pull uses elastic overscroll.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   accumulateEdgeOverscroll,
   commitEdgeNavigation,
   EDGE_NAV_MAX_PULL_PX,
   EDGE_NAV_MIN_DWELL_MS,
   EDGE_NAV_THRESHOLD_PX,
-  EDGE_PAD_PEEK_PX,
-  EDGE_TRAVEL_PAD_PX,
-  edgeTravelFromPads,
   elasticPullPx,
   isEdgeGestureArmed,
-  nextEdgePadVisibility,
+  nextEdgeCueVisibility,
   scaleWheelOverscrollDelta,
   scrollEdgeState,
   type ScriptureEdge,
 } from '../../../../features/nav/scriptureEdgeNavigate'
-import { beginProgrammaticScrollSuppress } from '../../../../features/nav/chapterScrollActivity'
 
 export interface UseScriptureEdgeNavigateOptions {
   /** Element that actually scrolls (overflow parent), or null until mounted. */
@@ -32,7 +28,7 @@ export interface UseScriptureEdgeNavigateOptions {
   onPrev: () => void
   canNext: () => boolean
   canPrev: () => boolean
-  /** Called when a travel pad first appears — warm the adjacent chapter. */
+  /** Called when an edge cue first appears — warm the adjacent chapter. */
   onArmed?: (edge: ScriptureEdge) => void
   enabled?: boolean
   thresholdPx?: number
@@ -50,7 +46,11 @@ function findOverflowParent(el: HTMLElement | null): HTMLElement | null {
   return null
 }
 
+/** Prefer the element itself when it is the scrollport (panel-owned overflow). */
 export function resolveScriptureScrollParent(contentRoot: HTMLElement | null): HTMLElement | null {
+  if (!contentRoot) return null
+  const selfOverflow = getComputedStyle(contentRoot).overflowY
+  if (selfOverflow === 'auto' || selfOverflow === 'scroll') return contentRoot
   return findOverflowParent(contentRoot)
 }
 
@@ -70,16 +70,16 @@ export function useScriptureEdgeNavigate({
   pullPx: number
   rawPullPx: number
   edge: ScriptureEdge | null
-  showTopPad: boolean
-  showBottomPad: boolean
+  showTopCue: boolean
+  showBottomCue: boolean
   clickPrev: () => void
   clickNext: () => void
 } {
   const [pullPx, setPullPx] = useState(0)
   const [rawPullPx, setRawPullPx] = useState(0)
   const [edge, setEdge] = useState<ScriptureEdge | null>(null)
-  const [showTopPad, setShowTopPad] = useState(false)
-  const [showBottomPad, setShowBottomPad] = useState(false)
+  const [showTopCue, setShowTopCue] = useState(false)
+  const [showBottomCue, setShowBottomCue] = useState(false)
 
   const rawRef = useRef(0)
   const edgeRef = useRef<ScriptureEdge | null>(null)
@@ -87,11 +87,9 @@ export function useScriptureEdgeNavigate({
   const touchStartYRef = useRef<number | null>(null)
   const touchStartedAtEdgeRef = useRef<ScriptureEdge | null>(null)
   const edgeReachedAtRef = useRef<number | null>(null)
-  const padArmedAtRef = useRef<number | null>(null)
-  const showTopPadRef = useRef(false)
-  const showBottomPadRef = useRef(false)
-  const prevTopPadRef = useRef(false)
-  const prevBottomPadRef = useRef(false)
+  const cueArmedAtRef = useRef<number | null>(null)
+  const showTopCueRef = useRef(false)
+  const showBottomCueRef = useRef(false)
   const onNextRef = useRef(onNext)
   const onPrevRef = useRef(onPrev)
   const canNextRef = useRef(canNext)
@@ -122,12 +120,12 @@ export function useScriptureEdgeNavigate({
     if (resetCommitted) committedRef.current = false
   }
 
-  const dismissPads = () => {
-    showTopPadRef.current = false
-    showBottomPadRef.current = false
-    padArmedAtRef.current = null
-    setShowTopPad(false)
-    setShowBottomPad(false)
+  const dismissCues = () => {
+    showTopCueRef.current = false
+    showBottomCueRef.current = false
+    cueArmedAtRef.current = null
+    setShowTopCue(false)
+    setShowBottomCue(false)
   }
 
   const noteEdgePresence = (atTop: boolean, atBottom: boolean) => {
@@ -148,12 +146,43 @@ export function useScriptureEdgeNavigate({
     }, 450)
   }
 
+  const syncCuesFromScroll = () => {
+    const next = nextEdgeCueVisibility({
+      canPrev: canPrevRef.current(),
+      canNext: canNextRef.current(),
+    })
+
+    if (next.showTop !== showTopCueRef.current) {
+      showTopCueRef.current = next.showTop
+      if (next.showTop) {
+        cueArmedAtRef.current = Date.now()
+        onArmedRef.current?.('top')
+      } else if (!next.showBottom) {
+        cueArmedAtRef.current = null
+      }
+      setShowTopCue(next.showTop)
+    }
+
+    if (next.showBottom !== showBottomCueRef.current) {
+      showBottomCueRef.current = next.showBottom
+      if (next.showBottom) {
+        cueArmedAtRef.current = Date.now()
+        onArmedRef.current?.('bottom')
+      } else if (!next.showTop) {
+        cueArmedAtRef.current = null
+      }
+      setShowBottomCue(next.showBottom)
+    }
+  }
+
   const fire = (action: 'previous' | 'next') => {
     lockGesture()
     clearPull(false)
-    dismissPads()
+    dismissCues()
     if (action === 'previous') onPrevRef.current()
     else onNextRef.current()
+    // Restore always-available cues for the new unit as soon as can* updates.
+    syncCuesFromScroll()
   }
 
   const tryCommit = (fromClick = false) => {
@@ -163,7 +192,7 @@ export function useScriptureEdgeNavigate({
     }
     if (
       !fromClick &&
-      !isEdgeGestureArmed(padArmedAtRef.current ?? edgeReachedAtRef.current, Date.now(), minDwellMs)
+      !isEdgeGestureArmed(cueArmedAtRef.current ?? edgeReachedAtRef.current, Date.now(), minDwellMs)
     ) {
       return
     }
@@ -198,103 +227,10 @@ export function useScriptureEdgeNavigate({
     tryCommit(true)
   }
 
-  const readPadTravel = () => {
-    if (!scrollParent) {
-      return edgeTravelFromPads({
-        scrollTop: 0,
-        scrollHeight: 0,
-        clientHeight: 0,
-        topPadPx: 0,
-        bottomPadPx: 0,
-      })
-    }
-    return edgeTravelFromPads({
-      scrollTop: scrollParent.scrollTop,
-      scrollHeight: scrollParent.scrollHeight,
-      clientHeight: scrollParent.clientHeight,
-      topPadPx: showTopPadRef.current ? EDGE_TRAVEL_PAD_PX : 0,
-      bottomPadPx: showBottomPadRef.current ? EDGE_TRAVEL_PAD_PX : 0,
-    })
-  }
-
-  const syncPadsFromScroll = () => {
-    if (!scrollParent) return
-    const travel = readPadTravel()
-    const next = nextEdgePadVisibility({
-      showTop: showTopPadRef.current,
-      showBottom: showBottomPadRef.current,
-      scrollTop: scrollParent.scrollTop,
-      contentMin: travel.contentMin,
-      contentMax: travel.contentMax,
-      topRaw: travel.topRaw,
-      bottomRaw: travel.bottomRaw,
-      canPrev: canPrevRef.current(),
-      canNext: canNextRef.current(),
-    })
-
-    if (next.showTop !== showTopPadRef.current) {
-      showTopPadRef.current = next.showTop
-      if (next.showTop) {
-        padArmedAtRef.current = Date.now()
-        onArmedRef.current?.('top')
-      } else if (!next.showBottom) {
-        padArmedAtRef.current = null
-      }
-      setShowTopPad(next.showTop)
-    }
-    if (next.showBottom !== showBottomPadRef.current) {
-      showBottomPadRef.current = next.showBottom
-      if (next.showBottom) {
-        padArmedAtRef.current = Date.now()
-        onArmedRef.current?.('bottom')
-      } else if (!next.showTop) {
-        padArmedAtRef.current = null
-      }
-      setShowBottomPad(next.showBottom)
-    }
-
-    if (travel.bottomRaw > 0) applyVisual(travel.bottomRaw, 'bottom')
-    else if (travel.topRaw > 0) applyVisual(travel.topRaw, 'top')
-    else if (rawRef.current > 0 && edgeRef.current) {
-      // Leave elastic pull alone when parked at the far document edge.
-      const { atTop, atBottom } = scrollEdgeState(
-        scrollParent.scrollTop,
-        scrollParent.scrollHeight,
-        scrollParent.clientHeight
-      )
-      if (!atTop && !atBottom) applyVisual(0, null)
-    }
-  }
-
-  useLayoutEffect(() => {
-    if (!scrollParent) {
-      prevTopPadRef.current = showTopPad
-      prevBottomPadRef.current = showBottomPad
-      return
-    }
-    const peekingIn =
-      (showTopPad && !prevTopPadRef.current) || (showBottomPad && !prevBottomPadRef.current)
-    const peekingOut =
-      (!showTopPad && prevTopPadRef.current) || (!showBottomPad && prevBottomPadRef.current)
-    if (peekingIn || peekingOut) {
-      beginProgrammaticScrollSuppress(120)
-    }
-    if (showTopPad && !prevTopPadRef.current) {
-      scrollParent.scrollTop += EDGE_TRAVEL_PAD_PX - EDGE_PAD_PEEK_PX
-    } else if (!showTopPad && prevTopPadRef.current) {
-      scrollParent.scrollTop = Math.max(0, scrollParent.scrollTop - EDGE_TRAVEL_PAD_PX)
-    }
-    if (showBottomPad && !prevBottomPadRef.current) {
-      scrollParent.scrollTop += EDGE_PAD_PEEK_PX
-    }
-    prevTopPadRef.current = showTopPad
-    prevBottomPadRef.current = showBottomPad
-  }, [showTopPad, showBottomPad, scrollParent])
-
   useEffect(() => {
     if (!enabled || !scrollParent) {
       clearPull()
-      dismissPads()
+      dismissCues()
       return
     }
 
@@ -304,15 +240,8 @@ export function useScriptureEdgeNavigate({
     const onWheel = (event: WheelEvent) => {
       const { atTop, atBottom } = readEdges()
       noteEdgePresence(atTop, atBottom)
-      syncPadsFromScroll()
+      syncCuesFromScroll()
       if (!atTop && !atBottom && rawRef.current === 0) return
-
-      const inPad =
-        (atBottom && showBottomPadRef.current) || (atTop && showTopPadRef.current)
-      // While a pad is open, let native scroll consume the extra range first.
-      if (inPad && (showBottomPadRef.current ? readPadTravel().bottomRaw < EDGE_TRAVEL_PAD_PX - 2 : readPadTravel().topRaw < EDGE_TRAVEL_PAD_PX - 2)) {
-        return
-      }
 
       const armed = isEdgeGestureArmed(edgeReachedAtRef.current, Date.now(), minDwellMs)
       const next = accumulateEdgeOverscroll({
@@ -356,19 +285,11 @@ export function useScriptureEdgeNavigate({
       if (startY == null || y == null) return
       const { atTop, atBottom } = readEdges()
       noteEdgePresence(atTop, atBottom)
-      syncPadsFromScroll()
+      syncCuesFromScroll()
 
       const started = touchStartedAtEdgeRef.current
       if (!started) {
         if (rawRef.current > 0) applyVisual(0, null)
-        return
-      }
-
-      const travel = readPadTravel()
-      if (started === 'bottom' && showBottomPadRef.current && travel.bottomRaw < EDGE_TRAVEL_PAD_PX - 2) {
-        return
-      }
-      if (started === 'top' && showTopPadRef.current && travel.topRaw < EDGE_TRAVEL_PAD_PX - 2) {
         return
       }
 
@@ -401,7 +322,8 @@ export function useScriptureEdgeNavigate({
     const onScroll = () => {
       const { atTop, atBottom } = readEdges()
       noteEdgePresence(atTop, atBottom)
-      syncPadsFromScroll()
+      syncCuesFromScroll()
+      if (rawRef.current > 0 && !atTop && !atBottom) applyVisual(0, null)
       if (scrollSettleTimer != null) window.clearTimeout(scrollSettleTimer)
       scrollSettleTimer = window.setTimeout(() => {
         scrollSettleTimer = null
@@ -415,7 +337,7 @@ export function useScriptureEdgeNavigate({
     scrollParent.addEventListener('touchend', onTouchEnd, { passive: true })
     scrollParent.addEventListener('touchcancel', onTouchEnd, { passive: true })
     scrollParent.addEventListener('scroll', onScroll, { passive: true })
-    syncPadsFromScroll()
+    syncCuesFromScroll()
 
     return () => {
       scrollParent.removeEventListener('wheel', onWheelSettle)
@@ -435,12 +357,19 @@ export function useScriptureEdgeNavigate({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- applyVisual closes over latest contentEl
   }, [enabled, scrollParent, contentEl, thresholdPx, maxPullPx, minDwellMs])
 
+  // canNext/canPrev change with chapter without a scroll event — keep cues in sync.
+  useEffect(() => {
+    if (!enabled || !scrollParent) return
+    syncCuesFromScroll()
+    // Re-run when navigation callbacks change identity (chapter / can* closure).
+  }, [enabled, scrollParent, canNext, canPrev])
+
   return {
     pullPx,
     rawPullPx,
     edge,
-    showTopPad,
-    showBottomPad,
+    showTopCue,
+    showBottomCue,
     clickPrev,
     clickNext,
   }

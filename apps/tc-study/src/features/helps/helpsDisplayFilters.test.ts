@@ -6,7 +6,9 @@ import {
   filterNotesByReferenceRange,
   filterSupportRefFallbackChunk,
   flattenBookNotes,
+  mergeFocusChapterBookMatches,
   planSupportRefStreamChapters,
+  streamRowsForChapter,
   resolveHelpsTokenClickFilter,
   resolveRangeEndVerse,
   reuseUnchangedSupportRefNotes,
@@ -15,6 +17,12 @@ import {
   supportReferenceKey,
   supportReferencesMatch,
   supportRefNotesForChapter,
+  settleTwlArticleDisplayLinks,
+  twlArticleChipTitle,
+  twlArticleFirstPaintLinks,
+  twlArticleKey,
+  twlArticleLinksForChapter,
+  twlArticlesMatch,
 } from './helpsDisplayFilters'
 
 describe('filterNotesByReferenceRange', () => {
@@ -271,6 +279,65 @@ describe('filterDisplayLinks', () => {
     expect(hasLinkMatches).toBe(false)
     expect(displayLinks).toEqual([])
   })
+
+  test('twlArticleFilter keeps links with the same articlePath / twLink', () => {
+    const links = [
+      {
+        id: 'l1',
+        reference: '1:1',
+        articlePath: 'bible/kt/sin',
+        twLink: 'rc://*/tw/dict/bible/kt/sin',
+      },
+      {
+        id: 'l2',
+        reference: '2:4',
+        articlePath: 'bible/kt/sin/',
+        twLink: 'rc://*/tw/dict/bible/kt/sin/',
+      },
+      {
+        id: 'l3',
+        reference: '1:2',
+        articlePath: 'bible/kt/grace',
+        twLink: 'rc://*/tw/dict/bible/kt/grace',
+      },
+    ]
+    const { displayLinks, hasLinkMatches } = filterDisplayLinks(links, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: null,
+      twlArticleFilter: {
+        articlePath: 'bible/kt/sin',
+        title: 'Sin',
+        timestamp: 1,
+      },
+      bookCodeLower: 'tit',
+    })
+    expect(hasLinkMatches).toBe(true)
+    expect(displayLinks.map((l) => l.id)).toEqual(['l1', 'l2'])
+  })
+})
+
+describe('filterDisplayNotes twl article', () => {
+  test('twlArticleFilter hides all TN notes', () => {
+    const notes = [
+      { id: 'n1', reference: '1:1', supportReference: 'rc://*/ta/man/translate/figs-metaphor' },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(notes, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: null,
+      twlArticleFilter: {
+        articlePath: 'bible/kt/sin',
+        title: 'Sin',
+        timestamp: 1,
+      },
+      bookCodeLower: 'tit',
+    })
+    expect(hasNoteMatches).toBe(false)
+    expect(displayNotes).toEqual([])
+  })
 })
 
 describe('supportReferenceKey', () => {
@@ -288,6 +355,121 @@ describe('supportReferenceKey', () => {
   })
 })
 
+describe('twlArticleKey', () => {
+  test('normalizes articlePath and twLink to the same bible/cat/term key', () => {
+    expect(twlArticleKey('bible/kt/sin')).toBe('bible/kt/sin')
+    expect(twlArticleKey('bible/kt/sin/')).toBe('bible/kt/sin')
+    expect(twlArticleKey(undefined, 'rc://*/tw/dict/bible/kt/sin')).toBe('bible/kt/sin')
+    expect(twlArticleKey(undefined, 'rc://*/tw/dict/bible/kt/sin/')).toBe('bible/kt/sin')
+    expect(twlArticlesMatch(
+      { articlePath: 'bible/kt/sin' },
+      { twLink: 'rc://*/tw/dict/bible/kt/sin' }
+    )).toBe(true)
+    expect(twlArticlesMatch('bible/kt/sin', 'rc://*/tw/dict/bible/kt/sin')).toBe(true)
+    expect(twlArticlesMatch('bible/kt/sin', 'bible/kt/grace')).toBe(false)
+  })
+
+  test('chip title uses the first TW gloss, not the full synonym list', () => {
+    expect(twlArticleChipTitle('sin, sinful, sinner, sinning', 'bible/kt/sin')).toBe('Sin')
+    expect(twlArticleChipTitle('Yahweh, Yah', 'bible/kt/yahweh')).toBe('Yahweh')
+    expect(twlArticleChipTitle('', 'bible/kt/sin')).toBe('Sin')
+  })
+})
+
+describe('twlArticleFirstPaintLinks', () => {
+  const sin = 'bible/kt/sin'
+  const bookLinks = [
+    { id: 'psa-1', reference: '1:3', articlePath: sin, twLink: 'rc://*/tw/dict/bible/kt/sin' },
+    { id: 'psa-2', reference: '2:1', articlePath: sin, twLink: 'rc://*/tw/dict/bible/kt/sin' },
+    { id: 'psa-150', reference: '150:1', twLink: 'rc://*/tw/dict/bible/kt/sin/' },
+    { id: 'other', reference: '1:4', articlePath: 'bible/kt/grace', twLink: 'rc://*/tw/dict/bible/kt/grace' },
+  ]
+
+  test('first paint is current-chapter matches only — no book flatten', () => {
+    const first = twlArticleFirstPaintLinks(bookLinks, sin, 3)
+    expect(first.map((l) => l.id)).toEqual([])
+    const focusPaint = twlArticleFirstPaintLinks(
+      [
+        { id: 'psa-3', reference: '3:1', articlePath: sin, twLink: 'rc://*/tw/dict/bible/kt/sin' },
+        bookLinks[0]!,
+      ],
+      sin,
+      3
+    )
+    expect(focusPaint.map((l) => l.id)).toEqual(['psa-3'])
+    expect(twlArticleLinksForChapter([bookLinks[1]!, bookLinks[3]!], sin).map((l) => l.id)).toEqual([
+      'psa-2',
+    ])
+  })
+
+  test('idle plan includes chapters before the focus chapter', () => {
+    expect(
+      planSupportRefStreamChapters(
+        { '3': [bookLinks[0]], '5': [bookLinks[2]] },
+        3
+      )
+    ).toEqual([1, 2, 4, 5])
+    expect(
+      planSupportRefStreamChapters(
+        { '3': [], '4': [] },
+        3,
+        [{ reference: '1:3' }, { reference: '2:1' }, { reference: '4:1' }]
+      )
+    ).toEqual([1, 2, 4])
+    expect(streamRowsForChapter(
+      { '3': [bookLinks[0]] },
+      bookLinks,
+      2
+    ).map((l) => l.id)).toEqual(['psa-2'])
+  })
+})
+
+describe('settleTwlArticleDisplayLinks', () => {
+  test('quoted off-chapter links without enrichment show OL fallback with warm-pending', () => {
+    const book = [
+      {
+        id: 'twl-18',
+        reference: '18:1',
+        articlePath: 'bible/kt/yahweh',
+        origWords: 'יְהוָה',
+      },
+    ]
+    const settled = settleTwlArticleDisplayLinks(book, 'bible/kt/yahweh', new Map())
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBe(true)
+  })
+
+  test('merges lane-2 quote/align enrichment when passage align is missing', () => {
+    const book = [
+      {
+        id: 'twl-18',
+        reference: '18:1',
+        articlePath: 'bible/kt/yahweh',
+        origWords: 'יְהוָה',
+      },
+    ]
+    const enrichment = new Map([
+      [
+        'twl-18',
+        {
+          quoteTokens: [{ id: 1, text: 'יְהוָה', type: 'word', occurrence: 1, content: 'יְהוָה' }],
+          quoteStatus: 'aligned',
+          alignedTokens: [{ position: 0, content: 'Yahweh' }],
+          semanticIds: ['psa 18:1:yahweh:1'],
+        },
+      ],
+    ])
+    const settled = settleTwlArticleDisplayLinks(
+      book,
+      'bible/kt/yahweh',
+      new Map(),
+      enrichment
+    )
+    expect(settled[0]!.quoteStatus).toBe('aligned')
+    expect(settled[0]!.alignedTokens).toEqual([{ position: 0, content: 'Yahweh' }])
+  })
+})
+
 describe('supportRefFirstPaintNotes', () => {
   const metaphor = 'rc://*/ta/man/translate/figs-metaphor'
   const bookNotes = [
@@ -300,8 +482,30 @@ describe('supportRefFirstPaintNotes', () => {
   test('first paint is current-chapter matches only — no book flatten', () => {
     const first = supportRefFirstPaintNotes(bookNotes, metaphor, 1)
     expect(first.map((n) => n.id)).toEqual(['psa-1'])
-    expect(planSupportRefStreamChapters({ '1': [bookNotes[0]], '2': [bookNotes[1]], '150': [bookNotes[2]] }, 1)).toEqual([
-      2, 150,
+    expect(planSupportRefStreamChapters({ '1': [bookNotes[0]], '2': [bookNotes[1]], '4': [bookNotes[2]] }, 1)).toEqual([
+      2, 3, 4,
+    ])
+  })
+
+  test('idle plan walks preceding chapters, not only current→end', () => {
+    expect(
+      planSupportRefStreamChapters(
+        { '3': [bookNotes[0]], '4': [bookNotes[2]] },
+        3
+      )
+    ).toEqual([1, 2, 4])
+    const passageOnly = supportRefFirstPaintNotes(
+      [{ id: 'psa-3b', reference: '3:8', supportReference: metaphor }],
+      metaphor,
+      3
+    )
+    const chapterRows = [
+      { id: 'psa-3a', reference: '3:1', supportReference: metaphor },
+      { id: 'psa-3b', reference: '3:8', supportReference: metaphor },
+    ]
+    expect(mergeFocusChapterBookMatches(passageOnly, chapterRows).map((n) => n.id)).toEqual([
+      'psa-3b',
+      'psa-3a',
     ])
   })
 
@@ -462,6 +666,109 @@ describe('settleSupportRefDisplayNotes', () => {
     )
     expect(settled[0]!.semanticIds).toEqual(['tit 2:11:men:1'])
     expect(settled[0]!.quoteStatus).toBe('aligned')
+  })
+
+  test('chapter remount pending demotes to OL + warm when enrichment is only fallback', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'for all men',
+      },
+    ]
+    const aligned = new Map([
+      [
+        'n2',
+        {
+          id: 'n2',
+          supportReference: 'rc://*/ta/man/translate/figs-doublet',
+          quote: 'for all men',
+          quoteStatus: 'pending',
+        },
+      ],
+    ])
+    const enrichment = new Map([
+      [
+        'n2',
+        {
+          quoteStatus: 'ol-fallback',
+          quoteWarmPending: true,
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      aligned,
+      enrichment
+    )
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBe(true)
+  })
+
+  test('settled enrichment over pending does not force warm-pending spinner', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'for all men',
+      },
+    ]
+    const aligned = new Map([
+      [
+        'n2',
+        {
+          id: 'n2',
+          supportReference: 'rc://*/ta/man/translate/figs-doublet',
+          quote: 'for all men',
+          quoteStatus: 'pending',
+        },
+      ],
+    ])
+    const enrichment = new Map([
+      [
+        'n2',
+        {
+          quoteStatus: 'ol-fallback',
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      aligned,
+      enrichment
+    )
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBeUndefined()
+  })
+
+  test('chapter remount pending without enrichment still paints OL without eternal spinner', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'for all men',
+      },
+    ]
+    const aligned = new Map([
+      [
+        'n2',
+        {
+          id: 'n2',
+          supportReference: 'rc://*/ta/man/translate/figs-doublet',
+          quote: 'for all men',
+          quoteStatus: 'pending',
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      aligned
+    )
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBeUndefined()
   })
 })
 

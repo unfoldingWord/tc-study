@@ -50,11 +50,10 @@ function needsSpaceBeforeFullInline(
   next: FullInline
 ): boolean {
   if (!prev || next.kind !== 'token') return false
-  if (prev.kind === 'text') return !/\s$/.test(prev.text)
+  if (prev.kind === 'text' || prev.kind === 'heading') return !/\s$/.test(prev.text)
   return (
     prev.kind === 'verse' ||
     prev.kind === 'token' ||
-    prev.kind === 'heading' ||
     prev.kind === 'note' ||
     prev.kind === 'xref'
   )

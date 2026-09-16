@@ -9,6 +9,7 @@ import {
   parseObsStoryMarkdown,
   type ParsedObsStory,
 } from '../obs/parseObsMarkdown'
+import { obsStoryCacheKey, resolveObsStoryIds } from '../obs/obsStoryIds'
 
 function getStoryPath(metadata: ResourceMetadata, storyId: string): string | null {
   const ingredients = metadata.contentMetadata?.ingredients
@@ -118,7 +119,7 @@ export class ObsLoader implements ResourceLoader {
   async loadContent(resourceKey: string, storyId: string): Promise<ParsedObsStory> {
     const padded = normalizeObsStoryId(storyId)
     const storyNum = parseInt(padded, 10)
-    const cacheKey = `obs:${resourceKey}:${padded}`
+    const cacheKey = obsStoryCacheKey(resourceKey, padded)
 
     try {
       const cached = await this.cacheAdapter.get(cacheKey)
@@ -186,13 +187,14 @@ export class ObsLoader implements ResourceLoader {
   }
 
   /**
-   * Prefetch all 50 OBS stories for offline use.
+   * Prefetch all OBS stories for offline use.
    * Called by the background-download pipeline after Phase 2 metadata is loaded.
-   * Mirrors the pattern used by TSV loaders (which iterate book ingredients).
+   * Honors skipExisting: when every story blob is already cached, returns without
+   * network work (completeness expands the same story list via resolveObsStoryIds).
    */
   async downloadResource(
     resourceKey: string,
-    _options?: { method?: 'individual' | 'zip' | 'tar'; skipExisting?: boolean },
+    options?: { method?: 'individual' | 'zip' | 'tar'; skipExisting?: boolean },
     onProgress?: ProgressCallback
   ): Promise<void> {
     const metadata = await this.getMetadata(resourceKey)
@@ -201,19 +203,31 @@ export class ObsLoader implements ResourceLoader {
       return
     }
 
-    const storyIds: string[] = []
-    for (const ing of ingredients as { identifier?: string }[]) {
-      if (ing.identifier && /^\d+$/.test(String(ing.identifier))) {
-        storyIds.push(String(ing.identifier))
+    const toFetch = resolveObsStoryIds(ingredients as { identifier?: string }[])
+    const total = toFetch.length
+    if (total === 0) return
+
+    const skipExisting = options?.skipExisting !== false
+    let remaining = toFetch
+    if (skipExisting) {
+      remaining = []
+      for (const storyId of toFetch) {
+        const cached = await this.cacheAdapter.get(obsStoryCacheKey(resourceKey, storyId))
+        if (!cached?.content) remaining.push(storyId)
+      }
+      if (remaining.length === 0) {
+        onProgress?.({
+          loaded: total,
+          total,
+          percentage: 100,
+          message: 'Skipped (already cached)',
+        })
+        return
       }
     }
 
-    // Fallback: iterate 1–50 if ingredients don't have numeric identifiers
-    const toFetch = storyIds.length > 0 ? storyIds : Array.from({ length: 50 }, (_, i) => String(i + 1))
-    const total = toFetch.length
-
-    let loaded = 0
-    for (const storyId of toFetch) {
+    let loaded = total - remaining.length
+    for (const storyId of remaining) {
       try {
         await this.loadContent(resourceKey, storyId)
         loaded++
@@ -236,6 +250,5 @@ export class ObsLoader implements ResourceLoader {
         }
       }
     }
-
   }
 }

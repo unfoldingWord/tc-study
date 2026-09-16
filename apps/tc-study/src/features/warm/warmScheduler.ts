@@ -27,6 +27,7 @@ import {
   LANE3_ADMIT_COOLDOWN_MS,
   LANE3_MAX_PENDING,
   canAdmitBackgroundLanes,
+  warmLaneBlockedReason,
 } from './warmLanePolicy'
 import { classifyWarmResource, languageFromKey } from './warmResourceClass'
 import {
@@ -37,6 +38,10 @@ import {
   subscribeWarmDone,
 } from '../../workers/warmClient'
 import { subscribePrepareWarmDone } from '../../workers/prepareClient'
+import {
+  createProcessStepRing,
+  pushProcessStep,
+} from '../debug/processStepRing'
 import { markRelationCovered, readWarmCoverage } from './warmCoverage'
 import { runWarmGc, type WarmGcCacheAdapter } from './warmGc'
 import type { WarmJob, WarmJobOutcome } from './warmTypes'
@@ -86,8 +91,18 @@ export type WarmSchedulerStats = {
   lane1Drained: boolean
   scrollUnsettled: boolean
   pendingJobKeys: number
+  /** Sample of pending jobKeys for debug UI (capped). */
+  pendingJobKeySample: string[]
   dedicatedWorker: boolean
+  /** Why lane 2 admit is gated (null = open). */
+  lane2Blocked: string | null
+  /** Why lane 3 admit is gated (null = open). */
+  lane3Blocked: string | null
   context: WarmVisibleContext | null
+  /** Recent warm job outcomes (newest last). */
+  recentOutcomes: Array<{ t: number; jobKey: string; outcome: WarmJobOutcome }>
+  /** Lane-1 busy owners for debug. */
+  lane1BusyOwnerSample: string[]
 }
 
 type CoverageBatch = CoverageSettleState
@@ -110,15 +125,44 @@ let admittedLane3Seed = ''
 let gcScheduled = false
 let lastLane3AdmitAt = 0
 let lane3AdmitTimer: ReturnType<typeof setTimeout> | null = null
+const outcomeRing = createProcessStepRing(40)
+const recentOutcomes: Array<{ t: number; jobKey: string; outcome: WarmJobOutcome }> = []
 
-function emit() {
-  const stats: WarmSchedulerStats = {
+function buildWarmStats(): WarmSchedulerStats {
+  const pendingSample = [...pendingKeys].slice(0, 24)
+  const documentVisible =
+    typeof document === 'undefined' ? true : document.visibilityState !== 'hidden'
+  return {
     lane1Drained,
     scrollUnsettled: context?.scrollUnsettled ?? false,
     pendingJobKeys: pendingKeys.size,
+    pendingJobKeySample: pendingSample,
     dedicatedWorker: isDedicatedWarmWorkerActive(),
+    lane2Blocked: warmLaneBlockedReason({
+      lane1Drained,
+      scrollUnsettled: context?.scrollUnsettled,
+      documentVisible,
+      lane: 2,
+    }),
+    lane3Blocked: warmLaneBlockedReason({
+      lane1Drained,
+      scrollUnsettled: context?.scrollUnsettled,
+      documentVisible,
+      pendingJobKeys: pendingKeys.size,
+      maxPending: LANE3_MAX_PENDING,
+      lastAdmitAt: lastLane3AdmitAt,
+      now: Date.now(),
+      cooldownMs: LANE3_ADMIT_COOLDOWN_MS,
+      lane: 3,
+    }),
     context,
+    recentOutcomes: [...recentOutcomes],
+    lane1BusyOwnerSample: [...lane1BusyOwners],
   }
+}
+
+function emit() {
+  const stats = buildWarmStats()
   for (const l of listeners) l(stats)
   if (typeof window !== 'undefined') {
     ;(window as unknown as { __warmDebug?: WarmSchedulerStats }).__warmDebug = stats
@@ -269,6 +313,15 @@ function onJobDone(jobKey: string, outcome: WarmJobOutcome = 'noop') {
   pendingKeys.delete(jobKey)
   pendingLangByKey.delete(jobKey)
   settleCoverage(jobKey, outcome)
+  const t = Date.now()
+  recentOutcomes.push({ t, jobKey, outcome })
+  while (recentOutcomes.length > 24) recentOutcomes.shift()
+  pushProcessStep(outcomeRing, {
+    worker: 'warm',
+    step: `outcome:${outcome}`,
+    detail: jobKey,
+    t,
+  })
   emit()
   if (canAdmitLane2()) void seedLane2()
   scheduleMaybeAdmitLane3()
@@ -582,10 +635,15 @@ export const warmScheduler = {
     emit()
   },
 
-  async enqueue(job: WarmJob) {
-    if (job.lane >= 2 && !canAdmitLane2()) return
-    if (job.lane >= 3 && !canAdmitLane3()) return
-    await enqueue(job)
+  async enqueue(job: WarmJob): Promise<boolean> {
+    if (job.lane >= 2 && !canAdmitLane2()) return false
+    if (job.lane >= 3 && !canAdmitLane3()) return false
+    return enqueue(job)
+  },
+
+  /** True while a jobKey is queued/in-flight in the scheduler (not local book-filter maps). */
+  isJobPending(jobKey: string): boolean {
+    return pendingKeys.has(jobKey)
   },
 
   async cancelJobsForLanguage(lang: string) {
@@ -605,24 +663,12 @@ export const warmScheduler = {
 
   subscribe(listener: StatsListener): () => void {
     listeners.add(listener)
-    listener({
-      lane1Drained,
-      scrollUnsettled: context?.scrollUnsettled ?? false,
-      pendingJobKeys: pendingKeys.size,
-      dedicatedWorker: isDedicatedWarmWorkerActive(),
-      context,
-    })
+    listener(buildWarmStats())
     return () => listeners.delete(listener)
   },
 
   getStats(): WarmSchedulerStats {
-    return {
-      lane1Drained,
-      scrollUnsettled: context?.scrollUnsettled ?? false,
-      pendingJobKeys: pendingKeys.size,
-      dedicatedWorker: isDedicatedWarmWorkerActive(),
-      context,
-    }
+    return buildWarmStats()
   },
 
   async refreshQueueStats() {

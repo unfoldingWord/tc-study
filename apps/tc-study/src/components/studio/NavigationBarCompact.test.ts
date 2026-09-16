@@ -13,9 +13,10 @@ const readModeSrc = readFileSync(join(import.meta.dir, '../read/ReadModeSwitch.t
 
 describe('NavigationBarCompact Bible/OBS vs grain', () => {
   test('center pill hosts Bible↔Stories click-to-toggle, not grain', () => {
+    const rightStart = compactSrc.indexOf('{showLanguagePicker && (')
     const pill = compactSrc.slice(
       compactSrc.indexOf('flex-1 flex items-center justify-center'),
-      compactSrc.indexOf('{downloadIndicator}')
+      rightStart
     )
     expect(pill).toContain('<NavigationScopeSwitch')
     expect(pill).toContain('scope={navigationScope}')
@@ -26,10 +27,11 @@ describe('NavigationBarCompact Bible/OBS vs grain', () => {
   })
 
   test('grain selector lives in the hamburger menu, not beside Open menu', () => {
-    const right = compactSrc.slice(compactSrc.indexOf('{downloadIndicator}'))
+    const right = compactSrc.slice(compactSrc.indexOf('{showLanguagePicker && ('))
     expect(right).toContain('title={isMenuOpen ? \'Close menu\' : \'Open menu\'}')
     expect(right).toContain('<NavigationBarMenu')
     expect(right).toContain('isObs={currentRef.book === \'obs\'}')
+    expect(right).toContain('<DownloadBusyBadge />')
     expect(right).not.toContain('typeSelectorRef')
     expect(right).not.toContain('title={`Navigation type: ${modeLabel}`}')
     expect(right).not.toContain('<NavigationTypeSelector')
@@ -37,6 +39,7 @@ describe('NavigationBarCompact Bible/OBS vs grain', () => {
     expect(menuSrc).toContain('variant="menu"')
     expect(menuSrc).toContain('<NavigationTypeSelector variant="menu"')
     expect(menuSrc).toContain('<ObsNavigationTypeSelector variant="menu"')
+    expect(menuSrc).toContain('<DownloadIndicator onClose={onClose} />')
   })
 
   test('hamburger grain is one cycling current-mode button, not a 4-button row', () => {

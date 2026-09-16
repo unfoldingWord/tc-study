@@ -145,7 +145,7 @@ function buildChapters(
   usj: CachedUsjDocument,
   alignmentMap: AlignmentMap
 ): UsjChapterView[] {
-  const words = collectUsjWords(usj)
+  const words = collectUsjWords(usj, bookCode)
   const byChapter = new Map<number, Map<number, string[]>>()
   const bookCodeLower = bookCode.toLowerCase()
 

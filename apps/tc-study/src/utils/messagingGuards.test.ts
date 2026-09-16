@@ -221,11 +221,17 @@ describe('messagingGuards', () => {
       join(ROOT, 'features/messaging/scriptureTokensOwnership.ts'),
       'utf8'
     )
-    // Multi-owner bootstrap (allow-all when both null) is forbidden
-    expect(ownership).not.toContain('return true')
-    expect(ownership).toContain('return false')
+    // isScriptureTokensOwner must deny when both pointers are null (no allow-all).
+    const ownerFn = ownership.slice(
+      ownership.indexOf('export function isScriptureTokensOwner'),
+      ownership.indexOf('export function pickSuccessorScriptureResourceId')
+    )
+    expect(ownerFn).toContain('return false')
+    expect(ownerFn).not.toMatch(/return true/)
     expect(ownership).toMatch(/lastActiveScriptureResourceId/)
     expect(ownership).toMatch(/anchorResourceId/)
+    // Mode-switch reclaim may return true only when lastActive is cleared/orphaned.
+    expect(ownership).toContain('shouldClaimScriptureTokensOwnership')
   })
 
   test('TN/TWL/CombinedHelps leave via clearResourceState — no empty tokenGroups sendToAll', () => {

@@ -19,7 +19,7 @@ describe('toUsjCacheContent chapter slices', () => {
     const content = proc.toUsjCacheContent(result, 'tit', 'Titus')
 
     expect(content.metadata.version).toBe(USJ_PROCESSING_VERSION)
-    expect(USJ_PROCESSING_VERSION).toBe('2.1.0-usj')
+    expect(USJ_PROCESSING_VERSION).toBe('2.2.0-usj')
     expect(content.chapters?.length).toBeGreaterThan(0)
 
     const chapterNumbers = (content.chapters ?? []).map((c) => c.number)

@@ -11,7 +11,8 @@ import type {
   VerseFilterSignal,
   VerseNavigationSignal,
 } from '../../../signals/studioSignals'
-import type { SupportRefFilter } from '../../../features/helps/helpsDisplayFilters'
+import type { SupportRefFilter, TwlArticleFilter } from '../../../features/helps/helpsDisplayFilters'
+import { twlArticleChipTitle, twlArticleKey } from '../../../features/helps/helpsDisplayFilters'
 import {
   persistHelpsHighlight,
   planHelpsCardScriptureAction,
@@ -21,6 +22,7 @@ import { markReadNavigationInternal } from '../../../features/read/replaceReadUr
 import { parseTWLink } from '../../../features/helps/quoteTokens'
 import type { NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
 import { helpsCardVerseFilter, obsFrameHighlightFromHelpsRow } from './combinedHelpsUtils'
+import { helpsFilterAnchorFromRow } from './helpsFilterAnchorPin'
 import type { HelpsCardSelection } from './helpsCardSelection'
 
 type SendTokenClick = (data: {
@@ -62,8 +64,10 @@ export interface UseCombinedHelpsHandlersParams {
   broadcastObsHighlight: BroadcastObsHighlight
   setSelectedHelpsCard: (selection: HelpsCardSelection) => void
   setSupportRefFilter?: (filter: SupportRefFilter | null) => void
+  setTwlArticleFilter?: (filter: TwlArticleFilter | null) => void
   clearCompetingFilters?: () => void
-  setKindFilter?: (kind: 'all' | 'notes' | 'twl') => void
+  /** Snapshot current kind, then force notes/twl for a book-wide chip. */
+  enterBookKindFilter?: (kind: 'notes' | 'twl') => void
 }
 
 export function useCombinedHelpsHandlers({
@@ -80,8 +84,9 @@ export function useCombinedHelpsHandlers({
   broadcastObsHighlight,
   setSelectedHelpsCard,
   setSupportRefFilter,
+  setTwlArticleFilter,
   clearCompetingFilters,
-  setKindFilter,
+  enterBookKindFilter,
 }: UseCombinedHelpsHandlersParams) {
   const sendObsCardFrameFilter = useCallback(
     (reference: string) => {
@@ -116,7 +121,8 @@ export function useCombinedHelpsHandlers({
     [bookCode, helpsScope, sendVerseNavigation]
   )
 
-  /** Persist + token-click before navigate so dest-chapter remount can replay IDs. */
+  /** Persist + token-click before navigate so dest-chapter remount can replay IDs.
+   *  Navigate even when the quote is still building (no token payload yet). */
   const applyHelpsQuoteToScripture = useCallback(
     (reference: string | undefined, item?: HelpsQuoteClickItem | null) => {
       if (helpsScope !== 'scripture') return
@@ -129,6 +135,7 @@ export function useCombinedHelpsHandlers({
       })
       if (token) persistHelpsHighlight(token)
       if (token) sendTokenClick({ lifecycle: 'event', token })
+      // Verse/chapter jump uses the note reference — independent of quote chips.
       navigateToHelpsRow(reference)
     },
     [bookCode, helpsScope, navigateToHelpsRow, sendTokenClick]
@@ -197,7 +204,7 @@ export function useCombinedHelpsHandlers({
   )
 
   const handleFilterBySupportReference = useCallback(
-    (supportRef: string, title?: string) => {
+    (supportRef: string, title?: string, source?: { id: string; reference: string }) => {
       if (!supportRef?.startsWith('rc://') || !setSupportRefFilter) return
       clearCompetingFilters?.()
       const fallback =
@@ -206,11 +213,36 @@ export function useCombinedHelpsHandlers({
         supportReference: supportRef,
         title: (title && title !== 'Learn more' ? title : fallback) || fallback,
         timestamp: Date.now(),
+        anchor: source
+          ? helpsFilterAnchorFromRow('tn', source.id, source.reference)
+          : undefined,
       })
-      setKindFilter?.('notes')
+      enterBookKindFilter?.('notes')
+      setSelectedHelpsCard(null)
+      setTwlArticleFilter?.(null)
+    },
+    [setSupportRefFilter, setTwlArticleFilter, clearCompetingFilters, enterBookKindFilter, setSelectedHelpsCard]
+  )
+
+  const handleFilterByTwlArticle = useCallback(
+    (link: TranslationWordsLink, title?: string) => {
+      const articlePath = twlArticleKey(
+        (link as TranslationWordsLink & { articlePath?: string }).articlePath,
+        link.twLink
+      )
+      if (!articlePath || !setTwlArticleFilter) return
+      clearCompetingFilters?.()
+      setSupportRefFilter?.(null)
+      setTwlArticleFilter({
+        articlePath,
+        title: twlArticleChipTitle(title, articlePath),
+        timestamp: Date.now(),
+        anchor: helpsFilterAnchorFromRow('twl', link.id, link.reference),
+      })
+      enterBookKindFilter?.('twl')
       setSelectedHelpsCard(null)
     },
-    [setSupportRefFilter, clearCompetingFilters, setKindFilter, setSelectedHelpsCard]
+    [setTwlArticleFilter, setSupportRefFilter, clearCompetingFilters, enterBookKindFilter, setSelectedHelpsCard]
   )
 
   const handleTitleClick = useCallback(
@@ -271,6 +303,7 @@ export function useCombinedHelpsHandlers({
     handleNoteQuoteClick,
     handleSupportReferenceClick,
     handleFilterBySupportReference,
+    handleFilterByTwlArticle,
     handleTitleClick,
     handleLinkQuoteClick,
   }

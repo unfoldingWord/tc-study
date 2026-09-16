@@ -73,6 +73,24 @@ describe('paintSupportRefQuoteEnrichment', () => {
     expect(painted.get('psa-18')?.quoteStatus).toBe('ol-fallback')
     expect(painted.get('psa-18')?.quoteWarmPending).toBeUndefined()
   })
+
+  test('align miss not listed in reconstructed still settles when cache is known', () => {
+    const painted = paintSupportRefQuoteEnrichment({
+      notes: [{ id: 'twl-e1n9', quote: 'הִֽשְׁחִ֗יתוּ' }],
+      quoteHits: new Map([
+        [
+          'twl-e1n9',
+          [{ id: 1, text: 'הִשְׁחִיתוּ', type: 'word', occurrence: 1, content: 'הִשְׁחִיתוּ' }],
+        ],
+      ]),
+      reconstructedById: new Map(),
+      alignCacheKnown: true,
+      warmInFlight: false,
+    })
+    expect(painted.get('twl-e1n9')?.quoteStatus).toBe('ol-fallback')
+    expect(painted.get('twl-e1n9')?.quoteWarmPending).toBeUndefined()
+    expect(painted.get('twl-e1n9')?.quoteTokens?.[0]?.text).toBe('הִשְׁחִיתוּ')
+  })
 })
 
 describe('supportRefQuoteChipKind', () => {
@@ -114,6 +132,13 @@ describe('supportRefQuoteChipKind', () => {
     ).toBe('placeholder')
     expect(
       supportRefQuoteChipKind({
+        hasAlignedTokens: false,
+        quoteStatus: 'pending',
+        olQuote: 'וְהוֹד',
+      })
+    ).toBe('ol-pending')
+    expect(
+      supportRefQuoteChipKind({
         hasAlignedTokens: true,
         quoteStatus: 'aligned',
         olQuote: 'x',
@@ -141,13 +166,42 @@ describe('planSupportRefQuoteWarmJobs', () => {
     expect(jobs.map((j) => j.kind)).toEqual([
       'quote-chapter',
       'quote-chapter',
+      'prepare-unit',
       'align-chapter',
+      'prepare-unit',
       'align-chapter',
     ])
-    expect(jobs.some((j) => j.kind === 'prepare-unit')).toBe(false)
+    expect(jobs.some((j) => j.kind === 'prepare-unit')).toBe(true)
     expect(jobs.find((j) => j.kind === 'align-chapter')?.jobKey).toBe(
       'align:unfoldingWord/en/tn:unfoldingWord/en/ult:psa:18'
     )
+    expect(jobs.find((j) => j.kind === 'prepare-unit')?.jobKey).toBe(
+      'prep:scripture:unfoldingWord/en/ult:psa:18'
+    )
+    expect(jobs.filter((j) => j.kind === 'quote-chapter' || j.kind === 'align-chapter').every((j) => 'helpsType' in j && j.helpsType === 'notes')).toBe(true)
+  })
+
+  test('TWL off-chapter miss uses words-links helpsType and the same job keys', () => {
+    const jobs = planSupportRefQuoteWarmJobs({
+      helpsKey: 'unfoldingWord/en/twl',
+      bookId: 'psa',
+      languageCode: 'en',
+      quoteMissChapters: [18],
+      alignMissChapters: [18],
+      helpsStamp: 'twl1',
+      olKey: 'unfoldingWord/hbo/uhb',
+      olStamp: 'uhb1',
+      targetKey: 'unfoldingWord/en/ult',
+      targetStamp: 'ult1',
+      textLanguage: 'en',
+      helpsType: 'words-links',
+    })
+    expect(jobs.map((j) => j.kind)).toEqual(['quote-chapter', 'prepare-unit', 'align-chapter'])
+    expect(jobs.every((j) => j.lane === 2)).toBe(true)
+    expect(jobs.filter((j) => j.kind !== 'prepare-unit').every((j) => 'helpsType' in j && j.helpsType === 'words-links')).toBe(true)
+    expect(jobs[0]?.jobKey).toBe('quote:unfoldingWord/en/twl:psa:18')
+    expect(jobs[1]?.jobKey).toBe('prep:scripture:unfoldingWord/en/ult:psa:18')
+    expect(jobs[2]?.jobKey).toBe('align:unfoldingWord/en/twl:unfoldingWord/en/ult:psa:18')
   })
 
   test('without target key only quote-chapter jobs are planned', () => {

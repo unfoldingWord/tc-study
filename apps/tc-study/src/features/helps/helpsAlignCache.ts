@@ -13,16 +13,26 @@ import { SCRIPTURE_PREPARE_VERSION } from '../scripture/scripturePreparer'
 import { resourceContentStamp, type ResourceStampSource } from './resourceContentStamp'
 
 export const HELPS_ALIGN_PREFIX = 'helps-align:'
-/** Bump when compact row shape or reconstruct rules change. */
-export const HELPS_ALIGN_VERSION = 1
+/** Bump when compact row shape, reconstruct rules, or align match-key fold change. */
+export const HELPS_ALIGN_VERSION = 2
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_ALIGN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
 /** 0 = settled miss, 1 = semantic-id / zaln, 2 = quote-text fallback */
 export type AlignMatchMethod = 0 | 1 | 2
-export type CachedAlignRow = { p: number[]; m: AlignMatchMethod }
+/**
+ * Compact align row. `p` = word positions in prepared full chapter.
+ * Optional `t` = word display texts so chips can paint on refresh before
+ * prepared:scripture / SCRIPTURE_TOKENS are ready (reconstruct still preferred).
+ */
+export type CachedAlignRow = { p: number[]; m: AlignMatchMethod; t?: string[] }
 /** linkId → compact align row (p:[] + m:0 = settled miss). */
 export type CachedAlignments = Record<string, CachedAlignRow>
+
+/** True when a hit row can paint a ULT chip without target tokens. */
+export function alignRowHasDisplayText(row: CachedAlignRow | null | undefined): boolean {
+  return Boolean(row && row.m !== 0 && row.t && row.t.length > 0)
+}
 
 export type HelpsAlignCacheAdapter = {
   get(key: string): Promise<unknown>
@@ -234,15 +244,28 @@ export async function mergeAndWriteCachedAlignments(
   }
 }
 
+/**
+ * Split links into cache hits vs misses.
+ *
+ * `retrySettledMisses`: treat `m:0` (settled empty align) as misses so lane-1 can
+ * re-live-align once target tokens are align-ready. Premature m:0 rows (align
+ * before zaln / prepared tokens) must not permanently paint ol-fallback.
+ */
 export function subtractCachedAlignHits<T extends { id: string }>(
   needsBuild: readonly T[],
-  cached: CachedAlignments
+  cached: CachedAlignments,
+  options?: { retrySettledMisses?: boolean }
 ): { hits: Map<string, CachedAlignRow>; misses: T[] } {
   const hits = new Map<string, CachedAlignRow>()
   const misses: T[] = []
   for (const link of needsBuild) {
     if (Object.prototype.hasOwnProperty.call(cached, link.id)) {
-      hits.set(link.id, cached[link.id]!)
+      const row = cached[link.id]!
+      if (options?.retrySettledMisses && row.m === 0) {
+        misses.push(link)
+      } else {
+        hits.set(link.id, row)
+      }
     } else {
       misses.push(link)
     }

@@ -22,7 +22,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import type { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
-import { totalIngredientsForResourceKeys } from '../features/download/backgroundDownloadRun'
+import {
+  discoveredIngredientCount,
+  totalIngredientsForResourceKeys,
+} from '../features/download/backgroundDownloadRun'
 import {
   CATALOG_KEYS_TIMEOUT,
   CATALOG_KEYS_TIMEOUT_MS,
@@ -219,19 +222,35 @@ export function useCatalogBackgroundDownload(
       const rememberListedCount = async (resourceKey: string) => {
         try {
           const metadata = await catalogManager.getResourceMetadata(resourceKey)
-          const n = metadata?.contentMetadata?.ingredients?.length
-          if (typeof n === 'number' && n > 0) listedCountByKey[resourceKey] = n
+          const n = discoveredIngredientCount(
+            resourceKey,
+            metadata?.contentMetadata?.ingredients,
+            metadata?.type
+          )
+          if (n > 0) listedCountByKey[resourceKey] = n
         } catch {
-          /* totalIngredientsForResourceKeys still covers UHB/UGNT */
+          /* totalIngredientsForResourceKeys still covers UHB/UGNT/OBS */
         }
       }
 
-      // Catalog IDB timed out — don't probe each key (same lock). Queue them.
+      // Catalog IDB timed out — same as completeness timeout: unknown, retry next idle pass.
+      // Do not treat every expected key as incomplete (false enqueue of full language zips).
       if (allResourceKeys.length === 0 && uncheckedResources.length > 0) {
-        for (const resourceKey of uncheckedResources) {
-          incompleteResources.push(resourceKey)
+        if (typeof window !== 'undefined') {
+          ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+            phase: 'catalog-keys-timeout',
+            candidate: candidateKeys.length,
+            unchecked: uncheckedResources.length,
+            expected: expectedResources?.length ?? 0,
+            incomplete: 0,
+            started: false,
+          }
         }
-      } else {
+        setMonitoredCount(candidateKeys.length)
+        setIsChecking(false)
+        return
+      }
+
       for (const resourceKey of uncheckedResources) {
         try {
           const status = await raceWithTimeout(
@@ -254,7 +273,6 @@ export function useCatalogBackgroundDownload(
           console.error(`[BG-DL] 🔍 Monitor Error checking ${resourceKey}:`, error)
           incompleteResources.push(resourceKey)
         }
-      }
       }
 
       const totalIngredientsToDownload = totalIngredientsForResourceKeys(

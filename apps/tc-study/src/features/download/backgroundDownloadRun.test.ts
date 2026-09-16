@@ -6,8 +6,10 @@ import {
   createInitialDownloadProgress,
   currentResourceDisplayPercent,
   displayDownloadPercent,
+  downloadBlockedReason,
   isZipByteProgress,
   keysForDownloadRetry,
+  inferDownloadPhase,
   mapLoaderProgressToResource,
   pulseInFlightDownloadProgress,
   shouldAcceptStartDownload,
@@ -15,6 +17,7 @@ import {
   shouldFailStalledDownload,
   shouldFallbackOnWorkerError,
   shouldFallbackSilentWorker,
+  shouldFallbackStuckStarting,
   isWorkerIsolateFailure,
   downloadControlSnapshotEqual,
   shouldRunExtractOnThisThread,
@@ -23,11 +26,13 @@ import {
   shouldSkipCompleteResourceDownload,
   skippedCompleteResourceProgress,
   applyDiscoveredIngredientTotal,
+  discoveredIngredientCount,
   fallbackIngredientCount,
   displayIngredientCounts,
   growRunIngredientTotal,
   resolveRunIngredientTotal,
   totalIngredientsForResourceKeys,
+  OBS_FALLBACK_INGREDIENT_COUNT,
   UHB_FALLBACK_INGREDIENT_COUNT,
   UGNT_FALLBACK_INGREDIENT_COUNT,
   DOWNLOAD_STALL_TIMEOUT_MS,
@@ -156,6 +161,13 @@ describe('backgroundDownloadRun', () => {
     expect(progress.totalResources).toBe(2)
     expect(progress.totalIngredients).toBe(40)
     expect(progress.completedIngredients).toBe(0)
+    expect(progress.phase).toBe('starting')
+  })
+
+  test('UHB without listed total seeds 39 ingredients (not 0 → UI 0/1)', () => {
+    const progress = createInitialDownloadProgress(['unfoldingWord/hbo/uhb'])
+    expect(progress.totalIngredients).toBe(UHB_FALLBACK_INGREDIENT_COUNT)
+    expect(progress.totalResources).toBe(1)
   })
 
   test('in-flight zip percent moves the badge before any ingredient floors', () => {
@@ -440,6 +452,41 @@ describe('backgroundDownloadRun', () => {
     ).toBe(1)
   })
 
+  test('OBS directory-only catalog is 50 stories, not 0/1', () => {
+    expect(fallbackIngredientCount('unfoldingWord/en/obs')).toBe(
+      OBS_FALLBACK_INGREDIENT_COUNT
+    )
+    expect(fallbackIngredientCount('unfoldingWord/en/obs', 0)).toBe(
+      OBS_FALLBACK_INGREDIENT_COUNT
+    )
+    expect(fallbackIngredientCount('unfoldingWord/en/obs', 1)).toBe(
+      OBS_FALLBACK_INGREDIENT_COUNT
+    )
+    expect(fallbackIngredientCount('unfoldingWord/en/obs', 50)).toBe(50)
+    expect(
+      discoveredIngredientCount('unfoldingWord/en/obs', [
+        { identifier: 'obs', path: './content' },
+      ])
+    ).toBe(50)
+    expect(
+      discoveredIngredientCount('unfoldingWord/en/obs', [
+        { identifier: '1' },
+        { identifier: '2' },
+      ])
+    ).toBe(2)
+    expect(
+      totalIngredientsForResourceKeys(['unfoldingWord/en/obs'], {
+        'unfoldingWord/en/obs': 1,
+      })
+    ).toBe(50)
+    expect(
+      createInitialDownloadProgress(['unfoldingWord/en/obs'], 1).totalIngredients
+    ).toBe(50)
+    expect(
+      createInitialDownloadProgress(['unfoldingWord/en/obs']).totalIngredients
+    ).toBe(50)
+  })
+
   test('silent worker with no messages falls back instead of sitting at 1%', () => {
     const started = 1_000
     expect(
@@ -478,6 +525,55 @@ describe('backgroundDownloadRun', () => {
     ).toBe(false)
   })
 
+  test('ready without progress falls back instead of sitting at starting', () => {
+    const started = 1_000
+    expect(
+      shouldFallbackStuckStarting({
+        isDownloading: true,
+        workerProgressCount: 0,
+        phase: 'starting',
+        startedAt: started,
+        now: started + 5_000,
+      })
+    ).toBe(false)
+    expect(
+      shouldFallbackStuckStarting({
+        isDownloading: true,
+        workerProgressCount: 0,
+        phase: 'starting',
+        startedAt: started,
+        now: started + DOWNLOAD_WORKER_READY_TIMEOUT_MS,
+      })
+    ).toBe(true)
+    expect(
+      shouldFallbackStuckStarting({
+        isDownloading: true,
+        workerProgressCount: 0,
+        phase: 'init',
+        startedAt: started,
+        now: started + DOWNLOAD_WORKER_READY_TIMEOUT_MS,
+      })
+    ).toBe(true)
+    expect(
+      shouldFallbackStuckStarting({
+        isDownloading: true,
+        workerProgressCount: 1,
+        phase: 'starting',
+        startedAt: started,
+        now: started + DOWNLOAD_WORKER_READY_TIMEOUT_MS,
+      })
+    ).toBe(false)
+    expect(
+      shouldFallbackStuckStarting({
+        isDownloading: true,
+        workerProgressCount: 0,
+        phase: 'checking',
+        startedAt: started,
+        now: started + DOWNLOAD_WORKER_READY_TIMEOUT_MS,
+      })
+    ).toBe(false)
+  })
+
   test('silent worker death after the 1% pulse marks the session failed', () => {
     const started = 1_000
     expect(
@@ -510,5 +606,43 @@ describe('backgroundDownloadRun', () => {
         now: started + DOWNLOAD_STALL_TIMEOUT_MS,
       })
     ).toBe(false)
+  })
+
+  test('inferDownloadPhase maps loader messages and explicit phases', () => {
+    expect(inferDownloadPhase({ isDownloading: false })).toBe('idle')
+    expect(inferDownloadPhase({ isDownloading: false, error: 'x' })).toBe('error')
+    expect(inferDownloadPhase({ isDownloading: true, phase: 'metadata' })).toBe('metadata')
+    expect(
+      inferDownloadPhase({ isDownloading: true, currentIngredient: 'Downloading zip' })
+    ).toBe('downloading')
+    expect(
+      inferDownloadPhase({ isDownloading: true, message: 'Extracting gen' })
+    ).toBe('extracting')
+  })
+
+  test('downloadBlockedReason surfaces quiet phases before full stall', () => {
+    const now = 1_000_000
+    expect(
+      downloadBlockedReason({
+        isDownloading: true,
+        phase: 'checking',
+        lastActivityAt: now - 20_000,
+        now,
+      })
+    ).toBe('quiet 20s · checking')
+    expect(
+      downloadBlockedReason({
+        isDownloading: true,
+        lastActivityAt: now - DOWNLOAD_STALL_TIMEOUT_MS,
+        now,
+      })
+    ).toContain('stalled')
+    expect(
+      downloadBlockedReason({
+        isDownloading: true,
+        lastActivityAt: now - 5_000,
+        now,
+      })
+    ).toBeNull()
   })
 })

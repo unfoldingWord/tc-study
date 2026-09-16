@@ -49,10 +49,23 @@ describe('helpsRowScriptureRef', () => {
 })
 
 describe('shouldNavigateScriptureToRef', () => {
-  test('off-chapter card navigates; same-chapter quote does not', () => {
-    const viewingCh2 = { book: 'tit', chapter: 2 }
-    expect(shouldNavigateScriptureToRef(viewingCh2, { book: 'tit', chapter: 1 })).toBe(true)
-    expect(shouldNavigateScriptureToRef(viewingCh2, { book: 'tit', chapter: 2 })).toBe(false)
+  test('off-chapter card navigates; same chapter+verse does not', () => {
+    const viewingCh2 = { book: 'tit', chapter: 2, verse: 1 }
+    expect(shouldNavigateScriptureToRef(viewingCh2, { book: 'tit', chapter: 1, verse: 1 })).toBe(
+      true
+    )
+    expect(shouldNavigateScriptureToRef(viewingCh2, { book: 'tit', chapter: 2, verse: 1 })).toBe(
+      false
+    )
+  })
+
+  test('same-chapter different verse navigates', () => {
+    expect(
+      shouldNavigateScriptureToRef(
+        { book: 'psa', chapter: 14, verse: 1 },
+        { book: 'psa', chapter: 14, verse: 3 }
+      )
+    ).toBe(true)
   })
 
   test('book change navigates even when chapter numbers match', () => {
@@ -201,11 +214,11 @@ describe('planHelpsCardScriptureAction', () => {
     ])
   })
 
-  test('same-chapter quote does not navigate but still sends token-click', () => {
+  test('same-chapter same-verse quote does not navigate but still sends token-click', () => {
     const plan = planHelpsCardScriptureAction({
       bookCode: 'tit',
       reference: '1:7',
-      current: { book: 'tit', chapter: 1 },
+      current: { book: 'tit', chapter: 1, verse: 7 },
       item: {
         quoteTokens: [{ text: 'overseer', id: '1' }],
         semanticIds: ['tit 1:7:ἐπίσκοπον:1'],
@@ -213,6 +226,18 @@ describe('planHelpsCardScriptureAction', () => {
     })
     expect(plan.navigate).toBeNull()
     expect(plan.token?.verseRef).toBe('tit 1:7')
+  })
+
+  test('same-chapter different verse navigates even without quote chips', () => {
+    const plan = planHelpsCardScriptureAction({
+      bookCode: 'psa',
+      reference: '14:3',
+      current: { book: 'psa', chapter: 14, verse: 1 },
+      item: { quote: 'הַ⁠כֹּ֥ל' },
+    })
+    expect(plan.navigate).toEqual({ book: 'psa', chapter: 14, verse: 3 })
+    // Unfinished quote: no semanticIds → no token, but BCV navigate still planned.
+    expect(plan.token).toBeNull()
   })
 
   test('uses live scripture chapter, not a pinned stale chapter', () => {
@@ -593,9 +618,10 @@ describe('handler wiring uses the store, not pinned chapter', () => {
     expect(handlers).toContain('markReadNavigationInternal')
     expect(handlers).toContain('useNavigationStore.getState().currentReference')
     expect(handlers).not.toContain('currentChapter')
-    expect(handlers).toMatch(
-      /if \(token\) persistHelpsHighlight\(token\)\s*if \(token\) sendTokenClick\(\{ lifecycle: 'event', token \}\)\s*navigateToHelpsRow\(reference\)/
-    )
+    expect(handlers).toContain('if (token) persistHelpsHighlight(token)')
+    expect(handlers).toContain('if (token) sendTokenClick({ lifecycle: \'event\', token })')
+    expect(handlers).toContain('navigateToHelpsRow(reference)')
+    expect(handlers).toContain('independent of quote chips')
     expect(handlers).toContain('applyHelpsQuoteToScripture(note.reference, note)')
     expect(card).toMatch(/onQuoteClick\?\.\(note\)\s*onClick\(note\)/)
   })

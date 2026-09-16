@@ -22,6 +22,7 @@ Welcome to the BT Synergy framework documentation! This framework enables you to
 
 - **[Workers and persistence](./workers-and-persistence.md)** — IndexedDB key families, download/prepare/warm workers, lanes vs the download badge
 - **[App lifecycle and data flow](./app-lifecycle-data-flow.md)** — process start → providers → Read → IndexedDB writes (boot order and mermaid)
+- **[Helps quote / align flow](./helps-quote-flow.md)** — TN/TWL ULT chips via prepare/warm/cache; decoupled from ScriptureViewer tokens
 
 #### I want to...
 

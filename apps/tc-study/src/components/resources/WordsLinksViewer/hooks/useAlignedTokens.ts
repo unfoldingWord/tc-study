@@ -3,8 +3,10 @@
  *
  * Aligns OL quote tokens to target-language scripture tokens.
  * Cache-first: read helps-align rows and reconstruct against prepared:scripture
- * full tokens when available; live-align only misses. Falls back to broadcast
- * SCRIPTURE_TOKENS when prepared full is absent.
+ * full tokens when available; live-align only misses. Target scripture identity
+ * comes from the shared helps target key (panel selection / catalog) — not from
+ * SCRIPTURE_TOKENS. Broadcast tokens remain an optional live-align fallback when
+ * prepared full is absent and a ScriptureViewer is mounted.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -12,10 +14,17 @@ import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import { useCacheAdapter, useCatalogManager, useCurrentReference } from '../../../../contexts'
 import {
   batchAlignLinks,
+  targetTokensAreAlignReady,
   type AlignLinkInput,
   type AlignLinkResult,
 } from '../../../../features/helps/batchAlignLinks'
 import {
+  broadcastTokensCoverFullChapter,
+  planAlignCacheHydrate,
+  resolveLiveAlignTargetSource,
+} from '../../../../features/helps/alignCacheHydratePlan'
+import {
+  alignRowHasDisplayText,
   mergeAndWriteCachedAlignments,
   readCachedAlignmentsForSpan,
   subtractCachedAlignHits,
@@ -34,6 +43,13 @@ import {
   resolveHelpsQuoteStatus,
   type HelpsQuoteStatus,
 } from '../../../../features/helps/resolveHelpsQuoteStatus'
+import { scriptureTokensContentStamp } from '../../../../features/scripture/scriptureTokensBookNav'
+import { logHelpsAlignMisses } from '../../../../features/helps/helpsQuoteBuildDebug'
+import {
+  HELPS_CACHE_HYDRATE_BUDGET_MS,
+  settleHelpsCacheContext,
+  shouldSyncHelpsAlign,
+} from '../../../../features/helps/helpsCacheContextBudget'
 import { resourceContentStamp } from '../../../../features/helps/resourceContentStamp'
 import { resolveOriginalLanguageKey } from '../../../../features/helps/olLoadCache'
 import {
@@ -43,6 +59,7 @@ import {
 import {
   reuseHelpsAlignRows,
   shouldSkipHelpsAlignRebuild,
+  helpsAlignRowsStillPending,
   type HelpsTokenCacheRow,
 } from '../../../../features/helps/helpsTokenReuse'
 import { useChapterScrollActivity } from '../../../../features/nav/usePinnedHelpsReference'
@@ -50,10 +67,22 @@ import { measureScripturePerfSync } from '../../../../features/perf/scripturePer
 import { readPreparedUnit } from '../../../../features/prepare/prepareCache'
 import { extractPreparedBroadcastTokens } from '../../../../features/scripture/extractPreparedBroadcastTokens'
 import {
+  ensurePreparedFullChapter,
+} from '../../../../features/scripture/ensurePreparedFullChapter'
+import {
   SCRIPTURE_PREPARE_VERSION,
   type ScriptureFullChapter,
 } from '../../../../features/scripture/scripturePreparer'
-import { batchAlignInWorker } from '../../../../workers/prepareClient'
+import { getLastScriptureTokensSourceResourceId } from '../../../../features/helps/scriptureTokensStore'
+import {
+  resolveHelpsTargetScriptureKey,
+  useHelpsTargetScriptureKey,
+} from '../../../../features/helps/helpsTargetScripture'
+import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
+import {
+  batchAlignInWorker,
+  subscribePrepareReady,
+} from '../../../../workers/prepareClient'
 import { useScriptureTokens } from './useScriptureTokens'
 
 /** Minimal link shape needed to attach aligned tokens (TN pseudo-links + full TWL rows). */
@@ -145,6 +174,10 @@ function alignFingerprint(args: {
   quoteBuildReady: boolean
   linkIds: string
   sourceResourceId: string
+  /** Wrong-book tokens can share a count; content must still retrigger align. */
+  tokenContentStamp: string
+  /** prepared:full landed without SCRIPTURE_TOKENS (collapsed scripture). */
+  preparedTick?: number
 }): string {
   return [
     args.book,
@@ -159,6 +192,8 @@ function alignFingerprint(args: {
     args.quoteBuildReady ? 1 : 0,
     args.sourceResourceId,
     args.linkIds,
+    args.tokenContentStamp,
+    args.preparedTick ?? 0,
   ].join('|')
 }
 
@@ -232,6 +267,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     () => lastAlignedRef.current
   )
   const [loadingAligned, setLoadingAligned] = useState(false)
+  /** Bumps when prepared:scripture full lands so align re-hydrates without SCRIPTURE_TOKENS. */
+  const [preparedTick, setPreparedTick] = useState(0)
   const cacheAdapter = useCacheAdapter() as HelpsAlignCacheAdapter | null
   const catalogManager = useCatalogManager()
 
@@ -242,6 +279,30 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     resourceMetadata,
     sourceResourceId,
   } = useScriptureTokens({ resourceId })
+
+  // Shared SoT catalog key (panel selection) — not gated on SCRIPTURE_TOKENS.
+  const sharedTargetKey = useHelpsTargetScriptureKey()
+  const targetKey =
+    resolveHelpsTargetScriptureKey({
+      sharedKey: sharedTargetKey,
+      broadcastKey: sourceResourceId,
+      lastKnownKey: getLastScriptureTokensSourceResourceId(),
+    }) ?? ''
+
+  useEffect(() => {
+    if (!targetKey || !helpsRef.book) return
+    const bookCode = helpsRef.book.toLowerCase()
+    const start = helpsRef.chapter || 1
+    const end = helpsRef.endChapter || start
+    return subscribePrepareReady((msg) => {
+      if (msg.typeId !== RESOURCE_TYPE_IDS.SCRIPTURE) return
+      if (msg.resourceKey !== targetKey) return
+      if (msg.bookId.toLowerCase() !== bookCode) return
+      if (msg.tier !== 'full' && msg.tier !== 'both') return
+      if (msg.unit < start || msg.unit > end) return
+      setPreparedTick((n) => n + 1)
+    })
+  }, [targetKey, helpsRef.book, helpsRef.chapter, helpsRef.endChapter])
 
   useEffect(() => {
     if (!shouldEnqueueQuoteBuild(scrollActivity.unsettled)) {
@@ -258,7 +319,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
               semanticIds: undefined,
               quoteStatus: resolveHelpsQuoteStatus({
                 hasAlignedTokens: false,
-                alignmentPending: true,
+                // Scroll gate: keep pending only while quotes are still building.
+                alignmentPending: !quoteBuildReady,
                 olQuote: link.origWords,
               }),
             }))
@@ -308,7 +370,6 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     const tokenEndChapter = tokenReference?.endChapter ?? tokenChapter
     const tokenStartVerse = tokenReference?.verse || 1
     const tokenEndVerse = tokenReference?.endVerse ?? 999
-    const targetKey = sourceResourceId ?? ''
 
     const linkIds = links
       .map((l) => `${l.id}:${l.quoteTokens?.length ?? 0}:${l.quoteReady === false ? 0 : 1}`)
@@ -326,10 +387,15 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       quoteBuildReady,
       sourceResourceId: targetKey,
       linkIds,
+      tokenContentStamp: scriptureTokensContentStamp(targetTokens),
+      preparedTick,
     })
     if (fingerprint === fingerprintRef.current && lastAlignedRef.current.length > 0) {
-      setLinksWithAlignedTokens(lastAlignedRef.current)
-      return
+      if (!helpsAlignRowsStillPending(lastAlignedRef.current)) {
+        setLinksWithAlignedTokens(lastAlignedRef.current)
+        return
+      }
+      // Same fingerprint but still pending — fall through and retry align.
     }
 
     const gen = ++genRef.current
@@ -350,6 +416,30 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       fingerprintRef.current = fingerprint
       setLinksWithAlignedTokens(merged)
       setLoadingAligned(false)
+      logHelpsAlignMisses({
+        stage: 'align',
+        resourceKey,
+        bookCode,
+        results: merged.map((row) => ({
+          id: row.id,
+          reference: row.reference,
+          origWords: row.origWords,
+          quoteTokens: row.quoteTokens,
+          quoteStatus: row.quoteStatus,
+          alignedTokens: row.alignedTokens,
+          semanticIds: row.semanticIds,
+          quoteReady: row.quoteReady,
+        })),
+        hasTargetTokens: hasTokens,
+        quoteBuildReady,
+        passageStartChapter: currentChapter,
+        passageEndChapter: endChapter,
+        tokenBook: tokenReference?.book ?? bookCode,
+        tokenChapter,
+        tokenEndChapter,
+        tokenStartVerse,
+        tokenEndVerse,
+      })
     }
 
     const persistAlignResults = async (
@@ -417,6 +507,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         persistCanonical: OptimizedToken[] | null
       }
     ) => {
+      const tokensAlignReady =
+        options.hasTokens && targetTokensAreAlignReady(tokens, textLanguage)
       const args = {
         links: alignLinks,
         targetTokens: tokens,
@@ -428,7 +520,7 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         tokenEndChapter: options.tokenEndChapter,
         tokenStartVerse: options.tokenStartVerse,
         tokenEndVerse: options.tokenEndVerse,
-        hasTokens: options.hasTokens,
+        hasTokens: tokensAlignReady,
         quoteBuildReady,
         resourceKey,
         textLanguage,
@@ -446,7 +538,14 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
 
       setLoadingAligned(true)
 
-      if (alignLinks.length <= HELPS_SYNC_MAX_LINKS) {
+      const preferSync = shouldSyncHelpsAlign({
+        linkCount: alignLinks.length,
+        syncMaxLinks: HELPS_SYNC_MAX_LINKS,
+        quoteBuildReady,
+        linksHaveQuoteTokens: alignLinks.some((l) => (l.quoteTokens?.length ?? 0) > 0),
+      })
+
+      if (preferSync) {
         const syncResults = measureScripturePerfSync('align-tokens', bookCode, () =>
           batchAlignLinks(args)
         )
@@ -455,7 +554,10 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       }
 
       void batchAlignInWorker(args)
-        .then((results) => finish(results))
+        .then((results) => {
+          if (gen !== genRef.current) return
+          finish(results)
+        })
         .catch(() => {
           if (gen !== genRef.current) return
           const syncResults = measureScripturePerfSync('align-tokens', bookCode, () =>
@@ -480,49 +582,19 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       }
 
       try {
-        const ctx = await resolveAlignCacheContext({
-          catalogManager,
-          helpsKey: resourceKey,
-          targetKey,
-          bookCode,
-        })
-        if (!ctx || gen !== genRef.current) {
-          runLiveAlign(toAlignInputs(links), targetTokens, {
-            hasTokens,
-            tokenChapter,
-            tokenEndChapter,
-            tokenStartVerse,
-            tokenEndVerse,
-            persistCanonical: null,
-          })
-          return
-        }
-
-        // Load prepared full for each chapter in the span; require all for reconstruct.
-        const chapterTokens = new Map<number, OptimizedToken[]>()
-        let allPrepared = true
-        for (let ch = currentChapter; ch <= endChapter; ch++) {
-          const full = await readPreparedUnit<ScriptureFullChapter>(
-            cacheAdapter,
-            'scripture',
+        // Hydrate budget (not soft 250ms): refresh must key warm helps-align rows
+        // before falling through to warm.worker live-align (8s RPC risk).
+        const ctx = await settleHelpsCacheContext(
+          resolveAlignCacheContext({
+            catalogManager,
+            helpsKey: resourceKey,
             targetKey,
             bookCode,
-            ch,
-            'full',
-            SCRIPTURE_PREPARE_VERSION
-          )
-          if (!full) {
-            allPrepared = false
-            break
-          }
-          chapterTokens.set(
-            ch,
-            extractPreparedBroadcastTokens(bookCode, ch, full, 1, 999) as OptimizedToken[]
-          )
-        }
-
-        if (!allPrepared || gen !== genRef.current) {
-          // Fall back to broadcast tokens; do not reconstruct against a subset.
+          }),
+          HELPS_CACHE_HYDRATE_BUDGET_MS
+        )
+        if (gen !== genRef.current) return
+        if (!ctx) {
           runLiveAlign(toAlignInputs(links), targetTokens, {
             hasTokens,
             tokenChapter,
@@ -534,6 +606,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
           return
         }
 
+        // Always read helps-align IDB before deciding to live-align. Skipping the
+        // cache when prepared:full was briefly missing forced a full rebuild.
         const cached = await readCachedAlignmentsForSpan(cacheAdapter, {
           helpsKey: resourceKey,
           helpsStamp: ctx.helpsStamp,
@@ -547,7 +621,145 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         })
         if (gen !== genRef.current) return
 
-        const { hits, misses } = subtractCachedAlignHits(links, cached)
+        // Load prepared full for each chapter; fall back to whole-chapter broadcast.
+        // Helps-side ensure so collapsed / unmounted ScriptureViewer still builds.
+        const chapterTokens = new Map<number, OptimizedToken[]>()
+        for (let ch = currentChapter; ch <= endChapter; ch++) {
+          let full = await readPreparedUnit<ScriptureFullChapter>(
+            cacheAdapter,
+            'scripture',
+            targetKey,
+            bookCode,
+            ch,
+            'full',
+            SCRIPTURE_PREPARE_VERSION
+          )
+          if (!full?.blocks?.length) {
+            const ensured = await ensurePreparedFullChapter(
+              cacheAdapter,
+              targetKey,
+              bookCode,
+              ch
+            )
+            full = ensured.full
+          }
+          if (!full?.blocks?.length) continue
+          chapterTokens.set(
+            ch,
+            extractPreparedBroadcastTokens(bookCode, ch, full, 1, 999) as OptimizedToken[]
+          )
+        }
+        if (gen !== genRef.current) return
+
+        const canUseBroadcast = broadcastTokensCoverFullChapter({
+          hasTokens,
+          passageStartChapter: currentChapter,
+          passageEndChapter: endChapter,
+          tokenChapter,
+          tokenEndChapter,
+          tokenStartVerse,
+          tokenEndVerse,
+        })
+        if (canUseBroadcast && currentChapter === endChapter && !chapterTokens.has(currentChapter)) {
+          chapterTokens.set(currentChapter, targetTokens)
+        }
+
+        let canReconstruct = true
+        for (let ch = currentChapter; ch <= endChapter; ch++) {
+          if (!chapterTokens.has(ch)) {
+            canReconstruct = false
+            break
+          }
+        }
+
+        const preparedFlatPreview = canReconstruct
+          ? Array.from(chapterTokens.values()).flat()
+          : []
+        const alignReadyTokens =
+          (preparedFlatPreview.length > 0 &&
+            targetTokensAreAlignReady(preparedFlatPreview, textLanguage)) ||
+          (hasTokens && targetTokensAreAlignReady(targetTokens, textLanguage))
+
+        // Retry helps-align m:0 once zaln-ready tokens exist — premature settles
+        // must not permanently lock TN chips on ol-fallback.
+        const { hits, misses } = subtractCachedAlignHits(links, cached, {
+          retrySettledMisses: alignReadyTokens,
+        })
+
+        // Non-miss hits that carry stored display texts can paint ULT chips
+        // before prepared / SCRIPTURE_TOKENS arrive (refresh path).
+        let canPaintDisplay = hits.size > 0
+        if (canPaintDisplay) {
+          for (const row of hits.values()) {
+            if (row.m === 0) continue // settled miss — no chip expected
+            if (!alignRowHasDisplayText(row)) {
+              canPaintDisplay = false
+              break
+            }
+          }
+        }
+
+        const plan = planAlignCacheHydrate({
+          canReconstruct,
+          hitCount: hits.size,
+          missCount: misses.length,
+          // Prepared chapter tokens count as "have target" — do not wait on broadcast.
+          hasAnyTargetTokens: hasTokens || chapterTokens.size > 0,
+          canPaintDisplay,
+        })
+
+        if (plan === 'wait-for-tokens') {
+          // Full IDB hit — keep chips pending until prepared/broadcast can reconstruct.
+          apply(
+            links.map((link, index) => ({
+              index,
+              id: link.id,
+              alignedTokens: undefined,
+              semanticIds: undefined,
+              quoteStatus: resolveHelpsQuoteStatus({
+                hasAlignedTokens: false,
+                // Always pending while waiting for target tokens (never false
+                // ol-fallback just because quote-build settled).
+                alignmentPending: true,
+                olQuote: link.origWords,
+              }),
+            }))
+          )
+          return
+        }
+
+        if (plan === 'live-align') {
+          // Prefer prepared:full over broadcast — cold miss must not wait on
+          // ScriptureViewer SCRIPTURE_TOKENS when prepare worker already wrote IDB.
+          const preparedFlat = canReconstruct
+            ? Array.from(chapterTokens.values()).flat()
+            : null
+          const liveSrc = resolveLiveAlignTargetSource({
+            preparedFlat,
+            broadcastTokens: targetTokens,
+            hasBroadcastTokens: hasTokens,
+            currentChapter,
+            endChapter,
+            tokenChapter,
+            tokenEndChapter,
+            tokenStartVerse,
+            tokenEndVerse,
+          })
+          runLiveAlign(
+            toAlignInputs(links),
+            liveSrc.usePrepared && preparedFlat ? preparedFlat : targetTokens,
+            {
+              hasTokens: liveSrc.hasTokens,
+              tokenChapter: liveSrc.tokenChapter,
+              tokenEndChapter: liveSrc.tokenEndChapter,
+              tokenStartVerse: liveSrc.tokenStartVerse,
+              tokenEndVerse: liveSrc.tokenEndVerse,
+              persistCanonical: preparedFlat,
+            }
+          )
+          return
+        }
+
         const results: AlignLinkResult[] = []
 
         for (let index = 0; index < links.length; index++) {
@@ -556,7 +768,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
           if (!hit) continue
           const ch = chapterOfLink(link)
           const vs = verseOfLink(link)
-          const tokensForChapter = chapterTokens.get(ch) ?? []
+          const tokensForChapter =
+            plan === 'paint-display' ? [] : (chapterTokens.get(ch) ?? [])
           const reconstructed = reconstructAlignFromPositions({
             targetTokens: tokensForChapter,
             quoteTokens: link.quoteTokens,
@@ -567,6 +780,29 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
             verse: vs,
             row: hit,
           })
+          // Display-text paint: show ULT chips immediately (no verse-span gate).
+          if (plan === 'paint-display') {
+            results.push({
+              index,
+              id: link.id,
+              alignedTokens: reconstructed.alignedTokens,
+              semanticIds: reconstructed.semanticIds,
+              quoteStatus: reconstructed.quoteStatus,
+            })
+            continue
+          }
+          // Prepared:full reconstruct — whole-chapter tokens; do not wait on
+          // SCRIPTURE_TOKENS broadcast or its verse-span hydrate.
+          if (plan === 'reconstruct') {
+            results.push({
+              index,
+              id: link.id,
+              alignedTokens: reconstructed.alignedTokens,
+              semanticIds: reconstructed.semanticIds,
+              quoteStatus: reconstructed.quoteStatus,
+            })
+            continue
+          }
           // Apply display gates: only within token verse span for edge chapters.
           const inTokenSpan =
             ch >= tokenChapter &&
@@ -581,6 +817,8 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
               semanticIds: reconstructed.semanticIds,
               quoteStatus: resolveHelpsQuoteStatus({
                 hasAlignedTokens: false,
+                // Missing scripture tokens: stay pending (never false ol-fallback).
+                // Out-of-span with tokens → settled miss.
                 alignmentPending: !hasTokens,
                 olQuote: link.origWords,
               }),
@@ -597,7 +835,52 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
         }
 
         if (misses.length === 0) {
-          // Preserve order for all links.
+          const byId = new Map(results.map((r) => [r.id, r]))
+          apply(
+            links.map((link, index) => {
+              const hit = byId.get(link.id)
+              return (
+                hit ?? {
+                  index,
+                  id: link.id,
+                  alignedTokens: undefined,
+                  semanticIds: undefined,
+                  quoteStatus: resolveHelpsQuoteStatus({
+                    hasAlignedTokens: false,
+                    alignmentPending: !quoteBuildReady,
+                    olQuote: link.origWords,
+                  }),
+                }
+              )
+            })
+          )
+          return
+        }
+
+        // Live-align misses (including retried m:0) against prepared full when
+        // present; otherwise broadcast. Never claim hasTokens with an empty array.
+        const flatTokens: OptimizedToken[] = []
+        for (let ch = currentChapter; ch <= endChapter; ch++) {
+          flatTokens.push(...(chapterTokens.get(ch) ?? []))
+        }
+        const missLiveSrc = resolveLiveAlignTargetSource({
+          preparedFlat: flatTokens.length > 0 ? flatTokens : null,
+          broadcastTokens: targetTokens,
+          hasBroadcastTokens: hasTokens,
+          currentChapter,
+          endChapter,
+          tokenChapter,
+          tokenEndChapter,
+          tokenStartVerse,
+          tokenEndVerse,
+        })
+        const missTokens =
+          missLiveSrc.usePrepared && flatTokens.length > 0 ? flatTokens : targetTokens
+        const missAlignReady =
+          missLiveSrc.hasTokens && targetTokensAreAlignReady(missTokens, textLanguage)
+
+        if (!missAlignReady) {
+          // Paint cache hits; keep misses pending until zaln-ready tokens arrive.
           const byId = new Map(results.map((r) => [r.id, r]))
           apply(
             links.map((link, index) => {
@@ -620,25 +903,18 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
           return
         }
 
-        // Live-align misses against canonical full-chapter tokens for their chapters.
-        // Flatten tokens for the passage span (same chapter order as extract).
-        const flatTokens: OptimizedToken[] = []
-        for (let ch = currentChapter; ch <= endChapter; ch++) {
-          flatTokens.push(...(chapterTokens.get(ch) ?? []))
-        }
-
         const missInputs = toAlignInputs(misses)
         const missArgs = {
           links: missInputs,
-          targetTokens: flatTokens,
+          targetTokens: missTokens,
           bookCode,
           currentChapter,
           endChapter,
           tokenBook: bookCode,
-          tokenChapter: currentChapter,
-          tokenEndChapter: endChapter,
-          tokenStartVerse: 1,
-          tokenEndVerse: 999,
+          tokenChapter: missLiveSrc.tokenChapter,
+          tokenEndChapter: missLiveSrc.tokenEndChapter,
+          tokenStartVerse: missLiveSrc.tokenStartVerse,
+          tokenEndVerse: missLiveSrc.tokenEndVerse,
           hasTokens: true,
           quoteBuildReady,
           resourceKey,
@@ -659,19 +935,30 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
                 semanticIds: undefined,
                 quoteStatus: resolveHelpsQuoteStatus({
                   hasAlignedTokens: false,
-                  alignmentPending: true,
+                  alignmentPending: !quoteBuildReady,
                   olQuote: link.origWords,
                 }),
               }
             )
           })
           apply(ordered)
-          void persistAlignResults(missResults, flatTokens)
+          // Persist only against prepared full positions (not broadcast-only).
+          void persistAlignResults(
+            missResults,
+            missLiveSrc.usePrepared && flatTokens.length > 0 ? flatTokens : null
+          )
         }
 
         setLoadingAligned(true)
 
-        if (missInputs.length <= HELPS_SYNC_MAX_LINKS) {
+        const preferSyncMisses = shouldSyncHelpsAlign({
+          linkCount: missInputs.length,
+          syncMaxLinks: HELPS_SYNC_MAX_LINKS,
+          quoteBuildReady,
+          linksHaveQuoteTokens: missInputs.some((l) => (l.quoteTokens?.length ?? 0) > 0),
+        })
+
+        if (preferSyncMisses) {
           const syncResults = measureScripturePerfSync('align-tokens', bookCode, () =>
             batchAlignLinks(missArgs)
           )
@@ -691,6 +978,7 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
             )
             mergeMisses(syncResults)
           })
+        return
       } catch {
         if (gen !== genRef.current) return
         runLiveAlign(toAlignInputs(links), targetTokens, {
@@ -710,6 +998,7 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     targetTokens,
     tokenReference,
     hasTokens,
+    targetKey,
     sourceResourceId,
     helpsRef.book,
     helpsRef.chapter,
@@ -721,6 +1010,7 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
     quoteBuildReady,
     cacheAdapter,
     catalogManager,
+    preparedTick,
   ])
 
   return {

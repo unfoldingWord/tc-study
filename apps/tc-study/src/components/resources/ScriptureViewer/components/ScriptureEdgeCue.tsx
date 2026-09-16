@@ -1,10 +1,10 @@
 /**
- * Edge chevron + travel pad. Shown only after the reader reaches that scroll edge.
- * The pad extends scrollHeight so the scrollbar can travel into next/prev.
+ * In-flow chevron at the scripture content start/end. Shown when an adjacent
+ * unit exists; click commits prev/next. Scrolls with content (not viewport-
+ * sticky). No travel pad — further pull uses elastic overscroll.
  */
 
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { EDGE_TRAVEL_PAD_PX } from '../../../../features/nav/scriptureEdgeNavigate'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 
 interface ScriptureEdgeCueProps {
@@ -30,11 +30,7 @@ export function ScriptureEdgeCue({
   const loadingLabel = edge === 'top' ? 'Loading previous' : 'Loading next'
 
   return (
-    <div
-      className={`flex justify-center ${edge === 'top' ? 'items-end pb-1' : 'items-start pt-1'}`}
-      style={{ height: EDGE_TRAVEL_PAD_PX, overflowAnchor: 'none' }}
-      data-scripture-edge-pad={edge}
-    >
+    <div className="flex justify-center py-1" data-scripture-edge-cue={edge}>
       <button
         type="button"
         className="p-1 text-fg-muted"

@@ -3,7 +3,7 @@
  * Pipeline / signals / deps / list / handlers live in sibling modules.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useCatalogManager, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
 import { usePinnedHelpsReference } from '../../../features/nav/usePinnedHelpsReference'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
@@ -25,43 +25,38 @@ import {
   isHelpsContentPending,
   staleQuotesAreUnderlineReady,
 } from '../../../features/helps/helpsListLoading'
-import {
-  usePreparedNotesChapter,
-  usePreparedWordsLinksChapter,
-} from '../../../features/helps/usePreparedHelpsChapter'
-import { useWarmAdjacentHelpsQuotes } from '../../../features/helps/useWarmAdjacentHelpsQuotes'
 import { helpsLane1Ready } from '../../../features/warm/warmLanePolicy'
 import { useWarmLanes } from '../../../features/warm/useWarmLanes'
 import { listedLanguageByCode } from '../../../features/read/languageListDisplayName'
 import { getLanguageDirection } from '../../../utils/languageDirection'
-import { useEntryTitles } from '../TranslationNotesViewer/hooks/useEntryTitles'
-import { useTAMetadataForTitles } from '../TranslationNotesViewer/hooks/useTAMetadataForTitles'
-import { useTATitles } from '../TranslationNotesViewer/hooks/useTATitles'
 import { useTranslationNotesContent } from '../TranslationNotesViewer/hooks/useTranslationNotesContent'
-import {
-    useScriptureTokens,
-    useTWPreviews,
-    useTWTitles,
-    useWordsLinksContent,
-} from '../WordsLinksViewer/hooks'
-import type { TokenFilter } from '../WordsLinksViewer/types'
-import { HelpsFilterBanners } from '../shared/HelpsFilterBanners'
+import { useScriptureTokens, useWordsLinksContent } from '../WordsLinksViewer/hooks'
 import { CombinedHelpsList } from './CombinedHelpsList'
-import { primaryLangCode, resolveHelpsViewerScope } from './combinedHelpsUtils'
-import type { HelpsCardSelection } from './helpsCardSelection'
-import type { HelpsKindFilter, ObsQuoteFilter, SupportRefFilter, VerseFilterState } from './types'
+import {
+  buildHelpsFilterChrome,
+  combinedHelpsFilterDisplayCount,
+  combinedHelpsFilterHasMatches,
+} from './helpsFilterChrome'
 import { useCombinedHelpsDeps } from './useCombinedHelpsDeps'
+import { useCombinedHelpsFilterState } from './useCombinedHelpsFilterState'
 import { useCombinedHelpsHandlers } from './useCombinedHelpsHandlers'
+import { useCombinedHelpsIdentity } from './useCombinedHelpsIdentity'
 import { useCombinedHelpsPipeline } from './useCombinedHelpsPipeline'
-import { useCombinedHelpsResources } from './useCombinedHelpsResources'
+import { useCombinedHelpsPrepare } from './useCombinedHelpsPrepare'
 import { useCombinedHelpsSignals } from './useCombinedHelpsSignals'
-import { useCombinedHelpsTitlePreload } from './useCombinedHelpsTitlePreload'
-import { RESOURCE_TYPE_IDS } from '../../../resourceTypes/resourceTypeIds'
+import { useCombinedHelpsTitles } from './useCombinedHelpsTitles'
 import { loadedResourcesMembershipKey } from '../../../features/read/loadedResourcesMembershipKey'
+import {
+  resolveHelpsTargetScriptureKey,
+  useHelpsTargetScriptureKey,
+} from '../../../features/helps/helpsTargetScripture'
+import { getLastScriptureTokensSourceResourceId } from '../../../features/helps/scriptureTokensStore'
+import { navigationLanguageCode } from '../../../features/read/readPanelModel'
+import { useReadPanelStore } from '../../../features/read/readPanelStore'
+import { warmVisibleHelpsResources } from './warmVisibleHelpsResources'
 
 export {
-    COMBINED_HELPS_IDS, COMBINED_HELPS_RESOURCE_ID,
-    OBS_COMBINED_HELPS_RESOURCE_ID
+  COMBINED_HELPS_IDS, COMBINED_HELPS_RESOURCE_ID, OBS_COMBINED_HELPS_RESOURCE_ID,
 } from '../../../features/helps/combinedHelpsIds'
 
 interface CombinedHelpsViewerProps {
@@ -84,68 +79,25 @@ export function CombinedHelpsViewer({
   const bookTitleSource = useBookTitleSource()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const loadedMembership = useAppStore((s) => loadedResourcesMembershipKey(s.loadedResources))
-  const loadedResources = useMemo(
-    () => useAppStore.getState().loadedResources,
-    [loadedMembership]
-  )
+  const loadedResources = useMemo(() => useAppStore.getState().loadedResources, [loadedMembership])
   const packageResources = useWorkspaceStore((s) => s.currentPackage?.resources)
   const helpsLanguageActions = useHelpsLanguageActions()
-
-  const [kindFilter, setKindFilter] = useState<HelpsKindFilter>('all')
-  const [selectedHelpsCard, setSelectedHelpsCard] = useState<HelpsCardSelection>(null)
-  const [tokenFilter, setTokenFilter] = useState<TokenFilter | null>(null)
-  const [verseFilter, setVerseFilter] = useState<VerseFilterState | null>(null)
-  const [obsQuoteFilter, setObsQuoteFilter] = useState<ObsQuoteFilter | null>(null)
-  const [supportRefFilter, setSupportRefFilter] = useState<SupportRefFilter | null>(null)
+  const filters = useCombinedHelpsFilterState(currentRef.book)
 
   const resourceFromStore = useAppStore((s) => (resource?.id ? s.loadedResources[resource.id] : undefined))
-  const workspaceHelps = packageResources?.get(resource?.id || resource?.key || '')
-  const effectiveResource = workspaceHelps ?? resourceFromStore ?? resource
-  // Prefer workspace pointers (SoT) — AppStore projection can lag after Unlock 1.
-  const wantLang = primaryLangCode(
-    effectiveResource.language ||
-      effectiveResource.languageCode ||
-      resource.language ||
-      resource.languageCode ||
-      ''
-  )
-  const helpsScope: 'scripture' | 'obs' = resolveHelpsViewerScope({
+  const { effectiveResource, wantLang, helpsScope, tnKey, twlKey } = useCombinedHelpsIdentity({
     resourceId,
     resourceKey,
-    type: effectiveResource.type,
-    appliesToScope: effectiveResource.appliesToScope,
-  })
-  const consumed = workspaceHelps?.consumedKeys ?? effectiveResource.consumedKeys
-  const notesType =
-    helpsScope === 'obs' ? RESOURCE_TYPE_IDS.OBS_NOTES : RESOURCE_TYPE_IDS.TRANSLATION_NOTES
-  const twlType =
-    helpsScope === 'obs'
-      ? RESOURCE_TYPE_IDS.OBS_WORDS_LINKS
-      : RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS
-  const injectedTnKey =
-    workspaceHelps?.helpsTnResourceKey ??
-    effectiveResource.helpsTnResourceKey ??
-    consumed?.[notesType]
-  const injectedTwlKey =
-    workspaceHelps?.helpsTwlResourceKey ??
-    effectiveResource.helpsTwlResourceKey ??
-    consumed?.[twlType]
-
-  const { tnKey, twlKey } = useCombinedHelpsResources({
-    loadedResources,
+    resource,
+    resourceFromStore,
     packageResources,
-    wantLang,
-    injectedTnKey,
-    injectedTwlKey,
-    helpsScope,
+    loadedResources,
   })
 
   const tnLoaderId = helpsScope === 'obs' ? 'obs-notes' : 'notes'
   const twlLoaderId = helpsScope === 'obs' ? 'obs-words-links' : 'words-links'
-
   const { notes: tnNotes, notesByChapter, loading: tnLoading, error: tnError } =
     useTranslationNotesContent(tnKey, currentRef.book || '', tnLoaderId)
-
   const { content: twlContent, loading: twlLoading, error: twlError } = useWordsLinksContent({
     resourceKey: twlKey,
     loaderTypeId: twlLoaderId,
@@ -154,89 +106,42 @@ export function CombinedHelpsViewer({
   const startChapter = currentRef.chapter || 1
   const endChapter = currentRef.endChapter || startChapter
   const bookId = currentRef.book || ''
-
-  const processedNotesForHeal = useMemo(() => {
-    if (!tnNotes?.length && (!notesByChapter || Object.keys(notesByChapter).length === 0)) {
-      return null
-    }
-    return {
-      bookCode: bookId,
-      bookName: bookId,
-      notes: tnNotes ?? [],
-      notesByChapter: notesByChapter ?? {},
-      metadata: {
-        bookCode: bookId,
-        bookName: bookId,
-        processingDate: '',
-        totalNotes: tnNotes?.length ?? 0,
-        chaptersWithNotes: Object.keys(notesByChapter ?? {})
-          .map((k) => parseInt(k, 10))
-          .filter((n) => Number.isFinite(n)),
-        statistics: {
-          totalNotes: tnNotes?.length ?? 0,
-          notesPerChapter: {},
-        },
-      },
-    }
-  }, [tnNotes, notesByChapter, bookId])
-
-  const { preparedNotes, status: notesPrepareStatus } = usePreparedNotesChapter({
-    resourceKey: tnKey,
-    bookId,
-    startChapter,
-    endChapter,
-    processedNotes: processedNotesForHeal,
-  })
-
-  const { preparedLinks, status: linksPrepareStatus } = usePreparedWordsLinksChapter({
-    resourceKey: twlKey,
-    bookId,
-    startChapter,
-    endChapter,
-    processedLinks: twlContent,
-  })
-
-  useWarmAdjacentHelpsQuotes({
+  const { preparedNotes, notesPrepareStatus, preparedLinks, linksPrepareStatus } = useCombinedHelpsPrepare({
+    tnNotes,
+    notesByChapter,
+    twlContent,
     tnKey,
     twlKey,
     bookId,
-    chapter: startChapter,
-    notesByChapter,
-    linksByChapter: twlContent?.linksByChapter,
+    startChapter,
+    endChapter,
   })
 
-  // Listen on the mounted CombinedHelps id (not TN/TWL catalog keys)
   const scriptureTokenListenerId = resourceId
-
   const filterResetKey =
     navigationMode === 'chapter'
       ? `${currentRef.book}:${currentRef.chapter}`
       : `${currentRef.book}:${currentRef.chapter}:${currentRef.verse}:${currentRef.endVerse ?? ''}`
 
-  // Token / verse / OBS filters are passage-scoped — clear on chapter (or verse) change.
-  // Keep the selected card when that card jumped scripture (persist or support-ref).
-  const supportRefFilterRef = useRef(supportRefFilter)
-  supportRefFilterRef.current = supportRefFilter
+  const supportRefFilterRef = useRef(filters.supportRefFilter)
+  supportRefFilterRef.current = filters.supportRefFilter
+  const twlArticleFilterRef = useRef(filters.twlArticleFilter)
+  twlArticleFilterRef.current = filters.twlArticleFilter
   useEffect(() => {
-    setTokenFilter(null)
-    setVerseFilter(null)
-    setObsQuoteFilter(null)
+    filters.setTokenFilter(null)
+    filters.setVerseFilter(null)
+    filters.setObsQuoteFilter(null)
     if (
       !shouldKeepSelectedHelpsCardOnPassageChange({
-        supportRefActive: Boolean(supportRefFilterRef.current),
+        supportRefActive: Boolean(supportRefFilterRef.current || twlArticleFilterRef.current),
         persist: getPersistedHelpsHighlight(),
         nextBook: currentRef.book,
         nextChapter: currentRef.chapter,
       })
     ) {
-      setSelectedHelpsCard(null)
+      filters.setSelectedHelpsCard(null)
     }
   }, [filterResetKey])
-
-  // Support-ref filter is book-wide — clear only when the book changes.
-  useEffect(() => {
-    setSupportRefFilter(null)
-  }, [currentRef.book])
 
   const { catalogMetadata } = useCombinedHelpsDeps({
     resourceKey,
@@ -247,9 +152,32 @@ export function CombinedHelpsViewer({
     resourceTypeRegistry,
   })
 
-  const { sourceResourceId: targetSourceId, resourceMetadata: targetScriptureMetadata } = useScriptureTokens({
-    resourceId: scriptureTokenListenerId,
-  })
+  const { sourceResourceId: broadcastTargetId, resourceMetadata: targetScriptureMetadata } =
+    useScriptureTokens({
+      resourceId: scriptureTokenListenerId,
+    })
+  const sharedTargetKey = useHelpsTargetScriptureKey()
+  const readPanels = useReadPanelStore((s) => s.panels)
+  const textLangPrefer = navigationLanguageCode(readPanels)
+  const targetSourceId = useMemo(
+    () =>
+      resolveHelpsTargetScriptureKey({
+        sharedKey: sharedTargetKey,
+        broadcastKey: broadcastTargetId,
+        lastKnownKey: getLastScriptureTokensSourceResourceId(),
+        loadedResources,
+        preferLanguage: textLangPrefer || helpsLanguageActions?.selectedLanguageCode,
+      }),
+    [
+      sharedTargetKey,
+      broadcastTargetId,
+      loadedResources,
+      textLangPrefer,
+      helpsLanguageActions?.selectedLanguageCode,
+      // Re-resolve after SCRIPTURE_TOKENS invalidate clears hydrate but keeps lastKnown.
+      targetScriptureMetadata?.id,
+    ]
+  )
 
   const helpsLangForWarm =
     helpsLanguageActions?.selectedLanguageCode ||
@@ -258,38 +186,10 @@ export function CombinedHelpsViewer({
     ''
   const textLangForWarm =
     targetSourceId?.split('/')[1]?.split('_')[0] || helpsLangForWarm
-  const warmVisibleResources = useMemo(() => {
-    const rows: Array<{
-      typeId: string
-      resourceKey: string
-      role: 'scripture' | 'helps'
-      helpsType?: 'notes' | 'words-links'
-    }> = []
-    if (targetSourceId) {
-      rows.push({
-        typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
-        resourceKey: targetSourceId,
-        role: 'scripture',
-      })
-    }
-    if (tnKey) {
-      rows.push({
-        typeId: RESOURCE_TYPE_IDS.TRANSLATION_NOTES,
-        resourceKey: tnKey,
-        role: 'helps',
-        helpsType: 'notes',
-      })
-    }
-    if (twlKey) {
-      rows.push({
-        typeId: RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS,
-        resourceKey: twlKey,
-        role: 'helps',
-        helpsType: 'words-links',
-      })
-    }
-    return rows
-  }, [targetSourceId, tnKey, twlKey])
+  const warmVisibleResources = useMemo(
+    () => warmVisibleHelpsResources({ targetSourceId, tnKey, twlKey }),
+    [targetSourceId, tnKey, twlKey]
+  )
 
   const languageCode =
     resource?.language ?? tnKey.split('/')[1]?.split('_')[0] ?? twlKey.split('/')[1]?.split('_')[0] ?? ''
@@ -303,10 +203,6 @@ export function CombinedHelpsViewer({
     resourceDirection,
     targetScriptureDirection: targetScriptureMetadata?.languageDirection,
   })
-
-  const { loadingTitles, fetchTATitle, getTATitle } = useTATitles(tnKey || resourceKey)
-  const taMetadata = useTAMetadataForTitles(tnKey || resourceKey)
-  const { fetchEntryTitle, getEntryTitle, invalidateTitles } = useEntryTitles(tnKey || resourceKey, taMetadata)
 
   const {
     notesWithAlignedTokens,
@@ -322,6 +218,7 @@ export function CombinedHelpsViewer({
     twlQuoteBuildReady,
     quotesBlocked,
     supportRefStreamPending,
+    twlArticleStreamPending,
   } = useCombinedHelpsPipeline({
     tnNotes,
     notesByChapter,
@@ -334,13 +231,14 @@ export function CombinedHelpsViewer({
     resourceKey,
     resourceId,
     helpsScope,
-    kindFilter,
+    kindFilter: filters.kindFilter,
     currentRef,
     navigationMode,
-    tokenFilter,
-    verseFilter,
-    obsQuoteFilter,
-    supportRefFilter,
+    tokenFilter: filters.tokenFilter,
+    verseFilter: filters.verseFilter,
+    obsQuoteFilter: filters.obsQuoteFilter,
+    supportRefFilter: filters.supportRefFilter,
+    twlArticleFilter: filters.twlArticleFilter,
     targetKey: targetSourceId,
   })
 
@@ -351,71 +249,44 @@ export function CombinedHelpsViewer({
     tnKey,
     twlKey,
     helpsScope,
-    kindFilter,
+    kindFilter: filters.kindFilter,
     wantLang,
-    currentRef: {
-      book: currentRef.book,
-      chapter: currentRef.chapter,
-      verse: currentRef.verse,
-    },
-        navigationMode,
-        notesWithAlignedTokens,
-        filteredByReference,
+    currentRef: { book: currentRef.book, chapter: currentRef.chapter, verse: currentRef.verse },
+    navigationMode,
+    notesWithAlignedTokens,
+    filteredByReference,
     underlineTnGroups,
     underlineTwlGroups,
-    setTokenFilter,
-    setVerseFilter,
-    setObsQuoteFilter,
-    setSupportRefFilter,
-    setSelectedHelpsCard,
+    setTokenFilter: filters.setTokenFilter,
+    setVerseFilter: filters.setVerseFilter,
+    setObsQuoteFilter: filters.setObsQuoteFilter,
+    setSupportRefFilter: filters.setSupportRefFilter,
+    setTwlArticleFilter: filters.setTwlArticleFilter,
+    setSelectedHelpsCard: filters.setSelectedHelpsCard,
+    restoreBookKind: filters.restoreBookKind,
   })
 
-  const hasMatches = supportRefFilter
-    ? hasNoteMatches
-    : obsQuoteFilter
-    ? hasNoteMatches || hasLinkMatches
-    : tokenFilter
-      ? kindFilter === 'notes'
-        ? hasNoteMatches
-        : kindFilter === 'twl'
-          ? hasLinkMatches
-          : hasNoteMatches || hasLinkMatches
-      : verseFilter
-        ? kindFilter === 'notes'
-          ? hasNoteMatches
-          : kindFilter === 'twl'
-            ? hasLinkMatches
-            : hasNoteMatches || hasLinkMatches
-        : true
-
-  const displayCount =
-    kindFilter === 'all'
-      ? displayNotes.length + displayLinks.length
-      : kindFilter === 'notes'
-        ? displayNotes.length
-        : displayLinks.length
-
-  const { twTitles, loadingTitles: twLoadingTitles, fetchTWTitle, getTWTitle } = useTWTitles(twlKey || resourceKey)
-  const {
-    twPreviews,
-    loadingPreviews: twLoadingPreviews,
-    fetchTWPreview,
-    getTWPreview,
-    isTWPreviewPending,
-  } = useTWPreviews(twlKey || resourceKey)
-
-  useCombinedHelpsTitlePreload({
+  const hasMatches = combinedHelpsFilterHasMatches({
+    supportRefFilter: filters.supportRefFilter,
+    twlArticleFilter: filters.twlArticleFilter,
+    obsQuoteFilter: filters.obsQuoteFilter,
+    tokenFilter: filters.tokenFilter,
+    verseFilter: filters.verseFilter,
+    kindFilter: filters.kindFilter,
+    hasNoteMatches,
+    hasLinkMatches,
+  })
+  const displayCount = combinedHelpsFilterDisplayCount({
+    kindFilter: filters.kindFilter,
+    notesCount: displayNotes.length,
+    linksCount: displayLinks.length,
+  })
+  const titles = useCombinedHelpsTitles({
+    tnKey,
+    twlKey,
+    resourceKey,
     displayNotes,
     displayLinks,
-    fetchTATitle,
-    fetchEntryTitle,
-    invalidateTitles,
-    twTitles,
-    twLoadingTitles,
-    fetchTWTitle,
-    twPreviews,
-    twLoadingPreviews,
-    fetchTWPreview,
   })
 
   const {
@@ -423,6 +294,7 @@ export function CombinedHelpsViewer({
     handleNoteQuoteClick,
     handleSupportReferenceClick,
     handleFilterBySupportReference,
+    handleFilterByTwlArticle,
     handleTitleClick,
     handleLinkQuoteClick,
   } = useCombinedHelpsHandlers({
@@ -437,14 +309,11 @@ export function CombinedHelpsViewer({
     sendVerseFilter,
     sendVerseNavigation,
     broadcastObsHighlight,
-    setSelectedHelpsCard,
-    setSupportRefFilter,
-    clearCompetingFilters: () => {
-      setTokenFilter(null)
-      setVerseFilter(null)
-      setObsQuoteFilter(null)
-    },
-    setKindFilter,
+    setSelectedHelpsCard: filters.setSelectedHelpsCard,
+    setSupportRefFilter: filters.setSupportRefFilter,
+    setTwlArticleFilter: filters.setTwlArticleFilter,
+    clearCompetingFilters: filters.clearCompetingFilters,
+    enterBookKindFilter: filters.enterBookKind,
   })
 
   const loading = isHelpsContentPending({
@@ -452,7 +321,11 @@ export function CombinedHelpsViewer({
     catalogLoading: Boolean(helpsLanguageActions?.isCatalogLoading),
     preparePending: notesPrepareStatus === 'pending' || linksPrepareStatus === 'pending',
     hasVisibleRows: mergedGroups.length > 0,
-  }) || Boolean(supportRefFilter && supportRefStreamPending && mergedGroups.length === 0)
+  }) || Boolean(
+    ((filters.supportRefFilter && supportRefStreamPending) ||
+      (filters.twlArticleFilter && twlArticleStreamPending)) &&
+      mergedGroups.length === 0
+  )
   useWarmLanes({
     owner: 'helps',
     visibleResources: warmVisibleResources,
@@ -465,8 +338,13 @@ export function CombinedHelpsViewer({
         tnQuoteBuildReady ||
         twlQuoteBuildReady ||
         (mergedGroups.length > 0 && !displayNotes.some((n) => n.quote?.trim())),
-      cacheHit: staleQuotesAreUnderlineReady(displayNotes),
+      cacheHit:
+        staleQuotesAreUnderlineReady(displayNotes) ||
+        staleQuotesAreUnderlineReady(displayLinks),
       quotesBlocked: quotesBlocked && mergedGroups.length > 0,
+      bookFilterRowsReady:
+        Boolean(filters.supportRefFilter || filters.twlArticleFilter) &&
+        mergedGroups.length > 0,
     }),
   })
   const noSources = !tnKey && !twlKey
@@ -483,33 +361,23 @@ export function CombinedHelpsViewer({
   const listedHelpsLang = listedLanguageByCode(availableLanguages, helpsLanguageCodeForCopy)
   const helpsLanguageName = listedHelpsLang ?? ''
   const passageLabel = formatHelpsPassageLabel(currentRef.book, currentRef.chapter)
-
-  // null when inactive so CombinedHelps can keep kind toggles in the header slot.
-  const filterScopeBar =
-    obsQuoteFilter || supportRefFilter || tokenFilter || verseFilter ? (
-      <HelpsFilterBanners
-        obsQuoteFilter={obsQuoteFilter}
-        tokenFilter={tokenFilter}
-        verseFilter={verseFilter}
-        supportRefFilter={supportRefFilter}
-        displayCount={displayCount}
-        hasMatches={hasMatches}
-        hideCount
-        onClearObsQuoteFilter={() => {
-          setObsQuoteFilter(null)
-          setSelectedHelpsCard(null)
-        }}
-        onClearTokenFilter={() => setTokenFilter(null)}
-        onClearVerseFilter={() => {
-          setVerseFilter(null)
-          sendVerseFilter({ lifecycle: 'event', filter: null })
-        }}
-        onClearSupportRefFilter={() => {
-          setSupportRefFilter(null)
-          setSelectedHelpsCard(null)
-        }}
-      />
-    ) : null
+  const { filterScopeBar, onClearActiveFilter } = buildHelpsFilterChrome({
+    obsQuoteFilter: filters.obsQuoteFilter,
+    tokenFilter: filters.tokenFilter,
+    verseFilter: filters.verseFilter,
+    supportRefFilter: filters.supportRefFilter,
+    twlArticleFilter: filters.twlArticleFilter,
+    displayCount,
+    hasMatches,
+    setObsQuoteFilter: filters.setObsQuoteFilter,
+    setTokenFilter: filters.setTokenFilter,
+    setVerseFilter: filters.setVerseFilter,
+    setSupportRefFilter: filters.setSupportRefFilter,
+    setTwlArticleFilter: filters.setTwlArticleFilter,
+    setSelectedHelpsCard: filters.setSelectedHelpsCard,
+    restoreBookKind: filters.restoreBookKind,
+    sendVerseFilter,
+  })
 
   return (
     <div className="h-full min-h-0 overflow-hidden flex flex-col">
@@ -519,34 +387,15 @@ export function CombinedHelpsViewer({
         bookCode={currentRef.book}
         bookTitleSource={bookTitleSource}
         languageDirection={helpsLanguageDirection}
-        kindFilter={kindFilter}
-        setKindFilter={setKindFilter}
+        kindFilter={filters.kindFilter}
+        setKindFilter={filters.setKindFilter}
         filterScopeBar={filterScopeBar}
         helpsLanguageCode={helpsLanguageCodeForCopy}
         helpsLanguageName={helpsLanguageName}
         passageLabel={passageLabel}
         noSources={noSources}
         chapterHasHelps={notesWithAlignedTokens.length > 0 || filteredByReference.length > 0}
-        onClearActiveFilter={() => {
-          if (obsQuoteFilter) {
-            setObsQuoteFilter(null)
-            setSelectedHelpsCard(null)
-            return
-          }
-          if (supportRefFilter) {
-            setSupportRefFilter(null)
-            setSelectedHelpsCard(null)
-            return
-          }
-          if (tokenFilter) {
-            setTokenFilter(null)
-            return
-          }
-          if (verseFilter) {
-            setVerseFilter(null)
-            sendVerseFilter({ lifecycle: 'event', filter: null })
-          }
-        }}
+        onClearActiveFilter={onClearActiveFilter}
         loading={loading}
         tnError={tnError}
         twlError={twlError}
@@ -554,22 +403,24 @@ export function CombinedHelpsViewer({
         twlKey={twlKey}
         resourceKey={resourceKey}
         mergedGroups={mergedGroups}
-        selectedHelpsCard={selectedHelpsCard}
+        selectedHelpsCard={filters.selectedHelpsCard}
         targetSourceId={targetSourceId}
         helpsScope={helpsScope}
-        tokenFilter={tokenFilter}
-        verseFilter={verseFilter}
-        obsQuoteFilter={obsQuoteFilter}
-        supportRefFilter={supportRefFilter}
-        loadingTitles={loadingTitles}
-        twLoadingTitles={twLoadingTitles}
-        getEntryTitle={getEntryTitle}
-        getTATitle={getTATitle}
-        getTWTitle={getTWTitle}
-        getTWPreview={getTWPreview}
-        isTWPreviewPending={isTWPreviewPending}
+        tokenFilter={filters.tokenFilter}
+        verseFilter={filters.verseFilter}
+        obsQuoteFilter={filters.obsQuoteFilter}
+        supportRefFilter={filters.supportRefFilter}
+        twlArticleFilter={filters.twlArticleFilter}
+        loadingTitles={titles.loadingTitles}
+        twLoadingTitles={titles.twLoadingTitles}
+        getEntryTitle={titles.getEntryTitle}
+        getTATitle={titles.getTATitle}
+        getTWTitle={titles.getTWTitle}
+        getTWPreview={titles.getTWPreview}
+        isTWPreviewPending={titles.isTWPreviewPending}
         onSupportReferenceClick={handleSupportReferenceClick}
         onFilterBySupportReference={handleFilterBySupportReference}
+        onFilterByTwlArticle={handleFilterByTwlArticle}
         onEntryLinkClick={onEntryLinkClick}
         onNoteQuoteClick={handleNoteQuoteClick}
         onNoteSelect={handleNoteSelect}

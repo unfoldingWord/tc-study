@@ -20,6 +20,7 @@ import {
   lastChapterNumber,
   paragraphChaptersFromSlots,
 } from '../../../../features/nav/chapterInfiniteScroll'
+import { resolveLastChapter } from '../../../../features/nav/bookChapterCounts'
 import {
   beginProgrammaticScrollSuppress,
   getChapterScrollActivity,
@@ -228,14 +229,21 @@ export function ScriptureContent({
   const slotsActive = slots != null
 
   const warmChapters = useMemo(() => {
-    const last =
-      (nav?.chapters?.length
-        ? lastChapterNumber(nav.chapters.map((c) => c.number))
-        : 0) ||
-      (viewModel?.chapters?.length
-        ? lastChapterNumber(viewModel.chapters.map((c) => c.number))
-        : 0) ||
-      currentRef.chapter
+    const tocChapters = availableBooks.find(
+      (b) => b.code.toLowerCase() === (currentRef.book || '').toLowerCase()
+    )?.chapters
+    const last = resolveLastChapter({
+      bookId: currentRef.book || '',
+      explicit:
+        (nav?.chapters?.length
+          ? lastChapterNumber(nav.chapters.map((c) => c.number))
+          : 0) ||
+        (viewModel?.chapters?.length
+          ? lastChapterNumber(viewModel.chapters.map((c) => c.number))
+          : 0) ||
+        undefined,
+      tocChapters,
+    })
     const around = chapterWindowAround(currentRef.chapter || 1, last)
     const set = new Set<number>(around)
     if (slots) {
@@ -254,7 +262,7 @@ export function ScriptureContent({
       for (const chapter of displayChapters) set.add(chapter)
     }
     return [...set].sort((a, b) => a - b)
-  }, [slots, displayChapters, nav, viewModel, currentRef.chapter])
+  }, [slots, displayChapters, nav, viewModel, currentRef.chapter, currentRef.book, availableBooks])
 
   const allBookChapters = useMemo(() => {
     if (nav?.chapters?.length) {

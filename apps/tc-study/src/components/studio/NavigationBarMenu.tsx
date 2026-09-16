@@ -1,6 +1,7 @@
 import { Download, FolderOpen, History, Info } from 'lucide-react'
 import type { BCVReference } from '../../contexts/types'
 import { ThemeToggle } from '../../features/theme'
+import { DownloadIndicator } from '../read/DownloadIndicator'
 import { NavigationTypeSelector } from './NavigationTypeSelector'
 import { ObsNavigationTypeSelector } from './ObsNavigationTypeSelector'
 
@@ -52,6 +53,10 @@ export function NavigationBarMenu({
           </span>
         )}
       </button>
+
+      <div className="border-t border-border-subtle">
+        <DownloadIndicator onClose={onClose} />
+      </div>
 
       {(onDownloadCollection || onLoadCollection) && (
         <>

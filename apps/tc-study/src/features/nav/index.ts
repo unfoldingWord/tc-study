@@ -5,7 +5,8 @@ export { BookPicker } from './BookPicker'
 export { ChapterVersePicker } from './ChapterVersePicker'
 export { ObsFrameRangePicker } from './ObsFrameRangePicker'
 export { ObsStoryPicker } from './ObsStoryPicker'
-export { ObsModeTabs, ScopeTabs } from './ScopeTabs'
+export { ObsModeTabs, ScopeTabs, ScriptureModeTabs } from './ScopeTabs'
+export type { ScripturePickerGrain } from './ScopeTabs'
 export { SectionPicker } from './SectionPicker'
 export {
   buildBookInfosFromIngredients,

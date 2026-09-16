@@ -13,7 +13,7 @@ import {
 import { useAppStore } from '../../../../contexts/AppContext'
 import type { BookInfo } from '../../../../contexts/types-only'
 import { defaultSectionsService } from '../../../../lib/services/default-sections'
-import { extractVerseCountsFromContent } from '../../../../lib/versification'
+import { mergeVerseCountsFromChapterMap } from '../../../../lib/versification'
 import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
 import { readPreparedNav } from '../../../../features/prepare/prepareCache'
 import {
@@ -26,6 +26,7 @@ import {
   type ScriptureNavRecord,
 } from '../../../../features/scripture/scripturePreparer'
 import { peekPreparedChapter } from '../../../../features/scripture/preparedChapterCache'
+import { resolveLastChapter } from '../../../../features/nav/bookChapterCounts'
 import { useWarmLanes } from '../../../../features/warm/useWarmLanes'
 import { scriptureLane1Ready } from '../../../../features/warm/warmLanePolicy'
 import { enqueueScriptureBookPriority } from '../../../../workers/prepareClient'
@@ -192,7 +193,11 @@ export function useContent(
         if (cancelled) return null
         navigation.updateBookVerseCount(
           bookCode,
-          extractVerseCountsFromContent(chapterVerseMapFromViewModel(rawVm))
+          mergeVerseCountsFromChapterMap(
+            bookCode,
+            chapterVerseMapFromViewModel(rawVm),
+            navigation.getBookInfo(bookCode)?.verses
+          )
         )
         await applyBookSections(bookCode, navigation.setBookSections)
         if (cancelled) return null
@@ -236,7 +241,11 @@ export function useContent(
         if (nav && nav.chapters.length > 0) {
           navigation.updateBookVerseCount(
             bookCode,
-            extractVerseCountsFromContent(chapterVerseMapFromNav(nav))
+            mergeVerseCountsFromChapterMap(
+              bookCode,
+              chapterVerseMapFromNav(nav),
+              navigation.getBookInfo(bookCode)?.verses
+            )
           )
           await applyBookSections(bookCode, navigation.setBookSections)
           if (cancelled) return
@@ -316,10 +325,16 @@ export function useContent(
   const isLoading = loaded.key !== loadKey || isLoadingRaw
 
   const lastChapterForWarm = useMemo(() => {
-    if (nav && nav.chapters.length > 0) return lastChapterFromNav(nav)
-    if (viewModel) return Math.max(...viewModel.chapters.map((c) => c.number), 1)
-    return 0
-  }, [nav, viewModel])
+    const bookId = currentRef.book || ''
+    const tocChapters = availableBooks.find(
+      (b) => b.code.toLowerCase() === bookId.toLowerCase()
+    )?.chapters
+    const explicit =
+      (nav && nav.chapters.length > 0 ? lastChapterFromNav(nav) : 0) ||
+      (viewModel ? Math.max(...viewModel.chapters.map((c) => c.number), 1) : 0) ||
+      undefined
+    return resolveLastChapter({ bookId, explicit, tocChapters })
+  }, [nav, viewModel, currentRef.book, availableBooks])
 
   const warmVisibleResources = useMemo(
     () => [
@@ -363,9 +378,7 @@ export function useContent(
     const bookCode = currentRef.book
     const openChapter = currentRef.chapter || 1
     if (!bookCode || loaded.key !== loadKey) return
-    const last =
-      (nav && lastChapterFromNav(nav)) ||
-      (viewModel ? Math.max(...viewModel.chapters.map((c) => c.number), 1) : 0)
+    const last = lastChapterForWarm
     if (last < 1) return
     void enqueueScriptureBookPriority({
       resourceKey,
@@ -381,8 +394,7 @@ export function useContent(
     resourceKey,
     loaded.key,
     loadKey,
-    nav,
-    viewModel,
+    lastChapterForWarm,
   ])
 
   const relevantChapters = useMemo(() => {

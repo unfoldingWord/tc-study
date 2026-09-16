@@ -4,6 +4,8 @@
  * `progress` must not re-arm UI isDownloading after the active run ends.
  */
 
+import { OBS_STORY_COUNT, resolveObsStoryIds } from '../../lib/obs/obsStoryIds'
+
 /** In-flight run: later completeness check can enqueue; startDownload would reseed 1%. */
 export function shouldAcceptStartDownload(isDownloading: boolean): boolean {
   return !isDownloading
@@ -84,6 +86,18 @@ export function shouldAcceptWorkerMessage(
 
 /** Badge floor while a run is queued/fetching so 0% never sticks. */
 export const STARTING_PROGRESS_PERCENT = 1
+
+/** Coarse step for debug UI — not user-facing copy. */
+export type DownloadRunPhase =
+  | 'starting'
+  | 'init'
+  | 'metadata'
+  | 'checking'
+  | 'downloading'
+  | 'extracting'
+  | 'completing'
+  | 'idle'
+  | 'error'
 
 export type LoaderProgressHint = {
   loaded?: number
@@ -323,11 +337,39 @@ export function shouldFallbackSilentWorker(input: {
   return input.now - input.startedAt >= (input.readyMs ?? DOWNLOAD_WORKER_READY_TIMEOUT_MS)
 }
 
+/**
+ * Worker posted `ready` (module loaded) but never a progress pulse after
+ * `start`. Main-thread phase stays `starting` / 1% forever otherwise — the
+ * ready message alone clears the silent-worker fallback.
+ */
+export function shouldFallbackStuckStarting(input: {
+  isDownloading: boolean
+  /** Progress / queue / resource-complete posts — not `ready`. */
+  workerProgressCount: number
+  phase?: string | null
+  startedAt: number
+  now: number
+  readyMs?: number
+}): boolean {
+  if (!input.isDownloading) return false
+  if (input.workerProgressCount > 0) return false
+  if (input.startedAt <= 0) return false
+  const phase = input.phase ?? 'starting'
+  if (phase !== 'starting' && phase !== 'init') return false
+  return input.now - input.startedAt >= (input.readyMs ?? DOWNLOAD_WORKER_READY_TIMEOUT_MS)
+}
+
+export const DOWNLOAD_WORKER_STUCK_STARTING_MESSAGE =
+  'Download worker ready but no progress. Continuing on this thread.'
+
 /** Protestant OT books in UHB when catalog ingredients are missing. */
 export const UHB_FALLBACK_INGREDIENT_COUNT = 39
 
 /** NT books in UGNT when catalog ingredients are missing. */
 export const UGNT_FALLBACK_INGREDIENT_COUNT = 27
+
+/** OBS stories when catalog lists a directory (or zero) ingredient — not 0/1. */
+export const OBS_FALLBACK_INGREDIENT_COUNT = OBS_STORY_COUNT
 
 /**
  * True when an in-flight session has not received progress for `stallMs`.
@@ -347,18 +389,42 @@ export function shouldFailStalledDownload(input: {
 /**
  * Ingredient total for the indicator. Catalog/OL enqueue used to default
  * missing UHB ingredients to 1, so the badge read `0 / 1` for 39 OT books.
+ * OBS directory-only manifests list 1 ingredient (`obs` / `./content`) — that
+ * is not one story; expand to 50 unless a real per-story list is present.
  */
 export function fallbackIngredientCount(
   resourceKey: string,
   listedCount?: number
 ): number {
-  if (typeof listedCount === 'number' && listedCount > 0) return listedCount
   const parts = resourceKey.split('/')
   const lang = (parts[1] ?? '').toLowerCase()
   const id = (parts[2] ?? '').split('#')[0]?.toLowerCase() ?? ''
+  if (id === 'obs') {
+    if (typeof listedCount === 'number' && listedCount > 1) return listedCount
+    return OBS_FALLBACK_INGREDIENT_COUNT
+  }
+  if (typeof listedCount === 'number' && listedCount > 0) return listedCount
   if (id === 'uhb' || lang === 'hbo') return UHB_FALLBACK_INGREDIENT_COUNT
   if (id === 'ugnt' || lang === 'el-x-koine') return UGNT_FALLBACK_INGREDIENT_COUNT
   return 1
+}
+
+/**
+ * Ingredient count once catalog metadata is known. OBS expands directory-only
+ * manifests via resolveObsStoryIds (same list ObsLoader / completeness use).
+ */
+export function discoveredIngredientCount(
+  resourceKey: string,
+  ingredients: Array<{ identifier?: string }> | null | undefined,
+  resourceType?: string
+): number {
+  const id = (resourceKey.split('/')[2] ?? '').split('#')[0]?.toLowerCase() ?? ''
+  const isObs = resourceType === 'obs' || id === 'obs'
+  if (isObs) {
+    const n = resolveObsStoryIds(ingredients ?? []).length
+    return fallbackIngredientCount(resourceKey, n > 0 ? n : undefined)
+  }
+  return fallbackIngredientCount(resourceKey, ingredients?.length)
 }
 
 export function totalIngredientsForResourceKeys(
@@ -452,6 +518,71 @@ export async function withResourceDownloadTimeout<T>(
   }
 }
 
+/**
+ * Infer a coarse phase from loader message / known fields when the worker
+ * omitted an explicit `phase` (older pulses, this-thread fallback).
+ */
+export function inferDownloadPhase(input: {
+  phase?: string | null
+  isDownloading?: boolean
+  error?: string | null
+  currentIngredient?: string | null
+  message?: string | null
+}): DownloadRunPhase {
+  if (input.error && !input.isDownloading) return 'error'
+  if (!input.isDownloading) return 'idle'
+  if (
+    input.phase === 'starting' ||
+    input.phase === 'init' ||
+    input.phase === 'metadata' ||
+    input.phase === 'checking' ||
+    input.phase === 'downloading' ||
+    input.phase === 'extracting' ||
+    input.phase === 'completing' ||
+    input.phase === 'idle' ||
+    input.phase === 'error'
+  ) {
+    return input.phase
+  }
+  const msg = (input.message ?? input.currentIngredient ?? '').toLowerCase()
+  if (msg.includes('completeness')) return 'checking'
+  if (msg.includes('zip') || msg.startsWith('downloading')) return 'downloading'
+  if (msg.includes('extract') || msg.startsWith('processed') || msg.startsWith('skipped')) {
+    return 'extracting'
+  }
+  if (msg.includes('check') || msg.includes('verif')) return 'checking'
+  if (msg.includes('metadata')) return 'metadata'
+  return 'starting'
+}
+
+/**
+ * Why the download UI looks frozen: silent worker, long phase, or stall window.
+ * Pure — session supplies timestamps.
+ */
+export function downloadBlockedReason(input: {
+  isDownloading: boolean
+  error?: string | null
+  phase?: string | null
+  lastActivityAt?: number | null
+  now?: number
+  stallMs?: number
+}): string | null {
+  if (input.error) return input.error
+  if (!input.isDownloading) return null
+  const now = input.now ?? Date.now()
+  const last = input.lastActivityAt ?? 0
+  const stallMs = input.stallMs ?? DOWNLOAD_STALL_TIMEOUT_MS
+  if (last > 0 && now - last >= stallMs) {
+    return DOWNLOAD_STALL_MESSAGE
+  }
+  const quietMs = last > 0 ? now - last : 0
+  if (quietMs >= 15_000) {
+    const phase = input.phase || 'starting'
+    return `quiet ${Math.round(quietMs / 1000)}s · ${phase}`
+  }
+  return null
+}
+
 /** Initial progress snapshot so the indicator is not stuck with a null / 0% payload. */
 export function createInitialDownloadProgress(
   resourceKeys: string[],
@@ -468,7 +599,25 @@ export function createInitialDownloadProgress(
   completedIngredients: number
   failedIngredients: number
   currentIngredient: undefined
+  phase: 'starting'
+  lastActivityAt: number
 } {
+  // Prefer catalog estimate; else UHB/UGNT/OBS fallbacks so the badge is never 0/1
+  // while the worker is still in init/metadata for a multi-ingredient zip/prefetch.
+  let seededTotal =
+    typeof totalIngredients === 'number' && totalIngredients > 0
+      ? totalIngredients
+      : totalIngredientsForResourceKeys(resourceKeys)
+  // OBS directory-only catalogs often enqueue with listedCount=1 — refuse 0/1.
+  if (
+    seededTotal <= 1 &&
+    resourceKeys.length > 0 &&
+    resourceKeys.every(
+      (k) => (k.split('/')[2] ?? '').split('#')[0]?.toLowerCase() === 'obs'
+    )
+  ) {
+    seededTotal = totalIngredientsForResourceKeys(resourceKeys)
+  }
   return {
     currentResource: resourceKeys[0] ?? null,
     currentResourceProgress: STARTING_PROGRESS_PERCENT,
@@ -477,9 +626,11 @@ export function createInitialDownloadProgress(
     failedResources: 0,
     overallProgress: resourceKeys.length > 0 ? STARTING_PROGRESS_PERCENT : 0,
     tasks: [],
-    totalIngredients: totalIngredients ?? 0,
+    totalIngredients: seededTotal,
     completedIngredients: 0,
     failedIngredients: 0,
     currentIngredient: undefined,
+    phase: 'starting',
+    lastActivityAt: Date.now(),
   }
 }

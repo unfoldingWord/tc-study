@@ -59,7 +59,59 @@ describe('batchAlignLinks', () => {
     expect(results[0]!.quoteStatus).not.toBe('pending')
   })
 
-  test('empty tokens stay pending', () => {
+  test('Hebrew UHB word-joiner quote aligns to ULT zaln without word joiner', () => {
+    // UHB `\w` surface often has U+2060 between morphs; ULT `\zaln` x-content does not.
+    const uhbSurface = 'לְ⁠דָ֫וִ֥ד'
+    const ultZalnContent = 'לְדָ֫וִ֥ד'
+    expect(uhbSurface.includes('\u2060')).toBe(true)
+    expect(ultZalnContent.includes('\u2060')).toBe(false)
+
+    const targetTokens = [
+      {
+        id: 1,
+        text: 'David',
+        type: 'word' as const,
+        content: 'David',
+        occurrence: 1,
+        semanticId: semanticIdFor('psa 14:1', 'David', 1),
+        alignedOriginalWordIds: [`psa 14:1:${ultZalnContent}:1`],
+      },
+    ]
+    const results = batchAlignLinks({
+      links: [
+        {
+          id: 'f0ya',
+          reference: '14:1',
+          origWords: uhbSurface,
+          occurrence: '1',
+          quoteTokens: [
+            {
+              id: 2,
+              text: uhbSurface,
+              type: 'word',
+              content: uhbSurface,
+              occurrence: 1,
+            } as never,
+          ],
+        },
+      ],
+      targetTokens: targetTokens as never,
+      bookCode: 'psa',
+      currentChapter: 14,
+      tokenBook: 'psa',
+      tokenChapter: 14,
+      tokenStartVerse: 1,
+      tokenEndVerse: 999,
+      hasTokens: true,
+      quoteBuildReady: true,
+      resourceKey: 'unfoldingWord/en/twl',
+      textLanguage: 'en',
+    })
+    expect(results[0]!.quoteStatus).toBe('aligned')
+    expect(results[0]!.alignedTokens?.some((t) => t.content === 'David')).toBe(true)
+  })
+
+  test('empty tokens stay pending even when quote-build is ready', () => {
     const results = batchAlignLinks({
       links: [{ id: 'tn-1', reference: '1:1', origWords: 'Παῦλος' }],
       targetTokens: [],
@@ -74,6 +126,66 @@ describe('batchAlignLinks', () => {
       resourceKey: 'unfoldingWord/en/tn',
     })
     expect(results[0]!.alignedTokens).toBeUndefined()
+    expect(results[0]!.quoteStatus).toBe('pending')
+  })
+
+  test('tokens without zaln ids stay pending (do not false ol-fallback)', () => {
+    const results = batchAlignLinks({
+      links: [
+        {
+          id: 'tn-1',
+          reference: '1:1',
+          origWords: 'Παῦλος',
+          quoteTokens: [
+            {
+              id: 1,
+              text: 'Παῦλος',
+              type: 'word' as const,
+              content: 'Παῦλος',
+              occurrence: 1,
+            },
+          ],
+        },
+      ],
+      targetTokens: [
+        {
+          id: 1,
+          text: 'Paul',
+          type: 'word' as const,
+          content: 'Paul',
+          occurrence: 1,
+          semanticId: 'tit 1:1:Paul:1',
+          alignedOriginalWordIds: [],
+        },
+      ] as never,
+      bookCode: 'tit',
+      currentChapter: 1,
+      tokenBook: 'tit',
+      tokenChapter: 1,
+      tokenStartVerse: 1,
+      tokenEndVerse: 999,
+      hasTokens: true,
+      quoteBuildReady: true,
+      resourceKey: 'unfoldingWord/en/tn',
+      textLanguage: 'en',
+    })
+    expect(results[0]!.quoteStatus).toBe('pending')
+  })
+
+  test('empty tokens stay pending while quote-build is still running', () => {
+    const results = batchAlignLinks({
+      links: [{ id: 'tn-1', reference: '1:1', origWords: 'Παῦλος' }],
+      targetTokens: [],
+      bookCode: 'tit',
+      currentChapter: 1,
+      tokenBook: 'tit',
+      tokenChapter: 1,
+      tokenStartVerse: 1,
+      tokenEndVerse: 999,
+      hasTokens: false,
+      quoteBuildReady: false,
+      resourceKey: 'unfoldingWord/en/tn',
+    })
     expect(results[0]!.quoteStatus).toBe('pending')
   })
 

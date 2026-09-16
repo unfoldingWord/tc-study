@@ -54,4 +54,8 @@ export const HELPS_CARD_FOOTER_BUTTON_TA = `${HELPS_CARD_FOOTER_BUTTON} text-war
 export const HELPS_CARD_FOOTER_ICON_BUTTON =
   'p-1 rounded-md text-warning-fg hover:text-warning hover:bg-warning/10 transition-colors shrink-0'
 
+/** Icon-only action beside TW title (e.g. book-wide TWL article filter). */
+export const HELPS_CARD_FOOTER_ICON_BUTTON_TW =
+  'p-1 rounded-md text-accent-fg hover:text-accent hover:bg-accent/10 transition-colors shrink-0'
+
 export const HELPS_CARD_FOOTER_ICON = 'w-3.5 h-3.5 flex-shrink-0'

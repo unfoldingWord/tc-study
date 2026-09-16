@@ -120,6 +120,37 @@ describe('helpsFilterIdentity', () => {
     expect(active).not.toBe(none)
     expect(active).toBe(same)
   })
+
+  test('TWL article filter changes identity', () => {
+    const none = helpsFilterIdentity({
+      tokenFilter: null,
+      verseFilter: null,
+      obsQuoteFilter: null,
+      twlArticleFilter: null,
+    })
+    const active = helpsFilterIdentity({
+      tokenFilter: null,
+      verseFilter: null,
+      obsQuoteFilter: null,
+      twlArticleFilter: {
+        articlePath: 'bible/kt/sin',
+        title: 'Sin',
+        timestamp: 1,
+      },
+    })
+    const same = helpsFilterIdentity({
+      tokenFilter: null,
+      verseFilter: null,
+      obsQuoteFilter: null,
+      twlArticleFilter: {
+        articlePath: 'bible/kt/sin',
+        title: 'Sin',
+        timestamp: 99,
+      },
+    })
+    expect(active).not.toBe(none)
+    expect(active).toBe(same)
+  })
 })
 
 describe('scrollHelpsToTop', () => {

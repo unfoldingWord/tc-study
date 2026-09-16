@@ -42,12 +42,18 @@ describe('backgroundDownloadSession', () => {
     expect(src).toContain('bumpReadyWatchdog')
     expect(src).toContain('startMainThreadFallback')
     expect(src).toContain('runBackgroundDownloadOnThisThread')
-    expect(src).toContain('Chrome: isolate is alive')
+    expect(src).toContain('shouldFallbackStuckStarting')
+    expect(src).toContain('workerProgressCount')
+    expect(src).toContain('Ready alone used to clear this timer')
     expect(src).toContain('shouldFallbackOnWorkerError')
     expect(src).toContain('shouldRunExtractOnThisThread')
     expect(src).not.toContain('isWorkerIsolateFailure(previousError)')
     expect(src).toContain('lastResourceKeys')
     expect(src).toContain('applyDiscoveredIngredientTotal')
+    expect(src).toContain('blockedReason')
+    expect(src).toContain('lastActivityAt')
+    expect(src).toContain('recentSteps')
+    expect(src).toContain('downloadBlockedReason')
     const thisThread = readFileSync(
       join(import.meta.dir, 'runBackgroundDownloadOnThisThread.ts'),
       'utf8'

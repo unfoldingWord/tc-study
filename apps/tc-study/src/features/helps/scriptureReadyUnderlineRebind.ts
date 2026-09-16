@@ -8,6 +8,7 @@
 
 import { parseLinkChapterVerse } from './quoteTokens'
 import { resolveQuoteSemanticIds, type QuoteSemanticSource } from './resolveQuoteSemanticIds'
+import { chapterOfHelpsReference } from './helpsDisplayFilters'
 
 export const SCRIPTURE_EMPTY_REVISION = 'scripture:empty'
 
@@ -29,6 +30,24 @@ export interface UnderlineNoteInput {
 export interface UnderlineTokenGroup {
   sourceId: string
   semanticIds: string[]
+}
+
+/**
+ * Book-wide Metaphor / TWL filters stream the whole book into display rows.
+ * Scripture underlines must use only the open chapter's matching rows — and
+ * those rows carry enrichment quoteTokens the unfiltered chapter slice may lack.
+ */
+export function chapterHelpsRowsForUnderlines<T extends { reference: string }>(
+  rows: readonly T[],
+  focusChapter: number,
+  endChapter?: number
+): T[] {
+  if (!rows.length || !(focusChapter > 0)) return []
+  const end = endChapter && endChapter >= focusChapter ? endChapter : focusChapter
+  return rows.filter((row) => {
+    const chapter = chapterOfHelpsReference(row.reference)
+    return chapter >= focusChapter && chapter <= end
+  })
 }
 
 /** Fingerprint of owner scripture (resource + book/chapter + USJ token count). */

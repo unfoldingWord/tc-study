@@ -22,23 +22,21 @@ describe('useSupportRefQuotes first paint', () => {
     expect(painted.size).toBe(2)
   })
 
-  test('session key is filter + focus chapter, not all book note ids', () => {
+  test('session key is filter identity, not focus chapter', () => {
     expect(
       supportRefQuoteSessionKey({
         enabled: true,
         tnKey: 'unfoldingWord/en/tn',
         bookId: 'psa',
         supportReference: 'rc://*/ta/man/translate/figs-metaphor',
-        focusChapter: 1,
       })
-    ).toBe('unfoldingWord/en/tn|psa|rc://*/ta/man/translate/figs-metaphor|1')
+    ).toBe('unfoldingWord/en/tn|psa|rc://*/ta/man/translate/figs-metaphor')
     expect(
       supportRefQuoteSessionKey({
         enabled: false,
         tnKey: 'unfoldingWord/en/tn',
         bookId: 'psa',
         supportReference: 'rc://*/ta/man/translate/figs-metaphor',
-        focusChapter: 1,
       })
     ).toBe('')
   })
@@ -49,8 +47,12 @@ describe('useSupportRefQuotes first paint', () => {
     expect(src).toContain('readCachedQuoteTokens')
     expect(src).toContain('readCachedAlignments')
     expect(src).toContain('hydrateChapter(focus')
+    expect(src).toContain('planSupportRefStreamChapters')
+    expect(src).toContain('fallbackNotes')
     expect(src).toContain('planSupportRefQuoteWarmJobs')
     expect(src).toContain('warmScheduler.enqueue')
+    expect(src).toContain('reconcileStaleBookFilterWarmJobs')
+    expect(src).toContain('isJobPending')
     expect(src).not.toContain('warmChapterQuotes')
     expect(src).not.toContain('batchAlignLinks')
     expect(src).not.toContain('batchAlignInWorker')

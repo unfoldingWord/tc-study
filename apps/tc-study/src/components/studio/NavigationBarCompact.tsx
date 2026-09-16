@@ -12,6 +12,7 @@ import type { NavigationCatalogScope } from '../../contexts/types'
 import { useBookTitleSource } from '../../contexts/AppContext'
 import { formatReferenceParts } from '../../features/nav/navigationBarReferenceFormat'
 import { applyTextModeScopeSwitch } from '../../features/read/textModeMismatch'
+import { DownloadBusyBadge } from '../read/DownloadIndicator'
 import { LanguagePicker } from '../LanguagePicker'
 import { BCVNavigator } from './BCVNavigator'
 import { NavigationBarMenu } from './NavigationBarMenu'
@@ -27,7 +28,6 @@ interface NavigationBarCompactProps {
   handleNext: () => void
   canGoPrevious: () => boolean
   canGoNext: () => boolean
-  downloadIndicator?: React.ReactNode
   showLanguagePicker?: boolean
   onLanguageSelected?: (languageCode: string) => void
   autoOpenLanguagePicker?: boolean
@@ -55,7 +55,6 @@ export function NavigationBarCompact({
   handleNext,
   canGoPrevious,
   canGoNext,
-  downloadIndicator,
   showLanguagePicker = false,
   onLanguageSelected,
   autoOpenLanguagePicker = false,
@@ -161,7 +160,6 @@ export function NavigationBarCompact({
       </div>
 
       <div className="flex items-center gap-chrome-tight shrink-0">
-        {downloadIndicator}
         {showLanguagePicker && (
           <LanguagePicker
             onLanguageSelected={onLanguageSelected}
@@ -174,11 +172,12 @@ export function NavigationBarCompact({
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-1.5 rounded-full hover:bg-muted text-fg-secondary hover:text-fg transition-colors"
+            className="relative p-1.5 rounded-full hover:bg-muted text-fg-secondary hover:text-fg transition-colors"
             title={isMenuOpen ? 'Close menu' : 'Open menu'}
             aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {isMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            <DownloadBusyBadge />
           </button>
           {isMenuOpen && (
             <NavigationBarMenu
@@ -200,7 +199,15 @@ export function NavigationBarCompact({
       {isNavigatorOpen && (availableBooks.length > 0 || hasObsResource) && (
         <BCVNavigator
           onClose={() => setIsNavigatorOpen(false)}
-          mode={navigationMode === 'section' && currentRef.book !== 'obs' ? 'section' : 'verse'}
+          mode={
+            currentRef.book === 'obs'
+              ? undefined
+              : navigationMode === 'section'
+                ? 'section'
+                : navigationMode === 'chapter'
+                  ? 'chapter'
+                  : 'verse'
+          }
           onNavigationScopeCommitted={onNavigationScopeCommitted}
         />
       )}

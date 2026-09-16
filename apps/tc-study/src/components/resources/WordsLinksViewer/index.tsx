@@ -13,6 +13,11 @@ import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/h
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
 import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
+import {
+  resolveHelpsTargetScriptureKey,
+  useHelpsTargetScriptureKey,
+} from '../../../features/helps/helpsTargetScripture'
+import { getLastScriptureTokensSourceResourceId } from '../../../features/helps/scriptureTokensStore'
 import { articlePathFromTwLink } from '../../../features/wordsLinks/wordsLinksPreparer'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
@@ -135,8 +140,18 @@ export function WordsLinksViewer({
     setSelectedLink,
   })
 
-  const { sourceResourceId: targetSourceId, resourceMetadata: targetScriptureMetadata } =
+  const { sourceResourceId: broadcastTargetId, resourceMetadata: targetScriptureMetadata } =
     useScriptureTokens({ resourceId })
+  const sharedTargetKey = useHelpsTargetScriptureKey()
+  const targetSourceId = useMemo(
+    () =>
+      resolveHelpsTargetScriptureKey({
+        sharedKey: sharedTargetKey,
+        broadcastKey: broadcastTargetId,
+        lastKnownKey: getLastScriptureTokensSourceResourceId(),
+      }),
+    [sharedTargetKey, broadcastTargetId]
+  )
   const helpsLanguageDirection = resolveHelpsViewerDirection({
     resourceDirection,
     targetScriptureDirection: targetScriptureMetadata?.languageDirection,

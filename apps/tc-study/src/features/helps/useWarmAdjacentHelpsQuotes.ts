@@ -231,7 +231,6 @@ export function useWarmAdjacentHelpsQuotes(args: {
         }
 
         try {
-          warmScheduler.notifyLane1Drained()
           await seedViaScheduler(tnKey, 'notes')
           await seedViaScheduler(twlKey, 'words-links')
         } catch {

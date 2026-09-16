@@ -9,9 +9,24 @@
  */
 
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import {
+  ABSENT_FROM_RELEASE_KEY,
+  buildIngestReceiptFromCatalog,
+  chooseIngredientFetchMode,
+  fetchReleasePathSet,
+  ingredientPresentInPathSet,
+  normalizeIngredientPath,
+  partitionIngredientsByReleasePaths,
+  pathSetFromZipFileNames,
+  persistAbsentFromRelease,
+  presentIngredientCount,
+  readAbsentFromRelease,
+  scriptureIngestSchema,
+} from '@bt-synergy/resource-catalog'
 import type { ProgressCallback, ResourceLoader } from '@bt-synergy/resource-types'
 import {
   USJProcessor,
+  USJ_PROCESSING_VERSION,
   type ProcessedScripture,
   type UsjScriptureViewModel,
 } from '@bt-synergy/usj-processor'
@@ -252,23 +267,24 @@ export class ScriptureLoader implements ResourceLoader {
     return isCachedScriptureBookComplete(this.cacheAdapter, resourceKey, bookId)
   }
 
-  private async areAllBooksComplete(
+  private async listIncompleteIngredients(
     resourceKey: string,
-    ingredients: Array<{ identifier?: string }>
-  ): Promise<boolean> {
-    const books = ingredients.filter((ing) => ing.identifier)
-    if (books.length === 0) return false
-    for (const ingredient of books) {
-      if (!(await this.isBookComplete(resourceKey, ingredient.identifier!))) {
-        return false
+    ingredients: Array<{ identifier?: string; path?: string }>
+  ): Promise<Array<{ identifier?: string; path?: string }>> {
+    const incomplete: Array<{ identifier?: string; path?: string }> = []
+    for (const ingredient of ingredients) {
+      if (!ingredient.identifier) continue
+      if (!(await this.isBookComplete(resourceKey, ingredient.identifier))) {
+        incomplete.push(ingredient)
       }
     }
-    return true
+    return incomplete
   }
 
   private emitSkippedIngredients(
     ingredients: Array<{ identifier?: string }>,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
+    reason: 'already cached' | 'not in release' = 'already cached'
   ): void {
     const total = ingredients.length
     let loaded = 0
@@ -279,9 +295,71 @@ export class ScriptureLoader implements ResourceLoader {
         loaded,
         total,
         percentage: Math.round((loaded / total) * 100),
-        message: `Skipped ${bookId} (already cached)`,
+        message: `Skipped ${bookId} (${reason})`,
       })
     }
+  }
+
+  /**
+   * Fill only missing books via per-book HTTP (avoid re-downloading a huge zip
+   * when some ingredients are already in cache — see chooseIngredientFetchMode).
+   */
+  private async fillIncompleteIndividually(
+    resourceKey: string,
+    incomplete: Array<{ identifier?: string; path?: string }>,
+    total: number,
+    loadedStart: number,
+    onProgress?: ProgressCallback
+  ): Promise<string[]> {
+    let loaded = loadedStart
+    const failedBooks: string[] = []
+    for (const ingredient of incomplete) {
+      const bookId = ingredient.identifier
+      if (!bookId) continue
+      try {
+        console.log(`📥 Downloading ${bookId}...`)
+        const usfmContent = await this.fetchUsfmText(resourceKey, bookId)
+        await this.processAndCacheResult(usfmContent, resourceKey, bookId, {
+          skipExisting: true,
+        })
+        if (!(await this.isBookComplete(resourceKey, bookId))) {
+          failedBooks.push(bookId)
+          loaded++
+          onProgress?.({
+            loaded,
+            total,
+            percentage: Math.round((loaded / Math.max(1, total)) * 100),
+            message: `Failed: ${bookId}`,
+          })
+          continue
+        }
+        loaded++
+        await new Promise<void>((resolve) => setTimeout(resolve, 0))
+        onProgress?.({
+          loaded,
+          total,
+          percentage: Math.round((loaded / Math.max(1, total)) * 100),
+          message: `Downloaded ${bookId}`,
+        })
+      } catch (error) {
+        const msg = describeError(error)
+        console.error(
+          `❌ Failed to download ${bookId}:`,
+          msg.includes('scripture-usj') || msg.includes('Stale scripture')
+            ? msg
+            : `${msg} ${STALE_SCRIPTURE_CACHE_HINT}`
+        )
+        failedBooks.push(bookId)
+        loaded++
+        onProgress?.({
+          loaded,
+          total,
+          percentage: Math.round((loaded / Math.max(1, total)) * 100),
+          message: `Failed: ${bookId}`,
+        })
+      }
+    }
+    return failedBooks
   }
 
   private async fetchUsfmText(resourceKey: string, bookId: string): Promise<string> {
@@ -539,6 +617,9 @@ export class ScriptureLoader implements ResourceLoader {
 
     if (failedBooks.length > 0) {
       // Do not mark downloadComplete — skipExisting can retry missing books later.
+      // Preserve prior absentFromRelease so phantom catalog books stay excluded.
+      const prior = await this.cacheAdapter.get(resourceCacheKey)
+      const priorAbsent = readAbsentFromRelease(prior?.metadata)
       await this.cacheAdapter.set(resourceCacheKey, {
         content: { downloaded: false, failedBooks },
         metadata: {
@@ -547,6 +628,9 @@ export class ScriptureLoader implements ResourceLoader {
           entryCount: Math.max(0, succeeded),
           expectedEntryCount: ingredients.length,
           failedBooks,
+          ...(priorAbsent.length > 0
+            ? { [ABSENT_FROM_RELEASE_KEY]: priorAbsent }
+            : {}),
         },
       })
       console.warn(
@@ -555,14 +639,30 @@ export class ScriptureLoader implements ResourceLoader {
       return
     }
 
+    const prior = await this.cacheAdapter.get(resourceCacheKey)
+    const absentFromRelease = readAbsentFromRelease(prior?.metadata)
+    const presentCount = presentIngredientCount(ingredients.length, absentFromRelease)
+
+    const receipt = buildIngestReceiptFromCatalog(metadata, {
+      ingestSchema: scriptureIngestSchema(USJ_PROCESSING_VERSION),
+      ingredientCount: presentCount,
+      downloadMethod: method,
+      entryCount: presentCount,
+      expectedEntryCount: presentCount,
+    })
     await this.cacheAdapter.set(resourceCacheKey, {
       content: { downloaded: true },
       metadata: {
-        downloadComplete: true,
-        downloadCompletedAt: new Date().toISOString(),
-        downloadMethod: method,
-        entryCount: ingredients.length,
-        expectedEntryCount: ingredients.length,
+        ...(receipt ?? {
+          downloadComplete: true,
+          downloadCompletedAt: new Date().toISOString(),
+          downloadMethod: method,
+          entryCount: presentCount,
+          expectedEntryCount: presentCount,
+        }),
+        ...(absentFromRelease.length > 0
+          ? { [ABSENT_FROM_RELEASE_KEY]: absentFromRelease }
+          : {}),
       },
     })
 
@@ -589,11 +689,92 @@ export class ScriptureLoader implements ResourceLoader {
     const repoName = `${language}_${resourceId}`
     const ref = metadata.release?.tag_name || (metadata as any).default_branch || 'master'
 
+    const recordAbsent = async (absentIds: string[]) => {
+      await persistAbsentFromRelease({
+        cacheAdapter: this.cacheAdapter,
+        catalogAdapter: this.catalogAdapter,
+        resourceKey,
+        metadata,
+        absentIds,
+        logLabel: 'ScriptureLoader',
+      })
+    }
+
+    // Peak written count before zip so UI is not stuck at 0/N while bytes climb.
+    let cachedBeforeZip = 0
     if (skipExisting) {
-      const allComplete = await this.areAllBooksComplete(resourceKey, ingredients)
-      if (allComplete) {
+      const incomplete = await this.listIncompleteIngredients(resourceKey, ingredients)
+      cachedBeforeZip = Math.max(0, ingredients.length - incomplete.length)
+      if (incomplete.length === 0) {
         this.emitSkippedIngredients(ingredients, onProgress)
         return []
+      }
+      if (cachedBeforeZip > 0) {
+        onProgress?.({
+          loaded: cachedBeforeZip,
+          total: ingredients.length,
+          percentage: Math.round((cachedBeforeZip / ingredients.length) * 100),
+          message: `Cached ${cachedBeforeZip}`,
+        })
+      }
+      onProgress?.({
+        loaded: cachedBeforeZip,
+        total: ingredients.length,
+        percentage: Math.round((cachedBeforeZip / Math.max(1, ingredients.length)) * 100),
+        message: 'Checking release',
+      })
+
+      // Catalog may list books absent from this release tag. Partition incomplete
+      // vs phantoms, then apply shared zip / individual / skip policy.
+      const treePaths = await fetchReleasePathSet(this.door43Client, owner, repoName, ref)
+      if (treePaths) {
+        const { present, absent } = partitionIngredientsByReleasePaths(incomplete, treePaths)
+        if (absent.length > 0) {
+          const absentIds = absent
+            .map((ing) => ing.identifier)
+            .filter((id): id is string => typeof id === 'string')
+          await recordAbsent(absentIds)
+        }
+        const mode = chooseIngredientFetchMode({
+          cachedCount: cachedBeforeZip,
+          remainingToFetchCount: present.length,
+        })
+        if (mode === 'skip') {
+          this.emitSkippedIngredients(incomplete, onProgress, 'not in release')
+          console.log(
+            `⏭️ [ScriptureLoader] Skipping zip for ${resourceKey}: incomplete book(s) absent from ${ref}`
+          )
+          return []
+        }
+        if (mode === 'individual') {
+          console.log(
+            `⏭️ [ScriptureLoader] Partial cache ${cachedBeforeZip}/${ingredients.length} — filling ${present.length} book(s) individually (skip zip)`
+          )
+          return await this.fillIncompleteIndividually(
+            resourceKey,
+            present,
+            ingredients.length,
+            cachedBeforeZip,
+            onProgress
+          )
+        }
+      } else {
+        const mode = chooseIngredientFetchMode({
+          cachedCount: cachedBeforeZip,
+          remainingToFetchCount: incomplete.length,
+        })
+        if (mode === 'individual') {
+          console.log(
+            `⏭️ [ScriptureLoader] Partial cache ${cachedBeforeZip}/${ingredients.length} — filling ${incomplete.length} book(s) individually (no tree; skip zip)`
+          )
+          return await this.fillIncompleteIndividually(
+            resourceKey,
+            incomplete,
+            ingredients.length,
+            cachedBeforeZip,
+            onProgress
+          )
+        }
       }
     }
 
@@ -601,7 +782,7 @@ export class ScriptureLoader implements ResourceLoader {
 
     if (onProgress) {
       onProgress({
-        loaded: 0,
+        loaded: cachedBeforeZip,
         total: ingredients.length,
         percentage: 0,
         message: 'Downloading zip',
@@ -615,7 +796,7 @@ export class ScriptureLoader implements ResourceLoader {
       onProgress
         ? (p: { percentage: number }) => {
             onProgress({
-              loaded: 0,
+              loaded: cachedBeforeZip,
               total: ingredients.length,
               percentage: p.percentage,
               message: 'Downloading zip',
@@ -629,11 +810,13 @@ export class ScriptureLoader implements ResourceLoader {
     const jszipMod = await import('jszip')
     const JSZip = (jszipMod as unknown as { default?: typeof jszipMod }).default ?? jszipMod
     const zip = await JSZip.loadAsync(zipballBuffer)
+    const zipPaths = pathSetFromZipFileNames(Object.keys(zip.files))
 
     const total = ingredients.length
     let loaded = 0
     let processed = 0
     const failedBooks: string[] = []
+    const absentBooks: string[] = []
 
     for (const ingredient of ingredients) {
       const bookId = ingredient.identifier
@@ -666,35 +849,49 @@ export class ScriptureLoader implements ResourceLoader {
           throw new Error(`No path found for book ${bookId}`)
         }
 
-        const normalizedPath = bookPath.replace(/^\.\//, '')
-
-        let zipFile: { dir?: boolean; async?(type: string): Promise<unknown> } | null = null
-        for (const [fileName, file] of Object.entries(zip.files)) {
-          const entry = file as { dir?: boolean }
-          if (fileName.endsWith(normalizedPath) && !entry.dir) {
-            zipFile = file as { dir?: boolean; async?(type: string): Promise<unknown> }
-            break
-          }
-        }
-
-        if (!zipFile) {
+        const normalizedPath = normalizeIngredientPath(bookPath)
+        if (
+          !normalizedPath ||
+          !ingredientPresentInPathSet({ path: bookPath }, zipPaths)
+        ) {
           if (this.debug) {
             console.warn(`⚠️ ${bookId} not found in ZIP (listed in ingredients but not in repo)`)
           }
-          failedBooks.push(bookId)
+          // Catalog phantom — not a processing failure; do not block completeness.
+          absentBooks.push(bookId)
           loaded++
           if (onProgress) {
             onProgress({
               loaded,
               total,
               percentage: Math.round((loaded / total) * 100),
-              message: `Skipped ${bookId} (not in repo)`,
+              message: `Skipped ${bookId} (not in release)`,
             })
           }
           continue
         }
 
-        const raw = await (zipFile as { async(type: string): Promise<unknown> }).async('string')
+        let zipFile: { dir?: boolean; async?(type: string): Promise<unknown> } | null = null
+        for (const [fileName, file] of Object.entries(zip.files)) {
+          const entry = file as { dir?: boolean }
+          if (
+            (fileName === normalizedPath ||
+              fileName.endsWith('/' + normalizedPath) ||
+              fileName.endsWith(normalizedPath)) &&
+            !entry.dir
+          ) {
+            zipFile = file as { dir?: boolean; async?(type: string): Promise<unknown> }
+            break
+          }
+        }
+
+        if (!zipFile?.async) {
+          absentBooks.push(bookId)
+          loaded++
+          continue
+        }
+
+        const raw = await zipFile.async('string')
         const usfmContent = raw as string
 
         if (this.debug) {
@@ -742,7 +939,13 @@ export class ScriptureLoader implements ResourceLoader {
       }
     }
 
-    console.log(`✅ Processed ${processed}/${total} books from zipball (${failedBooks.length} failed)`)
+    if (absentBooks.length > 0) {
+      await recordAbsent(absentBooks)
+    }
+
+    console.log(
+      `✅ Processed ${processed}/${total} books from zipball (${failedBooks.length} failed, ${absentBooks.length} absent from release)`
+    )
     return failedBooks
   }
 

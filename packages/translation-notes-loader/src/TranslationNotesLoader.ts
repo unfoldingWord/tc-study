@@ -11,8 +11,22 @@ import type {
     ResourceLoader,
     ResourceMetadata
 } from '@bt-synergy/catalog-manager'
-import { ResourceType } from '@bt-synergy/resource-catalog'
-import { Door43ServerAdapter } from '@bt-synergy/resource-catalog'
+import {
+    ABSENT_FROM_RELEASE_KEY,
+    Door43ServerAdapter,
+    ResourceType,
+    buildIngestReceiptFromCatalog,
+    chooseIngredientFetchMode,
+    fetchReleasePathSet,
+    helpsIngestSchema,
+    ingredientPresentInPathSet,
+    normalizeIngredientPath,
+    partitionIngredientsByReleasePaths,
+    pathSetFromZipFileNames,
+    persistAbsentFromRelease,
+    presentIngredientCount,
+    readAbsentFromRelease,
+} from '@bt-synergy/resource-catalog'
 import type { ProcessedNotes } from '@bt-synergy/resource-parsers'
 import { NotesProcessor } from '@bt-synergy/resource-parsers'
 import type {
@@ -276,7 +290,7 @@ export class TranslationNotesLoader implements ResourceLoader {
       try {
         failedBooks = await this.downloadViaZip(resourceKey, metadata, ingredients, skipExisting, onProgress)
         if (failedBooks.length === 0) {
-          await this.markComplete(resourceKey, ingredients.length, 'zip')
+          await this.markComplete(resourceKey, ingredients.length, 'zip', metadata)
         } else {
           await this.markIncomplete(resourceKey, ingredients.length, failedBooks, 'zip')
         }
@@ -329,11 +343,101 @@ export class TranslationNotesLoader implements ResourceLoader {
     }
 
     if (failedBooks.length === 0) {
-      await this.markComplete(resourceKey, ingredients.length, 'individual')
+      await this.markComplete(resourceKey, ingredients.length, 'individual', metadata)
       if (this.debug) console.log(`✅ [TranslationNotesLoader] Download complete for ${resourceKey}`)
     } else {
       await this.markIncomplete(resourceKey, ingredients.length, failedBooks, 'individual')
     }
+  }
+
+  private async isBookCached(resourceKey: string, bookId: string): Promise<boolean> {
+    const cached = await this.cacheAdapter.get(`tn:${resourceKey}:${bookId}`)
+    return !!(cached && cached.notes)
+  }
+
+  private async listIncompleteIngredients(
+    resourceKey: string,
+    ingredients: Array<{ identifier?: string; path?: string }>
+  ): Promise<Array<{ identifier?: string; path?: string }>> {
+    const incomplete: Array<{ identifier?: string; path?: string }> = []
+    for (const ingredient of ingredients) {
+      if (!ingredient.identifier) continue
+      if (!(await this.isBookCached(resourceKey, ingredient.identifier))) {
+        incomplete.push(ingredient)
+      }
+    }
+    return incomplete
+  }
+
+  private emitSkippedIngredients(
+    ingredients: Array<{ identifier?: string }>,
+    onProgress?: ProgressCallback,
+    reason: 'already cached' | 'not in release' = 'already cached'
+  ): void {
+    const total = ingredients.length
+    let loaded = 0
+    for (const ingredient of ingredients) {
+      loaded++
+      const bookId = ingredient.identifier ?? 'unknown'
+      onProgress?.({
+        loaded,
+        total,
+        percentage: Math.round((loaded / total) * 100),
+        message: `Skipped ${bookId} (${reason})`,
+      })
+    }
+  }
+
+  /**
+   * Fill only missing books via per-book HTTP (avoid re-downloading a huge zip
+   * when most ingredients are already in cache).
+   */
+  private async fillIncompleteIndividually(
+    resourceKey: string,
+    incomplete: Array<{ identifier?: string; path?: string }>,
+    total: number,
+    loadedStart: number,
+    onProgress?: ProgressCallback
+  ): Promise<string[]> {
+    let loaded = loadedStart
+    const failedBooks: string[] = []
+    for (const ingredient of incomplete) {
+      const bookId = ingredient.identifier
+      if (!bookId) continue
+      try {
+        await this.loadContent(resourceKey, bookId)
+        if (!(await this.isBookCached(resourceKey, bookId))) {
+          // 404 / empty payload is not cached — treat as missing, not success.
+          failedBooks.push(bookId)
+          loaded++
+          onProgress?.({
+            loaded,
+            total,
+            percentage: Math.round((loaded / Math.max(1, total)) * 100),
+            message: `Skipped ${bookId} (not in repo)`,
+          })
+          continue
+        }
+        loaded++
+        onProgress?.({
+          loaded,
+          total,
+          percentage: Math.round((loaded / Math.max(1, total)) * 100),
+          message: `Downloaded ${bookId}`,
+        })
+      } catch (error) {
+        if (this.debug) console.warn(`⚠️ Failed to download TN for ${bookId}:`, error)
+        failedBooks.push(bookId)
+        loaded++
+        onProgress?.({
+          loaded,
+          total,
+          percentage: Math.round((loaded / Math.max(1, total)) * 100),
+          message: `Skipped ${bookId} (not in repo)`,
+        })
+      }
+    }
+    return failedBooks
   }
 
   /**
@@ -350,10 +454,105 @@ export class TranslationNotesLoader implements ResourceLoader {
     const repoName = `${language}_${resourceId}`
     const ref = (metadata as any).release?.tag_name || 'master'
 
+    const recordAbsent = async (absentIds: string[]) => {
+      await persistAbsentFromRelease({
+        cacheAdapter: this.cacheAdapter,
+        catalogAdapter: this.catalogAdapter,
+        resourceKey,
+        metadata,
+        absentIds,
+        logLabel: 'TN',
+      })
+    }
+
+    // Peak written count before zip so UI is not stuck at 0/N while bytes climb.
+    let cachedBeforeZip = 0
+    if (skipExisting) {
+      const incomplete = await this.listIncompleteIngredients(resourceKey, ingredients)
+      cachedBeforeZip = Math.max(0, ingredients.length - incomplete.length)
+      if (incomplete.length === 0) {
+        this.emitSkippedIngredients(ingredients, onProgress)
+        return []
+      }
+      if (cachedBeforeZip > 0) {
+        onProgress?.({
+          loaded: cachedBeforeZip,
+          total: ingredients.length,
+          percentage: Math.round((cachedBeforeZip / ingredients.length) * 100),
+          message: `Cached ${cachedBeforeZip}`,
+        })
+      }
+      onProgress?.({
+        loaded: cachedBeforeZip,
+        total: ingredients.length,
+        percentage: Math.round((cachedBeforeZip / Math.max(1, ingredients.length)) * 100),
+        message: 'Checking release',
+      })
+      const treePaths = await fetchReleasePathSet(this.door43Client, owner, repoName, ref)
+      if (treePaths) {
+        const { present, absent } = partitionIngredientsByReleasePaths(incomplete, treePaths)
+        if (absent.length > 0) {
+          const absentIds = absent
+            .map((ing) => ing.identifier)
+            .filter((id): id is string => typeof id === 'string')
+          await recordAbsent(absentIds)
+        }
+        const mode = chooseIngredientFetchMode({
+          cachedCount: cachedBeforeZip,
+          remainingToFetchCount: present.length,
+        })
+        if (mode === 'skip') {
+          this.emitSkippedIngredients(incomplete, onProgress, 'not in release')
+          onProgress?.({
+            loaded: ingredients.length,
+            total: ingredients.length,
+            percentage: 100,
+            message: `Skipped ${resourceKey.split('/').pop() ?? resourceKey} (already cached)`,
+          })
+          console.log(
+            `⏭️ [TN] Skipping zip for ${resourceKey}: ${absent.length} incomplete book(s) absent from ${ref}`
+          )
+          return []
+        }
+        // Partial cache: fill remaining books individually — do not re-fetch the zip.
+        if (mode === 'individual') {
+          console.log(
+            `⏭️ [TN] Partial cache ${cachedBeforeZip}/${ingredients.length} — filling ${present.length} book(s) individually (skip zip)`
+          )
+          return await this.fillIncompleteIndividually(
+            resourceKey,
+            present,
+            ingredients.length,
+            cachedBeforeZip,
+            onProgress
+          )
+        }
+        // Cold start but some catalog phantoms — zip only needs present paths; still use zip below.
+      } else {
+        const mode = chooseIngredientFetchMode({
+          cachedCount: cachedBeforeZip,
+          remainingToFetchCount: incomplete.length,
+        })
+        // Tree probe unavailable: still avoid re-zipping when books are already local.
+        if (mode === 'individual') {
+          console.log(
+            `⏭️ [TN] Partial cache ${cachedBeforeZip}/${ingredients.length} — filling ${incomplete.length} book(s) individually (no tree; skip zip)`
+          )
+          return await this.fillIncompleteIndividually(
+            resourceKey,
+            incomplete,
+            ingredients.length,
+            cachedBeforeZip,
+            onProgress
+          )
+        }
+      }
+    }
+
     console.log(`📦 [TN] Downloading zipball for ${resourceKey} (ref: ${ref})`)
     if (onProgress) {
       onProgress({
-        loaded: 0,
+        loaded: cachedBeforeZip,
         total: ingredients.length,
         percentage: 0,
         message: 'Downloading zip',
@@ -366,7 +565,7 @@ export class TranslationNotesLoader implements ResourceLoader {
       onProgress
         ? (p: { percentage: number }) => {
             onProgress({
-              loaded: 0,
+              loaded: cachedBeforeZip,
               total: ingredients.length,
               percentage: p.percentage,
               message: 'Downloading zip',
@@ -379,10 +578,12 @@ export class TranslationNotesLoader implements ResourceLoader {
     const jszipMod = await import('jszip')
     const JSZip = (jszipMod as unknown as { default?: typeof jszipMod }).default ?? jszipMod
     const zip = await (JSZip as any).loadAsync(zipBuffer)
+    const zipPaths = pathSetFromZipFileNames(Object.keys(zip.files))
 
     const total = ingredients.length
     let loaded = 0
     const failedBooks: string[] = []
+    const absentBooks: string[] = []
 
     for (const ingredient of ingredients) {
       const bookId = ingredient.identifier
@@ -402,21 +603,38 @@ export class TranslationNotesLoader implements ResourceLoader {
           }
         }
 
-        const normalizedPath = (ingredient.path || '').replace(/^\.\//, '')
+        const normalizedPath = normalizeIngredientPath(ingredient.path)
+        if (
+          !normalizedPath ||
+          !ingredientPresentInPathSet({ path: ingredient.path }, zipPaths)
+        ) {
+          if (this.debug) console.warn(`⚠️ [TN] ${bookId} not found in ZIP`)
+          absentBooks.push(bookId)
+          loaded++
+          if (onProgress) {
+            onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (not in release)` })
+          }
+          continue
+        }
+
         let zipFile: any = null
         for (const [fileName, file] of Object.entries(zip.files) as [string, any][]) {
-          if (fileName.endsWith(normalizedPath) && !file.dir) {
+          if (
+            (fileName === normalizedPath ||
+              fileName.endsWith('/' + normalizedPath) ||
+              fileName.endsWith(normalizedPath)) &&
+            !file.dir
+          ) {
             zipFile = file
             break
           }
         }
 
         if (!zipFile) {
-          if (this.debug) console.warn(`⚠️ [TN] ${bookId} not found in ZIP`)
-          failedBooks.push(bookId)
+          absentBooks.push(bookId)
           loaded++
           if (onProgress) {
-            onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (not in repo)` })
+            onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (not in release)` })
           }
           continue
         }
@@ -440,21 +658,47 @@ export class TranslationNotesLoader implements ResourceLoader {
       }
     }
 
-    console.log(`✅ [TN] ZIP extraction complete for ${resourceKey} (${failedBooks.length} failed)`)
+    if (absentBooks.length > 0) {
+      await recordAbsent(absentBooks)
+    }
+
+    console.log(
+      `✅ [TN] ZIP extraction complete for ${resourceKey} (${failedBooks.length} failed, ${absentBooks.length} absent from release)`
+    )
     return failedBooks
   }
 
-  private async markComplete(resourceKey: string, entryCount: number, method: string): Promise<void> {
+  private async markComplete(
+    resourceKey: string,
+    ingredientCount: number,
+    method: string,
+    metadata?: ResourceMetadata
+  ): Promise<void> {
     const resourceCacheKey = `resource:${resourceKey}`
+    const prior = await this.cacheAdapter.get(resourceCacheKey)
+    const absentFromRelease = readAbsentFromRelease(prior?.metadata)
+    const presentCount = presentIngredientCount(ingredientCount, absentFromRelease)
+    const receipt = buildIngestReceiptFromCatalog(metadata, {
+      ingestSchema: helpsIngestSchema(),
+      ingredientCount: presentCount,
+      downloadMethod: method,
+      entryCount: presentCount,
+      expectedEntryCount: presentCount,
+    })
     await this.cacheAdapter.set(resourceCacheKey, {
       content: { downloaded: true },
       metadata: {
-        downloadComplete: true,
-        downloadCompletedAt: new Date().toISOString(),
-        downloadMethod: method,
-        entryCount,
-        expectedEntryCount: entryCount
-      }
+        ...(receipt ?? {
+          downloadComplete: true,
+          downloadCompletedAt: new Date().toISOString(),
+          downloadMethod: method,
+          entryCount: presentCount,
+          expectedEntryCount: presentCount,
+        }),
+        ...(absentFromRelease.length > 0
+          ? { [ABSENT_FROM_RELEASE_KEY]: absentFromRelease }
+          : {}),
+      },
     })
   }
 
@@ -465,6 +709,8 @@ export class TranslationNotesLoader implements ResourceLoader {
     method: string
   ): Promise<void> {
     const resourceCacheKey = `resource:${resourceKey}`
+    const prior = await this.cacheAdapter.get(resourceCacheKey)
+    const priorAbsent = readAbsentFromRelease(prior?.metadata)
     await this.cacheAdapter.set(resourceCacheKey, {
       content: { downloaded: false, failedBooks },
       metadata: {
@@ -473,6 +719,9 @@ export class TranslationNotesLoader implements ResourceLoader {
         entryCount: Math.max(0, expectedEntryCount - failedBooks.length),
         expectedEntryCount,
         failedBooks,
+        ...(priorAbsent.length > 0
+          ? { [ABSENT_FROM_RELEASE_KEY]: priorAbsent }
+          : {}),
       }
     })
     console.warn(

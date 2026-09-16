@@ -5,11 +5,14 @@
  * the broadcast key changes so CombinedHelps re-sends NOTES_TOKEN_GROUPS.
  */
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { semanticIdFor } from '@bt-synergy/scripture-loader'
 import { findAlignedTokens } from './findAlignedTokens'
 import { resolveAlignedQuoteTokens } from './resolveAlignedQuoteTokens'
 import {
   SCRIPTURE_EMPTY_REVISION,
+  chapterHelpsRowsForUnderlines,
   scriptureContentRevision,
   shouldRetryOriginalLanguageLoad,
   tokenGroupsBroadcastDedupeKey,
@@ -160,5 +163,34 @@ describe('helps-first then scripture hydrates', () => {
         lastAttemptedDownloadTick: 0,
       })
     ).toBe(false)
+  })
+})
+
+describe('book-filter underlines use current-chapter display rows', () => {
+  test('chapterHelpsRowsForUnderlines keeps every open-chapter match, not only the first', () => {
+    const rows = [
+      { id: 'a', reference: '1:1', quoteTokens: [PAUL_QUOTE] },
+      { id: 'b', reference: '1:5', quoteTokens: [PAUL_QUOTE] },
+      { id: 'c', reference: '2:1', quoteTokens: [PAUL_QUOTE] },
+    ]
+    const chapter1 = chapterHelpsRowsForUnderlines(rows, 1)
+    expect(chapter1.map((r) => r.id)).toEqual(['a', 'b'])
+    const groups = underlineGroupsFromHelpsNotes(chapter1, 'tit')
+    expect(groups.map((g) => g.sourceId)).toEqual(['a', 'b'])
+  })
+
+  test('CombinedHelps pipeline wires book-filter underlines from display rows', () => {
+    const src = readFileSync(
+      join(
+        import.meta.dir,
+        '../../components/resources/CombinedHelpsViewer/useCombinedHelpsPipeline.ts'
+      ),
+      'utf8'
+    )
+    expect(src).toContain('chapterHelpsRowsForUnderlines(notesForDisplay')
+    expect(src).toContain('linksForDisplay')
+    expect(src).toContain('chapterHelpsRowsForUnderlines')
+    expect(src).toMatch(/if \(twlArticleFilter\)/)
+    expect(src).toMatch(/supportRefFilter\s*\n\s*\? chapterHelpsRowsForUnderlines/)
   })
 })

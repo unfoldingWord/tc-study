@@ -7,6 +7,7 @@
 import type {
   ObsQuoteFilter,
   SupportRefFilter,
+  TwlArticleFilter,
   VerseFilterState,
 } from '../../../features/helps/helpsDisplayFilters'
 import { TokenFilterBanner } from '../WordsLinksViewer/components/TokenFilterBanner'
@@ -17,12 +18,14 @@ export interface HelpsFilterBannersProps {
   tokenFilter: TokenFilter | null
   verseFilter: VerseFilterState | null
   supportRefFilter?: SupportRefFilter | null
+  twlArticleFilter?: TwlArticleFilter | null
   displayCount: number
   hasMatches: boolean
   onClearObsQuoteFilter: () => void
   onClearTokenFilter: () => void
   onClearVerseFilter: () => void
   onClearSupportRefFilter?: () => void
+  onClearTwlArticleFilter?: () => void
   /** CombinedHelps compact chrome: chip only, no match count. */
   hideCount?: boolean
 }
@@ -32,12 +35,14 @@ export function HelpsFilterBanners({
   tokenFilter,
   verseFilter,
   supportRefFilter = null,
+  twlArticleFilter = null,
   displayCount,
   hasMatches,
   onClearObsQuoteFilter,
   onClearTokenFilter,
   onClearVerseFilter,
   onClearSupportRefFilter,
+  onClearTwlArticleFilter,
   hideCount = false,
 }: HelpsFilterBannersProps) {
   if (obsQuoteFilter) {
@@ -72,6 +77,23 @@ export function HelpsFilterBanners({
         hasMatches={hasMatches}
         hideCount={hideCount}
         onClearFilter={onClearSupportRefFilter ?? (() => undefined)}
+      />
+    )
+  }
+
+  if (twlArticleFilter) {
+    return (
+      <TokenFilterBanner
+        tokenFilter={{
+          semanticId: '',
+          content: twlArticleFilter.title || twlArticleFilter.articlePath,
+          alignedSemanticIds: [],
+          timestamp: twlArticleFilter.timestamp,
+        }}
+        displayLinksCount={displayCount}
+        hasMatches={hasMatches}
+        hideCount={hideCount}
+        onClearFilter={onClearTwlArticleFilter ?? (() => undefined)}
       />
     )
   }

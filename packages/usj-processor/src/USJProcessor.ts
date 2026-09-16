@@ -9,6 +9,10 @@
  */
 
 import type { ProcessedScripture, USJProcessingOptions } from './processedTypes'
+import {
+  harvestPreVerseAlignments,
+  mergePreVerseAlignments,
+} from './preVerseAlignments'
 import { projectToProcessedScripture } from './projectToProcessedScripture'
 import type { CachedUsjDocument, UsjScriptureCacheContent } from './usjCacheTypes'
 import { buildUsjViewModel, type UsjScriptureViewModel } from './usjViewModel'
@@ -88,9 +92,17 @@ export class USJProcessor {
     const includeAlignments = options.includeAlignments !== false
     const includeWordTokens = options.includeWordTokens !== false
 
+    // stripAlignments drops zaln before the first `\v`; restore `\d` / intro groups as v1.
+    const resolvedAlignments = includeAlignments
+      ? mergePreVerseAlignments(
+          alignmentMap,
+          harvestPreVerseAlignments(usj, bookCode)
+        )
+      : {}
+
     const viewModel = buildUsjViewModel({
       usj,
-      alignmentMap: includeAlignments ? alignmentMap : {},
+      alignmentMap: resolvedAlignments,
       bookCode,
       bookName,
     })
@@ -105,7 +117,7 @@ export class USJProcessor {
       scripture.metadata.hasAlignments = false
     }
 
-    return { viewModel, scripture, usj, alignmentMap }
+    return { viewModel, scripture, usj, alignmentMap: resolvedAlignments }
   }
 
   /**
