@@ -48,5 +48,10 @@ describe('SoT architecture wiring', () => {
     expect(pipeline).toContain('twlArticleFirstPaintLinks')
     expect(pipeline).toContain('useTwlArticleBookStream')
     expect(pipeline).toContain('useTwlArticleQuotes')
+    // Cross-chapter filter click: firstPaint + streamed must dedupe by id.
+    expect(pipeline).toContain('mergeFocusChapterBookMatches(firstPaint, streamedSupportRefNotes)')
+    expect(pipeline).toContain('mergeFocusChapterBookMatches(firstPaint, cacheHits)')
+    expect(pipeline).not.toContain('[...firstPaint, ...streamedSupportRefNotes]')
+    expect(pipeline).not.toContain('[...firstPaint, ...cacheHits]')
   })
 })

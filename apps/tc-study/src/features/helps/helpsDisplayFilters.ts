@@ -440,18 +440,21 @@ export function streamRowsForChapter<T extends { reference: string }>(
 }
 
 /**
- * Passage-aligned current-chapter matches first, then the rest of that chapter
- * from the map (earlier verses the passage slice dropped). Still one chapter.
+ * Prefer `preferred` rows, then append `rest` rows whose ids are not already
+ * present. Used for:
+ * - passage-aligned current-chapter matches + the rest of that chapter map
+ * - firstPaint + streamed book matches (stream skips only the initial focus
+ *   chapter and survives chapter jumps, so destination-chapter ids overlap)
  */
 export function mergeFocusChapterBookMatches<T extends { id: string }>(
-  passageMatches: readonly T[],
-  chapterMatches: readonly T[]
+  preferred: readonly T[],
+  rest: readonly T[]
 ): T[] {
-  if (!chapterMatches.length) return passageMatches.slice()
-  if (!passageMatches.length) return chapterMatches.slice()
-  const seen = new Set(passageMatches.map((row) => row.id))
-  const extra = chapterMatches.filter((row) => !seen.has(row.id))
-  return extra.length === 0 ? passageMatches.slice() : passageMatches.concat(extra)
+  if (!rest.length) return preferred.slice()
+  if (!preferred.length) return rest.slice()
+  const seen = new Set(preferred.map((row) => row.id))
+  const extra = rest.filter((row) => !seen.has(row.id))
+  return extra.length === 0 ? preferred.slice() : preferred.concat(extra)
 }
 
 export const SUPPORT_REF_STREAM_FALLBACK_CHUNK = 40

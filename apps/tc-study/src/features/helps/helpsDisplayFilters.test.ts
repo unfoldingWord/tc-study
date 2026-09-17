@@ -509,6 +509,75 @@ describe('supportRefFirstPaintNotes', () => {
     ])
   })
 
+  test('cross-chapter filter click: firstPaint + streamed destination chapter dedupes by id', () => {
+    // Filter applied on ch.1 → stream includes tit 1:3. User clicks that card →
+    // nav to ch.1 makes firstPaint include the same note. Concat without dedupe
+    // rendered two helps-row-tn-* cards (bug). Prefer firstPaint (aligned).
+    const metaphor = 'rc://*/ta/man/translate/figs-metaphor'
+    const alignedFocus = {
+      id: 'swi9',
+      reference: '1:3',
+      supportReference: metaphor,
+      quote: 'he revealed his word',
+      quoteStatus: 'aligned',
+      alignedTokens: [{ position: 0 }],
+    }
+    const streamedFromPriorFocus = [
+      {
+        id: 'swi9',
+        reference: '1:3',
+        supportReference: metaphor,
+        quote: 'he revealed his word',
+      },
+      {
+        id: 'tit2',
+        reference: '2:1',
+        supportReference: metaphor,
+        quote: 'speak what fits',
+      },
+    ]
+    const firstPaint = mergeFocusChapterBookMatches(
+      supportRefFirstPaintNotes([alignedFocus], metaphor, 1),
+      supportRefNotesForChapter([alignedFocus], metaphor)
+    )
+    const book = mergeFocusChapterBookMatches(firstPaint, streamedFromPriorFocus)
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      metaphor,
+      new Map([['swi9', alignedFocus]])
+    )
+    expect(settled.map((n) => n.id)).toEqual(['swi9', 'tit2'])
+    expect(settled[0]).toBe(alignedFocus)
+  })
+
+  test('cross-chapter TWL article click: firstPaint + streamed destination dedupes by id', () => {
+    const path = 'bible/kt/god'
+    const alignedFocus = {
+      id: 'l-tit-1',
+      reference: '1:1',
+      articlePath: path,
+      origWords: 'θεοῦ',
+      quoteStatus: 'aligned',
+      alignedTokens: [{ position: 0 }],
+    }
+    const streamedFromPriorFocus = [
+      { id: 'l-tit-1', reference: '1:1', articlePath: path, origWords: 'θεοῦ' },
+      { id: 'l-tit-2', reference: '2:13', articlePath: path, origWords: 'θεοῦ' },
+    ]
+    const firstPaint = mergeFocusChapterBookMatches(
+      twlArticleFirstPaintLinks([alignedFocus], path, 1),
+      twlArticleLinksForChapter([alignedFocus], path)
+    )
+    const book = mergeFocusChapterBookMatches(firstPaint, streamedFromPriorFocus)
+    const settled = settleTwlArticleDisplayLinks(
+      book,
+      path,
+      new Map([['l-tit-1', alignedFocus]])
+    )
+    expect(settled.map((l) => l.id)).toEqual(['l-tit-1', 'l-tit-2'])
+    expect(settled[0]).toBe(alignedFocus)
+  })
+
   test('current-chapter notes settle from passage align without book quotes', () => {
     const first = supportRefFirstPaintNotes(bookNotes, metaphor, 1)
     const aligned = new Map([
