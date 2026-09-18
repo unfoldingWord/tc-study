@@ -56,9 +56,35 @@ function provisionalVerseRef(bookCode: string, chapter: number): string {
   return `${bookCode} ${chapter}:1`
 }
 
+/** Parse book code from chapter sid (`PSA 5`) or verse sid (`PSA 5:1`). */
+function bookCodeFromSid(sid: string): string | null {
+  const m = sid.trim().match(/^(\S+)\s+\d+/)
+  return m?.[1] ?? null
+}
+
+/** Prefer USJ sid casing (usually uppercase book) when two refs differ only by case. */
+function preferredVerseRefKey(a: string, b: string): string {
+  const bookA = a.split(/\s+/)[0] ?? a
+  const bookB = b.split(/\s+/)[0] ?? b
+  const aHasUpper = bookA !== bookA.toLowerCase()
+  const bHasUpper = bookB !== bookB.toLowerCase()
+  if (aHasUpper && !bHasUpper) return a
+  if (bHasUpper && !aHasUpper) return b
+  return a
+}
+
+function groupTargetSignature(group: {
+  targets?: Array<{ word?: string }>
+}): string {
+  return (group.targets ?? []).map((t) => String(t.word ?? '').toLowerCase()).join('\0')
+}
+
 /**
  * Collect alignment groups from chapter intro / `\d` content before `\v 1`.
  * Keys use `${book} ${chapter}:1` (Door43 / TWL convention for superscriptions).
+ *
+ * Chapter slices often omit the book node — prefer book code from chapter/verse
+ * `sid` so keys match `stripAlignments` (`PSA 5:1`, not `psa 5:1`).
  */
 export function harvestPreVerseAlignments(
   usj: { content?: unknown[] },
@@ -109,6 +135,10 @@ export function harvestPreVerseAlignments(
           typeof item.number === 'number'
             ? item.number
             : parseInt(String(item.number ?? ''), 10)
+        if (typeof item.sid === 'string') {
+          const fromSid = bookCodeFromSid(item.sid)
+          if (fromSid) ctx.bookCode = fromSid
+        }
         if (Number.isFinite(n)) {
           ctx.chapter = n
           ctx.inPreVerse = true
@@ -165,23 +195,69 @@ export function harvestPreVerseAlignments(
   return alignments
 }
 
+/**
+ * Collapse refs that differ only by book-code case onto one key (USJ sid style).
+ * Prevents `psa 5:1` (harvest) vs `PSA 5:1` (stripAlignments) from splitting
+ * pre-verse and body groups across two maps.
+ */
+function collapseCaseVariantKeys(map: AlignmentMap): AlignmentMap {
+  const out: AlignmentMap = {}
+  for (const [ref, groups] of Object.entries(map)) {
+    if (!groups?.length) continue
+    const existingKey = Object.keys(out).find((k) => k.toLowerCase() === ref.toLowerCase())
+    if (!existingKey) {
+      out[ref] = [...groups]
+      continue
+    }
+    const canonical = preferredVerseRefKey(existingKey, ref)
+    const primary = out[existingKey]!
+    const secondary = groups
+    // Keep document order: if secondary's first target differs, treat as pre-verse prefix.
+    const firstPrimary = primary[0]?.targets?.[0]?.word
+    const firstSecondary = secondary[0]?.targets?.[0]?.word
+    const seen = new Set(primary.map(groupTargetSignature))
+    const uniqueSecondary = secondary.filter((g) => {
+      const sig = groupTargetSignature(g)
+      if (seen.has(sig)) return false
+      seen.add(sig)
+      return true
+    })
+    const merged =
+      firstSecondary && firstSecondary !== firstPrimary
+        ? [...uniqueSecondary, ...primary]
+        : [...primary, ...uniqueSecondary]
+    delete out[existingKey]
+    out[canonical] = merged
+  }
+  return out
+}
+
 /** Prepend pre-verse groups so surface-order alignment attach stays in document order. */
 export function mergePreVerseAlignments(
   alignmentMap: AlignmentMap,
   preVerse: AlignmentMap
 ): AlignmentMap {
-  const out: AlignmentMap = { ...alignmentMap }
+  // Normalize any pre-existing case-split keys before prepending harvest.
+  const out: AlignmentMap = collapseCaseVariantKeys(alignmentMap)
   for (const [ref, groups] of Object.entries(preVerse)) {
     if (!groups?.length) continue
-    const existing = out[ref] ?? []
+    const existingKey =
+      Object.keys(out).find((k) => k.toLowerCase() === ref.toLowerCase()) ?? ref
+    const existing = out[existingKey] ?? []
+    const canonical = preferredVerseRefKey(existingKey, ref)
     // Idempotent: skip when cache already stored a merged map.
     const firstPre = groups[0]?.targets?.[0]?.word
     const firstExisting = existing[0]?.targets?.[0]?.word
     if (firstPre && firstPre === firstExisting) {
-      out[ref] = existing
+      if (existingKey !== canonical) {
+        delete out[existingKey]
+        out[canonical] = existing
+      }
       continue
     }
-    out[ref] = [...groups, ...existing]
+    if (existingKey !== canonical) delete out[existingKey]
+    if (ref !== canonical) delete out[ref]
+    out[canonical] = [...groups, ...existing]
   }
   return out
 }

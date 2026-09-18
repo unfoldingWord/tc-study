@@ -2,7 +2,11 @@
  * TSV Parsers
  */
 
-export { NotesProcessor } from './notes-parser'
+export {
+  NotesProcessor,
+  NOTES_TSV_PARSER_VERSION,
+  processedNotesParserIsCurrent,
+} from './notes-parser'
 export { QuestionsProcessor } from './questions-parser'
 export { WordsLinksProcessor } from './words-links-parser'
 

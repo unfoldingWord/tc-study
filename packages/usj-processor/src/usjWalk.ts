@@ -76,6 +76,11 @@ export function collectUsjWords(
           typeof n.number === 'number'
             ? n.number
             : parseInt(String(n.number ?? ''), 10)
+        // Chapter slices often omit the book node — take book from sid (`PSA 5`).
+        if (typeof n.sid === 'string') {
+          const m = n.sid.trim().match(/^(\S+)\s+\d+/)
+          if (m?.[1]) ctx.bookCode = m[1]
+        }
         if (Number.isFinite(num)) {
           ctx.chapter = num
           // New chapter: clear prior verse; provisional sid applies until `\v`.

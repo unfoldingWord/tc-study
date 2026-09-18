@@ -8,7 +8,7 @@
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import type { HelpsQuoteStatus } from './resolveHelpsQuoteStatus'
-import type { CachedQuoteToken } from './helpsQuoteCache'
+import { toCachedQuoteTokens, type CachedQuoteToken } from './helpsQuoteCache'
 import type { WarmJob } from '../warm/warmTypes'
 
 export type SupportRefQuoteEnrichment = {
@@ -28,13 +28,7 @@ export type SupportRefQuoteEnrichment = {
 export type SupportRefQuoteChipKind = 'aligned' | 'ol-pending' | 'ol' | 'placeholder' | 'none'
 
 export function cachedQuoteTokensToOptimized(tokens: CachedQuoteToken[]): OptimizedToken[] {
-  return tokens.map((t) => ({
-    id: t.id,
-    text: t.text,
-    type: t.type,
-    occurrence: t.occurrence,
-    content: t.content,
-  })) as OptimizedToken[]
+  return toCachedQuoteTokens(tokens) as OptimizedToken[]
 }
 
 /** Spinner on the quote chip — orig fallback is visible, ULT is not ready. */

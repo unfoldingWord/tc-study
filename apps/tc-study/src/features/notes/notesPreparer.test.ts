@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import type { ProcessedNotes } from '@bt-synergy/resource-parsers'
+import { NOTES_TSV_PARSER_VERSION, type ProcessedNotes } from '@bt-synergy/resource-parsers'
 import {
+  NOTES_PREPARE_VERSION,
   buildNotesFull,
   buildNotesLight,
   notesPreparer,
@@ -60,6 +61,7 @@ const sampleNotes: ProcessedNotes = {
     bookCode: 'tit',
     bookName: 'Titus',
     processingDate: new Date().toISOString(),
+    parserVersion: NOTES_TSV_PARSER_VERSION,
     totalNotes: 2,
     chaptersWithNotes: [1, 2],
     statistics: { totalNotes: 2, notesPerChapter: { '1': 1, '2': 1 } },
@@ -102,7 +104,7 @@ describe('notesPreparer', () => {
       notes: sampleNotes,
     }
     const full = buildNotesFull(source, 1)
-    expect(full.version).toBe(2)
+    expect(full.version).toBe(NOTES_PREPARE_VERSION)
     expect(full.notes).toHaveLength(1)
     expect(full.notes[0]!.bodyHast.type).toBe('root')
     expect(full.notes[0]!.quoteFolded).toBeTruthy()

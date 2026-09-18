@@ -397,7 +397,7 @@ export function CombinedHelpsList({
                 {windowedGroups.map((group, groupIndex) => {
                   return (
                     <div
-                      key={group.ref}
+                      key={`${group.ref}#${groupIndex}`}
                       ref={(el) => {
                         if (el) groupElsRef.current.set(group.ref, el)
                         else groupElsRef.current.delete(group.ref)

@@ -111,6 +111,77 @@ describe('batchAlignLinks', () => {
     expect(results[0]!.alignedTokens?.some((t) => t.content === 'David')).toBe(true)
   })
 
+  test('5:front TWL aligns heading tokens extracted before \\v 1', () => {
+    const full = {
+      version: 1,
+      unit: 5,
+      matchKeys: ['psa 5:1:מזמור:1', 'psa 5:1:לדוד:1', 'psa 5:1:אמרי:1'],
+      blocks: [
+        {
+          marker: 'd',
+          role: 'heading',
+          indentLevel: 0,
+          chapterNumber: 5,
+          verseNumbers: [1],
+          inline: [
+            { kind: 'token', token: { c: 'psalm', o: 1, k: 0, a: [0] } },
+            { kind: 'token', token: { c: 'of', o: 1, k: 1, a: [1] } },
+            { kind: 'token', token: { c: 'David', o: 1, k: 1, a: [1] } },
+          ],
+        },
+        {
+          marker: 'q1',
+          role: 'para',
+          indentLevel: 0,
+          chapterNumber: 5,
+          verseNumbers: [1],
+          inline: [
+            { kind: 'verse', chapterNumber: 5, verseNumber: 1 },
+            { kind: 'token', token: { c: 'To', o: 1, k: 2, a: [2] } },
+          ],
+        },
+      ],
+    } as unknown as ScriptureFullChapter
+
+    const targetTokens = extractPreparedBroadcastTokens('psa', 5, full, 1, 999)
+    expect(targetTokens.map((t) => t.text)).toEqual(['psalm', 'of', 'David', 'To'])
+
+    const results = batchAlignLinks({
+      links: [
+        {
+          id: 'kjx7',
+          reference: '5:front',
+          origWords: 'מִזְמ֥וֹר',
+          occurrence: '1',
+          quoteTokens: [
+            {
+              id: 4,
+              text: 'מִזְמ֥וֹר',
+              type: 'word',
+              content: 'מִזְמ֥וֹר',
+              occurrence: 1,
+              chapter: 5,
+              verse: 1,
+            } as never,
+          ],
+        },
+      ],
+      targetTokens: targetTokens as never,
+      bookCode: 'psa',
+      currentChapter: 5,
+      tokenBook: 'psa',
+      tokenChapter: 5,
+      tokenStartVerse: 1,
+      tokenEndVerse: 999,
+      hasTokens: true,
+      quoteBuildReady: true,
+      resourceKey: 'unfoldingWord/en/twl',
+      textLanguage: 'en',
+    })
+    expect(results[0]!.quoteStatus).toBe('aligned')
+    expect(results[0]!.alignedTokens?.some((t) => t.content === 'psalm')).toBe(true)
+  })
+
   test('empty tokens stay pending even when quote-build is ready', () => {
     const results = batchAlignLinks({
       links: [{ id: 'tn-1', reference: '1:1', origWords: 'Παῦλος' }],
@@ -340,6 +411,185 @@ describe('batchAlignLinks', () => {
     })
     expect(results.find((r) => r.id === 'ch1')!.alignedTokens?.length).toBeGreaterThan(0)
     expect(results.find((r) => r.id === 'ch2')!.alignedTokens?.length).toBeGreaterThan(0)
+  })
+
+  test('aligns merged-stream hits across listed verses (sbh4)', () => {
+    const yahweh = 'יְהוָה'
+    const verses = [1, 3, 8, 12]
+    const targetTokens = verses.flatMap((verse, i) => [
+      {
+        id: i + 1,
+        text: 'Yahweh',
+        type: 'word' as const,
+        content: 'Yahweh',
+        occurrence: 1,
+        verseRef: `psa 5:${verse}`,
+        semanticId: semanticIdFor(`psa 5:${verse}`, 'Yahweh', 1),
+        alignedOriginalWordIds: [`psa 5:${verse}:${yahweh}:1`],
+      },
+    ])
+    const results = batchAlignLinks({
+      links: [
+        {
+          id: 'tn-sbh4',
+          reference: '5:1,3,8,12',
+          origWords: `${yahweh} & ${yahweh} & ${yahweh} & ${yahweh}`,
+          occurrence: '1',
+          quoteTokens: verses.map((verse, i) => ({
+            id: i + 1,
+            text: yahweh,
+            type: 'word',
+            content: yahweh,
+            occurrence: 1,
+            chapter: 5,
+            verse,
+          })) as never,
+        },
+      ],
+      targetTokens: targetTokens as never,
+      bookCode: 'psa',
+      currentChapter: 5,
+      tokenBook: 'psa',
+      tokenChapter: 5,
+      tokenStartVerse: 1,
+      tokenEndVerse: 999,
+      hasTokens: true,
+      quoteBuildReady: true,
+      resourceKey: 'unfoldingWord/en/tn',
+      textLanguage: 'en',
+    })
+    const words = (results[0]!.alignedTokens ?? []).filter((t) => t.type === 'word')
+    expect(words.map((t) => t.content)).toEqual(['Yahweh', 'Yahweh', 'Yahweh', 'Yahweh'])
+    expect(words.map((t) => t.verseRef)).toEqual([
+      'psa 5:1',
+      'psa 5:3',
+      'psa 5:8',
+      'psa 5:12',
+    ])
+    expect(results[0]!.alignedTokens?.some((t) => t.type === 'gap' && t.content === '…')).toBe(true)
+    expect(results[0]!.quoteStatus).toBe('aligned')
+  })
+
+  test('clone-safe quote tokens without verse stamps only hit the first verse', () => {
+    const yahweh = 'יְהוָה'
+    const verses = [1, 3, 8, 12]
+    const targetTokens = verses.flatMap((verse, i) => [
+      {
+        id: i + 1,
+        text: 'Yahweh',
+        type: 'word' as const,
+        content: 'Yahweh',
+        occurrence: 1,
+        verseRef: `psa 5:${verse}`,
+        semanticId: semanticIdFor(`psa 5:${verse}`, 'Yahweh', 1),
+        alignedOriginalWordIds: [`psa 5:${verse}:${yahweh}:1`],
+      },
+    ])
+    const results = batchAlignLinks({
+      links: [
+        {
+          id: 'tn-sbh4-stripped',
+          reference: '5:1,3,8,12',
+          origWords: `${yahweh} & ${yahweh} & ${yahweh} & ${yahweh}`,
+          occurrence: '1',
+          quoteTokens: verses.map((_verse, i) => ({
+            id: i + 1,
+            text: yahweh,
+            type: 'word',
+            content: yahweh,
+            occurrence: 1,
+          })) as never,
+        },
+      ],
+      targetTokens: targetTokens as never,
+      bookCode: 'psa',
+      currentChapter: 5,
+      tokenBook: 'psa',
+      tokenChapter: 5,
+      tokenStartVerse: 1,
+      tokenEndVerse: 999,
+      hasTokens: true,
+      quoteBuildReady: true,
+      resourceKey: 'unfoldingWord/en/tn',
+      textLanguage: 'en',
+    })
+    const words = (results[0]!.alignedTokens ?? []).filter((t) => t.type === 'word')
+    expect(words.map((t) => t.verseRef)).toEqual(['psa 5:1'])
+  })
+
+  test('aligns svyb range hits on 5:2-3 with a single … gap', () => {
+    const sound = 'לְקזוֹל'
+    const voice = 'קוֹלִי'
+    const targetTokens = [
+      {
+        id: 1,
+        text: 'sound',
+        type: 'word' as const,
+        content: 'sound',
+        occurrence: 1,
+        verseRef: 'psa 5:2',
+        semanticId: semanticIdFor('psa 5:2', 'sound', 1),
+        alignedOriginalWordIds: [`psa 5:2:${sound}:1`],
+      },
+      {
+        id: 2,
+        text: 'voice',
+        type: 'word' as const,
+        content: 'voice',
+        occurrence: 1,
+        verseRef: 'psa 5:3',
+        semanticId: semanticIdFor('psa 5:3', 'voice', 1),
+        alignedOriginalWordIds: [`psa 5:3:${voice}:1`],
+      },
+    ]
+    const results = batchAlignLinks({
+      links: [
+        {
+          id: 'tn-svyb',
+          reference: '5:2-3',
+          origWords: `${sound} & ${voice}`,
+          occurrence: '1',
+          quoteTokens: [
+            {
+              id: 1,
+              text: sound,
+              type: 'word',
+              content: sound,
+              occurrence: 1,
+              chapter: 5,
+              verse: 2,
+            },
+            {
+              id: 2,
+              text: voice,
+              type: 'word',
+              content: voice,
+              occurrence: 1,
+              chapter: 5,
+              verse: 3,
+            },
+          ] as never,
+        },
+      ],
+      targetTokens: targetTokens as never,
+      bookCode: 'psa',
+      currentChapter: 5,
+      tokenBook: 'psa',
+      tokenChapter: 5,
+      tokenStartVerse: 1,
+      tokenEndVerse: 999,
+      hasTokens: true,
+      quoteBuildReady: true,
+      resourceKey: 'unfoldingWord/en/tn',
+      textLanguage: 'en',
+    })
+    const words = (results[0]!.alignedTokens ?? []).filter((t) => t.type === 'word')
+    expect(words.map((t) => t.content)).toEqual(['sound', 'voice'])
+    expect(words.map((t) => t.verseRef)).toEqual(['psa 5:2', 'psa 5:3'])
+    expect(results[0]!.alignedTokens?.filter((t) => t.type === 'gap').map((t) => t.content)).toEqual([
+      '…',
+    ])
+    expect(results[0]!.quoteStatus).toBe('aligned')
   })
 })
 

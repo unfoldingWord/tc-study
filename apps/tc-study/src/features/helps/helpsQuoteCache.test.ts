@@ -49,6 +49,18 @@ describe('helpsQuoteCache', () => {
     )
   })
 
+  test('keeps stamped chapter/verse on clone-safe quote tokens', () => {
+    expect(
+      toCachedQuoteTokens([
+        { id: 1, text: 'יְהוָה', type: 'word', occurrence: 1, content: 'יְהוָה', chapter: 5, verse: 1 },
+        { id: 2, text: 'יְהוָה', type: 'word', occurrence: 1, content: 'יְהוָה', chapter: 5, verse: 12 },
+      ])
+    ).toEqual([
+      { id: 1, text: 'יְהוָה', type: 'word', occurrence: 1, content: 'יְהוָה', chapter: 5, verse: 1 },
+      { id: 2, text: 'יְהוָה', type: 'word', occurrence: 1, content: 'יְהוָה', chapter: 5, verse: 12 },
+    ])
+  })
+
   test('round-trips tokens with TTL envelope', async () => {
     const cache = createFakeAdapter()
     const args = {

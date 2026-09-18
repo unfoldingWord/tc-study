@@ -81,7 +81,7 @@ Numbered as CombinedHelps experiences them after Read has language + catalog.
 | --- | --- | --- | --- |
 | **0** | **Mount** | CombinedHelps + `useWarmLanes({ owner: 'helps' })`. Target key from shared SoT (or fallbacks). `warmVisibleHelpsResources` lists TN/TWL (+ target scripture for lane visibility). | — |
 | **1** | **Rows** | Prefer `prepared:notes` / `prepared:words-links` full for the chapter span; else loader `tn:` / `twl:` slices. Filter to BCV / kind / token filters. | `prepared:notes:` · `prepared:words-links:` · `tn:` · `twl:` |
-| **2** | **Quote** | `useQuoteTokens`: cache-first `readCachedQuoteTokensForSpan`. Miss → warm.worker `batch-quotes` (prepare.worker fallback). Needs OL USJ (`scripture-usj:` UGNT/UHB). Per-link `quoteReady` unblocks align after pass 1. | Write `helps-quote:` |
+| **2** | **Quote** | `useQuoteTokens`: cache-first `readCachedQuoteTokensForSpan`. Miss → warm.worker `batch-quotes` (prepare.worker fallback). Needs OL USJ (`scripture-usj:` UGNT/UHB). Per-link `quoteReady` unblocks align after pass 1. **Multi-verse TN:** `parseHelpsReference` expands `5:2-3` / `5:1,3,8,12`; listed verses are joined into one stream; each `&` part is the next occurrence left to right. Partial hits are kept. | Write `helps-quote:` |
 | **3** | **Align** | `useAlignedTokens`: cache-first `readCachedAlignmentsForSpan`. Prefer reconstruct `{p,m}` against **prepared full** tokens; else **paint-display** from stored `t`; else live-align (prepared full preferred over broadcast). | Read `prepared:scripture:…:full` · write `helps-align:` |
 | **4** | **Paint** | Cards show ULT chips from `alignedTokens`. Underlines (`NOTES_TOKEN_GROUPS`) rebind when scripture / tokens become ready — separate from chip paint. | Module highlight map (optional) |
 
@@ -138,6 +138,20 @@ After lane 1 drains: `quote-chapter` / `align-chapter` / `prepare-unit` fill the
 | Ownership (`isScriptureTokensOwner`) | N/A to chips — prevents multi-writer races |
 
 Chip path: **shared catalog key → prepared full / helps-align cache**. Broadcast is a side channel.
+
+### Multi-verse TN quotes (headers, chips, highlight)
+
+Door43 `Quote` uses `&` for discontinuous OL snippets; `Reference` may be a range (`5:2-3`) or a comma list (`5:1,3,8,12`).
+
+| Surface | Behavior |
+| --- | --- |
+| **Parse / align** | `parseHelpsReference` expands the listed verses; `buildQuoteTokens` joins those OL tokens into one virtual verse and walks each `&` part as the next occurrence (same as single-verse multi-occurrence). Hits keep real `chapter`/`verse` so ULT zaln paints every source verse. |
+| **Chips** | One button, ULT label. Non-contiguous hits join with `…` (same as `“will … sojourn with you”`). Do not show `&`. A partial hit paints what aligned — it does not lock the whole note on OL. |
+| **Headers** | CombinedHelps group label is the real ref (`5:1, 3, 8, 12`, `5:2–3`), still icon-first (`BookOpen` + compact numbers + count). |
+| **Highlight** | Card click jumps to the **first** hit; `alignedSemanticIds` cover every aligned verse so underlines appear on all hits in the chapter. |
+| **Placement** | Same as existing ranges: the note shows when viewing **any listed verse** (not in-between verses of a comma list). |
+
+`helps-quote:` v5 stores optional `chapter`/`verse` on cached tokens and keeps those stamps on align clones. `helps-align:` v6 rebuilds chips so every listed-verse hit paints (`…` between non-contiguous hits). TN TSV parse (`NOTES_TSV_PARSER_VERSION` 2) keeps the raw `Reference` string; prepared notes v4 rebuilds only from current `tn:` blobs.
 
 ---
 
@@ -252,6 +266,7 @@ Stamps, versions, TTL (30 days on quote/align), and GC: see [workers-and-persist
 | --- | --- |
 | Shared target SoT | `src/features/helps/helpsTargetScripture.ts` |
 | Quote / align hooks | `WordsLinksViewer/hooks/useQuoteTokens.ts`, `useAlignedTokens.ts` |
+| Multi-verse refs | `quoteTokens/parseHelpsReference.ts`, `resource-parsers` `NotesProcessor.normalizeReference` |
 | Pipeline / cards | `CombinedHelpsViewer/useCombinedHelpsPipeline.ts`, `index.tsx` |
 | Caches | `helpsQuoteCache.ts`, `helpsAlignCache.ts`, `alignCacheHydratePlan.ts`, `reconstructAlignFromPositions.ts` |
 | Budgets / reuse | `helpsCacheContextBudget.ts`, `helpsTokenReuse.ts` |

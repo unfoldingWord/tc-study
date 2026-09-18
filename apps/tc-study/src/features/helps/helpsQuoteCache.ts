@@ -13,8 +13,9 @@ import { unwrapVersioned, wrapVersioned } from '../cache/versionedEnvelope'
 import { resourceContentStamp, type ResourceStampSource } from './resourceContentStamp'
 
 export const HELPS_QUOTE_PREFIX = 'helps-quote:'
-/** Bump when QuoteMatcher / buildQuoteTokens output shape changes. */
-export const HELPS_QUOTE_VERSION = 1
+/** Bump when QuoteMatcher / buildQuoteTokens output shape changes.
+ *  5: align clones keep stamped chapter/verse so merged-stream hits paint every verse. */
+export const HELPS_QUOTE_VERSION = 5
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_QUOTE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -24,6 +25,9 @@ export type CachedQuoteToken = {
   type: string
   occurrence: number
   content: string
+  /** Stamped when a multi-verse quote segment matched this verse. */
+  chapter?: number
+  verse?: number
 }
 
 /** linkId → clone-safe quote tokens (empty array = settled miss). */
@@ -70,16 +74,23 @@ export function toCachedQuoteTokens(
     type?: string
     occurrence?: number
     content?: string
+    chapter?: number
+    verse?: number
   }> | null | undefined
 ): CachedQuoteToken[] {
   if (!tokens?.length) return []
-  return tokens.map((t) => ({
-    id: t.id ?? 0,
-    text: t.text ?? '',
-    type: t.type ?? 'word',
-    occurrence: t.occurrence ?? 1,
-    content: t.content ?? t.text ?? '',
-  }))
+  return tokens.map((t) => {
+    const row: CachedQuoteToken = {
+      id: t.id ?? 0,
+      text: t.text ?? '',
+      type: t.type ?? 'word',
+      occurrence: t.occurrence ?? 1,
+      content: t.content ?? t.text ?? '',
+    }
+    if (typeof t.chapter === 'number' && t.chapter > 0) row.chapter = t.chapter
+    if (typeof t.verse === 'number' && t.verse > 0) row.verse = t.verse
+    return row
+  })
 }
 
 export async function readCachedQuoteTokens(

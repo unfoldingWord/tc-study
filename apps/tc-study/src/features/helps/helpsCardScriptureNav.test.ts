@@ -240,6 +240,40 @@ describe('planHelpsCardScriptureAction', () => {
     expect(plan.token).toBeNull()
   })
 
+  test('sbh4 click jumps to the first hit and highlights every listed verse', () => {
+    const plan = planHelpsCardScriptureAction({
+      bookCode: 'psa',
+      reference: '5:1,3,8,12',
+      current: { book: 'psa', chapter: 5, verse: 5 },
+      item: {
+        alignedTokens: [
+          { semanticId: 'psa 5:1:Yahweh:1', type: 'word', content: 'Yahweh' },
+          { semanticId: 'psa 5:3:Yahweh:1', type: 'word', content: 'Yahweh' },
+          { semanticId: 'psa 5:8:Yahweh:1', type: 'word', content: 'Yahweh' },
+          { semanticId: 'psa 5:12:Yahweh:1', type: 'word', content: 'Yahweh' },
+        ],
+        semanticIds: [
+          'psa 5:1:יְהוָה:1',
+          'psa 5:3:יְהוָה:1',
+          'psa 5:8:יְהוָה:1',
+          'psa 5:12:יְהוָה:1',
+        ],
+      },
+    })
+    expect(plan.navigate).toEqual({ book: 'psa', chapter: 5, verse: 1 })
+    expect(plan.token?.semanticId).toBe('psa 5:1:Yahweh:1')
+    expect(plan.token?.alignedSemanticIds).toEqual([
+      'psa 5:1:יְהוָה:1',
+      'psa 5:3:יְהוָה:1',
+      'psa 5:8:יְהוָה:1',
+      'psa 5:12:יְהוָה:1',
+      'psa 5:1:Yahweh:1',
+      'psa 5:3:Yahweh:1',
+      'psa 5:8:Yahweh:1',
+      'psa 5:12:Yahweh:1',
+    ])
+  })
+
   test('uses live scripture chapter, not a pinned stale chapter', () => {
     const viewingCh1 = { book: 'tit', chapter: 1 }
     const plan = planHelpsCardScriptureAction({

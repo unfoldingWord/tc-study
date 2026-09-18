@@ -13,8 +13,9 @@ import { SCRIPTURE_PREPARE_VERSION } from '../scripture/scripturePreparer'
 import { resourceContentStamp, type ResourceStampSource } from './resourceContentStamp'
 
 export const HELPS_ALIGN_PREFIX = 'helps-align:'
-/** Bump when compact row shape, reconstruct rules, or align match-key fold change. */
-export const HELPS_ALIGN_VERSION = 2
+/** Bump when compact row shape, reconstruct rules, or align match-key fold change.
+ *  6: live/warm align keeps quote-token verse stamps (sbh4 four-hit chips). */
+export const HELPS_ALIGN_VERSION = 6
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_ALIGN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 

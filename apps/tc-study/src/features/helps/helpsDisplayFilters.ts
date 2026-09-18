@@ -2,7 +2,11 @@
  * Shared TN / TWL / CombinedHelps reference + display filters (pure).
  */
 
-import { generateSemanticIdsForQuoteTokens } from './quoteTokens'
+import {
+  generateSemanticIdsForQuoteTokens,
+  helpsReferenceCoversVerse,
+  helpsReferenceOverlapsRange,
+} from './quoteTokens'
 import { semanticIdMatchKey } from './semanticIdMatchKey'
 
 export interface ObsQuoteFilter {
@@ -200,24 +204,7 @@ export function filterNotesByReferenceRange<T extends { reference: string }>(
   notes: T[],
   range: ReferenceRange
 ): T[] {
-  const { startChapter, startVerse, endChapter, endVerse } = range
-  return notes.filter((note) => {
-    const [noteChapterStr, noteVerseRange] = note.reference.split(':')
-    const noteChapter = parseInt(noteChapterStr)
-    if (noteChapter < startChapter || noteChapter > endChapter) return false
-    let noteStartVerse: number
-    let noteEndVerse: number
-    if (noteVerseRange?.includes('-')) {
-      const [start, end] = noteVerseRange.split('-').map((v) => parseInt(v))
-      noteStartVerse = start
-      noteEndVerse = end
-    } else {
-      noteStartVerse = noteEndVerse = parseInt(noteVerseRange)
-    }
-    if (noteChapter === startChapter && noteEndVerse < startVerse) return false
-    if (noteChapter === endChapter && noteStartVerse > endVerse) return false
-    return true
-  })
+  return notes.filter((note) => helpsReferenceOverlapsRange(note.reference, range))
 }
 
 /** Filter TWL links whose reference falls within the given chapter/verse range. */
@@ -225,21 +212,7 @@ export function filterLinksByReferenceRange<T extends { reference: string }>(
   links: T[],
   range: ReferenceRange
 ): T[] {
-  const { startChapter, startVerse, endChapter, endVerse } = range
-  return links.filter((link) => {
-    const refParts = link.reference.split(':')
-    const linkChapter = parseInt(refParts[0] || '1', 10)
-    const linkVerse = parseInt(refParts[1] || '1', 10)
-    if (startChapter === endChapter) {
-      if (linkChapter !== startChapter) return false
-      return linkVerse >= startVerse && linkVerse <= endVerse
-    }
-    if (linkChapter < startChapter) return false
-    if (linkChapter > endChapter) return false
-    if (linkChapter === startChapter) return linkVerse >= startVerse
-    if (linkChapter === endChapter) return linkVerse <= endVerse
-    return true
-  })
+  return links.filter((link) => helpsReferenceOverlapsRange(link.reference, range))
 }
 
 function withFallback<T>(filtered: T[], source: T[], fallbackWhenEmpty?: boolean): T[] {
@@ -736,16 +709,10 @@ export function filterDisplayNotes<T extends NoteForDisplay>(
 
   if (verseFilter) {
     const filtered = notesWithAlignedTokens.filter((note) => {
-      const [chapterStr, verseRange] = note.reference.split(':')
-      const noteChapter = parseInt(chapterStr)
+      const noteChapter = parseInt(note.reference.split(':')[0] || '', 10)
       if (isNaN(noteChapter) || noteChapter !== verseFilter.chapter) return false
       if (verseFilter.verse === undefined) return true
-      if (!verseRange || verseRange === 'intro') return false
-      if (verseRange.includes('-')) {
-        const [start, end] = verseRange.split('-').map(Number)
-        return verseFilter.verse >= start && verseFilter.verse <= end
-      }
-      return parseInt(verseRange) === verseFilter.verse
+      return helpsReferenceCoversVerse(note.reference, verseFilter.chapter, verseFilter.verse)
     })
     return {
       displayNotes: withFallback(filtered, notesWithAlignedTokens, fallbackWhenEmpty),
@@ -816,16 +783,10 @@ export function filterDisplayLinks<T extends LinkForDisplay>(
 
   if (verseFilter) {
     const filtered = filteredByReference.filter((link) => {
-      const [chapterStr, verseRange] = link.reference.split(':')
-      const linkChapter = parseInt(chapterStr)
+      const linkChapter = parseInt(link.reference.split(':')[0] || '', 10)
       if (isNaN(linkChapter) || linkChapter !== verseFilter.chapter) return false
       if (verseFilter.verse === undefined) return true
-      if (!verseRange || verseRange === 'intro') return false
-      if (verseRange.includes('-')) {
-        const [start, end] = verseRange.split('-').map(Number)
-        return verseFilter.verse >= start && verseFilter.verse <= end
-      }
-      return parseInt(verseRange) === verseFilter.verse
+      return helpsReferenceCoversVerse(link.reference, verseFilter.chapter, verseFilter.verse)
     })
     return {
       displayLinks: withFallback(filtered, filteredByReference, fallbackWhenEmpty),

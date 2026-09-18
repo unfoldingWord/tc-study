@@ -3,7 +3,11 @@
  * React-free; safe for workers. Reads `tn:{resourceKey}:{book}` cache.
  */
 
-import type { ProcessedNotes, TranslationNote } from '@bt-synergy/resource-parsers'
+import {
+  processedNotesParserIsCurrent,
+  type ProcessedNotes,
+  type TranslationNote,
+} from '@bt-synergy/resource-parsers'
 import {
   markdownToHastSync,
   stripMarkdownLight,
@@ -18,7 +22,7 @@ import {
 } from '../prepare/prepareRegistry'
 
 /** Bump when light/full row shape changes (invalidates prepared: rows). */
-export const NOTES_PREPARE_VERSION = 2
+export const NOTES_PREPARE_VERSION = 4
 
 export function tnCacheKey(resourceKey: string, bookId: string): string {
   return `tn:${resourceKey}:${bookId}`
@@ -79,7 +83,8 @@ function unwrapCacheEntry(entry: unknown): ProcessedNotes | null {
   if (!entry || typeof entry !== 'object') return null
   const e = entry as Record<string, unknown>
   if (e.notesByChapter || Array.isArray(e.notes)) {
-    return e as unknown as ProcessedNotes
+    const notes = e as unknown as ProcessedNotes
+    return processedNotesParserIsCurrent(notes) ? notes : null
   }
   if (e.content && typeof e.content === 'object') {
     return unwrapCacheEntry(e.content)

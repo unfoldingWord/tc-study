@@ -41,6 +41,22 @@ describe('filterNotesByReferenceRange', () => {
       }).map((n) => n.id)
     ).toEqual(['b'])
   })
+
+  test('keeps discontinuous multi-verse notes on any listed verse', () => {
+    const notes = [
+      { id: 'sbh4', reference: '5:1,3,8,12' },
+      { id: 'svyb', reference: '5:2-3' },
+      { id: 'other', reference: '5:4' },
+    ]
+    expect(
+      filterNotesByReferenceRange(notes, {
+        startChapter: 5,
+        startVerse: 3,
+        endChapter: 5,
+        endVerse: 3,
+      }).map((n) => n.id)
+    ).toEqual(['sbh4', 'svyb'])
+  })
 })
 
 describe('filterLinksByReferenceRange', () => {
@@ -87,6 +103,40 @@ describe('filterDisplayNotes', () => {
     })
     expect(hasNoteMatches).toBe(true)
     expect(displayNotes.map((n) => n.id)).toEqual(['n2'])
+  })
+
+  test('verseFilter keeps multi-verse notes on any listed verse, not only the first', () => {
+    const multi = [
+      { id: 'sbh4', reference: '5:1,3,8,12', quote: 'יְהוָה' },
+      { id: 'svyb', reference: '5:2-3', quote: 'קול' },
+    ]
+    expect(
+      filterDisplayNotes(multi, {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: { chapter: 5, verse: 8, timestamp: 1 },
+        tokenFilter: null,
+        bookCodeLower: 'psa',
+      }).displayNotes.map((n) => n.id)
+    ).toEqual(['sbh4'])
+    expect(
+      filterDisplayNotes(multi, {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: { chapter: 5, verse: 2, timestamp: 1 },
+        tokenFilter: null,
+        bookCodeLower: 'psa',
+      }).displayNotes.map((n) => n.id)
+    ).toEqual(['svyb'])
+    expect(
+      filterDisplayNotes(multi, {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: { chapter: 5, verse: 4, timestamp: 1 },
+        tokenFilter: null,
+        bookCodeLower: 'psa',
+      }).displayNotes.map((n) => n.id)
+    ).toEqual([])
   })
 
   test('verseFilter keeps English tN for the clicked verse (language-agnostic)', () => {

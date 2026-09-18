@@ -50,6 +50,8 @@ export type { OptimizedScripture, BroadcastScriptureToken } from './parsers/scri
 // TSV Parsers
 export {
   NotesProcessor,
+  NOTES_TSV_PARSER_VERSION,
+  processedNotesParserIsCurrent,
   QuestionsProcessor,
   WordsLinksProcessor,
 } from './parsers/tsv'

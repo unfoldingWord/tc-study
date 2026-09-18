@@ -8,6 +8,15 @@ import {
   type ScriptureFullChapter,
 } from './scripturePreparer'
 
+function assignedVerseForPreparedToken(
+  verseFromMarker: number,
+  blockVerse: number
+): number {
+  if (verseFromMarker > 0) return verseFromMarker
+  if (blockVerse > 0) return blockVerse
+  return 1
+}
+
 export function extractPreparedBroadcastTokens(
   bookCode: string,
   chapter: number,
@@ -20,14 +29,18 @@ export function extractPreparedBroadcastTokens(
   const verseRefPrefix = `${bookCode.toLowerCase()} ${chapter}:`
 
   for (const block of full.blocks) {
+    const blockVerse = block.verseNumbers?.[0] ?? 0
     for (const item of block.inline) {
       if (item.kind === 'verse') {
         verse = item.verseNumber
         continue
       }
       if (item.kind !== 'token') continue
-      if (verse < startVerse || verse > endVerse) continue
-      const verseRef = `${verseRefPrefix}${verse}`
+      // Pre-verse `\d` tokens sit before `\v 1` but belong to verse 1
+      // (same convention as zaln harvest / TWL `5:front`).
+      const assignedVerse = assignedVerseForPreparedToken(verse, blockVerse)
+      if (assignedVerse < startVerse || assignedVerse > endVerse) continue
+      const verseRef = `${verseRefPrefix}${assignedVerse}`
       const token = item.token
       tokens.push({
         id: tokens.length,

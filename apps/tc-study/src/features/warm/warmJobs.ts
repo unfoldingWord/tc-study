@@ -390,13 +390,7 @@ export async function runWarmAlignChapter(
       origWords: l.origWords,
       occurrence: l.occurrence,
       quoteReady: true as const,
-      quoteTokens: (quoteRow[l.id] ?? []).map((t) => ({
-        id: t.id,
-        text: t.text,
-        type: t.type as 'word',
-        occurrence: t.occurrence,
-        content: t.content,
-      })),
+      quoteTokens: toCachedQuoteTokens(quoteRow[l.id] ?? []),
     }))
 
   if (!alignInputs.length) return 'noop'

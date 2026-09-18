@@ -27,8 +27,12 @@ import {
     presentIngredientCount,
     readAbsentFromRelease,
 } from '@bt-synergy/resource-catalog'
-import type { ProcessedNotes } from '@bt-synergy/resource-parsers'
-import { NotesProcessor } from '@bt-synergy/resource-parsers'
+import {
+    NOTES_TSV_PARSER_VERSION,
+    NotesProcessor,
+    processedNotesParserIsCurrent,
+    type ProcessedNotes,
+} from '@bt-synergy/resource-parsers'
 import type {
     TranslationNotesLoaderConfig
 } from './types'
@@ -134,6 +138,14 @@ export class TranslationNotesLoader implements ResourceLoader {
     }
   }
 
+  private notesCacheIsCurrent(cached: unknown): cached is ProcessedNotes {
+    if (!cached || typeof cached !== 'object') return false
+    const entry = cached as ProcessedNotes & { content?: ProcessedNotes }
+    const notes = entry.notesByChapter || Array.isArray(entry.notes) ? entry : entry.content
+    if (!notes || typeof notes !== 'object') return false
+    return processedNotesParserIsCurrent(notes.metadata ? notes : entry)
+  }
+
   private async notifyContentCached(resourceKey: string, bookId: string): Promise<void> {
     if (!this.onContentCached) return
     try {
@@ -151,9 +163,9 @@ export class TranslationNotesLoader implements ResourceLoader {
     const cacheKey = `tn:${resourceKey}:${bookCode}`
 
     try {
-      // Try cache first
+      // Try cache first — ignore rows parsed before multi-verse refs were kept.
       const cached = await this.cacheAdapter.get(cacheKey)
-      if (cached) {
+      if (this.notesCacheIsCurrent(cached)) {
         return cached
       }
 
@@ -316,7 +328,7 @@ export class TranslationNotesLoader implements ResourceLoader {
         if (skipExisting) {
           const cacheKey = `tn:${resourceKey}:${bookId}`
           const cached = await this.cacheAdapter.get(cacheKey)
-          if (cached && cached.notes) {
+          if (this.notesCacheIsCurrent(cached)) {
             loaded++
             if (onProgress) {
               onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (already cached)` })
@@ -352,7 +364,7 @@ export class TranslationNotesLoader implements ResourceLoader {
 
   private async isBookCached(resourceKey: string, bookId: string): Promise<boolean> {
     const cached = await this.cacheAdapter.get(`tn:${resourceKey}:${bookId}`)
-    return !!(cached && cached.notes)
+    return this.notesCacheIsCurrent(cached)
   }
 
   private async listIncompleteIngredients(
@@ -594,7 +606,7 @@ export class TranslationNotesLoader implements ResourceLoader {
 
         if (skipExisting) {
           const cached = await this.cacheAdapter.get(cacheKey)
-          if (cached && cached.notes) {
+          if (this.notesCacheIsCurrent(cached)) {
             loaded++
             if (onProgress) {
               onProgress({ loaded, total, percentage: Math.round((loaded / total) * 100), message: `Skipped ${bookId} (already cached)` })

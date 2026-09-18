@@ -15,7 +15,7 @@ import {
   resolveHelpsQuoteStatus,
   type HelpsQuoteStatus,
 } from './resolveHelpsQuoteStatus'
-import { generateSemanticIdsForQuoteTokens } from './quoteTokens'
+import { generateSemanticIdsForQuoteTokens, parseHelpsReference } from './quoteTokens'
 import type { AlignedToken } from './findAlignedTokens'
 
 type AlignReadyToken = OptimizedToken & { alignedOriginalWordIds?: unknown[] }
@@ -151,9 +151,9 @@ export function batchAlignLinks(args: BatchAlignLinksArgs): AlignLinkResult[] {
       }
     }
 
-    const refParts = link.reference.split(':')
-    const linkChapter = parseInt(refParts[0] || '1', 10)
-    const linkVerse = parseInt(refParts[1] || '1', 10)
+    const parsedRef = parseHelpsReference(link.reference)
+    const linkChapter = parsedRef.chapter
+    const linkVerse = parsedRef.verses[0]?.verse ?? 1
 
     if (linkChapter < currentChapter || linkChapter > passageEndChapter) {
       return {
@@ -193,7 +193,10 @@ export function batchAlignLinks(args: BatchAlignLinksArgs): AlignLinkResult[] {
 
     const verseStart = linkChapter === tokenChapter ? tokenStartVerse : 1
     const verseEnd = linkChapter === tokenEndChapter ? tokenEndVerse : 999
-    if (linkVerse < verseStart || linkVerse > verseEnd) {
+    const listedInSpan = parsedRef.verses.some(
+      (v) => v.chapter === linkChapter && v.verse >= verseStart && v.verse <= verseEnd
+    )
+    if (!listedInSpan) {
       return {
         index,
         id: link.id,

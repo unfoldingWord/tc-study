@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  cachedQuoteTokensToOptimized,
   enrichmentFromCachedQuotes,
   isSupportRefQuoteChipPending,
   isSupportRefPrepareJobFor,
@@ -9,6 +10,16 @@ import {
   supportRefQuoteChipKind,
   supportRefWarmJobChapter,
 } from './supportRefQuotePaint'
+
+describe('cachedQuoteTokensToOptimized', () => {
+  test('keeps stamped chapter/verse so align can paint every listed verse', () => {
+    const tokens = cachedQuoteTokensToOptimized([
+      { id: 1, text: 'יְהוָה', type: 'word', occurrence: 1, content: 'יְהוָה', chapter: 5, verse: 1 },
+      { id: 2, text: 'יְהוָה', type: 'word', occurrence: 1, content: 'יְהוָה', chapter: 5, verse: 12 },
+    ])
+    expect(tokens.map((t) => (t as { verse?: number }).verse)).toEqual([1, 12])
+  })
+})
 
 describe('paintSupportRefQuoteEnrichment', () => {
   test('quote-cache first paint stays ol-fallback without batchAlign', () => {

@@ -33,7 +33,7 @@ import {
   type HelpsAlignCacheAdapter,
 } from '../../../../features/helps/helpsAlignCache'
 import { HELPS_SYNC_MAX_LINKS } from '../../../../features/helps/helpsWorkStaging'
-import { olContentStamp } from '../../../../features/helps/helpsQuoteCache'
+import { olContentStamp, toCachedQuoteTokens } from '../../../../features/helps/helpsQuoteCache'
 import {
   compactFromAlignResult,
   reconstructAlignFromPositions,
@@ -135,7 +135,7 @@ function mergeAlignResults<TLink extends LinkQuotesInput>(
   })
 }
 
-/** Strip to clone-safe fields for the prepare worker. */
+/** Clone-safe fields for the align worker — keep verse stamps for multi-verse `&`. */
 function toAlignInputs(links: readonly LinkQuotesInput[]): AlignLinkInput[] {
   return links.map((link) => ({
     id: link.id,
@@ -143,13 +143,9 @@ function toAlignInputs(links: readonly LinkQuotesInput[]): AlignLinkInput[] {
     origWords: link.origWords,
     occurrence: link.occurrence,
     quoteReady: link.quoteReady,
-    quoteTokens: link.quoteTokens?.map((t) => ({
-      id: t.id,
-      text: t.text,
-      type: t.type,
-      occurrence: t.occurrence,
-      content: (t as { content?: string }).content ?? t.text,
-    })) as OptimizedToken[] | undefined,
+    quoteTokens: link.quoteTokens
+      ? (toCachedQuoteTokens(link.quoteTokens) as OptimizedToken[])
+      : undefined,
   }))
 }
 

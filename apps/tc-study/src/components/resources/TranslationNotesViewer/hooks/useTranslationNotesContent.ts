@@ -3,7 +3,11 @@
  * Results are cached by resourceKey+book so switching tabs doesn't re-fetch.
  */
 
-import type { ProcessedNotes, TranslationNote } from '@bt-synergy/resource-parsers'
+import {
+  processedNotesParserIsCurrent,
+  type ProcessedNotes,
+  type TranslationNote,
+} from '@bt-synergy/resource-parsers'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useCacheAdapter, useLoaderRegistry } from '../../../../contexts/CatalogContext'
 import { RESOURCE_TYPE_IDS } from '../../../../resourceTypes/resourceTypeIds'
@@ -95,9 +99,11 @@ export function useTranslationNotesContent(
             })
           : null
         const fromSoT = sot ? processedFromSoT<ProcessedNotes>(sot) : null
-        const processedNotes = (fromSoT?.notes
-          ? fromSoT
-          : ((await loader.loadContent(resourceKey, bookCode)) as ProcessedNotes | null))
+        const processedNotes = (
+          fromSoT?.notes && processedNotesParserIsCurrent(fromSoT)
+            ? fromSoT
+            : ((await loader.loadContent(resourceKey, bookCode)) as ProcessedNotes | null)
+        )
 
         if (cancelled) return
 

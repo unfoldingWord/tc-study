@@ -13,6 +13,7 @@ import {
   collectUsjWords,
   collectVerseDisplayInline,
   harvestPreVerseAlignments,
+  mergePreVerseAlignments,
   plainTextFromLayoutInline,
   USJProcessor,
 } from '../src/index'
@@ -131,5 +132,194 @@ describe('PSA 14 superscription (pre-verse \\d)', () => {
     const v1Inline = collectVerseDisplayInline(blocks, 14, 1)
     expect(plainTextFromLayoutInline(v1Inline)).toContain('foolish')
     expect(plainTextFromLayoutInline(v1Inline)).not.toContain('David')
+  })
+})
+
+describe('PSA \\d + following body verse (chapter-slice casing)', () => {
+  /**
+   * Regression: chapter SoT slices omit the book node; harvest with a lowercase
+   * book hint used to key pre-verse under `psa 5:1` while stripAlignments body
+   * stayed on `PSA 5:1`. groupsForVerse short-circuited on the lowercase key →
+   * heading tokens got zaln, body tokens did not → TN/TWL chips stayed on OL.
+   */
+  test('lowercase book hint + chapter sid: body v1 tokens keep zaln after \\d', () => {
+    const usj = {
+      content: [
+        { type: 'chapter', marker: 'c', number: 5, sid: 'PSA 5' },
+        {
+          type: 'para',
+          marker: 'd',
+          content: [
+            {
+              type: 'ms',
+              marker: 'zaln-s',
+              'x-strong': 'l:H5329',
+              'x-lemma': 'נָצַח',
+              'x-content': 'לַ⁠מְנַצֵּ֥חַ',
+              'x-occurrence': '1',
+              'x-occurrences': '1',
+            },
+            { type: 'char', marker: 'w', content: ['For'] },
+            { type: 'char', marker: 'w', content: ['the'] },
+            { type: 'char', marker: 'w', content: ['chief'] },
+            { type: 'char', marker: 'w', content: ['musician'] },
+            { type: 'ms', marker: 'zaln-e' },
+          ],
+        },
+        {
+          type: 'para',
+          marker: 'q1',
+          content: [
+            { type: 'verse', marker: 'v', number: '1', sid: 'PSA 5:1' },
+            {
+              type: 'ms',
+              marker: 'zaln-s',
+              'x-strong': 'H03068',
+              'x-lemma': 'יהוה',
+              'x-content': 'יְהוָ֗ה',
+              'x-occurrence': '1',
+              'x-occurrences': '1',
+            },
+            { type: 'char', marker: 'w', content: ['Yahweh'] },
+            { type: 'ms', marker: 'zaln-e' },
+            {
+              type: 'ms',
+              marker: 'zaln-s',
+              'x-strong': 'H0995',
+              'x-lemma': 'בּין',
+              'x-content': 'בִּ֣ינָ⁠ה',
+              'x-occurrence': '1',
+              'x-occurrences': '1',
+            },
+            { type: 'char', marker: 'w', content: ['Understand'] },
+            { type: 'ms', marker: 'zaln-e' },
+          ],
+        },
+      ],
+    }
+
+    const bodyOnly = {
+      'PSA 5:1': [
+        {
+          sources: [
+            {
+              strong: 'H03068',
+              lemma: 'יהוה',
+              content: 'יְהוָ֗ה',
+              occurrence: 1,
+              occurrences: 1,
+            },
+          ],
+          targets: [{ word: 'Yahweh', occurrence: 1, occurrences: 1 }],
+        },
+        {
+          sources: [
+            {
+              strong: 'H0995',
+              lemma: 'בּין',
+              content: 'בִּ֣ינָ⁠ה',
+              occurrence: 1,
+              occurrences: 1,
+            },
+          ],
+          targets: [{ word: 'Understand', occurrence: 1, occurrences: 1 }],
+        },
+      ],
+    }
+
+    const pre = harvestPreVerseAlignments(usj, 'psa')
+    expect(Object.keys(pre)).toEqual(['PSA 5:1'])
+    const merged = mergePreVerseAlignments(bodyOnly, pre)
+    expect(Object.keys(merged)).toEqual(['PSA 5:1'])
+    expect(merged['PSA 5:1']!.map((g) => g.targets.map((t) => t.word).join(' '))).toEqual([
+      'For the chief musician',
+      'Yahweh',
+      'Understand',
+    ])
+
+    const { viewModel } = new USJProcessor().fromUsjAndAlignments(
+      usj as never,
+      bodyOnly as never,
+      'psa',
+      'Psalms'
+    )
+    const v1 = viewModel.chapters
+      .find((c) => c.number === 5)!
+      .verses.find((v) => v.number === 1)!
+    const yahweh = v1.tokens.find((t) => t.content === 'Yahweh')
+    const understand = v1.tokens.find((t) => t.content === 'Understand')
+    const musician = v1.tokens.find((t) => t.content === 'musician')
+    expect(musician?.alignedOriginalWordIds.length).toBeGreaterThan(0)
+    expect(yahweh?.alignedOriginalWordIds.length).toBeGreaterThan(0)
+    expect(understand?.alignedOriginalWordIds.length).toBeGreaterThan(0)
+    expect(yahweh!.alignedOriginalWordIds.some((id) => id.includes('יְהוָ'))).toBe(true)
+    expect(understand!.alignedOriginalWordIds.some((id) => id.includes('בִּ֣ינ'))).toBe(true)
+  })
+
+  test('no chapter sid + lowercase hint: merge still collapses onto PSA body key', () => {
+    const usj = {
+      content: [
+        { type: 'chapter', marker: 'c', number: 5 },
+        {
+          type: 'para',
+          marker: 'd',
+          content: [
+            {
+              type: 'ms',
+              marker: 'zaln-s',
+              'x-strong': 'l:H5329',
+              'x-lemma': 'נ',
+              'x-content': 'ל',
+              'x-occurrence': '1',
+              'x-occurrences': '1',
+            },
+            { type: 'char', marker: 'w', content: ['For'] },
+            { type: 'ms', marker: 'zaln-e' },
+          ],
+        },
+        {
+          type: 'para',
+          marker: 'q1',
+          content: [
+            { type: 'verse', marker: 'v', number: '1', sid: 'PSA 5:1' },
+            {
+              type: 'ms',
+              marker: 'zaln-s',
+              'x-strong': 'H03068',
+              'x-lemma': 'י',
+              'x-content': 'יְהוָ֗ה',
+              'x-occurrence': '1',
+              'x-occurrences': '1',
+            },
+            { type: 'char', marker: 'w', content: ['Yahweh'] },
+            { type: 'ms', marker: 'zaln-e' },
+          ],
+        },
+      ],
+    }
+    const bodyOnly = {
+      'PSA 5:1': [
+        {
+          sources: [
+            {
+              strong: 'H03068',
+              lemma: 'י',
+              content: 'יְהוָ֗ה',
+              occurrence: 1,
+              occurrences: 1,
+            },
+          ],
+          targets: [{ word: 'Yahweh', occurrence: 1, occurrences: 1 }],
+        },
+      ],
+    }
+    const pre = harvestPreVerseAlignments(usj, 'psa')
+    expect(Object.keys(pre)).toEqual(['psa 5:1'])
+    const merged = mergePreVerseAlignments(bodyOnly, pre)
+    expect(Object.keys(merged)).toEqual(['PSA 5:1'])
+    expect(merged['PSA 5:1']!.map((g) => g.targets.map((t) => t.word).join(' '))).toEqual([
+      'For',
+      'Yahweh',
+    ])
   })
 })

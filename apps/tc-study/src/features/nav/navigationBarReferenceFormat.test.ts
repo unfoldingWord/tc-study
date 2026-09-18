@@ -87,4 +87,16 @@ describe('English LTR reference formatting', () => {
     expect(parts.bookPart).toBe('Titus')
     expect(parts.numberPart).toBe('1:3')
   })
+
+  test('formatVerseRefParts keeps comma lists and en-dash ranges', () => {
+    expect(formatVerseRefParts('Psalms', '5:1,3,8,12', false)).toEqual({
+      bookPart: 'Psalms',
+      numberPart: '5:1, 3, 8, 12',
+    })
+    expect(formatVerseRefParts('Psalms', '5:2-3', false)).toEqual({
+      bookPart: 'Psalms',
+      numberPart: '5:2–3',
+    })
+    expect(formatVerseRefParts('Psalms', '5:1,3,8,12', true).numberPart).toBe('1, 3, 8, 12:5')
+  })
 })

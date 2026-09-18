@@ -11,8 +11,17 @@
 import type { ProcessedNotes, TranslationNote } from '../../types';
 export type { ProcessedNotes, TranslationNote } from '../../types';
 
+/** Bump when TSV reference / row shape changes so loaders re-parse cached `tn:` blobs. */
+export const NOTES_TSV_PARSER_VERSION = '2'
+
+export function processedNotesParserIsCurrent(
+  notes: { metadata?: { parserVersion?: string } } | null | undefined
+): boolean {
+  return notes?.metadata?.parserVersion === NOTES_TSV_PARSER_VERSION
+}
+
 export class NotesProcessor {
-  private readonly PROCESSING_VERSION = '1.0.0-bt-studio';
+  private readonly PROCESSING_VERSION = NOTES_TSV_PARSER_VERSION;
 
   /**
    * Process TSV content into structured notes data
@@ -132,40 +141,36 @@ export class NotesProcessor {
   }
 
   /**
-   * Normalize reference format
-   * Based on web app's normalizeReference function
+   * Normalize reference format.
+   * Keeps Door43 ranges (`5:2-3`) and comma lists (`5:1,3,8,12`).
+   * Only collapses `front:*` / `*:intro` to a concrete first verse.
    */
   private normalizeReference(reference: string): { chapter: number; verse: number; normalized: string } | null {
     if (!reference || !reference.includes(':')) return null;
-    
-    const [chapterStr, verseStr] = reference.split(':');
-    
-    let chapter: number;
-    let verse: number;
-    
-    // Handle front matter
+
+    const colon = reference.indexOf(':');
+    const chapterStr = reference.slice(0, colon).trim();
+    const verseStr = reference.slice(colon + 1).trim();
+
     if (chapterStr === 'front') {
-      chapter = 1;
-      // front:intro -> 1:1, front:1 -> 1:1, etc.
-      verse = verseStr === 'intro' ? 1 : (parseInt(verseStr) || 1);
-    } else {
-      // Handle regular chapter references
-      chapter = parseInt(chapterStr);
-      if (isNaN(chapter)) return null;
-      
-      // Handle intro verses: 1:intro -> 1:1, 2:intro -> 2:1
-      if (verseStr === 'intro') {
-        verse = 1;
-      } else {
-        verse = parseInt(verseStr);
-        if (isNaN(verse)) return null;
-      }
+      const verse = verseStr === 'intro' ? 1 : (parseInt(verseStr, 10) || 1);
+      return { chapter: 1, verse, normalized: `1:${verse}` };
     }
-    
+
+    const chapter = parseInt(chapterStr, 10);
+    if (isNaN(chapter) || chapter < 1) return null;
+
+    if (!verseStr || verseStr === 'intro') {
+      return { chapter, verse: 1, normalized: `${chapter}:1` };
+    }
+
+    const firstVerse = parseInt(verseStr, 10);
+    if (isNaN(firstVerse) || firstVerse < 1) return null;
+
     return {
       chapter,
-      verse,
-      normalized: `${chapter}:${verse}`
+      verse: firstVerse,
+      normalized: `${chapter}:${verseStr}`,
     };
   }
 
@@ -212,6 +217,7 @@ export class NotesProcessor {
       bookCode,
       bookName,
       processingDate: new Date().toISOString(),
+      parserVersion: NOTES_TSV_PARSER_VERSION,
       totalNotes: notes.length,
       chaptersWithNotes,
       statistics: {

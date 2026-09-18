@@ -33,8 +33,10 @@ import {
 /**
  * Local prepare payload schema. Bump when light/full/nav *shape* changes
  * independently of the USJ SoT.
+ *
+ * 3: invalidate after pre-verse/`\d` merge casing fix (body v1 zaln after titles).
  */
-export const SCRIPTURE_PREPARE_SCHEMA = 2
+export const SCRIPTURE_PREPARE_SCHEMA = 3
 
 /**
  * Derived prepare cache version. Embeds USJ SoT version digits so nav/light/full
