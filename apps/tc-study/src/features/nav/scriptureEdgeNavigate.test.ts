@@ -18,6 +18,8 @@ import {
 
   isVerticalScrollbarHit,
 
+  peakOverscrollPx,
+
   nextEdgeCueVisibility,
 
   scaleWheelOverscrollDelta,
@@ -43,6 +45,14 @@ describe('elasticPullPx', () => {
 })
 
 
+
+describe('peakOverscrollPx', () => {
+  it('keeps the highest raw so bounce-back still commits', () => {
+    expect(peakOverscrollPx(0, 140)).toBe(140)
+    expect(peakOverscrollPx(80, 40)).toBe(80)
+    expect(peakOverscrollPx(-4, -2)).toBe(0)
+  })
+})
 
 describe('isPastCommitThreshold', () => {
 
@@ -130,7 +140,7 @@ describe('accumulateEdgeOverscroll', () => {
 
 
 
-  it('ignores accumulation when not armed', () => {
+  it('does not add when not armed, but keeps an existing pull', () => {
 
     const next = accumulateEdgeOverscroll({
 
@@ -148,10 +158,34 @@ describe('accumulateEdgeOverscroll', () => {
 
     })
 
-    expect(next.raw).toBe(0)
+    expect(next.raw).toBe(10)
 
-    expect(next.edge).toBeNull()
+    expect(next.edge).toBe('bottom')
 
+    expect(
+      accumulateEdgeOverscroll({
+        atTop: false,
+        atBottom: true,
+        deltaY: 40,
+        currentRaw: 0,
+        currentEdge: null,
+        armed: false,
+      })
+    ).toEqual({ raw: 0, edge: null })
+
+  })
+
+  it('decays reverse delta at the same edge instead of wiping', () => {
+    const bounced = accumulateEdgeOverscroll({
+      atTop: false,
+      atBottom: true,
+      deltaY: -30,
+      currentRaw: 150,
+      currentEdge: 'bottom',
+      armed: true,
+    })
+    expect(bounced.edge).toBe('bottom')
+    expect(bounced.raw).toBe(120)
   })
 
 
@@ -381,6 +415,31 @@ describe('commitEdgeNavigation', () => {
   })
 
 
+
+  it('commits from peak/latch after bounce-back drops live raw', () => {
+    expect(
+      commitEdgeNavigation({
+        edge: null,
+        rawOverscrollPx: 0,
+        peakOverscrollPx: 140,
+        latchedEdge: 'bottom',
+        canPrev: true,
+        canNext: true,
+        thresholdPx: EDGE_NAV_THRESHOLD_PX,
+      })
+    ).toBe('next')
+    expect(
+      commitEdgeNavigation({
+        edge: null,
+        rawOverscrollPx: 20,
+        peakOverscrollPx: 40,
+        latchedEdge: 'bottom',
+        canPrev: true,
+        canNext: true,
+        thresholdPx: EDGE_NAV_THRESHOLD_PX,
+      })
+    ).toBeNull()
+  })
 
   it('cancels below threshold', () => {
 

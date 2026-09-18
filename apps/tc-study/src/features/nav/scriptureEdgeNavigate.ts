@@ -82,7 +82,8 @@ export function accumulateEdgeOverscroll(args: {
   const { atTop, atBottom, deltaY, currentRaw, currentEdge, armed = true } = args
 
   if (!armed) {
-    return { raw: 0, edge: null }
+    // Dwell gate: do not add, but do not wipe a pull that already crossed.
+    return { raw: currentRaw, edge: currentRaw > 0 ? currentEdge : null }
   }
 
   if (deltaY < 0 && atTop) {
@@ -97,16 +98,31 @@ export function accumulateEdgeOverscroll(args: {
     return { raw: Math.max(0, next), edge: 'bottom' }
   }
 
-  // Left the edge or scrolled inward — clear pull
+  // Left the edge or scrolled inward — clear the live rubber-band only.
+  // Peak/latch in the hook still commit if this gesture already crossed.
   if (!atTop && !atBottom) {
     return { raw: 0, edge: null }
   }
 
-  // At edge but delta moves away from overscroll
+  // At edge but delta moves away — decay instead of wiping. A trackpad
+  // bounce-back of a few px must not erase a commit-threshold pull.
+  if (atTop && deltaY > 0 && currentEdge === 'top' && currentRaw > 0) {
+    const next = currentRaw - deltaY
+    return { raw: Math.max(0, next), edge: next > 0 ? 'top' : null }
+  }
+  if (atBottom && deltaY < 0 && currentEdge === 'bottom' && currentRaw > 0) {
+    const next = currentRaw + deltaY
+    return { raw: Math.max(0, next), edge: next > 0 ? 'bottom' : null }
+  }
   if (atTop && deltaY > 0) return { raw: 0, edge: null }
   if (atBottom && deltaY < 0) return { raw: 0, edge: null }
 
   return { raw: currentRaw, edge: currentEdge }
+}
+
+/** Highest raw this gesture should use when deciding commit (survives bounce-back). */
+export function peakOverscrollPx(currentRaw: number, peakRaw: number): number {
+  return Math.max(0, currentRaw, peakRaw)
 }
 
 /** Overlay scrollbars report 0 gutter; still hit-test a thin inline-end strip. */
@@ -154,9 +170,18 @@ export function commitEdgeNavigation(args: {
   canPrev: boolean
   canNext: boolean
   thresholdPx?: number
+  /**
+   * Highest raw this gesture reached. Wheel/touch bounce often drops live
+   * raw below the threshold before settle — still commit if the peak crossed.
+   */
+  peakOverscrollPx?: number
+  /** Edge that was armed when the peak crossed the threshold. */
+  latchedEdge?: ScriptureEdge | null
 }): 'previous' | 'next' | null {
-  const { edge, rawOverscrollPx, canPrev, canNext, thresholdPx } = args
-  if (!edge || !isPastCommitThreshold(rawOverscrollPx, thresholdPx)) return null
+  const { canPrev, canNext, thresholdPx } = args
+  const edge = args.edge ?? args.latchedEdge ?? null
+  const raw = peakOverscrollPx(args.rawOverscrollPx, args.peakOverscrollPx ?? 0)
+  if (!edge || !isPastCommitThreshold(raw, thresholdPx)) return null
   if (edge === 'top') return canPrev ? 'previous' : null
   return canNext ? 'next' : null
 }

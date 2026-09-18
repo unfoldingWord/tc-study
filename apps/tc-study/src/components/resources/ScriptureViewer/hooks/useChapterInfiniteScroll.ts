@@ -11,7 +11,6 @@ import {
   PHASE_UPGRADE_HOLD_MS,
   SETTLE_HOLD_MS,
   PREFETCH_DISTANCE_PX,
-  CHAPTER_REVEAL_TOP_OFFSET_PX,
   approachingNeighborChapter,
   canRevealChapterAtEdge,
   CHAPTER_EDGE_SWAP_MODE,
@@ -26,6 +25,8 @@ import {
   lastChapterNumber,
   measureScrollVelocity,
   neighborChapterToPaint,
+  paintedStackEdgeChapter,
+  peekScrollTopAfterEdgeReveal,
   recenterSlots,
   resetChapterSlots,
   revealChapterInWindow,
@@ -38,7 +39,6 @@ import {
   settleViewportChapter,
   singlePaintedChapterSlots,
   slotsEqual,
-  scrollTopForElementAtTop,
   upgradeSlot,
   type ChapterSlot,
 } from '../../../../features/nav/chapterInfiniteScroll'
@@ -137,10 +137,12 @@ export function useChapterInfiniteScroll(
   const prependAdjustRef = useRef<{ height: number; top: number } | null>(null)
   const preserveAlignRef = useRef<{ chapter: number; viewportOffset: number } | null>(null)
   const alignToChapterRef = useRef<number | null>(currentRef.chapter)
-  /** After next-edge reveal: scroll the new chapter heading to the top with offset. */
-  const pendingRevealTopAlignRef = useRef<number | null>(null)
+  /** After edge reveal: small peek toward the new chapter (not snap to verse 1). */
+  const pendingRevealPeekRef = useRef<'next' | 'previous' | null>(null)
   /** Previous chapter after a picker/helps jump — settle must not snap back. */
   const blockSnapBackToRef = useRef<number | null>(null)
+  /** Revealed chapter — settle must not snap back while the old pane still owns the read-line. */
+  const holdSettledToRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
 
   const registerChapter = useCallback((chapter: number, el: HTMLElement | null) => {
@@ -168,30 +170,46 @@ export function useChapterInfiniteScroll(
       const target = edgeRevealTargetChapter(slotsRef.current, direction, lastChapter)
       if (target == null) return false
 
-      if (direction === 'previous') {
-        const parent = scrollParentRef.current ?? findOverflowParent(contentRef.current)
-        if (parent) {
-          scrollParentRef.current = parent
+      const parent = scrollParentRef.current ?? findOverflowParent(contentRef.current)
+      if (parent) {
+        scrollParentRef.current = parent
+        const stayChapter = paintedStackEdgeChapter(
+          slotsRef.current,
+          direction === 'next' ? 'max' : 'min'
+        )
+        const stayEl = stayChapter != null ? chapterElsRef.current.get(stayChapter) : null
+        if (stayEl) {
+          // Keep the chapter the user was reading pinned, even if the opposite
+          // end is trimmed when the stack hits max mounted chapters.
+          preserveAlignRef.current = {
+            chapter: stayChapter,
+            viewportOffset:
+              stayEl.getBoundingClientRect().top - parent.getBoundingClientRect().top,
+          }
+        } else if (direction === 'previous') {
           prependAdjustRef.current = {
             height: parent.scrollHeight,
             top: parent.scrollTop,
           }
         }
       }
-      // After paint (and prepend adjust), land the revealed chapter heading near the top.
-      pendingRevealTopAlignRef.current = target
+      pendingRevealPeekRef.current = direction
+      holdSettledToRef.current = target
 
       setSlots((prev) => {
         const next = revealChapterInWindow(prev, target, direction, lastChapter)
         return slotsEqual(prev, next) ? prev : next
       })
+      // Click / overscroll asked for the adjacent chapter — update chrome/helps
+      // now. Peek keeps scroll at the junction; do not align to verse 1.
+      commitChapter(target)
       // Reveal often grows content without a scroll event — kick settle so
       // paragraph→rendered upgrade is not stuck behind unsettled forever.
       markChapterScrollUnsettled()
       setSettleKick((n) => n + 1)
       return true
     },
-    [enabled, lastChapter]
+    [enabled, lastChapter, commitChapter]
   )
 
   const warmChapterAtEdge = useCallback(
@@ -240,6 +258,7 @@ export function useChapterInfiniteScroll(
         ensureAttemptsRef.current.clear()
         setTokenSourceFailed(false)
         healingRef.current = false
+        holdSettledToRef.current = null
         setSlots(singlePaintedChapterSlots(currentRef.chapter, 'paragraph'))
         alignToChapterRef.current = currentRef.chapter
         committedByUsRef.current = null
@@ -252,6 +271,7 @@ export function useChapterInfiniteScroll(
           // Picker / helps jump: reset to one chapter. Do not let align-scroll
           // settle snap back to the previous chapter or block tokenize.
           blockSnapBackToRef.current = navChapterRef.current
+          holdSettledToRef.current = null
           beginProgrammaticScrollSuppress(800)
           ensureAttemptsRef.current.clear()
           setTokenSourceFailed(false)
@@ -379,22 +399,30 @@ export function useChapterInfiniteScroll(
       }
     }
 
-    const revealChapter = pendingRevealTopAlignRef.current
-    if (revealChapter != null && parent) {
-      const section = chapterElsRef.current.get(revealChapter)
-      const heading =
-        (section?.querySelector('h2') as HTMLElement | null) ?? section ?? null
-      if (heading) {
-        beginProgrammaticScrollSuppress(500)
-        const elementOffsetFromParentTop =
-          heading.getBoundingClientRect().top - parent.getBoundingClientRect().top
-        parent.scrollTop = scrollTopForElementAtTop({
-          parentScrollTop: parent.scrollTop,
-          elementOffsetFromParentTop,
-          offsetPx: CHAPTER_REVEAL_TOP_OFFSET_PX,
-        })
-        pendingRevealTopAlignRef.current = null
-      }
+    const peekDir = pendingRevealPeekRef.current
+    if (peekDir != null && parent) {
+      const incomingChapter = paintedStackEdgeChapter(
+        slots,
+        peekDir === 'next' ? 'max' : 'min'
+      )
+      const incomingEl =
+        incomingChapter != null ? chapterElsRef.current.get(incomingChapter) : null
+      const incomingTop =
+        incomingEl && incomingEl.offsetHeight > 0
+          ? incomingEl.getBoundingClientRect().top -
+            parent.getBoundingClientRect().top +
+            parent.scrollTop
+          : undefined
+      beginProgrammaticScrollSuppress(500)
+      parent.scrollTop = peekScrollTopAfterEdgeReveal({
+        direction: peekDir,
+        parentScrollTop: parent.scrollTop,
+        scrollHeight: parent.scrollHeight,
+        clientHeight: parent.clientHeight,
+        incomingTop,
+        incomingHeight: incomingEl?.offsetHeight,
+      })
+      pendingRevealPeekRef.current = null
     }
 
     for (const slot of slots) {
@@ -801,12 +829,15 @@ export function useChapterInfiniteScroll(
           navChapter: navChapterRef.current,
           paintedHasParked: parked != null && painted.has(parked),
           blockSnapBackTo: blockSnapBackToRef.current,
+          holdToChapter: holdSettledToRef.current,
         })
         if (commitSettled) {
           commitChapter(parked!)
           blockSnapBackToRef.current = null
+          holdSettledToRef.current = null
         } else if (parked === navChapterRef.current) {
           blockSnapBackToRef.current = null
+          holdSettledToRef.current = null
         }
         // Match legacy stitch settle: always re-settle, even when parked === nav
         // (post-commit scroll adjust / reveal-without-scroll would otherwise stick unsettled).

@@ -35,10 +35,10 @@ export const PREFETCH_DISTANCE_PX = 120
 /** Long enough that a continuous slow scroll stays “scrolling”, not a chain of settles. */
 export const SETTLE_HOLD_MS = 280
 /**
- * After edge-reveal appends the next chapter, land its heading this far below
- * the scrollport top (matches token highlight `scroll-mt-12`).
+ * After edge-reveal, nudge this far toward the new chapter so its incoming
+ * edge/title peeks in. Not a snap-to-heading reset and not a travel pad.
  */
-export const CHAPTER_REVEAL_TOP_OFFSET_PX = 48
+export const CHAPTER_REVEAL_PEEK_PX = 56
 /**
  * Extra hold after settle before mounting token trees / swapping light→full.
  * Settle already waited {@link SETTLE_HOLD_MS}; keep this at 0 so helps
@@ -763,16 +763,21 @@ export function shouldResetWindowOnNavChange(args: {
 /**
  * After a CombinedHelps / picker jump, ignore settle that would commit the
  * previous chapter (align scroll still sees the old pane for one frame).
+ *
+ * After an edge-cue reveal, `holdToChapter` keeps settle from snapping nav
+ * back to the chapter that still owns the read-line (peek is only ~56px).
  */
 export function shouldCommitSettledChapter(args: {
   parked: number | null
   navChapter: number
   paintedHasParked: boolean
   blockSnapBackTo: number | null
+  holdToChapter?: number | null
 }): boolean {
   if (args.parked == null || !args.paintedHasParked) return false
   if (args.parked === args.navChapter) return false
   if (args.blockSnapBackTo != null && args.parked === args.blockSnapBackTo) return false
+  if (args.holdToChapter != null && args.parked !== args.holdToChapter) return false
   return true
 }
 
@@ -784,14 +789,39 @@ export function wouldEnqueueWholeBook(
 }
 
 /**
- * ScrollTop that places an element near the top of its overflow parent,
- * leaving {@link CHAPTER_REVEAL_TOP_OFFSET_PX} (or `offsetPx`) of breathing room.
+ * Keep the user near the edge they left, then nudge a little toward the newly
+ * painted chapter. Clamped to the scroll range — never a verse-1 / heading snap.
+ *
+ * When the incoming chapter box is known, peek relative to that junction so
+ * scroll-anchoring (pin-to-end when content grows) cannot skip the new chapter.
  */
-export function scrollTopForElementAtTop(args: {
+export function peekScrollTopAfterEdgeReveal(args: {
+  direction: 'next' | 'previous'
   parentScrollTop: number
-  elementOffsetFromParentTop: number
-  offsetPx?: number
+  scrollHeight: number
+  clientHeight: number
+  peekPx?: number
+  incomingTop?: number
+  incomingHeight?: number
 }): number {
-  const offset = args.offsetPx ?? CHAPTER_REVEAL_TOP_OFFSET_PX
-  return Math.max(0, args.parentScrollTop + args.elementOffsetFromParentTop - offset)
+  const peek = args.peekPx ?? CHAPTER_REVEAL_PEEK_PX
+  const maxScroll = Math.max(0, args.scrollHeight - args.clientHeight)
+  const clamp = (top: number) => Math.min(maxScroll, Math.max(0, top))
+
+  const incomingTop = args.incomingTop
+  const incomingHeight = args.incomingHeight ?? 0
+  if (incomingTop != null && Number.isFinite(incomingTop)) {
+    if (args.direction === 'next') {
+      return clamp(incomingTop - args.clientHeight + peek)
+    }
+    if (incomingHeight > 0) {
+      return clamp(incomingTop + incomingHeight - peek)
+    }
+  }
+
+  const nextTop =
+    args.direction === 'next'
+      ? args.parentScrollTop + peek
+      : args.parentScrollTop - peek
+  return clamp(nextTop)
 }

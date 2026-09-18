@@ -13,7 +13,9 @@ import {
   EDGE_NAV_THRESHOLD_PX,
   elasticPullPx,
   isEdgeGestureArmed,
+  isPastCommitThreshold,
   nextEdgeCueVisibility,
+  peakOverscrollPx,
   scaleWheelOverscrollDelta,
   scrollEdgeState,
   type ScriptureEdge,
@@ -83,6 +85,9 @@ export function useScriptureEdgeNavigate({
 
   const rawRef = useRef(0)
   const edgeRef = useRef<ScriptureEdge | null>(null)
+  /** Highest raw this pull — bounce-back must not lose a crossed threshold. */
+  const peakRawRef = useRef(0)
+  const latchedEdgeRef = useRef<ScriptureEdge | null>(null)
   const committedRef = useRef(false)
   const touchStartYRef = useRef<number | null>(null)
   const touchStartedAtEdgeRef = useRef<ScriptureEdge | null>(null)
@@ -104,6 +109,12 @@ export function useScriptureEdgeNavigate({
   const applyVisual = (raw: number, nextEdge: ScriptureEdge | null) => {
     rawRef.current = raw
     edgeRef.current = nextEdge
+    if (nextEdge && raw > 0) {
+      peakRawRef.current = peakOverscrollPx(raw, peakRawRef.current)
+      if (isPastCommitThreshold(peakRawRef.current, thresholdPx)) {
+        latchedEdgeRef.current = nextEdge
+      }
+    }
     const display = nextEdge ? elasticPullPx(raw, maxPullPx) : 0
     const signed = nextEdge === 'top' ? display : nextEdge === 'bottom' ? -display : 0
     setPullPx(signed)
@@ -115,8 +126,14 @@ export function useScriptureEdgeNavigate({
     }
   }
 
+  const resetGesturePeak = () => {
+    peakRawRef.current = 0
+    latchedEdgeRef.current = null
+  }
+
   const clearPull = (resetCommitted = true) => {
     applyVisual(0, null)
+    resetGesturePeak()
     if (resetCommitted) committedRef.current = false
   }
 
@@ -190,8 +207,11 @@ export function useScriptureEdgeNavigate({
       clearPull(false)
       return
     }
+    const peak = peakOverscrollPx(rawRef.current, peakRawRef.current)
+    const crossed = fromClick || isPastCommitThreshold(peak, thresholdPx)
     if (
       !fromClick &&
+      !crossed &&
       !isEdgeGestureArmed(cueArmedAtRef.current ?? edgeReachedAtRef.current, Date.now(), minDwellMs)
     ) {
       return
@@ -199,6 +219,8 @@ export function useScriptureEdgeNavigate({
     const action = commitEdgeNavigation({
       edge: edgeRef.current,
       rawOverscrollPx: fromClick ? thresholdPx : rawRef.current,
+      peakOverscrollPx: fromClick ? thresholdPx : peak,
+      latchedEdge: fromClick ? edgeRef.current : latchedEdgeRef.current,
       canPrev: canPrevRef.current(),
       canNext: canNextRef.current(),
       thresholdPx,
@@ -211,6 +233,13 @@ export function useScriptureEdgeNavigate({
       contentEl.style.transition = 'transform 160ms ease-out'
     }
     clearPull(true)
+  }
+
+  const commitIfCrossed = () => {
+    const peak = peakOverscrollPx(rawRef.current, peakRawRef.current)
+    if (latchedEdgeRef.current || isPastCommitThreshold(peak, thresholdPx)) {
+      tryCommit()
+    }
   }
 
   const clickPrev = () => {
@@ -241,7 +270,10 @@ export function useScriptureEdgeNavigate({
       const { atTop, atBottom } = readEdges()
       noteEdgePresence(atTop, atBottom)
       syncCuesFromScroll()
-      if (!atTop && !atBottom && rawRef.current === 0) return
+      if (!atTop && !atBottom && rawRef.current === 0) {
+        commitIfCrossed()
+        return
+      }
 
       const armed = isEdgeGestureArmed(edgeReachedAtRef.current, Date.now(), minDwellMs)
       const next = accumulateEdgeOverscroll({
@@ -256,8 +288,12 @@ export function useScriptureEdgeNavigate({
       if (next.edge && next.raw > 0) {
         event.preventDefault()
         applyVisual(next.raw, next.edge)
+        // Click commits immediately; scroll must too once the spinner is shown.
+        // Waiting for settle lets bounce-back / leave-edge wipe raw and abort.
+        commitIfCrossed()
       } else if (rawRef.current > 0 && next.raw === 0) {
         applyVisual(0, null)
+        commitIfCrossed()
       }
     }
 
@@ -267,7 +303,7 @@ export function useScriptureEdgeNavigate({
       if (wheelSettleTimer != null) window.clearTimeout(wheelSettleTimer)
       wheelSettleTimer = window.setTimeout(() => {
         wheelSettleTimer = null
-        if (rawRef.current > 0) tryCommit()
+        if (rawRef.current > 0 || latchedEdgeRef.current) tryCommit()
       }, 180)
     }
 
@@ -298,6 +334,7 @@ export function useScriptureEdgeNavigate({
         if (raw > 0) {
           event.preventDefault()
           applyVisual(raw, 'top')
+          commitIfCrossed()
         }
         return
       }
@@ -306,6 +343,7 @@ export function useScriptureEdgeNavigate({
         if (raw > 0) {
           event.preventDefault()
           applyVisual(raw, 'bottom')
+          commitIfCrossed()
         }
         return
       }
@@ -315,7 +353,7 @@ export function useScriptureEdgeNavigate({
     const onTouchEnd = () => {
       touchStartYRef.current = null
       touchStartedAtEdgeRef.current = null
-      if (rawRef.current > 0) tryCommit()
+      if (rawRef.current > 0 || latchedEdgeRef.current) tryCommit()
     }
 
     let scrollSettleTimer: number | null = null
@@ -327,7 +365,7 @@ export function useScriptureEdgeNavigate({
       if (scrollSettleTimer != null) window.clearTimeout(scrollSettleTimer)
       scrollSettleTimer = window.setTimeout(() => {
         scrollSettleTimer = null
-        if (rawRef.current > 0) tryCommit()
+        if (rawRef.current > 0 || latchedEdgeRef.current) tryCommit()
       }, 180)
     }
 

@@ -8,8 +8,8 @@ import {
   PHASE_UPGRADE_HOLD_MS,
   PLACEHOLDER_MIN_HEIGHT_PX,
   SETTLE_HOLD_MS,
-  CHAPTER_REVEAL_TOP_OFFSET_PX,
-  scrollTopForElementAtTop,
+  CHAPTER_REVEAL_PEEK_PX,
+  peekScrollTopAfterEdgeReveal,
   adjacentChapterToRequest,
   adjacentSlotKindAfterSettle,
   approachingNeighborChapter,
@@ -96,22 +96,68 @@ describe('chapter edge-reveal stack', () => {
     expect(canRevealChapterAtEdge(revealChapterInWindow(slots, 4, 'next', 4), 'next', 4)).toBe(false)
   })
 
-  test('scrollTopForElementAtTop leaves a top offset under the scrollport', () => {
+  test('peekScrollTopAfterEdgeReveal nudges toward the new chapter without a start snap', () => {
+    expect(CHAPTER_REVEAL_PEEK_PX).toBe(56)
+    expect(CHAPTER_REVEAL_PEEK_PX).toBeLessThan(168)
     expect(
-      scrollTopForElementAtTop({
-        parentScrollTop: 1000,
-        elementOffsetFromParentTop: 200,
-        offsetPx: 48,
+      peekScrollTopAfterEdgeReveal({
+        direction: 'next',
+        parentScrollTop: 1400,
+        scrollHeight: 4000,
+        clientHeight: 600,
       })
-    ).toBe(1152)
+    ).toBe(1456)
     expect(
-      scrollTopForElementAtTop({
-        parentScrollTop: 0,
-        elementOffsetFromParentTop: 20,
-        offsetPx: 48,
+      peekScrollTopAfterEdgeReveal({
+        direction: 'previous',
+        parentScrollTop: 1800,
+        scrollHeight: 4000,
+        clientHeight: 600,
+      })
+    ).toBe(1744)
+  })
+
+  test('peekScrollTopAfterEdgeReveal clamps to the scroll range', () => {
+    expect(
+      peekScrollTopAfterEdgeReveal({
+        direction: 'next',
+        parentScrollTop: 3380,
+        scrollHeight: 4000,
+        clientHeight: 600,
+      })
+    ).toBe(3400)
+    expect(
+      peekScrollTopAfterEdgeReveal({
+        direction: 'previous',
+        parentScrollTop: 20,
+        scrollHeight: 4000,
+        clientHeight: 600,
       })
     ).toBe(0)
-    expect(CHAPTER_REVEAL_TOP_OFFSET_PX).toBe(48)
+  })
+
+  test('peekScrollTopAfterEdgeReveal uses the incoming chapter junction, not a start snap', () => {
+    // Bottom-anchored after append: pull back to show the new heading, not verse 1 (2000).
+    expect(
+      peekScrollTopAfterEdgeReveal({
+        direction: 'next',
+        parentScrollTop: 4000,
+        scrollHeight: 5000,
+        clientHeight: 600,
+        incomingTop: 2000,
+      })
+    ).toBe(1456)
+    // Prepend jumped to 0: show the previous chapter's end, not its verse 1.
+    expect(
+      peekScrollTopAfterEdgeReveal({
+        direction: 'previous',
+        parentScrollTop: 0,
+        scrollHeight: 4000,
+        clientHeight: 600,
+        incomingTop: 0,
+        incomingHeight: 1800,
+      })
+    ).toBe(1744)
   })
 })
 
@@ -329,6 +375,45 @@ describe('chapterInfiniteScroll nav settle', () => {
         navChapter: 2,
         paintedHasParked: true,
         blockSnapBackTo: 1,
+      })
+    ).toBe(true)
+  })
+
+  test('edge-reveal hold does not settle-commit the chapter that still owns the read-line', () => {
+    expect(
+      shouldCommitSettledChapter({
+        parked: 5,
+        navChapter: 6,
+        paintedHasParked: true,
+        blockSnapBackTo: null,
+        holdToChapter: 6,
+      })
+    ).toBe(false)
+    expect(
+      shouldCommitSettledChapter({
+        parked: 6,
+        navChapter: 6,
+        paintedHasParked: true,
+        blockSnapBackTo: null,
+        holdToChapter: 6,
+      })
+    ).toBe(false)
+    expect(
+      shouldCommitSettledChapter({
+        parked: 7,
+        navChapter: 6,
+        paintedHasParked: true,
+        blockSnapBackTo: null,
+        holdToChapter: 6,
+      })
+    ).toBe(false)
+    expect(
+      shouldCommitSettledChapter({
+        parked: 7,
+        navChapter: 6,
+        paintedHasParked: true,
+        blockSnapBackTo: null,
+        holdToChapter: 7,
       })
     ).toBe(true)
   })
