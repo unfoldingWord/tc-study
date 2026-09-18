@@ -37,13 +37,19 @@ export {
   viewModelFromProcessedScripture,
   usjTokensFromProcessedVerse,
 } from './viewModelFromProcessed'
-export { collectUsjWords, parseVerseSid, extractText } from './usjWalk'
+export { collectUsjWords, parseVerseSid, extractText, extractDeepText } from './usjWalk'
+export {
+  harvestPreVerseAlignments,
+  mergePreVerseAlignments,
+} from './preVerseAlignments'
 export {
   buildUsjLayoutBlocks,
+  buildUsjLayoutBlocksForChapter,
   buildTokenQueuesFromViewModel,
   filterUsjLayoutBlocks,
   clipLayoutInlineToVerses,
   collectVerseDisplayInline,
+  collectVerseBlockSequence,
   plainTextFromLayoutInline,
   shouldInsertSpaceBeforeInline,
   indentLevelForMarker,
@@ -52,10 +58,12 @@ export {
   HEADING_MARKERS,
   INTRO_HEADING_MARKERS,
   FOOTNOTE_MARKERS,
+  XREF_MARKERS,
   SKIP_MARKERS,
   type UsjLayoutBlock,
   type UsjLayoutInline,
   type UsjLayoutBlockRole,
+  type UsjVerseBlockItem,
   type FilterUsjLayoutOptions,
 } from './usjLayout'
 export { USJ_PROCESSING_VERSION, USJ_TOOL_VERSIONS, type UsjToolVersions } from './versions'

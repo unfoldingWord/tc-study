@@ -3,7 +3,8 @@
  * show MarkdownSkeleton instead of empty or finished-looking prose.
  *
  * - TWL: first-paragraph TW article fetch has no cache entry yet (Bible and OBS)
- * - TN: Bible quote chip is still building (TSV note body would look finished)
+ * - TN: TSV note body is already on the row — never gate prose on quote status.
+ *   Quote chips handle pending / OL / aligned on their own.
  * OBS TN uses the literal quote immediately — no body skeleton.
  */
 
@@ -12,6 +13,7 @@ import type { HelpsQuoteStatus } from './resolveHelpsQuoteStatus'
 export function shouldShowHelpsExcerptSkeleton(opts: {
   kind: 'tn' | 'twl'
   obsMode?: boolean
+  /** @deprecated TN no longer skeletons on quote pending; kept for call-site compat. */
   quoteStatus?: HelpsQuoteStatus
   /** TWL: preview string when cached and non-empty */
   twPreview?: string | null
@@ -21,6 +23,6 @@ export function shouldShowHelpsExcerptSkeleton(opts: {
   if (opts.kind === 'twl') {
     return !!opts.twPreviewPending && !opts.twPreview
   }
-  if (opts.obsMode) return false
-  return opts.quoteStatus === 'pending'
+  // TN note markdown ships with the TSV row — do not hide it while quotes build.
+  return false
 }

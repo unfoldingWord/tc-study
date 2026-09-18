@@ -1,121 +1,87 @@
 /**
  * useTATitles Hook
  *
- * Fetches and caches Translation Academy article titles
+ * Fetches Translation Academy article titles via shared helps-text cache
+ * (memory → IndexedDB → catalog TOC).
  */
 
-import { useCallback, useRef, useState } from 'react'
-import { useCatalogManager } from '../../../../contexts'
+import { useCallback } from 'react'
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
+import { useCatalogManager } from '../../../../contexts'
+import { resourceContentStamp } from '../../../../features/helps/resourceContentStamp'
+import { getCachedTocTitleIndex, lookupTocTitle } from '../../../../features/helps/tocTitleIndex'
+import { useHelpsTextCache } from '../../../../features/helps/useHelpsTextCache'
 
-// Parse TA support reference to extract article path
-// Example: rc://*/ta/man/translate/figs-metaphor -> translate/figs-metaphor
 function parseTAReference(supportRef: string): string | null {
   const match = supportRef.match(/rc:\/\/\*\/ta\/man\/(.+)/)
   return match ? match[1] : null
 }
 
+function resolveTaResourceKey(tnResourceKey: string): string | null {
+  const parts = tnResourceKey.split('/')
+  if (parts.length < 2) return null
+  const [owner, langPart] = parts
+  const language = langPart.split('_')[0]
+  return `${owner}/${language}/ta`
+}
+
 export function useTATitles(resourceKey: string) {
   const catalogManager = useCatalogManager()
-  const [taTitles, setTaTitles] = useState<Map<string, string>>(new Map())
-  const [loadingTitles, setLoadingTitles] = useState<Set<string>>(new Set())
-  const taTitlesRef = useRef<Map<string, string>>(new Map())
+  const { values: taTitles, loading: loadingTitles, fetchText, getCached } =
+    useHelpsTextCache('ta-title')
 
-  // Fetch TA title for a note from TOC
-  const fetchTATitle = useCallback(async (note: TranslationNote): Promise<string | null> => {
-    if (!note.supportReference) {
-      return null
-    }
+  const fetchTATitle = useCallback(
+    async (note: TranslationNote): Promise<string | null> => {
+      if (!note.supportReference) return null
+      const articlePath = parseTAReference(note.supportReference)
+      if (!articlePath) return null
 
-    const articlePath = parseTAReference(note.supportReference)
-    if (!articlePath) {
-      return null
-    }
+      const taResourceKey = resolveTaResourceKey(resourceKey)
+      if (!taResourceKey) return null
 
-    // Check cache first
-    if (taTitlesRef.current.has(articlePath)) {
-      return taTitlesRef.current.get(articlePath) || null
-    }
+      try {
+        const taMetadata = await catalogManager.getResourceMetadata(taResourceKey)
+        const stamp = resourceContentStamp(taMetadata)
 
-    // Check if already loading
-    if (loadingTitles.has(articlePath)) {
-      return null
-    }
-
-    try {
-      setLoadingTitles(prev => new Set(prev).add(articlePath))
-
-      // Find TA resource (same language, same owner)
-      const parts = resourceKey.split('/')
-      if (parts.length < 2) {
-        throw new Error(`Invalid resourceKey format: ${resourceKey}`)
+        return await fetchText({
+          resourceKey: taResourceKey,
+          stamp,
+          entryId: articlePath,
+          resolve: async () => {
+            const ingredients = taMetadata?.contentMetadata?.ingredients
+            const index = getCachedTocTitleIndex(taResourceKey, stamp, ingredients)
+            if (!index) {
+              return {
+                value: articlePath.split('/').pop() || 'Learn more',
+                confident: false,
+              }
+            }
+            const title = lookupTocTitle(index, articlePath)
+            if (!title) {
+              return {
+                value: articlePath.split('/').pop() || 'Learn more',
+                confident: false,
+              }
+            }
+            return { value: title, confident: true }
+          },
+        })
+      } catch {
+        return articlePath.split('/').pop() || 'Learn more'
       }
+    },
+    [resourceKey, catalogManager, fetchText]
+  )
 
-      const [owner, langPart] = parts
-      const language = langPart.split('_')[0]
-      const taResourceKey = `${owner}/${language}/ta`
-
-      // Get TA resource metadata from catalog (contains TOC in ingredients)
-      const taMetadata = await catalogManager.getResourceMetadata(taResourceKey)
-
-      if (!taMetadata?.contentMetadata?.ingredients) {
-        // TA metadata not ready yet - use fallback title
-        const fallback = articlePath.split('/').pop() || 'Learn more'
-        taTitlesRef.current.set(articlePath, fallback)
-        setTaTitles(prev => new Map(prev).set(articlePath, fallback))
-        return fallback
-      }
-
-      const ingredients = taMetadata.contentMetadata.ingredients
-
-      // Look up title from TOC ingredients
-      const ingredient = ingredients.find((ing: { identifier?: string; path?: string; title?: string }) => {
-        // Match by path or identifier
-        if (ing.identifier === articlePath) return true
-        if (ing.path && ing.path.replace(/\.md$/, '') === articlePath) return true
-        return false
-      })
-
-      if (!ingredient?.title) {
-        // Ingredient not found in TOC - use fallback
-        const fallback = articlePath.split('/').pop() || 'Learn more'
-        taTitlesRef.current.set(articlePath, fallback)
-        setTaTitles(prev => new Map(prev).set(articlePath, fallback))
-        return fallback
-      }
-
-      const title = ingredient.title
-      taTitlesRef.current.set(articlePath, title)
-      setTaTitles(prev => new Map(prev).set(articlePath, title))
-      return title
-    } catch (_error) {
-      // Silently fail - use fallback title
-      const fallback = articlePath.split('/').pop() || 'Learn more'
-      taTitlesRef.current.set(articlePath, fallback)
-      setTaTitles(prev => new Map(prev).set(articlePath, fallback))
-      return fallback
-    } finally {
-      setLoadingTitles(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(articlePath)
-        return newSet
-      })
-    }
-  }, [resourceKey, catalogManager])
-
-  // Get TA title for display
-  const getTATitle = useCallback((note: TranslationNote): string => {
-    if (!note.supportReference) {
-      return 'Learn more'
-    }
-
-    const articlePath = parseTAReference(note.supportReference)
-    if (!articlePath) {
-      return 'Learn more'
-    }
-
-    return taTitles.get(articlePath) || articlePath.split('/').pop() || 'Learn more'
-  }, [taTitles])
+  const getTATitle = useCallback(
+    (note: TranslationNote): string => {
+      if (!note.supportReference) return 'Learn more'
+      const articlePath = parseTAReference(note.supportReference)
+      if (!articlePath) return 'Learn more'
+      return getCached(articlePath) || articlePath.split('/').pop() || 'Learn more'
+    },
+    [getCached]
+  )
 
   return {
     taTitles,

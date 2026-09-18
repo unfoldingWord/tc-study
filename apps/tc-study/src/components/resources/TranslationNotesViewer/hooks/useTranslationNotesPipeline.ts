@@ -97,7 +97,10 @@ export function useTranslationNotesPipeline({
       quoteTokens: quoteTokensMap.get(note.id),
       alignedTokens: alignedTokensMap.get(note.id),
       semanticIds: semanticIdsMap.get(note.id),
-      quoteStatus: quoteStatusMap.get(note.id),
+      // Empty-quote notes skip quote-build; settle immediately so cards paint prose.
+      quoteStatus:
+        quoteStatusMap.get(note.id) ??
+        (note.quote?.trim() ? undefined : 'none'),
     })) as NoteWithTokens[]
   }, [relevantNotes, linksWithQuotes, linksWithAlignedTokens])
 

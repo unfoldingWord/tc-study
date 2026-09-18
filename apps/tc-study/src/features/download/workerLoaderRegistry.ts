@@ -2,6 +2,10 @@
  * Worker loader registration driven by loaderConfig SoT
  * (`getWorkerDownloadConfigs()` — surfaces.workerDownload only).
  * Factory keys dedupe shared loader instances (e.g. notes + obs-notes).
+ *
+ * Do not prepare books in this worker. A dynamic prepare import pulled a
+ * window-touching chunk here (UHB died at 1%). Extract/USJ cache is enough
+ * for resource-complete; prepare.worker + preparedTiersExist write light/full.
  */
 
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
@@ -26,12 +30,12 @@ export interface WorkerLoaderDeps {
   debug?: boolean
 }
 
-/** Shared ctor shape across worker loaders (adapters typed loosely at the worker boundary). */
 type LoaderConfig = {
   cacheAdapter: unknown
   catalogAdapter: unknown
   door43Client: unknown
   debug: boolean
+  enableMemoryCache?: boolean
 }
 
 type LoaderCtor = (deps: WorkerLoaderDeps) => ResourceLoader
@@ -47,7 +51,11 @@ function toLoaderConfig(deps: WorkerLoaderDeps): LoaderConfig {
 
 /** Worker-download factories only (compositions are not worker loaders). */
 const LOADER_FACTORIES: Partial<Record<LoaderFactoryKey, LoaderCtor>> = {
-  scripture: (deps) => new ScriptureLoader(toLoaderConfig(deps)),
+  scripture: (deps) =>
+    new ScriptureLoader({
+      ...toLoaderConfig(deps),
+      enableMemoryCache: true,
+    }),
   words: (deps) => new TranslationWordsLoader(toLoaderConfig(deps)),
   'words-links': (deps) => new TranslationWordsLinksLoader(toLoaderConfig(deps)),
   academy: (deps) => new TranslationAcademyLoader(toLoaderConfig(deps)),

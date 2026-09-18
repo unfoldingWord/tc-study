@@ -38,4 +38,15 @@ describe('BCV navigator Read wiring (issue #25)', () => {
     expect(controllerSrc).not.toContain('handleHelpsLanguageSelected')
     expect(controllerSrc).not.toContain('writePersistedHelpsLanguage')
   })
+
+  test('chapter mode opens chapter-only grid and modal can switch grain', () => {
+    expect(compactSrc).toContain("navigationMode === 'chapter'")
+    expect(bcvSrc).toContain('ScriptureModeTabs')
+    expect(bcvSrc).toContain("grain={c.scripturePickerMode === 'chapter' ? 'chapter' : 'verse'}")
+    expect(controllerSrc).toContain('buildChapterApplyRef')
+    expect(controllerSrc).toContain("setNavigationMode('chapter')")
+    const picker = readFileSync(join(import.meta.dir, 'ChapterVersePicker.tsx'), 'utf8')
+    expect(picker).toContain("grain === 'chapter'")
+    expect(picker).toContain('Chapter ${chapter}')
+  })
 })

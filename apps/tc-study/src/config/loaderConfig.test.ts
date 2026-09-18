@@ -133,6 +133,8 @@ describe('loaderConfig SoT', () => {
     )
     expect(registrySrc).toContain('getWorkerDownloadConfigs')
     expect(registrySrc).toContain('loaderRegistry.registerLoader(cfg.id')
+    expect(registrySrc).not.toContain("import('../prepare/registerPreparers')")
+    expect(registrySrc).not.toContain('persistPreparedOnContentCached')
     expect(registrySrc).not.toMatch(/for\s*\(\s*const\s+cfg\s+of\s+LOADER_CONFIGS\s*\)/)
 
     const factoryKeys = new Set(getWorkerDownloadConfigs().map((c) => c.factoryKey))
@@ -142,6 +144,19 @@ describe('loaderConfig SoT', () => {
       expect(registrySrc.includes(unquoted) || registrySrc.includes(quoted)).toBe(true)
     }
   })
+
+  test('surfaces.prepare ids match registered preparers (both directions)', async () => {
+    const { ensurePreparersRegistered } = await import('../features/prepare/registerPreparers')
+    const { getWorkerPrepareConfigs } = await import('./loaderConfig')
+    const registered = new Set(ensurePreparersRegistered())
+    const soT = new Set(getWorkerPrepareConfigs().map((c) => c.id))
+    for (const id of soT) {
+      expect(registered.has(id)).toBe(true)
+    }
+    for (const id of registered) {
+      expect(soT.has(id)).toBe(true)
+    }
+  }, { timeout: 30_000 })
 
   test('AdminPanel and BackgroundDownloadManager read getDownloadPriority SoT', () => {
     const adminSrc = readFileSync(

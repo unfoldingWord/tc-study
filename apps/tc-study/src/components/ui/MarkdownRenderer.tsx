@@ -1,16 +1,21 @@
 /**
  * Markdown Renderer Component
- * 
- * React component for rendering markdown content with support for internal links.
- * Uses the remark/unified ecosystem for robust markdown processing.
- * Rendered output is cached by content so switching tabs doesn't re-render.
+ *
+ * Accepts optional precomputed `hast` so title resolution can re-run hast→React
+ * without re-parsing markdown.
  */
 
 import { useEffect, useState } from 'react'
-import { RemarkMarkdownRenderer } from '../../lib/markdown/remarkRenderer'
+import { hastToReact } from '../../lib/markdown/hastToReact'
+import {
+  markdownToHast,
+  type HastRoot,
+} from '../../lib/markdown/markdownToHast'
 
 const RENDER_CACHE_MAX = 80
 const renderCache = new Map<string, React.ReactNode>()
+const HAST_CACHE_MAX = 80
+const hastCache = new Map<string, HastRoot>()
 
 function getCached(content: string): React.ReactNode | undefined {
   return renderCache.get(content)
@@ -22,6 +27,18 @@ function setCached(content: string, node: React.ReactNode): void {
     if (firstKey !== undefined) renderCache.delete(firstKey)
   }
   renderCache.set(content, node)
+}
+
+function getHastCached(content: string): HastRoot | undefined {
+  return hastCache.get(content)
+}
+
+function setHastCached(content: string, tree: HastRoot): void {
+  if (hastCache.size >= HAST_CACHE_MAX) {
+    const firstKey = hastCache.keys().next().value
+    if (firstKey !== undefined) hastCache.delete(firstKey)
+  }
+  hastCache.set(content, tree)
 }
 
 export function MarkdownSkeleton({ className = '' }: { className?: string }) {
@@ -36,33 +53,41 @@ export function MarkdownSkeleton({ className = '' }: { className?: string }) {
 
 interface MarkdownRendererProps {
   content: string
+  /** Precomputed hast JSON — when set, skip markdown parse. */
+  hast?: HastRoot | null
   className?: string
-  onInternalLinkClick?: (href: string, linkType: 'rc' | 'relative' | 'unknown', linkText?: string) => void
+  onInternalLinkClick?: (
+    href: string,
+    linkType: 'rc' | 'relative' | 'unknown',
+    linkText?: string
+  ) => void
   getEntryTitle?: (rcLink: string) => string | null
 }
 
-export function MarkdownRenderer({ 
-  content, 
+export function MarkdownRenderer({
+  content,
+  hast: hastProp,
   className = '',
   onInternalLinkClick,
-  getEntryTitle
+  getEntryTitle,
 }: MarkdownRendererProps) {
-  // When getEntryTitle is used, rendered link text depends on async titles - don't use cache
-  // so we re-render when titles resolve (otherwise cache keyed only by content would show entry IDs).
-  const useCache = !getEntryTitle
-  const cached = useCache && content ? getCached(content) : undefined
-  const [renderedContent, setRenderedContent] = useState<React.ReactNode>(cached ?? null)
+  // React cache only when titles are static (no getEntryTitle).
+  const useReactCache = !getEntryTitle && !hastProp
+  const cached = useReactCache && content ? getCached(content) : undefined
+  const [renderedContent, setRenderedContent] = useState<React.ReactNode>(
+    cached ?? null
+  )
   const [isLoading, setIsLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!content) {
+    if (!content && !hastProp) {
       setRenderedContent(null)
       setIsLoading(false)
       return
     }
 
-    if (useCache) {
+    if (useReactCache) {
       const cachedResult = getCached(content)
       if (cachedResult !== undefined) {
         setRenderedContent(cachedResult)
@@ -78,33 +103,47 @@ export function MarkdownRenderer({
         setIsLoading(true)
         setError(null)
 
-        const renderer = new RemarkMarkdownRenderer({
+        let tree = hastProp ?? null
+        if (!tree) {
+          tree = getHastCached(content) ?? null
+          if (!tree) {
+            tree = await markdownToHast(content)
+            setHastCached(content, tree)
+          }
+        }
+
+        if (cancelled) return
+
+        const result = hastToReact(tree, {
           linkTarget: '_blank',
           headerBaseLevel: 3,
           allowDangerousHtml: false,
           onInternalLinkClick,
-          getEntryTitle
+          getEntryTitle,
         })
 
-        const result = await renderer.renderToReact(content)
         if (cancelled) return
-        if (useCache) setCached(content, result)
+        if (useReactCache) setCached(content, result)
         setRenderedContent(result)
       } catch (err) {
         if (cancelled) return
         console.error('Markdown rendering error:', err)
         setError(err instanceof Error ? err.message : 'Unknown error')
-        setRenderedContent(<span className="text-red-500">Error rendering markdown</span>)
+        setRenderedContent(
+          <span className="text-red-500">Error rendering markdown</span>
+        )
       } finally {
         if (!cancelled) setIsLoading(false)
       }
     }
 
-    renderContent()
-    return () => { cancelled = true }
-  }, [content, onInternalLinkClick, getEntryTitle, useCache])
+    void renderContent()
+    return () => {
+      cancelled = true
+    }
+  }, [content, hastProp, onInternalLinkClick, getEntryTitle, useReactCache])
 
-  if (!content) {
+  if (!content && !hastProp) {
     return null
   }
 
@@ -125,11 +164,7 @@ export function MarkdownRenderer({
     )
   }
 
-  return (
-    <div className={className}>
-      {renderedContent}
-    </div>
-  )
+  return <div className={className}>{renderedContent}</div>
 }
 
 export default MarkdownRenderer

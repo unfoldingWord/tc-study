@@ -19,11 +19,29 @@ export function legacyScriptureKey(resourceKey: string, bookId: string): string 
 }
 
 export function usjScriptureKey(resourceKey: string, bookId: string): string {
-  return `${USJ_SCRIPTURE_PREFIX}${resourceKey}:${bookId}`
+  return `${USJ_SCRIPTURE_PREFIX}${resourceKey}:${bookId.toLowerCase()}`
+}
+
+/** One-chapter SoT: `scripture-usj:{resourceKey}:{book}:{chapter}`. */
+export function usjScriptureChapterKey(
+  resourceKey: string,
+  bookId: string,
+  chapter: number
+): string {
+  return `${usjScriptureKey(resourceKey, bookId)}:${chapter}`
 }
 
 export function isUsjScriptureKey(key: string): boolean {
   return key.startsWith(USJ_SCRIPTURE_PREFIX)
+}
+
+/** True for `scripture-usj:{resourceKey}:{book}:{chapter}` (not `:alignments`). */
+export function isUsjScriptureChapterKey(key: string): boolean {
+  if (!key.startsWith(USJ_SCRIPTURE_PREFIX)) return false
+  const rest = key.slice(USJ_SCRIPTURE_PREFIX.length)
+  const parts = rest.split(':')
+  const last = parts[parts.length - 1]
+  return parts.length >= 2 && last !== undefined && /^\d+$/.test(last)
 }
 
 /**

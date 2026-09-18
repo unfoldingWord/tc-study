@@ -24,13 +24,10 @@ function usjWordToOptimizedToken(token: UsjWordToken, index: number): OptimizedT
   }
 }
 
-/**
- * Project UsjScriptureViewModel chapters into OptimizedChapter[] for QuoteMatcher.
- */
-export function viewModelToOptimizedChapters(
-  viewModel: UsjScriptureViewModel
-): OptimizedChapter[] {
-  return viewModel.chapters.map((chapter) => ({
+function chapterViewToOptimized(
+  chapter: UsjScriptureViewModel['chapters'][number]
+): OptimizedChapter {
+  return {
     number: chapter.number,
     verseCount: chapter.verses.length,
     paragraphCount: 0,
@@ -39,7 +36,29 @@ export function viewModelToOptimizedChapters(
       text: verse.text || '',
       tokens: verse.tokens.map((token, index) => usjWordToOptimizedToken(token, index)),
     })),
-  }))
+  }
+}
+
+/**
+ * Project a single chapter from UsjScriptureViewModel into OptimizedChapter.
+ * Prefer this over projecting the whole book when only one chapter is needed.
+ */
+export function viewModelChapterToOptimized(
+  viewModel: UsjScriptureViewModel,
+  chapter: number
+): OptimizedChapter | null {
+  const ch = viewModel.chapters.find((c) => c.number === chapter)
+  if (!ch) return null
+  return chapterViewToOptimized(ch)
+}
+
+/**
+ * Project UsjScriptureViewModel chapters into OptimizedChapter[] for QuoteMatcher.
+ */
+export function viewModelToOptimizedChapters(
+  viewModel: UsjScriptureViewModel
+): OptimizedChapter[] {
+  return viewModel.chapters.map(chapterViewToOptimized)
 }
 
 /**

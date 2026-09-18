@@ -1,6 +1,7 @@
-import { BookMarked, BookOpen, Filter, LayoutGrid } from 'lucide-react'
+import { Filter, LayoutGrid } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { TextKindFilter } from '../features/read/filterPickerLanguages'
+import { TEXT_KIND_ICONS } from '../features/read/textKindIcons'
 
 const OPTIONS: Array<{
   value: TextKindFilter
@@ -8,8 +9,8 @@ const OPTIONS: Array<{
   Icon: typeof LayoutGrid
 }> = [
   { value: 'both', label: 'Any', Icon: LayoutGrid },
-  { value: 'bible', label: 'Bible', Icon: BookOpen },
-  { value: 'obs', label: 'OBS', Icon: BookMarked },
+  { value: 'bible', label: 'Bible', Icon: TEXT_KIND_ICONS.bible },
+  { value: 'obs', label: 'OBS', Icon: TEXT_KIND_ICONS.obs },
 ]
 
 export function LanguagePickerTextKindFilter({

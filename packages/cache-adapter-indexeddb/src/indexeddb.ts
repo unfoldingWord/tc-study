@@ -131,6 +131,25 @@ export class IndexedDBCacheAdapter {
     return reassembleBookEntry(key, result.entry, chapterRecords.map((r) => ({ key: r.key, entry: r.entry })))
   }
   
+  /**
+   * Return raw IndexedDB rows for keys in [prefix, prefix + '\uffff'].
+   * Does not reassemble chunked manifests — caller decides how to interpret rows.
+   */
+  async getByPrefix(prefix: string): Promise<Array<{ key: string; entry: CacheEntry }>> {
+    const db = await this.initDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.storeName, 'readonly')
+      const store = tx.objectStore(this.storeName)
+      const range = IDBKeyRange.bound(prefix, prefix + '\uffff')
+      const request = store.getAll(range)
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => {
+        const rows = (request.result ?? []) as Array<{ key: string; entry: CacheEntry }>
+        resolve(rows)
+      }
+    })
+  }
+
   async has(key: string): Promise<boolean> {
     const entry = await this.get(key)
     return entry !== null
@@ -160,9 +179,30 @@ export class IndexedDBCacheAdapter {
   }
 
   async setMany(items: Array<{ key: string; entry: CacheEntry }>): Promise<void> {
-    for (const item of items) {
-      await this.set(item.key, item.entry)
-    }
+    if (items.length === 0) return
+    const db = await this.initDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.storeName, 'readwrite')
+      const store = tx.objectStore(this.storeName)
+      for (const { key, entry } of items) {
+        if (canSplitBookEntry(key, entry)) {
+          const { manifestEntry, chapterEntries, alignmentEntries } = splitBookEntry(key, entry)
+          store.put({ key, entry: manifestEntry })
+          for (const { key: chKey, entry: chEntry } of chapterEntries) {
+            store.put({ key: chKey, entry: chEntry })
+          }
+          if (alignmentEntries?.length) {
+            for (const { key: aKey, entry: aEntry } of alignmentEntries) {
+              store.put({ key: aKey, entry: aEntry })
+            }
+          }
+        } else {
+          store.put({ key, entry })
+        }
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
   }
   
   async getMany(keys: string[]): Promise<Map<string, CacheEntry>> {

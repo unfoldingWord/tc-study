@@ -11,6 +11,7 @@
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import { semanticIdFor } from '@bt-synergy/scripture-loader'
+import type { QuoteTokenWithRef } from './buildQuoteTokens'
 
 interface GenerateSemanticIdOptions {
   token: OptimizedToken
@@ -47,15 +48,20 @@ export function generateSemanticIdsForQuoteTokens(
   verse: number,
   baseOccurrence?: number
 ): string[] {
-  // Lowercase book to match common Door43 ingredient casing; matchers compare case-insensitively.
-  const verseRef = `${bookCode.toLowerCase()} ${chapter}:${verse}`
+  const book = bookCode.toLowerCase()
+  const verseRefFor = (token: OptimizedToken): string => {
+    const stamped = token as QuoteTokenWithRef
+    const tokenChapter = stamped.chapter ?? chapter
+    const tokenVerse = stamped.verse ?? verse
+    return `${book} ${tokenChapter}:${tokenVerse}`
+  }
 
   // For single-token quotes, use the TWL occurrence directly
   if (tokens.length === 1 && baseOccurrence !== undefined) {
     return [
       generateSemanticId({
-        token: tokens[0],
-        verseRef,
+        token: tokens[0]!,
+        verseRef: verseRefFor(tokens[0]!),
         occurrence: baseOccurrence,
       }),
     ]
@@ -65,7 +71,7 @@ export function generateSemanticIdsForQuoteTokens(
   return tokens.map((token) =>
     generateSemanticId({
       token,
-      verseRef,
+      verseRef: verseRefFor(token),
       occurrence: token.occurrence || 1,
     })
   )

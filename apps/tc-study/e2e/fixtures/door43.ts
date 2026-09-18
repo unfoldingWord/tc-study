@@ -19,6 +19,18 @@ const TIT_INGREDIENT = {
  * Works for both `loadReadLanguageCatalog` (catalogIdentity) and wizard
  * `addDoor43CatalogResults` (uses result when `language` string is present).
  */
+const TIT_TN_INGREDIENT = {
+  identifier: 'tit',
+  path: './tn_TIT.tsv',
+  title: 'Titus',
+}
+
+const TIT_TWL_INGREDIENT = {
+  identifier: 'tit',
+  path: './twl_TIT.tsv',
+  title: 'Titus',
+}
+
 export const MOCK_CATALOG_SEARCH = [
   {
     name: 'e2e_ult',
@@ -33,12 +45,40 @@ export const MOCK_CATALOG_SEARCH = [
     ingredients: [TIT_INGREDIENT],
     release: { tag_name: 'v1' },
   },
+  {
+    name: 'e2e_tn',
+    repo_name: 'e2e_tn',
+    owner: 'unfoldingWord',
+    language: 'e2e',
+    identifier: 'tn',
+    abbreviation: 'tn',
+    id: 'tn',
+    title: 'E2E Translation Notes',
+    subject: 'TSV Translation Notes',
+    ingredients: [TIT_TN_INGREDIENT],
+    release: { tag_name: 'v1' },
+  },
+  {
+    name: 'e2e_twl',
+    repo_name: 'e2e_twl',
+    owner: 'unfoldingWord',
+    language: 'e2e',
+    identifier: 'twl',
+    abbreviation: 'twl',
+    id: 'twl',
+    title: 'E2E Words Links',
+    subject: 'TSV Translation Words Links',
+    ingredients: [TIT_TWL_INGREDIENT],
+    release: { tag_name: 'v1' },
+  },
 ]
 
 /** Repo tree blobs so ingredient verification does not write verifiedIngredients=[]. */
 const MOCK_REPO_TREE = {
   tree: [
     { path: 'tit.usfm', type: 'blob' },
+    { path: 'tn_TIT.tsv', type: 'blob' },
+    { path: 'twl_TIT.tsv', type: 'blob' },
     { path: 'manifest.yaml', type: 'blob' },
   ],
   truncated: false,

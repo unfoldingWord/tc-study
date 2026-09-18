@@ -13,6 +13,7 @@ import { getDefaultSections } from '../../lib/data/default-sections'
 import type { ParsedObsStory } from '../../lib/obs/parseObsMarkdown'
 import { findObsCatalogKey, findSectionIndexForRef } from './bcvNavHelpers'
 import {
+  buildChapterApplyRef,
   buildObsRangeApplyRef,
   buildSectionApplyRef,
   buildVerseApplyRef,
@@ -23,6 +24,7 @@ import {
   nextObsStoryHeaderSelection,
   nextVerseClickSelection,
   obsStoryIdsFromIngredients,
+  selectedChapterFromVerseRange,
 } from './bcvNavigatorActions'
 import {
   buildVersesFromCounts,
@@ -33,13 +35,24 @@ import { useBcvNavigatorCatalog } from './useBcvNavigatorCatalog'
 import { useBcvNavigatorScroll } from './useBcvNavigatorScroll'
 import { markReadNavigationInternal } from '../read/replaceReadUrlFromUi'
 import { navigatorCommittedScope } from './bcvNavigatorModeSwitch'
+import type { ScripturePickerGrain } from './ScopeTabs'
+
+function resolveScripturePickerGrain(
+  mode: 'verse' | 'section' | 'chapter' | undefined,
+  navigationMode: string
+): ScripturePickerGrain {
+  if (mode === 'section' || mode === 'chapter' || mode === 'verse') return mode
+  if (navigationMode === 'section') return 'section'
+  if (navigationMode === 'chapter') return 'chapter'
+  return 'verse'
+}
 
 export function useBcvNavigatorController(options: {
   onClose: () => void
-  mode?: 'verse' | 'section'
+  mode?: 'verse' | 'section' | 'chapter'
   onNavigationScopeCommitted?: (scope: 'scripture' | 'obs') => void
 }) {
-  const { onClose, mode = 'verse', onNavigationScopeCommitted } = options
+  const { onClose, mode, onNavigationScopeCommitted } = options
   const navigation = useNavigation()
   const navigationScope = useNavigationScope()
   const availableBooks = useAvailableBooks()
@@ -66,6 +79,9 @@ export function useBcvNavigatorController(options: {
   const [pickerObsMode, setPickerObsMode] = useState<'chapter' | 'verse'>(() =>
     navigationScope === 'obs' ? (navigationMode === 'chapter' ? 'chapter' : 'verse') : 'chapter'
   )
+  const [pickerScriptureMode, setPickerScriptureMode] = useState<ScripturePickerGrain>(() =>
+    resolveScripturePickerGrain(mode, navigationMode)
+  )
 
   const commitPickerToNavigation = useCallback((): 'scripture' | 'obs' | null => {
     markReadNavigationInternal()
@@ -82,7 +98,7 @@ export function useBcvNavigatorController(options: {
     return switched
   }, [navigation, pickerScope, pickerObsMode])
 
-  const scripturePickerMode = mode || navigationMode
+  const scripturePickerMode = pickerScriptureMode
 
   const obsStoryIds = useMemo(() => {
     if (!obsCatalogKey) return obsStoryIdsFromIngredients(undefined)
@@ -190,6 +206,20 @@ export function useBcvNavigatorController(options: {
     setEndVerse(next.endVerse)
   }
 
+  const setScriptureGrain = (grain: ScripturePickerGrain) => {
+    setPickerScriptureMode(grain)
+    if (grain === 'chapter' && startVerse) {
+      const chapter = parseInt(startVerse.split(':')[0] || '', 10)
+      if (chapter > 0) {
+        const next = chapterClickSelection(versesByChapter[chapter] || [])
+        if (next) {
+          setStartVerse(next.startVerse)
+          setEndVerse(next.endVerse)
+        }
+      }
+    }
+  }
+
   const applySectionSelection = () => {
     if (pickedSectionIdx == null) return
     const section = sections[pickedSectionIdx]
@@ -205,8 +235,19 @@ export function useBcvNavigatorController(options: {
   const handleApply = () => {
     if (!startVerse) return
     const switched = commitPickerToNavigation()
-    navigation.setNavigationMode('verse')
-    navigation.navigateToReference(buildVerseApplyRef(selectedBook, startVerse, endVerse))
+    if (pickerScriptureMode === 'chapter') {
+      const chapter = selectedChapterFromVerseRange(startVerse, endVerse)
+      if (!chapter) return
+      const lastVerse =
+        bookInfo?.verses?.[chapter - 1] ??
+        versesByChapter[chapter]?.[versesByChapter[chapter].length - 1]?.verse ??
+        1
+      navigation.setNavigationMode('chapter')
+      navigation.navigateToReference(buildChapterApplyRef(selectedBook, chapter, lastVerse))
+    } else {
+      navigation.setNavigationMode('verse')
+      navigation.navigateToReference(buildVerseApplyRef(selectedBook, startVerse, endVerse))
+    }
     if (switched) onNavigationScopeCommitted?.(switched)
     onClose()
   }
@@ -275,6 +316,8 @@ export function useBcvNavigatorController(options: {
     setPickerScope,
     pickerObsMode,
     setPickerObsMode,
+    pickerScriptureMode,
+    setPickerScriptureMode: setScriptureGrain,
     scripturePickerMode,
     obsResourceTitle,
     obsStoryIds,

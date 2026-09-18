@@ -23,6 +23,7 @@ export class IndexedDBCatalogAdapter implements CatalogAdapter {
   private storeName: string
   private version: number
   private db: IDBDatabase | null = null
+  private opening: Promise<IDBDatabase> | null = null
   
   constructor(options: IndexedDBAdapterOptions = {}) {
     this.dbName = options.dbName || 'resource-catalog'
@@ -35,13 +36,21 @@ export class IndexedDBCatalogAdapter implements CatalogAdapter {
    */
   private async initDB(): Promise<IDBDatabase> {
     if (this.db) return this.db
-    
-    return new Promise((resolve, reject) => {
+    if (this.opening) return this.opening
+
+    this.opening = new Promise((resolve, reject) => {
       const request = indexedDB.open(this.dbName, this.version)
       
-      request.onerror = () => reject(request.error)
+      request.onerror = () => {
+        this.opening = null
+        reject(request.error)
+      }
+      request.onblocked = () => {
+        /* another connection is mid-upgrade; onsuccess still fires after it closes */
+      }
       request.onsuccess = () => {
         this.db = request.result
+        this.opening = null
         resolve(request.result)
       }
       
@@ -61,6 +70,7 @@ export class IndexedDBCatalogAdapter implements CatalogAdapter {
         }
       }
     })
+    return this.opening
   }
   
   /**

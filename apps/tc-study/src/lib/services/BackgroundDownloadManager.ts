@@ -11,6 +11,7 @@ import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import type { ProgressCallback } from '@bt-synergy/resource-types'
 import { getDownloadPriority } from '../../config/loaderConfig'
+import type { DownloadRunPhase } from '../../features/download/backgroundDownloadRun'
 import type { LoaderRegistry } from '../loaders/LoaderRegistry'
 import type { ResourceCompletenessChecker } from './ResourceCompletenessChecker'
 import { DependencyResolver, type ResolvedResource } from './DependencyResolver'
@@ -43,6 +44,8 @@ export interface DownloadManagerConfig {
   skipExisting?: boolean
 }
 
+export type { DownloadRunPhase }
+
 export interface DownloadProgress {
   currentResource: string | null
   currentResourceProgress: number
@@ -56,6 +59,10 @@ export interface DownloadProgress {
   completedIngredients?: number
   failedIngredients?: number
   currentIngredient?: string // Name of the specific ingredient being processed (e.g., "Matthew", "faith")
+  /** Active run step (init → metadata → zip/extract…). */
+  phase?: DownloadRunPhase
+  /** Epoch ms of the last progress pulse (main thread may overwrite). */
+  lastActivityAt?: number
 }
 
 export class BackgroundDownloadManager {
@@ -288,7 +295,7 @@ export class BackgroundDownloadManager {
 
       // ✅ Mark resource as complete in cache metadata
       if (this.completenessChecker) {
-        await this.completenessChecker.markComplete(resourceKey, {
+        await this.completenessChecker.markCompleteIfVerified(resourceKey, {
           downloadMethod: method,
         })
       }

@@ -125,8 +125,26 @@ describe('tab activate does not ensure compositions', () => {
       join(import.meta.dir, '../../components/resources/CombinedHelpsViewer/useCombinedHelpsHandlers.ts'),
       'utf8'
     )
+    const payload = readFileSync(
+      join(import.meta.dir, 'buildQuoteClickPayload.ts'),
+      'utf8'
+    )
     expect(handlers).not.toMatch(/link\.quoteTokens\.forEach/)
-    expect(handlers).toContain('alignedSemanticIds: semanticIds')
-    expect(handlers).toContain('const firstToken = link.quoteTokens[0]')
+    expect(handlers).toContain('planHelpsCardScriptureAction')
+    expect(handlers).toContain('sendTokenClick({ lifecycle: \'event\', token })')
+    expect(payload).toContain('alignedSemanticIds: semanticIds')
+  })
+
+  test('off-chapter TN/TWL click navigates via store then token-click', () => {
+    const handlers = readFileSync(
+      join(import.meta.dir, '../../components/resources/CombinedHelpsViewer/useCombinedHelpsHandlers.ts'),
+      'utf8'
+    )
+    expect(handlers).toContain('navigateToHelpsRow')
+    expect(handlers).toContain('sendVerseNavigation')
+    expect(handlers).toContain('planHelpsCardScriptureAction')
+    expect(handlers).toContain('useNavigationStore.getState().navigateToReference')
+    expect(handlers).toMatch(/navigateToHelpsRow\(note\.reference\)/)
+    expect(handlers).toMatch(/navigateToHelpsRow\(link\.reference\)/)
   })
 })

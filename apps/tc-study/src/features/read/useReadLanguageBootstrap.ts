@@ -46,6 +46,7 @@ import { loadLanguagesCache } from './languagesCache'
 import { shouldPushReadLanguageUrl } from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
 import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
+import { useEnsureCurrentBookOriginalLanguage } from './useEnsureCurrentBookOriginalLanguage'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
 import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
@@ -117,6 +118,12 @@ export function useReadLanguageBootstrap({
     runCatalogLoad,
   } = useReadCatalogLoad()
 
+  useEnsureCurrentBookOriginalLanguage({
+    catalogManager,
+    resourceTypeRegistry,
+    setExpectedResources,
+  })
+
   useEffect(() => {
     const helps = firstHelpsLanguageCode(useReadPanelStore.getState().panels)
     if (helps) writePersistedHelpsLanguage(helps)
@@ -132,13 +139,13 @@ export function useReadLanguageBootstrap({
   const {
     startDownload,
     stopDownload,
-    stats: downloadStats,
     isDownloading: isBackgroundDownloading,
     queue,
   } = useBackgroundDownload({
     autoStart: false,
     skipExisting: true,
     debug: true,
+    controlOnly: true,
   })
   const isBackgroundDownloadingRef = useRef(isBackgroundDownloading)
   const queueRef = useRef(queue)
@@ -150,7 +157,6 @@ export function useReadLanguageBootstrap({
   }, [queue])
 
   const isLoadingResources = isLoadingTextResources
-  const isCatalogLoadBusy = isLoadingTextResources || isLoadingHelpsResources
 
   useCatalogBackgroundDownload({
     catalogManager,
@@ -160,10 +166,9 @@ export function useReadLanguageBootstrap({
     expectedResources,
     resetToken: downloadResetToken(panels['panel-1'].languageCode, panels['panel-2'].languageCode),
     isDownloading: isBackgroundDownloading,
-    enabled:
-      !DISABLE_BACKGROUND_DOWNLOAD &&
-      Object.keys(loadedResources).length > 0 &&
-      (!isCatalogLoadBusy || isBackgroundDownloading),
+    // Always arm the monitor. Catalog-load / loadedResources gates cancelled
+    // the enqueue timer and left missing UST/TN/TW undownloaded.
+    enabled: !DISABLE_BACKGROUND_DOWNLOAD,
     debug: true,
   })
 
@@ -320,6 +325,5 @@ export function useReadLanguageBootstrap({
     handleSwitchTextMode,
     handleNavigatorScopeCommitted,
     isBackgroundDownloading,
-    downloadStats,
   }
 }

@@ -51,3 +51,45 @@ export {
   isValidResourceTypeId,
   type ResourceTypeId,
 } from './resourceTypeIds'
+
+// Stamped ingest receipt (resource:{key} metadata)
+export {
+  resourceContentStamp,
+  expectedIngestReleaseStamp,
+  scriptureIngestSchema,
+  helpsIngestSchema,
+  ingestSchemaForResourceType,
+  isMatchingIngestReceipt,
+  isLegacyUnstampedComplete,
+  buildIngestReceiptMetadata,
+  buildIngestReceiptFromCatalog,
+  readIngestReceiptMeta,
+  HELPS_INGEST_SCHEMA,
+  INGEST_RECEIPT_KEYS,
+  type ResourceStampSource,
+  type IngestDownloadMethod,
+  type BuildIngestReceiptMetadataInput,
+} from './ingestReceipt'
+
+// Catalog phantoms vs release tree/zip (shared by scripture + TSV loaders)
+export {
+  ABSENT_FROM_RELEASE_KEY,
+  normalizeIngredientPath,
+  ingredientPresentInPathSet,
+  partitionIngredientsByReleasePaths,
+  pathSetFromZipFileNames,
+  omitAbsentIngredients,
+  readAbsentFromRelease,
+  mergeAbsentFromReleaseIds,
+  presentIngredientCount,
+  persistAbsentFromRelease,
+  fetchReleasePathSet,
+  type IngredientPathRef,
+} from './releaseIngredientPresence'
+
+// Zip vs per-file fill after interrupted / partial caches
+export {
+  PARTIAL_CACHE_INDIVIDUAL_MIN_CACHED,
+  chooseIngredientFetchMode,
+  type IngredientFetchMode,
+} from './ingredientFetchPolicy'

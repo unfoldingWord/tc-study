@@ -1,14 +1,14 @@
 /**
  * BCVNavigator - Book-Chapter-Verse, Section, or Open Bible Stories selection modal
  *
- * Scripture: (1) pick book → (2) verses or preset sections
+ * Scripture: (1) pick book → (2) chapters, verses, or preset sections
  * OBS: (1) pick story → (2) pick frame
  *
  * Presentational pickers live under `features/nav/*`.
  * Orchestration: `features/nav/useBcvNavigatorController`.
  */
 
-import { BookMarked, BookOpen, Hash, List } from 'lucide-react'
+import { BookMarked, BookOpen, Hash, Library, List } from 'lucide-react'
 import {
   BcvNavigatorEmpty,
   BcvNavigatorShell,
@@ -18,19 +18,20 @@ import {
   ObsModeTabs,
   ObsStoryPicker,
   ScopeTabs,
+  ScriptureModeTabs,
   SectionPicker,
   useBcvNavigatorController,
 } from '../../features/nav'
 
 interface BCVNavigatorProps {
   onClose: () => void
-  mode?: 'verse' | 'section'
+  mode?: 'verse' | 'section' | 'chapter'
   onNavigationScopeCommitted?: (scope: 'scripture' | 'obs') => void
 }
 
 export function BCVNavigator({
   onClose,
-  mode = 'verse',
+  mode,
   onNavigationScopeCommitted,
 }: BCVNavigatorProps) {
   const c = useBcvNavigatorController({ onClose, mode, onNavigationScopeCommitted })
@@ -50,6 +51,8 @@ export function BCVNavigator({
       <BookMarked className="w-5 h-5 text-blue-600" />
     ) : c.scripturePickerMode === 'section' ? (
       <List className="w-5 h-5 text-blue-600" />
+    ) : c.scripturePickerMode === 'chapter' ? (
+      <Library className="w-5 h-5 text-blue-600" />
     ) : (
       <Hash className="w-5 h-5 text-blue-600" />
     )
@@ -80,6 +83,15 @@ export function BCVNavigator({
           pickerObsMode={c.pickerObsMode}
           onSelectChapter={() => c.setPickerObsMode('chapter')}
           onSelectVerse={() => c.setPickerObsMode('verse')}
+        />
+      )}
+
+      {c.pickerScope === 'scripture' && (
+        <ScriptureModeTabs
+          grain={c.pickerScriptureMode}
+          onSelectChapter={() => c.setPickerScriptureMode('chapter')}
+          onSelectVerse={() => c.setPickerScriptureMode('verse')}
+          onSelectSection={() => c.setPickerScriptureMode('section')}
         />
       )}
 
@@ -147,6 +159,7 @@ export function BCVNavigator({
             endVerse={c.endVerse}
             selectionCount={c.selectionCount}
             startVerseRef={c.startVerseRef}
+            grain={c.scripturePickerMode === 'chapter' ? 'chapter' : 'verse'}
             onBack={() => c.setStep(1)}
             onChapterClick={c.handleChapterClick}
             onVerseClick={c.handleVerseClick}

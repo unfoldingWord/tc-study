@@ -1,7 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 import type { UsjWordToken } from '@bt-synergy/scripture-loader'
-import { foldHighlightTarget, resolveTokenVisualState, tokenMatchesHighlightTarget } from './tokenHighlight'
-import { attachFoldedMatchKeys, semanticIdFor, semanticIdKey } from './wordIdentity'
+import { semanticIdFor } from '@bt-synergy/scripture-loader'
+import { semanticIdMatchKey } from '../../../../features/helps/semanticIdMatchKey'
+import { resolveMatchIndices } from '../../../../features/scripture/scripturePreparer'
+import {
+  foldHighlightTarget,
+  highlightIndicesFromTarget,
+  resolveTokenVisualState,
+  resolveTokenVisualStateInterned,
+  tokenMatchesHighlightTarget,
+} from './tokenHighlight'
+import { attachFoldedMatchKeys, semanticIdKey } from './wordIdentity'
 
 function usjWord(
   partial: Pick<UsjWordToken, 'content' | 'verseRef'> & Partial<UsjWordToken>
@@ -200,5 +209,74 @@ describe('tokenMatchesHighlightTarget (toggle-off)', () => {
 
   test('null highlight never matches', () => {
     expect(tokenMatchesHighlightTarget(paul, null)).toBe(false)
+  })
+})
+
+describe('off-chapter CombinedHelps quote highlight', () => {
+  test('English ULT tokens highlight from OL+English alignedSemanticIds without zaln', () => {
+    const men = usjWord({ content: 'men', verseRef: 'tit 2:11' })
+    const state = resolveTokenVisualState(men, {
+      isOriginalLanguage: false,
+      highlightTarget: foldHighlightTarget({
+        semanticId: 'tit 2:11:πάντας:1',
+        alignedSemanticIds: ['tit 2:11:πάντας:1', 'tit 2:11:men:1'],
+        content: 'for all men',
+        verseRef: 'tit 2:11',
+      }),
+    })
+    expect(state.isHighlighted).toBe(true)
+  })
+
+  test('prepared-full paints when ownIndex is null but English ids are in matchKeys', () => {
+    const matchKeys = [
+      semanticIdMatchKey('tit 2:11:for:2'),
+      semanticIdMatchKey('tit 2:11:all:1'),
+      semanticIdMatchKey('tit 2:11:men:1'),
+    ]
+    const token = { c: 'men', o: 1, k: 2, a: [] as number[] }
+    const hl = highlightIndicesFromTarget(matchKeys, {
+      semanticId: 'tit 2:11:πάντας:1',
+      alignedSemanticIds: ['tit 2:11:πάντας:1', 'tit 2:11:men:1'],
+      content: 'for all men',
+      verseRef: 'tit 2:11',
+    })
+    expect(hl.ownIndex).toBeNull()
+    expect(hl.alignedIndices.has(2)).toBe(true)
+    const state = resolveTokenVisualStateInterned(token, {
+      underlineIndices: new Set(),
+      highlightOwnIndex: hl.ownIndex,
+      highlightAlignedIndices: hl.alignedIndices,
+      isOriginalLanguage: false,
+    })
+    expect(state.isHighlighted).toBe(true)
+  })
+})
+
+describe('resolveTokenVisualStateInterned', () => {
+  test('integer underline and highlight agree with folded string sets', () => {
+    const verseRef = 'tit 1:1'
+    const ownRaw = semanticIdFor(verseRef, 'Paul', 1)
+    const alignedRaw = semanticIdFor(verseRef, 'Παῦλος', 1)
+    const matchKeys = [semanticIdMatchKey(ownRaw), semanticIdMatchKey(alignedRaw)]
+    const token = { c: 'Paul', o: 1, k: 0, a: [1] }
+
+    const underlineIndices = resolveMatchIndices(matchKeys, [semanticIdMatchKey(alignedRaw)])
+    const hl = highlightIndicesFromTarget(matchKeys, {
+      semanticId: ownRaw,
+      alignedSemanticIds: [alignedRaw],
+      content: 'Paul',
+      verseRef,
+    })
+
+    const state = resolveTokenVisualStateInterned(token, {
+      underlineIndices,
+      highlightOwnIndex: hl.ownIndex,
+      highlightAlignedIndices: hl.alignedIndices,
+      isOriginalLanguage: false,
+    })
+    expect(hl.ownIndex).toBe(0)
+    expect(state.isHighlighted).toBe(true)
+    expect(state.isSelected).toBe(true)
+    expect(state.isUnderlined).toBe(true)
   })
 })
