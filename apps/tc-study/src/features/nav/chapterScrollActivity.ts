@@ -53,6 +53,11 @@ export function beginProgrammaticScrollSuppress(durationMs = 120): void {
   if (until > suppressUnsettledUntilMs) suppressUnsettledUntilMs = until
 }
 
+/** Peek / align `scrollTop` writes — edge-nav must not treat these as a new pull. */
+export function isProgrammaticScrollSuppressed(nowMs = Date.now()): boolean {
+  return nowMs < suppressUnsettledUntilMs
+}
+
 /** First scroll event / stitch: one notify. Later events are silent while already unsettled. */
 export function markChapterScrollUnsettled(): void {
   if (Date.now() < suppressUnsettledUntilMs) return

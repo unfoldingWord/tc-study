@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { isProgrammaticScrollSuppressed } from '../../../../features/nav/chapterScrollActivity'
 import {
   accumulateEdgeOverscroll,
   commitEdgeNavigation,
@@ -203,6 +204,10 @@ export function useScriptureEdgeNavigate({
   }
 
   const tryCommit = (fromClick = false) => {
+    if (!fromClick && isProgrammaticScrollSuppressed()) {
+      clearPull(false)
+      return
+    }
     if (committedRef.current) {
       clearPull(false)
       return

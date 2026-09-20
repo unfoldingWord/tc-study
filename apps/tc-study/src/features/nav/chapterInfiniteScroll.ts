@@ -781,6 +781,22 @@ export function shouldCommitSettledChapter(args: {
   return true
 }
 
+/**
+ * Peek, settle-hold, and chrome/helps commit must not start another edge
+ * reveal for the same target in the same tick. `slotsRef` is otherwise stale
+ * until React paints, so canReveal/overscroll latch would request the same
+ * chapter again and recurse (Maximum update depth).
+ */
+export function shouldBlockEdgeRevealRetrigger(args: {
+  inFlightTarget: number | null
+  target: number | null
+  programmaticScrollActive?: boolean
+}): boolean {
+  if (args.target == null) return true
+  if (args.programmaticScrollActive) return true
+  return args.inFlightTarget != null && args.inFlightTarget === args.target
+}
+
 export function wouldEnqueueWholeBook(
   mounted: readonly number[],
   lastChapter: number

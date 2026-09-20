@@ -37,6 +37,7 @@ import {
   settledCommitMode,
   settledNavChapter,
   shouldAllowChapterStitch,
+  shouldBlockEdgeRevealRetrigger,
   shouldCommitSettledChapter,
   shouldPromotePlaceholderOnSettle,
   shouldResetWindowOnNavChange,
@@ -377,6 +378,49 @@ describe('chapterInfiniteScroll nav settle', () => {
         blockSnapBackTo: 1,
       })
     ).toBe(true)
+  })
+
+  test('peek/settle/commit cannot retrigger the same edge reveal in the same tick', () => {
+    let slots = singlePaintedChapterSlots(3)
+    const first = edgeRevealTargetChapter(slots, 'next', 10)
+    expect(first).toBe(4)
+    slots = revealChapterInWindow(slots, first!, 'next', 10)
+    expect(slots.map((s) => s.chapter)).toEqual([3, 4])
+
+    expect(
+      shouldBlockEdgeRevealRetrigger({
+        inFlightTarget: 4,
+        target: 4,
+        programmaticScrollActive: false,
+      })
+    ).toBe(true)
+    expect(
+      shouldBlockEdgeRevealRetrigger({
+        inFlightTarget: 4,
+        target: 5,
+        programmaticScrollActive: true,
+      })
+    ).toBe(true)
+    expect(
+      shouldBlockEdgeRevealRetrigger({
+        inFlightTarget: null,
+        target: 5,
+        programmaticScrollActive: false,
+      })
+    ).toBe(false)
+    expect(shouldBlockEdgeRevealRetrigger({ inFlightTarget: 4, target: null })).toBe(true)
+
+    // Peek leaves the previous chapter on the read-line — settle must not
+    // snap nav back (that would look like a picker jump and re-reveal).
+    expect(
+      shouldCommitSettledChapter({
+        parked: 3,
+        navChapter: 4,
+        paintedHasParked: true,
+        blockSnapBackTo: null,
+        holdToChapter: 4,
+      })
+    ).toBe(false)
   })
 
   test('edge-reveal hold does not settle-commit the chapter that still owns the read-line', () => {

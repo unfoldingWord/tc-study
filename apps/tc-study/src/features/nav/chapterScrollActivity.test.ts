@@ -5,6 +5,7 @@ import {
   beginProgrammaticScrollSuppress,
   clearChapterScrollActivity,
   getChapterScrollActivity,
+  isProgrammaticScrollSuppressed,
   markChapterScrollSettled,
   markChapterScrollUnsettled,
   pinReferenceWhileScrolling,
@@ -138,6 +139,7 @@ describe('chapterScrollActivity gates', () => {
     beginProgrammaticScrollSuppress(200)
     markChapterScrollUnsettled()
     expect(getChapterScrollActivity().unsettled).toBe(false)
+    expect(isProgrammaticScrollSuppressed()).toBe(true)
   })
 
   test('non-empty underline groups broadcast while unsettled; empty do not', () => {
@@ -158,6 +160,8 @@ describe('chapter scroll activity wiring', () => {
     expect(hook).toContain('markChapterScrollUnsettled')
     expect(hook).toContain('markChapterScrollSettled')
     expect(hook).toContain('clearChapterScrollActivity')
+    expect(hook).toContain('isProgrammaticScrollSuppressed')
+    expect(hook).toContain('shouldBlockEdgeRevealRetrigger')
   })
 
   test('quote-build and OL hydrate wait for settle', () => {

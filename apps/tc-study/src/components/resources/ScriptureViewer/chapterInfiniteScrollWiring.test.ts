@@ -50,6 +50,11 @@ describe('chapter edge-reveal + warm wiring', () => {
     expect(hookSrc).toContain('holdSettledToRef')
     expect(hookSrc).toContain('commitChapter(target)')
     expect(hookSrc).toContain('holdToChapter: holdSettledToRef.current')
+    expect(hookSrc).toContain('shouldBlockEdgeRevealRetrigger')
+    expect(hookSrc).toContain('revealInFlightRef')
+    expect(hookSrc).toContain('isProgrammaticScrollSuppressed')
+    expect(hookSrc).toContain('beginProgrammaticScrollSuppress(500)')
+    expect(hookSrc).toContain('Do not mark unsettled')
     expect(hookSrc).toContain('incomingTop')
     expect(hookSrc).toContain('preserveAlignRef.current')
     expect(hookSrc).not.toContain('pendingRevealTopAlignRef')
@@ -63,6 +68,7 @@ describe('chapter edge-reveal + warm wiring', () => {
     expect(edgeSrc).toContain('peakRawRef')
     expect(edgeSrc).toContain('commitIfCrossed')
     expect(edgeSrc).toContain('peakOverscrollPx')
+    expect(edgeSrc).toContain('isProgrammaticScrollSuppressed')
     expect(edgeSrc).not.toContain('EDGE_TRAVEL_PAD_PX')
     const cueSrc = readFileSync(
       join(import.meta.dir, 'components/ScriptureEdgeCue.tsx'),
@@ -131,6 +137,7 @@ describe('chapter edge-reveal + warm wiring', () => {
     expect(navSrc).toContain('MAX_MOUNTED_CHAPTERS = 3')
     expect(navSrc).toContain('CHAPTER_REVEAL_PEEK_PX')
     expect(navSrc).toContain('peekScrollTopAfterEdgeReveal')
+    expect(navSrc).toContain('shouldBlockEdgeRevealRetrigger')
     expect(navSrc).not.toContain('CHAPTER_REVEAL_TOP_OFFSET_PX')
     expect(navSrc).not.toContain('scrollTopForElementAtTop')
   })
