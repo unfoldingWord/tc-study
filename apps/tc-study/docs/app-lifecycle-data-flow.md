@@ -2,7 +2,7 @@
 
 Process start → first paint → IndexedDB writes. This is the **current boot order**, read from the files named below — not a proposal.
 
-Companions: [workers-and-persistence.md](./workers-and-persistence.md) (key families, worker message types, lanes) · [helps-quote-flow.md](./helps-quote-flow.md) (TN/TWL chips without ScriptureViewer). Interactive map: open the Cursor canvas `tc-study-lifecycle-data-flow.canvas.tsx` beside chat.
+Companions: [workers-and-persistence.md](./workers-and-persistence.md) (key families, worker message types, lanes) · [helps-quote-flow.md](./helps-quote-flow.md) (TN/TWL chips without ScriptureViewer) · [cache-data-structure.md](./cache-data-structure.md) (SoT vs artifacts, payloads). Interactive map: open the Cursor canvas `tc-study-lifecycle-data-flow.canvas.tsx` beside chat.
 
 ---
 

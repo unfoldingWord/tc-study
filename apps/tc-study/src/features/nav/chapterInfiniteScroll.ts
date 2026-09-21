@@ -764,37 +764,61 @@ export function shouldResetWindowOnNavChange(args: {
  * After a CombinedHelps / picker jump, ignore settle that would commit the
  * previous chapter (align scroll still sees the old pane for one frame).
  *
- * After an edge-cue reveal, `holdToChapter` keeps settle from snapping nav
- * back to the chapter that still owns the read-line (peek is only ~56px).
+ * After an edge-cue peek, the stay chapter still owns the read-line (~56px).
+ * Click already committed chrome — do not settle-snap until the user
+ * actually scrolls. Once they have, follow whatever painted chapter is
+ * parked (stacked infinite), not an exclusive hold on the reveal target.
  */
 export function shouldCommitSettledChapter(args: {
   parked: number | null
   navChapter: number
   paintedHasParked: boolean
   blockSnapBackTo: number | null
-  holdToChapter?: number | null
+  userMovedSinceReveal?: boolean
 }): boolean {
   if (args.parked == null || !args.paintedHasParked) return false
   if (args.parked === args.navChapter) return false
   if (args.blockSnapBackTo != null && args.parked === args.blockSnapBackTo) return false
-  if (args.holdToChapter != null && args.parked !== args.holdToChapter) return false
+  if (!args.userMovedSinceReveal) return false
   return true
 }
 
+/** Leave the peek snap-back pin once the user has scrolled onto another chapter. */
+export function shouldReleaseEdgeRevealSnapBack(args: {
+  parked: number | null
+  blockSnapBackTo: number | null
+  userMovedSinceReveal?: boolean
+}): boolean {
+  if (!args.userMovedSinceReveal) return false
+  return args.blockSnapBackTo != null && args.parked != null && args.parked !== args.blockSnapBackTo
+}
+
 /**
- * Peek, settle-hold, and chrome/helps commit must not start another edge
- * reveal for the same target in the same tick. `slotsRef` is otherwise stale
- * until React paints, so canReveal/overscroll latch would request the same
- * chapter again and recurse (Maximum update depth).
+ * Same-tick peek/settle/commit must not request the same target again.
+ * `slotsRef` is otherwise stale until React paints, so canReveal/overscroll
+ * latch would recurse (Maximum update depth).
+ *
+ * A *different* neighbor must stay allowed while an earlier reveal is still
+ * loading — blocking every target (e.g. via programmatic peek suppress)
+ * overwrites nothing but also cannot protect the first target, and a second
+ * reveal then retriggers the first → commit oscillation.
  */
 export function shouldBlockEdgeRevealRetrigger(args: {
-  inFlightTarget: number | null
+  inFlightTargets: readonly number[]
   target: number | null
-  programmaticScrollActive?: boolean
 }): boolean {
   if (args.target == null) return true
-  if (args.programmaticScrollActive) return true
-  return args.inFlightTarget != null && args.inFlightTarget === args.target
+  return args.inFlightTargets.includes(args.target)
+}
+
+/** Drop in-flight targets once they are in the painted stack (peek applied). */
+export function inFlightTargetsAfterPeek(
+  inFlight: readonly number[],
+  paintedChapters: readonly number[]
+): number[] {
+  if (inFlight.length === 0) return []
+  const painted = new Set(paintedChapters)
+  return inFlight.filter((chapter) => !painted.has(chapter))
 }
 
 export function wouldEnqueueWholeBook(

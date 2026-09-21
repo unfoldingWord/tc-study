@@ -4,7 +4,7 @@ How CombinedHelps paints **ULT (target) quote chips** on TN/TWL without waiting 
 
 This is the **current intended design** after decoupling chip paint from `SCRIPTURE_TOKENS`. Key names match the code.
 
-**Companions:** [workers-and-persistence.md](./workers-and-persistence.md) (IDB prefixes, workers, lanes) · [app-lifecycle-data-flow.md](./app-lifecycle-data-flow.md) (boot → first paint).
+**Companions:** [workers-and-persistence.md](./workers-and-persistence.md) (IDB prefixes, workers, lanes) · [app-lifecycle-data-flow.md](./app-lifecycle-data-flow.md) (boot → first paint) · [cache-data-structure.md](./cache-data-structure.md) (SoT vs artifacts, quote v5 / align v6 payloads, language-pack zip).
 
 ---
 

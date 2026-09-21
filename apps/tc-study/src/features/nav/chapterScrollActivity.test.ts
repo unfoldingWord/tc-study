@@ -160,8 +160,10 @@ describe('chapter scroll activity wiring', () => {
     expect(hook).toContain('markChapterScrollUnsettled')
     expect(hook).toContain('markChapterScrollSettled')
     expect(hook).toContain('clearChapterScrollActivity')
+    expect(hook).toContain('beginProgrammaticScrollSuppress')
     expect(hook).toContain('isProgrammaticScrollSuppressed')
     expect(hook).toContain('shouldBlockEdgeRevealRetrigger')
+    expect(hook).toContain('inFlightTargetsAfterPeek')
   })
 
   test('quote-build and OL hydrate wait for settle', () => {

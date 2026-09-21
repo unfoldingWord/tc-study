@@ -24,6 +24,7 @@ import {
   edgeRevealTargetChapter,
   effectiveScrollVelocity,
   ensureChapterPainted,
+  inFlightTargetsAfterPeek,
   measureScrollVelocity,
   neighborChapterToPaint,
   placeholderHeightPx,
@@ -40,6 +41,7 @@ import {
   shouldBlockEdgeRevealRetrigger,
   shouldCommitSettledChapter,
   shouldPromotePlaceholderOnSettle,
+  shouldReleaseEdgeRevealSnapBack,
   shouldResetWindowOnNavChange,
   shouldStitchAtDocumentEdge,
   singlePaintedChapterSlots,
@@ -376,6 +378,7 @@ describe('chapterInfiniteScroll nav settle', () => {
         navChapter: 2,
         paintedHasParked: true,
         blockSnapBackTo: 1,
+        userMovedSinceReveal: true,
       })
     ).toBe(true)
   })
@@ -389,26 +392,28 @@ describe('chapterInfiniteScroll nav settle', () => {
 
     expect(
       shouldBlockEdgeRevealRetrigger({
-        inFlightTarget: 4,
+        inFlightTargets: [4],
         target: 4,
-        programmaticScrollActive: false,
       })
     ).toBe(true)
+    // Overlapping load: a different neighbor must still be allowed while 4
+    // is in-flight (programmatic peek suppress must not blanket-block).
     expect(
       shouldBlockEdgeRevealRetrigger({
-        inFlightTarget: 4,
+        inFlightTargets: [4],
         target: 5,
-        programmaticScrollActive: true,
-      })
-    ).toBe(true)
-    expect(
-      shouldBlockEdgeRevealRetrigger({
-        inFlightTarget: null,
-        target: 5,
-        programmaticScrollActive: false,
       })
     ).toBe(false)
-    expect(shouldBlockEdgeRevealRetrigger({ inFlightTarget: 4, target: null })).toBe(true)
+    expect(
+      shouldBlockEdgeRevealRetrigger({
+        inFlightTargets: [],
+        target: 5,
+      })
+    ).toBe(false)
+    expect(shouldBlockEdgeRevealRetrigger({ inFlightTargets: [4], target: null })).toBe(true)
+
+    expect(inFlightTargetsAfterPeek([4, 5], [3, 4])).toEqual([5])
+    expect(inFlightTargetsAfterPeek([4], [3, 4])).toEqual([])
 
     // Peek leaves the previous chapter on the read-line — settle must not
     // snap nav back (that would look like a picker jump and re-reveal).
@@ -417,20 +422,27 @@ describe('chapterInfiniteScroll nav settle', () => {
         parked: 3,
         navChapter: 4,
         paintedHasParked: true,
-        blockSnapBackTo: null,
-        holdToChapter: 4,
+        blockSnapBackTo: 3,
+        userMovedSinceReveal: false,
+      })
+    ).toBe(false)
+    expect(
+      shouldReleaseEdgeRevealSnapBack({
+        parked: 3,
+        blockSnapBackTo: 3,
+        userMovedSinceReveal: false,
       })
     ).toBe(false)
   })
 
-  test('edge-reveal hold does not settle-commit the chapter that still owns the read-line', () => {
+  test('edge-reveal snap-back pin allows settle once the user scrolls another chapter into view', () => {
     expect(
       shouldCommitSettledChapter({
         parked: 5,
         navChapter: 6,
         paintedHasParked: true,
-        blockSnapBackTo: null,
-        holdToChapter: 6,
+        blockSnapBackTo: 5,
+        userMovedSinceReveal: false,
       })
     ).toBe(false)
     expect(
@@ -438,26 +450,42 @@ describe('chapterInfiniteScroll nav settle', () => {
         parked: 6,
         navChapter: 6,
         paintedHasParked: true,
-        blockSnapBackTo: null,
-        holdToChapter: 6,
+        blockSnapBackTo: 5,
+        userMovedSinceReveal: false,
       })
     ).toBe(false)
+    // Peek settle must not snap to a stacked neighbor until the user scrolls.
     expect(
       shouldCommitSettledChapter({
         parked: 7,
         navChapter: 6,
         paintedHasParked: true,
-        blockSnapBackTo: null,
-        holdToChapter: 6,
+        blockSnapBackTo: 5,
+        userMovedSinceReveal: false,
       })
     ).toBe(false)
+    // After a real scroll, chrome follows the parked stacked chapter.
     expect(
       shouldCommitSettledChapter({
         parked: 7,
         navChapter: 6,
         paintedHasParked: true,
-        blockSnapBackTo: null,
-        holdToChapter: 7,
+        blockSnapBackTo: 5,
+        userMovedSinceReveal: true,
+      })
+    ).toBe(true)
+    expect(
+      shouldReleaseEdgeRevealSnapBack({
+        parked: 6,
+        blockSnapBackTo: 5,
+        userMovedSinceReveal: false,
+      })
+    ).toBe(false)
+    expect(
+      shouldReleaseEdgeRevealSnapBack({
+        parked: 7,
+        blockSnapBackTo: 5,
+        userMovedSinceReveal: true,
       })
     ).toBe(true)
   })

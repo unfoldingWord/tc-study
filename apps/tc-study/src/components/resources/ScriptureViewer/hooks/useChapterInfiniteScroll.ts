@@ -26,6 +26,7 @@ import {
   measureScrollVelocity,
   neighborChapterToPaint,
   paintedStackEdgeChapter,
+  inFlightTargetsAfterPeek,
   peekScrollTopAfterEdgeReveal,
   recenterSlots,
   resetChapterSlots,
@@ -36,6 +37,7 @@ import {
   shouldBlockEdgeRevealRetrigger,
   shouldCommitSettledChapter,
   shouldPromotePlaceholderOnSettle,
+  shouldReleaseEdgeRevealSnapBack,
   shouldResetWindowOnNavChange,
   settleViewportChapter,
   singlePaintedChapterSlots,
@@ -141,12 +143,12 @@ export function useChapterInfiniteScroll(
   const alignToChapterRef = useRef<number | null>(currentRef.chapter)
   /** After edge reveal: small peek toward the new chapter (not snap to verse 1). */
   const pendingRevealPeekRef = useRef<'next' | 'previous' | null>(null)
-  /** Previous chapter after a picker/helps jump — settle must not snap back. */
+  /** Previous / peek-stay chapter — settle must not snap back to it. */
   const blockSnapBackToRef = useRef<number | null>(null)
-  /** Revealed chapter — settle must not snap back while the old pane still owns the read-line. */
-  const holdSettledToRef = useRef<number | null>(null)
-  /** Same-tick peek/settle/commit must not request this target again. */
-  const revealInFlightRef = useRef<number | null>(null)
+  /** True after a real user scroll; peek/programmatic settle must not snap chrome. */
+  const userMovedSinceRevealRef = useRef(false)
+  /** Same-tick peek/settle/commit must not request these targets again. */
+  const revealInFlightRef = useRef<Set<number>>(new Set())
   const commitChapterRef = useRef<(chapter: number) => void>(() => {})
   const rafRef = useRef<number | null>(null)
 
@@ -173,30 +175,33 @@ export function useChapterInfiniteScroll(
   const revealChapterAtEdge = useCallback(
     (direction: 'next' | 'previous'): boolean => {
       if (!enabled || !CHAPTER_EDGE_SWAP_MODE || lastChapter < 1) return false
-      const target = edgeRevealTargetChapter(slotsRef.current, direction, lastChapter)
+      const prevSlots = slotsRef.current
+      const target = edgeRevealTargetChapter(prevSlots, direction, lastChapter)
       if (target == null) return false
       if (
         shouldBlockEdgeRevealRetrigger({
-          inFlightTarget: revealInFlightRef.current,
+          inFlightTargets: [...revealInFlightRef.current],
           target,
-          programmaticScrollActive: isProgrammaticScrollSuppressed(),
         })
       ) {
         return false
       }
 
       // Peek / preserve-align write scrollTop; suppress before chrome/helps
-      // sync so those writes cannot unsettle or re-latch overscroll.
+      // sync so those writes cannot unsettle or re-latch overscroll. Do not
+      // fold this into the same-target in-flight guard — a second neighbor
+      // must still be revealable while the first chapter is loading.
       beginProgrammaticScrollSuppress(500)
-      revealInFlightRef.current = target
+      userMovedSinceRevealRef.current = false
+      revealInFlightRef.current.add(target)
 
       const parent = scrollParentRef.current ?? findOverflowParent(contentRef.current)
+      const stayChapter = paintedStackEdgeChapter(
+        prevSlots,
+        direction === 'next' ? 'max' : 'min'
+      )
       if (parent) {
         scrollParentRef.current = parent
-        const stayChapter = paintedStackEdgeChapter(
-          slotsRef.current,
-          direction === 'next' ? 'max' : 'min'
-        )
         const stayEl = stayChapter != null ? chapterElsRef.current.get(stayChapter) : null
         if (stayEl) {
           // Keep the chapter the user was reading pinned, even if the opposite
@@ -213,26 +218,24 @@ export function useChapterInfiniteScroll(
           }
         }
       }
-      pendingRevealPeekRef.current = direction
-      holdSettledToRef.current = target
+      // Pin snap-back to the first stay chapter only — overlapping reveals
+      // must not replace it or settle can commit the original read-line.
+      if (blockSnapBackToRef.current == null && stayChapter != null) {
+        blockSnapBackToRef.current = stayChapter
+      }
 
-      let changed = false
-      setSlots((prev) => {
-        const next = revealChapterInWindow(prev, target, direction, lastChapter)
-        if (slotsEqual(prev, next)) {
-          slotsRef.current = prev
-          return prev
-        }
-        changed = true
-        slotsRef.current = next
-        return next
-      })
-      if (!changed) {
-        revealInFlightRef.current = null
+      const nextSlots = revealChapterInWindow(prevSlots, target, direction, lastChapter)
+      if (slotsEqual(prevSlots, nextSlots)) {
+        revealInFlightRef.current.delete(target)
         pendingRevealPeekRef.current = null
         if (target !== currentRef.chapter) commitChapter(target)
+        setSettleKick((n) => n + 1)
         return false
       }
+
+      pendingRevealPeekRef.current = direction
+      slotsRef.current = nextSlots
+      setSlots(nextSlots)
       // Click / overscroll asked for the adjacent chapter — update chrome/helps
       // now. Peek keeps scroll at the junction; do not align to verse 1.
       // Do not mark unsettled: peek/preserve scroll would pin helps back to the
@@ -291,8 +294,8 @@ export function useChapterInfiniteScroll(
         ensureAttemptsRef.current.clear()
         setTokenSourceFailed(false)
         healingRef.current = false
-        holdSettledToRef.current = null
-        revealInFlightRef.current = null
+        revealInFlightRef.current.clear()
+        userMovedSinceRevealRef.current = false
         setSlots((prev) => {
           const next = singlePaintedChapterSlots(currentRef.chapter, 'paragraph')
           return slotsEqual(prev, next) ? prev : next
@@ -308,8 +311,8 @@ export function useChapterInfiniteScroll(
           // Picker / helps jump: reset to one chapter. Do not let align-scroll
           // settle snap back to the previous chapter or block tokenize.
           blockSnapBackToRef.current = navChapterRef.current
-          holdSettledToRef.current = null
-          revealInFlightRef.current = null
+          revealInFlightRef.current.clear()
+          userMovedSinceRevealRef.current = false
           beginProgrammaticScrollSuppress(800)
           ensureAttemptsRef.current.clear()
           setTokenSourceFailed(false)
@@ -411,9 +414,8 @@ export function useChapterInfiniteScroll(
 
     const preserve = preserveAlignRef.current
     const peekDir = pendingRevealPeekRef.current
-    if ((preserve || peekDir != null) && parent) {
-      beginProgrammaticScrollSuppress(500)
-    }
+    // Slot paint / upgrade can shift scrollTop; do not treat that as a user move.
+    beginProgrammaticScrollSuppress(preserve || peekDir != null ? 500 : 400)
     if (preserve && parent) {
       const el = chapterElsRef.current.get(preserve.chapter)
       if (el) {
@@ -465,7 +467,11 @@ export function useChapterInfiniteScroll(
       pendingRevealPeekRef.current = null
     }
     if (preserve || peekDir != null) {
-      revealInFlightRef.current = null
+      const remaining = inFlightTargetsAfterPeek(
+        [...revealInFlightRef.current],
+        contentChaptersFromSlots(slots)
+      )
+      revealInFlightRef.current = new Set(remaining)
     }
 
     for (const slot of slots) {
@@ -867,28 +873,45 @@ export function useChapterInfiniteScroll(
           rootBottom: root.bottom,
           nearEnd: false,
         })
+        const snapBackChapter = blockSnapBackToRef.current
+        const userMoved = userMovedSinceRevealRef.current
         const commitSettled = shouldCommitSettledChapter({
           parked,
           navChapter: navChapterRef.current,
           paintedHasParked: parked != null && painted.has(parked),
-          blockSnapBackTo: blockSnapBackToRef.current,
-          holdToChapter: holdSettledToRef.current,
+          blockSnapBackTo: snapBackChapter,
+          userMovedSinceReveal: userMoved,
         })
         if (commitSettled) {
           commitChapterRef.current(parked!)
+        }
+        if (
+          shouldReleaseEdgeRevealSnapBack({
+            parked,
+            blockSnapBackTo: snapBackChapter,
+            userMovedSinceReveal: userMoved,
+          })
+        ) {
           blockSnapBackToRef.current = null
-          holdSettledToRef.current = null
-        } else if (parked === navChapterRef.current) {
-          blockSnapBackToRef.current = null
-          holdSettledToRef.current = null
         }
         // Match legacy stitch settle: always re-settle, even when parked === nav
         // (post-commit scroll adjust / reveal-without-scroll would otherwise stick unsettled).
-        markChapterScrollSettled(commitSettled ? parked! : navChapterRef.current)
+        // Until the user scrolls, keep settle on nav (click-committed). After
+        // that, follow the painted chapter under the read-line.
+        markChapterScrollSettled(
+          commitSettled
+            ? parked!
+            : userMoved
+              ? (parked ?? navChapterRef.current)
+              : navChapterRef.current
+        )
       }, SETTLE_HOLD_MS)
     }
 
     const onScroll = () => {
+      if (!isProgrammaticScrollSuppressed()) {
+        userMovedSinceRevealRef.current = true
+      }
       markChapterScrollUnsettled()
       scheduleSettle()
     }
@@ -900,7 +923,7 @@ export function useChapterInfiniteScroll(
       parent.removeEventListener('scroll', onScroll)
       if (settleTimer != null) window.clearTimeout(settleTimer)
     }
-  }, [enabled, lastChapter, settleKick])
+  }, [enabled, lastChapter, settleKick, slots])
 
   const retryTokenSource = useCallback(() => {
     if (!resourceKey || !bookId) return

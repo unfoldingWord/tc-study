@@ -4,7 +4,7 @@ How `apps/tc-study` stores data, what each Web Worker does, and how caching / wa
 
 This is the current code, not a proposal. Key prefixes and job types are taken from the workers, cache modules, and `features/warm/*`.
 
-**Boot order and when each DB opens:** [App lifecycle and data flow](./app-lifecycle-data-flow.md). **Helps ULT chips (quote → align, decoupled from ScriptureViewer):** [Helps quote / align flow](./helps-quote-flow.md).
+**Boot order and when each DB opens:** [App lifecycle and data flow](./app-lifecycle-data-flow.md). **Helps ULT chips (quote → align, decoupled from ScriptureViewer):** [Helps quote / align flow](./helps-quote-flow.md). **Physical keys, SoT vs artifacts, payloads, language-pack zip:** [Cache data structure](./cache-data-structure.md).
 
 ---
 
