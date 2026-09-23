@@ -70,6 +70,7 @@ const FormattedChapterPane = memo(function FormattedChapterPane({
       chapter={chapterNum}
       kind="rendered"
       register={registerChapter}
+      layout="formatted"
       book={currentBook}
     >
       <h2
@@ -186,11 +187,45 @@ export function FormattedScriptureContent({
                 />
               )
             }
+            const blocks = getChapterLayoutBlocks(viewModel, slot.chapter)
+            if (blocks.length === 0) {
+              // Stack chapter not yet in the paint viewModel — keep light text.
+              const peeked = resourceKey
+                ? peekPreparedChapter(resourceKey, currentRef.book, slot.chapter)
+                : null
+              const light =
+                peeked?.light?.blocks?.length
+                  ? peeked.light
+                  : buildLightChapter(viewModel, slot.chapter)
+              if (light.blocks.length > 0) {
+                return (
+                  <PreparedLightChapterPane
+                    key={`prepared-light-pending-${slot.chapter}`}
+                    chapterNum={slot.chapter}
+                    light={light}
+                    registerChapter={registerChapter}
+                    onChapterClick={onChapterClick}
+                    onVerseClick={onVerseClick}
+                    slotKind="rendered"
+                  />
+                )
+              }
+              return (
+                <ChapterSlotChrome
+                  key={`pending-formatted-${slot.chapter}`}
+                  slot={{ ...slot, kind: 'paragraph' }}
+                  book={currentRef.book}
+                  paragraphs={paragraphsForChapter(slot.chapter)}
+                  register={registerChapter}
+                  onChapterClick={onChapterClick}
+                />
+              )
+            }
             return (
               <FormattedChapterPane
                 key={slot.chapter}
                 chapterNum={slot.chapter}
-                blocks={getChapterLayoutBlocks(viewModel, slot.chapter)}
+                blocks={blocks}
                 registerChapter={registerChapter}
                 highlightTarget={highlightTarget}
                 underlinedSemanticIds={underlinedSemanticIds}

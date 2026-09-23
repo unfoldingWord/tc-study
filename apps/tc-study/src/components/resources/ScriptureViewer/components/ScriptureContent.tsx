@@ -42,6 +42,7 @@ import {
   peekPreparedChapter,
 } from '../../../../features/scripture/preparedChapterCache'
 import { usePreparedChapterWindow, usePreparedBookLightPreload } from '../../../../features/scripture/usePreparedChapter'
+import { useStackedChapterViewModel } from '../../../../features/scripture/useStackedChapterViewModel'
 import {
   buildLightChapter,
   type ScriptureNavRecord,
@@ -228,6 +229,12 @@ export function ScriptureContent({
   const slots = chapterSlots && chapterSlots.length > 0 ? chapterSlots : null
   const slotsActive = slots != null
 
+  const stackChapters = useMemo(() => {
+    if (slots) return contentChaptersFromSlots(slots)
+    if (displayChapters?.length) return [...displayChapters]
+    return currentRef.chapter ? [currentRef.chapter] : []
+  }, [slots, displayChapters, currentRef.chapter])
+
   const warmChapters = useMemo(() => {
     const tocChapters = availableBooks.find(
       (b) => b.code.toLowerCase() === (currentRef.book || '').toLowerCase()
@@ -288,6 +295,17 @@ export function ScriptureContent({
     enabled: Boolean(resourceKey && currentRef.book && allBookChapters.length > 0),
   })
 
+  // Chapter-grained SoT only ships the focused chapter. Expand with SoT slices
+  // for every painted stack chapter so layout toggle can re-render 4/5 too.
+  const paintViewModel = useStackedChapterViewModel({
+    viewModel,
+    resourceKey,
+    bookId: currentRef.book || '',
+    chapters: stackChapters,
+    enabled: Boolean(viewModel && slotsActive),
+    reloadToken: `${preparedRevision}:${bookLightRevision}`,
+  })
+
   const paragraphsForChapter = (chapter: number): string[] => {
     void preparedRevision
     void bookLightRevision
@@ -311,8 +329,8 @@ export function ScriptureContent({
     const light =
       peeked?.light?.blocks?.length
         ? peeked.light
-        : viewModel
-          ? buildLightChapter(viewModel, chapter)
+        : (paintViewModel ?? viewModel)
+          ? buildLightChapter((paintViewModel ?? viewModel)!, chapter)
           : null
     if (!light?.blocks?.length) return null
     return (
@@ -329,11 +347,12 @@ export function ScriptureContent({
   }
 
   useEffect(() => {
-    if (!viewModel || !slots || slots.length === 0) return
+    const vm = paintViewModel ?? viewModel
+    if (!vm || !slots || slots.length === 0) return
     const contentChapters = contentChaptersFromSlots(slots)
-    prefetchAdjacentChapterParagraphs(viewModel, contentChapters)
-    prefetchChapterLayouts(viewModel, paragraphChaptersFromSlots(slots))
-  }, [viewModel, slots])
+    prefetchAdjacentChapterParagraphs(vm, contentChapters)
+    prefetchChapterLayouts(vm, paragraphChaptersFromSlots(slots))
+  }, [paintViewModel, viewModel, slots])
 
   // Rendered/paragraph slots without full tokens — kick full prepare once per
   // chapter, stop when the worker reports source-missing (heal owns recovery).
@@ -622,9 +641,11 @@ export function ScriptureContent({
     )
   }
 
+  const slotPaintViewModel = paintViewModel ?? viewModel
+
   const slotWindowVerses =
     slotsActive && displayChapters && displayChapters.length > 0
-      ? displayVersesForChapters(viewModel, displayChapters)
+      ? displayVersesForChapters(slotPaintViewModel, displayChapters)
       : displayVerses
 
   if (
@@ -650,9 +671,9 @@ export function ScriptureContent({
           <TokenSourceHealButton onRetry={onRetryTokenSource} />
         </div>
       ) : null}
-      {layoutMode === 'formatted' && viewModel ? (
+      {layoutMode === 'formatted' && slotPaintViewModel ? (
         <FormattedScriptureContent
-          viewModel={viewModel}
+          viewModel={slotPaintViewModel}
           resourceKey={resourceKey}
           currentRef={currentRef}
           highlightTarget={highlightTarget}
@@ -688,33 +709,33 @@ export function ScriptureContent({
               />
             )
           }
+          // Verse-block mode must use one-verse-per-block layout. PreparedFull
+          // paints USJ paragraph blocks (same as formatted), so preferring it
+          // here made the layout toggle a no-op under infinite-scroll slots.
           void preparedRevision
-          const peeked = peekPreparedChapter(resourceKey, currentRef.book, slot.chapter)
-          if (peeked?.full && onInternedTokenClick) {
+          const verses = getChapterDisplayVerses(slotPaintViewModel, slot.chapter)
+          if (verses.length === 0) {
+            // Stack chapter not yet merged into the focused SoT slice — keep
+            // light text visible until useStackedChapterViewModel lands.
+            const light = lightPaneForChapter(slot.chapter, 'rendered')
+            if (light) return light
             return (
-              <PreparedFullChapterPane
-                key={`prepared-full-${slot.chapter}`}
-                chapterNum={slot.chapter}
-                full={peeked.full}
+              <ChapterSlotChrome
+                key={`pending-verse-block-${slot.chapter}`}
+                slot={{ ...slot, kind: 'paragraph' }}
                 book={currentRef.book}
-                registerChapter={registerChapter}
-                highlightTarget={highlightTarget}
-                underlinedSemanticIds={underlinedSemanticIds}
-                onInternedTokenClick={onInternedTokenClick}
+                paragraphs={paragraphsForChapter(slot.chapter)}
+                register={registerChapter}
                 onChapterClick={onChapterClick}
-                onVerseClick={onVerseClick}
-                isOriginalLanguage={isOriginalLanguage}
               />
             )
           }
-          // While full prepare is cold, fall back to USJ tokens (hover/underline capable)
-          // instead of non-interactive light chrome labeled as rendered.
           return (
             <VerseBlockChapterPane
-              key={`usj-pending-full-${slot.chapter}`}
+              key={`verse-block-${slot.chapter}`}
               chapterNum={slot.chapter}
-              items={getChapterVerseBlockItems(viewModel, slot.chapter)}
-              verses={getChapterDisplayVerses(viewModel, slot.chapter)}
+              items={getChapterVerseBlockItems(slotPaintViewModel, slot.chapter)}
+              verses={verses}
               registerChapter={registerChapter}
               highlightTarget={highlightTarget}
               underlinedSemanticIds={underlinedSemanticIds}

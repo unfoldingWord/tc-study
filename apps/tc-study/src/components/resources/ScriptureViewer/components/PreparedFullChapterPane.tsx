@@ -38,6 +38,8 @@ interface PreparedFullChapterPaneProps {
   onChapterClick?: (chapter: number) => void
   onVerseClick?: (chapter: number, verse: number) => void
   isOriginalLanguage: boolean
+  /** DOM layout marker — prepared-full paints USJ paragraphs (formatted). */
+  layout?: string
 }
 
 function verseRefFor(book: string, chapter: number, verse: number): string {
@@ -241,6 +243,7 @@ export const PreparedFullChapterPane = memo(function PreparedFullChapterPane({
   onChapterClick,
   onVerseClick,
   isOriginalLanguage,
+  layout = 'formatted',
 }: PreparedFullChapterPaneProps) {
   const underlineIndices = useMemo(
     () => mapUnderlinesToIndices(full.matchKeys, underlinedSemanticIds ?? new Set()),
@@ -256,7 +259,7 @@ export const PreparedFullChapterPane = memo(function PreparedFullChapterPane({
       chapter={chapterNum}
       kind="rendered"
       register={registerChapter}
-      layout="paragraph"
+      layout={layout}
     >
       <h2
         className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"

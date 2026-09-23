@@ -131,6 +131,40 @@ describe('chapter edge-reveal + warm wiring', () => {
     expect(preparedSrc).toContain('scroll-mt-12')
   })
 
+  test('layout toggle: verse-block slots use VerseBlockChapterPane, not PreparedFull', () => {
+    const contentSrc = readFileSync(
+      join(import.meta.dir, 'components/ScriptureContent.tsx'),
+      'utf8'
+    )
+    const toggleSrc = readFileSync(
+      join(import.meta.dir, 'components/ScriptureLayoutToggle.tsx'),
+      'utf8'
+    )
+    const formattedSrc = readFileSync(
+      join(import.meta.dir, 'components/FormattedScriptureContent.tsx'),
+      'utf8'
+    )
+    expect(toggleSrc).toContain('toggleLayoutMode')
+    expect(toggleSrc).toContain('data-scripture-layout-toggle')
+    expect(contentSrc).toContain("layoutMode === 'formatted'")
+    expect(contentSrc).toContain('FormattedScriptureContent')
+    expect(contentSrc).toContain('VerseBlockChapterPane')
+    expect(contentSrc).toContain('useStackedChapterViewModel')
+    expect(contentSrc).toContain('slotPaintViewModel')
+    // Infinite-scroll verse-block path must not prefer PreparedFull (paragraph
+    // BlockView) — that made the toggle a visual no-op.
+    const viewModelSlotsBranch = contentSrc.slice(
+      contentSrc.indexOf("layoutMode === 'formatted' && slotPaintViewModel"),
+      contentSrc.indexOf('chapters.map((chapterNum) =>')
+    )
+    expect(viewModelSlotsBranch).toContain('VerseBlockChapterPane')
+    expect(viewModelSlotsBranch).not.toContain('PreparedFullChapterPane')
+    expect(formattedSrc).toContain('layout="formatted"')
+    // Empty stack chapters keep light fallback until SoT merge lands.
+    expect(viewModelSlotsBranch).toContain('lightPaneForChapter')
+    expect(formattedSrc).toContain('prepared-light-pending')
+  })
+
   test('edge-reveal mode stacks up to three chapters', () => {
     const navSrc = readFileSync(
       join(import.meta.dir, '../../../features/nav/chapterInfiniteScroll.ts'),
