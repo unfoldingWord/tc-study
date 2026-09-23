@@ -240,6 +240,55 @@ describe('filterDisplayNotes', () => {
     expect(displayNotes.map((n) => n.id)).toEqual(['n-align'])
   })
 
+  test('token filter matches clicked instance, not surface substring (the ≠ Therefore)', () => {
+    const ephNotes = [
+      {
+        id: 'eph-5-1-therefore',
+        reference: '5:1',
+        quote: 'Therefore',
+        occurrence: '1',
+        quoteTokens: [{ text: 'Therefore' }],
+        semanticIds: ['eph 5:1:Therefore:1'],
+        alignedTokens: [{ semanticId: 'eph 5:1:Therefore:1', content: 'Therefore' }],
+      },
+      {
+        id: 'eph-5-9-the',
+        reference: '5:9',
+        quote: 'the',
+        occurrence: '1',
+        quoteTokens: [{ text: 'the' }],
+        semanticIds: ['eph 5:9:the:1'],
+        alignedTokens: [{ semanticId: 'eph 5:9:the:1', content: 'the' }],
+      },
+      {
+        id: 'eph-5-9-other-the',
+        reference: '5:9',
+        quote: 'the fruit',
+        occurrence: '2',
+        quoteTokens: [{ text: 'the' }, { text: 'fruit' }],
+        semanticIds: ['eph 5:9:the:2', 'eph 5:9:fruit:1'],
+        alignedTokens: [
+          { semanticId: 'eph 5:9:the:2', content: 'the' },
+          { semanticId: 'eph 5:9:fruit:1', content: 'fruit' },
+        ],
+      },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(ephNotes, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: {
+        semanticId: 'eph 5:9:the:1',
+        content: 'the',
+        alignedSemanticIds: [],
+        timestamp: 1,
+      },
+      bookCodeLower: 'eph',
+    })
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['eph-5-9-the'])
+  })
+
   test('token filter without fallback returns empty when no match', () => {
     const { displayNotes, hasNoteMatches } = filterDisplayNotes(notes, {
       helpsScope: 'scripture',

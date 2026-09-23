@@ -171,32 +171,25 @@ function itemMatchKeys(
   return [...raw, ...aligned].map(semanticIdMatchKey)
 }
 
+/**
+ * Token-click match is instance-based: intersection of clicked semantic /
+ * aligned ids with the note/link quote's semanticIds or alignedTokens.
+ * Never fall back to surface substring (e.g. "the" must not match "Therefore").
+ */
 function itemMatchesTokenFilter(
   item: {
     reference: string
     occurrence?: string
-    quote?: string
-    origWords?: string
     quoteTokens?: Array<{ text: string }>
     semanticIds?: string[]
     alignedTokens?: Array<{ semanticId?: string; content?: string; text?: string }>
   },
   tokenFilter: TokenFilterLike,
-  bookCodeLower: string,
-  extraText: string
+  bookCodeLower: string
 ): boolean {
   const wanted = tokenFilterMatchKeys(tokenFilter)
-  if (wanted.size > 0 && itemMatchKeys(item, bookCodeLower).some((id) => wanted.has(id))) {
-    return true
-  }
-  const cleanToken = tokenFilter.content.toLowerCase().trim()
-  if (!cleanToken) return false
-  if (extraText.includes(cleanToken)) return true
-  if (item.quoteTokens?.some((tok) => tok.text.toLowerCase().includes(cleanToken))) return true
-  return (item.alignedTokens ?? []).some((token) => {
-    const surface = (token.content || token.text || '').toLowerCase()
-    return surface.includes(cleanToken)
-  })
+  if (wanted.size === 0) return false
+  return itemMatchKeys(item, bookCodeLower).some((id) => wanted.has(id))
 }
 
 /** Filter translation notes whose reference overlaps the given chapter/verse range. */
@@ -725,7 +718,7 @@ export function filterDisplayNotes<T extends NoteForDisplay>(
   }
 
   const filtered = notesWithAlignedTokens.filter((note) =>
-    itemMatchesTokenFilter(note, tokenFilter, bookCodeLower, note.quote?.toLowerCase() || '')
+    itemMatchesTokenFilter(note, tokenFilter, bookCodeLower)
   )
   return {
     displayNotes: withFallback(filtered, notesWithAlignedTokens, fallbackWhenEmpty),
@@ -799,7 +792,7 @@ export function filterDisplayLinks<T extends LinkForDisplay>(
   }
 
   const filtered = filteredByReference.filter((link) =>
-    itemMatchesTokenFilter(link, tokenFilter, bookCodeLower, link.origWords?.toLowerCase() || '')
+    itemMatchesTokenFilter(link, tokenFilter, bookCodeLower)
   )
   return {
     displayLinks: withFallback(filtered, filteredByReference, fallbackWhenEmpty),
