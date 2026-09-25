@@ -80,9 +80,11 @@ interface TranslationNoteCardProps {
 function IntroExpandButton({
   expanded,
   onToggle,
+  className = '',
 }: {
   expanded: boolean
   onToggle: () => void
+  className?: string
 }) {
   const label = expanded ? 'Show less' : 'Show more'
   const Icon = expanded ? ChevronUp : ChevronDown
@@ -96,7 +98,7 @@ function IntroExpandButton({
         e.stopPropagation()
         onToggle()
       }}
-      className="p-1 rounded-md text-fg-muted hover:text-fg-secondary hover:bg-muted shrink-0"
+      className={`p-1 rounded-md text-fg-muted hover:text-fg-secondary hover:bg-muted shrink-0 ${className}`}
     >
       <Icon className="w-4 h-4" aria-hidden />
     </button>
@@ -213,7 +215,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   return (
     <div
       className={`
-        group rounded-md p-content cursor-pointer transition-colors duration-150 border
+        group relative rounded-md p-content cursor-pointer transition-colors duration-150 border
         ${helpsCardStateClass(isSelected, isFilterSource)}
 
       `}
@@ -230,6 +232,13 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       role="article"
       aria-label="Translation note"
     >
+      {isIntro && introExpanded ? (
+        <IntroExpandButton
+          expanded
+          onToggle={() => setIntroExpanded(false)}
+          className="absolute top-1 right-1 z-10 bg-surface/80"
+        />
+      ) : null}
       {/* Target Language Quote - Clickable aligned tokens when available */}
       {hasAlignedTokens && (
         <button
@@ -387,7 +396,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
             <MarkdownRenderer
               content={note.note}
               hast={note.bodyHast}
-              className="text-base text-fg-secondary leading-relaxed prose prose-base max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent"
+              className={`text-base text-fg-secondary leading-relaxed prose prose-base max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent${isIntro && introExpanded ? ' pe-6' : ''}`}
               onInternalLinkClick={handleInternalLinkClick}
               getEntryTitle={getEntryTitle}
             />
