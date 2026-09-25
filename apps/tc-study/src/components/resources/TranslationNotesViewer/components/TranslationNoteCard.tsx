@@ -219,6 +219,10 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
       `}
       data-helps-filter-source={isFilterSource || undefined}
       onClick={() => {
+        if (isIntro && !introExpanded) {
+          setIntroExpanded(true)
+          return
+        }
         // Quote persist/token-click first — select-driven navigate must not race ahead.
         onQuoteClick?.(note)
         onClick(note)
@@ -352,7 +356,14 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
 
       {/* Note Content - Translation guidance (markdown). Intros stay collapsed until expanded. */}
       {isIntro && !excerptLoading && note.note && !introExpanded ? (
-        <div className="flex items-start gap-2" dir={languageDirection}>
+        <div
+          className="flex items-start gap-2"
+          dir={languageDirection}
+          onClick={(e) => {
+            e.stopPropagation()
+            setIntroExpanded(true)
+          }}
+        >
           <p className="flex-1 min-w-0 text-base font-medium text-fg leading-relaxed">{introHeading}</p>
           <IntroExpandButton expanded={false} onToggle={() => setIntroExpanded(true)} />
         </div>
