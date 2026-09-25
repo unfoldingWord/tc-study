@@ -6,7 +6,7 @@
  * stays identical to verse-block mode.
  */
 
-import { extractText, isRecord, parseVerseSid } from './usjWalk'
+import { extractDeepText, extractText, isRecord, parseVerseSid } from './usjWalk'
 import type { CachedUsjDocument } from './usjCacheTypes'
 import type { UsjScriptureViewModel, UsjWordToken } from './usjViewModel'
 
@@ -89,7 +89,9 @@ export const INTRO_HEADING_MARKERS = new Set([
   'iex',
 ])
 
-export const FOOTNOTE_MARKERS = new Set(['f', 'fe', 'x'])
+export const FOOTNOTE_MARKERS = new Set(['f', 'fe', 'ef'])
+export const XREF_MARKERS = new Set(['x', 'ex'])
+export const NOTE_ORIGIN_MARKERS = new Set(['fr', 'xo'])
 export const SKIP_MARKERS = new Set([
   'id',
   'h',
@@ -104,11 +106,25 @@ export const SKIP_MARKERS = new Set([
 
 export type UsjLayoutBlockRole = 'para' | 'heading' | 'break' | 'intro'
 
+export type UsjLayoutNote = {
+  kind: 'note'
+  caller: string
+  text: string
+}
+
+export type UsjLayoutXref = {
+  kind: 'xref'
+  caller: string
+  text: string
+}
+
 export type UsjLayoutInline =
   | { kind: 'verse'; chapterNumber: number; verseNumber: number }
   | { kind: 'token'; token: UsjWordToken }
   | { kind: 'text'; text: string }
   | { kind: 'heading'; text: string }
+  | UsjLayoutNote
+  | UsjLayoutXref
 
 export interface UsjLayoutBlock {
   /** USFM marker, e.g. `p`, `q1`, `s1`, `b` */
@@ -160,6 +176,11 @@ type WalkCtx = {
   chapter: number
   verse: number
   queues: Map<string, UsjWordToken[]>
+  noteOrdinal: number
+  /** When set, only emit segments for this chapter (plus intro before ch1). */
+  targetChapter?: number
+  /** Set when a chapter marker past targetChapter is seen — abort walk. */
+  stopped?: boolean
 }
 
 type FlatSeg =
@@ -168,6 +189,57 @@ type FlatSeg =
   | { kind: 'token'; token: UsjWordToken; chapter: number }
   | { kind: 'text'; text: string; chapter: number }
   | { kind: 'heading'; text: string; chapter: number }
+  | { kind: 'note'; caller: string; text: string; chapter: number }
+  | { kind: 'xref'; caller: string; text: string; chapter: number }
+
+function shouldEmitChapter(ctx: WalkCtx): boolean {
+  if (ctx.targetChapter == null) return true
+  if (ctx.chapter === ctx.targetChapter) return true
+  // Book intro (before first `\c`) paints with chapter 1.
+  if (ctx.targetChapter === 1 && ctx.chapter === 0) return true
+  return false
+}
+
+function nextDisplayCaller(rawCaller: string, ctx: WalkCtx): string {
+  const caller = rawCaller.trim()
+  if (caller && caller !== '+' && caller !== '-') return caller
+  const letter = String.fromCharCode(97 + (ctx.noteOrdinal % 26))
+  ctx.noteOrdinal += 1
+  return letter
+}
+
+function extractNoteParts(raw: Record<string, unknown>): { caller: string; text: string } {
+  const caller = typeof raw.caller === 'string' ? raw.caller : ''
+  const content = raw.content
+  if (!Array.isArray(content)) {
+    return { caller, text: extractDeepText(content).replace(/\s+/g, ' ').trim() }
+  }
+
+  let text = ''
+  for (const child of content) {
+    if (typeof child === 'string') {
+      text += child
+      continue
+    }
+    if (!isRecord(child)) continue
+    const marker = String(child.marker ?? '')
+    if (NOTE_ORIGIN_MARKERS.has(marker)) continue
+    text += extractDeepText(child)
+  }
+  return { caller, text: text.replace(/\s+/g, ' ').trim() }
+}
+
+function pushNoteOrXref(raw: Record<string, unknown>, ctx: WalkCtx, out: FlatSeg[]): void {
+  const marker = String(raw.marker ?? '')
+  const { caller: rawCaller, text } = extractNoteParts(raw)
+  if (!text) return
+  const caller = nextDisplayCaller(rawCaller, ctx)
+  if (XREF_MARKERS.has(marker)) {
+    out.push({ kind: 'xref', caller, text, chapter: ctx.chapter })
+    return
+  }
+  out.push({ kind: 'note', caller, text, chapter: ctx.chapter })
+}
 
 function queueKey(chapter: number, verse: number): string {
   return `${chapter}:${verse}`
@@ -187,8 +259,10 @@ export function buildTokenQueuesFromViewModel(
 }
 
 function takeNextToken(ctx: WalkCtx): UsjWordToken | undefined {
-  if (ctx.verse <= 0) return undefined
-  const key = queueKey(ctx.chapter, ctx.verse)
+  if (ctx.chapter <= 0) return undefined
+  // Pre-verse chapter content (`\d` superscriptions) binds to verse 1 tokens.
+  const verse = ctx.verse > 0 ? ctx.verse : 1
+  const key = queueKey(ctx.chapter, verse)
   const q = ctx.queues.get(key)
   if (!q || q.length === 0) return undefined
   return q.shift()
@@ -196,8 +270,12 @@ function takeNextToken(ctx: WalkCtx): UsjWordToken | undefined {
 
 function collectFlatSegments(nodes: unknown[], ctx: WalkCtx, out: FlatSeg[]): void {
   for (const raw of nodes) {
+    if (ctx.stopped) return
+
     if (typeof raw === 'string') {
-      if (raw.length > 0) out.push({ kind: 'text', text: raw, chapter: ctx.chapter })
+      if (raw.length > 0 && shouldEmitChapter(ctx)) {
+        out.push({ kind: 'text', text: raw, chapter: ctx.chapter })
+      }
       continue
     }
     if (!isRecord(raw)) continue
@@ -215,7 +293,29 @@ function collectFlatSegments(nodes: unknown[], ctx: WalkCtx, out: FlatSeg[]): vo
       if (Number.isFinite(n)) {
         ctx.chapter = n
         ctx.verse = 0
+        if (ctx.targetChapter != null && n > ctx.targetChapter) {
+          ctx.stopped = true
+          return
+        }
       }
+      continue
+    }
+
+    // Outside the target chapter: skip verse/para bodies (no word walk), but still
+    // recurse opaque wrappers so nested chapter markers remain discoverable.
+    if (ctx.targetChapter != null && !shouldEmitChapter(ctx)) {
+      const isBody =
+        type === 'para' ||
+        type === 'verse' ||
+        type === 'char' ||
+        type === 'note' ||
+        PARAGRAPH_MARKERS.has(marker) ||
+        HEADING_MARKERS.has(marker) ||
+        INTRO_HEADING_MARKERS.has(marker) ||
+        FOOTNOTE_MARKERS.has(marker) ||
+        XREF_MARKERS.has(marker)
+      if (isBody) continue
+      if (Array.isArray(raw.content)) collectFlatSegments(raw.content, ctx, out)
       continue
     }
 
@@ -254,8 +354,25 @@ function collectFlatSegments(nodes: unknown[], ctx: WalkCtx, out: FlatSeg[]): vo
       continue
     }
 
-    if (FOOTNOTE_MARKERS.has(marker)) {
-      // Collapse footnotes — keep layout clean; full footnote UI is out of scope.
+    if (
+      type === 'note' ||
+      FOOTNOTE_MARKERS.has(marker) ||
+      XREF_MARKERS.has(marker)
+    ) {
+      pushNoteOrXref(raw, ctx, out)
+      continue
+    }
+
+    if (type === 'char' && (marker === 'xt' || marker === 'xts')) {
+      const text = extractDeepText(raw.content).replace(/\s+/g, ' ').trim()
+      if (text) {
+        out.push({
+          kind: 'xref',
+          caller: nextDisplayCaller('+', ctx),
+          text,
+          chapter: ctx.chapter,
+        })
+      }
       continue
     }
 
@@ -265,9 +382,12 @@ function collectFlatSegments(nodes: unknown[], ctx: WalkCtx, out: FlatSeg[]): vo
       if (Array.isArray(raw.content)) collectFlatSegments(raw.content, ctx, child)
       for (const s of child) {
         if (s.kind === 'text') {
+          // Drop pure whitespace — shouldInsertSpaceBeforeInline spaces tokens.
+          if (s.text.trim().length === 0) continue
           out.push({ kind: 'heading', text: s.text, chapter: s.chapter })
         } else if (s.kind === 'token') {
-          out.push({ kind: 'heading', text: s.token.content, chapter: s.chapter })
+          // Keep token identity for aligned superscriptions (`\d`, etc.).
+          out.push(s)
         } else if (s.kind !== 'para-break') {
           out.push(s)
         }
@@ -317,7 +437,7 @@ function groupSegments(segments: FlatSeg[]): UsjLayoutBlock[] {
 
   for (const seg of segments) {
     if (seg.kind === 'para-break') {
-      ensureBlock(seg.marker, seg.chapter || 1)
+      ensureBlock(seg.marker, seg.chapter)
       continue
     }
 
@@ -356,6 +476,16 @@ function groupSegments(segments: FlatSeg[]): UsjLayoutBlock[] {
       continue
     }
 
+    if (seg.kind === 'note') {
+      current!.inline.push({ kind: 'note', caller: seg.caller, text: seg.text })
+      continue
+    }
+
+    if (seg.kind === 'xref') {
+      current!.inline.push({ kind: 'xref', caller: seg.caller, text: seg.text })
+      continue
+    }
+
     if (seg.kind === 'text') {
       // Skip pure whitespace-only gaps between structural breaks; keep punctuation.
       if (seg.text.trim().length === 0 && current!.inline.length === 0) continue
@@ -378,10 +508,44 @@ export function buildUsjLayoutBlocks(
     chapter: 0,
     verse: 0,
     queues: buildTokenQueuesFromViewModel(viewModel),
+    noteOrdinal: 0,
   }
   const segments: FlatSeg[] = []
   collectFlatSegments(usj.content ?? [], ctx, segments)
   return groupSegments(segments)
+}
+
+/**
+ * Layout blocks for a single chapter. Skips other chapter bodies and stops at
+ * the next `\c`, so Psalms chapter 1 does not pay for chapters 2–150.
+ */
+export function buildUsjLayoutBlocksForChapter(
+  usj: CachedUsjDocument,
+  viewModel: UsjScriptureViewModel,
+  chapter: number
+): UsjLayoutBlock[] {
+  if (!Number.isFinite(chapter) || chapter < 1) return []
+  const queues = new Map<string, UsjWordToken[]>()
+  const chapterView = viewModel.chapters.find((ch) => ch.number === chapter)
+  if (chapterView) {
+    for (const v of chapterView.verses) {
+      queues.set(`${chapter}:${v.number}`, [...v.tokens])
+    }
+  }
+  const ctx: WalkCtx = {
+    chapter: 0,
+    verse: 0,
+    queues,
+    noteOrdinal: 0,
+    targetChapter: chapter,
+  }
+  const segments: FlatSeg[] = []
+  collectFlatSegments(usj.content ?? [], ctx, segments)
+  return groupSegments(segments).filter(
+    (block) =>
+      block.chapterNumber === chapter ||
+      (chapter === 1 && block.chapterNumber === 0)
+  )
 }
 
 export interface FilterUsjLayoutOptions {
@@ -423,8 +587,13 @@ export function shouldInsertSpaceBeforeInline(
   next: UsjLayoutInline
 ): boolean {
   if (!prev || next.kind !== 'token') return false
-  if (prev.kind === 'text') return !/\s$/.test(prev.text)
-  return prev.kind === 'verse' || prev.kind === 'token' || prev.kind === 'heading'
+  if (prev.kind === 'text' || prev.kind === 'heading') return !/\s$/.test(prev.text)
+  return (
+    prev.kind === 'verse' ||
+    prev.kind === 'token' ||
+    prev.kind === 'note' ||
+    prev.kind === 'xref'
+  )
 }
 
 /** Concatenate layout inline to a display string (tokens + punctuation text). */
@@ -439,6 +608,9 @@ export function plainTextFromLayoutInline(inline: UsjLayoutInline[]): string {
     }
     if (item.kind === 'text' || item.kind === 'heading') {
       text += item.text
+      continue
+    }
+    if (item.kind === 'note' || item.kind === 'xref') {
       continue
     }
     if (shouldInsertSpaceBeforeInline(inline[i - 1], item)) text += ' '
@@ -489,6 +661,17 @@ export function clipLayoutInlineToVerses(
     }
 
     if (item.kind === 'heading') {
+      // Headings belong to heading blocks, not verse-clipped inline.
+      continue
+    }
+
+    if (item.kind === 'note' || item.kind === 'xref') {
+      if (currentVerse === null) {
+        const peeked = peekNextVerse(inline, i + 1)
+        if (!peeked || !inRange(peeked.chapter, peeked.verse)) continue
+      } else if (!inRange(currentChapter, currentVerse)) {
+        continue
+      }
       out.push(item)
       continue
     }
@@ -542,12 +725,16 @@ export function collectVerseDisplayInline(
   const out: UsjLayoutInline[] = []
 
   for (const block of blocks) {
+    // Heading / intro chrome (incl. tokenized `\d`) stays out of verse-body inline.
+    if (block.role === 'heading' || block.role === 'intro') continue
     const clipped = clipLayoutInlineToVerses(
       block.inline,
       block.chapterNumber || chapter,
       (ch, v) => ch === chapter && v === verse
     )
-    const chunk = clipped.inline.filter((item) => item.kind !== 'verse')
+    const chunk = clipped.inline.filter(
+      (item) => item.kind !== 'verse' && item.kind !== 'heading'
+    )
     if (chunk.length === 0) continue
     if (out.length > 0 && shouldInsertSpaceBeforeInline(out[out.length - 1], chunk[0]!)) {
       out.push({ kind: 'text', text: ' ' })
@@ -618,4 +805,59 @@ export function filterUsjLayoutBlocks(
     if (clipped) filtered.push(clipped)
   })
   return filtered
+}
+
+export type UsjVerseBlockItem =
+  | { kind: 'chrome'; block: UsjLayoutBlock }
+  | { kind: 'verse'; chapter: number; verse: number; displayInline: UsjLayoutInline[] }
+
+/**
+ * Document-order sequence for verse-block mode: section chrome once,
+ * then each in-range verse with punctuation-only display inline.
+ */
+export function collectVerseBlockSequence(
+  blocks: UsjLayoutBlock[],
+  verses: Array<{ chapter: number; verse: number }>
+): UsjVerseBlockItem[] {
+  const wanted = new Set(verses.map((v) => `${v.chapter}:${v.verse}`))
+  const emitted = new Set<string>()
+  const items: UsjVerseBlockItem[] = []
+
+  for (const block of blocks) {
+    if (
+      block.role === 'heading' ||
+      block.role === 'intro' ||
+      block.role === 'break' ||
+      block.marker === 'b'
+    ) {
+      items.push({ kind: 'chrome', block })
+      continue
+    }
+
+    for (const verse of block.verseNumbers) {
+      const key = `${block.chapterNumber}:${verse}`
+      if (!wanted.has(key) || emitted.has(key)) continue
+      emitted.add(key)
+      items.push({
+        kind: 'verse',
+        chapter: block.chapterNumber,
+        verse,
+        displayInline: collectVerseDisplayInline(blocks, block.chapterNumber, verse),
+      })
+    }
+  }
+
+  for (const v of verses) {
+    const key = `${v.chapter}:${v.verse}`
+    if (emitted.has(key)) continue
+    emitted.add(key)
+    items.push({
+      kind: 'verse',
+      chapter: v.chapter,
+      verse: v.verse,
+      displayInline: collectVerseDisplayInline(blocks, v.chapter, v.verse),
+    })
+  }
+
+  return items
 }

@@ -58,8 +58,7 @@ describe('LanguagePickerTextKindFilter', () => {
     expect(filterSrc).toContain("value: 'bible', label: 'Bible'")
     expect(filterSrc).toContain("value: 'obs', label: 'OBS'")
     expect(filterSrc).toContain('LayoutGrid')
-    expect(filterSrc).toContain('BookOpen')
-    expect(filterSrc).toContain('BookMarked')
+    expect(filterSrc).toContain('TEXT_KIND_ICONS')
     expect(filterSrc).toContain('Filter')
   })
 

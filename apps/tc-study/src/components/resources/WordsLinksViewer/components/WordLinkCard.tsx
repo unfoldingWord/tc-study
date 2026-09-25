@@ -6,7 +6,7 @@
  * Entry title stays more prominent than the quote.
  */
 
-import { BookText } from 'lucide-react'
+import { BookText, Filter } from 'lucide-react'
 import { memo } from 'react'
 import { useAppStore } from '../../../../contexts/AppContext'
 import { shouldShowHelpsExcerptSkeleton } from '../../../../features/helps/helpsExcerptSkeleton'
@@ -14,6 +14,7 @@ import {
   resolveHelpsQuoteStatus,
   type HelpsQuoteStatus,
 } from '../../../../features/helps/resolveHelpsQuoteStatus'
+import { supportRefQuoteChipKind } from '../../../../features/helps/supportRefQuotePaint'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { MarkdownRenderer, MarkdownSkeleton } from '../../../ui/MarkdownRenderer'
@@ -21,8 +22,9 @@ import {
   HELPS_CARD_FOOTER,
   HELPS_CARD_FOOTER_BUTTON_TW,
   HELPS_CARD_FOOTER_ICON,
-  HELPS_CARD_IDLE,
-  HELPS_CARD_SELECTED,
+  HELPS_CARD_FOOTER_ICON_BUTTON_TW,
+  HELPS_CARD_FOOTER_ICON_BUTTON_TW_ACTIVE,
+  helpsCardStateClass,
 } from '../../helpsCardStyles'
 import { QuotedFilterText } from '../../shared/QuotedFilterText'
 import type { TokenFilter, TranslationWordsLink } from '../types'
@@ -37,6 +39,8 @@ interface AlignedToken {
 interface WordLinkCardProps {
   link: TranslationWordsLink
   isSelected: boolean
+  /** This link's TW article is the active book-wide filter (applied from this card). */
+  isFilterSource?: boolean
   twTitle: string
   isLoadingTitle: boolean
   /** First content paragraph of the TW article; omit/null when not loaded or empty */
@@ -45,6 +49,7 @@ interface WordLinkCardProps {
   isLoadingPreview?: boolean
   onTitleClick: (link: TranslationWordsLink) => void  // Opens TW article modal
   onQuoteClick: (link: TranslationWordsLink) => void  // Broadcasts tokens for highlighting
+  onFilterByTwlArticle?: (link: TranslationWordsLink, title?: string) => void
   tokenFilter: TokenFilter | null
   targetResourceId?: string | null  // Source scripture resource (e.g., "unfoldingWord/en/ult")
   /** Quote block direction (e.g. rtl for Persian) so quote marks and text align correctly */
@@ -61,12 +66,14 @@ const quoteChipStaticClass =
 export const WordLinkCard = memo(function WordLinkCard({
   link,
   isSelected,
+  isFilterSource = false,
   twTitle,
   isLoadingTitle,
   twPreview = null,
   isLoadingPreview = false,
   onTitleClick,
   onQuoteClick,
+  onFilterByTwlArticle,
   tokenFilter,
   targetResourceId,
   languageDirection = 'ltr',
@@ -75,16 +82,25 @@ export const WordLinkCard = memo(function WordLinkCard({
   const linkWithQuote = link as TranslationWordsLink & {
     alignedTokens?: AlignedToken[]
     quoteStatus?: HelpsQuoteStatus
+    quoteWarmPending?: boolean
   }
   const alignedTokens = linkWithQuote.alignedTokens
   const hasAlignedTokens = !!(alignedTokens && alignedTokens.length > 0)
+  // Missing quoteStatus = pipeline has not attached a result yet — keep pending,
+  // never paint a finished OL-fallback (Greek/Hebrew + target badge with no chips).
   const quoteStatus =
     linkWithQuote.quoteStatus ??
     resolveHelpsQuoteStatus({
       hasAlignedTokens,
-      alignmentPending: false,
+      alignmentPending: !hasAlignedTokens,
       olQuote: link.origWords,
     })
+  const quoteChipKind = supportRefQuoteChipKind({
+    hasAlignedTokens,
+    quoteStatus,
+    olQuote: link.origWords,
+    quoteWarmPending: linkWithQuote.quoteWarmPending,
+  })
   const excerptLoading = shouldShowHelpsExcerptSkeleton({
     kind: 'twl',
     obsMode,
@@ -103,9 +119,10 @@ export const WordLinkCard = memo(function WordLinkCard({
     <div
       className={`
         group rounded-md p-content cursor-pointer transition-colors duration-150 border
-        ${isSelected ? HELPS_CARD_SELECTED : HELPS_CARD_IDLE}
+        ${helpsCardStateClass(isSelected, isFilterSource)}
 
       `}
+      data-helps-filter-source={isFilterSource || undefined}
       onClick={(hasAlignedTokens || obsMode) ? () => onQuoteClick(link) : undefined}
       role="article"
       aria-label="Translation words link"
@@ -148,7 +165,7 @@ export const WordLinkCard = memo(function WordLinkCard({
         </button>
       )}
 
-      {!hasAlignedTokens && !obsMode && quoteStatus === 'pending' && (
+      {quoteChipKind === 'placeholder' && !obsMode && (
         <div
           className={`${quoteChipStaticClass} animate-pulse`}
           role="status"
@@ -159,19 +176,35 @@ export const WordLinkCard = memo(function WordLinkCard({
         </div>
       )}
 
-      {!hasAlignedTokens && !obsMode && quoteStatus === 'ol-fallback' && link.origWords?.trim() && (
+      {(quoteChipKind === 'ol' || quoteChipKind === 'ol-pending') &&
+        !obsMode &&
+        link.origWords?.trim() && (
         <div
           className={quoteChipStaticClass}
-          title="Original language phrase (target language alignment not available)"
+          title={
+            quoteChipKind === 'ol-pending'
+              ? 'Building quote'
+              : 'Original language phrase (target language alignment not available)'
+          }
           dir={languageDirection}
         >
-          <div className="text-base leading-relaxed">
-            <span className="italic text-fg-secondary">
+          <div className="flex items-center gap-2 text-base leading-relaxed" dir={languageDirection}>
+            <span className="italic text-fg-secondary min-w-0">
               &ldquo;<QuotedFilterText quote={link.origWords} filterText={filterText} />&rdquo;
             </span>
             {resourceAbbreviation && (
-              <span className="ml-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
+              <span className="ml-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium shrink-0">
                 {resourceAbbreviation}
+              </span>
+            )}
+            {quoteChipKind === 'ol-pending' && (
+              <span
+                className="shrink-0 inline-flex"
+                role="status"
+                title="Building quote"
+                aria-label="Building quote"
+              >
+                <LoadingSpinner size="sm" label="Building quote" className="text-fg-muted" />
               </span>
             )}
           </div>
@@ -224,23 +257,42 @@ export const WordLinkCard = memo(function WordLinkCard({
 
       {/* Entry Link - On bottom, with modal icon (matches Notes support reference style) */}
       <div className={HELPS_CARD_FOOTER} onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onTitleClick(link)
-          }}
-          className={HELPS_CARD_FOOTER_BUTTON_TW}
-          title={`View Translation Words article: ${twTitle}`}
-          aria-label={`View Translation Words article: ${twTitle}`}
-        >
-          <BookText className={HELPS_CARD_FOOTER_ICON} />
-          {isLoadingTitle ? (
-            <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
-          ) : (
-            <span>{twTitle}</span>
-          )}
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onTitleClick(link)
+            }}
+            className={`${HELPS_CARD_FOOTER_BUTTON_TW} flex-1 min-w-0`}
+            title={`View Translation Words article: ${twTitle}`}
+            aria-label={`View Translation Words article: ${twTitle}`}
+          >
+            <BookText className={HELPS_CARD_FOOTER_ICON} />
+            {isLoadingTitle ? (
+              <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
+            ) : (
+              <span className="truncate">{twTitle}</span>
+            )}
+          </button>
+          {onFilterByTwlArticle ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onFilterByTwlArticle(link, twTitle)
+              }}
+              className={
+                isFilterSource ? HELPS_CARD_FOOTER_ICON_BUTTON_TW_ACTIVE : HELPS_CARD_FOOTER_ICON_BUTTON_TW
+              }
+              aria-pressed={isFilterSource}
+              title={`Filter book links: ${twTitle}`}
+              aria-label={`Filter book links: ${twTitle}`}
+            >
+              <Filter className={HELPS_CARD_FOOTER_ICON} />
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   )

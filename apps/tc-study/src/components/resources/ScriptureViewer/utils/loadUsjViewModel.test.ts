@@ -15,7 +15,7 @@ function stubProcessed(): ProcessedScripture {
       bookName: 'Titus',
       processingDate: '',
       processingDuration: 0,
-      version: '2.0.0-usj',
+      version: '2.1.0-usj',
       hasAlignments: true,
       hasSections: false,
       hasWordTokens: true,

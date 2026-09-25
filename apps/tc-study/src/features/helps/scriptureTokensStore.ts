@@ -4,9 +4,19 @@
  * Linked-panels STATE is delivered only to resources registered at send time.
  * CombinedHelps unmounts in scripture mode and remounts on switch-back, so it
  * misses the last broadcast unless we keep it here (same pattern as OBS quotes).
+ *
+ * Helps quote/align identity uses `helpsTargetScripture` (shared catalog key),
+ * not this token snapshot. Tokens remain optional for live underlines when a
+ * ScriptureViewer is mounted.
+ *
+ * Ownership handoff: when the focused scripture panel switches back to helps,
+ * lastActive must move to a still-mounted scripture (see
+ * resolveLastActiveAfterScriptureUnmount) or the remaining panel must reclaim —
+ * otherwise hydrate alone is not enough after chapter-nav invalidated the store.
  */
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
+import { setHelpsTargetScriptureKey } from './helpsTargetScripture'
 
 export interface ScriptureTokensSnapshot {
   tokens: readonly OptimizedToken[]
@@ -27,7 +37,22 @@ export interface ScriptureTokensSnapshot {
 }
 
 let current: ScriptureTokensSnapshot | null = null
+/** Survives passage invalidate / empty announce so helps keep the ULT catalog key. */
+let lastSourceResourceId: string | null = null
 const listeners = new Set<() => void>()
+
+function rememberSourceResourceId(payload: ScriptureTokensSnapshot | null): void {
+  if (!payload) return
+  const key =
+    payload.sourceResourceId?.trim() ||
+    payload.resourceMetadata?.id?.trim() ||
+    ''
+  if (key) {
+    lastSourceResourceId = key
+    // Keep shared helps target SoT in sync when tokens publish (optional path).
+    setHelpsTargetScriptureKey(key)
+  }
+}
 
 export function scriptureTokensSnapshotKey(
   payload: ScriptureTokensSnapshot | null | undefined
@@ -56,18 +81,64 @@ export function scriptureTokensHaveEntries(
 /**
  * Prefer live STATE when it has tokens; otherwise the hydrate snapshot
  * (CombinedHelps remounted after scripture already broadcast).
+ *
+ * When live STATE announces the current passage with empty tokens (full tier
+ * still loading), never resurrect a published snapshot from another book/chapter.
  */
 export function preferHydratedScriptureTokens(
   messaging: ScriptureTokensSnapshot | null | undefined,
   published: ScriptureTokensSnapshot | null | undefined
 ): ScriptureTokensSnapshot | null {
   if (scriptureTokensHaveEntries(messaging)) return messaging ?? null
-  if (scriptureTokensHaveEntries(published)) return published ?? null
+  if (scriptureTokensHaveEntries(published)) {
+    if (
+      messaging &&
+      messaging.reference.book &&
+      messaging.reference.chapter > 0 &&
+      (published!.reference.book.toLowerCase() !== messaging.reference.book.toLowerCase() ||
+        published!.reference.chapter !== messaging.reference.chapter)
+    ) {
+      return messaging
+    }
+    return published ?? null
+  }
   return messaging ?? published ?? null
+}
+
+/** True when the hydrate snapshot matches the open scripture passage. */
+export function publishedScriptureTokensMatchPassage(
+  published: ScriptureTokensSnapshot | null | undefined,
+  book: string,
+  chapter: number
+): boolean {
+  if (!scriptureTokensHaveEntries(published)) return false
+  return (
+    published!.reference.book.toLowerCase() === book.toLowerCase() &&
+    published!.reference.chapter === chapter
+  )
+}
+
+/**
+ * Drop the late-subscriber snapshot when nav moved to another passage so helps
+ * cannot align against the previous chapter while full tokens load.
+ */
+export function invalidatePublishedScriptureTokensForPassage(
+  book: string,
+  chapter: number
+): void {
+  const pub = current
+  if (!pub) return
+  if (publishedScriptureTokensMatchPassage(pub, book, chapter)) return
+  publishScriptureTokens(null)
 }
 
 export function getScriptureTokensSnapshot(): ScriptureTokensSnapshot | null {
   return current
+}
+
+/** Catalog key of the last scripture that published tokens (not cleared on invalidate). */
+export function getLastScriptureTokensSourceResourceId(): string | null {
+  return lastSourceResourceId
 }
 
 export function subscribeScriptureTokensSnapshot(onStoreChange: () => void): () => void {
@@ -78,6 +149,7 @@ export function subscribeScriptureTokensSnapshot(onStoreChange: () => void): () 
 }
 
 export function publishScriptureTokens(next: ScriptureTokensSnapshot | null): void {
+  rememberSourceResourceId(next)
   if (current === next) return
   if (scriptureTokensSnapshotKey(current) === scriptureTokensSnapshotKey(next)) return
   current = next
@@ -87,5 +159,6 @@ export function publishScriptureTokens(next: ScriptureTokensSnapshot | null): vo
 /** Test-only: drop the snapshot between cases. */
 export function resetScriptureTokensStore(): void {
   current = null
+  lastSourceResourceId = null
   listeners.clear()
 }

@@ -1,4 +1,4 @@
-import { parseLinkChapterVerse } from '../../../features/helps/quoteTokens'
+import { parseHelpsReference, parseLinkChapterVerse } from '../../../features/helps/quoteTokens'
 import { isObsCombinedHelpsId } from '../../../features/helps/combinedHelpsIds'
 import {
   isNotesResourceType,
@@ -34,8 +34,10 @@ export function isWordsLinksType(
 }
 
 export function refSortParts(ref: string): { chapter: number; verse: number } {
-  const { chapter, verse } = parseLinkChapterVerse(ref)
-  return { chapter, verse }
+  const parsed = parseHelpsReference(ref)
+  if (parsed.isFront) return { chapter: parsed.chapter, verse: 0 }
+  if (parsed.isIntro) return { chapter: parsed.chapter, verse: 0 }
+  return parsed.verses[0] ?? { chapter: parsed.chapter, verse: 1 }
 }
 
 /** OBS CombinedHelps card → verse-filter (story:frame as chapter:verse). */

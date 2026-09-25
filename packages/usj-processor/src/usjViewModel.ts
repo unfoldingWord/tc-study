@@ -74,22 +74,36 @@ function groupsForVerse(
   verseRef: string,
   bookCode: string
 ): AlignmentMap[string] {
-  const direct = alignmentMap[verseRef]
-  if (direct?.length) return direct
-
-  // AlignmentMap keys usually use uppercase book from USJ sid
-  const upper = remapVerseRefBookCode(verseRef, bookCode.toUpperCase())
-  if (alignmentMap[upper]?.length) return alignmentMap[upper]
-
-  const lower = remapVerseRefBookCode(verseRef, bookCode.toLowerCase())
-  if (alignmentMap[lower]?.length) return alignmentMap[lower]
-
-  // Last resort: case-insensitive key scan
+  // Collect every case-variant of this verse ref. A short-circuit on the first
+  // hit is unsafe: harvest with a lowercase book hint can leave pre-verse
+  // groups under `psa 5:1` while body groups stay under `PSA 5:1`.
   const target = verseRef.toLowerCase()
-  for (const [k, groups] of Object.entries(alignmentMap)) {
-    if (k.toLowerCase() === target && groups?.length) return groups
+  const candidates = [
+    verseRef,
+    remapVerseRefBookCode(verseRef, bookCode),
+    remapVerseRefBookCode(verseRef, bookCode.toUpperCase()),
+    remapVerseRefBookCode(verseRef, bookCode.toLowerCase()),
+  ]
+  for (const k of Object.keys(alignmentMap)) {
+    if (k.toLowerCase() === target) candidates.push(k)
   }
-  return []
+
+  const seenKeys = new Set<string>()
+  const seenGroupSigs = new Set<string>()
+  const out: NonNullable<AlignmentMap[string]> = []
+  for (const key of candidates) {
+    if (seenKeys.has(key)) continue
+    seenKeys.add(key)
+    const groups = alignmentMap[key]
+    if (!groups?.length) continue
+    for (const g of groups) {
+      const sig = (g.targets ?? []).map((t) => String(t.word ?? '').toLowerCase()).join('\0')
+      if (seenGroupSigs.has(sig)) continue
+      seenGroupSigs.add(sig)
+      out.push(g)
+    }
+  }
+  return out
 }
 
 /**
@@ -145,7 +159,7 @@ function buildChapters(
   usj: CachedUsjDocument,
   alignmentMap: AlignmentMap
 ): UsjChapterView[] {
-  const words = collectUsjWords(usj)
+  const words = collectUsjWords(usj, bookCode)
   const byChapter = new Map<number, Map<number, string[]>>()
   const bookCodeLower = bookCode.toLowerCase()
 

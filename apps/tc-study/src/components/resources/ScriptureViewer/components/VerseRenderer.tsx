@@ -1,7 +1,11 @@
 import { shouldInsertSpaceBeforeInline, type UsjLayoutInline } from '@bt-synergy/scripture-loader'
 import { Fragment, memo } from 'react'
+import type { BCVReference } from '../../../../contexts/types-only'
 import type { OriginalLanguageToken, VerseDisplayProps } from '../types'
 import { resolveTokenVisualState } from '../utils/tokenHighlight'
+import { SCRIPTURE_VERSE_NUMBER_CLASS } from '../utils/paraStyles'
+import { ScriptureNoteMarker } from './ScriptureNoteMarker'
+import { ScriptureRefLinks } from './ScriptureRefLinks'
 import { TokenRenderer } from './TokenRenderer'
 
 function verseNumFromRef(ref: string | undefined): number | null {
@@ -25,11 +29,35 @@ function renderDisplayInline(
   highlightTarget: VerseDisplayProps['highlightTarget'],
   underlinedSemanticIds: VerseDisplayProps['underlinedSemanticIds'],
   onTokenClick: VerseDisplayProps['onTokenClick'],
-  isOriginalLanguage: boolean
+  isOriginalLanguage: boolean,
+  currentBook: string,
+  onScriptureRefClick?: (ref: BCVReference) => void
 ) {
   return displayInline.map((item, index) => {
-    if (item.kind === 'text' || item.kind === 'heading') {
+    if (item.kind === 'heading') {
+      return (
+        <ScriptureRefLinks
+          key={`h-${index}`}
+          text={item.text}
+          currentBook={currentBook}
+          onScriptureRefClick={onScriptureRefClick}
+        />
+      )
+    }
+    if (item.kind === 'text') {
       return <Fragment key={`t-${index}`}>{item.text}</Fragment>
+    }
+    if (item.kind === 'note' || item.kind === 'xref') {
+      return (
+        <ScriptureNoteMarker
+          key={`${item.kind}-${index}`}
+          kind={item.kind}
+          caller={item.caller}
+          text={item.text}
+          currentBook={currentBook}
+          onScriptureRefClick={onScriptureRefClick}
+        />
+      )
     }
     if (item.kind !== 'token') return null
 
@@ -64,6 +92,8 @@ export const VerseRenderer = memo(function VerseRenderer({
   underlinedSemanticIds,
   onTokenClick,
   onVerseClick,
+  onScriptureRefClick,
+  currentBook = '',
   isOriginalLanguage,
 }: VerseDisplayProps) {
   const renderVerseContent = () => {
@@ -73,7 +103,9 @@ export const VerseRenderer = memo(function VerseRenderer({
         highlightTarget,
         underlinedSemanticIds,
         onTokenClick,
-        isOriginalLanguage
+        isOriginalLanguage,
+        currentBook,
+        onScriptureRefClick
       )
     }
 
@@ -115,7 +147,7 @@ export const VerseRenderer = memo(function VerseRenderer({
   return (
     <div className="mb-2 leading-relaxed">
       <span
-        className="text-sm font-bold text-accent mr-2 select-none cursor-pointer hover:text-accent-hover"
+        className={SCRIPTURE_VERSE_NUMBER_CLASS}
         onClick={(e) => {
           e.stopPropagation()
           onVerseClick?.(chapterNumber, verse.number)
@@ -142,6 +174,8 @@ export const VerseRenderer = memo(function VerseRenderer({
     prev.underlinedSemanticIds !== next.underlinedSemanticIds ||
     prev.onTokenClick !== next.onTokenClick ||
     prev.onVerseClick !== next.onVerseClick ||
+    prev.onScriptureRefClick !== next.onScriptureRefClick ||
+    prev.currentBook !== next.currentBook ||
     prev.isOriginalLanguage !== next.isOriginalLanguage ||
     prev.chapterNumber !== next.chapterNumber
   ) {

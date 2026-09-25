@@ -1,7 +1,7 @@
 /**
  * Helpers for scripture-usj: SoT cache read (version-gated).
  *
- * Namespace: scripture-usj:{resourceKey}:{book}
+ * Namespace: scripture-usj:{resourceKey}:{book}:{chapter} (legacy book blob still migrates).
  * Payload: UsjScriptureCacheContent (USJ document + AlignmentMap).
  * Legacy `scripture:` blobs are not read here.
  */

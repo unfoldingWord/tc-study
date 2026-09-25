@@ -26,6 +26,9 @@ export function formatReferenceParts(
     return { bookPart: 'OBS', numberPart }
   }
   const bookName = getBookTitle(bookTitleSource, ref.book)
+  if (navigationMode === 'chapter') {
+    return { bookPart: bookName, numberPart: `${ref.chapter}` }
+  }
   if (!isRtl) {
     let numberPart = `${ref.chapter}:${ref.verse}`
     if (ref.endChapter && ref.endChapter !== ref.chapter) {

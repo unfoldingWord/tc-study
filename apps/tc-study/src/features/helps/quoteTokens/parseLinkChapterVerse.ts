@@ -1,16 +1,9 @@
 /**
  * Parse chapter:verse from TN/TWL reference strings (e.g. "3:5", "3:1-2", "1:intro").
+ * Complex refs (`5:1,3,8,12`, `5:2-3`) collapse to the first verse for sort / navigate.
  */
+import { firstHelpsVerse } from './parseHelpsReference'
+
 export function parseLinkChapterVerse(reference: string): { chapter: number; verse: number } {
-  const [chapterStr, versePart = '1'] = reference.split(':')
-  const chapter = parseInt(chapterStr || '1', 10) || 1
-  let v = versePart
-  if (v.includes('-')) {
-    v = v.split('-')[0] ?? '1'
-  }
-  if (v === 'intro') {
-    v = '1'
-  }
-  const verse = parseInt(v, 10) || 1
-  return { chapter, verse }
+  return firstHelpsVerse(reference)
 }

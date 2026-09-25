@@ -37,8 +37,10 @@ export function isScriptureBooksPending(options: {
   isLoading: boolean
   availableBookCount: number
   hasViewModel: boolean
+  /** Prepared nav is enough to leave the spinner (light/paragraph chrome). */
+  hasNav?: boolean
 }): boolean {
-  if (options.hasViewModel) return false
+  if (options.hasViewModel || options.hasNav) return false
   return options.isLoadingTOC || options.isLoading || options.availableBookCount === 0
 }
 

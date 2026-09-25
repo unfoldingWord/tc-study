@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { resolveHelpsListEmptyReason } from './helpsEmptyCopy'
-import { isHelpsContentPending } from './helpsListLoading'
+import { isHelpsContentPending, shouldKeepStaleHelpsRows, staleQuotesAreUnderlineReady } from './helpsListLoading'
 import { shouldInjectComposition } from './compositionInjection'
 import { coldStartCatalogLoads } from '../read/runReadPanelCatalog'
 import { isPanelCatalogSpinner } from '../read/panelCatalogLoading'
@@ -72,6 +72,60 @@ describe('CombinedHelps cold-start (empty cache)', () => {
     ).toBe(true)
   })
 
+  test('keeps last helps rows when quote/OL drops for one frame', () => {
+    expect(
+      shouldKeepStaleHelpsRows({
+        staleCount: 4,
+        incomingCount: 0,
+        originalContentMissing: false,
+      })
+    ).toBe(true)
+    expect(
+      shouldKeepStaleHelpsRows({
+        staleCount: 4,
+        incomingCount: 4,
+        originalContentMissing: true,
+      })
+    ).toBe(true)
+    expect(
+      shouldKeepStaleHelpsRows({
+        staleCount: 0,
+        incomingCount: 0,
+        originalContentMissing: true,
+      })
+    ).toBe(false)
+  })
+
+  test('stale quote rows with tokens are underline-ready', () => {
+    expect(staleQuotesAreUnderlineReady([{ quoteTokens: [{ id: 1 }] }])).toBe(true)
+    expect(staleQuotesAreUnderlineReady([{ quoteTokens: [] }, { quoteTokens: null }])).toBe(false)
+    expect(staleQuotesAreUnderlineReady([])).toBe(false)
+    expect(staleQuotesAreUnderlineReady(null)).toBe(false)
+  })
+
+  test('token-filter empty well waits when prepare is still pending', () => {
+    expect(
+      isHelpsContentPending({
+        tnKey: 'u/en/tn',
+        twlKey: 'u/en/twl',
+        tnLoading: false,
+        twlLoading: false,
+        preparePending: true,
+        hasVisibleRows: false,
+      })
+    ).toBe(true)
+    expect(
+      isHelpsContentPending({
+        tnKey: 'u/en/tn',
+        twlKey: 'u/en/twl',
+        tnLoading: false,
+        twlLoading: false,
+        preparePending: true,
+        hasVisibleRows: true,
+      })
+    ).toBe(false)
+  })
+
   test('Read bootstrap and CombinedHelps viewer wire the pending flag', () => {
     const bootstrap = readFileSync(join(import.meta.dir, '../read/useReadLanguageBootstrap.ts'), 'utf8')
     const viewer = readFileSync(
@@ -84,7 +138,19 @@ describe('CombinedHelps cold-start (empty cache)', () => {
     )
     expect(bootstrap).toContain('coldStartCatalogLoads')
     expect(bootstrap).toContain('Promise.all')
+    expect(bootstrap).toContain('useEnsureCurrentBookOriginalLanguage')
     expect(viewer).toContain('isHelpsContentPending')
+    expect(viewer).toContain('helpsLane1Ready')
+    expect(viewer).toContain('quotesBlocked')
+    expect(viewer).not.toMatch(/lane1Ready:\s*true/)
+    const pipeline = readFileSync(
+      join(import.meta.dir, '../../components/resources/CombinedHelpsViewer/useCombinedHelpsPipeline.ts'),
+      'utf8'
+    )
+    expect(pipeline).toContain('focusChapter: currentRef.chapter')
+    expect(pipeline).toContain('tnQuoteBuildReady')
+    expect(viewer).toContain('filterResetKey')
+    expect(viewer).toContain('preparePending')
     expect(list).toContain('loading ?')
     expect(list).not.toContain('Loading dependencies')
   })

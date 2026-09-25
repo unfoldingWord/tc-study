@@ -5,15 +5,18 @@
 
 import { useSignal, useSignalHandler } from '@bt-synergy/resource-panels'
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from 'react'
+import { shouldClearHelpsHighlightOnTokenNull } from '../../../features/helps/helpsCardScriptureNav'
+import { resolveHelpsTokenClickFilter } from '../../../features/helps/helpsDisplayFilters'
 import type {
   EntryLinkClickSignal,
   ObsFrameHighlightSignal,
   TokenClickSignal,
   VerseFilterSignal,
+  VerseNavigationSignal,
 } from '../../../signals/studioSignals'
 import type { TokenFilter } from '../WordsLinksViewer/types'
 import { focusFirstMatchingHelpsCard, type HelpsCardSelection } from './helpsCardSelection'
-import type { HelpsKindFilter, ObsQuoteFilter, VerseFilterState } from './types'
+import type { HelpsKindFilter, ObsQuoteFilter, SupportRefFilter, TwlArticleFilter, VerseFilterState } from './types'
 import type { NoteWithAlignments, LinkWithAlignments } from './useCombinedHelpsMerge'
 import { useCombinedHelpsObsQuotesBroadcast } from './useCombinedHelpsObsQuotesBroadcast'
 import { useCombinedHelpsTokenGroupsBroadcast } from './useCombinedHelpsTokenGroupsBroadcast'
@@ -37,7 +40,11 @@ export interface UseCombinedHelpsSignalsParams {
   setTokenFilter: Dispatch<SetStateAction<TokenFilter | null>>
   setVerseFilter: Dispatch<SetStateAction<VerseFilterState | null>>
   setObsQuoteFilter: Dispatch<SetStateAction<ObsQuoteFilter | null>>
+  setSupportRefFilter?: Dispatch<SetStateAction<SupportRefFilter | null>>
+  setTwlArticleFilter?: Dispatch<SetStateAction<TwlArticleFilter | null>>
   setSelectedHelpsCard: Dispatch<SetStateAction<HelpsCardSelection>>
+  /** Token/verse/OBS applying displace book chips — restore kind only if one was active. */
+  restoreBookKind?: () => void
 }
 
 export function useCombinedHelpsSignals({
@@ -57,7 +64,10 @@ export function useCombinedHelpsSignals({
   setTokenFilter,
   setVerseFilter,
   setObsQuoteFilter,
+  setSupportRefFilter,
+  setTwlArticleFilter,
   setSelectedHelpsCard,
+  restoreBookKind,
 }: UseCombinedHelpsSignalsParams) {
   const resourceMetadata = useMemo(
     () => {
@@ -85,6 +95,11 @@ export function useCombinedHelpsSignals({
     resourceId,
     resourceMetadata
   )
+  const { sendToAll: sendVerseNavigation } = useSignal<VerseNavigationSignal>(
+    'verse-navigation',
+    resourceId,
+    resourceMetadata
+  )
   const { sendToAll: broadcastObsHighlight } = useSignal<ObsFrameHighlightSignal>(
     'obs-frame-highlight',
     resourceId,
@@ -98,22 +113,19 @@ export function useCombinedHelpsSignals({
       (signal) => {
         if (signal.sourceResourceId === resourceId) return
         // Toggle-off: clear token filter owned by the scripture selection (keep OBS/underlines).
-        if (signal.token === null) {
+        // Persist still owning a click means remount/reload null — keep the card.
+        const nextFilter = resolveHelpsTokenClickFilter(signal.token, signal.timestamp)
+        if (nextFilter === undefined) return
+        if (nextFilter === null) {
           setTokenFilter(null)
-          setSelectedHelpsCard(null)
+          if (shouldClearHelpsHighlightOnTokenNull()) setSelectedHelpsCard(null)
           return
-        }
-        // Uncovered scripture clicks broadcast token-click for scripture highlighting
-        // but also send verse-filter for helps — ignore the token filter here.
-        if (signal.token.hasHelpsCoverage === false) return
-        const nextFilter: TokenFilter = {
-          semanticId: signal.token.semanticId,
-          content: signal.token.content,
-          alignedSemanticIds: signal.token.alignedSemanticIds || [],
-          timestamp: signal.timestamp,
         }
         setTokenFilter(nextFilter)
         setVerseFilter(null)
+        setSupportRefFilter?.(null)
+        setTwlArticleFilter?.(null)
+        restoreBookKind?.()
         setSelectedHelpsCard(
           focusFirstMatchingHelpsCard({
             notes: notesWithAlignedTokens,
@@ -134,7 +146,10 @@ export function useCombinedHelpsSignals({
         currentRef.book,
         setTokenFilter,
         setVerseFilter,
+        setSupportRefFilter,
+        setTwlArticleFilter,
         setSelectedHelpsCard,
+        restoreBookKind,
       ]
     ),
     { debug: false, resourceMetadata }
@@ -157,9 +172,12 @@ export function useCombinedHelpsSignals({
           timestamp: signal.timestamp,
         })
         setTokenFilter(null)
+        setSupportRefFilter?.(null)
+        setTwlArticleFilter?.(null)
+        restoreBookKind?.()
         setSelectedHelpsCard(null)
       },
-      [resourceId, setVerseFilter, setTokenFilter, setSelectedHelpsCard]
+      [resourceId, setVerseFilter, setTokenFilter, setSupportRefFilter, setTwlArticleFilter, setSelectedHelpsCard, restoreBookKind]
     ),
     { debug: false, resourceMetadata }
   )
@@ -194,7 +212,14 @@ export function useCombinedHelpsSignals({
     notesWithAlignedTokens,
     filteredByReference,
     resourceMetadata,
-    setObsQuoteFilter,
+    setObsQuoteFilter: ((action) => {
+      if (typeof action !== 'function' && action) {
+        setSupportRefFilter?.(null)
+        setTwlArticleFilter?.(null)
+        restoreBookKind?.()
+      }
+      setObsQuoteFilter(action)
+    }) as Dispatch<SetStateAction<ObsQuoteFilter | null>>,
     setSelectedHelpsCard,
   })
 
@@ -203,6 +228,7 @@ export function useCombinedHelpsSignals({
     sendTokenClick,
     sendEntryLinkClick,
     sendVerseFilter,
+    sendVerseNavigation,
     broadcastObsHighlight,
   }
 }

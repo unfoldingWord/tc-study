@@ -75,11 +75,31 @@ export interface ScriptureLoaderConfig {
   /** Enable in-memory cache */
   enableMemoryCache?: boolean
   
-  /** Memory cache size limit (MB) */
+  /** Memory cache size limit (entry count when using MemoryCache) */
   memoryCacheSize?: number
   
   /** Enable debug logging */
   debug?: boolean
+
+  /**
+   * Optional hook after a book is processed into scripture-usj:.
+   * Prefer `onContentCached` for new callers (generic prepare surface).
+   */
+  onBookCached?: (args: {
+    resourceKey: string
+    bookId: string
+    viewModel: import('@bt-synergy/usj-processor').UsjScriptureViewModel
+  }) => void | Promise<void>
+
+  /**
+   * Generic post-cache hook — same payload as onBookCached for scripture.
+   * Used by worker prepare surface so any loader can hand off a parsed source.
+   */
+  onContentCached?: (args: {
+    resourceKey: string
+    bookId: string
+    viewModel: import('@bt-synergy/usj-processor').UsjScriptureViewModel
+  }) => void | Promise<void>
 }
 
 /**

@@ -15,6 +15,7 @@ import type { BaseEntryViewerProps } from '../../lib/viewers/EntryViewerRegistry
 import { useNavigation } from '../../contexts/NavigationContext'
 import { useEntryModalStore } from '../../features/entries'
 import { LoadingSpinner } from '../../shared/LoadingSpinner'
+import { isDebugBuild } from '../../utils/debugBuild'
 import { entryContentLoadKey } from './entryContentLoadKey'
 
 // Valid 3-letter Bible book codes (uppercase) — OBS handled separately
@@ -181,8 +182,8 @@ export function TranslationAcademyEntryViewer({
   const isRtl = direction === 'rtl'
   return (
     <div className="h-full relative bg-surface text-fg" dir={direction}>
-      {/* Debug toggle button for raw markdown (dev tool - only in development) */}
-      {import.meta.env.DEV && (
+      {/* Raw markdown toggle — debug builds only */}
+      {isDebugBuild() && (
         <button
           onClick={() => setShowRawMarkdown(!showRawMarkdown)}
           className={`absolute top-4 z-10 flex items-center justify-center p-1.5 bg-muted/80 hover:bg-muted text-fg-secondary hover:text-fg rounded transition-all opacity-50 hover:opacity-100 ${isRtl ? 'left-4' : 'right-4'}`}

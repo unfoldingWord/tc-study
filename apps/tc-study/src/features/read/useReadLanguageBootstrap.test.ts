@@ -140,7 +140,14 @@ describe('useReadLanguageBootstrap (split text vs helps)', () => {
     expect(src).toContain('shouldCancelDownloadsOnPaneSwitch')
     expect(src).toContain("downloadResetToken(panels['panel-1'].languageCode, panels['panel-2'].languageCode)")
     expect(src).toContain('isBackgroundDownloading')
-    expect(src).toContain('!isCatalogLoadBusy || isBackgroundDownloading')
+    expect(src).toContain('enabled: !DISABLE_BACKGROUND_DOWNLOAD')
+  })
+
+  test('does not hold download progress stats (badge leaf-subscribes)', () => {
+    expect(src).toContain('controlOnly: true')
+    expect(src).not.toContain('stats: downloadStats')
+    expect(src).not.toContain('downloadStats')
+    expect(src).not.toMatch(/return \{[\s\S]*downloadStats/)
   })
 
   test('mode switch does not cancel or reseed the download queue', () => {

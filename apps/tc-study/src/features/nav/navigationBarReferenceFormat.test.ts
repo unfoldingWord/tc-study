@@ -21,7 +21,7 @@ describe('English LTR reference formatting', () => {
   test('LTR display order is book then numbers (not numbers then book)', () => {
     const parts = formatReferenceParts(
       { book: 'tit', chapter: 3, verse: 1 },
-      'chapter',
+      'verse',
       false,
       { ingredients: [{ identifier: 'tit', title: 'Titus' }] }
     )
@@ -31,6 +31,49 @@ describe('English LTR reference formatting', () => {
     expect(ltrDisplay).toBe('Titus 3:1')
     expect(rtlLooking).toBe('3:1 Titus')
     expect(ltrDisplay).not.toBe(rtlLooking)
+  })
+
+  test('chapter mode omits verse and range from compact BCV label', () => {
+    const phmTitles = { ingredients: [{ identifier: 'phm', title: 'Philemon' }] }
+    const chapterRange = formatReferenceParts(
+      { book: 'phm', chapter: 1, verse: 1, endChapter: 1, endVerse: 25 },
+      'chapter',
+      false,
+      phmTitles
+    )
+    expect(`${chapterRange.bookPart} ${chapterRange.numberPart}`).toBe('Philemon 1')
+
+    const verseRange = formatReferenceParts(
+      { book: 'phm', chapter: 1, verse: 1, endChapter: 1, endVerse: 25 },
+      'verse',
+      false,
+      phmTitles
+    )
+    expect(`${verseRange.bookPart} ${verseRange.numberPart}`).toBe('Philemon 1:1-25')
+
+    const rtlChapter = formatReferenceParts(
+      { book: 'phm', chapter: 1, verse: 1, endChapter: 1, endVerse: 25 },
+      'chapter',
+      true,
+      phmTitles
+    )
+    expect(`${rtlChapter.bookPart} ${rtlChapter.numberPart}`).toBe('Philemon 1')
+
+    const obsStory = formatReferenceParts(
+      { book: 'obs', chapter: 1, verse: 1, endVerse: 8 },
+      'chapter',
+      false,
+      { ingredients: [] }
+    )
+    expect(`${obsStory.bookPart} ${obsStory.numberPart}`).toBe('OBS 1')
+
+    const obsFrame = formatReferenceParts(
+      { book: 'obs', chapter: 1, verse: 1, endVerse: 8 },
+      'verse',
+      false,
+      { ingredients: [] }
+    )
+    expect(`${obsFrame.bookPart} ${obsFrame.numberPart}`).toBe('OBS 1 · 1 – 1 · 8')
   })
 
   test('formatVerseRefParts keeps LTR order for English section headers', () => {
@@ -43,5 +86,17 @@ describe('English LTR reference formatting', () => {
     const parts = formatVerseRefParts('Titus', '3:1', true)
     expect(parts.bookPart).toBe('Titus')
     expect(parts.numberPart).toBe('1:3')
+  })
+
+  test('formatVerseRefParts keeps comma lists and en-dash ranges', () => {
+    expect(formatVerseRefParts('Psalms', '5:1,3,8,12', false)).toEqual({
+      bookPart: 'Psalms',
+      numberPart: '5:1, 3, 8, 12',
+    })
+    expect(formatVerseRefParts('Psalms', '5:2-3', false)).toEqual({
+      bookPart: 'Psalms',
+      numberPart: '5:2–3',
+    })
+    expect(formatVerseRefParts('Psalms', '5:1,3,8,12', true).numberPart).toBe('1, 3, 8, 12:5')
   })
 })

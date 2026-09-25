@@ -31,6 +31,34 @@ export function chapterClickSelection(chapterVerses: VerseEntry[]): {
   }
 }
 
+/** Full-chapter ref for scripture chapter grain (verse 1 → last verse). */
+export function buildChapterApplyRef(
+  selectedBook: string,
+  chapter: number,
+  lastVerse: number
+): BCVReference {
+  return {
+    book: selectedBook,
+    chapter,
+    verse: 1,
+    endVerse: Math.max(1, lastVerse),
+  }
+}
+
+/** Chapter number for a chapter-grain selection (same-chapter start/end). */
+export function selectedChapterFromVerseRange(
+  startVerse: string | null,
+  endVerse: string | null
+): number | null {
+  if (!startVerse) return null
+  const startChapter = parseInt(startVerse.split(':')[0] || '', 10)
+  if (!Number.isFinite(startChapter) || startChapter < 1) return null
+  if (!endVerse) return startChapter
+  const endChapter = parseInt(endVerse.split(':')[0] || '', 10)
+  if (!Number.isFinite(endChapter) || endChapter !== startChapter) return null
+  return startChapter
+}
+
 export function buildVerseApplyRef(
   selectedBook: string,
   startVerse: string,

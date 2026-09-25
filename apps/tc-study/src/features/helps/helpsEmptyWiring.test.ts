@@ -15,6 +15,10 @@ const viewerSrc = readFileSync(
   join(import.meta.dir, '../../components/resources/CombinedHelpsViewer/index.tsx'),
   'utf8'
 )
+const signalsSrc = readFileSync(
+  join(import.meta.dir, '../../components/resources/CombinedHelpsViewer/useCombinedHelpsSignals.ts'),
+  'utf8'
+)
 
 describe('helps empty copy wiring (issue #24)', () => {
   test('Use English helps is an onClick, never a useEffect auto-switch', () => {
@@ -38,10 +42,15 @@ describe('helps empty copy wiring (issue #24)', () => {
   })
 
   test('English + Exodus still renders note cards when groups exist (no false empty)', () => {
-    expect(listSrc).toContain('mergedGroups.map')
+    expect(listSrc).toContain('windowedGroups.map')
     expect(listSrc).toContain('TranslationNoteCard')
     expect(listSrc).toContain('CombinedHelpsEmptyState')
     expect(listSrc).toContain('explainedHelpsEmptyKind')
+    expect(listSrc).toContain('shouldShowHelpsFilterEmpty')
+    expect(listSrc).toContain('chapterHasHelps')
+    expect(listSrc).toContain('helps-filter-empty')
+    expect(viewerSrc).toContain('chapterHasHelps={notesWithAlignedTokens.length > 0')
+    expect(signalsSrc).toContain('resolveHelpsTokenClickFilter')
     expect(listSrc).not.toContain('No entries for this passage.')
     expect(viewerSrc).toContain('helpsLanguageCode={helpsLanguageCodeForCopy}')
     expect(viewerSrc).toContain('formatHelpsPassageLabel')

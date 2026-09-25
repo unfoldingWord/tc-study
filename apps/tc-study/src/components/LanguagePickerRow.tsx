@@ -4,8 +4,8 @@
  * Helps badges and listMode filtering are out of scope (A2).
  */
 
-import { BookMarked, BookOpen, type LucideIcon } from 'lucide-react'
 import type { LanguageAvailabilityFlags } from '../features/read/languageAvailability'
+import { TEXT_KIND_ICONS } from '../features/read/textKindIcons'
 import type { LanguagePickerCardRole } from '../features/read/languagePickerCardRole'
 import {
   languageListDisplayName,
@@ -31,11 +31,6 @@ export interface TextLanguageAvailabilityBadge {
 export const TEXT_LANGUAGE_BADGE_LABELS: Record<TextLanguageBadgeKind, string> = {
   bible: 'Bible',
   obs: 'OBS',
-}
-
-const TEXT_LANGUAGE_BADGE_ICONS: Record<TextLanguageBadgeKind, LucideIcon> = {
-  bible: BookOpen,
-  obs: BookMarked,
 }
 
 /**
@@ -98,7 +93,7 @@ export function LanguagePickerRow({
         {badges.length > 0 && (
           <span className="ml-auto flex items-center gap-1 shrink-0">
             {badges.map((badge) => {
-              const Icon = TEXT_LANGUAGE_BADGE_ICONS[badge.kind]
+              const Icon = TEXT_KIND_ICONS[badge.kind]
               return (
                 <span
                   key={badge.kind}

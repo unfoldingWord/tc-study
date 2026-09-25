@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { downloadControlSnapshotEqual } from '../features/download/backgroundDownloadRun'
 import {
   backgroundDownloadSession,
   type BackgroundDownloadStats,
@@ -19,6 +20,8 @@ export interface UseBackgroundDownloadReturn {
   startDownload: (resourceKeys: string[], totalIngredients?: number) => boolean
   /** Stop all downloads */
   stopDownload: () => void
+  /** Recreate the worker and restart the last queue / current key after an error */
+  retryLastRun: () => boolean
   /** Current download statistics */
   stats: BackgroundDownloadStats
   /** Whether downloads are currently active */
@@ -34,6 +37,11 @@ export interface UseBackgroundDownloadOptions {
   skipExisting?: boolean
   /** Enable debug logging */
   debug?: boolean
+  /**
+   * Ignore progress pulses. Read bootstrap uses this so zip/extract ticks
+   * do not re-render Scripture + CombinedHelps. DownloadIndicator subscribes itself.
+   */
+  controlOnly?: boolean
 }
 
 /**
@@ -52,7 +60,12 @@ export interface UseBackgroundDownloadOptions {
 export function useBackgroundDownload(
   options: UseBackgroundDownloadOptions = {}
 ): UseBackgroundDownloadReturn {
-  const { autoStart: _autoStart = false, skipExisting = true, debug = false } = options
+  const {
+    autoStart: _autoStart = false,
+    skipExisting = true,
+    debug = false,
+    controlOnly = false,
+  } = options
 
   backgroundDownloadSession.configure({ skipExisting, debug })
 
@@ -62,12 +75,19 @@ export function useBackgroundDownload(
 
   useEffect(() => {
     backgroundDownloadSession.configure({ skipExisting, debug })
-    return backgroundDownloadSession.subscribe(setStats)
-  }, [skipExisting, debug])
+    return backgroundDownloadSession.subscribe((next) => {
+      if (!controlOnly) {
+        setStats(next)
+        return
+      }
+      setStats((prev) => (downloadControlSnapshotEqual(prev, next) ? prev : next))
+    })
+  }, [skipExisting, debug, controlOnly])
 
   return {
     startDownload: backgroundDownloadSession.startDownload,
     stopDownload: backgroundDownloadSession.stopDownload,
+    retryLastRun: backgroundDownloadSession.retryLastRun,
     stats,
     isDownloading: stats.isDownloading,
     queue: stats.queue,

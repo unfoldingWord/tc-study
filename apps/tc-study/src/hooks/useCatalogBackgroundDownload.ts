@@ -23,10 +23,20 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import type { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
 import {
+  discoveredIngredientCount,
+  totalIngredientsForResourceKeys,
+} from '../features/download/backgroundDownloadRun'
+import {
+  CATALOG_KEYS_TIMEOUT,
+  CATALOG_KEYS_TIMEOUT_MS,
+  COMPLETE_CHECK_TIMEOUT,
+  COMPLETE_CHECK_TIMEOUT_MS,
   filterUncheckedResourceKeys,
-  findMissingExpectedResources,
+  isExpectedDownloadMonitorTimeout,
   keysToEnqueueForDownload,
+  raceWithTimeout,
   shouldResetDownloadTracking,
+  shouldWalkUiIdbDuringExtract,
 } from '../features/read/catalogBackgroundDownloadPolicy'
 
 export interface UseCatalogBackgroundDownloadOptions {
@@ -108,6 +118,7 @@ export function useCatalogBackgroundDownload(
 
   const resetTokenRef = useRef('')
   const wasDownloadingRef = useRef(false)
+  const scheduleRef = useRef<number | null>(null)
 
   // Unused ref to maintain hook count (React Rules of Hooks requirement)
   useRef(false)
@@ -134,7 +145,16 @@ export function useCatalogBackgroundDownload(
    * Check catalog for new resources and download if incomplete
    */
   const checkCatalogAndDownload = useCallback(async () => {
+    if (typeof window !== 'undefined') {
+      ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+        phase: !enabled ? 'disabled' : !catalogManager || !completenessChecker ? 'no-services' : 'start',
+        enabled,
+      }
+    }
     if (!enabled || !catalogManager || !completenessChecker) {
+      return
+    }
+    if (!shouldWalkUiIdbDuringExtract(isDownloading)) {
       return
     }
 
@@ -143,17 +163,32 @@ export function useCatalogBackgroundDownload(
     try {
       // Persistent catalog may still hold leftover languages. Queue only the
       // resources for languages currently on the two Read panels.
-      const allResourceKeys = await catalogManager.getAllResourceKeys()
-      const candidateKeys = keysToEnqueueForDownload(allResourceKeys, expectedResources)
+      // IDB getAll can hang while catalog writes hold the store — don't
+      // block enqueue forever; fall back to expected keys.
+      let allResourceKeys: string[] = []
+      try {
+        allResourceKeys = await raceWithTimeout(
+          catalogManager.getAllResourceKeys(),
+          CATALOG_KEYS_TIMEOUT_MS,
+          CATALOG_KEYS_TIMEOUT
+        )
+      } catch {
+        allResourceKeys = []
+      }
+      // Queue cataloged expected keys + OL extras. Do not wait for every
+      // expected key to land — one hung TA/UGNT entry used to block UHB.
+      const candidateKeys =
+        allResourceKeys.length > 0
+          ? keysToEnqueueForDownload(allResourceKeys, expectedResources)
+          : [...(expectedResources ?? [])]
 
-      // If expectedResources is provided, wait until those keys are in catalog
-      // (Phase 2 narrows keys that never arrive). Do not wait forever for
-      // contentMetadata on one hung OL/TA entry — completeness check skips those.
-      if (expectedResources && expectedResources.length > 0) {
-        const missing = findMissingExpectedResources(expectedResources, allResourceKeys)
-        if (missing.length > 0) {
-          setIsChecking(false)
-          return
+      if (typeof window !== 'undefined') {
+        ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+          phase: 'keys',
+          enabled: true,
+          catalog: allResourceKeys.length,
+          candidate: candidateKeys.length,
+          expected: expectedResources?.length ?? 0,
         }
       }
 
@@ -165,6 +200,15 @@ export function useCatalogBackgroundDownload(
       )
 
       if (uncheckedResources.length === 0) {
+        if (typeof window !== 'undefined') {
+          ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+            candidate: candidateKeys.length,
+            unchecked: 0,
+            expected: expectedResources?.length ?? 0,
+            incomplete: 0,
+            started: false,
+          }
+        }
         setMonitoredCount(candidateKeys.length)
         setIsChecking(false)
         return
@@ -173,33 +217,68 @@ export function useCatalogBackgroundDownload(
       // Check completeness for each unchecked resource AND count total ingredients
       const incompleteResources: string[] = []
       const completeResources: string[] = []
-      let totalIngredientsToDownload = 0
+      const listedCountByKey: Record<string, number> = {}
+
+      const rememberListedCount = async (resourceKey: string) => {
+        try {
+          const metadata = await catalogManager.getResourceMetadata(resourceKey)
+          const n = discoveredIngredientCount(
+            resourceKey,
+            metadata?.contentMetadata?.ingredients,
+            metadata?.type
+          )
+          if (n > 0) listedCountByKey[resourceKey] = n
+        } catch {
+          /* totalIngredientsForResourceKeys still covers UHB/UGNT/OBS */
+        }
+      }
+
+      // Catalog IDB timed out — same as completeness timeout: unknown, retry next idle pass.
+      // Do not treat every expected key as incomplete (false enqueue of full language zips).
+      if (allResourceKeys.length === 0 && uncheckedResources.length > 0) {
+        if (typeof window !== 'undefined') {
+          ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+            phase: 'catalog-keys-timeout',
+            candidate: candidateKeys.length,
+            unchecked: uncheckedResources.length,
+            expected: expectedResources?.length ?? 0,
+            incomplete: 0,
+            started: false,
+          }
+        }
+        setMonitoredCount(candidateKeys.length)
+        setIsChecking(false)
+        return
+      }
 
       for (const resourceKey of uncheckedResources) {
         try {
-          const status = await completenessChecker.checkResource(resourceKey)
+          const status = await raceWithTimeout(
+            completenessChecker.checkResource(resourceKey, { failFast: true }),
+            COMPLETE_CHECK_TIMEOUT_MS,
+            COMPLETE_CHECK_TIMEOUT
+          )
 
           if (status.isComplete) {
             completeResources.push(resourceKey)
             processedResourcesRef.current.add(resourceKey) // Mark as processed
           } else {
             incompleteResources.push(resourceKey)
-
-            // ✅ Count ingredients for this resource
-            const metadata = await catalogManager.getResourceMetadata(resourceKey)
-            if (metadata?.contentMetadata?.ingredients) {
-              const ingredientsCount = metadata.contentMetadata.ingredients.length
-              totalIngredientsToDownload += ingredientsCount
-            } else {
-              // Default to 1 if no ingredients metadata
-              totalIngredientsToDownload += 1
-            }
+            await rememberListedCount(resourceKey)
           }
         } catch (error) {
+          // Timeout = unknown, not incomplete. Leave unchecked for the next idle pass
+          // so a hung IDB walk does not re-queue already-cached scripture/helps.
+          if (isExpectedDownloadMonitorTimeout(error)) continue
           console.error(`[BG-DL] 🔍 Monitor Error checking ${resourceKey}:`, error)
-          // Skip this resource, can be checked manually via checkNow()
+          incompleteResources.push(resourceKey)
         }
       }
+
+      const totalIngredientsToDownload = totalIngredientsForResourceKeys(
+        incompleteResources,
+        listedCountByKey
+      )
 
       // Update stats
       setMonitoredCount(candidateKeys.length)
@@ -215,6 +294,16 @@ export function useCatalogBackgroundDownload(
         setPendingCount(downloadingResourcesRef.current.size)
 
         const started = onStartDownload(incompleteResources, totalIngredientsToDownload)
+        if (typeof window !== 'undefined') {
+          ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+            candidate: candidateKeys.length,
+            unchecked: uncheckedResources.length,
+            expected: expectedResources?.length ?? 0,
+            incomplete: incompleteResources.length,
+            started: started !== false,
+            keys: incompleteResources.slice(0, 12),
+          }
+        }
         if (started === false) {
           for (const key of incompleteResources) {
             downloadingResourcesRef.current.delete(key)
@@ -224,10 +313,16 @@ export function useCatalogBackgroundDownload(
       }
     } catch (error) {
       console.error('[BG-DL] 🔍 Monitor Error checking catalog:', error)
+      if (typeof window !== 'undefined') {
+        ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+          phase: 'error',
+          error: error instanceof Error ? error.message : String(error),
+        }
+      }
     } finally {
       setIsChecking(false)
     }
-  }, [enabled, catalogManager, completenessChecker, onStartDownload, expectedResources])
+  }, [enabled, catalogManager, completenessChecker, onStartDownload, expectedResources, isDownloading])
 
   // Worker finished or was cancelled — free sticky downloading marks for re-check
   useEffect(() => {
@@ -254,62 +349,27 @@ export function useCatalogBackgroundDownload(
   }, [checkCatalogAndDownload])
 
   /**
-   * React to catalog changes - check whenever catalogTrigger changes
-   * The 'enabled' prop should be controlled by UI loading state to avoid blocking rendering
-   *
-   * DETERMINISTIC MODE: When expectedResources is provided, we check immediately on each change
-   * since we know exactly which resources to wait for.
-   *
-   * FALLBACK MODE: When expectedResources is NOT provided, we use a short debounce to wait
-   * for the resource list to stabilize.
+   * Catalog trigger / expected-key drips must not reset the timer — that
+   * cancelled every requestIdleCallback and the download never enqueued.
+   * One scheduled check survives metadata bursts; a new one is armed after it fires.
    */
   useEffect(() => {
-    if (!enabled) {
-      return
-    }
-
-    // Track cleanup handles
-    let idleHandle: number | undefined
-    let fallbackTimer: number | undefined
-    let debounceTimer: number | undefined
-
-    const scheduleCheck = () => {
-      // Wait for browser to finish rendering UI before starting heavy background processing
-      // Use requestIdleCallback for best performance, fallback to setTimeout
-      if (typeof requestIdleCallback !== 'undefined') {
-        idleHandle = requestIdleCallback(() => {
-          checkCatalogAndDownload()
-        }, { timeout: 1000 })
-      } else {
-        // Fallback for browsers without requestIdleCallback
-        fallbackTimer = window.setTimeout(() => {
-          checkCatalogAndDownload()
-        }, 500)
-      }
-    }
-
-    if (expectedResources && expectedResources.length > 0) {
-      // DETERMINISTIC MODE: We have expected resources, check immediately on each change
-      scheduleCheck()
-    } else {
-      // FALLBACK MODE: No expected resources list, use debounce to wait for stabilization
-      debounceTimer = window.setTimeout(() => {
-        scheduleCheck()
-      }, 1000) // Short 1-second debounce as fallback
-    }
-
-    return () => {
-      if (debounceTimer !== undefined) {
-        clearTimeout(debounceTimer)
-      }
-      if (idleHandle !== undefined) {
-        cancelIdleCallback(idleHandle)
-      }
-      if (fallbackTimer !== undefined) {
-        clearTimeout(fallbackTimer)
-      }
-    }
+    if (!enabled) return
+    if (scheduleRef.current != null) return
+    scheduleRef.current = window.setTimeout(() => {
+      scheduleRef.current = null
+      void checkCatalogAndDownload()
+    }, 500)
   }, [enabled, catalogTrigger, expectedResources, checkCatalogAndDownload])
+
+  useEffect(() => {
+    return () => {
+      if (scheduleRef.current != null) {
+        window.clearTimeout(scheduleRef.current)
+        scheduleRef.current = null
+      }
+    }
+  }, [])
 
   return {
     monitoredCount,
