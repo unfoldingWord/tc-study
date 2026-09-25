@@ -5,6 +5,11 @@
 
 export const HELPS_LIST_INITIAL_GROUPS = 12
 export const HELPS_LIST_GROUP_STEP = 12
+/**
+ * Groups mounted after the selected card so the scrollport can hold it near
+ * the top — with none below, max scrollTop parks it at the bottom edge.
+ */
+export const HELPS_LIST_GROUPS_AFTER_SELECTION = 4
 
 export function windowMergedGroups<T>(groups: readonly T[], visibleCount: number): T[] {
   if (visibleCount >= groups.length) return groups as T[]
@@ -38,5 +43,5 @@ export function visibleGroupCountForSelection(
 ): number {
   const idx = groupIndexForCard(groups, selected)
   if (idx < 0) return initial
-  return Math.max(initial, idx + 1)
+  return Math.max(initial, idx + 1 + HELPS_LIST_GROUPS_AFTER_SELECTION)
 }

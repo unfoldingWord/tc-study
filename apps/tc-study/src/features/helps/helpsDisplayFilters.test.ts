@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  bookFilterChapterMatches,
+  bookFilterStreamSeed,
+  bookFilterStreamSpanKey,
   filterDisplayLinks,
   filterDisplayNotes,
   filterLinksByReferenceRange,
@@ -7,6 +10,7 @@ import {
   filterSupportRefFallbackChunk,
   flattenBookNotes,
   mergeFocusChapterBookMatches,
+  planBookFilterStreamChapters,
   planSupportRefStreamChapters,
   streamRowsForChapter,
   resolveHelpsTokenClickFilter,
@@ -677,6 +681,65 @@ describe('supportRefFirstPaintNotes', () => {
     expect(settled[0]).toBe(alignedFocus)
   })
 
+  test('book-filter stream plan ends with the start focus chapter', () => {
+    expect(
+      planBookFilterStreamChapters({ '1': [bookNotes[0]], '2': [bookNotes[1]], '4': [bookNotes[2]] }, 2)
+    ).toEqual([1, 3, 4, 2])
+    expect(planBookFilterStreamChapters({ '1': [bookNotes[0]] }, 0)).toEqual([1])
+  })
+
+  test('cross-chapter support-ref click keeps start-chapter cards (no shrink, no dupes)', () => {
+    const byChapter: Record<string, typeof bookNotes> = {
+      '1': [bookNotes[0]!, bookNotes[3]!],
+      '2': [bookNotes[1]!],
+      '150': [bookNotes[2]!],
+    }
+    // Stream starts with focus 1 and does not restart on chapter jumps.
+    const streamed = planBookFilterStreamChapters(byChapter, 1).flatMap((c) =>
+      supportRefNotesForChapter(streamRowsForChapter(byChapter, null, c), metaphor)
+    )
+    const renderedAt = (chapter: number) => {
+      const firstPaint = mergeFocusChapterBookMatches(
+        supportRefFirstPaintNotes(byChapter[String(chapter)] ?? [], metaphor, chapter),
+        supportRefNotesForChapter(byChapter[String(chapter)] ?? [], metaphor)
+      )
+      return mergeFocusChapterBookMatches(firstPaint, streamed).map((n) => n.id)
+    }
+    const before = renderedAt(1)
+    const after = renderedAt(2)
+    expect([...before].sort()).toEqual(['psa-1', 'psa-150', 'psa-2'])
+    expect([...after].sort()).toEqual([...before].sort())
+    expect(new Set(after).size).toBe(after.length)
+  })
+
+  test('cross-chapter TWL article click keeps start-chapter cards (no shrink, no dupes)', () => {
+    const path = 'bible/kt/god'
+    const byChapter: Record<string, Array<{ id: string; reference: string; articlePath: string }>> = {
+      '1': [
+        { id: 'l-1a', reference: '1:1', articlePath: path },
+        { id: 'l-1x', reference: '1:2', articlePath: 'bible/kt/love' },
+      ],
+      '2': [{ id: 'l-2a', reference: '2:13', articlePath: path }],
+      '3': [{ id: 'l-3a', reference: '3:4', articlePath: path }],
+    }
+    const streamed = planBookFilterStreamChapters(byChapter, 1).flatMap((c) =>
+      twlArticleLinksForChapter(streamRowsForChapter(byChapter, null, c), path)
+    )
+    const renderedAt = (chapter: number) => {
+      const rows = streamRowsForChapter(byChapter, null, chapter)
+      const firstPaint = mergeFocusChapterBookMatches(
+        twlArticleFirstPaintLinks(rows, path, chapter),
+        twlArticleLinksForChapter(rows, path)
+      )
+      return mergeFocusChapterBookMatches(firstPaint, streamed).map((l) => l.id)
+    }
+    const before = renderedAt(1)
+    const after = renderedAt(3)
+    expect([...before].sort()).toEqual(['l-1a', 'l-2a', 'l-3a'])
+    expect([...after].sort()).toEqual([...before].sort())
+    expect(new Set(after).size).toBe(after.length)
+  })
+
   test('current-chapter notes settle from passage align without book quotes', () => {
     const first = supportRefFirstPaintNotes(bookNotes, metaphor, 1)
     const aligned = new Map([
@@ -990,6 +1053,92 @@ describe('resolveHelpsTokenClickFilter', () => {
 
   test('null token clears the filter', () => {
     expect(resolveHelpsTokenClickFilter(null, 1)).toBeNull()
+  })
+})
+
+describe('book filter stream (whole book, not current chapter)', () => {
+  const metaphor = 'rc://*/ta/man/translate/figs-metaphor'
+  type Row = { id: string; reference: string; supportReference?: string }
+  const note = (id: string, reference: string, supportReference = metaphor): Row => ({
+    id,
+    reference,
+    supportReference,
+  })
+  const fullBook: Record<string, Row[]> = {
+    '1': [note('e1', '1:3'), note('x1', '1:4', 'rc://*/ta/man/translate/figs-idiom')],
+    '2': [note('e2', '2:1')],
+    '3': [note('e3', '3:5')],
+    '4': [note('e4a', '4:1'), note('e4b', '4:14')],
+    '5': [note('e5', '5:2')],
+    '6': [note('e6', '6:11')],
+  }
+  const match = (rows: readonly Row[]) => supportRefNotesForChapter(rows, metaphor)
+
+  /** One hook run: plan + per-chapter matches, seeded like a restart. */
+  const runStream = (
+    byChapter: Record<string, Row[]>,
+    focus: number,
+    seed: Row[] = []
+  ): Row[] => {
+    const seen = new Set(seed.map((r) => r.id))
+    const out = seed.slice()
+    for (const chapter of planBookFilterStreamChapters(byChapter, focus)) {
+      const rows = bookFilterChapterMatches(byChapter, null, chapter, match, seen)
+      for (const r of rows) seen.add(r.id)
+      out.push(...rows)
+    }
+    return out
+  }
+  const rendered = (byChapter: Record<string, Row[]>, current: number, streamed: Row[]) =>
+    mergeFocusChapterBookMatches(
+      supportRefFirstPaintNotes(byChapter[String(current)] ?? [], metaphor, current),
+      streamed
+    )
+  const chaptersOf = (rows: Row[]) =>
+    [...new Set(rows.map((r) => Number(r.reference.split(':')[0])))].sort((a, b) => a - b)
+
+  test('filter from chapter 4 lists matches before and after chapter 4', () => {
+    const list = rendered(fullBook, 4, runStream(fullBook, 4))
+    expect(chaptersOf(list)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(list.map((r) => r.id).sort()).toEqual(['e1', 'e2', 'e3', 'e4a', 'e4b', 'e5', 'e6'])
+    expect(new Set(list.map((r) => r.id)).size).toBe(list.length)
+  })
+
+  test('partial chapter map at filter time: growth re-streams instead of sticking to one chapter', () => {
+    const partial: Record<string, Row[]> = { '4': fullBook['4']! }
+    const first = runStream(partial, 4)
+    expect(chaptersOf(rendered(partial, 4, first))).toEqual([4])
+    // The effect must see new content (span key changes) and re-walk the book.
+    expect(bookFilterStreamSpanKey(fullBook)).not.toBe(bookFilterStreamSpanKey(partial))
+    const seed = bookFilterStreamSeed(metaphor, metaphor, first)
+    const grown = runStream(fullBook, 4, seed)
+    const list = rendered(fullBook, 4, grown)
+    expect(chaptersOf(list)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(new Set(list.map((r) => r.id)).size).toBe(list.length)
+  })
+
+  test('span key ignores object identity churn and empty content', () => {
+    const clone = Object.fromEntries(
+      Object.entries(fullBook).map(([k, rows]) => [k, rows.map((r) => ({ ...r }))])
+    )
+    expect(bookFilterStreamSpanKey(clone)).toBe(bookFilterStreamSpanKey(fullBook))
+    expect(bookFilterStreamSpanKey(null, null)).toBe('')
+    expect(bookFilterStreamSpanKey({}, [])).toBe('')
+    expect(bookFilterStreamSpanKey(null, [{ reference: '2:1' }])).not.toBe('')
+  })
+
+  test('seed keeps rows for the same filter, clears for a new one', () => {
+    const rows = [note('e1', '1:3')]
+    expect(bookFilterStreamSeed(metaphor, metaphor, rows)).toEqual(rows)
+    expect(bookFilterStreamSeed('rc://*/ta/man/translate/figs-idiom', metaphor, rows)).toEqual([])
+    expect(bookFilterStreamSeed(null, metaphor, rows)).toEqual([])
+  })
+
+  test('chapter jump after filter keeps the whole book (focus read once at start)', () => {
+    const streamed = runStream(fullBook, 4)
+    for (const current of [1, 2, 6]) {
+      expect(chaptersOf(rendered(fullBook, current, streamed))).toEqual([1, 2, 3, 4, 5, 6])
+    }
   })
 })
 

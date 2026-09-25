@@ -391,6 +391,63 @@ export function planSupportRefStreamChapters(
 }
 
 /**
+ * Book-filter stream plan: off-focus chapters first, then the start focus
+ * chapter. firstPaint only covers the *current* chapter, so after a
+ * cross-chapter jump the start chapter's matches must come from the stream.
+ */
+export function planBookFilterStreamChapters(
+  byChapter: Record<string, unknown[]> | null | undefined,
+  focusChapter: number,
+  fallback?: ReadonlyArray<{ reference: string }> | null
+): number[] {
+  const rest = planSupportRefStreamChapters(byChapter, focusChapter, fallback)
+  if (!Number.isFinite(focusChapter) || focusChapter < 1) return rest
+  return rest.concat(focusChapter)
+}
+
+/**
+ * Identity of the book content a filter stream walked. Changes when the chapter
+ * map / fallback grows (partial → full book) but not on object-identity churn,
+ * so the stream re-walks new chapters without restarting on every render.
+ * Empty string = no content yet.
+ */
+export function bookFilterStreamSpanKey(
+  byChapter: Record<string, unknown[]> | null | undefined,
+  fallback?: ReadonlyArray<{ reference: string }> | null
+): string {
+  const mapCount = chapterMapNoteCount(byChapter)
+  const fallbackCount = fallback?.length ?? 0
+  if (mapCount === 0 && fallbackCount === 0) return ''
+  const chapters = planSupportRefStreamChapters(byChapter, 0, fallback)
+  return `${chapters.length}:${mapCount}:${fallbackCount}`
+}
+
+/**
+ * Rows a (re)started book-filter stream keeps. Same filter → keep what is
+ * already streamed (content grew; never shrink back to first paint).
+ */
+export function bookFilterStreamSeed<T>(
+  prevFilterKey: string | null,
+  filterKey: string,
+  prevRows: readonly T[]
+): T[] {
+  return prevFilterKey === filterKey ? prevRows.slice() : []
+}
+
+/** One chapter's matches not yet streamed (dedupe by id across restarts). */
+export function bookFilterChapterMatches<T extends { id: string; reference: string }>(
+  byChapter: Record<string, T[]> | null | undefined,
+  fallback: readonly T[] | null | undefined,
+  chapter: number,
+  match: (rows: readonly T[]) => T[],
+  seenIds: ReadonlySet<string>
+): T[] {
+  return match(streamRowsForChapter(byChapter, fallback, chapter)).filter(
+    (row) => !seenIds.has(row.id)
+  )
+}
+
+/**
  * Prefer the chapter map; if that key is missing (chunked / current→end map),
  * take that chapter from the flat fallback. Idle-only — not a book flatten.
  */
@@ -409,8 +466,8 @@ export function streamRowsForChapter<T extends { reference: string }>(
  * Prefer `preferred` rows, then append `rest` rows whose ids are not already
  * present. Used for:
  * - passage-aligned current-chapter matches + the rest of that chapter map
- * - firstPaint + streamed book matches (stream skips only the initial focus
- *   chapter and survives chapter jumps, so destination-chapter ids overlap)
+ * - firstPaint + streamed book matches (stream covers every chapter and
+ *   survives chapter jumps, so current-chapter ids overlap)
  */
 export function mergeFocusChapterBookMatches<T extends { id: string }>(
   preferred: readonly T[],

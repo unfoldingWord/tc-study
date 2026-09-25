@@ -323,9 +323,9 @@ export function useCombinedHelpsPipeline({
       )
     )
     const alignById = new Map(notesWithAlignedTokens.map((n) => [n.id, n]))
-    // Stream skips only the *initial* focus chapter and does not restart on
-    // chapter jumps — so after a cross-chapter card click the destination
-    // chapter is in both firstPaint and streamed. Prefer firstPaint (aligned).
+    // Stream covers every chapter (start focus last) and does not restart on
+    // chapter jumps — the current chapter is in both firstPaint and streamed.
+    // Prefer firstPaint (aligned).
     const settled = settleSupportRefDisplayNotes(
       mergeFocusChapterBookMatches(firstPaint, streamedSupportRefNotes),
       supportRefFilter.supportReference,
@@ -412,8 +412,7 @@ export function useCombinedHelpsPipeline({
     const alignById = new Map(processedLinks.map((link) => [link.id, link]))
     const streamed = streamedTwlArticleLinks.map(withArticlePath)
     const cacheHits = attachHelpsTokenCache(streamed, helpsTokenCacheRef.current)
-    // Same as support-ref: streamed off-focus rows can overlap firstPaint after
-    // navigating to a previously streamed chapter (TWL article filter click).
+    // Same as support-ref: streamed rows overlap firstPaint for the current chapter.
     const settled = settleTwlArticleDisplayLinks(
       mergeFocusChapterBookMatches(firstPaint, cacheHits),
       twlArticleFilter.articlePath,

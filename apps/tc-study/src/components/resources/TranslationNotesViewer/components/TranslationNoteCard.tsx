@@ -25,8 +25,8 @@ import {
   HELPS_CARD_FOOTER_BUTTON_TA,
   HELPS_CARD_FOOTER_ICON,
   HELPS_CARD_FOOTER_ICON_BUTTON,
-  HELPS_CARD_IDLE,
-  HELPS_CARD_SELECTED,
+  HELPS_CARD_FOOTER_ICON_BUTTON_ACTIVE,
+  helpsCardStateClass,
 } from '../../helpsCardStyles'
 import { QuotedFilterText } from '../../shared/QuotedFilterText'
 import type { TokenFilter } from '../../WordsLinksViewer/types'
@@ -53,6 +53,8 @@ export type NoteWithTokens = TranslationNote & {
 interface TranslationNoteCardProps {
   note: NoteWithTokens
   isSelected: boolean
+  /** This note's support-reference is the active book-wide filter (applied from this card). */
+  isFilterSource?: boolean
   /** Called with the note object so callers can use a single stable handler */
   onClick: (note: NoteWithTokens) => void
   /** Called with the note object so callers can use a single stable handler */
@@ -81,6 +83,7 @@ const quoteChipStaticClass =
 export const TranslationNoteCard = memo(function TranslationNoteCard({
   note,
   isSelected,
+  isFilterSource = false,
   onClick,
   onQuoteClick,
   onSupportReferenceClick,
@@ -180,9 +183,10 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
     <div
       className={`
         group rounded-md p-content cursor-pointer transition-colors duration-150 border
-        ${isSelected ? HELPS_CARD_SELECTED : HELPS_CARD_IDLE}
+        ${helpsCardStateClass(isSelected, isFilterSource)}
 
       `}
+      data-helps-filter-source={isFilterSource || undefined}
       onClick={() => {
         // Quote persist/token-click first — select-driven navigate must not race ahead.
         onQuoteClick?.(note)
@@ -385,7 +389,10 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
                   e.stopPropagation()
                   onFilterBySupportReference(note.supportReference, taTitle)
                 }}
-                className={HELPS_CARD_FOOTER_ICON_BUTTON}
+                className={
+                  isFilterSource ? HELPS_CARD_FOOTER_ICON_BUTTON_ACTIVE : HELPS_CARD_FOOTER_ICON_BUTTON
+                }
+                aria-pressed={isFilterSource}
                 title={`Filter book notes: ${taTitle}`}
                 aria-label={`Filter book notes: ${taTitle}`}
               >

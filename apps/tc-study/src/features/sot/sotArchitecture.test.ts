@@ -53,5 +53,18 @@ describe('SoT architecture wiring', () => {
     expect(pipeline).toContain('mergeFocusChapterBookMatches(firstPaint, cacheHits)')
     expect(pipeline).not.toContain('[...firstPaint, ...streamedSupportRefNotes]')
     expect(pipeline).not.toContain('[...firstPaint, ...cacheHits]')
+    // Cross-chapter filter click: stream must include the start focus chapter
+    // (firstPaint follows the current chapter) or its cards drop off the list.
+    const stream = src('../helps/useBookFilterStream.ts')
+    expect(stream).toContain('planBookFilterStreamChapters(')
+    expect(stream).not.toContain('planSupportRefStreamChapters(')
+    // Restart on content growth (not a boolean "ready") or a partial chapter
+    // map at filter time leaves the list stuck on the current chapter.
+    expect(stream).toContain('bookFilterStreamSpanKey(')
+    expect(stream).toContain('[enabled, filterKey, spanKey]')
+    expect(stream).not.toContain('bookFilterContentReady')
+    for (const hook of ['../helps/useSupportRefBookStream.ts', '../helps/useTwlArticleBookStream.ts']) {
+      expect(src(hook)).toContain('useBookFilterStream')
+    }
   })
 })

@@ -23,8 +23,8 @@ import {
   HELPS_CARD_FOOTER_BUTTON_TW,
   HELPS_CARD_FOOTER_ICON,
   HELPS_CARD_FOOTER_ICON_BUTTON_TW,
-  HELPS_CARD_IDLE,
-  HELPS_CARD_SELECTED,
+  HELPS_CARD_FOOTER_ICON_BUTTON_TW_ACTIVE,
+  helpsCardStateClass,
 } from '../../helpsCardStyles'
 import { QuotedFilterText } from '../../shared/QuotedFilterText'
 import type { TokenFilter, TranslationWordsLink } from '../types'
@@ -39,6 +39,8 @@ interface AlignedToken {
 interface WordLinkCardProps {
   link: TranslationWordsLink
   isSelected: boolean
+  /** This link's TW article is the active book-wide filter (applied from this card). */
+  isFilterSource?: boolean
   twTitle: string
   isLoadingTitle: boolean
   /** First content paragraph of the TW article; omit/null when not loaded or empty */
@@ -64,6 +66,7 @@ const quoteChipStaticClass =
 export const WordLinkCard = memo(function WordLinkCard({
   link,
   isSelected,
+  isFilterSource = false,
   twTitle,
   isLoadingTitle,
   twPreview = null,
@@ -116,9 +119,10 @@ export const WordLinkCard = memo(function WordLinkCard({
     <div
       className={`
         group rounded-md p-content cursor-pointer transition-colors duration-150 border
-        ${isSelected ? HELPS_CARD_SELECTED : HELPS_CARD_IDLE}
+        ${helpsCardStateClass(isSelected, isFilterSource)}
 
       `}
+      data-helps-filter-source={isFilterSource || undefined}
       onClick={(hasAlignedTokens || obsMode) ? () => onQuoteClick(link) : undefined}
       role="article"
       aria-label="Translation words link"
@@ -278,7 +282,10 @@ export const WordLinkCard = memo(function WordLinkCard({
                 e.stopPropagation()
                 onFilterByTwlArticle(link, twTitle)
               }}
-              className={HELPS_CARD_FOOTER_ICON_BUTTON_TW}
+              className={
+                isFilterSource ? HELPS_CARD_FOOTER_ICON_BUTTON_TW_ACTIVE : HELPS_CARD_FOOTER_ICON_BUTTON_TW
+              }
+              aria-pressed={isFilterSource}
               title={`Filter book links: ${twTitle}`}
               aria-label={`Filter book links: ${twTitle}`}
             >

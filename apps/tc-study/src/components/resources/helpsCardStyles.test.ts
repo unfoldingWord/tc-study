@@ -2,7 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import {
   HELPS_CARD_FOOTER_BUTTON_TA,
   HELPS_CARD_FOOTER_BUTTON_TW,
+  HELPS_CARD_IDLE,
+  HELPS_CARD_SELECTED,
   HELPS_COMPACT_STICKY_BAR,
+  helpsCardStateClass,
   HELPS_LIST_PANEL,
   HELPS_LIST_SHELL,
   HELPS_VERSE_HEADER,
@@ -16,6 +19,29 @@ describe('helps card footer kind colors (CVD)', () => {
     expect(HELPS_CARD_FOOTER_BUTTON_TA).toContain('text-warning-fg')
     expect(HELPS_CARD_FOOTER_BUTTON_TA).toContain('hover:text-warning')
     expect(HELPS_CARD_FOOTER_BUTTON_TA).not.toContain('helps')
+  })
+})
+
+describe('helps card active states', () => {
+  test('clicked card keeps the highlight wash', () => {
+    expect(helpsCardStateClass(true, false)).toBe(HELPS_CARD_SELECTED)
+    expect(helpsCardStateClass(false, false)).toBe(HELPS_CARD_IDLE)
+  })
+
+  test('filter source uses accent chrome, distinct from click highlight', () => {
+    const source = helpsCardStateClass(false, true)
+    expect(source).toContain('border-accent')
+    expect(source).toContain('bg-accent-soft')
+    expect(source).not.toBe(HELPS_CARD_SELECTED)
+  })
+
+  test('clicked + filter source keeps accent primary and adds a highlight ring', () => {
+    const both = helpsCardStateClass(true, true)
+    expect(both).toContain('border-accent')
+    expect(both).toContain('ring-highlight-strong')
+    expect(both).toContain('ring-inset')
+    expect(both).not.toBe(helpsCardStateClass(false, true))
+    expect(both).not.toBe(HELPS_CARD_SELECTED)
   })
 })
 

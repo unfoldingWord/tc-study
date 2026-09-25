@@ -1,6 +1,6 @@
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { BookOpen, Filter } from 'lucide-react'
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getBookTitleWithFallback } from '../../../utils/bookNames'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
 import type { ResourceInfo } from '../../../contexts/types'
@@ -20,7 +20,11 @@ import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
 import { helpsFilterIdentity, scrollHelpsToTop } from './scrollHelpsToTop'
-import { isHelpsCardSelected, type HelpsCardSelection } from './helpsCardSelection'
+import {
+  isHelpsCardSelected,
+  isHelpsFilterSourceCard,
+  type HelpsCardSelection,
+} from './helpsCardSelection'
 import { HelpsCompactStickyBar } from './HelpsCompactStickyBar'
 import { HelpsVerseGroupHeader } from './HelpsVerseGroupHeader'
 import {
@@ -29,10 +33,10 @@ import {
   windowMergedGroups,
 } from './helpsListWindow'
 import {
+  HELPS_ANCHOR_PIN_RELEASE_EVENTS,
   helpsAnchorRowId,
   helpsAnchorSelection,
-  nextHelpsAnchorPin,
-  scrollTopToKeepAnchorInView,
+  scrollTopToPinAnchor,
   shouldScrollHelpsListToTop,
 } from './helpsFilterAnchorPin'
 import { currentHelpsGroupFromBounds } from './helpsStickyCurrentRef'
@@ -138,16 +142,16 @@ export function CombinedHelpsList({
   onLinkQuoteClick,
 }: CombinedHelpsListProps) {
   const listPanelRef = useRef<HTMLDivElement>(null)
+  const listContentRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const groupElsRef = useRef(new Map<string, HTMLElement>())
   const pinReleasedRef = useRef(false)
-  const prevGroupRefsRef = useRef<string[]>([])
-  const pinApplyPassRef = useRef(false)
   const [stickyRef, setStickyRef] = useState<string | null>(null)
   const [pinStickyRef, setPinStickyRef] = useState<string | null>(null)
   const filterAnchor = supportRefFilter?.anchor ?? twlArticleFilter?.anchor ?? null
   const pinSelection = helpsAnchorSelection(filterAnchor) ?? selectedHelpsCard
   const bookWideFilter = Boolean(supportRefFilter || twlArticleFilter)
+  const anchorRowId = bookWideFilter && filterAnchor ? helpsAnchorRowId(filterAnchor) : null
   const filterIdentity = helpsFilterIdentity({
     tokenFilter,
     verseFilter,
@@ -157,9 +161,7 @@ export function CombinedHelpsList({
   })
   useLayoutEffect(() => {
     pinReleasedRef.current = false
-    prevGroupRefsRef.current = []
-    pinApplyPassRef.current = Boolean(bookWideFilter && filterAnchor)
-    setPinStickyRef(bookWideFilter && filterAnchor ? filterAnchor.ref : null)
+    setPinStickyRef(anchorRowId && filterAnchor ? filterAnchor.ref : null)
     if (
       shouldScrollHelpsListToTop({
         bookWideFilter,
@@ -168,7 +170,7 @@ export function CombinedHelpsList({
     ) {
       scrollHelpsToTop(listPanelRef.current)
     }
-  }, [filterIdentity])
+  }, [filterIdentity, anchorRowId])
 
   const [visibleCount, setVisibleCount] = useState(() =>
     visibleGroupCountForSelection(mergedGroups, pinSelection)
@@ -187,62 +189,46 @@ export function CombinedHelpsList({
     return windowMergedGroups(mergedGroups, Math.max(visibleCount, needed))
   }, [mergedGroups, visibleCount, pinSelection])
 
-  useLayoutEffect(() => {
+  const pinAnchorRow = useCallback(() => {
     const root = listPanelRef.current
-    if (!root || !filterAnchor) return
-    const nextRefs = mergedGroups.map((group) => group.ref)
-    const heights: Record<string, number> = {}
-    for (const [ref, el] of groupElsRef.current) {
-      heights[ref] = el.offsetHeight
-    }
-    const next = nextHelpsAnchorPin({
-      pinned: !pinReleasedRef.current,
-      userScrolled: pinReleasedRef.current,
+    if (!root || !anchorRowId || pinReleasedRef.current) return
+    const row = root.querySelector<HTMLElement>(`#${CSS.escape(anchorRowId)}`)
+    if (!row) return
+    const next = scrollTopToPinAnchor({
       scrollTop: root.scrollTop,
-      prevGroupRefs: prevGroupRefsRef.current,
-      nextGroupRefs: nextRefs,
-      groupHeights: heights,
-      isApplyPass: pinApplyPassRef.current,
-      anchorRef: filterAnchor.ref,
+      anchorOffsetTop: row.getBoundingClientRect().top - root.getBoundingClientRect().top,
     })
-    pinApplyPassRef.current = false
-    prevGroupRefsRef.current = nextRefs
-    if (!next.pinned) return
-    if (next.scrollTop !== root.scrollTop) {
-      root.scrollTop = next.scrollTop
-    }
-    if (next.scrollAnchorIntoView) {
-      const row = document.getElementById(helpsAnchorRowId(filterAnchor))
-      if (row) {
-        const rootRect = root.getBoundingClientRect()
-        const rowRect = row.getBoundingClientRect()
-        const kept = scrollTopToKeepAnchorInView({
-          scrollTop: root.scrollTop,
-          viewportHeight: root.clientHeight,
-          anchorOffsetTop: rowRect.top - rootRect.top,
-          anchorHeight: rowRect.height || 120,
-        })
-        if (kept !== root.scrollTop) root.scrollTop = kept
-      }
-    }
-  }, [mergedGroups, windowedGroups, filterAnchor])
+    if (next !== root.scrollTop) root.scrollTop = next
+  }, [anchorRowId])
+
+  useLayoutEffect(() => {
+    pinAnchorRow()
+  }, [pinAnchorRow, mergedGroups, windowedGroups, loading])
 
   useEffect(() => {
     const root = listPanelRef.current
-    if (!root || !filterAnchor) return
+    const content = listContentRef.current
+    if (!root || !content || !anchorRowId) return
     const releasePin = () => {
       if (pinReleasedRef.current) return
       pinReleasedRef.current = true
       setPinStickyRef(null)
     }
-    // Programmatic scrollTop (prepend compensation) must not release the pin.
-    root.addEventListener('wheel', releasePin, { passive: true })
-    root.addEventListener('touchmove', releasePin, { passive: true })
-    return () => {
-      root.removeEventListener('wheel', releasePin)
-      root.removeEventListener('touchmove', releasePin)
+    // Rows above the anchor grow after paint (content-visibility, previews,
+    // streamed chapters) without a React commit here.
+    const resizeObserver = new ResizeObserver(() => pinAnchorRow())
+    resizeObserver.observe(content)
+    resizeObserver.observe(root)
+    for (const type of HELPS_ANCHOR_PIN_RELEASE_EVENTS) {
+      root.addEventListener(type, releasePin, { passive: true })
     }
-  }, [filterIdentity, filterAnchor])
+    return () => {
+      resizeObserver.disconnect()
+      for (const type of HELPS_ANCHOR_PIN_RELEASE_EVENTS) {
+        root.removeEventListener(type, releasePin)
+      }
+    }
+  }, [filterIdentity, anchorRowId, pinAnchorRow])
   useEffect(() => {
     const el = sentinelRef.current
     if (!el || windowedGroups.length >= mergedGroups.length) return
@@ -353,7 +339,7 @@ export function CombinedHelpsList({
           className={HELPS_LIST_PANEL}
           data-testid="helps-list-scrollport"
         >
-      <div className="p-content max-w-2xl mx-auto w-full">
+      <div ref={listContentRef} className="p-content max-w-2xl mx-auto w-full">
         {explainedEmpty ? (
           <CombinedHelpsEmptyState view={explainedEmpty} />
         ) : loading ? (
@@ -439,6 +425,11 @@ export function CombinedHelpsList({
                               <TranslationNoteCard
                                 note={note as NoteWithTokens}
                                 isSelected={isHelpsCardSelected(selectedHelpsCard, 'tn', note.id)}
+                                isFilterSource={isHelpsFilterSourceCard(
+                                  { supportRefFilter, twlArticleFilter },
+                                  'tn',
+                                  note.id
+                                )}
                                 onSupportReferenceClick={onSupportReferenceClick}
                                 onFilterBySupportReference={
                                   onFilterBySupportReference
@@ -480,6 +471,11 @@ export function CombinedHelpsList({
                             <WordLinkCard
                               link={link}
                               isSelected={isHelpsCardSelected(selectedHelpsCard, 'twl', link.id)}
+                              isFilterSource={isHelpsFilterSourceCard(
+                                { supportRefFilter, twlArticleFilter },
+                                'twl',
+                                link.id
+                              )}
                               twTitle={twTitle}
                               isLoadingTitle={isLoadingTwTitle}
                               twPreview={twPreview}
