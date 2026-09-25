@@ -16,6 +16,12 @@ const deployVersion =
   process.env.VITE_DEPLOY_VERSION ||
   new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
 
+/** Raw-markdown toggles. Set by `bun run build:debug` (DEBUG_BUILD=1). */
+const isDebugBuild =
+  process.env.DEBUG_BUILD === '1' ||
+  process.env.DEBUG_BUILD === 'true' ||
+  process.env.DEBUG_BUILD === 'yes'
+
 /**
  * NOTE: Vite resolves vite.config.js before vite.config.ts when both exist.
  * Keep this file as the SoT for preview/e2e builds, and mirror critical
@@ -73,6 +79,7 @@ function forceDecodeNamedCharRefNode() {
 export default defineConfig({
   define: {
     __DEPLOY_VERSION__: JSON.stringify(deployVersion),
+    'import.meta.env.VITE_DEBUG_BUILD': JSON.stringify(isDebugBuild ? '1' : ''),
   },
   plugins: [react(), tailwindcss(), forceDecodeNamedCharRefNode()],
   resolve: {

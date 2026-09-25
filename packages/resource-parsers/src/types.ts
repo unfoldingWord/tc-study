@@ -20,6 +20,8 @@ export interface TranslationNote {
   quote: string;
   occurrence: string;
   note: string;
+  /** Door43 `front:intro` / `N:intro` row. Reference is still normalized to verse 1. */
+  isIntro?: boolean;
   quoteTokens?: OptimizedToken[]; // Original language tokens for the quote (calculated in NotesViewer)
 }
 

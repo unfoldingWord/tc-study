@@ -22,7 +22,7 @@ import {
 } from '../prepare/prepareRegistry'
 
 /** Bump when light/full row shape changes (invalidates prepared: rows). */
-export const NOTES_PREPARE_VERSION = 4
+export const NOTES_PREPARE_VERSION = 5
 
 export function tnCacheKey(resourceKey: string, bookId: string): string {
   return `tn:${resourceKey}:${bookId}`
@@ -37,6 +37,7 @@ export interface NotesLightRow {
   supportReference: string
   tags: string
   occurrence: string
+  isIntro?: boolean
 }
 
 export interface NotesFullRow {
@@ -51,6 +52,7 @@ export interface NotesFullRow {
   supportReference: string
   tags: string
   occurrence: string
+  isIntro?: boolean
 }
 
 export interface NotesNavRecord {
@@ -144,6 +146,7 @@ export function buildNotesLight(source: NotesSource, unit: number): NotesLightCh
     supportReference: n.supportReference || '',
     tags: n.tags || '',
     occurrence: n.occurrence || '1',
+    isIntro: n.isIntro === true,
   }))
   return { version: NOTES_PREPARE_VERSION, unit, notes }
 }
@@ -162,6 +165,7 @@ export function buildNotesFull(source: NotesSource, unit: number): NotesFullChap
       supportReference: n.supportReference || '',
       tags: n.tags || '',
       occurrence: n.occurrence || '1',
+      isIntro: n.isIntro === true,
     }
   })
   return { version: NOTES_PREPARE_VERSION, unit, notes }

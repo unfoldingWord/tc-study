@@ -30,7 +30,8 @@ const sampleNotes: ProcessedNotes = {
       supportReference: '',
       quote: '',
       occurrence: '1',
-      note: 'Chapter two note',
+      note: '# Ephesians 2 Chapter Introduction',
+      isIntro: true,
     },
   ],
   notesByChapter: {
@@ -53,7 +54,8 @@ const sampleNotes: ProcessedNotes = {
         supportReference: '',
         quote: '',
         occurrence: '1',
-        note: 'Chapter two note',
+        note: '# Ephesians 2 Chapter Introduction',
+        isIntro: true,
       },
     ],
   },
@@ -95,6 +97,9 @@ describe('notesPreparer', () => {
     expect(light.notes[0]!.quote).toBe('Παῦλος')
     expect(light.notes[0]!.note).toContain('**apostle**')
     expect(light.notes[0]!.occurrence).toBe('1')
+    expect(light.notes[0]!.isIntro).toBe(false)
+    const intro = buildNotesLight(source, 2)
+    expect(intro.notes[0]!.isIntro).toBe(true)
   })
 
   test('prepareFull includes hast + folded quote + render-complete fields', () => {
@@ -112,6 +117,9 @@ describe('notesPreparer', () => {
     expect(full.notes[0]!.supportReference).toBe('')
     expect(full.notes[0]!.tags).toBe('')
     expect(full.notes[0]!.occurrence).toBe('1')
+    expect(full.notes[0]!.isIntro).toBe(false)
+    const intro = buildNotesFull(source, 2)
+    expect(intro.notes[0]!.isIntro).toBe(true)
   })
 
   test('readSource loads tn: cache', async () => {

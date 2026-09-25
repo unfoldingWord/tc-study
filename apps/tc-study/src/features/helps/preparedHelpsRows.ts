@@ -27,6 +27,7 @@ export function preparedNoteToTranslationNote(
     tags: row.tags,
     occurrence: row.occurrence,
     bodyHast: row.bodyHast,
+    isIntro: row.isIntro === true,
   }
 }
 

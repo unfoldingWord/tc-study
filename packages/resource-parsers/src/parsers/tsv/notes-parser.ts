@@ -12,7 +12,7 @@ import type { ProcessedNotes, TranslationNote } from '../../types';
 export type { ProcessedNotes, TranslationNote } from '../../types';
 
 /** Bump when TSV reference / row shape changes so loaders re-parse cached `tn:` blobs. */
-export const NOTES_TSV_PARSER_VERSION = '2'
+export const NOTES_TSV_PARSER_VERSION = '3'
 
 export function processedNotesParserIsCurrent(
   notes: { metadata?: { parserVersion?: string } } | null | undefined
@@ -81,7 +81,7 @@ export class NotesProcessor {
       const normalizedRef = this.normalizeReference(reference);
       if (!normalizedRef) continue;
       
-      const { chapter, verse, normalized } = normalizedRef;
+      const { chapter, verse, normalized, isIntro } = normalizedRef;
       
       notes.push({
         reference: normalized,
@@ -90,7 +90,8 @@ export class NotesProcessor {
         supportReference: supportReference || '',
         quote: quote || '',
         occurrence: occurrence || '1',
-        note: note || ''
+        note: note || '',
+        isIntro,
       });
     }
     
@@ -121,7 +122,7 @@ export class NotesProcessor {
       const normalizedRef = this.normalizeReference(reference);
       if (!normalizedRef) continue;
       
-      const { chapter, verse, normalized } = normalizedRef;
+      const { chapter, verse, normalized, isIntro } = normalizedRef;
       
       // Filter by target chapter
       if (chapter !== targetChapter) continue;
@@ -133,7 +134,8 @@ export class NotesProcessor {
         supportReference: supportReference || '',
         quote: quote || '',
         occurrence: occurrence || '1',
-        note: note || ''
+        note: note || '',
+        isIntro,
       });
     }
     
@@ -145,23 +147,24 @@ export class NotesProcessor {
    * Keeps Door43 ranges (`5:2-3`) and comma lists (`5:1,3,8,12`).
    * Only collapses `front:*` / `*:intro` to a concrete first verse.
    */
-  private normalizeReference(reference: string): { chapter: number; verse: number; normalized: string } | null {
+  private normalizeReference(reference: string): { chapter: number; verse: number; normalized: string; isIntro: boolean } | null {
     if (!reference || !reference.includes(':')) return null;
 
     const colon = reference.indexOf(':');
     const chapterStr = reference.slice(0, colon).trim();
     const verseStr = reference.slice(colon + 1).trim();
+    const isIntro = verseStr.toLowerCase() === 'intro';
 
     if (chapterStr === 'front') {
-      const verse = verseStr === 'intro' ? 1 : (parseInt(verseStr, 10) || 1);
-      return { chapter: 1, verse, normalized: `1:${verse}` };
+      const verse = isIntro ? 1 : (parseInt(verseStr, 10) || 1);
+      return { chapter: 1, verse, normalized: `1:${verse}`, isIntro };
     }
 
     const chapter = parseInt(chapterStr, 10);
     if (isNaN(chapter) || chapter < 1) return null;
 
-    if (!verseStr || verseStr === 'intro') {
-      return { chapter, verse: 1, normalized: `${chapter}:1` };
+    if (!verseStr || isIntro) {
+      return { chapter, verse: 1, normalized: `${chapter}:1`, isIntro };
     }
 
     const firstVerse = parseInt(verseStr, 10);
@@ -171,6 +174,7 @@ export class NotesProcessor {
       chapter,
       verse: firstVerse,
       normalized: `${chapter}:${verseStr}`,
+      isIntro: false,
     };
   }
 

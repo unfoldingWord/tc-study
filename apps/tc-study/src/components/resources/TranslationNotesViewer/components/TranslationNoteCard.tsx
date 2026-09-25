@@ -5,7 +5,7 @@
  */
 
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
-import { Code, Filter, GraduationCap } from 'lucide-react'
+import { ChevronDown, ChevronUp, Code, Filter, GraduationCap } from 'lucide-react'
 import { memo, startTransition, useCallback, useState } from 'react'
 import { useNavigationStore } from '../../../../contexts'
 import { useAppStore } from '../../../../contexts/AppContext'
@@ -19,6 +19,7 @@ import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
 import type { HastRoot } from '../../../../lib/markdown/markdownToHast'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
+import { isDebugBuild } from '../../../../utils/debugBuild'
 import { MarkdownRenderer, MarkdownSkeleton } from '../../../ui/MarkdownRenderer'
 import {
   HELPS_CARD_FOOTER,
@@ -30,6 +31,7 @@ import {
 } from '../../helpsCardStyles'
 import { QuotedFilterText } from '../../shared/QuotedFilterText'
 import type { TokenFilter } from '../../WordsLinksViewer/types'
+import { introNoteHeading, shouldCollapseIntroNote } from '../utils/introNoteHeading'
 import { parseScriptureLink } from '../utils/parseScriptureLink'
 
 interface AlignedToken {
@@ -75,6 +77,32 @@ interface TranslationNoteCardProps {
   tokenFilter?: TokenFilter | null
 }
 
+function IntroExpandButton({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean
+  onToggle: () => void
+}) {
+  const label = expanded ? 'Show less' : 'Show more'
+  const Icon = expanded ? ChevronUp : ChevronDown
+  return (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      title={label}
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation()
+        onToggle()
+      }}
+      className="p-1 rounded-md text-fg-muted hover:text-fg-secondary hover:bg-muted shrink-0"
+    >
+      <Icon className="w-4 h-4" aria-hidden />
+    </button>
+  )
+}
+
 const quoteChipClass =
   'w-full text-start mb-stack px-chrome py-chrome-tight bg-chip-quote hover:bg-chip-quote-hover rounded-md transition-colors duration-150'
 const quoteChipStaticClass =
@@ -99,6 +127,9 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   tokenFilter = null,
 }: TranslationNoteCardProps) {
   const [showRawMarkdown, setShowRawMarkdown] = useState(false)
+  const [introExpanded, setIntroExpanded] = useState(false)
+  const isIntro = shouldCollapseIntroNote(note)
+  const introHeading = isIntro ? introNoteHeading(note.note) : ''
   // Narrow selector: only re-render when the book changes (OBS↔scripture switch),
   // not on every chapter/verse navigation or obsFrameCountByStory update.
   const currentBook = useNavigationStore((s) => s.currentReference.book)
@@ -319,8 +350,13 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </button>
       )}
 
-      {/* Note Content - Translation guidance (markdown) */}
-      {excerptLoading ? (
+      {/* Note Content - Translation guidance (markdown). Intros stay collapsed until expanded. */}
+      {isIntro && !excerptLoading && note.note && !introExpanded ? (
+        <div className="flex items-start gap-2" dir={languageDirection}>
+          <p className="flex-1 min-w-0 text-base font-medium text-fg leading-relaxed">{introHeading}</p>
+          <IntroExpandButton expanded={false} onToggle={() => setIntroExpanded(true)} />
+        </div>
+      ) : excerptLoading ? (
         <div
           className="relative"
           dir={languageDirection}
@@ -332,7 +368,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </div>
       ) : note.note ? (
         <div className="relative" dir={languageDirection}>
-          {showRawMarkdown ? (
+          {isDebugBuild() && showRawMarkdown ? (
             <pre className="text-xs text-fg-secondary leading-relaxed whitespace-pre-wrap font-mono bg-muted p-2.5 rounded-lg overflow-x-auto">
               {note.note}
             </pre>
@@ -345,17 +381,27 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
               getEntryTitle={getEntryTitle}
             />
           )}
-          {/* Toggle button - small and discrete */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowRawMarkdown(!showRawMarkdown)
-            }}
-            className="absolute top-0 right-0 p-1 text-fg-muted hover:text-fg-secondary hover:bg-muted rounded-md transition-colors opacity-0 group-hover:opacity-100"
-            title={showRawMarkdown ? "Show rendered markdown" : "Show raw markdown"}
-          >
-            <Code className="w-3.5 h-3.5" />
-          </button>
+          {isIntro ? (
+            <div className="mt-2 flex" dir={languageDirection}>
+              <span className="ms-auto">
+                <IntroExpandButton expanded onToggle={() => setIntroExpanded(false)} />
+              </span>
+            </div>
+          ) : null}
+          {isDebugBuild() ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowRawMarkdown(!showRawMarkdown)
+              }}
+              className="absolute top-0 right-0 p-1 text-fg-muted hover:text-fg-secondary hover:bg-muted rounded-md transition-colors opacity-0 group-hover:opacity-100"
+              title={showRawMarkdown ? 'Show rendered markdown' : 'Show raw markdown'}
+              aria-label={showRawMarkdown ? 'Show rendered markdown' : 'Show raw markdown'}
+            >
+              <Code className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
         </div>
       ) : null}
 

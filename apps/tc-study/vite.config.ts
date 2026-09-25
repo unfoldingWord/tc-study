@@ -17,6 +17,12 @@ const deployVersion =
   process.env.VITE_DEPLOY_VERSION ||
   new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
 
+/** Raw-markdown toggles. Set by `bun run build:debug` (DEBUG_BUILD=1). */
+const isDebugBuild =
+  process.env.DEBUG_BUILD === '1' ||
+  process.env.DEBUG_BUILD === 'true' ||
+  process.env.DEBUG_BUILD === 'yes'
+
 // Prefer keeping resolve.dedupe in sync with vite.config.js — Vite loads .js first when both exist.
 /**
  * Keep in sync with vite.config.js (Vite prefers .js when both exist).
@@ -68,6 +74,7 @@ function forceDecodeNamedCharRefNode() {
 export default defineConfig({
   define: {
     __DEPLOY_VERSION__: JSON.stringify(deployVersion),
+    'import.meta.env.VITE_DEBUG_BUILD': JSON.stringify(isDebugBuild ? '1' : ''),
   },
   plugins: [
     react(),
