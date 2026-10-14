@@ -11,7 +11,13 @@
  */
 
 import JSZip from 'jszip'
-import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
+import {
+  expectedIngestReleaseStamp,
+  ingestSchemaForResourceType,
+  isMatchingIngestReceipt,
+  resourceContentStamp,
+  type ResourceMetadata,
+} from '@bt-synergy/resource-catalog'
 import { ORIGINAL_LANGUAGE_KEYS, belongsTo, fileSafe, scansFor } from './keys'
 import {
   ALL_LAYERS,
@@ -25,6 +31,7 @@ import {
   type PackResourceRole,
   type PackSource,
   type PackTarget,
+  type PackVersions,
 } from './types'
 
 const keyOf = (metadata: ResourceMetadata): string =>
@@ -58,7 +65,21 @@ export type BuildPackParams = {
   layers?: readonly PackLayer[]
   createdBy?: string
   app?: { name: string; version?: string }
+  /** The app's processing versions, by layer; `sot.usjProcessing` is also what scripture receipts are checked with. */
+  versions?: PackVersions
   now?: Date
+}
+
+/**
+ * Whether the store has a receipt saying the resource is complete for the release its catalog row names: stamped,
+ * `downloadComplete: true`, and the ingest schema of this app. A receipt left by a failed download, or by a release
+ * the catalog no longer names, does not count: the device that opens the pack would try to download it again.
+ */
+function completeReceipt(receipt: CacheRow | undefined, metadata: ResourceMetadata, versions: PackVersions | undefined): boolean {
+  if (!receipt) return false
+  const usj = versions?.sot?.usjProcessing
+  const schema = ingestSchemaForResourceType(String((metadata as { type?: string }).type ?? ''), usj === undefined ? undefined : String(usj))
+  return isMatchingIngestReceipt(receipt.entry, expectedIngestReleaseStamp(metadata), schema)
 }
 
 /**
@@ -88,9 +109,11 @@ export async function buildLanguagePack(params: BuildPackParams): Promise<{ byte
       continue
     }
     const byLayer = await rowsOfResource(source, key, layers)
-    if (!byLayer.get('receipt')?.length) {
+    if (!completeReceipt(byLayer.get('receipt')?.[0], metadata, params.versions)) {
       // An original language the store never had is not news; a resource of the language that is half there is.
-      if (role === 'language') skipped.push({ key, why: 'no se terminó de descargar (no tiene recibo)' })
+      if (role === 'language' || byLayer.get('receipt')?.length) {
+        skipped.push({ key, why: byLayer.get('receipt')?.length ? 'su descarga no terminó, o es de otra versión' : 'no se terminó de descargar (no tiene recibo)' })
+      }
       continue
     }
     packed.add(key)
@@ -111,6 +134,7 @@ export async function buildLanguagePack(params: BuildPackParams): Promise<{ byte
     ...(params.createdBy ? { createdBy: params.createdBy } : {}),
     ...(params.app ? { app: params.app } : {}),
     layers,
+    ...(params.versions ? { versions: params.versions } : {}),
     resources,
   }
   zip.file('manifest.json', JSON.stringify(manifest, null, 2))
@@ -141,6 +165,8 @@ export type ImportPackParams = {
   overwrite?: boolean
   /** Rows written per batch. */
   batch?: number
+  /** This app's processing versions, by layer, to compare with the pack's (see `PackManifest.versions`). */
+  versions?: PackVersions
 }
 
 export type ImportPackResult = {
@@ -148,6 +174,23 @@ export type ImportPackResult = {
   written: number
   keptExisting: number
   byLayer: Partial<Record<PackLayer, number>>
+  /** Layers left out because this app builds them with another version: they are rebuilt from the source. */
+  skippedLayers: PackLayer[]
+  /** Resources the device already had in another release, left as they were (without `overwrite`). */
+  skippedResources: Array<{ key: string; why: string }>
+}
+
+/** The layers whose versions differ between the pack and this app. */
+function differingLayers(pack: PackVersions | undefined, mine: PackVersions | undefined): PackLayer[] {
+  if (!pack || !mine) return []
+  const out: PackLayer[] = []
+  for (const layer of Object.keys(mine) as PackLayer[]) {
+    const a = pack[layer]
+    const b = mine[layer]
+    if (!a || !b) continue
+    if (Object.keys(b).some((name) => name in a && String(a[name]) !== String(b[name]))) out.push(layer)
+  }
+  return out
 }
 
 /**
@@ -158,15 +201,37 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
   const { target } = params
   const manifest = await readPackManifest(params.bytes)
   const zip = await JSZip.loadAsync(params.bytes)
+  const differ = differingLayers(manifest.versions, params.versions)
+  if (differ.some((layer) => REQUIRED_LAYERS.includes(layer))) {
+    throw new Error('Este paquete se hizo con otra versión del procesamiento de los textos. Esta app lo descartaría: hace falta un paquete hecho con la misma versión de la app.')
+  }
   const layers = new Set<PackLayer>([...REQUIRED_LAYERS, ...(params.layers ?? manifest.layers)])
+  for (const layer of differ) layers.delete(layer)
   const batch = params.batch ?? 200
-  const result: ImportPackResult = { manifest, written: 0, keptExisting: 0, byLayer: {} }
+  const result: ImportPackResult = { manifest, written: 0, keptExisting: 0, byLayer: {}, skippedLayers: differ, skippedResources: [] }
 
+  // Each resource comes whole or not at all: its catalog row, its rows and its receipt belong to one release. When
+  // the device has the same release, the pack fills the gaps; with another one, the pack replaces it only on request.
   const catalogFile = zip.file('catalog.json')
-  if (catalogFile) await target.putCatalogRows(JSON.parse(await catalogFile.async('string')))
+  const catalog = catalogFile ? (JSON.parse(await catalogFile.async('string')) as Array<{ key: string; metadata: ResourceMetadata }>) : []
+  const replace = new Set<string>()
+  const skip = new Set<string>()
+  for (const row of catalog) {
+    const mine = target.catalogRow ? await target.catalogRow(row.key) : null
+    if (!mine) continue
+    if (resourceContentStamp(mine) === resourceContentStamp(row.metadata)) continue
+    if (params.overwrite) replace.add(row.key)
+    else {
+      skip.add(row.key)
+      result.skippedResources.push({ key: row.key, why: `el aparato tiene otra versión (${resourceContentStamp(mine)})` })
+    }
+  }
+  await target.putCatalogRows(catalog.filter((row) => !skip.has(row.key)))
 
   const order: PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text', 'receipt']
   for (const resource of manifest.resources) {
+    if (skip.has(resource.key)) continue
+    const overwrite = params.overwrite || replace.has(resource.key)
     for (const layer of order) {
       if (!layers.has(layer) || !resource.rows[layer]) continue
       const file = zip.file(`rows/${layer}/${fileSafe(resource.key)}.jsonl`)
@@ -177,7 +242,7 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
         .map((line) => JSON.parse(line) as CacheRow)
       for (let i = 0; i < rows.length; i += batch) {
         let slice = rows.slice(i, i + batch)
-        if (!params.overwrite && target.existingKeys) {
+        if (!overwrite && target.existingKeys) {
           const have = await target.existingKeys(slice.map((row) => row.key))
           result.keptExisting += slice.filter((row) => have.has(row.key)).length
           slice = slice.filter((row) => !have.has(row.key))

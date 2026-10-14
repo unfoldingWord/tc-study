@@ -50,8 +50,16 @@ export type PackManifest = {
   /** The app that made it, for whoever has to tell two packs apart. */
   app?: { name: string; version?: string }
   layers: PackLayer[]
+  /**
+   * The processing versions of the app that made the pack, by layer (e.g. `sot: { usjProcessing: '2.2.0-usj' }`,
+   * `quote: { helpsQuote: 5 }`). An app with other source versions would throw the rows away, so it refuses the pack;
+   * with other derived versions it skips those layers and rebuilds them.
+   */
+  versions?: PackVersions
   resources: PackManifestResource[]
 }
+
+export type PackVersions = Partial<Record<PackLayer, Record<string, string | number>>>
 
 /** Where a pack is read from when it is made: the cache store and the catalog of an app. */
 export interface PackSource {
@@ -70,4 +78,6 @@ export interface PackTarget {
   /** Keys already in the store among `keys`, to leave them when the import does not overwrite. */
   existingKeys?(keys: string[]): Promise<Set<string>>
   putCatalogRows(rows: Array<{ key: string; metadata: ResourceMetadata }>): Promise<void>
+  /** The catalog row the device already has for a resource, to compare its version with the pack's. */
+  catalogRow?(resourceKey: string): Promise<ResourceMetadata | null>
 }

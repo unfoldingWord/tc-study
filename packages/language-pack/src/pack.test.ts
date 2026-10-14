@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test'
 import JSZip from 'jszip'
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { buildLanguagePack, importLanguagePack, readPackManifest } from './pack'
+import { packSourceFrom, packTargetFrom } from './stores'
 import type { CacheRow, PackSource, PackTarget } from './types'
 
 const TN = 'es-419_gl/es-419/tn'
@@ -21,15 +22,23 @@ const meta = (key: string, extra: Partial<ResourceMetadata> = {}): ResourceMetad
     title: key,
     version: 'v1',
     release: { tag_name: 'v1', published_at: '2026-10-01T00:00:00Z' },
+    type: [TPL, UGNT].includes(key) ? 'scripture' : 'notes',
     ...extra,
   }) as unknown as ResourceMetadata
 
 const row = (key: string, content: unknown = { key }): CacheRow => ({ key, entry: { content, timestamp: 1, version: 1 } })
+const STAMP = 'v1#2026-10-01T00_00_00Z'
+const VERSIONS = { sot: { usjProcessing: '2.2.0-usj', notesTsvParser: 3 }, quote: { helpsQuote: 5 }, align: { helpsAlign: 6 } }
+/** A receipt as the download worker leaves it after a complete download of the release the catalog names. */
+const receipt = (key: string, scripture = false, extra: Record<string, unknown> = {}): CacheRow => ({
+  key: `resource:${key}`,
+  entry: { content: {}, metadata: { downloadComplete: true, releaseStamp: STAMP, ingestSchema: scripture ? 'usj:2.2.0-usj' : 'helps:1', ...extra } },
+})
 
 /** A store with what tc-study keeps for an es-419 Titus, the Greek it is built on, and things of other resources. */
 function store() {
   const rows: CacheRow[] = [
-    row(`resource:${TN}`, { releaseStamp: 'v1#2026-10-01T00_00_00Z' }),
+    receipt(TN),
     row(`tn:${TN}:tit`, { _chunkedBook: true, chapters: [1, 2] }),
     row(`tn:${TN}:tit:1`),
     row(`tn:${TN}:tit:2`),
@@ -37,20 +46,22 @@ function store() {
     row(`prepared:notes:${TN}:tit:1:full`),
     row(`helps-quote:${TN}@v1#2026:${UGNT}@v1+2.2.0-usj:tit:1`),
     row(`helps-align:${TN}@v1#2026:${UGNT}@v1+2.2.0-usj:${TPL}@v1+3000220:tit:1`),
-    row(`resource:${TPL}`),
+    receipt(TPL, true),
     row(`scripture-usj:${TPL}:tit`),
     row(`scripture-usj:${TPL}:tit:1`),
     row(`prepared:scripture:${TPL}:tit:1:full`),
-    row(`resource:${TA}`),
+    receipt(TA),
     row(`${TA}/translate/figs-metaphor`),
     row(`helps-text:ta-title:${TA}@v1:translate/figs-metaphor`, 'Metáfora'),
-    row(`resource:${UGNT}`),
+    receipt(UGNT, true),
     row(`scripture-usj:${UGNT}:tit:1`),
     // Not of the pack: another language, and a resource whose key starts like ours.
-    row(`resource:${EN_TN}`),
+    receipt(EN_TN),
     row(`tn:${EN_TN}:tit`),
     row(`prepared:notes:${EN_TN}:tit:nav`),
-    row(`resource:${TN}-extra`),
+    receipt(`${TN}-extra`),
+    // Downloaded, then a book failed: the worker merges the error into the receipt.
+    receipt('es-419_gl/es-419/tq', false, { downloadComplete: false, downloadError: 'tit: 404' }),
     row(`tn:${TN}-extra:tit`),
     row('warm-coverage:v1'),
   ]
@@ -85,7 +96,7 @@ function emptyTarget(initial: CacheRow[] = []) {
 describe('hacer un paquete de idioma', () => {
   it('lleva los recursos del idioma y el griego que sus citas necesitan, con cada capa, y nada de otros recursos', async () => {
     const { source } = store()
-    const { bytes, manifest, skipped } = await buildLanguagePack({ source, language: 'es-419', originalKeys: [UGNT], now: new Date('2026-10-14T00:00:00Z') })
+    const { bytes, manifest, skipped } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', originalKeys: [UGNT], now: new Date('2026-10-14T00:00:00Z') })
     expect(manifest.resources.map((r) => [r.key, r.role])).toEqual([
       [TN, 'language'],
       [TPL, 'language'],
@@ -96,7 +107,8 @@ describe('hacer un paquete de idioma', () => {
     expect(manifest.resources[2]!.rows).toEqual({ receipt: 1, sot: 1, text: 1 })
     expect(manifest.resources[0]!.stamp).toBe('v1#2026-10-01T00_00_00Z')
     // The tQ of the catalog was never downloaded.
-    expect(skipped.map((s) => s.key).sort()).toEqual(['es-419_gl/es-419/tq'])
+    expect(skipped).toEqual([{ key: 'es-419_gl/es-419/tq', why: 'su descarga no terminó, o es de otra versión' }])
+    expect(manifest.versions).toEqual(VERSIONS)
     const zip = await JSZip.loadAsync(bytes)
     const all = (await Promise.all(Object.values(zip.files).filter((f) => f.name.endsWith('.jsonl')).map((f) => f.async('string')))).join('')
     expect(all).not.toContain(EN_TN)
@@ -106,7 +118,7 @@ describe('hacer un paquete de idioma', () => {
 
   it('un recurso cuya clave empieza igual que la de otro no se cuela en el paquete', async () => {
     const { source } = store()
-    const { bytes, manifest } = await buildLanguagePack({ source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+    const { bytes, manifest } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
     expect(manifest.resources[0]!.rows.receipt).toBe(1)
     const zip = await JSZip.loadAsync(bytes)
     const all = (await Promise.all(Object.values(zip.files).filter((f) => f.name.endsWith('.jsonl')).map((f) => f.async('string')))).join('')
@@ -115,17 +127,17 @@ describe('hacer un paquete de idioma', () => {
 
   it('se puede pedir solo lo mínimo: los recibos y la fuente, sin lo construido', async () => {
     const { source } = store()
-    const { manifest } = await buildLanguagePack({ source, language: 'es-419', resourceKeys: [TN], originalKeys: [], layers: [] })
+    const { manifest } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [], layers: [] })
     expect(manifest.layers).toEqual(['receipt', 'sot'])
     expect(manifest.resources[0]!.rows).toEqual({ receipt: 1, sot: 3 })
   })
 
   it('un recurso que no se terminó de descargar no entra, y se dice por qué', async () => {
     const { source } = store()
-    const { manifest, skipped } = await buildLanguagePack({ source, language: 'es-419', resourceKeys: ['es-419_gl/es-419/tq', 'x/y/z'], originalKeys: [] })
+    const { manifest, skipped } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: ['es-419_gl/es-419/tq', 'x/y/z'], originalKeys: [] })
     expect(manifest.resources).toEqual([])
     expect(skipped).toEqual([
-      { key: 'es-419_gl/es-419/tq', why: 'no se terminó de descargar (no tiene recibo)' },
+      { key: 'es-419_gl/es-419/tq', why: 'su descarga no terminó, o es de otra versión' },
       { key: 'x/y/z', why: 'no está en el catálogo' },
     ])
   })
@@ -134,19 +146,61 @@ describe('hacer un paquete de idioma', () => {
 describe('abrir un paquete de idioma en otro aparato', () => {
   it('deja las filas y el catálogo tal como estaban, con los trozos por capítulo incluidos', async () => {
     const { source, rows } = store()
-    const { bytes } = await buildLanguagePack({ source, language: 'es-419', originalKeys: [UGNT] })
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', originalKeys: [UGNT] })
     const there = emptyTarget()
     const result = await importLanguagePack({ bytes, target: there.target })
-    const packed = rows.filter((r) => ![EN_TN, `${TN}-extra`, 'warm-coverage'].some((s) => r.key.includes(s)))
+    const packed = rows.filter((r) => ![EN_TN, `${TN}-extra`, 'warm-coverage', 'es-419/tq'].some((s) => r.key.includes(s)))
     expect([...there.rows.keys()].sort()).toEqual(packed.map((r) => r.key).sort())
     expect(there.rows.get(`tn:${TN}:tit`)).toEqual(rows.find((r) => r.key === `tn:${TN}:tit`)!.entry)
     expect([...there.catalog.keys()].sort()).toEqual([TA, TN, TPL, UGNT].sort())
     expect(result.written).toBe(packed.length)
   })
 
+  it('funciona con el catálogo de tc-study, que lista claves y guarda de a una', async () => {
+    const { rows, catalog } = store()
+    const cache = { getByPrefix: async (prefix: string) => rows.filter((r) => r.key >= prefix && r.key <= prefix + '\uffff') }
+    const tcCatalog = { get: async (k: string) => catalog.get(k) ?? null, getAll: async () => [...catalog.keys()] }
+    const { manifest } = await buildLanguagePack({ versions: VERSIONS, source: packSourceFrom({ cache, catalog: tcCatalog }), language: 'es-419', originalKeys: [] })
+    expect(manifest.resources.map((r) => r.key)).toEqual([TN, TPL, TA])
+    const saved = new Map<string, ResourceMetadata>()
+    const there = { getByPrefix: async () => [], putRawMany: async () => {}, hasRawKeys: async () => new Set<string>() }
+    const target = packTargetFrom({ cache: there, catalog: { get: async (k: string) => saved.get(k) ?? null, getAll: async () => [...saved.keys()], set: async (k: string, m: ResourceMetadata) => void saved.set(k, m) } })
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source: packSourceFrom({ cache, catalog: tcCatalog }), language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+    await importLanguagePack({ bytes, target, versions: VERSIONS })
+    expect([...saved.keys()]).toEqual([TN])
+  })
+
+  it('una app con otra versión del procesamiento de los textos no abre el paquete; con otra versión de las citas, las reconstruye', async () => {
+    const { source } = store()
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+    await expect(importLanguagePack({ bytes, target: emptyTarget().target, versions: { ...VERSIONS, sot: { usjProcessing: '2.3.0-usj' } } })).rejects.toThrow(/otra versión del procesamiento/)
+    const result = await importLanguagePack({ bytes, target: emptyTarget().target, versions: { ...VERSIONS, quote: { helpsQuote: 6 } } })
+    expect(result.skippedLayers).toEqual(['quote'])
+    expect(result.byLayer.quote).toBeUndefined()
+    expect(result.byLayer.align).toBe(1)
+  })
+
+  it('un recurso que el aparato tiene en otra versión se deja como está, salvo que se pida reemplazarlo; entonces entra entero', async () => {
+    const { source } = store()
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+    const older = meta(TN, { release: { tag_name: 'v0', published_at: '2026-01-01T00:00:00Z' } } as never)
+    const mine = { content: 'lo de la versión vieja', timestamp: 9, version: 1 }
+    const kept = emptyTarget([{ key: `tn:${TN}:tit:1`, entry: mine }])
+    kept.catalog.set(TN, older)
+    const target = { ...kept.target, catalogRow: async (k: string) => kept.catalog.get(k) ?? null }
+    const left = await importLanguagePack({ bytes, target, versions: VERSIONS })
+    expect(left.skippedResources).toEqual([{ key: TN, why: 'el aparato tiene otra versión (v0#2026-01-01T00_00_00Z)' }])
+    expect(left.written).toBe(0)
+    expect(kept.catalog.get(TN)).toBe(older)
+    const replaced = await importLanguagePack({ bytes, target, versions: VERSIONS, overwrite: true })
+    expect(replaced.skippedResources).toEqual([])
+    expect(kept.rows.get(`tn:${TN}:tit:1`)).not.toEqual(mine)
+    expect(kept.catalog.get(TN)).not.toBe(older)
+  })
+
   it('el recibo de cada recurso se escribe al final, para que un paquete cortado no deje nada por completo que no lo está', async () => {
     const { source } = store()
-    const { bytes } = await buildLanguagePack({ source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
     const there = emptyTarget()
     await importLanguagePack({ bytes, target: there.target, batch: 2 })
     expect(there.writes.at(-1)).toBe(`resource:${TN}`)
@@ -154,7 +208,7 @@ describe('abrir un paquete de idioma en otro aparato', () => {
 
   it('lo que el aparato ya tiene se queda, salvo que se pida reemplazarlo', async () => {
     const { source } = store()
-    const { bytes } = await buildLanguagePack({ source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
     const mine = { content: 'lo mío', timestamp: 9, version: 1 }
     const kept = emptyTarget([{ key: `tn:${TN}:tit:1`, entry: mine }])
     const first = await importLanguagePack({ bytes, target: kept.target })
@@ -167,7 +221,7 @@ describe('abrir un paquete de idioma en otro aparato', () => {
 
   it('se puede abrir solo una parte: la fuente sin lo construido', async () => {
     const { source } = store()
-    const { bytes } = await buildLanguagePack({ source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
     const there = emptyTarget()
     const result = await importLanguagePack({ bytes, target: there.target, layers: [] })
     expect(result.byLayer).toEqual({ sot: 3, receipt: 1 })

@@ -32,15 +32,30 @@ import { buildLanguagePack, importLanguagePack, packSourceFrom, packTargetFrom, 
 
 const stores = { cache: new IndexedDBCacheAdapter({ dbName: 'tc-study-cache' }), catalog: new IndexedDBCatalogAdapter({ /* … */ }) }
 
-const { bytes, manifest, skipped } = await buildLanguagePack({ source: packSourceFrom(stores), language: 'es-419', createdBy: 'Ana' })
+const versions = { sot: { usjProcessing: USJ_PROCESSING_VERSION }, quote: { helpsQuote: HELPS_QUOTE_VERSION }, align: { helpsAlign: HELPS_ALIGN_VERSION } }
+const { bytes, manifest, skipped } = await buildLanguagePack({ source: packSourceFrom(stores), language: 'es-419', versions, createdBy: 'Ana' })
 // save `bytes` as es-419.langpack.zip
 
 const about = await readPackManifest(bytes) // show what it brings before importing
-const result = await importLanguagePack({ bytes, target: packTargetFrom(stores) })
+const result = await importLanguagePack({ bytes, target: packTargetFrom(stores), versions })
 ```
 
-Importing does not overwrite rows the device already has unless `overwrite: true`. Receipts are written last for
+Each resource comes whole or not at all. When the device has the same release, the pack fills the gaps; when it has another release, the resource is left as it is unless `overwrite: true`, and then it is replaced whole. Receipts are written last for
 each resource, so a pack cut short never marks an incomplete resource as complete.
+
+## What a pack is not yet enough for
+
+- **tc-study's Read page still needs the network to open a language**: it clears its panels and then searches the
+  Door43 catalog; offline, nothing fills them from the local catalog. A pack gives the device every row; the app has
+  to learn to start from them.
+- **A pack only carries what the store has, complete.** The Read page downloads in the background only the two panel
+  languages, one original (the current book's testament), OBS helps after an OBS visit, and builds prepared views,
+  quotes and aligned quotes mostly for the books visited. Resources opened only chapter by chapter have no receipt.
+  To make a full pack, the app first has to download and build everything for the language.
+- OBS images are remote URLs and are not in the pack; neither is the app shell (tc-study has no service worker).
+
+Pass the app's processing versions (`versions`) when making and opening a pack: an app with another source version
+refuses it (it would throw the rows away), and one with other derived versions skips those layers and rebuilds them.
 
 ## Tests
 
