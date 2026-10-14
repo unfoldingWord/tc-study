@@ -116,7 +116,7 @@ export function hydrateReadCatalogHits(
     const appliesToScope =
       scopeForType === 'scripture' || scopeForType === 'obs' ? scopeForType : ('shared' as const)
     const abbreviation = asString(item.abbreviation).trim() || undefined
-    const catalogIngredients = (item.ingredients ?? item.repo?.ingredients) as
+    const catalogIngredients = item.ingredients as
       | ResourceInfo['ingredients']
       | undefined
     const contentStructure: 'book' | 'entry' =

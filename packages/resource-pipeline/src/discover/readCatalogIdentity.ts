@@ -46,8 +46,51 @@ export function ownerField(value: unknown): string | undefined {
   return undefined
 }
 
+/**
+ * What the release's manifest says. `repo` carries the same fields as the default branch has them now, which can
+ * list books the release does not contain, so they are never taken from `repo`, even when the hit lacks them.
+ */
+const RELEASE_SCOPED_FIELDS = new Set([
+  'ingredients',
+  'books',
+  'relations',
+  'checking_level',
+  'title',
+  'subject',
+  'abbreviation',
+  'identifier',
+  'language',
+  'language_code',
+  'language_title',
+  'language_direction',
+  'language_is_gl',
+  'content_format',
+  'format',
+  'flavor',
+  'flavor_type',
+  'metadata_type',
+  'metadata_version',
+  'metadata_url',
+  'release',
+])
+
+/**
+ * A catalog search hit describes one release; its `repo` describes the repository on its default branch. The hit
+ * wins for every field it carries, and `repo` only fills in the repository's own fields the hit lacks (description,
+ * html_url, catalog, ...).
+ */
+export function catalogHitItem(entry: CatalogEntry): CatalogEntry {
+  const repo = entry.repo
+  if (!repo) return entry
+  const item: CatalogEntry = { ...entry }
+  for (const [key, value] of Object.entries(repo)) {
+    if (item[key] == null && !RELEASE_SCOPED_FIELDS.has(key)) item[key] = value
+  }
+  return item
+}
+
 export function catalogIdentity(entry: CatalogEntry, languageCode: string) {
-  const item: CatalogEntry = entry.repo ? { ...entry, ...entry.repo } : entry
+  const item = catalogHitItem(entry)
   const repoName = asString(item.name) || asString(item.repo_name)
   if (!repoName) return null
 

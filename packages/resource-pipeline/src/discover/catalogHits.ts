@@ -34,7 +34,7 @@ export function door43ResourceForHit(
     content_format: item.content_format ?? item.format,
     metadata_url: item.metadata_url ?? entry.metadata_url,
     description: item.description ?? item.repo?.description,
-    ingredients: item.ingredients ?? item.repo?.ingredients,
+    ingredients: item.ingredients,
     release,
     server: 'git.door43.org',
     html_url: item.html_url ?? entry.html_url ?? release?.html_url,
