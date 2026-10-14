@@ -6,7 +6,7 @@ const src = (rel: string) => readFileSync(join(import.meta.dir, rel), 'utf8')
 
 describe('SoT architecture wiring', () => {
   test('warm jobs stay local-only — no DCS fetch', () => {
-    const jobs = src('../warm/warmJobs.ts')
+    const jobs = src('../../../../../packages/resource-pipeline/src/warm/warmJobs.ts')
     expect(jobs).toContain('getLocalSoT')
     expect(jobs).not.toContain('allowDcs: true')
     expect(jobs).not.toContain('fetchDcs')
