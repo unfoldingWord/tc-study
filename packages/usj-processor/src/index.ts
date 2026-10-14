@@ -39,6 +39,7 @@ export {
 } from './viewModelFromProcessed'
 export { collectUsjWords, parseVerseSid, extractText, extractDeepText } from './usjWalk'
 export {
+  alignmentGroupSignature,
   harvestPreVerseAlignments,
   mergePreVerseAlignments,
 } from './preVerseAlignments'

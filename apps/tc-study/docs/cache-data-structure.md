@@ -88,7 +88,7 @@ flowchart TB
 Resource keys are `{owner}/{language}/{id}`. Stamps come from catalog metadata (`release.tag_name` + `published_at`, else `version`, else `nostamp`). Separators `:` `|` `@` in stamp parts become `_`.
 
 - **OL stamp** (quote/align): `{resourceContentStamp}+{USJ_PROCESSING_VERSION}` → e.g. `v1+2.2.0-usj`.
-- **Target-scripture stamp** (align): `{resourceContentStamp}+{SCRIPTURE_PREPARE_VERSION}` → e.g. `v1+3000220` (schema `3` + USJ digits `220`).
+- **Target-scripture stamp** (align): `{resourceContentStamp}+{SCRIPTURE_PREPARE_VERSION}` → e.g. `v1+4000220` (schema `4` + USJ digits `220`).
 
 Prepared / quote / align / coverage use envelope `{ content, timestamp, version }`. Quote and align also set `expiresAt`. A version mismatch is a miss.
 
@@ -195,7 +195,7 @@ helps-align:{helps}@{hs}:{ol}@{os}:{target}@{ts}:{book}:{ch}
 ```
 
 ```
-helps-align:unfoldingWord/en/tn@v45:unfoldingWord/el-x-koine/ugnt@v1+2.2.0-usj:unfoldingWord/en/ult@v1+3000220:tit:1
+helps-align:unfoldingWord/en/tn@v45:unfoldingWord/el-x-koine/ugnt@v1+2.2.0-usj:unfoldingWord/en/ult@v1+4000220:tit:1
 ```
 
 Value: `Record<linkId, { p: number[]; m: 0|1|2; t?: string[] }>`. `m`: 0 miss, 1 semantic/zaln, 2 quote-text fallback. `p` = word positions in prepared **full**. `t` = display texts so chips paint on refresh before tokens. TTL **30 days**. One row **per target** scripture.
@@ -220,12 +220,12 @@ Value: `{ stamp, unitCount, updatedAt }`. Lane 3 uses this to skip a finished re
 | --- | --- | --- |
 | `USJ_PROCESSING_VERSION` / `USJ_TOOL_VERSIONS` | `2.2.0-usj` / parser+usjCore `0.1.1` | `scripture-usj:` chapter SoT; scripture `ingestSchema` (`usj:2.2.0-usj`) |
 | `HELPS_INGEST_SCHEMA` | `1` → receipt `helps:1` | Helps / article / OBS receipts |
-| `SCRIPTURE_PREPARE_SCHEMA` | `3` | Light/full/nav **shape**. Combined version = `schema * 1_000_000 + USJ digits` → **`3000220`** |
+| `SCRIPTURE_PREPARE_SCHEMA` | `4` | Light/full/nav **shape**. Combined version = `schema * 1_000_000 + USJ digits` → **`4000220`** |
 | `NOTES_PREPARE_VERSION` | `4` | `prepared:notes:` |
 | `WORDS_LINKS_PREPARE_VERSION` | `1` | `prepared:words-links:` |
 | `QUESTIONS_PREPARE_VERSION` / `OBS_PREPARE_VERSION` / `OBS_NOTES_PREPARE_VERSION` | `1` | Matching `prepared:` rows |
 | `HELPS_QUOTE_VERSION` | `5` | Quote rows (verse stamps on tokens) |
-| `HELPS_ALIGN_VERSION` | `6` | Align rows (keeps quote verse stamps; `t[]` chips) |
+| `HELPS_ALIGN_VERSION` | `7` | Align rows (keeps quote verse stamps; `t[]` chips) |
 | `HELPS_TEXT_VERSION` | `1` | Title / preview strings |
 | `WARM_COVERAGE_VERSION` | `1` | Coverage map envelope |
 | Quote / align TTL | **30 days** (`expiresAt`) | Abandoned book/chapter combos; stamps still handle correctness |
@@ -289,12 +289,12 @@ Book index at `scripture-usj:…:tit` is `{ book, bookCode, metadata, chapterNum
 ### Prepared scripture full
 
 Key: `prepared:scripture:unfoldingWord/en/ult:tit:1:full`  
-Envelope version = `SCRIPTURE_PREPARE_VERSION` (`3000220`).
+Envelope version = `SCRIPTURE_PREPARE_VERSION` (`4000220`).
 
 ```json
 {
   "content": {
-    "version": 3000220,
+    "version": 4000220,
     "unit": 1,
     "matchKeys": ["tit 1:1|paul|1"],
     "blocks": [{
@@ -310,7 +310,7 @@ Envelope version = `SCRIPTURE_PREPARE_VERSION` (`3000220`).
     }]
   },
   "timestamp": 1774300000000,
-  "version": 3000220
+  "version": 4000220
 }
 ```
 
@@ -336,7 +336,7 @@ Key: `helps-quote:unfoldingWord/en/tn@v45:unfoldingWord/el-x-koine/ugnt@v1+2.2.0
 
 ### Align row (v6)
 
-Key: `helps-align:…ugnt@v1+2.2.0-usj:unfoldingWord/en/ult@v1+3000220:tit:1`
+Key: `helps-align:…ugnt@v1+2.2.0-usj:unfoldingWord/en/ult@v1+4000220:tit:1`
 
 ```json
 {

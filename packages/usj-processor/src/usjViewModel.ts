@@ -12,6 +12,7 @@ import {
   remapVerseRefBookCode,
   semanticIdFor,
 } from './identity'
+import { alignmentGroupSignature } from './preVerseAlignments'
 import type { CachedUsjDocument } from './usjCacheTypes'
 import { collectUsjWords, parseVerseSid } from './usjWalk'
 import { USJ_PROCESSING_VERSION, USJ_TOOL_VERSIONS, type UsjToolVersions } from './versions'
@@ -97,7 +98,7 @@ function groupsForVerse(
     const groups = alignmentMap[key]
     if (!groups?.length) continue
     for (const g of groups) {
-      const sig = (g.targets ?? []).map((t) => String(t.word ?? '').toLowerCase()).join('\0')
+      const sig = alignmentGroupSignature(g)
       if (seenGroupSigs.has(sig)) continue
       seenGroupSigs.add(sig)
       out.push(g)
