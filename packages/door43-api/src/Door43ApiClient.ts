@@ -1247,35 +1247,40 @@ export class Door43ApiClient {
       throw this.createError('Missing required parameters for fetchRepoTreePaths', 'INVALID_PARAM');
     }
 
-    const url = `${this.config.baseUrl}/api/v1/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1&per_page=99999`;
+    const baseUrl = `${this.config.baseUrl}/api/v1/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1&per_page=99999`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await fetch(url, {
-        headers: this.config.headers,
-        signal: controller.signal,
-      });
+      const set = new Set<string>();
+      // Door43 cuts a large tree into pages (12 000 entries) and says `truncated: true` until the last one. es-419_tq
+      // keeps its books after an `_old/` folder of 11 000 files: reading only page 1 made every book look absent.
+      for (let page = 1; page <= 50; page++) {
+        const response = await fetch(`${baseUrl}&page=${page}`, {
+          headers: this.config.headers,
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw this.createError(
+            `Failed to fetch repo tree: ${response.status} ${response.statusText}`,
+            'HTTP_ERROR',
+            response.status
+          );
+        }
+
+        const data = await response.json() as { tree?: Array<{ path: string; type: string }>; truncated?: boolean };
+        for (const entry of (data.tree ?? [])) {
+          if (entry.type === 'blob') {
+            // Normalize: strip leading "./"
+            set.add(entry.path.replace(/^\.\//, ''));
+          }
+        }
+        if (!data.truncated || !data.tree?.length) break;
+      }
 
       clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw this.createError(
-          `Failed to fetch repo tree: ${response.status} ${response.statusText}`,
-          'HTTP_ERROR',
-          response.status
-        );
-      }
-
-      const data = await response.json() as { tree?: Array<{ path: string; type: string }> };
-      const set = new Set<string>();
-      for (const entry of (data.tree ?? [])) {
-        if (entry.type === 'blob') {
-          // Normalize: strip leading "./"
-          set.add(entry.path.replace(/^\.\//, ''));
-        }
-      }
       return set;
     } catch (error) {
       clearTimeout(timeoutId);

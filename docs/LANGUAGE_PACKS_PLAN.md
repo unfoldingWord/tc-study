@@ -74,12 +74,13 @@ Steps 1–5 do not depend on 6 or 7; step 7 is the most tangled with the UI (zus
   (`bun run build` in each: Bun reads their `dist`, the app reads their `src`). `cli/open-pack.ts` opens a pack into
   empty stores and checks every layer of every resource arrived.
 - First real run, es-419 (2026-10-14): 19 resources found and downloaded (17 of the language, among them OBS from BSA
-  and growing-church and a second TW from es-419_obt; UGNT and UHB), 18 151 jobs planned, 4 015 built, the rest blocked because es-419 has those books
-  in none of its resources; 2 344 article titles. The pack is 26.7 MB and took 7.5 minutes; opening it into empty
-  stores takes 15 s and every row arrives. `es-419_gl/es-419/tq` comes with its receipt and no rows: its catalog row
-  lists five books from master that release v38 does not have, so the loader skips the zip (the `repo` ingredients
-  issue below). In a first run the two OBS downloads finished without a verified receipt and were left out of the pack;
-  the second run verified them.
+  and growing-church and a second TW from es-419_obt; UGNT and UHB), 18 151 jobs planned, 4 015 built, the rest
+  blocked because es-419 has those books in none of its resources; 2 344 article titles. The pack is 26.7 MB and took
+  7.5 minutes; opening it into empty stores takes 15 s and every row arrives. In a first run the two OBS downloads
+  finished without a verified receipt and were left out of the pack; the second run verified them.
+- `es-419_gl/es-419/tq` came with its receipt and no rows, in tc-study too: its v38 tree has an `_old/` folder of
+  11 000 files, Door43 returns a tree 12 000 entries per page (`truncated: true`), and `fetchRepoTreePaths` read only
+  page 1, so all its books looked absent from the release and the loader skipped the zip. It now reads every page.
 
 Not done: the clock and logger seams; thin worker shells (left on purpose: the workers keep importing the same code
 through the app's re-exports); TW previews (`tw-preview` rows) in the title pass.
