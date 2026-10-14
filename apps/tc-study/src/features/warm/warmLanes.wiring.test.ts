@@ -41,7 +41,15 @@ describe('warm lane wiring', () => {
   })
 
   test('useWarmLanes stamps both UGNT and UHB for whole-Bible fill', () => {
-    const src = readFileSync(join(import.meta.dir, 'useWarmLanes.ts'), 'utf8')
+    // The stamp bags are built by resource-pipeline's resolveWarmStamps, which the hook calls.
+    const hook = readFileSync(join(import.meta.dir, 'useWarmLanes.ts'), 'utf8')
+    expect(hook).toContain('resolveWarmStamps')
+    const src =
+      hook +
+      readFileSync(
+        join(import.meta.dir, '../../../../../packages/resource-pipeline/src/warm/warmStamps.ts'),
+        'utf8'
+      )
     expect(src).toContain('UGNT_RESOURCE_KEY')
     expect(src).toContain('UHB_RESOURCE_KEY')
     expect(src).toContain('olStampByKey')

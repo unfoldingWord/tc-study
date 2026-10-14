@@ -11,26 +11,16 @@ import {
 } from '../../contexts'
 import { isOriginalLanguageDownloadTarget } from '../download/downloadBatchOrder'
 import { backgroundDownloadSession } from '../download/backgroundDownloadSession'
-import { olContentStamp } from '../helps/helpsQuoteCache'
 import { resolveOriginalLanguageKey } from '../helps/olLoadCache'
-import { UGNT_RESOURCE_KEY, UHB_RESOURCE_KEY } from '../read/originalLanguageForBook'
-import { resourceContentStamp } from '../helps/resourceContentStamp'
-import { targetContentStamp } from '../helps/helpsAlignCache'
 import { resolveLastChapter } from '../nav/bookChapterCounts'
+import { resolveWarmStamps } from '@bt-synergy/resource-pipeline/warm/warmStamps'
 import { useChapterScrollActivity } from '../nav/usePinnedHelpsReference'
 import {
   warmScheduler,
   type WarmContextOwner,
   type VisibleWarmResource,
 } from './warmScheduler'
-import { classifyWarmResource, languageFromKey } from './warmResourceClass'
-
-type StampMeta = {
-  version?: string
-  language?: string
-  release?: { tag_name?: string; published_at?: string }
-  contentMetadata?: { ingredients?: Array<{ identifier?: string }> }
-}
+import { languageFromKey } from './warmResourceClass'
 
 export function useWarmLanes(args: {
   visibleResources: VisibleWarmResource[]
@@ -109,11 +99,6 @@ export function useWarmLanes(args: {
     if (!bookId) return
 
     void (async () => {
-      const helpsStampByKey: Record<string, string> = {}
-      const targetStampByKey: Record<string, string> = {}
-      const textLanguageByTarget: Record<string, string> = {}
-      const articleIdsByKey: Record<string, string[]> = {}
-
       let downloadedKeys = downloadedKeysArg ?? []
       if (!downloadedKeysArg && catalogManager && !backgroundDownloadSession.isBusy()) {
         try {
@@ -134,62 +119,23 @@ export function useWarmLanes(args: {
         ...downloadedKeys.filter((k) => !langs.size || langs.has(languageFromKey(k))),
       ])
 
-      if (catalogManager) {
-        await Promise.all(
-          [...stampKeys].map(async (key) => {
-            try {
-              const meta = (await catalogManager.getResourceMetadata(key)) as StampMeta | null
-              const classified = classifyWarmResource(key)
-              const visible = visibleResources.find((r) => r.resourceKey === key)
-              if (visible?.role === 'helps' || classified.stampBag === 'helps') {
-                helpsStampByKey[key] = resourceContentStamp(meta)
-              }
-              if (
-                visible?.role === 'scripture' ||
-                key === sourceResourceId ||
-                classified.stampBag === 'target'
-              ) {
-                targetStampByKey[key] = targetContentStamp(meta)
-                if (meta?.language) textLanguageByTarget[key] = meta.language
-              }
-              if (classified.isArticle) {
-                const ids = (meta?.contentMetadata?.ingredients ?? [])
-                  .map((ing) => ing.identifier)
-                  .filter((id): id is string => Boolean(id))
-                if (ids.length) articleIdsByKey[key] = ids
-              }
-            } catch {
-              /* ignore */
-            }
+      const bags = catalogManager
+        ? await resolveWarmStamps({
+            catalog: catalogManager,
+            stampKeys,
+            visibleResources,
+            sourceResourceId,
           })
-        )
-      }
-
-      const olStampByKey: Record<string, string> = {}
-      if (catalogManager) {
-        await Promise.all(
-          [UGNT_RESOURCE_KEY, UHB_RESOURCE_KEY].map(async (olKey) => {
-            try {
-              const olMeta = (await catalogManager.getResourceMetadata(olKey)) as
-                | { version?: string; release?: { tag_name?: string; published_at?: string } }
-                | null
-              olStampByKey[olKey] = olContentStamp(olMeta)
-            } catch {
-              olStampByKey[olKey] = 'nostamp'
-            }
-          })
-        )
-      }
+        : {
+            helpsStampByKey: {},
+            targetStampByKey: {},
+            textLanguageByTarget: {},
+            articleIdsByKey: {},
+            olStampByKey: {},
+          }
 
       if (cancelled) return
-      stampsRef.current = {
-        helpsStampByKey,
-        targetStampByKey,
-        textLanguageByTarget,
-        articleIdsByKey,
-        olStampByKey,
-        downloadedKeys,
-      }
+      stampsRef.current = { ...bags, downloadedKeys }
       setStampsTick((n) => n + 1)
     })()
 
