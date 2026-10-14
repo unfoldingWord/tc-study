@@ -58,13 +58,33 @@ still builds the four workers.
 
 Steps 1–5 do not depend on 6 or 7; step 7 is the most tangled with the UI (zustand stores, panel sync) and goes last.
 
-**Where it stands (2026-10-14):** steps 1–5 are done on `feat/language-pack`, in `packages/resource-pipeline`. Not done
-from them: the clock seams (`wrapVersioned`, `expiresAt` still read `Date.now()`), the logger seam, and turning
-`warm.worker` / `prepare.worker` into thin shells (they still import the same code through the app's re-exports, which
-keeps them as they are). `resolveOriginalLanguageKey` moved alone (`scripture/originalLanguage`); `olLoadCache` stays in
-the app as lane 1's loader. After each step: the same tc-study tests fail as before (20 now: one passes since step 2),
-type errors went from 44 to 35 with none new, and the four worker bundles are the same code (byte-identical through
-step 4; in step 5 only module order and minified names changed).
+**Where it stands (2026-10-14):** steps 1–8 are done on `feat/language-pack`, in `packages/resource-pipeline`.
+
+- Step 6: the download pipeline moved; the body of `runBackgroundDownloadOnThisThread` became `runDownload`, which takes
+  the stores and the Door43 client from its caller. The package compiles class fields as the app does
+  (`useDefineForClassFields`); without it the download worker's classes changed shape.
+- Step 7: `discoverLanguage`, `createHeadlessResourceTypeRegistry` (tc-study's resource types without viewers: the app
+  spreads the data half and adds the viewer), and the Read page's hydrate now calls the shared `door43ResourceForHit` and
+  `ensureOriginalLanguageInCatalog`.
+- Step 8: `buildLanguageArtifacts` (every lane-3 job with no budget, coverage marked as the scheduler marks it, then
+  TA/TW titles, and a report) and `prepareLanguage` (discover, download, build, for the language and UGNT/UHB). The
+  warm stamp bags moved out of `useWarmLanes` into `resolveWarmStamps`, which both use.
+- `cli/prepare-language.ts` runs it all in Bun over tc-study's IndexedDB adapters on fake-indexeddb and writes
+  `{lang}.langpack.zip` and a report. It needs `language-pack`, `cache-adapter-indexeddb` and `catalog-manager` built
+  (`bun run build` in each: Bun reads their `dist`, the app reads their `src`).
+
+Not done: the clock and logger seams; thin worker shells (left on purpose: the workers keep importing the same code
+through the app's re-exports); TW previews (`tw-preview` rows) in the title pass; the per-book and original-only packs
+(`requires` in the manifest); compression level 9 (language-pack uses 6).
+
+How every step was checked against the state before it: the same tc-study unit tests fail (20; one of the 21 passes
+since step 2), type errors went from 44 to 35 with none new, the four worker bundles are byte-identical (step 5: only
+module order and minified names changed), and for steps 7 and 8, which touch the Read page, the browser from an empty
+store: the same 14 catalog rows for es-419, and the same warm stamp timeline.
+
+Found on the way, already in tc-study before this work: the warm stamps are resolved before the Read hydrate writes the
+catalog rows, so lanes 2/3 build rows under `nostamp` keys until the first download finishes; and the Read hydrate
+takes a hit's ingredients from `repo` (master) over the release's (es-419 TN v66 lists Esther, which v66 does not have).
 
 ## 4. Compatibility: what must match
 

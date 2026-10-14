@@ -12,6 +12,8 @@ import { resolveTaTitle, resolveTwTitle, twTitleEntry } from '../helps/articleTi
 import type { HelpsTextKind } from '../helps/helpsCacheKeys'
 import { writeHelpsText, type HelpsTextCacheAdapter } from '../helps/helpsTextStore'
 import { getCachedTocTitleIndex, type TocIngredient } from '../helps/tocTitleIndex'
+// Every preparer registers itself on import, as the warm and prepare workers do.
+import '../prepare/registerPreparers'
 import { resolveOriginalLanguageKey } from '../scripture/originalLanguage'
 import { UGNT_RESOURCE_KEY, UHB_RESOURCE_KEY } from '../scripture/originalLanguageSpecs'
 import { collectLane3Groups, type WarmPlanStamps } from '../warm/warmAdmitPlan'
