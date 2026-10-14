@@ -10,7 +10,7 @@
  * - text      `helps-text:{kind}:{key}@…`
  */
 
-import type { PackLayer } from './types'
+import type { PackLayer, PackRequirement } from './types'
 
 const SOT_PREFIXES = ['scripture-usj:', 'tn:', 'twl:', 'tq:', 'obs:'] as const
 
@@ -38,6 +38,60 @@ export function belongsTo(key: string, resourceKey: string, scan: { prefix: stri
   if (scan.layer === 'prepared') return key.split(':')[2] === resourceKey
   if (scan.layer === 'text') return (key.split(':')[2] ?? '').startsWith(`${resourceKey}@`)
   return key.startsWith(scan.prefix)
+}
+
+/** Resource types whose rows are kept book by book; everything else (TA, TW, OBS…) is not about one book. */
+const BOOK_SCOPED_TYPES = new Set(['scripture', 'notes', 'questions', 'words-links'])
+/**
+ * The Door43 subjects of those types, as tc-study's resource types list them. tc-study's catalog rows say
+ * `type: 'unknown'` for some of them (word links, for one), so the subject decides as well.
+ */
+const BOOK_SCOPED_SUBJECTS = new Set([
+  'Bible',
+  'Aligned Bible',
+  'Greek New Testament',
+  'Hebrew Old Testament',
+  'TSV Translation Notes',
+  'TSV Translation Questions',
+  'TSV Translation Words Links',
+])
+
+/** Whether a resource's rows are kept book by book, from its catalog row. */
+export function isBookScoped(metadata: { type?: unknown; subject?: unknown }): boolean {
+  return BOOK_SCOPED_TYPES.has(String(metadata.type ?? '')) || BOOK_SCOPED_SUBJECTS.has(String(metadata.subject ?? ''))
+}
+
+/**
+ * The book a row of `resourceKey` is about, lowercase, or null for rows that are not about one book (receipts,
+ * articles, titles). Source rows carry it right after the resource key (`tn:{key}:{book}…`), prepared rows in their
+ * fourth part (`prepared:{type}:{key}:{book}:…`), quotes and aligned quotes before the chapter (`…:{book}:{chapter}`).
+ */
+export function bookOfRow(key: string, layer: PackLayer, resourceKey: string): string | null {
+  if (layer === 'sot') {
+    for (const prefix of SOT_PREFIXES) {
+      const head = `${prefix}${resourceKey}:`
+      if (key.startsWith(head)) return key.slice(head.length).split(':')[0].toLowerCase() || null
+    }
+    return null
+  }
+  if (layer === 'prepared') return key.split(':')[3]?.toLowerCase() || null
+  if (layer === 'quote' || layer === 'align') {
+    const parts = key.split(':')
+    return parts.length >= 2 ? parts[parts.length - 2].toLowerCase() : null
+  }
+  return null
+}
+
+/**
+ * The original-language release a quote or aligned-quote row was built against. Their keys name it third:
+ * `helps-quote:{helps}@{stamp}:{original}@{stamp}+{usj}:…` (stamps never hold `:`).
+ */
+export function originalOfDerivedRow(key: string): PackRequirement | null {
+  const part = key.split(':')[2]
+  if (!part) return null
+  const at = part.indexOf('@')
+  if (at <= 0) return null
+  return { key: part.slice(0, at), stamp: part.slice(at + 1).split('+')[0] }
 }
 
 /** NT and OT original languages, whose scripture the quotes of notes and word links are built against (§6). */

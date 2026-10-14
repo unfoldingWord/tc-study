@@ -18,7 +18,7 @@ import {
   resourceContentStamp,
   type ResourceMetadata,
 } from '@bt-synergy/resource-catalog'
-import { ORIGINAL_LANGUAGE_KEYS, belongsTo, fileSafe, scansFor } from './keys'
+import { ORIGINAL_LANGUAGE_KEYS, belongsTo, bookOfRow, fileSafe, isBookScoped, originalOfDerivedRow, scansFor } from './keys'
 import {
   ALL_LAYERS,
   PACK_FORMAT,
@@ -26,8 +26,10 @@ import {
   REQUIRED_LAYERS,
   type CacheRow,
   type PackLayer,
+  type PackKind,
   type PackManifest,
   type PackManifestResource,
+  type PackRequirement,
   type PackResourceRole,
   type PackSource,
   type PackTarget,
@@ -59,8 +61,17 @@ export type BuildPackParams = {
   language: string
   /** The resources to pack; by default every resource of `language` the catalog has, with a receipt in the store. */
   resourceKeys?: string[]
-  /** Original-language scriptures to add (by default UGNT and UHB, when the store has them). `[]` adds none. */
+  /**
+   * Original-language scriptures to add. By default none, except in an `originals` pack, which takes UGNT and UHB
+   * when the store has them: they go apart because they are the same for every language.
+   */
   originalKeys?: string[]
+  /** What the pack holds (see `PackKind`). Default `language`. */
+  kind?: PackKind
+  /** `book` packs: the books to bring (any case). */
+  books?: string[]
+  /** DEFLATE level, 1–9. Default 9: a pack is made once and copied many times. */
+  compressionLevel?: number
   /** Which layers to carry; the receipts and the source of truth always go. */
   layers?: readonly PackLayer[]
   createdBy?: string
@@ -88,11 +99,15 @@ function completeReceipt(receipt: CacheRow | undefined, metadata: ResourceMetada
  */
 export async function buildLanguagePack(params: BuildPackParams): Promise<{ bytes: Uint8Array; manifest: PackManifest; skipped: Array<{ key: string; why: string }> }> {
   const { source, language } = params
+  const kind: PackKind = params.kind ?? 'language'
+  const books = kind === 'book' ? new Set((params.books ?? []).map((b) => b.toLowerCase())) : null
+  if (books && books.size === 0) throw new Error('Un paquete de libro necesita al menos un libro.')
   const layers = [...new Set([...REQUIRED_LAYERS, ...(params.layers ?? ALL_LAYERS)])]
-  const catalog = params.resourceKeys ? null : await source.catalogRows()
+  const catalog = params.resourceKeys || kind === 'originals' ? null : await source.catalogRows()
+  const languageKeys = kind === 'originals' ? [] : (params.resourceKeys ?? catalog!.filter((m) => m.language === language).map(keyOf))
   const wanted: Array<{ key: string; role: PackResourceRole }> = [
-    ...(params.resourceKeys ?? catalog!.filter((m) => m.language === language).map(keyOf)).map((key) => ({ key, role: 'language' as const })),
-    ...(params.originalKeys ?? ORIGINAL_LANGUAGE_KEYS).map((key) => ({ key, role: 'original' as const })),
+    ...languageKeys.map((key) => ({ key, role: 'language' as const })),
+    ...(params.originalKeys ?? (kind === 'originals' ? ORIGINAL_LANGUAGE_KEYS : [])).map((key) => ({ key, role: 'original' as const })),
   ]
 
   const zip = new JSZip()
@@ -100,6 +115,7 @@ export async function buildLanguagePack(params: BuildPackParams): Promise<{ byte
   const catalogOut: Array<{ key: string; metadata: ResourceMetadata }> = []
   const skipped: Array<{ key: string; why: string }> = []
   const packed = new Set<string>()
+  const requires = new Map<string, PackRequirement>()
 
   for (const { key, role } of wanted) {
     if (packed.has(key)) continue
@@ -108,6 +124,9 @@ export async function buildLanguagePack(params: BuildPackParams): Promise<{ byte
       if (role === 'language') skipped.push({ key, why: 'no está en el catálogo' })
       continue
     }
+    // Originals in an `originals` pack always go whole; a book pack carries only the book-scoped resources.
+    const bookScoped = role === 'language' && isBookScoped(metadata as { type?: unknown; subject?: unknown })
+    if (kind === 'book' && !bookScoped) continue
     const byLayer = await rowsOfResource(source, key, layers)
     if (!completeReceipt(byLayer.get('receipt')?.[0], metadata, params.versions)) {
       // An original language the store never had is not news; a resource of the language that is half there is.
@@ -116,20 +135,57 @@ export async function buildLanguagePack(params: BuildPackParams): Promise<{ byte
       }
       continue
     }
+    const storeBooks = bookScoped
+      ? [...new Set((byLayer.get('sot') ?? []).map((row) => bookOfRow(row.key, 'sot', key)).filter((b): b is string => Boolean(b)))].sort()
+      : undefined
+
+    // What of the resource goes in this pack.
+    let carried = byLayer
+    if (kind === 'book') {
+      carried = new Map()
+      for (const [layer, list] of byLayer) {
+        if (layer === 'receipt' || layer === 'text') continue
+        const kept = list.filter((row) => books!.has(bookOfRow(row.key, layer, key) ?? ''))
+        if (kept.length) carried.set(layer, kept)
+      }
+      if (!carried.get('sot')?.length) {
+        skipped.push({ key, why: `no tiene ${[...books!].join(', ')}` })
+        continue
+      }
+    } else if (kind === 'base' && bookScoped) {
+      carried = new Map()
+    }
+
     packed.add(key)
     catalogOut.push({ key, metadata })
     const rows: Partial<Record<PackLayer, number>> = {}
-    for (const [layer, list] of byLayer) {
+    for (const [layer, list] of carried) {
       rows[layer] = list.length
       zip.file(`rows/${layer}/${fileSafe(key)}.jsonl`, list.map((row) => JSON.stringify(row)).join('\n') + '\n')
+      if (layer !== 'quote' && layer !== 'align') continue
+      for (const row of list) {
+        const original = originalOfDerivedRow(row.key)
+        if (original) requires.set(`${original.key}@${original.stamp}`, original)
+      }
     }
-    resources.push({ key, role, stamp: resourceContentStamp(metadata), subject: metadata.subject, title: metadata.title, rows })
+    resources.push({
+      key,
+      role,
+      stamp: resourceContentStamp(metadata),
+      subject: metadata.subject,
+      title: metadata.title,
+      rows,
+      ...(storeBooks ? { books: storeBooks } : {}),
+    })
   }
 
   const manifest: PackManifest = {
     format: PACK_FORMAT,
     formatVersion: PACK_FORMAT_VERSION,
     language,
+    kind,
+    ...(books ? { books: [...books].sort() } : {}),
+    ...(requires.size ? { requires: [...requires.values()].sort((a, b) => a.key.localeCompare(b.key)) } : {}),
     createdAt: (params.now ?? new Date()).toISOString(),
     ...(params.createdBy ? { createdBy: params.createdBy } : {}),
     ...(params.app ? { app: params.app } : {}),
@@ -139,7 +195,11 @@ export async function buildLanguagePack(params: BuildPackParams): Promise<{ byte
   }
   zip.file('manifest.json', JSON.stringify(manifest, null, 2))
   zip.file('catalog.json', JSON.stringify(catalogOut))
-  const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+  const bytes = await zip.generateAsync({
+    type: 'uint8array',
+    compression: 'DEFLATE',
+    compressionOptions: { level: params.compressionLevel ?? 9 },
+  })
   return { bytes, manifest, skipped }
 }
 
@@ -174,8 +234,16 @@ export type ImportPackResult = {
   written: number
   keptExisting: number
   byLayer: Partial<Record<PackLayer, number>>
-  /** Layers left out because this app builds them with another version: they are rebuilt from the source. */
+  /**
+   * Layers left out: built with another processing version than this app's, or (quotes and aligned quotes) against
+   * another release of an original than the device has. They are rebuilt from the source.
+   */
   skippedLayers: PackLayer[]
+  /**
+   * The originals the pack's quotes need, and whether the device has them: `present` (same release), `in-pack`,
+   * `missing` (the rows are kept and will match once that originals pack is opened), or `other-release`.
+   */
+  originals: Array<PackRequirement & { status: 'present' | 'in-pack' | 'missing' | 'other-release' }>
   /** Resources the device already had in another release, left as they were (without `overwrite`). */
   skippedResources: Array<{ key: string; why: string }>
 }
@@ -208,12 +276,33 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
   const layers = new Set<PackLayer>([...REQUIRED_LAYERS, ...(params.layers ?? manifest.layers)])
   for (const layer of differ) layers.delete(layer)
   const batch = params.batch ?? 200
-  const result: ImportPackResult = { manifest, written: 0, keptExisting: 0, byLayer: {}, skippedLayers: differ, skippedResources: [] }
+  const result: ImportPackResult = { manifest, written: 0, keptExisting: 0, byLayer: {}, skippedLayers: [...differ], skippedResources: [], originals: [] }
+
+  const catalogFile = zip.file('catalog.json')
+  const catalog = catalogFile ? (JSON.parse(await catalogFile.async('string')) as Array<{ key: string; metadata: ResourceMetadata }>) : []
+
+  // Quotes and aligned quotes name the original release they were built against. With another release on the device
+  // they would never be read: leave them out. Without the original yet, keep them: they match once it arrives.
+  for (const required of manifest.requires ?? []) {
+    const inPack = catalog.find((row) => row.key === required.key)
+    const mine = inPack ? null : target.catalogRow ? await target.catalogRow(required.key) : null
+    const status = inPack && resourceContentStamp(inPack.metadata) === required.stamp
+      ? 'in-pack'
+      : !mine
+        ? 'missing'
+        : resourceContentStamp(mine) === required.stamp
+          ? 'present'
+          : 'other-release'
+    result.originals.push({ ...required, status })
+    if (status !== 'other-release') continue
+    for (const layer of ['quote', 'align'] as const) {
+      if (!layers.delete(layer)) continue
+      if (!result.skippedLayers.includes(layer)) result.skippedLayers.push(layer)
+    }
+  }
 
   // Each resource comes whole or not at all: its catalog row, its rows and its receipt belong to one release. When
   // the device has the same release, the pack fills the gaps; with another one, the pack replaces it only on request.
-  const catalogFile = zip.file('catalog.json')
-  const catalog = catalogFile ? (JSON.parse(await catalogFile.async('string')) as Array<{ key: string; metadata: ResourceMetadata }>) : []
   const replace = new Set<string>()
   const skip = new Set<string>()
   for (const row of catalog) {

@@ -82,8 +82,7 @@ Steps 1–5 do not depend on 6 or 7; step 7 is the most tangled with the UI (zus
   the second run verified them.
 
 Not done: the clock and logger seams; thin worker shells (left on purpose: the workers keep importing the same code
-through the app's re-exports); TW previews (`tw-preview` rows) in the title pass; the per-book and original-only packs
-(`requires` in the manifest); compression level 9 (language-pack uses 6).
+through the app's re-exports); TW previews (`tw-preview` rows) in the title pass.
 
 How every step was checked against the state before it: the same tc-study unit tests fail (20; one of the 21 passes
 since step 2), type errors went from 44 to 35 with none new, the four worker bundles are byte-identical (step 5: only
@@ -114,6 +113,13 @@ Physical layout too: databases `tc-study-cache` / `cache-entries` and `tc-study-
 book rows of `scripture-usj:`, `tn:`, `tq:` split into a manifest and chapter rows.
 
 ## 5. Splitting packs
+
+**Done (format 1.1, `@bt-synergy/language-pack`):** four kinds of pack, `language`, `originals`, `base` and `book`,
+with `requires` in the manifest, and DEFLATE level 9. A resource is book-scoped by its catalog type or, since tc-study
+stores some as `type: 'unknown'` (word links, OBS helps), by its Door43 subject. On opening, quotes and aligned quotes
+are left out only when the device has another release of the original; without it they come and match once the
+originals pack is opened. `cli/prepare-language.ts --books all` writes all of them; `cli/open-pack.ts` opens any
+sequence of them and checks every row.
 
 ### Originals apart
 

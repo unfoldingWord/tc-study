@@ -1,12 +1,17 @@
 /**
  * Prepare a language from the command line and save it as a language pack.
  *
- *   bun packages/resource-pipeline/cli/prepare-language.ts --lang es-419 --out ./packs [--no-originals]
+ *   bun packages/resource-pipeline/cli/prepare-language.ts --lang es-419 --out ./packs [--no-originals] [--books all|tit,rut]
  *
  * Runs tc-study's own pipeline (discover, download, build) into tc-study's own IndexedDB adapters, kept in memory by
  * fake-indexeddb, so the rows are byte for byte the ones the app writes; then packs them with
- * @bt-synergy/language-pack. Reads only the public Door43 catalog. Writes `{lang}.langpack.zip` and
- * `{lang}.report.json` in `--out`.
+ * @bt-synergy/language-pack. Reads only the public Door43 catalog. Writes in `--out`:
+ *
+ *   {lang}.langpack.zip            the whole language, without the originals (its manifest says which ones it needs)
+ *   originals.langpack.zip         UGNT and UHB, the same for every language (unless --no-originals)
+ *   {lang}-base.langpack.zip       with --books: catalog, TA, TW, OBS…
+ *   {lang}-{book}.langpack.zip     with --books: one per book (`all`: every book the language has)
+ *   {lang}.report.json             what was found, built, blocked and packed
  */
 
 import 'fake-indexeddb/auto'
@@ -29,11 +34,12 @@ function arg(name: string): string | undefined {
 
 const language = arg('lang')
 if (!language) {
-  console.error('Uso: prepare-language --lang <código> [--out <carpeta>] [--no-originals]')
+  console.error('Uso: prepare-language --lang <código> [--out <carpeta>] [--no-originals] [--books all|tit,rut]')
   process.exit(2)
 }
 const outDir = resolve(arg('out') ?? '.')
 const includeOriginals = !process.argv.includes('--no-originals')
+const booksArg = arg('books')
 
 const cacheAdapter = new IndexedDBCacheAdapter({ dbName: 'tc-study-cache', storeName: 'cache-entries', version: 1 })
 const catalogAdapter = new IndexedDBCatalogAdapter({ dbName: 'tc-study-catalog', storeName: 'catalog-entries', version: 1 })
@@ -74,9 +80,9 @@ const preparation = await prepareLanguage({
   onProgress: report,
 })
 
-console.log(`[${elapsed()}] Armando el paquete…`)
-const { bytes, manifest, skipped } = await buildLanguagePack({
-  source: packSourceFrom({ cache: cacheAdapter as never, catalog: catalogAdapter as never }),
+const source = packSourceFrom({ cache: cacheAdapter as never, catalog: catalogAdapter as never })
+const common = {
+  source,
   language,
   versions: {
     sot: { usjProcessing: USJ_PROCESSING_VERSION },
@@ -85,17 +91,32 @@ const { bytes, manifest, skipped } = await buildLanguagePack({
     text: { helpsText: HELPS_TEXT_VERSION },
   },
   app: { name: 'resource-pipeline cli' },
-})
+}
 
 mkdirSync(outDir, { recursive: true })
-const zipPath = join(outDir, `${language}.langpack.zip`)
-writeFileSync(zipPath, bytes)
-writeFileSync(
-  join(outDir, `${language}.report.json`),
-  JSON.stringify({ preparation, pack: { manifest, skipped, bytes: bytes.length } }, null, 2)
-)
+const packs: Array<{ file: string; kind: string; bytes: number; manifest: unknown; skipped: unknown[] }> = []
+async function writePack(file: string, params: Partial<Parameters<typeof buildLanguagePack>[0]>) {
+  const { bytes, manifest, skipped } = await buildLanguagePack({ ...common, ...params })
+  writeFileSync(join(outDir, file), bytes)
+  packs.push({ file, kind: manifest.kind ?? 'language', bytes: bytes.length, manifest, skipped })
+  console.log(`[${elapsed()}]   ${file}: ${(bytes.length / 1024 / 1024).toFixed(1)} MB, ${manifest.resources.length} recursos`)
+  if (skipped.length) console.log(`      fuera: ${skipped.map((s) => `${s.key} (${s.why})`).join(', ')}`)
+  return manifest
+}
 
-console.log(`[${elapsed()}] Listo: ${zipPath} (${(bytes.length / 1024 / 1024).toFixed(1)} MB)`)
+console.log(`[${elapsed()}] Armando los paquetes…`)
+const languageManifest = await writePack(`${language}.langpack.zip`, { kind: 'language' })
+if (includeOriginals) await writePack('originals.langpack.zip', { kind: 'originals' })
+if (booksArg) {
+  const base = await writePack(`${language}-base.langpack.zip`, { kind: 'base' })
+  const available = [...new Set(base.resources.flatMap((r) => r.books ?? []))].sort()
+  const books = booksArg === 'all' ? available : booksArg.split(',').map((b) => b.trim().toLowerCase()).filter(Boolean)
+  for (const book of books) await writePack(`${language}-${book}.langpack.zip`, { kind: 'book', books: [book] })
+}
+
+writeFileSync(join(outDir, `${language}.report.json`), JSON.stringify({ preparation, packs }, null, 2))
+
+console.log(`[${elapsed()}] Listo en ${outDir}`)
 for (const build of preparation.builds) {
   const j = build.jobs
   console.log(
@@ -103,4 +124,6 @@ for (const build of preparation.builds) {
       ` ${build.resources.filter((r) => r.complete).length}/${build.resources.length} recursos completos`
   )
 }
-if (skipped.length) console.log(`  fuera del paquete: ${skipped.map((s) => `${s.key} (${s.why})`).join(', ')}`)
+if (languageManifest.requires?.length) {
+  console.log(`  ${language} necesita: ${languageManifest.requires.map((r) => `${r.key}@${r.stamp}`).join(', ')}`)
+}

@@ -1,14 +1,17 @@
 /**
- * Open a language pack into empty tc-study stores and check that every row the manifest lists arrived.
+ * Open one or more language packs, in order, into empty tc-study stores and check that every row each manifest lists
+ * arrived.
  *
- *   bun packages/resource-pipeline/cli/open-pack.ts path/to/es-419.langpack.zip
+ *   bun packages/resource-pipeline/cli/open-pack.ts originals.langpack.zip es-419.langpack.zip
+ *   bun packages/resource-pipeline/cli/open-pack.ts es-419-base.langpack.zip es-419-tit.langpack.zip
  *
  * Uses tc-study's IndexedDB adapters on fake-indexeddb, as a device with nothing would. Exits with 1 when a resource
- * was skipped or a layer came back with fewer rows than the pack says it carries.
+ * was skipped, a layer came back with fewer rows than its pack says, or an original a pack needs is of another release.
  */
 
 import 'fake-indexeddb/auto'
 import { readFileSync } from 'node:fs'
+import { basename } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import {
@@ -24,9 +27,9 @@ import { HELPS_TEXT_VERSION } from '../src/helps/helpsCacheKeys'
 import { HELPS_ALIGN_VERSION } from '../src/helps/helpsAlignCache'
 import { HELPS_QUOTE_VERSION } from '../src/helps/helpsQuoteCache'
 
-const path = process.argv[2]
-if (!path) {
-  console.error('Uso: open-pack <paquete.langpack.zip>')
+const paths = process.argv.slice(2)
+if (paths.length === 0) {
+  console.error('Uso: open-pack <paquete.langpack.zip> [otro.langpack.zip …]')
   process.exit(2)
 }
 
@@ -38,38 +41,47 @@ const versions = {
 }
 const cache = new IndexedDBCacheAdapter({ dbName: 'tc-study-cache', storeName: 'cache-entries', version: 1 })
 const catalog = new IndexedDBCatalogAdapter({ dbName: 'tc-study-catalog', storeName: 'catalog-entries', version: 1 })
-
-const bytes = new Uint8Array(readFileSync(path))
-const manifest = await readPackManifest(bytes)
-const started = Date.now()
-const result = await importLanguagePack({
-  bytes,
-  target: packTargetFrom({ cache: cache as never, catalog: catalog as never }),
-  versions,
-})
-console.log(`Abierto en ${((Date.now() - started) / 1000).toFixed(1)} s: ${JSON.stringify(result).slice(0, 400)}`)
-
-// Read every resource back the way a pack is made and compare with what the manifest says it carries.
+const target = packTargetFrom({ cache: cache as never, catalog: catalog as never })
 const source = packSourceFrom({ cache: cache as never, catalog: catalog as never })
+
 let problems = 0
-for (const res of manifest.resources as Array<{ key: string; rows?: Record<string, number> }>) {
-  const expected = res.rows ?? {}
-  const layers = Object.keys(expected) as PackLayer[]
-  const got = await rowsOfResource(source, res.key, layers)
-  const missing = layers.filter((layer) => (got.get(layer)?.length ?? 0) < expected[layer])
-  const inCatalog = Boolean(await source.catalogRow(res.key))
-  if (missing.length || !inCatalog) {
+for (const path of paths) {
+  const bytes = new Uint8Array(readFileSync(path))
+  const manifest = await readPackManifest(bytes)
+  const started = Date.now()
+  const result = await importLanguagePack({ bytes, target, versions })
+  const kind = manifest.kind ?? 'language'
+  const books = manifest.books?.length ? ` (${manifest.books.join(', ')})` : ''
+  console.log(
+    `${basename(path)}: ${kind}${books}, ${result.written} filas en ${((Date.now() - started) / 1000).toFixed(1)} s` +
+      (result.keptExisting ? `, ${result.keptExisting} ya estaban` : '')
+  )
+  for (const original of result.originals) {
+    console.log(`  necesita ${original.key}@${original.stamp}: ${original.status}`)
+    if (original.status === 'other-release') problems += 1
+  }
+  for (const skipped of result.skippedResources) {
     problems += 1
-    console.log(
-      `  FALTA ${res.key}: ${inCatalog ? '' : 'sin fila de catálogo; '}` +
-        missing.map((l) => `${l} ${got.get(l)?.length ?? 0}/${expected[l]}`).join(', ')
+    console.log(`  SALTADO ${skipped.key}: ${skipped.why}`)
+  }
+  if (result.skippedLayers.length) console.log(`  capas dejadas fuera: ${result.skippedLayers.join(', ')}`)
+
+  // Read every resource back the way a pack is made and compare with what the manifest says it carries.
+  for (const res of manifest.resources) {
+    const layers = Object.keys(res.rows) as PackLayer[]
+    const got = await rowsOfResource(source, res.key, layers)
+    const missing = layers.filter(
+      (layer) => !result.skippedLayers.includes(layer) && (got.get(layer)?.length ?? 0) < (res.rows[layer] ?? 0)
     )
+    const inCatalog = Boolean(await source.catalogRow(res.key))
+    if (missing.length || !inCatalog) {
+      problems += 1
+      console.log(
+        `  FALTA ${res.key}: ${inCatalog ? '' : 'sin fila de catálogo; '}` +
+          missing.map((l) => `${l} ${got.get(l)?.length ?? 0}/${res.rows[l]}`).join(', ')
+      )
+    }
   }
 }
-const skipped = (result as { skippedResources?: unknown[] }).skippedResources ?? []
-console.log(
-  problems === 0 && skipped.length === 0
-    ? `Todo llegó: ${manifest.resources.length} recursos, cada capa con sus filas.`
-    : `${problems} recursos con faltantes, ${skipped.length} saltados.`
-)
-process.exit(problems === 0 && skipped.length === 0 ? 0 : 1)
+console.log(problems === 0 ? 'Todo llegó.' : `${problems} problemas.`)
+process.exit(problems === 0 ? 0 : 1)

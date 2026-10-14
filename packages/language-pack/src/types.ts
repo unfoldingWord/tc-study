@@ -11,7 +11,29 @@
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 
 export const PACK_FORMAT = 'bt-synergy-language-pack' as const
-export const PACK_FORMAT_VERSION = '1.0.0' as const
+/** 1.1: `kind`, `books` and `requires`, so originals and books travel in packs of their own. */
+export const PACK_FORMAT_VERSION = '1.1.0' as const
+
+/**
+ * What a pack holds:
+ * - `language`: every resource of a language, whole, with its receipts. The originals go in a pack of their own.
+ * - `originals`: UGNT and/or UHB, whole: the same for every language.
+ * - `base`: what a language needs whatever the book: catalog rows of all its resources, and the resources that are not
+ *   about one book (TA, TW, OBS and their helps) whole. Book-scoped resources bring only their catalog row and which
+ *   books exist, so an app can offer the book packs.
+ * - `book`: the rows of one or more books of the book-scoped resources (scripture, notes, questions, word links), with
+ *   no receipts: a receipt says a whole release is complete, and a book is not the whole release.
+ * A 1.0 pack has no kind: it is a `language` pack that may carry the originals too.
+ */
+export type PackKind = 'language' | 'originals' | 'base' | 'book'
+
+/** An original-language release that the quotes and aligned quotes of a pack were built against. */
+export type PackRequirement = {
+  /** `unfoldingWord/el-x-koine/ugnt` or `unfoldingWord/hbo/uhb`. */
+  key: string
+  /** `resourceContentStamp` of the original's catalog row (`{tag}#{published_at}`). */
+  stamp: string
+}
 
 /** What a cache row is, for a pack: which layer of §2 it belongs to. */
 export type PackLayer = 'receipt' | 'sot' | 'prepared' | 'quote' | 'align' | 'text'
@@ -38,6 +60,8 @@ export type PackManifestResource = {
   title?: string
   /** How many rows of each layer the pack holds for it. */
   rows: Partial<Record<PackLayer, number>>
+  /** Book-scoped resources: the books the store had for it (lowercase), whether or not this pack carries them. */
+  books?: string[]
 }
 
 export type PackManifest = {
@@ -45,6 +69,12 @@ export type PackManifest = {
   formatVersion: string
   /** The language the pack is for, e.g. `es-419`. */
   language: string
+  /** Absent in 1.0 packs, which are `language` packs. */
+  kind?: PackKind
+  /** `book` packs: the books they bring (lowercase). */
+  books?: string[]
+  /** The original-language releases its quotes and aligned quotes need; the device must have the same ones. */
+  requires?: PackRequirement[]
   createdAt: string
   createdBy?: string
   /** The app that made it, for whoever has to tell two packs apart. */
