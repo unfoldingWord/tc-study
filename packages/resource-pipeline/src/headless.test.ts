@@ -16,6 +16,20 @@ describe('resource-pipeline sin pantalla', () => {
     expect(typeof pipeline.helpsTextKey).toBe('function')
     expect(typeof pipeline.buildQuoteTokens).toBe('function')
     expect(typeof pipeline.markdownToHastSync).toBe('function')
+    expect(typeof pipeline.findAlignedTokens).toBe('function')
+    expect(typeof pipeline.helpsQuoteKey).toBe('function')
+    expect(typeof pipeline.helpsAlignKey).toBe('function')
+    expect(typeof pipeline.prepareBookWithPreparer).toBe('function')
+    expect(typeof pipeline.scripturePreparer.prepareFull).toBe('function')
+    expect(typeof pipeline.markRelationCovered).toBe('function')
+  })
+
+  test('las versiones son las que los paquetes de idioma llevan en su manifiesto', async () => {
+    const p = await import('./index')
+    expect(p.HELPS_QUOTE_VERSION).toBe(5)
+    expect(p.HELPS_ALIGN_VERSION).toBe(6)
+    expect(p.SCRIPTURE_PREPARE_VERSION).toBe(3000220)
+    expect(p.WARM_COVERAGE_KEY).toBe('warm-coverage:v1')
   })
 
   test('las claves salen igual que en tc-study', async () => {
