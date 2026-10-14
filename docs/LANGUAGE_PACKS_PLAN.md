@@ -58,6 +58,14 @@ still builds the four workers.
 
 Steps 1–5 do not depend on 6 or 7; step 7 is the most tangled with the UI (zustand stores, panel sync) and goes last.
 
+**Where it stands (2026-10-14):** steps 1–5 are done on `feat/language-pack`, in `packages/resource-pipeline`. Not done
+from them: the clock seams (`wrapVersioned`, `expiresAt` still read `Date.now()`), the logger seam, and turning
+`warm.worker` / `prepare.worker` into thin shells (they still import the same code through the app's re-exports, which
+keeps them as they are). `resolveOriginalLanguageKey` moved alone (`scripture/originalLanguage`); `olLoadCache` stays in
+the app as lane 1's loader. After each step: the same tc-study tests fail as before (20 now: one passes since step 2),
+type errors went from 44 to 35 with none new, and the four worker bundles are the same code (byte-identical through
+step 4; in step 5 only module order and minified names changed).
+
 ## 4. Compatibility: what must match
 
 Pack and app must agree on these constants; the pack manifest carries them by layer (`versions`).
