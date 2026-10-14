@@ -24,6 +24,13 @@ describe('resource-pipeline sin pantalla', () => {
     expect(typeof pipeline.markRelationCovered).toBe('function')
   })
 
+  test('al cargarse registra los nueve preparadores de tc-study', async () => {
+    const p = await import('./index')
+    expect(p.ensurePreparersRegistered().length).toBe(9)
+    expect(p.resolveOriginalLanguageKey('EZR')?.resourceKey).toBe('unfoldingWord/hbo/uhb')
+    expect(p.resolveOriginalLanguageKey('TIT')?.resourceKey).toBe('unfoldingWord/el-x-koine/ugnt')
+  })
+
   test('las versiones son las que los paquetes de idioma llevan en su manifiesto', async () => {
     const p = await import('./index')
     expect(p.HELPS_QUOTE_VERSION).toBe(5)

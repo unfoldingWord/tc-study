@@ -19,58 +19,10 @@ const usjProcessor = new USJProcessor()
 
 const inflight = new Map<string, Promise<OptimizedChapter[]>>()
 
-const NT_BOOKS = new Set([
-  'MAT',
-  'MRK',
-  'LUK',
-  'JHN',
-  'ACT',
-  'ROM',
-  '1CO',
-  '2CO',
-  'GAL',
-  'EPH',
-  'PHP',
-  'COL',
-  '1TH',
-  '2TH',
-  '1TI',
-  '2TI',
-  'TIT',
-  'PHM',
-  'HEB',
-  'JAS',
-  '1PE',
-  '2PE',
-  '1JN',
-  '2JN',
-  '3JN',
-  'JUD',
-  'REV',
-])
-
-export interface OriginalLanguageResource {
-  resourceKey: string
-  language: string
-  bookCode: string
-}
-
-export function resolveOriginalLanguageKey(bookCode: string): OriginalLanguageResource | null {
-  const upper = bookCode.toUpperCase()
-  if (!upper || upper === 'OBS') return null
-  if (NT_BOOKS.has(upper)) {
-    return {
-      resourceKey: 'unfoldingWord/el-x-koine/ugnt',
-      language: 'el-x-koine',
-      bookCode: upper,
-    }
-  }
-  return {
-    resourceKey: 'unfoldingWord/hbo/uhb',
-    language: 'hbo',
-    bookCode: upper,
-  }
-}
+export {
+  resolveOriginalLanguageKey,
+  type OriginalLanguageResource,
+} from '@bt-synergy/resource-pipeline/scripture/originalLanguage'
 
 export function olLoadCacheKey(
   olKey: string,
