@@ -128,7 +128,7 @@ describe('loaderConfig SoT', () => {
 
   test('workerLoaderRegistry iterates getWorkerDownloadConfigs (not all LOADER_CONFIGS)', () => {
     const registrySrc = readFileSync(
-      join(import.meta.dir, '../features/download/workerLoaderRegistry.ts'),
+      join(import.meta.dir, '../../../../packages/resource-pipeline/src/download/workerLoaderRegistry.ts'),
       'utf8'
     )
     expect(registrySrc).toContain('getWorkerDownloadConfigs')
@@ -164,7 +164,7 @@ describe('loaderConfig SoT', () => {
       'utf8'
     )
     const bgSrc = readFileSync(
-      join(import.meta.dir, '../lib/services/BackgroundDownloadManager.ts'),
+      join(import.meta.dir, '../../../../packages/resource-pipeline/src/download/BackgroundDownloadManager.ts'),
       'utf8'
     )
     expect(adminSrc).toContain('getDownloadPriority')

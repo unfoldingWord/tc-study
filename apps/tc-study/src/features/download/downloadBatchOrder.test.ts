@@ -32,7 +32,7 @@ describe('downloadBatchOrder', () => {
   })
 
   test('does not import Read/React store modules (worker-safe)', () => {
-    const src = readFileSync(join(import.meta.dir, 'downloadBatchOrder.ts'), 'utf8')
+    const src = readFileSync(join(import.meta.dir, '../../../../../packages/resource-pipeline/src/download/downloadBatchOrder.ts'), 'utf8')
     expect(src).not.toContain('originalLanguageForBook')
     expect(src).not.toContain('projectPanelResourcesToAppStore')
     expect(src).not.toContain('AppContext')

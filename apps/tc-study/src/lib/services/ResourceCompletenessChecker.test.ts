@@ -195,7 +195,7 @@ describe('checkResource failFast', () => {
   })
 
   test('failFast does not yield between complete books', () => {
-    const src = readFileSync(join(import.meta.dir, 'ResourceCompletenessChecker.ts'), 'utf8')
+    const src = readFileSync(join(import.meta.dir, '../../../../../packages/resource-pipeline/src/download/ResourceCompletenessChecker.ts'), 'utf8')
     expect(src).toContain('if (!failFast && i + 1 < ingredients.length)')
   })
 
