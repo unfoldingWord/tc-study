@@ -11,7 +11,9 @@ import {
   type ReadPanelId,
 } from './readPanelModel'
 
-export type CatalogLoadTarget = 'text' | 'helps' | 'both'
+import type { CatalogLoadTarget } from '@bt-synergy/resource-pipeline/discover/readCatalogSearch'
+
+export type { CatalogLoadTarget }
 
 export type PanelAssignment =
   | { kind: 'panel'; panelId: ReadPanelId }

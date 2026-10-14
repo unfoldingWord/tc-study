@@ -28,6 +28,8 @@ const PLUGIN_EXPORT_TO_ID: Record<(typeof RESOURCE_TYPE_PLUGIN_EXPORTS)[number],
 }
 
 const RESOURCE_TYPES_DIR = join(import.meta.dir, '../resourceTypes')
+/** The data half of each definition (no viewer) lives in resource-pipeline. */
+const PIPELINE_TYPES_DIR = join(import.meta.dir, '../../../../packages/resource-pipeline/src/resourceTypes')
 
 describe('loaderConfig SoT', () => {
   test('every loader id is a canonical RESOURCE_TYPE_IDS value', () => {
@@ -94,8 +96,15 @@ describe('loaderConfig SoT', () => {
     )
     expect(pluginFiles.length).toBeGreaterThan(5)
 
-    for (const file of pluginFiles) {
-      const src = readFileSync(join(RESOURCE_TYPES_DIR, file), 'utf8')
+    const pipelineFiles = readdirSync(PIPELINE_TYPES_DIR).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    expect(pipelineFiles.length).toBeGreaterThan(5)
+    const sources = [
+      ...pluginFiles.map((file) => join(RESOURCE_TYPES_DIR, file)),
+      ...pipelineFiles.map((file) => join(PIPELINE_TYPES_DIR, file)),
+    ].map((path) => readFileSync(path, 'utf8'))
+    expect(sources.filter((src) => src.includes('downloadPriority')).length).toBeGreaterThan(5)
+
+    for (const src of sources) {
       if (!src.includes('downloadPriority')) continue
       expect(src).toContain('getDownloadPriority')
       expect(src).not.toMatch(/downloadPriority:\s*\d+/)

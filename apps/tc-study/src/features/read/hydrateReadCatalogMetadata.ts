@@ -12,7 +12,8 @@ import {
 } from '../../lib/services/ResourceMetadataFactory'
 import { panelAssignmentForContentRole, type CatalogLoadTarget } from './readCatalogPanelPolicy'
 import type { ReadPanelId } from './readPanelModel'
-import { asString, catalogIdentity, type CatalogEntry } from './readCatalogIdentity'
+import { catalogIdentity, type CatalogEntry } from './readCatalogIdentity'
+import { catalogHitRelease, door43ResourceForHit } from '@bt-synergy/resource-pipeline/discover/catalogHits'
 
 /** AppStore keys are instance ids (`glt#2`); catalog writes use the base key. */
 export function loadedResourcesForCatalogKey(
@@ -65,7 +66,7 @@ export function collectCatalogMetadataPromises(options: {
   return catalogResults.map(async (entry): Promise<ResourceInfo[]> => {
     const id = catalogIdentity(entry, languageCode)
     if (!id) return []
-    const { item, ownerStr, langStr, resourceId, resourceKey, subject, repoName } = id
+    const { resourceKey, subject } = id
     const type = resourceTypeRegistry.getTypeForSubject(subject)
     if (!type) return []
 
@@ -79,30 +80,11 @@ export function collectCatalogMetadataPromises(options: {
     )
     if (assignment.kind === 'skip') return []
 
-    const release = item.release ?? item.catalog?.prod
+    const release = catalogHitRelease(id)
     if (!release?.tag_name) return []
 
     try {
-      const abbreviation = asString(item.abbreviation).trim() || undefined
-      const door43Resource = {
-        id: resourceId,
-        name: repoName,
-        title: item.title ?? entry.title ?? resourceKey,
-        ...(abbreviation ? { abbreviation } : {}),
-        owner: ownerStr,
-        language: langStr,
-        language_title: item.language_title,
-        subject,
-        version: release.tag_name,
-        format: item.content_format ?? item.format,
-        content_format: item.content_format ?? item.format,
-        metadata_url: item.metadata_url ?? entry.metadata_url,
-        description: item.description ?? item.repo?.description,
-        ingredients: item.ingredients ?? item.repo?.ingredients,
-        release,
-        server: 'git.door43.org',
-        html_url: item.html_url ?? entry.html_url ?? release?.html_url,
-      }
+      const door43Resource = door43ResourceForHit(entry, id, release)
 
       const metadata = await createResourceMetadata(door43Resource as Door43Resource, {
         resourceTypeRegistry,
