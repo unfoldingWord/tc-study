@@ -1,17 +1,2 @@
-/**
- * Quote / semantic-id helpers shared by TN, TWL, and CombinedHelps.
- */
-
-export { buildQuoteTokens } from './buildQuoteTokens'
-export type { QuoteTokenWithRef } from './buildQuoteTokens'
-export { generateSemanticIdsForQuoteTokens, generateSemanticId } from './generateSemanticIds'
-export {
-  formatHelpsChapterVerseLabel,
-  helpsReferenceCoversVerse,
-  helpsReferenceOverlapsRange,
-  parseHelpsReference,
-  splitHelpsQuote,
-} from './parseHelpsReference'
-export { parseLinkChapterVerse } from './parseLinkChapterVerse'
-export { parseTWLink } from './parseTWLink'
-export type { TWLinkInfo } from './types'
+/** Moved to @bt-synergy/resource-pipeline (docs/LANGUAGE_PACKS_PLAN.md); re-exported so the app's imports stay as they were. */
+export * from '@bt-synergy/resource-pipeline/helps/quoteTokens/index'

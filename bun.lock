@@ -206,6 +206,7 @@
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-panels": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
+        "@bt-synergy/resource-pipeline": "workspace:*",
         "@bt-synergy/resource-types": "workspace:*",
         "@bt-synergy/scripture-loader": "workspace:*",
         "@bt-synergy/translation-academy-loader": "workspace:*",
@@ -704,6 +705,23 @@
       "optionalPeers": [
         "marked",
       ],
+    },
+    "packages/resource-pipeline": {
+      "name": "@bt-synergy/resource-pipeline",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/resource-catalog": "workspace:*",
+        "@bt-synergy/resource-parsers": "workspace:*",
+        "@bt-synergy/scripture-loader": "workspace:*",
+        "remark-gfm": "^4.0.1",
+        "remark-parse": "^11.0.0",
+        "remark-rehype": "^11.1.2",
+        "unified": "^11.0.5",
+      },
+      "devDependencies": {
+        "@types/node": "^20.10.0",
+        "typescript": "~5.9.3",
+      },
     },
     "packages/resource-selection": {
       "name": "@bt-synergy/resource-selection",
@@ -1258,6 +1276,8 @@
     "@bt-synergy/resource-panels": ["@bt-synergy/resource-panels@workspace:packages/resource-panels"],
 
     "@bt-synergy/resource-parsers": ["@bt-synergy/resource-parsers@workspace:packages/resource-parsers"],
+
+    "@bt-synergy/resource-pipeline": ["@bt-synergy/resource-pipeline@workspace:packages/resource-pipeline"],
 
     "@bt-synergy/resource-selection": ["@bt-synergy/resource-selection@workspace:packages/resource-selection"],
 

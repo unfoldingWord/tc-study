@@ -42,6 +42,7 @@
     "@bt-synergy/resource-catalog": "workspace:*",
     "@bt-synergy/resource-panels": "workspace:*",
     "@bt-synergy/resource-parsers": "workspace:*",
+    "@bt-synergy/resource-pipeline": "workspace:*",
     "@bt-synergy/resource-types": "workspace:*",
     "@bt-synergy/scripture-loader": "workspace:*",
     "@bt-synergy/usj-processor": "workspace:*",

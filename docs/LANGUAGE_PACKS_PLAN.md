@@ -38,6 +38,12 @@ two never drift.
 
 At every step the old file in the app becomes a re-export of the package, and tc-study keeps working.
 
+**tc-study's three workers must work exactly as they do now** (Abel, 2026-10-14): the person reads while resources
+are still downloading, chapter by chapter, and prepares and warms what is on screen first. Moving code must not change
+when or what they download, prepare or warm. Each step is checked against the state before it: the same tc-study unit
+tests pass and fail (`bun test src`, 1832 pass and 21 failing before step 1), no new type errors, and `vite build`
+still builds the four workers.
+
 | Step | What | Seams to add |
 |---|---|---|
 | 0 | Export `bookChunkedStorage` from `cache-adapter-indexeddb` (Node needs the same chunking), or run Node on fake-indexeddb | — |
