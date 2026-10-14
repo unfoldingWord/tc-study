@@ -227,6 +227,21 @@ export type ImportPackParams = {
   batch?: number
   /** This app's processing versions, by layer, to compare with the pack's (see `PackManifest.versions`). */
   versions?: PackVersions
+  /** When the pack is opened; rows with a cache lifetime start it again from here. */
+  now?: Date
+}
+
+/**
+ * Quote and align rows carry `expiresAt` (a 30-day bound on cache growth, not a statement about their content: their
+ * keys hold the releases they were built from). A pack can travel for months before it is opened, and the IndexedDB
+ * adapter deletes a row past `expiresAt` when it reads it, so each lifetime starts again when the pack is opened.
+ */
+function restartLifetime(row: CacheRow, now: number): CacheRow {
+  const entry = row.entry as { expiresAt?: unknown; timestamp?: unknown } | null
+  if (!entry || typeof entry !== 'object' || typeof entry.expiresAt !== 'string' || typeof entry.timestamp !== 'number') return row
+  const lifetime = Date.parse(entry.expiresAt) - entry.timestamp
+  if (!Number.isFinite(lifetime) || lifetime <= 0) return row
+  return { key: row.key, entry: { ...entry, timestamp: now, expiresAt: new Date(now + lifetime).toISOString() } }
 }
 
 export type ImportPackResult = {
@@ -325,10 +340,11 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
       if (!layers.has(layer) || !resource.rows[layer]) continue
       const file = zip.file(`rows/${layer}/${fileSafe(resource.key)}.jsonl`)
       if (!file) throw new Error(`Al paquete le falta una parte: ${layer} de ${resource.key}.`)
+      const opened = (params.now ?? new Date()).getTime()
       const rows = (await file.async('string'))
         .split('\n')
         .filter((line) => line.trim())
-        .map((line) => JSON.parse(line) as CacheRow)
+        .map((line) => restartLifetime(JSON.parse(line) as CacheRow, opened))
       for (let i = 0; i < rows.length; i += batch) {
         let slice = rows.slice(i, i + batch)
         if (!overwrite && target.existingKeys) {

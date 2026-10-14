@@ -182,6 +182,31 @@ describe('las clases de paquete', () => {
   })
 })
 
+describe('abrir un paquete que viajó mucho tiempo', () => {
+  it('una cita vencida en la caché vuelve a contar sus 30 días desde que se abre el paquete', async () => {
+    const DAY = 24 * 60 * 60 * 1000
+    const built = Date.parse('2026-01-01T00:00:00Z')
+    const quoteKey = `helps-quote:${TN}@${stamp(TN)}:${ol(UGNT)}:tit:1`
+    const base = store()
+    const source: PackSource = {
+      ...base,
+      rowsByPrefix: async (prefix) =>
+        (await base.rowsByPrefix(prefix)).map((r) =>
+          r.key === quoteKey ? { key: r.key, entry: { content: {}, version: 5, timestamp: built, expiresAt: new Date(built + 30 * DAY).toISOString() } } : r
+        ),
+    }
+    const { bytes } = await buildLanguagePack({ source, language: 'es-419', kind: 'book', books: ['tit'], versions: VERSIONS })
+    const { target: t, rows } = target({ [UGNT]: META[UGNT] })
+    const opened = new Date('2026-10-14T12:00:00Z')
+    await importLanguagePack({ bytes, target: t, versions: VERSIONS, now: opened })
+    const entry = rows.get(quoteKey) as { expiresAt: string; timestamp: number }
+    expect(entry.timestamp).toBe(opened.getTime())
+    expect(entry.expiresAt).toBe(new Date(opened.getTime() + 30 * DAY).toISOString())
+    // Rows without a lifetime come as they were.
+    expect((rows.get(`tn:${TN}:tit:1`) as { timestamp: number }).timestamp).toBe(1)
+  })
+})
+
 describe('abrir un paquete que necesita originales', () => {
   it('con el mismo original en el aparato, entran las citas', async () => {
     const { bytes } = await buildLanguagePack({ source: store(), language: 'es-419', kind: 'book', books: ['tit'], versions: VERSIONS })
