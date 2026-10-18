@@ -352,19 +352,26 @@ export class QuoteMatcher {
       return matches;
     }
     
-    // Try exact substring matching first
+    // Try exact substring matching first. A quote is whole words: `text` is the verse's words joined by spaces, so a
+    // match starts and ends at one. A match inside a word is not counted while the quote is found as whole words:
+    // Ruth 1:16 «אֱלֹהָֽי» (my God), folded to its consonants, is inside «וֵאלֹהַיִךְ» (and your God) before it, and
+    // occurrence 1 took that word. Only when no match is whole words are the others kept, as before.
+    const inside: {start: number, end: number}[] = [];
     let startIndex = 0;
     while (true) {
       const index = text.indexOf(quote, startIndex);
       if (index === -1) break;
-      
-      matches.push({
+
+      const end = index + quote.length;
+      const wholeWords = (index === 0 || text[index - 1] === ' ') && (end === text.length || text[end] === ' ');
+      (wholeWords ? matches : inside).push({
         start: index,
-        end: index + quote.length
+        end
       });
-      
+
       startIndex = index + 1;
     }
+    if (matches.length === 0) matches.push(...inside);
     
     // If no exact matches found and this is Hebrew text, try flexible matching
     if (matches.length === 0 && isHebrewText(quote)) {

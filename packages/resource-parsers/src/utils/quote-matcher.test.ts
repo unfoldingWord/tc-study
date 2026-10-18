@@ -26,6 +26,19 @@ function chapter(words: string[]): OptimizedChapter[] {
 describe('QuoteMatcher occurrence (USJ identity contract)', () => {
   const matcher = new QuoteMatcher()
 
+  test('a quote is whole words: «my God» is not found inside «and your God» (Ruth 1:16)', () => {
+    const verse = chapter(['וֵ⁠אלֹהַ֖יִ⁠ךְ', 'אֱלֹהָֽ⁠י'])
+    const result = matcher.findOriginalTokens(verse, 'אֱלֹהָֽ⁠י', 1, { book: 'rut', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([2])
+  })
+
+  test('a quote found only inside a word is still found, as before', () => {
+    const result = matcher.findOriginalTokens(chapter(['ואלהיך']), 'אלהי', 1, { book: 'rut', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([1])
+  })
+
   test('assigns verse-wide occurrence case-insensitively', () => {
     const result = matcher.findOriginalTokens(chapter(['God', 'of', 'god']), 'god', 2, {
       book: 'tit',

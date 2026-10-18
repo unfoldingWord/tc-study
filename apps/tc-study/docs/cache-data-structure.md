@@ -225,7 +225,7 @@ Value: `{ stamp, unitCount, updatedAt }`. Lane 3 uses this to skip a finished re
 | `WORDS_LINKS_PREPARE_VERSION` | `1` | `prepared:words-links:` |
 | `QUESTIONS_PREPARE_VERSION` / `OBS_PREPARE_VERSION` / `OBS_NOTES_PREPARE_VERSION` | `1` | Matching `prepared:` rows |
 | `HELPS_QUOTE_VERSION` | `5` | Quote rows (verse stamps on tokens) |
-| `HELPS_ALIGN_VERSION` | `8` | Align rows (keeps quote verse stamps; `t[]` chips; 8: matched by the word as written) |
+| `HELPS_ALIGN_VERSION` | `9` | Align rows (keeps quote verse stamps; `t[]` chips; 8: matched by the word as written; 9: from whole-word quotes) |
 | `HELPS_TEXT_VERSION` | `1` | Title / preview strings |
 | `WARM_COVERAGE_VERSION` | `1` | Coverage map envelope |
 | Quote / align TTL | **30 days** (`expiresAt`) | Abandoned book/chapter combos; stamps still handle correctness |

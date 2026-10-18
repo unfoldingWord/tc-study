@@ -15,7 +15,7 @@ import { resourceContentStamp, type ResourceStampSource } from '@bt-synergy/reso
 export const HELPS_QUOTE_PREFIX = 'helps-quote:'
 /** Bump when QuoteMatcher / buildQuoteTokens output shape changes.
  *  5: align clones keep stamped chapter/verse so merged-stream hits paint every verse. */
-export const HELPS_QUOTE_VERSION = 5
+export const HELPS_QUOTE_VERSION = 6
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_QUOTE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
