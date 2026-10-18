@@ -16,6 +16,7 @@
  */
 
 import 'fake-indexeddb/auto'
+import { requireFreshBuilds } from './freshBuilds'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
@@ -45,6 +46,8 @@ if (!packPath) {
   process.exit(2)
 }
 const outDir = resolve(arg('out') ?? '.')
+// Packs made with code compiled before its last change are not this code's packs.
+requireFreshBuilds(['@bt-synergy/resource-pipeline', '@bt-synergy/language-pack', '@bt-synergy/cache-adapter-indexeddb', '@bt-synergy/catalog-adapter-indexeddb'])
 
 const cache = new IndexedDBCacheAdapter({ dbName: 'mcp-views-cache', storeName: 'cache-entries', version: 1 })
 const catalog = new IndexedDBCatalogAdapter({ dbName: 'mcp-views-catalog', storeName: 'catalog-entries', version: 1 })
