@@ -152,16 +152,27 @@ describe('resolveTokenVisualState (Journey 4/8 contract)', () => {
     }
   })
 
-  test('UHB pane underlines pointed Hebrew via folded semanticId', () => {
-    const pointed = usjWord({ content: 'בְּרֵאשִׁית', verseRef: 'rut 1:1' })
+  test('UHB pane underlines pointed Hebrew via its semanticId, word joiners aside', () => {
+    const pointed = usjWord({ content: 'וַ⁠יְהִ֗י', verseRef: 'rut 1:1' })
     attachFoldedMatchKeys(pointed)
     const state = resolveTokenVisualState(pointed, {
       isOriginalLanguage: true,
       highlightTarget: null,
-      underlinedSemanticIds: new Set([semanticIdKey('rut 1:1:בראשית:1')]),
+      underlinedSemanticIds: new Set([semanticIdKey('rut 1:1:וַיְהִ֗י:1')]),
     })
     expect(state.isUnderlined).toBe(true)
-    expect(pointed.foldedSemanticId).toBe(semanticIdKey('rut 1:1:בראשית:1'))
+    expect(pointed.foldedSemanticId).toBe(semanticIdKey('rut 1:1:וַיְהִ֗י:1'))
+  })
+
+  test('the other word of the verse written with other accents is not underlined (Ruth 1:1)', () => {
+    const second = usjWord({ content: 'וַ⁠יְהִ֥י', verseRef: 'rut 1:1' })
+    attachFoldedMatchKeys(second)
+    const state = resolveTokenVisualState(second, {
+      isOriginalLanguage: true,
+      highlightTarget: null,
+      underlinedSemanticIds: new Set([semanticIdKey('rut 1:1:וַ⁠יְהִ֗י:1')]),
+    })
+    expect(state.isUnderlined).toBe(false)
   })
 })
 

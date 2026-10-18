@@ -17,7 +17,7 @@ export type ScriptureRenderToken = Pick<
   UsjWordToken,
   'semanticId' | 'content' | 'occurrence' | 'verseRef' | 'alignedOriginalWordIds'
 > & {
-  /** NFD-folded once at load. Paint path must not re-normalize. */
+  /** Its match key (semanticIdMatchKey), computed once at load. Paint path must not re-normalize. */
   foldedSemanticId?: string
   foldedAlignedIds?: string[]
 }

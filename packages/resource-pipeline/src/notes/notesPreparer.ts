@@ -14,7 +14,7 @@ import {
   type HastRoot,
 } from '../markdown/markdownToHast'
 import { RESOURCE_TYPE_IDS } from '@bt-synergy/resource-catalog'
-import { semanticIdMatchKey } from '../helps/semanticIdMatchKey'
+import { foldedMatchKey } from '../helps/semanticIdMatchKey'
 import {
   registerPreparer,
   type PrepareContext,
@@ -159,7 +159,7 @@ export function buildNotesFull(source: NotesSource, unit: number): NotesFullChap
       id: n.id,
       reference: n.reference,
       quote,
-      quoteFolded: quote ? semanticIdMatchKey(quote) : undefined,
+      quoteFolded: quote ? foldedMatchKey(quote) : undefined,
       bodyHast: markdownToHastSync(note),
       note,
       supportReference: n.supportReference || '',

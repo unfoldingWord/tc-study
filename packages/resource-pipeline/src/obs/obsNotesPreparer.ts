@@ -9,7 +9,7 @@ import {
   stripMarkdownLight,
 } from '../markdown/markdownToHast'
 import { RESOURCE_TYPE_IDS } from '@bt-synergy/resource-catalog'
-import { semanticIdMatchKey } from '../helps/semanticIdMatchKey'
+import { foldedMatchKey } from '../helps/semanticIdMatchKey'
 import { tnCacheKey, type NotesSource } from '../notes/notesPreparer'
 import {
   registerPreparer,
@@ -88,7 +88,7 @@ export const obsNotesPreparer: ResourcePreparer<NotesSource, number> = {
           id: n.id,
           reference: n.reference,
           quote,
-          quoteFolded: quote ? semanticIdMatchKey(quote) : undefined,
+          quoteFolded: quote ? foldedMatchKey(quote) : undefined,
           bodyHast: markdownToHastSync(n.note || ''),
           note: n.note || '',
         }

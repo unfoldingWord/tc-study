@@ -178,25 +178,25 @@ describe('filterDisplayNotes', () => {
     expect(displayNotes).toHaveLength(1)
   })
 
-  test('ULT English token matches Hebrew quote via folded aligned ids (Psalms)', () => {
-    const pointed = 'יִדֳּפֶנּוּ'
-    const unpointed = pointed.normalize('NFD').replace(/\p{M}/gu, '')
+  test('ULT English token matches Hebrew quote via its aligned ids (Psalms)', () => {
+    const pointed = 'יִדֳּפֶ֥⁠נּוּ'
     const psaNotes = [
       {
         id: 'psa-1-4-chaff',
         reference: '1:4',
         quote: pointed,
         occurrence: '1',
-        quoteTokens: [{ text: unpointed }],
-        semanticIds: [`psa 1:4:${unpointed}:1`],
+        quoteTokens: [{ text: pointed }],
+        // The quote's word as UHB writes it, word joiner included; the ULT's zaln may omit the joiner.
+        semanticIds: [`psa 1:4:${pointed}:1`],
       },
       {
         id: 'psa-1-1-blessed',
         reference: '1:1',
-        quote: 'אַשְׁרֵי',
+        quote: 'אַ֥שְֽׁרֵי',
         occurrence: '1',
-        quoteTokens: [{ text: 'אַשְׁרֵי' }],
-        semanticIds: ['psa 1:1:אשרי:1'],
+        quoteTokens: [{ text: 'אַ֥שְֽׁרֵי' }],
+        semanticIds: ['psa 1:1:אַ֥שְֽׁרֵי:1'],
       },
     ]
     const { displayNotes, hasNoteMatches } = filterDisplayNotes(psaNotes, {
@@ -206,13 +206,36 @@ describe('filterDisplayNotes', () => {
       tokenFilter: {
         semanticId: 'psa 1:4:chasses:1',
         content: 'chasses',
-        alignedSemanticIds: [`psa 1:4:${pointed}:1`],
+        alignedSemanticIds: [`psa 1:4:${pointed.replace('\u2060', '')}:1`],
         timestamp: 1,
       },
       bookCodeLower: 'psa',
     })
     expect(hasNoteMatches).toBe(true)
     expect(displayNotes.map((n) => n.id)).toEqual(['psa-1-4-chaff'])
+  })
+
+  test('a word that differs from another only by its accents keeps its own notes (Jonah 1:3)', () => {
+    // «del rostro de Jehová» (יְהוָֽה) and the earlier «de Jehová» (יְהוָ֑ה): each is the first of its kind.
+    const notes = [
+      {
+        id: 'flee',
+        reference: '1:3',
+        quote: 'מִ⁠לִּ⁠פְנֵ֖י יְהוָֽה',
+        occurrence: '1',
+        semanticIds: ['jon 1:3:מִ⁠לִּ⁠פְנֵ֖י:1', 'jon 1:3:יְהוָֽה:1'],
+      },
+    ]
+    const clicked = (aligned: string) =>
+      filterDisplayNotes(notes, {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: null,
+        tokenFilter: { semanticId: 'jon 1:3:Jehová:1', content: 'Jehová', alignedSemanticIds: [aligned], timestamp: 1 },
+        bookCodeLower: 'jon',
+      }).displayNotes.map((n) => n.id)
+    expect(clicked('jon 1:3:יְהוָֽה:1')).toEqual(['flee'])
+    expect(clicked('jon 1:3:יְהוָ֑ה:1')).toEqual([])
   })
 
   test('token click ids match notes that only have cached semanticIds (no quoteTokens)', () => {

@@ -6,7 +6,7 @@
 
 import type { OptimizedToken } from '@bt-synergy/resource-parsers'
 import { semanticIdFor } from '@bt-synergy/scripture-loader'
-import { semanticIdMatchKey } from './semanticIdMatchKey'
+import { foldedMatchKey, semanticIdMatchKey } from './semanticIdMatchKey'
 
 export interface AlignedToken {
   content: string
@@ -143,6 +143,11 @@ export function alignedTokensFromPositions(
  * Find aligned tokens in target language tokens from SCRIPTURE_TOKENS broadcast.
  * Matches `\zaln` / alignedOriginalWordIds, or the token's own semanticId when
  * the text pane is original language (UGNT/UHB).
+ *
+ * A word is matched as written first (semanticIdMatchKey): words that differ
+ * only by their accents are different words, each with its own occurrence. A
+ * wanted word no token is aligned to as written is looked for with its marks
+ * folded (an alignment made against another edition of the original).
  */
 export function findAlignedTokens(
   targetTokens: OptimizedToken[],
@@ -152,12 +157,18 @@ export function findAlignedTokens(
   verse: number
 ): AlignedToken[] {
   if (!originalSemanticIds.length) return []
-  const wanted = originalSemanticIds.map((id) => semanticIdMatchKey(id))
+  const wanted = new Set(originalSemanticIds.map((id) => semanticIdMatchKey(id)))
+  const linked = targetTokens.map((token) =>
+    token.type === 'word' ? tokenMatchIds(token).map((id) => semanticIdMatchKey(id)) : []
+  )
+  const found = new Set(linked.flat().filter((id) => wanted.has(id)))
+  const unfound = new Set([...wanted].filter((id) => !found.has(id)).map(foldedMatchKey))
   const matchedPositions: number[] = []
 
-  targetTokens.forEach((token, index) => {
-    if (token.type !== 'word') return
-    const hasMatch = tokenMatchIds(token).some((id) => wanted.includes(semanticIdMatchKey(id)))
+  linked.forEach((ids, index) => {
+    const hasMatch =
+      ids.some((id) => wanted.has(id)) ||
+      (unfound.size > 0 && ids.some((id) => unfound.has(foldedMatchKey(id))))
     if (hasMatch) matchedPositions.push(index)
   })
 

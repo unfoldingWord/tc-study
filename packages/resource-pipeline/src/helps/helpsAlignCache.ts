@@ -16,8 +16,10 @@ export const HELPS_ALIGN_PREFIX = 'helps-align:'
 /** Bump when compact row shape, reconstruct rules, or align match-key fold change.
  *  6: live/warm align keeps quote-token verse stamps (sbh4 four-hit chips).
  *  7: positions from target tokens whose repeated words keep their own zaln
- *     group (es-419 Titus 1:1 «de» marked one occurrence early). */
-export const HELPS_ALIGN_VERSION = 7
+ *     group (es-419 Titus 1:1 «de» marked one occurrence early).
+ *  8: matched by the word as written, marks kept: a note on one of two words
+ *     that differ only by their accents no longer marks both (Jonah 1:3). */
+export const HELPS_ALIGN_VERSION = 8
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_ALIGN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 

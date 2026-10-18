@@ -37,8 +37,11 @@ import {
  * 3: invalidate after pre-verse/`\d` merge casing fix (body v1 zaln after titles).
  * 4: full-tier `a` ids after groups sharing target words stopped being deduped
  *    (es-419 Titus 1:1: second «de Dios» dropped, later «de» shifted by one).
+ * 5: full-tier match keys keep a word's marks (semanticIdMatchKey): two words
+ *    that differ only by their accents no longer share a key (Jonah 1:3 יְהוָ֑ה,
+ *    יְהוָֽה). The unmerged nav fix (fb52783) must take 6.
  */
-export const SCRIPTURE_PREPARE_SCHEMA = 4
+export const SCRIPTURE_PREPARE_SCHEMA = 5
 
 /**
  * Derived prepare cache version. Embeds USJ SoT version digits so nav/light/full

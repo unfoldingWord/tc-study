@@ -8,7 +8,7 @@ import type {
   TranslationWordsLink,
 } from '@bt-synergy/resource-parsers'
 import { RESOURCE_TYPE_IDS } from '@bt-synergy/resource-catalog'
-import { semanticIdMatchKey } from '../helps/semanticIdMatchKey'
+import { foldedMatchKey } from '../helps/semanticIdMatchKey'
 import {
   registerPreparer,
   type PrepareContext,
@@ -138,7 +138,7 @@ function toFullRow(link: TranslationWordsLink): WordsLinksFullRow {
   const origWords = light.origWords
   return {
     ...light,
-    quoteFolded: origWords ? semanticIdMatchKey(origWords) : undefined,
+    quoteFolded: origWords ? foldedMatchKey(origWords) : undefined,
   }
 }
 
