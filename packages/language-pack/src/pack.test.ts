@@ -156,6 +156,16 @@ describe('abrir un paquete de idioma en otro aparato', () => {
     expect(result.written).toBe(packed.length)
   })
 
+  it('dice cuánto lleva mientras abre, hasta todas sus filas', async () => {
+    const { source } = store()
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', originalKeys: [UGNT] })
+    const seen: Array<[number, number]> = []
+    const result = await importLanguagePack({ bytes, target: emptyTarget().target, batch: 2, onProgress: (done, total) => seen.push([done, total]) })
+    expect(seen[0][0]).toBe(0)
+    expect(seen.at(-1)).toEqual([result.written, result.written])
+    expect(seen.every(([d], i) => i === 0 || d >= seen[i - 1][0])).toBe(true)
+  })
+
   it('funciona con el catálogo de tc-study, que lista claves y guarda de a una', async () => {
     const { rows, catalog } = store()
     const cache = { getByPrefix: async (prefix: string) => rows.filter((r) => r.key >= prefix && r.key <= prefix + '\uffff') }

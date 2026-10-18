@@ -229,6 +229,8 @@ export type ImportPackParams = {
   versions?: PackVersions
   /** When the pack is opened; rows with a cache lifetime start it again from here. */
   now?: Date
+  /** Told after every batch: the rows gone through (written or kept) of all the pack's rows to open. */
+  onProgress?: (done: number, total: number) => void
 }
 
 /**
@@ -333,6 +335,11 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
   await target.putCatalogRows(catalog.filter((row) => !skip.has(row.key)))
 
   const order: PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text', 'receipt']
+  const total = manifest.resources
+    .filter((resource) => !skip.has(resource.key))
+    .reduce((n, resource) => n + order.filter((layer) => layers.has(layer)).reduce((m, layer) => m + (resource.rows[layer] ?? 0), 0), 0)
+  let done = 0
+  params.onProgress?.(0, total)
   for (const resource of manifest.resources) {
     if (skip.has(resource.key)) continue
     const overwrite = params.overwrite || replace.has(resource.key)
@@ -347,15 +354,18 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
         .map((line) => restartLifetime(JSON.parse(line) as CacheRow, opened))
       for (let i = 0; i < rows.length; i += batch) {
         let slice = rows.slice(i, i + batch)
+        done += slice.length
         if (!overwrite && target.existingKeys) {
           const have = await target.existingKeys(slice.map((row) => row.key))
           result.keptExisting += slice.filter((row) => have.has(row.key)).length
           slice = slice.filter((row) => !have.has(row.key))
         }
-        if (!slice.length) continue
-        await target.putRows(slice)
-        result.written += slice.length
-        result.byLayer[layer] = (result.byLayer[layer] ?? 0) + slice.length
+        if (slice.length) {
+          await target.putRows(slice)
+          result.written += slice.length
+          result.byLayer[layer] = (result.byLayer[layer] ?? 0) + slice.length
+        }
+        params.onProgress?.(Math.min(done, total), total)
       }
     }
   }
