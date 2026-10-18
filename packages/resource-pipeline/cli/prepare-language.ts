@@ -33,6 +33,7 @@ import { HELPS_TEXT_VERSION } from '../src/helps/helpsCacheKeys'
 import { HELPS_ALIGN_VERSION } from '../src/helps/helpsAlignCache'
 import { HELPS_QUOTE_VERSION } from '../src/helps/helpsQuoteCache'
 import { prepareLanguage, type PrepareLanguageProgress } from '../src/language/prepareLanguage'
+import { SCRIPTURE_PREPARE_VERSION } from '../src/scripture/scripturePreparer'
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)
@@ -122,6 +123,8 @@ const common = {
   ...(resourceKeys ? { resourceKeys } : {}),
   versions: {
     sot: { usjProcessing: USJ_PROCESSING_VERSION },
+    // An app that reads the prepared chapters without making them (Servos) must know whose they are.
+    prepared: { scripturePrepare: SCRIPTURE_PREPARE_VERSION },
     quote: { helpsQuote: HELPS_QUOTE_VERSION },
     align: { helpsAlign: HELPS_ALIGN_VERSION },
     text: { helpsText: HELPS_TEXT_VERSION },
