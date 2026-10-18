@@ -104,6 +104,10 @@ export function collectUsjWords(
         }
       }
 
+      // A note's words are not the verse's: the Hebrew Bible's qere (`\f + \ft Q \+w …\+w*\f*`) follows its ketiv,
+      // and the layout shows no words of notes, so counting it shifted every later word onto its neighbour's token.
+      if (n.type === 'note') continue
+
       if (Array.isArray(n.content)) {
         walk(n.content)
       }

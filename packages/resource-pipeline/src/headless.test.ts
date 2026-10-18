@@ -35,7 +35,7 @@ describe('resource-pipeline sin pantalla', () => {
     const p = await import('./index')
     expect(p.HELPS_QUOTE_VERSION).toBe(5)
     expect(p.HELPS_ALIGN_VERSION).toBe(7)
-    expect(p.SCRIPTURE_PREPARE_VERSION).toBe(4000220)
+    expect(p.SCRIPTURE_PREPARE_VERSION).toBe(4000230)
     expect(p.WARM_COVERAGE_KEY).toBe('warm-coverage:v1')
   })
 
