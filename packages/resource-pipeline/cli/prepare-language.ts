@@ -2,6 +2,12 @@
  * Prepare a language from the command line and save it as a language pack.
  *
  *   bun packages/resource-pipeline/cli/prepare-language.ts --lang es-419 --out ./packs [--no-originals] [--books all|tit,rut]
+ *     [--macula <folder>] [--no-lexicons] [--no-obs]
+ *
+ * Beside tc-study's resources (companions.ts): the language's lexicons from Door43 (`{owner}/{lang}_uhl`, `_ugl`, the
+ * owner of its literal text) unless `--no-lexicons`; MACULA's sentences and referents from a folder with Taller's
+ * `trees/` and `referents/` with `--macula`, in the originals pack. `--no-obs` leaves Open Bible Stories and their helps
+ * out of the packs (an app that translates only the Bible).
  *
  * Runs tc-study's own pipeline (discover, download, build) into tc-study's own IndexedDB adapters, kept in memory by
  * fake-indexeddb, so the rows are byte for byte the ones the app writes; then packs them with
@@ -20,7 +26,8 @@ import { join, resolve } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
-import { buildLanguagePack, packSourceFrom } from '@bt-synergy/language-pack'
+import { buildLanguagePack, ORIGINAL_LANGUAGE_KEYS, packSourceFrom } from '@bt-synergy/language-pack'
+import { addLexicons, addMacula, MACULA_KEYS } from './companions'
 import { USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
 import { HELPS_TEXT_VERSION } from '../src/helps/helpsCacheKeys'
 import { HELPS_ALIGN_VERSION } from '../src/helps/helpsAlignCache'
@@ -81,9 +88,38 @@ const preparation = await prepareLanguage({
 })
 
 const source = packSourceFrom({ cache: cacheAdapter as never, catalog: catalogAdapter as never })
+
+// The resources beside tc-study's (companions.ts), into the same store before packing.
+const companions: Record<string, unknown> = {}
+const languageRows = (await source.catalogRows()).filter((m) => m.language === language)
+const literal = languageRows.find((m) => m.subject === 'Aligned Bible' && /lt$/.test(String(m.resourceId)))
+if (!process.argv.includes('--no-lexicons')) {
+  if (literal) {
+    console.log(`[${elapsed()}] Léxicos de ${literal.owner}…`)
+    companions.lexicons = await addLexicons(cacheAdapter as never, catalogAdapter as never, language, literal.owner)
+    for (const l of companions.lexicons as Array<{ key: string; entries?: number; why?: string }>) {
+      console.log(`[${elapsed()}]   ${l.key}: ${l.entries !== undefined ? `${l.entries} entradas` : l.why}`)
+    }
+  } else companions.lexicons = 'sin texto literal: no se sabe de qué dueño'
+}
+const maculaFolder = arg('macula')
+if (maculaFolder) {
+  console.log(`[${elapsed()}] MACULA desde ${maculaFolder}…`)
+  companions.macula = await addMacula(cacheAdapter as never, catalogAdapter as never, resolve(maculaFolder), new Date().toISOString())
+  for (const m of companions.macula as Array<{ key: string; books: number }>) console.log(`[${elapsed()}]   ${m.key}: ${m.books} libros`)
+}
+// Open Bible Stories and their helps left out when asked: only the Bible is translated.
+const isObs = (m: { subject?: unknown }) => /OBS|Open Bible Stories/i.test(String(m.subject ?? ''))
+const keyOfRow = (m: { owner?: unknown; language?: unknown; resourceId?: unknown; resourceKey?: unknown }) =>
+  String(m.resourceKey ?? `${m.owner}/${m.language}/${m.resourceId}`)
+const resourceKeys = process.argv.includes('--no-obs')
+  ? (await source.catalogRows()).filter((m) => m.language === language && !isObs(m)).map(keyOfRow)
+  : undefined
+
 const common = {
   source,
   language,
+  ...(resourceKeys ? { resourceKeys } : {}),
   versions: {
     sot: { usjProcessing: USJ_PROCESSING_VERSION },
     quote: { helpsQuote: HELPS_QUOTE_VERSION },
@@ -106,7 +142,13 @@ async function writePack(file: string, params: Partial<Parameters<typeof buildLa
 
 console.log(`[${elapsed()}] Armando los paquetes…`)
 const languageManifest = await writePack(`${language}.langpack.zip`, { kind: 'language' })
-if (includeOriginals) await writePack('originals.langpack.zip', { kind: 'originals' })
+if (includeOriginals) {
+  await writePack('originals.langpack.zip', {
+    kind: 'originals',
+    resourceKeys: undefined,
+    originalKeys: [...ORIGINAL_LANGUAGE_KEYS, ...(companions.macula ? MACULA_KEYS : [])],
+  })
+}
 if (booksArg) {
   const base = await writePack(`${language}-base.langpack.zip`, { kind: 'base' })
   const available = [...new Set(base.resources.flatMap((r) => r.books ?? []))].sort()
@@ -114,7 +156,7 @@ if (booksArg) {
   for (const book of books) await writePack(`${language}-${book}.langpack.zip`, { kind: 'book', books: [book] })
 }
 
-writeFileSync(join(outDir, `${language}.report.json`), JSON.stringify({ preparation, packs }, null, 2))
+writeFileSync(join(outDir, `${language}.report.json`), JSON.stringify({ preparation, companions, packs }, null, 2))
 
 console.log(`[${elapsed()}] Listo en ${outDir}`)
 for (const build of preparation.builds) {
