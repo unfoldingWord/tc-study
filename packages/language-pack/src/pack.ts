@@ -221,8 +221,11 @@ export type ImportPackParams = {
   target: PackTarget
   /** Only these layers (the receipts and the source of truth always come). */
   layers?: readonly PackLayer[]
-  /** Replace rows the store already has. Off by default: what the device has stays, and the pack fills the gaps. */
-  overwrite?: boolean
+  /**
+   * Replace rows the store already has. Off by default: what the device has stays, and the pack fills the gaps. A list
+   * of resource keys replaces only those (an app that opens a newer release of one resource and keeps the rest).
+   */
+  overwrite?: boolean | readonly string[]
   /** Rows written per batch. */
   batch?: number
   /** This app's processing versions, by layer, to compare with the pack's (see `PackManifest.versions`). */
@@ -278,6 +281,10 @@ function differingLayers(pack: PackVersions | undefined, mine: PackVersions | un
   return out
 }
 
+/** Whether `overwrite` asks to replace what the store has of a resource. */
+const replacing = (overwrite: ImportPackParams['overwrite'], key: string): boolean =>
+  Array.isArray(overwrite) ? overwrite.includes(key) : overwrite === true
+
 /**
  * Opens a pack into an app's store. Catalog rows go first, then receipts last of all for each resource, so a pack cut
  * short never leaves a receipt saying "complete" for a resource whose rows did not all arrive.
@@ -326,7 +333,7 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
     const mine = target.catalogRow ? await target.catalogRow(row.key) : null
     if (!mine) continue
     if (resourceContentStamp(mine) === resourceContentStamp(row.metadata)) continue
-    if (params.overwrite) replace.add(row.key)
+    if (replacing(params.overwrite, row.key)) replace.add(row.key)
     else {
       skip.add(row.key)
       result.skippedResources.push({ key: row.key, why: `el aparato tiene otra versión (${resourceContentStamp(mine)})` })
@@ -342,7 +349,7 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
   params.onProgress?.(0, total)
   for (const resource of manifest.resources) {
     if (skip.has(resource.key)) continue
-    const overwrite = params.overwrite || replace.has(resource.key)
+    const overwrite = replacing(params.overwrite, resource.key) || replace.has(resource.key)
     for (const layer of order) {
       if (!layers.has(layer) || !resource.rows[layer]) continue
       const file = zip.file(`rows/${layer}/${fileSafe(resource.key)}.jsonl`)

@@ -208,6 +208,26 @@ describe('abrir un paquete de idioma en otro aparato', () => {
     expect(kept.catalog.get(TN)).not.toBe(older)
   })
 
+  it('se puede pedir reemplazar solo algunos recursos: los demás en otra versión se dejan como están', async () => {
+    const { source } = store()
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN, TPL], originalKeys: [] })
+    const older = (key: string) => meta(key, { release: { tag_name: 'v0', published_at: '2026-01-01T00:00:00Z' } } as never)
+    const mine = { content: 'lo de la versión vieja', timestamp: 9, version: 1 }
+    const kept = emptyTarget([
+      { key: `tn:${TN}:tit:1`, entry: mine },
+      { key: `scripture-usj:${TPL}:tit:1`, entry: mine },
+    ])
+    kept.catalog.set(TN, older(TN))
+    kept.catalog.set(TPL, older(TPL))
+    const target = { ...kept.target, catalogRow: async (k: string) => kept.catalog.get(k) ?? null }
+    const result = await importLanguagePack({ bytes, target, versions: VERSIONS, overwrite: [TN] })
+    expect(result.skippedResources.map((r) => r.key)).toEqual([TPL])
+    expect(kept.rows.get(`tn:${TN}:tit:1`)).not.toEqual(mine)
+    expect(kept.catalog.get(TN)).not.toEqual(older(TN))
+    expect(kept.rows.get(`scripture-usj:${TPL}:tit:1`)).toEqual(mine)
+    expect(kept.catalog.get(TPL)).toEqual(older(TPL))
+  })
+
   it('el recibo de cada recurso se escribe al final, para que un paquete cortado no deje nada por completo que no lo está', async () => {
     const { source } = store()
     const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
