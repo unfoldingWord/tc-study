@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { ProcessedNotes } from '@bt-synergy/resource-parsers'
+import { NOTES_TSV_PARSER_VERSION, type ProcessedNotes } from '@bt-synergy/resource-parsers'
 import { ensurePreparersRegistered } from '../prepare/registerPreparers'
 import { runWarmAlignChapter, runWarmPrepareUnit, runWarmQuoteChapter } from './warmJobs'
 import type { WarmAlignChapterJob, WarmQuoteChapterJob } from './warmTypes'
@@ -40,6 +40,7 @@ const notesWithQuote: ProcessedNotes = {
     bookName: 'Titus',
     processingDate: new Date().toISOString(),
     totalNotes: 1,
+    parserVersion: NOTES_TSV_PARSER_VERSION,
     chaptersWithNotes: [1],
     statistics: { totalNotes: 1, notesPerChapter: { '1': 1 } },
   },
