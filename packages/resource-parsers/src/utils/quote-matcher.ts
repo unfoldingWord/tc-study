@@ -294,74 +294,58 @@ export class QuoteMatcher {
     reference: QuoteReference
   ): QuoteMatch | null {
     const normalizedQuote = this.normalizeText(quote);
-    let foundOccurrences = 0;
-    // Occurrence -1 in a TSV means every occurrence of the quote (unfoldingWord's format): no single one matches it,
-    // so the note was left without words (es-419 Jonah 1:3 n96t). All of them are gathered, in reading order.
-    const every: QuoteMatch[] = [];
+    // Every occurrence found by its consonants, in reading order, from where the search starts.
+    const found: QuoteMatch[] = [];
 
     // Search through verses starting from startVerseIndex
     for (let i = startVerseIndex; i < verses.length; i++) {
       const verse = verses[i];
-      
+
       if (!verse.tokens || verse.tokens.length === 0) {
         continue;
       }
-      
+
       // Create searchable text from tokens
       const wordTokens = verse.tokens.filter(token => token.type === 'word');
       const verseText = wordTokens
         .map(token => this.normalizeText(token.text))
         .join(' ');
-      
+
       // Find all occurrences of the quote in this verse
       const matches = this.findQuoteOccurrencesInText(verseText, normalizedQuote);
-      
+
       for (const match of matches) {
         // Skip matches that are before our start position (for sequential quote matching)
         if (i === startVerseIndex && match.start < startPosition) {
           continue;
         }
-        
-        foundOccurrences++;
-
-        if (occurrence === -1) {
-          every.push({
-            quote,
-            occurrence,
-            tokens: this.extractTokensForMatch(verse, match.start, match.end),
-            verseRef: `${reference.book} ${reference.startChapter}:${verse.number}`,
-            startPosition: match.start,
-            endPosition: match.end
-          });
-          continue;
-        }
-
-        if (foundOccurrences === occurrence) {
-          // Found the target occurrence, extract tokens
-          const tokens = this.extractTokensForMatch(verse, match.start, match.end);
-          
-          return {
-            quote,
-            occurrence,
-            tokens,
-            verseRef: `${reference.book} ${reference.startChapter}:${verse.number}`, // Construct reference from book and verse info
-            startPosition: match.start,
-            endPosition: match.end
-          };
-        }
+        found.push({
+          quote,
+          occurrence,
+          tokens: this.extractTokensForMatch(verse, match.start, match.end),
+          verseRef: `${reference.book} ${reference.startChapter}:${verse.number}`, // Construct reference from book and verse info
+          startPosition: match.start,
+          endPosition: match.end
+        });
       }
     }
 
-    if (every.length) {
-      // Found by consonants, kept as written: when some occurrences are the quote with its accents, only those are it
-      // (Jonah 1:3 has «מִלִּפְנֵי יְהוָה» twice, with different accents, and a note for each).
-      const asWritten = (s: string) => s.normalize('NFC').replace(/[\p{P}⁠]/gu, '').replace(/\s+/g, ' ').trim();
-      const exact = every.filter(m => asWritten(m.tokens.map(t => t.text).join(' ')) === asWritten(quote));
-      const taken = exact.length ? exact : every;
-      const last = taken[taken.length - 1];
-      return { ...taken[0], tokens: taken.flatMap(m => m.tokens), verseRef: last.verseRef, endPosition: last.endPosition };
+    // Found by consonants, counted as written (but not by case, as occurrences are): when some occurrences are the
+    // quote with its accents, only those count. Jonah 1:3 says «מִלִּפְנֵי יְהוָה» twice, with atnach and with silluq,
+    // and es-419 has a note for each: the one on the second, occurrence 1, took the first. A quote without its accents
+    // still counts every occurrence.
+    const asWritten = (text: string) => text.normalize('NFC').toLowerCase().replace(/[\p{P}\u2060]/gu, '').replace(/\s+/g, ' ').trim();
+    const exact = found.filter(m => asWritten(m.tokens.map(t => t.text).join(' ')) === asWritten(quote));
+    const counted = exact.length ? exact : found;
+
+    // Occurrence -1 in a TSV means every occurrence of the quote (unfoldingWord's format): counting never reached it,
+    // so the note was left without words (es-419 Jonah 1:3 n96t).
+    if (occurrence === -1) {
+      if (!counted.length) return null;
+      const last = counted[counted.length - 1];
+      return { ...counted[0], tokens: counted.flatMap(m => m.tokens), verseRef: last.verseRef, endPosition: last.endPosition };
     }
-    return null;
+    return counted[occurrence - 1] ?? null;
   }
   
   /**

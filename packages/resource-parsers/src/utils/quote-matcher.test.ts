@@ -61,6 +61,18 @@ describe('QuoteMatcher occurrence (USJ identity contract)', () => {
     expect(result.totalTokens.map((t) => t.id)).toEqual([2, 3])
   })
 
+  test('occurrence 1 of the second, by its accents, is the second (Jonah 1:3 sw66)', () => {
+    const result = matcher.findOriginalTokens(chapter(jonah13), 'מִ⁠לִּ⁠פְנֵ֖י יְהוָֽה', 1, { book: 'jon', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([5, 6])
+  })
+
+  test('occurrence 2 of a quote without accents is still the second by its consonants', () => {
+    const result = matcher.findOriginalTokens(chapter(jonah13), 'מלפני יהוה', 2, { book: 'jon', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([5, 6])
+  })
+
   test('occurrence -1 of a quote without accents takes every occurrence', () => {
     const result = matcher.findOriginalTokens(chapter(jonah13), 'מלפני יהוה', -1, { book: 'jon', startChapter: 1, startVerse: 1 })
     expect(result.success).toBe(true)
