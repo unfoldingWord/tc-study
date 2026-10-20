@@ -15,7 +15,8 @@ import { resourceContentStamp, type ResourceStampSource } from '@bt-synergy/reso
 export const HELPS_QUOTE_PREFIX = 'helps-quote:'
 /** Bump when QuoteMatcher / buildQuoteTokens output shape changes.
  *  5: align clones keep stamped chapter/verse so merged-stream hits paint every verse. */
-export const HELPS_QUOTE_VERSION = 6
+/*  7: occurrence -1 (every occurrence) is found, as written where the accents tell (es-419 Jonah 1:3 n96t). */
+export const HELPS_QUOTE_VERSION = 7
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_QUOTE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 

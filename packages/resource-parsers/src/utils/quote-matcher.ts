@@ -295,7 +295,10 @@ export class QuoteMatcher {
   ): QuoteMatch | null {
     const normalizedQuote = this.normalizeText(quote);
     let foundOccurrences = 0;
-    
+    // Occurrence -1 in a TSV means every occurrence of the quote (unfoldingWord's format): no single one matches it,
+    // so the note was left without words (es-419 Jonah 1:3 n96t). All of them are gathered, in reading order.
+    const every: QuoteMatch[] = [];
+
     // Search through verses starting from startVerseIndex
     for (let i = startVerseIndex; i < verses.length; i++) {
       const verse = verses[i];
@@ -320,7 +323,19 @@ export class QuoteMatcher {
         }
         
         foundOccurrences++;
-        
+
+        if (occurrence === -1) {
+          every.push({
+            quote,
+            occurrence,
+            tokens: this.extractTokensForMatch(verse, match.start, match.end),
+            verseRef: `${reference.book} ${reference.startChapter}:${verse.number}`,
+            startPosition: match.start,
+            endPosition: match.end
+          });
+          continue;
+        }
+
         if (foundOccurrences === occurrence) {
           // Found the target occurrence, extract tokens
           const tokens = this.extractTokensForMatch(verse, match.start, match.end);
@@ -336,7 +351,16 @@ export class QuoteMatcher {
         }
       }
     }
-    
+
+    if (every.length) {
+      // Found by consonants, kept as written: when some occurrences are the quote with its accents, only those are it
+      // (Jonah 1:3 has «מִלִּפְנֵי יְהוָה» twice, with different accents, and a note for each).
+      const asWritten = (s: string) => s.normalize('NFC').replace(/[\p{P}⁠]/gu, '').replace(/\s+/g, ' ').trim();
+      const exact = every.filter(m => asWritten(m.tokens.map(t => t.text).join(' ')) === asWritten(quote));
+      const taken = exact.length ? exact : every;
+      const last = taken[taken.length - 1];
+      return { ...taken[0], tokens: taken.flatMap(m => m.tokens), verseRef: last.verseRef, endPosition: last.endPosition };
+    }
     return null;
   }
   

@@ -33,8 +33,8 @@ describe('resource-pipeline sin pantalla', () => {
 
   test('las versiones son las que los paquetes de idioma llevan en su manifiesto', async () => {
     const p = await import('./index')
-    expect(p.HELPS_QUOTE_VERSION).toBe(6)
-    expect(p.HELPS_ALIGN_VERSION).toBe(9)
+    expect(p.HELPS_QUOTE_VERSION).toBe(7)
+    expect(p.HELPS_ALIGN_VERSION).toBe(10)
     expect(p.SCRIPTURE_PREPARE_VERSION).toBe(5000230)
     expect(p.WARM_COVERAGE_KEY).toBe('warm-coverage:v1')
   })
