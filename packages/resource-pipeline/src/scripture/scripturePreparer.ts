@@ -39,9 +39,11 @@ import {
  *    (es-419 Titus 1:1: second «de Dios» dropped, later «de» shifted by one).
  * 5: full-tier match keys keep a word's marks (semanticIdMatchKey): two words
  *    that differ only by their accents no longer share a key (Jonah 1:3 יְהוָ֑ה,
- *    יְהוָֽה). The unmerged nav fix (fb52783) must take 6.
+ *    יְהוָֽה). The unmerged nav fix (fb52783) must take 7.
+ * 6: a ketiv's token carries the key of its qere (`q`), the word as alignments
+ *    name it (Ruth 4:5 קניתי, aligned as קָנִ֔יתָה).
  */
-export const SCRIPTURE_PREPARE_SCHEMA = 5
+export const SCRIPTURE_PREPARE_SCHEMA = 6
 
 /**
  * Derived prepare cache version. Embeds USJ SoT version digits so nav/light/full
@@ -65,6 +67,9 @@ export interface InternedToken {
   o: number
   k: number
   a?: number[]
+  /** A ketiv's qere surface and the matchKeys index of its id (UsjWordToken.qereSemanticId). */
+  qc?: string
+  q?: number
 }
 
 export type LightInline =
@@ -219,7 +224,11 @@ function toInternedToken(
   if (aligned.length > 0) {
     a = aligned.map((id) => internKey(table, index, semanticIdMatchKey(id)))
   }
-  return { c: token.content, o: token.occurrence, k, ...(a ? { a } : {}) }
+  const qere =
+    token.qere && token.qereSemanticId
+      ? { qc: token.qere, q: internKey(table, index, semanticIdMatchKey(token.qereSemanticId)) }
+      : {}
+  return { c: token.content, o: token.occurrence, k, ...(a ? { a } : {}), ...qere }
 }
 
 export function buildFullChapter(

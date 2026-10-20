@@ -36,13 +36,17 @@ function quotePartWords(quote: string): string[][] {
     })
 }
 
-function findSequenceMatches(haystack: string[], needle: string[]): number[] {
+function findSequenceMatches(
+  haystack: string[],
+  needle: string[],
+  alternates: Array<string | undefined> = []
+): number[] {
   if (!needle.length || haystack.length < needle.length) return []
   const starts: number[] = []
   for (let i = 0; i <= haystack.length - needle.length; i++) {
     let ok = true
     for (let k = 0; k < needle.length; k++) {
-      if (haystack[i + k] !== needle[k]) {
+      if (haystack[i + k] !== needle[k] && alternates[i + k] !== needle[k]) {
         ok = false
         break
       }
@@ -71,10 +75,14 @@ export function findTokensByQuoteText(
 
   const wordPositions: number[] = []
   const wordNorms: string[] = []
+  // A ketiv is also found by its qere, the word quotes name (when the qere is one word).
+  const qereNorms: Array<string | undefined> = []
   targetTokens.forEach((token, index) => {
     if (token.type !== 'word') return
     wordPositions.push(index)
     wordNorms.push(fold(token.text))
+    const qere = token.qere ? fold(token.qere) : undefined
+    qereNorms.push(qere && !qere.includes(' ') ? qere : undefined)
   })
   if (!wordNorms.length) return []
 
@@ -83,7 +91,7 @@ export function findTokensByQuoteText(
 
   for (let pi = 0; pi < parts.length; pi++) {
     const needle = parts[pi]!
-    const starts = findSequenceMatches(wordNorms, needle).filter((s) => s > after)
+    const starts = findSequenceMatches(wordNorms, needle, qereNorms).filter((s) => s > after)
     if (!starts.length) return []
     const chosen = pi === 0 ? starts[occurrence - 1] : starts[0]
     if (chosen == null) return []

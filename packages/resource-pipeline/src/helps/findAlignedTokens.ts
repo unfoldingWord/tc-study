@@ -19,12 +19,15 @@ export interface AlignedToken {
 type BroadcastishToken = OptimizedToken & {
   alignedOriginalWordIds?: unknown[]
   semanticId?: string
+  qereSemanticId?: string
 }
 
 function tokenMatchIds(token: OptimizedToken): string[] {
   const tk = token as BroadcastishToken
   const ids: string[] = []
   if (tk.semanticId) ids.push(String(tk.semanticId))
+  // A ketiv of the Hebrew Bible is also the word its qere names.
+  if (tk.qereSemanticId) ids.push(String(tk.qereSemanticId))
   if (Array.isArray(tk.alignedOriginalWordIds)) {
     for (const id of tk.alignedOriginalWordIds) ids.push(String(id))
   }

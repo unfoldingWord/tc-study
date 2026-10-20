@@ -20,8 +20,9 @@ export const HELPS_ALIGN_PREFIX = 'helps-align:'
  *  8: matched by the word as written, marks kept: a note on one of two words
  *     that differ only by their accents no longer marks both (Jonah 1:3).
  *  9: from quote tokens that are whole words (HELPS_QUOTE_VERSION 6, Ruth 1:16).
- *  10: from quote tokens of occurrence -1 notes, which had none (HELPS_QUOTE_VERSION 7, Jonah 1:3). */
-export const HELPS_ALIGN_VERSION = 10
+ *  10: from quote tokens of occurrence -1 notes, which had none (HELPS_QUOTE_VERSION 7, Jonah 1:3).
+ *  11: a ketiv's quote token is also aligned by its qere (HELPS_QUOTE_VERSION 8, Ruth 4:5). */
+export const HELPS_ALIGN_VERSION = 11
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_ALIGN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 

@@ -220,12 +220,12 @@ Value: `{ stamp, unitCount, updatedAt }`. Lane 3 uses this to skip a finished re
 | --- | --- | --- |
 | `USJ_PROCESSING_VERSION` / `USJ_TOOL_VERSIONS` | `2.3.0-usj` / parser+usjCore `0.1.1` | `scripture-usj:` chapter SoT; scripture `ingestSchema` (`usj:2.3.0-usj`); word tokens (2.3.0: a note's words, the Hebrew qere, are not the verse's) |
 | `HELPS_INGEST_SCHEMA` | `1` → receipt `helps:1` | Helps / article / OBS receipts |
-| `SCRIPTURE_PREPARE_SCHEMA` | `5` | Light/full/nav **shape**, and the full tier's match keys (5: a word as written, marks kept). Combined version = `schema * 1_000_000 + USJ digits` → **`5000230`** |
+| `SCRIPTURE_PREPARE_SCHEMA` | `6` | Light/full/nav **shape**, and the full tier's match keys (5: a word as written, marks kept; 6: a ketiv's token carries its qere's key `q`). Combined version = `schema * 1_000_000 + USJ digits` → **`6000230`** |
 | `NOTES_PREPARE_VERSION` | `4` | `prepared:notes:` |
 | `WORDS_LINKS_PREPARE_VERSION` | `1` | `prepared:words-links:` |
 | `QUESTIONS_PREPARE_VERSION` / `OBS_PREPARE_VERSION` / `OBS_NOTES_PREPARE_VERSION` | `1` | Matching `prepared:` rows |
-| `HELPS_QUOTE_VERSION` | `5` | Quote rows (verse stamps on tokens) |
-| `HELPS_ALIGN_VERSION` | `9` | Align rows (keeps quote verse stamps; `t[]` chips; 8: matched by the word as written; 9: from whole-word quotes) |
+| `HELPS_QUOTE_VERSION` | `8` | Quote rows (verse stamps on tokens; 8: a ketiv found by its qere keeps it) |
+| `HELPS_ALIGN_VERSION` | `11` | Align rows (keeps quote verse stamps; `t[]` chips; 8: matched by the word as written; 9: from whole-word quotes; 11: a ketiv aligned by its qere) |
 | `HELPS_TEXT_VERSION` | `1` | Title / preview strings |
 | `WARM_COVERAGE_VERSION` | `1` | Coverage map envelope |
 | Quote / align TTL | **30 days** (`expiresAt`) | Abandoned book/chapter combos; stamps still handle correctness |

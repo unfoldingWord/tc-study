@@ -42,6 +42,7 @@ export function extractPreparedBroadcastTokens(
       if (assignedVerse < startVerse || assignedVerse > endVerse) continue
       const verseRef = `${verseRefPrefix}${assignedVerse}`
       const token = item.token
+      const qereId = token.q != null ? full.matchKeys[token.q] : undefined
       tokens.push({
         id: tokens.length,
         text: token.c,
@@ -52,6 +53,7 @@ export function extractPreparedBroadcastTokens(
         alignedOriginalWordIds: (token.a ?? [])
           .map((idx) => full.matchKeys[idx])
           .filter((id): id is string => typeof id === 'string'),
+        ...(token.qc && qereId ? { qere: token.qc, qereSemanticId: qereId } : {}),
       })
     }
   }

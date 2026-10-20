@@ -103,11 +103,11 @@ Pack and app must agree on these constants; the pack manifest carries them by la
 | `USJ_PROCESSING_VERSION` | `2.3.0-usj` | `packages/usj-processor/src/versions.ts` |
 | `NOTES_TSV_PARSER_VERSION` | `3` | `packages/resource-parsers/src/parsers/tsv/notes-parser.ts` |
 | `HELPS_INGEST_SCHEMA` | `1` (receipt `helps:1`; scripture `usj:2.3.0-usj`) | `packages/resource-catalog/src/ingestReceipt.ts` |
-| `SCRIPTURE_PREPARE_VERSION` | `5000230` | `features/scripture/scripturePreparer.ts` |
+| `SCRIPTURE_PREPARE_VERSION` | `6000230` | `features/scripture/scripturePreparer.ts` |
 | `NOTES_PREPARE_VERSION` | `5` | `features/notes/notesPreparer.ts` |
 | words-links, questions, academy, words, OBS, OBS notes, OBS questions prepare versions | `1` each | their preparers |
-| `HELPS_QUOTE_VERSION` | `5` (TTL 30 days) | `features/helps/helpsQuoteCache.ts` |
-| `HELPS_ALIGN_VERSION` | `9` (TTL 30 days) | `features/helps/helpsAlignCache.ts` |
+| `HELPS_QUOTE_VERSION` | `8` (TTL 30 days) | `features/helps/helpsQuoteCache.ts` |
+| `HELPS_ALIGN_VERSION` | `11` (TTL 30 days) | `features/helps/helpsAlignCache.ts` |
 | `HELPS_TEXT_VERSION` | `1` | `features/helps/helpsCacheKeys.ts` |
 
 Physical layout too: databases `tc-study-cache` / `cache-entries` and `tc-study-catalog` / `catalog-entries`, and

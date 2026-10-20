@@ -16,7 +16,8 @@ export const HELPS_QUOTE_PREFIX = 'helps-quote:'
 /** Bump when QuoteMatcher / buildQuoteTokens output shape changes.
  *  5: align clones keep stamped chapter/verse so merged-stream hits paint every verse. */
 /*  7: occurrence -1 (every occurrence) is found, as written where the accents tell (es-419 Jonah 1:3 n96t). */
-export const HELPS_QUOTE_VERSION = 7
+/*  8: a ketiv is found by its qere and keeps it (es-419 Ruth 4:5 ut23 lost קָנִ֔יתָה). */
+export const HELPS_QUOTE_VERSION = 8
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_QUOTE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -29,6 +30,9 @@ export type CachedQuoteToken = {
   /** Stamped when a multi-verse quote segment matched this verse. */
   chapter?: number
   verse?: number
+  /** A ketiv's qere and its occurrence (OptimizedToken.qere): alignments name the word by it. */
+  qere?: string
+  qereOccurrence?: number
 }
 
 /** linkId → clone-safe quote tokens (empty array = settled miss). */
@@ -77,6 +81,8 @@ export function toCachedQuoteTokens(
     content?: string
     chapter?: number
     verse?: number
+    qere?: string
+    qereOccurrence?: number
   }> | null | undefined
 ): CachedQuoteToken[] {
   if (!tokens?.length) return []
@@ -90,6 +96,10 @@ export function toCachedQuoteTokens(
     }
     if (typeof t.chapter === 'number' && t.chapter > 0) row.chapter = t.chapter
     if (typeof t.verse === 'number' && t.verse > 0) row.verse = t.verse
+    if (t.qere) {
+      row.qere = t.qere
+      if (typeof t.qereOccurrence === 'number' && t.qereOccurrence > 0) row.qereOccurrence = t.qereOccurrence
+    }
     return row
   })
 }

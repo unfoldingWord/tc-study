@@ -56,6 +56,13 @@ export function generateSemanticIdsForQuoteTokens(
     return `${book} ${tokenChapter}:${tokenVerse}`
   }
 
+  // A ketiv is also named by its qere: `\zaln` x-content gives the qere (Ruth 4:5 קָנִ֔יתָה, where the text says קניתי),
+  // so the quote carries both ids, and each pane finds the one it knows.
+  const qereIdFor = (token: OptimizedToken, fallbackOccurrence: number): string[] =>
+    token.qere
+      ? [semanticIdFor(verseRefFor(token), token.qere, token.qereOccurrence || fallbackOccurrence)]
+      : []
+
   // For single-token quotes, use the TWL occurrence directly
   if (tokens.length === 1 && baseOccurrence !== undefined) {
     return [
@@ -64,15 +71,17 @@ export function generateSemanticIdsForQuoteTokens(
         verseRef: verseRefFor(tokens[0]!),
         occurrence: baseOccurrence,
       }),
+      ...qereIdFor(tokens[0]!, baseOccurrence),
     ]
   }
 
   // Multi-token / multi-part: occurrence is verse-wide (set by QuoteMatcher)
-  return tokens.map((token) =>
+  return tokens.flatMap((token) => [
     generateSemanticId({
       token,
       verseRef: verseRefFor(token),
       occurrence: token.occurrence || 1,
-    })
-  )
+    }),
+    ...qereIdFor(token, token.occurrence || 1),
+  ])
 }
