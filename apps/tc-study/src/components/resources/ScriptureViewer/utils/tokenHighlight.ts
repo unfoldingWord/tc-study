@@ -12,7 +12,12 @@ export interface TokenVisualState {
 type PaintTokenKeys = {
   semanticId: string
   alignedOriginalWordIds: readonly string[]
+  /** A ketiv's id by its qere — gateway alignments and helps name the qere. */
+  qereSemanticId?: string
 }
+
+/** A Hebrew Bible ketiv also answers to its qere's id (UsjWordToken.qereSemanticId). */
+type PaintToken = ScriptureRenderToken & { qereSemanticId?: string }
 
 type PaintTargetKeys = {
   semanticId: string
@@ -32,16 +37,19 @@ export function foldHighlightTarget(
   }
 }
 
-function paintTokenKeys(token: ScriptureRenderToken): PaintTokenKeys {
+function paintTokenKeys(token: PaintToken): PaintTokenKeys {
+  const qere = token.qereSemanticId ? { qereSemanticId: semanticIdKey(token.qereSemanticId) } : {}
   if (token.foldedSemanticId !== undefined) {
     return {
       semanticId: token.foldedSemanticId,
       alignedOriginalWordIds: token.foldedAlignedIds ?? [],
+      ...qere,
     }
   }
   return {
     semanticId: semanticIdKey(token.semanticId),
     alignedOriginalWordIds: token.alignedOriginalWordIds.map(semanticIdKey),
+    ...qere,
   }
 }
 
@@ -64,13 +72,15 @@ function paintTargetKeys(target: OriginalLanguageToken | null): PaintTargetKeys 
  * (same semanticId or cross-pane alignment overlap). Used for toggle-off.
  */
 export function tokenMatchesHighlightTarget(
-  token: ScriptureRenderToken,
+  token: PaintToken,
   highlightTarget: OriginalLanguageToken | null
 ): boolean {
   const target = paintTargetKeys(highlightTarget)
   if (!target) return false
   const tokenKeys = paintTokenKeys(token)
+  const qere = tokenKeys.qereSemanticId
   if (tokenKeys.semanticId === target.semanticId) return true
+  if (qere && (qere === target.semanticId || target.alignedSemanticIds.has(qere))) return true
   if (tokenKeys.alignedOriginalWordIds.includes(target.semanticId)) return true
   if (target.alignedSemanticIds.has(tokenKeys.semanticId)) return true
   if (
@@ -84,7 +94,7 @@ export function tokenMatchesHighlightTarget(
 }
 
 export function resolveTokenVisualState(
-  token: ScriptureRenderToken,
+  token: PaintToken,
   opts: {
     highlightTarget: OriginalLanguageToken | null
     underlinedSemanticIds?: Set<string>
@@ -93,15 +103,18 @@ export function resolveTokenVisualState(
 ): TokenVisualState {
   const tokenKeys = paintTokenKeys(token)
   const target = paintTargetKeys(opts.highlightTarget)
+  const qere = tokenKeys.qereSemanticId
   let isHighlighted = false
   let isSelected = false
   if (target) {
     if (opts.isOriginalLanguage) {
-      if (tokenKeys.semanticId === target.semanticId) {
+      if (tokenKeys.semanticId === target.semanticId || (qere && qere === target.semanticId)) {
         isHighlighted = true
         isSelected = true
       } else if (target.alignedSemanticIds.size > 0) {
-        isHighlighted = target.alignedSemanticIds.has(tokenKeys.semanticId)
+        isHighlighted =
+          target.alignedSemanticIds.has(tokenKeys.semanticId) ||
+          Boolean(qere && target.alignedSemanticIds.has(qere))
       }
     } else if (tokenKeys.semanticId === target.semanticId) {
       isHighlighted = true
@@ -124,6 +137,7 @@ export function resolveTokenVisualState(
   if (underlines && underlines.size > 0) {
     isUnderlined =
       underlines.has(tokenKeys.semanticId) ||
+      Boolean(qere && underlines.has(qere)) ||
       tokenKeys.alignedOriginalWordIds.some((id) => underlines.has(id))
   }
   return { isHighlighted, isSelected, isUnderlined }
@@ -145,17 +159,19 @@ export function resolveTokenVisualStateInterned(
   let isHighlighted = false
   let isSelected = false
   const own = token.k
+  // A ketiv's qere index: gateway alignments and helps name the qere, not the ketiv.
+  const qere = token.q
   const aligned = token.a ?? []
   const hlOwn = opts.highlightOwnIndex
   const hlAligned = opts.highlightAlignedIndices
 
   if (hlOwn != null || hlAligned.size > 0) {
     if (opts.isOriginalLanguage) {
-      if (hlOwn != null && own === hlOwn) {
+      if (hlOwn != null && (own === hlOwn || qere === hlOwn)) {
         isHighlighted = true
         isSelected = true
       } else if (hlAligned.size > 0) {
-        isHighlighted = hlAligned.has(own)
+        isHighlighted = hlAligned.has(own) || (qere != null && hlAligned.has(qere))
       }
     } else if (hlOwn != null && own === hlOwn) {
       isHighlighted = true
@@ -175,7 +191,9 @@ export function resolveTokenVisualStateInterned(
   const underlines = opts.underlineIndices
   const isUnderlined =
     underlines.size > 0 &&
-    (underlines.has(own) || aligned.some((i) => underlines.has(i)))
+    (underlines.has(own) ||
+      (qere != null && underlines.has(qere)) ||
+      aligned.some((i) => underlines.has(i)))
 
   return { isHighlighted, isSelected, isUnderlined }
 }

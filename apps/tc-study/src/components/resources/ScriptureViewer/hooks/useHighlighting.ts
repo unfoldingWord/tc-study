@@ -51,6 +51,7 @@ export function usjWordFromInterned(
   token: InternedToken,
   matchKeys: readonly string[]
 ): UsjWordToken {
+  const qereSemanticId = token.q != null ? matchKeys[token.q] : undefined
   return {
     semanticId: rawSemanticIdForToken(verseRef, token),
     content: token.c,
@@ -60,7 +61,21 @@ export function usjWordFromInterned(
     alignedOriginalWordIds: (token.a ?? [])
       .map((i) => matchKeys[i])
       .filter((id): id is string => typeof id === 'string'),
+    ...(token.qc && qereSemanticId ? { qere: token.qc, qereSemanticId } : {}),
   }
+}
+
+/**
+ * IDs a click broadcasts as `alignedSemanticIds`: the gateway word's alignments, or the original word itself.
+ * A Hebrew Bible ketiv also sends its qere's id — gateway `\zaln` and the helps name the qere, not the ketiv.
+ */
+export function clickAlignedSemanticIds(token: UsjWordToken): string[] {
+  const ids =
+    token.alignedOriginalWordIds.length > 0
+      ? [...token.alignedOriginalWordIds]
+      : [token.semanticId]
+  if (token.qereSemanticId && !ids.includes(token.qereSemanticId)) ids.push(token.qereSemanticId)
+  return ids
 }
 
 export function useHighlighting(
@@ -207,10 +222,6 @@ export function useHighlighting(
         const currentRefSnapshot = currentRefRef.current
         const underlinedSnapshot = underlinedRef.current
         const { semanticId, verseRef, content: tokenContent } = token
-        const alignedSemanticIds =
-          token.alignedOriginalWordIds.length > 0
-            ? [...token.alignedOriginalWordIds]
-            : undefined
 
         // Toggle-off: clicking the active highlight clears selection + owned filters.
         if (tokenMatchesHighlightTarget(token, highlightTargetRef.current)) {
@@ -224,15 +235,14 @@ export function useHighlighting(
           return
         }
 
+        const effectiveAlignedIds = clickAlignedSemanticIds(token)
         const tokenKey = semanticIdKey(semanticId)
-        const alignedKeys = alignedSemanticIds?.map(semanticIdKey) ?? []
+        const alignedKeys = effectiveAlignedIds.map(semanticIdKey)
         const hasCoverage =
           underlinedSnapshot && underlinedSnapshot.size > 0
             ? underlinedSnapshot.has(tokenKey) ||
               alignedKeys.some((k) => underlinedSnapshot.has(k))
             : false
-
-        const effectiveAlignedIds = alignedSemanticIds ?? [semanticId]
 
         const next = foldHighlightTarget({
           semanticId,

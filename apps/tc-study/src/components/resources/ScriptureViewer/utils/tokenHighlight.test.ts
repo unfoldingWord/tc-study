@@ -291,3 +291,99 @@ describe('resolveTokenVisualStateInterned', () => {
     expect(state.isUnderlined).toBe(true)
   })
 })
+
+describe('ketiv and qere (Ruth 4:5)', () => {
+  // The UHB verse has the ketiv קניתי; the GLT aligns «adquieres» to its qere קָנִ֔יתָה.
+  const verseRef = 'rut 4:5'
+  const ketivRaw = semanticIdFor(verseRef, 'קניתי', 1)
+  const qereRaw = semanticIdFor(verseRef, 'קָנִ֔יתָה', 1)
+  const adquieresRaw = semanticIdFor(verseRef, 'adquieres', 1)
+  const matchKeys = [
+    semanticIdMatchKey(ketivRaw),
+    semanticIdMatchKey(qereRaw),
+    semanticIdMatchKey(adquieresRaw),
+  ]
+  const ketiv = { c: 'קניתי', o: 1, k: 0, qc: 'קָנִ֔יתָה', q: 1 }
+  const adquieres = { c: 'adquieres', o: 1, k: 2, a: [1] }
+  const ketivWord = {
+    ...usjWord({ content: 'קניתי', verseRef }),
+    qere: 'קָנִ֔יתָה',
+    qereOccurrence: 1,
+    qereSemanticId: qereRaw,
+  }
+
+  // What the GLT pane receives when the ketiv is clicked in the UHB.
+  const ketivClick = {
+    semanticId: ketivRaw,
+    alignedSemanticIds: [ketivRaw, qereRaw],
+    content: 'קניתי',
+    verseRef,
+  }
+  // What the UHB pane receives when «adquieres» is clicked in the GLT.
+  const adquieresClick = {
+    semanticId: adquieresRaw,
+    alignedSemanticIds: [qereRaw],
+    content: 'adquieres',
+    verseRef,
+  }
+
+  test('a ketiv click lights up the gateway word aligned to the qere', () => {
+    const hl = highlightIndicesFromTarget(matchKeys, ketivClick)
+    const state = resolveTokenVisualStateInterned(adquieres, {
+      underlineIndices: new Set(),
+      highlightOwnIndex: hl.ownIndex,
+      highlightAlignedIndices: hl.alignedIndices,
+      isOriginalLanguage: false,
+    })
+    expect(state.isHighlighted).toBe(true)
+  })
+
+  test('a gateway click on the qere lights up the prepared ketiv', () => {
+    const hl = highlightIndicesFromTarget(matchKeys, adquieresClick)
+    const state = resolveTokenVisualStateInterned(ketiv, {
+      underlineIndices: new Set(),
+      highlightOwnIndex: hl.ownIndex,
+      highlightAlignedIndices: hl.alignedIndices,
+      isOriginalLanguage: true,
+    })
+    expect(state.isHighlighted).toBe(true)
+  })
+
+  test('the prepared ketiv is not lit by another word of the verse', () => {
+    const hl = highlightIndicesFromTarget(matchKeys, {
+      ...adquieresClick,
+      alignedSemanticIds: [adquieresRaw],
+    })
+    const state = resolveTokenVisualStateInterned(ketiv, {
+      underlineIndices: new Set(),
+      highlightOwnIndex: hl.ownIndex,
+      highlightAlignedIndices: hl.alignedIndices,
+      isOriginalLanguage: true,
+    })
+    expect(state.isHighlighted).toBe(false)
+  })
+
+  test('a helps underline on the qere underlines the prepared ketiv', () => {
+    const state = resolveTokenVisualStateInterned(ketiv, {
+      underlineIndices: new Set([1]),
+      highlightOwnIndex: null,
+      highlightAlignedIndices: new Set(),
+      isOriginalLanguage: true,
+    })
+    expect(state.isUnderlined).toBe(true)
+  })
+
+  test('a gateway click on the qere lights up the view-model ketiv', () => {
+    const state = resolveTokenVisualState(attachFoldedMatchKeys(ketivWord), {
+      highlightTarget: foldHighlightTarget(adquieresClick),
+      underlinedSemanticIds: new Set([semanticIdKey(qereRaw)]),
+      isOriginalLanguage: true,
+    })
+    expect(state.isHighlighted).toBe(true)
+    expect(state.isUnderlined).toBe(true)
+  })
+
+  test('clicking the lit ketiv toggles the gateway selection off', () => {
+    expect(tokenMatchesHighlightTarget(ketivWord, foldHighlightTarget(adquieresClick))).toBe(true)
+  })
+})
