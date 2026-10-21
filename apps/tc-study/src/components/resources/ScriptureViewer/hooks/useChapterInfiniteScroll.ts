@@ -203,7 +203,7 @@ export function useChapterInfiniteScroll(
       if (parent) {
         scrollParentRef.current = parent
         const stayEl = stayChapter != null ? chapterElsRef.current.get(stayChapter) : null
-        if (stayEl) {
+        if (stayEl && stayChapter != null) {
           // Keep the chapter the user was reading pinned, even if the opposite
           // end is trimmed when the stack hits max mounted chapters.
           preserveAlignRef.current = {
@@ -530,8 +530,6 @@ export function useChapterInfiniteScroll(
       return { parked, onSpacer, root, entries }
     }
 
-    const readViewportChapter = () => readViewportPark().parked
-
     const paintApproachingNeighbor = () => {
       const { root, entries } = readViewportEntries()
       // Never drive paint from spacer chrome — that teleports the window and
@@ -652,7 +650,7 @@ export function useChapterInfiniteScroll(
       if (msg.typeId !== RESOURCE_TYPE_IDS.SCRIPTURE) return
       if (msg.resourceKey !== resourceKey) return
       if (msg.bookId.toLowerCase() !== bookId.toLowerCase()) return
-      if (msg.tier !== 'full' && msg.tier !== 'both') return
+      if (msg.tier !== 'full') return
       setTokenSourceFailed(false)
       ensureAttemptsRef.current.delete(msg.unit)
       setFullReadyTick((n) => n + 1)

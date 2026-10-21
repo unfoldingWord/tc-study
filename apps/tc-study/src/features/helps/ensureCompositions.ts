@@ -139,7 +139,7 @@ function resourceHasPersistId(
   return false
 }
 
-function bindingsFingerprint(bindings: Record<string, string> | undefined): string {
+function bindingsFingerprint(bindings: Partial<Record<string, string>> | undefined): string {
   return Object.entries(bindings ?? {})
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}=${v}`)

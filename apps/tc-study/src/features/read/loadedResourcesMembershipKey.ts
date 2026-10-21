@@ -12,7 +12,7 @@ export function loadedResourcesMembershipKey(
       contentMetadata?: { ingredients?: ReadonlyArray<{ identifier?: string }> } | unknown
       helpsTnResourceKey?: string
       helpsTwlResourceKey?: string
-      consumedKeys?: Record<string, string>
+      consumedKeys?: Partial<Record<string, string>>
       appliesToScope?: string
     } | undefined
   >

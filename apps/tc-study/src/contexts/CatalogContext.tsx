@@ -129,7 +129,14 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
       hasResourceType: (id) => resourceTypeRegistry.has(id),
       getResourceType: (id) => resourceTypeRegistry.get(id),
       getAllResourceTypes: () => resourceTypeRegistry.getAll(),
-      viewerRegistry,
+      viewerRegistry: {
+        // ViewerRegistry stores renderable components; this web app takes the web half of platform viewers.
+        registerViewer: ({ component, ...viewer }) =>
+          viewerRegistry.registerViewer({
+            ...viewer,
+            component: 'web' in component ? component.web : component,
+          }),
+      },
       debug: false,
     })
     setActiveRegistries({

@@ -38,14 +38,14 @@ export async function resolveLane1SoT(args: {
   return result
 }
 
-export async function resolveLane1ScriptureViewModel(args: {
+export async function resolveLane1ScriptureViewModel<L extends DcsLoader>(args: {
   resourceKey: string
   book: string
   chapter?: number
   cache: SoTCache | null | undefined
-  loader: DcsLoader | null | undefined
+  loader: L | null | undefined
   loadViewModel: (
-    loader: DcsLoader | null | undefined,
+    loader: L | null | undefined,
     resourceKey: string,
     bookId: string
   ) => Promise<{ chapters: Array<{ number: number }> }>
