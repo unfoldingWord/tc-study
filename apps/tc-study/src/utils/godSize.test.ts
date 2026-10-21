@@ -31,7 +31,7 @@ const HARD_GODS: { name: string; path: string; hardMax: number }[] = [
   { name: 'navigationStore', path: 'features/nav/navigationStore.ts', hardMax: 100 },
   { name: 'WordsLinksViewer', path: 'components/resources/WordsLinksViewer/index.tsx', hardMax: 400 },
   { name: 'TranslationNotesViewer', path: 'components/resources/TranslationNotesViewer/index.tsx', hardMax: 400 },
-  { name: 'CombinedHelpsViewer', path: 'components/resources/CombinedHelpsViewer/index.tsx', hardMax: 433 },
+  { name: 'CombinedHelpsViewer', path: 'components/resources/CombinedHelpsViewer/index.tsx', hardMax: 391 },
   { name: 'SimplifiedReadView', path: 'components/read/SimplifiedReadView.tsx', hardMax: 400 },
   { name: 'useReadLanguageBootstrap', path: 'features/read/useReadLanguageBootstrap.ts', hardMax: 350 },
   // Chrome / studio shells (hard ≤400)
