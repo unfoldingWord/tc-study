@@ -75,7 +75,7 @@ describe('downloadBatchOrder', () => {
     )
     expect(src).toContain('compareDownloadBatchOrder')
     expect(src).toContain("type: 'resource-complete'")
-    expect(src).toContain('fallbackIngredientCount')
+    expect(src).toContain('discoveredIngredientCount')
     expect(src).toContain('resolveRunIngredientTotal')
     expect(src).not.toContain('needsCalculation')
     expect(src).not.toContain('registerPreparers')
