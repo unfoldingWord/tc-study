@@ -29,12 +29,20 @@ on:
           - staging
           - production
         default: staging
+      compat:
+        description: The pack compat key the dispatcher expects (the Worker sends its own); a run of other code stops
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 # One build per language and bucket at a time. A run queued behind it waits instead of cancelling the one in flight.
 # `target` is empty when a dispatch omits it, and then means staging, as in the environment below.
+# Languages are not serialized against each other: each catalog entry names its own originals pack, so a phone reading
+# one entry stays consistent, and originals.json is last-writer-wins between valid builds. (A shared job-level group
+# would not do: GitHub keeps one pending job per group and cancels the older pending ones.)
 concurrency:
   group: packs-${{ inputs.target || 'staging' }}-${{ inputs.language }}
   cancel-in-progress: false
@@ -48,14 +56,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     environment: ${{ inputs.target == 'production' && 'packs-production' || 'packs-staging' }}
-    # Any publish may write originals.json, which every language of a bucket names: they take turns. A no-upload run writes nothing,
-    # so it gets a group of its own per run and never waits.
-    concurrency:
-      group: ${{ inputs.mode == 'publish' && format('packs-originals-{0}', inputs.target || 'staging') || format('packs-run-{0}', github.run_id) }}
-      cancel-in-progress: false
     env:
       LANGUAGE: ${{ inputs.language }}
       MODE: ${{ inputs.mode }}
+      REQUESTED_COMPAT: ${{ inputs.compat }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
@@ -66,6 +70,11 @@ jobs:
             exit 1
           fi
           case "$MODE" in publish | no-upload) ;; *) echo "::error::mode must be publish or no-upload"; exit 1 ;; esac
+          # The same shape the Worker and packs-status check: the compat becomes a bucket key.
+          if [ -n "$REQUESTED_COMPAT" ] && ! [[ "$REQUESTED_COMPAT" =~ ^f[0-9]+\.[0-9]+-u[A-Za-z0-9_.]+-p[0-9]+-q[0-9]+-a[0-9]+-t[0-9]+$ ]]; then
+            echo "::error::compat is not a compat key"
+            exit 1
+          fi
 
       - name: Checkout tc-study
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -82,8 +91,27 @@ jobs:
       - name: Build pack tools
         run: bash scripts/build-pack-tools.sh
 
-      # Runs that fail before this step leave no status; the Worker writes `running` when it dispatches (plan 2, Task 5),
-      # so they are still counted.
+      # The Worker asks for builds of the compat it was deployed with. Code that builds another one (a compat bump not yet
+      # followed by a v2 redeploy) would publish where the Worker never looks and be dispatched again every hour: it marks
+      # the requested compat failed instead, which the Worker's guard reads, and builds nothing.
+      - name: Check compat
+        if: inputs.compat != ''
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          built="$(bun packages/resource-pipeline/cli/packs-status.ts --print-compat)"
+          if [ "$REQUESTED_COMPAT" = "$built" ]; then exit 0; fi
+          echo "::error::asked for compat $REQUESTED_COMPAT, this code builds $built: update CURRENT_PACK_COMPAT in translation-helps-mcp (v2) and redeploy"
+          if [ "$MODE" = publish ]; then
+            bun packages/resource-pipeline/cli/packs-status.ts --lang "$LANGUAGE" --state failed --run "$RUN_URL" --compat "$REQUESTED_COMPAT"
+          fi
+          exit 1
+
+      # Runs that fail before this step leave no status of their own; the Worker writes `running` when it dispatches
+      # (plan 2, Task 5), and counts a `running` mark it replaces after 5.5 hours as a failure, so they still count.
       # Only a publish run owns the language's status: a measurement must not flip it, nor count as a failure.
       - name: Status running
         id: running
