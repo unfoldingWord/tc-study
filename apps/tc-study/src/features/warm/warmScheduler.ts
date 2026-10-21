@@ -87,6 +87,13 @@ export type WarmVisibleContext = {
 
 type StatsListener = (stats: WarmSchedulerStats) => void
 
+declare global {
+  interface Window {
+    /** Latest warm stats, for inspecting the scheduler from devtools. */
+    __warmDebug?: WarmSchedulerStats
+  }
+}
+
 export type WarmSchedulerStats = {
   lane1Drained: boolean
   scrollUnsettled: boolean
@@ -165,7 +172,7 @@ function emit() {
   const stats = buildWarmStats()
   for (const l of listeners) l(stats)
   if (typeof window !== 'undefined') {
-    ;(window as unknown as { __warmDebug?: WarmSchedulerStats }).__warmDebug = stats
+    window.__warmDebug = stats
   }
 }
 

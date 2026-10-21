@@ -39,6 +39,13 @@ import {
   shouldWalkUiIdbDuringExtract,
 } from '../features/read/catalogBackgroundDownloadPolicy'
 
+declare global {
+  interface Window {
+    /** Last monitor decision, for inspecting background download from devtools. */
+    __bgdlLast?: unknown
+  }
+}
+
 export interface UseCatalogBackgroundDownloadOptions {
   /** Catalog manager instance */
   catalogManager: CatalogManager
@@ -146,7 +153,7 @@ export function useCatalogBackgroundDownload(
    */
   const checkCatalogAndDownload = useCallback(async () => {
     if (typeof window !== 'undefined') {
-      ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+      window.__bgdlLast = {
         phase: !enabled ? 'disabled' : !catalogManager || !completenessChecker ? 'no-services' : 'start',
         enabled,
       }
@@ -183,7 +190,7 @@ export function useCatalogBackgroundDownload(
           : [...(expectedResources ?? [])]
 
       if (typeof window !== 'undefined') {
-        ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+        window.__bgdlLast = {
           phase: 'keys',
           enabled: true,
           catalog: allResourceKeys.length,
@@ -201,7 +208,7 @@ export function useCatalogBackgroundDownload(
 
       if (uncheckedResources.length === 0) {
         if (typeof window !== 'undefined') {
-          ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+          window.__bgdlLast = {
             candidate: candidateKeys.length,
             unchecked: 0,
             expected: expectedResources?.length ?? 0,
@@ -237,7 +244,7 @@ export function useCatalogBackgroundDownload(
       // Do not treat every expected key as incomplete (false enqueue of full language zips).
       if (allResourceKeys.length === 0 && uncheckedResources.length > 0) {
         if (typeof window !== 'undefined') {
-          ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+          window.__bgdlLast = {
             phase: 'catalog-keys-timeout',
             candidate: candidateKeys.length,
             unchecked: uncheckedResources.length,
@@ -295,7 +302,7 @@ export function useCatalogBackgroundDownload(
 
         const started = onStartDownload(incompleteResources, totalIngredientsToDownload)
         if (typeof window !== 'undefined') {
-          ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+          window.__bgdlLast = {
             candidate: candidateKeys.length,
             unchecked: uncheckedResources.length,
             expected: expectedResources?.length ?? 0,
@@ -314,7 +321,7 @@ export function useCatalogBackgroundDownload(
     } catch (error) {
       console.error('[BG-DL] 🔍 Monitor Error checking catalog:', error)
       if (typeof window !== 'undefined') {
-        ;(window as unknown as { __bgdlLast?: unknown }).__bgdlLast = {
+        window.__bgdlLast = {
           phase: 'error',
           error: error instanceof Error ? error.message : String(error),
         }

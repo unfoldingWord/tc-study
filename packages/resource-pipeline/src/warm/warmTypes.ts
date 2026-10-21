@@ -2,6 +2,7 @@
  * Warm-lane job types — small postMessage payloads (keys + stamps only).
  */
 
+import type { BatchAlignLinksArgs } from '../helps/batchAlignLinks'
 import type { PrepareTier } from '../prepare/prepareKeys'
 
 export type WarmLane = 1 | 2 | 3
@@ -85,7 +86,7 @@ export type WarmBatchQuotesMsg = {
 export type WarmBatchAlignMsg = {
   id: string
   type: 'batch-align'
-} & Record<string, unknown>
+} & BatchAlignLinksArgs
 
 export type WarmInMsg =
   | { id: string; type: 'enqueue'; job: WarmJob }
