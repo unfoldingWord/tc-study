@@ -153,13 +153,8 @@ export const VerseRenderer = memo(function VerseRenderer({
           onVerseClick?.(chapterNumber, verse.number)
         }}
         role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onVerseClick?.(chapterNumber, verse.number)
-          }
-        }}
+        tabIndex={-1}
+        data-verse-number={verse.number}
         aria-label={`Verse ${verse.number}`}
       >
         {verse.number}{' '}
