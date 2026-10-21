@@ -166,6 +166,27 @@ describe('abrir un paquete de idioma en otro aparato', () => {
     expect(seen.every(([d], i) => i === 0 || d >= seen[i - 1][0])).toBe(true)
   })
 
+  it('abre una capa de a lotes sin cambiar las filas ni su orden', async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => row(`tn:${TN}:tit:${i + 1}`, { n: i + 1 }))
+    const rows = [receipt(TN), row(`tn:${TN}:tit`, { _chunkedBook: true, chapters: [1] }), ...ten]
+    const catalog = new Map([[TN, meta(TN)]])
+    const source: PackSource = {
+      rowsByPrefix: async (prefix) => rows.filter((r) => r.key >= prefix && r.key <= prefix + '￿'),
+      catalogRow: async (key) => catalog.get(key) ?? null,
+      catalogRows: async () => [...catalog.values()],
+    }
+    const { bytes } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+    const seen: Array<[number, number]> = []
+    const there = emptyTarget()
+    const result = await importLanguagePack({ bytes, target: there.target, batch: 3, onProgress: (done, total) => seen.push([done, total]) })
+    expect(there.writes.filter((k) => /:tit:\d+$/.test(k))).toEqual(ten.map((r) => r.key))
+    expect(result.written).toBe(rows.length)
+    expect(result.byLayer.sot).toBe(11)
+    // 12 rows in batches of 3 (the layers of one resource are read apart): the count goes up with every batch.
+    expect(seen.at(-1)).toEqual([12, 12])
+    expect(seen.length).toBeGreaterThan(4)
+  })
+
   it('funciona con el catálogo de tc-study, que lista claves y guarda de a una', async () => {
     const { rows, catalog } = store()
     const cache = { getByPrefix: async (prefix: string) => rows.filter((r) => r.key >= prefix && r.key <= prefix + '\uffff') }

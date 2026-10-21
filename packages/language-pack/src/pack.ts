@@ -19,6 +19,7 @@ import {
   type ResourceMetadata,
 } from '@bt-synergy/resource-catalog'
 import { ORIGINAL_LANGUAGE_KEYS, belongsTo, bookOfRow, fileSafe, isBookScoped, originalOfDerivedRow, scansFor } from './keys'
+import { chunksOf, linesFrom } from './lines'
 import {
   ALL_LAYERS,
   PACK_FORMAT,
@@ -355,12 +356,9 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
       const file = zip.file(`rows/${layer}/${fileSafe(resource.key)}.jsonl`)
       if (!file) throw new Error(`Al paquete le falta una parte: ${layer} de ${resource.key}.`)
       const opened = (params.now ?? new Date()).getTime()
-      const rows = (await file.async('string'))
-        .split('\n')
-        .filter((line) => line.trim())
-        .map((line) => restartLifetime(JSON.parse(line) as CacheRow, opened))
-      for (let i = 0; i < rows.length; i += batch) {
-        let slice = rows.slice(i, i + batch)
+      // A batch at a time, from the zip's stream: the layer is never held whole in memory.
+      const flush = async (rows: CacheRow[]) => {
+        let slice = rows
         done += slice.length
         if (!overwrite && target.existingKeys) {
           const have = await target.existingKeys(slice.map((row) => row.key))
@@ -374,6 +372,14 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
         }
         params.onProgress?.(Math.min(done, total), total)
       }
+      let pending: CacheRow[] = []
+      for await (const line of linesFrom(chunksOf(file))) {
+        pending.push(restartLifetime(JSON.parse(line) as CacheRow, opened))
+        if (pending.length < batch) continue
+        await flush(pending)
+        pending = []
+      }
+      if (pending.length) await flush(pending)
     }
   }
   return result
