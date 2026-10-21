@@ -5,7 +5,7 @@
  * Only visible in development mode
  */
 
-import { useState, useEffect, useSyncExternalStore } from 'react'
+import { useState, useEffect, useCallback, useSyncExternalStore } from 'react'
 import {
   Database,
   Download,
@@ -53,8 +53,8 @@ export function AdminPanel() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'complete' | 'incomplete' | 'error'>('all')
 
-  // Load resources data
-  const loadResourcesData = async () => {
+  // Load resources data (the catalog services are created once per CatalogProvider)
+  const loadResourcesData = useCallback(async () => {
     setLoading(true)
     try {
       // Get all resource keys from catalog
@@ -107,13 +107,13 @@ export function AdminPanel() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [catalogManager, resourceTypeRegistry, completenessChecker])
 
   useEffect(() => {
     if (isOpen) {
       loadResourcesData()
     }
-  }, [isOpen])
+  }, [isOpen, loadResourcesData])
 
   const toggleResource = (resourceKey: string) => {
     setExpandedResources(prev => {

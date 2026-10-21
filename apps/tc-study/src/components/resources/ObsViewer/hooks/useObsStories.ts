@@ -116,7 +116,7 @@ export function useObsStories(params: {
     return () => {
       cancelled = true
     }
-  }, [loadKey, catalogManager, allowHardMiss, resourceKey, storyNum, endStory])
+  }, [loadKey, catalogManager, allowHardMiss, resourceKey, storyNum, endStory, book])
 
   return { storyMap, loading, error }
 }

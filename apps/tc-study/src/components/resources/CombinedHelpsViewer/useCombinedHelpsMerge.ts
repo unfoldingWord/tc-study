@@ -1,4 +1,5 @@
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
+import type { AlignedToken } from '../../../features/helps/findAlignedTokens'
 import type { HelpsQuoteStatus } from '../../../features/helps/resolveHelpsQuoteStatus'
 import type { HastRoot } from '../../../lib/markdown/markdownToHast'
 import { useMemo } from 'react'
@@ -22,7 +23,7 @@ export {
 
 export type NoteWithAlignments = TranslationNote & {
   quoteTokens?: Array<{ text: string; id?: string | number; strong?: string; lemma?: string; morph?: string }>
-  alignedTokens?: Array<{ position: number }>
+  alignedTokens?: AlignedToken[]
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
   quoteWarmPending?: boolean
@@ -32,7 +33,7 @@ export type NoteWithAlignments = TranslationNote & {
 
 export type LinkWithAlignments = TranslationWordsLink & {
   quoteTokens?: Array<{ text: string }>
-  alignedTokens?: Array<{ position: number }>
+  alignedTokens?: AlignedToken[]
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
   quoteWarmPending?: boolean

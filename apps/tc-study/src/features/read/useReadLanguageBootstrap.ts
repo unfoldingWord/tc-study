@@ -187,7 +187,7 @@ export function useReadLanguageBootstrap({
       }
       stopDownload()
     },
-    [stopDownload]
+    [stopDownload, textKeysRef, helpsKeysRef]
   )
 
   const handleLanguageSelected = useCallback(
@@ -255,6 +255,9 @@ export function useReadLanguageBootstrap({
       seedBothLanguages,
       setPanelLanguage,
       inheritEmptyLanguage,
+      textKeysRef,
+      helpsKeysRef,
+      setExpectedResources,
     ]
   )
 
@@ -284,9 +287,12 @@ export function useReadLanguageBootstrap({
     handleLanguageSelected,
   })
 
+  const panel1Language = panels['panel-1'].languageCode
+  const panel2Language = panels['panel-2'].languageCode
+
   useEffect(() => {
     resetCatalogSettled()
-  }, [panels['panel-1'].languageCode, panels['panel-2'].languageCode, resetCatalogSettled])
+  }, [panel1Language, panel2Language, resetCatalogSettled])
 
   useEffect(() => {
     const inheritedId = inheritEmptyLanguage()
@@ -295,12 +301,7 @@ export function useReadLanguageBootstrap({
     if (!one) return
     const navigationScope = useNavigationStore.getState().navigationScope
     void runCatalogLoad({ ...one, navigationScope })
-  }, [
-    panels['panel-1'].languageCode,
-    panels['panel-2'].languageCode,
-    inheritEmptyLanguage,
-    runCatalogLoad,
-  ])
+  }, [panel1Language, panel2Language, inheritEmptyLanguage, runCatalogLoad])
 
   return {
     loadedResources,

@@ -19,6 +19,9 @@ import {
 } from './panelEntry'
 import type { ResourceTypeDefinition } from './types'
 
+/** The metadata fields a panel entry's viewer match reads (catalog metadata or a loaded-resource record). */
+type ViewerMatchMetadata = { type?: unknown; resourceId?: unknown; resourceKey?: unknown; id?: unknown }
+
 export interface PanelEntryRegistryConfig {
   /** Used to validate `consumes` ids. */
   hasResourceType: (id: string) => boolean
@@ -28,8 +31,8 @@ export interface PanelEntryRegistryConfig {
     registerViewer: (viewer: {
       resourceType: string
       displayName: string
-      component: PanelEntryDefinition['viewer']
-      canHandle: (metadata: Record<string, unknown>) => boolean
+      component: NonNullable<PanelEntryDefinition['viewer']>
+      canHandle: (metadata: ViewerMatchMetadata) => boolean
     }) => void
   }
   debug?: boolean
@@ -74,7 +77,7 @@ export class PanelEntryRegistry {
           resourceType: def.id,
           displayName: def.displayName,
           component: def.viewer,
-          canHandle: (metadata: Record<string, unknown>) => {
+          canHandle: (metadata: ViewerMatchMetadata) => {
             if (metadata.type === def.id) return true
             if (def.persistId && (metadata.type === def.persistId || metadata.resourceId === def.persistId)) {
               return true

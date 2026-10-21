@@ -56,10 +56,13 @@ export function useEntryTitles(resourceKey: string, taMetadata?: TAMetadataForTi
 
   // Clear retry timeouts when resourceKey (e.g. language) changes or unmount
   useEffect(() => {
+    // Both refs hold one Map for the hook's lifetime (mutated, never reassigned).
+    const retryTimeouts = retryTimeoutsRef.current
+    const retryCounts = retryCountRef.current
     return () => {
-      retryTimeoutsRef.current.forEach(t => clearTimeout(t))
-      retryTimeoutsRef.current.clear()
-      retryCountRef.current.clear()
+      retryTimeouts.forEach(t => clearTimeout(t))
+      retryTimeouts.clear()
+      retryCounts.clear()
     }
   }, [resourceKey])
 

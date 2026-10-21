@@ -124,7 +124,6 @@ const pendingLangByKey = new Map<string, string>()
 const coverageByJob = new Map<string, string>()
 const coverageBatches = new Map<string, CoverageBatch>()
 const listeners = new Set<StatsListener>()
-let seededBookKey = ''
 const admittedLane2Keys = new Set<string>()
 let admittedLane2Seed = ''
 const admittedLane3Keys = new Set<string>()
@@ -411,7 +410,6 @@ function resetLane2AdmitsIfNeeded(ctx: WarmVisibleContext): void {
   if (seed === admittedLane2Seed) return
   admittedLane2Seed = seed
   admittedLane2Keys.clear()
-  seededBookKey = seed
 }
 
 async function seedLane2(): Promise<void> {
@@ -604,7 +602,6 @@ function applyMergedContext(): void {
       void warmScheduler.cancelJobsForLanguage(prev.helpsLanguageCode)
     }
     if (prev.bookId !== context.bookId) {
-      seededBookKey = ''
       admittedLane2Seed = ''
       admittedLane2Keys.clear()
     }

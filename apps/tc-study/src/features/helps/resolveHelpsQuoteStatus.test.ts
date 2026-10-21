@@ -252,13 +252,6 @@ describe('TN quote-status wiring (same helper as TWL)', () => {
     ),
     'utf8'
   )
-  const tnPipelineSrc = readFileSync(
-    join(
-      import.meta.dir,
-      '../../components/resources/TranslationNotesViewer/hooks/useTranslationNotesPipeline.ts'
-    ),
-    'utf8'
-  )
 
   test('TranslationNoteCard reuses resolveHelpsQuoteStatus and pending spinner', () => {
     expect(tnCardSrc).toContain('resolveHelpsQuoteStatusForNote')

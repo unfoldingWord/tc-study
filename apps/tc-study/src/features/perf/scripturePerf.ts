@@ -7,6 +7,7 @@
 
 export type ScripturePerfPhase =
   | 'book-load'
+  | 'book-load-vm'
   | 'layout-build'
   | 'chapter-sequence'
   | 'chapter-upgrade'

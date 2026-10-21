@@ -128,8 +128,7 @@ export function ScriptureViewer({
       const successors = Object.entries(app.loadedResources)
         .filter(
           ([id, res]) =>
-            id !== resourceId &&
-            (res?.type === RESOURCE_TYPE_IDS.SCRIPTURE || res?.type === 'scripture')
+            id !== resourceId && res?.type === RESOURCE_TYPE_IDS.SCRIPTURE
         )
         .map(([id]) => id)
       const next = resolveLastActiveAfterScriptureUnmount({
@@ -148,8 +147,7 @@ export function ScriptureViewer({
   const liveScriptureIdsSig = useAppStore((s) =>
     Object.entries(s.loadedResources)
       .filter(
-        ([, res]) =>
-          res?.type === RESOURCE_TYPE_IDS.SCRIPTURE || res?.type === 'scripture'
+        ([, res]) => res?.type === RESOURCE_TYPE_IDS.SCRIPTURE
       )
       .map(([id]) => id)
       .sort()

@@ -19,7 +19,8 @@ export function useSimpleResourceWizard(onAddResource: (resourceId: string) => v
   const [catalogResources, setCatalogResources] = useState<CatalogResourceRow[]>([])
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true)
 
-  const packages = usePackageStore((s) => s.packages) || []
+  const storedPackages = usePackageStore((s) => s.packages)
+  const packages = useMemo(() => storedPackages || [], [storedPackages])
   const catalogManager = useCatalogManager()
 
   const loadCatalogResources = async () => {
