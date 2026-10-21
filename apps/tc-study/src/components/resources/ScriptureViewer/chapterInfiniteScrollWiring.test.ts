@@ -173,7 +173,9 @@ describe('chapter edge-reveal + warm wiring', () => {
       join(import.meta.dir, '../../../features/nav/chapterInfiniteScroll.ts'),
       'utf8'
     )
-    expect(navSrc).toContain('CHAPTER_EDGE_SWAP_MODE = true')
+    // Edge-reveal is the only mode: the legacy stitch / spacer path stays gone.
+    expect(navSrc).not.toContain('stitchMountedChapters')
+    expect(navSrc).not.toContain("'spacer'")
     expect(navSrc).toContain('revealChapterInWindow')
     expect(navSrc).toContain('MAX_MOUNTED_CHAPTERS = 3')
     expect(navSrc).toContain('CHAPTER_REVEAL_PEEK_PX')

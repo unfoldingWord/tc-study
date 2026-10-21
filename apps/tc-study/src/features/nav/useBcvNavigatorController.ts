@@ -18,6 +18,8 @@ import {
   buildSectionApplyRef,
   buildVerseApplyRef,
   chapterClickSelection,
+  chapterGrainSelection,
+  chapterLastVerse,
   findLoadedResourceTitle,
   initVerseRangeFromRef,
   nextObsRangeClick,
@@ -34,18 +36,8 @@ import {
 import { useBcvNavigatorCatalog } from './useBcvNavigatorCatalog'
 import { useBcvNavigatorScroll } from './useBcvNavigatorScroll'
 import { markReadNavigationInternal } from '../read/replaceReadUrlFromUi'
-import { navigatorCommittedScope } from './bcvNavigatorModeSwitch'
+import { navigatorCommittedScope, resolveScripturePickerGrain } from './bcvNavigatorModeSwitch'
 import type { ScripturePickerGrain } from './ScopeTabs'
-
-function resolveScripturePickerGrain(
-  mode: 'verse' | 'section' | 'chapter' | undefined,
-  navigationMode: string
-): ScripturePickerGrain {
-  if (mode === 'section' || mode === 'chapter' || mode === 'verse') return mode
-  if (navigationMode === 'section') return 'section'
-  if (navigationMode === 'chapter') return 'chapter'
-  return 'verse'
-}
 
 export function useBcvNavigatorController(options: {
   onClose: () => void
@@ -208,16 +200,10 @@ export function useBcvNavigatorController(options: {
 
   const setScriptureGrain = (grain: ScripturePickerGrain) => {
     setPickerScriptureMode(grain)
-    if (grain === 'chapter' && startVerse) {
-      const chapter = parseInt(startVerse.split(':')[0] || '', 10)
-      if (chapter > 0) {
-        const next = chapterClickSelection(versesByChapter[chapter] || [])
-        if (next) {
-          setStartVerse(next.startVerse)
-          setEndVerse(next.endVerse)
-        }
-      }
-    }
+    const next = grain === 'chapter' ? chapterGrainSelection(startVerse, versesByChapter) : null
+    if (!next) return
+    setStartVerse(next.startVerse)
+    setEndVerse(next.endVerse)
   }
 
   const applySectionSelection = () => {
@@ -238,10 +224,7 @@ export function useBcvNavigatorController(options: {
     if (pickerScriptureMode === 'chapter') {
       const chapter = selectedChapterFromVerseRange(startVerse, endVerse)
       if (!chapter) return
-      const lastVerse =
-        bookInfo?.verses?.[chapter - 1] ??
-        versesByChapter[chapter]?.[versesByChapter[chapter].length - 1]?.verse ??
-        1
+      const lastVerse = chapterLastVerse(bookInfo?.verses, versesByChapter, chapter)
       navigation.setNavigationMode('chapter')
       navigation.navigateToReference(buildChapterApplyRef(selectedBook, chapter, lastVerse))
     } else {

@@ -8,7 +8,7 @@ import {
   useNavigationMode,
 } from '../../../../contexts'
 import {
-  PHASE_UPGRADE_HOLD_MS,
+  FULL_TIER_HOLD_MS,
   SETTLE_HOLD_MS,
   canRevealChapterAtEdge,
   contentChaptersFromSlots,
@@ -519,7 +519,7 @@ export function useChapterInfiniteScroll(
       }
 
       runUpgrade()
-    }, PHASE_UPGRADE_HOLD_MS)
+    }, FULL_TIER_HOLD_MS)
 
     return () => {
       cancelled = true

@@ -192,6 +192,28 @@ export function mergeVerseCountsFromChapterMap(
 }
 
 /**
+ * Merge a book's incoming verse counts with what navigation already holds.
+ * Never shrink below standard/existing length — chapter-grained SoT often
+ * reports only the open chapter (e.g. Psalms → [6]). Gaps fall back to the
+ * existing count, then the standard count, then 1.
+ */
+export function mergeBookVerseCounts(
+  bookCode: string,
+  existing: readonly number[],
+  incoming: readonly number[]
+): number[] {
+  const standard = getStandardVerseCount(bookCode) ?? []
+  const len = Math.max(standard.length, existing.length, incoming.length)
+  if (len <= incoming.length) return incoming.slice()
+  return Array.from({ length: len }, (_, i) => {
+    for (const count of [incoming[i], existing[i], standard[i]]) {
+      if (typeof count === 'number' && count > 0) return count
+    }
+    return 1
+  })
+}
+
+/**
  * Get verse counts with fallback strategy:
  * 1. From content metadata (if available) merged with standard length
  * 2. From standard versification

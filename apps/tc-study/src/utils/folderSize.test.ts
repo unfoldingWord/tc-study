@@ -50,7 +50,7 @@ function hardMax(currentLoc: number): number {
 
 /**
  * Worst-folder aggregates (production .ts/.tsx only; tests excluded).
- * currentLoc measured 2026-08-17; CombinedHelpsViewer, WordsLinksViewer, ScriptureViewer, TranslationNotesViewer and features/nav re-measured 2026-10-21 after the language-pack branch — bump only when intentionally growing.
+ * currentLoc measured 2026-08-17; CombinedHelpsViewer, WordsLinksViewer, ScriptureViewer, TranslationNotesViewer and features/nav re-measured 2026-10-21 after the language-pack branch (features/nav again after its dead stitch helpers went) — bump only when intentionally growing.
  */
 const FOLDER_BUDGETS: { name: string; path: string; currentLoc: number }[] = [
   {
@@ -76,7 +76,7 @@ const FOLDER_BUDGETS: { name: string; path: string; currentLoc: number }[] = [
   {
     name: 'features/nav',
     path: 'features/nav',
-    currentLoc: 5036,
+    currentLoc: 4143,
   },
   {
     name: 'wizard',

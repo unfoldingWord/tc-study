@@ -31,6 +31,27 @@ export function chapterClickSelection(chapterVerses: VerseEntry[]): {
   }
 }
 
+/** Switching to chapter grain widens the selection to the start verse's whole chapter. */
+export function chapterGrainSelection(
+  startVerse: string | null,
+  versesByChapter: Record<number, VerseEntry[]>
+): { startVerse: string; endVerse: string } | null {
+  if (!startVerse) return null
+  const chapter = parseInt(startVerse.split(':')[0] || '', 10)
+  if (!(chapter > 0)) return null
+  return chapterClickSelection(versesByChapter[chapter] || [])
+}
+
+/** Last verse of a chapter: book verse counts first, then the picker's verse list, else 1. */
+export function chapterLastVerse(
+  bookVerses: readonly number[] | undefined,
+  versesByChapter: Record<number, VerseEntry[]>,
+  chapter: number
+): number {
+  const listed = versesByChapter[chapter]
+  return bookVerses?.[chapter - 1] ?? listed?.[listed.length - 1]?.verse ?? 1
+}
+
 /** Full-chapter ref for scripture chapter grain (verse 1 → last verse). */
 export function buildChapterApplyRef(
   selectedBook: string,

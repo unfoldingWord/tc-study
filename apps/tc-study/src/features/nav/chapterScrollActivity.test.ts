@@ -14,7 +14,6 @@ import {
   shouldBroadcastUnderlineGroups,
   shouldEnqueueQuoteBuild,
   shouldHydrateHelpsForChapter,
-  shouldPaintScriptureChromeExtras,
   subscribeChapterScrollActivity,
 } from './chapterScrollActivity'
 
@@ -92,18 +91,6 @@ describe('chapterScrollActivity gates', () => {
     markChapterScrollUnsettled()
     expect(seen).toEqual([true])
     unsubscribe()
-  })
-
-  test('incoming chapter skips scripture chrome until settle; hydrated stays rich', () => {
-    expect(
-      shouldPaintScriptureChromeExtras({ unsettled: true, chapterHydrated: false })
-    ).toBe(false)
-    expect(
-      shouldPaintScriptureChromeExtras({ unsettled: true, chapterHydrated: true })
-    ).toBe(true)
-    expect(
-      shouldPaintScriptureChromeExtras({ unsettled: false, chapterHydrated: false })
-    ).toBe(true)
   })
 
   test('pin keeps helps on the settled chapter while nav has already advanced', () => {

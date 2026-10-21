@@ -125,12 +125,6 @@ export function peakOverscrollPx(currentRaw: number, peakRaw: number): number {
   return Math.max(0, currentRaw, peakRaw)
 }
 
-/** Overlay scrollbars report 0 gutter; still hit-test a thin inline-end strip. */
-export const SCROLLBAR_HIT_FALLBACK_PX = 14
-/** Synthetic raw overscroll per hold tick while the thumb stays pinned at an edge. */
-export const SCROLLBAR_HOLD_DELTA_PX = 8
-export const SCROLLBAR_HOLD_TICK_MS = 16
-
 /**
  * Mount content-edge chevrons whenever an adjacent unit exists.
  * Cues live at document start/end (not viewport-sticky); visibility does not
@@ -144,24 +138,6 @@ export function nextEdgeCueVisibility(args: {
     showTop: Boolean(args.canPrev),
     showBottom: Boolean(args.canNext),
   }
-}
-
-/**
- * True when a pointer is on the vertical scrollbar (classic gutter or overlay strip).
- * Used so mouse thumb-drag can accumulate the same edge overscroll as wheel/touch.
- */
-export function isVerticalScrollbarHit(
-  el: Pick<HTMLElement, 'getBoundingClientRect' | 'offsetWidth' | 'clientWidth'>,
-  clientX: number,
-  direction: 'ltr' | 'rtl' = 'ltr'
-): boolean {
-  const rect = el.getBoundingClientRect()
-  const gutter = Math.max(el.offsetWidth - el.clientWidth, 0)
-  const hitWidth = Math.max(gutter, SCROLLBAR_HIT_FALLBACK_PX)
-  if (direction === 'rtl') {
-    return clientX <= rect.left + hitWidth
-  }
-  return clientX >= rect.right - hitWidth
 }
 
 export function commitEdgeNavigation(args: {
