@@ -1,21 +1,18 @@
 import { RESOURCE_TYPE_IDS } from '../../../resourceTypes/resourceTypeIds'
 
-export function warmVisibleHelpsResources(args: {
-  targetSourceId?: string | null
-  tnKey: string
-  twlKey: string
-}): Array<{
+type WarmVisibleHelpsResource = {
   typeId: string
   resourceKey: string
   role: 'scripture' | 'helps'
   helpsType?: 'notes' | 'words-links'
-}> {
-  const rows: Array<{
-    typeId: string
-    resourceKey: string
-    role: 'scripture' | 'helps'
-    helpsType?: 'notes' | 'words-links'
-  }> = []
+}
+
+export function warmVisibleHelpsResources(args: {
+  targetSourceId?: string | null
+  tnKey: string
+  twlKey: string
+}): WarmVisibleHelpsResource[] {
+  const rows: WarmVisibleHelpsResource[] = []
   if (args.targetSourceId) {
     rows.push({
       typeId: RESOURCE_TYPE_IDS.SCRIPTURE,

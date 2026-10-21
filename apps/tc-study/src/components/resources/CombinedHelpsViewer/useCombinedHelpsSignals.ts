@@ -15,6 +15,7 @@ import type {
   VerseNavigationSignal,
 } from '../../../signals/studioSignals'
 import type { TokenFilter } from '../WordsLinksViewer/types'
+import { resourceKeyLangSegment } from './combinedHelpsUtils'
 import { focusFirstMatchingHelpsCard, type HelpsCardSelection } from './helpsCardSelection'
 import type { HelpsKindFilter, ObsQuoteFilter, SupportRefFilter, TwlArticleFilter, VerseFilterState } from './types'
 import type { NoteWithAlignments, LinkWithAlignments } from './useCombinedHelpsMerge'
@@ -70,19 +71,21 @@ export function useCombinedHelpsSignals({
   restoreBookKind,
 }: UseCombinedHelpsSignalsParams) {
   const resourceMetadata = useMemo(
-    () => {
-      const parts = resourceKey.split('/')
-      const owner = parts[0] || ''
-      const language = parts[1]?.split('_')[0] || wantLang || ''
-      return {
-        type: 'combined-helps' as const,
-        language,
-        owner,
-        tags: ['combined-helps', 'tn', 'twl'],
-      }
-    },
+    () => ({
+      type: 'combined-helps' as const,
+      language: resourceKeyLangSegment(resourceKey) || wantLang || '',
+      owner: resourceKey.split('/')[0] || '',
+      tags: ['combined-helps', 'tn', 'twl'],
+    }),
     [resourceKey, wantLang]
   )
+
+  // Token/verse/OBS applying displaces book chips — restore kind only if one was active.
+  const displaceBookFilters = useCallback(() => {
+    setSupportRefFilter?.(null)
+    setTwlArticleFilter?.(null)
+    restoreBookKind?.()
+  }, [setSupportRefFilter, setTwlArticleFilter, restoreBookKind])
 
   const { sendToAll: sendTokenClick } = useSignal<TokenClickSignal>('token-click', resourceId, resourceMetadata)
   const { sendToAll: sendEntryLinkClick } = useSignal<EntryLinkClickSignal>(
@@ -123,9 +126,7 @@ export function useCombinedHelpsSignals({
         }
         setTokenFilter(nextFilter)
         setVerseFilter(null)
-        setSupportRefFilter?.(null)
-        setTwlArticleFilter?.(null)
-        restoreBookKind?.()
+        displaceBookFilters()
         setSelectedHelpsCard(
           focusFirstMatchingHelpsCard({
             notes: notesWithAlignedTokens,
@@ -146,10 +147,8 @@ export function useCombinedHelpsSignals({
         currentRef.book,
         setTokenFilter,
         setVerseFilter,
-        setSupportRefFilter,
-        setTwlArticleFilter,
+        displaceBookFilters,
         setSelectedHelpsCard,
-        restoreBookKind,
       ]
     ),
     { debug: false, resourceMetadata }
@@ -172,12 +171,10 @@ export function useCombinedHelpsSignals({
           timestamp: signal.timestamp,
         })
         setTokenFilter(null)
-        setSupportRefFilter?.(null)
-        setTwlArticleFilter?.(null)
-        restoreBookKind?.()
+        displaceBookFilters()
         setSelectedHelpsCard(null)
       },
-      [resourceId, setVerseFilter, setTokenFilter, setSupportRefFilter, setTwlArticleFilter, setSelectedHelpsCard, restoreBookKind]
+      [resourceId, setVerseFilter, setTokenFilter, displaceBookFilters, setSelectedHelpsCard]
     ),
     { debug: false, resourceMetadata }
   )
@@ -213,11 +210,7 @@ export function useCombinedHelpsSignals({
     filteredByReference,
     resourceMetadata,
     setObsQuoteFilter: ((action) => {
-      if (typeof action !== 'function' && action) {
-        setSupportRefFilter?.(null)
-        setTwlArticleFilter?.(null)
-        restoreBookKind?.()
-      }
+      if (typeof action !== 'function' && action) displaceBookFilters()
       setObsQuoteFilter(action)
     }) as Dispatch<SetStateAction<ObsQuoteFilter | null>>,
     setSelectedHelpsCard,

@@ -12,6 +12,7 @@ import { shouldBroadcastUnderlineGroups } from '../../../features/nav/chapterScr
 import { useChapterScrollActivity } from '../../../features/nav/usePinnedHelpsReference'
 import type { NotesTokenGroupsSignal } from '../../../signals/studioSignals'
 import { useScriptureContentRevision } from '../WordsLinksViewer/hooks'
+import { resourceKeyLangSegment } from './combinedHelpsUtils'
 import type { HelpsKindFilter } from './types'
 
 export interface UseCombinedHelpsTokenGroupsBroadcastParams {
@@ -94,22 +95,20 @@ export function useCombinedHelpsTokenGroupsBroadcast({
     const tnKeyDedupe = tokenGroupsBroadcastDedupeKey(kindFilter, activeTn, scriptureRevision)
     if (tnKeyDedupe !== lastTnKeyRef.current) {
       lastTnKeyRef.current = tnKeyDedupe
-      const parts = (tnKey || resourceKey).split('/')
-      const language = parts[1]?.split('_')[0] || ''
+      const id = tnKey || resourceKey
       sendTnTokenGroups({
         tokenGroups: activeTn,
-        resourceMetadata: { id: tnKey || resourceKey, language, type: 'tn' },
+        resourceMetadata: { id, language: resourceKeyLangSegment(id) || '', type: 'tn' },
       })
     }
 
     const twlKeyDedupe = tokenGroupsBroadcastDedupeKey(kindFilter, activeTwl, scriptureRevision)
     if (twlKeyDedupe !== lastTwlKeyRef.current) {
       lastTwlKeyRef.current = twlKeyDedupe
-      const parts = (twlKey || resourceKey).split('/')
-      const language = parts[1]?.split('_')[0] || ''
+      const id = twlKey || resourceKey
       sendTwlTokenGroups({
         tokenGroups: activeTwl,
-        resourceMetadata: { id: twlKey || resourceKey, language, type: 'words-links' },
+        resourceMetadata: { id, language: resourceKeyLangSegment(id) || '', type: 'words-links' },
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sendState refs stable; keys dedupe

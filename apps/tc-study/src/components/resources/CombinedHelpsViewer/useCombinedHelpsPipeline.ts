@@ -210,17 +210,9 @@ export function useCombinedHelpsPipeline({
     helpsTokenBookRef.current = currentRef.book
     helpsTokenCacheRef.current = new Map()
   }
-  if (supportRefQuoteEnrichment.size) {
-    mergeHelpsTokenCache(
-      helpsTokenCacheRef.current,
-      [...supportRefQuoteEnrichment.entries()].map(([id, row]) => ({ id, ...row }))
-    )
-  }
-  if (twlArticleQuoteEnrichment.size) {
-    mergeHelpsTokenCache(
-      helpsTokenCacheRef.current,
-      [...twlArticleQuoteEnrichment.entries()].map(([id, row]) => ({ id, ...row }))
-    )
+  for (const enrichment of [supportRefQuoteEnrichment, twlArticleQuoteEnrichment]) {
+    if (!enrichment.size) continue
+    mergeHelpsTokenCache(helpsTokenCacheRef.current, [...enrichment.entries()].map(([id, row]) => ({ id, ...row })))
   }
 
   // Chapter quote/align (useQuoteTokens) must not restart when book-filter
@@ -353,16 +345,7 @@ export function useCombinedHelpsPipeline({
     const raw =
       preparedRowsCoverChapterSpan(preparedLinks, startChapter, endChapter) && preparedLinks
         ? preparedLinks.map(preparedLinkToTranslationWordsLink)
-        : (() => {
-            const chapterScoped = collectChapterSlice(
-              linksByChapter,
-              twlLinksRaw,
-              startChapter,
-              endChapter
-            )
-            if (!chapterScoped.length) return []
-            return chapterScoped.map(withArticlePath)
-          })()
+        : collectChapterSlice(linksByChapter, twlLinksRaw, startChapter, endChapter).map(withArticlePath)
     return attachHelpsTokenCache(raw, helpsTokenCacheRef.current)
   }, [preparedLinks, twlLinksRaw, linksByChapter, currentRef.chapter, currentRef.endChapter])
 
@@ -433,30 +416,25 @@ export function useCombinedHelpsPipeline({
   ])
   mergeHelpsTokenCache(helpsTokenCacheRef.current, linksForDisplay)
 
-  const filteredByReference = useMemo(() => {
-    if (!processedLinks.length) return []
+  // TWL passage range: missing chapter/verse default to 1 (the TN slice above does not).
+  const twlRange = useMemo(() => {
     const startChapter = currentRef.chapter || 1
-    const endChapter = currentRef.endChapter || startChapter
     const startVerse = currentRef.verse || 1
-    const endVerse = resolveRangeEndVerse(
-      { book: currentRef.book, verse: startVerse, endVerse: currentRef.endVerse },
-      navigationMode
-    )
-    return filterLinksByReferenceRange(processedLinks, {
+    return {
       startChapter,
       startVerse,
-      endChapter,
-      endVerse,
-    })
-  }, [
-    processedLinks,
-    currentRef.chapter,
-    currentRef.verse,
-    currentRef.endChapter,
-    currentRef.endVerse,
-    currentRef.book,
-    navigationMode,
-  ])
+      endChapter: currentRef.endChapter || startChapter,
+      endVerse: resolveRangeEndVerse(
+        { book: currentRef.book, verse: startVerse, endVerse: currentRef.endVerse },
+        navigationMode
+      ),
+    }
+  }, [currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse, currentRef.book, navigationMode])
+
+  const filteredByReference = useMemo(
+    () => (processedLinks.length ? filterLinksByReferenceRange(processedLinks, twlRange) : []),
+    [processedLinks, twlRange]
+  )
 
   const bookCodeLower = currentRef.book?.toLowerCase() || ''
 
@@ -498,18 +476,11 @@ export function useCombinedHelpsPipeline({
   const underlineTwlGroups = useMemo(
     () =>
       measureScripturePerfSync('underline-groups', 'twl', () => {
-        const startChapter = currentRef.chapter || 1
-        const endChapter = currentRef.endChapter || startChapter
-        const startVerse = currentRef.verse || 1
-        const endVerse = resolveRangeEndVerse(
-          { book: currentRef.book, verse: startVerse, endVerse: currentRef.endVerse },
-          navigationMode
-        )
         if (twlArticleFilter) {
           const chapterLinks = chapterHelpsRowsForUnderlines(
             linksForDisplay,
-            startChapter,
-            endChapter
+            twlRange.startChapter,
+            twlRange.endChapter
           )
           return underlineGroupsFromHelpsNotes(chapterLinks, bookCodeLower)
         }
@@ -518,28 +489,9 @@ export function useCombinedHelpsPipeline({
           twlLinksWithQuotes.length === links.length && links.length > 0
             ? twlLinksWithQuotes
             : processedLinks
-        const ranged = filterLinksByReferenceRange(quoteSource, {
-          startChapter,
-          startVerse,
-          endChapter,
-          endVerse,
-        })
-        return underlineGroupsFromHelpsNotes(ranged, bookCodeLower)
+        return underlineGroupsFromHelpsNotes(filterLinksByReferenceRange(quoteSource, twlRange), bookCodeLower)
       }),
-    [
-      twlLinksWithQuotes,
-      processedLinks,
-      linksForDisplay,
-      twlArticleFilter,
-      links.length,
-      currentRef.chapter,
-      currentRef.verse,
-      currentRef.endChapter,
-      currentRef.endVerse,
-      currentRef.book,
-      navigationMode,
-      bookCodeLower,
-    ]
+    [twlLinksWithQuotes, processedLinks, linksForDisplay, twlArticleFilter, links.length, twlRange, bookCodeLower]
   )
 
   const { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches } = useCombinedHelpsDisplay({

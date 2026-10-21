@@ -19,6 +19,7 @@ import type { LanguageListNameFields } from '../../../features/read/languageList
 import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
+import { taArticleIdFromSupportRef } from './combinedHelpsUtils'
 import { helpsFilterIdentity, scrollHelpsToTop } from './scrollHelpsToTop'
 import {
   isHelpsCardSelected,
@@ -96,6 +97,9 @@ export interface CombinedHelpsListProps {
   onLinkQuoteClick: (link: TranslationWordsLink) => void
 }
 
+/** Off-screen rows skip layout/paint; estimate keeps the scrollbar stable. */
+const HELPS_ROW_STYLE = { contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' } as const
+
 export function CombinedHelpsList({
   effectiveResource,
   bookCode,
@@ -150,6 +154,7 @@ export function CombinedHelpsList({
   const [pinStickyRef, setPinStickyRef] = useState<string | null>(null)
   const filterAnchor = supportRefFilter?.anchor ?? twlArticleFilter?.anchor ?? null
   const pinSelection = helpsAnchorSelection(filterAnchor) ?? selectedHelpsCard
+  const bookFilters = { supportRefFilter, twlArticleFilter }
   const bookWideFilter = Boolean(supportRefFilter || twlArticleFilter)
   const anchorRowId = bookWideFilter && filterAnchor ? helpsAnchorRowId(filterAnchor) : null
   const filterIdentity = helpsFilterIdentity({
@@ -289,12 +294,10 @@ export function CombinedHelpsList({
   }, [windowedGroups])
 
   const stickyGroup = useMemo(() => {
-    const forced = pinStickyRef
-    if (forced) {
-      return mergedGroups.find((group) => group.ref === forced) ?? windowedGroups[0] ?? null
-    }
-    if (!stickyRef) return windowedGroups[0] ?? null
-    return mergedGroups.find((group) => group.ref === stickyRef) ?? windowedGroups[0] ?? null
+    // Anchor pin wins over the scroll-tracked group until user input releases it.
+    const ref = pinStickyRef || stickyRef
+    if (!ref) return windowedGroups[0] ?? null
+    return mergedGroups.find((group) => group.ref === ref) ?? windowedGroups[0] ?? null
   }, [pinStickyRef, stickyRef, mergedGroups, windowedGroups])
 
   const emptyReason = resolveHelpsListEmptyReason({
@@ -411,25 +414,19 @@ export function CombinedHelpsList({
                             : null
                           const taTitle = entryTitle ?? getTATitle(note as NoteWithTokens)
                           const isLoadingTitle = note.supportReference
-                            ? loadingTitles.has(
-                                note.supportReference.match(/rc:\/\/\*\/ta\/man\/(.+)/)?.[1] || ''
-                              )
+                            ? loadingTitles.has(taArticleIdFromSupportRef(note.supportReference) || '')
                             : false
                           return (
                             <div
                               key={`tn-${note.id}`}
                               id={helpsAnchorRowId({ kind: 'tn', id: note.id, ref: note.reference })}
                               data-helps-row={`tn:${note.id}`}
-                              style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' }}
+                              style={HELPS_ROW_STYLE}
                             >
                               <TranslationNoteCard
                                 note={note as NoteWithTokens}
                                 isSelected={isHelpsCardSelected(selectedHelpsCard, 'tn', note.id)}
-                                isFilterSource={isHelpsFilterSourceCard(
-                                  { supportRefFilter, twlArticleFilter },
-                                  'tn',
-                                  note.id
-                                )}
+                                isFilterSource={isHelpsFilterSourceCard(bookFilters, 'tn', note.id)}
                                 onSupportReferenceClick={onSupportReferenceClick}
                                 onFilterBySupportReference={
                                   onFilterBySupportReference
@@ -466,16 +463,12 @@ export function CombinedHelpsList({
                             key={`twl-${link.id}`}
                             id={helpsAnchorRowId({ kind: 'twl', id: link.id, ref: link.reference })}
                             data-helps-row={`twl:${link.id}`}
-                            style={{ contentVisibility: 'auto', containIntrinsicSize: 'auto 120px' }}
+                            style={HELPS_ROW_STYLE}
                           >
                             <WordLinkCard
                               link={link}
                               isSelected={isHelpsCardSelected(selectedHelpsCard, 'twl', link.id)}
-                              isFilterSource={isHelpsFilterSourceCard(
-                                { supportRefFilter, twlArticleFilter },
-                                'twl',
-                                link.id
-                              )}
+                              isFilterSource={isHelpsFilterSourceCard(bookFilters, 'twl', link.id)}
                               twTitle={twTitle}
                               isLoadingTitle={isLoadingTwTitle}
                               twPreview={twPreview}

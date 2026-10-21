@@ -199,22 +199,16 @@ export function useCombinedHelpsObsQuotesBroadcast({
           }
         }
         const nq = h.quote.trim().toLowerCase()
-        for (const note of notesWithAlignedTokens) {
-          if ((note.quote || '').trim().toLowerCase() !== nq) continue
-          const occ = Number.parseInt(String(note.occurrence ?? '1'), 10)
-          if (occ === h.occurrence) {
-            setSelectedHelpsCard({ kind: 'tn', id: note.id })
-            return
-          }
+        const sameQuote = (quote: string | null | undefined, occurrence: unknown) =>
+          (quote || '').trim().toLowerCase() === nq &&
+          Number.parseInt(String(occurrence ?? '1'), 10) === h.occurrence
+        const note = notesWithAlignedTokens.find((n) => sameQuote(n.quote, n.occurrence))
+        if (note) {
+          setSelectedHelpsCard({ kind: 'tn', id: note.id })
+          return
         }
-        for (const link of filteredByReference) {
-          if ((link.origWords || '').trim().toLowerCase() !== nq) continue
-          const occ = Number.parseInt(String(link.occurrence ?? '1'), 10)
-          if (occ === h.occurrence) {
-            setSelectedHelpsCard({ kind: 'twl', id: link.id })
-            return
-          }
-        }
+        const link = filteredByReference.find((l) => sameQuote(l.origWords, l.occurrence))
+        if (link) setSelectedHelpsCard({ kind: 'twl', id: link.id })
       },
       [
         resourceId,
