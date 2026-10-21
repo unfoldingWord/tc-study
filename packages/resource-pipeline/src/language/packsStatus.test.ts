@@ -13,7 +13,7 @@ describe('packsStatus', () => {
     const now = new Date('2026-10-21T12:00:00Z')
     await packsStatus({ bucket, compat, language: 'es-419', state: 'running', run: RUN, now })
     expect(bucket.puts).toEqual([{ key: `status/${compat}/es-419.json`, contentType: 'application/json', cacheControl: 'no-cache', bytes: expect.any(Number) }])
-    expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).toEqual({ state: 'running', at: '2026-10-21T12:00:00.000Z', failures: 0, run: RUN })
+    expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).toEqual({ state: 'running', at: '2026-10-21T12:00:00.000Z', failures: 0, run: RUN, started: '2026-10-21T12:00:00.000Z' })
   })
 
   test('a second failure in a row makes failures 2', async () => {
@@ -75,6 +75,40 @@ describe('packsStatus', () => {
     const unparsable = { ...bucket, getJson: async () => JSON.parse('{"state": "failed",') }
     await packsStatus({ bucket: unparsable, compat, language: 'es-419', state: 'running', run: RUN })
     expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).toMatchObject({ state: 'running', failures: 0 })
+  })
+
+  test('running sets started to now, replacing the start of an earlier run', async () => {
+    const bucket = memoryBucket({ [statusPath(compat, 'es-419')]: { state: 'ok', at: '2026-10-20T03:00:00.000Z', failures: 0, run: RUN, started: '2026-10-20T01:00:00.000Z' } })
+    await packsStatus({ bucket, compat, language: 'es-419', state: 'running', run: RUN, now: new Date('2026-10-21T12:00:00Z') })
+    expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))?.started).toBe('2026-10-21T12:00:00.000Z')
+  })
+
+  test('ok and failed keep the started of the run they end, so a release published during the build is not taken as seen', async () => {
+    for (const state of ['ok', 'failed'] as const) {
+      const bucket = memoryBucket()
+      await packsStatus({ bucket, compat, language: 'es-419', state: 'running', run: RUN, now: new Date('2026-10-21T12:00:00Z') })
+      await packsStatus({ bucket, compat, language: 'es-419', state, run: RUN, now: new Date('2026-10-21T14:30:00Z') })
+      expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).toMatchObject({ state, at: '2026-10-21T14:30:00.000Z', started: '2026-10-21T12:00:00.000Z' })
+    }
+  })
+
+  test('ok with no stored start writes no started', async () => {
+    const bucket = memoryBucket({ [statusPath(compat, 'es-419')]: { state: 'running', at: '2026-10-21T12:00:00.000Z', failures: 0, run: 'dispatched' } })
+    await packsStatus({ bucket, compat, language: 'es-419', state: 'ok', run: RUN })
+    expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).not.toHaveProperty('started')
+  })
+
+  test('an unparsable stored status gives ok no started to keep', async () => {
+    const bucket = memoryBucket()
+    const unparsable = { ...bucket, getJson: async () => JSON.parse('{"state": "running", "started": "2026-') }
+    await packsStatus({ bucket: unparsable, compat, language: 'es-419', state: 'ok', run: RUN })
+    expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).not.toHaveProperty('started')
+  })
+
+  test('a stored started that is not a date is not kept', async () => {
+    const bucket = memoryBucket({ [statusPath(compat, 'es-419')]: { state: 'running', at: '2026-10-21T12:00:00.000Z', failures: 0, run: RUN, started: 'yesterday' } })
+    await packsStatus({ bucket, compat, language: 'es-419', state: 'failed', run: RUN })
+    expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).not.toHaveProperty('started')
   })
 
   test('a read that fails for another reason stops the run and writes nothing', async () => {

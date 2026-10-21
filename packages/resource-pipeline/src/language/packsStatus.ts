@@ -3,13 +3,17 @@
  * in flight, one that just failed, or one that keeps failing. It lives next to the catalog entries in the same bucket
  * and is written by the workflow around publish-language, so a crashed run leaves `running` behind, which the Worker
  * stops trusting after 5.5 hours (longer than the job's 300-minute timeout) and then counts as one more failure.
+ *
+ * `started` is when the build began reading Door43 (the `running` write comes right before it). The Worker compares
+ * a Door43 release against it, not against `at`: an `ok` status is written when the run ends, so a release published
+ * while the build ran is later than `started` but earlier than `at`, and the build never saw it.
  */
 
 import { isLanguageCode, type PackBucket } from './publishLanguage'
 
 export type PackState = 'running' | 'ok' | 'failed'
 
-export type PackStatus = { state: PackState; at: string; failures: number; run: string }
+export type PackStatus = { state: PackState; at: string; failures: number; run: string; started?: string }
 
 export const statusPath = (compat: string, language: string) => `status/${compat}/${language}.json`
 
@@ -21,7 +25,10 @@ export const COMPAT_RE = /^f\d+\.\d+-u[\w.]+-p\d+-q\d+-a\d+-t\d+$/
 
 export const isCompatKey = (s: string) => COMPAT_RE.test(s)
 
-/** `failed` adds one to the failures in a row, `ok` clears them, and `running` leaves them as they were. */
+/**
+ * `failed` adds one to the failures in a row, `ok` clears them, and `running` leaves them as they were. `running`
+ * sets `started` to now; `ok` and `failed` keep the stored one, so it names the start of the run they end.
+ */
 export async function packsStatus(o: {
   bucket: PackBucket
   compat: string
@@ -43,6 +50,9 @@ export async function packsStatus(o: {
   // A hand-edited or damaged file must not turn the count into NaN, which no comparison would ever catch.
   const before = Number.isInteger(previous?.failures) && (previous!.failures as number) > 0 ? (previous!.failures as number) : 0
   const failures = o.state === 'failed' ? before + 1 : o.state === 'ok' ? 0 : before
-  const status: PackStatus = { state: o.state, at: (o.now ?? new Date()).toISOString(), failures, run: o.run }
+  const at = (o.now ?? new Date()).toISOString()
+  const kept = typeof previous?.started === 'string' && !Number.isNaN(Date.parse(previous.started)) ? previous.started : undefined
+  const started = o.state === 'running' ? at : kept
+  const status: PackStatus = { state: o.state, at, failures, run: o.run, ...(started ? { started } : {}) }
   await o.bucket.put(key, JSON.stringify(status), { contentType: 'application/json', cacheControl: 'no-cache' })
 }
