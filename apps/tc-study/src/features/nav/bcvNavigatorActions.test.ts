@@ -4,12 +4,15 @@ import {
   buildObsRangeApplyRef,
   buildVerseApplyRef,
   chapterClickSelection,
+  chapterGrainSelection,
+  chapterLastVerse,
   initVerseRangeFromRef,
   nextObsRangeClick,
   nextVerseClickSelection,
   obsStoryIdsFromIngredients,
   selectedChapterFromVerseRange,
 } from './bcvNavigatorActions'
+import { buildVersesFromCounts, groupVersesByChapter } from './verseSelectionUtils'
 
 describe('bcvNavigatorActions', () => {
   test('nextVerseClickSelection toggles start/end', () => {
@@ -77,5 +80,25 @@ describe('bcvNavigatorActions', () => {
     expect(obsStoryIdsFromIngredients([{ identifier: '3' }, { identifier: '1' }])).toEqual([
       1, 3,
     ])
+  })
+})
+
+describe('chapter grain helpers', () => {
+  const versesByChapter = groupVersesByChapter(buildVersesFromCounts([3, 2]))
+
+  test('chapterGrainSelection widens the start verse to its whole chapter', () => {
+    expect(chapterGrainSelection('2:2', versesByChapter)).toEqual({
+      startVerse: '2:1',
+      endVerse: '2:2',
+    })
+    expect(chapterGrainSelection(null, versesByChapter)).toBeNull()
+    expect(chapterGrainSelection('x:1', versesByChapter)).toBeNull()
+    expect(chapterGrainSelection('9:1', versesByChapter)).toBeNull()
+  })
+
+  test('chapterLastVerse prefers book counts, then the picker list, then 1', () => {
+    expect(chapterLastVerse([10, 20], versesByChapter, 2)).toBe(20)
+    expect(chapterLastVerse(undefined, versesByChapter, 1)).toBe(3)
+    expect(chapterLastVerse(undefined, versesByChapter, 9)).toBe(1)
   })
 })

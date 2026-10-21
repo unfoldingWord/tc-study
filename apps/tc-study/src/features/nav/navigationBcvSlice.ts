@@ -3,7 +3,7 @@
  */
 
 import type { BCVReference, BookInfo, NavigationMode } from '../../contexts/types'
-import { getStandardVerseCount } from '../../lib/versification'
+import { mergeBookVerseCounts } from '../../lib/versification'
 import {
   coerceReferenceToAvailableBooks,
   fallbackBookIfUnavailable,
@@ -116,22 +116,7 @@ export function createBcvSlice(set: NavigationSet, get: NavigationGet): BcvSlice
         const bookIndex = state.availableBooks.findIndex((b) => b.code === bookCode)
         if (bookIndex >= 0) {
           const prev = state.availableBooks[bookIndex].verses ?? []
-          const standard = getStandardVerseCount(bookCode) ?? []
-          // Never shrink below standard/existing length — chapter-grained SoT
-          // often reports only the open chapter (e.g. Psalms → [6]).
-          const len = Math.max(standard.length, prev.length, verses.length)
-          const merged =
-            len <= verses.length
-              ? verses.slice()
-              : Array.from({ length: len }, (_, i) => {
-                  const incoming = verses[i]
-                  if (typeof incoming === 'number' && incoming > 0) return incoming
-                  const fromPrev = prev[i]
-                  if (typeof fromPrev === 'number' && fromPrev > 0) return fromPrev
-                  const fromStandard = standard[i]
-                  if (typeof fromStandard === 'number' && fromStandard > 0) return fromStandard
-                  return 1
-                })
+          const merged = mergeBookVerseCounts(bookCode, prev, verses)
           state.availableBooks[bookIndex].verses = merged
           state.availableBooks[bookIndex].chapters = merged.length
           if (
