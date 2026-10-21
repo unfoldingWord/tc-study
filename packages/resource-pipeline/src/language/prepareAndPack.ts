@@ -13,13 +13,9 @@ import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { buildLanguagePack, ORIGINAL_LANGUAGE_KEYS, packSourceFrom, type PackManifest } from '@bt-synergy/language-pack'
-import { USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
 import { addLexicons, addMacula, MACULA_KEYS } from '../../cli/companions'
-import { HELPS_TEXT_VERSION } from '../helps/helpsCacheKeys'
-import { HELPS_ALIGN_VERSION } from '../helps/helpsAlignCache'
-import { HELPS_QUOTE_VERSION } from '../helps/helpsQuoteCache'
-import { SCRIPTURE_PREPARE_VERSION } from '../scripture/scripturePreparer'
 import { isObs, keyOfRow } from './door43Stamps'
+import { PACK_VERSIONS } from './packVersions'
 import { prepareLanguage, type PrepareLanguageProgress } from './prepareLanguage'
 
 type PackResult = { file: string; bytes: Uint8Array; manifest: PackManifest; skipped: Array<{ key: string; why: string }> }
@@ -39,6 +35,11 @@ export async function prepareAndPack(o: {
   books?: 'all' | string[]
   /** A folder with Taller's `trees/` and `referents/`: MACULA goes in the originals pack. */
   macula?: string
+  /**
+   * MACULA's stamp in the packs (its commit, for a publisher); the build date when absent. A date would make every
+   * rebuild's originals look newer to the apps that hold them.
+   */
+  maculaStamp?: string
   /** The lexicons are read from this ref of their Door43 repositories; `false` leaves them out. */
   lexicons: false | { ref: string }
   /** `false` leaves Open Bible Stories and their helps out (an app that translates only the Bible). */
@@ -105,7 +106,7 @@ export async function prepareAndPack(o: {
   }
   if (o.macula) {
     say(`[${elapsed()}] MACULA desde ${o.macula}…`)
-    companions.macula = await addMacula(cacheAdapter as never, catalogAdapter as never, resolve(o.macula), new Date().toISOString())
+    companions.macula = await addMacula(cacheAdapter as never, catalogAdapter as never, resolve(o.macula), o.maculaStamp ?? new Date().toISOString())
     for (const m of companions.macula as Array<{ key: string; books: number }>) say(`[${elapsed()}]   ${m.key}: ${m.books} libros`)
   }
   // Open Bible Stories and their helps left out when asked: only the Bible is translated.
@@ -115,14 +116,7 @@ export async function prepareAndPack(o: {
     source,
     language,
     ...(resourceKeys ? { resourceKeys } : {}),
-    versions: {
-      sot: { usjProcessing: USJ_PROCESSING_VERSION },
-      // An app that reads the prepared chapters without making them (Servos) must know whose they are.
-      prepared: { scripturePrepare: SCRIPTURE_PREPARE_VERSION },
-      quote: { helpsQuote: HELPS_QUOTE_VERSION },
-      align: { helpsAlign: HELPS_ALIGN_VERSION },
-      text: { helpsText: HELPS_TEXT_VERSION },
-    },
+    versions: PACK_VERSIONS,
     app: { name: 'resource-pipeline cli' },
   }
 
