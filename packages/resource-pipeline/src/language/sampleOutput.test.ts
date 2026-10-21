@@ -1,8 +1,8 @@
 /**
  * Packs are filed by a compatibility key made of every processing version (PACK_VERSIONS): a phone only opens packs
  * whose key it knows. A builder change that alters the rows but not a version would put new rows in an old folder and
- * no phone would ever fetch the fix. This test keeps a hash of the quote and align rows of a fixed sample (Ruth 4:5,
- * with its Q footnote) next to the key it was made under, and fails when the hash moves and the key does not.
+ * no phone would ever fetch the fix. This test keeps a hash of the quote and align rows and of the prepared
+ * chapters (full and light) of a fixed sample (Ruth 4:5, with its Q footnote) next to the key it was made under, and fails when the hash moves and the key does not.
  */
 
 import { describe, expect, test } from 'bun:test'
@@ -13,6 +13,7 @@ import { PACK_FORMAT_VERSION, compatKeyOf } from '@bt-synergy/language-pack'
 import { buildQuoteTokens } from '../helps/quoteTokens/buildQuoteTokens'
 import { readCachedQuoteTokens, toCachedQuoteTokens, writeCachedQuoteTokens } from '../helps/helpsQuoteCache'
 import { compactFromAlignResult } from '../helps/reconstructAlignFromPositions'
+import { buildFullChapter, buildLightChapter } from '../scripture/scripturePreparer'
 import { DYA3, UT23, alignWarm, link, ruth } from '../helps/ketivQere.fixtures'
 import { PACK_VERSIONS } from './packVersions'
 
@@ -52,6 +53,12 @@ async function sampleRows() {
   await writeCachedQuoteTokens(cache, where, built)
   const quote = await readCachedQuoteTokens(cache, where)
 
+  // The prepared tier is what an app reads without rebuilding (Servos): its shape is guarded by the same key.
+  const prepared = {
+    uhb: { full: buildFullChapter(uhb.viewModel, 4), light: buildLightChapter(uhb.viewModel, 4) },
+    glt: { full: buildFullChapter(glt.viewModel, 4), light: buildLightChapter(glt.viewModel, 4) },
+  }
+
   const align: Record<string, Record<string, unknown>> = {}
   for (const [target, viewModel, language] of [
     ['uhb', uhb.viewModel, 'hbo'],
@@ -70,7 +77,7 @@ async function sampleRows() {
     }
     align[target] = rows
   }
-  return { quote, align }
+  return { quote, align, prepared }
 }
 
 function sha256(text: string): string {
@@ -95,11 +102,16 @@ describe('the pack output of a fixed sample', () => {
 
     expect(existsSync(SAMPLE_FILE)).toBe(true)
     const stored = JSON.parse(readFileSync(SAMPLE_FILE, 'utf8')) as { compat: string; hash: string }
-    // A new key means a version was bumped: the stored sample is stale, not wrong. Refresh it with UPDATE_SAMPLE=1.
-    if (stored.compat !== compat) return
+    const refresh = '`UPDATE_SAMPLE=1 bun test src/language/sampleOutput.test.ts` in packages/resource-pipeline and commit sample-output.json'
+    // A bumped version is expected; the stored sample must follow it, or the guard would be off from then on.
+    if (stored.compat !== compat) {
+      throw new Error(`the pack compatibility key changed (${stored.compat} → ${compat}): run ${refresh}`)
+    }
     if (stored.hash !== hash) {
       throw new Error(
-        'pack output changed without a version bump: bump HELPS_QUOTE_VERSION/HELPS_ALIGN_VERSION/SCRIPTURE_PREPARE_SCHEMA, then run with UPDATE_SAMPLE=1'
+        'pack output changed without a version bump: bump the version that covers the change (USJ_PROCESSING_VERSION, ' +
+          'SCRIPTURE_PREPARE_SCHEMA, HELPS_QUOTE_VERSION, HELPS_ALIGN_VERSION or HELPS_TEXT_VERSION), then run ' +
+          `${refresh}. Running UPDATE_SAMPLE=1 without a bump defeats this check.`
       )
     }
   })
