@@ -127,7 +127,6 @@ export function getChapterLayoutBlocks(
   return ensureChapterBlocks(viewModel, chapter)
 }
 
-const EMPTY_BLOCKS: UsjLayoutBlock[] = []
 const EMPTY_VERSES: DisplayUsjVerse[] = []
 const EMPTY_SEQUENCE: UsjVerseBlockItem[] = []
 const EMPTY_PARAGRAPHS: string[] = []
@@ -143,21 +142,6 @@ export function getChapterParagraphs(
     paragraphCache.set(viewModel, byChapter)
   }
   return byChapter.get(chapter) ?? EMPTY_PARAGRAPHS
-}
-
-/** Seed paragraph strings from download-time prep so read path is a cache hit. */
-export function seedChapterParagraphs(
-  viewModel: UsjScriptureViewModel,
-  paragraphsByChapter: Record<string, string[]>
-): void {
-  const byChapter = new Map<number, string[]>()
-  for (const [key, paras] of Object.entries(paragraphsByChapter)) {
-    const chapter = Number(key)
-    if (!Number.isFinite(chapter) || chapter < 1) continue
-    byChapter.set(chapter, paras)
-  }
-  if (byChapter.size === 0) return
-  paragraphCache.set(viewModel, byChapter)
 }
 
 export function getChapterDisplayVerses(
@@ -234,7 +218,7 @@ export function resetChapterLayoutHeights(): void {
   layoutHeights.clear()
 }
 
-/** Idle-warm specific chapters (placeholders) without mounting token trees. */
+/** Idle-warm specific chapters without mounting token trees. */
 export function prefetchChapterLayouts(
   viewModel: UsjScriptureViewModel,
   chapters: readonly number[]
@@ -260,19 +244,6 @@ export function prefetchChapterParagraphs(
   }, 400)
 }
 
-/** Warm the next/prev chapter off the stitch/paint path. */
-export function prefetchAdjacentChapterLayouts(
-  viewModel: UsjScriptureViewModel,
-  mounted: readonly number[]
-): void {
-  if (mounted.length === 0) return
-  const last = lastChapterNumber(viewModel)
-  const lo = Math.min(...mounted)
-  const hi = Math.max(...mounted)
-  const neighbors = [lo - 1, hi + 1].filter((chapter) => chapter >= 1 && chapter <= last)
-  prefetchChapterLayouts(viewModel, neighbors)
-}
-
 /** Idle-prefetch paragraph strings for chapters next to the painted window. */
 export function prefetchAdjacentChapterParagraphs(
   viewModel: UsjScriptureViewModel,
@@ -285,6 +256,3 @@ export function prefetchAdjacentChapterParagraphs(
   const neighbors = [lo - 1, hi + 1].filter((chapter) => chapter >= 1 && chapter <= last)
   prefetchChapterParagraphs(viewModel, neighbors)
 }
-
-// silence unused when EMPTY_BLOCKS only referenced historically
-void EMPTY_BLOCKS

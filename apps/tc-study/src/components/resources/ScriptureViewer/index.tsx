@@ -323,38 +323,27 @@ export function ScriptureViewer({
     setIsUnitTransitioning(true)
   }, [])
 
-  const handleEdgeNext = useCallback(() => {
+  // Next lands at the start of the new unit, previous at its end.
+  const stepEdge = useCallback((direction: 'next' | 'previous') => {
     if (chapterScroll.enabled) {
-      chapterScroll.revealChapterAtEdge('next')
+      chapterScroll.revealChapterAtEdge(direction)
       return
     }
     markReadNavigationInternal()
-    const ok = advanceNavigationUnit({ ...unitArgs, direction: 'next' })
+    const ok = advanceNavigationUnit({ ...unitArgs, direction })
     if (ok) {
-      pendingScrollAlignRef.current = 'start'
+      pendingScrollAlignRef.current = direction === 'next' ? 'start' : 'end'
       beginUnitTransition()
     }
   }, [chapterScroll.enabled, chapterScroll.revealChapterAtEdge, navigationMode, currentRef, navigation, hasPassageSet, beginUnitTransition])
+  const handleEdgeNext = useCallback(() => stepEdge('next'), [stepEdge])
+  const handleEdgePrev = useCallback(() => stepEdge('previous'), [stepEdge])
 
-  const handleEdgePrev = useCallback(() => {
-    if (chapterScroll.enabled) {
-      chapterScroll.revealChapterAtEdge('previous')
-      return
-    }
-    markReadNavigationInternal()
-    const ok = advanceNavigationUnit({ ...unitArgs, direction: 'previous' })
-    if (ok) {
-      pendingScrollAlignRef.current = 'end'
-      beginUnitTransition()
-    }
-  }, [chapterScroll.enabled, chapterScroll.revealChapterAtEdge, navigationMode, currentRef, navigation, hasPassageSet, beginUnitTransition])
-
-  const canEdgeNext = useCallback(
-    () =>
+  const canStepEdge = useCallback(
+    (direction: 'next' | 'previous') =>
       chapterScroll.enabled
-        ? chapterScroll.canRevealChapterAtEdge('next')
-        : !isUnitTransitioning &&
-          canAdvanceNavigationUnit({ ...unitArgs, direction: 'next' }),
+        ? chapterScroll.canRevealChapterAtEdge(direction)
+        : !isUnitTransitioning && canAdvanceNavigationUnit({ ...unitArgs, direction }),
     [
       chapterScroll.enabled,
       chapterScroll.canRevealChapterAtEdge,
@@ -365,23 +354,8 @@ export function ScriptureViewer({
       isUnitTransitioning,
     ]
   )
-
-  const canEdgePrev = useCallback(
-    () =>
-      chapterScroll.enabled
-        ? chapterScroll.canRevealChapterAtEdge('previous')
-        : !isUnitTransitioning &&
-          canAdvanceNavigationUnit({ ...unitArgs, direction: 'previous' }),
-    [
-      chapterScroll.enabled,
-      chapterScroll.canRevealChapterAtEdge,
-      navigationMode,
-      currentRef,
-      navigation,
-      hasPassageSet,
-      isUnitTransitioning,
-    ]
-  )
+  const canEdgeNext = useCallback(() => canStepEdge('next'), [canStepEdge])
+  const canEdgePrev = useCallback(() => canStepEdge('previous'), [canStepEdge])
 
   const { pullPx, rawPullPx, edge, showTopCue, showBottomCue, clickPrev, clickNext } =
     useScriptureEdgeNavigate({

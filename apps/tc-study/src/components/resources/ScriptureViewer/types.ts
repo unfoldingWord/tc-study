@@ -1,10 +1,9 @@
 import type {
   UsjLayoutInline,
-  UsjScriptureViewModel,
   UsjVerseView,
   UsjWordToken,
 } from '@bt-synergy/scripture-loader'
-import type { BCVReference, BookInfo } from '../../../contexts/types-only'
+import type { BCVReference } from '../../../contexts/types-only'
 import type { ResourceInfo } from '../../../contexts/types'
 
 export interface ScriptureViewerProps {
@@ -16,13 +15,6 @@ export interface ScriptureViewerProps {
   language?: string
   resourceType?: string
   isAnchor?: boolean
-}
-
-export interface ScriptureViewerState {
-  viewModel: UsjScriptureViewModel | null
-  availableBooks: BookInfo[]
-  isLoading: boolean
-  error: string | null
 }
 
 export interface OriginalLanguageToken {

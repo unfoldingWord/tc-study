@@ -29,6 +29,7 @@ import { peekPreparedChapter } from '../../../../features/scripture/preparedChap
 import { resolveLastChapter } from '../../../../features/nav/bookChapterCounts'
 import { useWarmLanes } from '../../../../features/warm/useWarmLanes'
 import { scriptureLane1Ready } from '../../../../features/warm/warmLanePolicy'
+import { scheduleIdle } from '../../../../utils/scheduleIdle'
 import { enqueueScriptureBookPriority } from '../../../../workers/prepareClient'
 import type { DisplayUsjVerse } from '../types'
 import { loadUsjViewModel } from '../utils/loadUsjViewModel'
@@ -38,6 +39,7 @@ import {
   getChapterVerseBlockItems,
 } from '../utils/chapterLayoutCache'
 import { attachFoldedMatchKeysToChapter } from '../utils/wordIdentity'
+import { lastChapterFromViewModel } from './useChapterInfiniteScroll'
 import {
   applyScriptureContentLoadFailure,
   scriptureContentLoadKey,
@@ -47,55 +49,40 @@ import {
 const METADATA_POLL_MS = 250
 const HARD_MISS_POLLS = 12
 
-function chapterVerseMapFromViewModel(
-  viewModel: UsjScriptureViewModel
+function chapterVerseMap<T extends { number: number }>(
+  chapters: readonly T[],
+  verseCount: (chapter: T) => number
 ): Record<string, number> {
   const map: Record<string, number> = {}
-  for (const ch of viewModel.chapters) {
-    map[String(ch.number)] = ch.verses.length
+  for (const ch of chapters) {
+    map[String(ch.number)] = verseCount(ch)
   }
   return map
 }
 
-function chapterVerseMapFromNav(nav: ScriptureNavRecord): Record<string, number> {
-  const map: Record<string, number> = {}
-  for (const ch of nav.chapters) {
-    map[String(ch.number)] = ch.verseCount
-  }
-  return map
-}
-
-function lastChapterFromNav(nav: ScriptureNavRecord): number {
-  let last = 0
-  for (const ch of nav.chapters) {
-    if (ch.number > last) last = ch.number
-  }
-  return last
-}
-
-async function applyBookSections(
-  bookCode: string,
-  setBookSections: (book: string, sections: Awaited<
-    ReturnType<typeof defaultSectionsService.getDefaultSections>
-  >) => void
-): Promise<void> {
-  const sections = await defaultSectionsService.getDefaultSections(bookCode)
-  if (sections.length > 0) {
-    setBookSections(bookCode, sections)
-  }
+/** Open chapter first; the rest of the book is not enqueued from here. */
+function enqueueBookPriority(
+  resourceKey: string,
+  bookId: string,
+  openChapter: number,
+  lastChapter: number
+): void {
+  void enqueueScriptureBookPriority({
+    resourceKey,
+    bookId,
+    openChapter,
+    lastChapter,
+    typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
+    includeRest: false,
+  }).catch(() => undefined)
 }
 
 function warmCurrentChapter(vm: UsjScriptureViewModel, chapter: number): void {
-  const warm = () => {
+  scheduleIdle(() => {
     attachFoldedMatchKeysToChapter(vm, chapter)
     getChapterLayoutBlocks(vm, chapter)
     getChapterVerseBlockItems(vm, chapter)
-  }
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(warm, { timeout: 800 })
-  } else {
-    window.setTimeout(warm, 0)
-  }
+  }, 800)
 }
 
 export function useContent(
@@ -174,6 +161,19 @@ export function useContent(
     setIsLoading(true)
     setError(null)
 
+    const applyBookCounts = async (chapterVerses: Record<string, number>) => {
+      navigation.updateBookVerseCount(
+        bookCode,
+        mergeVerseCountsFromChapterMap(
+          bookCode,
+          chapterVerses,
+          navigation.getBookInfo(bookCode)?.verses
+        )
+      )
+      const sections = await defaultSectionsService.getDefaultSections(bookCode)
+      if (sections.length > 0) navigation.setBookSections(bookCode, sections)
+    }
+
     const loadViewModel = async (reason: 'nav-miss' | 'deferred') => {
       const loader = loaderRegistry.getLoader(RESOURCE_TYPE_IDS.SCRIPTURE) as
         | ScriptureLoader
@@ -191,15 +191,7 @@ export function useContent(
           loadViewModel: loadUsjViewModel,
         })) as UsjScriptureViewModel
         if (cancelled) return null
-        navigation.updateBookVerseCount(
-          bookCode,
-          mergeVerseCountsFromChapterMap(
-            bookCode,
-            chapterVerseMapFromViewModel(rawVm),
-            navigation.getBookInfo(bookCode)?.verses
-          )
-        )
-        await applyBookSections(bookCode, navigation.setBookSections)
+        await applyBookCounts(chapterVerseMap(rawVm.chapters, (ch) => ch.verses.length))
         if (cancelled) return null
         setLoaded((prev) =>
           prev.key === loadKey
@@ -208,15 +200,8 @@ export function useContent(
         )
         setIsLoading(false)
         warmCurrentChapter(rawVm, openChapter)
-        const lastChapter = Math.max(...rawVm.chapters.map((c) => c.number), 1)
-        void enqueueScriptureBookPriority({
-          resourceKey,
-          bookId: bookCode,
-          openChapter,
-          lastChapter,
-          typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
-          includeRest: false,
-        }).catch(() => undefined)
+        const lastChapter = Math.max(lastChapterFromViewModel(rawVm.chapters), 1)
+        enqueueBookPriority(resourceKey, bookCode, openChapter, lastChapter)
         return rawVm
       } catch (err) {
         if (cancelled) return null
@@ -239,30 +224,14 @@ export function useContent(
         if (cancelled) return
 
         if (nav && nav.chapters.length > 0) {
-          navigation.updateBookVerseCount(
-            bookCode,
-            mergeVerseCountsFromChapterMap(
-              bookCode,
-              chapterVerseMapFromNav(nav),
-              navigation.getBookInfo(bookCode)?.verses
-            )
-          )
-          await applyBookSections(bookCode, navigation.setBookSections)
+          await applyBookCounts(chapterVerseMap(nav.chapters, (ch) => ch.verseCount))
           if (cancelled) return
 
           setLoaded({ key: loadKey, viewModel: null, nav })
           setIsLoading(false)
           markScripturePerfEnd('book-load', bookCode)
 
-          const lastChapter = lastChapterFromNav(nav)
-          void enqueueScriptureBookPriority({
-            resourceKey,
-            bookId: bookCode,
-            openChapter,
-            lastChapter,
-            typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
-            includeRest: false,
-          }).catch(() => undefined)
+          enqueueBookPriority(resourceKey, bookCode, openChapter, lastChapterFromViewModel(nav.chapters))
 
           // Defer whole-book viewModel so nav + light chrome can paint first.
           // On failure, promote to an immediate retry and surface real error —
@@ -286,11 +255,7 @@ export function useContent(
               })
             })
           }
-          if (typeof requestIdleCallback === 'function') {
-            requestIdleCallback(deferVm, { timeout: 2500 })
-          } else {
-            window.setTimeout(deferVm, 0)
-          }
+          scheduleIdle(deferVm, 2500)
           return
         }
 
@@ -330,8 +295,8 @@ export function useContent(
       (b) => b.code.toLowerCase() === bookId.toLowerCase()
     )?.chapters
     const explicit =
-      (nav && nav.chapters.length > 0 ? lastChapterFromNav(nav) : 0) ||
-      (viewModel ? Math.max(...viewModel.chapters.map((c) => c.number), 1) : 0) ||
+      lastChapterFromViewModel(nav?.chapters) ||
+      (viewModel ? Math.max(lastChapterFromViewModel(viewModel.chapters), 1) : 0) ||
       undefined
     return resolveLastChapter({ bookId, explicit, tocChapters })
   }, [nav, viewModel, currentRef.book, availableBooks])
@@ -378,16 +343,8 @@ export function useContent(
     const bookCode = currentRef.book
     const openChapter = currentRef.chapter || 1
     if (!bookCode || loaded.key !== loadKey) return
-    const last = lastChapterForWarm
-    if (last < 1) return
-    void enqueueScriptureBookPriority({
-      resourceKey,
-      bookId: bookCode,
-      openChapter,
-      lastChapter: last,
-      typeId: RESOURCE_TYPE_IDS.SCRIPTURE,
-      includeRest: false,
-    }).catch(() => undefined)
+    if (lastChapterForWarm < 1) return
+    enqueueBookPriority(resourceKey, bookCode, openChapter, lastChapterForWarm)
   }, [
     currentRef.chapter,
     currentRef.book,
