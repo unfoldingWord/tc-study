@@ -14,5 +14,5 @@
     "noEmit": true
   },
   "include": ["src/**/*", "cli/**/*"],
-  "exclude": ["node_modules", "src/**/*.test.ts"]
+  "exclude": ["node_modules", "src/**/*.test.ts", "cli/**/*.test.ts"]
 }

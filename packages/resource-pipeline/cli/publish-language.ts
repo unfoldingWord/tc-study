@@ -3,7 +3,10 @@
  * the lexicons changed since the build the bucket holds (src/language/publishLanguage.ts).
  *
  *   bun packages/resource-pipeline/cli/publish-language.ts --lang es-419 --work <dir> --generator <sha> \
- *     --macula <folder> --macula-commit <sha> --lexicons-ref <ref> [--obs] [--dry-run]
+ *     --macula <folder> --macula-commit <sha> [--macula-date <iso>] --lexicons-ref <ref> [--obs] [--dry-run]
+ *
+ * `--macula-date` is the MACULA commit's date, what apps order MACULA's stamps by; without it, it is read from the
+ * folder's git (`git log -1 --format=%cI`).
  *
  * The bucket: R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY. A dry run without them decides against
  * an empty bucket, as if nothing had been published. One language per process: the build's in-memory databases have
@@ -15,6 +18,7 @@
 
 import 'fake-indexeddb/auto'
 import { tmpdir } from 'node:os'
+import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import { requireFreshBuilds } from './freshBuilds'
 import type { PackBucket } from '../src/language/publishLanguage'
@@ -32,7 +36,7 @@ function arg(name: string): string | undefined {
 function usage(why: string): never {
   console.error(why)
   console.error(
-    'Uso: publish-language --lang <código> --work <carpeta> --generator <sha> --macula <carpeta> --macula-commit <sha> --lexicons-ref <ref> [--obs] [--dry-run]'
+    'Uso: publish-language --lang <código> --work <carpeta> --generator <sha> --macula <carpeta> --macula-commit <sha> [--macula-date <iso>] --lexicons-ref <ref> [--obs] [--dry-run]'
   )
   process.exit(2)
 }
@@ -43,6 +47,14 @@ const dryRun = process.argv.includes('--dry-run')
 const required = Object.fromEntries(['generator', 'macula', 'macula-commit', 'lexicons-ref'].map((name) => [name, arg(name)]))
 const missing = Object.entries(required).filter(([, v]) => !v).map(([k]) => `--${k}`)
 if (missing.length) usage(`Faltan ${missing.join(', ')}`)
+
+function commitDateIn(folder: string): string | undefined {
+  const git = spawnSync('git', ['-C', folder, 'log', '-1', '--format=%cI'], { encoding: 'utf8' })
+  return git.status === 0 ? git.stdout.trim() || undefined : undefined
+}
+const maculaFolder = resolve(required.macula!)
+const maculaDate = arg('macula-date') ?? commitDateIn(maculaFolder)
+if (!maculaDate) usage(`Sin --macula-date, y no se pudo leer la fecha del último commit de ${maculaFolder} con git`)
 
 const env = { endpoint: process.env.R2_ENDPOINT, bucket: process.env.R2_BUCKET, accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY }
 const given = Object.values(env).filter(Boolean).length
@@ -65,7 +77,7 @@ try {
     bucket,
     workDir: resolve(arg('work') ?? join(tmpdir(), `publish-language-${language}`)),
     generator: required.generator!,
-    macula: { folder: resolve(required.macula!), commit: required['macula-commit']! },
+    macula: { folder: maculaFolder, commit: required['macula-commit']!, date: maculaDate },
     lexiconsRef: required['lexicons-ref']!,
     obs: process.argv.includes('--obs'),
     dryRun,

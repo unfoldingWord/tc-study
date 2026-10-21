@@ -141,8 +141,14 @@ export const MACULA_KEYS = ['Biblica/hbo/macula', 'Biblica/el-x-koine/macula'] a
 /**
  * What MACULA says of the originals, from a folder with Taller's `trees/` and `referents/` (one `{BOOK}.json` each):
  * the Old Testament's books to the Hebrew resource, the New's to the Greek. Returns the books of each.
+ * `stamp.publishedAt` must be a date: apps order two stamps of a resource by it.
  */
-export async function addMacula(cache: Store, catalog: Catalog, folder: string, builtAt: string): Promise<Array<{ key: string; books: number }>> {
+export async function addMacula(
+  cache: Store,
+  catalog: Catalog,
+  folder: string,
+  stamp: { version: string; publishedAt: string }
+): Promise<Array<{ key: string; books: number }>> {
   const byKey = new Map<string, { rows: Array<{ key: string; entry: unknown }>; books: Set<string> }>(MACULA_KEYS.map((k) => [k, { rows: [], books: new Set() }]))
   for (const part of ['trees', 'referents'] as const) {
     for (const name of readdirSync(join(folder, part))) {
@@ -169,8 +175,8 @@ export async function addMacula(cache: Store, catalog: Catalog, folder: string, 
         subject: 'Original Language Syntax',
         title: language === 'hbo' ? 'MACULA hebreo: oraciones y referentes' : 'MACULA griego: oraciones y referentes',
         type: 'original-syntax',
-        version: builtAt.slice(0, 10),
-        publishedAt: builtAt,
+        version: stamp.version,
+        publishedAt: stamp.publishedAt,
         books: [...books].sort(),
       },
       rows

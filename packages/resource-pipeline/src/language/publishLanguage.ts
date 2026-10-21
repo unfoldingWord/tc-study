@@ -92,7 +92,8 @@ export async function publishLanguage(o: {
   bucket: PackBucket
   workDir: string
   generator: string
-  macula: { folder: string; commit: string }
+  /** `date`: the commit's date (ISO 8601), what apps order MACULA's stamps by; the commit alone makes the build id. */
+  macula: { folder: string; commit: string; date: string }
   lexiconsRef: string
   /** Open Bible Stories and their helps in the pack; left out by default, as the published packs always were. */
   obs?: boolean
@@ -104,6 +105,12 @@ export async function publishLanguage(o: {
 }): Promise<PublishResult> {
   const { language, bucket } = o
   if (!isLanguageCode(language)) throw new Error(`Not a language code: ${JSON.stringify(language)}`)
+  const maculaDate = new Date(o.macula.date)
+  if (!/^\d{4}-\d{2}-\d{2}/.test(o.macula.date) || Number.isNaN(maculaDate.getTime())) {
+    throw new Error(`Not an ISO 8601 date for MACULA's commit: ${JSON.stringify(o.macula.date)}`)
+  }
+  // In UTC: apps compare the dates as text, and two offsets would not sort.
+  const maculaStamp = { version: o.macula.commit.slice(0, 10), publishedAt: maculaDate.toISOString() }
   const obs = o.obs ?? false
   const write = o.log ?? (() => {})
   const say = (line: string) => write(oneLine(line))
@@ -145,7 +152,7 @@ export async function publishLanguage(o: {
     outDir: join(o.workDir, 'packs'),
     originals: true,
     macula: o.macula.folder,
-    maculaStamp: o.macula.commit,
+    maculaStamp,
     lexicons: { ref: o.lexiconsRef },
     obs,
     log: say,

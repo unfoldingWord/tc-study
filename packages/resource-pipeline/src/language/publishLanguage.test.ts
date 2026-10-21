@@ -12,11 +12,14 @@ import {
   type PackCatalogEntry,
   type PackManifest,
 } from '@bt-synergy/language-pack'
+import { resourceContentStamp } from '@bt-synergy/resource-catalog'
 import { PACK_VERSIONS } from './packVersions'
 import { memoryBucket, publishLanguage, r2Bucket, type PackBucket } from './publishLanguage'
 
 const compat = compatKeyOf(PACK_FORMAT_VERSION, PACK_VERSIONS)
-const macula = { folder: '/taller/public', commit: 'm1' }
+// A commit whose hash sorts after a later one's: only the date may order them.
+const macula = { folder: '/taller/public', commit: 'f1e2d3c4b5a69788f1e2d3c4b5a69788f1e2d3c4', date: '2026-10-01T09:00:00-05:00' }
+const M = macula.commit
 const lexiconsRef = 'v3'
 
 const STAMPS = {
@@ -108,7 +111,7 @@ function base(bucket: PackBucket, over: Record<string, unknown> = {}) {
 
 describe('publishLanguage', () => {
   test('unchanged: the stored entry has the same build id, so nothing is built and nothing is put', async () => {
-    const stored = await storedEntry('es-419', { generator: 'g2', macula: 'm1', lexicons: 'v3', stamps: STAMPS })
+    const stored = await storedEntry('es-419', { generator: 'g2', macula: M, lexicons: 'v3', stamps: STAMPS })
     const bucket = memoryBucket({ [catalogPath(compat, 'es-419')]: stored })
     const { options } = base(bucket, { build: neverBuild })
 
@@ -120,8 +123,8 @@ describe('publishLanguage', () => {
 
   test('a new generator publishes: pack, then views, then originals.json, then the language entry last', async () => {
     const bucket = memoryBucket({
-      [catalogPath(compat, 'es-419')]: await storedEntry('es-419', { generator: 'g1', macula: 'm1', lexicons: 'v3', stamps: STAMPS }),
-      [catalogPath(compat, 'originals')]: await storedEntry('originals', { generator: 'g1', macula: 'm1', stamps: ORIGINAL_STAMPS }),
+      [catalogPath(compat, 'es-419')]: await storedEntry('es-419', { generator: 'g1', macula: M, lexicons: 'v3', stamps: STAMPS }),
+      [catalogPath(compat, 'originals')]: await storedEntry('originals', { generator: 'g1', macula: M, stamps: ORIGINAL_STAMPS }),
     })
     const { build, calls } = fakeBuild()
     const { options } = base(bucket, { build })
@@ -147,24 +150,24 @@ describe('publishLanguage', () => {
     expect(entry).toEqual(result.entry!)
     expect(entry.pack).toEqual({ path: `packs/${compat}/es-419/${sha}.langpack.zip`, bytes: 3, sha256: sha })
     expect(entry.build.stamps).toMatchObject(ORIGINAL_STAMPS)
-    expect(entry.build).toMatchObject({ generator: 'g2', macula: 'm1', lexicons: 'v3' })
-    expect(entry.build.id).toBe(await buildIdOf({ generator: 'g2', macula: 'm1', lexicons: 'v3', stamps: STAMPS }))
+    expect(entry.build).toMatchObject({ generator: 'g2', macula: M, lexicons: 'v3' })
+    expect(entry.build.id).toBe(await buildIdOf({ generator: 'g2', macula: M, lexicons: 'v3', stamps: STAMPS }))
     expect(entry.left).toEqual([{ key: 'es-419_gl/es-419/gst', why: 'no tiene est' }])
     expect(entry.views).toBe('v1/es-419/')
 
     const originals = bucket.json<PackCatalogEntry>(catalogPath(compat, 'originals'))!
     expect(originals.language).toBe('originals')
     expect(originals.pack.path).toBe(keys[1])
-    expect(originals.build).toEqual({ id: await buildIdOf({ generator: 'g2', macula: 'm1', stamps: ORIGINAL_STAMPS }), generator: 'g2', macula: 'm1', stamps: ORIGINAL_STAMPS })
+    expect(originals.build).toEqual({ id: await buildIdOf({ generator: 'g2', macula: M, stamps: ORIGINAL_STAMPS }), generator: 'g2', macula: M, stamps: ORIGINAL_STAMPS })
 
     expect(calls).toEqual([
-      expect.objectContaining({ language: 'es-419', originals: true, macula: '/taller/public', maculaStamp: 'm1', lexicons: { ref: 'v3' }, obs: false }),
+      expect.objectContaining({ language: 'es-419', originals: true, macula: '/taller/public', maculaStamp: { version: 'f1e2d3c4b5', publishedAt: '2026-10-01T14:00:00.000Z' }, lexicons: { ref: 'v3' }, obs: false }),
     ])
   })
 
   test('a language whose originals did not change leaves the originals pack and entry alone', async () => {
     const bucket = memoryBucket({
-      [catalogPath(compat, 'originals')]: await storedEntry('originals', { generator: 'g2', macula: 'm1', stamps: ORIGINAL_STAMPS }),
+      [catalogPath(compat, 'originals')]: await storedEntry('originals', { generator: 'g2', macula: M, stamps: ORIGINAL_STAMPS }),
     })
     const { options } = base(bucket, { build: fakeBuild().build })
 
@@ -202,6 +205,25 @@ describe('publishLanguage', () => {
     expect(result).toEqual({ language: 'es-419', outcome: 'published', originals: 'published' })
     expect(bucket.puts).toEqual([])
     expect(lines.join('\n')).toContain('dry run')
+  })
+
+  test("MACULA's stamp sorts by its commit date, never by its hash", async () => {
+    const stampOf = async (m: { folder: string; commit: string; date: string }) => {
+      const { build, calls } = fakeBuild()
+      await publishLanguage(base(memoryBucket(), { build, macula: m }).options)
+      const { version, publishedAt } = (calls[0] as { maculaStamp: { version: string; publishedAt: string } }).maculaStamp
+      return resourceContentStamp({ version, release: { tag_name: version, published_at: publishedAt } } as never)
+    }
+    const older = await stampOf(macula)
+    const newer = await stampOf({ folder: macula.folder, commit: '0a1b2c3d4e5f60718293a4b5c6d7e8f901234567', date: '2026-10-15T08:00:00+02:00' })
+
+    expect(older).toBe('f1e2d3c4b5#2026-10-01T14_00_00.000Z')
+    expect(newer.split('#')[1] > older.split('#')[1]).toBe(true)
+  })
+
+  test('a MACULA date that is not a date is refused before anything runs', async () => {
+    const { options } = base(memoryBucket(), { build: neverBuild, macula: { ...macula, date: 'yesterday' } })
+    await expect(publishLanguage(options)).rejects.toThrow('yesterday')
   })
 
   test('a language code that could leave its folder is refused before anything runs', async () => {

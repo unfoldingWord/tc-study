@@ -18,6 +18,11 @@ import { isObs, keyOfRow } from './door43Stamps'
 import { PACK_VERSIONS } from './packVersions'
 import { prepareLanguage, type PrepareLanguageProgress } from './prepareLanguage'
 
+function builtNow(): { version: string; publishedAt: string } {
+  const now = new Date().toISOString()
+  return { version: now.slice(0, 10), publishedAt: now }
+}
+
 type PackResult = { file: string; bytes: Uint8Array; manifest: PackManifest; skipped: Array<{ key: string; why: string }> }
 
 export type PreparedPacks = {
@@ -36,10 +41,10 @@ export async function prepareAndPack(o: {
   /** A folder with Taller's `trees/` and `referents/`: MACULA goes in the originals pack. */
   macula?: string
   /**
-   * MACULA's stamp in the packs (its commit, for a publisher); the build date when absent. A date would make every
-   * rebuild's originals look newer to the apps that hold them.
+   * MACULA's stamp in the packs (for a publisher: its commit and the commit's date); the build date when absent, which
+   * makes every rebuild's originals look newer to the apps that hold them.
    */
-  maculaStamp?: string
+  maculaStamp?: { version: string; publishedAt: string }
   /** The lexicons are read from this ref of their Door43 repositories; `false` leaves them out. */
   lexicons: false | { ref: string }
   /** `false` leaves Open Bible Stories and their helps out (an app that translates only the Bible). */
@@ -106,7 +111,7 @@ export async function prepareAndPack(o: {
   }
   if (o.macula) {
     say(`[${elapsed()}] MACULA desde ${o.macula}…`)
-    companions.macula = await addMacula(cacheAdapter as never, catalogAdapter as never, resolve(o.macula), o.maculaStamp ?? new Date().toISOString())
+    companions.macula = await addMacula(cacheAdapter as never, catalogAdapter as never, resolve(o.macula), o.maculaStamp ?? builtNow())
     for (const m of companions.macula as Array<{ key: string; books: number }>) say(`[${elapsed()}]   ${m.key}: ${m.books} libros`)
   }
   // Open Bible Stories and their helps left out when asked: only the Bible is translated.
