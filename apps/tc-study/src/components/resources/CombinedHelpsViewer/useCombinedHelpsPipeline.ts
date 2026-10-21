@@ -138,7 +138,10 @@ export function useCombinedHelpsPipeline({
     const startChapter = currentRef.chapter
     const startVerse = currentRef.verse
     const endChapter = currentRef.endChapter || startChapter
-    const endVerse = resolveRangeEndVerse(currentRef, navigationMode)
+    const endVerse = resolveRangeEndVerse(
+      { book: currentRef.book, endVerse: currentRef.endVerse, verse: startVerse },
+      navigationMode
+    )
 
     const chapterScoped: PreparedTranslationNote[] =
       preparedRowsCoverChapterSpan(preparedNotes, startChapter, endChapter) && preparedNotes

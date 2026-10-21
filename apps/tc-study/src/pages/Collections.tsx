@@ -4,7 +4,7 @@
 
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { AlertCircle, Check, Download, FolderOpen, Loader, Plus, RefreshCw, Upload } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CollectionExportDialog } from '../components/collections/CollectionExportDialog'
 import { CollectionImportDialog } from '../components/collections/CollectionImportDialog'
@@ -34,12 +34,8 @@ export default function Collections() {
   const [showManageDialog, setShowManageDialog] = useState(false)
   const [selectedCollection, setSelectedCollection] = useState<ResourcePackage | null>(null)
 
-  useEffect(() => {
-    loadPackages()
-    loadCatalogResources()
-  }, [loadPackages])
-
-  const loadCatalogResources = async () => {
+  // catalogManager is created once per CatalogProvider, so this stays one function.
+  const loadCatalogResources = useCallback(async () => {
     setLoadingResources(true)
     try {
       const resources = await catalogManager.searchResources({})
@@ -50,7 +46,12 @@ export default function Collections() {
     } finally {
       setLoadingResources(false)
     }
-  }
+  }, [catalogManager])
+
+  useEffect(() => {
+    loadPackages()
+    loadCatalogResources()
+  }, [loadPackages, loadCatalogResources])
 
   const handleRefresh = async () => {
     setRefreshing(true)

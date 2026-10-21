@@ -28,8 +28,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   // Initialize with first reference in history
   useEffect(() => {
-    if (store.navigationHistory.length === 0) {
-      store.navigateToReference(store.currentReference)
+    const nav = useNavigationStore.getState()
+    if (nav.navigationHistory.length === 0) {
+      nav.navigateToReference(nav.currentReference)
     }
   }, [])
 

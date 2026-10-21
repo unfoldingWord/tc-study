@@ -169,9 +169,6 @@ export function useTwlArticleQuotes(args: {
     const isNewSession = paintedSessionRef.current !== sessionKey
     paintedSessionRef.current = sessionKey
     let cancelIdle: (() => void) | undefined
-    let unsubWarm: (() => void) | undefined
-    let unsubPrepare: (() => void) | undefined
-    let unsubSched: (() => void) | undefined
     let chaptersSincePaint = 0
     let pendingPaint = new Map<string, SupportRefQuoteEnrichment>()
 
@@ -513,9 +510,9 @@ export function useTwlArticleQuotes(args: {
       })()
     }
 
-    unsubWarm = subscribeWarmDone(onWarmDone)
-    unsubPrepare = subscribePrepareWarmDone(onWarmDone)
-    unsubSched = warmScheduler.subscribe((stats) => {
+    const unsubWarm = subscribeWarmDone(onWarmDone)
+    const unsubPrepare = subscribePrepareWarmDone(onWarmDone)
+    const unsubSched = warmScheduler.subscribe((stats) => {
       reconcilePending()
       if (!stats.lane1Drained) return
       void (async () => {

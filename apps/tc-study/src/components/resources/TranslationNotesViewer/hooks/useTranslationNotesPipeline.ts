@@ -53,7 +53,10 @@ export function useTranslationNotesPipeline({
     const startChapter = currentRef.chapter
     const startVerse = currentRef.verse
     const endChapter = currentRef.endChapter || startChapter
-    const endVerse = resolveRangeEndVerse(currentRef, navigationMode)
+    const endVerse = resolveRangeEndVerse(
+      { book: currentRef.book, endVerse: currentRef.endVerse, verse: startVerse },
+      navigationMode
+    )
     return filterNotesByReferenceRange(notes, { startChapter, startVerse, endChapter, endVerse })
   }, [notes, currentRef.chapter, currentRef.verse, currentRef.endChapter, currentRef.endVerse, currentRef.book, navigationMode])
 

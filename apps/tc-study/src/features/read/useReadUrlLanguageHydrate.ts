@@ -15,6 +15,7 @@ export function useReadUrlLanguageHydrate(options: {
   initialLanguage?: string
   handleLanguageSelected: (languageCode: string) => void
 }): void {
+  const { initialLanguage, handleLanguageSelected } = options
   const location = useLocation()
   const hydrateLanguagesFromUrl = useReadPanelStore((s) => s.hydrateLanguagesFromUrl)
   const autoLoadedLanguageForUrlRef = useRef<string | null>(null)
@@ -31,17 +32,17 @@ export function useReadUrlLanguageHydrate(options: {
     // Path langs only — cache is not a single-lang URL (that would overwrite
     // persisted p2 on bare `/read`). Empty path → inherit-empty only.
     hydrateLanguagesFromUrl(pathLangs)
-    const raw = pathLangs[0] || resolved.language || options.initialLanguage?.trim()
+    const raw = pathLangs[0] || resolved.language || initialLanguage?.trim()
     if (!raw) return
     const lang = canonicalReadLanguageCode(raw)
     const sig = pathLangs.length > 0 ? pathLangs.join(',') : lang
     if (autoLoadedLanguageForUrlRef.current === sig) return
     autoLoadedLanguageForUrlRef.current = sig
-    options.handleLanguageSelected(lang)
+    handleLanguageSelected(lang)
   }, [
     location.pathname,
-    options.initialLanguage,
-    options.handleLanguageSelected,
+    initialLanguage,
+    handleLanguageSelected,
     hydrateLanguagesFromUrl,
   ])
 }
