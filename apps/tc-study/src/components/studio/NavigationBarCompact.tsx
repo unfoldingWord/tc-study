@@ -113,7 +113,11 @@ export function NavigationBarCompact({
       </div>
 
       <div className="flex-1 flex items-center justify-center min-w-0">
-        <div className="flex items-center gap-chrome-tight bg-accent-soft px-chrome py-0.5 rounded-full min-h-chrome-control">
+        <div
+          role="group"
+          aria-label="Reference navigation"
+          className="flex items-center gap-chrome-tight bg-accent-soft px-chrome py-0.5 rounded-full min-h-chrome-control"
+        >
           <button
             onClick={isRtl ? handleNext : handlePrevious}
             disabled={isRtl ? !canGoNext() : !canGoPrevious()}

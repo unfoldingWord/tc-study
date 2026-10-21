@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /** Open BCV dialog from Studio/Read chrome. */
 export async function openBcvDialog(page: Page): Promise<Locator> {
@@ -15,6 +15,13 @@ export async function selectBookChapterVerse(
   dialog: Locator,
   opts: { bookName: RegExp; chapter: number; verse: number }
 ): Promise<void> {
+  // Read defaults to chapter grain (chapter grid only); a verse needs the verse grid.
+  const verseGrain = dialog.getByRole('button', { name: 'Verse', exact: true })
+  if ((await verseGrain.count()) > 0 && (await verseGrain.getAttribute('aria-pressed')) !== 'true') {
+    await verseGrain.click()
+    await expect(verseGrain).toHaveAttribute('aria-pressed', 'true')
+  }
+
   const book = dialog.getByRole('button', { name: opts.bookName }).first()
   if (await book.isVisible().catch(() => false)) {
     await book.click()
