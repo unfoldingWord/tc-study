@@ -78,7 +78,8 @@ export default function Layout() {
           </nav>
         </header>
       )}
-      <main className="flex-1 overflow-auto">
+      {/* Read needs overflow-hidden + h-full chain so docked debug can shrink panels */}
+      <main className={`flex-1 min-h-0 ${isReadPage ? 'overflow-hidden' : 'overflow-auto'}`}>
         <Outlet />
       </main>
 

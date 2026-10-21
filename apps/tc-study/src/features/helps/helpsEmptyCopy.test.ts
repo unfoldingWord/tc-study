@@ -12,6 +12,7 @@ import {
   resolveHelpsLanguageCodeForCopy,
   resolveHelpsListEmptyReason,
   resolveHelpsPaneNoSourcesView,
+  shouldShowHelpsFilterEmpty,
 } from './helpsEmptyCopy'
 
 /** Door43 list/languages: `ln` (autonym) vs `ang` (English display name). */
@@ -228,6 +229,37 @@ describe('resolveHelpsListEmptyReason', () => {
       })
     ).toBe('filter-miss')
   })
+
+  test('token filter + chapter notes is filter-miss, not no-passage', () => {
+    expect(
+      resolveHelpsListEmptyReason({
+        noSources: false,
+        loading: false,
+        depsOk: true,
+        mergedEmpty: true,
+        hasLoadError: false,
+        hasActiveFilter: true,
+        chapterHasHelps: true,
+      })
+    ).toBe('filter-miss')
+    expect(explainedHelpsEmptyKind('filter-miss')).toBeNull()
+    expect(shouldShowHelpsFilterEmpty('filter-miss')).toBe(true)
+    expect(HELPS_EMPTY_COPY.noPassage('English', 'Psalms 1')).toContain("doesn't have helps")
+  })
+
+  test('token chip with a truly empty chapter stays no-passage', () => {
+    expect(
+      resolveHelpsListEmptyReason({
+        noSources: false,
+        loading: false,
+        depsOk: true,
+        mergedEmpty: true,
+        hasLoadError: false,
+        hasActiveFilter: true,
+        chapterHasHelps: false,
+      })
+    ).toBe('no-passage')
+  })
 })
 
 describe('resolveHelpsPaneNoSourcesView', () => {
@@ -313,8 +345,9 @@ describe('resolveHelpsPaneNoSourcesView', () => {
 })
 
 describe('explainedHelpsEmptyKind', () => {
-  test('filter-miss uses the no-passage explained empty, not a crash sentence', () => {
-    expect(explainedHelpsEmptyKind('filter-miss')).toBe('no-passage')
+  test('filter-miss is not the no-passage copy; no-passage and no-sources stay explained', () => {
+    expect(explainedHelpsEmptyKind('filter-miss')).toBeNull()
+    expect(shouldShowHelpsFilterEmpty('filter-miss')).toBe(true)
     expect(explainedHelpsEmptyKind('no-passage')).toBe('no-passage')
     expect(explainedHelpsEmptyKind('no-sources')).toBe('no-sources')
     expect(explainedHelpsEmptyKind(null)).toBeNull()

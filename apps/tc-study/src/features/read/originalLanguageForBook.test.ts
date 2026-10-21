@@ -18,6 +18,7 @@ describe('originalLanguageKeyForBook', () => {
     expect(originalLanguageKeyForBook('rut')).toBe(UHB_RESOURCE_KEY)
     expect(originalLanguageKeyForBook('gen')).toBe(UHB_RESOURCE_KEY)
     expect(originalLanguageKeyForBook('mal')).toBe(UHB_RESOURCE_KEY)
+    expect(originalLanguageKeyForBook('psa')).toBe(UHB_RESOURCE_KEY)
   })
 
   test('OBS and unknown books have no original-language tab', () => {

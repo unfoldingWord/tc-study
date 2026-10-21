@@ -21,6 +21,7 @@ describe('inferDoor43ResourceTypeId', () => {
     expect(inferDoor43ResourceTypeId('obs')).toBe(RESOURCE_TYPE_IDS.OBS)
     expect(inferDoor43ResourceTypeId('obs-twl')).toBe(RESOURCE_TYPE_IDS.OBS_WORDS_LINKS)
     expect(inferDoor43ResourceTypeId('obs-tn')).toBe(RESOURCE_TYPE_IDS.OBS_NOTES)
+    expect(inferDoor43ResourceTypeId('tn-obs')).toBe(RESOURCE_TYPE_IDS.OBS_NOTES)
     expect(inferDoor43ResourceTypeId('obs-tq')).toBe(RESOURCE_TYPE_IDS.OBS_QUESTIONS)
     expect(inferDoor43ResourceTypeId('tn')).toBe(RESOURCE_TYPE_IDS.TRANSLATION_NOTES)
     expect(inferDoor43ResourceTypeId('ta')).toBe(RESOURCE_TYPE_IDS.TRANSLATION_ACADEMY)

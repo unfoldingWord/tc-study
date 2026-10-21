@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  buildChapterApplyRef,
   buildObsRangeApplyRef,
   buildVerseApplyRef,
   chapterClickSelection,
@@ -7,6 +8,7 @@ import {
   nextObsRangeClick,
   nextVerseClickSelection,
   obsStoryIdsFromIngredients,
+  selectedChapterFromVerseRange,
 } from './bcvNavigatorActions'
 
 describe('bcvNavigatorActions', () => {
@@ -43,6 +45,14 @@ describe('bcvNavigatorActions', () => {
       endChapter: 1,
       endVerse: 3,
     })
+    expect(buildChapterApplyRef('psa', 2, 12)).toEqual({
+      book: 'psa',
+      chapter: 2,
+      verse: 1,
+      endVerse: 12,
+    })
+    expect(selectedChapterFromVerseRange('2:1', '2:12')).toBe(2)
+    expect(selectedChapterFromVerseRange('2:1', '3:1')).toBeNull()
     expect(buildObsRangeApplyRef({ story: 1, frame: 2 }, { story: 1, frame: 4 })).toEqual({
       book: 'obs',
       chapter: 1,

@@ -383,7 +383,7 @@ describe('readPanelLayout', () => {
     expect(onePanel.flexBasis).toBe(0)
   })
 
-  test('collapse/restore tween the same in-flow flex-basis live drag uses', () => {
+  test('open two-pane split uses grow ratios so the fixed divider fits', () => {
     expect(edgeSplitPercent('panel-1')).toBe(0)
     expect(edgeSplitPercent('panel-2')).toBe(100)
     expect(collapseTweenRange('panel-2', 72)).toEqual({ from: 72, to: 100 })
@@ -399,7 +399,9 @@ describe('readPanelLayout', () => {
       collapsedPanelId: null,
       panel1Percent: 85,
     })
-    expect(mid.flexBasis).toBe('15%')
+    expect(mid.flexGrow).toBe(15)
+    expect(mid.flexShrink).toBe(1)
+    expect(mid.flexBasis).toBe(0)
     expect(mid.position).toBeUndefined()
     expect(mid.visibility).toBe('visible')
     expect(mid.transition).toBe('none')
@@ -410,7 +412,8 @@ describe('readPanelLayout', () => {
       collapsedPanelId: null,
       panel1Percent: 85,
     })
-    expect(sibling.flexBasis).toBe('85%')
+    expect(sibling.flexGrow).toBe(85)
+    expect(sibling.flexBasis).toBe(0)
     expect(sibling.position).toBeUndefined()
   })
 

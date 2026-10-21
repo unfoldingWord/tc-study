@@ -4,11 +4,19 @@
   "type": "module",
   "description": "Translation Notes resource loader for catalog-manager - handles TN TSV files",
   "main": "dist/index.js",
+  "module": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "node -e \"console.error('ERROR: translation-notes-loader has no real tests'); process.exit(1)\""
+    "test": "bun test"
   },
   "keywords": [
     "translation",

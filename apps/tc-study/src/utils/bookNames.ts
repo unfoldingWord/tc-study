@@ -5,6 +5,8 @@
  * Falls back to uppercase book code if title is not available.
  */
 
+import { formatHelpsChapterVerseLabel } from '../features/helps/quoteTokens/parseHelpsReference'
+
 interface BookTitleIngredient {
   identifier?: string
   title?: string
@@ -92,12 +94,15 @@ export function formatVerseRefParts(
   chapterVerse: string,
   isRtl: boolean
 ): { bookPart: string; numberPart: string } {
+  const formatted = formatHelpsChapterVerseLabel(chapterVerse)
   if (!isRtl) {
-    return { bookPart: bookName, numberPart: chapterVerse }
+    return { bookPart: bookName, numberPart: formatted }
   }
-  const [chapter, verse] = chapterVerse.split(':')
-  const numberPart = verse !== undefined ? `${verse}:${chapter}` : chapterVerse
-  return { bookPart: bookName, numberPart }
+  const colon = formatted.indexOf(':')
+  if (colon < 0) return { bookPart: bookName, numberPart: formatted }
+  const chapter = formatted.slice(0, colon)
+  const verse = formatted.slice(colon + 1)
+  return { bookPart: bookName, numberPart: `${verse}:${chapter}` }
 }
 
 /**

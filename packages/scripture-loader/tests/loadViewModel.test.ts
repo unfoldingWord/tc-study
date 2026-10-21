@@ -10,6 +10,7 @@ import { USJProcessor, USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
 
 import { ScriptureLoader } from '../src/ScriptureLoader'
 import { usjScriptureKey, legacyScriptureKey } from '../src/scriptureCacheKeys'
+import { writeUsjChapters } from '../src/usjChapterStore'
 import {
   canSplitUsjScripture,
   reassembleUsjScripture,
@@ -125,5 +126,42 @@ describe('ScriptureLoader.loadViewModel', () => {
     expect(bundle.viewModel.chapters[0]?.verses[0]?.tokens.length).toBeGreaterThan(0)
     expect(bundle.scripture.metadata.version).toBe(USJ_PROCESSING_VERSION)
     expect(cache.store.has(usjScriptureKey(resourceKey, bookId))).toBe(true)
+  })
+
+  test('assembles a full book from chapter keys + thin chapterNumbers index', async () => {
+    const cache = new MemoryCacheAdapter()
+    const resourceKey = 'unfoldingWord/en/ult'
+    const bookId = 'tit'
+    const proc = new USJProcessor()
+    const processed = await proc.processUSFM(ULT_USFM, bookId, 'Titus')
+    const cacheContent = proc.toUsjCacheContent(processed, bookId, 'Titus')
+    await writeUsjChapters(
+      {
+        get: async (key) => cache.store.get(key) ?? null,
+        set: async (key, entry) => {
+          cache.store.set(key, entry as { content: unknown; timestamp?: number })
+        },
+      },
+      resourceKey,
+      bookId,
+      cacheContent
+    )
+
+    const index = cache.store.get(usjScriptureKey(resourceKey, bookId)) as {
+      content: { chapterNumbers?: number[]; usj?: unknown }
+    }
+    expect(index.content.usj).toBeUndefined()
+    expect(index.content.chapterNumbers?.length).toBe(cacheContent.chapters?.length)
+
+    const loader = new ScriptureLoader({
+      cacheAdapter: cache,
+      door43Client: {},
+    })
+    const viewModel = await loader.loadViewModel(resourceKey, bookId)
+    expect(viewModel.bookCode).toBe(bookId)
+    expect(viewModel.chapters.length).toBeGreaterThan(0)
+    const bundle = await loader.loadScriptureResult(resourceKey, bookId)
+    expect(bundle.fromUsjCache).toBe(true)
+    expect(bundle.viewModel.chapters.length).toBe(viewModel.chapters.length)
   })
 })

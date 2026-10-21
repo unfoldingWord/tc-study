@@ -5,7 +5,8 @@ export { BookPicker } from './BookPicker'
 export { ChapterVersePicker } from './ChapterVersePicker'
 export { ObsFrameRangePicker } from './ObsFrameRangePicker'
 export { ObsStoryPicker } from './ObsStoryPicker'
-export { ObsModeTabs, ScopeTabs } from './ScopeTabs'
+export { ObsModeTabs, ScopeTabs, ScriptureModeTabs } from './ScopeTabs'
+export type { ScripturePickerGrain } from './ScopeTabs'
 export { SectionPicker } from './SectionPicker'
 export {
   buildBookInfosFromIngredients,
@@ -42,6 +43,28 @@ export {
   shrinkRangeFromStart,
 } from './navigationBarRangeActions'
 export { useNavigationBarMovement } from './useNavigationBarMovement'
+export {
+  advanceNavigationUnit,
+  canAdvanceNavigationUnit,
+  isMultiVerseSpan,
+  verseAfterRef,
+  verseBeforeRef,
+} from './advanceNavigationUnit'
+export {
+  accumulateEdgeOverscroll,
+  commitEdgeNavigation,
+  elasticPullPx,
+  isEdgeGestureArmed,
+  isPastCommitThreshold,
+  isVerticalScrollbarHit,
+  scaleWheelOverscrollDelta,
+  scrollEdgeState,
+  EDGE_NAV_THRESHOLD_PX,
+  EDGE_NAV_MAX_PULL_PX,
+  EDGE_NAV_MIN_DWELL_MS,
+  EDGE_NAV_WHEEL_SCALE,
+  SCROLLBAR_HIT_FALLBACK_PX,
+} from './scriptureEdgeNavigate'
 export { useNavigationBarRtl } from './useNavigationBarRtl'
 export {
   dirFromResource,

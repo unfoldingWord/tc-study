@@ -1,14 +1,42 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  CATALOG_KEYS_TIMEOUT,
+  COMPLETE_CHECK_TIMEOUT,
   expectedResourcesSignature,
   filterUncheckedResourceKeys,
   findMissingExpectedResources,
+  isExpectedDownloadMonitorTimeout,
   keysToEnqueueForDownload,
   narrowExpectedToCataloged,
+  raceWithTimeout,
   shouldResetDownloadTracking,
+  shouldWalkUiIdbDuringExtract,
 } from './catalogBackgroundDownloadPolicy'
 
 describe('catalogBackgroundDownloadPolicy', () => {
+  test('monitor timeouts are expected, not console-error / enqueue', () => {
+    expect(isExpectedDownloadMonitorTimeout(new Error(COMPLETE_CHECK_TIMEOUT))).toBe(true)
+    expect(isExpectedDownloadMonitorTimeout(new Error(CATALOG_KEYS_TIMEOUT))).toBe(true)
+    expect(isExpectedDownloadMonitorTimeout(new Error('IDB transaction inactive'))).toBe(false)
+  })
+
+  test('raceWithTimeout clears the timer so a late reject is not unhandled', async () => {
+    const result = await raceWithTimeout(Promise.resolve('ok'), 20, COMPLETE_CHECK_TIMEOUT)
+    expect(result).toBe('ok')
+    await new Promise((resolve) => setTimeout(resolve, 30))
+  })
+
+  test('raceWithTimeout rejects with the timeout message', async () => {
+    await expect(
+      raceWithTimeout(new Promise(() => {}), 10, COMPLETE_CHECK_TIMEOUT)
+    ).rejects.toThrow(COMPLETE_CHECK_TIMEOUT)
+  })
+
+  test('UI IDB walks skip while extract is writing', () => {
+    expect(shouldWalkUiIdbDuringExtract(true)).toBe(false)
+    expect(shouldWalkUiIdbDuringExtract(false)).toBe(true)
+  })
+
   test('language switch / deep-link scope resets download tracking', () => {
     expect(shouldResetDownloadTracking('', 'en')).toBe(true)
     expect(shouldResetDownloadTracking('en', 'es-419')).toBe(true)
@@ -63,6 +91,16 @@ describe('catalogBackgroundDownloadPolicy', () => {
     const catalog = ['unfoldingWord/en/ult', 'unfoldingWord/en/tn']
     expect(keysToEnqueueForDownload(catalog, [])).toEqual(catalog)
     expect(keysToEnqueueForDownload(catalog, null)).toEqual(catalog)
+  })
+
+  test('English expected still pulls cataloged UHB for OT quote-build', () => {
+    const expected = ['unfoldingWord/en/ult', 'unfoldingWord/en/tn']
+    const catalog = [...expected, 'unfoldingWord/hbo/uhb', 'unfoldingWord/fr/ult']
+    const queued = keysToEnqueueForDownload(catalog, expected)
+    expect(queued).toContain('unfoldingWord/en/ult')
+    expect(queued).toContain('unfoldingWord/en/tn')
+    expect(queued).toContain('unfoldingWord/hbo/uhb')
+    expect(queued).not.toContain('unfoldingWord/fr/ult')
   })
 
   test('narrowExpectedToCataloged drops keys that never got metadata', () => {

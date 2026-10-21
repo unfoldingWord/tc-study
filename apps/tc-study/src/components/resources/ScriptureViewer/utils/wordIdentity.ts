@@ -38,3 +38,15 @@ export function attachFoldedMatchKeysToViewModel(
   }
   return viewModel
 }
+
+/** Fold only one chapter — book-open must not NFD-normalize all of Psalms. */
+export function attachFoldedMatchKeysToChapter(
+  viewModel: UsjScriptureViewModel,
+  chapter: number
+): void {
+  const chapterView = viewModel.chapters.find((ch) => ch.number === chapter)
+  if (!chapterView) return
+  for (const verse of chapterView.verses) {
+    for (const token of verse.tokens) attachFoldedMatchKeys(token)
+  }
+}

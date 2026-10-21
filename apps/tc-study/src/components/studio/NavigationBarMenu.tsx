@@ -1,10 +1,14 @@
 import { Download, FolderOpen, History, Info } from 'lucide-react'
 import type { BCVReference } from '../../contexts/types'
 import { ThemeToggle } from '../../features/theme'
+import { DownloadIndicator } from '../read/DownloadIndicator'
+import { NavigationTypeSelector } from './NavigationTypeSelector'
+import { ObsNavigationTypeSelector } from './ObsNavigationTypeSelector'
 
 interface NavigationBarMenuProps {
   history: BCVReference[]
   showLanguagePicker?: boolean
+  isObs?: boolean
   onOpenHistory: () => void
   onOpenVersion: () => void
   onDownloadCollection?: () => void
@@ -15,6 +19,7 @@ interface NavigationBarMenuProps {
 export function NavigationBarMenu({
   history,
   showLanguagePicker = false,
+  isObs = false,
   onOpenHistory,
   onOpenVersion,
   onDownloadCollection,
@@ -24,13 +29,20 @@ export function NavigationBarMenu({
   return (
     <div className="absolute bottom-full right-0 mb-1 md:bottom-auto md:mb-0 md:top-full md:mt-1 w-auto bg-elevated rounded-lg shadow-xl border border-border py-1 z-50">
       <ThemeToggle size="sm" variant="menu" />
+      <div className="border-y border-border-subtle">
+        {isObs ? (
+          <ObsNavigationTypeSelector variant="menu" onClose={onClose} />
+        ) : (
+          <NavigationTypeSelector variant="menu" onClose={onClose} />
+        )}
+      </div>
       <button
         onClick={() => {
           onOpenHistory()
           onClose()
         }}
         disabled={history.length === 0}
-        className="flex items-center justify-center p-2 hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed relative"
+        className="flex items-center justify-center p-2 w-full hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed relative"
         title={`Navigation history${history.length > 0 ? ` (${history.length})` : ''}`}
         aria-label={`Navigation history${history.length > 0 ? ` (${history.length} locations)` : ''}`}
       >
@@ -42,6 +54,10 @@ export function NavigationBarMenu({
         )}
       </button>
 
+      <div className="border-t border-border-subtle">
+        <DownloadIndicator onClose={onClose} />
+      </div>
+
       {(onDownloadCollection || onLoadCollection) && (
         <>
           {onDownloadCollection && (
@@ -50,7 +66,7 @@ export function NavigationBarMenu({
                 onDownloadCollection()
                 onClose()
               }}
-              className="flex items-center justify-center p-2 hover:bg-muted"
+              className="flex items-center justify-center p-2 w-full hover:bg-muted"
               title="Download current collection"
               aria-label="Download current collection"
             >
@@ -63,7 +79,7 @@ export function NavigationBarMenu({
                 onLoadCollection()
                 onClose()
               }}
-              className="flex items-center justify-center p-2 hover:bg-muted"
+              className="flex items-center justify-center p-2 w-full hover:bg-muted"
               title="Load a collection (from database or file)"
               aria-label="Load a collection (from database or file)"
             >

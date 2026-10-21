@@ -1,6 +1,9 @@
 /**
  * Loader registration + download-priority Source of Truth (SoT)
  *
+ * Artifact recipes (SoT grain, prepare tiers, quotes/align/preview) live in
+ * `resourceArtifactRecipe.ts` and are re-exported below.
+ *
  * THIS FILE IS THE SINGLE SOURCE OF TRUTH for:
  * - Which resource types register as main-thread plugins (`surfaces.mainPlugin`)
  * - Which resource types register loaders in the background download worker
@@ -31,6 +34,11 @@ export interface LoaderSurfaces {
   mainPlugin: boolean
   /** Registered on the worker LoaderRegistry for background download */
   workerDownload: boolean
+  /**
+   * Worker-side light/full preparation (prepared:{typeId}:... rows).
+   * Must have a matching ResourcePreparer in features/prepare.
+   */
+  prepare?: boolean
 }
 
 export interface LoaderConfig {
@@ -67,7 +75,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/scripture-loader',
     downloadPriority: 2,
     factoryKey: 'scripture',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.TRANSLATION_NOTES,
@@ -75,7 +83,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-notes-loader',
     downloadPriority: 1,
     factoryKey: 'notes',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.TRANSLATION_QUESTIONS,
@@ -83,7 +91,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-questions-loader',
     downloadPriority: 25,
     factoryKey: 'questions',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.TRANSLATION_WORDS_LINKS,
@@ -91,7 +99,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-words-links-loader',
     downloadPriority: 10,
     factoryKey: 'words-links',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.OBS_WORDS_LINKS,
@@ -107,7 +115,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-words-loader',
     downloadPriority: 20,
     factoryKey: 'words',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.TRANSLATION_ACADEMY,
@@ -115,7 +123,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-academy-loader',
     downloadPriority: 30,
     factoryKey: 'academy',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.OBS,
@@ -123,7 +131,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: 'src/lib/loaders/ObsLoader',
     downloadPriority: 5,
     factoryKey: 'obs',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.OBS_NOTES,
@@ -131,7 +139,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-notes-loader',
     downloadPriority: 11,
     factoryKey: 'notes',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
   {
     id: RESOURCE_TYPE_IDS.OBS_QUESTIONS,
@@ -139,7 +147,7 @@ export const LOADER_CONFIGS: LoaderConfig[] = [
     loaderImport: '@bt-synergy/translation-questions-loader',
     downloadPriority: 26,
     factoryKey: 'questions',
-    surfaces: { mainPlugin: true, workerDownload: true },
+    surfaces: { mainPlugin: true, workerDownload: true, prepare: true },
   },
 ]
 
@@ -151,6 +159,11 @@ export function getWorkerDownloadConfigs(): LoaderConfig[] {
 /** Entries that must have a main-thread resource type plugin. */
 export function getMainPluginConfigs(): LoaderConfig[] {
   return LOADER_CONFIGS.filter((c) => c.surfaces.mainPlugin)
+}
+
+/** Entries that register a worker-side ResourcePreparer. */
+export function getWorkerPrepareConfigs(): LoaderConfig[] {
+  return LOADER_CONFIGS.filter((c) => c.surfaces.prepare)
 }
 
 /**
@@ -166,3 +179,11 @@ export function getDownloadPriority(resourceType: string): number {
 export function getAllLoaderIds(): string[] {
   return LOADER_CONFIGS.map((c) => c.id)
 }
+
+export {
+  ARTIFACT_RECIPES,
+  getArtifactRecipe,
+  recipeHasAlign,
+  recipeHasQuotes,
+  recipeNeedsOlByBook,
+} from './resourceArtifactRecipe'

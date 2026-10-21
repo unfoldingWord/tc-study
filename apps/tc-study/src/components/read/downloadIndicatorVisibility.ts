@@ -35,8 +35,9 @@ export function downloadFailureCount(progress?: DownloadProgress | null): number
 }
 
 /**
- * Show the Read chrome download button while work is in-flight or a failure
+ * Show the hamburger-menu download control while work is in-flight or a failure
  * is still on the snapshot. Hide leftover success / idle complete.
+ * (Hamburger busy badge uses `isDownloading` only — not failure leftovers.)
  */
 export function shouldShowDownloadIndicator(input: {
   isDownloading: boolean

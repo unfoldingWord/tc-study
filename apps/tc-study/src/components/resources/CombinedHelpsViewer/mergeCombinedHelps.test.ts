@@ -4,6 +4,7 @@ import {
   filterLinksByReferenceRange,
   filterNotesByReferenceRange,
   filterRowsByKind,
+  dedupeMergedRowsById,
   groupMergedRows,
   inheritedPositions,
   mergeNotesAndLinksToRows,
@@ -178,6 +179,53 @@ describe('Titus 1 CombinedHelps list (TN + TWL)', () => {
     expect(verseOne!.items.some((item) => item.kind === 'tn')).toBe(true)
     expect(verseOne!.items.some((item) => item.kind === 'twl')).toBe(true)
     expect(verseOne!.items.filter((item) => item.kind === 'twl')).toHaveLength(2)
+  })
+})
+
+describe('dedupeMergedRowsById', () => {
+  test('keeps one row per kind+id and prefers aligned chips', () => {
+    const pending = {
+      kind: 'twl' as const,
+      ref: '5:front',
+      sortChapter: 5,
+      sortVerse: 0,
+      sortPosition: -1,
+      link: makeLink({ id: 'kjx7', reference: '5:front', quoteStatus: 'ol-fallback' }),
+    }
+    const aligned = {
+      kind: 'twl' as const,
+      ref: '5:front',
+      sortChapter: 5,
+      sortVerse: 0,
+      sortPosition: 2,
+      link: makeLink({
+        id: 'kjx7',
+        reference: '5:front',
+        quoteStatus: 'aligned',
+        alignedTokens: [{ position: 2 }],
+      }),
+    }
+    const rows = dedupeMergedRowsById([pending, aligned])
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toBe(aligned)
+  })
+})
+
+describe('buildSortedMergedRows front-matter', () => {
+  test('sorts 5:front before 5:1 and dedupes the same TWL id', () => {
+    const rows = buildSortedMergedRows(
+      [makeNote({ id: 'i566', reference: '5:1' }), makeNote({ id: 'i566', reference: '5:1' })],
+      [
+        makeLink({ id: 'kjx7', reference: '5:front' }),
+        makeLink({ id: 'kjx7', reference: '5:front' }),
+        makeLink({ id: 'r3ao', reference: '5:front' }),
+      ],
+      'all'
+    )
+    expect(rows.filter((r) => r.kind === 'twl' && r.link.id === 'kjx7')).toHaveLength(1)
+    expect(rows.filter((r) => r.kind === 'tn' && r.note.id === 'i566')).toHaveLength(1)
+    expect(rows[0]!.ref).toBe('5:front')
+    expect(groupMergedRows(rows).filter((g) => g.ref === '5:front')).toHaveLength(1)
   })
 })
 

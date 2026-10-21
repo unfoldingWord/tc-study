@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   buildUsjLayoutBlocks,
+  buildUsjLayoutBlocksForChapter,
+  collectVerseBlockSequence,
   collectVerseDisplayInline,
   filterUsjLayoutBlocks,
   indentLevelForMarker,
@@ -64,12 +66,12 @@ function poetryUsj(): CachedUsjDocument {
   }
 }
 
-function viewModelFor(usj: CachedUsjDocument): UsjScriptureViewModel {
+function viewModelFor(usj: CachedUsjDocument, bookCode = 'JON'): UsjScriptureViewModel {
   return buildUsjViewModel({
     usj,
     alignmentMap: {},
-    bookCode: 'JON',
-    bookName: 'Jonah',
+    bookCode,
+    bookName: bookCode,
   })
 }
 
@@ -131,6 +133,61 @@ describe('usjLayout helpers', () => {
     const prose = blocks.find((b) => b.marker === 'p')!
     expect(prose.indentLevel).toBe(0)
     expect(prose.verseNumbers).toEqual([10])
+  })
+
+  test('buildUsjLayoutBlocksForChapter matches full-book slice and stops early', () => {
+    const usj = {
+      type: 'USJ',
+      version: '3.1',
+      content: [
+        { type: 'book', marker: 'id', content: 'TIT' },
+        { type: 'chapter', marker: 'c', number: '1', sid: 'TIT 1' },
+        {
+          type: 'para',
+          marker: 'p',
+          content: [
+            { type: 'verse', marker: 'v', number: '1', sid: 'TIT 1:1' },
+            { type: 'char', marker: 'w', content: ['Paul'] },
+          ],
+        },
+        { type: 'chapter', marker: 'c', number: '2', sid: 'TIT 2' },
+        {
+          type: 'para',
+          marker: 'p',
+          content: [
+            { type: 'verse', marker: 'v', number: '1', sid: 'TIT 2:1' },
+            { type: 'char', marker: 'w', content: ['Teach'] },
+          ],
+        },
+      ],
+    } as CachedUsjDocument
+    const viewModel = viewModelFor(usj, 'TIT')
+    const full = buildUsjLayoutBlocks(usj, viewModel)
+    const ch1 = buildUsjLayoutBlocksForChapter(usj, viewModel, 1)
+    const ch2 = buildUsjLayoutBlocksForChapter(usj, viewModel, 2)
+    expect(viewModel.chapters.map((c) => c.number)).toEqual([1, 2])
+    expect(ch1.length).toBeGreaterThan(0)
+    expect(ch2.length).toBeGreaterThan(0)
+    expect(ch1.every((b) => b.chapterNumber === 1 || b.chapterNumber === 0)).toBe(true)
+    expect(ch2.every((b) => b.chapterNumber === 2)).toBe(true)
+    const ch1Text = ch1
+      .flatMap((b) => b.inline)
+      .map((i) =>
+        i.kind === 'token' ? i.token.content : i.kind === 'text' ? i.text : ''
+      )
+      .join('')
+    const ch2Text = ch2
+      .flatMap((b) => b.inline)
+      .map((i) =>
+        i.kind === 'token' ? i.token.content : i.kind === 'text' ? i.text : ''
+      )
+      .join('')
+    expect(ch1Text).toContain('Paul')
+    expect(ch2Text).toContain('Teach')
+    expect(ch1Text).not.toContain('Teach')
+    expect(full.filter((b) => b.chapterNumber === 1).length).toBe(
+      ch1.filter((b) => b.chapterNumber === 1).length
+    )
   })
 
   test('filterUsjLayoutBlocks respects chapter + verse window', () => {
@@ -264,5 +321,153 @@ describe('paragraph clip + verse-block punctuation', () => {
     expect(viewModel.chapters[0]!.verses[0]!.tokens.some((t) => t.content === 'Paul,')).toBe(
       false
     )
+  })
+})
+
+/** BSB-like Ruth 1: headings, parallel-passage `\r`, outline, footnote, xref. */
+function ruthHeadingNoteUsj(): CachedUsjDocument {
+  return {
+    type: 'USJ',
+    version: '3.1',
+    content: [
+      { type: 'book', marker: 'id', content: 'RUT' },
+      { type: 'para', marker: 'iot', content: ['Outline'] },
+      { type: 'para', marker: 'io1', content: ['Ruth’s Loyalty to Naomi'] },
+      { type: 'para', marker: 'io1', content: ['The Return to Bethlehem'] },
+      { type: 'para', marker: 'io1', content: ['The Line of David'] },
+      { type: 'chapter', marker: 'c', number: '1', sid: 'RUT 1' },
+      { type: 'para', marker: 's1', content: ['Naomi Becomes a Widow'] },
+      { type: 'para', marker: 'r', content: ['(1 Timothy 5:3–16)'] },
+      {
+        type: 'para',
+        marker: 'p',
+        content: [
+          { type: 'verse', marker: 'v', number: '5', sid: 'RUT 1:5' },
+          { type: 'char', marker: 'w', content: ['both'] },
+          ' ',
+          { type: 'char', marker: 'w', content: ['Mahlon'] },
+          {
+            type: 'note',
+            marker: 'f',
+            caller: '+',
+            content: [
+              { type: 'char', marker: 'fr', content: ['1:5 '] },
+              { type: 'char', marker: 'ft', content: ['Or Elimelech’s sons.'] },
+            ],
+          },
+          ' ',
+          { type: 'char', marker: 'w', content: ['died'] },
+          '.',
+        ],
+      },
+      { type: 'para', marker: 's1', content: ['Ruth’s Loyalty to Naomi'] },
+      {
+        type: 'para',
+        marker: 'p',
+        content: [
+          { type: 'verse', marker: 'v', number: '6', sid: 'RUT 1:6' },
+          { type: 'char', marker: 'w', content: ['When'] },
+          ' ',
+          { type: 'char', marker: 'w', content: ['Naomi'] },
+          ' ',
+          { type: 'char', marker: 'w', content: ['heard'] },
+          {
+            type: 'note',
+            marker: 'x',
+            caller: '+',
+            content: [
+              { type: 'char', marker: 'xo', content: ['1:6 '] },
+              { type: 'char', marker: 'xt', content: ['Matthew 1:1–17'] },
+            ],
+          },
+          '.',
+        ],
+      },
+      { type: 'chapter', marker: 'c', number: '4', sid: 'RUT 4' },
+      { type: 'para', marker: 's1', content: ['The Line of David'] },
+      { type: 'para', marker: 'r', content: ['(Matthew 1:1–17; Luke 3:23–38)'] },
+    ],
+  }
+}
+
+describe('headings, footnotes, and xrefs', () => {
+  test('verse-block inline excludes headings and outline, keeps punctuation and note markers', () => {
+    const usj = ruthHeadingNoteUsj()
+    const viewModel = rutViewModel(usj)
+    const blocks = buildUsjLayoutBlocks(usj, viewModel)
+
+    const v5 = collectVerseDisplayInline(blocks, 1, 5)
+    const v5Text = plainTextFromLayoutInline(v5)
+    expect(v5Text).toBe('both Mahlon died.')
+    expect(v5Text).not.toContain('Naomi Becomes a Widow')
+    expect(v5Text).not.toContain('1 Timothy')
+    expect(v5Text).not.toContain('The Line of David')
+    expect(v5Text).not.toContain('Or Elimelech')
+    expect(v5.some((i) => i.kind === 'heading')).toBe(false)
+    expect(v5.some((i) => i.kind === 'note' && i.text === 'Or Elimelech’s sons.')).toBe(
+      true
+    )
+    expect(v5.some((i) => i.kind === 'text' && i.text.includes('.'))).toBe(true)
+
+    const v6 = collectVerseDisplayInline(blocks, 1, 6)
+    expect(plainTextFromLayoutInline(v6)).toBe('When Naomi heard.')
+    expect(plainTextFromLayoutInline(v6)).not.toContain('Ruth’s Loyalty')
+    expect(v6.some((i) => i.kind === 'xref' && i.text === 'Matthew 1:1–17')).toBe(true)
+  })
+
+  test('verse-block sequence renders each heading once in document order', () => {
+    const usj = ruthHeadingNoteUsj()
+    const viewModel = rutViewModel(usj)
+    const all = buildUsjLayoutBlocks(usj, viewModel)
+    const blocks = filterUsjLayoutBlocks(all, {
+      chapters: [1],
+      includeVerse: (_ch, v) => v === 5 || v === 6,
+    })
+    const sequence = collectVerseBlockSequence(blocks, [
+      { chapter: 1, verse: 5 },
+      { chapter: 1, verse: 6 },
+    ])
+
+    const headingTexts = sequence
+      .filter((item) => item.kind === 'chrome')
+      .flatMap((item) =>
+        item.kind === 'chrome'
+          ? item.block.inline
+              .filter((i) => i.kind === 'heading')
+              .map((i) => (i.kind === 'heading' ? i.text : ''))
+          : []
+      )
+
+    expect(headingTexts.filter((t) => t === 'Naomi Becomes a Widow')).toHaveLength(1)
+    expect(headingTexts.filter((t) => t === '(1 Timothy 5:3–16)')).toHaveLength(1)
+    expect(headingTexts.filter((t) => t === 'Ruth’s Loyalty to Naomi')).toHaveLength(1)
+    expect(headingTexts).not.toContain('The Line of David')
+    expect(headingTexts).not.toContain('The Return to Bethlehem')
+
+    const verseItems = sequence.filter((item) => item.kind === 'verse')
+    expect(verseItems.map((item) => (item.kind === 'verse' ? item.verse : 0))).toEqual([
+      5, 6,
+    ])
+    expect(
+      verseItems.every(
+        (item) =>
+          item.kind === 'verse' &&
+          !plainTextFromLayoutInline(item.displayInline).includes('Naomi Becomes a Widow')
+      )
+    ).toBe(true)
+  })
+
+  test('paragraph-mode range clip still hides out-of-range verses beside notes', () => {
+    const usj = ruthHeadingNoteUsj()
+    const viewModel = rutViewModel(usj)
+    const blocks = filterUsjLayoutBlocks(buildUsjLayoutBlocks(usj, viewModel), {
+      chapters: [1],
+      includeVerse: (_ch, v) => v === 5,
+    })
+    const para = blocks.find((b) => b.marker === 'p' && b.verseNumbers.includes(5))
+    expect(para).toBeTruthy()
+    expect(plainTextFromLayoutInline(para!.inline)).toContain('Mahlon')
+    expect(plainTextFromLayoutInline(para!.inline)).not.toContain('When')
+    expect(para!.inline.some((i) => i.kind === 'note')).toBe(true)
   })
 })

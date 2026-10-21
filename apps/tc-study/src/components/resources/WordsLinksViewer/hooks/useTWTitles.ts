@@ -1,152 +1,106 @@
 /**
  * useTWTitles Hook
  *
- * Fetches and caches Translation Words article titles
+ * Fetches Translation Words article titles via shared helps-text cache
+ * (memory → IndexedDB → catalog TOC).
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback } from 'react'
 import { useCatalogManager } from '../../../../contexts'
-import type { TranslationWordsLink } from '../types'
 import { parseTWLink } from '../../../../features/helps/quoteTokens'
+import { resourceContentStamp } from '../../../../features/helps/resourceContentStamp'
+import { getCachedTocTitleIndex, lookupTocTitle } from '../../../../features/helps/tocTitleIndex'
+import { useHelpsTextCache } from '../../../../features/helps/useHelpsTextCache'
+import type { TranslationWordsLink } from '../types'
+
+function resolveTwResourceKey(twlResourceKey: string): string | null {
+  const parts = twlResourceKey.split('/')
+  if (parts.length < 2) return null
+  const [owner, ...rest] = parts
+  if (rest.length === 1) {
+    const language = rest[0].split('_')[0]
+    return `${owner}/${language}_tw`
+  }
+  if (rest.length >= 2) {
+    return `${owner}/${rest[0]}/tw`
+  }
+  return null
+}
+
+function linkSourceFor(link: TranslationWordsLink): string | null {
+  let linkSource = link.twLink || link.articlePath
+  if (!linkSource && link.id?.startsWith('rc://')) {
+    linkSource = link.id
+  }
+  return linkSource || null
+}
 
 export function useTWTitles(resourceKey: string) {
   const catalogManager = useCatalogManager()
-  const [twTitles, setTwTitles] = useState<Map<string, string>>(new Map())
-  const [loadingTitles, setLoadingTitles] = useState<Set<string>>(new Set())
-  const twTitlesRef = useRef<Map<string, string>>(new Map())
-  const fallbackTitlesRef = useRef<Set<string>>(new Set()) // Track which titles are fallbacks
+  const { values: twTitles, loading: loadingTitles, fetchText, getCached } =
+    useHelpsTextCache('tw-title')
 
-  // Fetch TW title for a link from TOC
-  const fetchTWTitle = useCallback(async (link: TranslationWordsLink): Promise<string | null> => {
-    // Try multiple sources for the TW link
-    let linkSource = link.twLink || link.articlePath
-
-    // If id looks like an RC link, use it
-    if (!linkSource && link.id && link.id.startsWith('rc://')) {
-      linkSource = link.id
-    }
-
-    // If still no link source, we can't fetch the title
-    if (!linkSource) {
-      console.error(`❌ [TWL Title Fetch] No valid link source found for link:`, {
-        id: link.id,
-        twLink: link.twLink,
-        articlePath: link.articlePath,
-      })
-      return null
-    }
-
-    const twInfo = parseTWLink(linkSource)
-
-    // If parsing failed, we can't fetch the title
-    if (twInfo.category === 'unknown' || !twInfo.term) {
-      console.error(`❌ [TWL Title Fetch] Failed to parse link source: "${linkSource}"`)
-      return null
-    }
-
-    const cacheKey = `${twInfo.category}/${twInfo.term}`
-
-    // Check cache first
-    if (twTitlesRef.current.has(cacheKey)) {
-      return twTitlesRef.current.get(cacheKey) || null
-    }
-
-    // Check if already loading
-    if (loadingTitles.has(cacheKey)) {
-      return null
-    }
-
-    try {
-      setLoadingTitles(prev => new Set(prev).add(cacheKey))
-
-      // Find TW resource (same language, same owner)
-      const parts = resourceKey.split('/')
-      if (parts.length < 2) {
-        throw new Error(`Invalid resourceKey format: ${resourceKey}`)
+  const fetchTWTitle = useCallback(
+    async (link: TranslationWordsLink): Promise<string | null> => {
+      const linkSource = linkSourceFor(link)
+      if (!linkSource) {
+        console.error(`❌ [TWL Title Fetch] No valid link source found for link:`, {
+          id: link.id,
+          twLink: link.twLink,
+          articlePath: link.articlePath,
+        })
+        return null
       }
 
-      const [owner, ...rest] = parts
-      let twResourceKey: string
-      let language: string
-
-      if (rest.length === 1) {
-        // Format: "owner/language_resourceId" (e.g., "unfoldingWord/en_twl")
-        const langResource = rest[0]
-        language = langResource.split('_')[0]
-        twResourceKey = `${owner}/${language}_tw`
-      } else if (rest.length >= 2) {
-        // Format: "owner/language/resourceId" (e.g., "es-419_gl/es-419/twl")
-        language = rest[0]
-        twResourceKey = `${owner}/${language}/tw`
-      } else {
-        throw new Error(`Invalid resourceKey format: ${resourceKey}`)
+      const twInfo = parseTWLink(linkSource)
+      if (twInfo.category === 'unknown' || !twInfo.term) {
+        console.error(`❌ [TWL Title Fetch] Failed to parse link source: "${linkSource}"`)
+        return null
       }
 
-      // Construct article ID to match against TOC
-      const articleId = `bible/${twInfo.category}/${twInfo.term}`
+      const cacheKey = `${twInfo.category}/${twInfo.term}`
+      const twResourceKey = resolveTwResourceKey(resourceKey)
+      if (!twResourceKey) return null
 
-      // Get TW resource metadata from catalog (contains TOC in ingredients)
-      const twMetadata = await catalogManager.getResourceMetadata(twResourceKey)
+      try {
+        const twMetadata = await catalogManager.getResourceMetadata(twResourceKey)
+        const stamp = resourceContentStamp(twMetadata)
+        const articleId = `bible/${twInfo.category}/${twInfo.term}`
 
-      if (!twMetadata?.contentMetadata?.ingredients) {
-        // TW metadata not ready yet - cache the term as fallback to prevent infinite retries
-        const fallback = twInfo.term
-        fallbackTitlesRef.current.add(cacheKey) // Mark as fallback
-        twTitlesRef.current.set(cacheKey, fallback)
-        setTwTitles(prev => new Map(prev).set(cacheKey, fallback))
-        return fallback
+        return await fetchText({
+          resourceKey: twResourceKey,
+          stamp,
+          entryId: cacheKey,
+          resolve: async () => {
+            const ingredients = twMetadata?.contentMetadata?.ingredients
+            const index = getCachedTocTitleIndex(twResourceKey, stamp, ingredients)
+            if (!index) {
+              return { value: twInfo.term, confident: false }
+            }
+            const title =
+              lookupTocTitle(index, articleId) ||
+              lookupTocTitle(index, cacheKey)
+            if (!title) {
+              return { value: twInfo.term, confident: false }
+            }
+            return { value: title, confident: true }
+          },
+        })
+      } catch {
+        return twInfo.term
       }
+    },
+    [resourceKey, catalogManager, fetchText]
+  )
 
-      const ingredients = twMetadata.contentMetadata.ingredients
-
-      // Look up title from TOC ingredients
-      const ingredient = ingredients.find((ing: { identifier?: string; path?: string; title?: string }) => {
-        if (ing.identifier === articleId) return true
-        if (ing.path && ing.path.replace(/\.md$/, '') === articleId) return true
-        const ingParts = ing.identifier?.split('/') || []
-        const articleParts = articleId.split('/')
-        if (ingParts.length >= 3 && articleParts.length >= 3) {
-          return ingParts[ingParts.length - 2] === articleParts[articleParts.length - 2] &&
-                 ingParts[ingParts.length - 1] === articleParts[articleParts.length - 1]
-        }
-        return false
-      })
-
-      if (!ingredient?.title) {
-        // Ingredient not found in TOC - cache the term as fallback
-        const fallback = twInfo.term
-        fallbackTitlesRef.current.add(cacheKey) // Mark as fallback
-        twTitlesRef.current.set(cacheKey, fallback)
-        setTwTitles(prev => new Map(prev).set(cacheKey, fallback))
-        return fallback
-      }
-
-      const title = ingredient.title
-      fallbackTitlesRef.current.delete(cacheKey) // Remove from fallback set if it was there
-      twTitlesRef.current.set(cacheKey, title)
-      setTwTitles(prev => new Map(prev).set(cacheKey, title))
-      return title
-    } catch (_error) {
-      // Silently fail - cache term as fallback to prevent infinite retries
-      const fallbackTitle = twInfo.term
-      twTitlesRef.current.set(cacheKey, fallbackTitle)
-      setTwTitles(prev => new Map(prev).set(cacheKey, fallbackTitle))
-      return fallbackTitle
-    } finally {
-      setLoadingTitles(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(cacheKey)
-        return newSet
-      })
-    }
-  }, [resourceKey, catalogManager])
-
-  // Get TW title for display
-  const getTWTitle = useCallback((link: TranslationWordsLink): string => {
-    const twInfo = parseTWLink(link.twLink)
-    const cacheKey = `${twInfo.category}/${twInfo.term}`
-    return twTitles.get(cacheKey) || twInfo.term
-  }, [twTitles])
+  const getTWTitle = useCallback(
+    (link: TranslationWordsLink): string => {
+      const twInfo = parseTWLink(link.twLink)
+      const cacheKey = `${twInfo.category}/${twInfo.term}`
+      return getCached(cacheKey) || twInfo.term
+    },
+    [getCached]
+  )
 
   return {
     twTitles,

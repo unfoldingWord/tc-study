@@ -1,3 +1,4 @@
+import type { InternedToken } from '../../../../features/scripture/scripturePreparer'
 import type { OriginalLanguageToken } from '../types'
 import type { ScriptureRenderToken } from './wordIdentity'
 import { semanticIdKey } from './wordIdentity'
@@ -126,4 +127,77 @@ export function resolveTokenVisualState(
       tokenKeys.alignedOriginalWordIds.some((id) => underlines.has(id))
   }
   return { isHighlighted, isSelected, isUnderlined }
+}
+
+/**
+ * Integer paint path for InternedToken + chapter matchKeys indices.
+ * Prefer this when a full prepared chapter is available.
+ */
+export function resolveTokenVisualStateInterned(
+  token: InternedToken,
+  opts: {
+    underlineIndices: Set<number>
+    highlightOwnIndex: number | null
+    highlightAlignedIndices: Set<number>
+    isOriginalLanguage: boolean
+  }
+): TokenVisualState {
+  let isHighlighted = false
+  let isSelected = false
+  const own = token.k
+  const aligned = token.a ?? []
+  const hlOwn = opts.highlightOwnIndex
+  const hlAligned = opts.highlightAlignedIndices
+
+  if (hlOwn != null || hlAligned.size > 0) {
+    if (opts.isOriginalLanguage) {
+      if (hlOwn != null && own === hlOwn) {
+        isHighlighted = true
+        isSelected = true
+      } else if (hlAligned.size > 0) {
+        isHighlighted = hlAligned.has(own)
+      }
+    } else if (hlOwn != null && own === hlOwn) {
+      isHighlighted = true
+      isSelected = true
+    } else if (aligned.length > 0) {
+      if (hlOwn != null && aligned.includes(hlOwn)) {
+        isHighlighted = true
+        isSelected = true
+      } else if (hlAligned.size > 0) {
+        isHighlighted = aligned.some((i) => hlAligned.has(i))
+      }
+    } else if (hlAligned.has(own)) {
+      isHighlighted = true
+    }
+  }
+
+  const underlines = opts.underlineIndices
+  const isUnderlined =
+    underlines.size > 0 &&
+    (underlines.has(own) || aligned.some((i) => underlines.has(i)))
+
+  return { isHighlighted, isSelected, isUnderlined }
+}
+
+/** Map a folded highlight target through chapter matchKeys into integer indices. */
+export function highlightIndicesFromTarget(
+  matchKeys: readonly string[],
+  highlightTarget: OriginalLanguageToken | null
+): { ownIndex: number | null; alignedIndices: Set<number> } {
+  if (!highlightTarget) return { ownIndex: null, alignedIndices: new Set() }
+  const folded = foldHighlightTarget(highlightTarget)!
+  const lookup = new Map<string, number>()
+  for (let i = 0; i < matchKeys.length; i++) lookup.set(matchKeys[i]!, i)
+  const ownKey = folded.foldedSemanticId ?? semanticIdKey(folded.semanticId)
+  const ownIndex = lookup.has(ownKey) ? lookup.get(ownKey)! : null
+  const alignedIndices = new Set<number>()
+  const aligned =
+    folded.foldedAlignedIdSet ??
+    new Set((folded.alignedSemanticIds ?? []).map(semanticIdKey))
+  for (const id of aligned) {
+    const idx = lookup.get(id)
+    if (idx !== undefined) alignedIndices.add(idx)
+  }
+  return { ownIndex, alignedIndices }
 }

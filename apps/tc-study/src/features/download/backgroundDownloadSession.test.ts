@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   backgroundDownloadSession,
   getBackgroundDownloadSession,
@@ -22,5 +24,41 @@ describe('backgroundDownloadSession', () => {
     // Guard lives in startDownload: if isBusy, return false without emit/reset.
     // Worker is not constructed by subscribe/remount — only by an accepted start.
     expect(getBackgroundDownloadWorkerConstructCount()).toBe(0)
+  })
+
+  test('session can retry the last key after an error (recreates worker)', () => {
+    expect(typeof backgroundDownloadSession.retryLastRun).toBe('function')
+    expect(backgroundDownloadSession.retryLastRun()).toBe(false)
+  })
+
+  test('stall watchdog lives on the session so a dead worker cannot leave 1% forever', () => {
+    const src = readFileSync(
+      join(import.meta.dir, 'backgroundDownloadSession.ts'),
+      'utf8'
+    )
+    expect(src).toContain('DOWNLOAD_STALL_MESSAGE')
+    expect(src).toContain('bumpStallWatchdog')
+    expect(src).toContain('failSession(DOWNLOAD_STALL_MESSAGE)')
+    expect(src).toContain('bumpReadyWatchdog')
+    expect(src).toContain('startMainThreadFallback')
+    expect(src).toContain('runBackgroundDownloadOnThisThread')
+    expect(src).toContain('shouldFallbackStuckStarting')
+    expect(src).toContain('workerProgressCount')
+    expect(src).toContain('Ready alone used to clear this timer')
+    expect(src).toContain('shouldFallbackOnWorkerError')
+    expect(src).toContain('shouldRunExtractOnThisThread')
+    expect(src).not.toContain('isWorkerIsolateFailure(previousError)')
+    expect(src).toContain('lastResourceKeys')
+    expect(src).toContain('applyDiscoveredIngredientTotal')
+    expect(src).toContain('blockedReason')
+    expect(src).toContain('lastActivityAt')
+    expect(src).toContain('recentSteps')
+    expect(src).toContain('downloadBlockedReason')
+    const thisThread = readFileSync(
+      join(import.meta.dir, 'runBackgroundDownloadOnThisThread.ts'),
+      'utf8'
+    )
+    expect(thisThread).toContain('resolveRunIngredientTotal')
+    expect(thisThread).not.toContain('needsCalculation')
   })
 })

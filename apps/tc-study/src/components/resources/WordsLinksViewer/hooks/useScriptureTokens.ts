@@ -12,6 +12,7 @@ import { RESOURCE_STATE_KEYS, useResourceState } from '@bt-synergy/resource-pane
 import { useSyncExternalStore } from 'react'
 import { scriptureContentRevision } from '../../../../features/helps/scriptureReadyUnderlineRebind'
 import {
+  getLastScriptureTokensSourceResourceId,
   getScriptureTokensSnapshot,
   preferHydratedScriptureTokens,
   subscribeScriptureTokensSnapshot,
@@ -53,6 +54,12 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
     getScriptureTokensSnapshot,
     getScriptureTokensSnapshot
   )
+  // Same store subscription — last-known catalog key survives passage invalidate.
+  const lastKnownSourceId = useSyncExternalStore(
+    subscribeScriptureTokensSnapshot,
+    getLastScriptureTokensSourceResourceId,
+    getLastScriptureTokensSourceResourceId
+  )
 
   const isClearMessage =
     scriptureTokensBroadcast &&
@@ -66,10 +73,20 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
           tokens: scriptureTokensBroadcast.tokens,
           reference: scriptureTokensBroadcast.reference,
           resourceMetadata: scriptureTokensBroadcast.resourceMetadata,
-          sourceResourceId: scriptureTokensBroadcast.sourceResourceId ?? null,
+          // Prefer catalog key (resourceMetadata.id) over panel instance id so
+          // align/warm look up prepared scripture after dual-pane mode-switch.
+          sourceResourceId:
+            scriptureTokensBroadcast.resourceMetadata?.id ||
+            scriptureTokensBroadcast.sourceResourceId ||
+            null,
         }
 
   const resolved = preferHydratedScriptureTokens(messaging, publishedTokens)
+  const sourceResourceId =
+    resolved?.sourceResourceId ||
+    resolved?.resourceMetadata?.id ||
+    lastKnownSourceId ||
+    null
 
   if (!resolved) {
     return {
@@ -77,7 +94,7 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
       reference: null,
       resourceMetadata: null,
       hasTokens: false,
-      sourceResourceId: null,
+      sourceResourceId,
     }
   }
 
@@ -86,7 +103,7 @@ export function useScriptureTokens({ resourceId }: UseScriptureTokensOptions): S
     reference: resolved.reference,
     resourceMetadata: resolved.resourceMetadata,
     hasTokens: resolved.tokens.length > 0,
-    sourceResourceId: resolved.sourceResourceId,
+    sourceResourceId,
   }
 }
 

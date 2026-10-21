@@ -10,6 +10,7 @@ export {
 export type { OptimizedScripture } from './optimized-scripture'
 export {
   viewModelToOptimizedChapters,
+  viewModelChapterToOptimized,
   extractUsjBroadcastTokens,
 } from './usj-projection'
 export type { BroadcastScriptureToken } from './usj-projection'

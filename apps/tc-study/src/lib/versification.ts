@@ -129,35 +129,83 @@ export function getIngredientBookSortKey(
 }
 
 /**
- * Extract verse counts from parsed USFM content metadata
+ * Extract verse counts from parsed USFM content metadata.
+ * Dense maps keyed 1..N become a length-N array. Prefer
+ * {@link mergeVerseCountsFromChapterMap} for chapter-grained / sparse loads.
  */
 export function extractVerseCountsFromContent(
   chapterVerseMap: Record<string, number>
 ): number[] {
   const chapters = Object.keys(chapterVerseMap)
     .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0)
     .sort((a, b) => a - b)
-  
-  return chapters.map(chapter => chapterVerseMap[chapter] || 0)
+
+  if (chapters.length === 0) return []
+
+  // Contiguous 1..N → dense array (legacy full-book metadata).
+  const max = chapters[chapters.length - 1]!
+  if (chapters.length === max && chapters[0] === 1) {
+    return chapters.map((chapter) => chapterVerseMap[String(chapter)] || chapterVerseMap[chapter] || 0)
+  }
+
+  // Sparse: allocate by chapter number so chapter 119 is index 118, not 0.
+  const out = Array.from({ length: max }, () => 0)
+  for (const chapter of chapters) {
+    out[chapter - 1] = chapterVerseMap[String(chapter)] || chapterVerseMap[chapter] || 0
+  }
+  return out
+}
+
+/**
+ * Overlay chapter-grained verse counts onto standard / existing book length.
+ * Partial SoT loads (Psalms ch.1 only) must not shrink navigation to 1 chapter.
+ */
+export function mergeVerseCountsFromChapterMap(
+  bookCode: string,
+  chapterVerseMap: Record<string, number>,
+  existing?: readonly number[] | null
+): number[] {
+  const standard = getStandardVerseCount(bookCode) ?? []
+  let maxFromMap = 0
+  for (const key of Object.keys(chapterVerseMap)) {
+    const n = Number(key)
+    if (Number.isFinite(n) && n > maxFromMap) maxFromMap = n
+  }
+  const len = Math.max(standard.length, existing?.length ?? 0, maxFromMap)
+  if (len === 0) return extractVerseCountsFromContent(chapterVerseMap)
+
+  const merged = Array.from({ length: len }, (_, i) => {
+    const fromExisting = existing?.[i]
+    if (typeof fromExisting === 'number' && fromExisting > 0) return fromExisting
+    const fromStandard = standard[i]
+    if (typeof fromStandard === 'number' && fromStandard > 0) return fromStandard
+    return 1
+  })
+
+  for (const [chStr, count] of Object.entries(chapterVerseMap)) {
+    const chapter = Number(chStr)
+    if (!Number.isFinite(chapter) || chapter < 1 || !(count > 0)) continue
+    merged[chapter - 1] = count
+  }
+  return merged
 }
 
 /**
  * Get verse counts with fallback strategy:
- * 1. From content metadata (if available)
+ * 1. From content metadata (if available) merged with standard length
  * 2. From standard versification
  */
 export function getVerseCount(
   bookCode: string,
   contentMetadata?: { chapterVerseMap?: Record<string, number> }
 ): number[] {
-  // First, try to get from content metadata
   if (contentMetadata?.chapterVerseMap) {
-    const counts = extractVerseCountsFromContent(contentMetadata.chapterVerseMap)
+    const counts = mergeVerseCountsFromChapterMap(bookCode, contentMetadata.chapterVerseMap)
     if (counts.length > 0) {
       return counts
     }
   }
-  
-  // Fall back to standard versification
+
   return getStandardVerseCount(bookCode) || []
 }

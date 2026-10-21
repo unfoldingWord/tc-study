@@ -4,7 +4,7 @@ import type {
   UsjVerseView,
   UsjWordToken,
 } from '@bt-synergy/scripture-loader'
-import type { BookInfo } from '../../../contexts/types-only'
+import type { BCVReference, BookInfo } from '../../../contexts/types-only'
 import type { ResourceInfo } from '../../../contexts/types'
 
 export interface ScriptureViewerProps {
@@ -49,7 +49,11 @@ export interface VerseDisplayProps {
   underlinedSemanticIds?: Set<string>
   onTokenClick: (token: UsjWordToken) => void
   onVerseClick?: (chapter: number, verse: number) => void
+  onScriptureRefClick?: (ref: BCVReference) => void
+  currentBook?: string
   isOriginalLanguage: boolean
+  /** Skip footnote/xref/heading extras on a chapter that is still first-painting. */
+  cheapPaint?: boolean
 }
 
 export interface TokenDisplayProps {

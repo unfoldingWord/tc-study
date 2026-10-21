@@ -36,6 +36,7 @@ describe('text-mode mismatch wiring (issue #25 / #30)', () => {
     expect(viewSrc).toContain('excludePanelIds')
     expect(viewSrc).toContain('onSwitchTextMode={handleSwitchTextMode}')
     expect(viewSrc).toContain('onNavigationScopeCommitted={handleNavigatorScopeCommitted}')
+    expect(viewSrc).toMatch(/<NavigationBar[\s\S]*onSwitchTextMode=\{handleSwitchTextMode\}/)
     expect(viewSrc).toContain('handlePanelLanguageSelected')
     const areaSrc = readFileSync(join(import.meta.dir, 'ReadPanelsArea.tsx'), 'utf8')
     expect(areaSrc).toContain('scriptureKeysForMismatchDisplay')

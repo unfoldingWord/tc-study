@@ -83,11 +83,12 @@ export function useReadLanguageBootstrap({
     completenessChecker
   )
 
-  const { startDownload, stopDownload, stats: downloadStats, isDownloading: isBackgroundDownloading } =
+  const { startDownload, stopDownload, isDownloading: isBackgroundDownloading } =
     useBackgroundDownload({
       autoStart: false,
       skipExisting: true,
       debug: true,
+      controlOnly: true,
     })
   /** Keeps cancel-on-language-change without listing isDownloading in handleLanguageSelected deps. */
   const isBackgroundDownloadingRef = useRef(isBackgroundDownloading)
@@ -194,6 +195,5 @@ export function useReadLanguageBootstrap({
     isLanguagePickerRequired,
     handleLanguageSelected,
     isBackgroundDownloading,
-    downloadStats,
   }
 }

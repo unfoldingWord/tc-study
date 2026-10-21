@@ -1,5 +1,6 @@
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import type { HelpsQuoteStatus } from '../../../features/helps/resolveHelpsQuoteStatus'
+import type { HastRoot } from '../../../lib/markdown/markdownToHast'
 import { useMemo } from 'react'
 import {
   filterDisplayLinks,
@@ -24,6 +25,9 @@ export type NoteWithAlignments = TranslationNote & {
   alignedTokens?: Array<{ position: number }>
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
+  quoteWarmPending?: boolean
+  /** Precomputed markdown AST from prepared notes rows. */
+  bodyHast?: HastRoot
 }
 
 export type LinkWithAlignments = TranslationWordsLink & {
@@ -31,6 +35,8 @@ export type LinkWithAlignments = TranslationWordsLink & {
   alignedTokens?: Array<{ position: number }>
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
+  quoteWarmPending?: boolean
+  articlePath?: string
 }
 
 export type MergedRow =
@@ -91,6 +97,30 @@ export function sortMergedRows(rows: MergedRow[]): MergedRow[] {
   })
 }
 
+function rowId(row: MergedRow): string {
+  return row.kind === 'tn' ? `tn:${row.note.id}` : `twl:${row.link.id}`
+}
+
+function rowAlignScore(row: MergedRow): number {
+  const aligned = row.kind === 'tn' ? row.note.alignedTokens : row.link.alignedTokens
+  if (aligned && aligned.length > 0) return 2
+  const status = row.kind === 'tn' ? row.note.quoteStatus : row.link.quoteStatus
+  if (status === 'aligned') return 2
+  if (status === 'pending') return 0
+  return 1
+}
+
+/** Keep one row per kind+id; prefer a row that already has ULT chips. */
+export function dedupeMergedRowsById(rows: MergedRow[]): MergedRow[] {
+  const winner = new Map<string, MergedRow>()
+  for (const row of rows) {
+    const key = rowId(row)
+    const prev = winner.get(key)
+    if (!prev || rowAlignScore(row) > rowAlignScore(prev)) winner.set(key, row)
+  }
+  return rows.filter((row) => winner.get(rowId(row)) === row)
+}
+
 /** Merge notes + links into sortable rows (does not apply kind filter). */
 export function mergeNotesAndLinksToRows(
   notes: NoteWithAlignments[],
@@ -138,7 +168,7 @@ export function buildSortedMergedRows(
     includeNotes ? notes : [],
     includeLinks ? links : []
   )
-  return sortMergedRows(rows)
+  return dedupeMergedRowsById(sortMergedRows(rows))
 }
 
 /** Group consecutive rows that share the same reference. */
@@ -165,6 +195,8 @@ export function useCombinedHelpsDisplay({
   obsQuoteFilter,
   verseFilter,
   tokenFilter,
+  supportRefFilter = null,
+  twlArticleFilter = null,
   bookCodeLower,
 }: UseCombinedHelpsDisplayParams) {
   const params: DisplayFilterParams = {
@@ -172,19 +204,39 @@ export function useCombinedHelpsDisplay({
     obsQuoteFilter,
     verseFilter,
     tokenFilter,
+    supportRefFilter,
+    twlArticleFilter,
     bookCodeLower,
   }
 
   const { displayNotes, hasNoteMatches } = useMemo(
     () => filterDisplayNotes(notesWithAlignedTokens, params),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- params fields listed explicitly
-    [notesWithAlignedTokens, helpsScope, obsQuoteFilter, verseFilter, tokenFilter, bookCodeLower]
+    [
+      notesWithAlignedTokens,
+      helpsScope,
+      obsQuoteFilter,
+      verseFilter,
+      tokenFilter,
+      supportRefFilter,
+      twlArticleFilter,
+      bookCodeLower,
+    ]
   )
 
   const { displayLinks, hasLinkMatches } = useMemo(
     () => filterDisplayLinks(filteredByReference, params),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredByReference, helpsScope, obsQuoteFilter, verseFilter, tokenFilter, bookCodeLower]
+    [
+      filteredByReference,
+      helpsScope,
+      obsQuoteFilter,
+      verseFilter,
+      tokenFilter,
+      supportRefFilter,
+      twlArticleFilter,
+      bookCodeLower,
+    ]
   )
 
   return { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches }

@@ -1,11 +1,18 @@
 /**
  * Poll whether the language's `_tc-helps` collection is fully cached.
+ * failFast + skip while extract is writing so this never fights worker setMany.
  */
 
 import { useEffect, useState } from 'react'
+import { yieldBetweenCompletenessBooks } from '../../lib/services/ResourceCompletenessChecker'
+import { backgroundDownloadSession } from '../download/backgroundDownloadSession'
+import { shouldWalkUiIdbDuringExtract } from './catalogBackgroundDownloadPolicy'
 
 type CompletenessCheckerLike = {
-  checkResource: (resourceKey: string) => Promise<{ isComplete: boolean }>
+  checkResource: (
+    resourceKey: string,
+    options?: { failFast?: boolean }
+  ) => Promise<{ isComplete: boolean }>
 }
 
 type PackageLike = {
@@ -30,6 +37,9 @@ export function useReadCollectionCompleteness(
         setIsCollectionFullyCached(false)
         return
       }
+      if (!shouldWalkUiIdbDuringExtract(backgroundDownloadSession.isBusy())) {
+        return
+      }
 
       const collectionName = `${currentLanguageCode}_tc-helps`
       const collection = packages.find((pkg) => pkg.name === collectionName)
@@ -39,12 +49,16 @@ export function useReadCollectionCompleteness(
       }
 
       let allCached = true
-      for (const resource of collection.resources) {
+      for (let i = 0; i < collection.resources.length; i++) {
+        const resource = collection.resources[i]
         const resourceKey = `${resource.owner}/${resource.language}/${resource.resourceId}`
-        const status = await completenessChecker.checkResource(resourceKey)
+        const status = await completenessChecker.checkResource(resourceKey, { failFast: true })
         if (!status.isComplete) {
           allCached = false
           break
+        }
+        if (i + 1 < collection.resources.length) {
+          await yieldBetweenCompletenessBooks()
         }
       }
 
@@ -55,8 +69,14 @@ export function useReadCollectionCompleteness(
     const interval = setInterval(() => {
       void checkCollectionCompleteness()
     }, 5000)
+    const unsub = backgroundDownloadSession.subscribe((s) => {
+      if (!s.isDownloading) void checkCollectionCompleteness()
+    })
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      unsub()
+    }
   }, [currentLanguageCode, packages, completenessChecker])
 
   return isCollectionFullyCached

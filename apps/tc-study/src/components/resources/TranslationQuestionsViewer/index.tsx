@@ -10,7 +10,8 @@ import type { ProcessedQuestions } from '@bt-synergy/resource-parsers'
 import type { ResourceViewerProps } from '@bt-synergy/resource-types'
 import { AlertCircle, BookOpen, CheckCircle, ChevronDown, ChevronUp, HelpCircle, MessageCircleQuestion } from 'lucide-react'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { useCatalogManager, useCurrentReference } from '../../../contexts'
+import { useCatalogManager } from '../../../contexts'
+import { usePinnedHelpsReference } from '../../../features/nav/usePinnedHelpsReference'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { useLoaderRegistry } from '../../../contexts/CatalogContext'
@@ -40,7 +41,7 @@ function tqCacheKey(resourceKey: string, bookCode: string) {
 export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceViewerProps & { resource: ResourceInfo }) {
   const loaderRegistry = useLoaderRegistry()
   const catalogManager = useCatalogManager()
-  const currentRef = useCurrentReference()
+  const currentRef = usePinnedHelpsReference()
   const bookTitleSource = useBookTitleSource()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const bookCode = currentRef.book || 'gen'
@@ -228,7 +229,7 @@ export function TranslationQuestionsViewer({ resourceKey, resource }: ResourceVi
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 overflow-hidden flex flex-col">
       <div className={HELPS_LIST_PANEL} dir={languageDirection}>
         <ResourceViewerHeader
           title={resource.title}

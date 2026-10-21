@@ -390,11 +390,14 @@ export function panelStayMountedStyle(options: {
       ...noFlexTween,
     }
   }
-  const basis = options.panelId === 'panel-1' ? options.panel1Percent : 100 - options.panel1Percent
+  // Grow ratios share leftover after the fixed-width divider. Percent flex-basis
+  // sums to 100% of the container and leaves no room for the strip, so panel-2
+  // (and its scrollbar) clip past overflow-x:hidden.
+  const grow = options.panelId === 'panel-1' ? options.panel1Percent : 100 - options.panel1Percent
   return {
-    flexGrow: 0,
-    flexShrink: 0,
-    flexBasis: `${basis}%`,
+    flexGrow: grow,
+    flexShrink: 1,
+    flexBasis: 0,
     minWidth: 0,
     minHeight: 0,
     visibility: 'visible',

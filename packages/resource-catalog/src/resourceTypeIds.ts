@@ -77,6 +77,9 @@ export function inferDoor43ResourceTypeId(id: string): string {
     'obs-tn': RESOURCE_TYPE_IDS.OBS_NOTES,
     'obs-twl': RESOURCE_TYPE_IDS.OBS_WORDS_LINKS,
     'obs-tq': RESOURCE_TYPE_IDS.OBS_QUESTIONS,
+    'tn-obs': RESOURCE_TYPE_IDS.OBS_NOTES,
+    'twl-obs': RESOURCE_TYPE_IDS.OBS_WORDS_LINKS,
+    'tq-obs': RESOURCE_TYPE_IDS.OBS_QUESTIONS,
   }
 
   return typeMap[id.toLowerCase()] || 'unknown'

@@ -9,8 +9,9 @@ export type CachedUsjDocument = {
 }
 
 /**
- * Book-level USJ SoT payload under `scripture-usj:{resourceKey}:{bookId}`.
- * Chapter chunks store `{ number, content: nodes[] }`; alignments per chapter under `:alignments`.
+ * USJ SoT payload. New writes are per chapter at
+ * `scripture-usj:{resourceKey}:{bookId}:{chapter}`.
+ * Legacy book blobs still use this shape at the book key.
  */
 export interface UsjScriptureCacheContent {
   book: string

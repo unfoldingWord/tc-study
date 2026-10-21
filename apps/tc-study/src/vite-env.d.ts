@@ -6,6 +6,8 @@ interface ImportMetaEnv {
   readonly DEV: boolean
   readonly PROD: boolean
   readonly MODE: string
+  /** `'1'` only when the app is built with DEBUG_BUILD=1. */
+  readonly VITE_DEBUG_BUILD?: string
 }
 
 interface ImportMeta {

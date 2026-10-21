@@ -15,6 +15,10 @@ const combinedSrc = readFileSync(
   join(import.meta.dir, '../CombinedHelpsViewer/index.tsx'),
   'utf8'
 )
+const identitySrc = readFileSync(
+  join(import.meta.dir, '../CombinedHelpsViewer/useCombinedHelpsIdentity.ts'),
+  'utf8'
+)
 
 describe('OBS frame click → helps verse-filter', () => {
   test('useObsHighlight sends verse-filter via obsFrameVerseFilter', () => {
@@ -63,7 +67,8 @@ describe('OBS frame click → helps verse-filter', () => {
     expect(quotesSrc).not.toContain('panel.resourceKeys[panel.activeIndex')
     expect(quotesSrc).toContain('preferHydratedObsQuotes')
     expect(quotesSrc).toContain('subscribeObsFrameQuotes')
-    expect(combinedSrc).toContain('resolveHelpsViewerScope')
-    expect(combinedSrc).not.toContain("effectiveResource.appliesToScope === 'obs' ? 'obs' : 'scripture'")
+    expect(identitySrc).toContain('resolveHelpsViewerScope')
+    expect(identitySrc).not.toContain("effectiveResource.appliesToScope === 'obs' ? 'obs' : 'scripture'")
+    expect(combinedSrc).toContain('useCombinedHelpsIdentity')
   })
 })

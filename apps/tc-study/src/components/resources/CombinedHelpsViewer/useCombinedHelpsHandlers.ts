@@ -4,11 +4,25 @@
 
 import type { TranslationWordsLink } from '@bt-synergy/resource-parsers'
 import { useCallback } from 'react'
-import type { ObsFrameHighlightSignal, TokenClickSignal, VerseFilterSignal } from '../../../signals/studioSignals'
-import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
-import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
+import { useNavigationStore } from '../../../contexts'
+import type {
+  ObsFrameHighlightSignal,
+  TokenClickSignal,
+  VerseFilterSignal,
+  VerseNavigationSignal,
+} from '../../../signals/studioSignals'
+import type { SupportRefFilter, TwlArticleFilter } from '../../../features/helps/helpsDisplayFilters'
+import { twlArticleChipTitle, twlArticleKey } from '../../../features/helps/helpsDisplayFilters'
+import {
+  persistHelpsHighlight,
+  planHelpsCardScriptureAction,
+  type HelpsQuoteClickItem,
+} from '../../../features/helps/helpsCardScriptureNav'
+import { markReadNavigationInternal } from '../../../features/read/replaceReadUrlFromUi'
+import { parseTWLink } from '../../../features/helps/quoteTokens'
 import type { NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
 import { helpsCardVerseFilter, obsFrameHighlightFromHelpsRow } from './combinedHelpsUtils'
+import { helpsFilterAnchorFromRow } from './helpsFilterAnchorPin'
 import type { HelpsCardSelection } from './helpsCardSelection'
 
 type SendTokenClick = (data: {
@@ -31,6 +45,11 @@ type SendVerseFilter = (data: {
   filter: VerseFilterSignal['filter']
 }) => void
 
+type SendVerseNavigation = (data: {
+  lifecycle: 'event'
+  verse: VerseNavigationSignal['verse']
+}) => void
+
 export interface UseCombinedHelpsHandlersParams {
   helpsScope: 'scripture' | 'obs'
   bookCode?: string
@@ -41,8 +60,14 @@ export interface UseCombinedHelpsHandlersParams {
   sendTokenClick: SendTokenClick
   sendEntryLinkClick: SendEntryLinkClick
   sendVerseFilter: SendVerseFilter
+  sendVerseNavigation: SendVerseNavigation
   broadcastObsHighlight: BroadcastObsHighlight
   setSelectedHelpsCard: (selection: HelpsCardSelection) => void
+  setSupportRefFilter?: (filter: SupportRefFilter | null) => void
+  setTwlArticleFilter?: (filter: TwlArticleFilter | null) => void
+  clearCompetingFilters?: () => void
+  /** Snapshot current kind, then force notes/twl for a book-wide chip. */
+  enterBookKindFilter?: (kind: 'notes' | 'twl') => void
 }
 
 export function useCombinedHelpsHandlers({
@@ -55,8 +80,13 @@ export function useCombinedHelpsHandlers({
   sendTokenClick,
   sendEntryLinkClick,
   sendVerseFilter,
+  sendVerseNavigation,
   broadcastObsHighlight,
   setSelectedHelpsCard,
+  setSupportRefFilter,
+  setTwlArticleFilter,
+  clearCompetingFilters,
+  enterBookKindFilter,
 }: UseCombinedHelpsHandlersParams) {
   const sendObsCardFrameFilter = useCallback(
     (reference: string) => {
@@ -66,18 +96,75 @@ export function useCombinedHelpsHandlers({
     [helpsScope, sendVerseFilter]
   )
 
-  const handleNoteSelect = useCallback(
-    (note: { id: string; reference?: string }) => {
-      setSelectedHelpsCard({ kind: 'tn', id: note.id })
-      if (note.reference) sendObsCardFrameFilter(note.reference)
+  const navigateToHelpsRow = useCallback(
+    (reference?: string) => {
+      if (helpsScope !== 'scripture') return
+      const live = useNavigationStore.getState().currentReference
+      const { navigate } = planHelpsCardScriptureAction({
+        bookCode: bookCode || live.book,
+        reference,
+        current: live,
+      })
+      if (!navigate) return
+      // Store first — verse-navigation alone loses the jump to chapter-scroll settle.
+      markReadNavigationInternal()
+      useNavigationStore.getState().navigateToReference({
+        book: navigate.book,
+        chapter: navigate.chapter,
+        verse: navigate.verse,
+      })
+      sendVerseNavigation({
+        lifecycle: 'event',
+        verse: { book: navigate.book, chapter: navigate.chapter, verse: navigate.verse },
+      })
     },
-    [sendObsCardFrameFilter, setSelectedHelpsCard]
+    [bookCode, helpsScope, sendVerseNavigation]
+  )
+
+  /** Persist + token-click before navigate so dest-chapter remount can replay IDs.
+   *  Navigate even when the quote is still building (no token payload yet). */
+  const applyHelpsQuoteToScripture = useCallback(
+    (reference: string | undefined, item?: HelpsQuoteClickItem | null) => {
+      if (helpsScope !== 'scripture') return
+      const live = useNavigationStore.getState().currentReference
+      const { token } = planHelpsCardScriptureAction({
+        bookCode: bookCode || live.book,
+        reference,
+        current: live,
+        item: item ?? undefined,
+      })
+      if (token) persistHelpsHighlight(token)
+      if (token) sendTokenClick({ lifecycle: 'event', token })
+      // Verse/chapter jump uses the note reference — independent of quote chips.
+      navigateToHelpsRow(reference)
+    },
+    [bookCode, helpsScope, navigateToHelpsRow, sendTokenClick]
+  )
+
+  const handleNoteSelect = useCallback(
+    (note: NoteWithTokens) => {
+      setSelectedHelpsCard({ kind: 'tn', id: note.id })
+      if (helpsScope === 'obs') {
+        navigateToHelpsRow(note.reference)
+        if (note.reference) sendObsCardFrameFilter(note.reference)
+        return
+      }
+      applyHelpsQuoteToScripture(note.reference, note)
+    },
+    [
+      applyHelpsQuoteToScripture,
+      helpsScope,
+      navigateToHelpsRow,
+      sendObsCardFrameFilter,
+      setSelectedHelpsCard,
+    ]
   )
 
   const handleNoteQuoteClick = useCallback(
     (note: NoteWithTokens) => {
       setSelectedHelpsCard({ kind: 'tn', id: note.id })
       if (helpsScope === 'obs') {
+        navigateToHelpsRow(note.reference)
         sendObsCardFrameFilter(note.reference)
         const highlight = obsFrameHighlightFromHelpsRow({
           id: note.id,
@@ -90,45 +177,16 @@ export function useCombinedHelpsHandlers({
         broadcastObsHighlight({ lifecycle: 'event', highlight })
         return
       }
-      if (note.quoteTokens?.length) {
-        const refParts = note.reference.split(':')
-        const chapter = parseInt(refParts[0] || '1', 10)
-        const verse = parseInt(refParts[1] || '1', 10)
-        const book = bookCode?.toLowerCase() || ''
-        const baseOccurrence = parseInt(note.occurrence || '1', 10)
-        const semanticIds = generateSemanticIdsForQuoteTokens(
-          note.quoteTokens,
-          book,
-          chapter,
-          verse,
-          baseOccurrence
-        )
-        const firstToken = note.quoteTokens[0]
-        if (!firstToken) return
-        sendTokenClick({
-          lifecycle: 'event',
-          token: {
-            id: String(firstToken.id),
-            content: firstToken.text,
-            semanticId: semanticIds[0],
-            verseRef: `${book} ${chapter}:${verse}`,
-            position: 0,
-            strong: firstToken.strong,
-            lemma: firstToken.lemma,
-            morph: firstToken.morph,
-            alignedSemanticIds: semanticIds,
-          },
-        })
-        return
-      }
-      const refParts = note.reference.split(':')
-      const chapter = parseInt(refParts[0] || '1', 10)
-      const verse = parseInt(refParts[1] || '1', 10)
-      const payload = buildQuoteClickPayload(note, bookCode?.toLowerCase() || '', chapter, verse)
-      if (!payload) return
-      sendTokenClick({ lifecycle: 'event', token: payload })
+      applyHelpsQuoteToScripture(note.reference, note)
     },
-    [bookCode, helpsScope, broadcastObsHighlight, sendObsCardFrameFilter, sendTokenClick, setSelectedHelpsCard]
+    [
+      applyHelpsQuoteToScripture,
+      broadcastObsHighlight,
+      helpsScope,
+      navigateToHelpsRow,
+      sendObsCardFrameFilter,
+      setSelectedHelpsCard,
+    ]
   )
 
   const handleSupportReferenceClick = useCallback(
@@ -143,6 +201,48 @@ export function useCombinedHelpsHandlers({
       }
     },
     [tnKey, resourceKey, onEntryLinkClick]
+  )
+
+  const handleFilterBySupportReference = useCallback(
+    (supportRef: string, title?: string, source?: { id: string; reference: string }) => {
+      if (!supportRef?.startsWith('rc://') || !setSupportRefFilter) return
+      clearCompetingFilters?.()
+      const fallback =
+        supportRef.match(/rc:\/\/\*\/ta\/man\/(.+)/)?.[1]?.split('/').pop() || supportRef
+      setSupportRefFilter({
+        supportReference: supportRef,
+        title: (title && title !== 'Learn more' ? title : fallback) || fallback,
+        timestamp: Date.now(),
+        anchor: source
+          ? helpsFilterAnchorFromRow('tn', source.id, source.reference)
+          : undefined,
+      })
+      enterBookKindFilter?.('notes')
+      setSelectedHelpsCard(null)
+      setTwlArticleFilter?.(null)
+    },
+    [setSupportRefFilter, setTwlArticleFilter, clearCompetingFilters, enterBookKindFilter, setSelectedHelpsCard]
+  )
+
+  const handleFilterByTwlArticle = useCallback(
+    (link: TranslationWordsLink, title?: string) => {
+      const articlePath = twlArticleKey(
+        (link as TranslationWordsLink & { articlePath?: string }).articlePath,
+        link.twLink
+      )
+      if (!articlePath || !setTwlArticleFilter) return
+      clearCompetingFilters?.()
+      setSupportRefFilter?.(null)
+      setTwlArticleFilter({
+        articlePath,
+        title: twlArticleChipTitle(title, articlePath),
+        timestamp: Date.now(),
+        anchor: helpsFilterAnchorFromRow('twl', link.id, link.reference),
+      })
+      enterBookKindFilter?.('twl')
+      setSelectedHelpsCard(null)
+    },
+    [setTwlArticleFilter, setSupportRefFilter, clearCompetingFilters, enterBookKindFilter, setSelectedHelpsCard]
   )
 
   const handleTitleClick = useCallback(
@@ -173,6 +273,7 @@ export function useCombinedHelpsHandlers({
     (link: TranslationWordsLink) => {
       setSelectedHelpsCard({ kind: 'twl', id: link.id })
       if (helpsScope === 'obs') {
+        navigateToHelpsRow(link.reference)
         sendObsCardFrameFilter(link.reference)
         const highlight = obsFrameHighlightFromHelpsRow({
           id: link.id,
@@ -185,52 +286,24 @@ export function useCombinedHelpsHandlers({
         broadcastObsHighlight({ lifecycle: 'event', highlight })
         return
       }
-      if (link.quoteTokens?.length) {
-        const refParts = link.reference.split(':')
-        const chapter = parseInt(refParts[0] || '1', 10)
-        const verse = parseInt(refParts[1] || '1', 10)
-        const book = bookCode?.toLowerCase() || ''
-        const baseOccurrence = parseInt(link.occurrence || '1', 10)
-        const semanticIds = generateSemanticIdsForQuoteTokens(
-          link.quoteTokens,
-          book,
-          chapter,
-          verse,
-          baseOccurrence
-        )
-        const firstToken = link.quoteTokens[0]
-        const firstId = semanticIds[0]
-        if (!firstToken || !firstId) return
-        sendTokenClick({
-          lifecycle: 'event',
-          token: {
-            id: String(firstToken.id),
-            content: firstToken.text,
-            semanticId: firstId,
-            verseRef: `${book} ${chapter}:${verse}`,
-            position: 0,
-            strong: firstToken.strong,
-            lemma: firstToken.lemma,
-            morph: firstToken.morph,
-            alignedSemanticIds: semanticIds,
-          },
-        })
-        return
-      }
-      const refParts = link.reference.split(':')
-      const chapter = parseInt(refParts[0] || '1', 10)
-      const verse = parseInt(refParts[1] || '1', 10)
-      const payload = buildQuoteClickPayload(link, bookCode?.toLowerCase() || '', chapter, verse)
-      if (!payload) return
-      sendTokenClick({ lifecycle: 'event', token: payload })
+      applyHelpsQuoteToScripture(link.reference, link)
     },
-    [bookCode, helpsScope, broadcastObsHighlight, sendObsCardFrameFilter, sendTokenClick, setSelectedHelpsCard]
+    [
+      applyHelpsQuoteToScripture,
+      broadcastObsHighlight,
+      helpsScope,
+      navigateToHelpsRow,
+      sendObsCardFrameFilter,
+      setSelectedHelpsCard,
+    ]
   )
 
   return {
     handleNoteSelect,
     handleNoteQuoteClick,
     handleSupportReferenceClick,
+    handleFilterBySupportReference,
+    handleFilterByTwlArticle,
     handleTitleClick,
     handleLinkQuoteClick,
   }

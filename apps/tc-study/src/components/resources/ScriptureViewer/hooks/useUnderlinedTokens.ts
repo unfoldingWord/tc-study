@@ -8,9 +8,15 @@
 import { RESOURCE_STATE_KEYS, useResourceState } from '@bt-synergy/resource-panels'
 import { useMemo } from 'react'
 import type { NotesTokenGroupsSignal } from '../../../../signals/studioSignals'
+import {
+  markScripturePerfEnd,
+  markScripturePerfStart,
+} from '../../../../features/perf/scripturePerf'
+import { resolveMatchIndices } from '../../../../features/scripture/scripturePreparer'
 import { semanticIdKey } from '../utils/wordIdentity'
 
 const EMPTY_UNDERLINE_SET: Set<string> = new Set()
+const EMPTY_INDEX_SET: Set<number> = new Set()
 
 function foldUnderlineIds(state: NotesTokenGroupsSignal | null | undefined, into: Set<string>) {
   if (!state?.tokenGroups?.length) return
@@ -32,9 +38,21 @@ export function useUnderlinedTokens(resourceId: string): Set<string> {
   )
 
   return useMemo(() => {
+    markScripturePerfStart('underline-signal')
     const next = new Set<string>()
     foldUnderlineIds(tnState, next)
     foldUnderlineIds(twlState, next)
-    return next.size === 0 ? EMPTY_UNDERLINE_SET : next
+    const result = next.size === 0 ? EMPTY_UNDERLINE_SET : next
+    markScripturePerfEnd('underline-signal')
+    return result
   }, [tnState, twlState])
+}
+
+/** Map folded underline set through a chapter matchKeys table → integer indices. */
+export function mapUnderlinesToIndices(
+  matchKeys: readonly string[],
+  foldedSet: ReadonlySet<string>
+): Set<number> {
+  if (!matchKeys.length || foldedSet.size === 0) return EMPTY_INDEX_SET
+  return resolveMatchIndices(matchKeys, foldedSet)
 }

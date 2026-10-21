@@ -5,28 +5,33 @@
  */
 
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
-import { Code, GraduationCap } from 'lucide-react'
+import { ChevronDown, ChevronUp, Code, Filter, GraduationCap } from 'lucide-react'
 import { memo, startTransition, useCallback, useState } from 'react'
 import { useNavigationStore } from '../../../../contexts'
 import { useAppStore } from '../../../../contexts/AppContext'
 import { shouldShowHelpsExcerptSkeleton } from '../../../../features/helps/helpsExcerptSkeleton'
 import {
-  resolveHelpsQuoteStatus,
+  resolveHelpsQuoteStatusForNote,
   type HelpsQuoteStatus,
 } from '../../../../features/helps/resolveHelpsQuoteStatus'
+import { supportRefQuoteChipKind } from '../../../../features/helps/supportRefQuotePaint'
 import { getResourceBadgeLabel } from '../../../../features/tabs/tabShortLabel'
+import type { HastRoot } from '../../../../lib/markdown/markdownToHast'
 import { parseRcLink } from '../../../../lib/markdown/rc-link-parser'
 import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
+import { isDebugBuild } from '../../../../utils/debugBuild'
 import { MarkdownRenderer, MarkdownSkeleton } from '../../../ui/MarkdownRenderer'
 import {
   HELPS_CARD_FOOTER,
   HELPS_CARD_FOOTER_BUTTON_TA,
   HELPS_CARD_FOOTER_ICON,
-  HELPS_CARD_IDLE,
-  HELPS_CARD_SELECTED,
+  HELPS_CARD_FOOTER_ICON_BUTTON,
+  HELPS_CARD_FOOTER_ICON_BUTTON_ACTIVE,
+  helpsCardStateClass,
 } from '../../helpsCardStyles'
 import { QuotedFilterText } from '../../shared/QuotedFilterText'
 import type { TokenFilter } from '../../WordsLinksViewer/types'
+import { introNoteHeading, shouldCollapseIntroNote } from '../utils/introNoteHeading'
 import { parseScriptureLink } from '../utils/parseScriptureLink'
 
 interface AlignedToken {
@@ -42,16 +47,23 @@ export type NoteWithTokens = TranslationNote & {
   alignedTokens?: AlignedToken[]
   semanticIds?: string[]
   quoteStatus?: HelpsQuoteStatus
+  quoteWarmPending?: boolean
+  /** Precomputed markdown AST — skips remark parse when present. */
+  bodyHast?: HastRoot
 }
 
 interface TranslationNoteCardProps {
   note: NoteWithTokens
   isSelected: boolean
+  /** This note's support-reference is the active book-wide filter (applied from this card). */
+  isFilterSource?: boolean
   /** Called with the note object so callers can use a single stable handler */
   onClick: (note: NoteWithTokens) => void
   /** Called with the note object so callers can use a single stable handler */
   onQuoteClick?: (note: NoteWithTokens) => void
-  onSupportReferenceClick?: (supportRef: string) => void
+  onSupportReferenceClick?: (supportRef: string, title?: string) => void
+  /** CombinedHelps: filter book notes that share this TA support-reference. */
+  onFilterBySupportReference?: (supportRef: string, title?: string) => void
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
   targetResourceId?: string
   resourceKey?: string
@@ -65,6 +77,34 @@ interface TranslationNoteCardProps {
   tokenFilter?: TokenFilter | null
 }
 
+function IntroExpandButton({
+  expanded,
+  onToggle,
+  className = '',
+}: {
+  expanded: boolean
+  onToggle: () => void
+  className?: string
+}) {
+  const label = expanded ? 'Show less' : 'Show more'
+  const Icon = expanded ? ChevronUp : ChevronDown
+  return (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      title={label}
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation()
+        onToggle()
+      }}
+      className={`p-1 rounded-md text-fg-muted hover:text-fg-secondary hover:bg-muted shrink-0 ${className}`}
+    >
+      <Icon className="w-4 h-4" aria-hidden />
+    </button>
+  )
+}
+
 const quoteChipClass =
   'w-full text-start mb-stack px-chrome py-chrome-tight bg-chip-quote hover:bg-chip-quote-hover rounded-md transition-colors duration-150'
 const quoteChipStaticClass =
@@ -73,9 +113,11 @@ const quoteChipStaticClass =
 export const TranslationNoteCard = memo(function TranslationNoteCard({
   note,
   isSelected,
+  isFilterSource = false,
   onClick,
   onQuoteClick,
   onSupportReferenceClick,
+  onFilterBySupportReference,
   onEntryLinkClick,
   targetResourceId,
   resourceKey,
@@ -87,17 +129,26 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   tokenFilter = null,
 }: TranslationNoteCardProps) {
   const [showRawMarkdown, setShowRawMarkdown] = useState(false)
+  const [introExpanded, setIntroExpanded] = useState(false)
+  const isIntro = shouldCollapseIntroNote(note)
+  const introHeading = isIntro ? introNoteHeading(note.note) : ''
   // Narrow selector: only re-render when the book changes (OBS↔scripture switch),
   // not on every chapter/verse navigation or obsFrameCountByStory update.
   const currentBook = useNavigationStore((s) => s.currentReference.book)
   const hasAlignedTokens = !!(note.alignedTokens && note.alignedTokens.length > 0)
-  const quoteStatus =
-    note.quoteStatus ??
-    resolveHelpsQuoteStatus({
-      hasAlignedTokens,
-      alignmentPending: false,
-      olQuote: note.quote,
-    })
+  // Missing quoteStatus: wait only when there is a Quote to align. Empty-quote
+  // notes (often chapter intros) never enter quote-build — settle to `none`.
+  const quoteStatus = resolveHelpsQuoteStatusForNote({
+    quoteStatus: note.quoteStatus,
+    hasAlignedTokens,
+    quote: note.quote,
+  })
+  const quoteChipKind = supportRefQuoteChipKind({
+    hasAlignedTokens,
+    quoteStatus,
+    olQuote: note.quote,
+    quoteWarmPending: note.quoteWarmPending,
+  })
   const excerptLoading = shouldShowHelpsExcerptSkeleton({
     kind: 'tn',
     obsMode,
@@ -164,19 +215,30 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
   return (
     <div
       className={`
-        group rounded-md p-content cursor-pointer transition-colors duration-150 border
-        ${isSelected ? HELPS_CARD_SELECTED : HELPS_CARD_IDLE}
+        group relative rounded-md p-content cursor-pointer transition-colors duration-150 border
+        ${helpsCardStateClass(isSelected, isFilterSource)}
 
       `}
+      data-helps-filter-source={isFilterSource || undefined}
       onClick={() => {
-        onClick(note)
-        if ((hasAlignedTokens || obsMode) && onQuoteClick) {
-          onQuoteClick(note)
+        if (isIntro && !introExpanded) {
+          setIntroExpanded(true)
+          return
         }
+        // Quote persist/token-click first — select-driven navigate must not race ahead.
+        onQuoteClick?.(note)
+        onClick(note)
       }}
       role="article"
       aria-label="Translation note"
     >
+      {isIntro && introExpanded ? (
+        <IntroExpandButton
+          expanded
+          onToggle={() => setIntroExpanded(false)}
+          className="absolute top-1 right-1 z-10 bg-surface/80"
+        />
+      ) : null}
       {/* Target Language Quote - Clickable aligned tokens when available */}
       {hasAlignedTokens && (
         <button
@@ -233,7 +295,7 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </button>
       )}
 
-      {!hasAlignedTokens && !obsMode && quoteStatus === 'pending' && (
+      {quoteChipKind === 'placeholder' && !obsMode && (
         <div
           className={`${quoteChipStaticClass} animate-pulse`}
           role="status"
@@ -244,20 +306,33 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </div>
       )}
 
-      {/* Fallback: Original language quote only after a settled miss */}
-      {!hasAlignedTokens && !obsMode && quoteStatus === 'ol-fallback' && note.quote?.trim() && (
+      {(quoteChipKind === 'ol' || quoteChipKind === 'ol-pending') && !obsMode && note.quote?.trim() && (
         <div
           className={quoteChipStaticClass}
-          title="Original language phrase (target language alignment not available)"
+          title={
+            quoteChipKind === 'ol-pending'
+              ? 'Building quote'
+              : 'Original language phrase (target language alignment not available)'
+          }
           dir={languageDirection}
         >
-          <div className="text-base leading-relaxed" dir={languageDirection}>
-            <span className="italic text-fg-secondary">
+          <div className="flex items-center gap-2 text-base leading-relaxed" dir={languageDirection}>
+            <span className="italic text-fg-secondary min-w-0">
               &ldquo;<QuotedFilterText quote={note.quote} filterText={filterText} />&rdquo;
             </span>
             {resourceAbbreviation && (
-              <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium">
+              <span className="ms-2 px-1.5 py-0.5 bg-surface/80 backdrop-blur rounded text-[10px] text-chip-quote-fg font-medium shrink-0">
                 {resourceAbbreviation}
+              </span>
+            )}
+            {quoteChipKind === 'ol-pending' && (
+              <span
+                className="shrink-0 inline-flex"
+                role="status"
+                title="Building quote"
+                aria-label="Building quote"
+              >
+                <LoadingSpinner size="sm" label="Building quote" className="text-fg-muted" />
               </span>
             )}
           </div>
@@ -288,8 +363,20 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </button>
       )}
 
-      {/* Note Content - Translation guidance (markdown) */}
-      {excerptLoading ? (
+      {/* Note Content - Translation guidance (markdown). Intros stay collapsed until expanded. */}
+      {isIntro && !excerptLoading && note.note && !introExpanded ? (
+        <div
+          className="flex items-start gap-2"
+          dir={languageDirection}
+          onClick={(e) => {
+            e.stopPropagation()
+            setIntroExpanded(true)
+          }}
+        >
+          <p className="flex-1 min-w-0 text-base font-medium text-fg leading-relaxed">{introHeading}</p>
+          <IntroExpandButton expanded={false} onToggle={() => setIntroExpanded(true)} />
+        </div>
+      ) : excerptLoading ? (
         <div
           className="relative"
           dir={languageDirection}
@@ -301,54 +388,84 @@ export const TranslationNoteCard = memo(function TranslationNoteCard({
         </div>
       ) : note.note ? (
         <div className="relative" dir={languageDirection}>
-          {showRawMarkdown ? (
+          {isDebugBuild() && showRawMarkdown ? (
             <pre className="text-xs text-fg-secondary leading-relaxed whitespace-pre-wrap font-mono bg-muted p-2.5 rounded-lg overflow-x-auto">
               {note.note}
             </pre>
           ) : (
             <MarkdownRenderer
               content={note.note}
-              className="text-base text-fg-secondary leading-relaxed prose prose-base max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent"
+              hast={note.bodyHast}
+              className={`text-base text-fg-secondary leading-relaxed prose prose-base max-w-none prose-headings:text-fg prose-p:text-fg-secondary prose-strong:text-fg prose-a:text-accent${isIntro && introExpanded ? ' pe-6' : ''}`}
               onInternalLinkClick={handleInternalLinkClick}
               getEntryTitle={getEntryTitle}
             />
           )}
-          {/* Toggle button - small and discrete */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowRawMarkdown(!showRawMarkdown)
-            }}
-            className="absolute top-0 right-0 p-1 text-fg-muted hover:text-fg-secondary hover:bg-muted rounded-md transition-colors opacity-0 group-hover:opacity-100"
-            title={showRawMarkdown ? "Show rendered markdown" : "Show raw markdown"}
-          >
-            <Code className="w-3.5 h-3.5" />
-          </button>
+          {isIntro ? (
+            <div className="mt-2 flex" dir={languageDirection}>
+              <span className="ms-auto">
+                <IntroExpandButton expanded onToggle={() => setIntroExpanded(false)} />
+              </span>
+            </div>
+          ) : null}
+          {isDebugBuild() ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowRawMarkdown(!showRawMarkdown)
+              }}
+              className="absolute top-0 right-0 p-1 text-fg-muted hover:text-fg-secondary hover:bg-muted rounded-md transition-colors opacity-0 group-hover:opacity-100"
+              title={showRawMarkdown ? 'Show rendered markdown' : 'Show raw markdown'}
+              aria-label={showRawMarkdown ? 'Show rendered markdown' : 'Show raw markdown'}
+            >
+              <Code className="w-3.5 h-3.5" />
+            </button>
+          ) : null}
         </div>
       ) : null}
 
-      {/* Support Reference - Link to Translation Academy */}
+      {/* Support Reference — open TA; optional filter icon for book-wide matches */}
       {note.supportReference && note.supportReference.startsWith('rc://') && (
         <div className={HELPS_CARD_FOOTER} onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (onSupportReferenceClick) {
-                onSupportReferenceClick(note.supportReference)
-              }
-            }}
-            className={HELPS_CARD_FOOTER_BUTTON_TA}
-            title={`Learn more: ${taTitle}`}
-            aria-label={`Learn more: ${taTitle}`}
-          >
-            <GraduationCap className={HELPS_CARD_FOOTER_ICON} />
-            {isLoadingTATitle ? (
-              <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
-            ) : (
-              <span>{taTitle}</span>
-            )}
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (onSupportReferenceClick) {
+                  onSupportReferenceClick(note.supportReference, taTitle)
+                }
+              }}
+              className={`${HELPS_CARD_FOOTER_BUTTON_TA} flex-1 min-w-0`}
+              title={`Learn more: ${taTitle}`}
+              aria-label={`Learn more: ${taTitle}`}
+            >
+              <GraduationCap className={HELPS_CARD_FOOTER_ICON} />
+              {isLoadingTATitle ? (
+                <LoadingSpinner size="sm" label="Loading title" className="text-fg-muted" />
+              ) : (
+                <span className="truncate">{taTitle}</span>
+              )}
+            </button>
+            {onFilterBySupportReference ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onFilterBySupportReference(note.supportReference, taTitle)
+                }}
+                className={
+                  isFilterSource ? HELPS_CARD_FOOTER_ICON_BUTTON_ACTIVE : HELPS_CARD_FOOTER_ICON_BUTTON
+                }
+                aria-pressed={isFilterSource}
+                title={`Filter book notes: ${taTitle}`}
+                aria-label={`Filter book notes: ${taTitle}`}
+              >
+                <Filter className={HELPS_CARD_FOOTER_ICON} />
+              </button>
+            ) : null}
+          </div>
         </div>
       )}
 

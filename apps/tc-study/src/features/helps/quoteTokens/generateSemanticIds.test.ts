@@ -41,4 +41,19 @@ describe('generateSemanticIdsForQuoteTokens', () => {
       'jhn 3:16:God:1',
     ])
   })
+
+  test('stamped verse on each token wins over the fallback verse', () => {
+    const tokens = [
+      { ...token('יְהוָה'), chapter: 5, verse: 1 },
+      { ...token('יְהוָה'), chapter: 5, verse: 3 },
+      { ...token('יְהוָה'), chapter: 5, verse: 8 },
+      { ...token('יְהוָה'), chapter: 5, verse: 12 },
+    ]
+    expect(generateSemanticIdsForQuoteTokens(tokens, 'psa', 5, 1)).toEqual([
+      'psa 5:1:יְהוָה:1',
+      'psa 5:3:יְהוָה:1',
+      'psa 5:8:יְהוָה:1',
+      'psa 5:12:יְהוָה:1',
+    ])
+  })
 })

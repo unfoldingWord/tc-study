@@ -1,10 +1,32 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  bookFilterChapterMatches,
+  bookFilterStreamSeed,
+  bookFilterStreamSpanKey,
   filterDisplayLinks,
   filterDisplayNotes,
   filterLinksByReferenceRange,
   filterNotesByReferenceRange,
+  filterSupportRefFallbackChunk,
+  flattenBookNotes,
+  mergeFocusChapterBookMatches,
+  planBookFilterStreamChapters,
+  planSupportRefStreamChapters,
+  streamRowsForChapter,
+  resolveHelpsTokenClickFilter,
   resolveRangeEndVerse,
+  reuseUnchangedSupportRefNotes,
+  settleSupportRefDisplayNotes,
+  supportRefFirstPaintNotes,
+  supportReferenceKey,
+  supportReferencesMatch,
+  supportRefNotesForChapter,
+  settleTwlArticleDisplayLinks,
+  twlArticleChipTitle,
+  twlArticleFirstPaintLinks,
+  twlArticleKey,
+  twlArticleLinksForChapter,
+  twlArticlesMatch,
 } from './helpsDisplayFilters'
 
 describe('filterNotesByReferenceRange', () => {
@@ -22,6 +44,22 @@ describe('filterNotesByReferenceRange', () => {
         endVerse: 4,
       }).map((n) => n.id)
     ).toEqual(['b'])
+  })
+
+  test('keeps discontinuous multi-verse notes on any listed verse', () => {
+    const notes = [
+      { id: 'sbh4', reference: '5:1,3,8,12' },
+      { id: 'svyb', reference: '5:2-3' },
+      { id: 'other', reference: '5:4' },
+    ]
+    expect(
+      filterNotesByReferenceRange(notes, {
+        startChapter: 5,
+        startVerse: 3,
+        endChapter: 5,
+        endVerse: 3,
+      }).map((n) => n.id)
+    ).toEqual(['sbh4', 'svyb'])
   })
 })
 
@@ -71,6 +109,40 @@ describe('filterDisplayNotes', () => {
     expect(displayNotes.map((n) => n.id)).toEqual(['n2'])
   })
 
+  test('verseFilter keeps multi-verse notes on any listed verse, not only the first', () => {
+    const multi = [
+      { id: 'sbh4', reference: '5:1,3,8,12', quote: 'יְהוָה' },
+      { id: 'svyb', reference: '5:2-3', quote: 'קול' },
+    ]
+    expect(
+      filterDisplayNotes(multi, {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: { chapter: 5, verse: 8, timestamp: 1 },
+        tokenFilter: null,
+        bookCodeLower: 'psa',
+      }).displayNotes.map((n) => n.id)
+    ).toEqual(['sbh4'])
+    expect(
+      filterDisplayNotes(multi, {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: { chapter: 5, verse: 2, timestamp: 1 },
+        tokenFilter: null,
+        bookCodeLower: 'psa',
+      }).displayNotes.map((n) => n.id)
+    ).toEqual(['svyb'])
+    expect(
+      filterDisplayNotes(multi, {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: { chapter: 5, verse: 4, timestamp: 1 },
+        tokenFilter: null,
+        bookCodeLower: 'psa',
+      }).displayNotes.map((n) => n.id)
+    ).toEqual([])
+  })
+
   test('verseFilter keeps English tN for the clicked verse (language-agnostic)', () => {
     const verseNotes = [
       ...notes,
@@ -106,6 +178,121 @@ describe('filterDisplayNotes', () => {
     expect(displayNotes).toHaveLength(1)
   })
 
+  test('ULT English token matches Hebrew quote via folded aligned ids (Psalms)', () => {
+    const pointed = 'יִדֳּפֶנּוּ'
+    const unpointed = pointed.normalize('NFD').replace(/\p{M}/gu, '')
+    const psaNotes = [
+      {
+        id: 'psa-1-4-chaff',
+        reference: '1:4',
+        quote: pointed,
+        occurrence: '1',
+        quoteTokens: [{ text: unpointed }],
+        semanticIds: [`psa 1:4:${unpointed}:1`],
+      },
+      {
+        id: 'psa-1-1-blessed',
+        reference: '1:1',
+        quote: 'אַשְׁרֵי',
+        occurrence: '1',
+        quoteTokens: [{ text: 'אַשְׁרֵי' }],
+        semanticIds: ['psa 1:1:אשרי:1'],
+      },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(psaNotes, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: {
+        semanticId: 'psa 1:4:chasses:1',
+        content: 'chasses',
+        alignedSemanticIds: [`psa 1:4:${pointed}:1`],
+        timestamp: 1,
+      },
+      bookCodeLower: 'psa',
+    })
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['psa-1-4-chaff'])
+  })
+
+  test('token click ids match notes that only have cached semanticIds (no quoteTokens)', () => {
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(
+      [
+        {
+          id: 'n-align',
+          reference: '1:4',
+          quote: 'כַּמֹּץ',
+          occurrence: '1',
+          semanticIds: ['psa 1:4:כמץ:1'],
+          alignedTokens: [{ semanticId: 'psa 1:4:chasses:1', content: 'chasses' }],
+        },
+      ],
+      {
+        helpsScope: 'scripture',
+        obsQuoteFilter: null,
+        verseFilter: null,
+        tokenFilter: {
+          semanticId: 'psa 1:4:chasses:1',
+          content: 'chasses',
+          alignedSemanticIds: ['psa 1:4:כמץ:1'],
+          timestamp: 1,
+        },
+        bookCodeLower: 'psa',
+      }
+    )
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['n-align'])
+  })
+
+  test('token filter matches clicked instance, not surface substring (the ≠ Therefore)', () => {
+    const ephNotes = [
+      {
+        id: 'eph-5-1-therefore',
+        reference: '5:1',
+        quote: 'Therefore',
+        occurrence: '1',
+        quoteTokens: [{ text: 'Therefore' }],
+        semanticIds: ['eph 5:1:Therefore:1'],
+        alignedTokens: [{ semanticId: 'eph 5:1:Therefore:1', content: 'Therefore' }],
+      },
+      {
+        id: 'eph-5-9-the',
+        reference: '5:9',
+        quote: 'the',
+        occurrence: '1',
+        quoteTokens: [{ text: 'the' }],
+        semanticIds: ['eph 5:9:the:1'],
+        alignedTokens: [{ semanticId: 'eph 5:9:the:1', content: 'the' }],
+      },
+      {
+        id: 'eph-5-9-other-the',
+        reference: '5:9',
+        quote: 'the fruit',
+        occurrence: '2',
+        quoteTokens: [{ text: 'the' }, { text: 'fruit' }],
+        semanticIds: ['eph 5:9:the:2', 'eph 5:9:fruit:1'],
+        alignedTokens: [
+          { semanticId: 'eph 5:9:the:2', content: 'the' },
+          { semanticId: 'eph 5:9:fruit:1', content: 'fruit' },
+        ],
+      },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(ephNotes, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: {
+        semanticId: 'eph 5:9:the:1',
+        content: 'the',
+        alignedSemanticIds: [],
+        timestamp: 1,
+      },
+      bookCodeLower: 'eph',
+    })
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['eph-5-9-the'])
+  })
+
   test('token filter without fallback returns empty when no match', () => {
     const { displayNotes, hasNoteMatches } = filterDisplayNotes(notes, {
       helpsScope: 'scripture',
@@ -121,6 +308,40 @@ describe('filterDisplayNotes', () => {
     })
     expect(hasNoteMatches).toBe(false)
     expect(displayNotes).toHaveLength(0)
+  })
+
+  test('supportRefFilter keeps notes with the same TA support-reference', () => {
+    const bookNotes = [
+      {
+        id: 'n1',
+        reference: '1:1',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+      },
+      {
+        id: 'n2',
+        reference: '2:4',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet/',
+      },
+      {
+        id: 'n3',
+        reference: '1:2',
+        supportReference: 'rc://*/ta/man/translate/figs-metaphor',
+      },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(bookNotes, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: null,
+      supportRefFilter: {
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        title: 'Doublet',
+        timestamp: 1,
+      },
+      bookCodeLower: 'tit',
+    })
+    expect(hasNoteMatches).toBe(true)
+    expect(displayNotes.map((n) => n.id)).toEqual(['n1', 'n2'])
   })
 })
 
@@ -139,6 +360,785 @@ describe('filterDisplayLinks', () => {
     })
     expect(hasLinkMatches).toBe(true)
     expect(displayLinks.map((l) => l.id)).toEqual(['l2'])
+  })
+
+  test('supportRefFilter hides all TWL links', () => {
+    const links = [
+      { id: 'l1', reference: '1:1', origWords: 'a' },
+      { id: 'l2', reference: '2:1', origWords: 'b' },
+    ]
+    const { displayLinks, hasLinkMatches } = filterDisplayLinks(links, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: null,
+      supportRefFilter: {
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        title: 'Doublet',
+        timestamp: 1,
+      },
+      bookCodeLower: 'tit',
+    })
+    expect(hasLinkMatches).toBe(false)
+    expect(displayLinks).toEqual([])
+  })
+
+  test('twlArticleFilter keeps links with the same articlePath / twLink', () => {
+    const links = [
+      {
+        id: 'l1',
+        reference: '1:1',
+        articlePath: 'bible/kt/sin',
+        twLink: 'rc://*/tw/dict/bible/kt/sin',
+      },
+      {
+        id: 'l2',
+        reference: '2:4',
+        articlePath: 'bible/kt/sin/',
+        twLink: 'rc://*/tw/dict/bible/kt/sin/',
+      },
+      {
+        id: 'l3',
+        reference: '1:2',
+        articlePath: 'bible/kt/grace',
+        twLink: 'rc://*/tw/dict/bible/kt/grace',
+      },
+    ]
+    const { displayLinks, hasLinkMatches } = filterDisplayLinks(links, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: null,
+      twlArticleFilter: {
+        articlePath: 'bible/kt/sin',
+        title: 'Sin',
+        timestamp: 1,
+      },
+      bookCodeLower: 'tit',
+    })
+    expect(hasLinkMatches).toBe(true)
+    expect(displayLinks.map((l) => l.id)).toEqual(['l1', 'l2'])
+  })
+})
+
+describe('filterDisplayNotes twl article', () => {
+  test('twlArticleFilter hides all TN notes', () => {
+    const notes = [
+      { id: 'n1', reference: '1:1', supportReference: 'rc://*/ta/man/translate/figs-metaphor' },
+    ]
+    const { displayNotes, hasNoteMatches } = filterDisplayNotes(notes, {
+      helpsScope: 'scripture',
+      obsQuoteFilter: null,
+      verseFilter: null,
+      tokenFilter: null,
+      twlArticleFilter: {
+        articlePath: 'bible/kt/sin',
+        title: 'Sin',
+        timestamp: 1,
+      },
+      bookCodeLower: 'tit',
+    })
+    expect(hasNoteMatches).toBe(false)
+    expect(displayNotes).toEqual([])
+  })
+})
+
+describe('supportReferenceKey', () => {
+  test('normalizes rc paths and trailing slashes', () => {
+    expect(supportReferenceKey('rc://*/ta/man/translate/figs-doublet')).toBe(
+      'translate/figs-doublet'
+    )
+    expect(supportReferenceKey('rc://*/ta/man/translate/figs-doublet/')).toBe(
+      'translate/figs-doublet'
+    )
+    expect(supportReferencesMatch(
+      'rc://*/ta/man/translate/figs-doublet',
+      'rc://en/ta/man/translate/figs-doublet'
+    )).toBe(true)
+  })
+})
+
+describe('twlArticleKey', () => {
+  test('normalizes articlePath and twLink to the same bible/cat/term key', () => {
+    expect(twlArticleKey('bible/kt/sin')).toBe('bible/kt/sin')
+    expect(twlArticleKey('bible/kt/sin/')).toBe('bible/kt/sin')
+    expect(twlArticleKey(undefined, 'rc://*/tw/dict/bible/kt/sin')).toBe('bible/kt/sin')
+    expect(twlArticleKey(undefined, 'rc://*/tw/dict/bible/kt/sin/')).toBe('bible/kt/sin')
+    expect(twlArticlesMatch(
+      { articlePath: 'bible/kt/sin' },
+      { twLink: 'rc://*/tw/dict/bible/kt/sin' }
+    )).toBe(true)
+    expect(twlArticlesMatch('bible/kt/sin', 'rc://*/tw/dict/bible/kt/sin')).toBe(true)
+    expect(twlArticlesMatch('bible/kt/sin', 'bible/kt/grace')).toBe(false)
+  })
+
+  test('chip title uses the first TW gloss, not the full synonym list', () => {
+    expect(twlArticleChipTitle('sin, sinful, sinner, sinning', 'bible/kt/sin')).toBe('Sin')
+    expect(twlArticleChipTitle('Yahweh, Yah', 'bible/kt/yahweh')).toBe('Yahweh')
+    expect(twlArticleChipTitle('', 'bible/kt/sin')).toBe('Sin')
+  })
+})
+
+describe('twlArticleFirstPaintLinks', () => {
+  const sin = 'bible/kt/sin'
+  const bookLinks = [
+    { id: 'psa-1', reference: '1:3', articlePath: sin, twLink: 'rc://*/tw/dict/bible/kt/sin' },
+    { id: 'psa-2', reference: '2:1', articlePath: sin, twLink: 'rc://*/tw/dict/bible/kt/sin' },
+    { id: 'psa-150', reference: '150:1', twLink: 'rc://*/tw/dict/bible/kt/sin/' },
+    { id: 'other', reference: '1:4', articlePath: 'bible/kt/grace', twLink: 'rc://*/tw/dict/bible/kt/grace' },
+  ]
+
+  test('first paint is current-chapter matches only — no book flatten', () => {
+    const first = twlArticleFirstPaintLinks(bookLinks, sin, 3)
+    expect(first.map((l) => l.id)).toEqual([])
+    const focusPaint = twlArticleFirstPaintLinks(
+      [
+        { id: 'psa-3', reference: '3:1', articlePath: sin, twLink: 'rc://*/tw/dict/bible/kt/sin' },
+        bookLinks[0]!,
+      ],
+      sin,
+      3
+    )
+    expect(focusPaint.map((l) => l.id)).toEqual(['psa-3'])
+    expect(twlArticleLinksForChapter([bookLinks[1]!, bookLinks[3]!], sin).map((l) => l.id)).toEqual([
+      'psa-2',
+    ])
+  })
+
+  test('idle plan includes chapters before the focus chapter', () => {
+    expect(
+      planSupportRefStreamChapters(
+        { '3': [bookLinks[0]], '5': [bookLinks[2]] },
+        3
+      )
+    ).toEqual([1, 2, 4, 5])
+    expect(
+      planSupportRefStreamChapters(
+        { '3': [], '4': [] },
+        3,
+        [{ reference: '1:3' }, { reference: '2:1' }, { reference: '4:1' }]
+      )
+    ).toEqual([1, 2, 4])
+    expect(streamRowsForChapter(
+      { '3': [bookLinks[0]] },
+      bookLinks,
+      2
+    ).map((l) => l.id)).toEqual(['psa-2'])
+  })
+})
+
+describe('settleTwlArticleDisplayLinks', () => {
+  test('quoted off-chapter links without enrichment show OL fallback with warm-pending', () => {
+    const book = [
+      {
+        id: 'twl-18',
+        reference: '18:1',
+        articlePath: 'bible/kt/yahweh',
+        origWords: 'יְהוָה',
+      },
+    ]
+    const settled = settleTwlArticleDisplayLinks(book, 'bible/kt/yahweh', new Map())
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBe(true)
+  })
+
+  test('merges lane-2 quote/align enrichment when passage align is missing', () => {
+    const book = [
+      {
+        id: 'twl-18',
+        reference: '18:1',
+        articlePath: 'bible/kt/yahweh',
+        origWords: 'יְהוָה',
+      },
+    ]
+    const enrichment = new Map([
+      [
+        'twl-18',
+        {
+          quoteTokens: [{ id: 1, text: 'יְהוָה', type: 'word', occurrence: 1, content: 'יְהוָה' }],
+          quoteStatus: 'aligned',
+          alignedTokens: [{ position: 0, content: 'Yahweh' }],
+          semanticIds: ['psa 18:1:yahweh:1'],
+        },
+      ],
+    ])
+    const settled = settleTwlArticleDisplayLinks(
+      book,
+      'bible/kt/yahweh',
+      new Map(),
+      enrichment
+    )
+    expect(settled[0]!.quoteStatus).toBe('aligned')
+    expect(settled[0]!.alignedTokens).toEqual([{ position: 0, content: 'Yahweh' }])
+  })
+})
+
+describe('supportRefFirstPaintNotes', () => {
+  const metaphor = 'rc://*/ta/man/translate/figs-metaphor'
+  const bookNotes = [
+    { id: 'psa-1', reference: '1:3', supportReference: metaphor, quote: 'like a tree' },
+    { id: 'psa-2', reference: '2:1', supportReference: metaphor, quote: 'why rage' },
+    { id: 'psa-150', reference: '150:1', supportReference: metaphor, quote: 'praise' },
+    { id: 'other', reference: '1:4', supportReference: 'rc://*/ta/man/translate/figs-doublet' },
+  ]
+
+  test('first paint is current-chapter matches only — no book flatten', () => {
+    const first = supportRefFirstPaintNotes(bookNotes, metaphor, 1)
+    expect(first.map((n) => n.id)).toEqual(['psa-1'])
+    expect(planSupportRefStreamChapters({ '1': [bookNotes[0]], '2': [bookNotes[1]], '4': [bookNotes[2]] }, 1)).toEqual([
+      2, 3, 4,
+    ])
+  })
+
+  test('idle plan walks preceding chapters, not only current→end', () => {
+    expect(
+      planSupportRefStreamChapters(
+        { '3': [bookNotes[0]], '4': [bookNotes[2]] },
+        3
+      )
+    ).toEqual([1, 2, 4])
+    const passageOnly = supportRefFirstPaintNotes(
+      [{ id: 'psa-3b', reference: '3:8', supportReference: metaphor }],
+      metaphor,
+      3
+    )
+    const chapterRows = [
+      { id: 'psa-3a', reference: '3:1', supportReference: metaphor },
+      { id: 'psa-3b', reference: '3:8', supportReference: metaphor },
+    ]
+    expect(mergeFocusChapterBookMatches(passageOnly, chapterRows).map((n) => n.id)).toEqual([
+      'psa-3b',
+      'psa-3a',
+    ])
+  })
+
+  test('cross-chapter filter click: firstPaint + streamed destination chapter dedupes by id', () => {
+    // Filter applied on ch.1 → stream includes tit 1:3. User clicks that card →
+    // nav to ch.1 makes firstPaint include the same note. Concat without dedupe
+    // rendered two helps-row-tn-* cards (bug). Prefer firstPaint (aligned).
+    const metaphor = 'rc://*/ta/man/translate/figs-metaphor'
+    const alignedFocus = {
+      id: 'swi9',
+      reference: '1:3',
+      supportReference: metaphor,
+      quote: 'he revealed his word',
+      quoteStatus: 'aligned',
+      alignedTokens: [{ position: 0 }],
+    }
+    const streamedFromPriorFocus = [
+      {
+        id: 'swi9',
+        reference: '1:3',
+        supportReference: metaphor,
+        quote: 'he revealed his word',
+      },
+      {
+        id: 'tit2',
+        reference: '2:1',
+        supportReference: metaphor,
+        quote: 'speak what fits',
+      },
+    ]
+    const firstPaint = mergeFocusChapterBookMatches(
+      supportRefFirstPaintNotes([alignedFocus], metaphor, 1),
+      supportRefNotesForChapter([alignedFocus], metaphor)
+    )
+    const book = mergeFocusChapterBookMatches(firstPaint, streamedFromPriorFocus)
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      metaphor,
+      new Map([['swi9', alignedFocus]])
+    )
+    expect(settled.map((n) => n.id)).toEqual(['swi9', 'tit2'])
+    expect(settled[0]).toBe(alignedFocus)
+  })
+
+  test('cross-chapter TWL article click: firstPaint + streamed destination dedupes by id', () => {
+    const path = 'bible/kt/god'
+    const alignedFocus = {
+      id: 'l-tit-1',
+      reference: '1:1',
+      articlePath: path,
+      origWords: 'θεοῦ',
+      quoteStatus: 'aligned',
+      alignedTokens: [{ position: 0 }],
+    }
+    const streamedFromPriorFocus = [
+      { id: 'l-tit-1', reference: '1:1', articlePath: path, origWords: 'θεοῦ' },
+      { id: 'l-tit-2', reference: '2:13', articlePath: path, origWords: 'θεοῦ' },
+    ]
+    const firstPaint = mergeFocusChapterBookMatches(
+      twlArticleFirstPaintLinks([alignedFocus], path, 1),
+      twlArticleLinksForChapter([alignedFocus], path)
+    )
+    const book = mergeFocusChapterBookMatches(firstPaint, streamedFromPriorFocus)
+    const settled = settleTwlArticleDisplayLinks(
+      book,
+      path,
+      new Map([['l-tit-1', alignedFocus]])
+    )
+    expect(settled.map((l) => l.id)).toEqual(['l-tit-1', 'l-tit-2'])
+    expect(settled[0]).toBe(alignedFocus)
+  })
+
+  test('book-filter stream plan ends with the start focus chapter', () => {
+    expect(
+      planBookFilterStreamChapters({ '1': [bookNotes[0]], '2': [bookNotes[1]], '4': [bookNotes[2]] }, 2)
+    ).toEqual([1, 3, 4, 2])
+    expect(planBookFilterStreamChapters({ '1': [bookNotes[0]] }, 0)).toEqual([1])
+  })
+
+  test('cross-chapter support-ref click keeps start-chapter cards (no shrink, no dupes)', () => {
+    const byChapter: Record<string, typeof bookNotes> = {
+      '1': [bookNotes[0]!, bookNotes[3]!],
+      '2': [bookNotes[1]!],
+      '150': [bookNotes[2]!],
+    }
+    // Stream starts with focus 1 and does not restart on chapter jumps.
+    const streamed = planBookFilterStreamChapters(byChapter, 1).flatMap((c) =>
+      supportRefNotesForChapter(streamRowsForChapter(byChapter, null, c), metaphor)
+    )
+    const renderedAt = (chapter: number) => {
+      const firstPaint = mergeFocusChapterBookMatches(
+        supportRefFirstPaintNotes(byChapter[String(chapter)] ?? [], metaphor, chapter),
+        supportRefNotesForChapter(byChapter[String(chapter)] ?? [], metaphor)
+      )
+      return mergeFocusChapterBookMatches(firstPaint, streamed).map((n) => n.id)
+    }
+    const before = renderedAt(1)
+    const after = renderedAt(2)
+    expect([...before].sort()).toEqual(['psa-1', 'psa-150', 'psa-2'])
+    expect([...after].sort()).toEqual([...before].sort())
+    expect(new Set(after).size).toBe(after.length)
+  })
+
+  test('cross-chapter TWL article click keeps start-chapter cards (no shrink, no dupes)', () => {
+    const path = 'bible/kt/god'
+    const byChapter: Record<string, Array<{ id: string; reference: string; articlePath: string }>> = {
+      '1': [
+        { id: 'l-1a', reference: '1:1', articlePath: path },
+        { id: 'l-1x', reference: '1:2', articlePath: 'bible/kt/love' },
+      ],
+      '2': [{ id: 'l-2a', reference: '2:13', articlePath: path }],
+      '3': [{ id: 'l-3a', reference: '3:4', articlePath: path }],
+    }
+    const streamed = planBookFilterStreamChapters(byChapter, 1).flatMap((c) =>
+      twlArticleLinksForChapter(streamRowsForChapter(byChapter, null, c), path)
+    )
+    const renderedAt = (chapter: number) => {
+      const rows = streamRowsForChapter(byChapter, null, chapter)
+      const firstPaint = mergeFocusChapterBookMatches(
+        twlArticleFirstPaintLinks(rows, path, chapter),
+        twlArticleLinksForChapter(rows, path)
+      )
+      return mergeFocusChapterBookMatches(firstPaint, streamed).map((l) => l.id)
+    }
+    const before = renderedAt(1)
+    const after = renderedAt(3)
+    expect([...before].sort()).toEqual(['l-1a', 'l-2a', 'l-3a'])
+    expect([...after].sort()).toEqual([...before].sort())
+    expect(new Set(after).size).toBe(after.length)
+  })
+
+  test('current-chapter notes settle from passage align without book quotes', () => {
+    const first = supportRefFirstPaintNotes(bookNotes, metaphor, 1)
+    const aligned = new Map([
+      [
+        'psa-1',
+        {
+          ...first[0]!,
+          quoteTokens: [{ text: 'like', id: 1 }],
+          quoteStatus: 'aligned',
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(first, metaphor, aligned)
+    expect(settled).toHaveLength(1)
+    expect(settled[0]!.quoteStatus).toBe('aligned')
+    expect(settled[0]!.quoteTokens).toEqual([{ text: 'like', id: 1 }])
+  })
+
+  test('chapter notes filter does not require other chapters', () => {
+    expect(
+      supportRefNotesForChapter([{ id: 'a', supportReference: metaphor }], metaphor).map((n) => n.id)
+    ).toEqual(['a'])
+    expect(
+      filterSupportRefFallbackChunk(bookNotes, metaphor, 1, new Set(['psa-1'])).map((n) => n.id)
+    ).toEqual(['psa-2', 'psa-150'])
+  })
+})
+
+describe('flattenBookNotes', () => {
+  test('prefers the longer flat notes array when chapter map is incomplete', () => {
+    const byChapter = { '1': [{ id: 'a' }, { id: 'b' }] }
+    const all = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]
+    expect(flattenBookNotes(byChapter, all).map((n) => n.id)).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  test('uses chapter map when it is the fuller source', () => {
+    const byChapter = {
+      '1': [{ id: 'a' }],
+      '2': [{ id: 'b' }],
+      '3': [{ id: 'c' }],
+    }
+    expect(flattenBookNotes(byChapter, [{ id: 'a' }]).map((n) => n.id)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('settleSupportRefDisplayNotes', () => {
+  test('settles off-passage matches so excerpts are not stuck pending', () => {
+    const book = [
+      { id: 'n1', supportReference: 'rc://*/ta/man/translate/figs-doublet', quote: 'a and b' },
+      { id: 'n2', supportReference: 'rc://*/ta/man/translate/figs-doublet', quote: '' },
+      { id: 'n3', supportReference: 'rc://*/ta/man/translate/figs-metaphor', quote: 'x' },
+    ]
+    const aligned = new Map([
+      [
+        'n1',
+        {
+          id: 'n1',
+          supportReference: 'rc://*/ta/man/translate/figs-doublet',
+          quote: 'a and b',
+          quoteStatus: 'aligned',
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      aligned
+    )
+    expect(settled.map((n) => n.id)).toEqual(['n1', 'n2'])
+    expect(settled[0]!.quoteStatus).toBe('aligned')
+    expect(settled[1]!.quoteStatus).toBe('none')
+  })
+
+  test('quoted notes without enrichment show OL fallback with warm-pending icon', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'submit and obey',
+      },
+    ]
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      new Map()
+    )
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBe(true)
+  })
+
+  test('merges IndexedDB / align enrichment when passage align is missing', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'submit and obey',
+      },
+    ]
+    const enrichment = new Map([
+      [
+        'n2',
+        {
+          quoteTokens: [{ id: 1, text: 'a', type: 'word', occurrence: 1, content: 'a' }],
+          quoteStatus: 'aligned',
+          alignedTokens: [{ position: 0, content: 'sensible' }],
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      new Map(),
+      enrichment
+    )
+    expect(settled[0]!.quoteStatus).toBe('aligned')
+    expect(settled[0]!.alignedTokens).toEqual([{ position: 0, content: 'sensible' }])
+  })
+
+  test('keeps enrichment align when passage row is empty mid-reload', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'for all men',
+      },
+    ]
+    const aligned = new Map([
+      [
+        'n2',
+        {
+          id: 'n2',
+          supportReference: 'rc://*/ta/man/translate/figs-doublet',
+          quote: 'for all men',
+          quoteStatus: 'pending',
+          semanticIds: [],
+          alignedTokens: [],
+        },
+      ],
+    ])
+    const enrichment = new Map([
+      [
+        'n2',
+        {
+          semanticIds: ['tit 2:11:men:1'],
+          alignedTokens: [{ position: 0, content: 'men' }],
+          quoteStatus: 'aligned',
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      aligned,
+      enrichment
+    )
+    expect(settled[0]!.semanticIds).toEqual(['tit 2:11:men:1'])
+    expect(settled[0]!.quoteStatus).toBe('aligned')
+  })
+
+  test('chapter remount pending demotes to OL + warm when enrichment is only fallback', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'for all men',
+      },
+    ]
+    const aligned = new Map([
+      [
+        'n2',
+        {
+          id: 'n2',
+          supportReference: 'rc://*/ta/man/translate/figs-doublet',
+          quote: 'for all men',
+          quoteStatus: 'pending',
+        },
+      ],
+    ])
+    const enrichment = new Map([
+      [
+        'n2',
+        {
+          quoteStatus: 'ol-fallback',
+          quoteWarmPending: true,
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      aligned,
+      enrichment
+    )
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBe(true)
+  })
+
+  test('settled enrichment over pending does not force warm-pending spinner', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'for all men',
+      },
+    ]
+    const aligned = new Map([
+      [
+        'n2',
+        {
+          id: 'n2',
+          supportReference: 'rc://*/ta/man/translate/figs-doublet',
+          quote: 'for all men',
+          quoteStatus: 'pending',
+        },
+      ],
+    ])
+    const enrichment = new Map([
+      [
+        'n2',
+        {
+          quoteStatus: 'ol-fallback',
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      aligned,
+      enrichment
+    )
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBeUndefined()
+  })
+
+  test('chapter remount pending without enrichment still paints OL without eternal spinner', () => {
+    const book = [
+      {
+        id: 'n2',
+        supportReference: 'rc://*/ta/man/translate/figs-doublet',
+        quote: 'for all men',
+      },
+    ]
+    const aligned = new Map([
+      [
+        'n2',
+        {
+          id: 'n2',
+          supportReference: 'rc://*/ta/man/translate/figs-doublet',
+          quote: 'for all men',
+          quoteStatus: 'pending',
+        },
+      ],
+    ])
+    const settled = settleSupportRefDisplayNotes(
+      book,
+      'rc://*/ta/man/translate/figs-doublet',
+      aligned
+    )
+    expect(settled[0]!.quoteStatus).toBe('ol-fallback')
+    expect(settled[0]!.quoteWarmPending).toBeUndefined()
+  })
+})
+
+describe('reuseUnchangedSupportRefNotes', () => {
+  test('keeps object identity when quote fields are unchanged', () => {
+    const first = {
+      id: 'n1',
+      supportReference: 'rc://*/ta/man/translate/figs-metaphor',
+      quote: 'a',
+      quoteStatus: 'ol-fallback',
+    }
+    const next = [{ ...first }, { id: 'n2', quote: 'b', quoteStatus: 'ol-fallback' }]
+    const reused = reuseUnchangedSupportRefNotes(next, [first])
+    expect(reused[0]).toBe(first)
+    expect(reused[1]).toBe(next[1])
+  })
+})
+
+describe('resolveHelpsTokenClickFilter', () => {
+  test('covered scripture click sets semantic + aligned filter ids', () => {
+    const filter = resolveHelpsTokenClickFilter(
+      {
+        semanticId: 'psa 1:4:chasses:1',
+        content: 'chasses',
+        alignedSemanticIds: ['psa 1:4:יִדֳּפֶנּוּ:1'],
+        hasHelpsCoverage: true,
+      },
+      42
+    )
+    expect(filter).toEqual({
+      semanticId: 'psa 1:4:chasses:1',
+      content: 'chasses',
+      alignedSemanticIds: ['psa 1:4:יִדֳּפֶנּוּ:1'],
+      timestamp: 42,
+    })
+  })
+
+  test('uncovered click does not set a token filter', () => {
+    expect(
+      resolveHelpsTokenClickFilter(
+        {
+          semanticId: 'psa 1:1:the:1',
+          content: 'the',
+          alignedSemanticIds: [],
+          hasHelpsCoverage: false,
+        },
+        1
+      )
+    ).toBeUndefined()
+  })
+
+  test('null token clears the filter', () => {
+    expect(resolveHelpsTokenClickFilter(null, 1)).toBeNull()
+  })
+})
+
+describe('book filter stream (whole book, not current chapter)', () => {
+  const metaphor = 'rc://*/ta/man/translate/figs-metaphor'
+  type Row = { id: string; reference: string; supportReference?: string }
+  const note = (id: string, reference: string, supportReference = metaphor): Row => ({
+    id,
+    reference,
+    supportReference,
+  })
+  const fullBook: Record<string, Row[]> = {
+    '1': [note('e1', '1:3'), note('x1', '1:4', 'rc://*/ta/man/translate/figs-idiom')],
+    '2': [note('e2', '2:1')],
+    '3': [note('e3', '3:5')],
+    '4': [note('e4a', '4:1'), note('e4b', '4:14')],
+    '5': [note('e5', '5:2')],
+    '6': [note('e6', '6:11')],
+  }
+  const match = (rows: readonly Row[]) => supportRefNotesForChapter(rows, metaphor)
+
+  /** One hook run: plan + per-chapter matches, seeded like a restart. */
+  const runStream = (
+    byChapter: Record<string, Row[]>,
+    focus: number,
+    seed: Row[] = []
+  ): Row[] => {
+    const seen = new Set(seed.map((r) => r.id))
+    const out = seed.slice()
+    for (const chapter of planBookFilterStreamChapters(byChapter, focus)) {
+      const rows = bookFilterChapterMatches(byChapter, null, chapter, match, seen)
+      for (const r of rows) seen.add(r.id)
+      out.push(...rows)
+    }
+    return out
+  }
+  const rendered = (byChapter: Record<string, Row[]>, current: number, streamed: Row[]) =>
+    mergeFocusChapterBookMatches(
+      supportRefFirstPaintNotes(byChapter[String(current)] ?? [], metaphor, current),
+      streamed
+    )
+  const chaptersOf = (rows: Row[]) =>
+    [...new Set(rows.map((r) => Number(r.reference.split(':')[0])))].sort((a, b) => a - b)
+
+  test('filter from chapter 4 lists matches before and after chapter 4', () => {
+    const list = rendered(fullBook, 4, runStream(fullBook, 4))
+    expect(chaptersOf(list)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(list.map((r) => r.id).sort()).toEqual(['e1', 'e2', 'e3', 'e4a', 'e4b', 'e5', 'e6'])
+    expect(new Set(list.map((r) => r.id)).size).toBe(list.length)
+  })
+
+  test('partial chapter map at filter time: growth re-streams instead of sticking to one chapter', () => {
+    const partial: Record<string, Row[]> = { '4': fullBook['4']! }
+    const first = runStream(partial, 4)
+    expect(chaptersOf(rendered(partial, 4, first))).toEqual([4])
+    // The effect must see new content (span key changes) and re-walk the book.
+    expect(bookFilterStreamSpanKey(fullBook)).not.toBe(bookFilterStreamSpanKey(partial))
+    const seed = bookFilterStreamSeed(metaphor, metaphor, first)
+    const grown = runStream(fullBook, 4, seed)
+    const list = rendered(fullBook, 4, grown)
+    expect(chaptersOf(list)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(new Set(list.map((r) => r.id)).size).toBe(list.length)
+  })
+
+  test('span key ignores object identity churn and empty content', () => {
+    const clone = Object.fromEntries(
+      Object.entries(fullBook).map(([k, rows]) => [k, rows.map((r) => ({ ...r }))])
+    )
+    expect(bookFilterStreamSpanKey(clone)).toBe(bookFilterStreamSpanKey(fullBook))
+    expect(bookFilterStreamSpanKey(null, null)).toBe('')
+    expect(bookFilterStreamSpanKey({}, [])).toBe('')
+    expect(bookFilterStreamSpanKey(null, [{ reference: '2:1' }])).not.toBe('')
+  })
+
+  test('seed keeps rows for the same filter, clears for a new one', () => {
+    const rows = [note('e1', '1:3')]
+    expect(bookFilterStreamSeed(metaphor, metaphor, rows)).toEqual(rows)
+    expect(bookFilterStreamSeed('rc://*/ta/man/translate/figs-idiom', metaphor, rows)).toEqual([])
+    expect(bookFilterStreamSeed(null, metaphor, rows)).toEqual([])
+  })
+
+  test('chapter jump after filter keeps the whole book (focus read once at start)', () => {
+    const streamed = runStream(fullBook, 4)
+    for (const current of [1, 2, 6]) {
+      expect(chaptersOf(rendered(fullBook, current, streamed))).toEqual([1, 2, 3, 4, 5, 6])
+    }
   })
 })
 

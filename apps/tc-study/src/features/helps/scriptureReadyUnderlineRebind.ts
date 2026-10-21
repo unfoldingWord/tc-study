@@ -8,6 +8,7 @@
 
 import { parseLinkChapterVerse } from './quoteTokens'
 import { resolveQuoteSemanticIds, type QuoteSemanticSource } from './resolveQuoteSemanticIds'
+import { chapterOfHelpsReference } from './helpsDisplayFilters'
 
 export const SCRIPTURE_EMPTY_REVISION = 'scripture:empty'
 
@@ -29,6 +30,24 @@ export interface UnderlineNoteInput {
 export interface UnderlineTokenGroup {
   sourceId: string
   semanticIds: string[]
+}
+
+/**
+ * Book-wide Metaphor / TWL filters stream the whole book into display rows.
+ * Scripture underlines must use only the open chapter's matching rows — and
+ * those rows carry enrichment quoteTokens the unfiltered chapter slice may lack.
+ */
+export function chapterHelpsRowsForUnderlines<T extends { reference: string }>(
+  rows: readonly T[],
+  focusChapter: number,
+  endChapter?: number
+): T[] {
+  if (!rows.length || !(focusChapter > 0)) return []
+  const end = endChapter && endChapter >= focusChapter ? endChapter : focusChapter
+  return rows.filter((row) => {
+    const chapter = chapterOfHelpsReference(row.reference)
+    return chapter >= focusChapter && chapter <= end
+  })
 }
 
 /** Fingerprint of owner scripture (resource + book/chapter + USJ token count). */
@@ -68,13 +87,36 @@ export function underlineGroupsFromHelpsNotes(
   return groups
 }
 
-/** Retry UGNT/UHB quote match only after scripture hydrates and originals are still missing. */
+/** Retry UGNT/UHB quote match after scripture hydrates or OL zip lands. */
 export function shouldRetryOriginalLanguageLoad(opts: {
   hasOriginalContent: boolean
   scriptureRevision: string
   lastAttemptedRevision: string | null
+  olDownloadTick?: number
+  lastAttemptedDownloadTick?: number | null
 }): boolean {
   if (opts.hasOriginalContent) return false
+  if (
+    opts.olDownloadTick != null &&
+    opts.olDownloadTick > 0 &&
+    opts.olDownloadTick !== (opts.lastAttemptedDownloadTick ?? 0)
+  ) {
+    return true
+  }
   if (!opts.scriptureRevision || opts.scriptureRevision === SCRIPTURE_EMPTY_REVISION) return false
   return opts.scriptureRevision !== opts.lastAttemptedRevision
+}
+
+/**
+ * When SCRIPTURE_TOKENS leaves `scripture:empty`, NOTES_TOKEN_GROUPS must
+ * rebroadcast even if group shape looked the same under the empty revision.
+ */
+export function shouldResetTokenGroupsDedupe(args: {
+  previousRevision: string | null
+  nextRevision: string
+}): boolean {
+  if (!args.nextRevision || args.nextRevision === SCRIPTURE_EMPTY_REVISION) return false
+  return (
+    args.previousRevision == null || args.previousRevision === SCRIPTURE_EMPTY_REVISION
+  )
 }

@@ -5,7 +5,7 @@
  * Only visible in development mode
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import {
   Database,
   Download,
@@ -17,13 +17,22 @@ import {
   Package,
   AlertCircle,
   Search,
-  RefreshCw
+  RefreshCw,
+  Gauge
 } from 'lucide-react'
 import { useCatalogManager, useResourceTypeRegistry, useCacheAdapter, useCompletenessChecker } from '../../contexts'
 import { getDownloadPriority } from '../../config/loaderConfig'
 import { DependencyResolver } from '../../lib/services/DependencyResolver'
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import type { ResourceCompletenessStatus } from '../../lib/services/ResourceCompletenessChecker'
+import {
+  clearScripturePerfSamples,
+  getScripturePerfSamples,
+  isScripturePerfEnabled,
+  setScripturePerfEnabled,
+  subscribeScripturePerf,
+} from '../../features/perf/scripturePerf'
+import { warmScheduler } from '../../features/warm/warmScheduler'
 
 interface ResourceWithStatus {
   metadata: ResourceMetadata
@@ -174,10 +183,15 @@ export function AdminPanel() {
           <button
             onClick={() => setIsOpen(false)}
             className="text-fg-muted hover:text-fg-secondary transition-colors"
+            title="Close"
+            aria-label="Close"
           >
             <XCircle className="w-6 h-6" />
           </button>
         </div>
+
+        <ScripturePerfSection />
+        <WarmLaneSection />
 
         {/* Stats Bar */}
         <div className="grid grid-cols-4 gap-4 p-4 bg-muted border-b border-border">
@@ -442,6 +456,76 @@ function ResourceCard({ resource, isExpanded, onToggle }: ResourceCardProps) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function ScripturePerfSection() {
+  const enabled = useSyncExternalStore(subscribeScripturePerf, isScripturePerfEnabled, () => false)
+  const samples = useSyncExternalStore(subscribeScripturePerf, getScripturePerfSamples, () => [])
+  const recent = samples.slice(-12).reverse()
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/60">
+      <Gauge className="w-4 h-4 text-accent shrink-0" />
+      <button
+        type="button"
+        onClick={() => setScripturePerfEnabled(!enabled)}
+        className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+          enabled ? 'bg-accent text-white' : 'bg-surface text-fg-secondary hover:bg-muted'
+        }`}
+        title={enabled ? 'Disable scripture perf marks' : 'Enable scripture perf marks'}
+        aria-label={enabled ? 'Disable scripture perf marks' : 'Enable scripture perf marks'}
+        aria-pressed={enabled}
+      >
+        Perf
+      </button>
+      {enabled && (
+        <button
+          type="button"
+          onClick={() => clearScripturePerfSamples()}
+          className="p-1 rounded hover:bg-muted text-fg-secondary"
+          title="Clear samples"
+          aria-label="Clear samples"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      )}
+      {enabled && (
+        <div className="flex-1 min-w-0 overflow-x-auto flex gap-2 text-[10px] font-mono text-fg-secondary">
+          {recent.length === 0 ? (
+            <span>waiting…</span>
+          ) : (
+            recent.map((s, i) => (
+              <span key={`${s.at}-${i}`} className="whitespace-nowrap">
+                {s.phase}
+                {s.detail ? `:${s.detail}` : ''}={s.durationMs}ms
+              </span>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function WarmLaneSection() {
+  const stats = useSyncExternalStore(
+    warmScheduler.subscribe,
+    () => warmScheduler.getStats(),
+    () => warmScheduler.getStats()
+  )
+  return (
+    <div className="flex items-center gap-3 px-4 py-2 border-b border-border bg-muted/40 text-[10px] font-mono text-fg-secondary">
+      <span title="Warm lane scheduler" aria-label="Warm lane scheduler">
+        Warm
+      </span>
+      <span>pending={stats.pendingJobKeys}</span>
+      <span>lane1={stats.lane1Drained ? 'drained' : 'busy'}</span>
+      <span>scroll={stats.scrollUnsettled ? 'unsettled' : 'settled'}</span>
+      <span>worker={stats.dedicatedWorker ? 'dedicated' : 'prepare'}</span>
+      {stats.lane2Blocked ? <span>L2={stats.lane2Blocked}</span> : null}
+      {stats.lane3Blocked ? <span>L3={stats.lane3Blocked}</span> : null}
     </div>
   )
 }

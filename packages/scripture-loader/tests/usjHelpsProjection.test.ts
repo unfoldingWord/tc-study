@@ -5,6 +5,7 @@ import {
   extractUsjBroadcastTokens,
   processUsfmToUsjResult,
   semanticIdFor,
+  viewModelChapterToOptimized,
   viewModelToOptimizedChapters,
 } from '../src/index'
 
@@ -25,6 +26,20 @@ describe('usjHelpsProjection', () => {
     const paul = v1?.tokens.find((t) => t.text === 'Παῦλος')
     expect(paul?.occurrence).toBe(1)
     expect(paul?.type).toBe('word')
+  })
+
+  test('viewModelChapterToOptimized projects only the requested chapter', async () => {
+    const { viewModel } = await processUsfmToUsjResult({
+      usfmText: UGNT_USFM,
+      bookId: 'tit',
+      bookName: 'Titus',
+      options: { language: 'el-x-koine', includeWordTokens: true, includeAlignments: true },
+    })
+    const ch1 = viewModelChapterToOptimized(viewModel, 1)
+    expect(ch1?.number).toBe(1)
+    expect(viewModelChapterToOptimized(viewModel, 99)).toBeNull()
+    const all = viewModelToOptimizedChapters(viewModel)
+    expect(ch1?.verses.length).toBe(all.find((c) => c.number === 1)?.verses.length)
   })
 
   test('extractUsjBroadcastTokens includes semanticId + alignedOriginalWordIds', async () => {

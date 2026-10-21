@@ -163,8 +163,6 @@ export function SimplifiedReadView({
     shouldAutoOpenLanguagePicker,
     isLanguagePickerRequired,
     handleLanguageSelected,
-    isBackgroundDownloading,
-    downloadStats,
   } = useReadLanguageBootstrap({ initialLanguage, requireLanguageInUrl })
 
   useReadGatewayBookCatalog(currentLanguageCode)
@@ -271,12 +269,7 @@ export function SimplifiedReadView({
                 onLanguageSelected={handleLanguageSelected}
                 autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
                 languagePickerRequired={isLanguagePickerRequired}
-                downloadIndicator={
-                  <DownloadIndicator
-                    isDownloading={isBackgroundDownloading}
-                    progress={downloadStats.progress ?? undefined}
-                  />
-                }
+                downloadIndicator={<DownloadIndicator />}
                 onDownloadCollection={
                   isCollectionFullyCached ? handleDirectDownloadCollection : undefined
                 }

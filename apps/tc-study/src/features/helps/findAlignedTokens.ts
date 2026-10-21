@@ -31,6 +31,26 @@ function tokenMatchIds(token: OptimizedToken): string[] {
   return ids
 }
 
+type TokenWithVerseRef = OptimizedToken & { verseRef?: string }
+
+function tokenVerseRef(
+  token: OptimizedToken | undefined,
+  bookCode: string,
+  chapter: number,
+  verse: number
+): string {
+  const stamped = (token as TokenWithVerseRef | undefined)?.verseRef?.trim()
+  if (stamped) return stamped
+  return `${bookCode.toLowerCase()} ${chapter}:${verse}`
+}
+
+function verseNumberFromRef(verseRef: string, fallback: number): number {
+  const match = verseRef.match(/:(\d+)\s*$/)
+  if (!match) return fallback
+  const n = parseInt(match[1]!, 10)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
 /** Build chip/underline tokens from matched word positions, filling punctuation gaps. */
 export function alignedTokensFromPositions(
   targetTokens: OptimizedToken[],
@@ -40,12 +60,12 @@ export function alignedTokensFromPositions(
   verse: number
 ): AlignedToken[] {
   if (matchedPositions.length === 0) return []
-  const verseRef = `${bookCode.toLowerCase()} ${chapter}:${verse}`
   const result: AlignedToken[] = []
 
   matchedPositions.forEach((position, matchIndex) => {
     const token = targetTokens[position]
     if (!token) return
+    const verseRef = tokenVerseRef(token, bookCode, chapter, verse)
     const tokenOccurrence = token.occurrence || 1
     const semanticId = semanticIdFor(verseRef, token.text, tokenOccurrence)
 
@@ -59,6 +79,22 @@ export function alignedTokensFromPositions(
 
     if (matchIndex >= matchedPositions.length - 1) return
     const nextPosition = matchedPositions[matchIndex + 1]!
+    const nextToken = targetTokens[nextPosition]
+    const nextVerseRef = tokenVerseRef(nextToken, bookCode, chapter, verse)
+    const sameVerse =
+      verseNumberFromRef(verseRef, verse) === verseNumberFromRef(nextVerseRef, verse)
+
+    if (!sameVerse) {
+      result.push({
+        content: '…',
+        semanticId: `${verseRef}:sep:${position + 1}`,
+        verseRef,
+        position: position + 1,
+        type: 'gap',
+      })
+      return
+    }
+
     const gap = nextPosition - position
     if (gap <= 1) return
 

@@ -1,13 +1,15 @@
 /**
  * useTWPreviews Hook
  *
- * Fetches and caches the first content paragraph of Translation Words articles
- * (same in-memory Map + preload pattern as useTWTitles).
+ * Fetches the first content paragraph of Translation Words articles via
+ * shared helps-text cache (memory → IndexedDB → words loader).
  */
 
-import { useCallback, useRef, useState } from 'react'
-import { useLoaderRegistry } from '../../../../contexts'
+import { useCallback, useRef } from 'react'
+import { useCatalogManager, useLoaderRegistry } from '../../../../contexts'
 import { parseTWLink } from '../../../../features/helps/quoteTokens'
+import { resourceContentStamp } from '../../../../features/helps/resourceContentStamp'
+import { useHelpsTextCache } from '../../../../features/helps/useHelpsTextCache'
 import { extractFirstContentParagraph } from '../../../../lib/markdown/markdownProcessor'
 import type { TranslationWordsLink } from '../types'
 
@@ -32,10 +34,15 @@ function linkSourceFor(link: TranslationWordsLink): string | null {
 
 export function useTWPreviews(resourceKey: string) {
   const loaderRegistry = useLoaderRegistry()
-  const [twPreviews, setTwPreviews] = useState<Map<string, string>>(new Map())
-  const [loadingPreviews, setLoadingPreviews] = useState<Set<string>>(new Set())
-  const twPreviewsRef = useRef<Map<string, string>>(new Map())
-  const loadingRef = useRef<Set<string>>(new Set())
+  const catalogManager = useCatalogManager()
+  const stampByResourceRef = useRef<Map<string, string>>(new Map())
+  const {
+    values: twPreviews,
+    loading: loadingPreviews,
+    fetchText,
+    getCached,
+    hasCached,
+  } = useHelpsTextCache('tw-preview')
 
   const fetchTWPreview = useCallback(
     async (link: TranslationWordsLink): Promise<string | null> => {
@@ -46,61 +53,58 @@ export function useTWPreviews(resourceKey: string) {
       if (twInfo.category === 'unknown' || !twInfo.term) return null
 
       const cacheKey = `${twInfo.category}/${twInfo.term}`
-      if (twPreviewsRef.current.has(cacheKey)) {
-        return twPreviewsRef.current.get(cacheKey) ?? null
-      }
-      if (loadingRef.current.has(cacheKey)) return null
-
       const twResourceKey = resolveTwResourceKey(resourceKey)
       if (!twResourceKey) return null
 
       const loader = loaderRegistry.getLoader('words')
       if (!loader) return null
 
-      try {
-        loadingRef.current.add(cacheKey)
-        setLoadingPreviews((prev) => new Set(prev).add(cacheKey))
-
-        const articleId = `bible/${twInfo.category}/${twInfo.term}`
-        const raw = (await loader.loadContent(twResourceKey, articleId)) as {
-          definition?: string
-          content?: string
-          body?: string
+      let stamp = stampByResourceRef.current.get(twResourceKey)
+      if (!stamp) {
+        try {
+          const meta = await catalogManager.getResourceMetadata(twResourceKey)
+          stamp = resourceContentStamp(meta)
+        } catch {
+          stamp = 'nostamp'
         }
-
-        const fromDefinition = raw?.definition?.trim() ?? ''
-        const fromContent = extractFirstContentParagraph(raw?.content || raw?.body || '')
-        const preview = fromDefinition || fromContent
-
-        twPreviewsRef.current.set(cacheKey, preview)
-        setTwPreviews((prev) => new Map(prev).set(cacheKey, preview))
-        return preview
-      } catch {
-        // Cache empty to avoid retry storms when article is missing
-        twPreviewsRef.current.set(cacheKey, '')
-        setTwPreviews((prev) => new Map(prev).set(cacheKey, ''))
-        return ''
-      } finally {
-        loadingRef.current.delete(cacheKey)
-        setLoadingPreviews((prev) => {
-          const next = new Set(prev)
-          next.delete(cacheKey)
-          return next
-        })
+        stampByResourceRef.current.set(twResourceKey, stamp)
       }
+
+      return await fetchText({
+        resourceKey: twResourceKey,
+        stamp,
+        entryId: cacheKey,
+        resolve: async () => {
+          try {
+            const articleId = `bible/${twInfo.category}/${twInfo.term}`
+            const raw = (await loader.loadContent(twResourceKey, articleId)) as {
+              definition?: string
+              content?: string
+              body?: string
+            }
+            const fromDefinition = raw?.definition?.trim() ?? ''
+            const fromContent = extractFirstContentParagraph(raw?.content || raw?.body || '')
+            const preview = fromDefinition || fromContent
+            // Empty string is a settled miss (article missing) — persist to avoid retry storms.
+            return { value: preview, confident: true }
+          } catch {
+            return { value: '', confident: true }
+          }
+        },
+      })
     },
-    [resourceKey, loaderRegistry]
+    [resourceKey, loaderRegistry, catalogManager, fetchText]
   )
 
   const getTWPreview = useCallback(
     (link: TranslationWordsLink): string | null => {
       const twInfo = parseTWLink(link.twLink || link.articlePath)
       const cacheKey = `${twInfo.category}/${twInfo.term}`
-      if (!twPreviews.has(cacheKey)) return null
-      const value = twPreviews.get(cacheKey) ?? ''
+      if (!hasCached(cacheKey)) return null
+      const value = getCached(cacheKey) ?? ''
       return value || null
     },
-    [twPreviews]
+    [getCached, hasCached]
   )
 
   const isTWPreviewPending = useCallback(
@@ -108,9 +112,9 @@ export function useTWPreviews(resourceKey: string) {
       const twInfo = parseTWLink(link.twLink || link.articlePath)
       if (twInfo.category === 'unknown' || !twInfo.term) return false
       const cacheKey = `${twInfo.category}/${twInfo.term}`
-      return !twPreviews.has(cacheKey)
+      return !hasCached(cacheKey)
     },
-    [twPreviews]
+    [hasCached]
   )
 
   return {

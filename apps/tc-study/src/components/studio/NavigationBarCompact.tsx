@@ -1,15 +1,4 @@
-import {
-  ArrowLeft,
-  BookMarked,
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
-  Library,
-  List,
-  ListOrdered,
-  Menu,
-  X,
-} from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Menu, X } from 'lucide-react'
 import type { RefObject } from 'react'
 import {
   useAvailableBooks,
@@ -17,16 +6,19 @@ import {
   useNavigation,
   useNavigationHistory,
   useNavigationMode,
+  useNavigationScope,
 } from '../../contexts'
+import type { NavigationCatalogScope } from '../../contexts/types'
 import { useBookTitleSource } from '../../contexts/AppContext'
 import { formatReferenceParts } from '../../features/nav/navigationBarReferenceFormat'
+import { applyTextModeScopeSwitch } from '../../features/read/textModeMismatch'
+import { DownloadBusyBadge } from '../read/DownloadIndicator'
 import { LanguagePicker } from '../LanguagePicker'
 import { BCVNavigator } from './BCVNavigator'
 import { NavigationBarMenu } from './NavigationBarMenu'
 import { NavigationBarVersionModal } from './NavigationBarVersionModal'
 import { NavigationHistoryModal } from './NavigationHistoryModal'
-import { NavigationTypeSelector } from './NavigationTypeSelector'
-import { ObsNavigationTypeSelector } from './ObsNavigationTypeSelector'
+import { NavigationScopeSwitch } from './NavigationScopeSwitch'
 
 interface NavigationBarCompactProps {
   isRtl: boolean
@@ -36,7 +28,6 @@ interface NavigationBarCompactProps {
   handleNext: () => void
   canGoPrevious: () => boolean
   canGoNext: () => boolean
-  downloadIndicator?: React.ReactNode
   showLanguagePicker?: boolean
   onLanguageSelected?: (languageCode: string) => void
   autoOpenLanguagePicker?: boolean
@@ -44,18 +35,16 @@ interface NavigationBarCompactProps {
   onDownloadCollection?: () => void
   onLoadCollection?: () => void
   onNavigationScopeCommitted?: (scope: 'scripture' | 'obs') => void
+  onSwitchTextMode?: (scope: 'scripture' | 'obs') => void
   isNavigatorOpen: boolean
   setIsNavigatorOpen: (open: boolean) => void
   isHistoryOpen: boolean
   setIsHistoryOpen: (open: boolean) => void
-  isTypeSelectorOpen: boolean
-  setIsTypeSelectorOpen: (open: boolean) => void
   isMenuOpen: boolean
   setIsMenuOpen: (open: boolean) => void
   isVersionOpen: boolean
   setIsVersionOpen: (open: boolean) => void
   menuRef: RefObject<HTMLDivElement | null>
-  typeSelectorRef: RefObject<HTMLDivElement | null>
 }
 
 export function NavigationBarCompact({
@@ -66,7 +55,6 @@ export function NavigationBarCompact({
   handleNext,
   canGoPrevious,
   canGoNext,
-  downloadIndicator,
   showLanguagePicker = false,
   onLanguageSelected,
   autoOpenLanguagePicker = false,
@@ -74,25 +62,33 @@ export function NavigationBarCompact({
   onDownloadCollection,
   onLoadCollection,
   onNavigationScopeCommitted,
+  onSwitchTextMode,
   isNavigatorOpen,
   setIsNavigatorOpen,
   isHistoryOpen,
   setIsHistoryOpen,
-  isTypeSelectorOpen,
-  setIsTypeSelectorOpen,
   isMenuOpen,
   setIsMenuOpen,
   isVersionOpen,
   setIsVersionOpen,
   menuRef,
-  typeSelectorRef,
 }: NavigationBarCompactProps) {
   const navigation = useNavigation()
   const currentRef = useCurrentReference()
   const navigationMode = useNavigationMode()
+  const navigationScope = useNavigationScope()
   const history = useNavigationHistory()
   const availableBooks = useAvailableBooks()
   const bookTitleSource = useBookTitleSource()
+
+  const handleScopeSwitch = (scope: NavigationCatalogScope) => {
+    if (onSwitchTextMode) {
+      onSwitchTextMode(scope)
+      return
+    }
+    applyTextModeScopeSwitch(navigation, scope)
+    onNavigationScopeCommitted?.(scope)
+  }
 
   const { bookPart, numberPart } = formatReferenceParts(
     currentRef,
@@ -102,8 +98,8 @@ export function NavigationBarCompact({
   )
 
   return (
-    <div className="flex items-center gap-chrome-tight w-full">
-      <div className="flex items-center gap-0.5">
+    <div className="flex items-center flex-nowrap gap-chrome-tight w-full min-h-chrome-control">
+      <div className="flex items-center gap-0.5 shrink-0">
         {navigation.canGoBack() && (
           <button
             onClick={() => navigation.goBack()}
@@ -116,8 +112,8 @@ export function NavigationBarCompact({
         )}
       </div>
 
-      <div className="flex-1 flex items-center justify-center">
-        <div className="flex items-center gap-chrome-tight bg-accent-soft px-chrome py-chrome-tight rounded-full">
+      <div className="flex-1 flex items-center justify-center min-w-0">
+        <div className="flex items-center gap-chrome-tight bg-accent-soft px-chrome py-0.5 rounded-full min-h-chrome-control">
           <button
             onClick={isRtl ? handleNext : handlePrevious}
             disabled={isRtl ? !canGoNext() : !canGoPrevious()}
@@ -128,44 +124,7 @@ export function NavigationBarCompact({
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
 
-          <div className="relative" ref={typeSelectorRef}>
-            {currentRef.book === 'obs' ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
-                  className="p-1.5 hover:bg-accent/15 text-accent-fg transition-colors rounded-full flex items-center justify-center"
-                  title={`Navigation type: ${modeLabel}`}
-                >
-                  {navigationMode === 'chapter' ? (
-                    <Library className="w-4 h-4" />
-                  ) : (
-                    <BookMarked className="w-4 h-4" />
-                  )}
-                </button>
-                {isTypeSelectorOpen && (
-                  <ObsNavigationTypeSelector onClose={() => setIsTypeSelectorOpen(false)} />
-                )}
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setIsTypeSelectorOpen(!isTypeSelectorOpen)}
-                  className="p-1.5 hover:bg-accent/15 text-accent-fg transition-colors rounded-full flex items-center justify-center"
-                  title={`Navigation type: ${modeLabel}`}
-                >
-                  {navigationMode === 'verse' && <BookOpen className="w-4 h-4" />}
-                  {navigationMode === 'chapter' && <Library className="w-4 h-4" />}
-                  {navigationMode === 'section' && <List className="w-4 h-4" />}
-                  {navigationMode === 'passage-set' && <ListOrdered className="w-4 h-4" />}
-                </button>
-                {isTypeSelectorOpen && (
-                  <NavigationTypeSelector onClose={() => setIsTypeSelectorOpen(false)} />
-                )}
-              </>
-            )}
-          </div>
+          <NavigationScopeSwitch scope={navigationScope} onSwitch={handleScopeSwitch} />
 
           <div className="w-px h-5 bg-accent/30" />
 
@@ -200,8 +159,7 @@ export function NavigationBarCompact({
         </div>
       </div>
 
-      <div className="flex items-center gap-chrome-tight">
-        {downloadIndicator}
+      <div className="flex items-center gap-chrome-tight shrink-0">
         {showLanguagePicker && (
           <LanguagePicker
             onLanguageSelected={onLanguageSelected}
@@ -214,16 +172,18 @@ export function NavigationBarCompact({
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 rounded-full hover:bg-muted text-fg-secondary hover:text-fg transition-colors"
+            className="relative p-1.5 rounded-full hover:bg-muted text-fg-secondary hover:text-fg transition-colors"
             title={isMenuOpen ? 'Close menu' : 'Open menu'}
             aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {isMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            <DownloadBusyBadge />
           </button>
           {isMenuOpen && (
             <NavigationBarMenu
               history={history}
               showLanguagePicker={showLanguagePicker}
+              isObs={currentRef.book === 'obs'}
               onOpenHistory={() => setIsHistoryOpen(true)}
               onOpenVersion={() => setIsVersionOpen(true)}
               onDownloadCollection={onDownloadCollection}
@@ -239,7 +199,15 @@ export function NavigationBarCompact({
       {isNavigatorOpen && (availableBooks.length > 0 || hasObsResource) && (
         <BCVNavigator
           onClose={() => setIsNavigatorOpen(false)}
-          mode={navigationMode === 'section' && currentRef.book !== 'obs' ? 'section' : 'verse'}
+          mode={
+            currentRef.book === 'obs'
+              ? undefined
+              : navigationMode === 'section'
+                ? 'section'
+                : navigationMode === 'chapter'
+                  ? 'chapter'
+                  : 'verse'
+          }
           onNavigationScopeCommitted={onNavigationScopeCommitted}
         />
       )}

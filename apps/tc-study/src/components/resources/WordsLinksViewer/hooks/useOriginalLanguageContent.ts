@@ -3,16 +3,27 @@
  *
  * Loads original-language scripture (UGNT/UHB) as OptimizedChapter[] for QuoteMatcher.
  * Primary path: ScriptureLoader.loadViewModel → viewModelToOptimizedChapters.
+ * Concurrent TN/TWL mounts share one load via olLoadCache.
  */
 
 import type { OptimizedChapter } from '@bt-synergy/resource-parsers'
-import {
-  ScriptureLoader,
-  viewModelToOptimizedChapters,
-} from '@bt-synergy/scripture-loader'
+import { ScriptureLoader } from '@bt-synergy/scripture-loader'
 import { useEffect, useRef, useState } from 'react'
-import { useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { useCacheAdapter, useCurrentReference, useLoaderRegistry } from '../../../../contexts'
+import { backgroundDownloadSession } from '../../../../features/download/backgroundDownloadSession'
+import { enqueueOriginalLanguageDownload } from '../../../../features/download/ensureOriginalLanguageDownload'
+import {
+  loadOriginalLanguageChapters,
+  resolveOriginalLanguageKey,
+  type OriginalLanguageResource,
+} from '../../../../features/helps/olLoadCache'
+import { isOriginalLanguageQuoteBlocked } from '../../../../features/helps/resolveHelpsQuoteStatus'
 import { shouldRetryOriginalLanguageLoad } from '../../../../features/helps/scriptureReadyUnderlineRebind'
+import {
+  pinReferenceWhileScrolling,
+  shouldHydrateHelpsForChapter,
+} from '../../../../features/nav/chapterScrollActivity'
+import { useChapterScrollActivity } from '../../../../features/nav/usePinnedHelpsReference'
 
 interface UseOriginalLanguageContentOptions {
   resourceKey: string // TWL resource key (e.g., "unfoldingWord/en/twl")
@@ -21,31 +32,56 @@ interface UseOriginalLanguageContentOptions {
   scriptureRevision?: string
 }
 
-interface OriginalLanguageResource {
-  resourceKey: string
-  language: string
-  bookCode: string
+export { resolveOriginalLanguageKey } from '../../../../features/helps/olLoadCache'
+
+function olSpanKey(book: string, chapter: number, endChapter: number): string {
+  return `${book}:${chapter}:${endChapter}`
 }
 
 export function useOriginalLanguageContent({
-  resourceKey,
   scriptureRevision = '',
 }: UseOriginalLanguageContentOptions) {
   const currentRef = useCurrentReference()
   const loaderRegistry = useLoaderRegistry()
+  const cacheAdapter = useCacheAdapter()
+  const scrollActivity = useChapterScrollActivity()
+  const helpsRef = pinReferenceWhileScrolling(currentRef, scrollActivity)
+  const allowChapterHydrate = shouldHydrateHelpsForChapter({
+    unsettled: scrollActivity.unsettled,
+    requestedChapter: helpsRef.chapter,
+    settledChapter: scrollActivity.settledChapter,
+  })
 
   const [originalLanguageResources, setOriginalLanguageResources] = useState<
     OriginalLanguageResource[]
   >([])
   const [originalContent, setOriginalContent] = useState<OptimizedChapter[] | null>(null)
+  const [loadedSpan, setLoadedSpan] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [retryTick, setRetryTick] = useState(0)
+  const [olDownloadTick, setOlDownloadTick] = useState(0)
   const lastAttemptedRevisionRef = useRef<string | null>(null)
+  const lastAttemptedDownloadTickRef = useRef<number | null>(null)
+  const loadedSpanRef = useRef('')
+  const enqueuedOlKeyRef = useRef('')
+  const contentRef = useRef(originalContent)
+  contentRef.current = originalContent
+
+  const startChapter = helpsRef.chapter || 1
+  const endChapter = helpsRef.endChapter || startChapter
+  const nextSpan = olSpanKey(helpsRef.book || '', startChapter, endChapter)
 
   useEffect(() => {
     lastAttemptedRevisionRef.current = null
-  }, [currentRef.book, currentRef.chapter])
+    lastAttemptedDownloadTickRef.current = null
+    enqueuedOlKeyRef.current = ''
+    loadedSpanRef.current = ''
+    // Wrong-testament OL must not keep quote-build "ready" (UGNT ≠ UHB).
+    setOriginalContent(null)
+    setLoadedSpan('')
+    setError(null)
+  }, [helpsRef.book])
 
   useEffect(() => {
     if (
@@ -53,21 +89,39 @@ export function useOriginalLanguageContent({
         hasOriginalContent: !!(originalContent && originalContent.length > 0),
         scriptureRevision,
         lastAttemptedRevision: lastAttemptedRevisionRef.current,
+        olDownloadTick,
+        lastAttemptedDownloadTick: lastAttemptedDownloadTickRef.current,
       })
     ) {
       return
     }
     lastAttemptedRevisionRef.current = scriptureRevision
+    lastAttemptedDownloadTickRef.current = olDownloadTick
     setRetryTick((n) => n + 1)
-  }, [scriptureRevision, originalContent])
+  }, [scriptureRevision, originalContent, olDownloadTick])
 
   useEffect(() => {
-    if (!currentRef.book || !currentRef.chapter || !loaderRegistry) {
+    const book = helpsRef.book || ''
+    const olKey = resolveOriginalLanguageKey(book)?.resourceKey
+    if (!olKey) return
+    return backgroundDownloadSession.subscribe((s) => {
+      if (s.error) {
+        enqueuedOlKeyRef.current = ''
+      }
+      if (!s.completedResourceKeys.includes(olKey)) return
+      if (contentRef.current && contentRef.current.length > 0) return
+      setOlDownloadTick((n) => n + 1)
+    })
+  }, [helpsRef.book])
+
+  useEffect(() => {
+    if (!allowChapterHydrate) return
+    if (!helpsRef.book || !helpsRef.chapter || !loaderRegistry) {
       return
     }
 
     // OBS is not a biblical book — it has no Hebrew/Greek original language
-    if (currentRef.book.toLowerCase() === 'obs') {
+    if (helpsRef.book.toLowerCase() === 'obs') {
       setLoading(false)
       setOriginalContent(null)
       return
@@ -79,91 +133,44 @@ export function useOriginalLanguageContent({
       try {
         setLoading(true)
         setError(null)
-        setOriginalContent(null)
 
-        const bookCode = currentRef.book?.toUpperCase() || ''
-
-        const ntBooks = [
-          'MAT',
-          'MRK',
-          'LUK',
-          'JHN',
-          'ACT',
-          'ROM',
-          '1CO',
-          '2CO',
-          'GAL',
-          'EPH',
-          'PHP',
-          'COL',
-          '1TH',
-          '2TH',
-          '1TI',
-          '2TI',
-          'TIT',
-          'PHM',
-          'HEB',
-          'JAS',
-          '1PE',
-          '2PE',
-          '1JN',
-          '2JN',
-          '3JN',
-          'JUD',
-          'REV',
-        ]
-        const isNT = ntBooks.includes(bookCode)
-
-        const resources: OriginalLanguageResource[] = []
-
-        // Always try the painted OL key. Catalog metadata is a hint only —
-        // UHB is often in the workspace/loader cache before catalog get() lands.
-        if (isNT) {
-          const greekResourceKey = 'unfoldingWord/el-x-koine/ugnt'
-          resources.push({
-            resourceKey: greekResourceKey,
-            language: 'el-x-koine',
-            bookCode,
-          })
-        } else {
-          const hebrewResourceKey = 'unfoldingWord/hbo/uhb'
-          resources.push({
-            resourceKey: hebrewResourceKey,
-            language: 'hbo',
-            bookCode,
-          })
-        }
-
-        if (cancelled) return
-        setOriginalLanguageResources(resources)
-
-        if (resources.length === 0) {
+        const bookCode = helpsRef.book?.toUpperCase() || ''
+        const resource = resolveOriginalLanguageKey(bookCode)
+        if (!resource) {
           setLoading(false)
           return
         }
 
-        const resource = resources[0]
-        const chapter = currentRef.chapter
+        if (cancelled) return
+        setOriginalLanguageResources([resource])
 
         const loader = loaderRegistry.getLoader('scripture') as ScriptureLoader | undefined
         if (!loader || typeof loader.loadViewModel !== 'function') {
           throw new Error('Scripture loader with loadViewModel not found')
         }
 
-        const viewModel = await loader.loadViewModel(resource.resourceKey, currentRef.book)
+        const optimized = await loadOriginalLanguageChapters({
+          loader,
+          olKey: resource.resourceKey,
+          bookId: helpsRef.book,
+          startChapter,
+          endChapter,
+          cache: cacheAdapter,
+          allowDcs: true,
+        })
         if (cancelled) return
 
-        const optimizedChapters = viewModelToOptimizedChapters(viewModel)
-        const filteredChapters = optimizedChapters.filter((ch) => ch.number === chapter)
+        // `[]` = attempted empty (distinct from first-paint `null`)
+        loadedSpanRef.current = nextSpan
+        setLoadedSpan(nextSpan)
+        setOriginalContent(optimized)
 
-        if (filteredChapters.length === 0) {
-          // `[]` = attempted empty (distinct from first-paint `null`)
-          setOriginalContent([])
-          setLoading(false)
-          return
+        if (optimized.length === 0) {
+          if (enqueuedOlKeyRef.current !== resource.resourceKey) {
+            enqueuedOlKeyRef.current = resource.resourceKey
+            enqueueOriginalLanguageDownload(resource.resourceKey)
+          }
         }
-
-        setOriginalContent(filteredChapters)
       } catch (err) {
         if (cancelled) return
         console.error('❌ [useOriginalLanguageContent] Failed to load original language content:', err)
@@ -171,7 +178,15 @@ export function useOriginalLanguageContent({
           message: err instanceof Error ? err.message : String(err),
           stack: err instanceof Error ? err.stack : undefined,
         })
+        loadedSpanRef.current = nextSpan
+        setLoadedSpan(nextSpan)
+        setOriginalContent([])
         setError(err instanceof Error ? err.message : 'Failed to load original language content')
+        const olKey = resolveOriginalLanguageKey(helpsRef.book || '')?.resourceKey
+        if (olKey && enqueuedOlKeyRef.current !== olKey) {
+          enqueuedOlKeyRef.current = olKey
+          enqueueOriginalLanguageDownload(olKey)
+        }
       } finally {
         if (!cancelled) {
           setLoading(false)
@@ -179,17 +194,36 @@ export function useOriginalLanguageContent({
       }
     }
 
-    loadOriginalContent()
+    void loadOriginalContent()
 
     return () => {
       cancelled = true
     }
-  }, [currentRef.book, currentRef.chapter, loaderRegistry, resourceKey, retryTick])
+  }, [
+    allowChapterHydrate,
+    helpsRef.book,
+    helpsRef.chapter,
+    helpsRef.endChapter,
+    startChapter,
+    endChapter,
+    nextSpan,
+    loaderRegistry,
+    cacheAdapter,
+    retryTick,
+  ])
+
+  const spanMatches = loadedSpan === nextSpan
+  const spanContent = spanMatches ? originalContent : null
 
   return {
     originalLanguageResources,
-    originalContent,
-    loading,
-    error,
+    originalContent: spanContent,
+    loading: loading || !spanMatches,
+    error: spanMatches ? error : null,
+    olBlocked: isOriginalLanguageQuoteBlocked({
+      loadingOriginal: loading || !spanMatches,
+      originalContent: spanContent,
+      originalError: spanMatches ? error : null,
+    }),
   }
 }

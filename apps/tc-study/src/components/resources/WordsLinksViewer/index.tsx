@@ -4,7 +4,8 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useCatalogManager, useCurrentReference, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { useCatalogManager, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { usePinnedHelpsReference } from '../../../features/nav/usePinnedHelpsReference'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import { useWizardStore } from '../../../lib/stores/wizardStore'
 import { RESOURCE_TYPE_IDS } from '../../../resourceTypes/resourceTypeIds'
@@ -12,6 +13,12 @@ import type { ObsQuoteFilter, VerseFilterState } from '../../../features/helps/h
 import { generateSemanticIdsForQuoteTokens, parseTWLink } from '../../../features/helps/quoteTokens'
 import { buildQuoteClickPayload } from '../../../features/helps/buildQuoteClickPayload'
 import { resolveHelpsViewerDirection } from '../../../features/read/paneDirection'
+import {
+  resolveHelpsTargetScriptureKey,
+  useHelpsTargetScriptureKey,
+} from '../../../features/helps/helpsTargetScripture'
+import { getLastScriptureTokensSourceResourceId } from '../../../features/helps/scriptureTokensStore'
+import { articlePathFromTwLink } from '../../../features/wordsLinks/wordsLinksPreparer'
 import { getLanguageDirection } from '../../../utils/languageDirection'
 import { checkDependenciesReady } from '../../../utils/resourceDependencies'
 import { HelpsFilterBanners } from '../shared/HelpsFilterBanners'
@@ -34,7 +41,7 @@ export function WordsLinksViewer({
   wordsLinksContent,
   onEntryLinkClick,
 }: WordsLinksViewerProps) {
-  const currentRef = useCurrentReference()
+  const currentRef = usePinnedHelpsReference()
   const navigationMode = useNavigationMode()
   const catalogManager = useCatalogManager()
   const resourceTypeRegistry = useResourceTypeRegistry()
@@ -97,13 +104,7 @@ export function WordsLinksViewer({
     if (!content?.links) return []
     return content.links.map((link) => ({
       ...link,
-      articlePath:
-        link.articlePath ||
-        (() => {
-          if (!link.twLink) return ''
-          const match = link.twLink.match(/rc:\/\/\*\/tw\/dict\/(.+)$/)
-          return match ? match[1] : ''
-        })(),
+      articlePath: link.articlePath || articlePathFromTwLink(link.twLink),
     }))
   }, [content])
 
@@ -139,8 +140,18 @@ export function WordsLinksViewer({
     setSelectedLink,
   })
 
-  const { sourceResourceId: targetSourceId, resourceMetadata: targetScriptureMetadata } =
+  const { sourceResourceId: broadcastTargetId, resourceMetadata: targetScriptureMetadata } =
     useScriptureTokens({ resourceId })
+  const sharedTargetKey = useHelpsTargetScriptureKey()
+  const targetSourceId = useMemo(
+    () =>
+      resolveHelpsTargetScriptureKey({
+        sharedKey: sharedTargetKey,
+        broadcastKey: broadcastTargetId,
+        lastKnownKey: getLastScriptureTokensSourceResourceId(),
+      }),
+    [sharedTargetKey, broadcastTargetId]
+  )
   const helpsLanguageDirection = resolveHelpsViewerDirection({
     resourceDirection,
     targetScriptureDirection: targetScriptureMetadata?.languageDirection,
@@ -314,7 +325,7 @@ export function WordsLinksViewer({
     ) : null
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full min-h-0 overflow-hidden flex flex-col">
       <WordsLinksList
         resource={resource}
         effectiveResource={effectiveResource}

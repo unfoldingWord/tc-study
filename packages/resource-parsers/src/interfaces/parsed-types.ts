@@ -32,6 +32,7 @@ export interface ProcessedNotes {
     bookCode: string;
     bookName: string;
     processingDate: string;
+    parserVersion?: string;
     totalNotes: number;
     chaptersWithNotes: number[];
     statistics: {

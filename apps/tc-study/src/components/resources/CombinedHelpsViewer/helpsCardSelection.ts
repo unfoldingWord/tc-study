@@ -6,6 +6,7 @@
 import {
   filterDisplayLinks,
   filterDisplayNotes,
+  type HelpsFilterAnchor,
   type TokenFilterLike,
 } from '../../../features/helps/helpsDisplayFilters'
 import type { HelpsKindFilter } from './types'
@@ -26,6 +27,19 @@ export function isHelpsCardSelected(
   id: string
 ): boolean {
   return selection?.kind === kind && selection.id === id
+}
+
+/** Card that applied the active book-wide TWL-article / support-ref filter. */
+export function isHelpsFilterSourceCard(
+  filters: {
+    supportRefFilter?: { anchor?: HelpsFilterAnchor } | null
+    twlArticleFilter?: { anchor?: HelpsFilterAnchor } | null
+  },
+  kind: HelpsCardKind,
+  id: string
+): boolean {
+  const anchor = filters.supportRefFilter?.anchor ?? filters.twlArticleFilter?.anchor
+  return anchor?.kind === kind && anchor.id === id
 }
 
 export function firstVisibleHelpsSelection(rows: MergedRow[]): HelpsCardSelection {

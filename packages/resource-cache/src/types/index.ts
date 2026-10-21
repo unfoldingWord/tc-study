@@ -65,6 +65,11 @@ export interface CacheStorageAdapter {
   getMany?(keys: string[]): Promise<Map<string, CacheEntry>>
   setMany?(entries: Array<{ key: string; entry: CacheEntry }>): Promise<void>
   deleteMany?(keys: string[]): Promise<void>
+  /**
+   * Return raw rows whose keys fall in [prefix, prefix + '\uffff'].
+   * Does not reassemble chunked manifests — caller decides.
+   */
+  getByPrefix?(prefix: string): Promise<Array<{ key: string; entry: CacheEntry }>>
   /** Size in bytes (sync getter or async method) */
   size?(): number | Promise<number>
   /** Entry count (sync getter or async method) */

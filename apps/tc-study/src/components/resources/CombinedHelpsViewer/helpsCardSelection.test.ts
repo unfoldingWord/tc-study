@@ -3,6 +3,7 @@ import {
   firstVisibleHelpsSelection,
   focusFirstMatchingHelpsCard,
   isHelpsCardSelected,
+  isHelpsFilterSourceCard,
   type HelpsCardSelection,
 } from './helpsCardSelection'
 import type { LinkWithAlignments, MergedRow, NoteWithAlignments } from './useCombinedHelpsMerge'
@@ -63,6 +64,31 @@ describe('exclusive CombinedHelps card selection', () => {
     })
     expect(focused).toEqual({ kind: 'tn', id: tn.id })
     expect(isHelpsCardSelected(focused, 'twl', twl.id)).toBe(false)
+  })
+
+  test('filter source is the anchor card only, independent of click selection', () => {
+    const twlArticleFilter = {
+      articlePath: 'bible/kt/elect',
+      title: 'Elect',
+      timestamp: 1,
+      anchor: { kind: 'twl' as const, id: twl.id, ref: '2:9' },
+    }
+    expect(isHelpsFilterSourceCard({ twlArticleFilter }, 'twl', twl.id)).toBe(true)
+    expect(isHelpsFilterSourceCard({ twlArticleFilter }, 'twl', 'twl-other')).toBe(false)
+    expect(isHelpsFilterSourceCard({ twlArticleFilter }, 'tn', twl.id)).toBe(false)
+
+    const supportRefFilter = {
+      supportReference: 'rc://*/ta/man/translate/figs-doublet',
+      title: 'Doublet',
+      timestamp: 1,
+      anchor: { kind: 'tn' as const, id: tn.id, ref: '2:9' },
+    }
+    expect(isHelpsFilterSourceCard({ supportRefFilter }, 'tn', tn.id)).toBe(true)
+    expect(isHelpsFilterSourceCard({ supportRefFilter: null, twlArticleFilter: null }, 'tn', tn.id)).toBe(
+      false
+    )
+    const { anchor: _anchor, ...noAnchor } = supportRefFilter
+    expect(isHelpsFilterSourceCard({ supportRefFilter: noAnchor }, 'tn', tn.id)).toBe(false)
   })
 
   test('first visible row is the only focused card', () => {
