@@ -146,13 +146,18 @@ sequence of them and checks every row.
 
 ## 6. The server
 
+Decided 2026-10-20: GitHub Actions runs the job and R2, in unfoldingWord's Cloudflare account, holds the files. The
+design is the spec `docs/superpowers/specs/2026-10-20-language-packs-online-design.md` in the translation-helps-mcp
+repository; the command the job runs is `publish-language` (`packages/resource-pipeline/cli/publish-language.ts`),
+after `scripts/build-pack-tools.sh` has installed and built what it reads compiled.
+
 - A scheduled job (not a request handler: preparing a language downloads and builds for minutes) runs
-  `prepareLanguage` for each language, and per book, when the Door43 release stamps of its resources change.
+  `publish-language` for each language, and per book, when the Door43 release stamps of its resources change.
 - It keeps the latest pack of each one, compressed as much as possible (the zip format only offers DEFLATE; level 9),
   with its manifest so the page can list sizes, versions and dates without opening the zip.
 - A page of the official site lists languages and books and downloads them.
-- To decide: where it runs and where the files live (for example a scheduled CI job writing to object storage), and
-  whether the packs are named by release so old links keep working.
+- Packs are uploaded under names that include their sha256, so they never change and old links keep working; the
+  catalog entry is written last.
 
 ## 7. What a pack still cannot fix in tc-study
 
