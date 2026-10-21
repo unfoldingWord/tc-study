@@ -22,6 +22,8 @@ import {
   type ScriptureEdge,
 } from '../../../../features/nav/scriptureEdgeNavigate'
 
+export { resolveScriptureScrollParent } from '../utils/scrollParent'
+
 export interface UseScriptureEdgeNavigateOptions {
   /** Element that actually scrolls (overflow parent), or null until mounted. */
   scrollParent: HTMLElement | null
@@ -37,24 +39,6 @@ export interface UseScriptureEdgeNavigateOptions {
   thresholdPx?: number
   maxPullPx?: number
   minDwellMs?: number
-}
-
-function findOverflowParent(el: HTMLElement | null): HTMLElement | null {
-  let parent = el?.parentElement ?? null
-  while (parent) {
-    const overflowY = getComputedStyle(parent).overflowY
-    if (overflowY === 'auto' || overflowY === 'scroll') return parent
-    parent = parent.parentElement
-  }
-  return null
-}
-
-/** Prefer the element itself when it is the scrollport (panel-owned overflow). */
-export function resolveScriptureScrollParent(contentRoot: HTMLElement | null): HTMLElement | null {
-  if (!contentRoot) return null
-  const selfOverflow = getComputedStyle(contentRoot).overflowY
-  if (selfOverflow === 'auto' || selfOverflow === 'scroll') return contentRoot
-  return findOverflowParent(contentRoot)
 }
 
 export function useScriptureEdgeNavigate({

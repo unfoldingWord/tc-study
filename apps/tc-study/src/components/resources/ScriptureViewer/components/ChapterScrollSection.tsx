@@ -5,7 +5,6 @@ import { getCachedChapterLayoutHeight } from '../utils/chapterLayoutCache'
 interface ChapterScrollSectionProps {
   chapter: number
   kind?: ChapterSlotKind
-  toChapter?: number
   register?: (chapter: number, el: HTMLElement | null) => void
   children: ReactNode
   className?: string
@@ -16,7 +15,6 @@ interface ChapterScrollSectionProps {
 export function ChapterScrollSection({
   chapter,
   kind = 'rendered',
-  toChapter,
   register,
   children,
   className = 'space-y-0.5',
@@ -37,8 +35,6 @@ export function ChapterScrollSection({
       ref={(el) => register?.(chapter, el)}
       data-chapter-section={chapter}
       data-chapter-kind={kind}
-      data-chapter-spacer-from={kind === 'spacer' ? chapter : undefined}
-      data-chapter-spacer-to={kind === 'spacer' ? (toChapter ?? chapter) : undefined}
       data-scripture-layout={layout}
       className={className}
       style={style}

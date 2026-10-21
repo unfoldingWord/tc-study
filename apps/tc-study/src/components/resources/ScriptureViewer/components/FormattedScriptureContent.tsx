@@ -16,8 +16,9 @@ import { buildLightChapter } from '../../../../features/scripture/scripturePrepa
 import type { OriginalLanguageToken } from '../types'
 import { getChapterLayoutBlocks, getChapterParagraphs } from '../utils/chapterLayoutCache'
 import { chaptersForRef, includeVerseForRef } from '../utils/scriptureNavRange'
+import { ChapterHeading } from './ChapterHeading'
+import { ChapterParagraphPane } from './ChapterParagraphPane'
 import { ChapterScrollSection } from './ChapterScrollSection'
-import { ChapterSlotChrome } from './ChapterSlotChrome'
 import { FormattedBlockRenderer } from './FormattedBlockRenderer'
 import { PreparedLightChapterPane } from './PreparedLightChapterPane'
 
@@ -73,15 +74,7 @@ const FormattedChapterPane = memo(function FormattedChapterPane({
       layout="formatted"
       book={currentBook}
     >
-      <h2
-        className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
-        onClick={(e) => {
-          e.stopPropagation()
-          onChapterClick?.(chapterNum)
-        }}
-      >
-        {chapterNum}
-      </h2>
+      <ChapterHeading chapter={chapterNum} onChapterClick={onChapterClick} />
       {blocks.map((block, idx) => (
         <FormattedBlockRenderer
           key={`${chapterNum}-${block.marker}-${idx}`}
@@ -128,6 +121,38 @@ export function FormattedScriptureContent({
     }
     return getChapterParagraphs(viewModel, chapter)
   }
+  /** Light text (or plain paragraphs) while a chapter has no formatted blocks to paint. */
+  const lightOrParagraphPane = (
+    chapter: number,
+    slotKind: 'paragraph' | 'rendered',
+    lightKey: string,
+    paragraphKey: string
+  ) => {
+    const peeked = resourceKey ? peekPreparedChapter(resourceKey, currentRef.book, chapter) : null
+    const light = peeked?.light?.blocks?.length ? peeked.light : buildLightChapter(viewModel, chapter)
+    if (light.blocks.length > 0) {
+      return (
+        <PreparedLightChapterPane
+          key={lightKey}
+          chapterNum={chapter}
+          light={light}
+          registerChapter={registerChapter}
+          onChapterClick={onChapterClick}
+          onVerseClick={onVerseClick}
+          slotKind={slotKind}
+        />
+      )
+    }
+    return (
+      <ChapterParagraphPane
+        key={paragraphKey}
+        chapter={chapter}
+        paragraphs={paragraphsForChapter(chapter)}
+        register={registerChapter}
+        onChapterClick={onChapterClick}
+      />
+    )
+  }
   const blocksByChapter = useMemo(() => {
     if (slotsActive) return null
     const all = buildUsjLayoutBlocks(viewModel.usj, viewModel)
@@ -150,75 +175,21 @@ export function FormattedScriptureContent({
       {slotsActive && slots
         ? slots.map((slot) => {
             if (slot.kind !== 'rendered') {
-              if (slot.kind === 'paragraph' || slot.kind === 'placeholder') {
-                const peeked = resourceKey
-                  ? peekPreparedChapter(resourceKey, currentRef.book, slot.chapter)
-                  : null
-                const light =
-                  peeked?.light?.blocks?.length
-                    ? peeked.light
-                    : buildLightChapter(viewModel, slot.chapter)
-                if (light.blocks.length > 0) {
-                  return (
-                    <PreparedLightChapterPane
-                      key={`prepared-light-${slot.chapter}`}
-                      chapterNum={slot.chapter}
-                      light={light}
-                      registerChapter={registerChapter}
-                      onChapterClick={onChapterClick}
-                      onVerseClick={onVerseClick}
-                      slotKind="paragraph"
-                    />
-                  )
-                }
-              }
-              return (
-                <ChapterSlotChrome
-                  key={`${slot.kind}-${slot.chapter}-${slot.toChapter ?? slot.chapter}`}
-                  slot={slot}
-                  book={currentRef.book}
-                  paragraphs={
-                    slot.kind === 'paragraph'
-                      ? paragraphsForChapter(slot.chapter)
-                      : undefined
-                  }
-                  register={registerChapter}
-                  onChapterClick={onChapterClick}
-                />
+              return lightOrParagraphPane(
+                slot.chapter,
+                'paragraph',
+                `prepared-light-${slot.chapter}`,
+                `paragraph-${slot.chapter}-${slot.chapter}`
               )
             }
             const blocks = getChapterLayoutBlocks(viewModel, slot.chapter)
             if (blocks.length === 0) {
               // Stack chapter not yet in the paint viewModel — keep light text.
-              const peeked = resourceKey
-                ? peekPreparedChapter(resourceKey, currentRef.book, slot.chapter)
-                : null
-              const light =
-                peeked?.light?.blocks?.length
-                  ? peeked.light
-                  : buildLightChapter(viewModel, slot.chapter)
-              if (light.blocks.length > 0) {
-                return (
-                  <PreparedLightChapterPane
-                    key={`prepared-light-pending-${slot.chapter}`}
-                    chapterNum={slot.chapter}
-                    light={light}
-                    registerChapter={registerChapter}
-                    onChapterClick={onChapterClick}
-                    onVerseClick={onVerseClick}
-                    slotKind="rendered"
-                  />
-                )
-              }
-              return (
-                <ChapterSlotChrome
-                  key={`pending-formatted-${slot.chapter}`}
-                  slot={{ ...slot, kind: 'paragraph' }}
-                  book={currentRef.book}
-                  paragraphs={paragraphsForChapter(slot.chapter)}
-                  register={registerChapter}
-                  onChapterClick={onChapterClick}
-                />
+              return lightOrParagraphPane(
+                slot.chapter,
+                'rendered',
+                `prepared-light-pending-${slot.chapter}`,
+                `pending-formatted-${slot.chapter}`
               )
             }
             return (
@@ -243,15 +214,7 @@ export function FormattedScriptureContent({
             if (blocks.length === 0) return null
             return (
               <div key={chapterNum} className="space-y-0.5">
-                <h2
-                  className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onChapterClick?.(chapterNum)
-                  }}
-                >
-                  {chapterNum}
-                </h2>
+                <ChapterHeading chapter={chapterNum} onChapterClick={onChapterClick} />
                 {blocks.map((block, idx) => (
                   <FormattedBlockRenderer
                     key={`${chapterNum}-${block.marker}-${idx}`}

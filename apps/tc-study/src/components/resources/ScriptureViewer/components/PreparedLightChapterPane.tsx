@@ -12,6 +12,7 @@ import {
   blockClassForMarker,
   SCRIPTURE_VERSE_NUMBER_CLASS,
 } from '../utils/paraStyles'
+import { ChapterHeading } from './ChapterHeading'
 import { ChapterScrollSection } from './ChapterScrollSection'
 
 interface PreparedLightChapterPaneProps {
@@ -111,15 +112,7 @@ export const PreparedLightChapterPane = memo(function PreparedLightChapterPane({
       register={registerChapter}
       layout="paragraph"
     >
-      <h2
-        className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
-        onClick={(e) => {
-          e.stopPropagation()
-          onChapterClick?.(chapterNum)
-        }}
-      >
-        {chapterNum}
-      </h2>
+      <ChapterHeading chapter={chapterNum} onChapterClick={onChapterClick} />
       <div className="space-y-0.5" data-scripture-layout="prepared-light">
         {light.blocks.map((block, idx) => (
           <BlockView

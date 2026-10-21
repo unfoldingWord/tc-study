@@ -34,7 +34,10 @@ describe('chapter edge-reveal + warm wiring', () => {
     expect(hookSrc).toContain('warmChapterAtEdge')
     expect(viewerSrc).toContain('displayChapters={chapterScroll.displayChapters}')
     expect(viewerSrc).toContain('chapterSlots={chapterScroll.chapterSlots}')
-    expect(hookSrc).toContain('CHAPTER_EDGE_SWAP_MODE')
+    // Edge-reveal is the only chapter mode the hook implements — no stitch path.
+    expect(hookSrc).not.toContain('resetChapterSlots')
+    expect(hookSrc).not.toContain('shouldResetWindowOnNavChange')
+    expect(hookSrc).not.toContain('approachingNeighborChapter')
     expect(hookSrc).toContain('revealChapterInWindow')
     expect(hookSrc).toContain('revealChapterAtEdge')
     expect(hookSrc).toContain('ensurePreparedFullChapter')
