@@ -294,7 +294,7 @@ export function useAlignedTokens<TLink extends LinkQuotesInput>({
       if (msg.typeId !== RESOURCE_TYPE_IDS.SCRIPTURE) return
       if (msg.resourceKey !== targetKey) return
       if (msg.bookId.toLowerCase() !== bookCode) return
-      if (msg.tier !== 'full' && msg.tier !== 'both') return
+      if (msg.tier !== 'full') return
       if (msg.unit < start || msg.unit > end) return
       setPreparedTick((n) => n + 1)
     })

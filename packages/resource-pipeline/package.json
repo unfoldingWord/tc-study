@@ -1,0 +1,45 @@
+{
+  "name": "@bt-synergy/resource-pipeline",
+  "version": "0.1.0",
+  "description": "tc-study's resource pipeline without a screen: discover, download, prepare, quote, align and title the resources of a language, in a browser worker or in Node",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "type-check": "tsc --noEmit",
+    "prepare-language": "bun cli/prepare-language.ts"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@bt-synergy/catalog-manager": "workspace:*",
+    "@bt-synergy/door43-api": "workspace:*",
+    "@bt-synergy/resource-cache": "workspace:*",
+    "@bt-synergy/resource-catalog": "workspace:*",
+    "@bt-synergy/resource-parsers": "workspace:*",
+    "@bt-synergy/resource-types": "workspace:*",
+    "@bt-synergy/scripture-loader": "workspace:*",
+    "@bt-synergy/translation-academy-loader": "workspace:*",
+    "@bt-synergy/translation-notes-loader": "workspace:*",
+    "@bt-synergy/translation-questions-loader": "workspace:*",
+    "@bt-synergy/translation-words-links-loader": "workspace:*",
+    "@bt-synergy/translation-words-loader": "workspace:*",
+    "@bt-synergy/usj-processor": "workspace:*",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.2",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@bt-synergy/cache-adapter-indexeddb": "workspace:*",
+    "@bt-synergy/catalog-adapter-indexeddb": "workspace:*",
+    "@bt-synergy/language-pack": "workspace:*",
+    "@types/node": "^20.10.0",
+    "fake-indexeddb": "6.0.0",
+    "typescript": "~5.9.3"
+  }
+}

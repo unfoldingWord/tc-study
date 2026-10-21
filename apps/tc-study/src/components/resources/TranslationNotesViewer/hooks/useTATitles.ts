@@ -9,21 +9,15 @@ import { useCallback } from 'react'
 import type { TranslationNote } from '@bt-synergy/resource-parsers'
 import { useCatalogManager } from '../../../../contexts'
 import { resourceContentStamp } from '../../../../features/helps/resourceContentStamp'
-import { getCachedTocTitleIndex, lookupTocTitle } from '../../../../features/helps/tocTitleIndex'
+import { getCachedTocTitleIndex } from '../../../../features/helps/tocTitleIndex'
 import { useHelpsTextCache } from '../../../../features/helps/useHelpsTextCache'
-
-function parseTAReference(supportRef: string): string | null {
-  const match = supportRef.match(/rc:\/\/\*\/ta\/man\/(.+)/)
-  return match ? match[1] : null
-}
-
-function resolveTaResourceKey(tnResourceKey: string): string | null {
-  const parts = tnResourceKey.split('/')
-  if (parts.length < 2) return null
-  const [owner, langPart] = parts
-  const language = langPart.split('_')[0]
-  return `${owner}/${language}/ta`
-}
+import {
+  parseTAReference,
+  resolveTaTitle,
+  taResourceKeyFor as resolveTaResourceKey,
+  taTitlePlaceholder,
+  TA_TITLE_FALLBACK,
+} from '@bt-synergy/resource-pipeline/helps/articleTitles'
 
 export function useTATitles(resourceKey: string) {
   const catalogManager = useCatalogManager()
@@ -49,25 +43,11 @@ export function useTATitles(resourceKey: string) {
           entryId: articlePath,
           resolve: async () => {
             const ingredients = taMetadata?.contentMetadata?.ingredients
-            const index = getCachedTocTitleIndex(taResourceKey, stamp, ingredients)
-            if (!index) {
-              return {
-                value: articlePath.split('/').pop() || 'Learn more',
-                confident: false,
-              }
-            }
-            const title = lookupTocTitle(index, articlePath)
-            if (!title) {
-              return {
-                value: articlePath.split('/').pop() || 'Learn more',
-                confident: false,
-              }
-            }
-            return { value: title, confident: true }
+            return resolveTaTitle(getCachedTocTitleIndex(taResourceKey, stamp, ingredients), articlePath)
           },
         })
       } catch {
-        return articlePath.split('/').pop() || 'Learn more'
+        return taTitlePlaceholder(articlePath)
       }
     },
     [resourceKey, catalogManager, fetchText]
@@ -75,10 +55,10 @@ export function useTATitles(resourceKey: string) {
 
   const getTATitle = useCallback(
     (note: TranslationNote): string => {
-      if (!note.supportReference) return 'Learn more'
+      if (!note.supportReference) return TA_TITLE_FALLBACK
       const articlePath = parseTAReference(note.supportReference)
-      if (!articlePath) return 'Learn more'
-      return getCached(articlePath) || articlePath.split('/').pop() || 'Learn more'
+      if (!articlePath) return TA_TITLE_FALLBACK
+      return getCached(articlePath) || taTitlePlaceholder(articlePath)
     },
     [getCached]
   )

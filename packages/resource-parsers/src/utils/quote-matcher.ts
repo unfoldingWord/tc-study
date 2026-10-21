@@ -294,85 +294,151 @@ export class QuoteMatcher {
     reference: QuoteReference
   ): QuoteMatch | null {
     const normalizedQuote = this.normalizeText(quote);
-    let foundOccurrences = 0;
-    
+    // Every occurrence found by its consonants, in reading order, from where the search starts.
+    const found: QuoteMatch[] = [];
+
     // Search through verses starting from startVerseIndex
     for (let i = startVerseIndex; i < verses.length; i++) {
       const verse = verses[i];
-      
+
       if (!verse.tokens || verse.tokens.length === 0) {
         continue;
       }
-      
-      // Create searchable text from tokens
-      const wordTokens = verse.tokens.filter(token => token.type === 'word');
-      const verseText = wordTokens
-        .map(token => this.normalizeText(token.text))
-        .join(' ');
-      
+
       // Find all occurrences of the quote in this verse
-      const matches = this.findQuoteOccurrencesInText(verseText, normalizedQuote);
-      
+      const matches = this.findQuoteOccurrencesInVerse(verse, normalizedQuote);
+
       for (const match of matches) {
         // Skip matches that are before our start position (for sequential quote matching)
         if (i === startVerseIndex && match.start < startPosition) {
           continue;
         }
-        
-        foundOccurrences++;
-        
-        if (foundOccurrences === occurrence) {
-          // Found the target occurrence, extract tokens
-          const tokens = this.extractTokensForMatch(verse, match.start, match.end);
-          
-          return {
-            quote,
-            occurrence,
-            tokens,
-            verseRef: `${reference.book} ${reference.startChapter}:${verse.number}`, // Construct reference from book and verse info
-            startPosition: match.start,
-            endPosition: match.end
-          };
-        }
+        found.push({
+          quote,
+          occurrence,
+          tokens: this.extractTokensForMatch(verse, match.indices),
+          verseRef: `${reference.book} ${reference.startChapter}:${verse.number}`, // Construct reference from book and verse info
+          startPosition: match.start,
+          endPosition: match.end
+        });
       }
     }
-    
-    return null;
+
+    // Found by consonants, counted as written (but not by case, as occurrences are): when some occurrences are the
+    // quote with its accents, only those count. Jonah 1:3 says «מִלִּפְנֵי יְהוָה» twice, with atnach and with silluq,
+    // and es-419 has a note for each: the one on the second, occurrence 1, took the first. A quote without its accents
+    // still counts every occurrence.
+    const asWritten = (text: string) => text.normalize('NFC').toLowerCase().replace(/[\p{P}\u2060]/gu, '').replace(/\s+/g, ' ').trim();
+    const exact = found.filter(m =>
+      asWritten(m.tokens.map(t => t.text).join(' ')) === asWritten(quote) ||
+      (m.tokens.some(t => t.qere) && asWritten(m.tokens.map(t => t.qere ?? t.text).join(' ')) === asWritten(quote)));
+    const counted = exact.length ? exact : found;
+
+    // Occurrence -1 in a TSV means every occurrence of the quote (unfoldingWord's format): counting never reached it,
+    // so the note was left without words (es-419 Jonah 1:3 n96t).
+    if (occurrence === -1) {
+      if (!counted.length) return null;
+      const last = counted[counted.length - 1];
+      return { ...counted[0], tokens: counted.flatMap(m => m.tokens), verseRef: last.verseRef, endPosition: last.endPosition };
+    }
+    return counted[occurrence - 1] ?? null;
   }
   
   /**
-   * Find all occurrences of a quote in text
-   * Uses both exact matching and flexible token-based matching for Hebrew
+   * The verse's words as one searchable text (normalized, joined by spaces) and each word's span in it. Read with
+   * its qeres, a ketiv stands as its qere.
    */
-  private findQuoteOccurrencesInText(text: string, quote: string): {start: number, end: number}[] {
+  private searchableVerse(wordTokens: OptimizedToken[], readQere: boolean): { text: string; spans: { start: number; end: number }[] } {
+    const spans: { start: number; end: number }[] = [];
+    let text = '';
+    wordTokens.forEach((token, i) => {
+      if (i > 0) text += ' ';
+      const word = this.normalizeText(readQere && token.qere ? token.qere : token.text);
+      spans.push({ start: text.length, end: text.length + word.length });
+      text += word;
+    });
+    return { text, spans };
+  }
+
+  /**
+   * Find all occurrences of a quote in a verse, as the indices of its word tokens and positions in the verse as
+   * written. The Hebrew Bible's text is the ketiv, but quotes name the qere (Ruth 4:5 «קָנִ֔יתָה», where the text says
+   * קניתי): the verse is also searched read with its qeres, and a match there that takes in a ketiv counts too.
+   */
+  private findQuoteOccurrencesInVerse(
+    verse: OptimizedVerse,
+    quote: string
+  ): { start: number; end: number; indices: number[] }[] {
+    const wordTokens = verse.tokens.filter(token => token.type === 'word');
+    const written = this.searchableVerse(wordTokens, false);
+    const readings = [written];
+    if (wordTokens.some(token => token.qere)) readings.push(this.searchableVerse(wordTokens, true));
+
+    const collect = (find: (text: string, reading: number) => { start: number; end: number }[]) => {
+      const out: { start: number; end: number; indices: number[] }[] = [];
+      readings.forEach((reading, r) => {
+        for (const match of find(reading.text, r)) {
+          const indices = reading.spans
+            .map((span, i) => (span.end > match.start && span.start < match.end ? i : -1))
+            .filter(i => i >= 0);
+          if (r === 0) {
+            out.push({ ...match, indices });
+            continue;
+          }
+          if (!indices.length || !indices.some(i => wordTokens[i].qere)) continue;
+          const start = written.spans[indices[0]].start;
+          const end = written.spans[indices[indices.length - 1]].end;
+          if (!out.some(m => m.start === start && m.end === end)) out.push({ start, end, indices });
+        }
+      });
+      return out.sort((a, b) => a.start - b.start);
+    };
+
+    const exact = readings.map(reading => this.findExactOccurrences(reading.text, quote));
+    const whole = collect((_, r) => exact[r].whole);
+    if (whole.length) return whole;
+    const inside = collect((_, r) => exact[r].inside);
+    if (inside.length) return inside;
+
+    // If no exact matches found and this is Hebrew text, try flexible matching
+    if (quote && isHebrewText(quote)) {
+      return collect(text => this.findFlexibleHebrewMatches(text, quote));
+    }
+    return [];
+  }
+
+  /**
+   * Find all exact occurrences of a quote in text: those that are whole words, and those that start or end inside a
+   * word.
+   */
+  private findExactOccurrences(text: string, quote: string): { whole: {start: number, end: number}[]; inside: {start: number, end: number}[] } {
     const matches: {start: number, end: number}[] = [];
-    
+    const inside: {start: number, end: number}[] = [];
+
     // Safety check: empty quote would cause infinite loop
     if (!quote || quote.length === 0) {
-      return matches;
+      return { whole: matches, inside };
     }
-    
-    // Try exact substring matching first
+
+    // Try exact substring matching first. A quote is whole words: `text` is the verse's words joined by spaces, so a
+    // match starts and ends at one. A match inside a word is not counted while the quote is found as whole words:
+    // Ruth 1:16 «אֱלֹהָֽי» (my God), folded to its consonants, is inside «וֵאלֹהַיִךְ» (and your God) before it, and
+    // occurrence 1 took that word. Only when no match is whole words are the others kept, as before.
     let startIndex = 0;
     while (true) {
       const index = text.indexOf(quote, startIndex);
       if (index === -1) break;
-      
-      matches.push({
+
+      const end = index + quote.length;
+      const wholeWords = (index === 0 || text[index - 1] === ' ') && (end === text.length || text[end] === ' ');
+      (wholeWords ? matches : inside).push({
         start: index,
-        end: index + quote.length
+        end
       });
-      
+
       startIndex = index + 1;
     }
-    
-    // If no exact matches found and this is Hebrew text, try flexible matching
-    if (matches.length === 0 && isHebrewText(quote)) {
-      const flexibleMatches = this.findFlexibleHebrewMatches(text, quote);
-      matches.push(...flexibleMatches);
-    }
-    
-    return matches;
+    return { whole: matches, inside };
   }
 
   /**
@@ -429,51 +495,37 @@ export class QuoteMatcher {
   }
   
   /**
-   * Extract tokens that correspond to a text match
-   * 
-   * Maps string positions from normalized text back to original tokens.
-   * CRITICAL: Position calculation must match how verseText is constructed (join(' '))
+   * The word tokens a match takes in (indices among the verse's word tokens), each with its verse-wide occurrence.
    */
   private extractTokensForMatch(
     verse: OptimizedVerse,
-    startPos: number,
-    endPos: number
+    indices: number[]
   ): OptimizedToken[] {
     if (!verse.tokens) return [];
-    
+
     const wordTokens = verse.tokens.filter(token => token.type === 'word');
+    const wanted = new Set(indices);
     const tokens: OptimizedToken[] = [];
-    let currentPos = 0;
-    
+
     // Track occurrence counts for each word in the verse (up to current position)
     const occurrenceCounts = new Map<string, number>();
-    
+
     for (let i = 0; i < wordTokens.length; i++) {
       const token = wordTokens[i];
-      const tokenText = this.normalizeText(token.text);
-      const tokenStart = currentPos;
-      const tokenEnd = currentPos + tokenText.length;
-      
+
       // Verse-wide occurrence: case-insensitive on surface (matches USJ / identity contract)
       const wordKey = token.text.toLowerCase();
-      const currentCount = occurrenceCounts.get(wordKey) || 0;
-      const occurrence = currentCount + 1;
+      const occurrence = (occurrenceCounts.get(wordKey) || 0) + 1;
       occurrenceCounts.set(wordKey, occurrence);
-      
-      // Check if this token overlaps with the match range
-      if (tokenEnd > startPos && tokenStart < endPos) {
-        // Add token with calculated occurrence number
+
+      if (wanted.has(i)) {
         tokens.push({
           ...token,
           occurrence, // Add the verse-wide occurrence number
         });
       }
-      
-      // Move to next token position
-      // Add token length + 1 for space (except after last token)
-      currentPos = tokenEnd + (i < wordTokens.length - 1 ? 1 : 0);
     }
-    
+
     return tokens;
   }
   

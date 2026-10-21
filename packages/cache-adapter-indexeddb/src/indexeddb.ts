@@ -150,6 +150,41 @@ export class IndexedDBCacheAdapter {
     })
   }
 
+  /**
+   * Write rows exactly as given, chapter chunks and manifests included, without splitting anything again. For rows
+   * that were read with `getByPrefix` somewhere else, e.g. from a language pack.
+   */
+  async putRawMany(rows: Array<{ key: string; entry: CacheEntry }>): Promise<void> {
+    if (rows.length === 0) return
+    const db = await this.initDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.storeName, 'readwrite')
+      const store = tx.objectStore(this.storeName)
+      for (const row of rows) store.put({ key: row.key, entry: row.entry })
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  /** Which of these raw keys the store has, without reading their entries. */
+  async hasRawKeys(keys: string[]): Promise<Set<string>> {
+    const found = new Set<string>()
+    if (keys.length === 0) return found
+    const db = await this.initDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.storeName, 'readonly')
+      const store = tx.objectStore(this.storeName)
+      for (const key of keys) {
+        const request = store.getKey(key)
+        request.onsuccess = () => {
+          if (request.result !== undefined) found.add(key)
+        }
+      }
+      tx.oncomplete = () => resolve(found)
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
   async has(key: string): Promise<boolean> {
     const entry = await this.get(key)
     return entry !== null

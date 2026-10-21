@@ -22,6 +22,13 @@ export interface OptimizedToken {
   morph?: string
   /** Occurrence number within the verse (calculated by QuoteMatcher for alignment) */
   occurrence?: number
+  /**
+   * Hebrew Bible ketiv only: the qere its footnote gives. Quotes and alignments name the qere, so a quote word
+   * matches this token by its text or by its qere.
+   */
+  qere?: string
+  /** The qere's occurrence in the verse read with every qere in place of its ketiv. */
+  qereOccurrence?: number
   /** Paragraph segment information for intra-verse formatting */
   paragraphSegment?: {
     id: number

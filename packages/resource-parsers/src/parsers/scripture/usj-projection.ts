@@ -13,6 +13,12 @@ export type BroadcastScriptureToken = OptimizedToken & {
   occurrence: number
   semanticId: string
   alignedOriginalWordIds: string[]
+  /** A ketiv's id as alignments name it, by its qere (UsjWordToken.qereSemanticId). */
+  qereSemanticId?: string
+}
+
+function qereFields(token: UsjWordToken): Pick<OptimizedToken, 'qere' | 'qereOccurrence'> {
+  return token.qere ? { qere: token.qere, qereOccurrence: token.qereOccurrence } : {}
 }
 
 function usjWordToOptimizedToken(token: UsjWordToken, index: number): OptimizedToken {
@@ -21,6 +27,7 @@ function usjWordToOptimizedToken(token: UsjWordToken, index: number): OptimizedT
     text: token.content,
     type: 'word',
     occurrence: token.occurrence,
+    ...qereFields(token),
   }
 }
 
@@ -97,6 +104,8 @@ export function extractUsjBroadcastTokens(
           occurrence: token.occurrence,
           semanticId: token.semanticId,
           alignedOriginalWordIds: token.alignedOriginalWordIds || [],
+          ...qereFields(token),
+          ...(token.qereSemanticId ? { qereSemanticId: token.qereSemanticId } : {}),
         })
       }
     }

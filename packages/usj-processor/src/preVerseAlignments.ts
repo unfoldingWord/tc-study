@@ -73,10 +73,23 @@ function preferredVerseRefKey(a: string, b: string): string {
   return a
 }
 
-function groupTargetSignature(group: {
-  targets?: Array<{ word?: string }>
+/**
+ * Identity of one alignment group: OL sources and gateway targets, each with
+ * its occurrence. Groups that share target words (`de Dios` for Θεοῦ
+ * occurrence 1 and 2) are distinct; only the same group stored twice (under
+ * case-variant verse keys) shares a signature.
+ */
+export function alignmentGroupSignature(group: {
+  sources?: Array<{ content?: string; occurrence?: number }>
+  targets?: Array<{ word?: string; occurrence?: number }>
 }): string {
-  return (group.targets ?? []).map((t) => String(t.word ?? '').toLowerCase()).join('\0')
+  const sources = (group.sources ?? []).map(
+    (s) => `${String(s.content ?? '').toLowerCase()}:${s.occurrence ?? ''}`
+  )
+  const targets = (group.targets ?? []).map(
+    (t) => `${String(t.word ?? '').toLowerCase()}:${t.occurrence ?? ''}`
+  )
+  return `${sources.join('\0')}\u0001${targets.join('\0')}`
 }
 
 /**
@@ -215,9 +228,9 @@ function collapseCaseVariantKeys(map: AlignmentMap): AlignmentMap {
     // Keep document order: if secondary's first target differs, treat as pre-verse prefix.
     const firstPrimary = primary[0]?.targets?.[0]?.word
     const firstSecondary = secondary[0]?.targets?.[0]?.word
-    const seen = new Set(primary.map(groupTargetSignature))
+    const seen = new Set(primary.map(alignmentGroupSignature))
     const uniqueSecondary = secondary.filter((g) => {
-      const sig = groupTargetSignature(g)
+      const sig = alignmentGroupSignature(g)
       if (seen.has(sig)) return false
       seen.add(sig)
       return true

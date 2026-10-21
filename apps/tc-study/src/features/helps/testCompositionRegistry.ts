@@ -11,6 +11,7 @@ import {
   PanelEntryRegistry,
   PanelModeRegistry,
   ResourceTypeRegistry,
+  type ResourceLoader,
 } from '@bt-synergy/resource-types'
 import {
   getActivePanelEntryRegistry,
@@ -27,9 +28,19 @@ import {
 export const FAKE_COMPOSITION_PERSIST_ID = '__fake-pair__'
 export const FAKE_COMPOSITION_ID = 'fake-pair'
 
-class DummyLoader {
-  // eslint-disable-next-line @typescript-eslint/no-useless-constructor
+/** Satisfies ResourceLoader for registration only; the bound registries never load content. */
+class DummyLoader implements ResourceLoader {
+  readonly resourceType = 'dummy'
   constructor(_config: unknown) {}
+  canHandle(): boolean {
+    return false
+  }
+  loadContent(): Promise<unknown> {
+    return Promise.resolve(null)
+  }
+  getMetadata(): Promise<never> {
+    return Promise.reject(new Error('DummyLoader has no metadata'))
+  }
 }
 
 function DummyViewer() {

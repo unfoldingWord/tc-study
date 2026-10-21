@@ -26,23 +26,22 @@ export function SimpleCollectionCreator({ onClose, onComplete, onAddResources, i
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
 
-  // Load resources from library
+  // Load resources from library (catalogManager is created once per CatalogProvider)
   useEffect(() => {
-    loadResources()
-  }, [])
-
-  const loadResources = async () => {
-    setLoading(true)
-    try {
-      const allResources = await catalogManager.searchResources({})
-      setResources(allResources || [])
-    } catch (error) {
-      console.error('Failed to load resources:', error)
-      setResources([])
-    } finally {
-      setLoading(false)
+    const loadResources = async () => {
+      setLoading(true)
+      try {
+        const allResources = await catalogManager.searchResources({})
+        setResources(allResources || [])
+      } catch (error) {
+        console.error('Failed to load resources:', error)
+        setResources([])
+      } finally {
+        setLoading(false)
+      }
     }
-  }
+    loadResources()
+  }, [catalogManager])
 
   const getResourceKey = (resource: ResourceMetadata) => {
     return `${resource.owner}/${resource.language}/${resource.resourceId}`

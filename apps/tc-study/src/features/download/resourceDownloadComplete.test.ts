@@ -1,4 +1,6 @@
 import { describe, expect, test } from 'bun:test'
+import { scriptureIngestSchema } from '@bt-synergy/resource-catalog'
+import { USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
 import { CACHE_METADATA_KEYS } from '../../lib/services/ResourceCompletenessChecker'
 import {
   isDownloadCompleteMetadata,
@@ -43,7 +45,7 @@ describe('resourceDownloadComplete', () => {
           metadata: {
             downloadComplete: true,
             releaseStamp: stamp,
-            ingestSchema: 'usj:2.1.0-usj',
+            ingestSchema: scriptureIngestSchema(USJ_PROCESSING_VERSION),
           },
         },
       ],

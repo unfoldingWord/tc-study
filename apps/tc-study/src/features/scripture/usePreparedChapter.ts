@@ -131,7 +131,7 @@ export function usePreparedChapterWindow(args: {
   const chaptersKey = chapters.join(',')
 
   useEffect(() => {
-    if (!enabled || !resourceKey || !bookId || chapters.length === 0) return
+    if (!enabled || !resourceKey || !bookId || chaptersKey === '') return
     let cancelled = false
     const chapterList = chaptersKey
       .split(',')
@@ -183,7 +183,7 @@ export function usePreparedBookLightPreload(args: {
   const chaptersKey = chapters.join(',')
 
   useEffect(() => {
-    if (!enabled || !resourceKey || !bookId || chapters.length === 0) return
+    if (!enabled || !resourceKey || !bookId || chaptersKey === '') return
     let cancelled = false
     const chapterList = chaptersKey
       .split(',')

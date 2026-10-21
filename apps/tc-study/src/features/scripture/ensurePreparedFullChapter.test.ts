@@ -102,7 +102,10 @@ describe('ensurePreparedFullChapter', () => {
     expect(hookSrc).toContain('ensurePreparedFullChapter')
     expect(hookSrc).toContain('healPreparedFullChapter')
     expect(hookSrc).toContain('MAX_FULL_ENSURE_ATTEMPTS')
-    expect(hookSrc).toContain('Never flip to "rendered" without full tokens')
+    // A slot may flip to rendered before full rows land: ScriptureContent paints
+    // USJ tokens (VerseBlock) meanwhile, so the reader is never stuck on light.
+    expect(hookSrc).toContain('Prefer prepared-full before flipping to rendered')
+    expect(hookSrc).toContain('ScriptureContent paints VerseBlock until full rows land')
     expect(hookSrc).toContain('tokenSourceFailed')
   })
 
@@ -116,8 +119,12 @@ describe('ensurePreparedFullChapter', () => {
     )
     expect(contentSrc).toContain('ensurePreparedFullChapter')
     expect(contentSrc).toContain("lightPaneForChapter(slot.chapter, 'paragraph')")
-    expect(contentSrc).not.toContain("lightPaneForChapter(slot.chapter, 'rendered')")
-    expect(contentSrc).toContain('usj-pending-full')
+    // Light text labelled rendered only stands in while a stacked chapter has no
+    // USJ verses yet; once it has them, the interactive VerseBlock pane paints.
+    const lightRendered = contentSrc.split("lightPaneForChapter(slot.chapter, 'rendered')")
+    expect(lightRendered.length).toBe(2)
+    expect(lightRendered[0]!.slice(-400)).toContain('if (verses.length === 0)')
+    expect(contentSrc).toContain('key={`verse-block-${slot.chapter}`}')
     expect(contentSrc).toContain('isPreparedSourceMissing')
     expect(contentSrc).toContain('TokenSourceHealButton')
   })

@@ -206,6 +206,7 @@
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-panels": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
+        "@bt-synergy/resource-pipeline": "workspace:*",
         "@bt-synergy/resource-types": "workspace:*",
         "@bt-synergy/scripture-loader": "workspace:*",
         "@bt-synergy/translation-academy-loader": "workspace:*",
@@ -357,6 +358,7 @@
       },
       "devDependencies": {
         "@types/node": "^20.10.0",
+        "fake-indexeddb": "6.0.0",
         "typescript": "^5.3.3",
       },
       "peerDependencies": {
@@ -479,6 +481,18 @@
       "devDependencies": {
         "@types/node": "^20.0.0",
         "typescript": "~5.9.2",
+      },
+    },
+    "packages/language-pack": {
+      "name": "@bt-synergy/language-pack",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/resource-catalog": "workspace:*",
+        "jszip": "^3.10.1",
+      },
+      "devDependencies": {
+        "@types/node": "^20.10.0",
+        "typescript": "^5.3.3",
       },
     },
     "packages/linked-panels": {
@@ -691,6 +705,37 @@
       "optionalPeers": [
         "marked",
       ],
+    },
+    "packages/resource-pipeline": {
+      "name": "@bt-synergy/resource-pipeline",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/catalog-manager": "workspace:*",
+        "@bt-synergy/door43-api": "workspace:*",
+        "@bt-synergy/resource-cache": "workspace:*",
+        "@bt-synergy/resource-catalog": "workspace:*",
+        "@bt-synergy/resource-parsers": "workspace:*",
+        "@bt-synergy/resource-types": "workspace:*",
+        "@bt-synergy/scripture-loader": "workspace:*",
+        "@bt-synergy/translation-academy-loader": "workspace:*",
+        "@bt-synergy/translation-notes-loader": "workspace:*",
+        "@bt-synergy/translation-questions-loader": "workspace:*",
+        "@bt-synergy/translation-words-links-loader": "workspace:*",
+        "@bt-synergy/translation-words-loader": "workspace:*",
+        "@bt-synergy/usj-processor": "workspace:*",
+        "remark-gfm": "^4.0.1",
+        "remark-parse": "^11.0.0",
+        "remark-rehype": "^11.1.2",
+        "unified": "^11.0.5",
+      },
+      "devDependencies": {
+        "@bt-synergy/cache-adapter-indexeddb": "workspace:*",
+        "@bt-synergy/catalog-adapter-indexeddb": "workspace:*",
+        "@bt-synergy/language-pack": "workspace:*",
+        "@types/node": "^20.10.0",
+        "fake-indexeddb": "6.0.0",
+        "typescript": "~5.9.3",
+      },
     },
     "packages/resource-selection": {
       "name": "@bt-synergy/resource-selection",
@@ -1206,6 +1251,8 @@
 
     "@bt-synergy/door43-api": ["@bt-synergy/door43-api@workspace:packages/door43-api"],
 
+    "@bt-synergy/language-pack": ["@bt-synergy/language-pack@workspace:packages/language-pack"],
+
     "@bt-synergy/linked-panels": ["@bt-synergy/linked-panels@workspace:packages/linked-panels"],
 
     "@bt-synergy/mobile": ["@bt-synergy/mobile@workspace:apps/mobile"],
@@ -1243,6 +1290,8 @@
     "@bt-synergy/resource-panels": ["@bt-synergy/resource-panels@workspace:packages/resource-panels"],
 
     "@bt-synergy/resource-parsers": ["@bt-synergy/resource-parsers@workspace:packages/resource-parsers"],
+
+    "@bt-synergy/resource-pipeline": ["@bt-synergy/resource-pipeline@workspace:packages/resource-pipeline"],
 
     "@bt-synergy/resource-selection": ["@bt-synergy/resource-selection@workspace:packages/resource-selection"],
 
@@ -2393,6 +2442,8 @@
     "exponential-backoff": ["exponential-backoff@3.1.3", "", {}, "sha512-ZgEeZXj30q+I0EN+CbSSpIyPaJ5HVQD18Z1m+u1FXbAeT94mr1zw50q4q6jiiC447Nl/YTcIYSAftiGqetwXCA=="],
 
     "extend": ["extend@3.0.2", "", {}, "sha512-fjquC59cD7CyW6urNXK0FBufkZcoiGG80wTuPujX590cB5Ttln20E2UB4S/WARVqhXffZl2LNgS+gQdPIIim/g=="],
+
+    "fake-indexeddb": ["fake-indexeddb@6.0.0", "", {}, "sha512-YEboHE5VfopUclOck7LncgIqskAqnv4q0EWbYCaxKKjAvO93c+TJIaBuGy8CBFdbg9nKdpN3AuPRwVBJ4k7NrQ=="],
 
     "fast-deep-equal": ["fast-deep-equal@3.1.3", "", {}, "sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q=="],
 

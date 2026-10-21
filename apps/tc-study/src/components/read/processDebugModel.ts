@@ -182,7 +182,7 @@ export function buildWarmSection(input: {
   if (w) {
     lines.push(`q ${w.queueDepth} · L1:${w.byLane[1]} L2:${w.byLane[2]} L3:${w.byLane[3]}`)
   }
-  const pendingJobs = w?.pending?.length
+  const pendingJobs: NonNullable<WarmWorkerQueueStats['pending']> = w?.pending?.length
     ? w.pending
     : s.pendingJobKeySample.map((jobKey) => ({
         jobKey,

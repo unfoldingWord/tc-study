@@ -194,7 +194,6 @@ describe('scripturePreparer', () => {
     // larger. Document both sizes so Stage 2 measurements are explicit.
     expect(lightBytes).toBeGreaterThan(0)
     expect(fullBytes).toBeGreaterThan(0)
-    // eslint-disable-next-line no-console
     console.log(
       `[scripturePreparer] tit 1 light=${lightBytes}B full=${fullBytes}B matchKeys=${full.matchKeys.length}`
     )

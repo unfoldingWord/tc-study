@@ -18,7 +18,7 @@
  * ```
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { CheckCircle, XCircle, Loader, AlertCircle, PlayCircle, Database, Cpu, Network } from 'lucide-react'
 import { useBackgroundDownload } from '../hooks'
 import { useCatalogManager } from '../contexts'
@@ -50,37 +50,14 @@ export function WorkerTestPanel() {
   const [resourceCount, setResourceCount] = useState(0)
   const [testStartTime, setTestStartTime] = useState(0)
 
-  // Run basic checks on mount
-  useEffect(() => {
-    runBasicChecks()
-  }, [])
-
-  // Monitor download progress
-  useEffect(() => {
-    if (isDownloading && testStartTime > 0) {
-      updateTest('Download Triggered', 'passed', 'Worker is processing downloads')
-
-      if (stats.progress && stats.progress.currentResource) {
-        updateTest('Progress Updates', 'passed', `Current: ${stats.progress.currentResource}`)
-      }
-    }
-
-    if (!isDownloading && testStartTime > 0 && stats.progress) {
-      const duration = (Date.now() - testStartTime) / 1000
-      if (stats.progress.completedResources > 0) {
-        updateTest('Download Completed', 'passed', `${stats.progress.completedResources} resources in ${duration.toFixed(1)}s`, duration)
-        checkCache()
-      }
-    }
-  }, [isDownloading, stats, testStartTime])
-
-  const updateTest = (name: string, status: TestResult['status'], message?: string, duration?: number) => {
+  // Stable callbacks: they only use state setters and the catalog manager (created once per provider).
+  const updateTest = useCallback((name: string, status: TestResult['status'], message?: string, duration?: number) => {
     setTests(prev => prev.map(test =>
       test.name === name ? { ...test, status, message, duration } : test
     ))
-  }
+  }, [])
 
-  const runBasicChecks = async () => {
+  const runBasicChecks = useCallback(async () => {
     // Check 1: Worker API
     if (typeof Worker !== 'undefined') {
       updateTest('Worker API Available', 'passed', 'Browser supports Web Workers')
@@ -109,7 +86,7 @@ export function WorkerTestPanel() {
     } catch (error) {
       updateTest('Catalog Manager Ready', 'failed', error instanceof Error ? error.message : 'Unknown error')
     }
-  }
+  }, [catalogManager, updateTest])
 
   const runDownloadTest = async () => {
     if (resourceCount === 0) {
@@ -136,7 +113,7 @@ export function WorkerTestPanel() {
     startDownload([testResourceKey])
   }
 
-  const checkCache = async () => {
+  const checkCache = useCallback(async () => {
     try {
       // Try to open IndexedDB and check for cached content
       const dbRequest = indexedDB.open('tc-study-cache', 1)
@@ -163,7 +140,31 @@ export function WorkerTestPanel() {
     } catch (error) {
       updateTest('Cache Verified', 'failed', error instanceof Error ? error.message : 'Unknown error')
     }
-  }
+  }, [updateTest])
+
+  // Run basic checks on mount
+  useEffect(() => {
+    runBasicChecks()
+  }, [runBasicChecks])
+
+  // Monitor download progress
+  useEffect(() => {
+    if (isDownloading && testStartTime > 0) {
+      updateTest('Download Triggered', 'passed', 'Worker is processing downloads')
+
+      if (stats.progress && stats.progress.currentResource) {
+        updateTest('Progress Updates', 'passed', `Current: ${stats.progress.currentResource}`)
+      }
+    }
+
+    if (!isDownloading && testStartTime > 0 && stats.progress) {
+      const duration = (Date.now() - testStartTime) / 1000
+      if (stats.progress.completedResources > 0) {
+        updateTest('Download Completed', 'passed', `${stats.progress.completedResources} resources in ${duration.toFixed(1)}s`, duration)
+        checkCache()
+      }
+    }
+  }, [isDownloading, stats, testStartTime, updateTest, checkCache])
 
   const getStatusIcon = (status: TestResult['status']) => {
     switch (status) {

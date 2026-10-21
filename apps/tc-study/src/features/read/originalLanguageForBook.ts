@@ -4,31 +4,25 @@
 
 import { getStandardBookOrderIndex } from '../../lib/versification'
 import { getBaseResourceKey } from '../workspace/projectPanelResourcesToAppStore'
+import {
+  ORIGINAL_LANGUAGE_RESOURCE_KEYS,
+  ORIGINAL_LANGUAGE_SPECS,
+  UGNT_RESOURCE_KEY,
+  UHB_RESOURCE_KEY,
+  originalLanguageResourceKey,
+  type OriginalLanguageSpec,
+} from '@bt-synergy/resource-pipeline/scripture/originalLanguageSpecs'
 
-export interface OriginalLanguageSpec {
-  lang: 'el-x-koine' | 'hbo'
-  id: 'ugnt' | 'uhb'
-  label: 'UGNT' | 'UHB'
-  subject: 'Greek New Testament' | 'Hebrew Old Testament'
+export {
+  ORIGINAL_LANGUAGE_RESOURCE_KEYS,
+  ORIGINAL_LANGUAGE_SPECS,
+  UGNT_RESOURCE_KEY,
+  UHB_RESOURCE_KEY,
+  originalLanguageResourceKey,
+  type OriginalLanguageSpec,
 }
-
-export const ORIGINAL_LANGUAGE_SPECS: readonly OriginalLanguageSpec[] = [
-  { lang: 'el-x-koine', id: 'ugnt', label: 'UGNT', subject: 'Greek New Testament' },
-  { lang: 'hbo', id: 'uhb', label: 'UHB', subject: 'Hebrew Old Testament' },
-]
-
-export const UGNT_RESOURCE_KEY = 'unfoldingWord/el-x-koine/ugnt'
-export const UHB_RESOURCE_KEY = 'unfoldingWord/hbo/uhb'
-
-export const ORIGINAL_LANGUAGE_RESOURCE_KEYS: readonly string[] = ORIGINAL_LANGUAGE_SPECS.map(
-  (orig) => originalLanguageResourceKey(orig)
-)
 
 const FIRST_NT_ORDER = getStandardBookOrderIndex('mat')
-
-export function originalLanguageResourceKey(spec: OriginalLanguageSpec): string {
-  return `unfoldingWord/${spec.lang}/${spec.id}`
-}
 
 export function specForOriginalLanguageKey(resourceKey: string): OriginalLanguageSpec | undefined {
   const base = getBaseResourceKey(resourceKey)

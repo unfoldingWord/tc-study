@@ -23,13 +23,11 @@ export function splitUsjContentByChapter(
 ): { preamble: unknown[]; byChapter: Map<number, unknown[]> } {
   const byChapter = new Map<number, unknown[]>()
   const preamble: unknown[] = []
-  let current: number | null = null
   let bucket: unknown[] = preamble
 
   for (const node of content) {
     const chapter = chapterNumberFromNode(node)
     if (chapter != null) {
-      current = chapter
       bucket = []
       byChapter.set(chapter, bucket)
       bucket.push(node)

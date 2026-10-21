@@ -17,7 +17,6 @@ import { ensureCompositions } from './ensureCompositions'
 const FAKE_PERSIST_ID = '__fake-pair__'
 
 class DummyLoader {
-  // eslint-disable-next-line @typescript-eslint/no-useless-constructor
   constructor(_config: unknown) {}
 }
 

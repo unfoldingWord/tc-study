@@ -12,6 +12,7 @@ import {
   remapVerseRefBookCode,
   semanticIdFor,
 } from './identity'
+import { alignmentGroupSignature } from './preVerseAlignments'
 import type { CachedUsjDocument } from './usjCacheTypes'
 import { collectUsjWords, parseVerseSid } from './usjWalk'
 import { USJ_PROCESSING_VERSION, USJ_TOOL_VERSIONS, type UsjToolVersions } from './versions'
@@ -32,6 +33,14 @@ export interface UsjWordToken {
    * Empty for original-language resources (UGNT/UHB) or unaligned words.
    */
   alignedOriginalWordIds: string[]
+  /**
+   * Hebrew Bible ketiv only: its qere (from the footnote after it) and the qere's own occurrence, counted on the verse
+   * read with every qere in place of its ketiv. Quotes and `\zaln` x-content name the qere, not the ketiv.
+   */
+  qere?: string
+  qereOccurrence?: number
+  /** `${verseRef}:${qere}:${qereOccurrence}` — the id alignments give this word. */
+  qereSemanticId?: string
 }
 
 export interface UsjVerseView {
@@ -97,7 +106,7 @@ function groupsForVerse(
     const groups = alignmentMap[key]
     if (!groups?.length) continue
     for (const g of groups) {
-      const sig = (g.targets ?? []).map((t) => String(t.word ?? '').toLowerCase()).join('\0')
+      const sig = alignmentGroupSignature(g)
       if (seenGroupSigs.has(sig)) continue
       seenGroupSigs.add(sig)
       out.push(g)
@@ -160,7 +169,7 @@ function buildChapters(
   alignmentMap: AlignmentMap
 ): UsjChapterView[] {
   const words = collectUsjWords(usj, bookCode)
-  const byChapter = new Map<number, Map<number, string[]>>()
+  const byChapter = new Map<number, Map<number, Array<{ content: string; qere?: string }>>>()
   const bookCodeLower = bookCode.toLowerCase()
 
   for (const w of words) {
@@ -169,7 +178,7 @@ function buildChapters(
     if (!byChapter.has(parsed.chapter)) byChapter.set(parsed.chapter, new Map())
     const verseMap = byChapter.get(parsed.chapter)!
     if (!verseMap.has(parsed.verse)) verseMap.set(parsed.verse, [])
-    verseMap.get(parsed.verse)!.push(w.content)
+    verseMap.get(parsed.verse)!.push({ content: w.content, qere: w.qere })
   }
 
   const chapters: UsjChapterView[] = []
@@ -177,17 +186,29 @@ function buildChapters(
     const verseMap = byChapter.get(chapterNum)!
     const verses: UsjVerseView[] = []
     for (const verseNum of [...verseMap.keys()].sort((a, b) => a - b)) {
-      const surfaces = verseMap.get(verseNum)!
+      const words = verseMap.get(verseNum)!
+      const surfaces = words.map((w) => w.content)
       const reference = `${bookCode} ${chapterNum}:${verseNum}`
       const occs = assignSurfaceOccurrences(surfaces)
-      const tokens: UsjWordToken[] = occs.map((o) => ({
-        semanticId: semanticIdFor(reference, o.content, o.occurrence),
-        content: o.content,
-        occurrence: o.occurrence,
-        totalOccurrences: o.totalOccurrences,
-        verseRef: reference,
-        alignedOriginalWordIds: [],
-      }))
+      const hasQere = words.some((w) => w.qere)
+      const readOccs = hasQere ? assignSurfaceOccurrences(words.map((w) => w.qere ?? w.content)) : []
+      const tokens: UsjWordToken[] = occs.map((o, i) => {
+        const token: UsjWordToken = {
+          semanticId: semanticIdFor(reference, o.content, o.occurrence),
+          content: o.content,
+          occurrence: o.occurrence,
+          totalOccurrences: o.totalOccurrences,
+          verseRef: reference,
+          alignedOriginalWordIds: [],
+        }
+        const qere = words[i]!.qere
+        if (qere) {
+          token.qere = qere
+          token.qereOccurrence = readOccs[i]!.occurrence
+          token.qereSemanticId = semanticIdFor(reference, qere, token.qereOccurrence)
+        }
+        return token
+      })
       attachAlignedOriginalWordIds(tokens, reference, alignmentMap, bookCode)
       verses.push({
         number: verseNum,

@@ -4,6 +4,7 @@ import { mockDoor43Network } from '../fixtures/door43'
 import { openBcvDialog, selectBookChapterVerse } from '../helpers/bcv'
 import { trackPageErrors, waitForCatalogReady } from '../helpers/app'
 import { seedCatalogResources } from '../helpers/idb'
+import { LANGUAGES_CACHE_KEY, LANGUAGES_CACHE_VERSION } from '../../src/features/read/languagesCache'
 
 const E2E_COLLECTION_NAME = 'E2E Saved Collection'
 
@@ -16,19 +17,25 @@ test.describe('Journey 5: Persistence (language cache + BCV + collection save)',
     await page.goto('/read')
     await waitForCatalogReady(page)
 
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByText('E2E Language')).toBeVisible()
+    const picker = page.getByRole('dialog', { name: 'Select language' })
+    await expect(picker).toBeVisible()
+    const e2eLanguage = picker.getByRole('button', { name: 'E2E Language', exact: true })
+    await expect(e2eLanguage).toBeVisible()
 
     await expect
-      .poll(async () => page.evaluate(() => localStorage.getItem('tc-study:languages-cache')))
+      .poll(async () => page.evaluate((key) => localStorage.getItem(key), LANGUAGES_CACHE_KEY))
       .toBeTruthy()
 
-    const cache = await page.evaluate(() => localStorage.getItem('tc-study:languages-cache'))
+    const cache = await page.evaluate(
+      (key) => localStorage.getItem(key),
+      LANGUAGES_CACHE_KEY
+    )
     expect(cache).toContain('E2E Language')
-    expect(cache).toContain('"version":2')
+    // Written in the format the app reads back (a stale version is discarded on reload)
+    expect(JSON.parse(cache ?? '{}').version).toBe(LANGUAGES_CACHE_VERSION)
 
     // Dismiss language picker so later Studio chrome is not blocked by a leftover dialog
-    await page.getByText('E2E Language').click()
+    await e2eLanguage.click()
     await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 30_000 })
 
     await page.goto('/studio')

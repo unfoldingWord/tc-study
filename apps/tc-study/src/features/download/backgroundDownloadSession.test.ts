@@ -54,8 +54,9 @@ describe('backgroundDownloadSession', () => {
     expect(src).toContain('lastActivityAt')
     expect(src).toContain('recentSteps')
     expect(src).toContain('downloadBlockedReason')
+    // The main-thread run is runDownload with tc-study's IndexedDB stores.
     const thisThread = readFileSync(
-      join(import.meta.dir, 'runBackgroundDownloadOnThisThread.ts'),
+      join(import.meta.dir, '../../../../../packages/resource-pipeline/src/download/runDownload.ts'),
       'utf8'
     )
     expect(thisThread).toContain('resolveRunIngredientTotal')

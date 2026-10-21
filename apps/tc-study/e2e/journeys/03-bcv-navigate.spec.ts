@@ -43,7 +43,11 @@ test.describe('Journey 3: Navigate BCV and see reference update', () => {
       timeout: 30_000,
     })
 
-    await page.getByRole('button', { name: 'Next' }).click()
+    // The scripture pane has its own edge "Next" cue; use the reference bar's arrow
+    await page
+      .getByRole('group', { name: 'Reference navigation' })
+      .getByRole('button', { name: 'Next', exact: true })
+      .click()
     await expect(refButton).toContainText('2:2')
     await expect(page.getByText('No verses found for TIT 2:2')).toBeVisible()
 

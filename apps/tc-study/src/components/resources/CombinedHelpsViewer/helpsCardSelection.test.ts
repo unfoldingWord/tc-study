@@ -17,6 +17,8 @@ function makeNote(id: string, quote: string): NoteWithAlignments {
     occurrence: '1',
     note: 'note',
     supportReference: '',
+    // Token clicks match helps by semantic id only (b8e70b5), not by the quote's text.
+    semanticIds: ['1pe-2-9-chosen-1'],
   } as NoteWithAlignments
 }
 
@@ -29,6 +31,7 @@ function makeLink(id: string, origWords: string): LinkWithAlignments {
     occurrence: '1',
     twLink: 'rc://*/tw/dict/bible/kt/elect',
     articlePath: 'bible/kt/elect',
+    semanticIds: ['1pe-2-9-chosen-1'],
   } as LinkWithAlignments
 }
 

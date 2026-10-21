@@ -33,6 +33,27 @@ export function extractDeepText(content: unknown): string {
 export interface UsjWordHit {
   verseSid: string
   content: string
+  /** The qere of a ketiv word, from the footnote right after it (`\f + \ft Q \+w …\+w*\f*`). */
+  qere?: string
+}
+
+/**
+ * The words a footnote gives as the qere: the `\+w` words of a `\ft` that starts with `Q`. Other notes
+ * (`Or perhaps …`) give none.
+ */
+export function qereOfNote(note: Record<string, unknown>): string | undefined {
+  if (note.marker !== 'f' || !Array.isArray(note.content)) return undefined
+  const words: string[] = []
+  for (const part of note.content) {
+    if (!isRecord(part) || part.type !== 'char' || part.marker !== 'ft' || !Array.isArray(part.content)) continue
+    const lead = part.content.find((c) => typeof c === 'string')
+    if (typeof lead !== 'string' || !/^\s*Q(\s|$)/.test(lead)) continue
+    for (const c of part.content) {
+      if (isRecord(c) && c.type === 'char' && c.marker === 'w') words.push(extractText(c.content))
+    }
+  }
+  const qere = words.join(' ').trim()
+  return qere || undefined
 }
 
 function provisionalVerseSid(bookCode: string, chapter: number): string {
@@ -63,8 +84,13 @@ export function collectUsjWords(
     ctx.verseSid || provisionalVerseSid(ctx.bookCode, ctx.chapter)
 
   const walk = (nodes: unknown[]) => {
+    // The word a footnote right after it gives a qere to: only spaces and punctuation may stand between them.
+    let ketiv: UsjWordHit | undefined
     for (const n of nodes) {
-      if (typeof n === 'string') continue
+      if (typeof n === 'string') {
+        if (/[\p{L}\p{N}]/u.test(n)) ketiv = undefined
+        continue
+      }
       if (!isRecord(n)) continue
 
       if (n.type === 'book' && typeof n.code === 'string' && n.code.trim()) {
@@ -100,9 +126,23 @@ export function collectUsjWords(
       if (n.type === 'char' && n.marker === 'w') {
         const sid = activeSid()
         if (sid) {
-          words.push({ verseSid: sid, content: extractText(n.content) })
+          ketiv = { verseSid: sid, content: extractText(n.content) }
+          words.push(ketiv)
         }
+        if (Array.isArray(n.content)) walk(n.content)
+        continue
       }
+
+      // A note's words are not the verse's: the Hebrew Bible's qere (`\f + \ft Q \+w …\+w*\f*`) follows its ketiv,
+      // and the layout shows no words of notes, so counting it shifted every later word onto its neighbour's token.
+      // Quotes and alignments name the qere all the same, so the ketiv carries it.
+      if (n.type === 'note') {
+        const qere = ketiv ? qereOfNote(n) : undefined
+        if (ketiv && qere) ketiv.qere = qere
+        ketiv = undefined
+        continue
+      }
+      ketiv = undefined
 
       if (Array.isArray(n.content)) {
         walk(n.content)

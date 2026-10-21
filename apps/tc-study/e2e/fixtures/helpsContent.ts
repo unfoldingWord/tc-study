@@ -4,6 +4,8 @@
  * - Παῦλος ↔ Paul via alignedOriginalWordIds (cross-panel token-click)
  */
 
+import { NOTES_TSV_PARSER_VERSION } from '../../../../packages/resource-parsers/src/parsers/tsv/notes-parser'
+
 export const E2E_TN_KEY = 'unfoldingWord/e2e/tn'
 export const E2E_TWL_KEY = 'unfoldingWord/e2e/twl'
 export const E2E_TW_KEY = 'unfoldingWord/e2e/tw'
@@ -144,7 +146,7 @@ export function buildE2ECatalogEntries() {
 }
 
 /** Must match `@bt-synergy/usj-processor` USJ_PROCESSING_VERSION / USJ_TOOL_VERSIONS. */
-const E2E_USJ_PROCESSING_VERSION = '2.2.0-usj'
+const E2E_USJ_PROCESSING_VERSION = '2.3.0-usj'
 const E2E_USJ_TOOL_VERSIONS = { parser: '0.1.1', usjCore: '0.1.1' } as const
 
 function usjWord(content: string) {
@@ -218,6 +220,8 @@ export function buildE2ECacheEntries() {
       bookCode: E2E_BOOK,
       bookName: 'Titus',
       processingDate: new Date().toISOString(),
+      // Loaders drop `tn:` blobs from an older parser and re-fetch; seed as current.
+      parserVersion: NOTES_TSV_PARSER_VERSION,
       totalNotes: 1,
       chaptersWithNotes: [1],
       statistics: {

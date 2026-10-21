@@ -49,7 +49,7 @@ flowchart LR
 | [CHAPTER_VERSE_MAP.md](./CHAPTER_VERSE_MAP.md) | Historical metadata | Not the current `scripture-usj:` chapter SoT |
 | [DYNAMIC_PANELS_ARCHITECTURE.md](./DYNAMIC_PANELS_ARCHITECTURE.md) | This app | Panel grid |
 
-**Version authority:** [cache-data-structure.md](./cache-data-structure.md) §4 (`HELPS_QUOTE_VERSION` **5**, `HELPS_ALIGN_VERSION` **6**, `SCRIPTURE_PREPARE_SCHEMA` **3** → combined **`3000220`** for `2.2.0-usj`). Companion docs still show older digits in places — follow the cache doc + `resourceArtifactRecipe.ts`.
+**Version authority:** [cache-data-structure.md](./cache-data-structure.md) §4 (`HELPS_QUOTE_VERSION` **6**, `HELPS_ALIGN_VERSION` **9**, `SCRIPTURE_PREPARE_SCHEMA` **5** → combined **`5000230`** for `2.3.0-usj`). Companion docs still show older digits in places — follow the cache doc + `resourceArtifactRecipe.ts`.
 
 ---
 

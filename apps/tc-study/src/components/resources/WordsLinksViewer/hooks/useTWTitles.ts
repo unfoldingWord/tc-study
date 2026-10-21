@@ -9,23 +9,14 @@ import { useCallback } from 'react'
 import { useCatalogManager } from '../../../../contexts'
 import { parseTWLink } from '../../../../features/helps/quoteTokens'
 import { resourceContentStamp } from '../../../../features/helps/resourceContentStamp'
-import { getCachedTocTitleIndex, lookupTocTitle } from '../../../../features/helps/tocTitleIndex'
+import { getCachedTocTitleIndex } from '../../../../features/helps/tocTitleIndex'
 import { useHelpsTextCache } from '../../../../features/helps/useHelpsTextCache'
+import {
+  resolveTwTitle,
+  twResourceKeyFor as resolveTwResourceKey,
+  twTitleEntry,
+} from '@bt-synergy/resource-pipeline/helps/articleTitles'
 import type { TranslationWordsLink } from '../types'
-
-function resolveTwResourceKey(twlResourceKey: string): string | null {
-  const parts = twlResourceKey.split('/')
-  if (parts.length < 2) return null
-  const [owner, ...rest] = parts
-  if (rest.length === 1) {
-    const language = rest[0].split('_')[0]
-    return `${owner}/${language}_tw`
-  }
-  if (rest.length >= 2) {
-    return `${owner}/${rest[0]}/tw`
-  }
-  return null
-}
 
 function linkSourceFor(link: TranslationWordsLink): string | null {
   let linkSource = link.twLink || link.articlePath
@@ -52,42 +43,30 @@ export function useTWTitles(resourceKey: string) {
         return null
       }
 
-      const twInfo = parseTWLink(linkSource)
-      if (twInfo.category === 'unknown' || !twInfo.term) {
+      const entry = twTitleEntry(linkSource)
+      if (!entry) {
         console.error(`❌ [TWL Title Fetch] Failed to parse link source: "${linkSource}"`)
         return null
       }
 
-      const cacheKey = `${twInfo.category}/${twInfo.term}`
       const twResourceKey = resolveTwResourceKey(resourceKey)
       if (!twResourceKey) return null
 
       try {
         const twMetadata = await catalogManager.getResourceMetadata(twResourceKey)
         const stamp = resourceContentStamp(twMetadata)
-        const articleId = `bible/${twInfo.category}/${twInfo.term}`
 
         return await fetchText({
           resourceKey: twResourceKey,
           stamp,
-          entryId: cacheKey,
+          entryId: entry.entryId,
           resolve: async () => {
             const ingredients = twMetadata?.contentMetadata?.ingredients
-            const index = getCachedTocTitleIndex(twResourceKey, stamp, ingredients)
-            if (!index) {
-              return { value: twInfo.term, confident: false }
-            }
-            const title =
-              lookupTocTitle(index, articleId) ||
-              lookupTocTitle(index, cacheKey)
-            if (!title) {
-              return { value: twInfo.term, confident: false }
-            }
-            return { value: title, confident: true }
+            return resolveTwTitle(getCachedTocTitleIndex(twResourceKey, stamp, ingredients), entry)
           },
         })
       } catch {
-        return twInfo.term
+        return entry.term
       }
     },
     [resourceKey, catalogManager, fetchText]

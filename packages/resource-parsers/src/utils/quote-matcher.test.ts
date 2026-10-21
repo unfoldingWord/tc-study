@@ -26,6 +26,19 @@ function chapter(words: string[]): OptimizedChapter[] {
 describe('QuoteMatcher occurrence (USJ identity contract)', () => {
   const matcher = new QuoteMatcher()
 
+  test('a quote is whole words: «my God» is not found inside «and your God» (Ruth 1:16)', () => {
+    const verse = chapter(['וֵ⁠אלֹהַ֖יִ⁠ךְ', 'אֱלֹהָֽ⁠י'])
+    const result = matcher.findOriginalTokens(verse, 'אֱלֹהָֽ⁠י', 1, { book: 'rut', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([2])
+  })
+
+  test('a quote found only inside a word is still found, as before', () => {
+    const result = matcher.findOriginalTokens(chapter(['ואלהיך']), 'אלהי', 1, { book: 'rut', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([1])
+  })
+
   test('assigns verse-wide occurrence case-insensitively', () => {
     const result = matcher.findOriginalTokens(chapter(['God', 'of', 'god']), 'god', 2, {
       book: 'tit',
@@ -36,6 +49,39 @@ describe('QuoteMatcher occurrence (USJ identity contract)', () => {
     expect(result.totalTokens).toHaveLength(1)
     expect(result.totalTokens[0]?.text).toBe('god')
     expect(result.totalTokens[0]?.occurrence).toBe(2)
+  })
+
+  // Jonah 1:3 says «מִלִּפְנֵי יְהוָה» twice, the first with atnach, the second with silluq: es-419's n96t quotes the
+  // first with occurrence -1, and sw66 the second with occurrence 1.
+  const jonah13 = ['וַ⁠יָּ֤קָם', 'מִ⁠לִּ⁠פְנֵ֖י', 'יְהוָ֑ה', 'וַ⁠יֵּ֨רֶד', 'מִ⁠לִּ⁠פְנֵ֖י', 'יְהוָֽה׃']
+
+  test('occurrence -1 is found: the quote as written, accents and all, only where it is so (Jonah 1:3 n96t)', () => {
+    const result = matcher.findOriginalTokens(chapter(jonah13), 'מִ⁠לִּ⁠פְנֵ֖י יְהוָ֑ה', -1, { book: 'jon', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([2, 3])
+  })
+
+  test('occurrence 1 of the second, by its accents, is the second (Jonah 1:3 sw66)', () => {
+    const result = matcher.findOriginalTokens(chapter(jonah13), 'מִ⁠לִּ⁠פְנֵ֖י יְהוָֽה', 1, { book: 'jon', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([5, 6])
+  })
+
+  test('occurrence 2 of a quote without accents is still the second by its consonants', () => {
+    const result = matcher.findOriginalTokens(chapter(jonah13), 'מלפני יהוה', 2, { book: 'jon', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([5, 6])
+  })
+
+  test('occurrence -1 of a quote without accents takes every occurrence', () => {
+    const result = matcher.findOriginalTokens(chapter(jonah13), 'מלפני יהוה', -1, { book: 'jon', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(true)
+    expect(result.totalTokens.map((t) => t.id)).toEqual([2, 3, 5, 6])
+  })
+
+  test('occurrence -1 of a quote that is not there still fails', () => {
+    const result = matcher.findOriginalTokens(chapter(['God', 'of']), 'Lord', -1, { book: 'tit', startChapter: 1, startVerse: 1 })
+    expect(result.success).toBe(false)
   })
 
   test('matches multi-part quotes with & (later parts occurrence 1 after prior)', () => {

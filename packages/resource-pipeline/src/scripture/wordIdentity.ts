@@ -1,0 +1,52 @@
+/**
+ * Linked-panels word identity — Pipeline contract (2026-08-12).
+ * Match key: \`${verseRef}:${content}:${occurrence}\`
+ */
+import {
+  semanticIdFor,
+  type UsjScriptureViewModel,
+  type UsjWordToken,
+} from '@bt-synergy/scripture-loader'
+import { semanticIdMatchKey } from '../helps/semanticIdMatchKey'
+
+export { semanticIdFor }
+export type { UsjWordToken }
+export const semanticIdKey = semanticIdMatchKey
+
+export type ScriptureRenderToken = Pick<
+  UsjWordToken,
+  'semanticId' | 'content' | 'occurrence' | 'verseRef' | 'alignedOriginalWordIds'
+> & {
+  /** Its match key (semanticIdMatchKey), computed once at load. Paint path must not re-normalize. */
+  foldedSemanticId?: string
+  foldedAlignedIds?: string[]
+}
+
+export function attachFoldedMatchKeys(token: ScriptureRenderToken): ScriptureRenderToken {
+  token.foldedSemanticId = semanticIdKey(token.semanticId)
+  token.foldedAlignedIds = token.alignedOriginalWordIds.map(semanticIdKey)
+  return token
+}
+
+export function attachFoldedMatchKeysToViewModel(
+  viewModel: UsjScriptureViewModel
+): UsjScriptureViewModel {
+  for (const chapter of viewModel.chapters) {
+    for (const verse of chapter.verses) {
+      for (const token of verse.tokens) attachFoldedMatchKeys(token)
+    }
+  }
+  return viewModel
+}
+
+/** Fold only one chapter — book-open must not NFD-normalize all of Psalms. */
+export function attachFoldedMatchKeysToChapter(
+  viewModel: UsjScriptureViewModel,
+  chapter: number
+): void {
+  const chapterView = viewModel.chapters.find((ch) => ch.number === chapter)
+  if (!chapterView) return
+  for (const verse of chapterView.verses) {
+    for (const token of verse.tokens) attachFoldedMatchKeys(token)
+  }
+}

@@ -19,6 +19,7 @@ import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
 import { narrowExpectedToCataloged } from './catalogBackgroundDownloadPolicy'
 import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
+import { catalogHitItem } from '../read/readCatalogIdentity'
 
 /** Door43 catalog search hit (fields vary by endpoint / nested repo). */
 type CatalogEntry = {
@@ -79,7 +80,7 @@ function ownerField(value: unknown): string | undefined {
 }
 
 function catalogIdentity(entry: CatalogEntry, languageCode: string) {
-  const item: CatalogEntry = entry.repo ? { ...entry, ...entry.repo } : entry
+  const item = catalogHitItem(entry) as CatalogEntry
   const repoName = asString(item.name) || asString(item.repo_name)
   if (!repoName) return null
 
@@ -174,7 +175,7 @@ export async function loadReadLanguageCatalog(deps: LoadReadLanguageCatalogDeps)
       scopeForType === 'scripture' || scopeForType === 'obs' ? scopeForType : ('shared' as const)
     const abbreviation = asString(item.abbreviation).trim() || undefined
 
-    const catalogIngredients = item.ingredients ?? item.repo?.ingredients
+    const catalogIngredients = item.ingredients
     // Book-companion helps (TN/TWL/TQ) ship per-book files even though their Door43
     // subject strings don't contain "bible". Mark them book-structured so Phase 1
     // tab filtering can use ingredients immediately (avoids TQ flash-then-hide).
@@ -264,7 +265,7 @@ export async function loadReadLanguageCatalog(deps: LoadReadLanguageCatalogDeps)
         content_format: item.content_format ?? item.format,
         metadata_url: item.metadata_url ?? entry.metadata_url,
         description: item.description ?? item.repo?.description,
-        ingredients: item.ingredients ?? item.repo?.ingredients,
+        ingredients: item.ingredients,
         release,
         server: 'git.door43.org',
         html_url: item.html_url ?? entry.html_url ?? release?.html_url,

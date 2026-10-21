@@ -1,0 +1,179 @@
+/**
+ * STEP 3 of TSV alignment: map OL semantic IDs → target scripture tokens
+ * via alignedOriginalWordIds (USJ / legacy projection) or the token's own
+ * semanticId (UGNT/UHB in the text pane).
+ */
+
+import type { OptimizedToken } from '@bt-synergy/resource-parsers'
+import { semanticIdFor } from '@bt-synergy/scripture-loader'
+import { foldedMatchKey, semanticIdMatchKey } from './semanticIdMatchKey'
+
+export interface AlignedToken {
+  content: string
+  semanticId: string
+  verseRef: string
+  position: number
+  type?: 'word' | 'punctuation' | 'whitespace' | 'text' | 'gap'
+}
+
+type BroadcastishToken = OptimizedToken & {
+  alignedOriginalWordIds?: unknown[]
+  semanticId?: string
+  qereSemanticId?: string
+}
+
+function tokenMatchIds(token: OptimizedToken): string[] {
+  const tk = token as BroadcastishToken
+  const ids: string[] = []
+  if (tk.semanticId) ids.push(String(tk.semanticId))
+  // A ketiv of the Hebrew Bible is also the word its qere names.
+  if (tk.qereSemanticId) ids.push(String(tk.qereSemanticId))
+  if (Array.isArray(tk.alignedOriginalWordIds)) {
+    for (const id of tk.alignedOriginalWordIds) ids.push(String(id))
+  }
+  return ids
+}
+
+type TokenWithVerseRef = OptimizedToken & { verseRef?: string }
+
+function tokenVerseRef(
+  token: OptimizedToken | undefined,
+  bookCode: string,
+  chapter: number,
+  verse: number
+): string {
+  const stamped = (token as TokenWithVerseRef | undefined)?.verseRef?.trim()
+  if (stamped) return stamped
+  return `${bookCode.toLowerCase()} ${chapter}:${verse}`
+}
+
+function verseNumberFromRef(verseRef: string, fallback: number): number {
+  const match = verseRef.match(/:(\d+)\s*$/)
+  if (!match) return fallback
+  const n = parseInt(match[1]!, 10)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+/** Build chip/underline tokens from matched word positions, filling punctuation gaps. */
+export function alignedTokensFromPositions(
+  targetTokens: OptimizedToken[],
+  matchedPositions: number[],
+  bookCode: string,
+  chapter: number,
+  verse: number
+): AlignedToken[] {
+  if (matchedPositions.length === 0) return []
+  const result: AlignedToken[] = []
+
+  matchedPositions.forEach((position, matchIndex) => {
+    const token = targetTokens[position]
+    if (!token) return
+    const verseRef = tokenVerseRef(token, bookCode, chapter, verse)
+    const tokenOccurrence = token.occurrence || 1
+    const semanticId = semanticIdFor(verseRef, token.text, tokenOccurrence)
+
+    result.push({
+      content: token.text,
+      semanticId,
+      verseRef,
+      position,
+      type: 'word',
+    })
+
+    if (matchIndex >= matchedPositions.length - 1) return
+    const nextPosition = matchedPositions[matchIndex + 1]!
+    const nextToken = targetTokens[nextPosition]
+    const nextVerseRef = tokenVerseRef(nextToken, bookCode, chapter, verse)
+    const sameVerse =
+      verseNumberFromRef(verseRef, verse) === verseNumberFromRef(nextVerseRef, verse)
+
+    if (!sameVerse) {
+      result.push({
+        content: '…',
+        semanticId: `${verseRef}:sep:${position + 1}`,
+        verseRef,
+        position: position + 1,
+        type: 'gap',
+      })
+      return
+    }
+
+    const gap = nextPosition - position
+    if (gap <= 1) return
+
+    const betweenTokens: AlignedToken[] = []
+    let hasWordsBetween = false
+
+    for (let i = position + 1; i < nextPosition; i++) {
+      const between = targetTokens[i]
+      if (!between) continue
+      if (between.type === 'word') {
+        hasWordsBetween = true
+      } else if (
+        between.type === 'punctuation' ||
+        between.type === 'whitespace' ||
+        between.type === 'number' ||
+        between.type === 'paragraph-marker' ||
+        (between as { type?: string }).type === 'text'
+      ) {
+        betweenTokens.push({
+          content: between.text,
+          semanticId: `${verseRef}:${between.type}:${i}`,
+          verseRef,
+          position: i,
+          type: between.type === 'whitespace' ? 'whitespace' : 'punctuation',
+        })
+      }
+    }
+
+    if (hasWordsBetween) {
+      result.push({
+        content: '…',
+        semanticId: `${verseRef}:gap:${position + 1}`,
+        verseRef,
+        position: position + 1,
+        type: 'gap',
+      })
+    } else {
+      result.push(...betweenTokens)
+    }
+  })
+
+  return result
+}
+
+/**
+ * Find aligned tokens in target language tokens from SCRIPTURE_TOKENS broadcast.
+ * Matches `\zaln` / alignedOriginalWordIds, or the token's own semanticId when
+ * the text pane is original language (UGNT/UHB).
+ *
+ * A word is matched as written first (semanticIdMatchKey): words that differ
+ * only by their accents are different words, each with its own occurrence. A
+ * wanted word no token is aligned to as written is looked for with its marks
+ * folded (an alignment made against another edition of the original).
+ */
+export function findAlignedTokens(
+  targetTokens: OptimizedToken[],
+  originalSemanticIds: string[],
+  bookCode: string,
+  chapter: number,
+  verse: number
+): AlignedToken[] {
+  if (!originalSemanticIds.length) return []
+  const wanted = new Set(originalSemanticIds.map((id) => semanticIdMatchKey(id)))
+  const linked = targetTokens.map((token) =>
+    token.type === 'word' ? tokenMatchIds(token).map((id) => semanticIdMatchKey(id)) : []
+  )
+  const found = new Set(linked.flat().filter((id) => wanted.has(id)))
+  const unfound = new Set([...wanted].filter((id) => !found.has(id)).map(foldedMatchKey))
+  const matchedPositions: number[] = []
+
+  linked.forEach((ids, index) => {
+    const hasMatch =
+      ids.some((id) => wanted.has(id)) ||
+      (unfound.size > 0 && ids.some((id) => unfound.has(foldedMatchKey(id))))
+    if (hasMatch) matchedPositions.push(index)
+  })
+
+  return alignedTokensFromPositions(targetTokens, matchedPositions, bookCode, chapter, verse)
+}

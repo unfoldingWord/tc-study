@@ -39,7 +39,6 @@ import { createStudioPluginRegistry } from '../../features/studio/createStudioPl
 import { moveResourceBetweenPanels } from '../../features/workspace/resourceMutations'
 import { ThemeToggle } from '../../features/theme'
 import { NavigationBar } from '../studio/NavigationBar'
-import { DownloadIndicator } from './DownloadIndicator'
 import { ExportProgressToast } from './ExportProgressToast'
 import { PanelResizeDivider } from '../shared/PanelResizeDivider'
 import { ReadLinkedPanel } from './ReadLinkedPanel'
@@ -269,7 +268,6 @@ export function SimplifiedReadView({
                 onLanguageSelected={handleLanguageSelected}
                 autoOpenLanguagePicker={shouldAutoOpenLanguagePicker}
                 languagePickerRequired={isLanguagePickerRequired}
-                downloadIndicator={<DownloadIndicator />}
                 onDownloadCollection={
                   isCollectionFullyCached ? handleDirectDownloadCollection : undefined
                 }

@@ -65,7 +65,6 @@ describe('scripturePreparer size compare (ULT Titus)', () => {
 
     expect(bookLight).toBeLessThan(bookFull)
 
-    // eslint-disable-next-line no-console
     console.log(
       [
         '[scripturePreparer size]',

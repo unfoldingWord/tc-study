@@ -58,7 +58,7 @@ describe('live quote path vs lane 2 skip', () => {
       ),
       'utf8'
     )
-    const admitSrc = readFileSync(join(import.meta.dir, '../warm/warmAdmitPlan.ts'), 'utf8')
+    const admitSrc = readFileSync(join(import.meta.dir, '../../../../../packages/resource-pipeline/src/warm/warmAdmitPlan.ts'), 'utf8')
     const helpsSrc = readFileSync(
       join(import.meta.dir, '../../components/resources/CombinedHelpsViewer/index.tsx'),
       'utf8'
