@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { compatKeyOf, PACK_FORMAT_VERSION } from '@bt-synergy/language-pack'
 import { PACK_VERSIONS } from './packVersions'
-import { packsStatus, statusPath, type PackStatus } from './packsStatus'
+import { isCompatKey, packsStatus, statusPath, type PackStatus } from './packsStatus'
 import { memoryBucket } from './publishLanguage'
 
 const compat = compatKeyOf(PACK_FORMAT_VERSION, PACK_VERSIONS)
@@ -43,6 +43,24 @@ describe('packsStatus', () => {
 
   test('refuses a language code that is not safe in a key', async () => {
     await expect(packsStatus({ bucket: memoryBucket(), compat, language: '../x', state: 'ok', run: RUN })).rejects.toThrow('Not a language code')
+  })
+
+  test('the compat key the code computes passes the same check the Worker applies', () => {
+    expect(isCompatKey(compat)).toBe(true)
+  })
+
+  test('refuses a compat that is not a compat key, so a workflow input cannot pick another bucket path', async () => {
+    for (const bad of ['../x', 'f1.0-u1-p1-q1-a1', 'f1.0-u1/../-p1-q1-a1-t1', '']) {
+      await expect(packsStatus({ bucket: memoryBucket(), compat: bad, language: 'es-419', state: 'failed', run: RUN })).rejects.toThrow('Not a compat key')
+    }
+  })
+
+  test('a drifted compat gets its own failed status, apart from the current one', async () => {
+    const bucket = memoryBucket()
+    const drifted = 'f1.0-u9-p9-q9-a9-t9'
+    await packsStatus({ bucket, compat: drifted, language: 'es-419', state: 'failed', run: RUN })
+    expect(bucket.json<PackStatus>(statusPath(drifted, 'es-419'))).toMatchObject({ state: 'failed', failures: 1 })
+    expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).toBeNull()
   })
 
   test('languages do not share a status', async () => {

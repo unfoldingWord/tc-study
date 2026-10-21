@@ -105,7 +105,11 @@ describe('the pack output of a fixed sample', () => {
     const refresh = '`UPDATE_SAMPLE=1 bun test src/language/sampleOutput.test.ts` in packages/resource-pipeline and commit sample-output.json'
     // A bumped version is expected; the stored sample must follow it, or the guard would be off from then on.
     if (stored.compat !== compat) {
-      throw new Error(`the pack compatibility key changed (${stored.compat} → ${compat}): run ${refresh}`)
+      // The serving Worker dispatches builds for the compat it was deployed with; a workflow given another one stops.
+      throw new Error(
+        `the pack compatibility key changed (${stored.compat} → ${compat}): run ${refresh}, ` +
+          'then update CURRENT_PACK_COMPAT in translation-helps-mcp (v2) src/packs/dispatch.ts and redeploy v2'
+      )
     }
     if (stored.hash !== hash) {
       throw new Error(
