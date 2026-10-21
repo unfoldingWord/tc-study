@@ -152,7 +152,9 @@ repository; the command the job runs is `publish-language` (`packages/resource-p
 after `scripts/build-pack-tools.sh` has installed and built what it reads compiled.
 
 - A scheduled job (not a request handler: preparing a language downloads and builds for minutes) runs
-  `publish-language` for each language, and per book, when the Door43 release stamps of its resources change.
+  `publish-language` for each language when the Door43 release stamps of its resources, the generator, MACULA or the
+  lexicons change. It builds the language pack, the originals pack (when those changed) and the MCP views; no book
+  packs (downloading single books is postponed).
 - It keeps the latest pack of each one, compressed as much as possible (the zip format only offers DEFLATE; level 9),
   with its manifest so the page can list sizes, versions and dates without opening the zip.
 - A page of the official site lists languages and books and downloads them.

@@ -389,6 +389,7 @@ export function publishLanguage(o: {
 **After this plan:**
 
 - Plan 2 (MCP repo: workflow, buckets, routes, dispatch, measuring) starts with the English measurement on a runner,
-  `publish-language --dry-run --lang en` wrapped in `/usr/bin/time -v`.
+  `publish-language --no-upload --lang en` wrapped in `/usr/bin/time -v` (it builds the packs and views into `--work`
+  and puts nothing; `--dry-run` only decides and builds nothing, so it measures nothing).
 - If English runs out of memory there, a task is added here before en is scheduled: `buildLanguagePack` writes each
   layer's rows to the zip as a stream instead of one string (`pack.ts:164`).
