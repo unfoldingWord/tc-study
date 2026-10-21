@@ -78,9 +78,10 @@ async function addResource(
 
 /**
  * The lexicons of a language, from Door43: `{owner}/{lang}_uhl` (Hebrew) and `{owner}/{lang}_ugl` (Greek), whole
- * (each entry with the verses of every book). Returns what was added, and why a lexicon was not.
+ * (each entry with the verses of every book), read from `ref` (a branch or tag; `master` is what Door43 serves them
+ * from today). Returns what was added, and why a lexicon was not.
  */
-export async function addLexicons(cache: Store, catalog: Catalog, language: string, owner: string): Promise<Array<{ key: string; entries?: number; why?: string }>> {
+export async function addLexicons(cache: Store, catalog: Catalog, language: string, owner: string, ref = 'master'): Promise<Array<{ key: string; entries?: number; why?: string }>> {
   const done: Array<{ key: string; entries?: number; why?: string }> = []
   for (const [id, subject, title] of [
     ['uhl', 'Hebrew Lexicon', 'Léxico hebreo'],
@@ -93,9 +94,9 @@ export async function addLexicons(cache: Store, catalog: Catalog, language: stri
       done.push({ key, why: `${repo} no está en Door43` })
       continue
     }
-    const { default_branch: branch = 'master', updated_at: updatedAt = '' } = (await info.json()) as { default_branch?: string; updated_at?: string }
-    const commit = (await (await fetch(`${HOST}/api/v1/repos/${repo}/commits?sha=${branch}&limit=1`)).json()) as Array<{ sha: string; created?: string }>
-    const archive = await fetch(`${HOST}/${repo}/archive/${branch}.tar.gz`)
+    const { updated_at: updatedAt = '' } = (await info.json()) as { updated_at?: string }
+    const commit = (await (await fetch(`${HOST}/api/v1/repos/${repo}/commits?sha=${ref}&limit=1`)).json()) as Array<{ sha: string; created?: string }>
+    const archive = await fetch(`${HOST}/${repo}/archive/${ref}.tar.gz`)
     if (!archive.ok) {
       done.push({ key, why: `no se pudo bajar ${repo}` })
       continue
@@ -122,7 +123,7 @@ export async function addLexicons(cache: Store, catalog: Catalog, language: stri
         subject,
         title: named ?? title,
         type: 'lexicon',
-        version: commit[0]?.sha.slice(0, 10) ?? branch,
+        version: commit[0]?.sha.slice(0, 10) ?? ref,
         publishedAt: commit[0]?.created ?? updatedAt,
       },
       rows
