@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
@@ -33,6 +33,12 @@ const ORIGINAL_STAMPS = {
   'unfoldingWord/el-x-koine/ugnt': STAMPS['unfoldingWord/el-x-koine/ugnt'],
 }
 
+const SUBJECTS: Record<string, string> = {
+  'es-419_gl/es-419/glt': 'Aligned Bible',
+  'es-419_gl/es-419/gst': 'Aligned Bible',
+  'es-419_obt/es-419/tw': 'Translation Words',
+}
+
 function manifestOf(language: string, kind: 'language' | 'originals', keys: string[]): PackManifest {
   return {
     format: PACK_FORMAT,
@@ -42,12 +48,20 @@ function manifestOf(language: string, kind: 'language' | 'originals', keys: stri
     createdAt: '2026-10-20T00:00:00.000Z',
     layers: ['sot'],
     versions: PACK_VERSIONS,
-    resources: keys.map((key) => ({ key, role: 'source', stamp: 's', rows: { sot: 1 } }) as never),
+    resources: keys.map((key) => ({ key, role: kind === 'originals' ? 'original' : 'language', stamp: 's', subject: SUBJECTS[key], rows: { sot: 1 } }) as never),
   }
 }
 
-/** A prepareAndPack that packs nothing real: two tiny packs, the originals one named for the language as the real one is. */
-function fakeBuild() {
+const LANGUAGE_KEYS = ['es-419_gl/es-419/glt', 'es-419_obt/es-419/tw']
+const ORIGINAL_KEYS = ['unfoldingWord/hbo/uhb', 'unfoldingWord/el-x-koine/ugnt', 'Biblica/hbo/macula', 'Biblica/el-x-koine/macula']
+
+type FakePacks = { languageKeys?: string[]; originalKeys?: string[]; skipped?: Array<{ key: string; why: string }> }
+
+/**
+ * A prepareAndPack that packs nothing real: two tiny packs, the originals one named for the language as the real one
+ * is. By default the language pack holds every language key of STAMPS, and the originals pack UHB, UGNT and MACULA.
+ */
+function fakeBuild(over: FakePacks = {}) {
   const calls: unknown[] = []
   const build = (async (o: unknown) => {
     calls.push(o)
@@ -55,13 +69,13 @@ function fakeBuild() {
       language: {
         file: 'es-419.langpack.zip',
         bytes: new Uint8Array([1, 2, 3]),
-        manifest: manifestOf('es-419', 'language', ['es-419_gl/es-419/glt']),
-        skipped: [{ key: 'es-419_gl/es-419/gst', why: 'no tiene est' }],
+        manifest: manifestOf('es-419', 'language', over.languageKeys ?? LANGUAGE_KEYS),
+        skipped: over.skipped ?? [{ key: 'es-419_gl/es-419/gst', why: 'no tiene est' }],
       },
       originals: {
         file: 'originals.langpack.zip',
         bytes: new Uint8Array([4, 5]),
-        manifest: manifestOf('es-419', 'originals', ['unfoldingWord/hbo/uhb', 'unfoldingWord/el-x-koine/ugnt']),
+        manifest: manifestOf('es-419', 'originals', over.originalKeys ?? ORIGINAL_KEYS),
         skipped: [],
       },
       report: {},
@@ -87,7 +101,8 @@ const neverBuild = (async () => {
 }) as never
 
 async function storedEntry(language: string, build: Omit<PackBuild, 'id'>): Promise<PackCatalogEntry> {
-  return { language, compat, build: { id: await buildIdOf(build), ...build } } as PackCatalogEntry
+  const pack = { path: `packs/${compat}/${language}/stored.langpack.zip`, bytes: 1, sha256: 'stored' }
+  return { language, compat, build: { id: await buildIdOf(build), ...build }, pack } as PackCatalogEntry
 }
 
 function base(bucket: PackBucket, over: Record<string, unknown> = {}) {
@@ -158,6 +173,8 @@ describe('publishLanguage', () => {
     const originals = bucket.json<PackCatalogEntry>(catalogPath(compat, 'originals'))!
     expect(originals.language).toBe('originals')
     expect(originals.pack.path).toBe(keys[1])
+    // The language names the originals it was just built with.
+    expect(entry.originals).toEqual({ build: originals.build.id, path: originals.pack.path, bytes: 2, sha256: originals.pack.sha256 })
     expect(originals.build).toEqual({ id: await buildIdOf({ generator: 'g2', macula: M, stamps: ORIGINAL_STAMPS }), generator: 'g2', macula: M, stamps: ORIGINAL_STAMPS })
 
     expect(calls).toEqual([
@@ -177,6 +194,20 @@ describe('publishLanguage', () => {
     const keys = bucket.puts.map((p) => p.key)
     expect(keys.filter((k) => k.includes('originals'))).toEqual([])
     expect(keys.at(-1)).toBe(catalogPath(compat, 'es-419'))
+  })
+
+  test('originals unchanged: the language entry names the stored originals build and pack', async () => {
+    const stored = {
+      ...(await storedEntry('originals', { generator: 'g2', macula: M, stamps: ORIGINAL_STAMPS })),
+      pack: { path: `packs/${compat}/originals/abc.langpack.zip`, bytes: 22_000_000, sha256: 'abc' },
+    }
+    const bucket = memoryBucket({ [catalogPath(compat, 'originals')]: stored })
+    const { options } = base(bucket, { build: fakeBuild().build })
+
+    const result = await publishLanguage(options)
+
+    expect(result.entry!.originals).toEqual({ build: stored.build.id, path: stored.pack.path, bytes: 22_000_000, sha256: 'abc' })
+    expect(bucket.json<PackCatalogEntry>(catalogPath(compat, 'es-419'))!.originals).toEqual(result.entry!.originals!)
   })
 
   test('cut short: a put that fails on the views leaves every catalog entry as it was, and the error goes up', async () => {
@@ -202,9 +233,59 @@ describe('publishLanguage', () => {
 
     const result = await publishLanguage(options)
 
-    expect(result).toEqual({ language: 'es-419', outcome: 'published', originals: 'published' })
+    expect(result).toEqual({ language: 'es-419', outcome: 'would-publish', originals: 'would-publish' })
     expect(bucket.puts).toEqual([])
     expect(lines.join('\n')).toContain('dry run')
+  })
+
+  test('no upload: it builds the packs and the views into the work folder, and puts nothing', async () => {
+    const bucket = memoryBucket()
+    const { build, calls } = fakeBuild()
+    const { options } = base(bucket, { build, noUpload: true })
+
+    const result = await publishLanguage(options)
+
+    expect(result.outcome).toBe('built')
+    expect(result.originals).toBe('built')
+    expect(result.entry?.pack.bytes).toBe(3)
+    expect(bucket.puts).toEqual([])
+    expect(calls).toEqual([expect.objectContaining({ outDir: join(options.workDir, 'packs') })])
+    expect(existsSync(join(options.workDir, 'views', 'v1/es-419/index.json'))).toBe(true)
+  })
+
+  describe('a build that is not whole is never published', () => {
+    const refused = async (packs: FakePacks, why: string | RegExp) => {
+      const bucket = memoryBucket()
+      const { options } = base(bucket, { build: fakeBuild(packs).build })
+      await expect(publishLanguage(options)).rejects.toThrow(why)
+      expect(bucket.puts).toEqual([])
+    }
+
+    test('a resource whose download failed (left out with a download reason)', async () => {
+      await refused(
+        {
+          languageKeys: ['es-419_gl/es-419/glt'],
+          skipped: [{ key: 'es-419_obt/es-419/tw', why: 'su descarga no terminó, o es de otra versión' }],
+        },
+        'es-419_obt/es-419/tw'
+      )
+    })
+
+    test('an original missing from the originals pack, though nothing says so', async () => {
+      await refused({ originalKeys: ORIGINAL_KEYS.filter((k) => k !== 'unfoldingWord/hbo/uhb') }, 'unfoldingWord/hbo/uhb')
+    })
+
+    test('MACULA missing from the originals pack', async () => {
+      await refused({ originalKeys: ORIGINAL_KEYS.filter((k) => k !== 'Biblica/el-x-koine/macula') }, 'Biblica/el-x-koine/macula')
+    })
+
+    test('a resource Door43 lists that is neither packed nor left out for good', async () => {
+      await refused({ languageKeys: ['es-419_gl/es-419/glt'], skipped: [] }, 'es-419_obt/es-419/tw')
+    })
+
+    test('a language pack without an aligned literal text', async () => {
+      await refused({ languageKeys: ['es-419_obt/es-419/tw'], skipped: [{ key: 'es-419_gl/es-419/glt', why: 'no tiene tit' }] }, /literal/)
+    })
   })
 
   test("MACULA's stamp sorts by its commit date, never by its hash", async () => {
@@ -278,13 +359,105 @@ describe('r2Bucket', () => {
     }
   })
 
-  test('a failed put throws with the status', async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }) })
+  test('a failed put throws with the status, and a 403 is not retried', async () => {
+    let requests = 0
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        requests++
+        return new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 })
+      },
+    })
     try {
-      const bucket = r2Bucket({ endpoint: `http://127.0.0.1:${server.port}`, bucket: 'packs', accessKeyId: 'a', secretAccessKey: 's' })
+      const bucket = r2Bucket({ endpoint: `http://127.0.0.1:${server.port}`, bucket: 'packs', accessKeyId: 'a', secretAccessKey: 's', retryDelaysMs: [0, 0] })
       await expect(bucket.put('k', 'x', { contentType: 'application/json', cacheControl: 'no-cache' })).rejects.toThrow('403')
+      expect(requests).toBe(1)
     } finally {
       server.stop(true)
     }
+  })
+
+  /** A server that answers each request with the next status of the list, then 200. */
+  function answering(statuses: number[]) {
+    const seen: Array<{ method: string; body: string }> = []
+    const server = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        seen.push({ method: req.method, body: await req.text() })
+        const status = statuses[seen.length - 1] ?? 200
+        if (status !== 200) return new Response('<Error><Code>SlowDown</Code></Error>', { status })
+        return req.method === 'GET' ? Response.json({ ok: 1 }) : new Response('')
+      },
+    })
+    const bucket = r2Bucket({ endpoint: `http://127.0.0.1:${server.port}`, bucket: 'packs', accessKeyId: 'a', secretAccessKey: 's', retryDelaysMs: [0, 0] })
+    return { server, bucket, seen }
+  }
+
+  test('a put that gets a 503 is retried with the same body, and succeeds', async () => {
+    const { server, bucket, seen } = answering([503])
+    try {
+      await bucket.put('catalog/c/es-419.json', '{"x":1}', { contentType: 'application/json', cacheControl: 'no-cache' })
+      expect(seen).toEqual([
+        { method: 'PUT', body: '{"x":1}' },
+        { method: 'PUT', body: '{"x":1}' },
+      ])
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('a 429 and then a 500 are retried too', async () => {
+    const { server, bucket, seen } = answering([429, 500])
+    try {
+      await bucket.put('k', new Uint8Array([1, 2]), { contentType: 'application/zip', cacheControl: 'immutable' })
+      expect(seen.length).toBe(3)
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('three 503s in a row fail the put with the status', async () => {
+    const { server, bucket, seen } = answering([503, 503, 503])
+    try {
+      await expect(bucket.put('k', 'x', { contentType: 'application/json', cacheControl: 'no-cache' })).rejects.toThrow('503')
+      expect(seen.length).toBe(3)
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('a read is retried on a 503, and a 404 is null at once', async () => {
+    const { server, bucket, seen } = answering([503])
+    try {
+      expect(await bucket.getJson('catalog/c/there.json')).toEqual({ ok: 1 })
+      expect(seen.length).toBe(2)
+    } finally {
+      server.stop(true)
+    }
+    const missing = answering([404])
+    try {
+      expect(await missing.bucket.getJson('catalog/c/missing.json')).toBeNull()
+      expect(missing.seen.length).toBe(1)
+    } finally {
+      missing.server.stop(true)
+    }
+  })
+
+  test('a network error is retried, and the last one goes up', async () => {
+    // A port nothing listens on any more.
+    const gone = Bun.serve({ port: 0, fetch: () => new Response('') })
+    const port = gone.port
+    gone.stop(true)
+    const retries: string[] = []
+    const bucket = r2Bucket({
+      endpoint: `http://127.0.0.1:${port}`,
+      bucket: 'packs',
+      accessKeyId: 'a',
+      secretAccessKey: 's',
+      retryDelaysMs: [0, 0],
+      log: (line) => retries.push(line),
+    })
+    await expect(bucket.put('k', 'x', { contentType: 'application/json', cacheControl: 'no-cache' })).rejects.toThrow()
+    expect(retries.length).toBe(2)
   })
 })

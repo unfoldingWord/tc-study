@@ -6,6 +6,9 @@
  * The upload order is what keeps a cut-short run harmless: the packs (named by content, so new keys), then the views,
  * then the originals' entry and the language's entry last. Until that entry is written the bucket names the previous
  * build, whose pack is still there.
+ *
+ * A build that is not whole is never published: the build id is made of what Door43 lists, so a resource dropped by a
+ * failed download would otherwise be frozen out until Door43 publishes again.
  */
 
 import { readFileSync } from 'node:fs'
@@ -19,7 +22,9 @@ import {
   PACK_FORMAT_VERSION,
   type PackBuild,
   type PackCatalogEntry,
+  type PackManifest,
 } from '@bt-synergy/language-pack'
+import { MACULA_KEYS } from '../../cli/companions'
 import { door43Stamps } from './door43Stamps'
 import { PACK_VERSIONS } from './packVersions'
 import { prepareAndPack } from './prepareAndPack'
@@ -30,11 +35,17 @@ export interface PackBucket {
   put(key: string, body: Uint8Array | string, o: { contentType: string; cacheControl: string }): Promise<void>
 }
 
+/**
+ * `would-publish`: a dry run found changes (nothing built). `built`: `noUpload` built the packs and views into the work
+ * folder and put nothing.
+ */
+export type PublishOutcome = 'unchanged' | 'published' | 'would-publish' | 'built'
+
 export type PublishResult = {
   language: string
-  outcome: 'unchanged' | 'published'
+  outcome: PublishOutcome
   entry?: PackCatalogEntry
-  originals?: 'unchanged' | 'published'
+  originals?: PublishOutcome
 }
 
 const IMMUTABLE = 'public, max-age=31536000, immutable'
@@ -69,6 +80,46 @@ function changesSince(stored: PackBuild | undefined, next: Omit<PackBuild, 'id'>
   return out
 }
 
+type PackLeft = Array<{ key: string; why: string }>
+
+/** Reasons a resource is left out that a rebuild would not change: a book pack's book it does not have. */
+const PERMANENT_LEFT = /^no tiene /
+
+const resourceIdOf = (key: string) => key.split('/')[2] ?? ''
+
+/**
+ * Why a build must not be published, if anything: a resource left out by a failed download, an original or MACULA
+ * missing from the originals pack, a resource Door43 lists that the pack neither carries nor leaves out for good, or no
+ * aligned literal text (a language without one cannot be opened in Servos; the spec's eligibility rule).
+ */
+export function notWhole(
+  packs: { language: { manifest: PackManifest; skipped: PackLeft }; originals: { manifest: PackManifest; skipped: PackLeft } },
+  stamps: Record<string, string>,
+  o: { obs: boolean }
+): string[] {
+  const out: string[] = []
+  for (const { key, why } of [...packs.language.skipped, ...packs.originals.skipped]) {
+    if (!PERMANENT_LEFT.test(why)) out.push(`${key}: ${why}`)
+  }
+  const inOriginals = new Set(packs.originals.manifest.resources.map((r) => r.key))
+  for (const key of [...ORIGINAL_LANGUAGE_KEYS, ...MACULA_KEYS]) {
+    if (!inOriginals.has(key)) out.push(`${key}: no está en el paquete de originales`)
+  }
+  const packed = new Set(packs.language.manifest.resources.map((r) => r.key))
+  const leftForGood = new Set(packs.language.skipped.filter((s) => PERMANENT_LEFT.test(s.why)).map((s) => s.key))
+  const originals = new Set<string>(ORIGINAL_LANGUAGE_KEYS)
+  for (const key of Object.keys(stamps).sort()) {
+    // The stamps carry OBS only when it is packed; with it, its own rules may leave parts out.
+    if (originals.has(key) || (o.obs && /^obs/i.test(resourceIdOf(key)))) continue
+    if (!packed.has(key) && !leftForGood.has(key) && !out.some((line) => line.startsWith(`${key}: `))) {
+      out.push(`${key}: Door43 lo lista y el paquete no lo tiene`)
+    }
+  }
+  const literal = packs.language.manifest.resources.some((r) => r.subject === 'Aligned Bible' && /lt$/.test(resourceIdOf(r.key)))
+  if (!literal) out.push('el paquete no tiene texto literal alineado')
+  return out
+}
+
 /** Like Promise.all over a pool: stops starting uploads at the first failure, and rejects with it. */
 async function eachLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let next = 0
@@ -100,7 +151,10 @@ export async function publishLanguage(o: {
   stamps?: (language: string) => Promise<Record<string, string>>
   build?: typeof prepareAndPack
   views?: typeof writeMcpViews
+  /** Decide only: nothing is built or put. */
   dryRun?: boolean
+  /** Decide, then build the packs and views into `workDir`, and put nothing (a measurement, a check). */
+  noUpload?: boolean
   log?: (line: string) => void
 }): Promise<PublishResult> {
   const { language, bucket } = o
@@ -114,7 +168,7 @@ export async function publishLanguage(o: {
   const obs = o.obs ?? false
   const write = o.log ?? (() => {})
   const say = (line: string) => write(oneLine(line))
-  const stampsOf = o.stamps ?? ((l: string) => door43Stamps({ language: l, obs }))
+  const stampsOf = o.stamps ?? ((l: string) => door43Stamps({ language: l, obs, lexiconsRef: o.lexiconsRef }))
   const build = o.build ?? prepareAndPack
   const views = o.views ?? writeMcpViews
 
@@ -139,12 +193,13 @@ export async function publishLanguage(o: {
     return { language, outcome: 'unchanged', entry: stored }
   }
   for (const change of changesSince(stored?.build, languageBase)) say(`  ${change}`)
-  const originalsChanged = storedOriginals?.build?.id !== originalsBuild.id
+  // An entry without its pack cannot be named by a language, so it is published again.
+  const originalsChanged = storedOriginals?.build?.id !== originalsBuild.id || !storedOriginals?.pack?.path
   say(`originals: build ${originalsBuild.id} (guardado: ${storedOriginals?.build?.id ?? 'ninguno'})${originalsChanged ? ', se publica' : ', sin cambios'}`)
 
   if (o.dryRun) {
     say(`${language}: dry run, se publicaría; no se construye ni se sube nada`)
-    return { language, outcome: 'published', originals: originalsChanged ? 'published' : 'unchanged' }
+    return { language, outcome: 'would-publish', originals: originalsChanged ? 'would-publish' : 'unchanged' }
   }
 
   const packs = await build({
@@ -165,17 +220,9 @@ export async function publishLanguage(o: {
   if (packs.language.manifest.language !== language) {
     throw new Error(`${packs.language.file} is for ${packs.language.manifest.language}, not ${language}`)
   }
+  const gaps = notWhole({ language: packs.language, originals: packs.originals }, stamps, { obs })
+  if (gaps.length) throw new Error(`Not publishing ${language}, the build is not whole: ${gaps.join('; ')}`)
 
-  const languageSha = await sha256Of(packs.language.bytes)
-  const entry = catalogEntryOf({
-    manifest: packs.language.manifest,
-    compat,
-    build: languageBuild,
-    bytes: packs.language.bytes,
-    sha256: languageSha,
-    left: packs.language.skipped,
-    views: `v1/${language}/`,
-  })
   const originalsSha = await sha256Of(packs.originals.bytes)
   // The originals pack is made inside a language's run and its manifest names that language; it is everyone's.
   const originalsEntry = catalogEntryOf({
@@ -186,12 +233,30 @@ export async function publishLanguage(o: {
     sha256: originalsSha,
     left: packs.originals.skipped,
   })
+  // Unchanged originals have the same build id, so the stored pack is what this language's rows were made against.
+  const originalsNamed = originalsChanged ? originalsEntry : storedOriginals!
+  const languageSha = await sha256Of(packs.language.bytes)
+  const entry = catalogEntryOf({
+    manifest: packs.language.manifest,
+    compat,
+    build: languageBuild,
+    bytes: packs.language.bytes,
+    sha256: languageSha,
+    left: packs.language.skipped,
+    views: `v1/${language}/`,
+    originals: { build: originalsNamed.build.id, path: originalsNamed.pack.path, bytes: originalsNamed.pack.bytes, sha256: originalsNamed.pack.sha256 },
+  })
 
   const viewsDir = join(o.workDir, 'views')
   const { files } = await views({ pack: packs.language.bytes, outDir: viewsDir, log: say })
   const prefix = `v1/${language}/`
   const stray = files.find((f) => !f.startsWith(prefix) || f.split('/').includes('..'))
   if (stray) throw new Error(`A view outside ${prefix}: ${stray}`)
+
+  if (o.noUpload) {
+    say(`${language}: --no-upload, paquetes en ${join(o.workDir, 'packs')} y ${files.length} vistas en ${viewsDir}; no se sube nada`)
+    return { language, outcome: 'built', entry, originals: originalsChanged ? 'built' : 'unchanged' }
+  }
 
   await bucket.put(entry.pack.path, packs.language.bytes, { contentType: 'application/zip', cacheControl: IMMUTABLE })
   say(`subido ${entry.pack.path}`)
@@ -240,29 +305,73 @@ export function memoryBucket(seed: Record<string, unknown> = {}): PackBucket & {
 
 type S3ClientLike = { presign(key: string, o: { method: 'GET' | 'PUT'; expiresIn: number }): string }
 
+const JSON_TIMEOUT_MS = 60_000
+const PACK_TIMEOUT_MS = 10 * 60_000
+/** Three tries in all: R2 answers 429 and 5xx now and then, and a run should not lose an hour's build to one. */
+const RETRY_DELAYS_MS = [1_000, 4_000]
+
+/** A status worth asking again for: R2 busy or failing, not a request that is wrong. */
+const retryable = (status: number) => status === 429 || status >= 500
+
 /**
  * Cloudflare R2 through Bun's S3 client, used only to sign: Bun 1.3's `write` sends no Cache-Control, so the request
- * is a plain fetch to a presigned URL that carries the headers itself.
+ * is a plain fetch to a presigned URL that carries the headers itself. Each request has a timeout (ten minutes for a
+ * pack) and is tried again after a network error, a 429 or a 5xx.
  */
-export function r2Bucket(o: { endpoint: string; bucket: string; accessKeyId: string; secretAccessKey: string }): PackBucket {
+export function r2Bucket(o: {
+  endpoint: string
+  bucket: string
+  accessKeyId: string
+  secretAccessKey: string
+  /** The waits before each retry; their number is the number of retries. */
+  retryDelaysMs?: number[]
+  log?: (line: string) => void
+}): PackBucket {
   // Read from the global so the package still type-checks without Bun's types.
   const { S3Client } = (globalThis as unknown as { Bun: { S3Client: new (o: object) => S3ClientLike } }).Bun
   const client = new S3Client({ endpoint: o.endpoint, bucket: o.bucket, accessKeyId: o.accessKeyId, secretAccessKey: o.secretAccessKey })
+  const delays = o.retryDelaysMs ?? RETRY_DELAYS_MS
+  const say = (line: string) => (o.log ?? console.error)(oneLine(line))
   const failure = async (what: string, key: string, res: Response) =>
     new Error(`${what} ${key}: ${res.status} ${oneLine((await res.text().catch(() => '')).slice(0, 300))}`)
+
+  /** The response of the last try: a good one, a 404, or one not worth retrying; a network error after the last try. */
+  async function withRetries(what: string, key: string, send: () => Promise<Response>): Promise<Response> {
+    for (let attempt = 0; ; attempt++) {
+      let why: string
+      try {
+        const res = await send()
+        if (!retryable(res.status) || attempt >= delays.length) return res
+        why = String(res.status)
+        await res.body?.cancel().catch(() => {})
+      } catch (e) {
+        if (attempt >= delays.length) throw e
+        why = e instanceof Error ? e.message : String(e)
+      }
+      say(`${what} ${key}: ${why}; otra vez en ${delays[attempt] / 1000} s`)
+      await new Promise((resolve) => setTimeout(resolve, delays[attempt]))
+    }
+  }
+
   return {
     async getJson<T>(key: string) {
-      const res = await fetch(client.presign(key, { method: 'GET', expiresIn: 600 }))
+      const res = await withRetries('GET', key, () =>
+        fetch(client.presign(key, { method: 'GET', expiresIn: 600 }), { signal: AbortSignal.timeout(JSON_TIMEOUT_MS) })
+      )
       if (res.status === 404) return null
       if (!res.ok) throw await failure('GET', key, res)
       return (await res.json()) as T
     },
     async put(key, body, m) {
-      const res = await fetch(client.presign(key, { method: 'PUT', expiresIn: 3600 }), {
-        method: 'PUT',
-        headers: { 'content-type': m.contentType, 'cache-control': m.cacheControl },
-        body: body as BodyInit,
-      })
+      const timeout = m.contentType === 'application/zip' ? PACK_TIMEOUT_MS : JSON_TIMEOUT_MS
+      const res = await withRetries('PUT', key, () =>
+        fetch(client.presign(key, { method: 'PUT', expiresIn: 3600 }), {
+          method: 'PUT',
+          headers: { 'content-type': m.contentType, 'cache-control': m.cacheControl },
+          body: body as BodyInit,
+          signal: AbortSignal.timeout(timeout),
+        })
+      )
       if (!res.ok) throw await failure('PUT', key, res)
     },
   }
