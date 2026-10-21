@@ -1,5 +1,5 @@
 import { BookMarked, Info, NotebookPen, Scale } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAppStore } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
 import { useWorkspaceStore } from '../../../features/workspace/workspaceStore'
@@ -13,6 +13,7 @@ import {
   toResourceInfoModalProps,
 } from '../common/resourceInfoModalProps'
 import { useEnrichedResourceInfoModal } from '../common/useEnrichedResourceInfoModal'
+import { useHelpsMenuPopover, type HelpsMenuPopoverPos } from './useHelpsMenuPopover'
 
 export { licenseIdOf, releaseVersionOf, toResourceInfoModalProps }
 
@@ -21,6 +22,8 @@ export { licenseIdOf, releaseVersionOf, toResourceInfoModalProps }
  * Prefer workspace package map (Unlock 1 may strip TN/TWL from panel keys).
  */
 export const lookupHelpsSourceResource = lookupWorkspaceResource
+
+const SOURCES_MENU_FALLBACK_POS: HelpsMenuPopoverPos = { top: 56, right: 12 }
 
 type SourceKind = 'tn' | 'twl'
 
@@ -39,11 +42,8 @@ interface HelpsSourcesMenuProps {
  * Lists resolved TN + TWL packages; row opens real ResourceInfoModal metadata.
  */
 export function HelpsSourcesMenu({ tnKey, twlKey }: HelpsSourcesMenuProps) {
-  const [open, setOpen] = useState(false)
+  const { open, setOpen, buttonRef, menuRef, pos } = useHelpsMenuPopover(SOURCES_MENU_FALLBACK_POS)
   const [infoResource, setInfoResource] = useState<ResourceInfo | null>(null)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
 
   const loadedResources = useAppStore((s) => s.loadedResources)
   const packageResources = useWorkspaceStore((s) => s.currentPackage?.resources)
@@ -57,44 +57,6 @@ export function HelpsSourcesMenu({ tnKey, twlKey }: HelpsSourcesMenuProps) {
     if (twl) rows.push({ kind: 'twl', resource: twl })
     return rows
   }, [loadedResources, packageResources, tnKey, twlKey])
-
-  useEffect(() => {
-    if (!open) return
-    const update = () => {
-      const el = buttonRef.current
-      if (!el) {
-        setPos({ top: 56, right: 12 })
-        return
-      }
-      const rect = el.getBoundingClientRect()
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-    }
-    update()
-    window.addEventListener('resize', update)
-    window.addEventListener('scroll', update, true)
-    return () => {
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update, true)
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as Node
-      if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return
-      setOpen(false)
-    }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onDown)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onDown)
-    }
-  }, [open])
 
   return (
     <div className="relative flex items-center">

@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useMemo, useRef } from 'react'
-import { useCatalogManager, useNavigationMode, useResourceTypeRegistry } from '../../../contexts'
+import { useCatalogManager, useNavigationMode } from '../../../contexts'
 import { usePinnedHelpsReference } from '../../../features/nav/usePinnedHelpsReference'
 import { useAppStore, useBookTitleSource } from '../../../contexts/AppContext'
 import type { ResourceInfo } from '../../../contexts/types'
@@ -32,6 +32,7 @@ import { getLanguageDirection } from '../../../utils/languageDirection'
 import { useTranslationNotesContent } from '../TranslationNotesViewer/hooks/useTranslationNotesContent'
 import { useScriptureTokens, useWordsLinksContent } from '../WordsLinksViewer/hooks'
 import { CombinedHelpsList } from './CombinedHelpsList'
+import { resourceKeyLangSegment } from './combinedHelpsUtils'
 import {
   buildHelpsFilterChrome,
   combinedHelpsFilterDisplayCount,
@@ -75,7 +76,6 @@ export function CombinedHelpsViewer({
   const currentRef = usePinnedHelpsReference()
   const navigationMode = useNavigationMode()
   const catalogManager = useCatalogManager()
-  const resourceTypeRegistry = useResourceTypeRegistry()
   const bookTitleSource = useBookTitleSource()
   const availableLanguages = useWizardStore((s) => s.availableLanguages)
   const loadedMembership = useAppStore((s) => loadedResourcesMembershipKey(s.loadedResources))
@@ -117,7 +117,6 @@ export function CombinedHelpsViewer({
     endChapter,
   })
 
-  const scriptureTokenListenerId = resourceId
   const filterResetKey =
     navigationMode === 'chapter'
       ? `${currentRef.book}:${currentRef.chapter}`
@@ -143,19 +142,11 @@ export function CombinedHelpsViewer({
     }
   }, [filterResetKey])
 
-  const { catalogMetadata } = useCombinedHelpsDeps({
-    resourceKey,
-    tnKey,
-    twlKey,
-    helpsScope,
-    catalogManager,
-    resourceTypeRegistry,
-  })
+  const { catalogMetadata } = useCombinedHelpsDeps({ resourceKey, catalogManager })
 
+  // SCRIPTURE_TOKENS is received on the mounted CombinedHelps resourceId.
   const { sourceResourceId: broadcastTargetId, resourceMetadata: targetScriptureMetadata } =
-    useScriptureTokens({
-      resourceId: scriptureTokenListenerId,
-    })
+    useScriptureTokens({ resourceId })
   const sharedTargetKey = useHelpsTargetScriptureKey()
   const readPanels = useReadPanelStore((s) => s.panels)
   const textLangPrefer = navigationLanguageCode(readPanels)
@@ -180,19 +171,14 @@ export function CombinedHelpsViewer({
   )
 
   const helpsLangForWarm =
-    helpsLanguageActions?.selectedLanguageCode ||
-    tnKey.split('/')[1]?.split('_')[0] ||
-    twlKey.split('/')[1]?.split('_')[0] ||
-    ''
-  const textLangForWarm =
-    targetSourceId?.split('/')[1]?.split('_')[0] || helpsLangForWarm
+    helpsLanguageActions?.selectedLanguageCode || resourceKeyLangSegment(tnKey) || resourceKeyLangSegment(twlKey) || ''
+  const textLangForWarm = resourceKeyLangSegment(targetSourceId) || helpsLangForWarm
   const warmVisibleResources = useMemo(
     () => warmVisibleHelpsResources({ targetSourceId, tnKey, twlKey }),
     [targetSourceId, tnKey, twlKey]
   )
 
-  const languageCode =
-    resource?.language ?? tnKey.split('/')[1]?.split('_')[0] ?? twlKey.split('/')[1]?.split('_')[0] ?? ''
+  const languageCode = resource?.language ?? resourceKeyLangSegment(tnKey) ?? resourceKeyLangSegment(twlKey) ?? ''
   const languageFromList = availableLanguages.find((l) => l.code === languageCode)
   const resourceDirection = getLanguageDirection(
     catalogMetadata?.languageDirection ?? undefined,
@@ -266,16 +252,7 @@ export function CombinedHelpsViewer({
     restoreBookKind: filters.restoreBookKind,
   })
 
-  const hasMatches = combinedHelpsFilterHasMatches({
-    supportRefFilter: filters.supportRefFilter,
-    twlArticleFilter: filters.twlArticleFilter,
-    obsQuoteFilter: filters.obsQuoteFilter,
-    tokenFilter: filters.tokenFilter,
-    verseFilter: filters.verseFilter,
-    kindFilter: filters.kindFilter,
-    hasNoteMatches,
-    hasLinkMatches,
-  })
+  const hasMatches = combinedHelpsFilterHasMatches({ ...filters, hasNoteMatches, hasLinkMatches })
   const displayCount = combinedHelpsFilterDisplayCount({
     kindFilter: filters.kindFilter,
     notesCount: displayNotes.length,
@@ -289,15 +266,7 @@ export function CombinedHelpsViewer({
     displayLinks,
   })
 
-  const {
-    handleNoteSelect,
-    handleNoteQuoteClick,
-    handleSupportReferenceClick,
-    handleFilterBySupportReference,
-    handleFilterByTwlArticle,
-    handleTitleClick,
-    handleLinkQuoteClick,
-  } = useCombinedHelpsHandlers({
+  const handlers = useCombinedHelpsHandlers({
     helpsScope,
     bookCode: currentRef.book,
     tnKey,
@@ -362,20 +331,9 @@ export function CombinedHelpsViewer({
   const helpsLanguageName = listedHelpsLang ?? ''
   const passageLabel = formatHelpsPassageLabel(currentRef.book, currentRef.chapter)
   const { filterScopeBar, onClearActiveFilter } = buildHelpsFilterChrome({
-    obsQuoteFilter: filters.obsQuoteFilter,
-    tokenFilter: filters.tokenFilter,
-    verseFilter: filters.verseFilter,
-    supportRefFilter: filters.supportRefFilter,
-    twlArticleFilter: filters.twlArticleFilter,
+    ...filters,
     displayCount,
     hasMatches,
-    setObsQuoteFilter: filters.setObsQuoteFilter,
-    setTokenFilter: filters.setTokenFilter,
-    setVerseFilter: filters.setVerseFilter,
-    setSupportRefFilter: filters.setSupportRefFilter,
-    setTwlArticleFilter: filters.setTwlArticleFilter,
-    setSelectedHelpsCard: filters.setSelectedHelpsCard,
-    restoreBookKind: filters.restoreBookKind,
     sendVerseFilter,
   })
 
@@ -418,14 +376,14 @@ export function CombinedHelpsViewer({
         getTWTitle={titles.getTWTitle}
         getTWPreview={titles.getTWPreview}
         isTWPreviewPending={titles.isTWPreviewPending}
-        onSupportReferenceClick={handleSupportReferenceClick}
-        onFilterBySupportReference={handleFilterBySupportReference}
-        onFilterByTwlArticle={handleFilterByTwlArticle}
+        onSupportReferenceClick={handlers.handleSupportReferenceClick}
+        onFilterBySupportReference={handlers.handleFilterBySupportReference}
+        onFilterByTwlArticle={handlers.handleFilterByTwlArticle}
         onEntryLinkClick={onEntryLinkClick}
-        onNoteQuoteClick={handleNoteQuoteClick}
-        onNoteSelect={handleNoteSelect}
-        onTitleClick={handleTitleClick}
-        onLinkQuoteClick={handleLinkQuoteClick}
+        onNoteQuoteClick={handlers.handleNoteQuoteClick}
+        onNoteSelect={handlers.handleNoteSelect}
+        onTitleClick={handlers.handleTitleClick}
+        onLinkQuoteClick={handlers.handleLinkQuoteClick}
       />
     </div>
   )

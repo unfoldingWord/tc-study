@@ -21,34 +21,16 @@ import {
 import { markReadNavigationInternal } from '../../../features/read/replaceReadUrlFromUi'
 import { parseTWLink } from '../../../features/helps/quoteTokens'
 import type { NoteWithTokens } from '../TranslationNotesViewer/components/TranslationNoteCard'
-import { helpsCardVerseFilter, obsFrameHighlightFromHelpsRow } from './combinedHelpsUtils'
+import {
+  helpsCardVerseFilter,
+  obsFrameHighlightFromHelpsRow,
+  taArticleIdFromSupportRef,
+} from './combinedHelpsUtils'
 import { helpsFilterAnchorFromRow } from './helpsFilterAnchorPin'
 import type { HelpsCardSelection } from './helpsCardSelection'
 
-type SendTokenClick = (data: {
-  lifecycle: 'event'
-  token: TokenClickSignal['token']
-}) => void
-
-type SendEntryLinkClick = (data: {
-  lifecycle: 'event'
-  link: { resourceType: string; resourceId: string; entryId: string; text: string }
-}) => void
-
-type BroadcastObsHighlight = (data: {
-  lifecycle: 'event'
-  highlight: ObsFrameHighlightSignal['highlight']
-}) => void
-
-type SendVerseFilter = (data: {
-  lifecycle: 'event'
-  filter: VerseFilterSignal['filter']
-}) => void
-
-type SendVerseNavigation = (data: {
-  lifecycle: 'event'
-  verse: VerseNavigationSignal['verse']
-}) => void
+/** `useSignal(...).sendToAll` for one event payload. */
+type SendEvent<T> = (data: { lifecycle: 'event' } & T) => void
 
 export interface UseCombinedHelpsHandlersParams {
   helpsScope: 'scripture' | 'obs'
@@ -57,11 +39,13 @@ export interface UseCombinedHelpsHandlersParams {
   twlKey: string
   resourceKey: string
   onEntryLinkClick?: (resourceKey: string, entryId: string) => void
-  sendTokenClick: SendTokenClick
-  sendEntryLinkClick: SendEntryLinkClick
-  sendVerseFilter: SendVerseFilter
-  sendVerseNavigation: SendVerseNavigation
-  broadcastObsHighlight: BroadcastObsHighlight
+  sendTokenClick: SendEvent<{ token: TokenClickSignal['token'] }>
+  sendEntryLinkClick: SendEvent<{
+    link: { resourceType: string; resourceId: string; entryId: string; text: string }
+  }>
+  sendVerseFilter: SendEvent<{ filter: VerseFilterSignal['filter'] }>
+  sendVerseNavigation: SendEvent<{ verse: VerseNavigationSignal['verse'] }>
+  broadcastObsHighlight: SendEvent<{ highlight: ObsFrameHighlightSignal['highlight'] }>
   setSelectedHelpsCard: (selection: HelpsCardSelection) => void
   setSupportRefFilter?: (filter: SupportRefFilter | null) => void
   setTwlArticleFilter?: (filter: TwlArticleFilter | null) => void
@@ -160,40 +144,34 @@ export function useCombinedHelpsHandlers({
     ]
   )
 
+  /** OBS quote click (after the row jump): frame filter, then highlight the quote in the story. */
+  const obsQuoteClick = useCallback(
+    (row: Parameters<typeof obsFrameHighlightFromHelpsRow>[0]) => {
+      sendObsCardFrameFilter(row.reference)
+      const highlight = obsFrameHighlightFromHelpsRow(row)
+      if (highlight) broadcastObsHighlight({ lifecycle: 'event', highlight })
+    },
+    [broadcastObsHighlight, sendObsCardFrameFilter]
+  )
+
   const handleNoteQuoteClick = useCallback(
     (note: NoteWithTokens) => {
       setSelectedHelpsCard({ kind: 'tn', id: note.id })
       if (helpsScope === 'obs') {
+        const { id, reference, quote, occurrence } = note
         navigateToHelpsRow(note.reference)
-        sendObsCardFrameFilter(note.reference)
-        const highlight = obsFrameHighlightFromHelpsRow({
-          id: note.id,
-          reference: note.reference,
-          quote: note.quote,
-          occurrence: note.occurrence,
-          kind: 'tn',
-        })
-        if (!highlight) return
-        broadcastObsHighlight({ lifecycle: 'event', highlight })
+        obsQuoteClick({ id, reference, quote, occurrence, kind: 'tn' })
         return
       }
       applyHelpsQuoteToScripture(note.reference, note)
     },
-    [
-      applyHelpsQuoteToScripture,
-      broadcastObsHighlight,
-      helpsScope,
-      navigateToHelpsRow,
-      sendObsCardFrameFilter,
-      setSelectedHelpsCard,
-    ]
+    [applyHelpsQuoteToScripture, helpsScope, navigateToHelpsRow, obsQuoteClick, setSelectedHelpsCard]
   )
 
   const handleSupportReferenceClick = useCallback(
     (supportRef: string) => {
-      const match = supportRef.match(/rc:\/\/\*\/ta\/man\/(.+)/)
-      if (match && onEntryLinkClick) {
-        const entryId = match[1]
+      const entryId = taArticleIdFromSupportRef(supportRef)
+      if (entryId && onEntryLinkClick) {
         const parts = (tnKey || resourceKey).split('/')
         const language = parts.length >= 2 ? parts[1] : 'en'
         const owner = parts[0] || 'unfoldingWord'
@@ -207,8 +185,7 @@ export function useCombinedHelpsHandlers({
     (supportRef: string, title?: string, source?: { id: string; reference: string }) => {
       if (!supportRef?.startsWith('rc://') || !setSupportRefFilter) return
       clearCompetingFilters?.()
-      const fallback =
-        supportRef.match(/rc:\/\/\*\/ta\/man\/(.+)/)?.[1]?.split('/').pop() || supportRef
+      const fallback = taArticleIdFromSupportRef(supportRef)?.split('/').pop() || supportRef
       setSupportRefFilter({
         supportReference: supportRef,
         title: (title && title !== 'Learn more' ? title : fallback) || fallback,
@@ -273,29 +250,14 @@ export function useCombinedHelpsHandlers({
     (link: TranslationWordsLink) => {
       setSelectedHelpsCard({ kind: 'twl', id: link.id })
       if (helpsScope === 'obs') {
+        const { id, reference, origWords, occurrence } = link
         navigateToHelpsRow(link.reference)
-        sendObsCardFrameFilter(link.reference)
-        const highlight = obsFrameHighlightFromHelpsRow({
-          id: link.id,
-          reference: link.reference,
-          quote: link.origWords,
-          occurrence: link.occurrence,
-          kind: 'twl',
-        })
-        if (!highlight) return
-        broadcastObsHighlight({ lifecycle: 'event', highlight })
+        obsQuoteClick({ id, reference, quote: origWords, occurrence, kind: 'twl' })
         return
       }
       applyHelpsQuoteToScripture(link.reference, link)
     },
-    [
-      applyHelpsQuoteToScripture,
-      broadcastObsHighlight,
-      helpsScope,
-      navigateToHelpsRow,
-      sendObsCardFrameFilter,
-      setSelectedHelpsCard,
-    ]
+    [applyHelpsQuoteToScripture, helpsScope, navigateToHelpsRow, obsQuoteClick, setSelectedHelpsCard]
   )
 
   return {

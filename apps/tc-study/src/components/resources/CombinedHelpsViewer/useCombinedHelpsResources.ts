@@ -64,6 +64,8 @@ export function resolveCombinedHelpsResourceKeys({
     }
   }
 
+  // Metadata language OR the `owner/lang/...` key segment (covers wrong metadata).
+  // Never pick TN/TWL from another language still present in loadedResources.
   const matchesLang = (r: ResourceInfo) => {
     if (!wantLang) return true
     const key = r.key || r.id || ''
@@ -81,17 +83,6 @@ export function resolveCombinedHelpsResourceKeys({
     if (!matchesLang(r)) continue
     if (isNotesType(t, helpsScope) && !tn) tn = key
     if (isWordsLinksType(t, helpsScope) && !twl) twl = key
-  }
-
-  // Fallback when metadata language is wrong: use `owner/lang/...` from the key only.
-  // Never pick TN/TWL from another language still present in loadedResources.
-  for (const r of list) {
-    const t = r.type as string | undefined
-    const key = r.key || r.id || ''
-    if (COMBINED_HELPS_IDS.has(key)) continue
-    if (wantLang && langFromResourceKey(key) !== wantLang) continue
-    if (!tn && isNotesType(t, helpsScope)) tn = key
-    if (!twl && isWordsLinksType(t, helpsScope)) twl = key
   }
 
   return { tnKey: tn || '', twlKey: twl || '' }

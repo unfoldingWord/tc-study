@@ -17,6 +17,7 @@ import type {
   InternedToken,
   ScriptureFullChapter,
 } from '../../../../features/scripture/scripturePreparer'
+import { ChapterHeading } from './ChapterHeading'
 import { ChapterScrollSection } from './ChapterScrollSection'
 import {
   blockClassForMarker,
@@ -261,15 +262,7 @@ export const PreparedFullChapterPane = memo(function PreparedFullChapterPane({
       register={registerChapter}
       layout={layout}
     >
-      <h2
-        className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
-        onClick={(e) => {
-          e.stopPropagation()
-          onChapterClick?.(chapterNum)
-        }}
-      >
-        {chapterNum}
-      </h2>
+      <ChapterHeading chapter={chapterNum} onChapterClick={onChapterClick} />
       <div className="space-y-0.5" data-scripture-layout="prepared-full">
         {full.blocks.map((block, idx) => (
           <BlockView

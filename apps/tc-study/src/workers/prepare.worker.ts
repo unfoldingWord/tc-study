@@ -151,7 +151,7 @@ function warmJobMatchesCancel(
 }
 
 function reply(payload: Record<string, unknown>) {
-  ;(self as unknown as { postMessage: (data: unknown) => void }).postMessage(payload)
+  self.postMessage(payload)
 }
 
 function jobSortKey(j: PrepareJob): number {

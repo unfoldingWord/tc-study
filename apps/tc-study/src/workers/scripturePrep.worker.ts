@@ -49,7 +49,7 @@ type InMsg =
 self.onmessage = (event: MessageEvent<InMsg>) => {
   const msg = event.data
   const reply = (payload: Record<string, unknown>) => {
-    ;(self as unknown as { postMessage: (data: unknown) => void }).postMessage(payload)
+    self.postMessage(payload)
   }
   try {
     if (msg.type === 'prep-from-view-model') {

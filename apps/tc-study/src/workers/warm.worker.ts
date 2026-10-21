@@ -27,7 +27,7 @@ async function runBatchQuotes(msg: Extract<WarmInMsg, { type: 'batch-quotes' }>)
 async function runBatchAlign(msg: Extract<WarmInMsg, { type: 'batch-align' }>) {
   const { batchAlignLinks } = await import('../features/helps/batchAlignLinks')
   const { id: _id, type: _type, ...args } = msg
-  return batchAlignLinks(args as unknown as Parameters<typeof batchAlignLinks>[0])
+  return batchAlignLinks(args)
 }
 
 const WorkerScope = (globalThis as typeof globalThis & {
@@ -49,7 +49,7 @@ let cancelToken = 0
 let currentJob: WarmJob | null = null
 
 function reply(payload: Record<string, unknown>) {
-  ;(self as unknown as { postMessage: (data: unknown) => void }).postMessage(payload)
+  self.postMessage(payload)
 }
 
 function laneSortKey(lane: WarmLane): number {

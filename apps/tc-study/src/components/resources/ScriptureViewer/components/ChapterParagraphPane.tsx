@@ -1,3 +1,4 @@
+import { ChapterHeading } from './ChapterHeading'
 import { ChapterScrollSection } from './ChapterScrollSection'
 
 interface ChapterParagraphPaneProps {
@@ -21,15 +22,7 @@ export function ChapterParagraphPane({
       className="space-y-0.5"
       layout="paragraph"
     >
-      <h2
-        className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
-        onClick={(e) => {
-          e.stopPropagation()
-          onChapterClick?.(chapter)
-        }}
-      >
-        {chapter}
-      </h2>
+      <ChapterHeading chapter={chapter} onChapterClick={onChapterClick} />
       {paragraphs.map((text, index) => (
         <p key={`${chapter}-p-${index}`} className="leading-relaxed text-lg text-scripture-fg mb-3">
           {text}

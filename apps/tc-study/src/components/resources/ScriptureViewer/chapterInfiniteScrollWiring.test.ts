@@ -34,7 +34,10 @@ describe('chapter edge-reveal + warm wiring', () => {
     expect(hookSrc).toContain('warmChapterAtEdge')
     expect(viewerSrc).toContain('displayChapters={chapterScroll.displayChapters}')
     expect(viewerSrc).toContain('chapterSlots={chapterScroll.chapterSlots}')
-    expect(hookSrc).toContain('CHAPTER_EDGE_SWAP_MODE')
+    // Edge-reveal is the only chapter mode the hook implements — no stitch path.
+    expect(hookSrc).not.toContain('resetChapterSlots')
+    expect(hookSrc).not.toContain('shouldResetWindowOnNavChange')
+    expect(hookSrc).not.toContain('approachingNeighborChapter')
     expect(hookSrc).toContain('revealChapterInWindow')
     expect(hookSrc).toContain('revealChapterAtEdge')
     expect(hookSrc).toContain('ensurePreparedFullChapter')
@@ -170,7 +173,9 @@ describe('chapter edge-reveal + warm wiring', () => {
       join(import.meta.dir, '../../../features/nav/chapterInfiniteScroll.ts'),
       'utf8'
     )
-    expect(navSrc).toContain('CHAPTER_EDGE_SWAP_MODE = true')
+    // Edge-reveal is the only mode: the legacy stitch / spacer path stays gone.
+    expect(navSrc).not.toContain('stitchMountedChapters')
+    expect(navSrc).not.toContain("'spacer'")
     expect(navSrc).toContain('revealChapterInWindow')
     expect(navSrc).toContain('MAX_MOUNTED_CHAPTERS = 3')
     expect(navSrc).toContain('CHAPTER_REVEAL_PEEK_PX')

@@ -1,6 +1,6 @@
 /**
  * Preload TA / entry / TW titles and TW first-paragraph previews for CombinedHelps rows.
- * Runs on idle with a concurrency cap so chapter changes do not fan out on the critical path.
+ * Runs on idle so chapter changes do not fan out on the critical path.
  */
 
 import type { TranslationNote, TranslationWordsLink } from '@bt-synergy/resource-parsers'
@@ -23,8 +23,6 @@ export interface UseCombinedHelpsTitlePreloadParams {
   twLoadingPreviews: Set<string>
   fetchTWPreview: (link: TranslationWordsLink) => void
 }
-
-const TITLE_PRELOAD_CONCURRENCY = 4
 
 export function useCombinedHelpsTitlePreload({
   displayNotes,
@@ -54,19 +52,10 @@ export function useCombinedHelpsTitlePreload({
 
   useEffect(() => {
     let cancelled = false
-    let inFlight = 0
+    // Queue every job before running any, so the has() checks see pre-fetch sets.
     const queue: Array<() => void> = []
-
     const pump = () => {
-      while (!cancelled && inFlight < TITLE_PRELOAD_CONCURRENCY && queue.length > 0) {
-        const job = queue.shift()!
-        inFlight += 1
-        try {
-          job()
-        } finally {
-          inFlight -= 1
-        }
-      }
+      while (!cancelled && queue.length > 0) queue.shift()!()
     }
 
     const cancelIdle = scheduleIdle(() => {

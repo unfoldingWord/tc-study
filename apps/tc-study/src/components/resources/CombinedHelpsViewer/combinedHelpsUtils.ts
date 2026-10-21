@@ -19,6 +19,16 @@ export function langFromResourceKey(key: string | undefined): string {
   return primaryLangCode(parts[1])
 }
 
+/** Raw language segment of `owner/lang_region/id` (`lang`; no case/region normalising). */
+export function resourceKeyLangSegment(key: string | null | undefined): string | undefined {
+  return key?.split('/')[1]?.split('_')[0]
+}
+
+/** `rc://…/ta/man/<id>` support reference → TA article id (`translate/figs-metaphor`). */
+export function taArticleIdFromSupportRef(supportRef: string): string | undefined {
+  return supportRef.match(/rc:\/\/\*\/ta\/man\/(.+)/)?.[1]
+}
+
 export function isNotesType(
   t: string | undefined,
   scope: 'scripture' | 'obs' = 'scripture'

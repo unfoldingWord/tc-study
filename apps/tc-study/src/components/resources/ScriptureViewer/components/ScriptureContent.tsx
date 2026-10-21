@@ -3,11 +3,10 @@ import {
   collectVerseBlockSequence,
   filterUsjLayoutBlocks,
   type UsjScriptureViewModel,
-  type UsjVerseBlockItem,
   type UsjWordToken,
 } from '@bt-synergy/scripture-loader'
 import { BookX } from 'lucide-react'
-import { memo, useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useCacheAdapter } from '../../../../contexts'
 import type { BCVReference, BookInfo, ReferenceState } from '../../../../contexts/types-only'
 import { useScriptureDisplayStore } from '../../../../lib/stores/scriptureDisplayStore'
@@ -15,9 +14,7 @@ import { LoadingSpinner } from '../../../../shared/LoadingSpinner'
 import { isOriginalLanguageCode } from '../../../../features/helps/resolveAlignedQuoteTokens'
 import type { ChapterSlot } from '../../../../features/nav/chapterInfiniteScroll'
 import {
-  chapterWindowAround,
   contentChaptersFromSlots,
-  lastChapterNumber,
   paragraphChaptersFromSlots,
 } from '../../../../features/nav/chapterInfiniteScroll'
 import { resolveLastChapter } from '../../../../features/nav/bookChapterCounts'
@@ -47,6 +44,7 @@ import {
   buildLightChapter,
   type ScriptureNavRecord,
 } from '../../../../features/scripture/scripturePreparer'
+import { lastChapterFromViewModel } from '../hooks/useChapterInfiniteScroll'
 import { isScriptureBooksPending } from '../hooks/scriptureContentLoad'
 import type { DisplayUsjVerse, OriginalLanguageToken } from '../types'
 import {
@@ -56,16 +54,16 @@ import {
   prefetchAdjacentChapterParagraphs,
   prefetchChapterLayouts,
 } from '../utils/chapterLayoutCache'
+import { chaptersToWarm } from '../utils/chaptersToWarm'
 import { displayVersesForChapters } from '../utils/displayVersesForChapters'
 import { chaptersForRef, includeVerseForRef } from '../utils/scriptureNavRange'
-import { ChapterScrollSection } from './ChapterScrollSection'
-import { ChapterSlotChrome } from './ChapterSlotChrome'
-import { FormattedBlockRenderer } from './FormattedBlockRenderer'
+import { ChapterHeading } from './ChapterHeading'
+import { ChapterParagraphPane } from './ChapterParagraphPane'
 import { FormattedScriptureContent } from './FormattedScriptureContent'
 import { PreparedFullChapterPane } from './PreparedFullChapterPane'
 import { PreparedLightChapterPane } from './PreparedLightChapterPane'
 import { TokenSourceHealButton } from './TokenSourceHealButton'
-import { VerseRenderer } from './VerseRenderer'
+import { VerseBlockChapterPane, VerseBlockItems } from './VerseBlockChapterPane'
 
 interface ScriptureContentProps {
   isLoading: boolean
@@ -101,96 +99,6 @@ interface ScriptureContentProps {
   tokenSourceFailed?: boolean
   onRetryTokenSource?: () => void
 }
-
-interface VerseBlockChapterPaneProps {
-  chapterNum: number
-  items: UsjVerseBlockItem[]
-  verses: DisplayUsjVerse[]
-  registerChapter?: (chapter: number, el: HTMLElement | null) => void
-  highlightTarget: OriginalLanguageToken | null
-  underlinedSemanticIds?: Set<string>
-  onTokenClick: (token: UsjWordToken) => void
-  onVerseClick?: (chapter: number, verse: number) => void
-  onChapterClick?: (chapter: number) => void
-  onScriptureRefClick?: (ref: BCVReference) => void
-  currentBook: string
-  isOriginalLanguage: boolean
-}
-
-const VerseBlockChapterPane = memo(function VerseBlockChapterPane({
-  chapterNum,
-  items,
-  verses,
-  registerChapter,
-  highlightTarget,
-  underlinedSemanticIds,
-  onTokenClick,
-  onVerseClick,
-  onChapterClick,
-  onScriptureRefClick,
-  currentBook,
-  isOriginalLanguage,
-}: VerseBlockChapterPaneProps) {
-  const verseByNumber = new Map<number, DisplayUsjVerse>()
-  for (const verse of verses) verseByNumber.set(verse.number, verse)
-
-  return (
-    <ChapterScrollSection
-      chapter={chapterNum}
-      kind="rendered"
-      register={registerChapter}
-      className="space-y-1"
-      layout="verse-block"
-      book={currentBook}
-    >
-      <h2
-        className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
-        onClick={(e) => {
-          e.stopPropagation()
-          onChapterClick?.(chapterNum)
-        }}
-      >
-        {chapterNum}
-      </h2>
-
-      {items.map((item, idx) => {
-        if (item.kind === 'chrome') {
-          return (
-            <FormattedBlockRenderer
-              key={`chrome-${chapterNum}-${item.block.marker}-${idx}`}
-              block={item.block}
-              blockIndex={idx}
-              highlightTarget={highlightTarget}
-              underlinedSemanticIds={underlinedSemanticIds}
-              onTokenClick={onTokenClick}
-              onVerseClick={onVerseClick}
-              onScriptureRefClick={onScriptureRefClick}
-              currentBook={currentBook}
-              isOriginalLanguage={isOriginalLanguage}
-            />
-          )
-        }
-        const verse = verseByNumber.get(item.verse)
-        if (!verse) return null
-        return (
-          <VerseRenderer
-            key={`${item.chapter}:${item.verse}`}
-            verse={verse}
-            chapterNumber={item.chapter}
-            displayInline={item.displayInline}
-            highlightTarget={highlightTarget}
-            underlinedSemanticIds={underlinedSemanticIds}
-            onTokenClick={onTokenClick}
-            onVerseClick={onVerseClick}
-            onScriptureRefClick={onScriptureRefClick}
-            currentBook={currentBook}
-            isOriginalLanguage={isOriginalLanguage}
-          />
-        )
-      })}
-    </ChapterScrollSection>
-  )
-})
 
 export function ScriptureContent({
   isLoading,
@@ -236,39 +144,21 @@ export function ScriptureContent({
   }, [slots, displayChapters, currentRef.chapter])
 
   const warmChapters = useMemo(() => {
-    const tocChapters = availableBooks.find(
-      (b) => b.code.toLowerCase() === (currentRef.book || '').toLowerCase()
-    )?.chapters
     const last = resolveLastChapter({
       bookId: currentRef.book || '',
       explicit:
-        (nav?.chapters?.length
-          ? lastChapterNumber(nav.chapters.map((c) => c.number))
-          : 0) ||
-        (viewModel?.chapters?.length
-          ? lastChapterNumber(viewModel.chapters.map((c) => c.number))
-          : 0) ||
+        lastChapterFromViewModel(nav?.chapters) ||
+        lastChapterFromViewModel(viewModel?.chapters) ||
         undefined,
-      tocChapters,
+      tocChapters: availableBooks.find(
+        (b) => b.code.toLowerCase() === (currentRef.book || '').toLowerCase()
+      )?.chapters,
     })
-    const around = chapterWindowAround(currentRef.chapter || 1, last)
-    const set = new Set<number>(around)
-    if (slots) {
-      const painted = contentChaptersFromSlots(slots)
-      for (const chapter of painted) set.add(chapter)
-      if (painted.length > 0) {
-        const lo = Math.min(...painted)
-        const hi = Math.max(...painted)
-        if (lo > 1) set.add(lo - 1)
-        if (hi < last) set.add(hi + 1)
-      }
-      for (const slot of slots) {
-        if (slot.kind === 'placeholder') set.add(slot.chapter)
-      }
-    } else if (displayChapters?.length) {
-      for (const chapter of displayChapters) set.add(chapter)
-    }
-    return [...set].sort((a, b) => a - b)
+    // displayChapters is the painted stack whenever slots are on, null otherwise.
+    const painted = slots ? contentChaptersFromSlots(slots) : (displayChapters ?? [])
+    return chaptersToWarm({ navChapter: currentRef.chapter || 1, lastChapter: last, painted }).sort(
+      (a, b) => a - b
+    )
   }, [slots, displayChapters, nav, viewModel, currentRef.chapter, currentRef.book, availableBooks])
 
   const allBookChapters = useMemo(() => {
@@ -316,22 +206,19 @@ export function ScriptureContent({
     return []
   }
 
-  const lightPaneForChapter = (
-    chapter: number,
-    slotKind: 'paragraph' | 'rendered' = 'paragraph'
-  ) => {
+  const lightPaneForChapter = (chapter: number, slotKind: 'paragraph' | 'rendered') => {
     void preparedRevision
     void bookLightRevision
     const peeked = peekPreparedChapter(resourceKey, currentRef.book, chapter)
     // Prefer cached light; if the prepare worker has not filled the LRU yet but
     // the view model is already in hand, build light sync so verse markers paint
     // during the paragraph phase (not only after full-tier upgrade).
-    const light =
-      peeked?.light?.blocks?.length
-        ? peeked.light
-        : (paintViewModel ?? viewModel)
-          ? buildLightChapter((paintViewModel ?? viewModel)!, chapter)
-          : null
+    const vm = paintViewModel ?? viewModel
+    const light = peeked?.light?.blocks?.length
+      ? peeked.light
+      : vm
+        ? buildLightChapter(vm, chapter)
+        : null
     if (!light?.blocks?.length) return null
     return (
       <PreparedLightChapterPane
@@ -345,6 +232,17 @@ export function ScriptureContent({
       />
     )
   }
+
+  /** Plain paragraphs while a chapter has no light blocks yet — never token trees. */
+  const paragraphPane = (chapter: number, key: string) => (
+    <ChapterParagraphPane
+      key={key}
+      chapter={chapter}
+      paragraphs={paragraphsForChapter(chapter)}
+      register={registerChapter}
+      onChapterClick={onChapterClick}
+    />
+  )
 
   useEffect(() => {
     const vm = paintViewModel ?? viewModel
@@ -398,8 +296,8 @@ export function ScriptureContent({
     const highlightChapter =
       persist?.chapter || parseTokenVerseRef(highlightTarget.verseRef)?.chapter || null
     const highlightEpoch = getHelpsHighlightEpoch()
-    if (
-      !shouldScrollToQuoteHighlight({
+    const shouldScroll = () =>
+      shouldScrollToQuoteHighlight({
         selectedTokenId,
         lastScrolledTokenId: lastScrolledTokenRef.current,
         lastScrolledEpoch: lastScrolledEpochRef.current,
@@ -409,27 +307,12 @@ export function ScriptureContent({
         visibleChapter: currentRef.chapter,
         highlightApplied: isHelpsHighlightApplied(),
       })
-    ) {
-      return
-    }
+    if (!shouldScroll()) return
 
     let cancelled = false
     const tryScroll = (attempt: number) => {
       if (cancelled) return
-      if (
-        !shouldScrollToQuoteHighlight({
-          selectedTokenId,
-          lastScrolledTokenId: lastScrolledTokenRef.current,
-          lastScrolledEpoch: lastScrolledEpochRef.current,
-          highlightEpoch,
-          userScrolling: getChapterScrollActivity().unsettled,
-          highlightChapter,
-          visibleChapter: currentRef.chapter,
-          highlightApplied: isHelpsHighlightApplied(),
-        })
-      ) {
-        return
-      }
+      if (!shouldScroll()) return
       const highlightedElements = containerRef.current?.querySelectorAll('[data-highlighted="true"]')
       if (highlightedElements && highlightedElements.length > 0) {
         // Top of the scrollport with scroll-mt on highlighted tokens (not center):
@@ -471,14 +354,6 @@ export function ScriptureContent({
         : [],
     [viewModel, layoutMode, slotsActive, navChapters, includeVerse]
   )
-
-  const verseByKey = useMemo(() => {
-    const map = new Map<string, DisplayUsjVerse>()
-    for (const verse of displayVerses) {
-      map.set(`${verse.chapterNumber || currentRef.chapter}:${verse.number}`, verse)
-    }
-    return map
-  }, [displayVerses, currentRef.chapter])
 
   const { versesByChapter, chapters } = useMemo(() => {
     if (slotsActive && displayChapters && displayChapters.length > 0) {
@@ -563,17 +438,29 @@ export function ScriptureContent({
     )
   }
 
-  // Nav-only: show infinite-scroll chrome (paragraph/placeholder) without viewModel.
+  const isOriginalLanguage = isOriginalLanguageCode(language)
+  const healButton =
+    tokenSourceFailed && onRetryTokenSource ? (
+      <div className="sticky top-0 z-10 flex justify-end -mb-2">
+        <TokenSourceHealButton onRetry={onRetryTokenSource} />
+      </div>
+    ) : null
+  const tokenProps = {
+    highlightTarget,
+    underlinedSemanticIds,
+    onTokenClick,
+    onVerseClick,
+    onScriptureRefClick,
+    currentBook: currentRef.book,
+    isOriginalLanguage,
+  }
+
+  // Nav-only: paint slot chrome (light / paragraph) without the viewModel.
   // When full prepared rows exist, render interned tokens without loading the view model.
   if (!viewModel && nav && slotsActive && slots) {
-    const isOriginalLanguage = isOriginalLanguageCode(language)
     return (
       <div ref={containerRef} className="space-y-6" dir={languageDirection}>
-        {tokenSourceFailed && onRetryTokenSource ? (
-          <div className="sticky top-0 z-10 flex justify-end -mb-2">
-            <TokenSourceHealButton onRetry={onRetryTokenSource} />
-          </div>
-        ) : null}
+        {healButton}
         {slots.map((slot) => {
           if (slot.kind === 'rendered') {
             void preparedRevision
@@ -596,34 +483,14 @@ export function ScriptureContent({
               )
             }
             // Full tokens missing — stay on light (paragraph), never claim interactive.
-            const light = lightPaneForChapter(slot.chapter, 'paragraph')
-            if (light) return light
             return (
-              <ChapterSlotChrome
-                key={`pending-rendered-${slot.chapter}`}
-                slot={{ ...slot, kind: 'paragraph' }}
-                book={currentRef.book}
-                paragraphs={paragraphsForChapter(slot.chapter)}
-                register={registerChapter}
-                onChapterClick={onChapterClick}
-              />
+              lightPaneForChapter(slot.chapter, 'paragraph') ??
+              paragraphPane(slot.chapter, `pending-rendered-${slot.chapter}`)
             )
           }
-          if (slot.kind === 'paragraph' || slot.kind === 'placeholder') {
-            const light = lightPaneForChapter(slot.chapter, 'paragraph')
-            if (light) return light
-          }
           return (
-            <ChapterSlotChrome
-              key={`${slot.kind}-${slot.chapter}-${slot.toChapter ?? slot.chapter}`}
-              slot={slot}
-              book={currentRef.book}
-              paragraphs={
-                slot.kind === 'paragraph' ? paragraphsForChapter(slot.chapter) : undefined
-              }
-              register={registerChapter}
-              onChapterClick={onChapterClick}
-            />
+            lightPaneForChapter(slot.chapter, 'paragraph') ??
+            paragraphPane(slot.chapter, `paragraph-${slot.chapter}-${slot.chapter}`)
           )
         })}
       </div>
@@ -662,15 +529,9 @@ export function ScriptureContent({
     )
   }
 
-  const isOriginalLanguage = isOriginalLanguageCode(language)
-
   return (
     <div ref={containerRef} className="space-y-6" dir={languageDirection}>
-      {tokenSourceFailed && onRetryTokenSource ? (
-        <div className="sticky top-0 z-10 flex justify-end -mb-2">
-          <TokenSourceHealButton onRetry={onRetryTokenSource} />
-        </div>
-      ) : null}
+      {healButton}
       {layoutMode === 'formatted' && slotPaintViewModel ? (
         <FormattedScriptureContent
           viewModel={slotPaintViewModel}
@@ -690,23 +551,9 @@ export function ScriptureContent({
       ) : slotsActive && slots ? (
         slots.map((slot) => {
           if (slot.kind !== 'rendered') {
-            if (slot.kind === 'paragraph' || slot.kind === 'placeholder') {
-              const light = lightPaneForChapter(slot.chapter, 'paragraph')
-              if (light) return light
-            }
             return (
-              <ChapterSlotChrome
-                key={`${slot.kind}-${slot.chapter}-${slot.toChapter ?? slot.chapter}`}
-                slot={slot}
-                book={currentRef.book}
-                paragraphs={
-                  slot.kind === 'paragraph'
-                    ? paragraphsForChapter(slot.chapter)
-                    : undefined
-                }
-                register={registerChapter}
-                onChapterClick={onChapterClick}
-              />
+              lightPaneForChapter(slot.chapter, 'paragraph') ??
+              paragraphPane(slot.chapter, `paragraph-${slot.chapter}-${slot.chapter}`)
             )
           }
           // Verse-block mode must use one-verse-per-block layout. PreparedFull
@@ -717,17 +564,9 @@ export function ScriptureContent({
           if (verses.length === 0) {
             // Stack chapter not yet merged into the focused SoT slice — keep
             // light text visible until useStackedChapterViewModel lands.
-            const light = lightPaneForChapter(slot.chapter, 'rendered')
-            if (light) return light
             return (
-              <ChapterSlotChrome
-                key={`pending-verse-block-${slot.chapter}`}
-                slot={{ ...slot, kind: 'paragraph' }}
-                book={currentRef.book}
-                paragraphs={paragraphsForChapter(slot.chapter)}
-                register={registerChapter}
-                onChapterClick={onChapterClick}
-              />
+              lightPaneForChapter(slot.chapter, 'rendered') ??
+              paragraphPane(slot.chapter, `pending-verse-block-${slot.chapter}`)
             )
           }
           return (
@@ -737,65 +576,21 @@ export function ScriptureContent({
               items={getChapterVerseBlockItems(slotPaintViewModel, slot.chapter)}
               verses={verses}
               registerChapter={registerChapter}
-              highlightTarget={highlightTarget}
-              underlinedSemanticIds={underlinedSemanticIds}
-              onTokenClick={onTokenClick}
-              onVerseClick={onVerseClick}
               onChapterClick={onChapterClick}
-              onScriptureRefClick={onScriptureRefClick}
-              currentBook={currentRef.book}
-              isOriginalLanguage={isOriginalLanguage}
+              {...tokenProps}
             />
           )
         })
       ) : (
         chapters.map((chapterNum) => (
           <div key={chapterNum} className="space-y-1" data-scripture-layout="verse-block">
-            <h2
-              className="text-2xl font-bold text-scripture-fg mb-4 pb-2 border-b border-border cursor-pointer hover:text-accent transition-colors"
-              onClick={(e) => {
-                e.stopPropagation()
-                onChapterClick?.(chapterNum)
-              }}
-            >
-              {chapterNum}
-            </h2>
-
-            {(verseBlockItemsByChapter.get(chapterNum) ?? []).map((item, idx) => {
-              if (item.kind === 'chrome') {
-                return (
-                  <FormattedBlockRenderer
-                    key={`chrome-${chapterNum}-${item.block.marker}-${idx}`}
-                    block={item.block}
-                    blockIndex={idx}
-                    highlightTarget={highlightTarget}
-                    underlinedSemanticIds={underlinedSemanticIds}
-                    onTokenClick={onTokenClick}
-                    onVerseClick={onVerseClick}
-                    onScriptureRefClick={onScriptureRefClick}
-                    currentBook={currentRef.book}
-                    isOriginalLanguage={isOriginalLanguage}
-                  />
-                )
-              }
-              const verse = verseByKey.get(`${item.chapter}:${item.verse}`)
-              if (!verse) return null
-              return (
-                <VerseRenderer
-                  key={`${item.chapter}:${item.verse}`}
-                  verse={verse}
-                  chapterNumber={item.chapter}
-                  displayInline={item.displayInline}
-                  highlightTarget={highlightTarget}
-                  underlinedSemanticIds={underlinedSemanticIds}
-                  onTokenClick={onTokenClick}
-                  onVerseClick={onVerseClick}
-                  onScriptureRefClick={onScriptureRefClick}
-                  currentBook={currentRef.book}
-                  isOriginalLanguage={isOriginalLanguage}
-                />
-              )
-            })}
+            <ChapterHeading chapter={chapterNum} onChapterClick={onChapterClick} />
+            <VerseBlockItems
+              chapterNum={chapterNum}
+              items={verseBlockItemsByChapter.get(chapterNum) ?? []}
+              verses={versesByChapter[chapterNum] ?? []}
+              {...tokenProps}
+            />
           </div>
         ))
       )}

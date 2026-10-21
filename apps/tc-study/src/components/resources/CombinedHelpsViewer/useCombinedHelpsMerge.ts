@@ -40,23 +40,16 @@ export type LinkWithAlignments = TranslationWordsLink & {
   articlePath?: string
 }
 
+type MergedRowSort = { ref: string; sortChapter: number; sortVerse: number; sortPosition: number }
+
 export type MergedRow =
-  | {
-      kind: 'tn'
-      ref: string
-      sortChapter: number
-      sortVerse: number
-      sortPosition: number
-      note: NoteWithAlignments
-    }
-  | {
-      kind: 'twl'
-      ref: string
-      sortChapter: number
-      sortVerse: number
-      sortPosition: number
-      link: LinkWithAlignments
-    }
+  | ({ kind: 'tn'; note: NoteWithAlignments } & MergedRowSort)
+  | ({ kind: 'twl'; link: LinkWithAlignments } & MergedRowSort)
+
+function mergedRowSort(ref: string, sortPosition: number): MergedRowSort {
+  const { chapter, verse } = refSortParts(ref)
+  return { ref, sortChapter: chapter, sortVerse: verse, sortPosition }
+}
 
 /**
  * Entries with alignedTokens get their first token's position.
@@ -127,34 +120,12 @@ export function mergeNotesAndLinksToRows(
   notes: NoteWithAlignments[],
   links: LinkWithAlignments[]
 ): MergedRow[] {
-  const rows: MergedRow[] = []
   const tnPositions = inheritedPositions(notes)
-  for (let i = 0; i < notes.length; i++) {
-    const note = notes[i]!
-    const { chapter, verse } = refSortParts(note.reference)
-    rows.push({
-      kind: 'tn',
-      ref: note.reference,
-      sortChapter: chapter,
-      sortVerse: verse,
-      sortPosition: tnPositions[i]!,
-      note,
-    })
-  }
   const twlPositions = inheritedPositions(links)
-  for (let i = 0; i < links.length; i++) {
-    const link = links[i]!
-    const { chapter, verse } = refSortParts(link.reference)
-    rows.push({
-      kind: 'twl',
-      ref: link.reference,
-      sortChapter: chapter,
-      sortVerse: verse,
-      sortPosition: twlPositions[i]!,
-      link,
-    })
-  }
-  return rows
+  return [
+    ...notes.map((note, i): MergedRow => ({ kind: 'tn', note, ...mergedRowSort(note.reference, tnPositions[i]!) })),
+    ...links.map((link, i): MergedRow => ({ kind: 'twl', link, ...mergedRowSort(link.reference, twlPositions[i]!) })),
+  ]
 }
 
 /** Merge, filter by kind, and sort into a single ordered list. */
@@ -200,21 +171,8 @@ export function useCombinedHelpsDisplay({
   twlArticleFilter = null,
   bookCodeLower,
 }: UseCombinedHelpsDisplayParams) {
-  const params: DisplayFilterParams = {
-    helpsScope,
-    obsQuoteFilter,
-    verseFilter,
-    tokenFilter,
-    supportRefFilter,
-    twlArticleFilter,
-    bookCodeLower,
-  }
-
-  const { displayNotes, hasNoteMatches } = useMemo(
-    () => filterDisplayNotes(notesWithAlignedTokens, params),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- params fields listed explicitly
-    [
-      notesWithAlignedTokens,
+  const params = useMemo(
+    (): DisplayFilterParams => ({
       helpsScope,
       obsQuoteFilter,
       verseFilter,
@@ -222,22 +180,18 @@ export function useCombinedHelpsDisplay({
       supportRefFilter,
       twlArticleFilter,
       bookCodeLower,
-    ]
+    }),
+    [helpsScope, obsQuoteFilter, verseFilter, tokenFilter, supportRefFilter, twlArticleFilter, bookCodeLower]
+  )
+
+  const { displayNotes, hasNoteMatches } = useMemo(
+    () => filterDisplayNotes(notesWithAlignedTokens, params),
+    [notesWithAlignedTokens, params]
   )
 
   const { displayLinks, hasLinkMatches } = useMemo(
     () => filterDisplayLinks(filteredByReference, params),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      filteredByReference,
-      helpsScope,
-      obsQuoteFilter,
-      verseFilter,
-      tokenFilter,
-      supportRefFilter,
-      twlArticleFilter,
-      bookCodeLower,
-    ]
+    [filteredByReference, params]
   )
 
   return { displayNotes, hasNoteMatches, displayLinks, hasLinkMatches }

@@ -11,7 +11,7 @@ const ROOT = join(import.meta.dir, '..')
 
 /** Baseline after Round 4 freeze-hole close (ratchet down only). */
 const GENERIC_ANY_BASELINE = 15
-const AS_UNKNOWN_AS_BASELINE = 22
+const AS_UNKNOWN_AS_BASELINE = 11
 
 const GENERIC_ANY_RE =
   /\b(?:Map|Record|Set|WeakMap|WeakSet|Array|Promise|Partial|Required|Readonly|useState|useRef|useMemo|useCallback)\s*<\s*[^>]*\bany\b/g

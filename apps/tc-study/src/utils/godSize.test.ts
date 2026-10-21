@@ -31,7 +31,7 @@ const HARD_GODS: { name: string; path: string; hardMax: number }[] = [
   { name: 'navigationStore', path: 'features/nav/navigationStore.ts', hardMax: 100 },
   { name: 'WordsLinksViewer', path: 'components/resources/WordsLinksViewer/index.tsx', hardMax: 400 },
   { name: 'TranslationNotesViewer', path: 'components/resources/TranslationNotesViewer/index.tsx', hardMax: 400 },
-  { name: 'CombinedHelpsViewer', path: 'components/resources/CombinedHelpsViewer/index.tsx', hardMax: 433 },
+  { name: 'CombinedHelpsViewer', path: 'components/resources/CombinedHelpsViewer/index.tsx', hardMax: 391 },
   { name: 'SimplifiedReadView', path: 'components/read/SimplifiedReadView.tsx', hardMax: 400 },
   { name: 'useReadLanguageBootstrap', path: 'features/read/useReadLanguageBootstrap.ts', hardMax: 350 },
   // Chrome / studio shells (hard ≤400)
@@ -49,7 +49,7 @@ const HARD_GODS: { name: string; path: string; hardMax: number }[] = [
   { name: 'Library', path: 'pages/Library.tsx', hardMax: 400 },
   // P1 Round 2 — Studio DnD + BCV controller hard ≤350
   { name: 'useStudioDnD', path: 'features/studio/useStudioDnD.ts', hardMax: 350 },
-  { name: 'useBcvNavigatorController', path: 'features/nav/useBcvNavigatorController.ts', hardMax: 355 },
+  { name: 'useBcvNavigatorController', path: 'features/nav/useBcvNavigatorController.ts', hardMax: 338 },
   // Residual LOC peel — import dialog + data management hard ≤400
   { name: 'CollectionImportDialog', path: 'components/collections/CollectionImportDialog.tsx', hardMax: 400 },
   { name: 'DataManagement', path: 'pages/DataManagement.tsx', hardMax: 400 },
@@ -88,7 +88,7 @@ const HARD_GODS: { name: string; path: string; hardMax: number }[] = [
 
 /** Slice / sibling soft caps (≤300 store slices; ≤350 hooks). */
 const NAV_SLICES: { name: string; path: string; currentLoc: number }[] = [
-  { name: 'navigationBcvSlice', path: 'features/nav/navigationBcvSlice.ts', currentLoc: 190 },
+  { name: 'navigationBcvSlice', path: 'features/nav/navigationBcvSlice.ts', currentLoc: 175 },
   { name: 'navigationVerseChapterSlice', path: 'features/nav/navigationVerseChapterSlice.ts', currentLoc: 240 },
   { name: 'navigationHistorySlice', path: 'features/nav/navigationHistorySlice.ts', currentLoc: 58 },
   { name: 'navigationSectionSlice', path: 'features/nav/navigationSectionSlice.ts', currentLoc: 87 },

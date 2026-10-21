@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { navigatorCommittedScope } from './bcvNavigatorModeSwitch'
+import { navigatorCommittedScope, resolveScripturePickerGrain } from './bcvNavigatorModeSwitch'
 
 describe('navigatorCommittedScope', () => {
   test('language pick staying on Bible is not a mode switch', () => {
@@ -15,5 +15,18 @@ describe('navigatorCommittedScope', () => {
     expect(navigatorCommittedScope({ previousScope: 'obs', pickerScope: 'scripture' })).toBe(
       'scripture'
     )
+  })
+})
+
+describe('resolveScripturePickerGrain', () => {
+  test('explicit picker mode wins over navigation mode', () => {
+    expect(resolveScripturePickerGrain('verse', 'chapter')).toBe('verse')
+    expect(resolveScripturePickerGrain('section', 'verse')).toBe('section')
+  })
+
+  test('without a picker mode, follow navigation mode and default to verse', () => {
+    expect(resolveScripturePickerGrain(undefined, 'section')).toBe('section')
+    expect(resolveScripturePickerGrain(undefined, 'chapter')).toBe('chapter')
+    expect(resolveScripturePickerGrain(undefined, 'passage-set')).toBe('verse')
   })
 })

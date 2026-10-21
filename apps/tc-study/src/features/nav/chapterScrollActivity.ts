@@ -127,36 +127,6 @@ export function shouldHydrateHelpsForChapter(args: {
   return args.requestedChapter === args.settledChapter
 }
 
-/**
- * True when a chapter falls inside the open BCV span (section / custom range).
- * When settle pinning is active, only the settled chapter is in-span for hydrate.
- */
-export function chapterInHelpsPassageSpan(args: {
-  chapter: number
-  startChapter: number
-  endChapter: number
-  unsettled: boolean
-  settledChapter: number | null
-}): boolean {
-  if (args.unsettled) return false
-  if (args.settledChapter != null) {
-    return args.chapter === args.settledChapter
-  }
-  return args.chapter >= args.startChapter && args.chapter <= args.endChapter
-}
-
-/**
- * Footnotes, xref popovers, and heading ref-link parsing.
- * Already-painted chapters keep extras (avoid layout shift + remount).
- * A chapter first seen while scroll is unsettled paints words only.
- */
-export function shouldPaintScriptureChromeExtras(args: {
-  unsettled: boolean
-  chapterHydrated: boolean
-}): boolean {
-  return args.chapterHydrated || !args.unsettled
-}
-
 /** Keep helps / quote work on the last settled chapter while the user is still scrolling. */
 export function pinReferenceWhileScrolling<T extends PinnableReference>(
   currentRef: T,

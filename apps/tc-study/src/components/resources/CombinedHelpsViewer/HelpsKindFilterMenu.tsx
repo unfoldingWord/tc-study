@@ -1,8 +1,8 @@
 import { BookMarked, Check, LayoutList, NotebookPen, SlidersHorizontal } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
 import { ModalPortal } from '../../shared/ModalPortal'
 import { chromeIconButtonClass } from '../common/chromeIconButton'
 import type { HelpsKindFilter } from './types'
+import { useHelpsMenuPopover } from './useHelpsMenuPopover'
 
 const KIND_OPTIONS: {
   value: HelpsKindFilter
@@ -20,44 +20,7 @@ interface HelpsKindFilterMenuProps {
 }
 
 export function HelpsKindFilterMenu({ kindFilter, setKindFilter }: HelpsKindFilterMenuProps) {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
-
-  useEffect(() => {
-    if (!open || !buttonRef.current) return
-    const update = () => {
-      const rect = buttonRef.current?.getBoundingClientRect()
-      if (!rect) return
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
-    }
-    update()
-    window.addEventListener('resize', update)
-    window.addEventListener('scroll', update, true)
-    return () => {
-      window.removeEventListener('resize', update)
-      window.removeEventListener('scroll', update, true)
-    }
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as Node
-      if (buttonRef.current?.contains(t) || menuRef.current?.contains(t)) return
-      setOpen(false)
-    }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onDown)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onDown)
-    }
-  }, [open])
+  const { open, setOpen, buttonRef, menuRef, pos } = useHelpsMenuPopover()
 
   return (
     <div className="relative flex items-center">

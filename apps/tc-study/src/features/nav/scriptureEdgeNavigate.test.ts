@@ -16,8 +16,6 @@ import {
 
   isPastCommitThreshold,
 
-  isVerticalScrollbarHit,
-
   peakOverscrollPx,
 
   nextEdgeCueVisibility,
@@ -233,64 +231,6 @@ describe('accumulateEdgeOverscroll', () => {
     expect(next.raw).toBe(0)
 
     expect(next.edge).toBeNull()
-
-  })
-
-})
-
-
-
-describe('isVerticalScrollbarHit', () => {
-
-  function box(args: { left: number; right: number; offsetWidth: number; clientWidth: number }) {
-
-    return {
-
-      getBoundingClientRect: () =>
-
-        ({ left: args.left, right: args.right, top: 0, bottom: 200, width: args.right - args.left, height: 200 }) as DOMRect,
-
-      offsetWidth: args.offsetWidth,
-
-      clientWidth: args.clientWidth,
-
-    }
-
-  }
-
-
-
-  it('hits the classic LTR gutter', () => {
-
-    const el = box({ left: 0, right: 200, offsetWidth: 200, clientWidth: 185 })
-
-    expect(isVerticalScrollbarHit(el, 190, 'ltr')).toBe(true)
-
-    expect(isVerticalScrollbarHit(el, 100, 'ltr')).toBe(false)
-
-  })
-
-
-
-  it('hits the RTL gutter on the inline-start side', () => {
-
-    const el = box({ left: 0, right: 200, offsetWidth: 200, clientWidth: 185 })
-
-    expect(isVerticalScrollbarHit(el, 8, 'rtl')).toBe(true)
-
-    expect(isVerticalScrollbarHit(el, 190, 'rtl')).toBe(false)
-
-  })
-
-
-
-  it('falls back to a thin overlay strip when gutter is 0', () => {
-
-    const el = box({ left: 0, right: 200, offsetWidth: 200, clientWidth: 200 })
-
-    expect(isVerticalScrollbarHit(el, 195, 'ltr')).toBe(true)
-
-    expect(isVerticalScrollbarHit(el, 160, 'ltr')).toBe(false)
 
   })
 
