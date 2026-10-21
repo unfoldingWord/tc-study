@@ -19,6 +19,7 @@ import { HELPS_TEXT_VERSION } from '../helps/helpsCacheKeys'
 import { HELPS_ALIGN_VERSION } from '../helps/helpsAlignCache'
 import { HELPS_QUOTE_VERSION } from '../helps/helpsQuoteCache'
 import { SCRIPTURE_PREPARE_VERSION } from '../scripture/scripturePreparer'
+import { isObs, keyOfRow } from './door43Stamps'
 import { prepareLanguage, type PrepareLanguageProgress } from './prepareLanguage'
 
 type PackResult = { file: string; bytes: Uint8Array; manifest: PackManifest; skipped: Array<{ key: string; why: string }> }
@@ -108,9 +109,6 @@ export async function prepareAndPack(o: {
     for (const m of companions.macula as Array<{ key: string; books: number }>) say(`[${elapsed()}]   ${m.key}: ${m.books} libros`)
   }
   // Open Bible Stories and their helps left out when asked: only the Bible is translated.
-  const isObs = (m: { subject?: unknown }) => /OBS|Open Bible Stories/i.test(String(m.subject ?? ''))
-  const keyOfRow = (m: { owner?: unknown; language?: unknown; resourceId?: unknown; resourceKey?: unknown }) =>
-    String(m.resourceKey ?? `${m.owner}/${m.language}/${m.resourceId}`)
   const resourceKeys = o.obs ? undefined : (await source.catalogRows()).filter((m) => m.language === language && !isObs(m)).map(keyOfRow)
 
   const common = {
