@@ -1,4 +1,4 @@
-import type { PackManifest, PackRequirement, PackVersions } from './types'
+import type { PackManifest, PackRequirement, PackResourceRole, PackVersions } from './types'
 
 export type PackBuild = {
   id: string
@@ -18,12 +18,20 @@ export type PackCatalogEntry = {
   createdAt: string
   pack: { path: string; bytes: number; sha256: string }
   versions: PackVersions
-  resources: Array<{ key: string; stamp: string; subject?: string }>
+  /**
+   * The manifest's resources, enough for an app to decide what opening the pack would replace (Servos'
+   * `packAgainstDevice`) before downloading it. `books` is empty for a resource kept by article: it comes whole.
+   */
+  resources: Array<{ key: string; stamp: string; role: PackResourceRole; books: string[]; subject?: string; title?: string }>
   left: Array<{ key: string; why: string }>
   requires?: PackRequirement[]
   /** Where the pack's book views live in the bucket, e.g. `v1/es-419/`. */
   views?: string
+  /** A language's entry: the originals build its quote and align rows were made against, and where its pack is. */
+  originals?: PackOriginalsRef
 }
+
+export type PackOriginalsRef = { build: string; path: string; bytes: number; sha256: string }
 
 /**
  * The folder a pack lives in: two packs with the same key can be opened by the same app. It names the format
@@ -87,6 +95,7 @@ export function catalogEntryOf(p: {
   sha256: string
   left: Array<{ key: string; why: string }>
   views?: string
+  originals?: PackOriginalsRef
 }): PackCatalogEntry {
   const { manifest } = p
   const entry: PackCatalogEntry = {
@@ -97,10 +106,18 @@ export function catalogEntryOf(p: {
     createdAt: manifest.createdAt,
     pack: { path: packPath(p.compat, manifest.language, p.sha256), bytes: p.bytes.length, sha256: p.sha256 },
     versions: manifest.versions ?? {},
-    resources: manifest.resources.map((r) => ({ key: r.key, stamp: r.stamp, subject: r.subject })),
+    resources: manifest.resources.map((r) => ({
+      key: r.key,
+      stamp: r.stamp,
+      role: r.role,
+      books: r.books ? [...r.books] : [],
+      ...(r.subject !== undefined ? { subject: r.subject } : {}),
+      ...(r.title !== undefined ? { title: r.title } : {}),
+    })),
     left: p.left,
   }
   if (manifest.requires) entry.requires = manifest.requires
   if (p.views) entry.views = p.views
+  if (p.originals) entry.originals = { ...p.originals }
   return entry
 }

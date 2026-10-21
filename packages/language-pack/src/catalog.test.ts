@@ -44,8 +44,9 @@ test('the entry names its pack by content, its resources with stamps, and what w
     layers: ['receipt', 'sot'],
     versions: VERSIONS,
     resources: [
-      { key: 'es-419_gl/es-419/glt', role: 'language', stamp: 'v42#2026-10-01', subject: 'Aligned Bible', rows: { sot: 3 } },
-      { key: 'es-419_gl/es-419/tn', role: 'language', stamp: 'v7#2026-09-02', rows: { sot: 2 } },
+      { key: 'es-419_gl/es-419/glt', role: 'language', stamp: 'v42#2026-10-01', subject: 'Aligned Bible', title: 'Texto Puente Literal', rows: { sot: 3 }, books: ['rut', 'tit'] },
+      { key: 'es-419_gl/es-419/tn', role: 'language', stamp: 'v7#2026-09-02', rows: { sot: 2 }, books: ['tit'] },
+      { key: 'es-419_gl/es-419/tw', role: 'language', stamp: 'v9#2026-09-03', subject: 'Translation Words', rows: { sot: 9 } },
     ] as PackManifest['resources'],
   }
   const compat = compatKeyOf(manifest.formatVersion, manifest.versions!)
@@ -66,9 +67,33 @@ test('the entry names its pack by content, its resources with stamps, and what w
   expect(entry.versions).toEqual(manifest.versions!)
   expect(entry.requires).toEqual(manifest.requires!)
   expect(entry.resources).toEqual([
-    { key: 'es-419_gl/es-419/glt', stamp: 'v42#2026-10-01', subject: 'Aligned Bible' },
-    { key: 'es-419_gl/es-419/tn', stamp: 'v7#2026-09-02', subject: undefined },
+    { key: 'es-419_gl/es-419/glt', stamp: 'v42#2026-10-01', role: 'language', books: ['rut', 'tit'], subject: 'Aligned Bible', title: 'Texto Puente Literal' },
+    { key: 'es-419_gl/es-419/tn', stamp: 'v7#2026-09-02', role: 'language', books: ['tit'] },
+    // Kept by article: no books, which an app reads as «comes whole».
+    { key: 'es-419_gl/es-419/tw', stamp: 'v9#2026-09-03', role: 'language', books: [], subject: 'Translation Words' },
   ])
-  expect(entry.left).toContainEqual({ key: 'es-419_gl/es-419/gst', why: 'no tiene est' })
+  expect(Object.keys(entry.resources[1])).not.toContain('subject')
+  expect(entry.left).toEqual([{ key: 'es-419_gl/es-419/gst', why: 'no tiene est' }])
   expect(entry.views).toBeUndefined()
+  expect(entry.originals).toBeUndefined()
+})
+
+test('the entry names the originals build and pack it needs, when given', () => {
+  const manifest: PackManifest = {
+    format: PACK_FORMAT,
+    formatVersion: PACK_FORMAT_VERSION,
+    language: 'es-419',
+    kind: 'language',
+    createdAt: '2026-10-20T10:00:00.000Z',
+    layers: ['receipt', 'sot'],
+    versions: VERSIONS,
+    resources: [],
+  }
+  const compat = compatKeyOf(manifest.formatVersion, manifest.versions!)
+  const build = { id: 'b1', generator: 'g1', stamps: {} }
+  const originals = { build: '0123456789abcdef', path: `packs/${compat}/originals/cafe.langpack.zip`, bytes: 22, sha256: 'cafe' }
+
+  const entry = catalogEntryOf({ manifest, compat, build, bytes: new Uint8Array([1]), sha256: 'beef', left: [], originals })
+
+  expect(entry.originals).toEqual(originals)
 })
