@@ -10,13 +10,20 @@ import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { ORIGINAL_LANGUAGE_KEYS, packSourceFrom } from '@bt-synergy/language-pack'
 import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
+import { lexiconStamps } from '../../cli/companions'
 import { discoverLanguage } from '../discover/discoverLanguage'
 import { createHeadlessResourceTypeRegistry } from '../discover/resourceTypeRegistry'
+import { closeAndDelete } from './fakeDatabases'
 
 // The same two rules prepare-and-pack uses to decide which rows the pack carries; shared so the stamps never drift.
 export const isObs = (m: { subject?: unknown }) => /OBS|Open Bible Stories/i.test(String(m.subject ?? ''))
 export const keyOfRow = (m: { owner?: unknown; language?: unknown; resourceId?: unknown; resourceKey?: unknown }) =>
   String(m.resourceKey ?? `${m.owner}/${m.language}/${m.resourceId}`)
+
+/** The language's literal text, whose owner's lexicons go in the pack: its aligned Bible whose id ends in `lt`. */
+export function literalTextOf<T extends { language?: unknown; subject?: unknown; resourceId?: unknown }>(rows: T[], language: string): T | undefined {
+  return rows.find((m) => m.language === language && m.subject === 'Aligned Bible' && /lt$/.test(String(m.resourceId)))
+}
 
 export function stampsOfRows(rows: ResourceMetadata[], o: { language: string; obs: boolean }): Record<string, string> {
   const originals = new Set<string>(ORIGINAL_LANGUAGE_KEYS)
@@ -29,9 +36,23 @@ export function stampsOfRows(rows: ResourceMetadata[], o: { language: string; ob
   return stamps
 }
 
+/**
+ * The rows' stamps, and with a lexicons ref the stamps of the lexicons the build will read at that ref (those of the
+ * literal text's owner, as prepareAndPack chooses them).
+ */
+export async function stampsWithLexicons(
+  rows: ResourceMetadata[],
+  o: { language: string; obs: boolean; lexiconsRef?: string; fetch?: (url: string) => Promise<Response> }
+): Promise<Record<string, string>> {
+  const stamps = stampsOfRows(rows, o)
+  const literal = literalTextOf(rows as Array<ResourceMetadata & { owner?: string }>, o.language)
+  if (!o.lexiconsRef || !literal?.owner) return stamps
+  return { ...stamps, ...(await lexiconStamps({ language: o.language, owner: String(literal.owner), ref: o.lexiconsRef, fetch: o.fetch })) }
+}
+
 let calls = 0
 
-export async function door43Stamps(o: { language: string; obs: boolean }): Promise<Record<string, string>> {
+export async function door43Stamps(o: { language: string; obs: boolean; lexiconsRef?: string }): Promise<Record<string, string>> {
   // Node has no IndexedDB; a browser keeps its own. Only fill the gap, never replace a real one.
   if (!('indexedDB' in globalThis)) await import('fake-indexeddb/auto')
   // A database of its own per call: a library must not share state with the pack build or with a second call.
@@ -51,5 +72,7 @@ export async function door43Stamps(o: { language: string; obs: boolean }): Promi
   await discoverLanguage({ language: o.language, door43Client: door43Client as never, catalogManager, resourceTypeRegistry })
 
   const source = packSourceFrom({ cache: cacheAdapter as never, catalog: catalogAdapter as never })
-  return stampsOfRows((await source.catalogRows()) as ResourceMetadata[], o)
+  const rows = (await source.catalogRows()) as ResourceMetadata[]
+  await closeAndDelete([cacheAdapter, catalogAdapter], [`door43-stamps-catalog-${id}`, `door43-stamps-cache-${id}`])
+  return stampsWithLexicons(rows, o)
 }

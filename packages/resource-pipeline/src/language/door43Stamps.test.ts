@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { resourceContentStamp } from '@bt-synergy/resource-catalog'
-import { stampsOfRows } from './door43Stamps'
+import { literalTextOf, stampsOfRows, stampsWithLexicons } from './door43Stamps'
 
 const row = (owner: string, language: string, resourceId: string, subject: string, tag: string) => ({
   resourceKey: `${owner}/${language}/${resourceId}`,
@@ -33,5 +33,41 @@ describe('stampsOfRows', () => {
     const stamps = stampsOfRows(rows, { language: 'es-419', obs: true })
     expect(Object.keys(stamps)).toContain('es-419_gl/es-419/obs')
     expect(Object.keys(stamps)).not.toContain('unfoldingWord/en/ult')
+  })
+})
+
+describe('the lexicons in the stamps', () => {
+  const withSimple = [row('es-419_gl', 'es-419', 'gst', 'Aligned Bible', 'v3'), ...rows] as never[]
+
+  test("the literal text is the language's aligned Bible whose id ends in lt, not its simple one", () => {
+    expect(literalTextOf(withSimple, 'es-419')?.owner).toBe('es-419_gl')
+    expect(literalTextOf(withSimple, 'en')?.owner).toBe('unfoldingWord')
+    expect(literalTextOf(withSimple, 'fr')).toBeUndefined()
+  })
+
+  test("the lexicons of the literal text's owner, at the ref, join the stamps", async () => {
+    const asked: string[] = []
+    const fetchFn = async (url: string) => {
+      asked.push(url)
+      if (url.endsWith('/repos/es-419_gl/es-419_uhl')) return Response.json({})
+      if (url.includes('/repos/es-419_gl/es-419_uhl/commits?sha=v3&')) return Response.json([{ sha: 'abcdef0123456789', created: '2026-10-19T10:00:00Z' }])
+      return new Response('not found', { status: 404 })
+    }
+    const stamps = await stampsWithLexicons(rows, { language: 'es-419', obs: false, lexiconsRef: 'v3', fetch: fetchFn })
+    expect(stamps['es-419_gl/es-419/uhl']).toBe('abcdef0123#2026-10-19T10_00_00Z')
+    expect(stamps['es-419_gl/es-419/glt']).toBe('v42#2026-01-02T03_04_05Z')
+    expect(Object.keys(stamps)).not.toContain('es-419_gl/es-419/ugl')
+  })
+
+  test('no literal text, or no ref: nothing is asked of Door43', async () => {
+    const fetchFn = async (): Promise<Response> => {
+      throw new Error('no request expected')
+    }
+    expect(await stampsWithLexicons(rows, { language: 'fr', obs: false, lexiconsRef: 'v3', fetch: fetchFn })).toEqual(
+      stampsOfRows(rows, { language: 'fr', obs: false })
+    )
+    expect(await stampsWithLexicons(rows, { language: 'es-419', obs: false, fetch: fetchFn })).toEqual(
+      stampsOfRows(rows, { language: 'es-419', obs: false })
+    )
   })
 })

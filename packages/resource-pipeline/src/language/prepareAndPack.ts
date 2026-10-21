@@ -14,9 +14,14 @@ import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { buildLanguagePack, ORIGINAL_LANGUAGE_KEYS, packSourceFrom, type PackManifest } from '@bt-synergy/language-pack'
 import { addLexicons, addMacula, MACULA_KEYS } from '../../cli/companions'
-import { isObs, keyOfRow } from './door43Stamps'
+import { isObs, keyOfRow, literalTextOf } from './door43Stamps'
+import { closeAndDelete } from './fakeDatabases'
 import { PACK_VERSIONS } from './packVersions'
 import { prepareLanguage, type PrepareLanguageProgress } from './prepareLanguage'
+
+// tc-study's own database names, so the rows are keyed as the app keys them.
+const CACHE_DB = 'tc-study-cache'
+const CATALOG_DB = 'tc-study-catalog'
 
 function builtNow(): { version: string; publishedAt: string } {
   const now = new Date().toISOString()
@@ -55,8 +60,8 @@ export async function prepareAndPack(o: {
   const outDir = resolve(o.outDir)
   const say = o.log ?? (() => {})
 
-  const cacheAdapter = new IndexedDBCacheAdapter({ dbName: 'tc-study-cache', storeName: 'cache-entries', version: 1 })
-  const catalogAdapter = new IndexedDBCatalogAdapter({ dbName: 'tc-study-catalog', storeName: 'catalog-entries', version: 1 })
+  const cacheAdapter = new IndexedDBCacheAdapter({ dbName: CACHE_DB, storeName: 'cache-entries', version: 1 })
+  const catalogAdapter = new IndexedDBCatalogAdapter({ dbName: CATALOG_DB, storeName: 'catalog-entries', version: 1 })
   const door43Client = getDoor43ApiClient({ baseUrl: 'https://git.door43.org', debug: false })
 
   const started = Date.now()
@@ -99,7 +104,7 @@ export async function prepareAndPack(o: {
   // The resources beside tc-study's (cli/companions.ts), into the same store before packing.
   const companions: Record<string, unknown> = {}
   const languageRows = (await source.catalogRows()).filter((m) => m.language === language)
-  const literal = languageRows.find((m) => m.subject === 'Aligned Bible' && /lt$/.test(String(m.resourceId)))
+  const literal = literalTextOf(languageRows, language)
   if (o.lexicons) {
     if (literal) {
       say(`[${elapsed()}] Léxicos de ${literal.owner}…`)
@@ -155,6 +160,8 @@ export async function prepareAndPack(o: {
 
   const reportJson = { preparation, companions, packs }
   writeFileSync(join(outDir, `${language}.report.json`), JSON.stringify(reportJson, null, 2))
+  // The packs are bytes now; the store would otherwise stay in memory through the views step, which opens its own.
+  await closeAndDelete([cacheAdapter, catalogAdapter], [CACHE_DB, CATALOG_DB], say)
 
   say(`[${elapsed()}] Listo en ${outDir}`)
   for (const build of preparation.builds) {

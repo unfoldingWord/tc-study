@@ -14,7 +14,7 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { buildIngestReceiptFromCatalog, ingestSchemaForResourceType } from '@bt-synergy/resource-catalog'
+import { buildIngestReceiptFromCatalog, ingestSchemaForResourceType, resourceContentStamp } from '@bt-synergy/resource-catalog'
 
 type Store = { set(key: string, entry: unknown): Promise<void>; putRawMany(rows: Array<{ key: string; entry: unknown }>): Promise<void> }
 type Catalog = { set(key: string, metadata: never): Promise<void> }
@@ -76,31 +76,67 @@ async function addResource(
   if (receipt) await cache.set(`resource:${resource.key}`, { metadata: receipt })
 }
 
+const LEXICONS = [
+  ['uhl', 'Hebrew Lexicon', 'Léxico hebreo'],
+  ['ugl', 'Greek Lexicon', 'Léxico griego'],
+] as const
+
+type Fetch = (url: string) => Promise<Response>
+
+/**
+ * The commit a lexicon repository has at `ref`, or null when Door43 has no such repository (most languages have no
+ * lexicons: nothing to read, and nothing a rerun would change). A repository that exists without the ref, or a Door43
+ * that fails, throws: a lexicon silently left out would be published as if the language had none.
+ */
+export async function resolveLexicon(repo: string, ref: string, fetchFn: Fetch = fetch): Promise<{ sha: string; date: string } | null> {
+  const info = await fetchFn(`${HOST}/api/v1/repos/${repo}`)
+  if (info.status === 404) return null
+  if (!info.ok) throw new Error(`Door43 answered ${info.status} for ${repo}`)
+  const res = await fetchFn(`${HOST}/api/v1/repos/${repo}/commits?sha=${encodeURIComponent(ref)}&limit=1&stat=false&files=false&verification=false`)
+  if (!res.ok) throw new Error(`${repo} has no ref ${JSON.stringify(ref)} (Door43 answered ${res.status})`)
+  const [commit] = (await res.json()) as Array<{ sha?: string; created?: string; commit?: { committer?: { date?: string } } }>
+  const date = commit?.created ?? commit?.commit?.committer?.date
+  if (!commit?.sha || !date) throw new Error(`${repo} has no commit at ${JSON.stringify(ref)}`)
+  return { sha: commit.sha, date }
+}
+
+/** A lexicon's stamp, as its catalog row gets it in `addLexicons`: the commit's first ten characters and its date. */
+const lexiconStampOf = (commit: { sha: string; date: string }) => {
+  const version = commit.sha.slice(0, 10)
+  return resourceContentStamp({ version, release: { tag_name: version, published_at: commit.date } } as never)
+}
+
+/**
+ * The stamps of the lexicons `addLexicons` would read, `{owner}/{lang}/uhl` → `{sha10}#{date}`: a publisher puts them
+ * in the build id, so a lexicon change is a change, and a bad ref fails before the hour-long build.
+ */
+export async function lexiconStamps(o: { language: string; owner: string; ref: string; fetch?: Fetch }): Promise<Record<string, string>> {
+  const stamps: Record<string, string> = {}
+  for (const [id] of LEXICONS) {
+    const commit = await resolveLexicon(`${o.owner}/${o.language}_${id}`, o.ref, o.fetch)
+    if (commit) stamps[`${o.owner}/${o.language}/${id}`] = lexiconStampOf(commit)
+  }
+  return stamps
+}
+
 /**
  * The lexicons of a language, from Door43: `{owner}/{lang}_uhl` (Hebrew) and `{owner}/{lang}_ugl` (Greek), whole
- * (each entry with the verses of every book), read from `ref` (a branch or tag; `master` is what Door43 serves them
- * from today). Returns what was added, and why a lexicon was not.
+ * (each entry with the verses of every book), read from `ref` (a branch, tag or commit; `master` is what Door43 serves
+ * them from today). Returns what was added, and why a lexicon was not; a ref the repository lacks throws.
  */
-export async function addLexicons(cache: Store, catalog: Catalog, language: string, owner: string, ref = 'master'): Promise<Array<{ key: string; entries?: number; why?: string }>> {
+export async function addLexicons(cache: Store, catalog: Catalog, language: string, owner: string, ref = 'master', fetchFn: Fetch = fetch): Promise<Array<{ key: string; entries?: number; why?: string }>> {
   const done: Array<{ key: string; entries?: number; why?: string }> = []
-  for (const [id, subject, title] of [
-    ['uhl', 'Hebrew Lexicon', 'Léxico hebreo'],
-    ['ugl', 'Greek Lexicon', 'Léxico griego'],
-  ] as const) {
+  for (const [id, subject, title] of LEXICONS) {
     const repo = `${owner}/${language}_${id}`
     const key = `${owner}/${language}/${id}`
-    const info = await fetch(`${HOST}/api/v1/repos/${repo}`)
-    if (!info.ok) {
+    const commit = await resolveLexicon(repo, ref, fetchFn)
+    if (!commit) {
       done.push({ key, why: `${repo} no está en Door43` })
       continue
     }
-    const { updated_at: updatedAt = '' } = (await info.json()) as { updated_at?: string }
-    const commit = (await (await fetch(`${HOST}/api/v1/repos/${repo}/commits?sha=${ref}&limit=1`)).json()) as Array<{ sha: string; created?: string }>
-    const archive = await fetch(`${HOST}/${repo}/archive/${ref}.tar.gz`)
-    if (!archive.ok) {
-      done.push({ key, why: `no se pudo bajar ${repo}` })
-      continue
-    }
+    // The commit, not the ref: what is read is what the stamp names, even if the branch moves meanwhile.
+    const archive = await fetchFn(`${HOST}/${repo}/archive/${commit.sha}.tar.gz`)
+    if (!archive.ok) throw new Error(`Could not download ${repo} at ${commit.sha} (Door43 answered ${archive.status})`)
     const files = untar(new Uint8Array(await archive.arrayBuffer()))
     const rows: Array<{ key: string; entry: unknown }> = []
     let entries = 0
@@ -123,8 +159,8 @@ export async function addLexicons(cache: Store, catalog: Catalog, language: stri
         subject,
         title: named ?? title,
         type: 'lexicon',
-        version: commit[0]?.sha.slice(0, 10) ?? ref,
-        publishedAt: commit[0]?.created ?? updatedAt,
+        version: commit.sha.slice(0, 10),
+        publishedAt: commit.date,
       },
       rows
     )
