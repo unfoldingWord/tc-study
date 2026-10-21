@@ -51,4 +51,18 @@ describe('packsStatus', () => {
     await packsStatus({ bucket, compat, language: 'pt-br', state: 'failed', run: RUN })
     expect(bucket.json<PackStatus>(statusPath(compat, 'pt-br'))?.failures).toBe(1)
   })
+
+  test('an unparsable stored status counts as no previous one, so the language can still be built', async () => {
+    const bucket = memoryBucket()
+    const unparsable = { ...bucket, getJson: async () => JSON.parse('{"state": "failed",') }
+    await packsStatus({ bucket: unparsable, compat, language: 'es-419', state: 'running', run: RUN })
+    expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).toMatchObject({ state: 'running', failures: 0 })
+  })
+
+  test('a read that fails for another reason stops the run and writes nothing', async () => {
+    const bucket = memoryBucket()
+    const down = { ...bucket, getJson: async () => { throw new Error('GET status: 503') } }
+    await expect(packsStatus({ bucket: down, compat, language: 'es-419', state: 'running', run: RUN })).rejects.toThrow('503')
+    expect(bucket.puts).toHaveLength(0)
+  })
 })

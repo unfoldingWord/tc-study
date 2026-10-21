@@ -25,7 +25,12 @@ export async function packsStatus(o: {
 }): Promise<void> {
   if (!isLanguageCode(o.language)) throw new Error(`Not a language code: ${JSON.stringify(o.language)}`)
   const key = statusPath(o.compat, o.language)
-  const previous = await o.bucket.getJson<Partial<PackStatus>>(key)
+  // A status that does not parse (a hand edit gone wrong) would otherwise make the language unbuildable: the next run
+  // could not write `running`. Network and HTTP errors still stop the run.
+  const previous = await o.bucket.getJson<Partial<PackStatus>>(key).catch((e: unknown) => {
+    if (e instanceof SyntaxError) return null
+    throw e
+  })
   // A hand-edited or damaged file must not turn the count into NaN, which no comparison would ever catch.
   const before = Number.isInteger(previous?.failures) && (previous!.failures as number) > 0 ? (previous!.failures as number) : 0
   const failures = o.state === 'failed' ? before + 1 : o.state === 'ok' ? 0 : before
