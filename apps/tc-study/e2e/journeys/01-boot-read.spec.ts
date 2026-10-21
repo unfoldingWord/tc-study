@@ -17,12 +17,13 @@ test.describe('Journey 1: App boots / catalog ready → Read loads', () => {
     await page.goto('/read')
     await waitForCatalogReady(page)
 
-    // Language picker required on bare /read
-    await expect(page.getByRole('dialog')).toBeVisible()
-    await expect(page.getByLabel('Language selection')).toBeVisible()
-    await expect(page.getByText('E2E Language')).toBeVisible()
+    // Language picker required on bare /read (dialog is named by its trigger label)
+    const picker = page.getByRole('dialog', { name: 'Select language' })
+    await expect(picker).toBeVisible()
+    const e2eLanguage = picker.getByRole('button', { name: 'E2E Language', exact: true })
+    await expect(e2eLanguage).toBeVisible()
 
-    await page.getByText('E2E Language').click()
+    await e2eLanguage.click()
 
     // Picker closes; URL includes language; scripture content renders from cache
     await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 30_000 })
