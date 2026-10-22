@@ -152,4 +152,54 @@ describe('recordBookBlobs', () => {
     expect(await recordBookBlobs({ door43Client: empty, catalogAdapter: a, resourceKey: 'a/es/tn' })).toBe('skipped')
     expect(a.writes).toBe(0)
   })
+
+  test('keeps a catalog write that lands during the tree fetch', async () => {
+    const catalogAdapter = adapterWith(tnRow())
+    const door43Client = {
+      fetchRepoTreeBlobs: async () => {
+        // A download records progress on the row while the tree is being fetched
+        const live = catalogAdapter.store.get('a/es/tn') as any
+        catalogAdapter.store.set('a/es/tn', {
+          ...live,
+          contentMetadata: { ...live.contentMetadata, downloadedIngredients: ['rut'] },
+        })
+        return new Map([['tn_RUT.tsv', RUT_SHA]])
+      },
+    }
+
+    expect(await recordBookBlobs({ door43Client, catalogAdapter, resourceKey: 'a/es/tn' })).toBe('recorded')
+    const written = catalogAdapter.store.get('a/es/tn') as any
+    expect(written.contentMetadata.downloadedIngredients).toEqual(['rut'])
+    expect(written.contentMetadata.bookBlobs).toEqual({ rut: RUT_SHA })
+    expect(written.contentMetadata.bookBlobsRef).toBe('v66')
+  })
+
+  test('skips, leaving the row untouched, when the release tag changes during the tree fetch', async () => {
+    const catalogAdapter = adapterWith(tnRow())
+    let newer: unknown
+    const door43Client = {
+      fetchRepoTreeBlobs: async () => {
+        newer = { ...tnRow(), release: { tag_name: 'v67', published_at: '2026-02-01T00:00:00Z' } }
+        catalogAdapter.store.set('a/es/tn', newer)
+        return new Map([['tn_RUT.tsv', RUT_SHA]])
+      },
+    }
+
+    expect(await recordBookBlobs({ door43Client, catalogAdapter, resourceKey: 'a/es/tn' })).toBe('skipped')
+    expect(catalogAdapter.writes).toBe(0)
+    expect(catalogAdapter.store.get('a/es/tn')).toBe(newer)
+  })
+
+  test('skips when the row disappears during the tree fetch', async () => {
+    const catalogAdapter = adapterWith(tnRow())
+    const door43Client = {
+      fetchRepoTreeBlobs: async () => {
+        catalogAdapter.store.delete('a/es/tn')
+        return new Map([['tn_RUT.tsv', RUT_SHA]])
+      },
+    }
+
+    expect(await recordBookBlobs({ door43Client, catalogAdapter, resourceKey: 'a/es/tn' })).toBe('skipped')
+    expect(catalogAdapter.writes).toBe(0)
+  })
 })

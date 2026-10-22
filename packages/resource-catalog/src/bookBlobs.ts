@@ -90,9 +90,16 @@ export async function recordBookBlobs(o: {
     const bookBlobs = bookBlobsFromTree(tree, ingredients)
     if (Object.keys(bookBlobs).length === 0) return 'skipped'
 
+    // The network wait may have let other writes land on the row (download progress, absent
+    // ids): write onto the row as it is now, and only if it is still the release we fetched for.
+    const fresh = (await o.catalogAdapter.get(o.resourceKey)) as BlobsRow | null | undefined
+    if (!fresh || typeof fresh !== 'object') return 'skipped'
+    const freshTag = fresh.release?.tag_name?.trim() || fresh.version?.trim() || ''
+    if (freshTag !== tag) return 'skipped'
+
     await o.catalogAdapter.set(o.resourceKey, {
-      ...row,
-      contentMetadata: { ...row.contentMetadata, bookBlobs, bookBlobsRef: tag },
+      ...fresh,
+      contentMetadata: { ...fresh.contentMetadata, bookBlobs, bookBlobsRef: tag },
     })
     return 'recorded'
   } catch {
