@@ -113,10 +113,9 @@ describe('warmGc stamp mismatch', () => {
       helpsLanguageCode: 'en',
       currentBook: 'tit',
       stamps: {
-        helpsStampByKey: { 'owner/en/tn': 'new' },
-        olKey: 'owner/el/ugnt',
-        olStamp: 'ol1',
-        targetStampByKey: { 'owner/en/ult': 'new-t' },
+        helpsStampOf: (key) => (key === 'owner/en/tn' ? 'new' : undefined),
+        olStampOf: (olKey) => (olKey === 'owner/el/ugnt' ? 'ol1' : 'nostamp'),
+        targetStampOf: (key) => (key === 'owner/en/ult' ? 'new-t' : undefined),
       },
     })
 

@@ -52,7 +52,7 @@ describe('warm lane wiring', () => {
       )
     expect(src).toContain('UGNT_RESOURCE_KEY')
     expect(src).toContain('UHB_RESOURCE_KEY')
-    expect(src).toContain('olStampByKey')
+    expect(src).toContain('olStampOf')
     expect(src).toContain('classifyWarmResource')
     expect(src).toContain('articleIdsByKey')
     expect(src).not.toContain('HELPS_CATALOG_IDS')

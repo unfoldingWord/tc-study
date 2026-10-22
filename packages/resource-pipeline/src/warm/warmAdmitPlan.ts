@@ -19,15 +19,12 @@ import {
   sharesCurrentMode,
   type ClassifiedWarmKey,
 } from './warmResourceClass'
+import type { WarmStampResolvers } from './warmStamps'
 import type { WarmJob } from './warmTypes'
 
-export type WarmPlanStamps = {
-  helpsStampByKey?: Record<string, string>
-  olKey?: string
-  olStamp?: string
-  targetStampByKey?: Record<string, string>
+/** Stamps are asked per book: a job and its coverage carry the stamp of the book they build. */
+export type WarmPlanStamps = Partial<WarmStampResolvers> & {
   textLanguageByTarget?: Record<string, string>
-  olStampByKey?: Record<string, string>
 }
 
 export type WarmAdmitGroup = {
@@ -75,9 +72,17 @@ export type Lane3PlanArgs = {
   readyOlKeys?: Iterable<string>
 }
 
-function stampFor(item: ClassifiedWarmKey, stamps?: WarmPlanStamps): string {
-  if (item.stampBag === 'helps') return stamps?.helpsStampByKey?.[item.key] ?? 'nostamp'
-  return stamps?.targetStampByKey?.[item.key] ?? 'nostamp'
+function stampFor(item: ClassifiedWarmKey, book: string, stamps?: WarmPlanStamps): string {
+  if (item.stampBag === 'helps') return helpsStampFor(item.key, book, stamps)
+  return targetStampFor(item.key, book, stamps)
+}
+
+function helpsStampFor(key: string, book: string, stamps?: WarmPlanStamps): string {
+  return stamps?.helpsStampOf?.(key, book) ?? 'nostamp'
+}
+
+function targetStampFor(key: string, book: string, stamps?: WarmPlanStamps): string {
+  return stamps?.targetStampOf?.(key, book) ?? 'nostamp'
 }
 
 function classifiedInLangs(keys: string[], textLang: string, helpsLang: string): ClassifiedWarmKey[] {
@@ -261,7 +266,6 @@ export function collectLane2Groups(args: Lane2PlanArgs): WarmAdmitGroup[] {
   for (const item of items) {
     if (budget.left <= 0) break
     const visible = visibleKeys.has(item.key)
-    const pStamp = stampFor(item, args.stamps)
 
     if (item.unitScope === 'canon' && item.hasPrepare) {
       // Open + adjacent stay on the interactive prepare worker. Rest of the
@@ -277,7 +281,7 @@ export function collectLane2Groups(args: Lane2PlanArgs): WarmAdmitGroup[] {
       pushGroup(
         out,
         prepareRelationId({ typeId: item.typeId, resourceKey: item.key, book: bookId }),
-        pStamp,
+        stampFor(item, bookId, args.stamps),
         prepareUnitJobs({ item, bookId, units, lane: 2 })
       )
     }
@@ -294,7 +298,7 @@ export function collectLane2Groups(args: Lane2PlanArgs): WarmAdmitGroup[] {
       pushGroup(
         out,
         prepareRelationId({ typeId: item.typeId, resourceKey: item.key, book: 'obs' }),
-        pStamp,
+        stampFor(item, 'obs', args.stamps),
         prepareUnitJobs({ item, bookId: 'obs', units, lane: 2 })
       )
     }
@@ -313,14 +317,14 @@ export function collectLane2Groups(args: Lane2PlanArgs): WarmAdmitGroup[] {
         pushGroup(
           out,
           prepareRelationId({ typeId: item.typeId, resourceKey: item.key, book: bid }),
-          pStamp,
+          stampFor(item, bid, args.stamps),
           prepareUnitJobs({ item, bookId: bid, units: [story], lane: 2 })
         )
       }
     }
 
     if (item.quotesOl && item.helpsType && args.olKey && olKeyIsReady(args.olKey, args.readyOlKeys)) {
-      const helpsStamp = args.stamps?.helpsStampByKey?.[item.key] ?? 'nostamp'
+      const helpsStamp = helpsStampFor(item.key, bookId, args.stamps)
       const qStamp = `${helpsStamp}|${args.olStamp}`
       const planned = lane2QuoteAlignChapters({
         lastChapter: last,
@@ -350,7 +354,7 @@ export function collectLane2Groups(args: Lane2PlanArgs): WarmAdmitGroup[] {
           : []
       for (const sk of targets) {
         if (budget.left <= 0) break
-        const targetStamp = args.stamps?.targetStampByKey?.[sk] ?? 'nostamp'
+        const targetStamp = targetStampFor(sk, bookId, args.stamps)
         const aChapters = takeChapters(
           planned,
           (ch) => `align:${item.key}:${sk}:${bookId}:${ch}`
@@ -396,7 +400,7 @@ function admitCanonPrepare(
   if (!item.hasPrepare || budget.left <= 0) return
   const maxCh = knownChapterCount(book)
   const pRel = prepareRelationId({ typeId: item.typeId, resourceKey: item.key, book })
-  const pStamp = stampFor(item, stamps)
+  const pStamp = stampFor(item, book, stamps)
   if (skipRelation?.(pRel, pStamp, maxCh)) return
   const jobKey = (ch: number) => `prep:${item.typeId}:${item.key}:${book}:${ch}`
   const chapters = nextUnadmittedChapters({
@@ -426,7 +430,7 @@ function admitQuoteAlign(
 ): void {
   if (!item.quotesOl || !item.helpsType || !olKey || budget.left <= 0) return
   if (!olKeyIsReady(olKey, readyOlKeys)) return
-  const helpsStamp = stamps?.helpsStampByKey?.[item.key] ?? 'nostamp'
+  const helpsStamp = helpsStampFor(item.key, book, stamps)
   const maxCh = knownChapterCount(book)
 
   const qRel = quoteRelationId({ helpsKey: item.key, olKey, book })
@@ -455,7 +459,7 @@ function admitQuoteAlign(
 
   for (const sk of scriptures) {
     if (budget.left <= 0) break
-    const targetStamp = stamps?.targetStampByKey?.[sk] ?? 'nostamp'
+    const targetStamp = targetStampFor(sk, book, stamps)
     const aRel = alignRelationId({ helpsKey: item.key, olKey, targetKey: sk, book })
     const aStamp = `${helpsStamp}|${olStamp}|${targetStamp}`
     if (skipRelation?.(aRel, aStamp, maxCh)) continue
@@ -500,10 +504,10 @@ function admitObsStories(
     jobKey: (story) => `prep:${item.typeId}:${item.key}:${obsStoryBookId(story)}:${story}`,
     budget: budget.left,
   })
-  const pStamp = stampFor(item, stamps)
   for (const story of stories) {
     const bid = obsStoryBookId(story)
     const pRel = prepareRelationId({ typeId: item.typeId, resourceKey: item.key, book: bid })
+    const pStamp = stampFor(item, bid, stamps)
     if (skipRelation?.(pRel, pStamp, 1)) continue
     const jobs = prepareUnitJobs({ item, bookId: bid, units: [story], lane: 3 })
     for (const j of jobs) admitted.add(j.jobKey)
@@ -522,7 +526,7 @@ function admitObsBook(
 ): void {
   if (!item.hasPrepare || budget.left <= 0) return
   const pRel = prepareRelationId({ typeId: item.typeId, resourceKey: item.key, book: 'obs' })
-  const pStamp = stampFor(item, stamps)
+  const pStamp = stampFor(item, 'obs', stamps)
   if (skipRelation?.(pRel, pStamp, OBS_STORY_COUNT)) return
   const jobKey = (ch: number) => `prep:${item.typeId}:${item.key}:obs:${ch}`
   const units = nextUnadmittedChapters({
@@ -549,7 +553,7 @@ function admitArticles(
 ): void {
   if (!item.hasPrepare || articleIds.length === 0 || budget.left <= 0) return
   const pRel = prepareRelationId({ typeId: item.typeId, resourceKey: item.key, book: 'articles' })
-  const pStamp = stampFor(item, stamps)
+  const pStamp = stampFor(item, 'articles', stamps)
   if (skipRelation?.(pRel, pStamp, articleIds.length)) return
   const jobs: WarmJob[] = []
   for (const unit of articleIds) {

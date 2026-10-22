@@ -14,7 +14,12 @@
 import { isResourceMarkedComplete } from '../download/resourceDownloadComplete'
 import { resolveOriginalLanguageKey } from '../helps/olLoadCache'
 import { knownChapterCount } from '../nav/bookChapterCounts'
-import { collectLane2Groups, collectLane3Groups } from './warmAdmitPlan'
+import { collectLane2Groups, collectLane3Groups, type WarmPlanStamps } from './warmAdmitPlan'
+import { mergeWarmStamps } from '@bt-synergy/resource-pipeline/warm/warmStamps'
+import {
+  UGNT_RESOURCE_KEY,
+  UHB_RESOURCE_KEY,
+} from '@bt-synergy/resource-pipeline/scripture/originalLanguageSpecs'
 import { shouldCancelWarmJobsForLanguage } from './warmCancelPolicy'
 import {
   applyCoverageOutcome,
@@ -64,16 +69,11 @@ export type WarmVisibleContext = {
   textLanguageCode: string
   helpsLanguageCode: string
   scrollUnsettled: boolean
-  /** Stamp bags resolved on the main thread (catalog metadata). */
-  stamps?: {
-    helpsStampByKey: Record<string, string>
-    olKey?: string
-    olStamp?: string
-    targetStampByKey: Record<string, string>
-    textLanguageByTarget?: Record<string, string>
-    /** UGNT + UHB stamps so lane 3 can quote/align OT and NT books. */
-    olStampByKey?: Record<string, string>
-  }
+  /**
+   * Stamps resolved on the main thread from catalog metadata, asked per book: helps, target, and the UGNT/UHB
+   * stamps so lane 3 can quote/align OT and NT books.
+   */
+  stamps?: WarmPlanStamps
   /** TA/TW entry ids from catalog ingredients (lane 3 prepare-article). */
   articleIdsByKey?: Record<string, string[]>
   /** Downloaded catalog keys for lane 3 (owner/lang/id). */
@@ -189,10 +189,7 @@ function mergeOwnerContexts(
   if (owners.size === 0) return null
   const list = [...owners.values()]
   const visibleByKey = new Map<string, VisibleWarmResource>()
-  const helpsStampByKey: Record<string, string> = {}
-  const targetStampByKey: Record<string, string> = {}
   const textLanguageByTarget: Record<string, string> = {}
-  const olStampByKey: Record<string, string> = {}
   const articleIdsByKey: Record<string, string[]> = {}
   const downloaded = new Set<string>()
   let bookId = ''
@@ -202,8 +199,6 @@ function mergeOwnerContexts(
   let textLanguageCode = ''
   let helpsLanguageCode = ''
   let scrollUnsettled = false
-  let olKey: string | undefined
-  let olStamp: string | undefined
   const readyOl = new Set<string>()
   let cacheAdapter: WarmGcCacheAdapter | null | undefined
 
@@ -217,12 +212,7 @@ function mergeOwnerContexts(
     scrollUnsettled = scrollUnsettled || c.scrollUnsettled
     if (c.cacheAdapter) cacheAdapter = c.cacheAdapter
     for (const r of c.visibleResources) visibleByKey.set(r.resourceKey, r)
-    Object.assign(helpsStampByKey, c.stamps?.helpsStampByKey)
-    Object.assign(targetStampByKey, c.stamps?.targetStampByKey)
     Object.assign(textLanguageByTarget, c.stamps?.textLanguageByTarget)
-    Object.assign(olStampByKey, c.stamps?.olStampByKey)
-    if (c.stamps?.olKey) olKey = c.stamps.olKey
-    if (c.stamps?.olStamp) olStamp = c.stamps.olStamp
     for (const k of c.readyOlKeys ?? []) readyOl.add(k)
     for (const [k, ids] of Object.entries(c.articleIdsByKey ?? {})) {
       const prev = articleIdsByKey[k] ?? []
@@ -240,14 +230,10 @@ function mergeOwnerContexts(
     textLanguageCode,
     helpsLanguageCode,
     scrollUnsettled,
-    stamps: {
-      helpsStampByKey,
-      olKey,
-      olStamp,
-      targetStampByKey,
-      textLanguageByTarget,
-      olStampByKey,
-    },
+    // No owner has resolved its stamps yet: plan with none (every stamp `nostamp`), as before.
+    stamps: list.some((c) => c.stamps)
+      ? { ...mergeWarmStamps(list.map((c) => c.stamps)), textLanguageByTarget }
+      : undefined,
     articleIdsByKey,
     downloadedKeys: [...downloaded],
     downloadGeneration: Math.max(0, ...list.map((c) => c.downloadGeneration ?? 0)),
@@ -419,9 +405,7 @@ async function seedLane2(): Promise<void> {
     context
   resetLane2AdmitsIfNeeded(context)
 
-  const ol = resolveOriginalLanguageKey(bookId)
-  const olKey = stamps?.olKey ?? ol?.resourceKey ?? ''
-  const olStamp = stamps?.olStamp ?? 'nostamp'
+  const { olKey, olStamp } = olStampForBook(bookId, stamps)
   const bookLast = lastChapter > 0 ? lastChapter : knownChapterCount(bookId)
 
   const visibleKeyList = visibleResources.map((r) => r.resourceKey)
@@ -459,8 +443,8 @@ async function resolveReadyOlKeys(ctx: WarmVisibleContext): Promise<string[] | u
   const cache = ctx.cacheAdapter
   if (!cache) return fromOwners.length > 0 ? [...new Set(fromOwners)] : undefined
   const candidates = new Set<string>(fromOwners)
-  if (ctx.stamps?.olKey) candidates.add(ctx.stamps.olKey)
-  for (const k of Object.keys(ctx.stamps?.olStampByKey ?? {})) candidates.add(k)
+  // The stamps read both originals, so either may be ready.
+  if (ctx.stamps) for (const k of [UGNT_RESOURCE_KEY, UHB_RESOURCE_KEY]) candidates.add(k)
   const ready: string[] = []
   for (const key of candidates) {
     if (fromOwners.includes(key) || (await isResourceMarkedComplete(cache, key))) {
@@ -476,11 +460,8 @@ function olStampForBook(
   book: string,
   stamps: WarmVisibleContext['stamps']
 ): { olKey: string; olStamp: string } {
-  const ol = resolveOriginalLanguageKey(book)
-  const olKey = ol?.resourceKey ?? ''
-  const fromMap = olKey ? stamps?.olStampByKey?.[olKey] : undefined
-  const olStamp =
-    fromMap ?? (olKey && olKey === stamps?.olKey ? stamps.olStamp : undefined) ?? 'nostamp'
+  const olKey = resolveOriginalLanguageKey(book)?.resourceKey ?? ''
+  const olStamp = (olKey && stamps?.olStampOf?.(olKey, book)) || 'nostamp'
   return { olKey, olStamp }
 }
 

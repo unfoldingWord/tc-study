@@ -5,6 +5,7 @@
 import { HELPS_ALIGN_PREFIX } from '../helps/helpsAlignCache'
 import { HELPS_QUOTE_PREFIX } from '../helps/helpsQuoteCache'
 import { readWarmCoverage, writeWarmCoverage } from './warmCoverage'
+import { NO_OL_STAMP, type WarmStampResolvers } from './warmStamps'
 
 export type WarmGcCacheAdapter = {
   get(key: string): Promise<unknown>
@@ -14,12 +15,8 @@ export type WarmGcCacheAdapter = {
   prune?(): Promise<void>
 }
 
-export type WarmGcStamps = {
-  helpsStampByKey?: Record<string, string>
-  olKey?: string
-  olStamp?: string
-  targetStampByKey?: Record<string, string>
-}
+/** The current stamps, asked per book: a row is collected when its book's stamp moved, not its resource's release. */
+export type WarmGcStamps = Partial<WarmStampResolvers>
 
 const QUOTA_BUDGET = 0.6
 
@@ -108,30 +105,26 @@ function targetKeyFromAlignKey(key: string): string | null {
   return parseAlignWarmKey(key)?.targetKey ?? null
 }
 
-function quoteStampMismatch(
-  parsed: NonNullable<ReturnType<typeof parseQuoteWarmKey>>,
-  stamps: WarmGcStamps
-): boolean {
-  const currentHelps = stamps.helpsStampByKey?.[parsed.helpsKey]
-  if (currentHelps && parsed.helpsStamp !== currentHelps) return true
-  if (
-    stamps.olKey &&
-    stamps.olStamp &&
-    parsed.olKey === stamps.olKey &&
-    parsed.olStamp !== stamps.olStamp
-  ) {
-    return true
-  }
-  return false
+/** A stamp that differs from the current one; an unknown current stamp (unread resource or original) collects nothing. */
+function moved(stored: string | undefined, current: string | undefined): boolean {
+  return Boolean(current && current !== NO_OL_STAMP && stored !== current)
 }
 
-function alignStampMismatch(
-  parsed: NonNullable<ReturnType<typeof parseAlignWarmKey>>,
-  stamps: WarmGcStamps
-): boolean {
-  if (quoteStampMismatch(parsed, stamps)) return true
-  const currentTarget = stamps.targetStampByKey?.[parsed.targetKey]
-  return Boolean(currentTarget && parsed.targetStamp !== currentTarget)
+type QuoteStamps = { helpsKey: string; helpsStamp: string; olKey: string; olStamp: string; book: string }
+type AlignStamps = QuoteStamps & { targetKey: string; targetStamp: string }
+
+function quoteStampMismatch(parsed: QuoteStamps, stamps: WarmGcStamps): boolean {
+  return (
+    moved(parsed.helpsStamp, stamps.helpsStampOf?.(parsed.helpsKey, parsed.book)) ||
+    moved(parsed.olStamp, stamps.olStampOf?.(parsed.olKey, parsed.book))
+  )
+}
+
+function alignStampMismatch(parsed: AlignStamps, stamps: WarmGcStamps): boolean {
+  return (
+    quoteStampMismatch(parsed, stamps) ||
+    moved(parsed.targetStamp, stamps.targetStampOf?.(parsed.targetKey, parsed.book))
+  )
 }
 
 async function deleteStampMismatches(
@@ -160,27 +153,24 @@ async function deleteStampMismatches(
   try {
     const coverage = await readWarmCoverage(cache)
     let changed = false
+    // quote:{helps}|{ol}|{book} stamped "hs|os"; align:{helps}|{ol}|{target}|{book} stamped "hs|os|ts".
     for (const [id, entry] of Object.entries(coverage)) {
       const parts = id.split('|')
-      if (id.startsWith('quote:')) {
-        const helpsKey = parts[0]?.replace(/^quote:/, '') ?? ''
-        const current = stamps.helpsStampByKey?.[helpsKey]
-        const stampHelps = entry.stamp.split('|')[0]
-        if (current && stampHelps && stampHelps !== current) {
-          delete coverage[id]
-          changed = true
-        }
-      } else if (id.startsWith('align:')) {
-        const helpsKey = parts[0]?.replace(/^align:/, '') ?? ''
-        const targetKey = parts[2] ?? ''
-        const [hs, , ts] = entry.stamp.split('|')
-        if (stamps.helpsStampByKey?.[helpsKey] && hs !== stamps.helpsStampByKey[helpsKey]) {
-          delete coverage[id]
-          changed = true
-        } else if (stamps.targetStampByKey?.[targetKey] && ts !== stamps.targetStampByKey[targetKey]) {
-          delete coverage[id]
-          changed = true
-        }
+      const [hs = '', os = '', ts = ''] = entry.stamp.split('|')
+      let stale = false
+      if (id.startsWith('quote:') && parts.length === 3) {
+        const [helpsKey, olKey, book] = [parts[0].slice('quote:'.length), parts[1], parts[2]]
+        stale = quoteStampMismatch({ helpsKey, helpsStamp: hs, olKey, olStamp: os, book }, stamps)
+      } else if (id.startsWith('align:') && parts.length === 4) {
+        const [helpsKey, olKey, targetKey, book] = [parts[0].slice('align:'.length), parts[1], parts[2], parts[3]]
+        stale = alignStampMismatch(
+          { helpsKey, helpsStamp: hs, olKey, olStamp: os, targetKey, targetStamp: ts, book },
+          stamps
+        )
+      }
+      if (stale) {
+        delete coverage[id]
+        changed = true
       }
     }
     if (changed) await writeWarmCoverage(cache, coverage)
