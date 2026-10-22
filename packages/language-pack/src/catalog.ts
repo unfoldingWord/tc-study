@@ -69,9 +69,16 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value)
 }
 
-/** Sixteen hex characters of the sha256 of what the pack was built from. `crypto.subtle` works in Bun and browsers. */
-export async function buildIdOf(build: Omit<PackBuild, 'id'>): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableJson(build)))
+/**
+ * Sixteen hex characters of the sha256 of what the pack was built from: Door43's stamps, MACULA's commit and the
+ * lexicons' ref. The generator's commit is recorded beside it but left out: tc-study gets commits most days, nearly all
+ * unrelated to packs. A builder change that alters the rows bumps the compat key (the sample-output check catches the
+ * rows it hashes); one that changes what goes in without changing a stamp (which resources discovery takes, how
+ * lexicons are read) is republished with `publish-language --force`. `crypto.subtle` works in Bun and browsers.
+ */
+export async function buildIdOf(build: Omit<PackBuild, 'id' | 'generator'> & { generator?: string }): Promise<string> {
+  const { generator: _recorded, ...identifying } = build
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(stableJson(identifying)))
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0'))
     .join('')
     .slice(0, 16)

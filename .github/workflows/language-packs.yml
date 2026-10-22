@@ -34,6 +34,11 @@ on:
         required: false
         type: string
         default: ''
+      force:
+        description: Build and publish even when nothing it is built from changed (a builder fix no stamp shows)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -60,6 +65,7 @@ jobs:
       LANGUAGE: ${{ inputs.language }}
       MODE: ${{ inputs.mode }}
       REQUESTED_COMPAT: ${{ inputs.compat }}
+      FORCE: ${{ inputs.force }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
@@ -136,6 +142,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/packs-out"
           args=(--lang "$LANGUAGE" --work "$RUNNER_TEMP/packs-work" --generator "$GENERATOR" --macula "$RUNNER_TEMP/taller/public" --lexicons-ref master)
           runner=()
+          if [ "$FORCE" = true ]; then args+=(--force); fi
           if [ "$MODE" = no-upload ]; then
             args+=(--no-upload)
             command -v /usr/bin/time > /dev/null || { sudo apt-get update -q && sudo apt-get install -y time; }

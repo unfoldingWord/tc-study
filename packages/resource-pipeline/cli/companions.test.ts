@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { addLexicons, addMacula, lexiconStamps } from './companions'
+import { addLexicons, addMacula, lexiconOwnerOf, lexiconRowPath, lexiconStamps } from './companions'
 
 describe('addMacula', () => {
   test('the catalog rows carry the version and the date it is given, not one cut from the other', async () => {
@@ -79,5 +79,55 @@ describe('lexiconStamps', () => {
     const store = { putRawMany: async () => {}, set: async () => {} }
     const catalog = { set: async () => {} }
     await expect(addLexicons(store as never, catalog as never, 'es-419', 'es-419_gl', 'main', fetchFn)).rejects.toThrow('"main"')
+  })
+})
+
+/** A `.tar.gz` (ustar) of the files given, as Door43 serves an archive. */
+function tarGz(files: Record<string, string>): Uint8Array {
+  const blocks: Uint8Array[] = []
+  for (const [path, body] of Object.entries(files)) {
+    const bytes = new TextEncoder().encode(body)
+    const header = new Uint8Array(512)
+    header.set(new TextEncoder().encode(path), 0)
+    header.set(new TextEncoder().encode(bytes.length.toString(8).padStart(11, '0')), 124)
+    header.set(new TextEncoder().encode('0'), 156)
+    blocks.push(header, bytes, new Uint8Array((512 - (bytes.length % 512)) % 512))
+  }
+  blocks.push(new Uint8Array(1024))
+  return Bun.gzipSync(Buffer.concat(blocks))
+}
+
+describe("lexicons in translationCore's layout", () => {
+  test("lexiconRowPath reads the root layout and translationCore's", () => {
+    expect(lexiconRowPath('content/1.json')).toBe('content/1.json')
+    expect(lexiconRowPath('domains/12.json')).toBe('domains/12.json')
+    expect(lexiconRowPath('ugl/v0/content/1.json')).toBe('content/1.json')
+    expect(lexiconRowPath('resources/en/lexicons/uhl/v0/content/8674.json')).toBe('content/8674.json')
+    for (const other of ['OldLexicon/lexicon.xml', 'package.json', 'README.md', 'ugl/v0/content/notes/x.json']) {
+      expect(lexiconRowPath(other)).toBeNull()
+    }
+  })
+
+  test('English lexicons come from test_org, other languages from their literal text', () => {
+    expect(lexiconOwnerOf('en', 'unfoldingWord')).toBe('test_org')
+    expect(lexiconOwnerOf('es-419', 'es-419_gl')).toBe('es-419_gl')
+  })
+
+  test('addLexicons stores translationCore entries where Servos reads them', async () => {
+    const alpha = { brief: 'the first letter of the Greek alphabet', long: 'alpha; the first letter of the Greek alphabet.' }
+    const commit = { sha: '5f1e2d3c4b5a69788796a5b4c3d2e1f001122334', created: '2021-09-14T19:21:29Z' }
+    const archive = tarGz({ 'en_ugl/ugl/v0/content/1.json': JSON.stringify(alpha), 'en_ugl/package.json': '{}' })
+    const { fetchFn: api } = door43({ 'test_org/en_ugl': { master: commit } })
+    const fetchFn = async (url: string) =>
+      url.endsWith(`/test_org/en_ugl/archive/${commit.sha}.tar.gz`) ? new Response(archive) : api(url)
+    const rows = new Map<string, unknown>()
+    const store = {
+      putRawMany: async (list: Array<{ key: string; entry: unknown }>) => list.forEach((r) => rows.set(r.key, r.entry)),
+      set: async () => {},
+    }
+    const done = await addLexicons(store as never, { set: async () => {} } as never, 'en', 'test_org', 'master', fetchFn)
+    expect(rows.get('test_org/en/ugl/content/1.json')).toEqual(alpha)
+    expect([...rows.keys()]).toEqual(['test_org/en/ugl/content/1.json'])
+    expect(done).toContainEqual({ key: 'test_org/en/ugl', entries: 1 })
   })
 })

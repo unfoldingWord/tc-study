@@ -18,12 +18,18 @@ test('a pack without one of the versions has no compatibility key', () => {
   expect(() => compatKeyOf('1.1.0', { sot: { usjProcessing: '2.3.0-usj' } })).toThrow()
 })
 
-test('the build id changes with the generator, and not with the order of the stamps', async () => {
+test('the build id changes with the stamps, not with their order', async () => {
   const stamps = { 'es-419_gl/es-419/glt': 'v42#2026-10-01', 'unfoldingWord/hbo/uhb': 'v3.0.0#2026-08-14' }
-  const a = await buildIdOf({ generator: 'aaa', stamps })
-  expect(await buildIdOf({ generator: 'aaa', stamps: Object.fromEntries(Object.entries(stamps).reverse()) })).toBe(a)
-  expect(await buildIdOf({ generator: 'bbb', stamps })).not.toBe(a)
+  const a = await buildIdOf({ stamps })
+  expect(await buildIdOf({ stamps: Object.fromEntries(Object.entries(stamps).reverse()) })).toBe(a)
+  expect(await buildIdOf({ stamps: { ...stamps, 'unfoldingWord/hbo/uhb': 'v3.0.1#2026-10-14' } })).not.toBe(a)
   expect(a).toMatch(/^[0-9a-f]{16}$/)
+})
+
+test('the generator is recorded but does not make the build id', async () => {
+  const build = { macula: 'm', lexicons: 'master', stamps: { a: 'v1#d' } }
+  expect(await buildIdOf({ ...build, generator: 'aaa' })).toBe(await buildIdOf(build))
+  expect(await buildIdOf({ ...build, generator: 'bbb' })).toBe(await buildIdOf(build))
 })
 
 test('the paths of the catalog and of the pack follow the compatibility key and the language', () => {

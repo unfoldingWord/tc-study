@@ -1,7 +1,8 @@
 /**
  * Publish one language to a bucket only when something it is built from changed: the Door43 releases (read in seconds
- * from the catalog), the generator's commit, MACULA's commit or the lexicons' ref. Those make the build id; a stored
- * catalog entry with the same id means the hour-long build is skipped.
+ * from the catalog), MACULA's commit or the lexicons' ref. Those make the build id; a stored catalog entry with the same
+ * id means the hour-long build is skipped. The generator's commit is recorded in the entry but is not compared, so an
+ * unrelated tc-study commit rebuilds nothing; a builder fix no stamp shows is republished with `force`.
  *
  * The upload order is what keeps a cut-short run harmless: the packs (named by content, so new keys), then the views,
  * then the originals' entry and the language's entry last. Until that entry is written the bucket names the previous
@@ -151,6 +152,11 @@ export async function publishLanguage(o: {
   stamps?: (language: string) => Promise<Record<string, string>>
   build?: typeof prepareAndPack
   views?: typeof writeMcpViews
+  /**
+   * Build and publish even when the build id matches the stored one, the language's and the originals': for a builder
+   * fix no stamp shows and no compat key covers (which resources discovery takes, how lexicons are read).
+   */
+  force?: boolean
   /** Decide only: nothing is built or put. */
   dryRun?: boolean
   /** Decide, then build the packs and views into `workDir`, and put nothing (a measurement, a check). */
@@ -188,13 +194,14 @@ export async function publishLanguage(o: {
   const storedOriginals = await bucket.getJson<PackCatalogEntry>(catalogPath(compat, 'originals'))
   say(`${language}: compat ${compat}, build ${languageBuild.id} (guardado: ${stored?.build?.id ?? 'ninguno'})`)
 
-  if (stored?.build?.id === languageBuild.id) {
+  if (stored?.build?.id === languageBuild.id && !o.force) {
     say(`${language}: sin cambios`)
     return { language, outcome: 'unchanged', entry: stored }
   }
+  if (o.force) say(`${language}: forzado`)
   for (const change of changesSince(stored?.build, languageBase)) say(`  ${change}`)
   // An entry without its pack cannot be named by a language, so it is published again.
-  const originalsChanged = storedOriginals?.build?.id !== originalsBuild.id || !storedOriginals?.pack?.path
+  const originalsChanged = Boolean(o.force) || storedOriginals?.build?.id !== originalsBuild.id || !storedOriginals?.pack?.path
   say(`originals: build ${originalsBuild.id} (guardado: ${storedOriginals?.build?.id ?? 'ninguno'})${originalsChanged ? ', se publica' : ', sin cambios'}`)
 
   if (o.dryRun) {

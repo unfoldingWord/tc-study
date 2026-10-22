@@ -13,7 +13,7 @@ import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { buildLanguagePack, ORIGINAL_LANGUAGE_KEYS, packSourceFrom, type PackManifest } from '@bt-synergy/language-pack'
-import { addLexicons, addMacula, MACULA_KEYS } from '../../cli/companions'
+import { addLexicons, addMacula, lexiconOwnerOf, MACULA_KEYS } from '../../cli/companions'
 import { isObs, keyOfRow, literalTextOf } from './door43Stamps'
 import { closeAndDelete } from './fakeDatabases'
 import { PACK_VERSIONS } from './packVersions'
@@ -107,8 +107,9 @@ export async function prepareAndPack(o: {
   const literal = literalTextOf(languageRows, language)
   if (o.lexicons) {
     if (literal) {
-      say(`[${elapsed()}] Léxicos de ${literal.owner}…`)
-      companions.lexicons = await addLexicons(cacheAdapter as never, catalogAdapter as never, language, literal.owner, o.lexicons.ref)
+      const owner = lexiconOwnerOf(language, literal.owner)
+      say(`[${elapsed()}] Léxicos de ${owner}…`)
+      companions.lexicons = await addLexicons(cacheAdapter as never, catalogAdapter as never, language, owner, o.lexicons.ref)
       for (const l of companions.lexicons as Array<{ key: string; entries?: number; why?: string }>) {
         say(`[${elapsed()}]   ${l.key}: ${l.entries !== undefined ? `${l.entries} entradas` : l.why}`)
       }

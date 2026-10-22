@@ -3,6 +3,9 @@
  * `topic=tc-ready` search (every owner, `stage=prod`), the OBS helps searches one subject at a time, and both
  * original languages (the Read page adds only the current book's). Hits go through the same identity, release and
  * metadata steps as the Read page's hydrate, so the catalog rows are the ones tc-study would write.
+ *
+ * One difference with the Read page: the OBS helps searches, which go without the topic, ask only for OBS's own helps.
+ * TW and TA come only from the `tc-ready` search; untopiced, any fork of them would come in (es-419_obt/es-419_tw).
  */
 
 import type { CatalogManager } from '@bt-synergy/catalog-manager/core'
@@ -40,6 +43,11 @@ export interface LanguageDiscovery {
   skipped: SkippedHit[]
 }
 
+/** The OBS helps subjects that are OBS's own (`TSV OBS Translation Notes`…), not the TW and TA OBS also links to. */
+export function obsOwnHelpsSubjects(subjects: readonly string[]): string[] {
+  return subjects.filter((subject) => /\bOBS\b/.test(subject))
+}
+
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -65,7 +73,7 @@ export async function discoverLanguage(options: {
       languageCode: language,
       target: 'helps',
       navigationScope: 'obs',
-      helpsSubjects: resourceTypeRegistry.subjectsForHelpsCatalogLoad('obs'),
+      helpsSubjects: obsOwnHelpsSubjects(resourceTypeRegistry.subjectsForHelpsCatalogLoad('obs')),
     })),
   ]
 

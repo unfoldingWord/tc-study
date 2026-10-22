@@ -59,6 +59,22 @@ describe('the lexicons in the stamps', () => {
     expect(Object.keys(stamps)).not.toContain('es-419_gl/es-419/ugl')
   })
 
+  test("English stamps name test_org's lexicons, as the build reads them", async () => {
+    const asked: string[] = []
+    const fetchFn = async (url: string) => {
+      asked.push(url)
+      if (/\/repos\/test_org\/en_u[hg]l$/.test(url)) return Response.json({})
+      if (/\/repos\/test_org\/en_u[hg]l\/commits\?sha=master&/.test(url)) return Response.json([{ sha: 'fedcba9876543210', created: '2021-09-14T19:21:29Z' }])
+      return new Response('not found', { status: 404 })
+    }
+    const stamps = await stampsWithLexicons(rows, { language: 'en', obs: false, lexiconsRef: 'master', fetch: fetchFn })
+    expect(asked.some((u) => u.includes('/repos/test_org/en_uhl'))).toBe(true)
+    expect(asked.some((u) => u.includes('/repos/test_org/en_ugl'))).toBe(true)
+    expect(asked.some((u) => u.includes('/repos/unfoldingWord/en_u'))).toBe(false)
+    expect(Object.keys(stamps)).toContain('test_org/en/uhl')
+    expect(Object.keys(stamps)).toContain('test_org/en/ugl')
+  })
+
   test('no literal text, or no ref: nothing is asked of Door43', async () => {
     const fetchFn = async (): Promise<Response> => {
       throw new Error('no request expected')

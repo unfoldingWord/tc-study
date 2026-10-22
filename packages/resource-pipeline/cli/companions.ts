@@ -83,6 +83,23 @@ const LEXICONS = [
 
 type Fetch = (url: string) => Promise<Response>
 
+/** Where a language's lexicons come from when not from its literal text's owner: translationCore reads English's there. */
+export const LEXICON_OWNERS: Readonly<Record<string, string>> = { en: 'test_org' }
+
+/** The Door43 owner of a language's lexicons: `LEXICON_OWNERS`', else its literal text's owner. */
+export const lexiconOwnerOf = (language: string, literalOwner: string): string => LEXICON_OWNERS[language] ?? literalOwner
+
+/**
+ * A lexicon file's row path under the lexicon's key, from its path inside the repository, or null when it is not an
+ * entry. Two layouts: `content/{n}.json` at the root (es-419's), and translationCore's, under a `…/v0/` folder
+ * (`ugl/v0/content/1.json`, `resources/en/lexicons/uhl/v0/content/1.json`). Both end where Servos reads an entry.
+ */
+export function lexiconRowPath(inside: string): string | null {
+  if (/^(content|domains)\/.+\.json$/.test(inside)) return inside
+  const nested = inside.match(/(?:^|\/)v0\/(content|domains)\/([^/]+\.json)$/)
+  return nested ? `${nested[1]}/${nested[2]}` : null
+}
+
 /**
  * The commit a lexicon repository has at `ref`, or null when Door43 has no such repository (most languages have no
  * lexicons: nothing to read, and nothing a rerun would change). A repository that exists without the ref, or a Door43
@@ -122,7 +139,8 @@ export async function lexiconStamps(o: { language: string; owner: string; ref: s
 /**
  * The lexicons of a language, from Door43: `{owner}/{lang}_uhl` (Hebrew) and `{owner}/{lang}_ugl` (Greek), whole
  * (each entry with the verses of every book), read from `ref` (a branch, tag or commit; `master` is what Door43 serves
- * them from today). Returns what was added, and why a lexicon was not; a ref the repository lacks throws.
+ * them from today). The owner is `lexiconOwnerOf`'s; both layouts `lexiconRowPath` knows are read. Returns what was
+ * added, and why a lexicon was not; a ref the repository lacks throws.
  */
 export async function addLexicons(cache: Store, catalog: Catalog, language: string, owner: string, ref = 'master', fetchFn: Fetch = fetch): Promise<Array<{ key: string; entries?: number; why?: string }>> {
   const done: Array<{ key: string; entries?: number; why?: string }> = []
@@ -141,10 +159,10 @@ export async function addLexicons(cache: Store, catalog: Catalog, language: stri
     const rows: Array<{ key: string; entry: unknown }> = []
     let entries = 0
     for (const file of files) {
-      const inside = file.path.split('/').slice(1).join('/')
-      if (!/^(content|domains)\/.+\.json$/.test(inside)) continue
-      rows.push({ key: `${key}/${inside}`, entry: JSON.parse(new TextDecoder().decode(file.bytes)) })
-      if (inside.startsWith('content/')) entries++
+      const path = lexiconRowPath(file.path.split('/').slice(1).join('/'))
+      if (!path) continue
+      rows.push({ key: `${key}/${path}`, entry: JSON.parse(new TextDecoder().decode(file.bytes)) })
+      if (path.startsWith('content/')) entries++
     }
     const manifest = files.find((f) => /\/manifest\.yaml$/.test(f.path))
     const named = manifest ? new TextDecoder().decode(manifest.bytes).match(/^\s*title:\s*['"]?(.+?)['"]?\s*$/m)?.[1] : undefined
