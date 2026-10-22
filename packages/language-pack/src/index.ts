@@ -9,3 +9,5 @@ export { VOLATILE_FIELDS, PART_LAYERS, stripVolatile, writePart, readPart, partP
 export type { PartRow } from './parts/partFile'
 export { LIST_DROPPED_FIELDS, partsListPath, serializePartsList } from './parts/partsList'
 export type { PartKind, PartEntry, PartsList, PartsListResource } from './parts/partsList'
+export { fnv1a32, slotOfRow, slotId, TW_BUCKETS, TA_TRANSLATE_BUCKETS, LEXICON_RANGE, OBS_STORIES_PER_PART } from './parts/partSlots'
+export type { PartSlot } from './parts/partSlots'
