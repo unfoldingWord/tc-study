@@ -29,6 +29,8 @@ export function bookBlobsFromTree(
 }
 
 type BlobsRow = {
+  type?: string
+  subject?: string
   owner?: string
   language?: string
   resourceId?: string
@@ -44,6 +46,27 @@ type BlobsRow = {
   [key: string]: unknown
 }
 
+/**
+ * Resource types whose files are one per book (Bible texts, TN, TQ, TWL). Mirrors `isBookScoped` in
+ * @bt-synergy/language-pack, which depends on this package and so cannot be imported here: keep the two in step.
+ * Everything else (TA, TW, OBS) has no per-book file whose sha could stamp a row.
+ */
+const BOOK_SCOPED_TYPES = new Set(['scripture', 'notes', 'questions', 'words-links'])
+/** The Door43 subjects of those types; some catalog rows say `type: 'unknown'` (word links), so the subject decides too. */
+const BOOK_SCOPED_SUBJECTS = new Set([
+  'Bible',
+  'Aligned Bible',
+  'Greek New Testament',
+  'Hebrew Old Testament',
+  'TSV Translation Notes',
+  'TSV Translation Questions',
+  'TSV Translation Words Links',
+])
+
+function isBookScopedRow(row: BlobsRow): boolean {
+  return BOOK_SCOPED_TYPES.has(String(row.type ?? '')) || BOOK_SCOPED_SUBJECTS.has(String(row.subject ?? ''))
+}
+
 /** Repository name: the last segment of the row's network location, else `{language}_{id}`. */
 function repoNameOf(row: BlobsRow): string | null {
   const fromLocation = row.locations?.[0]?.path?.split('/').filter(Boolean).pop()
@@ -54,7 +77,9 @@ function repoNameOf(row: BlobsRow): string | null {
 /**
  * Read the release tree once and write each book's blob sha onto the catalog row.
  * `current` when the row already holds blobs read at its release tag; `skipped` when there
- * is nothing to record or Door43 could not be asked. Never throws: stamps then simply fall
+ * is nothing to record, the resource is not book-scoped (no tree request is made for it), or
+ * Door43 could not be asked. A book-scoped resource whose tree holds none of its files records
+ * `{}` for the tag, so the next pass answers `current` instead of reading the tree again. Never throws: stamps then simply fall
  * back to the release stamp.
  */
 export async function recordBookBlobs(o: {
@@ -78,6 +103,8 @@ export async function recordBookBlobs(o: {
     const tag = row.release?.tag_name?.trim() || row.version?.trim() || ''
     if (!tag) return 'skipped'
     if (row.contentMetadata?.bookBlobsRef === tag) return 'current'
+    // TA and TW list directories or articles, OBS has none: no per-book blob to record
+    if (!isBookScopedRow(row)) return 'skipped'
 
     const client = o.door43Client
     const ingredients = (row.contentMetadata?.ingredients ?? []).filter((i) => i.identifier)
@@ -88,7 +115,6 @@ export async function recordBookBlobs(o: {
 
     const tree = await client.fetchRepoTreeBlobs(row.owner, repo, tag)
     const bookBlobs = bookBlobsFromTree(tree, ingredients)
-    if (Object.keys(bookBlobs).length === 0) return 'skipped'
 
     // The network wait may have let other writes land on the row (download progress, absent
     // ids): write onto the row as it is now, and only if it is still the release we fetched for.

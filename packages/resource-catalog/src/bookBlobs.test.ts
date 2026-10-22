@@ -93,6 +93,8 @@ function tnRow(extra: Record<string, unknown> = {}) {
     owner: 'a',
     language: 'es',
     resourceId: 'tn',
+    type: 'notes',
+    subject: 'TSV Translation Notes',
     release: { tag_name: 'v66', published_at: '2026-01-01T00:00:00Z' },
     contentMetadata: {
       ingredients: [{ identifier: 'rut', path: './tn_RUT.tsv' }],
@@ -148,9 +150,54 @@ describe('recordBookBlobs', () => {
     const none = adapterWith({ ...tnRow(), contentMetadata: {} })
     expect(await recordBookBlobs({ door43Client: withTree, catalogAdapter: none, resourceKey: 'a/es/tn' })).toBe('skipped')
 
-    const empty = { fetchRepoTreeBlobs: async () => new Map<string, string>() }
-    expect(await recordBookBlobs({ door43Client: empty, catalogAdapter: a, resourceKey: 'a/es/tn' })).toBe('skipped')
     expect(a.writes).toBe(0)
+  })
+
+  test('a book-scoped resource whose tree has none of its paths records {} once, then answers current without a request', async () => {
+    const catalogAdapter = adapterWith(tnRow())
+    let treeCalls = 0
+    const door43Client = {
+      fetchRepoTreeBlobs: async () => {
+        treeCalls++
+        return new Map<string, string>()
+      },
+    }
+    const o = { door43Client, catalogAdapter, resourceKey: 'a/es/tn' }
+
+    expect(await recordBookBlobs(o)).toBe('recorded')
+    const written = catalogAdapter.store.get('a/es/tn') as any
+    expect(written.contentMetadata.bookBlobs).toEqual({})
+    expect(written.contentMetadata.bookBlobsRef).toBe('v66')
+
+    expect(await recordBookBlobs(o)).toBe('current')
+    expect(treeCalls).toBe(1)
+    expect(catalogAdapter.writes).toBe(1)
+  })
+
+  test.each([
+    ['a TA row', { resourceId: 'ta', type: 'academy', subject: 'Translation Academy' }],
+    ['a TW row', { resourceId: 'tw', type: 'words', subject: 'Translation Words' }],
+    ['a row with no type or subject', { resourceId: 'tw', type: undefined, subject: undefined }],
+  ])('skips %s without asking Door43 for the tree', async (_name, overrides) => {
+    const initial = { ...tnRow(), ...overrides }
+    const catalogAdapter = adapterWith(initial)
+    let treeCalls = 0
+    const door43Client = {
+      fetchRepoTreeBlobs: async () => {
+        treeCalls++
+        return new Map([['tn_RUT.tsv', RUT_SHA]])
+      },
+    }
+    expect(await recordBookBlobs({ door43Client, catalogAdapter, resourceKey: 'a/es/tn' })).toBe('skipped')
+    expect(treeCalls).toBe(0)
+    expect(catalogAdapter.writes).toBe(0)
+    expect(catalogAdapter.store.get('a/es/tn')).toBe(initial)
+  })
+
+  test('recognises a book-scoped resource by its subject when the type says unknown', async () => {
+    const catalogAdapter = adapterWith({ ...tnRow(), resourceId: 'twl', type: 'unknown', subject: 'TSV Translation Words Links' })
+    const door43Client = { fetchRepoTreeBlobs: async () => new Map([['tn_RUT.tsv', RUT_SHA]]) }
+    expect(await recordBookBlobs({ door43Client, catalogAdapter, resourceKey: 'a/es/tn' })).toBe('recorded')
   })
 
   test('keeps a catalog write that lands during the tree fetch', async () => {
