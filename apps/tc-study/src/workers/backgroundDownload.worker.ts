@@ -23,6 +23,7 @@ import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { CatalogManager } from '@bt-synergy/catalog-manager/core'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
+import { recordBookBlobs } from '@bt-synergy/resource-catalog'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { compareDownloadBatchOrder } from '../features/download/downloadBatchOrder'
 import {
@@ -79,6 +80,11 @@ if (typeof WorkerScope === 'undefined' || !(self instanceof WorkerScope)) {
 let downloadManager: BackgroundDownloadManager | null = null
 let catalogManager: CatalogManager | null = null
 let completenessChecker: ResourceCompletenessChecker | null = null
+/** What `recordBookBlobs` reads and writes after a download; set with the other services. */
+let blobRecorderDeps: {
+  door43Client: Door43ApiClient
+  catalogAdapter: IndexedDBCatalogAdapter
+} | null = null
 let isInitialized = false
 /** Active run id from the main thread; bumped/replaced on start/stop to drop stale work. */
 let activeRunId = 0
@@ -112,6 +118,8 @@ async function initialize() {
       baseUrl: 'https://git.door43.org',
       debug: false // Reduce logging in worker
     })
+
+    blobRecorderDeps = { door43Client, catalogAdapter }
 
     // 3. Create CatalogManager
     catalogManager = new CatalogManager({
@@ -734,9 +742,14 @@ async function downloadSpecificResources(
 
       // ✅ Mark as complete in cache (so it won't be re-downloaded)
       if (completenessChecker) {
-        await completenessChecker.markCompleteIfVerified(resourceKey, {
+        const verified = await completenessChecker.markCompleteIfVerified(resourceKey, {
           downloadMethod: method
         })
+        if (verified && blobRecorderDeps) {
+          // Per-book cache stamps come from this release's blob shas; never throws.
+          const outcome = await recordBookBlobs({ ...blobRecorderDeps, resourceKey })
+          console.log(`[BG-DL] ⚙️ Worker book blobs for ${resourceKey}: ${outcome}`)
+        }
       }
 
       if (runId === activeRunId) {

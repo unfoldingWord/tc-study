@@ -6,7 +6,7 @@
  */
 
 import { CatalogManager, type CatalogConfig } from '@bt-synergy/catalog-manager/core'
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import { recordBookBlobs, type ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { LoaderRegistry } from '../loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from './BackgroundDownloadManager'
@@ -282,7 +282,19 @@ export async function runDownload(args: {
       )
       completedIngredients += ingredientsCount
       completedResourceCount += 1
-      await completenessChecker.markCompleteIfVerified(resourceKey, { downloadMethod: method })
+      const verified = await completenessChecker.markCompleteIfVerified(resourceKey, {
+        downloadMethod: method,
+      })
+      if (verified) {
+        // Per-book cache stamps come from this release's blob shas. It never throws, so a
+        // Door43 hiccup here cannot turn a finished download into a failed one.
+        const outcome = await recordBookBlobs({
+          door43Client: door43Client as Parameters<typeof recordBookBlobs>[0]['door43Client'],
+          catalogAdapter,
+          resourceKey,
+        })
+        console.log(`[runDownload] book blobs for ${resourceKey}: ${outcome}`)
+      }
       if (isCurrentRun()) {
         post({ type: 'resource-complete', runId, payload: { resourceKey } })
       }
