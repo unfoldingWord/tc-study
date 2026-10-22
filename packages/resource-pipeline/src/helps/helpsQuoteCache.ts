@@ -10,14 +10,15 @@
 
 import { USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
 import { unwrapVersioned, wrapVersioned } from '../cache/versionedEnvelope'
-import { resourceContentStamp, type ResourceStampSource } from '@bt-synergy/resource-catalog'
+import { bookContentStamp, type BookStampSource } from '@bt-synergy/resource-catalog'
 
 export const HELPS_QUOTE_PREFIX = 'helps-quote:'
 /** Bump when QuoteMatcher / buildQuoteTokens output shape changes.
  *  5: align clones keep stamped chapter/verse so merged-stream hits paint every verse. */
 /*  7: occurrence -1 (every occurrence) is found, as written where the accents tell (es-419 Jonah 1:3 n96t). */
 /*  8: a ketiv is found by its qere and keeps it (es-419 Ruth 4:5 ut23 lost קָנִ֔יתָה). */
-export const HELPS_QUOTE_VERSION = 8
+/*  9: stamps are per book (the book's blob sha), not per release. */
+export const HELPS_QUOTE_VERSION = 9
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_QUOTE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -45,11 +46,17 @@ export type HelpsQuoteCacheAdapter = {
   getByPrefix?(prefix: string): Promise<Array<{ key: string; entry: unknown }>>
 }
 
-export function olContentStamp(
-  metadata: ResourceStampSource | null | undefined,
+/** The helps side of a quote/align key: the book's own stamp, so a release that left this book alone keeps its rows. */
+export function helpsBookStamp(metadata: BookStampSource | null | undefined, book: string): string {
+  return bookContentStamp(metadata, book)
+}
+
+export function olBookStamp(
+  metadata: BookStampSource | null | undefined,
+  book: string,
   usjProcessingVersion: string = USJ_PROCESSING_VERSION
 ): string {
-  const base = resourceContentStamp(metadata)
+  const base = bookContentStamp(metadata, book)
   const usj = usjProcessingVersion.replace(/[:|@]/g, '_')
   return `${base}+${usj}`
 }
