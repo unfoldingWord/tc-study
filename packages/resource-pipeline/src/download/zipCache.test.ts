@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { zipCachingClient } from './zipCache'
+import { zipCachingClient, zipFileNames } from './zipCache'
+import { storedZip } from './zipFixture'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -23,7 +24,7 @@ function fakeDoor43() {
     baseUrl: 'https://git.door43.org',
     async downloadZipball(owner: string, repo: string, ref: string): Promise<ArrayBuffer> {
       downloads.push(`${owner}/${repo}@${ref}`)
-      return new TextEncoder().encode(`zip of ${owner}/${repo}@${ref}`).buffer as ArrayBuffer
+      return storedZip({ [`zip of ${owner}/${repo}@${ref}`]: 'x' })
     },
     async fetchRepoTreePaths(this: { baseUrl: string }, owner: string) {
       return new Set([`${this.baseUrl}/${owner}`])
@@ -31,7 +32,8 @@ function fakeDoor43() {
   }
 }
 
-const text = (bytes: ArrayBuffer) => new TextDecoder().decode(bytes)
+/** What the fake zip says it is: its one file's name. */
+const text = (bytes: ArrayBuffer) => zipFileNames(bytes)?.[0]
 
 describe('zipCachingClient', () => {
   test('downloads a release zip once and reads it from disk afterwards', async () => {
@@ -86,6 +88,30 @@ describe('zipCachingClient', () => {
     )
     await expect(failing.downloadZipball('unfoldingWord', 'en_twl', 'v85')).rejects.toThrow('502')
     expect(existsSync(join(dir, 'unfoldingWord__en_twl__v85.zip'))).toBe(false)
+  })
+
+  test('a download that is not a whole zip is refused and not kept', async () => {
+    const dir = freshDir()
+    const broken = zipCachingClient({ downloadZipball: async () => new TextEncoder().encode('<html>502</html>').buffer as ArrayBuffer }, dir)
+    await expect(broken.downloadZipball('unfoldingWord', 'en_tn', 'v86')).rejects.toThrow('not a whole zip')
+    expect(existsSync(join(dir, 'unfoldingWord__en_tn__v86.zip'))).toBe(false)
+  })
+
+  test('a saved file that is not a whole zip is downloaded again', async () => {
+    const dir = freshDir()
+    await writeFile(join(dir, 'unfoldingWord__en_tn__v86.zip'), 'truncated')
+    const door43 = fakeDoor43()
+
+    const bytes = await zipCachingClient(door43, dir).downloadZipball('unfoldingWord', 'en_tn', 'v86')
+
+    expect(door43.downloads).toEqual(['unfoldingWord/en_tn@v86'])
+    expect(text(bytes)).toBe('zip of unfoldingWord/en_tn@v86')
+    expect(text(new Uint8Array(await readFile(join(dir, 'unfoldingWord__en_tn__v86.zip'))).buffer as ArrayBuffer)).toBe(text(bytes))
+  })
+
+  test('zipFileNames lists what the central directory names', () => {
+    expect(zipFileNames(storedZip({ 'en_ult/08-RUT.usfm': 'a', 'en_ult/manifest.yaml': 'b' }))).toEqual(['en_ult/08-RUT.usfm', 'en_ult/manifest.yaml'])
+    expect(zipFileNames(new Uint8Array(10))).toBeNull()
   })
 
   test('every other method is the client’s own', async () => {
