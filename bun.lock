@@ -489,9 +489,11 @@
       "dependencies": {
         "@bt-synergy/resource-catalog": "workspace:*",
         "jszip": "^3.10.1",
+        "pako": "2.1.0",
       },
       "devDependencies": {
         "@types/node": "^20.10.0",
+        "@types/pako": "^2.0.4",
         "typescript": "^5.3.3",
       },
     },

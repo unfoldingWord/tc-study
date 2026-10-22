@@ -284,7 +284,7 @@ describe('abrir un paquete de idioma en otro aparato', () => {
     other.file('manifest.json', JSON.stringify({ format: 'bt-synergy-collection' }))
     await expect(readPackManifest(await other.generateAsync({ type: 'uint8array' }))).rejects.toThrow(/no es un paquete de idioma/)
     const newer = new JSZip()
-    newer.file('manifest.json', JSON.stringify({ format: 'bt-synergy-language-pack', formatVersion: '3.0.0' }))
+    newer.file('manifest.json', JSON.stringify({ format: 'bt-synergy-language-pack', formatVersion: '2.0.0' }))
     await expect(readPackManifest(await newer.generateAsync({ type: 'uint8array' }))).rejects.toThrow(/versión más nueva/)
     await expect(readPackManifest(await new JSZip().generateAsync({ type: 'uint8array' }))).rejects.toThrow(/manifest\.json/)
   })

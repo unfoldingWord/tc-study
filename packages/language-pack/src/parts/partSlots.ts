@@ -48,10 +48,17 @@ function carried(row: { layer: PackLayer; key: string }, resourceKey: string): b
   return scansFor(resourceKey).some((scan) => scan.layer === row.layer && row.key.startsWith(scan.prefix) && belongsTo(row.key, resourceKey, scan))
 }
 
-/** What an article-style row names after its resource: `{key}/{item}` (sot) or `prepared:{type}:{key}:{item}`. */
-function itemOf(row: { layer: PackLayer; key: string }, resourceKey: string): string | null {
+/**
+ * The article (or file) an article-style row is about: `{key}/{id}` (sot), or the unit of
+ * `prepared:{type}:{key}:{id, lowercase}:{id}:{tier}` as the warm article jobs write it. The unit keeps the source
+ * row's case, so both rows of one article hash alike.
+ */
+export function articleIdOfRow(row: { layer: PackLayer; key: string }, resourceKey: string): string | null {
   if (row.layer === 'sot' && row.key.startsWith(`${resourceKey}/`)) return row.key.slice(resourceKey.length + 1)
-  if (row.layer === 'prepared') return row.key.split(':').slice(3).join(':') || null
+  if (row.layer === 'prepared') {
+    const parts = row.key.split(':')
+    return (parts.length >= 6 ? parts.slice(4, -1).join(':') : parts[3]) || null
+  }
   return null
 }
 
@@ -67,10 +74,11 @@ function taGroup(item: string): string | null {
   return manual === 'translate' ? `translate:${fnv1a32(article) % TA_TRANSLATE_BUCKETS}` : manual
 }
 
-function lexiconGroup(item: string): string | null {
+/** Every lexicon file has a part: a file named by no Strong number (an index, a manifest) goes in `other`. */
+function lexiconGroup(item: string): string {
   if (item.startsWith('domains/')) return 'domains'
   const m = item.match(/^content\/[^/\d]*(\d+)[^/]*$/)
-  return m ? String(Math.floor(Number(m[1]) / LEXICON_RANGE)) : null
+  return m ? String(Math.floor(Number(m[1]) / LEXICON_RANGE)) : 'other'
 }
 
 /** The story a row of OBS or of its helps is about: the first number after the resource (the last, in derived keys). */
@@ -91,19 +99,25 @@ function obsGroup(row: { layer: PackLayer; key: string }, resourceKey: string): 
 }
 
 /**
- * The part a row goes in, or null when no part carries it: receipts, rows of other resources, keys of no resource
- * (`warm-coverage:v1`), and rows of a resource whose item no rule names.
+ * The part a row goes in, or null when no part carries it: receipts, rows of other resources and keys of no resource
+ * (`warm-coverage:v1`). A row today's pack carries but no rule places throws: a part build must never lose a row.
  */
 export function slotOfRow(row: { layer: PackLayer; key: string }, resource: Resource): PartSlot | null {
   const rk = resource.key
   if (!carried(row, rk)) return null
+  const slot = placeRow(row, resource)
+  if (!slot) throw new Error(`No part for the ${row.layer} row ${row.key} of ${rk}`)
+  return slot
+}
 
+function placeRow(row: { layer: PackLayer; key: string }, resource: Resource): PartSlot | null {
+  const rk = resource.key
   if ((ORIGINAL_LANGUAGE_KEYS as readonly string[]).includes(rk)) {
     const book = bookOfRow(row.key, row.layer, rk)
     return book ? { kind: 'original', resource: rk, book } : null
   }
   if (isMacula(resource)) {
-    const m = itemOf(row, rk)?.match(/^(?:trees|referents)\/([1-3A-Za-z]{3})$/)
+    const m = articleIdOfRow(row, rk)?.match(/^(?:trees|referents)\/([1-3A-Za-z]{3})$/)
     return m ? { kind: 'macula', resource: rk, book: m[1].toLowerCase() } : null
   }
   if (isObs(resource)) return row.layer === 'text' ? null : { kind: 'obs', resource: rk, group: obsGroup(row, rk) }
@@ -116,7 +130,7 @@ export function slotOfRow(row: { layer: PackLayer; key: string }, resource: Reso
   const tw = isTw(resource)
   const ta = !tw && isTa(resource)
   if ((tw || ta) && row.layer === 'text') return { kind: 'titles', resource: rk }
-  const item = itemOf(row, rk)
+  const item = articleIdOfRow(row, rk)
   if (!item) return null
   const group = tw ? twGroup(item) : ta ? taGroup(item) : isLexicon(resource) ? lexiconGroup(item) : null
   if (!group) return null

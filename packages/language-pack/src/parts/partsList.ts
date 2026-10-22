@@ -4,9 +4,10 @@
  * part the person chose is there, so no receipt travels.
  */
 
+import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { catalogPath } from '../catalog'
 import type { PackLayer, PackResourceRole, PackVersions } from '../types'
-import { PART_LAYERS, VOLATILE_FIELDS, stableJson } from './partFile'
+import { PART_LAYERS, VOLATILE_FIELDS, stableJson, toJsonValue } from './partFile'
 
 export type PartKind = 'book' | 'alignments' | 'original' | 'macula' | 'tw' | 'ta' | 'titles' | 'lexicon' | 'obs'
 
@@ -64,7 +65,8 @@ export const LIST_DROPPED_FIELDS: readonly string[] = [
 
 const DROPPED = new Set(LIST_DROPPED_FIELDS)
 
-function withoutBookkeeping(value: unknown): unknown {
+function withoutBookkeeping(input: unknown): unknown {
+  const value = toJsonValue(input)
   if (Array.isArray(value)) return value.map(withoutBookkeeping)
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
@@ -88,7 +90,15 @@ export function serializePartsList(list: PartsList): string {
     .map((p) => ({ ...p, layers: [...p.layers].sort((a, b) => PART_LAYERS.indexOf(a) - PART_LAYERS.indexOf(b)) }))
     .sort((a, b) => cmp(a.kind, b.kind) || cmp(a.resource, b.resource) || cmp(a.book ?? '', b.book ?? '') || cmp(a.group ?? '', b.group ?? ''))
   const resources = [...list.resources]
-    .map((r) => ({ ...r, metadata: withoutBookkeeping(r.metadata) }))
+    .map((r) => ({ ...r, ...(r.books ? { books: [...r.books].sort(cmp) } : {}), metadata: withoutBookkeeping(r.metadata) }))
     .sort((a, b) => cmp(a.key, b.key))
   return stableJson({ ...list, resources, parts })
+}
+
+/**
+ * A list's catalog row as the catalog stores it: puts back the required fields `LIST_DROPPED_FIELDS` left out
+ * (`catalogedAt`, the only one `ResourceMetadata` requires), dated `now` (ms), the moment it is imported.
+ */
+export function restoreCatalogBookkeeping(metadata: unknown, now: number): ResourceMetadata {
+  return { ...(metadata as ResourceMetadata), catalogedAt: new Date(now).toISOString() }
 }

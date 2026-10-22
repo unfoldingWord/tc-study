@@ -11,11 +11,13 @@
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 
 export const PACK_FORMAT = 'bt-synergy-language-pack' as const
+/** 1.1: `kind`, `books` and `requires`, so originals and books travel in packs of their own. */
+export const PACK_FORMAT_VERSION = '1.1.0' as const
 /**
- * 1.1: `kind`, `books` and `requires`, so originals and books travel in packs of their own.
- * 2.0: a language also travels as content-addressed parts named by a parts list (schema 2, `parts/`).
+ * The format of a parts list and its parts (schema 2, `parts/`), used only in their compat key. Whole packs stay at
+ * 1.1: deployed apps refuse a whole pack of major 2, and the f1.1 lists stay until every app has moved (spec §3).
  */
-export const PACK_FORMAT_VERSION = '2.0.0' as const
+export const PARTS_FORMAT_VERSION = '2.0.0' as const
 
 /**
  * What a pack holds:

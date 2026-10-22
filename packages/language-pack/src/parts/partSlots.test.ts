@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { fnv1a32, slotId, slotOfRow } from './partSlots'
+import { articleIdOfRow, fnv1a32, slotId, slotOfRow } from './partSlots'
 
 const ULT = { key: 'unfoldingWord/en/ult', type: 'scripture', subject: 'Aligned Bible' }
 const TN = { key: 'unfoldingWord/en/tn', type: 'notes', subject: 'TSV Translation Notes' }
@@ -67,6 +67,36 @@ describe('which part a row belongs to', () => {
     expect(slotOfRow({ layer: 'sot', key: 'unfoldingWord/en/ta/process/intro-publishing' }, TA)?.group).toBe('process')
   })
 
+  test('every row of a TW article (source, light, full) lands in the source row’s part', () => {
+    const sot = slotOfRow({ layer: 'sot', key: 'unfoldingWord/en/tw/bible/kt/god' }, TW)
+    expect(sot).toEqual({ kind: 'tw', resource: TW.key, group: `kt:${fnv1a32('kt/god.md') % 8}` })
+    // `prepared:{type}:{key}:{article id, lowercase}:{article id}:{tier}`, as the warm article jobs write them.
+    for (const tier of ['light', 'full']) {
+      expect(slotOfRow({ layer: 'prepared', key: `prepared:words:unfoldingWord/en/tw:bible/kt/god:bible/kt/god:${tier}` }, TW)).toEqual(sot)
+    }
+    const names = slotOfRow({ layer: 'sot', key: 'unfoldingWord/en/tw/bible/names/ruth' }, TW)
+    expect(slotOfRow({ layer: 'prepared', key: 'prepared:words:unfoldingWord/en/tw:bible/names/ruth:bible/names/ruth:full' }, TW)).toEqual(names)
+  })
+
+  test('every row of a TA article (source, light, full) lands in the source row’s part', () => {
+    for (const id of ['translate/figs-metaphor', 'translate/figs-abstractnouns', 'translate/translate-names', 'checking/acceptable']) {
+      const sot = slotOfRow({ layer: 'sot', key: `unfoldingWord/en/ta/${id}` }, TA)
+      expect(sot?.kind).toBe('ta')
+      for (const tier of ['light', 'full']) {
+        expect(slotOfRow({ layer: 'prepared', key: `prepared:academy:unfoldingWord/en/ta:${id}:${id}:${tier}` }, TA)).toEqual(sot)
+      }
+    }
+  })
+
+  test('the article id of a prepared row is the id alone, without the tier or the repeated id', () => {
+    // Checked on the id itself, not only on the bucket: two wrong ids can share a bucket by chance.
+    expect(articleIdOfRow({ layer: 'prepared', key: 'prepared:academy:unfoldingWord/en/ta:translate/figs-metaphor:translate/figs-metaphor:full' }, TA.key)).toBe('translate/figs-metaphor')
+    expect(articleIdOfRow({ layer: 'prepared', key: 'prepared:words:unfoldingWord/en/tw:bible/kt/god:bible/kt/god:light' }, TW.key)).toBe('bible/kt/god')
+    expect(articleIdOfRow({ layer: 'sot', key: 'unfoldingWord/en/ta/translate/figs-metaphor' }, TA.key)).toBe('translate/figs-metaphor')
+    // The key's fourth part is lowercased; the unit keeps the source row's case, so both hash alike.
+    expect(articleIdOfRow({ layer: 'prepared', key: 'prepared:words:x/en/tw:bible/names/abel:bible/names/Abel:full' }, 'x/en/tw')).toBe('bible/names/Abel')
+  })
+
   test('TA and TW titles (and TW previews) go in one titles part each', () => {
     expect(slotOfRow({ layer: 'text', key: 'helps-text:ta-title:unfoldingWord/en/ta@v80#2026-01-01:translate/figs-metaphor' }, TA)).toEqual({ kind: 'titles', resource: TA.key })
     expect(slotOfRow({ layer: 'text', key: 'helps-text:tw-title:unfoldingWord/en/tw@v80#2026-01-01:bible/kt/god' }, TW)).toEqual({ kind: 'titles', resource: TW.key })
@@ -78,6 +108,19 @@ describe('which part a row belongs to', () => {
     expect(slotOfRow({ layer: 'sot', key: 'test_org/en/uhl/content/999.json' }, UHL)?.group).toBe('0')
     expect(slotOfRow({ layer: 'sot', key: 'test_org/en/uhl/content/8674.json' }, UHL)?.group).toBe('8')
     expect(slotOfRow({ layer: 'sot', key: 'test_org/en/uhl/domains/12.json' }, UHL)?.group).toBe('domains')
+  })
+
+  test('a lexicon file whose name holds no number goes in an other part, not nowhere', () => {
+    expect(slotOfRow({ layer: 'sot', key: 'test_org/en/uhl/content/index.json' }, UHL)).toEqual({ kind: 'lexicon', resource: UHL.key, group: 'other' })
+    expect(slotOfRow({ layer: 'sot', key: 'test_org/en/uhl/content/sub/1234.json' }, UHL)?.group).toBe('other')
+    expect(slotOfRow({ layer: 'sot', key: 'test_org/en/uhl/manifest' }, UHL)?.group).toBe('other')
+  })
+
+  test('a row the pack carries but no rule places is an error naming the key and resource, never dropped', () => {
+    expect(() => slotOfRow({ layer: 'sot', key: 'unfoldingWord/en/tw/bible/config' }, TW)).toThrow(/unfoldingWord\/en\/tw\/bible\/config.*unfoldingWord\/en\/tw/)
+    expect(() => slotOfRow({ layer: 'sot', key: 'unfoldingWord/en/ta/manifest' }, TA)).toThrow(/unfoldingWord\/en\/ta\/manifest/)
+    expect(() => slotOfRow({ layer: 'sot', key: 'Biblica/hbo/macula/README' }, MACULA)).toThrow(/Biblica\/hbo\/macula/)
+    expect(() => slotOfRow({ layer: 'sot', key: 'unfoldingWord/en/ult/manifest' }, ULT)).toThrow(/unfoldingWord\/en\/ult\/manifest/)
   })
 
   test('OBS and its helps go ten stories at a time', () => {

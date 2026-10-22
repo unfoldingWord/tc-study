@@ -3,6 +3,7 @@
  * give the same bytes, so an unchanged part keeps its name and is never uploaded or downloaded again.
  */
 
+import { gzip, ungzip } from 'pako'
 import type { PackLayer } from '../types'
 
 export type PartRow = { layer: PackLayer; key: string; value: unknown }
@@ -15,7 +16,14 @@ const VOLATILE = new Set(VOLATILE_FIELDS)
 /** Receipts never travel in parts: the list says when a resource is complete. */
 export const PART_LAYERS: readonly PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text']
 
-export function stripVolatile(value: unknown): unknown {
+/** What JSON.stringify would write for the value: `toJSON` first (a Date becomes its ISO text). */
+export function toJsonValue(value: unknown): unknown {
+  const toJSON = value && typeof value === 'object' ? (value as { toJSON?: unknown }).toJSON : undefined
+  return typeof toJSON === 'function' ? toJSON.call(value) : value
+}
+
+export function stripVolatile(input: unknown): unknown {
+  const value = toJsonValue(input)
   if (Array.isArray(value)) return value.map(stripVolatile)
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {}
@@ -28,7 +36,8 @@ export function stripVolatile(value: unknown): unknown {
 }
 
 /** JSON with object keys sorted at every depth (code-unit order, not locale). */
-export function stableJson(value: unknown): string {
+export function stableJson(input: unknown): string {
+  const value = toJsonValue(input)
   if (Array.isArray(value)) return `[${value.map((v) => (v === undefined ? 'null' : stableJson(v))).join(',')}]`
   if (value && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
@@ -45,11 +54,17 @@ function layerRank(layer: PackLayer): number {
   return rank
 }
 
-// Loaded on use, so that importing the package in a browser does not pull in a Node builtin.
-const zlib = () => import('node:zlib')
+/**
+ * pako, pinned, rather than node:zlib: zlib's deflate output differs between runtimes (Bun and Node give different
+ * bytes for the same input), and the bytes name the part. The header is fixed too: no name, mtime 0, OS 255
+ * ("unknown"), so Windows and Linux builds agree.
+ */
+const GZIP_OPTIONS = { level: 9, header: { time: 0, os: 255 } } as const
 
-/** gzip header byte 9 (OS): zlib writes the build's own (3 on Unix, 10 on Windows); 255 is "unknown" everywhere. */
-const GZIP_OS_BYTE = 9
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>))
+  return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('')
+}
 
 export async function writePart(rows: Iterable<PartRow>): Promise<{ bytes: Uint8Array; sha256: string; rows: number }> {
   const list = [...rows].map((r) => ({ rank: layerRank(r.layer), layer: r.layer, key: r.key, value: stripVolatile(r.value) }))
@@ -59,16 +74,12 @@ export async function writePart(rows: Iterable<PartRow>): Promise<{ bytes: Uint8
     if (list[i].rank === list[i - 1].rank && list[i].key === list[i - 1].key) throw new Error(`Row ${list[i].layer} ${list[i].key} given twice`)
   }
   const text = list.map((r) => `{"layer":${JSON.stringify(r.layer)},"key":${JSON.stringify(r.key)},"value":${stableJson(r.value)}}\n`).join('')
-  const { gzipSync } = await zlib()
-  const bytes = new Uint8Array(gzipSync(Buffer.from(text, 'utf8'), { level: 9 }))
-  bytes[GZIP_OS_BYTE] = 255
-  const { createHash } = await import('node:crypto')
-  return { bytes, sha256: createHash('sha256').update(bytes).digest('hex'), rows: list.length }
+  const bytes = gzip(new TextEncoder().encode(text), GZIP_OPTIONS)
+  return { bytes, sha256: await sha256Hex(bytes), rows: list.length }
 }
 
 export async function readPart(bytes: Uint8Array): Promise<PartRow[]> {
-  const { gunzipSync } = await zlib()
-  const text = gunzipSync(bytes).toString('utf8')
+  const text = new TextDecoder().decode(ungzip(bytes))
   return text
     .split('\n')
     .filter((line) => line.length > 0)

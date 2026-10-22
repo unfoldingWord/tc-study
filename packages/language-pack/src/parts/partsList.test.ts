@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { compatKeyOf } from '../catalog'
-import { PACK_FORMAT_VERSION, type PackVersions } from '../types'
-import { LIST_DROPPED_FIELDS, partsListPath, serializePartsList, type PartEntry, type PartsList } from './partsList'
+import { PACK_FORMAT_VERSION, PARTS_FORMAT_VERSION, type PackVersions } from '../types'
+import { LIST_DROPPED_FIELDS, partsListPath, restoreCatalogBookkeeping, serializePartsList, type PartEntry, type PartsList } from './partsList'
 
 const VERSIONS: PackVersions = {
   sot: { usjProcessing: '2.3.0-usj' },
@@ -41,7 +41,7 @@ function list(parts: PartEntry[], resourcesReversed = false, dated = false): Par
   return {
     schema: 2,
     language: 'en',
-    compat: compatKeyOf(PACK_FORMAT_VERSION, VERSIONS),
+    compat: compatKeyOf(PARTS_FORMAT_VERSION, VERSIONS),
     versions: VERSIONS,
     resources: resourcesReversed ? [...resources].reverse() : resources,
     parts,
@@ -74,8 +74,35 @@ describe('the parts list', () => {
     expect(partsListPath('f2.0-x', 'originals')).toBe('catalog/f2.0-x/originals.json')
   })
 
-  test('is filed under format 2.0', () => {
-    expect(PACK_FORMAT_VERSION).toBe('2.0.0')
-    expect(compatKeyOf(PACK_FORMAT_VERSION, VERSIONS).startsWith('f2.0-')).toBe(true)
+  test('is filed under format 2.0, while whole packs stay 1.1 for the apps already out there', () => {
+    expect(PARTS_FORMAT_VERSION).toBe('2.0.0')
+    expect(compatKeyOf(PARTS_FORMAT_VERSION, VERSIONS).startsWith('f2.0-')).toBe(true)
+    // Deployed apps refuse a whole pack of format major 2; the f1.1 lists stay until every app has moved (spec §3).
+    expect(PACK_FORMAT_VERSION).toBe('1.1.0')
+  })
+
+  test('sorts each resource’s books', () => {
+    const parsed = JSON.parse(serializePartsList(list(PARTS))) as PartsList
+    expect(parsed.resources.find((r) => r.key === 'unfoldingWord/en/tn')?.books).toEqual(['jon', 'rut'])
+  })
+
+  test('writes a date in metadata the way JSON.stringify does, not as an empty object', () => {
+    const at = new Date('2026-01-01T00:00:00.000Z')
+    const base = list(PARTS)
+    const withDate = { ...base, resources: base.resources.map((r) => ({ ...r, metadata: { ...(r.metadata as object), releasedOn: at } })) }
+    const parsed = JSON.parse(serializePartsList(withDate)) as PartsList
+    expect((parsed.resources[0].metadata as { releasedOn: unknown }).releasedOn).toBe('2026-01-01T00:00:00.000Z')
+  })
+})
+
+describe('restoreCatalogBookkeeping', () => {
+  test('gives an imported catalog row back the fields the list leaves out and the catalog requires', () => {
+    const now = Date.parse('2026-10-22T12:00:00.000Z')
+    const metadata = { resourceKey: 'unfoldingWord/en/tn', release: { tag_name: 'v80', published_at: '2026-01-01T00:00:00Z' } }
+    const row = restoreCatalogBookkeeping(metadata, now)
+    expect(row.catalogedAt).toBe('2026-10-22T12:00:00.000Z')
+    expect(row.resourceKey).toBe('unfoldingWord/en/tn')
+    expect(row.release?.published_at).toBe('2026-01-01T00:00:00Z')
+    expect('catalogedAt' in metadata).toBe(false)
   })
 })

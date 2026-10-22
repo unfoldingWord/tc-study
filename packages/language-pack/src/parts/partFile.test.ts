@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
-import { VOLATILE_FIELDS, partPath, readPart, stripVolatile, writePart, type PartRow } from './partFile'
+import { VOLATILE_FIELDS, partPath, readPart, stableJson, stripVolatile, writePart, type PartRow } from './partFile'
 
 const ROWS: PartRow[] = [
   { layer: 'text', key: 'helps-text:ta-title:unfoldingWord/en/ta@v1:translate/figs-metaphor', value: { title: 'Metaphor' } },
@@ -63,6 +63,13 @@ describe('a part file', () => {
     expect(bytes[9]).toBe(255) // OS "unknown", so Windows and Linux builds agree
   })
 
+  test('a fixed set of rows always gives the same bytes (golden: any compressor drift fails here)', async () => {
+    // Same answer under Bun and Node, Linux and Windows: the hash names the file on the server.
+    const { bytes, sha256 } = await writePart(ROWS)
+    expect(sha256).toBe('427f235276f9d4e60ba06edbda20e323b6496c1ce68f31b2c8dc14b38bd831e7')
+    expect(bytes.length).toBe(242)
+  })
+
   test('refuses receipts and a key given twice in one layer', async () => {
     await expect(writePart([{ layer: 'receipt', key: 'resource:a/b/c', value: {} }])).rejects.toThrow()
     await expect(writePart([ROWS[1], { ...ROWS[1], value: {} }])).rejects.toThrow()
@@ -80,5 +87,14 @@ describe('stripVolatile', () => {
     const out = stripVolatile(value)
     expect(out).toEqual({ a: 1, inner: [{ b: 4 }] })
     expect(value.timestamp).toBe(2)
+  })
+})
+
+describe('stableJson', () => {
+  test('honours toJSON as JSON.stringify does (a Date is its ISO text)', () => {
+    const at = new Date('2026-01-01T00:00:00.000Z')
+    expect(stableJson({ at })).toBe(JSON.stringify({ at }))
+    expect(stableJson({ v: { toJSON: () => ({ b: 1, a: 2 }) } })).toBe('{"v":{"a":2,"b":1}}')
+    expect(stripVolatile({ at })).toEqual({ at: '2026-01-01T00:00:00.000Z' })
   })
 })
