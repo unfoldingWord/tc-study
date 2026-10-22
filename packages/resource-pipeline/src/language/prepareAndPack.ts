@@ -168,9 +168,10 @@ export async function prepareAndPack(o: {
   for (const build of preparation.builds) {
     const j = build.jobs
     say(
-      `  ${build.language}: ${j.finished} construidos, ${j.cached} ya estaban, ${j.blocked} bloqueados, ${j.noop} sin hacer;` +
+      `  ${build.language}: ${j.finished} construidos, ${j.cached} ya estaban, ${j.blocked} bloqueados, ${j.noop} sin hacer, ${j.failed} fallidos;` +
         ` ${build.resources.filter((r) => r.complete).length}/${build.resources.length} recursos completos`
     )
+    for (const f of build.failures) say(`    falló ${f.job}: ${f.error}`)
   }
   if (languagePack.manifest.requires?.length) {
     say(`  ${language} necesita: ${languagePack.manifest.requires.map((r) => `${r.key}@${r.stamp}`).join(', ')}`)
