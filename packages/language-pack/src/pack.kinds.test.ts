@@ -130,6 +130,16 @@ describe('las claves dicen de qué libro y de qué original son', () => {
       book: 'rut',
     })
   })
+
+  it('cuts the +usj suffix at the last +, so a release stamp holding a + survives', () => {
+    // resourceContentStamp keeps a +02:00 offset (as +02_00); only : | @ are rewritten
+    const release = 'v66#2026-01-01T00_00_00+02_00'
+    expect(originalOfDerivedRow(`helps-align:${TN}@x:${UHB}@${release}+2.2.0-usj:${GLT}@y+3000220:rut:1`)).toEqual({
+      key: UHB,
+      stamp: release,
+      book: 'rut',
+    })
+  })
 })
 
 describe('las clases de paquete', () => {

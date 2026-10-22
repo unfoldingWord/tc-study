@@ -104,7 +104,10 @@ export function originalOfDerivedRow(key: string): DerivedRowOriginal | null {
   if (!part || parts.length < 5) return null
   const at = part.indexOf('@')
   if (at <= 0) return null
-  return { key: part.slice(0, at), stamp: part.slice(at + 1).split('+')[0], book: parts[parts.length - 2].toLowerCase() }
+  // The `+{usj}` suffix is always last; a release stamp may hold a `+` of its own (a `+02:00` offset)
+  const rest = part.slice(at + 1)
+  const plus = rest.lastIndexOf('+')
+  return { key: part.slice(0, at), stamp: plus < 0 ? rest : rest.slice(0, plus), book: parts[parts.length - 2].toLowerCase() }
 }
 
 /** NT and OT original languages, whose scripture the quotes of notes and word links are built against (§6). */
