@@ -136,6 +136,21 @@ describe('publishLanguage', () => {
     expect(bucket.puts).toEqual([])
   })
 
+  test('force: the same build id is built and published again, for a builder fix no stamp shows', async () => {
+    const stored = await storedEntry('es-419', { generator: 'g1', macula: M, lexicons: 'v3', stamps: STAMPS })
+    const bucket = memoryBucket({ [catalogPath(compat, 'es-419')]: stored })
+    const { build, calls } = fakeBuild()
+    const { options } = base(bucket, { build, force: true })
+
+    const result = await publishLanguage(options)
+
+    expect(result.outcome).toBe('published')
+    expect(calls).toHaveLength(1)
+    expect(result.entry!.build.id).toBe(stored.build.id)
+    expect(result.entry!.build.generator).toBe('g2')
+    expect(bucket.puts.map((p) => p.key)).toContain(catalogPath(compat, 'es-419'))
+  })
+
   test('a new tc-study commit alone is unchanged: nothing is built and nothing is put', async () => {
     const stored = await storedEntry('es-419', { generator: 'g1', macula: M, lexicons: 'v3', stamps: STAMPS })
     const bucket = memoryBucket({ [catalogPath(compat, 'es-419')]: stored })

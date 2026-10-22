@@ -1,17 +1,18 @@
 /**
- * Build a language's packs and views and upload them to the packs bucket, only when Door43, the generator, MACULA or
- * the lexicons changed since the build the bucket holds (src/language/publishLanguage.ts).
+ * Build a language's packs and views and upload them to the packs bucket, only when Door43, MACULA or the lexicons
+ * changed since the build the bucket holds (src/language/publishLanguage.ts), or when `--force` says so.
  *
  *   bun packages/resource-pipeline/cli/publish-language.ts --lang es-419 --work <dir> --generator <sha> \
  *     --macula <taller>/public [--macula-commit <sha>] [--macula-date <iso>] --lexicons-ref <ref> [--obs] \
- *     [--dry-run | --no-upload]
+ *     [--dry-run | --no-upload] [--force]
  *
  * `--macula` is the `public/` folder of a Taller checkout. `--macula-commit` defaults to the last commit that touched
  * its `trees/` and `referents/`, and `--macula-date` to that commit's date, what apps order MACULA's stamps by
  * (cli/maculaIdentity.ts).
  *
  * `--dry-run` decides only (outcome `would-publish` or `unchanged`). `--no-upload` decides, then builds the packs and
- * the views into `--work` and puts nothing (outcome `built`): a measurement or a check.
+ * the views into `--work` and puts nothing (outcome `built`): a measurement or a check. `--force` builds and publishes
+ * even an unchanged build id: for a builder fix no stamp shows and no compat key covers.
  *
  * The bucket: R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY. A dry run or a no-upload run without them
  * decides against an empty bucket, as if nothing had been published. One language per process: the build's in-memory
@@ -42,7 +43,7 @@ function arg(name: string): string | undefined {
 function usage(why: string): never {
   console.error(why)
   console.error(
-    'Uso: publish-language --lang <código> --work <carpeta> --generator <sha> --macula <taller>/public [--macula-commit <sha>] [--macula-date <iso>] --lexicons-ref <ref> [--obs] [--dry-run | --no-upload]'
+    'Uso: publish-language --lang <código> --work <carpeta> --generator <sha> --macula <taller>/public [--macula-commit <sha>] [--macula-date <iso>] --lexicons-ref <ref> [--obs] [--dry-run | --no-upload] [--force]'
   )
   process.exit(2)
 }
@@ -51,6 +52,7 @@ const language = arg('lang')
 if (!language || !isLanguageCode(language)) usage(`--lang no es un código de idioma: ${JSON.stringify(language ?? null)}`)
 const dryRun = process.argv.includes('--dry-run')
 const noUpload = process.argv.includes('--no-upload')
+const force = process.argv.includes('--force')
 if (dryRun && noUpload) usage('--dry-run y --no-upload no van juntos')
 const required = Object.fromEntries(['generator', 'macula', 'lexicons-ref'].map((name) => [name, arg(name)]))
 const missing = Object.entries(required).filter(([, v]) => !v).map(([k]) => `--${k}`)
@@ -91,6 +93,7 @@ try {
     obs: process.argv.includes('--obs'),
     dryRun,
     noUpload,
+    force,
     log: (line) => console.error(line),
   })
   printResult(JSON.stringify(result))
