@@ -17,12 +17,13 @@ import '../prepare/registerPreparers'
 import { resolveOriginalLanguageKey } from '../scripture/originalLanguage'
 import { UGNT_RESOURCE_KEY, UHB_RESOURCE_KEY } from '../scripture/originalLanguageSpecs'
 import { collectLane3Groups, type WarmPlanStamps } from '../warm/warmAdmitPlan'
+import { CANON_BOOK_ORDER } from '../warm/warmBookOrder'
 import { markRelationCovered, readWarmCoverage } from '../warm/warmCoverage'
 import { applyCoverageOutcome, createCoverageSettleState, type CoverageSettleState } from '../warm/warmCoverageSettle'
 import { runWarmJob } from '../warm/warmJobs'
 import { classifyWarmResource, languageFromKey } from '../warm/warmResourceClass'
 import { resolveWarmStamps, type WarmStampCatalog, type WarmStampResolvers } from '../warm/warmStamps'
-import type { WarmJob, WarmJobOutcome } from '../warm/warmTypes'
+import type { BuildJobOutcome, WarmJob } from '../warm/warmTypes'
 
 export type PipelineCache = Parameters<typeof runWarmJob>[0] &
   HelpsTextCacheAdapter & {
@@ -35,7 +36,7 @@ export interface PipelineCatalog extends WarmStampCatalog {
 
 export type BuildProgress =
   | { phase: 'plan'; jobs: number }
-  | { phase: 'jobs'; done: number; total: number; job: WarmJob; outcome: WarmJobOutcome }
+  | { phase: 'jobs'; done: number; total: number; job: WarmJob; outcome: BuildJobOutcome }
   | { phase: 'titles'; resourceKey: string }
 
 export interface TitlesReport {
@@ -50,15 +51,25 @@ export interface BuildReport {
   language: string
   /** The language's resources and whether each has a complete receipt for its current release. */
   resources: Array<{ resourceKey: string; complete: boolean }>
-  jobs: { total: number } & Record<WarmJobOutcome, number>
-  /** Jobs that did not build: blocked (source or original missing) or noop. */
-  incomplete: Array<{ jobKey: string; outcome: WarmJobOutcome }>
+  jobs: { total: number } & Record<BuildJobOutcome, number>
+  /** Jobs that did not build: blocked (source or original missing), noop or failed. */
+  incomplete: Array<{ jobKey: string; outcome: BuildJobOutcome }>
+  /** The first jobs that threw, with their message (all of them are counted in `jobs.failed`). */
+  failures: Array<{ job: string; error: string }>
   relationsCovered: number
   titles: TitlesReport[]
 }
 
 /** No budget: every lane-3 job of the language at once. */
 const NO_BUDGET = Number.MAX_SAFE_INTEGER
+
+/** Enough failures to see what broke without flooding a report. */
+const MAX_FAILURES_LISTED = 20
+
+export type ChaptersOf = (
+  resourceKey: string,
+  book: string
+) => readonly number[] | null | Promise<readonly number[] | null>
 
 function olStampForBook(book: string, stamps: WarmStampResolvers): { olKey: string; olStamp: string } {
   const olKey = resolveOriginalLanguageKey(book)?.resourceKey ?? ''
@@ -133,6 +144,14 @@ export async function buildLanguageArtifacts(options: {
   catalog: PipelineCatalog
   onProgress?: (progress: BuildProgress) => void
   cancelled?: () => boolean
+  /** Build only these books (none: only articles, OBS and titles). Omitted = the whole canon. */
+  books?: readonly string[]
+  /** The chapters each resource has in a book (e.g. `chaptersFromStore`); `null`/`[]`: nothing of that book. */
+  chaptersOf?: ChaptersOf
+  /** `false`: no TA/TW article jobs and no titles. Default true. */
+  articles?: boolean
+  /** `false`: no OBS jobs. Default true. */
+  obs?: boolean
 }): Promise<BuildReport> {
   const { cache, catalog, onProgress } = options
   const language = options.language.toLowerCase()
@@ -147,6 +166,18 @@ export async function buildLanguageArtifacts(options: {
     if (articleIdsByKey[key]?.length || !classifyWarmResource(key).isArticle) continue
     const ids = await articleIdsFromCache(cache, key)
     if (ids.length) articleIdsByKey[key] = ids
+  }
+
+  // The planner is synchronous: ask for every resource's chapters of every book up front.
+  let chaptersOf: ((resourceKey: string, book: string) => readonly number[] | null) | undefined
+  if (options.chaptersOf) {
+    const known = new Map<string, readonly number[] | null>()
+    for (const book of options.books ?? CANON_BOOK_ORDER) {
+      for (const key of inLang) {
+        known.set(`${key}\n${book.toLowerCase()}`, await options.chaptersOf(key, book.toLowerCase()))
+      }
+    }
+    chaptersOf = (key, book) => known.get(`${key}\n${book}`) ?? null
   }
 
   const coverage = await readWarmCoverage(cache)
@@ -166,6 +197,10 @@ export async function buildLanguageArtifacts(options: {
       return Boolean(entry && entry.stamp === stamp && entry.unitCount >= minUnitCount)
     },
     readyOlKeys: await readyOriginals(cache),
+    books: options.books,
+    chaptersOf,
+    articles: options.articles,
+    obs: options.obs,
   })
 
   // Register every job before running any, so a relation split over several groups is marked once, when all of it
@@ -188,27 +223,34 @@ export async function buildLanguageArtifacts(options: {
   }
   onProgress?.({ phase: 'plan', jobs: jobs.length })
 
-  const counts: BuildReport['jobs'] = { total: jobs.length, finished: 0, cached: 0, blocked: 0, noop: 0 }
+  const counts: BuildReport['jobs'] = { total: jobs.length, finished: 0, cached: 0, blocked: 0, noop: 0, failed: 0 }
   const incomplete: BuildReport['incomplete'] = []
+  const failures: BuildReport['failures'] = []
   let relationsCovered = 0
   let done = 0
   for (const job of jobs) {
     if (cancelled()) break
-    let outcome: WarmJobOutcome
+    let outcome: BuildJobOutcome
     try {
       outcome = await runWarmJob(cache, job, cancelled)
-    } catch {
-      outcome = 'noop'
+    } catch (error) {
+      outcome = 'failed'
+      if (failures.length < MAX_FAILURES_LISTED) {
+        failures.push({ job: job.jobKey, error: error instanceof Error ? error.message : String(error) })
+      }
     }
     counts[outcome] += 1
-    if (outcome === 'blocked' || outcome === 'noop') incomplete.push({ jobKey: job.jobKey, outcome })
+    if (outcome === 'blocked' || outcome === 'noop' || outcome === 'failed') {
+      incomplete.push({ jobKey: job.jobKey, outcome })
+    }
     done += 1
     onProgress?.({ phase: 'jobs', done, total: jobs.length, job, outcome })
 
     const relationId = relationOf.get(job.jobKey)
     const batch = relationId ? batches.get(relationId) : undefined
     if (!relationId || !batch) continue
-    const { shouldMark, succeeded } = applyCoverageOutcome(batch, job.jobKey, outcome)
+    // A failed job leaves its relation uncovered, as a noop does.
+    const { shouldMark, succeeded } = applyCoverageOutcome(batch, job.jobKey, outcome === 'failed' ? 'noop' : outcome)
     if (batch.remaining.size > 0) continue
     batches.delete(relationId)
     if (shouldMark) {
@@ -218,7 +260,7 @@ export async function buildLanguageArtifacts(options: {
   }
 
   const titles: TitlesReport[] = []
-  for (const key of inLang) {
+  for (const key of options.articles === false ? [] : inLang) {
     if (cancelled()) break
     const typeId = classifyWarmResource(key).typeId
     const kind =
@@ -243,6 +285,7 @@ export async function buildLanguageArtifacts(options: {
     resources,
     jobs: counts,
     incomplete,
+    failures,
     relationsCovered,
     titles,
   }

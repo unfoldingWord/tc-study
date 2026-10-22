@@ -92,3 +92,102 @@ describe('buildLanguageArtifacts', () => {
     expect(Object.keys(await readWarmCoverage(cache))).toEqual([])
   })
 })
+
+describe('buildLanguageArtifacts, one book at a time', () => {
+  const GLT = 'es-419_gl/es-419/glt'
+  const TN = 'es-419_gl/es-419/tn'
+  const TA = 'es-419_gl/es-419/ta'
+  const BOOK_META: Record<string, unknown> = {
+    [GLT]: { language: 'es-419', release, contentMetadata: { ingredients: [{ identifier: 'rut' }, { identifier: 'jon' }] } },
+    [TN]: { language: 'es-419', release, contentMetadata: { ingredients: [{ identifier: 'rut' }] } },
+    [TA]: META[TA],
+  }
+  const bookCatalog = () => ({
+    async getAllResourceKeys() {
+      return Object.keys(BOOK_META)
+    },
+    async getResourceMetadata(key: string) {
+      return BOOK_META[key] ?? null
+    },
+  })
+
+  async function plannedJobs(options: Record<string, unknown>) {
+    const jobs: string[] = []
+    const report = await buildLanguageArtifacts({
+      language: 'es-419',
+      cache: memoryCache(),
+      catalog: bookCatalog(),
+      onProgress: (p) => {
+        if (p.phase === 'jobs') jobs.push(p.job.jobKey)
+      },
+      ...options,
+    })
+    return { jobs, report }
+  }
+
+  test('plans only the books and chapters it is given, and no articles or titles when told so', async () => {
+    const { jobs, report } = await plannedJobs({
+      books: ['rut'],
+      chaptersOf: (key: string, book: string) => (key === GLT && book === 'rut' ? [1, 2] : null),
+      articles: false,
+      obs: false,
+    })
+    expect(jobs).toEqual([`prep:scripture:${GLT}:rut:1`, `prep:scripture:${GLT}:rut:2`])
+    expect(report.titles).toEqual([])
+  })
+
+  test('without the new options every book and the articles are planned as before', async () => {
+    const { jobs } = await plannedJobs({})
+    expect(jobs.some((j) => j.includes(':jon:'))).toBe(true)
+    expect(jobs.some((j) => j.startsWith('prep-article:'))).toBe(true)
+  })
+
+  test('a job that throws is counted failed with its message, never noop', async () => {
+    const cache = memoryCache()
+    const failing = {
+      ...cache,
+      async get(key: string) {
+        if (key.startsWith('scripture-usj:')) throw new Error(`disk read failed: ${key}`)
+        return cache.get(key)
+      },
+    }
+    const report = await buildLanguageArtifacts({
+      language: 'es-419',
+      cache: failing,
+      catalog: bookCatalog(),
+      books: ['rut'],
+      chaptersOf: (key: string) => (key === GLT ? [1, 2] : null),
+      articles: false,
+      obs: false,
+    })
+    expect(report.jobs.total).toBe(2)
+    expect(report.jobs.failed).toBe(2)
+    expect(report.jobs.noop).toBe(0)
+    expect(report.failures).toEqual([
+      { job: `prep:scripture:${GLT}:rut:1`, error: `disk read failed: scripture-usj:${GLT}:rut:1` },
+      { job: `prep:scripture:${GLT}:rut:2`, error: `disk read failed: scripture-usj:${GLT}:rut:2` },
+    ])
+    expect(report.incomplete.map((j) => j.outcome)).toEqual(['failed', 'failed'])
+  })
+
+  test('the failures list keeps the first 20, the count keeps them all', async () => {
+    const report = await buildLanguageArtifacts({
+      language: 'es-419',
+      cache: {
+        ...memoryCache(),
+        async get(key: string) {
+          if (key.startsWith('scripture-usj:')) throw new Error('boom')
+          return null
+        },
+      },
+      catalog: bookCatalog(),
+      books: ['gen'],
+      articles: false,
+      obs: false,
+    })
+    // Genesis has 50 chapters for the GLT; TN's jobs are blocked (no notes), not failed.
+    expect(report.jobs.failed).toBe(50)
+    expect(report.failures.length).toBe(20)
+    expect(report.failures[0]).toEqual({ job: `prep:scripture:${GLT}:gen:1`, error: 'boom' })
+  })
+})

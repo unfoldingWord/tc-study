@@ -70,6 +70,44 @@ export type Lane3PlanArgs = {
   skipRelation?: (relationId: string, stamp: string, minUnitCount: number) => boolean
   /** When set, quote/align waits until this OL key is marked complete. */
   readyOlKeys?: Iterable<string>
+  /** Walk only these books, in this order (a build one book at a time). Omitted = the whole canon from `bookId`. */
+  books?: readonly string[]
+  /**
+   * The chapters a resource has in a book; only those are planned. `null` or `[]`: the resource lacks the book and
+   * nothing of it is planned. Omitted = every chapter of the book's known count.
+   */
+  chaptersOf?: (resourceKey: string, book: string) => readonly number[] | null
+  /** `false` plans no TA/TW article jobs. Default true. */
+  articles?: boolean
+  /** `false` plans no OBS jobs. Default true. */
+  obs?: boolean
+}
+
+/** Chapters a resource has in the book being planned: `undefined` = no restriction, `[]` = none. */
+type ChaptersFor = (resourceKey: string) => number[] | undefined
+
+function intersectChapters(a: number[] | undefined, b: number[] | undefined): number[] | undefined {
+  if (!a) return b
+  if (!b) return a
+  return a.filter((ch) => b.includes(ch))
+}
+
+/** Like `nextUnadmittedChapters`, limited to `only` when given. */
+function unadmittedChapters(args: {
+  book: string
+  admittedKeys: Set<string>
+  jobKey: (chapter: number) => string
+  budget: number
+  only?: number[]
+}): number[] {
+  if (!args.only) return nextUnadmittedChapters(args)
+  const out: number[] = []
+  for (const ch of args.only) {
+    if (out.length >= args.budget) break
+    if (args.admittedKeys.has(args.jobKey(ch))) continue
+    out.push(ch)
+  }
+  return out
 }
 
 function stampFor(item: ClassifiedWarmKey, book: string, stamps?: WarmPlanStamps): string {
@@ -395,19 +433,23 @@ function admitCanonPrepare(
   admitted: Set<string>,
   budget: { left: number },
   stamps?: WarmPlanStamps,
-  skipRelation?: Lane3PlanArgs['skipRelation']
+  skipRelation?: Lane3PlanArgs['skipRelation'],
+  chaptersFor?: ChaptersFor
 ): void {
   if (!item.hasPrepare || budget.left <= 0) return
+  const only = chaptersFor?.(item.key)
+  if (only?.length === 0) return
   const maxCh = knownChapterCount(book)
   const pRel = prepareRelationId({ typeId: item.typeId, resourceKey: item.key, book })
   const pStamp = stampFor(item, book, stamps)
   if (skipRelation?.(pRel, pStamp, maxCh)) return
   const jobKey = (ch: number) => `prep:${item.typeId}:${item.key}:${book}:${ch}`
-  const chapters = nextUnadmittedChapters({
+  const chapters = unadmittedChapters({
     book,
     admittedKeys: admitted,
     jobKey,
     budget: budget.left,
+    only,
   })
   const jobs = prepareUnitJobs({ item, bookId: book, units: chapters, lane: 3 })
   for (const j of jobs) admitted.add(j.jobKey)
@@ -426,10 +468,13 @@ function admitQuoteAlign(
   olStamp: string,
   stamps?: WarmPlanStamps,
   skipRelation?: Lane3PlanArgs['skipRelation'],
-  readyOlKeys?: Iterable<string>
+  readyOlKeys?: Iterable<string>,
+  chaptersFor?: ChaptersFor
 ): void {
   if (!item.quotesOl || !item.helpsType || !olKey || budget.left <= 0) return
   if (!olKeyIsReady(olKey, readyOlKeys)) return
+  const only = chaptersFor?.(item.key)
+  if (only?.length === 0) return
   const helpsStamp = helpsStampFor(item.key, book, stamps)
   const maxCh = knownChapterCount(book)
 
@@ -437,11 +482,12 @@ function admitQuoteAlign(
   const qStamp = `${helpsStamp}|${olStamp}`
   if (!skipRelation?.(qRel, qStamp, maxCh)) {
     const qJobKey = (ch: number) => `quote:${item.key}:${book}:${ch}`
-    const qChapters = nextUnadmittedChapters({
+    const qChapters = unadmittedChapters({
       book,
       admittedKeys: admitted,
       jobKey: qJobKey,
       budget: budget.left,
+      only,
     })
     const qJobs = quoteJobs({
       item,
@@ -459,16 +505,20 @@ function admitQuoteAlign(
 
   for (const sk of scriptures) {
     if (budget.left <= 0) break
+    // An aligned quote needs the text too: only the chapters both have.
+    const aOnly = intersectChapters(only, chaptersFor?.(sk))
+    if (aOnly?.length === 0) continue
     const targetStamp = targetStampFor(sk, book, stamps)
     const aRel = alignRelationId({ helpsKey: item.key, olKey, targetKey: sk, book })
     const aStamp = `${helpsStamp}|${olStamp}|${targetStamp}`
     if (skipRelation?.(aRel, aStamp, maxCh)) continue
     const aJobKey = (ch: number) => `align:${item.key}:${sk}:${book}:${ch}`
-    const aChapters = nextUnadmittedChapters({
+    const aChapters = unadmittedChapters({
       book,
       admittedKeys: admitted,
       jobKey: aJobKey,
       budget: budget.left,
+      only: aOnly,
     })
     const aJobs = alignJobs({
       item,
@@ -579,7 +629,8 @@ function admitArticles(
 
 /**
  * Lane 3: every downloaded key in {textLang, helpsLang} — full canon,
- * OBS stories, and article units. Throttle via `budget`.
+ * OBS stories, and article units. Throttle via `budget`. A build one book at a
+ * time narrows it with `books`, `chaptersOf`, `articles` and `obs`.
  */
 export function collectLane3Groups(args: Lane3PlanArgs): WarmAdmitGroup[] {
   const items = sortLane3Keys(
@@ -590,21 +641,25 @@ export function collectLane3Groups(args: Lane3PlanArgs): WarmAdmitGroup[] {
   const scriptures = scriptureKeysOf(items)
   const canonItems = items.filter((i) => i.unitScope === 'canon')
   const quoteItems = items.filter((i) => i.quotesOl)
-  const obsStoryItems = items.filter((i) => i.unitScope === 'obs-stories')
-  const obsBookItems = items.filter((i) => i.unitScope === 'obs-book')
-  const articleItems = items.filter((i) => i.unitScope === 'articles')
+  const obsStoryItems = args.obs === false ? [] : items.filter((i) => i.unitScope === 'obs-stories')
+  const obsBookItems = args.obs === false ? [] : items.filter((i) => i.unitScope === 'obs-book')
+  const articleItems = args.articles === false ? [] : items.filter((i) => i.unitScope === 'articles')
 
   const admitted = new Set(args.admittedKeys)
   const budget = { left: args.budget }
   const out: WarmAdmitGroup[] = []
-  const books = nextCanonBooks(args.bookId)
+  const books = args.books ? args.books.map((b) => b.toLowerCase()) : nextCanonBooks(args.bookId)
+  const { chaptersOf } = args
 
   for (const book of books) {
     if (budget.left <= 0) break
     const { olKey, olStamp } = args.olStampForBook(book)
+    const chaptersFor: ChaptersFor | undefined = chaptersOf
+      ? (key) => [...new Set(chaptersOf(key, book) ?? [])].sort((a, b) => a - b)
+      : undefined
     for (const item of canonItems) {
       if (budget.left <= 0) break
-      admitCanonPrepare(out, item, book, admitted, budget, args.stamps, args.skipRelation)
+      admitCanonPrepare(out, item, book, admitted, budget, args.stamps, args.skipRelation, chaptersFor)
     }
     if (olKey) {
       for (const item of quoteItems) {
@@ -620,7 +675,8 @@ export function collectLane3Groups(args: Lane3PlanArgs): WarmAdmitGroup[] {
           olStamp,
           args.stamps,
           args.skipRelation,
-          args.readyOlKeys
+          args.readyOlKeys,
+          chaptersFor
         )
       }
     }
