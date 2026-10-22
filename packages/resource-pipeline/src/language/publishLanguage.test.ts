@@ -136,10 +136,35 @@ describe('publishLanguage', () => {
     expect(bucket.puts).toEqual([])
   })
 
-  test('a new generator publishes: pack, then views, then originals.json, then the language entry last', async () => {
+  test('a new tc-study commit alone is unchanged: nothing is built and nothing is put', async () => {
+    const stored = await storedEntry('es-419', { generator: 'g1', macula: M, lexicons: 'v3', stamps: STAMPS })
+    const bucket = memoryBucket({ [catalogPath(compat, 'es-419')]: stored })
+    const { options } = base(bucket, { build: neverBuild, generator: 'g2' })
+
+    const result = await publishLanguage(options)
+
+    expect(result.outcome).toBe('unchanged')
+    expect(bucket.puts).toEqual([])
+  })
+
+  test('an entry stored with the old id (the generator inside) is rebuilt once', async () => {
+    const stored = await storedEntry('es-419', { generator: 'g1', macula: M, lexicons: 'v3', stamps: STAMPS })
+    const bucket = memoryBucket({ [catalogPath(compat, 'es-419')]: { ...stored, build: { ...stored.build, id: '0123456789abcdef' } } })
+    const { build } = fakeBuild()
+    const { options } = base(bucket, { build })
+
+    const result = await publishLanguage(options)
+
+    expect(result.outcome).toBe('published')
+    expect(result.entry!.build.generator).toBe('g2')
+  })
+
+  test('a new Door43 stamp publishes: pack, then views, then originals.json, then the language entry last', async () => {
+    // What the stored packs were built from: an older UHB, so both the language and the originals changed.
+    const OLD_UHB = { 'unfoldingWord/hbo/uhb': 'v2.1.30#2024-06-01T00_00_00Z' }
     const bucket = memoryBucket({
-      [catalogPath(compat, 'es-419')]: await storedEntry('es-419', { generator: 'g1', macula: M, lexicons: 'v3', stamps: STAMPS }),
-      [catalogPath(compat, 'originals')]: await storedEntry('originals', { generator: 'g1', macula: M, stamps: ORIGINAL_STAMPS }),
+      [catalogPath(compat, 'es-419')]: await storedEntry('es-419', { generator: 'g1', macula: M, lexicons: 'v3', stamps: { ...STAMPS, ...OLD_UHB } }),
+      [catalogPath(compat, 'originals')]: await storedEntry('originals', { generator: 'g1', macula: M, stamps: { ...ORIGINAL_STAMPS, ...OLD_UHB } }),
     })
     const { build, calls } = fakeBuild()
     const { options } = base(bucket, { build })

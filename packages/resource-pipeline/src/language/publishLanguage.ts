@@ -1,7 +1,8 @@
 /**
  * Publish one language to a bucket only when something it is built from changed: the Door43 releases (read in seconds
- * from the catalog), the generator's commit, MACULA's commit or the lexicons' ref. Those make the build id; a stored
- * catalog entry with the same id means the hour-long build is skipped.
+ * from the catalog), MACULA's commit or the lexicons' ref. Those make the build id; a stored catalog entry with the same
+ * id means the hour-long build is skipped. The generator's commit is recorded in the entry but is not compared: a
+ * builder change that alters the output bumps the compat key, and an unrelated tc-study commit rebuilds nothing.
  *
  * The upload order is what keeps a cut-short run harmless: the packs (named by content, so new keys), then the views,
  * then the originals' entry and the language's entry last. Until that entry is written the bucket names the previous
