@@ -17,7 +17,7 @@ import { addLexicons, addMacula, lexiconOwnerOf, MACULA_KEYS } from '../../cli/c
 import { isObs, keyOfRow, literalTextOf } from './door43Stamps'
 import { closeAndDelete } from './fakeDatabases'
 import { PACK_VERSIONS } from './packVersions'
-import { prepareLanguage, type PrepareLanguageProgress } from './prepareLanguage'
+import { prepareLanguage, type DiscoverInto, type PrepareLanguageProgress } from './prepareLanguage'
 
 // tc-study's own database names, so the rows are keyed as the app keys them.
 const CACHE_DB = 'tc-study-cache'
@@ -55,14 +55,20 @@ export async function prepareAndPack(o: {
   /** `false` leaves Open Bible Stories and their helps out (an app that translates only the Bible). */
   obs: boolean
   log?: (line: string) => void
+  /** Test hooks: a fake Door43, its catalog, the lexicons' HTTP and the databases' names. The command uses none. */
+  door43Client?: unknown
+  discover?: DiscoverInto
+  fetch?: (url: string) => Promise<Response>
+  databases?: { cache: string; catalog: string }
 }): Promise<PreparedPacks> {
   const language = o.language
   const outDir = resolve(o.outDir)
   const say = o.log ?? (() => {})
 
-  const cacheAdapter = new IndexedDBCacheAdapter({ dbName: CACHE_DB, storeName: 'cache-entries', version: 1 })
-  const catalogAdapter = new IndexedDBCatalogAdapter({ dbName: CATALOG_DB, storeName: 'catalog-entries', version: 1 })
-  const door43Client = getDoor43ApiClient({ baseUrl: 'https://git.door43.org', debug: false })
+  const dbNames = o.databases ?? { cache: CACHE_DB, catalog: CATALOG_DB }
+  const cacheAdapter = new IndexedDBCacheAdapter({ dbName: dbNames.cache, storeName: 'cache-entries', version: 1 })
+  const catalogAdapter = new IndexedDBCatalogAdapter({ dbName: dbNames.catalog, storeName: 'catalog-entries', version: 1 })
+  const door43Client = o.door43Client ?? getDoor43ApiClient({ baseUrl: 'https://git.door43.org', debug: false })
 
   const started = Date.now()
   const elapsed = () => `${((Date.now() - started) / 1000).toFixed(0)}s`
@@ -97,6 +103,7 @@ export async function prepareAndPack(o: {
     door43Client: door43Client as never,
     includeOriginals: o.originals,
     onProgress: report,
+    ...(o.discover ? { discover: o.discover } : {}),
   })
 
   const source = packSourceFrom({ cache: cacheAdapter as never, catalog: catalogAdapter as never })
@@ -109,7 +116,7 @@ export async function prepareAndPack(o: {
     if (literal) {
       const owner = lexiconOwnerOf(language, literal.owner)
       say(`[${elapsed()}] Léxicos de ${owner}…`)
-      companions.lexicons = await addLexicons(cacheAdapter as never, catalogAdapter as never, language, owner, o.lexicons.ref)
+      companions.lexicons = await addLexicons(cacheAdapter as never, catalogAdapter as never, language, owner, o.lexicons.ref, o.fetch)
       for (const l of companions.lexicons as Array<{ key: string; entries?: number; why?: string }>) {
         say(`[${elapsed()}]   ${l.key}: ${l.entries !== undefined ? `${l.entries} entradas` : l.why}`)
       }
@@ -162,7 +169,7 @@ export async function prepareAndPack(o: {
   const reportJson = { preparation, companions, packs }
   writeFileSync(join(outDir, `${language}.report.json`), JSON.stringify(reportJson, null, 2))
   // The packs are bytes now; the store would otherwise stay in memory through the views step, which opens its own.
-  await closeAndDelete([cacheAdapter, catalogAdapter], [CACHE_DB, CATALOG_DB], say)
+  await closeAndDelete([cacheAdapter, catalogAdapter], [dbNames.cache, dbNames.catalog], say)
 
   say(`[${elapsed()}] Listo en ${outDir}`)
   for (const build of preparation.builds) {

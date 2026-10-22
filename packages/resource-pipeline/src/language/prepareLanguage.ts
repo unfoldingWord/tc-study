@@ -20,6 +20,13 @@ import {
   type PipelineCache,
 } from './buildLanguageArtifacts'
 
+/** Discovery puts the language's resources and the originals in the catalog; replaced in tests. */
+export type DiscoverInto = (o: {
+  language: string
+  catalogManager: CatalogManager
+  door43Client: never
+}) => Promise<{ resources: string[]; originals: string[] }>
+
 export type PrepareLanguageProgress =
   | { phase: 'discover' }
   | { phase: 'download'; message: DownloadThreadMessage }
@@ -43,6 +50,8 @@ export async function prepareLanguage(options: {
   includeOriginals?: boolean
   onProgress?: (progress: PrepareLanguageProgress) => void
   cancelled?: () => boolean
+  /** Instead of `discoverLanguage` (a test's fixture catalog); the discovery report then lists only the keys. */
+  discover?: DiscoverInto
 }): Promise<LanguagePreparation> {
   const { language, cacheAdapter, catalogAdapter, door43Client, onProgress } = options
   const cancelled = options.cancelled ?? (() => false)
@@ -58,7 +67,14 @@ export async function prepareLanguage(options: {
   const resourceTypeRegistry = createHeadlessResourceTypeRegistry(catalogManager)
 
   onProgress?.({ phase: 'discover' })
-  const discovery = await discoverLanguage({ language, door43Client, catalogManager, resourceTypeRegistry })
+  const discovery: LanguageDiscovery = options.discover
+    ? await options.discover({ language, catalogManager, door43Client: door43Client as never }).then((found) => ({
+        language,
+        resources: found.resources.map((resourceKey) => ({ resourceKey }) as LanguageDiscovery['resources'][number]),
+        originals: found.originals,
+        skipped: [],
+      }))
+    : await discoverLanguage({ language, door43Client, catalogManager, resourceTypeRegistry })
 
   const downloaded: string[] = []
   const resourceKeys = [...discovery.resources.map((r) => r.resourceKey), ...discovery.originals]
