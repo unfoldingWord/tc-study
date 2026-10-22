@@ -315,6 +315,15 @@ export async function createResourceMetadata(
     contentMetadata: {
       ingredients: ingredients,
       books: ingredients?.map((i) => i.identifier),
+      // A download recorded these; regenerating the row must not drop them
+      ...(existingMetadata?.contentMetadata?.bookBlobs
+        ? {
+            bookBlobs: existingMetadata.contentMetadata.bookBlobs,
+            ...(existingMetadata.contentMetadata.bookBlobsRef
+              ? { bookBlobsRef: existingMetadata.contentMetadata.bookBlobsRef }
+              : {}),
+          }
+        : {}),
     },
     
     // Release information (for ZIP downloads)
