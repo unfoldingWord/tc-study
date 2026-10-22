@@ -71,6 +71,8 @@ export interface ResourceLoader {
     options?: {
       method?: 'individual' | 'zip' | 'tar'
       skipExisting?: boolean
+      /** Only these books, and no receipt (scripture and TSV loaders; the others ignore it) */
+      books?: readonly string[]
     },
     onProgress?: ProgressCallback
   ): Promise<void>
