@@ -5,3 +5,5 @@ export { buildLanguagePack, readPackManifest, importLanguagePack, rowsOfResource
 export type { BuildPackParams, ImportPackParams, ImportPackResult } from './pack'
 export { packSourceFrom, packTargetFrom } from './stores'
 export type { RawCacheStore, CatalogStore } from './stores'
+export { VOLATILE_FIELDS, stripVolatile, writePart, readPart, partPath } from './parts/partFile'
+export type { PartRow } from './parts/partFile'
