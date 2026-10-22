@@ -65,7 +65,8 @@ export const LIST_DROPPED_FIELDS: readonly string[] = [
 
 const DROPPED = new Set(LIST_DROPPED_FIELDS)
 
-function withoutBookkeeping(input: unknown): unknown {
+/** A catalog row (or any value) without `LIST_DROPPED_FIELDS`, at any depth: what a list's `metadata` holds. */
+export function withoutBookkeeping(input: unknown): unknown {
   const value = toJsonValue(input)
   if (Array.isArray(value)) return value.map(withoutBookkeeping)
   if (value && typeof value === 'object') {
