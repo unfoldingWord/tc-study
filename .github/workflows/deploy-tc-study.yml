@@ -136,22 +136,22 @@ jobs:
     needs: [quality, e2e]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
+    # No checkout: the job only needs the dist artifact, and a checkout would put the
+    # root bun.lock in the workspace, making wrangler-action install wrangler with bun
+    # (not set up here) instead of npm.
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Download deploy-ready dist
         uses: actions/download-artifact@v4
         with:
           name: tc-study-dist
           path: apps/tc-study/dist
 
+      # cloudflare/pages-action was removed upstream; wrangler-action is its replacement.
+      # Without a checkout wrangler can't read git, so the commit is passed explicitly.
       - name: Publish to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: tc-study
-          directory: apps/tc-study/dist
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref_name }}
+          wranglerVersion: '4.149.0'
+          command: pages deploy apps/tc-study/dist --project-name=tc-study --branch=${{ github.ref_name }} --commit-hash=${{ github.sha }}
