@@ -86,6 +86,11 @@ jobs:
             echo "::error::parts builds only with mode no-upload"
             exit 1
           fi
+          # A parts run decides nothing, it always builds: force would do nothing.
+          if [ "$PARTS" = true ] && [ "$FORCE" = true ]; then
+            echo "::error::parts and force do not go together"
+            exit 1
+          fi
           # The same shape the Worker and packs-status check: the compat becomes a bucket key.
           if [ -n "$REQUESTED_COMPAT" ] && ! [[ "$REQUESTED_COMPAT" =~ ^f[0-9]+\.[0-9]+-u[A-Za-z0-9_.]+-p[0-9]+-q[0-9]+-a[0-9]+-t[0-9]+$ ]]; then
             echo "::error::compat is not a compat key"
@@ -110,8 +115,10 @@ jobs:
       # The Worker asks for builds of the compat it was deployed with. Code that builds another one (a compat bump not yet
       # followed by a v2 redeploy) would publish where the Worker never looks and be dispatched again every hour: it marks
       # the requested compat failed instead, which the Worker's guard reads, and builds nothing.
+      # Not for a parts run: parts have their own compat (PARTS_FORMAT_VERSION, f2.0), which no Worker asks for yet,
+      # and a parts run publishes nothing for the Worker to find.
       - name: Check compat
-        if: inputs.compat != ''
+        if: inputs.compat != '' && !inputs.parts
         env:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}

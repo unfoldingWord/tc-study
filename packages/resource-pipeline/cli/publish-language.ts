@@ -17,8 +17,10 @@
  * `--parts` (only with `--no-upload`, until parts are published) builds the language one book at a time
  * (src/language/buildLanguageParts.ts) instead of whole, without deciding: `--work` gets `parts/<sha256>.part.gz`,
  * `catalog/<compat>/<lang>.json`, `catalog/<compat>/originals.json`, `zips/` (the release zips it read) and
- * `parts-report.json` (each unit's jobs, memory and time). `--generator` is not needed. Exits 1 when a job, a book or
- * a resource failed, after writing all of that.
+ * `parts-report.json` (each unit's jobs, peak memory and time, and the failures; written after every unit, so a run
+ * stopped by the memory limit or an error still leaves it). `--generator` is not needed, and `--force` is refused:
+ * nothing is decided, so there is nothing to force. Exits 1 when a job, a book or a resource failed, after writing
+ * all of that.
  *
  * The bucket: R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY. A dry run or a no-upload run without them
  * decides against an empty bucket, as if nothing had been published. One language per process: the build's in-memory
@@ -30,7 +32,7 @@
  */
 
 import 'fake-indexeddb/auto'
-import { writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { requireFreshBuilds } from './freshBuilds'
@@ -64,6 +66,8 @@ const parts = process.argv.includes('--parts')
 if (dryRun && noUpload) usage('--dry-run y --no-upload no van juntos')
 // Parts are not published yet: a parts build only goes to the work folder.
 if (parts && !noUpload) usage('--parts solo va con --no-upload')
+// A parts build decides nothing (it always builds): a --force would be read as doing something it does not.
+if (parts && force) usage('--parts y --force no van juntos: una corrida por partes siempre construye')
 const required = Object.fromEntries([...(parts ? [] : ['generator']), 'macula', 'lexicons-ref'].map((name) => [name, arg(name)]))
 const missing = Object.entries(required).filter(([, v]) => !v).map(([k]) => `--${k}`)
 if (missing.length) usage(`Faltan ${missing.join(', ')}`)
@@ -81,7 +85,9 @@ const workDir = resolve(arg('work') ?? join(tmpdir(), `publish-language-${langua
 
 if (parts) {
   requireFreshBuilds(['@bt-synergy/resource-pipeline', '@bt-synergy/language-pack', '@bt-synergy/cache-adapter-indexeddb', '@bt-synergy/catalog-adapter-indexeddb'])
-  const { buildLanguageParts } = await import('../src/language/buildLanguageParts')
+  const { buildLanguageParts, PARTS_REPORT } = await import('../src/language/buildLanguageParts')
+  let exitCode = 1
+  let failure: unknown
   try {
     const date = new Date(macula.date)
     if (Number.isNaN(date.getTime())) throw new Error(`Not an ISO 8601 date for MACULA's commit: ${JSON.stringify(macula.date)}`)
@@ -94,8 +100,6 @@ if (parts) {
       obs: process.argv.includes('--obs'),
       log: (line) => console.error(oneLine(line)),
     })
-    const report = { summary: built.summary, units: built.units, peakRssMb: built.peakRssMb, failures: built.failures }
-    writeFileSync(join(workDir, 'parts-report.json'), JSON.stringify(report, null, 2))
     for (const f of built.failures) console.error(oneLine(`  falló (${f.unit}) ${f.job ?? ''} ${f.error}`))
     printResult(
       JSON.stringify({
@@ -108,11 +112,23 @@ if (parts) {
         failures: built.failures.length,
       })
     )
-    process.exit(built.failures.length ? 1 : 0)
+    exitCode = built.failures.length ? 1 : 0
   } catch (e) {
+    failure = e
     console.error(oneLine(`publish-language --parts ${language}: ${e instanceof Error ? e.message : String(e)}`))
-    process.exit(1)
+  } finally {
+    // buildLanguageParts writes the report after every unit and when it ends; a run that failed before it could
+    // (the work folder, a bad date) still leaves one, so the workflow's artifact always says why.
+    const report = join(workDir, PARTS_REPORT)
+    if (!existsSync(report)) {
+      try {
+        writeFileSync(report, JSON.stringify({ language, state: 'failed', error: failure instanceof Error ? failure.message : String(failure ?? 'unknown'), peakRssMb: 0, units: [], failures: [] }, null, 2))
+      } catch {
+        // No work folder to write in: the log already says why.
+      }
+    }
   }
+  process.exit(exitCode)
 }
 
 const env = { endpoint: process.env.R2_ENDPOINT, bucket: process.env.R2_BUCKET, accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY }
