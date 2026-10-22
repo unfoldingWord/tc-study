@@ -1243,6 +1243,23 @@ export class Door43ApiClient {
     repo: string,
     ref: string
   ): Promise<Set<string>> {
+    return new Set((await this.fetchRepoTreeBlobs(owner, repo, ref)).keys());
+  }
+
+  /**
+   * Fetch the full recursive tree of a given ref as a map of blob path (no leading "./") to git blob sha.
+   * The sha of a file only changes when its content does, so it can stamp what is derived from one file.
+   *
+   * @param owner - Repository owner
+   * @param repo - Repository name
+   * @param ref  - Branch name or tag name
+   * @returns Map of blob path to blob sha
+   */
+  async fetchRepoTreeBlobs(
+    owner: string,
+    repo: string,
+    ref: string
+  ): Promise<Map<string, string>> {
     if (!owner || !repo || !ref) {
       throw this.createError('Missing required parameters for fetchRepoTreePaths', 'INVALID_PARAM');
     }
@@ -1253,7 +1270,7 @@ export class Door43ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const set = new Set<string>();
+      const blobs = new Map<string, string>();
       // Door43 cuts a large tree into pages (12 000 entries) and says `truncated: true` until the last one. es-419_tq
       // keeps its books after an `_old/` folder of 11 000 files: reading only page 1 made every book look absent.
       for (let page = 1; page <= 50; page++) {
@@ -1270,18 +1287,18 @@ export class Door43ApiClient {
           );
         }
 
-        const data = await response.json() as { tree?: Array<{ path: string; type: string }>; truncated?: boolean };
+        const data = await response.json() as { tree?: Array<{ path: string; type: string; sha?: string }>; truncated?: boolean };
         for (const entry of (data.tree ?? [])) {
           if (entry.type === 'blob') {
             // Normalize: strip leading "./"
-            set.add(entry.path.replace(/^\.\//, ''));
+            blobs.set(entry.path.replace(/^\.\//, ''), entry.sha ?? '');
           }
         }
         if (!data.truncated || !data.tree?.length) break;
       }
 
       clearTimeout(timeoutId);
-      return set;
+      return blobs;
     } catch (error) {
       clearTimeout(timeoutId);
       if (error instanceof Door43ApiError) throw error;
