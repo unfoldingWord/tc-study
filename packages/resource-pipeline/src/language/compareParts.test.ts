@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { partPath, partsListPath, readPart, serializePartsList, writePart, type PartsList } from '@bt-synergy/language-pack'
 import { buildLanguageParts } from './buildLanguageParts'
 import { compareParts, formatComparison, type PartsComparison } from './compareParts'
-import { discover, fakeDoor43, GLT, LANG, MACULA_STAMP, maculaFolder, TN, wholePacks } from './partsFixture'
+import { discover, fakeDoor43, GLT, LANG, lexiconFetch, LEXICONS_REF, MACULA_STAMP, maculaFolder, OBS, TA, TN, TQ, UHL, wholePacks } from './partsFixture'
 
 const dirs: string[] = []
 const freshDir = (name: string) => {
@@ -27,6 +27,8 @@ beforeAll(async () => {
     language: LANG,
     workDir: built,
     macula: { folder: macula, ...MACULA_STAMP },
+    lexiconsRef: LEXICONS_REF,
+    fetch: lexiconFetch,
     door43Client: fakeDoor43() as never,
     discover,
   })
@@ -62,10 +64,13 @@ const bucket = (c: PartsComparison, resource: string, layer: string) => c.rows.f
 const tnRuthBook = (p: PartsList['parts'][number]) => p.kind === 'book' && p.resource === TN && p.book === 'rut'
 
 describe('compareParts', () => {
-  test('the real whole build and the real parts build of the fixture carry the same rows and catalog rows', async () => {
+  test('the real whole build (prepareAndPack) and the real parts build of the fixture carry the same rows and catalog rows', async () => {
     const c = await compare(built)
     if (c.differences) console.error(formatComparison(c))
     expect(c.differences).toBe(0)
+    // TQ, TA (linked from TN), the lexicon and the front matter outside the canon are in it, not only the basics.
+    for (const r of [TQ, TA, UHL]) expect(c.rows.some((d) => d.resource === r && d.whole > 0)).toBe(true)
+    expect(bucket(c, GLT, 'sot').whole).toBe(bucket(c, GLT, 'sot').parts)
     expect(c.resources).toEqual([])
     expect(c.partFiles).toEqual([])
     expect(c.rows.reduce((n, r) => n + r.whole, 0)).toBeGreaterThan(150)
@@ -74,6 +79,27 @@ describe('compareParts', () => {
     expect(c.rows.every((r) => r.layer !== 'receipt')).toBe(true)
     expect(formatComparison(c)).toContain('No differences')
   }, 60_000)
+
+  test('with Open Bible Stories, both builds carry the same stories', async () => {
+    const macula = maculaFolder(freshDir('macula-obs'))
+    const whole = await wholePacks(macula, { obs: true })
+    const workDir = freshDir('parts-obs')
+    const { failures } = await buildLanguageParts({
+      language: LANG,
+      workDir,
+      macula: { folder: macula, ...MACULA_STAMP },
+      lexiconsRef: LEXICONS_REF,
+      fetch: lexiconFetch,
+      obs: true,
+      door43Client: fakeDoor43() as never,
+      discover,
+    })
+    expect(failures).toEqual([])
+    const c = await compareParts({ pack: whole.language, originals: whole.originals, workDir })
+    if (c.differences) console.error(formatComparison(c))
+    expect(c.differences).toBe(0)
+    expect(c.rows.filter((d) => d.resource === OBS).reduce((n, d) => n + d.whole, 0)).toBeGreaterThan(0)
+  }, 120_000)
 
   test('a row whose value changed in a part is reported as differing', async () => {
     const copy = copyOfBuild()

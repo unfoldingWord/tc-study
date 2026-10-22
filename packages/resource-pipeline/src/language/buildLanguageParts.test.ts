@@ -1,149 +1,37 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
-import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
-import { CatalogManager } from '@bt-synergy/catalog-manager/core'
-import {
-  buildLanguagePack,
-  compatKeyOf,
-  ORIGINAL_LANGUAGE_KEYS,
-  PART_LAYERS,
-  PARTS_FORMAT_VERSION,
-  packSourceFrom,
-  partsListPath,
-  readPart,
-  rowsOfResource,
-  serializePartsList,
-  stableJson,
-  stripVolatile,
-} from '@bt-synergy/language-pack'
-import { addMacula, MACULA_KEYS } from '../../cli/companions'
+import { compatKeyOf, PARTS_FORMAT_VERSION, partsListPath, readPart, stripVolatile } from '@bt-synergy/language-pack'
 import { runDownload } from '../download/runDownload'
-import { storedZip } from '../download/zipFixture'
-import { buildLanguageArtifacts } from './buildLanguageArtifacts'
-import { buildLanguageParts, type DiscoverInto } from './buildLanguageParts'
+import { buildLanguageParts, PARTS_REPORT, slotRows, UNPLACED_LISTED, type PartsReport } from './buildLanguageParts'
 import { closeAndDelete } from './fakeDatabases'
 import { PACK_VERSIONS } from './packVersions'
+import {
+  catalogRows,
+  discover,
+  fakeDoor43,
+  GLT,
+  GST,
+  LANG,
+  lexiconFetch,
+  LEXICONS_REF,
+  MACULA_STAMP,
+  maculaFolder,
+  TA,
+  TN,
+  TQ,
+  TW,
+  TWL,
+  UGNT,
+  UHB,
+  UHL,
+} from './partsFixture'
 
-const LANG = 'es-419'
-const GLT = 'test_gl/es-419/glt'
-const GST = 'test_gl/es-419/gst'
-const TN = 'test_gl/es-419/tn'
-const TWL = 'test_gl/es-419/twl'
-const TW = 'test_gl/es-419/tw'
-const UHB = 'unfoldingWord/hbo/uhb'
-const UGNT = 'unfoldingWord/el-x-koine/ugnt'
-
-const HEBREW = (book: string) =>
-  `\\id ${book}\n\\c 1\n\\p\n\\v 1 \\w וַיְהִי|lemma="הָיָה" strong="H1961" x-morph="He,Vqw3ms"\\w* \\w בִּימֵי|lemma="יוֹם" strong="b:H3117" x-morph="He,R:Ncmpc"\\w*\n\\c 2\n\\p\n\\v 1 \\w וּלְנָעֳמִי|lemma="נָעֳמִי" strong="c:l:H5281" x-morph="He,C:R:Np"\\w*\n`
-const GREEK = `\\id TIT\n\\c 1\n\\p\n\\v 1 \\w Παῦλος|lemma="Παῦλος" strong="G39720" x-morph="Gr,N,,,,,NMS,"\\w*\n`
-const aligned = (book: string, words: [string, string]) =>
-  `\\id ${book}\n\\c 1\n\\p\n\\v 1 \\zaln-s |x-strong="H1961" x-lemma="הָיָה" x-morph="He,Vqw3ms" x-occurrence="1" x-occurrences="1" x-content="וַיְהִי"\\*\\w ${words[0]}|x-occurrence="1" x-occurrences="1"\\w*\\zaln-e\\* \\zaln-s |x-strong="b:H3117" x-lemma="יוֹם" x-morph="He,R:Ncmpc" x-occurrence="1" x-occurrences="1" x-content="בִּימֵי"\\*\\w ${words[1]}|x-occurrence="1" x-occurrences="1"\\w*\\zaln-e\\*\n\\c 2\n\\p\n\\v 1 \\zaln-s |x-strong="c:l:H5281" x-lemma="נָעֳמִי" x-morph="He,C:R:Np" x-occurrence="1" x-occurrences="1" x-content="וּלְנָעֳמִי"\\*\\w Noemí|x-occurrence="1" x-occurrences="1"\\w*\\zaln-e\\*\n`
-const TN_HEADER = 'Reference\tID\tTags\tSupportReference\tQuote\tOccurrence\tNote\n'
-const TWL_HEADER = 'Reference\tID\tTags\tOrigWords\tOccurrence\tTWLink\n'
-
-// The TW loader trusts a catalog row only with more than ten articles; fewer, it asks Door43 for them.
-const EXTRA_TW = ['faith', 'grace', 'love', 'sin', 'holy', 'lord', 'spirit', 'word']
-
-/** Each repository's release zip (top folder `{repo}/`, as Door43 serves it). */
-const REPOS: Record<string, Record<string, string>> = {
-  'test_gl/es-419_glt': { '08-RUT.usfm': aligned('RUT', ['Sucedió', 'en los días']), '32-JON.usfm': aligned('JON', ['Vino', 'palabra']) },
-  'test_gl/es-419_gst': { '08-RUT.usfm': aligned('RUT', ['Pasó', 'cuando']), '32-JON.usfm': aligned('JON', ['Llegó', 'mensaje']) },
-  'test_gl/es-419_tn': {
-    'tn_RUT.tsv': `${TN_HEADER}1:1\tab12\t\trc://*/ta/man/translate/figs-idiom\tוַיְהִי\t1\tUna nota de Rut\n2:1\tcd34\t\t\tוּלְנָעֳמִי\t1\tNoemí\n`,
-    'tn_JON.tsv': `${TN_HEADER}1:1\tef56\t\t\tוַיְהִי\t1\tUna nota de Jonás\n`,
-  },
-  'test_gl/es-419_twl': {
-    'twl_RUT.tsv': `${TWL_HEADER}1:1\tgh78\t\tבִּימֵי\t1\trc://*/tw/dict/bible/other/day\n2:1\tij90\t\tוּלְנָעֳמִי\t1\trc://*/tw/dict/bible/names/naomi\n`,
-    'twl_JON.tsv': `${TWL_HEADER}1:1\tkl12\t\tוַיְהִי\t1\trc://*/tw/dict/bible/kt/god\n`,
-  },
-  'test_gl/es-419_tw': {
-    'bible/kt/god.md': '# Dios\n\nEl creador.\n',
-    'bible/names/naomi.md': '# Noemí\n\nSuegra de Rut.\n',
-    'bible/other/day.md': '# día\n\nUn día.\n',
-    ...Object.fromEntries(EXTRA_TW.map((id) => [`bible/kt/${id}.md`, `# ${id}\n\nTérmino ${id}.\n`])),
-  },
-  'unfoldingWord/hbo_uhb': { '08-RUT.usfm': HEBREW('RUT'), '32-JON.usfm': HEBREW('JON') },
-  'unfoldingWord/el-x-koine_ugnt': { '57-TIT.usfm': GREEK },
-}
-
-const blobSha = (content: string) => {
-  const bytes = Buffer.from(content)
-  return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
-}
-
-function fakeDoor43() {
-  const downloads: string[] = []
-  return {
-    downloads,
-    async downloadZipball(owner: string, repo: string, ref: string) {
-      downloads.push(`${owner}/${repo}@${ref}`)
-      const files = REPOS[`${owner}/${repo}`]
-      if (!files) throw new Error(`404 ${owner}/${repo}`)
-      return storedZip(Object.fromEntries(Object.entries(files).map(([path, content]) => [`${repo}/${path}`, content])))
-    },
-    async fetchRepoTreeBlobs(owner: string, repo: string) {
-      return new Map(Object.entries(REPOS[`${owner}/${repo}`] ?? {}).map(([path, content]) => [path, blobSha(content)]))
-    },
-    async fetchRepoTreePaths(owner: string, repo: string) {
-      return new Set(Object.keys(REPOS[`${owner}/${repo}`] ?? {}))
-    },
-  }
-}
-
-function row(key: string, subject: string, type: string, ingredients: Array<{ identifier: string; path: string; title?: string }>) {
-  const [owner, language, resourceId] = key.split('/')
-  const tag = resourceId === 'uhb' || resourceId === 'ugnt' ? 'v2.1.30' : 'v12'
-  return {
-    resourceKey: key,
-    server: 'git.door43.org',
-    owner,
-    language,
-    resourceId,
-    subject,
-    type,
-    title: `${resourceId} (${language})`,
-    version: tag,
-    format: 'usfm',
-    availability: { online: true, offline: false, bundled: false, partial: false },
-    locations: [],
-    catalogedAt: new Date().toISOString(),
-    release: {
-      tag_name: tag,
-      published_at: '2026-09-01T00:00:00Z',
-      zipball_url: `https://git.door43.org/${owner}/${language}_${resourceId}/archive/${tag}.zip`,
-    },
-    contentMetadata: { ingredients, books: ingredients.map((i) => i.identifier) },
-  }
-}
-
-const book = (id: string, file: string) => ({ identifier: id, path: `./${file}` })
-
-/** What discovery would have put in the catalog: GST's catalog lists Genesis, which its release lacks. */
-const catalogRows = () => [
-    row(GLT, 'Aligned Bible', 'scripture', [book('rut', '08-RUT.usfm'), book('jon', '32-JON.usfm')]),
-    row(GST, 'Aligned Bible', 'scripture', [book('gen', '01-GEN.usfm'), book('rut', '08-RUT.usfm'), book('jon', '32-JON.usfm')]),
-    row(TN, 'TSV Translation Notes', 'notes', [book('rut', 'tn_RUT.tsv'), book('jon', 'tn_JON.tsv')]),
-    row(TWL, 'TSV Translation Words Links', 'words-links', [book('rut', 'twl_RUT.tsv'), book('jon', 'twl_JON.tsv')]),
-    row(TW, 'Translation Words', 'words', [
-      { identifier: 'bible/kt/god', path: './bible/kt/god.md', title: 'Dios' },
-      { identifier: 'bible/names/naomi', path: './bible/names/naomi.md', title: 'Noemí' },
-      { identifier: 'bible/other/day', path: './bible/other/day.md', title: 'día' },
-      ...EXTRA_TW.map((id) => ({ identifier: `bible/kt/${id}`, path: `./bible/kt/${id}.md`, title: id })),
-    ]),
-    row(UHB, 'Hebrew Old Testament', 'scripture', [book('rut', '08-RUT.usfm'), book('jon', '32-JON.usfm')]),
-    row(UGNT, 'Greek New Testament', 'scripture', [book('tit', '57-TIT.usfm')]),
-  ]
-
-const discover: DiscoverInto = async ({ catalogManager }) => {
-  const rows = catalogRows()
-  for (const r of rows) await catalogManager.catalogAdapter.set(r.resourceKey, r as never)
-  return { resources: rows.slice(0, 5).map((r) => r.resourceKey), originals: [UHB, UGNT] }
-}
+// The whole build and the parts build of this fixture are compared row by row in compareParts.test.ts, the whole
+// one through prepareAndPack itself.
 
 const dirs: string[] = []
 afterEach(() => {
@@ -155,55 +43,59 @@ function freshDir(name: string) {
   return dir
 }
 
-function maculaFolder() {
-  const dir = freshDir('macula')
-  for (const part of ['trees', 'referents']) mkdirSync(join(dir, part))
-  writeFileSync(join(dir, 'trees', 'RUT.json'), JSON.stringify({ sentences: ['Rut 1:1'] }))
-  writeFileSync(join(dir, 'referents', 'RUT.json'), JSON.stringify({ naomi: ['Rut 2:1'] }))
-  writeFileSync(join(dir, 'trees', 'TIT.json'), JSON.stringify({ sentences: ['Tito 1:1'] }))
-  return dir
-}
-
-async function build(workDir: string, extra: Partial<Parameters<typeof buildLanguageParts>[0]> = {}) {
-  const door43 = fakeDoor43()
+async function build(workDir: string, extra: Partial<Parameters<typeof buildLanguageParts>[0]> & { door43?: ReturnType<typeof fakeDoor43> } = {}) {
+  const { door43 = fakeDoor43(), ...rest } = extra
+  const lines: string[] = []
   const result = await buildLanguageParts({
     language: LANG,
     workDir,
-    macula: { folder: maculaFolder(), version: 'abc1234567', publishedAt: '2026-08-01T00:00:00.000Z' },
+    macula: { folder: maculaFolder(freshDir('macula')), ...MACULA_STAMP },
+    lexiconsRef: LEXICONS_REF,
+    fetch: lexiconFetch,
     door43Client: door43 as never,
     discover,
-    ...extra,
+    log: (line) => lines.push(line),
+    ...rest,
   })
-  return { ...result, door43 }
+  return { ...result, door43, lines }
 }
 
 const slots = (parts: Array<{ kind: string; resource: string; book?: string; group?: string }>) =>
   parts.map((p) => [p.kind, p.resource, p.book ?? '', p.group ?? ''].filter(Boolean).join(' ')).sort()
 
+const reportOf = (workDir: string) => JSON.parse(readFileSync(join(workDir, PARTS_REPORT), 'utf8')) as PartsReport
+const partsDatabases = async () => (await indexedDB.databases()).map((d) => d.name ?? '').filter((n) => n.startsWith('parts-'))
+const MB = 1024 * 1024
+
 describe('buildLanguageParts', () => {
   test('writes one part per slot, one book at a time, and nothing for a book no resource has', async () => {
     const workDir = freshDir('parts')
-    const { list, originals, failures, summary, units, door43 } = await build(workDir)
+    const { list, originals, failures, summary, units, door43, lines } = await build(workDir)
 
     expect(failures).toEqual([])
     // Each zip downloaded once for the whole run, however many units read it.
     expect(new Set(door43.downloads).size).toBe(door43.downloads.length)
-    expect(units.map((u) => u.unit)).toEqual(['shared', 'book rut', 'book jon', 'book tit'])
+    // The canon in order, then the front matter only the ULT-like text has.
+    expect(units.map((u) => u.unit)).toEqual(['shared', 'book rut', 'book jon', 'book tit', 'book frt'])
+    for (const u of units) expect(lines.some((l) => l.endsWith(`${u.unit}: start`))).toBe(true)
 
     const languageSlots = slots(list.parts)
     for (const book of ['rut', 'jon']) {
-      for (const r of [GLT, GST, TN, TWL]) expect(languageSlots).toContain(`book ${r} ${book}`)
+      for (const r of [GLT, GST, TN, TQ, TWL]) expect(languageSlots).toContain(`book ${r} ${book}`)
       for (const r of [TN, TWL]) expect(languageSlots).toContain(`alignments ${r} ${book}`)
     }
-    expect(languageSlots).toContain(`titles ${TW}`)
+    expect(languageSlots).toContain(`book ${GLT} frt`)
+    for (const r of [TW, TA]) expect(languageSlots).toContain(`titles ${r}`)
     expect(languageSlots.filter((s) => s.startsWith(`tw ${TW} `)).length).toBeGreaterThan(0)
-    expect(languageSlots.every((s) => /^(book|alignments|tw|titles) /.test(s))).toBe(true)
+    expect(languageSlots.filter((s) => s.startsWith(`ta ${TA} `)).length).toBeGreaterThan(0)
+    expect(languageSlots.filter((s) => s.includes(UHL)).length).toBeGreaterThan(0)
     // Genesis is in GST's catalog but not in its release: no unit, no part, and GST's row no longer lists it.
     expect(languageSlots.some((s) => s.includes(' gen'))).toBe(false)
     const gst = list.resources.find((r) => r.key === GST)!
     expect(gst.books).toEqual(['jon', 'rut'])
     expect((gst.metadata as any).contentMetadata.ingredients.map((i: any) => i.identifier)).toEqual(['rut', 'jon'])
     expect(Object.keys((gst.metadata as any).contentMetadata.bookBlobs).sort()).toEqual(['jon', 'rut'])
+    expect(list.resources.find((r) => r.key === GLT)!.books).toEqual(['frt', 'jon', 'rut'])
 
     expect(slots(originals.parts)).toEqual([
       'macula Biblica/el-x-koine/macula tit',
@@ -229,6 +121,14 @@ describe('buildLanguageParts', () => {
     expect(list.originals?.path).toBe(partsListPath(compat, 'originals'))
     const onDisk = readdirSync(join(workDir, 'parts')).sort()
     expect(onDisk).toEqual([...new Set([...list.parts, ...originals.parts].map((p) => `${p.sha256}.part.gz`))].sort())
+
+    // The report: every unit's own peak, time and jobs; and no database left behind.
+    const report = reportOf(workDir)
+    expect(report.state).toBe('done')
+    expect(report.units.map((u) => u.unit)).toEqual(units.map((u) => u.unit))
+    expect(report.units.every((u) => u.peakRssMb > 0 && u.seconds >= 0 && u.failures === 0)).toBe(true)
+    expect(report.units.find((u) => u.unit === 'book rut')!.jobs.built).toBe(summary['book rut'].built)
+    expect(await partsDatabases()).toEqual([])
   }, 120_000)
 
   test('two builds of the same inputs give the same lists and the same part files', async () => {
@@ -244,85 +144,106 @@ describe('buildLanguageParts', () => {
     }
     expect(readdirSync(join(b, 'parts')).sort()).toEqual(readdirSync(join(a, 'parts')).sort())
   }, 120_000)
+})
 
-  test('a unit over the memory limit stops the build, naming the unit', async () => {
-    await expect(build(freshDir('parts-limit'), { memoryLimitMb: 1 })).rejects.toThrow(/^shared used \d+ MB, over the 1 MB limit$/)
+describe('memory', () => {
+  test('a unit over the memory limit stops the build, naming the unit, and leaves no database and a report', async () => {
+    const workDir = freshDir('parts-limit')
+    await expect(build(workDir, { memoryLimitMb: 1 })).rejects.toThrow(/^shared used \d+ MB, over the 1 MB limit$/)
+    expect(await partsDatabases()).toEqual([])
+    const report = reportOf(workDir)
+    expect(report.state).toBe('failed')
+    expect(report.error).toMatch(/^shared used/)
+    expect(report.units.map((u) => [u.unit, u.stopped?.startsWith('shared used')])).toEqual([['shared', true]])
+  }, 120_000)
+
+  test('memory that grows within a unit stops it there, before the next unit starts', async () => {
+    const workDir = freshDir('parts-grow')
+    const lines: string[] = []
+    // Low until Ruth starts, then far over: the limit is crossed inside that unit, not between units.
+    const rss = () => (lines.some((l) => l.endsWith('book rut: start')) ? 9000 : 100) * MB
+    await expect(build(workDir, { memoryLimitMb: 1000, rss, memorySampleMs: 5, log: (l) => lines.push(l) })).rejects.toThrow(
+      'book rut used 9000 MB, over the 1000 MB limit'
+    )
+    expect(lines.some((l) => l.includes('book jon: start'))).toBe(false)
+    const report = reportOf(workDir)
+    expect(report.state).toBe('failed')
+    expect(report.units.map((u) => [u.unit, u.peakRssMb])).toEqual([
+      ['shared', 100],
+      ['book rut', 9000],
+    ])
+    expect(await partsDatabases()).toEqual([])
+  }, 120_000)
+
+  test('databases a stopped run left are deleted before the build opens its own', async () => {
+    const left = new IndexedDBCacheAdapter({ dbName: 'parts-book-zzz', storeName: 'cache-entries', version: 1 })
+    await left.set('stale', { data: 1 } as never)
+    await left.close()
+    expect(await partsDatabases()).toContain('parts-book-zzz')
+    const { failures } = await build(freshDir('parts-leftover'))
+    expect(failures).toEqual([])
+    expect(await partsDatabases()).toEqual([])
   }, 120_000)
 })
 
-/**
- * Today's whole build of the fixture, as prepareLanguage and prepareAndPack do it: one database, every resource
- * downloaded whole, the language's and both originals' jobs, MACULA, then the rows each pack carries.
- */
-async function wholeBuild(macula: string) {
-  const cache = new IndexedDBCacheAdapter({ dbName: 'whole-cache', storeName: 'cache-entries', version: 1 })
-  const catalog = new IndexedDBCatalogAdapter({ dbName: 'whole-catalog', storeName: 'catalog-entries', version: 1 })
-  const door43 = fakeDoor43()
-  const catalogManager = new CatalogManager({ catalogAdapter: catalog, cacheAdapter: cache, door43Client: door43, enableNetworkFallback: true, requireSecureConnection: false } as never)
-  const found = await discover({ language: LANG, catalogManager, door43Client: door43 as never })
-  await runDownload({
-    resourceKeys: [...found.resources, ...found.originals],
-    skipExisting: true,
-    runId: 1,
-    post: () => {},
-    isCurrentRun: () => true,
-    cacheAdapter: cache as never,
-    catalogAdapter: catalog as never,
-    door43Client: door43,
-  })
-  for (const language of [LANG, 'el-x-koine', 'hbo']) {
-    await buildLanguageArtifacts({ language, cache: cache as never, catalog: catalogManager as never })
-  }
-  await addMacula(cache as never, catalog as never, macula, { version: 'abc1234567', publishedAt: '2026-08-01T00:00:00.000Z' })
-  const source = packSourceFrom({ cache: cache as never, catalog: catalog as never })
-  const languageKeys = (await source.catalogRows()).filter((m) => m.language === LANG).map((m) => m.resourceKey)
-  const rows = new Set<string>()
-  const metadata: Record<string, unknown> = {}
-  for (const params of [
-    { kind: 'language' as const, resourceKeys: languageKeys },
-    { kind: 'originals' as const, originalKeys: [...ORIGINAL_LANGUAGE_KEYS, ...MACULA_KEYS] },
-  ]) {
-    const { manifest, skipped } = await buildLanguagePack({ source, language: LANG, versions: PACK_VERSIONS, ...params })
-    expect(skipped).toEqual([])
-    for (const r of manifest.resources) {
-      metadata[r.key] = await catalog.get(r.key)
-      for (const [layer, list] of await rowsOfResource(source, r.key, PART_LAYERS)) {
-        for (const row of list) rows.add(stableJson({ layer, key: row.key, value: stripVolatile(row.entry) }))
-      }
-    }
-  }
-  await closeAndDelete([cache, catalog], ['whole-cache', 'whole-catalog'])
-  return { rows, metadata }
-}
+describe('failures are listed, and the build goes on', () => {
+  const bad = (status: number) => new Error(`Door43 answered ${status}`)
 
-describe('the parts and the whole build', () => {
-  test('carry the same rows, and the same catalog row for each resource', async () => {
-    const macula = maculaFolder()
-    const whole = await wholeBuild(macula)
-    const workDir = freshDir('parts-same')
-    const { list, originals } = await build(workDir, { macula: { folder: macula, version: 'abc1234567', publishedAt: '2026-08-01T00:00:00.000Z' } })
-
-    const parted = new Set<string>()
-    for (const part of [...list.parts, ...originals.parts]) {
-      for (const row of await readPart(new Uint8Array(readFileSync(join(workDir, 'parts', `${part.sha256}.part.gz`))))) {
-        const line = stableJson(row)
-        expect(parted.has(line)).toBe(false)
-        parted.add(line)
-      }
-    }
-    expect(whole.rows.size).toBeGreaterThan(150)
-    expect([...parted].filter((r) => !whole.rows.has(r))).toEqual([])
-    expect([...whole.rows].filter((r) => !parted.has(r))).toEqual([])
-
-    // Compared as the list writes them, without the catalog's own bookkeeping.
-    const asListed = (resources: Array<{ key: string; metadata: unknown }>) =>
-      JSON.parse(serializePartsList({ schema: 2, language: LANG, compat: '', versions: {}, parts: [], resources: resources.map((r) => ({ ...r, stamp: '', role: 'language', subject: '', title: '' })) })).resources.map(
-        (r: { key: string; metadata: unknown }) => [r.key, r.metadata]
-      )
-    expect(asListed([...list.resources, ...originals.resources])).toEqual(
-      asListed(Object.entries(whole.metadata).map(([key, metadata]) => ({ key, metadata })))
-    )
+  test('a release zip that fails twice is tried again after 2 s and 4 s', async () => {
+    const waits: number[] = []
+    const door43 = fakeDoor43({ fail: (repo, attempt) => (repo === 'test_gl/es-419_tn' && attempt <= 2 ? bad(502) : undefined) })
+    const { failures, list } = await build(freshDir('parts-retry'), { door43, wait: async (ms) => void waits.push(ms) })
+    expect(failures).toEqual([])
+    expect(waits).toEqual([2000, 4000])
+    expect(slots(list.parts)).toContain(`book ${TN} rut`)
   }, 120_000)
+
+  test('a release zip that never comes leaves that resource out, with a failure, and builds the rest', async () => {
+    const waits: number[] = []
+    const door43 = fakeDoor43({ fail: (repo) => (repo === 'test_gl/es-419_tn' ? bad(503) : undefined) })
+    const { failures, list } = await build(freshDir('parts-no-zip'), { door43, wait: async (ms) => void waits.push(ms) })
+    expect(waits).toEqual([2000, 4000, 8000])
+    expect(failures).toEqual([{ unit: 'catalog', error: `${TN}: its release zip did not download after 4 tries, so it is left out: Door43 answered 503` }])
+    expect(list.parts.some((p) => p.resource === TN)).toBe(false)
+    expect(slots(list.parts)).toContain(`book ${GLT} rut`)
+  }, 120_000)
+
+  test("a whole resource whose download fails is a failure of the shared unit with Door43's error", async () => {
+    const door43 = fakeDoor43({ fail: (repo) => (repo === 'test_gl/es-419_ta' ? bad(500) : undefined) })
+    const { failures } = await build(freshDir('parts-ta'), { door43 })
+    expect(failures).toContainEqual({ unit: 'shared', error: `${TA}: its download did not finish: Door43 answered 500` })
+  }, 120_000)
+
+  test('rows with no part are failures of their unit, listed up to a limit, and the others are placed', () => {
+    const out = new Map()
+    const unplaced = { listed: [] as Array<{ unit: string; error: string }>, more: 0 }
+    const strays = Array.from({ length: UNPLACED_LISTED + 3 }, (_, i) => ({ key: `${TN}/manifest-${i}`, entry: {} }))
+    slotRows({
+      unit: 'book rut',
+      resource: { key: TN, type: 'notes', subject: 'TSV Translation Notes' },
+      byLayer: [['sot', [{ key: `tn:${TN}:rut:1`, entry: {} }, ...strays]]],
+      where: (s) => s.book === 'rut',
+      out,
+      unplaced,
+    })
+    expect(unplaced.listed.length).toBe(UNPLACED_LISTED)
+    expect(unplaced.more).toBe(3)
+    expect(unplaced.listed[0]).toEqual({ unit: 'book rut', error: `No part for the sot row ${TN}/manifest-0 of ${TN}` })
+    expect([...out.keys()].length).toBe(1)
+  })
+
+  test("a row of another unit's part is a failure too, not a stop", () => {
+    const unplaced = { listed: [] as Array<{ unit: string; error: string }>, more: 0 }
+    slotRows({
+      unit: 'book jon',
+      resource: { key: TN, type: 'notes', subject: 'TSV Translation Notes' },
+      byLayer: [['sot', [{ key: `tn:${TN}:rut:1`, entry: {} }]]],
+      where: (s) => s.book === 'jon',
+      out: new Map(),
+      unplaced,
+    })
+    expect(unplaced.listed.map((f) => f.error)).toEqual([expect.stringContaining("another unit's part")])
+  })
 })
 
 describe('one book downloaded alone', () => {
@@ -341,7 +262,7 @@ describe('one book downloaded alone', () => {
     const rowsOf = async (name: string, books?: string[]) => {
       const cache = new IndexedDBCacheAdapter({ dbName: name, storeName: 'cache-entries', version: 1 })
       await runDownload({
-        resourceKeys: [GLT, TN],
+        resourceKeys: [GLT, TN, TQ],
         skipExisting: true,
         ...(books ? { books } : {}),
         runId: 1,
