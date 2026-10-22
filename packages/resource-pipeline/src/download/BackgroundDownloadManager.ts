@@ -15,6 +15,7 @@ import type { DownloadRunPhase } from './backgroundDownloadRun'
 import type { LoaderRegistry } from '../loaders/LoaderRegistry'
 import type { ResourceCompletenessChecker } from './ResourceCompletenessChecker'
 import { DependencyResolver, type ResolvedResource } from './DependencyResolver'
+import { recordBlobsAfterComplete } from './recordBlobsAfterComplete'
 
 /** CatalogManager plus optional legacy bulk listing used by download-all. */
 type DownloadCatalogManager = CatalogManager & {
@@ -202,7 +203,7 @@ export class BackgroundDownloadManager {
         if (this.config.skipExisting && this.completenessChecker) {
           const status = await this.completenessChecker.checkResource(resolved.resourceKey)
           if (status.isComplete) {
-
+            await this.recordBlobs(resolved.resourceKey, true)
             const task = this.tasks.get(resolved.resourceKey)
             if (task) {
               task.status = 'completed'
@@ -221,6 +222,16 @@ export class BackgroundDownloadManager {
     } finally {
       this.isDownloading = false
     }
+  }
+
+  /** Per-book cache stamps: record the release's blob shas once a resource is complete. */
+  private recordBlobs(resourceKey: string, complete: boolean) {
+    return recordBlobsAfterComplete({
+      complete,
+      door43Client: this.catalogManager.door43Client,
+      catalogAdapter: this.catalogManager.catalogAdapter,
+      resourceKey,
+    })
   }
 
   /**
@@ -295,9 +306,10 @@ export class BackgroundDownloadManager {
 
       // ✅ Mark resource as complete in cache metadata
       if (this.completenessChecker) {
-        await this.completenessChecker.markCompleteIfVerified(resourceKey, {
+        const verified = await this.completenessChecker.markCompleteIfVerified(resourceKey, {
           downloadMethod: method,
         })
+        await this.recordBlobs(resourceKey, verified)
       }
 
 

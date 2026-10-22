@@ -23,7 +23,6 @@ import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { CatalogManager } from '@bt-synergy/catalog-manager/core'
 import { Door43ApiClient } from '@bt-synergy/door43-api'
-import { recordBookBlobs } from '@bt-synergy/resource-catalog'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { compareDownloadBatchOrder } from '../features/download/downloadBatchOrder'
 import {
@@ -39,6 +38,7 @@ import {
   withResourceDownloadTimeout,
   type DownloadRunPhase,
 } from '../features/download/backgroundDownloadRun'
+import { recordBlobsAfterComplete } from '../features/download/recordBlobsAfterComplete'
 import { registerWorkerLoaders } from '../features/download/workerLoaderRegistry'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
@@ -652,6 +652,10 @@ async function downloadSpecificResources(
           isComplete = false
         }
         if (shouldSkipCompleteResourceDownload(skipExisting, isComplete)) {
+          // Downloaded before blobs were recorded: one tree request now, 'current' afterwards.
+          if (blobRecorderDeps) {
+            await recordBlobsAfterComplete({ complete: true, ...blobRecorderDeps, resourceKey })
+          }
           const skipped = skippedCompleteResourceProgress(ingredientsCount, resourceKey)
           onProgress(skipped)
           completedIngredients += ingredientsCount
@@ -745,10 +749,9 @@ async function downloadSpecificResources(
         const verified = await completenessChecker.markCompleteIfVerified(resourceKey, {
           downloadMethod: method
         })
-        if (verified && blobRecorderDeps) {
-          // Per-book cache stamps come from this release's blob shas; never throws.
-          const outcome = await recordBookBlobs({ ...blobRecorderDeps, resourceKey })
-          console.log(`[BG-DL] ⚙️ Worker book blobs for ${resourceKey}: ${outcome}`)
+        // Per-book cache stamps come from this release's blob shas; never throws.
+        if (blobRecorderDeps) {
+          await recordBlobsAfterComplete({ complete: verified, ...blobRecorderDeps, resourceKey })
         }
       }
 

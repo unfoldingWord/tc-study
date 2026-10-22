@@ -6,11 +6,12 @@
  */
 
 import { CatalogManager, type CatalogConfig } from '@bt-synergy/catalog-manager/core'
-import { recordBookBlobs, type ResourceMetadata } from '@bt-synergy/resource-catalog'
+import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { LoaderRegistry } from '../loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from './BackgroundDownloadManager'
 import { ResourceCompletenessChecker, type ResourceCompletenessCheckerOptions } from './ResourceCompletenessChecker'
+import { recordBlobsAfterComplete } from './recordBlobsAfterComplete'
 import { registerWorkerLoaders } from './workerLoaderRegistry'
 import {
   STARTING_PROGRESS_PERCENT,
@@ -203,6 +204,8 @@ export async function runDownload(args: {
         })
         const status = await completenessChecker.checkResource(resourceKey)
         if (shouldSkipCompleteResourceDownload(skipExisting, status.isComplete)) {
+          // Downloaded before blobs were recorded: one tree request now, 'current' afterwards.
+          await recordBlobsAfterComplete({ complete: true, door43Client, catalogAdapter, resourceKey })
           const skipped = skippedCompleteResourceProgress(ingredientsCount, resourceKey)
           currentResourcePeakCompleted = ingredientsCount
           postProgress({
@@ -285,16 +288,8 @@ export async function runDownload(args: {
       const verified = await completenessChecker.markCompleteIfVerified(resourceKey, {
         downloadMethod: method,
       })
-      if (verified) {
-        // Per-book cache stamps come from this release's blob shas. It never throws, so a
-        // Door43 hiccup here cannot turn a finished download into a failed one.
-        const outcome = await recordBookBlobs({
-          door43Client: door43Client as Parameters<typeof recordBookBlobs>[0]['door43Client'],
-          catalogAdapter,
-          resourceKey,
-        })
-        console.log(`[runDownload] book blobs for ${resourceKey}: ${outcome}`)
-      }
+      // Per-book cache stamps come from this release's blob shas.
+      await recordBlobsAfterComplete({ complete: verified, door43Client, catalogAdapter, resourceKey })
       if (isCurrentRun()) {
         post({ type: 'resource-complete', runId, payload: { resourceKey } })
       }

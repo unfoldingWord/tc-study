@@ -72,7 +72,7 @@ describe('runDownload records the book blobs', () => {
   })
 
   /** A catalog row of a book-scoped resource at release v91, and a run whose loader and completeness check succeed. */
-  async function runCompleteDownload(door43Client: unknown) {
+  async function runCompleteDownload(door43Client: unknown, options: { skipExisting?: boolean } = {}) {
     const catalog = memoryStore()
     catalog.rows.set(KEY, {
       resourceKey: KEY,
@@ -84,16 +84,21 @@ describe('runDownload records the book blobs', () => {
       locations: [{ path: 'https://git.door43.org/unfoldingWord/en_tn' }],
       contentMetadata: { ingredients: [{ identifier: 'rut', path: './tn_RUT.tsv' }] },
     })
+    const before = structuredClone(catalog.rows.get(KEY))
+    const downloaded: string[] = []
     spies.push(
       spyOn(LoaderRegistry.prototype, 'getLoaderForResource').mockReturnValue({
-        downloadResource: async () => {},
+        downloadResource: async (key: string) => {
+          downloaded.push(key)
+        },
       } as never),
-      spyOn(ResourceCompletenessChecker.prototype, 'markCompleteIfVerified').mockResolvedValue(true)
+      spyOn(ResourceCompletenessChecker.prototype, 'markCompleteIfVerified').mockResolvedValue(true),
+      spyOn(ResourceCompletenessChecker.prototype, 'checkResource').mockResolvedValue({ isComplete: true } as never)
     )
     const messages: DownloadThreadMessage[] = []
     await runDownload({
       resourceKeys: [KEY],
-      skipExisting: false,
+      skipExisting: options.skipExisting ?? false,
       runId: 1,
       post: (m) => messages.push(m),
       isCurrentRun: () => true,
@@ -101,7 +106,7 @@ describe('runDownload records the book blobs', () => {
       catalogAdapter: catalog as never,
       door43Client,
     })
-    return { row: catalog.rows.get(KEY) as any, messages }
+    return { row: catalog.rows.get(KEY) as any, before, downloaded, messages }
   }
 
   test('a completed download records the book blobs of a book-scoped resource', async () => {
@@ -118,14 +123,23 @@ describe('runDownload records the book blobs', () => {
     expect(messages.map((m) => m.type)).toContain('resource-complete')
   })
 
+  test('an already-complete resource (skipExisting) gets its book blobs recorded without a download', async () => {
+    const { row, downloaded } = await runCompleteDownload(
+      { fetchRepoTreeBlobs: async () => new Map([['tn_RUT.tsv', SHA]]) },
+      { skipExisting: true }
+    )
+    expect(downloaded).toEqual([])
+    expect(row.contentMetadata.bookBlobs).toEqual({ rut: SHA })
+    expect(row.contentMetadata.bookBlobsRef).toBe('v91')
+  })
+
   test('a failing tree request leaves the download complete and the row unchanged', async () => {
-    const { row, messages } = await runCompleteDownload({
+    const { row, before, messages } = await runCompleteDownload({
       fetchRepoTreeBlobs: async () => {
         throw new Error('Door43 unreachable')
       },
     })
-    expect(row.contentMetadata.bookBlobs).toBeUndefined()
-    expect(row.contentMetadata.bookBlobsRef).toBeUndefined()
+    expect(row).toEqual(before)
     const types = messages.map((m) => m.type)
     expect(types).toContain('resource-complete')
     expect(types).not.toContain('error')
