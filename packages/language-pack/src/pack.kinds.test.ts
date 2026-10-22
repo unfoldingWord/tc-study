@@ -123,7 +123,12 @@ describe('las claves dicen de qué libro y de qué original son', () => {
     expect(bookOfRow(`${TA}/translate/figs-metaphor`, 'sot', TA)).toBeNull()
     expect(bookOfRow(`prepared:notes:${TN}:rut:1:full`, 'prepared', TN)).toBe('rut')
     expect(bookOfRow(`helps-align:${TN}@x:${ol(UGNT)}:${GLT}@y+3000220:tit:1`, 'align', TN)).toBe('tit')
-    expect(originalOfDerivedRow(`helps-quote:${TN}@x:${ol(UHB)}:rut:1`)).toEqual({ key: UHB, stamp: stamp(UHB) })
+    expect(originalOfDerivedRow(`helps-quote:${TN}@x:${ol(UHB)}:rut:1`)).toEqual({ key: UHB, stamp: stamp(UHB), book: 'rut' })
+    expect(originalOfDerivedRow(`helps-align:${TN}@x:${UHB}@g3d230a0aca+2.2.0-usj:${GLT}@y+3000220:RUT:1`)).toEqual({
+      key: UHB,
+      stamp: 'g3d230a0aca',
+      book: 'rut',
+    })
   })
 })
 
@@ -232,7 +237,9 @@ describe('abrir un paquete que necesita originales', () => {
     const { target: t, rows } = target({ [UGNT]: otherUgnt })
     const result = await importLanguagePack({ bytes, target: t, versions: VERSIONS })
     expect(result.originals.map((o) => o.status)).toEqual(['other-release'])
-    expect(result.skippedLayers.sort()).toEqual(['align', 'quote'])
+    // No blob was recorded for Titus, so its release stamp decides: each of its rows is left out, not the layers.
+    expect(result.skippedLayers).toEqual([])
+    expect(result.droppedRows).toEqual({ [TN]: { quote: 1, align: 1 }, [TWL]: { quote: 1 } })
     const keys = [...rows.keys()]
     expect(keys.some((k) => k.startsWith('helps-quote:') || k.startsWith('helps-align:'))).toBe(false)
     expect(keys).toContain(`tn:${TN}:tit:1`)

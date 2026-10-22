@@ -20,12 +20,12 @@ import { dirname, join, resolve } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { importLanguagePack, packTargetFrom } from '@bt-synergy/language-pack'
-import { resourceContentStamp } from '@bt-synergy/resource-catalog'
+import { resourceContentStamp, type BookStampSource } from '@bt-synergy/resource-catalog'
 import { USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
 import { unwrapVersioned } from '../cache/versionedEnvelope'
-import { HELPS_ALIGN_VERSION, type CachedAlignments, type CachedAlignRow } from '../helps/helpsAlignCache'
+import { HELPS_ALIGN_VERSION, targetBookStamp, type CachedAlignments, type CachedAlignRow } from '../helps/helpsAlignCache'
 import { HELPS_TEXT_VERSION } from '../helps/helpsCacheKeys'
-import { HELPS_QUOTE_VERSION } from '../helps/helpsQuoteCache'
+import { HELPS_QUOTE_VERSION, helpsBookStamp } from '../helps/helpsQuoteCache'
 import { NOTES_PREPARE_VERSION, type NotesLightChapter } from '../notes/notesPreparer'
 import { QUESTIONS_PREPARE_VERSION } from '../questions/questionsPreparer'
 import { WORDS_LINKS_PREPARE_VERSION, type WordsLinksLightChapter } from '../wordsLinks/wordsLinksPreparer'
@@ -143,14 +143,20 @@ export async function writeMcpViews(o: {
 
   /**
    * The aligned rows of a helps resource for one text, by book and chapter: `helps-align:{helps}@{stamp}:{original}@…:
-   * {text}@…:{book}:{chapter}`. Read by prefix, so the original's stamp is not needed.
+   * {text}@{stamp}:{book}:{chapter}`. The helps and text stamps are each book's own (`helpsBookStamp`,
+   * `targetBookStamp`, as warm keys them), so every book's rows are matched with its stamps. The original's stamp is
+   * not checked: the language's pack does not carry the original's catalog row, and opening the pack already left out
+   * rows built against another original when one was there.
    */
-  async function alignedRows(helpsKey: string, helpsStamp: string, textKey: string): Promise<Map<string, CachedAlignments>> {
+  async function alignedRows(helps: { key: string; meta: Meta }, text: { key: string; meta: Meta }): Promise<Map<string, CachedAlignments>> {
     const out = new Map<string, CachedAlignments>()
-    for (const row of await cache.getByPrefix(`helps-align:${helpsKey}@${helpsStamp}:`)) {
+    for (const row of await cache.getByPrefix(`helps-align:${helps.key}@`)) {
       const parts = row.key.split(':')
-      if (parts[3]?.split('@')[0] !== textKey) continue
-      const at = `${parts[4]?.toUpperCase()}:${parts[5]}`
+      if (parts.length !== 6) continue
+      const book = parts[4]
+      if (parts[1] !== `${helps.key}@${helpsBookStamp(helps.meta as BookStampSource, book)}`) continue
+      if (parts[3] !== `${text.key}@${targetBookStamp(text.meta as BookStampSource, book)}`) continue
+      const at = `${book.toUpperCase()}:${parts[5]}`
       out.set(at, { ...(out.get(at) ?? {}), ...(unwrapVersioned<CachedAlignments>(row.entry, HELPS_ALIGN_VERSION) ?? {}) })
     }
     return out
@@ -167,8 +173,8 @@ export async function writeMcpViews(o: {
   const counts = { notes: 0, notesLiteral: 0, notesSimple: 0, links: 0, linksLiteral: 0, linksSimple: 0, questions: 0 }
 
   if (notes) {
-    const inLiteral = literal ? await alignedRows(notes.key, stamp(notes), literal.key) : new Map()
-    const inSimple = simple ? await alignedRows(notes.key, stamp(notes), simple.key) : new Map()
+    const inLiteral = literal ? await alignedRows(notes, literal) : new Map()
+    const inSimple = simple ? await alignedRows(notes, simple) : new Map()
     for (const { book, chapter, data } of await lightRows<NotesLightChapter>('notes', notes.key, NOTES_PREPARE_VERSION)) {
       const at = `${book}:${chapter}`
       const rows = []
@@ -216,8 +222,8 @@ export async function writeMcpViews(o: {
   }
 
   if (wordLinks) {
-    const inLiteral = literal ? await alignedRows(wordLinks.key, stamp(wordLinks), literal.key) : new Map()
-    const inSimple = simple ? await alignedRows(wordLinks.key, stamp(wordLinks), simple.key) : new Map()
+    const inLiteral = literal ? await alignedRows(wordLinks, literal) : new Map()
+    const inSimple = simple ? await alignedRows(wordLinks, simple) : new Map()
     for (const { book, chapter, data } of await lightRows<WordsLinksLightChapter>('words-links', wordLinks.key, WORDS_LINKS_PREPARE_VERSION)) {
       const at = `${book}:${chapter}`
       const rows = []

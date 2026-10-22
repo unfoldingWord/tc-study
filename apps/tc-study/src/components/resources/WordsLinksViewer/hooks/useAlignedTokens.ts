@@ -28,12 +28,12 @@ import {
   mergeAndWriteCachedAlignments,
   readCachedAlignmentsForSpan,
   subtractCachedAlignHits,
-  targetContentStamp,
   type CachedAlignments,
   type HelpsAlignCacheAdapter,
 } from '../../../../features/helps/helpsAlignCache'
+import { readHelpsBookStamps } from '../../../../features/helps/helpsBookStamps'
 import { HELPS_SYNC_MAX_LINKS } from '../../../../features/helps/helpsWorkStaging'
-import { olContentStamp, toCachedQuoteTokens } from '../../../../features/helps/helpsQuoteCache'
+import { toCachedQuoteTokens } from '../../../../features/helps/helpsQuoteCache'
 import {
   compactFromAlignResult,
   reconstructAlignFromPositions,
@@ -50,7 +50,6 @@ import {
   settleHelpsCacheContext,
   shouldSyncHelpsAlign,
 } from '../../../../features/helps/helpsCacheContextBudget'
-import { resourceContentStamp } from '../../../../features/helps/resourceContentStamp'
 import { resolveOriginalLanguageKey } from '../../../../features/helps/olLoadCache'
 import {
   pinReferenceWhileScrolling,
@@ -207,21 +206,14 @@ async function resolveAlignCacheContext(args: {
   try {
     const ol = resolveOriginalLanguageKey(args.bookCode)
     if (!ol) return null
-    const helpsMeta = (await args.catalogManager.getResourceMetadata(args.helpsKey)) as
-      | { version?: string; release?: { tag_name?: string; published_at?: string } }
-      | null
-    const olMeta = (await args.catalogManager.getResourceMetadata(ol.resourceKey)) as
-      | { version?: string; release?: { tag_name?: string; published_at?: string } }
-      | null
-    const targetMeta = (await args.catalogManager.getResourceMetadata(args.targetKey)) as
-      | { version?: string; release?: { tag_name?: string; published_at?: string } }
-      | null
-    return {
-      helpsStamp: resourceContentStamp(helpsMeta),
+    // Per-book stamps, exactly as warm keys and collects them (helpsBookStamps.ts).
+    const { helpsStamp, olStamp, targetStamp } = await readHelpsBookStamps(args.catalogManager, {
+      helpsKey: args.helpsKey,
       olKey: ol.resourceKey,
-      olStamp: olContentStamp(olMeta),
-      targetStamp: targetContentStamp(targetMeta),
-    }
+      targetKey: args.targetKey,
+      bookCode: args.bookCode,
+    })
+    return { helpsStamp, olKey: ol.resourceKey, olStamp, targetStamp: targetStamp! }
   } catch {
     return null
   }

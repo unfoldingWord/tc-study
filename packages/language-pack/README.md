@@ -19,9 +19,11 @@ use it for its own exports. `@bt-synergy/resource-pipeline` makes the store a pa
 | `book` | One or more books of the book-scoped resources, with no receipts: a receipt says the whole release is complete. |
 
 A language, base or book pack names in `requires` the original releases its quotes and aligned quotes were built
-against (the keys say it). On opening, if the device has another release of that original, those two layers are left
-out (they would never be read) and rebuilt there; if it has none yet, they come anyway and match once the originals pack
-is opened. `ImportPackResult.originals` says which case it was.
+against (the release the building store had). Each row's key stamps the original per book: the book file's blob
+(`g` + hex), or the release stamp when no blob was recorded. On opening, a row whose book stamps differently on the
+device (another blob, or another release without one) is left out alone (it would never be read) and rebuilt there;
+the rows of unchanged books come even from another release. Without the original yet, they all come and match once the
+originals pack is opened. `ImportPackResult.originals` says which release case it was, `droppedRows` what was left out.
 
 A 1.0 pack has no kind: it is a `language` pack that may carry the originals inside.
 

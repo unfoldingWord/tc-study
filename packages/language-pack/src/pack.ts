@@ -12,10 +12,12 @@
 
 import JSZip from 'jszip'
 import {
+  bookContentStamp,
   expectedIngestReleaseStamp,
   ingestSchemaForResourceType,
   isMatchingIngestReceipt,
   resourceContentStamp,
+  type BookStampSource,
   type ResourceMetadata,
 } from '@bt-synergy/resource-catalog'
 import { ORIGINAL_LANGUAGE_KEYS, belongsTo, bookOfRow, fileSafe, isBookScoped, originalOfDerivedRow, scansFor } from './keys'
@@ -164,9 +166,13 @@ export async function buildLanguagePack(params: BuildPackParams): Promise<{ byte
       rows[layer] = list.length
       zip.file(`rows/${layer}/${fileSafe(key)}.jsonl`, list.map((row) => JSON.stringify(row)).join('\n') + '\n')
       if (layer !== 'quote' && layer !== 'align') continue
+      // Row keys stamp the original per book (a blob stamp, mostly), so `requires` names the release of each original
+      // this store has, once per original; the import checks each row against its own book.
       for (const row of list) {
         const original = originalOfDerivedRow(row.key)
-        if (original) requires.set(`${original.key}@${original.stamp}`, original)
+        if (!original || requires.has(original.key)) continue
+        const originalMeta = await source.catalogRow(original.key)
+        requires.set(original.key, { key: original.key, stamp: originalMeta ? resourceContentStamp(originalMeta) : original.stamp })
       }
     }
     resources.push({
@@ -255,18 +261,21 @@ export type ImportPackResult = {
   written: number
   keptExisting: number
   byLayer: Partial<Record<PackLayer, number>>
-  /**
-   * Layers left out: built with another processing version than this app's, or (quotes and aligned quotes) against
-   * another release of an original than the device has. They are rebuilt from the source.
-   */
+  /** Layers left out: built with another processing version than this app's. They are rebuilt from the source. */
   skippedLayers: PackLayer[]
   /**
    * The originals the pack's quotes need, and whether the device has them: `present` (same release), `in-pack`,
-   * `missing` (the rows are kept and will match once that originals pack is opened), or `other-release`.
+   * `missing` (the rows are kept and will match once that originals pack is opened), or `other-release`. Another
+   * release drops only the rows of the books whose file changed (`droppedRows`).
    */
   originals: Array<PackRequirement & { status: 'present' | 'in-pack' | 'missing' | 'other-release' }>
   /** Resources the device already had in another release, left as they were (without `overwrite`). */
   skippedResources: Array<{ key: string; why: string }>
+  /**
+   * Quote and aligned-quote rows left out, by resource and layer: built against an original's book that differs from
+   * the device's (another blob, or another release when no blob was recorded). The app rebuilds them.
+   */
+  droppedRows: Record<string, Partial<Record<PackLayer, number>>>
 }
 
 /** The layers whose versions differ between the pack and this app. */
@@ -301,30 +310,19 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
   const layers = new Set<PackLayer>([...REQUIRED_LAYERS, ...(params.layers ?? manifest.layers)])
   for (const layer of differ) layers.delete(layer)
   const batch = params.batch ?? 200
-  const result: ImportPackResult = { manifest, written: 0, keptExisting: 0, byLayer: {}, skippedLayers: [...differ], skippedResources: [], originals: [] }
+  const result: ImportPackResult = {
+    manifest,
+    written: 0,
+    keptExisting: 0,
+    byLayer: {},
+    skippedLayers: [...differ],
+    skippedResources: [],
+    originals: [],
+    droppedRows: {},
+  }
 
   const catalogFile = zip.file('catalog.json')
   const catalog = catalogFile ? (JSON.parse(await catalogFile.async('string')) as Array<{ key: string; metadata: ResourceMetadata }>) : []
-
-  // Quotes and aligned quotes name the original release they were built against. With another release on the device
-  // they would never be read: leave them out. Without the original yet, keep them: they match once it arrives.
-  for (const required of manifest.requires ?? []) {
-    const inPack = catalog.find((row) => row.key === required.key)
-    const mine = inPack ? null : target.catalogRow ? await target.catalogRow(required.key) : null
-    const status = inPack && resourceContentStamp(inPack.metadata) === required.stamp
-      ? 'in-pack'
-      : !mine
-        ? 'missing'
-        : resourceContentStamp(mine) === required.stamp
-          ? 'present'
-          : 'other-release'
-    result.originals.push({ ...required, status })
-    if (status !== 'other-release') continue
-    for (const layer of ['quote', 'align'] as const) {
-      if (!layers.delete(layer)) continue
-      if (!result.skippedLayers.includes(layer)) result.skippedLayers.push(layer)
-    }
-  }
 
   // Each resource comes whole or not at all: its catalog row, its rows and its receipt belong to one release. When
   // the device has the same release, the pack fills the gaps; with another one, the pack replaces it only on request.
@@ -341,6 +339,44 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
     }
   }
   await target.putCatalogRows(catalog.filter((row) => !skip.has(row.key)))
+
+  // The original each quote row will be read against here: the pack's copy when the device takes it, else the
+  // device's own; null while neither has it.
+  const originalsHere = new Map<string, Promise<ResourceMetadata | null>>()
+  const originalHere = (key: string): Promise<ResourceMetadata | null> => {
+    let found = originalsHere.get(key)
+    if (!found) {
+      const inPack = catalog.find((row) => row.key === key && !skip.has(row.key))
+      found = inPack ? Promise.resolve(inPack.metadata) : target.catalogRow ? target.catalogRow(key) : Promise.resolve(null)
+      originalsHere.set(key, found)
+    }
+    return found
+  }
+
+  for (const required of manifest.requires ?? []) {
+    const inPack = catalog.find((row) => row.key === required.key)
+    const mine = inPack ? null : target.catalogRow ? await target.catalogRow(required.key) : null
+    const status = inPack && resourceContentStamp(inPack.metadata) === required.stamp
+      ? 'in-pack'
+      : !mine
+        ? 'missing'
+        : resourceContentStamp(mine) === required.stamp
+          ? 'present'
+          : 'other-release'
+    result.originals.push({ ...required, status })
+  }
+
+  // Quotes and aligned quotes name the original's book they were built against (its blob stamp, or its release
+  // stamp). A row whose book differs here would never be read: leave it out, alone; the rest of its layer comes. Without
+  // the original yet, keep it: it matches once the original arrives. The stamp's `+{usj}` part is the `sot` version,
+  // whose mismatch refuses the whole pack above, so the book stamp alone is compared (olBookStamp lives in
+  // resource-pipeline, which imports this package).
+  const builtOnOriginalHere = async (row: CacheRow): Promise<boolean> => {
+    const original = originalOfDerivedRow(row.key)
+    if (!original) return true
+    const meta = await originalHere(original.key)
+    return !meta || bookContentStamp(meta as BookStampSource, original.book) === original.stamp
+  }
 
   const order: PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text', 'receipt']
   const total = manifest.resources
@@ -360,6 +396,15 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
       const flush = async (rows: CacheRow[]) => {
         let slice = rows
         done += slice.length
+        if (layer === 'quote' || layer === 'align') {
+          const kept: CacheRow[] = []
+          for (const row of slice) if (await builtOnOriginalHere(row)) kept.push(row)
+          if (kept.length < slice.length) {
+            const dropped = (result.droppedRows[resource.key] ??= {})
+            dropped[layer] = (dropped[layer] ?? 0) + slice.length - kept.length
+          }
+          slice = kept
+        }
         if (!overwrite && target.existingKeys) {
           const have = await target.existingKeys(slice.map((row) => row.key))
           result.keptExisting += slice.filter((row) => have.has(row.key)).length

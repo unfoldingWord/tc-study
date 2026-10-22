@@ -10,7 +10,7 @@
  * - text      `helps-text:{kind}:{key}@…`
  */
 
-import type { PackLayer, PackRequirement } from './types'
+import type { PackLayer } from './types'
 
 const SOT_PREFIXES = ['scripture-usj:', 'tn:', 'twl:', 'tq:', 'obs:'] as const
 
@@ -82,16 +82,29 @@ export function bookOfRow(key: string, layer: PackLayer, resourceKey: string): s
   return null
 }
 
+/** The original a quote or aligned-quote row was built against, and the book the row is about. */
+export type DerivedRowOriginal = {
+  key: string
+  /**
+   * The original's stamp for that book, without the `+{usj}` suffix: the book file's blob stamp (`g` + hex), or the
+   * release stamp when no blob was recorded (`bookContentStamp` of the original's catalog row).
+   */
+  stamp: string
+  /** Lowercase, as keys write it. */
+  book: string
+}
+
 /**
- * The original-language release a quote or aligned-quote row was built against. Their keys name it third:
- * `helps-quote:{helps}@{stamp}:{original}@{stamp}+{usj}:…` (stamps never hold `:`).
+ * The original-language book a quote or aligned-quote row was built against. Their keys name it third and the book
+ * second to last: `helps-quote:{helps}@{stamp}:{original}@{stamp}+{usj}:…:{book}:{chapter}` (stamps never hold `:`).
  */
-export function originalOfDerivedRow(key: string): PackRequirement | null {
-  const part = key.split(':')[2]
-  if (!part) return null
+export function originalOfDerivedRow(key: string): DerivedRowOriginal | null {
+  const parts = key.split(':')
+  const part = parts[2]
+  if (!part || parts.length < 5) return null
   const at = part.indexOf('@')
   if (at <= 0) return null
-  return { key: part.slice(0, at), stamp: part.slice(at + 1).split('+')[0] }
+  return { key: part.slice(0, at), stamp: part.slice(at + 1).split('+')[0], book: parts[parts.length - 2].toLowerCase() }
 }
 
 /** NT and OT original languages, whose scripture the quotes of notes and word links are built against (§6). */
