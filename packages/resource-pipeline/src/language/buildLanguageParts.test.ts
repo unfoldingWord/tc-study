@@ -168,9 +168,9 @@ describe('memory', () => {
     expect(lines.some((l) => l.includes('book jon: start'))).toBe(false)
     const report = reportOf(workDir)
     expect(report.state).toBe('failed')
-    expect(report.units.map((u) => [u.unit, u.peakRssMb])).toEqual([
-      ['shared', 100],
-      ['book rut', 9000],
+    expect(report.units.map((u) => [u.unit, u.startRssMb, u.peakRssMb])).toEqual([
+      ['shared', 100, 100],
+      ['book rut', 9000, 9000],
     ])
     expect(await partsDatabases()).toEqual([])
   }, 120_000)

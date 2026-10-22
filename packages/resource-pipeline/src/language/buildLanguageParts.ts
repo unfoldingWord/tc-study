@@ -38,6 +38,7 @@ import {
   partsListPath,
   rowsOfResource,
   serializePartsList,
+  sha256Hex,
   slotId,
   slotOfRow,
   writePart,
@@ -83,6 +84,11 @@ export type PartsFailure = { unit: string; job?: string; error: string }
 
 export type UnitRecord = {
   unit: string
+  /**
+   * Resident memory when the unit started. Memory freed by a deleted database is reused but not returned, so a
+   * unit's own growth is `peakRssMb - startRssMb`, not its peak alone.
+   */
+  startRssMb: number
   /** The highest resident memory sampled while the unit ran, before its database was deleted. */
   peakRssMb: number
   seconds: number
@@ -312,10 +318,12 @@ export async function buildLanguageParts(o: {
       if (mb > limit) over = true
     }
     sample()
+    const start = peak
     const timer = setInterval(sample, o.memorySampleMs ?? 1000)
     ;(timer as { unref?: () => void }).unref?.()
     return {
       sample,
+      start: () => start,
       peak: () => peak,
       /** For the runs a unit starts: true stops them at their next step. */
       over: () => over,
@@ -353,6 +361,7 @@ export async function buildLanguageParts(o: {
       m.stop()
       const record: UnitRecord = {
         unit,
+        startRssMb: m.start(),
         peakRssMb: m.peak(),
         seconds: Math.round((Date.now() - unitStarted) / 100) / 10,
         parts,
@@ -364,7 +373,7 @@ export async function buildLanguageParts(o: {
       await deleteDatabases(unit, [cache], [dbName])
       record.failures = failures.length - failuresBefore
       units.push(record)
-      say(`[${elapsed()}] ${unit}: ${parts} partes, pico ${record.peakRssMb} MB, ${record.seconds} s${stopped ? ', detenido' : ''}`)
+      say(`[${elapsed()}] ${unit}: ${parts} partes, pico ${record.peakRssMb} MB (+${record.peakRssMb - record.startRssMb}), ${record.seconds} s${stopped ? ', detenido' : ''}`)
       writeReport('running')
     }
   }
@@ -696,9 +705,4 @@ export async function buildLanguageParts(o: {
     await deleteDatabases('end', [catalog], [CATALOG_DB])
     writeReport(error === undefined ? 'done' : 'failed', error)
   }
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as BufferSource))
-  return Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('')
 }
