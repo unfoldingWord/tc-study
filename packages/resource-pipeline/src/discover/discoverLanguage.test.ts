@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { CatalogManager } from '@bt-synergy/catalog-manager/core'
-import { discoverLanguage } from './discoverLanguage'
+import { discoverLanguage, obsOwnHelpsSubjects } from './discoverLanguage'
 import { createHeadlessResourceTypeRegistry } from './resourceTypeRegistry'
 
 function memoryStore() {
@@ -90,5 +90,41 @@ describe('discoverLanguage', () => {
     const obsSubjects = door43.calls.filter((c) => c.subject && !c.owner).map((c) => c.subject)
     expect(obsSubjects.length).toBeGreaterThan(0)
     expect(door43.calls.filter((c) => c.subject && !c.owner).every((c) => c.topic === undefined)).toBe(true)
+    expect(obsSubjects.every((s) => /\bOBS\b/.test(String(s)))).toBe(true)
+  })
+
+  test('obsOwnHelpsSubjects keeps only OBS subjects', () => {
+    expect(
+      obsOwnHelpsSubjects(['TSV OBS Translation Notes', 'OBS Translation Notes', 'Translation Words', 'Translation Academy', 'TSV OBS Study Questions'])
+    ).toEqual(['TSV OBS Translation Notes', 'OBS Translation Notes', 'TSV OBS Study Questions'])
+  })
+
+  test('a TW or TA without tc-ready never comes in through the OBS helps searches', async () => {
+    // A fork without the topic, as es-419_obt/es-419_tw is: only an untopiced search could find it.
+    const door43 = fakeDoor43((p) => {
+      if (p.topic === 'tc-ready' && p.language === 'es-419') return [hit('es-419_gl', 'es-419', 'es-419_glt', 'Aligned Bible')]
+      if (!p.topic && p.subject === 'Translation Words') return [hit('es-419_obt', 'es-419', 'es-419_tw', 'Translation Words')]
+      if (!p.topic && p.subject === 'Translation Academy') return [hit('es-419_obt', 'es-419', 'es-419_ta', 'Translation Academy')]
+      return []
+    })
+    const catalogManager = new CatalogManager({
+      catalogAdapter: memoryStore() as never,
+      cacheAdapter: memoryStore() as never,
+      door43Client: door43 as never,
+    } as never)
+
+    const found = await discoverLanguage({
+      language: 'es-419',
+      door43Client: door43 as never,
+      catalogManager,
+      resourceTypeRegistry: createHeadlessResourceTypeRegistry(catalogManager),
+    })
+
+    const untopiced = door43.calls.filter((c) => !c.topic && !c.owner).map((c) => c.subject)
+    expect(untopiced).not.toContain('Translation Words')
+    expect(untopiced).not.toContain('Translation Academy')
+    const keys = found.resources.map((r) => r.resourceKey)
+    expect(keys).not.toContain('es-419_obt/es-419/tw')
+    expect(keys).not.toContain('es-419_obt/es-419/ta')
   })
 })
