@@ -11,8 +11,11 @@
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 
 export const PACK_FORMAT = 'bt-synergy-language-pack' as const
-/** 1.1: `kind`, `books` and `requires`, so originals and books travel in packs of their own. */
-export const PACK_FORMAT_VERSION = '1.1.0' as const
+/**
+ * 1.1: `kind`, `books` and `requires`, so originals and books travel in packs of their own.
+ * 2.0: a language also travels as content-addressed parts named by a parts list (schema 2, `parts/`).
+ */
+export const PACK_FORMAT_VERSION = '2.0.0' as const
 
 /**
  * What a pack holds:

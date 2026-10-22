@@ -13,7 +13,7 @@ export const VOLATILE_FIELDS: readonly string[] = ['timestamp', 'expiresAt', 'pr
 const VOLATILE = new Set(VOLATILE_FIELDS)
 
 /** Receipts never travel in parts: the list says when a resource is complete. */
-const LAYER_ORDER: readonly PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text']
+export const PART_LAYERS: readonly PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text']
 
 export function stripVolatile(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripVolatile)
@@ -28,7 +28,7 @@ export function stripVolatile(value: unknown): unknown {
 }
 
 /** JSON with object keys sorted at every depth (code-unit order, not locale). */
-function stableJson(value: unknown): string {
+export function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map((v) => (v === undefined ? 'null' : stableJson(v))).join(',')}]`
   if (value && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>)
@@ -40,7 +40,7 @@ function stableJson(value: unknown): string {
 }
 
 function layerRank(layer: PackLayer): number {
-  const rank = LAYER_ORDER.indexOf(layer)
+  const rank = PART_LAYERS.indexOf(layer)
   if (rank < 0) throw new Error(`A part does not carry ${layer} rows`)
   return rank
 }

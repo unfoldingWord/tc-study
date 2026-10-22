@@ -5,5 +5,7 @@ export { buildLanguagePack, readPackManifest, importLanguagePack, rowsOfResource
 export type { BuildPackParams, ImportPackParams, ImportPackResult } from './pack'
 export { packSourceFrom, packTargetFrom } from './stores'
 export type { RawCacheStore, CatalogStore } from './stores'
-export { VOLATILE_FIELDS, stripVolatile, writePart, readPart, partPath } from './parts/partFile'
+export { VOLATILE_FIELDS, PART_LAYERS, stripVolatile, writePart, readPart, partPath } from './parts/partFile'
 export type { PartRow } from './parts/partFile'
+export { LIST_DROPPED_FIELDS, partsListPath, serializePartsList } from './parts/partsList'
+export type { PartKind, PartEntry, PartsList, PartsListResource } from './parts/partsList'
