@@ -10,7 +10,7 @@ import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import { ORIGINAL_LANGUAGE_KEYS, packSourceFrom } from '@bt-synergy/language-pack'
 import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
-import { lexiconStamps } from '../../cli/companions'
+import { lexiconOwnerOf, lexiconStamps } from '../../cli/companions'
 import { discoverLanguage } from '../discover/discoverLanguage'
 import { createHeadlessResourceTypeRegistry } from '../discover/resourceTypeRegistry'
 import { closeAndDelete } from './fakeDatabases'
@@ -38,7 +38,7 @@ export function stampsOfRows(rows: ResourceMetadata[], o: { language: string; ob
 
 /**
  * The rows' stamps, and with a lexicons ref the stamps of the lexicons the build will read at that ref (those of the
- * literal text's owner, as prepareAndPack chooses them).
+ * owner `lexiconOwnerOf` gives, as prepareAndPack chooses them).
  */
 export async function stampsWithLexicons(
   rows: ResourceMetadata[],
@@ -47,7 +47,8 @@ export async function stampsWithLexicons(
   const stamps = stampsOfRows(rows, o)
   const literal = literalTextOf(rows as Array<ResourceMetadata & { owner?: string }>, o.language)
   if (!o.lexiconsRef || !literal?.owner) return stamps
-  return { ...stamps, ...(await lexiconStamps({ language: o.language, owner: String(literal.owner), ref: o.lexiconsRef, fetch: o.fetch })) }
+  const owner = lexiconOwnerOf(o.language, String(literal.owner))
+  return { ...stamps, ...(await lexiconStamps({ language: o.language, owner, ref: o.lexiconsRef, fetch: o.fetch })) }
 }
 
 let calls = 0
