@@ -4,7 +4,7 @@ name: Language packs
 # and reports the build state next to the catalog (status/<compat>/<lang>.json) for the serving Worker's dispatch guard.
 # Dispatched by hand, or by the Worker (a GitHub App with actions: write on this repository only).
 
-run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }}${{ inputs.parts && ', parts' || '' }})
+run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }}${{ inputs.parts && ', parts' || '' }}${{ inputs.compare && ', compare' || '' }})
 
 on:
   workflow_dispatch:
@@ -44,6 +44,11 @@ on:
         required: false
         type: boolean
         default: false
+      compare:
+        description: With parts, also build the whole packs and fail on any row the two builds do not share
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -72,6 +77,7 @@ jobs:
       REQUESTED_COMPAT: ${{ inputs.compat }}
       FORCE: ${{ inputs.force }}
       PARTS: ${{ inputs.parts }}
+      COMPARE: ${{ inputs.compare }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
@@ -89,6 +95,10 @@ jobs:
           # A parts run decides nothing, it always builds: force would do nothing.
           if [ "$PARTS" = true ] && [ "$FORCE" = true ]; then
             echo "::error::parts and force do not go together"
+            exit 1
+          fi
+          if [ "$COMPARE" = true ] && [ "$PARTS" != true ]; then
+            echo "::error::compare needs parts (and so mode no-upload)"
             exit 1
           fi
           # The same shape the Worker and packs-status check: the compat becomes a bucket key.
@@ -184,6 +194,33 @@ jobs:
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The parts build must pack exactly the rows the whole build packs (plan 2b-1, Task 7). Both run here, where Door43
+      # is reachable, into separate work folders; nothing is uploaded. Runs even when the parts step failed, since a
+      # parts run exits 1 on failures it still wrote out, and the comparison says which rows those failures cost.
+      - name: Whole build and compare
+        if: always() && inputs.compare && steps.publish.conclusion != 'skipped'
+        env:
+          GENERATOR: ${{ github.sha }}
+        run: |
+          token="$(openssl rand -hex 16)"
+          echo "::stop-commands::$token"
+          trap 'echo "::$token::"' EXIT
+          whole="$RUNNER_TEMP/packs-whole"
+          bun packages/resource-pipeline/cli/publish-language.ts --lang "$LANGUAGE" --work "$whole" --generator "$GENERATOR" \
+            --macula "$RUNNER_TEMP/taller/public" --lexicons-ref master --no-upload > "$RUNNER_TEMP/packs-out/whole-stdout.txt"
+          status=0
+          bun packages/resource-pipeline/cli/compare-parts.ts --pack "$whole/packs/$LANGUAGE.langpack.zip" \
+            --originals "$whole/packs/originals.langpack.zip" --parts "$RUNNER_TEMP/packs-work" --examples 20 \
+            > "$RUNNER_TEMP/packs-out/compare.txt" || status=$?
+          {
+            echo
+            echo "### Compare (whole vs parts): exit $status"
+            echo '```'
+            head -n 200 "$RUNNER_TEMP/packs-out/compare.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
       # A cancelled or timed-out run counts as a failed one: left at «running» it would hold the dispatch for hours.
       - name: Status result
