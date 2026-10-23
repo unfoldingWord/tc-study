@@ -81,6 +81,7 @@ export {
   partitionIngredientsByReleasePaths,
   pathSetFromZipFileNames,
   omitAbsentIngredients,
+  ingredientsForBooks,
   readAbsentFromRelease,
   mergeAbsentFromReleaseIds,
   presentIngredientCount,

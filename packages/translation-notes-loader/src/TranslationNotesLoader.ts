@@ -20,6 +20,7 @@ import {
     fetchReleasePathSet,
     helpsIngestSchema,
     ingredientPresentInPathSet,
+    ingredientsForBooks,
     normalizeIngredientPath,
     partitionIngredientsByReleasePaths,
     pathSetFromZipFileNames,
@@ -274,11 +275,14 @@ export class TranslationNotesLoader implements ResourceLoader {
     options?: { 
       method?: 'individual' | 'zip'
       skipExisting?: boolean
+      /** Only these books, and no receipt: the book-by-book build owns `resource:{key}`. */
+      books?: readonly string[]
     },
     onProgress?: ProgressCallback
   ): Promise<void> {
     const skipExisting = options?.skipExisting ?? true
     const method = options?.method ?? 'zip'
+    const books = options?.books
 
     console.log(`📦 [TranslationNotesLoader] Starting download for ${resourceKey} (method: ${method})`)
 
@@ -287,10 +291,15 @@ export class TranslationNotesLoader implements ResourceLoader {
       throw new Error(`Resource metadata not found for ${resourceKey}`)
     }
 
-    const ingredients = metadata.contentMetadata?.ingredients
+    let ingredients = metadata.contentMetadata?.ingredients
     if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
       console.warn(`⚠️ No ingredients found for ${resourceKey}`)
       return
+    }
+    if (books) {
+      const prior = await this.cacheAdapter.get(`resource:${resourceKey}`)
+      ingredients = ingredientsForBooks(ingredients, books, readAbsentFromRelease(prior?.metadata))
+      if (ingredients.length === 0) return
     }
 
     console.log(`📦 Found ${ingredients.length} books to download`)
@@ -299,17 +308,23 @@ export class TranslationNotesLoader implements ResourceLoader {
     let failedBooks: string[] = []
 
     if (method === 'zip' && zipUrl) {
+      let bookRunFailed: string[] | null = null
       try {
-        failedBooks = await this.downloadViaZip(resourceKey, metadata, ingredients, skipExisting, onProgress)
-        if (failedBooks.length === 0) {
-          await this.markComplete(resourceKey, ingredients.length, 'zip', metadata)
+        failedBooks = await this.downloadViaZip(resourceKey, metadata, ingredients, skipExisting, onProgress, !!books)
+        if (books) {
+          bookRunFailed = failedBooks
         } else {
-          await this.markIncomplete(resourceKey, ingredients.length, failedBooks, 'zip')
+          if (failedBooks.length === 0) {
+            await this.markComplete(resourceKey, ingredients.length, 'zip', metadata)
+          } else {
+            await this.markIncomplete(resourceKey, ingredients.length, failedBooks, 'zip')
+          }
+          return
         }
-        return
       } catch (zipError) {
         console.warn(`⚠️ [TN] ZIP download failed, falling back to per-book fetch:`, zipError)
       }
+      if (bookRunFailed) return this.throwIfBooksFailed(resourceKey, bookRunFailed)
     }
 
     // Per-book fallback
@@ -354,11 +369,19 @@ export class TranslationNotesLoader implements ResourceLoader {
       }
     }
 
+    if (books) return this.throwIfBooksFailed(resourceKey, failedBooks)
     if (failedBooks.length === 0) {
       await this.markComplete(resourceKey, ingredients.length, 'individual', metadata)
       if (this.debug) console.log(`✅ [TranslationNotesLoader] Download complete for ${resourceKey}`)
     } else {
       await this.markIncomplete(resourceKey, ingredients.length, failedBooks, 'individual')
+    }
+  }
+
+  /** A book run writes no receipt to remember a failed book, so the failure must not pass quietly. */
+  private throwIfBooksFailed(resourceKey: string, failedBooks: string[]): void {
+    if (failedBooks.length > 0) {
+      throw new Error(`${resourceKey}: ${failedBooks.join(', ')} could not be processed`)
     }
   }
 
@@ -460,13 +483,16 @@ export class TranslationNotesLoader implements ResourceLoader {
     metadata: ResourceMetadata,
     ingredients: any[],
     skipExisting: boolean,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
+    bookScoped = false
   ): Promise<string[]> {
     const [owner, language, resourceId] = resourceKey.split('/')
     const repoName = `${language}_${resourceId}`
     const ref = (metadata as any).release?.tag_name || 'master'
 
     const recordAbsent = async (absentIds: string[]) => {
+      // A book run must not touch `resource:{key}` or prune the catalog the whole build reads.
+      if (bookScoped) return
       await persistAbsentFromRelease({
         cacheAdapter: this.cacheAdapter,
         catalogAdapter: this.catalogAdapter,
@@ -500,7 +526,10 @@ export class TranslationNotesLoader implements ResourceLoader {
         percentage: Math.round((cachedBeforeZip / Math.max(1, ingredients.length)) * 100),
         message: 'Checking release',
       })
-      const treePaths = await fetchReleasePathSet(this.door43Client, owner, repoName, ref)
+      // A book run skips the tree request: the zip it reads (kept on disk) is the release's tree.
+      const treePaths = bookScoped
+        ? null
+        : await fetchReleasePathSet(this.door43Client, owner, repoName, ref)
       if (treePaths) {
         const { present, absent } = partitionIngredientsByReleasePaths(incomplete, treePaths)
         if (absent.length > 0) {

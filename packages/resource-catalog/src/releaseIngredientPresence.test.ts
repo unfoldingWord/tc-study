@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   fetchReleasePathSet,
   ingredientPresentInPathSet,
+  ingredientsForBooks,
   mergeAbsentFromReleaseIds,
   normalizeIngredientPath,
   omitAbsentIngredients,
@@ -53,6 +54,18 @@ describe('releaseIngredientPresence', () => {
       new Set(['num'])
     )
     expect(next.map((i) => i.identifier)).toEqual(['gen'])
+  })
+
+  test('ingredientsForBooks keeps the asked books (any case) and never one absent from the release', () => {
+    const ingredients = [
+      { identifier: 'rut', path: './08-RUT.usfm' },
+      { identifier: 'JON', path: './32-JON.usfm' },
+      { identifier: 'tit', path: './57-TIT.usfm' },
+      { path: './front.usfm' },
+    ]
+    expect(ingredientsForBooks(ingredients, ['RUT', 'jon'], []).map((i) => i.identifier)).toEqual(['rut', 'JON'])
+    expect(ingredientsForBooks(ingredients, ['rut', 'jon'], ['Jon']).map((i) => i.identifier)).toEqual(['rut'])
+    expect(ingredientsForBooks(ingredients, [], [])).toEqual([])
   })
 
   test('read/merge/presentIngredientCount helpers', () => {

@@ -7,10 +7,12 @@ type Closable = { close(): Promise<void> }
 
 /**
  * Closes the adapters and deletes their databases, waiting for each delete. A connection someone else still holds
- * would block the delete until it closes; the run says so and goes on rather than hang.
+ * would block the delete until it closes; the run says so and goes on rather than hang. Returns the databases whose
+ * delete was blocked, for a caller to whom that is a failure (the parts build: a unit's rows would stay in memory).
  */
-export async function closeAndDelete(adapters: Closable[], names: string[], log?: (line: string) => void): Promise<void> {
+export async function closeAndDelete(adapters: Closable[], names: string[], log?: (line: string) => void): Promise<string[]> {
   for (const adapter of adapters) await adapter.close()
+  const blocked: string[] = []
   for (const name of names) {
     await new Promise<void>((resolve, reject) => {
       const request = indexedDB.deleteDatabase(name)
@@ -18,8 +20,10 @@ export async function closeAndDelete(adapters: Closable[], names: string[], log?
       request.onerror = () => reject(request.error ?? new Error(`Could not delete the database ${name}`))
       request.onblocked = () => {
         log?.(`la base ${name} sigue abierta en otra conexión: se borrará al cerrarse`)
+        blocked.push(name)
         resolve()
       }
     })
   }
+  return blocked
 }

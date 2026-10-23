@@ -223,6 +223,32 @@ export async function readPackManifest(bytes: Uint8Array | ArrayBuffer): Promise
   return manifest
 }
 
+/**
+ * A pack's catalog list and every row it carries, without opening it into a store: for checks that compare a pack
+ * with something else. Each layer is read a line at a time from the zip's stream.
+ */
+export async function readPack(bytes: Uint8Array | ArrayBuffer): Promise<{
+  manifest: PackManifest
+  catalog: Array<{ key: string; metadata: ResourceMetadata }>
+  rows(): AsyncGenerator<{ resource: string; layer: PackLayer; row: CacheRow }>
+}> {
+  const manifest = await readPackManifest(bytes)
+  const zip = await JSZip.loadAsync(bytes)
+  const catalogFile = zip.file('catalog.json')
+  const catalog = catalogFile ? (JSON.parse(await catalogFile.async('string')) as Array<{ key: string; metadata: ResourceMetadata }>) : []
+  async function* rows() {
+    for (const resource of manifest.resources) {
+      for (const layer of Object.keys(resource.rows) as PackLayer[]) {
+        if (!resource.rows[layer]) continue
+        const file = zip.file(`rows/${layer}/${fileSafe(resource.key)}.jsonl`)
+        if (!file) throw new Error(`The pack lacks ${layer} of ${resource.key}`)
+        for await (const line of linesFrom(chunksOf(file))) yield { resource: resource.key, layer, row: JSON.parse(line) as CacheRow }
+      }
+    }
+  }
+  return { manifest, catalog, rows }
+}
+
 export type ImportPackParams = {
   bytes: Uint8Array | ArrayBuffer
   target: PackTarget
