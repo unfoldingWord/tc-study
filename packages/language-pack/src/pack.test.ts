@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import JSZip from 'jszip'
 import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
-import { buildLanguagePack, importLanguagePack, readPackManifest } from './pack'
+import { buildLanguagePack, importLanguagePack, readPack, readPackManifest } from './pack'
 import { packSourceFrom, packTargetFrom } from './stores'
 import type { CacheRow, PackSource, PackTarget } from './types'
 
@@ -115,6 +115,19 @@ describe('hacer un paquete de idioma', () => {
     expect(all).not.toContain(EN_TN)
     expect(all).not.toContain(`${TN}-extra`)
     expect(all).not.toContain('warm-coverage')
+  })
+
+  it('readPack gives back each row the pack carries, with its resource and layer, and the catalog list', async () => {
+    const { source, rows } = store()
+    const { bytes, manifest } = await buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', originalKeys: [UGNT] })
+    const pack = await readPack(bytes)
+    expect(pack.manifest).toEqual(manifest)
+    expect(pack.catalog.map((c) => c.key)).toEqual([TN, TPL, TA, UGNT])
+    const read: Array<{ resource: string; layer: string; row: CacheRow }> = []
+    for await (const r of pack.rows()) read.push(r)
+    expect(read.length).toBe(manifest.resources.reduce((n, r) => n + Object.values(r.rows).reduce((m, k) => m + (k ?? 0), 0), 0))
+    expect(read.find((r) => r.row.key === `tn:${TN}:tit:1`)).toEqual({ resource: TN, layer: 'sot', row: rows.find((r) => r.key === `tn:${TN}:tit:1`)! })
+    expect(read.find((r) => r.row.key === `resource:${UGNT}`)?.layer).toBe('receipt')
   })
 
   it('un recurso cuya clave empieza igual que la de otro no se cuela en el paquete', async () => {

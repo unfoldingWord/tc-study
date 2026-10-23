@@ -183,3 +183,82 @@ describe('runDownload records the book blobs', () => {
     expect((catalog.rows.get(KEY) as any).contentMetadata.bookBlobs).toBeUndefined()
   })
 })
+
+describe('runDownload one book at a time', () => {
+  const KEY = 'unfoldingWord/en/tn'
+  const spies: Array<{ mockRestore(): void }> = []
+  afterEach(() => {
+    for (const spy of spies.splice(0)) spy.mockRestore()
+  })
+
+  async function runBooks(downloadResource: (key: string, options: unknown) => Promise<void>) {
+    const catalog = memoryStore()
+    catalog.rows.set(KEY, {
+      resourceKey: KEY,
+      owner: 'unfoldingWord',
+      language: 'en',
+      resourceId: 'tn',
+      type: 'notes',
+      release: { tag_name: 'v91', zipball_url: 'https://git.door43.org/unfoldingWord/en_tn/archive/v91.zip' },
+      contentMetadata: { ingredients: [{ identifier: 'rut', path: './tn_RUT.tsv' }] },
+    })
+    const before = structuredClone(catalog.rows.get(KEY))
+    const cache = memoryStore()
+    const checks = { check: 0, verify: 0, trees: 0 }
+    spies.push(
+      spyOn(LoaderRegistry.prototype, 'getLoaderForResource').mockReturnValue({ downloadResource } as never),
+      spyOn(ResourceCompletenessChecker.prototype, 'checkResource').mockImplementation(async () => {
+        checks.check += 1
+        return { isComplete: true } as never
+      }),
+      spyOn(ResourceCompletenessChecker.prototype, 'markCompleteIfVerified').mockImplementation(async () => {
+        checks.verify += 1
+        return true
+      })
+    )
+    const messages: DownloadThreadMessage[] = []
+    await runDownload({
+      resourceKeys: [KEY],
+      skipExisting: true,
+      books: ['rut'],
+      runId: 1,
+      post: (m) => messages.push(m),
+      isCurrentRun: () => true,
+      cacheAdapter: cache as never,
+      catalogAdapter: catalog as never,
+      door43Client: {
+        fetchRepoTreeBlobs: async () => {
+          checks.trees += 1
+          return new Map()
+        },
+      },
+    })
+    return { cache, catalog, before, checks, messages }
+  }
+
+  test('passes the books to the loader and leaves the receipt and the catalog row to the caller', async () => {
+    const asked: unknown[] = []
+    const { cache, catalog, before, checks, messages } = await runBooks(async (_key, options) => {
+      asked.push(options)
+    })
+
+    expect(asked).toEqual([{ method: 'zip', skipExisting: true, books: ['rut'] }])
+    // Not "already complete" (that would skip the book) and not marked complete (one book is not the resource).
+    expect(checks).toEqual({ check: 0, verify: 0, trees: 0 })
+    expect(cache.rows.size).toBe(0)
+    expect(catalog.rows.get(KEY)).toEqual(before)
+    expect(messages.map((m) => m.type)).toContain('resource-complete')
+  })
+
+  test('a book that fails is reported, without an error receipt in the book’s database', async () => {
+    const { cache, messages } = await runBooks(async () => {
+      throw new Error(`${KEY}: rut could not be processed`)
+    })
+
+    expect(cache.rows.size).toBe(0)
+    const error = messages.find((m) => m.type === 'error')
+    expect(error?.payload).toEqual({ resourceKey: KEY, error: `${KEY}: rut could not be processed` })
+    const done = messages.find((m) => m.type === 'complete')!.payload as { failedResources: number }
+    expect(done.failedResources).toBe(1)
+  })
+})

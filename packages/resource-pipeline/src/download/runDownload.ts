@@ -3,6 +3,10 @@
  * rows, then `markCompleteIfVerified` over them. The caller gives the stores and the Door43 client, so the same run
  * fills IndexedDB in a browser or another store in Node. tc-study's main-thread fallback
  * (`runBackgroundDownloadOnThisThread`) is this with its IndexedDB stores. Must stay prepare-free.
+ *
+ * With `books`, each loader writes only those books' rows and no receipt, and the run neither checks nor marks
+ * completeness nor records book blobs: one book is not the resource, so the caller (the book-by-book build) owns
+ * `resource:{key}` and the catalog row. A resource that fails is posted as `error` ({ resourceKey, error }).
  */
 
 import { CatalogManager, type CatalogConfig } from '@bt-synergy/catalog-manager/core'
@@ -41,12 +45,13 @@ export type DownloadThreadMessage = {
 export async function runDownload(args: {
   resourceKeys: string[]
   skipExisting: boolean
+  books?: readonly string[]
   totalIngredients?: number
   runId: number
   post: (message: DownloadThreadMessage) => void
   isCurrentRun: () => boolean
 } & DownloadStores): Promise<void> {
-  const { resourceKeys, skipExisting, totalIngredients: providedTotal, runId, post, isCurrentRun } =
+  const { resourceKeys, skipExisting, books, totalIngredients: providedTotal, runId, post, isCurrentRun } =
     args
   const { cacheAdapter, catalogAdapter, door43Client } = args
 
@@ -185,7 +190,7 @@ export async function runDownload(args: {
       }),
     })
     try {
-      if (skipExisting) {
+      if (skipExisting && !books) {
         postProgress({
           currentResource: resourceKey,
           currentIngredient: 'completeness check',
@@ -251,7 +256,7 @@ export async function runDownload(args: {
       }
       await loader.downloadResource(
         resourceKey,
-        { method, skipExisting },
+        books ? { method, skipExisting, books } : { method, skipExisting },
         (progress) => {
           if (!isCurrentRun()) return
           const mapped = mapLoaderProgressToResource({
@@ -285,21 +290,25 @@ export async function runDownload(args: {
       )
       completedIngredients += ingredientsCount
       completedResourceCount += 1
-      const verified = await completenessChecker.markCompleteIfVerified(resourceKey, {
-        downloadMethod: method,
-      })
-      // Per-book cache stamps come from this release's blob shas.
-      await recordBlobsAfterComplete({ complete: verified, door43Client, catalogAdapter, resourceKey })
+      if (!books) {
+        const verified = await completenessChecker.markCompleteIfVerified(resourceKey, {
+          downloadMethod: method,
+        })
+        // Per-book cache stamps come from this release's blob shas.
+        await recordBlobsAfterComplete({ complete: verified, door43Client, catalogAdapter, resourceKey })
+      }
       if (isCurrentRun()) {
         post({ type: 'resource-complete', runId, payload: { resourceKey } })
       }
     } catch (error) {
       failedIngredients += ingredientsCount
       failedResourceCount += 1
-      await completenessChecker.markError(
-        resourceKey,
-        error instanceof Error ? error.message : String(error)
-      )
+      const message = error instanceof Error ? error.message : String(error)
+      if (books) {
+        if (isCurrentRun()) post({ type: 'error', runId, payload: { resourceKey, error: message } })
+      } else {
+        await completenessChecker.markError(resourceKey, message)
+      }
     }
     postProgress({
       currentResource: resourceKey,

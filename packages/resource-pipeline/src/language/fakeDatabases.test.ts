@@ -36,7 +36,9 @@ test('a connection left open does not hang the run: it says so and goes on', asy
   })
   const lines: string[] = []
 
-  await closeAndDelete([open], ['drop-held'], (line) => lines.push(line))
+  const blocked = await closeAndDelete([open], ['drop-held'], (line) => lines.push(line))
 
   expect(lines.join('\n')).toContain('drop-held')
+  // And says which, for a caller to whom it is a failure.
+  expect(blocked).toEqual(['drop-held'])
 })

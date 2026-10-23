@@ -15,6 +15,7 @@ import {
   chooseIngredientFetchMode,
   fetchReleasePathSet,
   ingredientPresentInPathSet,
+  ingredientsForBooks,
   normalizeIngredientPath,
   partitionIngredientsByReleasePaths,
   pathSetFromZipFileNames,
@@ -558,11 +559,14 @@ export class ScriptureLoader implements ResourceLoader {
     options?: {
       method?: 'individual' | 'zip' | 'tar'
       skipExisting?: boolean
+      /** Only these books, and no receipt: the book-by-book build owns `resource:{key}`. */
+      books?: readonly string[]
     },
     onProgress?: ProgressCallback
   ): Promise<void> {
     const method = options?.method || 'zip'
     const skipExisting = options?.skipExisting ?? true
+    const books = options?.books
 
     console.log(`📦 [ScriptureLoader] Starting download for ${resourceKey}`)
     console.log(`📦 Method: ${method}, Skip existing: ${skipExisting}`)
@@ -572,9 +576,14 @@ export class ScriptureLoader implements ResourceLoader {
       throw new Error(`Resource metadata not found for ${resourceKey}`)
     }
 
-    const ingredients = metadata.contentMetadata?.ingredients
+    let ingredients = metadata.contentMetadata?.ingredients
     if (!ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
       throw new Error(`No ingredients found for ${resourceKey}`)
+    }
+    if (books) {
+      const prior = await this.cacheAdapter.get(`resource:${resourceKey}`)
+      ingredients = ingredientsForBooks(ingredients, books, readAbsentFromRelease(prior?.metadata))
+      if (ingredients.length === 0) return
     }
 
     console.log(`📦 Found ${ingredients.length} books to download`)
@@ -588,7 +597,8 @@ export class ScriptureLoader implements ResourceLoader {
           metadata,
           ingredients,
           skipExisting,
-          onProgress
+          onProgress,
+          !!books
         )
       } catch (zipError) {
         console.warn(`⚠️ ZIP download failed, falling back to individual downloads:`, zipError)
@@ -610,6 +620,14 @@ export class ScriptureLoader implements ResourceLoader {
       )
     } else {
       throw new Error(`Download method '${method}' not yet implemented. Use 'zip' or 'individual'.`)
+    }
+
+    if (books) {
+      // No receipt will remember a failed book, so it must not pass quietly.
+      if (failedBooks.length > 0) {
+        throw new Error(`${resourceKey}: ${failedBooks.join(', ')} could not be processed`)
+      }
+      return
     }
 
     const resourceCacheKey = `resource:${resourceKey}`
@@ -674,7 +692,8 @@ export class ScriptureLoader implements ResourceLoader {
     metadata: ResourceMetadata,
     ingredients: any[],
     skipExisting: boolean,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
+    bookScoped = false
   ): Promise<string[]> {
     const zipUrl = metadata.release?.zipball_url
     if (!zipUrl) {
@@ -690,6 +709,8 @@ export class ScriptureLoader implements ResourceLoader {
     const ref = metadata.release?.tag_name || (metadata as any).default_branch || 'master'
 
     const recordAbsent = async (absentIds: string[]) => {
+      // A book run must not touch `resource:{key}` or prune the catalog the whole build reads.
+      if (bookScoped) return
       await persistAbsentFromRelease({
         cacheAdapter: this.cacheAdapter,
         catalogAdapter: this.catalogAdapter,
@@ -725,8 +746,11 @@ export class ScriptureLoader implements ResourceLoader {
       })
 
       // Catalog may list books absent from this release tag. Partition incomplete
-      // vs phantoms, then apply shared zip / individual / skip policy.
-      const treePaths = await fetchReleasePathSet(this.door43Client, owner, repoName, ref)
+      // vs phantoms, then apply shared zip / individual / skip policy. A book run
+      // skips the tree request: the zip it reads (kept on disk) is the release's tree.
+      const treePaths = bookScoped
+        ? null
+        : await fetchReleasePathSet(this.door43Client, owner, repoName, ref)
       if (treePaths) {
         const { present, absent } = partitionIngredientsByReleasePaths(incomplete, treePaths)
         if (absent.length > 0) {

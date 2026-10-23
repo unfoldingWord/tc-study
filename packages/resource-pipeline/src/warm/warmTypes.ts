@@ -14,6 +14,12 @@ export type WarmLane = 1 | 2 | 3
  */
 export type WarmJobOutcome = 'finished' | 'cached' | 'blocked' | 'noop'
 
+/**
+ * A language build's outcome for a job: the warm outcomes, plus failed = the job threw. The app's warm lane never
+ * sees `failed`; a build counts it apart so an error is not hidden among the noops.
+ */
+export type BuildJobOutcome = WarmJobOutcome | 'failed'
+
 export type WarmJobKind =
   | 'prepare-unit'
   | 'quote-chapter'

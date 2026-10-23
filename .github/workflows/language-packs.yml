@@ -4,7 +4,7 @@ name: Language packs
 # and reports the build state next to the catalog (status/<compat>/<lang>.json) for the serving Worker's dispatch guard.
 # Dispatched by hand, or by the Worker (a GitHub App with actions: write on this repository only).
 
-run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }})
+run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }}${{ inputs.parts && ', parts' || '' }})
 
 on:
   workflow_dispatch:
@@ -39,6 +39,11 @@ on:
         required: false
         type: boolean
         default: false
+      parts:
+        description: Build as parts, one book at a time (no-upload only, until parts are published)
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -66,6 +71,7 @@ jobs:
       MODE: ${{ inputs.mode }}
       REQUESTED_COMPAT: ${{ inputs.compat }}
       FORCE: ${{ inputs.force }}
+      PARTS: ${{ inputs.parts }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
@@ -76,6 +82,15 @@ jobs:
             exit 1
           fi
           case "$MODE" in publish | no-upload) ;; *) echo "::error::mode must be publish or no-upload"; exit 1 ;; esac
+          if [ "$PARTS" = true ] && [ "$MODE" != no-upload ]; then
+            echo "::error::parts builds only with mode no-upload"
+            exit 1
+          fi
+          # A parts run decides nothing, it always builds: force would do nothing.
+          if [ "$PARTS" = true ] && [ "$FORCE" = true ]; then
+            echo "::error::parts and force do not go together"
+            exit 1
+          fi
           # The same shape the Worker and packs-status check: the compat becomes a bucket key.
           if [ -n "$REQUESTED_COMPAT" ] && ! [[ "$REQUESTED_COMPAT" =~ ^f[0-9]+\.[0-9]+-u[A-Za-z0-9_.]+-p[0-9]+-q[0-9]+-a[0-9]+-t[0-9]+$ ]]; then
             echo "::error::compat is not a compat key"
@@ -100,8 +115,10 @@ jobs:
       # The Worker asks for builds of the compat it was deployed with. Code that builds another one (a compat bump not yet
       # followed by a v2 redeploy) would publish where the Worker never looks and be dispatched again every hour: it marks
       # the requested compat failed instead, which the Worker's guard reads, and builds nothing.
+      # Not for a parts run: parts have their own compat (PARTS_FORMAT_VERSION, f2.0), which no Worker asks for yet,
+      # and a parts run publishes nothing for the Worker to find.
       - name: Check compat
-        if: inputs.compat != ''
+        if: inputs.compat != '' && !inputs.parts
         env:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
@@ -145,6 +162,7 @@ jobs:
           if [ "$FORCE" = true ]; then args+=(--force); fi
           if [ "$MODE" = no-upload ]; then
             args+=(--no-upload)
+            if [ "$PARTS" = true ]; then args+=(--parts); fi
             command -v /usr/bin/time > /dev/null || { sudo apt-get update -q && sudo apt-get install -y time; }
             runner=(/usr/bin/time -v -o "$RUNNER_TEMP/packs-out/time.txt")
           fi
@@ -186,6 +204,9 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: packs-result
-          path: ${{ runner.temp }}/packs-out
+          # parts-report.json: each unit's memory and time, what a parts run measures (there too when jobs failed).
+          path: |
+            ${{ runner.temp }}/packs-out
+            ${{ runner.temp }}/packs-work/parts-report.json
           if-no-files-found: ignore
           retention-days: 14

@@ -72,6 +72,20 @@ export function omitAbsentIngredients<T extends IngredientPathRef>(
   })
 }
 
+/**
+ * The ingredients of `books` (case-insensitive), minus any the release lacks. A book-by-book build asks for one book
+ * at a time; a book recorded absent from the release stays out even when its file turns up in the zip.
+ */
+export function ingredientsForBooks<T extends IngredientPathRef>(
+  ingredients: readonly T[],
+  books: readonly string[],
+  absentIds: readonly string[]
+): T[] {
+  const wanted = new Set(books.map((b) => b.toLowerCase()))
+  for (const id of absentIds) wanted.delete(id.toLowerCase())
+  return ingredients.filter((ing) => !!ing.identifier && wanted.has(ing.identifier.toLowerCase()))
+}
+
 /** Read `absentFromRelease` ids from resource:{key} metadata (lowercased unique). */
 export function readAbsentFromRelease(metadata: unknown): string[] {
   if (!metadata || typeof metadata !== 'object') return []

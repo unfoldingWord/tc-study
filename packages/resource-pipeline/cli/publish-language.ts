@@ -4,7 +4,7 @@
  *
  *   bun packages/resource-pipeline/cli/publish-language.ts --lang es-419 --work <dir> --generator <sha> \
  *     --macula <taller>/public [--macula-commit <sha>] [--macula-date <iso>] --lexicons-ref <ref> [--obs] \
- *     [--dry-run | --no-upload] [--force]
+ *     [--dry-run | --no-upload [--parts]] [--force]
  *
  * `--macula` is the `public/` folder of a Taller checkout. `--macula-commit` defaults to the last commit that touched
  * its `trees/` and `referents/`, and `--macula-date` to that commit's date, what apps order MACULA's stamps by
@@ -13,6 +13,14 @@
  * `--dry-run` decides only (outcome `would-publish` or `unchanged`). `--no-upload` decides, then builds the packs and
  * the views into `--work` and puts nothing (outcome `built`): a measurement or a check. `--force` builds and publishes
  * even an unchanged build id: for a builder fix no stamp shows and no compat key covers.
+ *
+ * `--parts` (only with `--no-upload`, until parts are published) builds the language one book at a time
+ * (src/language/buildLanguageParts.ts) instead of whole, without deciding: `--work` gets `parts/<sha256>.part.gz`,
+ * `catalog/<compat>/<lang>.json`, `catalog/<compat>/originals.json`, `zips/` (the release zips it read) and
+ * `parts-report.json` (each unit's jobs, peak memory and time, and the failures; written after every unit, so a run
+ * stopped by the memory limit or an error still leaves it). `--generator` is not needed, and `--force` is refused:
+ * nothing is decided, so there is nothing to force. Exits 1 when a job, a book or a resource failed, after writing
+ * all of that.
  *
  * The bucket: R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY. A dry run or a no-upload run without them
  * decides against an empty bucket, as if nothing had been published. One language per process: the build's in-memory
@@ -24,6 +32,7 @@
  */
 
 import 'fake-indexeddb/auto'
+import { existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { requireFreshBuilds } from './freshBuilds'
@@ -43,7 +52,7 @@ function arg(name: string): string | undefined {
 function usage(why: string): never {
   console.error(why)
   console.error(
-    'Uso: publish-language --lang <código> --work <carpeta> --generator <sha> --macula <taller>/public [--macula-commit <sha>] [--macula-date <iso>] --lexicons-ref <ref> [--obs] [--dry-run | --no-upload] [--force]'
+    'Uso: publish-language --lang <código> --work <carpeta> --generator <sha> --macula <taller>/public [--macula-commit <sha>] [--macula-date <iso>] --lexicons-ref <ref> [--obs] [--dry-run | --no-upload [--parts]] [--force]'
   )
   process.exit(2)
 }
@@ -53,8 +62,13 @@ if (!language || !isLanguageCode(language)) usage(`--lang no es un código de id
 const dryRun = process.argv.includes('--dry-run')
 const noUpload = process.argv.includes('--no-upload')
 const force = process.argv.includes('--force')
+const parts = process.argv.includes('--parts')
 if (dryRun && noUpload) usage('--dry-run y --no-upload no van juntos')
-const required = Object.fromEntries(['generator', 'macula', 'lexicons-ref'].map((name) => [name, arg(name)]))
+// Parts are not published yet: a parts build only goes to the work folder.
+if (parts && !noUpload) usage('--parts solo va con --no-upload')
+// A parts build decides nothing (it always builds): a --force would be read as doing something it does not.
+if (parts && force) usage('--parts y --force no van juntos: una corrida por partes siempre construye')
+const required = Object.fromEntries([...(parts ? [] : ['generator']), 'macula', 'lexicons-ref'].map((name) => [name, arg(name)]))
 const missing = Object.entries(required).filter(([, v]) => !v).map(([k]) => `--${k}`)
 if (missing.length) usage(`Faltan ${missing.join(', ')}`)
 
@@ -66,6 +80,56 @@ try {
   usage(`No se pudo leer el commit de MACULA en ${maculaFolder}: ${e instanceof Error ? e.message : String(e)}`)
 }
 console.error(`MACULA: ${macula.commit} (${macula.date})`)
+
+const workDir = resolve(arg('work') ?? join(tmpdir(), `publish-language-${language}`))
+
+if (parts) {
+  requireFreshBuilds(['@bt-synergy/resource-pipeline', '@bt-synergy/language-pack', '@bt-synergy/cache-adapter-indexeddb', '@bt-synergy/catalog-adapter-indexeddb'])
+  const { buildLanguageParts, PARTS_REPORT } = await import('../src/language/buildLanguageParts')
+  let exitCode = 1
+  let failure: unknown
+  try {
+    const date = new Date(macula.date)
+    if (Number.isNaN(date.getTime())) throw new Error(`Not an ISO 8601 date for MACULA's commit: ${JSON.stringify(macula.date)}`)
+    const built = await buildLanguageParts({
+      language,
+      workDir,
+      // As publishLanguage stamps MACULA: the commit's first ten characters and its date in UTC.
+      macula: { folder: maculaFolder, version: macula.commit.slice(0, 10), publishedAt: date.toISOString() },
+      lexiconsRef: required['lexicons-ref']!,
+      obs: process.argv.includes('--obs'),
+      log: (line) => console.error(oneLine(line)),
+    })
+    for (const f of built.failures) console.error(oneLine(`  falló (${f.unit}) ${f.job ?? ''} ${f.error}`))
+    printResult(
+      JSON.stringify({
+        language,
+        outcome: 'built',
+        compat: built.list.compat,
+        parts: built.list.parts.length,
+        originalParts: built.originals.parts.length,
+        peakRssMb: built.peakRssMb,
+        failures: built.failures.length,
+      })
+    )
+    exitCode = built.failures.length ? 1 : 0
+  } catch (e) {
+    failure = e
+    console.error(oneLine(`publish-language --parts ${language}: ${e instanceof Error ? e.message : String(e)}`))
+  } finally {
+    // buildLanguageParts writes the report after every unit and when it ends; a run that failed before it could
+    // (the work folder, a bad date) still leaves one, so the workflow's artifact always says why.
+    const report = join(workDir, PARTS_REPORT)
+    if (!existsSync(report)) {
+      try {
+        writeFileSync(report, JSON.stringify({ language, state: 'failed', error: failure instanceof Error ? failure.message : String(failure ?? 'unknown'), peakRssMb: 0, units: [], failures: [] }, null, 2))
+      } catch {
+        // No work folder to write in: the log already says why.
+      }
+    }
+  }
+  process.exit(exitCode)
+}
 
 const env = { endpoint: process.env.R2_ENDPOINT, bucket: process.env.R2_BUCKET, accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey: process.env.R2_SECRET_ACCESS_KEY }
 const given = Object.values(env).filter(Boolean).length
@@ -86,7 +150,7 @@ try {
   const result = await publishLanguage({
     language,
     bucket,
-    workDir: resolve(arg('work') ?? join(tmpdir(), `publish-language-${language}`)),
+    workDir,
     generator: required.generator!,
     macula: { folder: maculaFolder, ...macula },
     lexiconsRef: required['lexicons-ref']!,
