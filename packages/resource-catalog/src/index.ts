@@ -55,6 +55,7 @@ export {
 // Stamped ingest receipt (resource:{key} metadata)
 export {
   resourceContentStamp,
+  bookContentStamp,
   expectedIngestReleaseStamp,
   scriptureIngestSchema,
   helpsIngestSchema,
@@ -67,6 +68,7 @@ export {
   HELPS_INGEST_SCHEMA,
   INGEST_RECEIPT_KEYS,
   type ResourceStampSource,
+  type BookStampSource,
   type IngestDownloadMethod,
   type BuildIngestReceiptMetadataInput,
 } from './ingestReceipt'
@@ -86,6 +88,9 @@ export {
   fetchReleasePathSet,
   type IngredientPathRef,
 } from './releaseIngredientPresence'
+
+// Per-book git blob shas in the catalog row (stamps for derived rows)
+export { bookBlobsFromTree, recordBookBlobs } from './bookBlobs'
 
 // Zip vs per-file fill after interrupted / partial caches
 export {

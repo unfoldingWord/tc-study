@@ -169,6 +169,11 @@ export interface ResourceMetadata {
       downloadMethod?: 'tar' | 'individual' | 'zip' // How it was downloaded
     }
     
+    // Git blob sha of each book's file (lowercase book code -> full sha), read from Door43's
+    // tree at `bookBlobsRef`. Derived rows are stamped per book from it (see bookContentStamp).
+    bookBlobs?: Record<string, string>
+    bookBlobsRef?: string               // Release tag the blobs were read at
+
     // Derived/convenience fields
     books?: string[]          // Book codes (derived from ingredients)
     testament?: 'ot' | 'nt' | 'both'

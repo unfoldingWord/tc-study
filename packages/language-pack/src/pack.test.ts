@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test'
 import JSZip from 'jszip'
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { buildLanguagePack, importLanguagePack, readPackManifest } from './pack'
 import { packSourceFrom, packTargetFrom } from './stores'
 import type { CacheRow, PackSource, PackTarget } from './types'
@@ -44,8 +44,9 @@ function store() {
     row(`tn:${TN}:tit:2`),
     row(`prepared:notes:${TN}:tit:nav`),
     row(`prepared:notes:${TN}:tit:1:full`),
-    row(`helps-quote:${TN}@v1#2026:${UGNT}@v1+2.2.0-usj:tit:1`),
-    row(`helps-align:${TN}@v1#2026:${UGNT}@v1+2.2.0-usj:${TPL}@v1+3000220:tit:1`),
+    // Built against the Greek the catalog names (no blob recorded: its release stamp).
+    row(`helps-quote:${TN}@v1#2026:${UGNT}@${STAMP}+2.2.0-usj:tit:1`),
+    row(`helps-align:${TN}@v1#2026:${UGNT}@${STAMP}+2.2.0-usj:${TPL}@v1+3000220:tit:1`),
     receipt(TPL, true),
     row(`scripture-usj:${TPL}:tit`),
     row(`scripture-usj:${TPL}:tit:1`),
@@ -286,5 +287,64 @@ describe('abrir un paquete de idioma en otro aparato', () => {
     newer.file('manifest.json', JSON.stringify({ format: 'bt-synergy-language-pack', formatVersion: '2.0.0' }))
     await expect(readPackManifest(await newer.generateAsync({ type: 'uint8array' }))).rejects.toThrow(/versión más nueva/)
     await expect(readPackManifest(await new JSZip().generateAsync({ type: 'uint8array' }))).rejects.toThrow(/manifest\.json/)
+  })
+})
+
+describe('abrir citas hechas con sellos por libro', () => {
+  const UHB = 'unfoldingWord/hbo/uhb'
+  const RUT = '3d230a0aca1f9e2b7c4d5e6f708192a3b4c5d6e7'
+  const JON = '7a1b2c3d4e5f60718293a4b5c6d7e8f901234567'
+  /** The Hebrew a release names, with the blob of each book's file read at its tag. */
+  const uhb = (tag: string, blobs: Record<string, string>) =>
+    meta(UHB, { release: { tag_name: tag, published_at: '2026-10-01T00:00:00Z' }, contentMetadata: { bookBlobs: blobs, bookBlobsRef: tag } } as never)
+  const built = uhb('v2.1.30', { rut: RUT, jon: JON })
+  const olAt = (sha: string) => `${UHB}@g${sha.slice(0, 10)}+2.2.0-usj`
+  const ruthQuote = `helps-quote:${TN}@v1#2026:${olAt(RUT)}:rut:1`
+  const jonahQuote = `helps-quote:${TN}@v1#2026:${olAt(JON)}:jon:1`
+  const ruthAlign = `helps-align:${TN}@v1#2026:${olAt(RUT)}:${TPL}@v1+3000220:rut:1`
+
+  async function packOfRuthAndJonah() {
+    const rows: CacheRow[] = [receipt(TN), row(`tn:${TN}:rut`), row(`tn:${TN}:jon`), row(ruthQuote), row(jonahQuote), row(ruthAlign)]
+    const catalog = new Map<string, ResourceMetadata>([
+      [TN, meta(TN)],
+      [UHB, built],
+    ])
+    const source: PackSource = {
+      rowsByPrefix: async (prefix) => rows.filter((r) => r.key >= prefix && r.key <= prefix + '￿'),
+      catalogRow: async (key) => catalog.get(key) ?? null,
+      catalogRows: async () => [...catalog.values()],
+    }
+    return buildLanguagePack({ versions: VERSIONS, source, language: 'es-419', resourceKeys: [TN], originalKeys: [] })
+  }
+
+  function deviceWith(original: ResourceMetadata) {
+    const there = emptyTarget()
+    there.catalog.set(UHB, original)
+    return { ...there, target: { ...there.target, catalogRow: async (k: string) => there.catalog.get(k) ?? null } }
+  }
+
+  it("an original with the same Ruth blob but another release keeps Ruth's quote rows", async () => {
+    const { bytes, manifest } = await packOfRuthAndJonah()
+    // The pack still names the original's release it was made with, once per original.
+    expect(manifest.requires).toEqual([{ key: UHB, stamp: resourceContentStamp(built) }])
+    const device = deviceWith(uhb('v2.1.31', { rut: RUT, jon: JON }))
+    const result = await importLanguagePack({ bytes, target: device.target, versions: VERSIONS })
+    expect(result.originals.map((o) => o.status)).toEqual(['other-release'])
+    expect(result.skippedLayers).toEqual([])
+    expect([...device.rows.keys()]).toEqual(expect.arrayContaining([ruthQuote, jonahQuote, ruthAlign]))
+  })
+
+  it("an original whose Ruth changed drops Ruth's quote rows and keeps Jonah's", async () => {
+    const { bytes } = await packOfRuthAndJonah()
+    const device = deviceWith(uhb('v2.1.31', { rut: 'ffffffffff00000000000000000000000000000f', jon: JON }))
+    const result = await importLanguagePack({ bytes, target: device.target, versions: VERSIONS })
+    const keys = [...device.rows.keys()]
+    expect(keys).toContain(jonahQuote)
+    expect(keys).not.toContain(ruthQuote)
+    expect(keys).not.toContain(ruthAlign)
+    // The rest of Ruth comes: only what was built against the other Hebrew is left out, row by row.
+    expect(keys).toContain(`tn:${TN}:rut`)
+    expect(result.skippedLayers).toEqual([])
+    expect(result.droppedRows).toEqual({ [TN]: { quote: 1, align: 1 } })
   })
 })

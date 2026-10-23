@@ -10,7 +10,7 @@
 
 import { unwrapVersioned, wrapVersioned } from '../cache/versionedEnvelope'
 import { SCRIPTURE_PREPARE_VERSION } from '../scripture/scripturePreparer'
-import { resourceContentStamp, type ResourceStampSource } from '@bt-synergy/resource-catalog'
+import { bookContentStamp, type BookStampSource } from '@bt-synergy/resource-catalog'
 
 export const HELPS_ALIGN_PREFIX = 'helps-align:'
 /** Bump when compact row shape, reconstruct rules, or align match-key fold change.
@@ -21,8 +21,9 @@ export const HELPS_ALIGN_PREFIX = 'helps-align:'
  *     that differ only by their accents no longer marks both (Jonah 1:3).
  *  9: from quote tokens that are whole words (HELPS_QUOTE_VERSION 6, Ruth 1:16).
  *  10: from quote tokens of occurrence -1 notes, which had none (HELPS_QUOTE_VERSION 7, Jonah 1:3).
- *  11: a ketiv's quote token is also aligned by its qere (HELPS_QUOTE_VERSION 8, Ruth 4:5). */
-export const HELPS_ALIGN_VERSION = 11
+ *  11: a ketiv's quote token is also aligned by its qere (HELPS_QUOTE_VERSION 8, Ruth 4:5).
+ *  12: stamps are per book (the book's blob sha), not per release (HELPS_QUOTE_VERSION 9). */
+export const HELPS_ALIGN_VERSION = 12
 /** Bound growth for abandoned book/chapter combos; stamps handle correctness. */
 export const HELPS_ALIGN_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
@@ -49,11 +50,12 @@ export type HelpsAlignCacheAdapter = {
   getByPrefix?(prefix: string): Promise<Array<{ key: string; entry: unknown }>>
 }
 
-export function targetContentStamp(
-  metadata: ResourceStampSource | null | undefined,
+export function targetBookStamp(
+  metadata: BookStampSource | null | undefined,
+  book: string,
   prepareVersion: number = SCRIPTURE_PREPARE_VERSION
 ): string {
-  const base = resourceContentStamp(metadata)
+  const base = bookContentStamp(metadata, book)
   return `${base}+${prepareVersion}`
 }
 

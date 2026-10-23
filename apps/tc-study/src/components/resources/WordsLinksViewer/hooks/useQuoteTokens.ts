@@ -42,7 +42,6 @@ import {
 } from '../../../../features/helps/helpsWorkStaging'
 import {
   mergeAndWriteCachedQuoteTokens,
-  olContentStamp,
   readCachedQuoteTokensForSpan,
   subtractCachedQuoteHits,
   toCachedQuoteTokens,
@@ -50,7 +49,7 @@ import {
   type CachedQuoteTokens,
   type HelpsQuoteCacheAdapter,
 } from '../../../../features/helps/helpsQuoteCache'
-import { resourceContentStamp } from '../../../../features/helps/resourceContentStamp'
+import { readHelpsBookStamps } from '../../../../features/helps/helpsBookStamps'
 import { scheduleIdle } from '../../../../utils/scheduleIdle'
 import { batchQuotesInWorker } from '../../../../workers/prepareClient'
 import type { TranslationWordsLink } from '../types'
@@ -255,18 +254,14 @@ async function resolveQuoteCacheContext(args: {
   olStamp: string
 } | null> {
   try {
-    const helpsMeta = (await args.catalogManager.getResourceMetadata(args.helpsKey)) as
-      | { version?: string; release?: { tag_name?: string; published_at?: string } }
-      | null
     const olKey = originalLanguageKeyForBook(args.bookCode)
-    const olMeta = (await args.catalogManager.getResourceMetadata(olKey)) as
-      | { version?: string; release?: { tag_name?: string; published_at?: string } }
-      | null
-    return {
-      helpsStamp: resourceContentStamp(helpsMeta),
+    // Per-book stamps, exactly as warm keys and collects them (helpsBookStamps.ts).
+    const { helpsStamp, olStamp } = await readHelpsBookStamps(args.catalogManager, {
+      helpsKey: args.helpsKey,
       olKey,
-      olStamp: olContentStamp(olMeta),
-    }
+      bookCode: args.bookCode,
+    })
+    return { helpsStamp, olKey, olStamp }
   } catch {
     return null
   }

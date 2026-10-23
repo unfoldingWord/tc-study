@@ -10,7 +10,7 @@ import {
   readCachedAlignments,
   readCachedAlignmentsForChapters,
   subtractCachedAlignHits,
-  targetContentStamp,
+  targetBookStamp,
   writeCachedAlignments,
 } from './helpsAlignCache'
 import { wrapVersioned } from '../cache/versionedEnvelope'
@@ -32,8 +32,9 @@ function createFakeAdapter() {
 }
 
 describe('helpsAlignCache', () => {
-  test('targetContentStamp includes SCRIPTURE_PREPARE_VERSION', () => {
-    const stamp = targetContentStamp({ version: 'v45' }, 2_000_001)
+  test('targetBookStamp includes SCRIPTURE_PREPARE_VERSION', () => {
+    // No blob recorded for the book: the release stamp, as before per-book stamps.
+    const stamp = targetBookStamp({ version: 'v45' }, 'tit', 2_000_001)
     expect(stamp).toBe('v45+2000001')
   })
 

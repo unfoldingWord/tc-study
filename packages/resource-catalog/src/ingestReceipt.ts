@@ -38,6 +38,32 @@ export function resourceContentStamp(
   return 'nostamp'
 }
 
+/** The shape `bookContentStamp` reads: the row's release plus the blobs a download recorded. */
+export interface BookStampSource extends ResourceStampSource {
+  contentMetadata?: {
+    bookBlobs?: Record<string, string>
+    bookBlobsRef?: string
+  }
+}
+
+/**
+ * Stamp for what one book's derived rows were built from: `g` + the first ten hex
+ * characters of the book file's git blob sha. Hex never holds `@`, `:` or `+`, which the
+ * key parsers split on. Without a blob read at this row's release tag (old row, Door43
+ * unreachable, OBS, articles) it is the release stamp, exactly as before.
+ */
+export function bookContentStamp(
+  metadata: BookStampSource | null | undefined,
+  book: string
+): string {
+  const sha = metadata?.contentMetadata?.bookBlobs?.[book.toLowerCase()]
+  const tag = metadata?.release?.tag_name?.trim() || metadata?.version?.trim() || ''
+  if (sha && tag && metadata?.contentMetadata?.bookBlobsRef === tag) {
+    return `g${sha.slice(0, 10)}`
+  }
+  return resourceContentStamp(metadata)
+}
+
 /** Helps / article SoT schema bump when processor output shape changes. */
 export const HELPS_INGEST_SCHEMA = '1'
 

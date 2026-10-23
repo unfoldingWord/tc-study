@@ -11,6 +11,7 @@ import { getDownloadPriority } from '../config/loaderConfig'
 import { LoaderRegistry } from '../loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from './BackgroundDownloadManager'
 import { ResourceCompletenessChecker, type ResourceCompletenessCheckerOptions } from './ResourceCompletenessChecker'
+import { recordBlobsAfterComplete } from './recordBlobsAfterComplete'
 import { registerWorkerLoaders } from './workerLoaderRegistry'
 import {
   STARTING_PROGRESS_PERCENT,
@@ -203,6 +204,8 @@ export async function runDownload(args: {
         })
         const status = await completenessChecker.checkResource(resourceKey)
         if (shouldSkipCompleteResourceDownload(skipExisting, status.isComplete)) {
+          // Downloaded before blobs were recorded: one tree request now, 'current' afterwards.
+          await recordBlobsAfterComplete({ complete: true, door43Client, catalogAdapter, resourceKey })
           const skipped = skippedCompleteResourceProgress(ingredientsCount, resourceKey)
           currentResourcePeakCompleted = ingredientsCount
           postProgress({
@@ -282,7 +285,11 @@ export async function runDownload(args: {
       )
       completedIngredients += ingredientsCount
       completedResourceCount += 1
-      await completenessChecker.markCompleteIfVerified(resourceKey, { downloadMethod: method })
+      const verified = await completenessChecker.markCompleteIfVerified(resourceKey, {
+        downloadMethod: method,
+      })
+      // Per-book cache stamps come from this release's blob shas.
+      await recordBlobsAfterComplete({ complete: verified, door43Client, catalogAdapter, resourceKey })
       if (isCurrentRun()) {
         post({ type: 'resource-complete', runId, payload: { resourceKey } })
       }

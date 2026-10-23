@@ -11,9 +11,12 @@ import {
 } from '../../contexts'
 import { isOriginalLanguageDownloadTarget } from '../download/downloadBatchOrder'
 import { backgroundDownloadSession } from '../download/backgroundDownloadSession'
-import { resolveOriginalLanguageKey } from '../helps/olLoadCache'
 import { resolveLastChapter } from '../nav/bookChapterCounts'
-import { resolveWarmStamps } from '@bt-synergy/resource-pipeline/warm/warmStamps'
+import {
+  resolveWarmStamps,
+  NO_OL_STAMP,
+  type WarmStampBags,
+} from '@bt-synergy/resource-pipeline/warm/warmStamps'
 import { useChapterScrollActivity } from '../nav/usePinnedHelpsReference'
 import {
   warmScheduler,
@@ -51,14 +54,7 @@ export function useWarmLanes(args: {
   const cacheAdapter = useCacheAdapter()
   const [downloadTick, setDownloadTick] = useState(0)
   const [handoffKeys, setHandoffKeys] = useState<string[]>([])
-  const stampsRef = useRef<{
-    helpsStampByKey: Record<string, string>
-    targetStampByKey: Record<string, string>
-    textLanguageByTarget: Record<string, string>
-    articleIdsByKey: Record<string, string[]>
-    olStampByKey: Record<string, string>
-    downloadedKeys: string[]
-  } | null>(null)
+  const stampsRef = useRef<(WarmStampBags & { downloadedKeys: string[] }) | null>(null)
   const [stampsTick, setStampsTick] = useState(0)
 
   const bookId = (currentRef.book || '').toLowerCase()
@@ -127,11 +123,11 @@ export function useWarmLanes(args: {
             sourceResourceId,
           })
         : {
-            helpsStampByKey: {},
-            targetStampByKey: {},
+            helpsStampOf: () => undefined,
+            targetStampOf: () => undefined,
+            olStampOf: () => NO_OL_STAMP,
             textLanguageByTarget: {},
             articleIdsByKey: {},
-            olStampByKey: {},
           }
 
       if (cancelled) return
@@ -156,11 +152,8 @@ export function useWarmLanes(args: {
 
   useEffect(() => {
     if (!bookId) return
+    // Stamps are asked per book (the lane's `bookId` here, each lane-3 book in the scheduler).
     const stamps = stampsRef.current
-    const ol = resolveOriginalLanguageKey(bookId)
-    const olStampByKey = stamps?.olStampByKey ?? {}
-    const olStamp =
-      (ol?.resourceKey ? olStampByKey[ol.resourceKey] : undefined) ?? 'nostamp'
     warmScheduler.setVisibleContext(
       {
         bookId,
@@ -173,11 +166,9 @@ export function useWarmLanes(args: {
         scrollUnsettled: scrollActivity.unsettled,
         stamps: stamps
           ? {
-              helpsStampByKey: stamps.helpsStampByKey,
-              olKey: ol?.resourceKey,
-              olStamp,
-              olStampByKey,
-              targetStampByKey: stamps.targetStampByKey,
+              helpsStampOf: stamps.helpsStampOf,
+              targetStampOf: stamps.targetStampOf,
+              olStampOf: stamps.olStampOf,
               textLanguageByTarget: stamps.textLanguageByTarget,
             }
           : undefined,

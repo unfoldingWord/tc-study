@@ -12,6 +12,7 @@ import type {
   CatalogAdapter,
   CacheAdapter,
 } from './types'
+import { recordBookBlobs } from '@bt-synergy/resource-catalog'
 
 export class CatalogManager {
   private loaders = new Map<string, ResourceLoader>()
@@ -312,6 +313,14 @@ export class CatalogManager {
     }
 
     await loader.downloadResource(resourceKey, options, onProgress)
+
+    // The library and wizard finish a download here: keep the release's per-book blob shas
+    // (they stamp derived caches). Never throws; without them stamps fall back to the release.
+    await recordBookBlobs({
+      door43Client: this.door43Client,
+      catalogAdapter: this.catalogAdapter,
+      resourceKey,
+    })
 
     if (this.debug) {
       console.log(`✅ Downloaded all: ${resourceKey}`)

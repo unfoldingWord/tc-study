@@ -19,24 +19,31 @@ const KEYS = {
 
 const DOWNLOADED = Object.values(KEYS)
 
-const stamps = {
-  helpsStampByKey: {
-    [KEYS.tn]: 'tn1',
-    [KEYS.twl]: 'twl1',
-    [KEYS.tq]: 'tq1',
-    [KEYS.tw]: 'tw1',
-    [KEYS.ta]: 'ta1',
-  },
-  targetStampByKey: {
-    [KEYS.ult]: 'ult1',
-    [KEYS.ust]: 'ust1',
-  },
-  olKey: 'unfoldingWord/el-x-koine/ugnt',
-  olStamp: 'ol1',
+const OL_KEY = 'unfoldingWord/el-x-koine/ugnt'
+
+const HELPS_STAMPS: Record<string, string> = {
+  [KEYS.tn]: 'tn1',
+  [KEYS.twl]: 'twl1',
+  [KEYS.tq]: 'tq1',
+  [KEYS.tw]: 'tw1',
+  [KEYS.ta]: 'ta1',
+}
+const TARGET_STAMPS: Record<string, string> = {
+  [KEYS.ult]: 'ult1',
+  [KEYS.ust]: 'ust1',
 }
 
-function olStampForBook() {
-  return { olKey: stamps.olKey, olStamp: stamps.olStamp }
+/** Stamps per book: each book stamps differently, so a job carrying another book's stamp shows. */
+const stamps = {
+  helpsStampOf: (key: string, book: string) =>
+    HELPS_STAMPS[key] ? `${HELPS_STAMPS[key]}.${book}` : undefined,
+  targetStampOf: (key: string, book: string) =>
+    TARGET_STAMPS[key] ? `${TARGET_STAMPS[key]}.${book}` : undefined,
+  olStampOf: (_olKey: string, book: string) => `ol1.${book}`,
+}
+
+function olStampForBook(book: string) {
+  return { olKey: OL_KEY, olStamp: stamps.olStampOf(OL_KEY, book) }
 }
 
 describe('lane 2 current-book admission', () => {
@@ -51,8 +58,8 @@ describe('lane 2 current-book admission', () => {
       textLanguageCode: 'en',
       helpsLanguageCode: 'en',
       stamps,
-      olKey: stamps.olKey,
-      olStamp: stamps.olStamp,
+      olKey: OL_KEY,
+      olStamp: 'ol1.tit',
     })
     const jobs = flattenGroups(groups)
     expect(jobs.every((j) => j.lane === 2)).toBe(true)
@@ -89,8 +96,8 @@ describe('lane 2 current-book admission', () => {
         textLanguageCode: 'en',
         helpsLanguageCode: 'en',
         stamps,
-        olKey: stamps.olKey,
-        olStamp: stamps.olStamp,
+        olKey: OL_KEY,
+        olStamp: 'ol1.tit',
       })
     )
     const tnQuotes = jobs
@@ -147,8 +154,8 @@ describe('lane 2 current-book admission', () => {
         textLanguageCode: 'en',
         helpsLanguageCode: 'en',
         stamps,
-        olKey: stamps.olKey,
-        olStamp: stamps.olStamp,
+        olKey: OL_KEY,
+        olStamp: 'ol1.tit',
         readyOlKeys: [],
       })
     )
@@ -168,8 +175,8 @@ describe('lane 2 current-book admission', () => {
         textLanguageCode: 'en',
         helpsLanguageCode: 'en',
         stamps,
-        olKey: stamps.olKey,
-        olStamp: stamps.olStamp,
+        olKey: OL_KEY,
+        olStamp: 'ol1.tit',
         budget: 8,
       })
     )
@@ -187,8 +194,8 @@ describe('lane 2 current-book admission', () => {
         textLanguageCode: 'en',
         helpsLanguageCode: 'en',
         stamps,
-        olKey: stamps.olKey,
-        olStamp: stamps.olStamp,
+        olKey: OL_KEY,
+        olStamp: 'ol1.tit',
         admittedKeys: admitted,
         budget: 8,
       })
@@ -209,8 +216,8 @@ describe('lane 2 current-book admission', () => {
         textLanguageCode: 'en',
         helpsLanguageCode: 'en',
         stamps,
-        olKey: stamps.olKey,
-        olStamp: stamps.olStamp,
+        olKey: OL_KEY,
+        olStamp: 'ol1.tit',
       })
     )
     const ultUnits = jobs
@@ -347,5 +354,70 @@ describe('lane 3 language-set admission', () => {
     )
     expect(second.every((j) => !admitted.has(j.jobKey))).toBe(true)
     expect(second.length).toBeGreaterThan(0)
+  })
+})
+
+describe('stamps per book', () => {
+  test("lane 2 jobs and coverage carry the current book's stamps", () => {
+    const groups = collectLane2Groups({
+      bookId: 'tit',
+      chapter: 1,
+      lastChapter: 3,
+      downloadedKeys: DOWNLOADED,
+      visibleKeys: [],
+      sourceResourceId: KEYS.ult,
+      textLanguageCode: 'en',
+      helpsLanguageCode: 'en',
+      stamps,
+      olKey: OL_KEY,
+      olStamp: 'ol1.tit',
+    })
+    const prep = groups.find((g) => g.relationId === `prep:scripture:${KEYS.ult}:tit`)
+    expect(prep?.stamp).toBe('ult1.tit')
+    const quote = groups.find((g) => g.relationId.startsWith(`quote:${KEYS.tn}|`))
+    expect(quote?.stamp).toBe('tn1.tit|ol1.tit')
+    const align = groups.find((g) => g.relationId === `align:${KEYS.tn}|${OL_KEY}|${KEYS.ust}|tit`)
+    expect(align?.stamp).toBe('tn1.tit|ol1.tit|ust1.tit')
+    for (const job of flattenGroups(groups)) {
+      if (job.kind === 'quote-chapter' || job.kind === 'align-chapter') {
+        expect(job.helpsStamp).toBe(`${HELPS_STAMPS[job.resourceKey]}.tit`)
+        expect(job.olStamp).toBe('ol1.tit')
+      }
+      if (job.kind === 'align-chapter') expect(job.targetStamp).toBe(`${TARGET_STAMPS[job.targetKey]}.tit`)
+    }
+  })
+
+  test("lane 3 stamps each book's jobs and coverage with that book's stamps", () => {
+    const groups = collectLane3Groups({
+      bookId: 'tit',
+      downloadedKeys: [KEYS.ult, KEYS.tn],
+      textLanguageCode: 'en',
+      helpsLanguageCode: 'en',
+      stamps,
+      admittedKeys: [],
+      budget: 200,
+      olStampForBook,
+    })
+    const books = new Set(flattenGroups(groups).map((j) => j.bookId))
+    expect(books.size).toBeGreaterThan(1)
+    for (const group of groups) {
+      const book = group.relationId.split(/[:|]/).pop()!
+      if (group.relationId.startsWith('prep:')) {
+        const own = group.relationId.includes(KEYS.tn) ? 'tn1' : 'ult1'
+        expect(group.stamp).toBe(`${own}.${book}`)
+      }
+      if (group.relationId.startsWith('quote:')) expect(group.stamp).toBe(`tn1.${book}|ol1.${book}`)
+      if (group.relationId.startsWith('align:')) {
+        expect(group.stamp).toBe(`tn1.${book}|ol1.${book}|ult1.${book}`)
+      }
+      for (const job of group.jobs) {
+        expect(job.bookId).toBe(book)
+        if (job.kind === 'quote-chapter' || job.kind === 'align-chapter') {
+          expect(job.helpsStamp).toBe(`tn1.${book}`)
+          expect(job.olStamp).toBe(`ol1.${book}`)
+        }
+        if (job.kind === 'align-chapter') expect(job.targetStamp).toBe(`ult1.${book}`)
+      }
+    }
   })
 })

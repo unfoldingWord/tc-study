@@ -21,7 +21,7 @@ import { markRelationCovered, readWarmCoverage } from '../warm/warmCoverage'
 import { applyCoverageOutcome, createCoverageSettleState, type CoverageSettleState } from '../warm/warmCoverageSettle'
 import { runWarmJob } from '../warm/warmJobs'
 import { classifyWarmResource, languageFromKey } from '../warm/warmResourceClass'
-import { resolveWarmStamps, type WarmStampCatalog } from '../warm/warmStamps'
+import { resolveWarmStamps, type WarmStampCatalog, type WarmStampResolvers } from '../warm/warmStamps'
 import type { WarmJob, WarmJobOutcome } from '../warm/warmTypes'
 
 export type PipelineCache = Parameters<typeof runWarmJob>[0] &
@@ -60,9 +60,9 @@ export interface BuildReport {
 /** No budget: every lane-3 job of the language at once. */
 const NO_BUDGET = Number.MAX_SAFE_INTEGER
 
-function olStampForBook(book: string, olStampByKey: Record<string, string>): { olKey: string; olStamp: string } {
+function olStampForBook(book: string, stamps: WarmStampResolvers): { olKey: string; olStamp: string } {
   const olKey = resolveOriginalLanguageKey(book)?.resourceKey ?? ''
-  return { olKey, olStamp: (olKey && olStampByKey[olKey]) || 'nostamp' }
+  return { olKey, olStamp: olKey ? stamps.olStampOf(olKey, book) : 'nostamp' }
 }
 
 /** The original languages marked complete; none known means "let the jobs probe", as the warm scheduler does. */
@@ -150,12 +150,7 @@ export async function buildLanguageArtifacts(options: {
   }
 
   const coverage = await readWarmCoverage(cache)
-  const stamps: WarmPlanStamps = {
-    helpsStampByKey: bags.helpsStampByKey,
-    targetStampByKey: bags.targetStampByKey,
-    textLanguageByTarget: bags.textLanguageByTarget,
-    olStampByKey: bags.olStampByKey,
-  }
+  const stamps: WarmPlanStamps = bags
   const groups = collectLane3Groups({
     bookId: 'gen',
     downloadedKeys: allKeys,
@@ -165,7 +160,7 @@ export async function buildLanguageArtifacts(options: {
     articleIdsByKey,
     admittedKeys: [],
     budget: NO_BUDGET,
-    olStampForBook: (book) => olStampForBook(book, bags.olStampByKey),
+    olStampForBook: (book) => olStampForBook(book, bags),
     skipRelation: (relationId, stamp, minUnitCount) => {
       const entry = coverage[relationId]
       return Boolean(entry && entry.stamp === stamp && entry.unitCount >= minUnitCount)

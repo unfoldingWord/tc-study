@@ -3,7 +3,7 @@ import {
   HELPS_QUOTE_VERSION,
   helpsQuoteKey,
   mergeAndWriteCachedQuoteTokens,
-  olContentStamp,
+  olBookStamp,
   readCachedQuoteTokens,
   readCachedQuoteTokensForChapters,
   subtractCachedQuoteHits,
@@ -29,8 +29,9 @@ function createFakeAdapter() {
 }
 
 describe('helpsQuoteCache', () => {
-  test('olContentStamp includes USJ processing version', () => {
-    const stamp = olContentStamp({ version: 'v45' }, '2.1.0-usj')
+  test('olBookStamp includes USJ processing version', () => {
+    // No blob recorded for the book: the release stamp, as before per-book stamps.
+    const stamp = olBookStamp({ version: 'v45' }, 'tit', '2.1.0-usj')
     expect(stamp).toBe('v45+2.1.0-usj')
   })
 

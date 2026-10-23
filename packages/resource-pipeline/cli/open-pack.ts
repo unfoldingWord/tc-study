@@ -6,7 +6,8 @@
  *   bun packages/resource-pipeline/cli/open-pack.ts es-419-base.langpack.zip es-419-tit.langpack.zip
  *
  * Uses tc-study's IndexedDB adapters on fake-indexeddb, as a device with nothing would. Exits with 1 when a resource
- * was skipped, a layer came back with fewer rows than its pack says, or an original a pack needs is of another release.
+ * was skipped, a layer came back with fewer rows than its pack says, or quote rows were left out because they were
+ * built against another original's book than the one opened.
  */
 
 import 'fake-indexeddb/auto'
@@ -58,7 +59,12 @@ for (const path of paths) {
   )
   for (const original of result.originals) {
     console.log(`  necesita ${original.key}@${original.stamp}: ${original.status}`)
-    if (original.status === 'other-release') problems += 1
+  }
+  // Another release of an original only costs the rows of the books whose file changed: those are the problem.
+  for (const [key, layers] of Object.entries(result.droppedRows)) {
+    problems += 1
+    const counts = Object.entries(layers).map(([layer, n]) => `${layer} ${n}`)
+    console.log(`  FILAS DEJADAS ${key}: ${counts.join(', ')} (hechas con otro original)`)
   }
   for (const skipped of result.skippedResources) {
     problems += 1
@@ -70,8 +76,11 @@ for (const path of paths) {
   for (const res of manifest.resources) {
     const layers = Object.keys(res.rows) as PackLayer[]
     const got = await rowsOfResource(source, res.key, layers)
+    const dropped = result.droppedRows[res.key] ?? {}
     const missing = layers.filter(
-      (layer) => !result.skippedLayers.includes(layer) && (got.get(layer)?.length ?? 0) < (res.rows[layer] ?? 0)
+      (layer) =>
+        !result.skippedLayers.includes(layer) &&
+        (got.get(layer)?.length ?? 0) < (res.rows[layer] ?? 0) - (dropped[layer] ?? 0)
     )
     const inCatalog = Boolean(await source.catalogRow(res.key))
     if (missing.length || !inCatalog) {

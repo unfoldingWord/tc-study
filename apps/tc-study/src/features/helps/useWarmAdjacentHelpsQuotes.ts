@@ -20,16 +20,16 @@ import {
   loadOriginalLanguageChapters,
   resolveOriginalLanguageKey,
 } from './olLoadCache'
-import { targetContentStamp } from './helpsAlignCache'
+import type { BookStampSource } from '@bt-synergy/resource-catalog'
+import { targetBookStamp } from './helpsAlignCache'
+import { readHelpsBookStamps } from './helpsBookStamps'
 import {
   mergeAndWriteCachedQuoteTokens,
-  olContentStamp,
   readCachedQuoteTokens,
   toCachedQuoteTokens,
   type CachedQuoteTokens,
   type HelpsQuoteCacheAdapter,
 } from './helpsQuoteCache'
-import { resourceContentStamp } from './resourceContentStamp'
 import { useChapterScrollActivity } from '../nav/usePinnedHelpsReference'
 import { warmScheduler } from '../warm/warmScheduler'
 
@@ -53,17 +53,12 @@ export async function resolveHelpsQuoteCacheCtx(
   try {
     const ol = resolveOriginalLanguageKey(bookCode)
     if (!ol) return null
-    const helpsMeta = (await catalogManager.getResourceMetadata(helpsKey)) as
-      | { version?: string; release?: { tag_name?: string; published_at?: string } }
-      | null
-    const olMeta = (await catalogManager.getResourceMetadata(ol.resourceKey)) as
-      | { version?: string; release?: { tag_name?: string; published_at?: string } }
-      | null
-    return {
-      helpsStamp: resourceContentStamp(helpsMeta),
+    const { helpsStamp, olStamp } = await readHelpsBookStamps(catalogManager, {
+      helpsKey,
       olKey: ol.resourceKey,
-      olStamp: olContentStamp(olMeta),
-    }
+      bookCode,
+    })
+    return { helpsStamp, olKey: ol.resourceKey, olStamp }
   } catch {
     return null
   }
@@ -79,10 +74,8 @@ export async function resolveHelpsAlignCacheCtx(
   const base = await resolveHelpsQuoteCacheCtx(catalogManager, helpsKey, bookCode)
   if (!base) return null
   try {
-    const targetMeta = (await catalogManager.getResourceMetadata(targetKey)) as
-      | { version?: string; release?: { tag_name?: string; published_at?: string } }
-      | null
-    return { ...base, targetStamp: targetContentStamp(targetMeta) }
+    const targetMeta = (await catalogManager.getResourceMetadata(targetKey)) as BookStampSource | null
+    return { ...base, targetStamp: targetBookStamp(targetMeta, bookCode) }
   } catch {
     return null
   }

@@ -38,6 +38,7 @@ import {
   withResourceDownloadTimeout,
   type DownloadRunPhase,
 } from '../features/download/backgroundDownloadRun'
+import { recordBlobsAfterComplete } from '../features/download/recordBlobsAfterComplete'
 import { registerWorkerLoaders } from '../features/download/workerLoaderRegistry'
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
@@ -79,6 +80,11 @@ if (typeof WorkerScope === 'undefined' || !(self instanceof WorkerScope)) {
 let downloadManager: BackgroundDownloadManager | null = null
 let catalogManager: CatalogManager | null = null
 let completenessChecker: ResourceCompletenessChecker | null = null
+/** What `recordBookBlobs` reads and writes after a download; set with the other services. */
+let blobRecorderDeps: {
+  door43Client: Door43ApiClient
+  catalogAdapter: IndexedDBCatalogAdapter
+} | null = null
 let isInitialized = false
 /** Active run id from the main thread; bumped/replaced on start/stop to drop stale work. */
 let activeRunId = 0
@@ -112,6 +118,8 @@ async function initialize() {
       baseUrl: 'https://git.door43.org',
       debug: false // Reduce logging in worker
     })
+
+    blobRecorderDeps = { door43Client, catalogAdapter }
 
     // 3. Create CatalogManager
     catalogManager = new CatalogManager({
@@ -644,6 +652,10 @@ async function downloadSpecificResources(
           isComplete = false
         }
         if (shouldSkipCompleteResourceDownload(skipExisting, isComplete)) {
+          // Downloaded before blobs were recorded: one tree request now, 'current' afterwards.
+          if (blobRecorderDeps) {
+            await recordBlobsAfterComplete({ complete: true, ...blobRecorderDeps, resourceKey })
+          }
           const skipped = skippedCompleteResourceProgress(ingredientsCount, resourceKey)
           onProgress(skipped)
           completedIngredients += ingredientsCount
@@ -734,9 +746,13 @@ async function downloadSpecificResources(
 
       // ✅ Mark as complete in cache (so it won't be re-downloaded)
       if (completenessChecker) {
-        await completenessChecker.markCompleteIfVerified(resourceKey, {
+        const verified = await completenessChecker.markCompleteIfVerified(resourceKey, {
           downloadMethod: method
         })
+        // Per-book cache stamps come from this release's blob shas; never throws.
+        if (blobRecorderDeps) {
+          await recordBlobsAfterComplete({ complete: verified, ...blobRecorderDeps, resourceKey })
+        }
       }
 
       if (runId === activeRunId) {
