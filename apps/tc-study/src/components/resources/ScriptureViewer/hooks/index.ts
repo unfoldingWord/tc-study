@@ -17,6 +17,8 @@ export {
   useScriptureEdgeNavigate,
 } from './useScriptureEdgeNavigate'
 
+export { useScriptureKeyboardNav } from './useScriptureKeyboardNav'
+
 export { useTOC } from './useTOC'
 
 export { useTokenBroadcast } from './useTokenBroadcast'

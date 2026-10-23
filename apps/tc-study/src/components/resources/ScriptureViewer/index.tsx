@@ -55,6 +55,7 @@ import {
   useContent,
   useHighlighting,
   useScriptureEdgeNavigate,
+  useScriptureKeyboardNav,
   useTOC,
   useTokenBroadcast,
   useUnderlinedTokens,
@@ -223,6 +224,7 @@ export function ScriptureViewer({
     languageFromList?.direction ?? undefined,
     languageCode
   )
+  const keyboardNav = useScriptureKeyboardNav(languageDirection === 'rtl', setAsAnchor)
 
   // Must come before useHighlighting so the coverage set is available for click decisions
   const underlinedSemanticIds = useUnderlinedTokens(resourceId)
@@ -434,15 +436,17 @@ export function ScriptureViewer({
           ref={contentRootRef}
           className="h-full overflow-auto p-content-lg cursor-pointer"
           onClick={handleViewerClick}
-          role="button"
+          role="region"
+          aria-label={resource.title}
+          aria-describedby={keyboardNav.hintId}
           tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              handleViewerClick()
-            }
-          }}
+          onKeyDown={keyboardNav.onKeyDown}
         >
+          <span id={keyboardNav.hintId} className="sr-only">
+            Tab moves to the words. Arrow keys move between words, Up and Down between
+            verses; Enter selects.
+          </span>
+          <span ref={keyboardNav.announcerRef} className="sr-only" aria-live="polite" />
           <div
             ref={setElasticContentEl}
             className="max-w-2xl mx-auto w-full will-change-transform"

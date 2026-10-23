@@ -83,6 +83,7 @@ const InternedTokenSpan = memo(function InternedTokenSpan({
       }}
       data-token-semantic-id={matchKeys[token.k]}
       data-highlighted={visual.isHighlighted || visual.isSelected ? 'true' : undefined}
+      aria-current={visual.isHighlighted || visual.isSelected ? 'true' : undefined}
       data-underlined={visual.isUnderlined ? 'true' : undefined}
       className={`rounded cursor-pointer hover:bg-muted text-scripture-fg${
         visual.isHighlighted || visual.isSelected ? ' bg-highlight highlighted-token scroll-mt-12' : ''
@@ -123,13 +124,8 @@ function renderInline(
             ctx.onVerseClick?.(item.chapterNumber, item.verseNumber)
           }}
           role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              ctx.onVerseClick?.(item.chapterNumber, item.verseNumber)
-            }
-          }}
+          tabIndex={-1}
+          data-verse-number={item.verseNumber}
           aria-label={`Verse ${item.verseNumber}`}
         >
           {item.verseNumber}{' '}

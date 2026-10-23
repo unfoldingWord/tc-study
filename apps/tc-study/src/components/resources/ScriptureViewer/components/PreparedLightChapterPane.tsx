@@ -39,13 +39,8 @@ function renderInline(
             onVerseClick?.(item.chapterNumber, item.verseNumber)
           }}
           role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              onVerseClick?.(item.chapterNumber, item.verseNumber)
-            }
-          }}
+          tabIndex={-1}
+          data-verse-number={item.verseNumber}
           aria-label={`Verse ${item.verseNumber}`}
         >
           {item.verseNumber}{' '}

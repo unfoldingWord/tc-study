@@ -3,7 +3,10 @@
  *
  * DOM contract for Helps / Journey 4+8 (stable):
  * - data-token-semantic-id = token.semanticId (= semanticIdFor(...))
- * - data-underlined / data-highlighted
+ * - data-underlined / data-highlighted; aria-current="true" while highlighted
+ *
+ * No role/tabIndex/key handler per word (thousands per chapter): the scrollport
+ * gives keyboard access with a roving tabindex (useScriptureKeyboardNav).
  */
 
 import { memo } from 'react'
@@ -28,6 +31,7 @@ export const TokenRenderer = memo(function TokenRenderer({
       onClick={handleClick}
       data-token-semantic-id={token.semanticId}
       data-highlighted={isHighlighted || isSelected ? 'true' : undefined}
+      aria-current={isHighlighted || isSelected ? 'true' : undefined}
       data-underlined={isUnderlined ? 'true' : undefined}
       className={`rounded cursor-pointer hover:bg-muted text-scripture-fg${
         isHighlighted || isSelected ? ' bg-highlight highlighted-token scroll-mt-12' : ''

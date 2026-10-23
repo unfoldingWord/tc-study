@@ -82,8 +82,9 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
     await godToken.click()
 
     await expect(godToken).toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
-    // Tokens are plain spans since chapter infinite scroll (no role/aria-pressed);
-    // selection shows as data-highlighted + the highlighted-token paint class.
+    // Tokens are plain spans (no per-word role/tab stop); the selection is exposed
+    // as aria-current and painted with the highlighted-token class.
+    await expect(godToken).toHaveAttribute('aria-current', 'true')
     await expect(godToken).toHaveClass(/highlighted-token/)
 
     // Covered click sets helps token filter; toggle-off clears highlight + filter, keeps underline
@@ -93,6 +94,7 @@ test.describe('Journey 4: Helps interaction (CombinedHelps)', () => {
     await godToken.click()
     await expect(godToken).not.toHaveAttribute('data-highlighted', 'true', { timeout: 10_000 })
     await expect(godToken).not.toHaveClass(/highlighted-token/)
+    await expect(godToken).not.toHaveAttribute('aria-current')
     await expect(filterBar).toHaveCount(0)
     await expect(godToken).toHaveAttribute('data-underlined', 'true')
 
