@@ -21,6 +21,9 @@ import type {
   TranslationWordsLoaderConfig
 } from './types'
 
+/** Bump when the article rows this loader writes, or its ingredients' titles, change: it is in every part fingerprint. */
+export const TW_ROWS_VERSION = 1
+
 export class TranslationWordsLoader implements ResourceLoader {
   readonly resourceType = 'words'
   

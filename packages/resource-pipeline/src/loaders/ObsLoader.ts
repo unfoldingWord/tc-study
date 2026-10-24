@@ -11,6 +11,9 @@ import {
 } from '../obs/parseObsMarkdown'
 import { obsStoryCacheKey, resolveObsStoryIds } from '../obs/obsStoryIds'
 
+/** Bump when the story rows this loader writes (`parseObsStoryMarkdown`'s output, as stored) change: it is in every part fingerprint. */
+export const OBS_ROWS_VERSION = 1
+
 function getStoryPath(metadata: ResourceMetadata, storyId: string): string | null {
   const ingredients = metadata.contentMetadata?.ingredients
   if (!ingredients || !Array.isArray(ingredients)) return null

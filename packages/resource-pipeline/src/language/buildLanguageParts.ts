@@ -77,6 +77,7 @@ import { chaptersFromStore } from './chaptersFromStore'
 import { isObs, keyOfRow, literalTextOf } from './door43Stamps'
 import { closeAndDelete } from './fakeDatabases'
 import { PACK_VERSIONS } from './packVersions'
+import { partsCode } from './partsCode'
 
 export type UnitSummary = { built: number; cached: number; blocked: number; noop: number; failed: number }
 
@@ -273,6 +274,7 @@ export async function buildLanguageParts(o: {
   const rss = o.rss ?? (() => process.memoryUsage().rss)
   const wait = o.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
   const compat = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
+  const code = await partsCode()
   const door43 = zipCachingClient(
     (o.door43Client ?? (getDoor43ApiClient({ baseUrl: 'https://git.door43.org', debug: false }) as unknown as Door43Like)) as Door43Like,
     join(o.workDir, 'zips')
@@ -670,6 +672,7 @@ export async function buildLanguageParts(o: {
       schema: 2,
       language: 'originals',
       compat,
+      code,
       versions: PACK_VERSIONS,
       resources: await Promise.all(named(originalParts).map((k) => listResource(k, 'original'))),
       parts: originalParts,
@@ -680,6 +683,7 @@ export async function buildLanguageParts(o: {
       schema: 2,
       language,
       compat,
+      code,
       versions: PACK_VERSIONS,
       resources: await Promise.all(named(languageParts).map((k) => listResource(k, 'language'))),
       parts: languageParts,

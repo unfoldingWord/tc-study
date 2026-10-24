@@ -136,6 +136,9 @@ export async function lexiconStamps(o: { language: string; owner: string; ref: s
   return stamps
 }
 
+/** Bump when the rows `addLexicons` writes (their row paths or entries) change: it is in every part fingerprint. */
+export const LEXICON_ROWS_VERSION = 1
+
 /**
  * The lexicons of a language, from Door43: `{owner}/{lang}_uhl` (Hebrew) and `{owner}/{lang}_ugl` (Greek), whole
  * (each entry with the verses of every book), read from `ref` (a branch, tag or commit; `master` is what Door43 serves
@@ -188,6 +191,9 @@ export async function addLexicons(cache: Store, catalog: Catalog, language: stri
 }
 
 const NEW_TESTAMENT = new Set(['MAT', 'MRK', 'LUK', 'JHN', 'ACT', 'ROM', '1CO', '2CO', 'GAL', 'EPH', 'PHP', 'COL', '1TH', '2TH', '1TI', '2TI', 'TIT', 'PHM', 'HEB', 'JAS', '1PE', '2PE', '1JN', '2JN', '3JN', 'JUD', 'REV'])
+
+/** Bump when the rows `addMacula` writes (which files, their keys or entries) change: it is in every part fingerprint. */
+export const MACULA_ROWS_VERSION = 1
 
 /** The MACULA resources: one for the Hebrew, one for the Greek, as `--macula` names them. */
 export const MACULA_KEYS = ['Biblica/hbo/macula', 'Biblica/el-x-koine/macula'] as const

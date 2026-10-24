@@ -45,6 +45,12 @@ export type PartsList = {
   /** `es-419`, or `originals`. */
   language: string
   compat: string
+  /**
+   * The code its parts were built and fingerprinted with: the compat key and a hash of every row-producing code version
+   * (resource-pipeline `partsCode`). A reader recomputes fingerprints with it; a previous list of another code is not
+   * reused.
+   */
+  code: string
   versions: PackVersions
   resources: PartsListResource[]
   parts: PartEntry[]

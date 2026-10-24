@@ -11,8 +11,14 @@
 import type { ProcessedQuestions, TranslationQuestion } from '../../types';
 export type { ProcessedQuestions, TranslationQuestion } from '../../types';
 
+/**
+ * Bump when what this processor gives changes: the loader stores it as the `tq:` rows, which language-pack parts
+ * carry (resource-pipeline `partsCodeVersions`).
+ */
+export const QUESTIONS_TSV_PARSER_VERSION = '1.0.0-bt-studio'
+
 export class QuestionsProcessor {
-  private readonly PROCESSING_VERSION = '1.0.0-bt-studio';
+  private readonly PROCESSING_VERSION = QUESTIONS_TSV_PARSER_VERSION;
 
   /**
    * Process TSV content into structured questions data

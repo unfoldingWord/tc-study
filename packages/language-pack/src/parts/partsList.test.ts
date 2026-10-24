@@ -12,6 +12,7 @@ const VERSIONS: PackVersions = {
 }
 
 const FP = 'f'.repeat(64)
+const CODE = `${compatKeyOf(PARTS_FORMAT_VERSION, VERSIONS)}+0123456789abcdef`
 
 const PARTS: PartEntry[] = [
   { sha256: 'c3', bytes: 30, rows: 3, kind: 'tw', resource: 'unfoldingWord/en/tw', group: 'kt:3', fingerprint: FP, layers: ['sot', 'prepared'] },
@@ -50,6 +51,7 @@ function list(parts: PartEntry[], resourcesReversed = false, dated = false, unit
     schema: 2,
     language: 'en',
     compat: compatKeyOf(PARTS_FORMAT_VERSION, VERSIONS),
+    code: CODE,
     versions: VERSIONS,
     resources: resourcesReversed ? [...resources].reverse() : resources,
     parts,
@@ -118,6 +120,15 @@ describe('fingerprints and units in the list', () => {
     // @ts-expect-error fingerprint is required
     const missing: PartEntry = { sha256: 'e5', bytes: 1, rows: 1, kind: 'titles', resource: 'unfoldingWord/en/tw', layers: ['text'] }
     expect(missing.fingerprint).toBeUndefined()
+  })
+
+  test('names the code its fingerprints were computed with, and a list without it is a type error', () => {
+    expect((JSON.parse(serializePartsList(list(PARTS))) as PartsList).code).toBe(CODE)
+    // A reader (delivery 3's Worker) recomputes fingerprints with the list's code, not with versions of its own.
+    const { code: _, ...rest } = list(PARTS)
+    // @ts-expect-error code is required
+    const missing: PartsList = rest
+    expect(missing.code).toBeUndefined()
   })
 
   test('a list without units (the originals list) serializes without them', () => {

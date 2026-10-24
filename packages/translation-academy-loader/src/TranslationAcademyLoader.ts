@@ -17,6 +17,9 @@ import type {
   TranslationAcademyLoaderConfig
 } from './types'
 
+/** Bump when the article rows this loader writes, or its ingredients' titles, change: it is in every part fingerprint. */
+export const TA_ROWS_VERSION = 1
+
 export class TranslationAcademyLoader implements ResourceLoader {
   /** Canonical short ID — must match worker `registerLoader('academy', …)`. */
   readonly resourceType = RESOURCE_TYPE_IDS.TRANSLATION_ACADEMY

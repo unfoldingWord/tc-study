@@ -9,6 +9,7 @@ import { runDownload } from '../download/runDownload'
 import { buildLanguageParts, PARTS_REPORT, slotRows, UNPLACED_LISTED, type PartsReport } from './buildLanguageParts'
 import { closeAndDelete } from './fakeDatabases'
 import { PACK_VERSIONS } from './packVersions'
+import { partsCode } from './partsCode'
 import {
   catalogRows,
   discover,
@@ -117,6 +118,9 @@ describe('buildLanguageParts', () => {
     // The lists on disk, where the CLI says they are.
     const compat = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
     expect(list.compat).toBe(compat)
+    // The code every fingerprint is made with: what a reader recomputes them with.
+    expect(list.code).toBe(await partsCode())
+    expect(originals.code).toBe(list.code)
     expect(JSON.parse(readFileSync(join(workDir, partsListPath(compat, LANG)), 'utf8')).parts.length).toBe(list.parts.length)
     expect(list.originals?.path).toBe(partsListPath(compat, 'originals'))
     const onDisk = readdirSync(join(workDir, 'parts')).sort()
