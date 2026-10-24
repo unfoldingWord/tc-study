@@ -263,6 +263,26 @@ export async function previousUnusable(
     if (l.code !== now.code) return `its ${name} was built by code ${l.code}, not ${now.code}`
   }
   if (!list.units) return 'its list records no units'
+  // A part its unit cannot be told of (no book), or with no file to name, would stop the build when carried.
+  for (const [name, l] of [
+    ['list', list],
+    ['originals list', originals],
+  ] as const) {
+    for (const p of l.parts ?? []) {
+      let why: string | null = null
+      if (!p || typeof p.kind !== 'string' || typeof p.resource !== 'string') why = 'no kind or resource'
+      else if (!/^[0-9a-f]{64}$/.test(String(p.sha256))) why = `its sha256 is ${JSON.stringify(p.sha256)}`
+      else if (typeof p.fingerprint !== 'string') why = 'no fingerprint'
+      else {
+        try {
+          unitOfPart(p)
+        } catch (e) {
+          why = messageOf(e)
+        }
+      }
+      if (why) return `its ${name} has a malformed part (${p?.kind} ${p?.resource}): ${why}`
+    }
+  }
   const sha = await sha256Hex(new TextEncoder().encode(serializePartsList(originals)))
   if (!list.originals || list.originals.sha256 !== sha) return 'its originals list is not the one its list names'
   return null

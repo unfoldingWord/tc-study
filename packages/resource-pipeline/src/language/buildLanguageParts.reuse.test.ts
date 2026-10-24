@@ -327,6 +327,13 @@ describe('a build with the previous lists', () => {
     ['no units', ({ units: _, ...l }) => l as PartsList, 'records no units'],
     ['schema 1', (l) => ({ ...l, schema: 1 as never }), 'has schema 1, not 2'],
     ['another originals list', (l) => ({ ...l, originals: { ...l.originals!, sha256: '0'.repeat(64) } }), 'is not the one its list names'],
+    // A book part without its book would make unitOfPart throw in the middle of the build.
+    [
+      'a part that names no book',
+      (l) => ({ ...l, parts: l.parts.map((p) => (p.kind === 'book' && p.book === 'jon' && p.resource === TN ? (({ book: _, ...rest }) => rest)(p) as PartEntry : p)) }),
+      'its list has a malformed part (book test_gl/es-419/tn): A book part names no book',
+    ],
+    ['a part without a sha256', (l) => ({ ...l, parts: l.parts.map((p, i) => (i === 0 ? { ...p, sha256: 'x' } : p)) }), 'its list has a malformed part'],
   ]
   for (const [name, change, said] of IGNORED) {
     test(`a previous list with ${name} is ignored, with a log line, and every unit is built`, async () => {
