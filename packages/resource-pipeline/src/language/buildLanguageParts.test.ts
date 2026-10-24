@@ -139,7 +139,8 @@ describe('buildLanguageParts', () => {
     // The report: every unit's own peak, time and jobs; and no database left behind.
     const report = reportOf(workDir)
     expect(report.state).toBe('done')
-    expect(report.units.map((u) => u.unit)).toEqual(units.map((u) => u.unit))
+    // Step 1 first, metered as the unit `catalog`; the result's units are only those that make parts.
+    expect(report.units.map((u) => u.unit)).toEqual(['catalog', ...units.map((u) => u.unit)])
     expect(report.units.every((u) => u.peakRssMb > 0 && u.seconds >= 0 && u.failures === 0)).toBe(true)
     expect(report.units.find((u) => u.unit === 'book rut')!.jobs.built).toBe(summary['book rut'].built)
     expect(await partsDatabases()).toEqual([])
@@ -378,12 +379,29 @@ describe('the report', () => {
 describe('memory', () => {
   test('a unit over the memory limit stops the build, naming the unit, and leaves no database and a report', async () => {
     const workDir = freshDir('parts-limit')
-    await expect(build(workDir, { memoryLimitMb: 1 })).rejects.toThrow(/^shared used \d+ MB, over the 1 MB limit$/)
+    const lines: string[] = []
+    // Low through step 1, over once the shared unit starts.
+    const rss = () => (lines.some((l) => l.endsWith('shared: start')) ? 900 : 100) * MB
+    await expect(build(workDir, { memoryLimitMb: 500, rss, log: (l) => lines.push(l) })).rejects.toThrow(/^shared used 900 MB, over the 500 MB limit$/)
     expect(await partsDatabases()).toEqual([])
     const report = reportOf(workDir)
     expect(report.state).toBe('failed')
     expect(report.error).toMatch(/^shared used/)
-    expect(report.units.map((u) => [u.unit, u.stopped?.startsWith('shared used')])).toEqual([['shared', true]])
+    expect(report.units.map((u) => [u.unit, u.stopped?.startsWith('shared used') ?? false])).toEqual([['catalog', false], ['shared', true]])
+  }, 120_000)
+
+  test('step 1 is metered as the unit `catalog`: over the limit, it stops the build before any unit, and the report says so', async () => {
+    const workDir = freshDir('parts-limit-catalog')
+    const lines: string[] = []
+    // Over once the zips are being read.
+    const rss = () => (lines.some((l) => l.includes('Buscando los recursos')) ? 900 : 100) * MB
+    await expect(build(workDir, { memoryLimitMb: 500, rss, log: (l) => lines.push(l) })).rejects.toThrow('catalog used 900 MB, over the 500 MB limit')
+    expect(lines.some((l) => l.endsWith('shared: start'))).toBe(false)
+    const report = reportOf(workDir)
+    expect(report.state).toBe('failed')
+    expect(report.peakRssMb).toBe(900)
+    expect(report.units.map((u) => [u.unit, u.startRssMb, u.peakRssMb, u.stopped])).toEqual([['catalog', 100, 900, 'catalog used 900 MB, over the 500 MB limit']])
+    expect(await partsDatabases()).toEqual([])
   }, 120_000)
 
   test('memory that grows within a unit stops it there, before the next unit starts', async () => {
@@ -398,6 +416,7 @@ describe('memory', () => {
     const report = reportOf(workDir)
     expect(report.state).toBe('failed')
     expect(report.units.map((u) => [u.unit, u.startRssMb, u.peakRssMb])).toEqual([
+      ['catalog', 100, 100],
       ['shared', 100, 100],
       ['book rut', 9000, 9000],
     ])

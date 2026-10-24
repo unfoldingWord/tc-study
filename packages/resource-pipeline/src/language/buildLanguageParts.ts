@@ -470,7 +470,7 @@ export async function buildLanguageParts(o: {
   }
 
   function writeReport(state: PartsReport['state'], error?: unknown) {
-    const report: PartsReport = { language, state, ...(error !== undefined ? { error: messageOf(error) } : {}), peakRssMb, units, failures, treeChecks, sizes, downloads, releaseStampedBooks }
+    const report: PartsReport = { language, state, ...(error !== undefined ? { error: messageOf(error) } : {}), peakRssMb, units: [...steps, ...units], failures, treeChecks, sizes, downloads, releaseStampedBooks }
     const file = join(o.workDir, PARTS_REPORT)
     // Aside and renamed: a run killed mid-write still leaves the last whole report.
     writeFileSync(`${file}.partial`, JSON.stringify(report, null, 2))
@@ -857,9 +857,37 @@ export async function buildLanguageParts(o: {
     })
   }
 
+  /** Step 1 in the report, metered as the unit `catalog`, before the units (the result's `units` are those). */
+  const steps: UnitRecord[] = []
+  let catalogStep: { m: Meter; started: number; failuresBefore: number } | undefined
+  /** Ends step 1's metering and records it, once: when step 1 is done, or when the build stops in it. */
+  function endCatalogStep(stopped?: string) {
+    if (!catalogStep) return
+    const { m, started, failuresBefore } = catalogStep
+    catalogStep = undefined
+    m.stop()
+    const record: UnitRecord = {
+      unit: 'catalog',
+      outcome: 'built',
+      startRssMb: m.start(),
+      peakRssMb: m.peak(),
+      seconds: Math.round((Date.now() - started) / 100) / 10,
+      parts: 0,
+      jobs: { built: 0, cached: 0, blocked: 0, noop: 0, failed: 0 },
+      failures: failures.length - failuresBefore,
+      ...(stopped ? { stopped } : {}),
+    }
+    peakRssMb = Math.max(peakRssMb, record.peakRssMb)
+    steps.push(record)
+    say(`[${elapsed()}] catalog: pico ${record.peakRssMb} MB (+${record.peakRssMb - record.startRssMb}), ${record.seconds} s${stopped ? ', detenido' : ''}`)
+    writeReport('running')
+  }
+
   let error: unknown
   try {
-    // 1. The catalog.
+    // 1. The catalog: every archive read and hashed, under the memory limit as a unit is.
+    catalogStep = { m: meter('catalog'), started: Date.now(), failuresBefore: failures.length }
+    const stepMeter = catalogStep.m
     if (o.previous) {
       const why = await previousUnusable(o.previous, { language, compat, code })
       if (why) say(`[${elapsed()}] La lista anterior no se usa (${why}): se construye todo`)
@@ -961,6 +989,7 @@ export async function buildLanguageParts(o: {
           }
         }
       }
+      stepMeter.check()
       const row = await metaOf(key)
       resourceFiles.set(key, {
         key,
@@ -1011,6 +1040,7 @@ export async function buildLanguageParts(o: {
           files: read.files,
         })
         lexicons.set(lexicon.key, commit.sha.slice(0, 10))
+        stepMeter.check()
         companionRows.push(companionCatalogRow(lexiconResourceOf(lexicon, language, commit, read.title)))
       }
     }
@@ -1042,6 +1072,7 @@ export async function buildLanguageParts(o: {
         maculaKeys.push(key)
       }
       companionRows.push(...maculaCatalogRows(o.macula.folder, o.macula))
+      stepMeter.check()
     }
 
     // The units, the canon's books in order, then any other book a resource has (front matter…), sorted; and what
@@ -1076,6 +1107,8 @@ export async function buildLanguageParts(o: {
       unitPlan.set(unit, { keys: [...keys], inputs: read, fingerprint: await fingerprintOf({ code, id: unit, inputs: read }) })
     }
     say(`[${elapsed()}] Árboles de Door43: ${treeChecks.match} iguales, ${treeChecks.mismatch} distintos, ${treeChecks.unverified} sin comprobar`)
+    stepMeter.check()
+    endCatalogStep()
 
     // 2. The shared unit.
     if (await carry(SHARED_UNIT)) {
@@ -1260,6 +1293,7 @@ export async function buildLanguageParts(o: {
     return { list, originals: originalsList, summary, failures, units, carried, peakRssMb }
   } catch (e) {
     error = e
+    endCatalogStep(messageOf(e))
     throw e
   } finally {
     await deleteDatabases('end', [catalog], [CATALOG_DB])
