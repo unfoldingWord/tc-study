@@ -1260,6 +1260,24 @@ export class Door43ApiClient {
     repo: string,
     ref: string
   ): Promise<Map<string, string>> {
+    return (await this.fetchRepoTree(owner, repo, ref)).blobs;
+  }
+
+  /**
+   * Fetch the full recursive tree of a given ref, as `fetchRepoTreeBlobs` reads it, and whether it is all of it.
+   * `complete` is false when the last page read still says `truncated`: the 50-page cap was reached, or Door43 sent an
+   * empty page that says more follow. An incomplete tree can confirm a file's sha but not that a file is absent.
+   *
+   * @param owner - Repository owner
+   * @param repo - Repository name
+   * @param ref  - Branch name or tag name
+   * @returns Map of blob path to blob sha, and whether every page was read
+   */
+  async fetchRepoTree(
+    owner: string,
+    repo: string,
+    ref: string
+  ): Promise<{ blobs: Map<string, string>; complete: boolean }> {
     if (!owner || !repo || !ref) {
       throw this.createError('Missing required parameters for fetchRepoTreePaths', 'INVALID_PARAM');
     }
@@ -1271,6 +1289,7 @@ export class Door43ApiClient {
 
     try {
       const blobs = new Map<string, string>();
+      let complete = false;
       // Door43 cuts a large tree into pages (12 000 entries) and says `truncated: true` until the last one. es-419_tq
       // keeps its books after an `_old/` folder of 11 000 files: reading only page 1 made every book look absent.
       for (let page = 1; page <= 50; page++) {
@@ -1294,11 +1313,15 @@ export class Door43ApiClient {
             blobs.set(entry.path.replace(/^\.\//, ''), entry.sha ?? '');
           }
         }
-        if (!data.truncated || !data.tree?.length) break;
+        if (!data.truncated) {
+          complete = true;
+          break;
+        }
+        if (!data.tree?.length) break;
       }
 
       clearTimeout(timeoutId);
-      return blobs;
+      return { blobs, complete };
     } catch (error) {
       clearTimeout(timeoutId);
       if (error instanceof Door43ApiError) throw error;
