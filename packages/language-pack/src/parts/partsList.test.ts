@@ -41,7 +41,17 @@ function list(parts: PartEntry[], resourcesReversed = false, dated = false, unit
         resourceKey: 'unfoldingWord/en/tn',
         contentMetadata: { bookBlobs: { rut: 'aa', jon: 'bb' }, ...(dated ? { downloadStats: { lastDownload: '2026-10-22' } } : {}) },
         release: { tag_name: 'v80', published_at: '2026-01-01T00:00:00Z' },
-        ...(dated ? { catalogedAt: '2026-10-22T10:00:00Z', updatedAt: '2026-10-22T10:00:01Z', accessedAt: 'x', accessCount: 3, timestamp: 9 } : {}),
+        ...(dated
+          ? {
+              catalogedAt: '2026-10-22T10:00:00Z',
+              updatedAt: '2026-10-22T10:00:01Z',
+              accessedAt: 'x',
+              accessCount: 3,
+              timestamp: 9,
+              // The TW and TA loaders mark a resource offline once downloaded whole; a book's download does not.
+              availability: { online: true, offline: true, bundled: false, partial: false },
+            }
+          : {}),
       },
     },
     { key: 'unfoldingWord/en/tw', stamp: 'v80#2026-01-01T00:00:00Z', role: 'language', subject: 'Translation Words', title: 'Words', metadata: {} },
@@ -159,6 +169,8 @@ describe('restoreCatalogBookkeeping', () => {
     expect(row.catalogedAt).toBe('2026-10-22T12:00:00.000Z')
     expect(row.resourceKey).toBe('unfoldingWord/en/tn')
     expect(row.release?.published_at).toBe('2026-01-01T00:00:00Z')
+    // Nothing of it is on the device yet: its parts are not.
+    expect(row.availability).toEqual({ online: true, offline: false, bundled: false, partial: false })
     expect('catalogedAt' in metadata).toBe(false)
   })
 })

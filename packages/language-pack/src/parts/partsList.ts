@@ -89,6 +89,9 @@ export const LIST_DROPPED_FIELDS: readonly string[] = [
   // What this machine downloaded, not what the release holds.
   'downloadStats',
   'downloadedIngredients',
+  // Whether this machine has it: the TW and TA loaders mark a resource offline once downloaded whole, a book's download
+  // does not, so a build that carries a unit (downloads nothing of it) would give another list.
+  'availability',
 ]
 
 const DROPPED = new Set(LIST_DROPPED_FIELDS)
@@ -132,8 +135,13 @@ export function serializePartsList(list: PartsList): string {
 
 /**
  * A list's catalog row as the catalog stores it: puts back the required fields `LIST_DROPPED_FIELDS` left out
- * (`catalogedAt`, the only one `ResourceMetadata` requires), dated `now` (ms), the moment it is imported.
+ * (`catalogedAt`, dated `now` (ms), the moment it is imported; `availability`, online and nothing of it on the device
+ * yet, since its parts are not).
  */
 export function restoreCatalogBookkeeping(metadata: unknown, now: number): ResourceMetadata {
-  return { ...(metadata as ResourceMetadata), catalogedAt: new Date(now).toISOString() }
+  return {
+    ...(metadata as ResourceMetadata),
+    catalogedAt: new Date(now).toISOString(),
+    availability: { online: true, offline: false, bundled: false, partial: false },
+  }
 }
