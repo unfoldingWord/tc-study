@@ -33,6 +33,8 @@ import { writeMcpViews } from './writeMcpViews'
 
 export interface PackBucket {
   getJson<T>(key: string): Promise<T | null>
+  /** Whether the bucket has the key; an answer that is neither yes nor no throws. */
+  has(key: string): Promise<boolean>
   put(key: string, body: Uint8Array | string, o: { contentType: string; cacheControl: string }): Promise<void>
 }
 
@@ -49,8 +51,8 @@ export type PublishResult = {
   originals?: PublishOutcome
 }
 
-const IMMUTABLE = 'public, max-age=31536000, immutable'
-const NO_CACHE = 'no-cache'
+export const IMMUTABLE = 'public, max-age=31536000, immutable'
+export const NO_CACHE = 'no-cache'
 const VIEW_UPLOADS_AT_ONCE = 16
 
 /** A language code safe to put in a bucket key or a folder name: `es-419`, `pt-br`, `zh-Hant-TW`. */
@@ -122,7 +124,7 @@ export function notWhole(
 }
 
 /** Like Promise.all over a pool: stops starting uploads at the first failure, and rejects with it. */
-async function eachLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+export async function eachLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let next = 0
   let failed = false
   const worker = async () => {
@@ -289,6 +291,10 @@ export async function publishLanguage(o: {
 export function memoryBucket(seed: Record<string, unknown> = {}): PackBucket & {
   puts: Array<{ key: string; contentType: string; cacheControl: string; bytes: number }>
   json<T>(key: string): T | null
+  /** An object as text, or null. */
+  text(key: string): string | null
+  /** An object's bytes, or null. */
+  bytes(key: string): Uint8Array | null
 } {
   const objects = new Map<string, string | Uint8Array>(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]))
   const puts: Array<{ key: string; contentType: string; cacheControl: string; bytes: number }> = []
@@ -297,11 +303,24 @@ export function memoryBucket(seed: Record<string, unknown> = {}): PackBucket & {
     if (body === undefined) return null
     return JSON.parse(typeof body === 'string' ? body : new TextDecoder().decode(body)) as T
   }
+  const bytes = (key: string): Uint8Array | null => {
+    const body = objects.get(key)
+    if (body === undefined) return null
+    return typeof body === 'string' ? new TextEncoder().encode(body) : body
+  }
   return {
     puts,
     json,
+    text: (key) => {
+      const body = bytes(key)
+      return body && new TextDecoder().decode(body)
+    },
+    bytes,
     async getJson<T>(key: string) {
       return json<T>(key)
+    },
+    async has(key) {
+      return objects.has(key)
     },
     async put(key, body, m) {
       objects.set(key, body)
@@ -310,9 +329,10 @@ export function memoryBucket(seed: Record<string, unknown> = {}): PackBucket & {
   }
 }
 
-type S3ClientLike = { presign(key: string, o: { method: 'GET' | 'PUT'; expiresIn: number }): string }
+type S3ClientLike = { presign(key: string, o: { method: 'GET' | 'HEAD' | 'PUT'; expiresIn: number }): string }
 
 const JSON_TIMEOUT_MS = 60_000
+/** For anything but JSON: a whole pack, or a part (the largest are tens of MB). */
 const PACK_TIMEOUT_MS = 10 * 60_000
 /** Three tries in all: R2 answers 429 and 5xx now and then, and a run should not lose an hour's build to one. */
 const RETRY_DELAYS_MS = [1_000, 4_000]
@@ -323,7 +343,8 @@ const retryable = (status: number) => status === 429 || status >= 500
 /**
  * Cloudflare R2 through Bun's S3 client, used only to sign: Bun 1.3's `write` sends no Cache-Control, so the request
  * is a plain fetch to a presigned URL that carries the headers itself. Each request has a timeout (ten minutes for a
- * pack) and is tried again after a network error, a 429 or a 5xx.
+ * pack or a part) and is tried again after a network error, a 429 or a 5xx. `has` is a presigned HEAD (Bun signs the
+ * method, checked against SigV4 by hand), so asking costs no download.
  */
 export function r2Bucket(o: {
   endpoint: string
@@ -369,8 +390,18 @@ export function r2Bucket(o: {
       if (!res.ok) throw await failure('GET', key, res)
       return (await res.json()) as T
     },
+    async has(key) {
+      const res = await withRetries('HEAD', key, () =>
+        fetch(client.presign(key, { method: 'HEAD', expiresIn: 600 }), { method: 'HEAD', signal: AbortSignal.timeout(JSON_TIMEOUT_MS) })
+      )
+      if (res.status === 200) return true
+      if (res.status === 404) return false
+      // A 403 or a 5xx after the retries is not «missing»: a part taken for missing is only uploaded again, but a list
+      // must never be written on a guess.
+      throw await failure('HEAD', key, res)
+    },
     async put(key, body, m) {
-      const timeout = m.contentType === 'application/zip' ? PACK_TIMEOUT_MS : JSON_TIMEOUT_MS
+      const timeout = m.contentType === 'application/json' ? JSON_TIMEOUT_MS : PACK_TIMEOUT_MS
       const res = await withRetries('PUT', key, () =>
         fetch(client.presign(key, { method: 'PUT', expiresIn: 3600 }), {
           method: 'PUT',
