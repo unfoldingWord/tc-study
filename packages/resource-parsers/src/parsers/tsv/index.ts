@@ -7,8 +7,8 @@ export {
   NOTES_TSV_PARSER_VERSION,
   processedNotesParserIsCurrent,
 } from './notes-parser'
-export { QuestionsProcessor } from './questions-parser'
-export { WordsLinksProcessor } from './words-links-parser'
+export { QuestionsProcessor, QUESTIONS_TSV_PARSER_VERSION } from './questions-parser'
+export { WordsLinksProcessor, WORDS_LINKS_TSV_PARSER_VERSION } from './words-links-parser'
 
 // Re-export types
 export type {

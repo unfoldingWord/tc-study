@@ -55,7 +55,7 @@ export function getCachedTocTitleIndex(
   return index
 }
 
-/** Test-only: drop memoized indexes. */
+/** Drops memoized indexes: tests, and every parts build (a file can change under the same stamp between builds). */
 export function resetTocTitleIndexCache(): void {
   tocIndexCache.clear()
 }

@@ -1,4 +1,36 @@
 {
   "compat": "f1.1-u2.3.0-p6000230-q9-a12-t1",
-  "hash": "eb9151863a657e1f0970ed686a29b52ac40e2a97403b9107006d7b8d1ba51471"
+  "hash": "eb9151863a657e1f0970ed686a29b52ac40e2a97403b9107006d7b8d1ba51471",
+  "partsCompat": "f2.0-u2.3.0-p6000230-q9-a12-t1",
+  "partsHash": "1c1ec4ffea31ec6b457d3fd8cacbd63a4a5a6aa6ce4d1d6c85d480f6e9e6a135",
+  "partsCode": "f2.0-u2.3.0-p6000230-q9-a12-t1+7bc31e739fbeed69",
+  "partsGroups": {
+    "lexicon sot": "8c548e73babe6b0f960b583e4a4d308b3661d40c87ef1f5baac9aa3e380b3841",
+    "macula sot": "2c788003570a56ea5dab9c381fcbb38ae1ef864159aa757cbbd6fb8eb90251ff",
+    "obs prepared": "a3df12993b32ea9d180d071a719b29f2dd192b8debee974931583d89b63c9080",
+    "obs sot": "675d3dac61160e8f3c86113949b85104a3c517bb50e1074b767ae09aa157d6e8",
+    "original prepared": "79fd22663a66e6561c7a47adf145f90c3442518fa435e0b18c385995a18475a0",
+    "original sot": "43dad199678e96dfda81d68ccc7e64476cd5ea523ca2ec3452e221103db93c5f",
+    "part bytes": "569dd59de1b5a5bfc24f5dbd301a8cebca9456b7404a66de923f471962863d45",
+    "rules": "89d185d459922fd5232145a5f9888b45fe25767f25a27a11d3259b0c2948f3ec",
+    "ruth": "c842ea0b3c8f7b9e36dbe6de1aa70da83e1bb76958e89b8c1e9e49df00902915",
+    "ta prepared": "90c956551ce0102bed29b70d6640c3e2adda6a9a9ebd010789cb0d96fcf03a3c",
+    "ta sot": "dd74d0127b6220d0100c792be67f45ade6c87d74ee8b859bbc958c73b620434c",
+    "ta text": "ffa7a06fba3cc63ff294c862a999a30f675367bb5724cf0ba15b975f1582fa67",
+    "text prepared": "988b2610848464daa8227508987fc20894e26ecb0b2f9bdaf75f993d5eb3908f",
+    "text sot": "da06b17793ba78da985ceaaa8314bbe0e50f66ca659e1529c32b28d01bdc79c7",
+    "tn align": "e8e5128b3f17f7eed993ae14e64a00c45f00af13c90dc2d2ba233f5f0f56deae",
+    "tn prepared": "cc75f8ab5726d5777713b937859eb831badfb0a83659294b5aa9078e580d2a17",
+    "tn quote": "e1b6247e0788cba4b8738407a698552d0ea3ad6b7f6bf1147977d6e4bc84289c",
+    "tn sot": "b827facce07fb52f4c1c35c646dacf9ccec6738bbacc18fb6d698b66259ab3d2",
+    "tq prepared": "b5f645feecca65cd7f681d6d6e080688490fbe7bf9f9c515e024bb405ec23530",
+    "tq sot": "5c3a137892590f89c556cf99f00176a15d3b02216793eda4615efddc270b76bb",
+    "tw prepared": "3947d526eb5f2f1f77619ff3c6eab9c64bb4a707c2bfbcf953f45f959e3d286b",
+    "tw sot": "e74a1639c487f8d89ffa4a93b1ba1cf54cb90f1aa23df2a43fdc53a8dd86003c",
+    "tw text": "d16151eed7f21a99d5bed290c587ff9c6352be4aef3f88bccb92c996a54c2580",
+    "twl align": "7ffe200be4f844d5299ab58dd331cbdcc25ad9cc66e0e4b0d3f6ed3edb2cb649",
+    "twl prepared": "f9a797fd015eb599c72525951985c16331800ec4705abc273d4b648e8e827b6b",
+    "twl quote": "abb24fec332f8c9be7e300df28c853b60e10201356688b59353c11a5f862e9fe",
+    "twl sot": "6383c26c1657d25eeb2e35cdcb568098eb725f28b524b5309e492001ad93dc29"
+  }
 }

@@ -14,7 +14,7 @@ import {
 } from '@bt-synergy/language-pack'
 import { resourceContentStamp } from '@bt-synergy/resource-catalog'
 import { PACK_VERSIONS } from './packVersions'
-import { memoryBucket, publishLanguage, r2Bucket, type PackBucket } from './publishLanguage'
+import { IMMUTABLE, memoryBucket, publishLanguage, r2Bucket, type PackBucket } from './publishLanguage'
 
 const compat = compatKeyOf(PACK_FORMAT_VERSION, PACK_VERSIONS)
 // A commit whose hash sorts after a later one's: only the date may order them.
@@ -480,6 +480,61 @@ describe('r2Bucket', () => {
       expect(missing.seen.length).toBe(1)
     } finally {
       missing.server.stop(true)
+    }
+  })
+
+  test('has: a HEAD of the key, 200 is there and 404 is not', async () => {
+    const seen: string[] = []
+    const server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const path = new URL(req.url).pathname
+        seen.push(`${req.method} ${path}`)
+        return new Response(null, { status: path.endsWith('/there.part.gz') ? 200 : 404 })
+      },
+    })
+    try {
+      const bucket = r2Bucket({ endpoint: `http://127.0.0.1:${server.port}`, bucket: 'packs', accessKeyId: 'a', secretAccessKey: 's', retryDelaysMs: [0, 0] })
+      expect(await bucket.has('parts/there.part.gz')).toBe(true)
+      expect(await bucket.has('parts/missing.part.gz')).toBe(false)
+      expect(seen).toEqual(['HEAD /packs/parts/there.part.gz', 'HEAD /packs/parts/missing.part.gz'])
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('has: a 503 is asked again, and another status is an error, never a no', async () => {
+    const { server, bucket, seen } = answering([503])
+    try {
+      expect(await bucket.has('parts/x.part.gz')).toBe(true)
+      expect(seen.map((s) => s.method)).toEqual(['HEAD', 'HEAD'])
+    } finally {
+      server.stop(true)
+    }
+    const denied = answering([403])
+    try {
+      await expect(denied.bucket.has('parts/x.part.gz')).rejects.toThrow('403')
+      expect(denied.seen.length).toBe(1)
+    } finally {
+      denied.server.stop(true)
+    }
+  })
+
+  test('a part is put as gzip with the immutable cache control, and no content encoding', async () => {
+    const seen: Array<{ type: string | null; cache: string | null; encoding: string | null; bytes: number }> = []
+    const server = Bun.serve({
+      port: 0,
+      async fetch(req) {
+        seen.push({ type: req.headers.get('content-type'), cache: req.headers.get('cache-control'), encoding: req.headers.get('content-encoding'), bytes: (await req.arrayBuffer()).byteLength })
+        return new Response('')
+      },
+    })
+    try {
+      const bucket = r2Bucket({ endpoint: `http://127.0.0.1:${server.port}`, bucket: 'packs', accessKeyId: 'a', secretAccessKey: 's' })
+      await bucket.put('parts/x.part.gz', new Uint8Array([31, 139, 8]), { contentType: 'application/gzip', cacheControl: IMMUTABLE })
+      expect(seen).toEqual([{ type: 'application/gzip', cache: 'public, max-age=31536000, immutable', encoding: null, bytes: 3 }])
+    } finally {
+      server.stop(true)
     }
   })
 

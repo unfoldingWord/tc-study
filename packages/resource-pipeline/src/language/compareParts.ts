@@ -113,12 +113,13 @@ export async function compareParts(o: {
   const packs = [await readPack(o.pack), await readPack(o.originals)]
   const language = packs[0].manifest.language
   const compat = partsCompatOf(o.workDir, language)
-  const readList = (name: string): { list: PartsList; text: string } => {
-    const text = readFileSync(join(o.workDir, partsListPath(compat, name)), 'utf8')
+  const readList = (path: string): { list: PartsList; text: string } => {
+    const text = readFileSync(join(o.workDir, path), 'utf8')
     return { list: JSON.parse(text) as PartsList, text }
   }
-  const languageList = readList(language)
-  const originalsList = readList('originals')
+  const languageList = readList(partsListPath(compat, language))
+  // The originals list the language list was made against (its content address), not the latest `originals.json`.
+  const originalsList = readList(languageList.list.originals?.path ?? partsListPath(compat, 'originals'))
 
   // The whole side.
   const whole: Side = new Map()
@@ -144,7 +145,7 @@ export async function compareParts(o: {
   const partFiles: PartFileProblem[] = []
   const originalsSha = createHash('sha256').update(originalsList.text).digest('hex')
   if (languageList.list.originals?.sha256 !== originalsSha) {
-    partFiles.push({ part: 'originals.json', problem: `the language list names sha256 ${languageList.list.originals?.sha256}, the file has ${originalsSha}` })
+    partFiles.push({ part: languageList.list.originals?.path ?? 'originals.json', problem: `the language list names sha256 ${languageList.list.originals?.sha256}, the file has ${originalsSha}` })
   }
   const lists = [languageList.list, originalsList.list]
   let partsChecked = 0

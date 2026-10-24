@@ -40,4 +40,26 @@ describe('createResourceMetadata', () => {
     expect(row.contentMetadata).not.toHaveProperty('bookBlobs')
     expect(row.contentMetadata).not.toHaveProperty('bookBlobsRef')
   })
+
+  test("generates ingredients with the client it is given (the build's, whose zips it keeps), not a new one", async () => {
+    const tw: Door43Resource = { ...hit, id: 'tw', name: 'es-419_tw', subject: 'Translation Words', ingredients: [] }
+    const given = { downloadZipball: async () => new ArrayBuffer(0) }
+    const seen: unknown[] = []
+    const resourceTypeRegistry = {
+      getTypeForSubject: () => 'words',
+      get: () => ({
+        ingredientsGenerator: async (_r: Door43Resource, client: unknown) => {
+          seen.push(client)
+          return [{ identifier: 'bible/kt/god', title: 'Dios', path: './bible/kt/god.md' }]
+        },
+      }),
+    }
+    const row = await createResourceMetadata(tw, { includeEnrichment: false, resourceTypeRegistry, ingredientsClient: given as never })
+    expect(seen).toEqual([given])
+    expect(row.contentMetadata?.ingredients?.map((i) => i.identifier)).toEqual(['bible/kt/god'])
+    // Without one, a client of the resource's own server, as before.
+    await createResourceMetadata(tw, { includeEnrichment: false, resourceTypeRegistry })
+    expect(seen[1]).not.toBe(given)
+    expect(typeof (seen[1] as { downloadZipball?: unknown }).downloadZipball).toBe('function')
+  })
 })

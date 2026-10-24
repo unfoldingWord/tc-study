@@ -9,8 +9,14 @@
 import type { ProcessedWordsLinks, TranslationWordsLink } from '../../types';
 export type { ProcessedWordsLinks, TranslationWordsLink } from '../../types';
 
+/**
+ * Bump when what this processor gives changes: the loader stores it as the `twl:` rows, which language-pack parts
+ * carry (resource-pipeline `partsCodeVersions`).
+ */
+export const WORDS_LINKS_TSV_PARSER_VERSION = '1.0.0-bt-studio'
+
 export class WordsLinksProcessor {
-  private readonly PROCESSING_VERSION = '1.0.0-bt-studio';
+  private readonly PROCESSING_VERSION = WORDS_LINKS_TSV_PARSER_VERSION;
 
   /**
    * Process TSV content into structured words links data

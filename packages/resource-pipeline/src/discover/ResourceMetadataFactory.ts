@@ -94,6 +94,13 @@ export interface MetadataCreationOptions {
   
   /** Debug logging */
   debug?: boolean
+
+  /**
+   * The client ingredient generators read the repository with; default, a new one for the resource's server. The
+   * parts build gives its own, which keeps each release zip on disk: the titles in the ingredients then come from
+   * the very zip the build hashes.
+   */
+  ingredientsClient?: ReturnType<typeof getDoor43ApiClient>
 }
 
 /**
@@ -205,9 +212,9 @@ export async function createResourceMetadata(
       if (resourceTypeDef?.ingredientsGenerator) {
 
         
-        // Create Door43ApiClient configured with the resource's server
+        // The client given, or a Door43ApiClient configured with the resource's server
         const server = door43Resource.server || 'git.door43.org'
-        const door43Client = getDoor43ApiClient({ 
+        const door43Client = options.ingredientsClient ?? getDoor43ApiClient({ 
           baseUrl: server.startsWith('http') ? server : `https://${server}`,
           debug 
         })

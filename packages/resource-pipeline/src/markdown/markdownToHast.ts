@@ -8,6 +8,9 @@ import remarkParse from 'remark-parse'
 import remarkRehype from 'remark-rehype'
 import { unified } from 'unified'
 
+/** Bump when this pipeline's output (hast, light text) changes: every preparer's rows hold it, and it is in every part fingerprint. */
+export const MARKDOWN_HAST_VERSION = 1
+
 export type HastRoot = {
   type: 'root'
   children: unknown[]

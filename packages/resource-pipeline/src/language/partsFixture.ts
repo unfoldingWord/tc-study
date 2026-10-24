@@ -3,7 +3,9 @@
  * book, FRT, outside the canon), TN (linking a TA article), TQ, TWL, TW, TA and two Open Bible Stories (no OBS helps)
  * of es-419 with Ruth and Jonah, the
  * Hebrew of both and the Greek of Titus, a Hebrew lexicon behind a fake HTTP; and today's whole build of it, through
- * prepareAndPack itself.
+ * prepareAndPack itself. Every repository has a `manifest.yaml`, and Door43's tree of each is the true one unless a
+ * test says otherwise. The repositories, the catalog and the lexicon can be changed for a test (`fakeDoor43`'s
+ * options, `discoverWith`, `lexiconFetchOf`).
  *
  * Kept apart from the tests, so each test file builds it without registering another file's tests.
  */
@@ -48,8 +50,8 @@ const EXTRA_TW = ['faith', 'grace', 'love', 'sin', 'holy', 'lord', 'spirit', 'wo
 // The same rule for TA; the first is the article TN links to.
 const TA_ARTICLES = ['figs-idiom', 'figs-metaphor', 'figs-simile', 'figs-irony', 'figs-hyperbole', 'figs-litotes', 'figs-merism', 'figs-pastforfuture', 'figs-rquestion', 'figs-synecdoche', 'figs-metonymy']
 
-/** Each repository's release zip (top folder `{repo}/`, as Door43 serves it). */
-export const REPOS: Record<string, Record<string, string>> = {
+/** Each repository's files, without its manifest (top folder `{repo}/` in the zip, as Door43 serves it). */
+const FILES: Record<string, Record<string, string>> = {
   'test_gl/es-419_glt': { 'A0-FRT.usfm': FRONT, '08-RUT.usfm': aligned('RUT', ['Sucedió', 'en los días']), '32-JON.usfm': aligned('JON', ['Vino', 'palabra']) },
   'test_gl/es-419_gst': { '08-RUT.usfm': aligned('RUT', ['Pasó', 'cuando']), '32-JON.usfm': aligned('JON', ['Llegó', 'mensaje']) },
   'test_gl/es-419_tn': {
@@ -85,40 +87,111 @@ export const REPOS: Record<string, Record<string, string>> = {
   'unfoldingWord/el-x-koine_ugnt': { '57-TIT.usfm': GREEK },
 }
 
+/** The release tag of a fixture repository, as its catalog row names it. */
+const tagOf = (repo: string) => (/_(uhb|ugnt)$/.test(repo) ? 'v2.1.30' : 'v12')
+
+/**
+ * A Door43 manifest (rc0.2) as releases carry them: `version`, `modified`, `issued` and the relation's `?v=` move with
+ * every release, the rest only when someone edits it.
+ */
+export function manifestOf(repo: string, o: { title?: string; version?: string; date?: string } = {}): string {
+  const [, name] = repo.split('/')
+  const [language, id] = name.split('_')
+  const version = o.version ?? tagOf(repo).replace(/^v/, '')
+  const date = o.date ?? '2026-09-01'
+  return [
+    'dublin_core:',
+    "  conformsto: 'rc0.2'",
+    `  identifier: '${id}'`,
+    `  issued: '${date}'`,
+    '  language:',
+    `    identifier: '${language}'`,
+    `  modified: '${date}'`,
+    '  relation:',
+    `    - 'hbo/uhb?v=${version}'`,
+    `  title: '${o.title ?? `${id} (${language})`}'`,
+    `  version: '${version}'`,
+    'checking:',
+    "  checking_level: '3'",
+    'projects: []',
+    '',
+  ].join('\n')
+}
+
+/** Each repository's release zip (top folder `{repo}/`, as Door43 serves it): its files and its `manifest.yaml`. */
+export const REPOS: Record<string, Record<string, string>> = Object.fromEntries(
+  Object.entries(FILES).map(([repo, files]) => [repo, { ...files, 'manifest.yaml': manifestOf(repo) }])
+)
+
+/** A copy of REPOS to change, for a test that builds a changed fixture. */
+export const reposCopy = (): Record<string, Record<string, string>> => structuredClone(REPOS)
+
 const blobSha = (content: string) => {
   const bytes = Buffer.from(content)
   return createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
 }
 
-/** `fail` may make a zip download throw: given the repository and how many times it was asked for, 1 the first. */
-export function fakeDoor43(o: { fail?: (repo: string, attempt: number) => Error | undefined } = {}) {
+/** Door43's tree of a repository: every file's blob sha, all of it. */
+export type FakeTree = { blobs: Map<string, string>; complete: boolean }
+
+export type FakeDoor43Options = {
+  /** May make a zip download throw: given the repository and how many times it was asked for, 1 the first. */
+  fail?: (repo: string, attempt: number) => Error | undefined
+  /** The repositories' files (default REPOS). */
+  repos?: Record<string, Record<string, string>>
+  /** The lexicon repository's files (default LEXICON_FILES), for its tree. */
+  lexicon?: Record<string, string>
+  /** The tree Door43 answers, given the repository and the true one; it may throw. Default: the true one. */
+  tree?: (repo: string, truth: FakeTree) => FakeTree
+  /** The catalog the OBS loader's repository lookups read (default: catalogRows()). */
+  catalog?: CatalogOverrides
+}
+
+export function fakeDoor43(o: FakeDoor43Options = {}) {
+  const repos = o.repos ?? REPOS
   const downloads: string[] = []
+  const trees: string[] = []
   const asked = new Map<string, number>()
+  const filesOf = (owner: string, repo: string) =>
+    `${owner}/${repo}` === LEXICON_REPO ? (o.lexicon ?? LEXICON_FILES) : repos[`${owner}/${repo}`]
+  const truthOf = (owner: string, repo: string): FakeTree => ({
+    blobs: new Map(Object.entries(filesOf(owner, repo) ?? {}).map(([path, content]) => [path, blobSha(content)])),
+    complete: true,
+  })
+  const fetchRepoTree = async (owner: string, repo: string, ref = ''): Promise<FakeTree> => {
+    trees.push(`${owner}/${repo}@${ref}`)
+    const truth = truthOf(owner, repo)
+    return o.tree ? o.tree(`${owner}/${repo}`, truth) : truth
+  }
   return {
     downloads,
+    /** The trees asked for, `{owner}/{repo}@{ref}`. */
+    trees,
     async downloadZipball(owner: string, repo: string, ref: string) {
       const attempt = (asked.get(`${owner}/${repo}`) ?? 0) + 1
       asked.set(`${owner}/${repo}`, attempt)
       const failure = o.fail?.(`${owner}/${repo}`, attempt)
       if (failure) throw failure
       downloads.push(`${owner}/${repo}@${ref}`)
-      const files = REPOS[`${owner}/${repo}`]
+      const files = repos[`${owner}/${repo}`]
       if (!files) throw new Error(`404 ${owner}/${repo}`)
       return storedZip(Object.fromEntries(Object.entries(files).map(([path, content]) => [`${repo}/${path}`, content])))
     },
-    async fetchRepoTreeBlobs(owner: string, repo: string) {
-      return new Map(Object.entries(REPOS[`${owner}/${repo}`] ?? {}).map(([path, content]) => [path, blobSha(content)]))
+    fetchRepoTree,
+    async fetchRepoTreeBlobs(owner: string, repo: string, ref = '') {
+      return (await fetchRepoTree(owner, repo, ref)).blobs
     },
+    // Which files a release has (the whole download's completeness), not the tree `tree` changes.
     async fetchRepoTreePaths(owner: string, repo: string) {
-      return new Set(Object.keys(REPOS[`${owner}/${repo}`] ?? {}))
+      return new Set(truthOf(owner, repo).blobs.keys())
     },
     // What the OBS loader reads, story by story.
     async findRepository(owner: string, repo: string) {
-      const row = catalogRows().find((r) => repoOf(r.resourceKey) === `${owner}/${repo}`)
+      const row = catalogRows(o.catalog).find((r) => repoOf(r.resourceKey) === `${owner}/${repo}`)
       return row ? { release: row.release } : null
     },
     async fetchTextContent(owner: string, repo: string, path: string) {
-      const text = REPOS[`${owner}/${repo}`]?.[path.replace(/^\.\//, '')]
+      const text = repos[`${owner}/${repo}`]?.[path.replace(/^\.\//, '')]
       if (text === undefined) throw new Error(`404 ${owner}/${repo}/${path}`)
       return text
     },
@@ -130,9 +203,14 @@ const repoOf = (key: string) => {
   return `${owner}/${language}_${id}`
 }
 
+export type CatalogRow = ReturnType<typeof row>
+
+/** Changes to the catalog discovery finds: another release tag for some resources, or any edit of a row. */
+export type CatalogOverrides = { tags?: Readonly<Record<string, string>>; edit?: (row: CatalogRow) => void }
+
 function row(key: string, subject: string, type: string, ingredients: Array<{ identifier: string; path: string; title?: string }>) {
   const [owner, language, resourceId] = key.split('/')
-  const tag = resourceId === 'uhb' || resourceId === 'ugnt' ? 'v2.1.30' : 'v12'
+  const tag = tagOf(repoOf(key))
   return {
     resourceKey: key,
     server: 'git.door43.org',
@@ -159,7 +237,21 @@ function row(key: string, subject: string, type: string, ingredients: Array<{ id
 const book = (id: string, file: string) => ({ identifier: id, path: `./${file}` })
 
 /** What discovery would have put in the catalog: GST's catalog lists Genesis, which its release lacks. */
-export const catalogRows = () => [
+export function catalogRows(o: CatalogOverrides = {}): CatalogRow[] {
+  const rows = baseRows()
+  for (const r of rows) {
+    const tag = o.tags?.[r.resourceKey]
+    if (tag) {
+      r.version = tag
+      r.release.tag_name = tag
+      r.release.zipball_url = r.release.zipball_url.replace(/[^/]+\.zip$/, `${tag}.zip`)
+    }
+    o.edit?.(r)
+  }
+  return rows
+}
+
+const baseRows = () => [
     row(GLT, 'Aligned Bible', 'scripture', [book('frt', 'A0-FRT.usfm'), book('rut', '08-RUT.usfm'), book('jon', '32-JON.usfm')]),
     row(GST, 'Aligned Bible', 'scripture', [book('gen', '01-GEN.usfm'), book('rut', '08-RUT.usfm'), book('jon', '32-JON.usfm')]),
     row(TN, 'TSV Translation Notes', 'notes', [book('rut', 'tn_RUT.tsv'), book('jon', 'tn_JON.tsv')]),
@@ -180,11 +272,24 @@ export const catalogRows = () => [
     row(UGNT, 'Greek New Testament', 'scripture', [book('tit', '57-TIT.usfm')]),
   ]
 
-export const discover: DiscoverInto = async ({ catalogManager }) => {
-  const rows = catalogRows()
-  for (const r of rows) await catalogManager.catalogAdapter.set(r.resourceKey, r as never)
-  return { resources: rows.filter((r) => r.language === LANG).map((r) => r.resourceKey), originals: [UHB, UGNT] }
+/**
+ * A catalog edit: TN's Ruth at `./RUT.tsv`, a path no file of its release has. The loaders still find `tn_RUT.tsv` (they
+ * match the end of a path), but the book gets no blob, so its rows carry the release stamp.
+ */
+export const releaseStampedRuth = (row: CatalogRow) => {
+  if (row.resourceKey === TN) row.contentMetadata.ingredients[0].path = './RUT.tsv'
 }
+
+/** Discovery of the fixture's catalog, changed by `o`. */
+export function discoverWith(o: CatalogOverrides = {}): DiscoverInto {
+  return async ({ catalogManager }) => {
+    const rows = catalogRows(o)
+    for (const r of rows) await catalogManager.catalogAdapter.set(r.resourceKey, r as never)
+    return { resources: rows.filter((r) => r.language === LANG).map((r) => r.resourceKey), originals: [UHB, UGNT] }
+  }
+}
+
+export const discover: DiscoverInto = discoverWith()
 
 export function maculaFolder(dir: string) {
   for (const part of ['trees', 'referents']) mkdirSync(join(dir, part))
@@ -195,7 +300,7 @@ export function maculaFolder(dir: string) {
 }
 
 /** A `.tar.gz` (ustar) of the files given, as Door43 serves an archive. */
-function tarGz(files: Record<string, string>): Uint8Array<ArrayBuffer> {
+export function tarGz(files: Record<string, string>): Uint8Array<ArrayBuffer> {
   const blocks: Uint8Array[] = []
   for (const [path, body] of Object.entries(files)) {
     const bytes = new TextEncoder().encode(body)
@@ -209,25 +314,37 @@ function tarGz(files: Record<string, string>): Uint8Array<ArrayBuffer> {
   return new Uint8Array(gzipSync(Buffer.concat(blocks)))
 }
 
-const UHL_COMMIT = { sha: '0123456789abcdef0123456789abcdef01234567', created: '2026-07-01T00:00:00Z' }
+export const UHL_COMMIT = { sha: '0123456789abcdef0123456789abcdef01234567', created: '2026-07-01T00:00:00Z' }
 
-/** Door43's HTTP for the lexicons: es-419_gl has a Hebrew lexicon of two entries, and no Greek one. */
-export const lexiconFetch = async (url: string): Promise<Response> => {
-  const u = new URL(url)
-  const repo = 'test_gl/es-419_uhl'
-  if (u.pathname === `/api/v1/repos/${repo}`) return Response.json({ full_name: repo })
-  if (u.pathname === `/api/v1/repos/${repo}/commits`) return Response.json([UHL_COMMIT])
-  if (u.pathname === `/${repo}/archive/${UHL_COMMIT.sha}.tar.gz`) {
-    return new Response(
-      tarGz({
-        'es-419_uhl/content/H1961.json': JSON.stringify({ brief: 'ser, estar' }),
-        'es-419_uhl/content/H5281.json': JSON.stringify({ brief: 'Noemí' }),
-        'es-419_uhl/manifest.yaml': 'dublin_core:\n  title: Léxico hebreo\n',
-      })
-    )
-  }
-  return new Response('not found', { status: 404 })
+const LEXICON_REPO = 'test_gl/es-419_uhl'
+
+/** The Hebrew lexicon's repository files: two entries and its manifest. */
+export const LEXICON_FILES: Readonly<Record<string, string>> = {
+  'content/H1961.json': JSON.stringify({ brief: 'ser, estar' }),
+  'content/H5281.json': JSON.stringify({ brief: 'Noemí' }),
+  'manifest.yaml': 'dublin_core:\n  title: Léxico hebreo\n',
 }
+
+/**
+ * Door43's HTTP for the lexicons: es-419_gl has a Hebrew lexicon (`files`, default LEXICON_FILES, at `commit`), and
+ * no Greek one.
+ */
+export function lexiconFetchOf(o: { files?: Readonly<Record<string, string>>; commit?: { sha: string; created: string } } = {}) {
+  const files = o.files ?? LEXICON_FILES
+  const commit = o.commit ?? UHL_COMMIT
+  return async (url: string): Promise<Response> => {
+    const u = new URL(url)
+    const repo = LEXICON_REPO
+    if (u.pathname === `/api/v1/repos/${repo}`) return Response.json({ full_name: repo })
+    if (u.pathname === `/api/v1/repos/${repo}/commits`) return Response.json([commit])
+    if (u.pathname === `/${repo}/archive/${commit.sha}.tar.gz`) {
+      return new Response(tarGz(Object.fromEntries(Object.entries(files).map(([path, body]) => [`es-419_uhl/${path}`, body]))))
+    }
+    return new Response('not found', { status: 404 })
+  }
+}
+
+export const lexiconFetch = lexiconFetchOf()
 
 export const LEXICONS_REF = 'master'
 

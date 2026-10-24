@@ -98,6 +98,9 @@ async function articleIdsFromCache(cache: PipelineCache, key: string): Promise<s
   }
 }
 
+/** Bump when the titles `writeTitles` stores (which entries, their ids, how the TOC index resolves them) change: in every part fingerprint. */
+export const ARTICLE_TITLES_VERSION = 1
+
 async function writeTitles(
   cache: PipelineCache,
   catalog: WarmStampCatalog,

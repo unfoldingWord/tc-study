@@ -725,6 +725,7 @@
         "@bt-synergy/translation-words-links-loader": "workspace:*",
         "@bt-synergy/translation-words-loader": "workspace:*",
         "@bt-synergy/usj-processor": "workspace:*",
+        "jszip": "^3.10.1",
         "remark-gfm": "^4.0.1",
         "remark-parse": "^11.0.0",
         "remark-rehype": "^11.1.2",

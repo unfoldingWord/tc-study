@@ -53,7 +53,9 @@ export {
   NOTES_TSV_PARSER_VERSION,
   processedNotesParserIsCurrent,
   QuestionsProcessor,
+  QUESTIONS_TSV_PARSER_VERSION,
   WordsLinksProcessor,
+  WORDS_LINKS_TSV_PARSER_VERSION,
 } from './parsers/tsv'
 
 // Markdown Parser
