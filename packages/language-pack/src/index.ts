@@ -11,3 +11,5 @@ export { LIST_DROPPED_FIELDS, partsListPath, serializePartsList, restoreCatalogB
 export type { PartKind, PartEntry, PartsList, PartsListResource } from './parts/partsList'
 export { fnv1a32, slotOfRow, slotId, articleIdOfRow, TW_BUCKETS, TA_TRANSLATE_BUCKETS, LEXICON_RANGE, OBS_STORIES_PER_PART } from './parts/partSlots'
 export type { PartSlot } from './parts/partSlots'
+export { FINGERPRINT_VERSION, gitBlobSha, normalizeManifest, manifestFingerprint, canonicalInputs, fingerprintOf } from './parts/fingerprint'
+export type { FingerprintInputs } from './parts/fingerprint'
