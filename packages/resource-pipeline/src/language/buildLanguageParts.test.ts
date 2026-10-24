@@ -297,6 +297,46 @@ describe('fingerprints', () => {
   }, 120_000)
 })
 
+describe("a unit's network", () => {
+  test("a unit that asks Door43 for what step 1 did not read fails, naming the call", async () => {
+    // TN's zip gone from <work>/zips once step 1 ends: its loader would download it again, bytes no fingerprint saw,
+    // and then read the book's raw file.
+    const workDir = freshDir('parts-network')
+    const lines: string[] = []
+    const { failures, door43 } = await build(workDir, {
+      log: (line) => {
+        lines.push(line)
+        if (line.includes('Árboles de Door43')) {
+          for (const f of readdirSync(join(workDir, 'zips'))) if (f.includes('es-419_tn')) rmSync(join(workDir, 'zips', f))
+        }
+      },
+    })
+    const tnDownloads = door43.downloads.filter((d) => d.startsWith('test_gl/es-419_tn@'))
+    expect(tnDownloads).toEqual(['test_gl/es-419_tn@v12'])
+    const network = failures.filter((f) => f.error.includes('asked the network'))
+    expect(network.map((f) => f.unit)).toEqual(['book rut', 'book jon'])
+    // Refused, the loader fell back to the book's raw file through the process's fetch: refused too.
+    expect(network[0].error).toBe(
+      'book rut: it asked the network for what step 1 did not read, so its rows would not be of the files fingerprinted: downloadZipball(test_gl, es-419_tn, v12); fetch GET https://git.door43.org/test_gl/es-419_tn/raw/tag/v12/tn_RUT.tsv'
+    )
+  }, 120_000)
+
+  test("with OBS on, the OBS loader's story reads are let through and logged, and nothing else is", async () => {
+    const workDir = freshDir('parts-network-obs')
+    const { failures, lines } = await build(workDir, { obs: true })
+    expect(failures).toEqual([])
+    expect(lines.some((l) => /shared: fetchTextContent de test_gl\/es-419_obs desde Door43/.test(l))).toBe(true)
+  }, 120_000)
+
+  test("the process's fetch is given back when a unit ends, however it ends", async () => {
+    const before = globalThis.fetch
+    await expect(build(freshDir('parts-network-limit'), { memoryLimitMb: 1 })).rejects.toThrow(/over the 1 MB limit/)
+    expect(globalThis.fetch).toBe(before)
+    await build(freshDir('parts-network-ok'))
+    expect(globalThis.fetch).toBe(before)
+  }, 120_000)
+})
+
 describe('the report', () => {
   test('gives part sizes per kind and per TW and TA folder, the downloads of step 1, and ends the log with the sizes', async () => {
     const workDir = freshDir('parts-sizes')

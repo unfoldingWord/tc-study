@@ -114,7 +114,7 @@ import { createHeadlessResourceTypeRegistry } from '../discover/resourceTypeRegi
 import { CACHE_METADATA_KEYS } from '../download/ResourceCompletenessChecker'
 import { resetTocTitleIndexCache } from '../helps/tocTitleIndex'
 import { runDownload } from '../download/runDownload'
-import { zipCachingClient, zipFileNames } from '../download/zipCache'
+import { zipCachePath, zipCachingClient, zipFileNames } from '../download/zipCache'
 import { resolveOriginalLanguageKey } from '../scripture/originalLanguage'
 import { CANON_BOOK_ORDER } from '../warm/warmBookOrder'
 import { buildLanguageArtifacts, type BuildReport } from './buildLanguageArtifacts'
@@ -124,6 +124,7 @@ import { closeAndDelete } from './fakeDatabases'
 import { archiveCachingFetch, folderGitTree, folderInputs, lexiconInputs, treeCheck, zipInputs, type TreeCheck } from './inputFiles'
 import { PACK_VERSIONS } from './packVersions'
 import { partsCode } from './partsCode'
+import { cacheOnlyNetwork, recordingFetch } from './unitNetwork'
 
 export type UnitSummary = { built: number; cached: number; blocked: number; noop: number; failed: number }
 
@@ -440,6 +441,11 @@ export async function buildLanguageParts(o: {
   )
   // The lexicons' archives, kept beside the zips: what the catalog step hashes is what the shared unit adds.
   const fetchArchives = archiveCachingFetch((o.fetch ?? fetch) as (url: string) => Promise<Response>, join(o.workDir, 'zips'))
+  // What step 1 read: the only network a unit is given (unitNetwork.ts).
+  const stepOne = recordingFetch(fetchArchives)
+  const keptZips = new Set<string>()
+  /** The OBS repositories, whose loader reads each story from Door43 (`owner/repo`). */
+  const obsRepos = new Set<string>()
   mkdirSync(join(o.workDir, 'parts'), { recursive: true })
 
   const started = Date.now()
@@ -511,27 +517,64 @@ export async function buildLanguageParts(o: {
 
   type Meter = ReturnType<typeof meter>
 
+  type UnitNetwork = { client: Door43Like; fetch: typeof fetchArchives }
+
   /**
    * One unit in a database of its own: `body` returns how many parts it wrote. However it ends, the unit's peak is
    * kept before its database is deleted, the database is deleted, and the report written.
+   *
+   * The unit reads only what step 1 read (`net`, and the process's `fetch` refused meanwhile): any other network call
+   * is a failure of the unit naming it, since its rows would not be of the bytes fingerprinted. OBS, when on, is the
+   * exception: its loader reads each story from Door43 (logged; its unit is never carried).
    */
-  async function runUnit(unit: string, dbName: string, body: (cache: IndexedDBCacheAdapter, m: Meter) => Promise<number>) {
+  async function runUnit(unit: string, dbName: string, body: (cache: IndexedDBCacheAdapter, m: Meter, net: UnitNetwork) => Promise<number>) {
     say(`[${elapsed()}] ${unit}: start`)
     const unitStarted = Date.now()
     const failuresBefore = failures.length
     const m = meter(unit)
     const cache = cacheAdapterFor(dbName)
+    const allowed = new Set<string>()
+    const net = cacheOnlyNetwork({
+      unit,
+      client: door43,
+      // Step 1's zip, still on disk: a missing one would be downloaded again.
+      kept: (owner, repo, ref) => keptZips.has(`${owner}/${repo}@${ref}`) && existsSync(zipCachePath(join(o.workDir, 'zips'), owner, repo, ref)),
+      fetchFn: fetchArchives,
+      recorded: stepOne,
+      allow: (method, args) => {
+        const ok = unit === SHARED_UNIT && (method === 'findRepository' || method === 'fetchTextContent') && obsRepos.has(`${args[0]}/${args[1]}`)
+        if (ok && !allowed.has(method)) {
+          allowed.add(method)
+          say(`  ${unit}: ${method} de ${args[0]}/${args[1]} desde Door43 (el lector de OBS lee cada historia, no el zip)`)
+        }
+        return ok
+      },
+    })
+    const processFetch = globalThis.fetch
     let parts = 0
     let stopped: string | undefined
     try {
       m.check()
-      parts = await body(cache, m)
+      globalThis.fetch = net.global
+      try {
+        parts = await body(cache, m, { client: net.client, fetch: net.fetch })
+      } finally {
+        globalThis.fetch = processFetch
+      }
       m.check()
     } catch (e) {
       stopped = messageOf(e)
       throw e
     } finally {
       m.stop()
+      const calls = [...new Set(net.calls)]
+      if (calls.length) {
+        const more = calls.length - DIFFERING_LISTED
+        failures.push({
+          unit,
+          error: `${unit}: it asked the network for what step 1 did not read, so its rows would not be of the files fingerprinted: ${calls.slice(0, DIFFERING_LISTED).join('; ')}${more > 0 ? ` and ${more} more` : ''}`,
+        })
+      }
       const record: UnitRecord = {
         unit,
         outcome: 'built',
@@ -580,8 +623,8 @@ export async function buildLanguageParts(o: {
   }
 
   const catalog = new IndexedDBCatalogAdapter({ dbName: CATALOG_DB, storeName: 'catalog-entries', version: 1 })
-  const managerOver = (cache: IndexedDBCacheAdapter) =>
-    new CatalogManager({ catalogAdapter: catalog, cacheAdapter: cache, door43Client: door43, enableNetworkFallback: true, requireSecureConnection: false } as never)
+  const managerOver = (cache: IndexedDBCacheAdapter, client: Door43Like = door43) =>
+    new CatalogManager({ catalogAdapter: catalog, cacheAdapter: cache, door43Client: client, enableNetworkFallback: true, requireSecureConnection: false } as never)
   const metaOf = async (key: string) => {
     const m = await catalog.get(key)
     if (!m) throw new Error(`${key} is not in the catalog`)
@@ -758,6 +801,7 @@ export async function buildLanguageParts(o: {
         const names = zipFileNames(zip)
         if (!names) throw new Error('its release zip cannot be read')
         downloaded(zip.byteLength, since)
+        keptZips.add(`${owner}/${repo}@${refOf(m)}`)
         return { zip, names }
       } catch (e) {
         if (attempt >= ZIP_RETRY_DELAYS_S.length) {
@@ -935,14 +979,15 @@ export async function buildLanguageParts(o: {
     // Their catalog rows and MACULA's, as `addLexicons` and `addMacula` write them: a carried shared unit runs neither.
     const lexicons = new Map<string, string>()
     const companionRows: Array<ReturnType<typeof companionCatalogRow>> = []
+    for (const key of languageKeys) if (isObs(await metaOf(key))) obsRepos.add(Object.values(repoOf(key)).join('/'))
     const literal = literalTextOf(await Promise.all(languageKeys.map(metaOf)), language) as (ResourceMetadata & { owner?: string }) | undefined
     if (o.lexiconsRef && literal?.owner) {
       for (const lexicon of lexiconRepos(language, lexiconOwnerOf(language, literal.owner))) {
         const repo = `${lexicon.owner}/${lexicon.name}`
-        const commit = await resolveLexicon(repo, o.lexiconsRef, fetchArchives)
+        const commit = await resolveLexicon(repo, o.lexiconsRef, stepOne.fetch)
         if (!commit) continue
         const since = Date.now()
-        const res = await fetchArchives(lexiconArchiveUrl(repo, commit.sha))
+        const res = await stepOne.fetch(lexiconArchiveUrl(repo, commit.sha))
         if (!res.ok) throw new Error(`Could not download ${repo} at ${commit.sha} (Door43 answered ${res.status})`)
         const archive = new Uint8Array(await res.arrayBuffer())
         downloaded(archive.byteLength, since)
@@ -1035,9 +1080,9 @@ export async function buildLanguageParts(o: {
     // 2. The shared unit.
     if (await carry(SHARED_UNIT)) {
       for (const row of companionRows) await catalog.set(row.resourceKey, row as never)
-    } else await runUnit(SHARED_UNIT, SHARED_DB, async (cache, m) => {
+    } else await runUnit(SHARED_UNIT, SHARED_DB, async (cache, m, net) => {
       const unit = SHARED_UNIT
-      const catalogManager = managerOver(cache)
+      const catalogManager = managerOver(cache, net.client)
       say(`  ${whole.join(', ') || 'nada que descargar'}`)
       await runDownload({
         resourceKeys: whole,
@@ -1049,7 +1094,7 @@ export async function buildLanguageParts(o: {
         isCurrentRun: () => !m.over(),
         cacheAdapter: cache as never,
         catalogAdapter: catalog as never,
-        door43Client: door43,
+        door43Client: net.client,
       })
       m.check()
       // Before the companions, as the whole build runs its jobs before adding them.
@@ -1070,10 +1115,11 @@ export async function buildLanguageParts(o: {
       const companions: string[] = []
       if (o.lexiconsRef && literal?.owner) {
         const owner = lexiconOwnerOf(language, literal.owner)
-        for (const l of await addLexicons(cache as never, catalog as never, language, owner, o.lexiconsRef, fetchArchives)) {
+        for (const l of await addLexicons(cache as never, catalog as never, language, owner, o.lexiconsRef, net.fetch)) {
           say(`  ${l.key}: ${l.entries !== undefined ? `${l.entries} entradas` : l.why}`)
           if (l.entries === undefined) continue
-          // The ref may have moved since step 1: these rows would then not be of the files fingerprinted.
+          // The unit's fetch answers the ref's commit as step 1 got it, so it cannot have moved; kept as a check that
+          // these rows are of the files fingerprinted.
           const version = (await metaOf(l.key)).version
           if (lexicons.get(l.key) !== version) {
             failures.push({ unit, error: `${l.key}: read at ${version}, but its files were hashed at ${lexicons.get(l.key) ?? 'no commit'}: the ref moved during the build` })
@@ -1106,11 +1152,11 @@ export async function buildLanguageParts(o: {
     for (const book of books) {
       const unit = bookUnit(book)
       if (await carry(unit)) continue
-      await runUnit(unit, bookDb(book), async (cache, m) => {
+      await runUnit(unit, bookDb(book), async (cache, m, net) => {
         const { ofLanguage, originals } = keysOfBook(book)
         const original = resolveOriginalLanguageKey(book)
         const keys = [...ofLanguage, ...originals]
-        const catalogManager = managerOver(cache)
+        const catalogManager = managerOver(cache, net.client)
         for (const key of keys) await cache.set(`resource:${key}`, receiptOf(await metaOf(key), absentOf.get(key) ?? []) as never)
         await runDownload({
           resourceKeys: keys,
@@ -1126,7 +1172,7 @@ export async function buildLanguageParts(o: {
           isCurrentRun: () => !m.over(),
           cacheAdapter: cache as never,
           catalogAdapter: catalog as never,
-          door43Client: door43,
+          door43Client: net.client,
         })
         m.check()
         const blockedPrepare = new Set<string>()
