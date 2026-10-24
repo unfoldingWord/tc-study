@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { storedZip } from '../download/zipFixture'
-import { archiveCachingFetch, folderInputs, lexiconInputs, treeCheck, zipInputs } from './inputFiles'
+import { archiveCachingFetch, folderGitTree, folderInputs, lexiconInputs, treeCheck, zipInputs } from './inputFiles'
 import { addLexicons } from '../../cli/companions'
 import { fakeDoor43, lexiconFetch, maculaFolder, REPOS, tarGz, UHL_COMMIT } from './partsFixture'
 
@@ -176,6 +176,73 @@ describe('folderInputs', () => {
     const dir = fresh('macula')
     mkdirSync(join(dir, 'trees'))
     await expect(folderInputs(dir, ['trees', 'referents'])).rejects.toThrow()
+  })
+})
+
+/**
+ * A Taller-like checkout: MACULA under `public/`, committed, then the app changed in a later commit, as the workflow's
+ * clone has it. The commit that touched `trees/` and `referents/` last, and the `public/` folder.
+ */
+function tallerClone() {
+  const dir = fresh('taller')
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] })
+      .toString('utf8')
+      .trim()
+  git('init', '-q')
+  mkdirSync(join(dir, 'public'))
+  maculaFolder(join(dir, 'public'))
+  writeFileSync(join(dir, 'public', 'trees', 'README.md'), 'not a book')
+  git('add', '-A')
+  git('commit', '-q', '-m', 'macula')
+  const commit = git('rev-parse', 'HEAD')
+  writeFileSync(join(dir, 'app.ts'), 'later')
+  git('add', '-A')
+  git('commit', '-q', '-m', 'app')
+  return { folder: join(dir, 'public'), commit, git }
+}
+
+describe('folderGitTree', () => {
+  test.skipIf(!hasGit)("MACULA's files in git at its commit, selected as folderInputs selects them: they match", async () => {
+    const { folder, commit } = tallerClone()
+    const got = folderGitTree(folder, commit, ['trees', 'referents'])
+    expect(got.tree).not.toBeNull()
+    expect([...got.tree!.blobs.keys()].sort()).toEqual(['referents/RUT.json', 'trees/RUT.json', 'trees/TIT.json'])
+    expect(treeCheck(await folderInputs(folder, ['trees', 'referents']), got.tree)).toEqual({ state: 'match', differing: [] })
+    // An abbreviated commit, as the stamp keeps it, names the same tree.
+    expect(folderGitTree(folder, commit.slice(0, 10), ['trees', 'referents']).tree).toEqual(got.tree)
+  })
+
+  test.skipIf(!hasGit)('a file changed in the checkout, or one the commit lacks, is a mismatch naming it', async () => {
+    const { folder, commit } = tallerClone()
+    writeFileSync(join(folder, 'trees', 'RUT.json'), '{"edited":true}')
+    writeFileSync(join(folder, 'referents', 'TIT.json'), '{}')
+    const check = treeCheck(await folderInputs(folder, ['trees', 'referents']), folderGitTree(folder, commit, ['trees', 'referents']).tree)
+    expect(check).toEqual({ state: 'mismatch', differing: ['referents/TIT.json', 'trees/RUT.json'] })
+  })
+
+  test.skipIf(!hasGit)('a commit that changed MACULA after the one named is a mismatch: the files are not that commit\'s', async () => {
+    const { folder, commit, git } = tallerClone()
+    writeFileSync(join(folder, 'trees', 'RUT.json'), '{"newer":true}')
+    git('commit', '-q', '-am', 'newer macula')
+    const check = treeCheck(await folderInputs(folder, ['trees', 'referents']), folderGitTree(folder, commit, ['trees', 'referents']).tree)
+    expect(check).toEqual({ state: 'mismatch', differing: ['trees/RUT.json'] })
+  })
+
+  test('no repository, an unknown commit or no git: no tree, and why', () => {
+    const plain = maculaFolder(fresh('macula'))
+    const none = folderGitTree(plain, 'abc1234567', ['trees', 'referents'])
+    expect(none.tree).toBeNull()
+    expect(none.why).toBeTruthy()
+    if (hasGit) {
+      const { folder } = tallerClone()
+      const unknown = folderGitTree(folder, 'ffffffffffffffffffffffffffffffffffffffff', ['trees', 'referents'])
+      expect(unknown.tree).toBeNull()
+      expect(unknown.why).toContain('ffffffffff')
+    }
+    const noGit = folderGitTree(plain, 'abc1234567', ['trees', 'referents'], { git: 'no-such-git-binary' })
+    expect(noGit.tree).toBeNull()
+    expect(noGit.why).toBeTruthy()
   })
 })
 

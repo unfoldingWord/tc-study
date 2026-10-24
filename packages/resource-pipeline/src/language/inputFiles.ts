@@ -16,6 +16,7 @@
  * - An LFS pointer is a blob in the tree; if Door43 ever served the LFS object instead, its bytes differ: a mismatch.
  */
 
+import { spawnSync } from 'node:child_process'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
@@ -86,11 +87,46 @@ export async function folderInputs(folder: string, parts: readonly string[]): Pr
   for (const part of parts) {
     const entries = await readdir(join(folder, part), { withFileTypes: true })
     for (const entry of entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))) {
-      if (!entry.isFile() || !/^[1-3A-Z]{3}$/.test(entry.name.replace(/\.json$/, ''))) continue
+      if (!entry.isFile() || !isBookFile(entry.name)) continue
       files.set(`${part}/${entry.name}`, await gitBlobSha(new Uint8Array(await readFile(join(folder, part, entry.name)))))
     }
   }
   return files
+}
+
+/** A file of MACULA's part folders that `addMacula` reads: a three-character book name, with or without `.json`. */
+const isBookFile = (name: string) => /^[1-3A-Z]{3}$/.test(name.replace(/\.json$/, ''))
+
+/**
+ * `parts` of `folder` as git has them at `commit` (`git ls-tree -r`, run in `folder`, so paths are `<part>/<name>`):
+ * the tree the Worker reads MACULA's fingerprints from (Taller's `public/trees` and `public/referents` at the MACULA
+ * commit), selected as `folderInputs` selects files (a regular blob directly in a part folder, named as a book), so
+ * `treeCheck` against `folderInputs` says whether the files read are that commit's. No tree, and why, when git cannot
+ * be run, `folder` is in no repository or the commit is not in it: the check is `unverified`.
+ */
+export function folderGitTree(
+  folder: string,
+  commit: string,
+  parts: readonly string[],
+  o: { git?: string } = {}
+): { tree: { blobs: Map<string, string>; complete: boolean }; why?: undefined } | { tree: null; why: string } {
+  // A commit is hex: anything else could be read by git as an option.
+  if (!/^[0-9a-f]{4,64}$/i.test(commit)) return { tree: null, why: `${JSON.stringify(commit)} is not a commit` }
+  const run = spawnSync(o.git ?? 'git', ['-C', folder, 'ls-tree', '-r', '-z', commit, '--', ...parts], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  if (run.error) return { tree: null, why: `git could not be run: ${run.error.message}` }
+  if (run.status !== 0) return { tree: null, why: `git ls-tree ${commit} in ${folder}: ${(run.stderr || '').trim() || `exit ${run.status}`}` }
+  const blobs = new Map<string, string>()
+  for (const line of run.stdout.split('\0')) {
+    if (!line) continue
+    const tab = line.indexOf('\t')
+    const [mode, type, sha] = line.slice(0, tab).split(' ')
+    const path = line.slice(tab + 1)
+    const [part, name, ...deeper] = path.split('/')
+    // Regular files only (100644/100755): folderInputs reads files, never a symlink or a submodule.
+    if (type !== 'blob' || !mode.startsWith('100') || deeper.length || !name || !parts.includes(part) || !isBookFile(name)) continue
+    blobs.set(path, sha)
+  }
+  return { tree: { blobs, complete: true } }
 }
 
 export type TreeCheck = { state: 'match' | 'mismatch' | 'unverified'; differing: string[] }

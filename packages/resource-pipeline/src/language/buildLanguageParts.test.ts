@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
@@ -164,6 +165,30 @@ const HEX64 = /^[0-9a-f]{64}$/
 /** Door43 resources the fixture's build reads, each checked against its tree: 9 zips (OBS off) and the lexicon. */
 const TREE_CHECKED = 10
 
+/** MACULA's two resources (Hebrew, Greek): unverified in the tests' plain folder, which is in no git repository. */
+const MACULA_CHECKED = 2
+
+/** A Taller-like clone: MACULA committed under `public/`, then a later commit of the app only. */
+function tallerClone() {
+  const dir = freshDir('taller')
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-c', 'core.autocrlf=false', '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: dir, stdio: ['ignore', 'pipe', 'pipe'] })
+      .toString('utf8')
+      .trim()
+  git('init', '-q')
+  mkdirSync(join(dir, 'public'))
+  maculaFolder(join(dir, 'public'))
+  git('add', '-A')
+  git('commit', '-q', '-m', 'macula')
+  const commit = git('rev-parse', 'HEAD')
+  writeFileSync(join(dir, 'app.ts'), 'later')
+  git('add', '-A')
+  git('commit', '-q', '-m', 'app')
+  return { folder: join(dir, 'public'), commit }
+}
+
+const hasGit = spawnSync('git', ['--version']).status === 0
+
 describe('fingerprints', () => {
   test('every part and every unit has a fingerprint, and the report counts the tree checks', async () => {
     const workDir = freshDir('parts-fp')
@@ -177,7 +202,7 @@ describe('fingerprints', () => {
     // Different parts read different files.
     const tn = (book: string) => list.parts.find((p) => p.kind === 'book' && p.resource === TN && p.book === book)!.fingerprint
     expect(tn('rut')).not.toBe(tn('jon'))
-    expect(reportOf(workDir).treeChecks).toEqual({ match: TREE_CHECKED, mismatch: 0, unverified: 0 })
+    expect(reportOf(workDir).treeChecks).toEqual({ match: TREE_CHECKED, mismatch: 0, unverified: MACULA_CHECKED })
     // Each tree asked at the ref the zip was read at.
     expect(door43.trees).toContain('test_gl/es-419_tn@v12')
     expect(door43.trees).toContain('unfoldingWord/hbo_uhb@v2.1.30')
@@ -199,7 +224,7 @@ describe('fingerprints', () => {
     expect(blobsOf(TN).bookBlobs).toEqual({ rut: await sha('test_gl/es-419_tn', 'tn_RUT.tsv'), jon: await sha('test_gl/es-419_tn', 'tn_JON.tsv') })
     expect(blobsOf(TN).bookBlobsRef).toBe('v12')
     expect(blobsOf(UHB).bookBlobs.rut).toBe(await sha('unfoldingWord/hbo_uhb', '08-RUT.usfm'))
-    expect(reportOf(workDir).treeChecks).toEqual({ match: 0, mismatch: 0, unverified: TREE_CHECKED })
+    expect(reportOf(workDir).treeChecks).toEqual({ match: 0, mismatch: 0, unverified: TREE_CHECKED + MACULA_CHECKED })
   }, 120_000)
 
   test("a tree with another sha for one file is a failure of the catalog naming the resource and the path", async () => {
@@ -212,7 +237,29 @@ describe('fingerprints', () => {
     expect(failures).toEqual([
       { unit: 'catalog', error: `${TWL}: its files differ from Door43's tree at v12, so the Worker would compute other fingerprints: twl_RUT.tsv` },
     ])
-    expect(reportOf(workDir).treeChecks).toEqual({ match: TREE_CHECKED - 1, mismatch: 1, unverified: 0 })
+    expect(reportOf(workDir).treeChecks).toEqual({ match: TREE_CHECKED - 1, mismatch: 1, unverified: MACULA_CHECKED })
+  }, 120_000)
+
+  test.skipIf(!hasGit)("MACULA's files are checked against Taller's git tree at the MACULA commit", async () => {
+    const { folder, commit } = tallerClone()
+    const workDir = freshDir('parts-macula-git')
+    const { failures } = await build(workDir, { macula: { folder, ...MACULA_STAMP, commit } })
+    expect(failures).toEqual([])
+    expect(reportOf(workDir).treeChecks).toEqual({ match: TREE_CHECKED + MACULA_CHECKED, mismatch: 0, unverified: 0 })
+  }, 120_000)
+
+  test.skipIf(!hasGit)("a MACULA file that is not the commit's is a failure of the catalog naming the resource and the path", async () => {
+    const { folder, commit } = tallerClone()
+    writeFileSync(join(folder, 'trees', 'RUT.json'), JSON.stringify({ sentences: ['Rut 1:1', 'editado'] }))
+    const workDir = freshDir('parts-macula-differs')
+    const { failures } = await build(workDir, { macula: { folder, ...MACULA_STAMP, commit } })
+    expect(failures).toEqual([
+      {
+        unit: 'catalog',
+        error: `Biblica/hbo/macula: its files differ from Taller's git tree at ${commit}, so the Worker would compute other fingerprints: trees/RUT.json`,
+      },
+    ])
+    expect(reportOf(workDir).treeChecks).toEqual({ match: TREE_CHECKED + 1, mismatch: 1, unverified: 0 })
   }, 120_000)
 
   test("a book no file of its release has the catalog's path of reads the release stamp, and the report names it", async () => {
@@ -281,7 +328,7 @@ describe('the report', () => {
     expect(kept.length).toBe(report.downloads.archives)
     expect(report.downloads.bytes).toBe(kept.reduce((sum, f) => sum + statSync(join(workDir, 'zips', f)).size, 0))
     expect(report.downloads.seconds).toBeGreaterThanOrEqual(0)
-    expect(report.treeChecks).toEqual({ match: TREE_CHECKED, mismatch: 0, unverified: 0 })
+    expect(report.treeChecks).toEqual({ match: TREE_CHECKED, mismatch: 0, unverified: MACULA_CHECKED })
     const last = lines[lines.length - 1].split('\n')
     for (const row of ['tw', 'tw:kt', 'ta', 'ta:translate', 'lexicon', 'book']) expect(last.some((l) => l.startsWith(`${row} `))).toBe(true)
     expect(last.some((l) => l.startsWith('original '))).toBe(false)

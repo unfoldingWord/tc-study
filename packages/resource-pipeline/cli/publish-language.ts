@@ -95,7 +95,8 @@ if (parts) {
       language,
       workDir,
       // As publishLanguage stamps MACULA: the commit's first ten characters and its date in UTC.
-      macula: { folder: maculaFolder, version: macula.commit.slice(0, 10), publishedAt: date.toISOString() },
+      // The whole commit: the files are checked against Taller's git tree at it.
+      macula: { folder: maculaFolder, version: macula.commit.slice(0, 10), publishedAt: date.toISOString(), commit: macula.commit },
       lexiconsRef: required['lexicons-ref']!,
       obs: process.argv.includes('--obs'),
       log: (line) => console.error(oneLine(line)),

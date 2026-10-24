@@ -121,7 +121,7 @@ import { buildLanguageArtifacts, type BuildReport } from './buildLanguageArtifac
 import { chaptersFromStore } from './chaptersFromStore'
 import { isObs, keyOfRow, literalTextOf } from './door43Stamps'
 import { closeAndDelete } from './fakeDatabases'
-import { archiveCachingFetch, folderInputs, lexiconInputs, treeCheck, zipInputs, type TreeCheck } from './inputFiles'
+import { archiveCachingFetch, folderGitTree, folderInputs, lexiconInputs, treeCheck, zipInputs, type TreeCheck } from './inputFiles'
 import { PACK_VERSIONS } from './packVersions'
 import { partsCode } from './partsCode'
 
@@ -388,8 +388,11 @@ export async function buildLanguageParts(o: {
   language: string
   /** Gets `parts/`, `catalog/<compat>/`, `zips/` (the release zips of this run) and `parts-report.json`. */
   workDir: string
-  /** A folder with Taller's `trees/` and `referents/`, and the stamp MACULA's rows get (its commit and date). */
-  macula?: { folder: string; version: string; publishedAt: string }
+  /**
+   * A folder with Taller's `trees/` and `referents/`, and the stamp MACULA's rows get (its commit and date). `commit`
+   * (the whole sha; `version` when absent) is the one whose git tree the files are checked against.
+   */
+  macula?: { folder: string; version: string; publishedAt: string; commit?: string }
   /** Read the lexicons from this ref; none leaves them out. */
   lexiconsRef?: string
   /** Open Bible Stories and their helps; left out by default, as the published packs always were. */
@@ -800,13 +803,13 @@ export async function buildLanguageParts(o: {
   }
 
   /** Counts a tree check; a mismatch is a failure: the Worker, reading the tree, would never agree with the build. */
-  function recordTreeCheck(key: string, ref: string, check: TreeCheck) {
+  function recordTreeCheck(key: string, ref: string, check: TreeCheck, whose = "Door43's tree") {
     treeChecks[check.state] += 1
     if (check.state !== 'mismatch') return
     const more = check.differing.length - DIFFERING_LISTED
     failures.push({
       unit: 'catalog',
-      error: `${key}: its files differ from Door43's tree at ${ref}, so the Worker would compute other fingerprints: ${check.differing.slice(0, DIFFERING_LISTED).join(', ')}${more > 0 ? ` and ${more} more` : ''}`,
+      error: `${key}: its files differ from ${whose} at ${ref}, so the Worker would compute other fingerprints: ${check.differing.slice(0, DIFFERING_LISTED).join(', ')}${more > 0 ? ` and ${more} more` : ''}`,
     })
   }
 
@@ -967,18 +970,28 @@ export async function buildLanguageParts(o: {
       }
     }
 
-    // MACULA, from its folder (no Door43 tree to check it against): the Old Testament's files to the Hebrew resource,
-    // the New's to the Greek, as `addMacula` splits them.
+    // MACULA, from its folder: the Old Testament's files to the Hebrew resource, the New's to the Greek, as `addMacula`
+    // splits them. Checked against Taller's git tree at the MACULA commit, which the Worker reads them from.
     const maculaKeys: string[] = []
     if (o.macula) {
-      const byKey = new Map<string, Map<string, string>>()
-      for (const [path, sha] of await folderInputs(o.macula.folder, ['trees', 'referents'])) {
-        const key = maculaKeyOf(path.split('/')[1].replace(/\.json$/, ''))
-        byKey.set(key, (byKey.get(key) ?? new Map()).set(path, sha))
+      const byKey = (entries: Iterable<[string, string]>) => {
+        const out = new Map<string, Map<string, string>>()
+        for (const [path, sha] of entries) {
+          const key = maculaKeyOf(path.split('/')[1].replace(/\.json$/, ''))
+          out.set(key, (out.get(key) ?? new Map()).set(path, sha))
+        }
+        return out
       }
+      const filesOf = byKey(await folderInputs(o.macula.folder, ['trees', 'referents']))
+      const ref = o.macula.commit ?? o.macula.version
+      const git = folderGitTree(o.macula.folder, ref, ['trees', 'referents'])
+      if (!git.tree) say(`  MACULA: sin árbol de git (${git.why})`)
+      const treeOf = git.tree && byKey(git.tree.blobs)
       const stamp = resourceContentStamp({ version: o.macula.version, release: { tag_name: o.macula.version, published_at: o.macula.publishedAt } })
       for (const key of MACULA_KEYS) {
-        const files = byKey.get(key)
+        const files = filesOf.get(key)
+        const tree = treeOf?.get(key)
+        if (files || tree) recordTreeCheck(key, ref, treeCheck(files ?? new Map(), treeOf && { blobs: tree ?? new Map(), complete: true }), "Taller's git tree")
         if (!files) continue
         resourceFiles.set(key, { key, type: 'original-syntax', subject: 'Original Language Syntax', stamp, files })
         maculaKeys.push(key)
