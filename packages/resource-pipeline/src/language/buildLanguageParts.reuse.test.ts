@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compatKeyOf, PARTS_FORMAT_VERSION, partsListPath, readPart, slotId, unitOfPart, type PartEntry, type PartsList } from '@bt-synergy/language-pack'
-import { buildLanguageParts, type PreviousParts } from './buildLanguageParts'
+import { buildLanguageParts, PARTS_REPORT, type PartsReport, type PreviousParts } from './buildLanguageParts'
 import { PACK_VERSIONS } from './packVersions'
 import {
   discoverWith,
@@ -22,6 +22,7 @@ import {
   releaseStampedRuth,
   TA,
   TN,
+  UHB,
   UHL,
   type CatalogOverrides,
   type CatalogRow,
@@ -147,7 +148,8 @@ const retitled = (key: string, identifier: string, title: string) => (row: Catal
 
 const NEW_COMMIT = { sha: 'fedcba9876543210fedcba9876543210fedcba98', created: '2026-09-15T00:00:00Z' }
 
-const MUTATIONS: Array<{ name: string; fixture: Fixture; built: string[] }> = [
+/** `differs`: the lists must differ from the baseline's, so a case building nothing is known to have changed something. */
+const MUTATIONS: Array<{ name: string; fixture: Fixture; built: string[]; differs?: true }> = [
   { name: 'GLT 08-RUT.usfm text', fixture: edit('test_gl/es-419_glt', '08-RUT.usfm', changed('Sucedió', 'Aconteció')), built: ['book rut'] },
   { name: 'UHB 32-JON.usfm', fixture: edit('unfoldingWord/hbo_uhb', '32-JON.usfm', changed('\\id JON\n', '\\id JON\n\\h Jonás\n')), built: ['book jon'] },
   { name: 'TN tn_RUT.tsv', fixture: edit('test_gl/es-419_tn', 'tn_RUT.tsv', changed('Una nota de Rut', 'Otra nota de Rut')), built: ['book rut'] },
@@ -165,8 +167,8 @@ const MUTATIONS: Array<{ name: string; fixture: Fixture; built: string[] }> = [
     built: ['shared'],
   },
   { name: 'MACULA trees/RUT.json', fixture: { macula: (dir) => writeFileSync(join(dir, 'trees', 'RUT.json'), JSON.stringify({ sentences: ['Rut 1:1', 'Rut 1:2'] })) }, built: ['shared'] },
-  { name: 'MACULA commit only (same files)', fixture: { maculaStamp: { version: 'def7654321', publishedAt: '2026-09-15T00:00:00.000Z' } }, built: [] },
-  { name: 'lexicon commit only (same files)', fixture: { lexiconCommit: NEW_COMMIT }, built: [] },
+  { name: 'MACULA commit only (same files)', fixture: { maculaStamp: { version: 'def7654321', publishedAt: '2026-09-15T00:00:00.000Z' } }, built: [], differs: true },
+  { name: 'lexicon commit only (same files)', fixture: { lexiconCommit: NEW_COMMIT }, built: [], differs: true },
   {
     name: 'TN manifest: version, modified, issued only',
     fixture: edit('test_gl/es-419_tn', 'manifest.yaml', manifestOf('test_gl/es-419_tn', { version: '13', date: '2026-10-01' })),
@@ -222,6 +224,10 @@ describe('a build with the previous lists', () => {
     // The lexicons' and MACULA's catalog rows too, though the shared unit that adds them did not run.
     expect(again.texts).toEqual(baseline.texts)
     expect(again.units.every((u) => u.parts === baseline.units.find((b) => b.unit === u.unit)!.parts)).toBe(true)
+    // The sizes count carried parts as built ones.
+    const sizes = (b: Built) => (JSON.parse(readFileSync(join(b.workDir, PARTS_REPORT), 'utf8')) as PartsReport).sizes
+    expect(Object.keys(sizes(again)).length).toBeGreaterThan(0)
+    expect(sizes(again)).toEqual(sizes(baseline))
   }, 120_000)
 
   test("a previous list lacking a resource's part of a book (a silent gap) is not carried on: that book is built", async () => {
@@ -241,10 +247,21 @@ describe('a build with the previous lists', () => {
     expect(reuse.texts).toEqual(baseline.texts)
   }, 120_000)
 
+  test("an original's part or a MACULA part the bucket no longer has makes its unit built", async () => {
+    const original = baseline.originals.parts.find((p) => p.kind === 'original' && p.resource === UHB && p.book === 'jon')!
+    const byOriginal = await build({}, previousOf(baseline, { lacks: original.sha256 }))
+    expect(builtUnits(byOriginal)).toEqual(['book jon'])
+    expect(byOriginal.texts).toEqual(baseline.texts)
+    const macula = baseline.originals.parts.find((p) => p.kind === 'macula' && p.book === 'rut')!
+    const byMacula = await build({}, previousOf(baseline, { lacks: macula.sha256 }))
+    expect(builtUnits(byMacula)).toEqual(['shared'])
+    expect(byMacula.texts).toEqual(baseline.texts)
+  }, 120_000)
 
   for (const mutation of MUTATIONS) {
     test(`${mutation.name}: builds ${mutation.built.join(', ') || 'nothing'}, and gives what a full build gives`, async () => {
-      await expectAsFull(baseline, mutation.fixture, mutation.built)
+      const { full } = await expectAsFull(baseline, mutation.fixture, mutation.built)
+      if (mutation.differs) expect(full.texts).not.toEqual(baseline.texts)
     }, 120_000)
   }
 
