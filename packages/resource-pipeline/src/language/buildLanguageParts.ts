@@ -301,6 +301,9 @@ const defaultDiscover: DiscoverInto = async ({ language, catalogManager, door43C
     door43Client: door43Client as never,
     catalogManager,
     resourceTypeRegistry: createHeadlessResourceTypeRegistry(catalogManager),
+    // The build's client, which keeps each zip it downloads: TW's and TA's ingredients (their titles) come from the
+    // zip step 1 hashes, not from a download of their own.
+    ingredientsClient: door43Client as never,
   })
   return { resources: found.resources.map((r) => r.resourceKey), originals: found.originals }
 }

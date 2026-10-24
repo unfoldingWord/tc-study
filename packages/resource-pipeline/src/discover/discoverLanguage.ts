@@ -19,7 +19,7 @@ import { catalogHitRelease, door43ResourceForHit } from './catalogHits'
 import { ensureOriginalLanguageInCatalog } from './originalLanguageCatalog'
 import { catalogIdentity } from './readCatalogIdentity'
 import { searchCatalogHitsForTarget, type CatalogSearchClient } from './readCatalogSearch'
-import { createResourceMetadata, type Door43Resource } from './ResourceMetadataFactory'
+import { createResourceMetadata, type Door43Resource, type MetadataCreationOptions } from './ResourceMetadataFactory'
 
 export interface DiscoveredResource {
   resourceKey: string
@@ -59,6 +59,8 @@ export async function discoverLanguage(options: {
   resourceTypeRegistry: ResourceTypeRegistry
   /** Defaults to UGNT and UHB. */
   originals?: readonly OriginalLanguageSpec[]
+  /** The client TW's and TA's ingredients are generated with (createResourceMetadata's `ingredientsClient`). */
+  ingredientsClient?: MetadataCreationOptions['ingredientsClient']
 }): Promise<LanguageDiscovery> {
   const { language, door43Client, catalogManager, resourceTypeRegistry } = options
   const originals = options.originals ?? ORIGINAL_LANGUAGE_SPECS
@@ -104,6 +106,7 @@ export async function discoverLanguage(options: {
           getResourceType: () => type,
           catalogAdapter: catalogManager.catalogAdapter,
           debug: false,
+          ingredientsClient: options.ingredientsClient,
         }
       )
       await catalogManager.addResourceToCatalog(metadata)
