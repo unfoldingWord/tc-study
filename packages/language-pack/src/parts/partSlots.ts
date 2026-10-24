@@ -62,12 +62,14 @@ export function articleIdOfRow(row: { layer: PackLayer; key: string }, resourceK
   return null
 }
 
-function twGroup(item: string): string | null {
+/** A TW article's group, from its row id (`bible/kt/god`) or its file (`bible/kt/god.md`): both give one group. */
+export function twGroupOf(item: string): string | null {
   const m = item.replace(/^bible\//, '').match(/^(kt|names|other)\/(.+?)(?:\.md)?$/)
   return m ? `${m[1]}:${fnv1a32(`${m[1]}/${m[2]}.md`) % TW_BUCKETS}` : null
 }
 
-function taGroup(item: string): string | null {
+/** A TA article's group, from its row id (`translate/figs-idiom`) or any file under it (`translate/figs-idiom/01.md`). */
+export function taGroupOf(item: string): string | null {
   const [manual, article] = item.split('/')
   if (!article || !['translate', 'checking', 'process', 'intro'].includes(manual)) return null
   // The manual is already the group; its article directory alone picks the bucket.
@@ -75,7 +77,7 @@ function taGroup(item: string): string | null {
 }
 
 /** Every lexicon file has a part: a file named by no Strong number (an index, a manifest) goes in `other`. */
-function lexiconGroup(item: string): string {
+export function lexiconGroupOf(item: string): string {
   if (item.startsWith('domains/')) return 'domains'
   const m = item.match(/^content\/[^/\d]*(\d+)[^/]*$/)
   return m ? String(Math.floor(Number(m[1]) / LEXICON_RANGE)) : 'other'
@@ -110,29 +112,42 @@ export function slotOfRow(row: { layer: PackLayer; key: string }, resource: Reso
   return slot
 }
 
+/** Which rules place a resource's rows (and say which of its files each part reads), in the order they are tried. */
+export type ResourceFamily = 'original' | 'macula' | 'obs' | 'book' | 'tw' | 'ta' | 'lexicon'
+
+export function familyOf(resource: Resource): ResourceFamily | null {
+  if ((ORIGINAL_LANGUAGE_KEYS as readonly string[]).includes(resource.key)) return 'original'
+  if (isMacula(resource)) return 'macula'
+  if (isObs(resource)) return 'obs'
+  if (isBookScoped(resource)) return 'book'
+  if (isTw(resource)) return 'tw'
+  if (isTa(resource)) return 'ta'
+  if (isLexicon(resource)) return 'lexicon'
+  return null
+}
+
 function placeRow(row: { layer: PackLayer; key: string }, resource: Resource): PartSlot | null {
   const rk = resource.key
-  if ((ORIGINAL_LANGUAGE_KEYS as readonly string[]).includes(rk)) {
+  const family = familyOf(resource)
+  if (family === 'original') {
     const book = bookOfRow(row.key, row.layer, rk)
     return book ? { kind: 'original', resource: rk, book } : null
   }
-  if (isMacula(resource)) {
+  if (family === 'macula') {
     const m = articleIdOfRow(row, rk)?.match(/^(?:trees|referents)\/([1-3A-Za-z]{3})$/)
     return m ? { kind: 'macula', resource: rk, book: m[1].toLowerCase() } : null
   }
-  if (isObs(resource)) return row.layer === 'text' ? null : { kind: 'obs', resource: rk, group: obsGroup(row, rk) }
-  if (isBookScoped(resource)) {
+  if (family === 'obs') return row.layer === 'text' ? null : { kind: 'obs', resource: rk, group: obsGroup(row, rk) }
+  if (family === 'book') {
     if (row.layer === 'text') return null
     const book = bookOfRow(row.key, row.layer, rk)
     if (!book) return null
     return { kind: row.layer === 'align' ? 'alignments' : 'book', resource: rk, book }
   }
-  const tw = isTw(resource)
-  const ta = !tw && isTa(resource)
-  if ((tw || ta) && row.layer === 'text') return { kind: 'titles', resource: rk }
+  if ((family === 'tw' || family === 'ta') && row.layer === 'text') return { kind: 'titles', resource: rk }
   const item = articleIdOfRow(row, rk)
   if (!item) return null
-  const group = tw ? twGroup(item) : ta ? taGroup(item) : isLexicon(resource) ? lexiconGroup(item) : null
-  if (!group) return null
-  return { kind: tw ? 'tw' : ta ? 'ta' : 'lexicon', resource: rk, group }
+  const group = family === 'tw' ? twGroupOf(item) : family === 'ta' ? taGroupOf(item) : family === 'lexicon' ? lexiconGroupOf(item) : null
+  if (!group || !family) return null
+  return { kind: family, resource: rk, group }
 }
