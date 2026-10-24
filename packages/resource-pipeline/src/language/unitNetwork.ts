@@ -9,6 +9,16 @@
 
 type AnyFetch = (input: any, init?: any) => Promise<Response>
 
+/**
+ * Marks the process-wide refusal `cacheOnlyNetwork` gives (`global`): a unit that found it already in place would
+ * otherwise save it as "the process's fetch" and give it back, leaving every later fetch refused. `Symbol.for`, so a
+ * second copy of this module (another bundle) marks the same.
+ */
+export const REFUSING_FETCH = Symbol.for('bt-synergy.parts.refusingFetch')
+
+/** Whether `f` is a unit's refusal of the process's fetch (of this or any parts build in the process). */
+export const isRefusingFetch = (f: unknown): boolean => typeof f === 'function' && (f as unknown as Record<symbol, unknown>)[REFUSING_FETCH] === true
+
 /** One call a unit made to the network that step 1 did not make, as the failure names it. */
 export type NetworkCall = string
 
@@ -98,15 +108,18 @@ export function cacheOnlyNetwork<C extends object, F extends AnyFetch>(o: {
     }
   }
 
-  const global = ((input: string | URL | Request, init?: RequestInit) => {
-    const href = input instanceof Request ? input.url : String(input)
-    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
-    try {
-      return refuse(`fetch ${method} ${href}`)
-    } catch (e) {
-      return Promise.reject(e)
-    }
-  }) as typeof fetch
+  const global = Object.assign(
+    (input: string | URL | Request, init?: RequestInit) => {
+      const href = input instanceof Request ? input.url : String(input)
+      const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase()
+      try {
+        return refuse(`fetch ${method} ${href}`)
+      } catch (e) {
+        return Promise.reject(e)
+      }
+    },
+    { [REFUSING_FETCH]: true }
+  ) as unknown as typeof fetch
 
   return { client, fetch: fetchOf as unknown as F, global, calls }
 }

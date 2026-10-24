@@ -75,6 +75,8 @@ async function build(f: Fixture = {}, previous?: PreviousParts): Promise<Built> 
     door43Client: fakeDoor43({ repos: f.repos, lexicon: f.lexicon, catalog: f.catalog }) as never,
     discover: discoverWith(f.catalog),
     obs: f.obs ?? false,
+    // OBS parts are refused outside tests (its loader reads Door43): the fixture's stories are what the test checks.
+    obsTestOnly: f.obs ?? false,
     log: (line) => lines.push(line),
     ...(previous ? { previous } : {}),
   })

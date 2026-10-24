@@ -25,6 +25,7 @@
  * unit, so a run stopped by the memory limit or an error still leaves it). The workflow sends parts to the staging
  * bucket only, until the Worker serves them. `--generator` is not needed. `--force` reads no previous list (every unit
  * is built; parts the bucket has are still not put again). `--dry-run` is refused: a parts run decides by building.
+ * `--obs` is refused too, for now: the OBS loader reads each story from Door43, not the zip the build hashes.
  * With `--no-upload` nothing is put (outcome `built`); the previous lists come from the bucket when R2_* are given,
  * or from `--previous`, the work folder of an earlier whole `--parts --no-upload` run, whose carried part files are
  * copied into `--work`. Exits 1 when a job, a book or a resource failed, after writing all of that.
@@ -77,6 +78,8 @@ const previousDir = arg('previous')
 if (dryRun && noUpload) usage('--dry-run y --no-upload no van juntos')
 // A parts run has no stamps pre-check (it decides by building and comparing the lists): nothing to dry-run.
 if (parts && dryRun) usage('--parts y --dry-run no van juntos: una corrida por partes decide construyendo')
+// The build refuses it too (OBS_PARTS_REFUSED, the same words): its loader reads each story from Door43.
+if (parts && process.argv.includes('--obs')) usage('--parts y --obs no van juntos: OBS parts wait for the OBS loader to read the hashed zip')
 if (process.argv.includes('--previous')) {
   if (!previousDir || previousDir.startsWith('--')) usage('Falta la carpeta de --previous')
   // What a work folder holds says nothing of what the bucket holds: a list published on its word could name a missing part.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { cacheOnlyNetwork, recordingFetch } from './unitNetwork'
+import { cacheOnlyNetwork, isRefusingFetch, recordingFetch } from './unitNetwork'
 
 const API = 'https://git.door43.org/api/v1/repos/o/r'
 const ARCHIVE = 'https://git.door43.org/o/r/archive/abc.tar.gz'
@@ -81,5 +81,13 @@ describe("a unit's network", () => {
     const net = cacheOnlyNetwork({ unit: 'book jon', client: client(), kept: () => false, fetchFn, recorded })
     await expect(net.global('https://git.door43.org/o/r/raw/tag/v1/tn_JON.tsv')).rejects.toThrow('book jon: fetch GET https://git.door43.org/o/r/raw/tag/v1/tn_JON.tsv')
     expect(net.calls).toEqual(['fetch GET https://git.door43.org/o/r/raw/tag/v1/tn_JON.tsv'])
+  })
+
+  test("marks that refusal, so a unit can tell the process's fetch is already one", async () => {
+    const { fetchFn, recorded } = await stepOne()
+    const net = cacheOnlyNetwork({ unit: 'book jon', client: client(), kept: () => false, fetchFn, recorded })
+    expect(isRefusingFetch(net.global)).toBe(true)
+    expect(isRefusingFetch(net.fetch)).toBe(false)
+    expect(isRefusingFetch(globalThis.fetch)).toBe(false)
   })
 })

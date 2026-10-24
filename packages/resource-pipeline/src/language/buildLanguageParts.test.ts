@@ -7,10 +7,12 @@ import { join } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { compatKeyOf, gitBlobSha, originalsListPath, PARTS_FORMAT_VERSION, partsListPath, readPart, sha256Hex, stripVolatile } from '@bt-synergy/language-pack'
 import { runDownload } from '../download/runDownload'
-import { buildLanguageParts, PARTS_REPORT, slotRows, UNPLACED_LISTED, type PartsReport } from './buildLanguageParts'
+import { createDoor43ApiClient } from '@bt-synergy/door43-api'
+import { buildLanguageParts, discoveryReadsOf, PARTS_REPORT, slotRows, UNPLACED_LISTED, type PartsReport } from './buildLanguageParts'
 import { closeAndDelete } from './fakeDatabases'
 import { PACK_VERSIONS } from './packVersions'
 import { partsCode } from './partsCode'
+import { REFUSING_FETCH } from './unitNetwork'
 import {
   catalogRows,
   discover,
@@ -26,6 +28,7 @@ import {
   MACULA_STAMP,
   maculaFolder,
   REPOS,
+  reposCopy,
   TA,
   TN,
   TQ,
@@ -298,6 +301,80 @@ describe('fingerprints', () => {
   }, 120_000)
 })
 
+describe('a degraded discovery', () => {
+  // Discovery reads each resource's README.md and manifest.yaml (its `rights:`) from Door43 at the release tag, and any
+  // failure there is an empty README or no licence in the row, which the list carries: a second run with Door43 well
+  // would publish another list for the same inputs.
+  const TN_REPO = 'test_gl/es-419_tn'
+  const README = '# Notas de traducción\n\nPara el traductor.\n'
+  const RIGHTS = 'CC BY-SA 4.0'
+  const withRootFiles = () => {
+    const repos = reposCopy()
+    repos[TN_REPO]['README.md'] = README
+    repos[TN_REPO]['manifest.yaml'] = repos[TN_REPO]['manifest.yaml'].replace('checking:', `  rights: '${RIGHTS}'\nchecking:`)
+    return repos
+  }
+  const discovered = (o: { readme: string; license?: string }) =>
+    discoverWith({
+      edit: (row) => {
+        if (row.resourceKey !== TN) return
+        Object.assign(row, {
+          urls: { metadata: `https://git.door43.org/${TN_REPO}/raw/tag/v12/manifest.yaml` },
+          readme: o.readme,
+          ...(o.license ? { license: { id: o.license } } : {}),
+        })
+      },
+    })
+
+  test("a README or a licence discovery did not get, though the release zip has it, is a failure of the catalog naming the resource", async () => {
+    const repos = withRootFiles()
+    const well = await build(freshDir('parts-discovery-well'), { door43: fakeDoor43({ repos }), discover: discovered({ readme: README, license: RIGHTS }) })
+    expect(well.failures).toEqual([])
+    const degraded = await build(freshDir('parts-discovery-degraded'), { door43: fakeDoor43({ repos }), discover: discovered({ readme: '' }) })
+    expect(degraded.failures).toEqual([
+      { unit: 'catalog', error: `${TN}: its README could not be read during discovery (its release zip has one), so the list would carry an empty one; rerun` },
+      { unit: 'catalog', error: `${TN}: its licence (manifest.yaml's rights) could not be read during discovery (its release zip has one), so the list would carry none; rerun` },
+    ])
+  }, 120_000)
+
+  test('a resource with no README and no rights in its zip, or whose row has no metadata URL (discovery reads none), is no failure', async () => {
+    // The fixture's rows have no metadata URL; here TN has one and blank fields, and its zip neither file.
+    const { failures } = await build(freshDir('parts-discovery-none'), { discover: discovered({ readme: '' }) })
+    expect(failures).toEqual([])
+  }, 120_000)
+
+  test("what the check expects discovery to read is what Door43ApiClient's enrichment reads", async () => {
+    const cases: Array<{ readme?: string; manifest?: string }> = [
+      {},
+      { readme: '' },
+      { readme: README },
+      { manifest: 'dublin_core:\n  title: x\n' },
+      { manifest: `dublin_core:\n  rights: '${RIGHTS}'\n` },
+      { manifest: 'dublin_core:\n  rights: CC0\n', readme: 'x' },
+    ]
+    const processFetch = globalThis.fetch
+    try {
+      for (const files of cases) {
+        globalThis.fetch = (async (url: string) => {
+          const text = String(url).endsWith('/README.md') ? files.readme : files.manifest
+          return text === undefined ? new Response('not found', { status: 404 }) : new Response(text)
+        }) as unknown as typeof fetch
+        const got = await createDoor43ApiClient({ debug: false }).enrichResourceMetadata({ metadata_url: 'https://door43.invalid/o/r/raw/tag/v1/manifest.yaml' } as never)
+        expect({ files, reads: discoveryReadsOf(files) }).toEqual({ files, reads: { readme: !!got.readme, license: !!got.license } })
+      }
+    } finally {
+      globalThis.fetch = processFetch
+    }
+  })
+})
+
+describe('OBS', () => {
+  test('a parts build with OBS is refused before anything: its loader reads each story from Door43, not the zip hashed', async () => {
+    const workDir = freshDir('parts-obs-refused')
+    await expect(build(workDir, { obs: true })).rejects.toThrow('OBS parts wait for the OBS loader to read the hashed zip')
+  })
+})
+
 describe("a unit's network", () => {
   test("a unit that asks Door43 for what step 1 did not read fails, naming the call", async () => {
     // TN's zip gone from <work>/zips once step 1 ends: its loader would download it again, bytes no fingerprint saw,
@@ -324,9 +401,23 @@ describe("a unit's network", () => {
 
   test("with OBS on, the OBS loader's story reads are let through and logged, and nothing else is", async () => {
     const workDir = freshDir('parts-network-obs')
-    const { failures, lines } = await build(workDir, { obs: true })
+    const { failures, lines } = await build(workDir, { obs: true, obsTestOnly: true })
     expect(failures).toEqual([])
     expect(lines.some((l) => /shared: fetchTextContent de test_gl\/es-419_obs desde Door43/.test(l))).toBe(true)
+  }, 120_000)
+
+  test("a unit refuses to start while the process's fetch is already a unit's refusal (units cannot run at once)", async () => {
+    const processFetch = globalThis.fetch
+    const refusal = Object.assign(async () => new Response(''), { [REFUSING_FETCH]: true }) as unknown as typeof fetch
+    globalThis.fetch = refusal
+    try {
+      await expect(build(freshDir('parts-network-reentrant'))).rejects.toThrow(
+        "shared: the process's fetch is already a parts unit's refusal (another unit is running in this process), so this one cannot replace it"
+      )
+      expect(globalThis.fetch).toBe(refusal)
+    } finally {
+      globalThis.fetch = processFetch
+    }
   }, 120_000)
 
   test("the process's fetch is given back when a unit ends, however it ends", async () => {

@@ -329,6 +329,7 @@ async function fixtureParts() {
       door43Client: fixture.fakeDoor43() as never,
       discover: fixture.discover,
       obs: true,
+      obsTestOnly: true,
     })
     if (failures.length) throw new Error(`the parts fixture did not build: ${JSON.stringify(failures)}`)
     const rows = new Map<string, PartRow[]>()

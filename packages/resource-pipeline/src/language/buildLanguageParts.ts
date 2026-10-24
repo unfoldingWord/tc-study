@@ -124,7 +124,7 @@ import { closeAndDelete } from './fakeDatabases'
 import { archiveCachingFetch, folderGitTree, folderInputs, lexiconInputs, treeCheck, zipInputs, type TreeCheck } from './inputFiles'
 import { PACK_VERSIONS } from './packVersions'
 import { partsCode } from './partsCode'
-import { cacheOnlyNetwork, recordingFetch } from './unitNetwork'
+import { cacheOnlyNetwork, isRefusingFetch, recordingFetch } from './unitNetwork'
 
 export type UnitSummary = { built: number; cached: number; blocked: number; noop: number; failed: number }
 
@@ -310,6 +310,26 @@ const defaultDiscover: DiscoverInto = async ({ language, catalogManager, door43C
 
 const DEFAULT_MEMORY_LIMIT_MB = 10_240
 
+/**
+ * Why a parts build refuses OBS: its loader reads each story from Door43 at the release tag (findRepository,
+ * fetchTextContent), and the client's methods call the process's fetch, which a unit refuses; the rows would not be
+ * of the zip fingerprinted anyway.
+ */
+export const OBS_PARTS_REFUSED = 'OBS parts wait for the OBS loader to read the hashed zip'
+
+/**
+ * What discovery's enrichment (Door43ApiClient.enrichResourceMetadata) gets from a repository's root files, as the
+ * row's `readme` and `license`: README.md when not empty, and the `rights:` of manifest.yaml. A failed request there
+ * leaves the field empty with no error, so the build compares the row with the zip's root files.
+ */
+export function discoveryReadsOf(root: { readme?: string; manifest?: string }): { readme: boolean; license: boolean } {
+  return {
+    readme: !!root.readme,
+    // The regex enrichResourceMetadata parses the manifest with.
+    license: !!root.manifest && /rights:\s*['"]?([^'";\n]+)['"]?/i.test(root.manifest),
+  }
+}
+
 const PARTS_DB_PREFIX = 'parts-'
 const CATALOG_DB = 'parts-catalog'
 const DISCOVERY_DB = 'parts-discovery'
@@ -419,8 +439,14 @@ export async function buildLanguageParts(o: {
   macula?: { folder: string; version: string; publishedAt: string; commit?: string }
   /** Read the lexicons from this ref; none leaves them out. */
   lexiconsRef?: string
-  /** Open Bible Stories and their helps; left out by default, as the published packs always were. */
+  /**
+   * Open Bible Stories and their helps; left out by default, as the published packs always were. Refused for now
+   * (OBS_PARTS_REFUSED) unless `obsTestOnly` says this is a test: on Door43 the OBS loader reads each story with the
+   * process's fetch, which a unit refuses.
+   */
   obs?: boolean
+  /** Test-only: lets `obs` through, for a fixture whose client serves the stories itself. */
+  obsTestOnly?: boolean
   memoryLimitMb?: number
   log?: (line: string) => void
   door43Client?: Door43Like
@@ -451,6 +477,7 @@ export async function buildLanguageParts(o: {
   const language = o.language
   const say = o.log ?? (() => {})
   const obs = o.obs ?? false
+  if (obs && !o.obsTestOnly) throw new Error(OBS_PARTS_REFUSED)
   const limit = o.memoryLimitMb ?? DEFAULT_MEMORY_LIMIT_MB
   const rss = o.rss ?? (() => process.memoryUsage().rss)
   const wait = o.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
@@ -577,6 +604,10 @@ export async function buildLanguageParts(o: {
     let parts = 0
     let stopped: string | undefined
     try {
+      // Saving a refusal as the process's fetch would give it back at the end: every fetch after refused.
+      if (isRefusingFetch(processFetch)) {
+        throw new Error(`${unit}: the process's fetch is already a parts unit's refusal (another unit is running in this process), so this one cannot replace it`)
+      }
       m.check()
       globalThis.fetch = net.global
       try {
@@ -976,6 +1007,17 @@ export async function buildLanguageParts(o: {
       }
       const { owner, repo } = repoOf(key)
       recordTreeCheck(key, refOf(m), treeCheck(read.files, await treeOf(owner, repo, refOf(m))))
+      // The list carries the row's README and licence: one Door43 hiccup in discovery would publish another list
+      // for the same inputs, so such a row fails (the zip's text is not put in its place: the whole build has the row's).
+      if (m.urls?.metadata) {
+        const expected = discoveryReadsOf({ readme: read.readme, manifest: read.manifest })
+        if (expected.readme && !m.readme) {
+          failures.push({ unit: 'catalog', error: `${key}: its README could not be read during discovery (its release zip has one), so the list would carry an empty one; rerun` })
+        }
+        if (expected.license && !m.license) {
+          failures.push({ unit: 'catalog', error: `${key}: its licence (manifest.yaml's rights) could not be read during discovery (its release zip has one), so the list would carry none; rerun` })
+        }
+      }
       const family = familyOf({ key, type: String(m.type ?? ''), subject: m.subject })
       if (family === 'tw' || family === 'ta') {
         const why = await ingredientsProblem(m, got.zip, family)

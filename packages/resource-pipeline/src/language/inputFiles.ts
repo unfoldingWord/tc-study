@@ -30,12 +30,13 @@ export type InputFiles = { files: Map<string, string>; manifest?: string }
 /**
  * Every file of a Door43 zipball, keyed by its repository path (the zip's single top folder taken off, as Door43's
  * tree names it), with the git blob sha of its bytes exactly as stored. Directory entries are skipped. Entries are
- * read and hashed one at a time, so memory holds the zip and one file. `manifest`: `manifest.yaml`'s text.
+ * read and hashed one at a time, so memory holds the zip and one file. `manifest`: `manifest.yaml`'s text; `readme`:
+ * `README.md`'s (the root files discovery reads too).
  *
  * A zip without one top folder throws (its paths could not be the repository's), and so does an entry whose bytes do
  * not match their CRC (a damaged zip would give shas of bytes nobody published).
  */
-export async function zipInputs(zip: Uint8Array | ArrayBuffer): Promise<InputFiles> {
+export async function zipInputs(zip: Uint8Array | ArrayBuffer): Promise<InputFiles & { readme?: string }> {
   const archive = await JSZip.loadAsync(zip, { checkCRC32: true })
   const names = Object.keys(archive.files)
   const tops = new Set(names.map((name) => (name.includes('/') ? name.slice(0, name.indexOf('/')) : '')))
@@ -45,6 +46,7 @@ export async function zipInputs(zip: Uint8Array | ArrayBuffer): Promise<InputFil
   }
   const files = new Map<string, string>()
   let manifest: string | undefined
+  let readme: string | undefined
   for (const name of names.sort()) {
     const entry = archive.files[name]
     if (entry.dir || name.endsWith('/')) continue
@@ -52,8 +54,9 @@ export async function zipInputs(zip: Uint8Array | ArrayBuffer): Promise<InputFil
     const bytes = await entry.async('uint8array')
     files.set(path, await gitBlobSha(bytes))
     if (path === 'manifest.yaml') manifest = new TextDecoder().decode(bytes)
+    if (path === 'README.md') readme = new TextDecoder().decode(bytes)
   }
-  return { files, manifest }
+  return { files, manifest, readme }
 }
 
 /**

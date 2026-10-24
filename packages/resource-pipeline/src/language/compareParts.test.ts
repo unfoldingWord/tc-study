@@ -91,6 +91,7 @@ describe('compareParts', () => {
       lexiconsRef: LEXICONS_REF,
       fetch: lexiconFetch,
       obs: true,
+      obsTestOnly: true,
       door43Client: fakeDoor43() as never,
       discover,
     })
