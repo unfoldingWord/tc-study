@@ -152,6 +152,53 @@ export type UnitRecord = {
 /** How many resources' files matched Door43's tree, differed from it (a failure), or could not be checked. */
 export type TreeChecks = Record<TreeCheck['state'], number>
 
+/** The sizes (gzip bytes) of a set of parts. */
+export type PartSizes = { parts: number; bytes: number; min: number; median: number; max: number }
+
+/**
+ * Part sizes by kind, and for TW and TA also by folder (`tw:kt`, `ta:translate`…): what the bucket counts are chosen
+ * from. The median of an even count is the mean of the two middle sizes, rounded.
+ */
+export function partSizes(parts: ReadonlyArray<Pick<PartEntry, 'kind' | 'group' | 'bytes'>>): Record<string, PartSizes> {
+  const byKey = new Map<string, number[]>()
+  const add = (key: string, bytes: number) => byKey.set(key, [...(byKey.get(key) ?? []), bytes])
+  for (const p of parts) {
+    add(p.kind, p.bytes)
+    if ((p.kind === 'tw' || p.kind === 'ta') && p.group) add(`${p.kind}:${p.group.split(':')[0]}`, p.bytes)
+  }
+  const out: Record<string, PartSizes> = {}
+  for (const key of [...byKey.keys()].sort()) {
+    const sizes = byKey.get(key)!.sort((a, b) => a - b)
+    const mid = sizes.length >> 1
+    out[key] = {
+      parts: sizes.length,
+      bytes: sizes.reduce((a, b) => a + b, 0),
+      min: sizes[0],
+      median: sizes.length % 2 ? sizes[mid] : Math.round((sizes[mid - 1] + sizes[mid]) / 2),
+      max: sizes[sizes.length - 1],
+    }
+  }
+  return out
+}
+
+/** The kinds the build's last log line shows, each with its folders. */
+const SIZES_SHOWN = ['tw', 'ta', 'lexicon', 'book']
+
+/** `sizes`' rows of `SIZES_SHOWN` as a table, in KB. */
+export function sizesTable(sizes: Record<string, PartSizes>): string {
+  const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`
+  const rows = Object.keys(sizes)
+    .filter((k) => SIZES_SHOWN.includes(k.split(':')[0]))
+    .sort((a, b) => SIZES_SHOWN.indexOf(a.split(':')[0]) - SIZES_SHOWN.indexOf(b.split(':')[0]) || (a < b ? -1 : a > b ? 1 : 0))
+    .map((k) => [k, String(sizes[k].parts), kb(sizes[k].bytes), kb(sizes[k].min), kb(sizes[k].median), kb(sizes[k].max)])
+  const table = [['clase', 'partes', 'total', 'mín', 'mediana', 'máx'], ...rows]
+  const widths = table[0].map((_, i) => Math.max(...table.map((row) => row[i].length)))
+  return table.map((row) => row.map((cell, i) => (i ? cell.padStart(widths[i]) : cell.padEnd(widths[i]))).join('  ')).join('\n')
+}
+
+/** The archives step 1 downloaded (release zips, lexicon archives), their bytes and the seconds spent on them. */
+export type Downloads = { archives: number; bytes: number; seconds: number }
+
 /** What `parts-report.json` holds, written after every unit and when the build ends. */
 export type PartsReport = {
   language: string
@@ -161,6 +208,9 @@ export type PartsReport = {
   units: UnitRecord[]
   failures: PartsFailure[]
   treeChecks: TreeChecks
+  /** Over both lists, carried parts included; empty until the lists are made. */
+  sizes: Record<string, PartSizes>
+  downloads: Downloads
   /**
    * `<resource> <book>` of each book whose catalog path no file of its release has (a loader found it by the end of a
    * path): its rows carry the release stamp, so its parts and unit are rebuilt on every release.
@@ -399,9 +449,19 @@ export async function buildLanguageParts(o: {
   const originalParts: PartEntry[] = []
   const treeChecks: TreeChecks = { match: 0, mismatch: 0, unverified: 0 }
   const releaseStampedBooks: string[] = []
+  let sizes: Record<string, PartSizes> = {}
+  const downloads: Downloads = { archives: 0, bytes: 0, seconds: 0 }
+  let downloadMs = 0
+  /** Counts one archive step 1 fetched, and the time `since` it was asked for. */
+  const downloaded = (bytes: number, since: number) => {
+    downloads.archives += 1
+    downloads.bytes += bytes
+    downloadMs += Date.now() - since
+    downloads.seconds = Math.round(downloadMs / 100) / 10
+  }
 
   function writeReport(state: PartsReport['state'], error?: unknown) {
-    const report: PartsReport = { language, state, ...(error !== undefined ? { error: messageOf(error) } : {}), peakRssMb, units, failures, treeChecks, releaseStampedBooks }
+    const report: PartsReport = { language, state, ...(error !== undefined ? { error: messageOf(error) } : {}), peakRssMb, units, failures, treeChecks, sizes, downloads, releaseStampedBooks }
     const file = join(o.workDir, PARTS_REPORT)
     // Aside and renamed: a run killed mid-write still leaves the last whole report.
     writeFileSync(`${file}.partial`, JSON.stringify(report, null, 2))
@@ -690,9 +750,11 @@ export async function buildLanguageParts(o: {
     const { owner, repo } = repoOf(key)
     for (let attempt = 0; ; attempt++) {
       try {
+        const since = Date.now()
         const zip = await door43.downloadZipball(owner, repo, refOf(m))
         const names = zipFileNames(zip)
         if (!names) throw new Error('its release zip cannot be read')
+        downloaded(zip.byteLength, since)
         return { zip, names }
       } catch (e) {
         if (attempt >= ZIP_RETRY_DELAYS_S.length) {
@@ -876,9 +938,12 @@ export async function buildLanguageParts(o: {
         const repo = `${lexicon.owner}/${lexicon.name}`
         const commit = await resolveLexicon(repo, o.lexiconsRef, fetchArchives)
         if (!commit) continue
+        const since = Date.now()
         const res = await fetchArchives(lexiconArchiveUrl(repo, commit.sha))
         if (!res.ok) throw new Error(`Could not download ${repo} at ${commit.sha} (Door43 answered ${res.status})`)
-        const read = await lexiconInputs(new Uint8Array(await res.arrayBuffer()))
+        const archive = new Uint8Array(await res.arrayBuffer())
+        downloaded(archive.byteLength, since)
+        const read = await lexiconInputs(archive)
         // The tree by row path, as the files are keyed; files that make no row are no input, nor checked.
         const tree = await treeOf(lexicon.owner, lexicon.name, commit.sha)
         const rowTree = tree && {
@@ -1130,7 +1195,9 @@ export async function buildLanguageParts(o: {
     for (const key of [...ORIGINAL_LANGUAGE_KEYS, ...(o.macula ? MACULA_KEYS : [])]) {
       if (!named(originalParts).includes(key)) failures.push({ unit: 'originals', error: `${key}: no parts` })
     }
-    say(`[${elapsed()}] Listo: ${languageParts.length} partes de ${language}, ${originalParts.length} de los originales, ${units.length - carried.length} unidades construidas y ${carried.length} llevadas, pico ${peakRssMb} MB`)
+    sizes = partSizes([...languageParts, ...originalParts])
+    say(`[${elapsed()}] Listo: ${languageParts.length} partes de ${language}, ${originalParts.length} de los originales, ${units.length - carried.length} unidades construidas y ${carried.length} llevadas, pico ${peakRssMb} MB; ${downloads.archives} archivos descargados (${(downloads.bytes / 1024 / 1024).toFixed(1)} MB, ${downloads.seconds} s)`)
+    say(`Tamaños de las partes:\n${sizesTable(sizes)}`)
     return { list, originals: originalsList, summary, failures, units, carried, peakRssMb }
   } catch (e) {
     error = e

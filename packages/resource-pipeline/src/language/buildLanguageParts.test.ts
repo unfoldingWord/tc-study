@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
@@ -247,6 +247,44 @@ describe('fingerprints', () => {
     }
     const { failures } = await build(freshDir('parts-ta-few'), { discover: discoverWith({ edit }) })
     expect(failures).toEqual([{ unit: 'catalog', error: expect.stringContaining(`${TA}: its catalog row has 10 ingredients, so its loader would read`) }])
+  }, 120_000)
+})
+
+describe('the report', () => {
+  test('gives part sizes per kind and per TW and TA folder, the downloads of step 1, and ends the log with the sizes', async () => {
+    const workDir = freshDir('parts-sizes')
+    const { list, originals, door43, lines } = await build(workDir)
+    const report = reportOf(workDir)
+    const all = [...list.parts, ...originals.parts]
+    const sizesOf = (parts: typeof all) => {
+      const bytes = parts.map((p) => p.bytes).sort((a, b) => a - b)
+      const mid = bytes.length >> 1
+      return {
+        parts: bytes.length,
+        bytes: bytes.reduce((a, b) => a + b, 0),
+        min: bytes[0],
+        median: bytes.length % 2 ? bytes[mid] : Math.round((bytes[mid - 1] + bytes[mid]) / 2),
+        max: bytes[bytes.length - 1],
+      }
+    }
+    const kt = all.filter((p) => p.kind === 'tw' && p.group!.startsWith('kt:'))
+    expect(kt.length).toBeGreaterThan(1)
+    expect(report.sizes['tw:kt']).toEqual(sizesOf(kt))
+    expect(report.sizes.tw).toEqual(sizesOf(all.filter((p) => p.kind === 'tw')))
+    expect(report.sizes['ta:translate']).toEqual(sizesOf(all.filter((p) => p.kind === 'ta')))
+    expect(report.sizes.book).toEqual(sizesOf(all.filter((p) => p.kind === 'book')))
+    expect(report.sizes.original).toEqual(sizesOf(originals.parts.filter((p) => p.kind === 'original')))
+    expect(Object.keys(report.sizes).filter((k) => k.includes(':')).sort()).toEqual(['ta:translate', 'tw:kt', 'tw:names', 'tw:other'])
+    // Every release zip once, and the lexicon's archive: what `<work>/zips` keeps.
+    const kept = readdirSync(join(workDir, 'zips'))
+    expect(report.downloads.archives).toBe(door43.downloads.length + 1)
+    expect(kept.length).toBe(report.downloads.archives)
+    expect(report.downloads.bytes).toBe(kept.reduce((sum, f) => sum + statSync(join(workDir, 'zips', f)).size, 0))
+    expect(report.downloads.seconds).toBeGreaterThanOrEqual(0)
+    expect(report.treeChecks).toEqual({ match: TREE_CHECKED, mismatch: 0, unverified: 0 })
+    const last = lines[lines.length - 1].split('\n')
+    for (const row of ['tw', 'tw:kt', 'ta', 'ta:translate', 'lexicon', 'book']) expect(last.some((l) => l.startsWith(`${row} `))).toBe(true)
+    expect(last.some((l) => l.startsWith('original '))).toBe(false)
   }, 120_000)
 })
 
