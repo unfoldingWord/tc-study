@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { compatKeyOf } from '../catalog'
 import { PACK_FORMAT_VERSION, PARTS_FORMAT_VERSION, type PackVersions } from '../types'
-import { LIST_DROPPED_FIELDS, partsListPath, restoreCatalogBookkeeping, serializePartsList, type PartEntry, type PartsList } from './partsList'
+import { LIST_DROPPED_FIELDS, originalsListPath, partsListPath, restoreCatalogBookkeeping, serializePartsList, unitOfPart, type PartEntry, type PartsList } from './partsList'
 
 const VERSIONS: PackVersions = {
   sot: { usjProcessing: '2.3.0-usj' },
@@ -11,15 +11,23 @@ const VERSIONS: PackVersions = {
   text: { helpsText: 1 },
 }
 
+const FP = 'f'.repeat(64)
+
 const PARTS: PartEntry[] = [
-  { sha256: 'c3', bytes: 30, rows: 3, kind: 'tw', resource: 'unfoldingWord/en/tw', group: 'kt:3', layers: ['sot', 'prepared'] },
-  { sha256: 'a1', bytes: 10, rows: 1, kind: 'book', resource: 'unfoldingWord/en/ult', book: 'rut', layers: ['sot', 'prepared'] },
-  { sha256: 'b2', bytes: 20, rows: 2, kind: 'book', resource: 'unfoldingWord/en/tn', book: 'jon', layers: ['sot', 'prepared', 'quote'] },
-  { sha256: 'b1', bytes: 20, rows: 2, kind: 'book', resource: 'unfoldingWord/en/tn', book: 'rut', layers: ['sot', 'prepared', 'quote'] },
-  { sha256: 'd4', bytes: 40, rows: 4, kind: 'alignments', resource: 'unfoldingWord/en/tn', book: 'rut', layers: ['align'] },
+  { sha256: 'c3', bytes: 30, rows: 3, kind: 'tw', resource: 'unfoldingWord/en/tw', group: 'kt:3', fingerprint: FP, layers: ['sot', 'prepared'] },
+  { sha256: 'a1', bytes: 10, rows: 1, kind: 'book', resource: 'unfoldingWord/en/ult', book: 'rut', fingerprint: FP, layers: ['sot', 'prepared'] },
+  { sha256: 'b2', bytes: 20, rows: 2, kind: 'book', resource: 'unfoldingWord/en/tn', book: 'jon', fingerprint: FP, layers: ['sot', 'prepared', 'quote'] },
+  { sha256: 'b1', bytes: 20, rows: 2, kind: 'book', resource: 'unfoldingWord/en/tn', book: 'rut', fingerprint: FP, layers: ['sot', 'prepared', 'quote'] },
+  { sha256: 'd4', bytes: 40, rows: 4, kind: 'alignments', resource: 'unfoldingWord/en/tn', book: 'rut', fingerprint: FP, layers: ['align'] },
 ]
 
-function list(parts: PartEntry[], resourcesReversed = false, dated = false): PartsList {
+const UNITS = [
+  { id: 'book rut', fingerprint: 'a'.repeat(64) },
+  { id: 'shared', fingerprint: 'b'.repeat(64) },
+  { id: 'book jon', fingerprint: 'c'.repeat(64) },
+]
+
+function list(parts: PartEntry[], resourcesReversed = false, dated = false, units = UNITS): PartsList {
   const resources: PartsList['resources'] = [
     {
       key: 'unfoldingWord/en/tn',
@@ -45,7 +53,8 @@ function list(parts: PartEntry[], resourcesReversed = false, dated = false): Par
     versions: VERSIONS,
     resources: resourcesReversed ? [...resources].reverse() : resources,
     parts,
-    originals: { path: 'catalog/x/originals.json', sha256: 'ff' },
+    originals: { path: 'catalog/x/originals/ff.json', sha256: 'ff' },
+    units,
   }
 }
 
@@ -92,6 +101,42 @@ describe('the parts list', () => {
     const withDate = { ...base, resources: base.resources.map((r) => ({ ...r, metadata: { ...(r.metadata as object), releasedOn: at } })) }
     const parsed = JSON.parse(serializePartsList(withDate)) as PartsList
     expect((parsed.resources[0].metadata as { releasedOn: unknown }).releasedOn).toBe('2026-01-01T00:00:00.000Z')
+  })
+})
+
+describe('fingerprints and units in the list', () => {
+  test('units serialize alike whatever order they were added in, sorted by id', () => {
+    expect(serializePartsList(list(PARTS, false, false, [...UNITS].reverse()))).toBe(serializePartsList(list(PARTS)))
+    const parsed = JSON.parse(serializePartsList(list(PARTS))) as PartsList
+    expect(parsed.units?.map((u) => u.id)).toEqual(['book jon', 'book rut', 'shared'])
+  })
+
+  test('every part carries its fingerprint, and a part without one is a type error', () => {
+    const parsed = JSON.parse(serializePartsList(list(PARTS))) as PartsList
+    expect(parsed.parts.every((p) => p.fingerprint === FP)).toBe(true)
+    // The build must give one: a part the next run cannot compare would never be carried, or worse, always be.
+    // @ts-expect-error fingerprint is required
+    const missing: PartEntry = { sha256: 'e5', bytes: 1, rows: 1, kind: 'titles', resource: 'unfoldingWord/en/tw', layers: ['text'] }
+    expect(missing.fingerprint).toBeUndefined()
+  })
+
+  test('a list without units (the originals list) serializes without them', () => {
+    const { units: _, ...rest } = list(PARTS)
+    expect(JSON.parse(serializePartsList(rest)).units).toBeUndefined()
+  })
+
+  test('the originals list a language names lives at its content address', () => {
+    const sha = '0123456789abcdef'.repeat(4)
+    expect(originalsListPath('f2.0-u2.3.0-p6000230-q9-a12-t1', sha)).toBe(`catalog/f2.0-u2.3.0-p6000230-q9-a12-t1/originals/${sha}.json`)
+  })
+
+  test('a part’s unit: its book for book, alignments and original parts; shared for the rest', () => {
+    expect(unitOfPart({ kind: 'book', book: 'rut' })).toBe('book rut')
+    expect(unitOfPart({ kind: 'alignments', book: 'jon' })).toBe('book jon')
+    expect(unitOfPart({ kind: 'original', book: 'tit' })).toBe('book tit')
+    expect(unitOfPart({ kind: 'macula', book: 'rut' })).toBe('shared')
+    for (const kind of ['tw', 'ta', 'titles', 'lexicon', 'obs'] as const) expect(unitOfPart({ kind })).toBe('shared')
+    expect(() => unitOfPart({ kind: 'book' })).toThrow(/no book/)
   })
 })
 

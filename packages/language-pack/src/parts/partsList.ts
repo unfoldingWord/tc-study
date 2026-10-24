@@ -20,8 +20,13 @@ export type PartEntry = {
   /** Lowercase. */
   book?: string
   group?: string
+  /** `fingerprintOf` its inputs: what the next build compares to carry it. */
+  fingerprint: string
   layers: PackLayer[]
 }
+
+/** A unit (`shared`, `book <b>`) and the fingerprint of everything it is built from. */
+export type PartsUnit = { id: string; fingerprint: string }
 
 export type PartsListResource = {
   key: string
@@ -43,8 +48,25 @@ export type PartsList = {
   versions: PackVersions
   resources: PartsListResource[]
   parts: PartEntry[]
-  /** A language's list: the shared originals list its quote and align rows were made against. */
+  /**
+   * A language's list: the originals list its quote and align rows were made against, at its content address
+   * (`originalsListPath`), which another language's run cannot overwrite.
+   */
   originals?: { path: string; sha256: string }
+  /** A language's list: every unit built or carried, so the next build can tell which changed. */
+  units?: PartsUnit[]
+}
+
+export const SHARED_UNIT = 'shared'
+export const bookUnit = (book: string) => `book ${book}`
+
+export const BOOK_KINDS: ReadonlySet<PartKind> = new Set(['book', 'alignments', 'original'])
+
+/** `book <b>` for a book's own parts; `shared` for the rest (MACULA is sliced by book but built with the shared). */
+export function unitOfPart(part: Pick<PartEntry, 'kind' | 'book'>): string {
+  if (!BOOK_KINDS.has(part.kind)) return SHARED_UNIT
+  if (!part.book) throw new Error(`A ${part.kind} part names no book`)
+  return bookUnit(part.book)
 }
 
 /**
@@ -83,9 +105,14 @@ export function partsListPath(compat: string, language: string): string {
   return catalogPath(compat, language)
 }
 
+/** The originals list as a language list names it: by its sha256, never overwritten. `originals.json` is the latest. */
+export function originalsListPath(compat: string, sha256: string): string {
+  return `catalog/${compat}/originals/${sha256}.json`
+}
+
 const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0)
 
-/** Stable JSON: parts sorted by (kind, resource, book, group), resources by key, object keys sorted, no dates. */
+/** Stable JSON: parts sorted by (kind, resource, book, group), resources by key, units by id, keys sorted, no dates. */
 export function serializePartsList(list: PartsList): string {
   const parts = [...list.parts]
     .map((p) => ({ ...p, layers: [...p.layers].sort((a, b) => PART_LAYERS.indexOf(a) - PART_LAYERS.indexOf(b)) }))
@@ -93,7 +120,8 @@ export function serializePartsList(list: PartsList): string {
   const resources = [...list.resources]
     .map((r) => ({ ...r, ...(r.books ? { books: [...r.books].sort(cmp) } : {}), metadata: withoutBookkeeping(r.metadata) }))
     .sort((a, b) => cmp(a.key, b.key))
-  return stableJson({ ...list, resources, parts })
+  const units = list.units ? [...list.units].sort((a, b) => cmp(a.id, b.id)) : undefined
+  return stableJson({ ...list, resources, parts, units })
 }
 
 /**

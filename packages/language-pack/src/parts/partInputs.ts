@@ -7,7 +7,7 @@
 import { ORIGINAL_LANGUAGE_KEYS } from '../keys'
 import { canonicalInputs, type FingerprintInputs } from './fingerprint'
 import { familyOf, lexiconGroupOf, taGroupOf, twGroupOf, type PartSlot, type ResourceFamily } from './partSlots'
-import type { PartKind } from './partsList'
+import { BOOK_KINDS, SHARED_UNIT, unitOfPart, type PartKind } from './partsList'
 
 export type ResourceFiles = {
   key: string
@@ -29,16 +29,9 @@ export type InputsContext = {
   originalOf(book: string): string | undefined
 }
 
-export const SHARED_UNIT = 'shared'
-export const bookUnit = (book: string) => `book ${book}`
-
-const BOOK_KINDS: ReadonlySet<PartKind> = new Set(['book', 'alignments', 'original'])
-
-/** `book <b>` for a book's own parts; `shared` for the rest (MACULA is sliced by book but built with the shared). */
+/** `book <b>` for a book's own parts; `shared` for the rest: the list's rule (`unitOfPart`), for a slot. */
 export function unitOfSlot(slot: Pick<PartSlot, 'kind' | 'book'>): string {
-  if (!BOOK_KINDS.has(slot.kind)) return SHARED_UNIT
-  if (!slot.book) throw new Error(`A ${slot.kind} part names no book`)
-  return bookUnit(slot.book)
+  return unitOfPart(slot)
 }
 
 /** Read as an input of nothing: only its normalized sha256 is (`ResourceFiles.manifest`). */

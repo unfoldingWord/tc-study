@@ -447,7 +447,8 @@ export async function buildLanguageParts(o: {
       const file = join(o.workDir, partPath(sha256))
       if (!existsSync(file)) writeFileSync(file, bytes)
       const layers = PART_LAYERS.filter((l) => rows.some((r) => r.layer === l))
-      const entry: PartEntry = { sha256, bytes: bytes.length, rows: n, ...slot, layers }
+      // TODO(2b-2 Task 6): the fingerprint of the part's inputs.
+      const entry: PartEntry = { sha256, bytes: bytes.length, rows: n, ...slot, fingerprint: '', layers }
       const shared = slot.kind === 'original' || slot.kind === 'macula'
       ;(shared ? originalParts : languageParts).push(entry)
       m.sample()
