@@ -21,7 +21,7 @@ import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { gitBlobSha } from '@bt-synergy/language-pack'
 import JSZip from 'jszip'
-import { lexiconRowPath, untar } from '../../cli/companions'
+import { lexiconRowPath, lexiconTitleOf, untar } from '../../cli/companions'
 import { zipFileNames } from '../download/zipCache'
 
 export type InputFiles = { files: Map<string, string>; manifest?: string }
@@ -59,20 +59,21 @@ export async function zipInputs(zip: Uint8Array | ArrayBuffer): Promise<InputFil
  * A lexicon's files from its Door43 archive (`.tar.gz`), read with `untar` as the lexicons are added to the store:
  * only the files `lexiconRowPath` makes rows of, keyed by that row path (`content/H1961.json`), with the git blob sha
  * of their bytes. When two files give one row path the last wins, as it does in the store. `manifest`: the
- * repository's own `manifest.yaml` (at its root), never a file input.
+ * repository's own `manifest.yaml` (at its root), never a file input; `title`: the one `addLexicons` gives it.
  *
  * To check these against a tree, map the tree's paths through `lexiconRowPath` first.
  */
-export async function lexiconInputs(tarGz: Uint8Array): Promise<InputFiles> {
+export async function lexiconInputs(tarGz: Uint8Array): Promise<InputFiles & { title?: string }> {
   const files = new Map<string, string>()
   let manifest: string | undefined
-  for (const file of untar(tarGz)) {
+  const entries = untar(tarGz)
+  for (const file of entries) {
     const inside = file.path.split('/').slice(1).join('/')
     if (inside === 'manifest.yaml') manifest = new TextDecoder().decode(file.bytes)
     const row = lexiconRowPath(inside)
     if (row) files.set(row, await gitBlobSha(file.bytes))
   }
-  return { files, manifest }
+  return { files, manifest, title: lexiconTitleOf(entries) }
 }
 
 /**

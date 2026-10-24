@@ -8,8 +8,13 @@
  *    archives through `archiveCachingFetch`), so the units' loaders read the very bytes hashed here; MACULA comes from
  *    its folder. From those bytes: each resource's files and their git blob shas (checked against Door43's tree when
  *    the client can read it), the normalized manifests, each book-scoped resource's books absent from its release
- *    (pruned as a whole download prunes them) and its book blobs (which stamp the quote and alignment keys).
- *    Then every unit's fingerprint.
+ *    (pruned as a whole download prunes them) and its book blobs (which stamp the quote and alignment keys). TW's
+ *    and TA's catalog ingredients (their titles) must be those their zip gives. Then every unit's fingerprint.
+ *
+ *    Given the lists an earlier build published (`previous`, same compat, code and language), a unit whose
+ *    fingerprint they record, whose parts' fingerprints recomputed now are the recorded ones and which the bucket still
+ *    has, is carried: its parts copied into the new lists, no database opened, nothing written. Any other unit is built
+ *    whole, as below. With OBS on, the shared unit is always built.
  * 2. The shared unit: TW, TA (and OBS) downloaded whole, the lexicons and MACULA, their article jobs and titles.
  * 3. One unit per book any book-scoped resource or original has: that book of each, its receipt written first so the
  *    loaders and jobs find it, then the book's jobs for the language and for the book's original.
@@ -37,6 +42,7 @@ import { getDoor43ApiClient } from '@bt-synergy/door43-api'
 import {
   bookUnit,
   compatKeyOf,
+  familyOf,
   fingerprintOf,
   isBookScoped,
   manifestFingerprint,
@@ -56,6 +62,7 @@ import {
   slotId,
   slotOfRow,
   unitInputs,
+  unitOfPart,
   writePart,
   type FingerprintInputs,
   type InputsContext,
@@ -84,22 +91,28 @@ import {
   resourceContentStamp,
   type ResourceMetadata,
 } from '@bt-synergy/resource-catalog'
+import { taIngredientsFromZip } from '@bt-synergy/translation-academy-loader'
+import { twIngredientsFromZip } from '@bt-synergy/translation-words-loader'
 import { USJ_PROCESSING_VERSION } from '@bt-synergy/usj-processor'
 import {
   addLexicons,
   addMacula,
+  companionCatalogRow,
   lexiconArchiveUrl,
   lexiconOwnerOf,
   lexiconRepos,
   lexiconRowPath,
+  lexiconResourceOf,
   lexiconStampOf,
   MACULA_KEYS,
+  maculaCatalogRows,
   maculaKeyOf,
   resolveLexicon,
 } from '../../cli/companions'
 import { discoverLanguage } from '../discover/discoverLanguage'
 import { createHeadlessResourceTypeRegistry } from '../discover/resourceTypeRegistry'
 import { CACHE_METADATA_KEYS } from '../download/ResourceCompletenessChecker'
+import { resetTocTitleIndexCache } from '../helps/tocTitleIndex'
 import { runDownload } from '../download/runDownload'
 import { zipCachingClient, zipFileNames } from '../download/zipCache'
 import { resolveOriginalLanguageKey } from '../scripture/originalLanguage'
@@ -118,6 +131,8 @@ export type PartsFailure = { unit: string; job?: string; error: string }
 
 export type UnitRecord = {
   unit: string
+  /** Built in this run, or carried from the previous lists (nothing built, nothing written). */
+  outcome: 'built' | 'carried'
   /**
    * Resident memory when the unit started. Memory freed by a deleted database is reused but not returned, so a
    * unit's own growth is `peakRssMb - startRssMb`, not its peak alone.
@@ -146,6 +161,11 @@ export type PartsReport = {
   units: UnitRecord[]
   failures: PartsFailure[]
   treeChecks: TreeChecks
+  /**
+   * `<resource> <book>` of each book whose catalog path no file of its release has (a loader found it by the end of a
+   * path): its rows carry the release stamp, so its parts and unit are rebuilt on every release.
+   */
+  releaseStampedBooks: string[]
 }
 
 export const PARTS_REPORT = 'parts-report.json'
@@ -159,11 +179,42 @@ export const UNPLACED_LISTED = 20
 /** At most this many paths are named in a failure for files that differ from Door43's tree. */
 const DIFFERING_LISTED = 5
 
+/** The TW and TA loaders trust a catalog row's ingredients only above this many; fewer, they ask Door43 for them. */
+const LOADER_TRUSTED_INGREDIENTS = 10
+
 type Door43Like = {
   downloadZipball(owner: string, repo: string, ref?: string): Promise<ArrayBuffer>
   /** Door43's tree of a ref, to check the blob shas computed from the bytes; without it nothing is checked. */
   fetchRepoTree?(owner: string, repo: string, ref: string): Promise<{ blobs: Map<string, string>; complete: boolean }>
   [method: string]: unknown
+}
+
+/**
+ * What an earlier build of the language published: its list, the originals list that list names, and whether the
+ * bucket (or the work folder) still has a part.
+ */
+export type PreviousParts = { list: PartsList; originals: PartsList; has(sha256: string): Promise<boolean> }
+
+/** Why a previous build's lists cannot be reused by this one, or null when they can. */
+export async function previousUnusable(
+  previous: Pick<PreviousParts, 'list' | 'originals'>,
+  now: { language: string; compat: string; code: string }
+): Promise<string | null> {
+  const { list, originals } = previous
+  for (const [name, l, language] of [
+    ['list', list, now.language],
+    ['originals list', originals, 'originals'],
+  ] as const) {
+    if (l.schema !== 2) return `its ${name} has schema ${String(l.schema)}, not 2`
+    if (l.language !== language) return `its ${name} is of ${l.language}, not ${language}`
+    if (l.compat !== now.compat) return `its ${name} is of compat ${l.compat}, not ${now.compat}`
+    // Fingerprints made by other code say nothing of what this code would build.
+    if (l.code !== now.code) return `its ${name} was built by code ${l.code}, not ${now.code}`
+  }
+  if (!list.units) return 'its list records no units'
+  const sha = await sha256Hex(new TextEncoder().encode(serializePartsList(originals)))
+  if (!list.originals || list.originals.sha256 !== sha) return 'its originals list is not the one its list names'
+  return null
 }
 
 /** Discovery puts the language's resources and the originals in the catalog; replaced in tests. */
@@ -304,12 +355,20 @@ export async function buildLanguageParts(o: {
   memorySampleMs?: number
   /** Waits between tries of a release zip (ZIP_RETRY_DELAYS_S); a test passes one that does not wait. */
   wait?: (ms: number) => Promise<void>
+  /**
+   * The lists an earlier build published: a unit whose fingerprint they record, whose parts' fingerprints are
+   * unchanged and which the bucket still has, is carried (its parts copied, nothing built or written). Lists of
+   * another compat, code or language, or without units, are ignored.
+   */
+  previous?: PreviousParts
 }): Promise<{
   list: PartsList
   originals: PartsList
   summary: Record<string, UnitSummary>
   failures: PartsFailure[]
   units: UnitRecord[]
+  /** The units carried from `previous`. */
+  carried: string[]
   peakRssMb: number
 }> {
   const language = o.language
@@ -320,6 +379,8 @@ export async function buildLanguageParts(o: {
   const wait = o.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
   const compat = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
   const code = await partsCode()
+  // Titles are memoized per process by resource and stamp: a file changed under the same tag would get the old ones.
+  resetTocTitleIndexCache()
   const door43 = zipCachingClient(
     (o.door43Client ?? (getDoor43ApiClient({ baseUrl: 'https://git.door43.org', debug: false }) as unknown as Door43Like)) as Door43Like,
     join(o.workDir, 'zips')
@@ -337,9 +398,10 @@ export async function buildLanguageParts(o: {
   const languageParts: PartEntry[] = []
   const originalParts: PartEntry[] = []
   const treeChecks: TreeChecks = { match: 0, mismatch: 0, unverified: 0 }
+  const releaseStampedBooks: string[] = []
 
   function writeReport(state: PartsReport['state'], error?: unknown) {
-    const report: PartsReport = { language, state, ...(error !== undefined ? { error: messageOf(error) } : {}), peakRssMb, units, failures, treeChecks }
+    const report: PartsReport = { language, state, ...(error !== undefined ? { error: messageOf(error) } : {}), peakRssMb, units, failures, treeChecks, releaseStampedBooks }
     const file = join(o.workDir, PARTS_REPORT)
     // Aside and renamed: a run killed mid-write still leaves the last whole report.
     writeFileSync(`${file}.partial`, JSON.stringify(report, null, 2))
@@ -409,6 +471,7 @@ export async function buildLanguageParts(o: {
       m.stop()
       const record: UnitRecord = {
         unit,
+        outcome: 'built',
         startRssMb: m.start(),
         peakRssMb: m.peak(),
         seconds: Math.round((Date.now() - unitStarted) / 100) / 10,
@@ -497,38 +560,126 @@ export async function buildLanguageParts(o: {
   /** Each unit's inputs and fingerprint, made in step 1, before any unit is built. */
   const unitPlan = new Map<string, { keys: string[]; inputs: FingerprintInputs; fingerprint: string }>()
 
-  async function writeParts(unit: string, collected: Map<string, Collected>, m: Meter): Promise<number> {
+  function planOf(unit: string) {
     const plan = unitPlan.get(unit)
     if (!plan) throw new Error(`No inputs were planned for the unit ${unit}`)
+    return plan
+  }
+
+  /** What a part of `unit` reads; a part that reads something its unit does not could change while its unit looks unchanged. */
+  function inputsOfPart(unit: string, slot: PartSlot): FingerprintInputs {
+    const read = partInputs(slot, inputs)
+    const missing = missingFromUnit(read, planOf(unit).inputs)
+    if (missing.length) throw new Error(`The part ${slotId(slot)} reads what its unit ${unit} does not: ${missing.slice(0, DIFFERING_LISTED).join('; ')}`)
+    return read
+  }
+
+  /**
+   * Quote and alignment keys carry the book's stamp: its file's blob (`g…`), or, for a book no file of its release has
+   * the path of (`releaseStampedBooks`), the release stamp, which the part must then read (`partInputs` adds it).
+   */
+  async function checkBookStamp(unit: string, slot: PartSlot, read: FingerprintInputs, checked: Set<string>) {
+    if (!slot.book || !BOOK_STAMPED.has(slot.kind) || checked.has(`${slot.resource} ${slot.book}`)) return
+    checked.add(`${slot.resource} ${slot.book}`)
+    const stamp = bookContentStamp(await metaOf(slot.resource), slot.book)
+    if (stamp.startsWith('g') || read.stamps.some(([r, s]) => r === slot.resource && s === stamp)) return
+    failures.push({
+      unit,
+      error: `${slot.resource}: the ${slot.book} rows would carry the stamp ${stamp}, which none of the part's inputs is`,
+    })
+  }
+
+  const pushPart = (entry: PartEntry) => (entry.kind === 'original' || entry.kind === 'macula' ? originalParts : languageParts).push(entry)
+
+  async function writeParts(unit: string, collected: Map<string, Collected>, m: Meter): Promise<number> {
     const stampChecked = new Set<string>()
     for (const { slot, rows } of collected.values()) {
       const id = slotId(slot)
-      const read = partInputs(slot, inputs)
-      // A part that reads something its unit does not could change while its unit looks unchanged.
-      const missing = missingFromUnit(read, plan.inputs)
-      if (missing.length) throw new Error(`The part ${id} reads what its unit ${unit} does not: ${missing.slice(0, DIFFERING_LISTED).join('; ')}`)
-      if (slot.book && BOOK_STAMPED.has(slot.kind) && !stampChecked.has(`${slot.resource} ${slot.book}`)) {
-        stampChecked.add(`${slot.resource} ${slot.book}`)
-        // Quote and alignment keys carry the book's stamp, which no input carries: it must come from the file's blob.
-        const stamp = bookContentStamp(await metaOf(slot.resource), slot.book)
-        if (!stamp.startsWith('g')) {
-          failures.push({
-            unit,
-            error: `${slot.resource}: the ${slot.book} rows would carry its release stamp (${stamp}), not their file's: no file of its release has the path its catalog names for ${slot.book}`,
-          })
-        }
-      }
+      const read = inputsOfPart(unit, slot)
+      await checkBookStamp(unit, slot, read, stampChecked)
       const { bytes, sha256, rows: n } = await writePart(rows)
       const file = join(o.workDir, partPath(sha256))
       if (!existsSync(file)) writeFileSync(file, bytes)
       const layers = PART_LAYERS.filter((l) => rows.some((r) => r.layer === l))
       const fingerprint = await fingerprintOf({ code, id, inputs: read })
-      const entry: PartEntry = { sha256, bytes: bytes.length, rows: n, ...slot, fingerprint, layers }
-      const shared = slot.kind === 'original' || slot.kind === 'macula'
-      ;(shared ? originalParts : languageParts).push(entry)
+      pushPart({ sha256, bytes: bytes.length, rows: n, ...slot, fingerprint, layers })
       m.sample()
     }
     return collected.size
+  }
+
+  /** The previous lists, once step 1 found them usable. */
+  let previous: PreviousParts | undefined
+  const carried: string[] = []
+
+  const slotOfEntry = (p: PartEntry): PartSlot => ({
+    kind: p.kind,
+    resource: p.resource,
+    ...(p.book !== undefined ? { book: p.book } : {}),
+    ...(p.group !== undefined ? { group: p.group } : {}),
+  })
+
+  /**
+   * A unit's parts in the previous lists, when it can be carried: they record the fingerprint the unit has now, every
+   * part's fingerprint recomputed now is the one they record, and the bucket still has every part. Else why not.
+   */
+  async function carriable(unit: string): Promise<{ parts: PartEntry[] } | { why: string }> {
+    if (!previous) return { why: 'no previous list' }
+    // TODO(loader): the OBS loader reads each story from Door43 at the tag it looks up, not from the zip hashed here.
+    if (unit === SHARED_UNIT && obs) return { why: 'OBS stories are read one by one from Door43, not from the zip its fingerprint hashes' }
+    const recorded = previous.list.units?.find((u) => u.id === unit)
+    if (!recorded) return { why: 'new' }
+    if (recorded.fingerprint !== planOf(unit).fingerprint) return { why: 'changed' }
+    const parts = [...previous.list.parts, ...previous.originals.parts].filter((p) => unitOfPart(p) === unit)
+    for (const p of parts) {
+      const slot = slotOfEntry(p)
+      let fingerprint: string
+      try {
+        fingerprint = await fingerprintOf({ code, id: slotId(slot), inputs: inputsOfPart(unit, slot) })
+      } catch (e) {
+        return { why: `${slotId(slot)}: ${messageOf(e)}` }
+      }
+      if (fingerprint !== p.fingerprint) return { why: `the fingerprint of ${slotId(slot)} changed` }
+    }
+    for (const p of parts) {
+      if (!(await previous.has(p.sha256))) return { why: `the bucket has no ${p.sha256} (${slotId(slotOfEntry(p))})` }
+    }
+    return { parts }
+  }
+
+  /**
+   * Carries the unit when it can (its parts copied, no database opened, nothing written) and says so; false when it
+   * must be built.
+   */
+  async function carry(unit: string): Promise<boolean> {
+    const found = await carriable(unit)
+    if ('why' in found) {
+      if (previous && found.why !== 'changed' && found.why !== 'new') say(`[${elapsed()}] ${unit}: se construye (${found.why})`)
+      return false
+    }
+    const failuresBefore = failures.length
+    const stampChecked = new Set<string>()
+    for (const p of found.parts) {
+      const slot = slotOfEntry(p)
+      await checkBookStamp(unit, slot, inputsOfPart(unit, slot), stampChecked)
+      pushPart(p)
+    }
+    const mb = Math.round(rss() / 1024 / 1024)
+    peakRssMb = Math.max(peakRssMb, mb)
+    units.push({
+      unit,
+      outcome: 'carried',
+      startRssMb: mb,
+      peakRssMb: mb,
+      seconds: 0,
+      parts: found.parts.length,
+      jobs: { built: 0, cached: 0, blocked: 0, noop: 0, failed: 0 },
+      failures: failures.length - failuresBefore,
+    })
+    carried.push(unit)
+    say(`[${elapsed()}] ${unit}: llevada de la lista anterior, ${found.parts.length} partes`)
+    writeReport('running')
+    return true
   }
 
   /**
@@ -553,6 +704,26 @@ export async function buildLanguageParts(o: {
         await wait(seconds * 1000)
       }
     }
+  }
+
+  /**
+   * TW and TA titles are made from the catalog row's ingredients, which discovery read with a download of its own (or
+   * file by file, for a tag not like `v1`): they must be what the zip hashed here gives, so the titles come from the
+   * bytes fingerprinted. Why not, or null.
+   */
+  async function ingredientsProblem(m: ResourceMetadata, zip: ArrayBuffer, family: 'tw' | 'ta'): Promise<string | null> {
+    const listed = m.contentMetadata?.ingredients ?? []
+    if (listed.length <= LOADER_TRUSTED_INGREDIENTS) {
+      return `its catalog row has ${listed.length} ingredients, so its loader would read its articles' list from Door43 again, not from its release zip`
+    }
+    const { ingredients } = await (family === 'tw' ? twIngredientsFromZip : taIngredientsFromZip)(zip)
+    const byId = (list: ReadonlyArray<{ identifier?: string; title?: string; path?: string }>) =>
+      new Map(list.map((i) => [String(i.identifier ?? ''), JSON.stringify([i.title ?? '', String(i.path ?? '').replace(/^\.\//, '')])]))
+    const [ours, zips] = [byId(listed), byId(ingredients)]
+    const differing = [...new Set([...ours.keys(), ...zips.keys()])].filter((id) => ours.get(id) !== zips.get(id)).sort()
+    if (!differing.length) return null
+    const more = differing.length - DIFFERING_LISTED
+    return `its catalog's ingredients are not those of its release zip (${differing.slice(0, DIFFERING_LISTED).join(', ')}${more > 0 ? ` and ${more} more` : ''}), so its titles would not come from the files fingerprinted`
   }
 
   /** Door43's tree of a ref, or null when the client cannot read one or Door43 does not answer (`unverified`). */
@@ -580,6 +751,11 @@ export async function buildLanguageParts(o: {
   let error: unknown
   try {
     // 1. The catalog.
+    if (o.previous) {
+      const why = await previousUnusable(o.previous, { language, compat, code })
+      if (why) say(`[${elapsed()}] La lista anterior no se usa (${why}): se construye todo`)
+      else previous = o.previous
+    }
     say(`[${elapsed()}] Buscando los recursos de ${language} en Door43…`)
     const discoveryCache = cacheAdapterFor(DISCOVERY_DB)
     let found: Awaited<ReturnType<DiscoverInto>>
@@ -627,6 +803,15 @@ export async function buildLanguageParts(o: {
       }
       const { owner, repo } = repoOf(key)
       recordTreeCheck(key, refOf(m), treeCheck(read.files, await treeOf(owner, repo, refOf(m))))
+      const family = familyOf({ key, type: String(m.type ?? ''), subject: m.subject })
+      if (family === 'tw' || family === 'ta') {
+        const why = await ingredientsProblem(m, got.zip, family)
+        if (why) {
+          failures.push({ unit: 'catalog', error: `${key}: ${why}, so it is left out` })
+          leftOut.add(key)
+          continue
+        }
+      }
       let books: Record<string, string> | undefined
       if (bookScoped.has(key)) {
         const paths = pathSetFromZipFileNames(got.names)
@@ -658,7 +843,13 @@ export async function buildLanguageParts(o: {
         books = {}
         for (const i of ingredients) {
           const path = normalizeIngredientPath(i.path)
-          if (path) books[String(i.identifier).toLowerCase()] = path
+          if (!path) continue
+          const book = String(i.identifier).toLowerCase()
+          books[book] = path
+          if (!read.files.has(path)) {
+            releaseStampedBooks.push(`${key} ${book}`)
+            say(`  ${key}: ningún archivo de la versión tiene la ruta ${path} de ${book}; sus filas llevan la marca de la versión`)
+          }
         }
       }
       const row = await metaOf(key)
@@ -676,7 +867,9 @@ export async function buildLanguageParts(o: {
     const languageKeys = candidates.filter((k) => !leftOut.has(k))
 
     // The lexicons, from their archives at the commit the ref names now (the shared unit adds that same archive).
+    // Their catalog rows and MACULA's, as `addLexicons` and `addMacula` write them: a carried shared unit runs neither.
     const lexicons = new Map<string, string>()
+    const companionRows: Array<ReturnType<typeof companionCatalogRow>> = []
     const literal = literalTextOf(await Promise.all(languageKeys.map(metaOf)), language) as (ResourceMetadata & { owner?: string }) | undefined
     if (o.lexiconsRef && literal?.owner) {
       for (const lexicon of lexiconRepos(language, lexiconOwnerOf(language, literal.owner))) {
@@ -705,6 +898,7 @@ export async function buildLanguageParts(o: {
           files: read.files,
         })
         lexicons.set(lexicon.key, commit.sha.slice(0, 10))
+        companionRows.push(companionCatalogRow(lexiconResourceOf(lexicon, language, commit, read.title)))
       }
     }
 
@@ -724,6 +918,7 @@ export async function buildLanguageParts(o: {
         resourceFiles.set(key, { key, type: 'original-syntax', subject: 'Original Language Syntax', stamp, files })
         maculaKeys.push(key)
       }
+      companionRows.push(...maculaCatalogRows(o.macula.folder, o.macula))
     }
 
     // The units, the canon's books in order, then any other book a resource has (front matter…), sorted; and what
@@ -760,7 +955,9 @@ export async function buildLanguageParts(o: {
     say(`[${elapsed()}] Árboles de Door43: ${treeChecks.match} iguales, ${treeChecks.mismatch} distintos, ${treeChecks.unverified} sin comprobar`)
 
     // 2. The shared unit.
-    await runUnit(SHARED_UNIT, SHARED_DB, async (cache, m) => {
+    if (await carry(SHARED_UNIT)) {
+      for (const row of companionRows) await catalog.set(row.resourceKey, row as never)
+    } else await runUnit(SHARED_UNIT, SHARED_DB, async (cache, m) => {
       const unit = SHARED_UNIT
       const catalogManager = managerOver(cache)
       say(`  ${whole.join(', ') || 'nada que descargar'}`)
@@ -830,6 +1027,7 @@ export async function buildLanguageParts(o: {
     // 3. One unit per book.
     for (const book of books) {
       const unit = bookUnit(book)
+      if (await carry(unit)) continue
       await runUnit(unit, bookDb(book), async (cache, m) => {
         const { ofLanguage, originals } = keysOfBook(book)
         const original = resolveOriginalLanguageKey(book)
@@ -932,8 +1130,8 @@ export async function buildLanguageParts(o: {
     for (const key of [...ORIGINAL_LANGUAGE_KEYS, ...(o.macula ? MACULA_KEYS : [])]) {
       if (!named(originalParts).includes(key)) failures.push({ unit: 'originals', error: `${key}: no parts` })
     }
-    say(`[${elapsed()}] Listo: ${languageParts.length} partes de ${language}, ${originalParts.length} de los originales, pico ${peakRssMb} MB`)
-    return { list, originals: originalsList, summary, failures, units, peakRssMb }
+    say(`[${elapsed()}] Listo: ${languageParts.length} partes de ${language}, ${originalParts.length} de los originales, ${units.length - carried.length} unidades construidas y ${carried.length} llevadas, pico ${peakRssMb} MB`)
+    return { list, originals: originalsList, summary, failures, units, carried, peakRssMb }
   } catch (e) {
     error = e
     throw e

@@ -13,6 +13,8 @@ import { partsCode } from './partsCode'
 import {
   catalogRows,
   discover,
+  releaseStampedRuth,
+  type CatalogRow,
   discoverWith,
   fakeDoor43,
   GLT,
@@ -213,16 +215,38 @@ describe('fingerprints', () => {
     expect(reportOf(workDir).treeChecks).toEqual({ match: TREE_CHECKED - 1, mismatch: 1, unverified: 0 })
   }, 120_000)
 
-  test("a book whose stamp would be the release's, not its file's, is a failure of its unit", async () => {
+  test("a book no file of its release has the catalog's path of reads the release stamp, and the report names it", async () => {
     // The loader finds `tn_RUT.tsv` for `./RUT.tsv` (it matches the end of a path), but no file has that path, so
-    // the book has no blob and its quote keys would carry the release stamp, which no input of the part carries.
-    const edit = (r: { resourceKey: string; contentMetadata: { ingredients: Array<{ identifier: string; path: string }> } }) => {
-      if (r.resourceKey === TN) r.contentMetadata.ingredients[0].path = './RUT.tsv'
+    // the book has no blob and its quote keys carry the release stamp: the part and the unit read it.
+    const workDir = freshDir('parts-release-stamp')
+    const { failures, list } = await build(workDir, { discover: discoverWith({ edit: releaseStampedRuth }) })
+    expect(failures).toEqual([])
+    expect(reportOf(workDir).releaseStampedBooks).toEqual([`${TN} rut`])
+    const tn = list.resources.find((r) => r.key === TN)!
+    expect(tn.stamp).toMatch(/^v12#/)
+  }, 120_000)
+
+  test("a TW whose catalog ingredients are not those its release zip gives is left out, with a failure of the catalog", async () => {
+    // Its titles come from those ingredients, which discovery read with another download.
+    const edit = (row: CatalogRow) => {
+      if (row.resourceKey === TW) row.contentMetadata.ingredients[0].title = 'Dios todopoderoso'
     }
-    const { failures } = await build(freshDir('parts-release-stamp'), { discover: discoverWith({ edit: edit as never }) })
+    const { failures, list } = await build(freshDir('parts-tw-ingredients'), { discover: discoverWith({ edit }) })
     expect(failures).toEqual([
-      { unit: 'book rut', error: expect.stringContaining(`${TN}: the rut rows would carry its release stamp (v12#`) },
+      {
+        unit: 'catalog',
+        error: `${TW}: its catalog's ingredients are not those of its release zip (bible/kt/god), so its titles would not come from the files fingerprinted, so it is left out`,
+      },
     ])
+    expect(list.parts.some((p) => p.resource === TW)).toBe(false)
+  }, 120_000)
+
+  test('a TA whose catalog row has ten ingredients or fewer (the loaders then read them again from Door43) is left out', async () => {
+    const edit = (row: CatalogRow) => {
+      if (row.resourceKey === TA) row.contentMetadata.ingredients.splice(10)
+    }
+    const { failures } = await build(freshDir('parts-ta-few'), { discover: discoverWith({ edit }) })
+    expect(failures).toEqual([{ unit: 'catalog', error: expect.stringContaining(`${TA}: its catalog row has 10 ingredients, so its loader would read`) }])
   }, 120_000)
 })
 

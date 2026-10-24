@@ -272,6 +272,14 @@ const baseRows = () => [
     row(UGNT, 'Greek New Testament', 'scripture', [book('tit', '57-TIT.usfm')]),
   ]
 
+/**
+ * A catalog edit: TN's Ruth at `./RUT.tsv`, a path no file of its release has. The loaders still find `tn_RUT.tsv` (they
+ * match the end of a path), but the book gets no blob, so its rows carry the release stamp.
+ */
+export const releaseStampedRuth = (row: CatalogRow) => {
+  if (row.resourceKey === TN) row.contentMetadata.ingredients[0].path = './RUT.tsv'
+}
+
 /** Discovery of the fixture's catalog, changed by `o`. */
 export function discoverWith(o: CatalogOverrides = {}): DiscoverInto {
   return async ({ catalogManager }) => {
