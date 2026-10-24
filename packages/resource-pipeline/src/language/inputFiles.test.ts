@@ -12,7 +12,8 @@ import { join } from 'node:path'
 import JSZip from 'jszip'
 import { storedZip } from '../download/zipFixture'
 import { archiveCachingFetch, folderInputs, lexiconInputs, treeCheck, zipInputs } from './inputFiles'
-import { fakeDoor43, lexiconFetch, maculaFolder } from './partsFixture'
+import { addLexicons } from '../../cli/companions'
+import { fakeDoor43, lexiconFetch, maculaFolder, REPOS, tarGz, UHL_COMMIT } from './partsFixture'
 
 const sha1Blob = (bytes: Uint8Array) => createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex')
 const text = (s: string) => new TextEncoder().encode(s)
@@ -63,7 +64,7 @@ describe('zipInputs', () => {
     const zip = await door43.downloadZipball('test_gl', 'es-419_tn', 'v12')
     const { files, manifest } = await zipInputs(zip)
     expect([...files.entries()].sort()).toEqual([...(await door43.fetchRepoTreeBlobs('test_gl', 'es-419_tn')).entries()].sort())
-    expect(manifest).toBeUndefined()
+    expect(manifest).toBe(REPOS['test_gl/es-419_tn']['manifest.yaml'])
   })
 
   test('directory entries are skipped, deflated entries are read, bytes are hashed as stored (no text decoding)', async () => {
@@ -139,6 +140,26 @@ describe('lexiconInputs', () => {
     expect([...files.keys()].sort()).toEqual(['content/H1961.json', 'content/H5281.json'])
     expect(files.get('content/H1961.json')).toBe(sha1Blob(text(JSON.stringify({ brief: 'ser, estar' }))))
     expect(manifest).toBe('dublin_core:\n  title: Léxico hebreo\n')
+  })
+
+  test('two files with one row path: the sha is of the file whose row the store keeps (the last in the archive)', async () => {
+    for (const order of [['content', 'nested'], ['nested', 'content']] as const) {
+      const bodies = { content: JSON.stringify({ brief: 'en la raíz' }), nested: JSON.stringify({ brief: 'en v0' }) }
+      const paths = { content: 'es-419_uhl/content/H1961.json', nested: 'es-419_uhl/uhl/v0/content/H1961.json' }
+      const archive = tarGz(Object.fromEntries(order.map((which) => [paths[which], bodies[which]])))
+      const rows = new Map<string, unknown>()
+      const store = { set: async () => {}, putRawMany: async (batch: Array<{ key: string; entry: unknown }>) => batch.forEach((r) => rows.set(r.key, r.entry)) }
+      const fetchFn = async (url: string) => {
+        if (url.includes('/commits')) return Response.json([UHL_COMMIT])
+        if (url.includes('/archive/')) return new Response(archive)
+        return url.endsWith('_uhl') ? Response.json({}) : new Response('', { status: 404 })
+      }
+      await addLexicons(store, { set: async () => {} }, 'es-419', 'test_gl', 'master', fetchFn)
+      const last = order[1]
+      expect(rows.get('test_gl/es-419/uhl/content/H1961.json')).toEqual(JSON.parse(bodies[last]))
+      const { files } = await lexiconInputs(archive)
+      expect(files.get('content/H1961.json')).toBe(sha1Blob(text(bodies[last])))
+    }
   })
 })
 

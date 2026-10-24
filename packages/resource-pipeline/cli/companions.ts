@@ -83,6 +83,14 @@ const LEXICONS = [
 
 type Fetch = (url: string) => Promise<Response>
 
+/** The lexicons a language may have from `owner`: their keys, Door43 repositories (`owner/name`) and subjects. */
+export function lexiconRepos(language: string, owner: string): Array<{ key: string; owner: string; name: string; subject: string; title: string }> {
+  return LEXICONS.map(([id, subject, title]) => ({ key: `${owner}/${language}/${id}`, owner, name: `${language}_${id}`, subject, title }))
+}
+
+/** Where `addLexicons` downloads a lexicon at a commit: one archive per commit, so a cache of it never goes stale. */
+export const lexiconArchiveUrl = (repo: string, sha: string) => `${HOST}/${repo}/archive/${sha}.tar.gz`
+
 /** Where a language's lexicons come from when not from its literal text's owner: translationCore reads English's there. */
 export const LEXICON_OWNERS: Readonly<Record<string, string>> = { en: 'test_org' }
 
@@ -118,7 +126,7 @@ export async function resolveLexicon(repo: string, ref: string, fetchFn: Fetch =
 }
 
 /** A lexicon's stamp, as its catalog row gets it in `addLexicons`: the commit's first ten characters and its date. */
-const lexiconStampOf = (commit: { sha: string; date: string }) => {
+export const lexiconStampOf = (commit: { sha: string; date: string }) => {
   const version = commit.sha.slice(0, 10)
   return resourceContentStamp({ version, release: { tag_name: version, published_at: commit.date } } as never)
 }
@@ -129,9 +137,9 @@ const lexiconStampOf = (commit: { sha: string; date: string }) => {
  */
 export async function lexiconStamps(o: { language: string; owner: string; ref: string; fetch?: Fetch }): Promise<Record<string, string>> {
   const stamps: Record<string, string> = {}
-  for (const [id] of LEXICONS) {
-    const commit = await resolveLexicon(`${o.owner}/${o.language}_${id}`, o.ref, o.fetch)
-    if (commit) stamps[`${o.owner}/${o.language}/${id}`] = lexiconStampOf(commit)
+  for (const { key, owner, name } of lexiconRepos(o.language, o.owner)) {
+    const commit = await resolveLexicon(`${owner}/${name}`, o.ref, o.fetch)
+    if (commit) stamps[key] = lexiconStampOf(commit)
   }
   return stamps
 }
@@ -147,16 +155,16 @@ export const LEXICON_ROWS_VERSION = 1
  */
 export async function addLexicons(cache: Store, catalog: Catalog, language: string, owner: string, ref = 'master', fetchFn: Fetch = fetch): Promise<Array<{ key: string; entries?: number; why?: string }>> {
   const done: Array<{ key: string; entries?: number; why?: string }> = []
-  for (const [id, subject, title] of LEXICONS) {
-    const repo = `${owner}/${language}_${id}`
-    const key = `${owner}/${language}/${id}`
+  for (const { key, name, subject, title } of lexiconRepos(language, owner)) {
+    const repo = `${owner}/${name}`
+    const id = key.split('/')[2]
     const commit = await resolveLexicon(repo, ref, fetchFn)
     if (!commit) {
       done.push({ key, why: `${repo} no está en Door43` })
       continue
     }
     // The commit, not the ref: what is read is what the stamp names, even if the branch moves meanwhile.
-    const archive = await fetchFn(`${HOST}/${repo}/archive/${commit.sha}.tar.gz`)
+    const archive = await fetchFn(lexiconArchiveUrl(repo, commit.sha))
     if (!archive.ok) throw new Error(`Could not download ${repo} at ${commit.sha} (Door43 answered ${archive.status})`)
     const files = untar(new Uint8Array(await archive.arrayBuffer()))
     const rows: Array<{ key: string; entry: unknown }> = []
@@ -198,6 +206,9 @@ export const MACULA_ROWS_VERSION = 1
 /** The MACULA resources: one for the Hebrew, one for the Greek, as `--macula` names them. */
 export const MACULA_KEYS = ['Biblica/hbo/macula', 'Biblica/el-x-koine/macula'] as const
 
+/** The MACULA resource a book's files go to (`RUT`, `tit`): the Greek for the New Testament, else the Hebrew. */
+export const maculaKeyOf = (book: string): (typeof MACULA_KEYS)[number] => (NEW_TESTAMENT.has(book.toUpperCase()) ? MACULA_KEYS[1] : MACULA_KEYS[0])
+
 /**
  * What MACULA says of the originals, from a folder with Taller's `trees/` and `referents/` (one `{BOOK}.json` each):
  * the Old Testament's books to the Hebrew resource, the New's to the Greek. Returns the books of each.
@@ -214,7 +225,7 @@ export async function addMacula(
     for (const name of readdirSync(join(folder, part))) {
       const book = name.replace(/\.json$/, '')
       if (!/^[1-3A-Z]{3}$/.test(book)) continue
-      const key = NEW_TESTAMENT.has(book) ? MACULA_KEYS[1] : MACULA_KEYS[0]
+      const key = maculaKeyOf(book)
       const target = byKey.get(key)!
       target.rows.push({ key: `${key}/${part}/${book}`, entry: JSON.parse(readFileSync(join(folder, part, name), 'utf8')) })
       target.books.add(book.toLowerCase())

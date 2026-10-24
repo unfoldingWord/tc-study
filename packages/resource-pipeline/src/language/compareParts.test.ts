@@ -101,6 +101,15 @@ describe('compareParts', () => {
     expect(c.rows.filter((d) => d.resource === OBS).reduce((n, d) => n + d.whole, 0)).toBeGreaterThan(0)
   }, 120_000)
 
+  test("the originals list read is the one the language list names, whatever another run left in originals.json", async () => {
+    const copy = copyOfBuild()
+    // Another language's run, made against other originals, wrote the latest originals.json.
+    writeFileSync(join(copy.dir, partsListPath(compat, 'originals')), serializePartsList({ ...copy.list, language: 'originals', parts: [] }))
+    const c = await compare(copy.dir)
+    if (c.differences) console.error(formatComparison(c))
+    expect(c.differences).toBe(0)
+  }, 60_000)
+
   test('a row whose value changed in a part is reported as differing', async () => {
     const copy = copyOfBuild()
     let changed = ''
