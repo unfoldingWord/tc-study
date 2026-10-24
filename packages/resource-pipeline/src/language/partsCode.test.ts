@@ -2,8 +2,19 @@ import { describe, expect, test } from 'bun:test'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { compatKeyOf, fingerprintOf, PARTS_FORMAT_VERSION } from '@bt-synergy/language-pack'
+import { USJ_TOOL_VERSIONS } from '@bt-synergy/usj-processor'
 import { PACK_VERSIONS } from './packVersions'
-import { NOT_ROW_CODE, partsCode, partsCodeOf, partsCodeVersions } from './partsCode'
+import {
+  installedVersions,
+  NOT_ROW_CODE,
+  NOT_ROW_DEPENDENCIES,
+  NOT_SCANNED,
+  partsCode,
+  partsCodeOf,
+  partsCodeVersions,
+  ROW_DEPENDENCIES,
+  STAMP_SAMPLE,
+} from './partsCode'
 
 const PACKAGES = join(import.meta.dir, '..', '..', '..')
 
@@ -21,7 +32,26 @@ const ROW_PRODUCERS = [
   'resource-pipeline/src',
   'resource-pipeline/cli',
   'language-pack/src',
+  // The catalog rows the loaders read their files and ingredients from, the registry that picks a loader, the client
+  // that downloads, and the stores every row goes through.
+  'catalog-manager/src',
+  'resource-types/src',
+  'door43-api/src',
+  'cache-adapter-indexeddb/src',
+  'catalog-adapter-indexeddb/src',
 ]
+
+const packageJson = (name: string) =>
+  JSON.parse(readFileSync(join(PACKAGES, name, 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>
+    peerDependencies?: Record<string, string>
+  }
+
+/** The leaves of a constant's object, `NAME.a.b`, as partsCodeVersions names them. */
+function leaves(prefix: string, value: unknown): string[] {
+  if (value === null || typeof value !== 'object') return [prefix]
+  return Object.entries(value).flatMap(([k, v]) => leaves(`${prefix}.${k}`, v))
+}
 
 function sources(dir: string): string[] {
   const out: string[] = []
@@ -72,18 +102,87 @@ describe('the code of a parts build', () => {
     expect(versions.HELPS_TEXT_VERSION).toBe(PACK_VERSIONS.text.helpsText)
   })
 
-  test('holds every exported version or schema constant of the row producers, or says why one is not row code', () => {
+  test('holds every version, versions or schema constant of the row producers, or says why one is not row code', async () => {
     const versions = partsCodeVersions()
     const unknown: string[] = []
     for (const dir of ROW_PRODUCERS) {
       for (const file of sources(join(PACKAGES, dir))) {
-        for (const m of readFileSync(file, 'utf8').matchAll(/export const ([A-Z][A-Z0-9_]*_(?:VERSION|SCHEMA))\b/g)) {
-          if (!(m[1] in versions) && !(m[1] in NOT_ROW_CODE)) unknown.push(`${m[1]} (${relative(PACKAGES, file)})`)
+        const text = readFileSync(file, 'utf8')
+        for (const m of text.matchAll(/^\s*(export\s+)?const ([A-Z][A-Z0-9_]*_(?:VERSIONS?|SCHEMA))\b/gm)) {
+          const [, exported, name] = m
+          if (name in NOT_ROW_CODE) continue
+          const where = `${name} (${relative(PACKAGES, file)})`
+          if (!exported) {
+            // Not exported, it cannot be read here: export it and add it, or say in NOT_ROW_CODE why it is not row code.
+            unknown.push(`${where}: not exported`)
+          } else if (name.endsWith('_VERSIONS')) {
+            // An object of versions: each of its leaves by `NAME.key`.
+            const value = (await import(file))[name]
+            for (const leaf of leaves(name, value)) if (!(leaf in versions)) unknown.push(`${leaf} (${relative(PACKAGES, file)})`)
+          } else if (!(name in versions)) unknown.push(where)
         }
       }
     }
     // A new one is either code a part's rows come from (add it to partsCodeVersions) or not (NOT_ROW_CODE, with why).
     expect(unknown).toEqual([])
     for (const name of Object.keys(NOT_ROW_CODE)) expect(versions[name]).toBeUndefined()
+  })
+
+  test('scans every workspace package the row producers depend on, or says why one makes no rows', () => {
+    const scanned = new Set(ROW_PRODUCERS.map((dir) => dir.split('/')[0]))
+    const unscanned: string[] = []
+    for (const name of scanned) {
+      const pkg = packageJson(name)
+      for (const dep of Object.keys({ ...pkg.dependencies, ...pkg.peerDependencies })) {
+        const workspace = dep.startsWith('@bt-synergy/') ? dep.slice('@bt-synergy/'.length) : null
+        if (workspace && !scanned.has(workspace) && !(workspace in NOT_SCANNED)) unscanned.push(`${workspace} (a dependency of ${name})`)
+      }
+    }
+    expect(unscanned).toEqual([])
+  })
+
+  test('holds the installed version of every third-party package on the row path and of what they depend on', () => {
+    const versions = partsCodeVersions()
+    const installed = installedVersions()
+    for (const [name, version] of Object.entries(installed)) expect(versions[name]).toBe(version)
+    // The roots, and some of what they pull in: an upgrade of any of them may change rows without any constant moving.
+    for (const name of ['@usfm-tools/parser', '@usfm-tools/usj-core', '@usfm-tools/types', '@xmldom/xmldom', 'unified', 'remark-parse', 'remark-gfm', 'remark-rehype', 'mdast-util-to-hast', 'micromark', 'jszip', 'fake-indexeddb']) {
+      expect(installed[`npm ${name}`]).toMatch(/^\d+\.\d+\.\d+/)
+    }
+    // Read from node_modules, not from a package.json range.
+    const parser = JSON.parse(readFileSync(join(PACKAGES, 'usj-processor', 'node_modules', '@usfm-tools', 'parser', 'package.json'), 'utf8'))
+    expect(installed['npm @usfm-tools/parser']).toBe(parser.version)
+  })
+
+  test("names every third-party dependency of the row producers, or says why it makes no rows", () => {
+    const roots = new Set(Object.values(ROW_DEPENDENCIES).flat())
+    const unnamed: string[] = []
+    for (const dir of ROW_PRODUCERS) {
+      const name = dir.split('/')[0]
+      const pkg = packageJson(name)
+      for (const dep of Object.keys({ ...pkg.dependencies, ...pkg.peerDependencies })) {
+        if (dep.startsWith('@bt-synergy/')) continue
+        if (!roots.has(dep) && !(dep in NOT_ROW_DEPENDENCIES)) unnamed.push(`${dep} (${name})`)
+      }
+    }
+    expect([...new Set(unnamed)]).toEqual([])
+    for (const [pkg, deps] of Object.entries(ROW_DEPENDENCIES)) {
+      const declared = { ...packageJson(pkg).dependencies, ...packageJson(pkg).peerDependencies, ...(pkg === 'resource-pipeline' ? { 'fake-indexeddb': '' } : {}) }
+      for (const dep of deps) expect(`${dep} in ${pkg}: ${dep in declared}`).toBe(`${dep} in ${pkg}: true`)
+    }
+  })
+
+  test('says the USJ tool versions the USJ rows are stamped with are the installed ones', () => {
+    const installed = installedVersions()
+    expect({ ...USJ_TOOL_VERSIONS }).toEqual({ parser: installed['npm @usfm-tools/parser'], usjCore: installed['npm @usfm-tools/usj-core'] })
+  })
+
+  test('holds a sample of the stamps keys carry, so a change of their format moves the code', () => {
+    const versions = partsCodeVersions()
+    expect(versions['stamp resourceContentStamp']).toBe('v2_a_b_c#2026-01-02T03_04_05Z')
+    expect(versions['stamp bookContentStamp']).toBe('gce01362503')
+    expect(versions['stamp bookContentStamp, no blob']).toBe('v2_a_b_c#2026-01-02T03_04_05Z')
+    expect(versions['stamp lexiconStampOf']).toBe('0123456789#2026-07-01T00_00_00Z')
+    expect(STAMP_SAMPLE.release.tag_name).toBe('v2:a|b@c')
   })
 })
