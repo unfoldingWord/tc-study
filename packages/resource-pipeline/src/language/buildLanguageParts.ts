@@ -737,6 +737,19 @@ export async function buildLanguageParts(o: {
     if (!recorded) return { why: 'new' }
     if (recorded.fingerprint !== planOf(unit).fingerprint) return { why: 'changed' }
     const parts = [...previous.list.parts, ...previous.originals.parts].filter((p) => unitOfPart(p) === unit)
+    // Every resource the unit builds must have left a part: else a part the previous build lost (a silent gap) would
+    // stay lost for as long as the unit is carried. A book's source part of each resource; any part of a shared one.
+    const book = unit === SHARED_UNIT ? undefined : unit.slice('book '.length)
+    for (const key of planOf(unit).keys) {
+      if (book === undefined) {
+        if (!parts.some((p) => p.resource === key)) return { why: `the previous lists have no part of ${key}` }
+        continue
+      }
+      const kind = (ORIGINAL_LANGUAGE_KEYS as readonly string[]).includes(key) ? 'original' : 'book'
+      if (!parts.some((p) => p.resource === key && p.kind === kind && p.book === book && p.layers.includes('sot'))) {
+        return { why: `the previous lists have no ${kind} part of ${key} ${book}` }
+      }
+    }
     for (const p of parts) {
       const slot = slotOfEntry(p)
       let fingerprint: string

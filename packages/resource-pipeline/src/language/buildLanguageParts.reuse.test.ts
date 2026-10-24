@@ -22,6 +22,7 @@ import {
   releaseStampedRuth,
   TA,
   TN,
+  UHL,
   type CatalogOverrides,
   type CatalogRow,
 } from './partsFixture'
@@ -222,6 +223,24 @@ describe('a build with the previous lists', () => {
     expect(again.texts).toEqual(baseline.texts)
     expect(again.units.every((u) => u.parts === baseline.units.find((b) => b.unit === u.unit)!.parts)).toBe(true)
   }, 120_000)
+
+  test("a previous list lacking a resource's part of a book (a silent gap) is not carried on: that book is built", async () => {
+    const gltRuth = (p: PartEntry) => p.kind === 'book' && p.book === 'rut' && p.resource === GLT
+    const reuse = await build({}, previousOf(baseline, { list: (l) => ({ ...l, parts: l.parts.filter((p) => !gltRuth(p)) }) }))
+    expect(reuse.failures).toEqual([])
+    expect(builtUnits(reuse)).toEqual(['book rut'])
+    expect(reuse.lines).toContainEqual(expect.stringContaining(`book rut: se construye (the previous lists have no book part of ${GLT} rut)`))
+    expect(reuse.texts).toEqual(baseline.texts)
+  }, 120_000)
+
+  test("a previous list with no part of a shared resource (the lexicon) is not carried on: the shared unit is built", async () => {
+    const reuse = await build({}, previousOf(baseline, { list: (l) => ({ ...l, parts: l.parts.filter((p) => p.resource !== UHL) }) }))
+    expect(reuse.failures).toEqual([])
+    expect(builtUnits(reuse)).toEqual(['shared'])
+    expect(reuse.lines).toContainEqual(expect.stringContaining(`shared: se construye (the previous lists have no part of ${UHL})`))
+    expect(reuse.texts).toEqual(baseline.texts)
+  }, 120_000)
+
 
   for (const mutation of MUTATIONS) {
     test(`${mutation.name}: builds ${mutation.built.join(', ') || 'nothing'}, and gives what a full build gives`, async () => {
