@@ -2,6 +2,8 @@ name: Language packs
 
 # Builds one language's packs and publishes them to the packs bucket (packages/resource-pipeline/cli/publish-language.ts),
 # and reports the build state next to the catalog (status/<compat>/<lang>.json) for the serving Worker's dispatch guard.
+# With `parts` it builds the language one book at a time and publishes the parts (staging only, until the Worker serves
+# them) under the parts compat (f2.0-…), with that compat's status: nothing a whole build or the Worker reads changes.
 # Dispatched by hand, or by the Worker (a GitHub App with actions: write on this repository only).
 
 run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }}${{ inputs.parts && ', parts' || '' }}${{ inputs.compare && ', compare' || '' }})
@@ -40,7 +42,7 @@ on:
         type: boolean
         default: false
       parts:
-        description: Build as parts, one book at a time (no-upload only, until parts are published)
+        description: 'Build as parts, one book at a time (publish: staging only, until the Worker serves parts)'
         required: false
         type: boolean
         default: false
@@ -82,23 +84,22 @@ jobs:
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
       - name: Validate inputs
+        env:
+          TARGET: ${{ inputs.target }}
         run: |
           if ! [[ "$LANGUAGE" =~ ^[a-z]{2,3}(-[A-Za-z0-9]+)*$ ]]; then
             echo "::error::language is not a language code"
             exit 1
           fi
           case "$MODE" in publish | no-upload) ;; *) echo "::error::mode must be publish or no-upload"; exit 1 ;; esac
-          if [ "$PARTS" = true ] && [ "$MODE" != no-upload ]; then
-            echo "::error::parts builds only with mode no-upload"
+          # The Worker reads no part yet: parts in production would be bytes nobody serves, under keys nothing cleans.
+          if [ "$PARTS" = true ] && [ "$MODE" = publish ] && [ "$TARGET" = production ]; then
+            echo "::error::parts publish to production waits for the Worker (delivery 3)"
             exit 1
           fi
-          # A parts run decides nothing, it always builds: force would do nothing.
-          if [ "$PARTS" = true ] && [ "$FORCE" = true ]; then
-            echo "::error::parts and force do not go together"
-            exit 1
-          fi
-          if [ "$COMPARE" = true ] && [ "$PARTS" != true ]; then
-            echo "::error::compare needs parts (and so mode no-upload)"
+          # The comparison builds the whole packs beside the parts, into the runner: nothing of it is published.
+          if [ "$COMPARE" = true ] && { [ "$PARTS" != true ] || [ "$MODE" != no-upload ]; }; then
+            echo "::error::compare needs parts and mode no-upload"
             exit 1
           fi
           # The same shape the Worker and packs-status check: the compat becomes a bucket key.
@@ -126,7 +127,7 @@ jobs:
       # followed by a v2 redeploy) would publish where the Worker never looks and be dispatched again every hour: it marks
       # the requested compat failed instead, which the Worker's guard reads, and builds nothing.
       # Not for a parts run: parts have their own compat (PARTS_FORMAT_VERSION, f2.0), which no Worker asks for yet,
-      # and a parts run publishes nothing for the Worker to find.
+      # and a parts run publishes nothing the Worker reads (staging only, and its own status).
       - name: Check compat
         if: inputs.compat != '' && !inputs.parts
         env:
@@ -146,6 +147,7 @@ jobs:
       # Runs that fail before this step leave no status of their own; the Worker writes `running` when it dispatches
       # (plan 2, Task 5), and counts a `running` mark it replaces after 5.5 hours as a failure, so they still count.
       # Only a publish run owns the language's status: a measurement must not flip it, nor count as a failure.
+      # A parts publish writes the parts compat's status (status/f2.0-…), never the f1.1 one the Worker reads.
       - name: Status running
         id: running
         if: inputs.mode == 'publish'
@@ -154,7 +156,10 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-        run: bun packages/resource-pipeline/cli/packs-status.ts --lang "$LANGUAGE" --state running --run "$RUN_URL"
+        run: |
+          status=(--lang "$LANGUAGE" --state running --run "$RUN_URL")
+          if [ "$PARTS" = true ]; then status+=(--parts); fi
+          bun packages/resource-pipeline/cli/packs-status.ts "${status[@]}"
 
       # A no-upload run is given no bucket: against the real one it would stop at «unchanged» and measure nothing.
       - name: Build and publish
@@ -170,9 +175,10 @@ jobs:
           args=(--lang "$LANGUAGE" --work "$RUNNER_TEMP/packs-work" --generator "$GENERATOR" --macula "$RUNNER_TEMP/taller/public" --lexicons-ref master)
           runner=()
           if [ "$FORCE" = true ]; then args+=(--force); fi
-          if [ "$MODE" = no-upload ]; then
-            args+=(--no-upload)
-            if [ "$PARTS" = true ]; then args+=(--parts); fi
+          if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
+          # Parts in both modes. A parts publish is measured too: its time and memory are what carrying units saves.
+          if [ "$PARTS" = true ]; then args+=(--parts); fi
+          if [ "$MODE" = no-upload ] || [ "$PARTS" = true ]; then
             command -v /usr/bin/time > /dev/null || { sudo apt-get update -q && sudo apt-get install -y time; }
             runner=(/usr/bin/time -v -o "$RUNNER_TEMP/packs-out/time.txt")
           fi
@@ -192,6 +198,45 @@ jobs:
               echo '```'
               grep -E 'Maximum resident set size|Elapsed \(wall clock\)' "$RUNNER_TEMP/packs-out/time.txt" || true
               echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # What a parts run built, carried and put, its tree checks, and the part sizes the bucket counts are chosen from.
+      # A step of its own so that a failed run gets it too: a parts run exits 1 on failures it still wrote out. Every
+      # field may be missing (a run stopped early): it then shows as «?» or is left out, and never fails the step.
+      - name: Parts summary
+        if: always() && inputs.parts && steps.publish.conclusion != 'skipped'
+        run: |
+          line="$(tail -n 1 "$RUNNER_TEMP/packs-out/stdout.txt" 2> /dev/null || true)"
+          report="$RUNNER_TEMP/packs-work/parts-report.json"
+          {
+            echo
+            echo "### Parts"
+            if [ -n "$line" ] && printf '%s\n' "$line" | jq -e 'type == "object"' > /dev/null 2>&1; then
+              printf '%s\n' "$line" | jq -r '
+                "Units: \(.units.built? // "?") built, \(.units.carried? // "?") carried",
+                "Parts: \(.parts.put? // "?") put, \(.parts.present? // "?") already there (\(.parts.language? // "?") of the language, \(.parts.originals? // "?") originals)",
+                "Peak: \(.peakRssMb? // "?") MB; failures: \(.failures? // "?")"' || true
+            else
+              echo "No result line: the build stopped before printing it."
+            fi
+            if [ -f "$report" ] && jq -e 'type == "object"' "$report" > /dev/null 2>&1; then
+              jq -r '
+                def n: if type == "number" then (. * 10 | round / 10 | tostring) else "?" end;
+                def kb: if type == "number" then (. / 102.4 | round / 10 | tostring) else "" end;
+                def mb: if type == "number" then (. / 104857.6 | round / 10 | tostring) else "?" end;
+                "Tree checks: \(.treeChecks.match? | n) match, \(.treeChecks.mismatch? | n) mismatch, \(.treeChecks.unverified? | n) unverified",
+                "Books whose rows carry their release stamp: \(.releaseStampedBooks? | if type == "array" then length else "?" end)",
+                "Downloads: \(.downloads.archives? | n) archives, \(.downloads.bytes? | mb) MB, \(.downloads.seconds? | n) s",
+                ((.sizes? // empty | if type == "object" then to_entries else [] end)
+                  | map(select((.key | test("^(tw|ta|lexicon|book)(:|$)")) and (.value | type == "object")))
+                  | sort_by(.key)
+                  | if length == 0 then empty else
+                      "", "| Sizes | parts | total KB | min KB | median KB | max KB |", "|---|--:|--:|--:|--:|--:|",
+                      (.[] | "| \(.key) | \(.value.parts | n) | \(.value.bytes | kb) | \(.value.min | kb) | \(.value.median | kb) | \(.value.max | kb) |")
+                    end)' "$report" || true
+            else
+              echo "No readable parts-report.json."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -234,7 +279,9 @@ jobs:
         run: |
           state=failed
           if [ "$PUBLISH_OUTCOME" = success ]; then state=ok; fi
-          bun packages/resource-pipeline/cli/packs-status.ts --lang "$LANGUAGE" --state "$state" --run "$RUN_URL"
+          status=(--lang "$LANGUAGE" --state "$state" --run "$RUN_URL")
+          if [ "$PARTS" = true ]; then status+=(--parts); fi
+          bun packages/resource-pipeline/cli/packs-status.ts "${status[@]}"
 
       - name: Upload result
         if: always()
@@ -242,8 +289,10 @@ jobs:
         with:
           name: packs-result
           # parts-report.json: each unit's memory and time, what a parts run measures (there too when jobs failed).
+          # catalog/: a parts run's lists, as built (a whole run writes none there).
           path: |
             ${{ runner.temp }}/packs-out
             ${{ runner.temp }}/packs-work/parts-report.json
+            ${{ runner.temp }}/packs-work/catalog/
           if-no-files-found: ignore
           retention-days: 14

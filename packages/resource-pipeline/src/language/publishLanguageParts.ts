@@ -198,7 +198,8 @@ export async function publishLanguageParts(o: {
   const built = await build({
     language,
     workDir,
-    macula: { folder: o.macula.folder, version: o.macula.commit.slice(0, 10), publishedAt: maculaDate.toISOString() },
+    // The whole commit too: MACULA's files are checked against Taller's git tree at it.
+    macula: { folder: o.macula.folder, version: o.macula.commit.slice(0, 10), publishedAt: maculaDate.toISOString(), commit: o.macula.commit },
     lexiconsRef: o.lexiconsRef,
     obs: o.obs ?? false,
     log: say,
