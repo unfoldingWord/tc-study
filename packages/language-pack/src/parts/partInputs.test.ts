@@ -124,6 +124,23 @@ describe('the files a part reads', () => {
     expect(filesOf({ kind: 'alignments', resource: TWL, book: 'jon' }).map(([r]) => r)).toEqual([GLT, GST, RVR, TWL, UHB])
   })
 
+  test('a book its release has no file for (its catalog names another path) reads the release stamp, its keys carry it', () => {
+    // bookContentStamp falls back to the release stamp when the book has no blob: a new tag changes those keys.
+    const tn = resource(TN, { type: 'notes', subject: 'TSV Translation Notes' }, ['tn_RUT.tsv', 'tn_JON.tsv'], { rut: './RUT.tsv', jon: 'tn_JON.tsv' })
+    const ctx = ctxOf([...RESOURCES.filter((x) => x.key !== TN && x.key !== GST), tn, { ...RESOURCES.find((x) => x.key === GST)!, books: { rut: 'RUT.usfm', jon: '32-JON.usfm' } }])
+    for (const kind of ['book', 'alignments'] as const) {
+      expect(partInputs({ kind, resource: TN, book: 'rut' }, ctx).stamps).toContainEqual([TN, `v12#${TN}`])
+      expect(partInputs({ kind, resource: TN, book: 'jon' }, ctx).stamps).toEqual([])
+    }
+    // A text the alignments read whose book is so stamped: its stamp too.
+    expect(partInputs({ kind: 'alignments', resource: TWL, book: 'rut' }, ctx).stamps).toEqual([[GST, `v12#${GST}`]])
+    expect(unitInputs('book rut', keysOf('book rut'), ctx).stamps).toEqual([
+      [GST, `v12#${GST}`],
+      [TN, `v12#${TN}`],
+    ])
+    expect(unitInputs('book jon', keysOf('book jon'), ctx).stamps).toEqual([])
+  })
+
   test('an original’s book reads its file; MACULA’s, its trees and referents of the book', () => {
     expect(filesOf({ kind: 'original', resource: UGNT, book: 'tit' })).toEqual([[UGNT, '57-TIT.usfm', blob(UGNT, '57-TIT.usfm')]])
     expect(pathsOf({ kind: 'macula', resource: MACULA, book: 'rut' })).toEqual(['referents/RUT.json', 'trees/RUT.json'])

@@ -107,10 +107,17 @@ class Collector {
     this.inputs.stamps.push([r.key, r.stamp])
   }
 
-  /** A resource's file of one book, and its manifest. */
+  /**
+   * A resource's file of one book, and its manifest. A book whose catalog path no file of the release has (a loader
+   * may still find it by the end of a path) gets no blob, so its keys carry the release stamp (`bookContentStamp`):
+   * then that stamp is read too.
+   */
   book(r: ResourceFiles, book: string) {
     const path = bookPath(r, book)
-    if (path !== undefined) this.files(r, (p) => p === path)
+    if (path !== undefined) {
+      this.files(r, (p) => p === path)
+      if (!r.files.has(path)) this.stamp(r)
+    }
     this.manifest(r)
   }
 
@@ -183,7 +190,7 @@ export function partInputs(slot: PartSlot, ctx: InputsContext): FingerprintInput
 
 /**
  * The inputs of a unit: `keys` are the resources it builds. `book <b>`: their files of b, their unmapped files and
- * manifests, and the original's book; `shared`: every file and manifest of them, and the TW and TA release stamps.
+ * manifests, and the original's book (and the release stamp of a book no file of its release has); `shared`: every file and manifest of them, and the TW and TA release stamps.
  */
 export function unitInputs(unit: string, keys: readonly string[], ctx: InputsContext): FingerprintInputs {
   const c = new Collector()
