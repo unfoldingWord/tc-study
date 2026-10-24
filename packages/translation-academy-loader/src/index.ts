@@ -3,7 +3,7 @@
  */
 
 export { TranslationAcademyLoader, TA_ROWS_VERSION } from './TranslationAcademyLoader'
-export { generateTAIngredients } from './ingredients-generator'
+export { generateTAIngredients, taIngredientsFromZip } from './ingredients-generator'
 export type * from './types'
 export type {
   TAIngredient,

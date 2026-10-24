@@ -107,6 +107,23 @@ async function generateFromZipball(
     console.log(`✅ Downloaded zipball: ${sizeMB} MB`)
   }
   
+  const { ingredients, fileCount } = await taIngredientsFromZip(zipballBuffer, debug)
+
+  return {
+    ingredients,
+    fileCount,
+    method: 'zipball',
+  }
+}
+
+/**
+ * The ingredients of a release zip's bytes: what the zipball method gives, from a zip already in hand (a build that
+ * hashes the same bytes it reads titles from).
+ */
+export async function taIngredientsFromZip(
+  zipballBuffer: ArrayBuffer | Uint8Array,
+  debug = false
+): Promise<{ ingredients: TAIngredient[]; fileCount: number }> {
   // Extract zip archive
   const zip = await JSZip.loadAsync(zipballBuffer)
   
@@ -225,11 +242,7 @@ async function generateFromZipball(
   // Sort by identifier for consistent ordering
   ingredients.sort((a, b) => a.identifier.localeCompare(b.identifier))
   
-  return {
-    ingredients,
-    fileCount: entryDirs.size,
-    method: 'zipball',
-  }
+  return { ingredients, fileCount: entryDirs.size }
 }
 
 /**
