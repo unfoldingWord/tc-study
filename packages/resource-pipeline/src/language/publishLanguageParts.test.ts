@@ -137,6 +137,22 @@ describe('publishLanguageParts', () => {
     expect(result.units.built).toBe(0)
   })
 
+  test('over a list published before lists had stamps: every unit carried, no part put, the list alone put with them', async () => {
+    const { bucket } = await published()
+    const { stamps, ...old } = bucket.json<PartsList>(LANGUAGE_LIST)!
+    expect(Object.keys(stamps ?? {}).length).toBeGreaterThan(0)
+    await bucket.put(LANGUAGE_LIST, new TextEncoder().encode(serializePartsList(old)), { contentType: 'application/json', cacheControl: 'no-cache' })
+    const before = bucket.puts.length
+
+    const result = await publish(bucket).run
+
+    expect(result.outcome).toBe('published')
+    expect(result.units.built).toBe(0)
+    expect(result.parts.put).toBe(0)
+    expect(keysOf(bucket).slice(before)).toEqual([LANGUAGE_LIST])
+    expect(bucket.json<PartsList>(LANGUAGE_LIST)!.stamps).toEqual(stamps)
+  })
+
   test('a part the bucket already has is not put again', async () => {
     const { bucket: full } = await published()
     const sha = full.json<PartsList>(LANGUAGE_LIST)!.parts[0].sha256

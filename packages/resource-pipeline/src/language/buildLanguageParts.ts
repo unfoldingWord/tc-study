@@ -1351,6 +1351,8 @@ export async function buildLanguageParts(o: {
       parts: languageParts,
       units: unitEntries,
       originals: { path: originalsPath, sha256: originalsSha },
+      // Every input step 1 read (a resource left out never got there): the Worker's freshness check compares these.
+      stamps: Object.fromEntries([...resourceFiles].map(([key, r]) => [key, r.stamp]).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
     }
     for (const [path, text] of [
       [originalsPath, originalsText],
