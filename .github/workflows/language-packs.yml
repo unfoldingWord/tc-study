@@ -193,9 +193,10 @@ jobs:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
-          head="$(git ls-remote origin refs/heads/master | cut -f1)"
-          if [ "$head" != "$GITHUB_SHA" ]; then
-            echo "::notice::master is at ${head:-?} now, not $GITHUB_SHA: the builder file is left to packs-builder.yml"
+          # Not knowing where master is counts as having moved: nothing is written.
+          head="$(git ls-remote origin refs/heads/master | cut -f1)" || head=''
+          if [ -z "$head" ] || [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::notice::master is at ${head:-? (git ls-remote failed)} now, not $GITHUB_SHA: the builder file is left to packs-builder.yml"
             exit 0
           fi
           bun packages/resource-pipeline/cli/packs-status.ts --builder --commit "$GITHUB_SHA"

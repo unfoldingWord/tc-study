@@ -98,6 +98,33 @@ describe('packs-status: the builder file', () => {
       expect(out.stdout).toBe('')
     })
   }
+
+  test('--builder --commit writes status/builder.json; written again with the same code, `at` is kept and the commit moves', async () => {
+    const s3 = fakeS3()
+    try {
+      const r2 = { ...R2, R2_ENDPOINT: s3.endpoint }
+      const code = await partsCode()
+      const first = await runAsync('packs-status.ts', ['--builder', '--commit', COMMIT], r2)
+      expect(first.stderr).toContain(`status/builder.json: ${code} (${COMMIT})`)
+      expect(first.code).toBe(0)
+
+      const written = s3.objects.get('status/builder.json')!
+      expect(written.contentType).toBe('application/json')
+      expect(written.cacheControl).toBe('no-cache')
+      const builder = JSON.parse(written.body)
+      expect(Object.keys(builder)).toEqual(['compat', 'code', 'commit', 'at'])
+      expect(builder).toEqual({ compat: compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS), code, commit: COMMIT, at: expect.any(String) })
+      expect(Number.isNaN(Date.parse(builder.at))).toBe(false)
+
+      const NEXT = 'fedcba9876543210fedcba9876543210fedcba98'
+      const second = await runAsync('packs-status.ts', ['--builder', '--commit', NEXT], r2)
+      expect(second.code).toBe(0)
+      expect(JSON.parse(s3.objects.get('status/builder.json')!.body)).toEqual({ ...builder, commit: NEXT })
+      expect([...s3.objects.keys()]).toEqual(['status/builder.json'])
+    } finally {
+      s3.stop()
+    }
+  })
 })
 
 /** A local S3 that has no object until one is put, and keeps what is put; the CLI reaches it with presigned URLs. */

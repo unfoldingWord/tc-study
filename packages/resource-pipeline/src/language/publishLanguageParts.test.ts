@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { afterAll, describe, expect, test } from 'bun:test'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compatKeyOf, partPath, partsListPath, PARTS_FORMAT_VERSION, serializePartsList, type PartsList } from '@bt-synergy/language-pack'
@@ -454,6 +454,27 @@ describe('publish against the cleanup', () => {
     const { run, workDir } = publish(bucket, { now: () => clock.now, force: true })
     await run
     expect(bucket.bytes(partPath(shas[0]))).toEqual(new Uint8Array(readFileSync(join(workDir, partPath(shas[0])))))
+  })
+
+  test('an old part whose file in the work folder is not the one its name says: refused, and the good object in the bucket is not put over', async () => {
+    const { bucket, clock, later, shas } = await publishedAt()
+    const good = bucket.bytes(partPath(shas[0]))
+    later(21)
+    const before = bucket.puts.length
+    // The build writes the part, then something spoils the file before the upload reads it.
+    const spoiling: typeof buildLanguageParts = async (o) => {
+      const built = await fixtureBuild()(o)
+      writeFileSync(join(o.workDir, partPath(shas[0])), new Uint8Array([31, 139, 8, 0]))
+      return built
+    }
+
+    const { run, workDir } = publish(bucket, { now: () => clock.now, force: true, build: spoiling })
+    await expect(run).rejects.toThrow(`${join(workDir, partPath(shas[0]))} is not the part its name says`)
+    await expect(run).rejects.toThrow('delete that file and run again')
+
+    expect(keysOf(bucket).slice(before)).not.toContain(partPath(shas[0]))
+    expect(bucket.bytes(partPath(shas[0]))).toEqual(good)
+    expect(catalogKeys(bucket).length).toBe(catalogKeys({ puts: bucket.puts.slice(0, before) }).length)
   })
 
   test('before the lists, R2 is asked again for every part the run found there and for the originals address', async () => {

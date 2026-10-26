@@ -288,11 +288,17 @@ export async function publishLanguageParts(o: {
   }
   const target = bucket!
 
-  /** A part's bytes to put again: this run's file, or for a carried part the bucket's own, checked against the name. */
+  /** A part's bytes to put again: this run's file, or for a carried part the bucket's own; either checked against the name. */
   async function bytesToRefresh(sha: string): Promise<Uint8Array> {
     const key = partPath(sha)
     const file = join(workDir, key)
-    if (existsSync(file)) return readFileSync(file)
+    if (existsSync(file)) {
+      // The build keeps a part file already in the folder, so a bad one survives a rerun over the same folder.
+      const bytes = readFileSync(file)
+      const got = await sha256Hex(bytes)
+      if (got !== sha) throw new Error(`${file} is not the part its name says (its sha256 is ${got}): not publishing ${language}, and the bucket's ${key} is left as it was; delete that file and run again`)
+      return bytes
+    }
     const bytes = await target.getBytes(key)
     if (!bytes) throw new Error(`Not publishing ${language}: ${key} vanished while publishing`)
     const got = await sha256Hex(bytes)
