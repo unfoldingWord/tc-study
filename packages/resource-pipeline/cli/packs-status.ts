@@ -4,11 +4,16 @@
  *
  *   bun packages/resource-pipeline/cli/packs-status.ts --lang es-419 --state running|ok|failed --run <url> [--compat <key>] [--parts]
  *   bun packages/resource-pipeline/cli/packs-status.ts --print-compat [--parts]
+ *   bun packages/resource-pipeline/cli/packs-status.ts --print-code
+ *   bun packages/resource-pipeline/cli/packs-status.ts --builder --commit <sha>
  *
  * --compat writes under another compat than the one this code builds (the workflow uses it to mark a dispatch for a
  * compat it cannot build as failed). --print-compat prints the compat this code builds, to stdout, and needs no bucket.
  * --parts: the compat of parts (PARTS_FORMAT_VERSION, f2.0-…) instead of whole packs' (f1.1-…), so a parts run writes
  * status/f2.0-…/<lang>.json and never touches the status the Worker reads.
+ * --print-code prints the code a parts build of this checkout writes in its lists (`partsCode`), and needs no bucket.
+ * --builder writes status/builder.json, that code under the parts compat and the commit it was built from, which the
+ * Worker compares with each published list's code.
  *
  * The bucket: R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, all four. Exits 0 when written, 1 when
  * the write fails, 2 on bad arguments.
@@ -16,7 +21,7 @@
 
 import { compatKeyOf, PACK_FORMAT_VERSION, PARTS_FORMAT_VERSION } from '@bt-synergy/language-pack'
 import { PACK_VERSIONS } from '../src/language/packVersions'
-import { isCompatKey, packsStatus, type PackState } from '../src/language/packsStatus'
+import { isCompatKey, packsStatus, writeBuilder, type PackState } from '../src/language/packsStatus'
 import { isLanguageCode, oneLine, r2Bucket } from '../src/language/publishLanguage'
 
 function arg(name: string): string | undefined {
@@ -26,7 +31,7 @@ function arg(name: string): string | undefined {
 
 function usage(why: string): never {
   console.error(why)
-  console.error('Uso: packs-status --lang <código> --state running|ok|failed --run <url> [--compat <clave>] [--parts] | --print-compat [--parts]')
+  console.error('Uso: packs-status --lang <código> --state running|ok|failed --run <url> [--compat <clave>] [--parts] | --print-compat [--parts] | --print-code | --builder --commit <sha>')
   process.exit(2)
 }
 
@@ -35,6 +40,40 @@ const builtCompat = compatKeyOf(process.argv.includes('--parts') ? PARTS_FORMAT_
 if (process.argv.includes('--print-compat')) {
   console.log(builtCompat)
   process.exit(0)
+}
+
+// Imported only here: the code is a hash over every row-producing package, which a status write does not need.
+const partsCodeNow = async () => (await import('../src/language/partsCode')).partsCode()
+
+if (process.argv.includes('--print-code')) {
+  console.log(await partsCodeNow())
+  process.exit(0)
+}
+
+function bucketFromEnv() {
+  const { R2_ENDPOINT: endpoint, R2_BUCKET: bucket, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey } = process.env
+  if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
+    usage('Faltan R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID o R2_SECRET_ACCESS_KEY')
+  }
+  return r2Bucket({ endpoint, bucket, accessKeyId, secretAccessKey, log: (line) => console.error(line) })
+}
+
+if (process.argv.includes('--builder')) {
+  const commit = arg('commit')
+  if (!commit) usage('Falta --commit')
+  if (!/^[0-9a-f]{40}$/.test(commit)) usage(`--commit no es un commit (40 caracteres hexadecimales): ${JSON.stringify(commit)}`)
+  if (process.argv.includes('--compat')) usage('--builder no lleva --compat: escribe la de las partes que este código construye')
+  const compat = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
+  try {
+    const bucket = bucketFromEnv()
+    const code = await partsCodeNow()
+    await writeBuilder({ bucket, compat, code, commit })
+    console.error(`status/builder.json: ${code} (${commit})`)
+    process.exit(0)
+  } catch (e) {
+    console.error(oneLine(`packs-status --builder: ${e instanceof Error ? e.message : String(e)}`))
+    process.exit(1)
+  }
 }
 
 const language = arg('lang')
@@ -46,15 +85,11 @@ if (!run) usage('Falta --run')
 const compatArg = arg('compat')
 if (compatArg !== undefined && !isCompatKey(compatArg)) usage('--compat no es una clave de compatibilidad')
 
-const { R2_ENDPOINT: endpoint, R2_BUCKET: bucket, R2_ACCESS_KEY_ID: accessKeyId, R2_SECRET_ACCESS_KEY: secretAccessKey } = process.env
-if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
-  usage('Faltan R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID o R2_SECRET_ACCESS_KEY')
-}
-
 try {
+  const bucket = bucketFromEnv()
   const compat = compatArg ?? builtCompat
   await packsStatus({
-    bucket: r2Bucket({ endpoint, bucket, accessKeyId, secretAccessKey, log: (line) => console.error(line) }),
+    bucket,
     compat,
     language,
     state: state as PackState,

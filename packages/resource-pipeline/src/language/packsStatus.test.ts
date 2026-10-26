@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { compatKeyOf, PACK_FORMAT_VERSION } from '@bt-synergy/language-pack'
+import { compatKeyOf, PACK_FORMAT_VERSION, PARTS_FORMAT_VERSION } from '@bt-synergy/language-pack'
 import { PACK_VERSIONS } from './packVersions'
-import { isCompatKey, packsStatus, statusPath, type PackStatus } from './packsStatus'
+import { builderPath, isCompatKey, packsStatus, statusPath, writeBuilder, type PackStatus, type PartsBuilder } from './packsStatus'
 import { memoryBucket } from './publishLanguage'
 
 const compat = compatKeyOf(PACK_FORMAT_VERSION, PACK_VERSIONS)
@@ -115,6 +115,53 @@ describe('packsStatus', () => {
     const bucket = memoryBucket()
     const down = { ...bucket, getJson: async () => { throw new Error('GET status: 503') } }
     await expect(packsStatus({ bucket: down, compat, language: 'es-419', state: 'running', run: RUN })).rejects.toThrow('503')
+    expect(bucket.puts).toHaveLength(0)
+  })
+})
+
+describe('writeBuilder', () => {
+  const parts = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
+  const code = `${parts}+0123456789abcdef`
+  const COMMIT = '0123456789abcdef0123456789abcdef01234567'
+
+  test('writes status/builder.json, { compat, code, commit, at }, with no-cache', async () => {
+    const bucket = memoryBucket()
+    await writeBuilder({ bucket, compat: parts, code, commit: COMMIT, now: new Date('2026-10-26T12:00:00Z') })
+    expect(builderPath).toBe('status/builder.json')
+    expect(bucket.puts).toEqual([{ key: 'status/builder.json', contentType: 'application/json', cacheControl: 'no-cache', bytes: expect.any(Number) }])
+    expect(bucket.json<PartsBuilder>(builderPath)).toEqual({ compat: parts, code, commit: COMMIT, at: '2026-10-26T12:00:00.000Z' })
+  })
+
+  test('the same code again keeps the moment it was first written, with the newer commit: the Worker dates the code change by it', async () => {
+    const bucket = memoryBucket()
+    await writeBuilder({ bucket, compat: parts, code, commit: COMMIT, now: new Date('2026-10-26T12:00:00Z') })
+    const later = 'f'.repeat(40)
+    await writeBuilder({ bucket, compat: parts, code, commit: later, now: new Date('2026-10-27T08:00:00Z') })
+    expect(bucket.json<PartsBuilder>(builderPath)).toEqual({ compat: parts, code, commit: later, at: '2026-10-26T12:00:00.000Z' })
+  })
+
+  test('another code is dated now', async () => {
+    const bucket = memoryBucket({ [builderPath]: { compat: parts, code, commit: COMMIT, at: '2026-10-26T12:00:00.000Z' } })
+    const next = `${parts}+fedcba9876543210`
+    await writeBuilder({ bucket, compat: parts, code: next, commit: COMMIT, now: new Date('2026-10-27T08:00:00Z') })
+    expect(bucket.json<PartsBuilder>(builderPath)).toMatchObject({ code: next, at: '2026-10-27T08:00:00.000Z' })
+  })
+
+  test('a stored file that does not parse, or has no date, is replaced, dated now', async () => {
+    const now = new Date('2026-10-27T08:00:00Z')
+    const unparsable = { ...memoryBucket(), getJson: async () => JSON.parse('{"code": ') }
+    const bucket = memoryBucket({ [builderPath]: { compat: parts, code, commit: COMMIT, at: 'yesterday' } })
+    for (const b of [{ ...bucket, getJson: unparsable.getJson }, bucket]) {
+      await writeBuilder({ bucket: b, compat: parts, code, commit: COMMIT, now })
+      expect(bucket.json<PartsBuilder>(builderPath)?.at).toBe('2026-10-27T08:00:00.000Z')
+    }
+  })
+
+  test('refuses a compat that is not a key, a code of another compat, and a commit that is not a whole sha', async () => {
+    const bucket = memoryBucket()
+    await expect(writeBuilder({ bucket, compat: '../x', code, commit: COMMIT })).rejects.toThrow('Not a compat key')
+    await expect(writeBuilder({ bucket, compat: parts, code: 'f2.0-u0+0123456789abcdef', commit: COMMIT })).rejects.toThrow('Not a code of')
+    await expect(writeBuilder({ bucket, compat: parts, code, commit: 'abc123' })).rejects.toThrow('Not a commit')
     expect(bucket.puts).toHaveLength(0)
   })
 })

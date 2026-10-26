@@ -4,6 +4,7 @@ name: Language packs
 # and reports the build state next to the catalog (status/<compat>/<lang>.json) for the serving Worker's dispatch guard.
 # With `parts` it builds the language one book at a time and publishes the parts (staging only, until the Worker serves
 # them) under the parts compat (f2.0-…), with that compat's status: nothing a whole build or the Worker reads changes.
+# A parts publish from master also writes the code it builds with to status/builder.json (as packs-builder.yml does).
 # Dispatched by hand, or by the Worker (a GitHub App with actions: write on this repository only).
 
 run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }}${{ inputs.parts && ', parts' || '' }}${{ inputs.compare && ', compare' || '' }})
@@ -60,8 +61,11 @@ permissions:
 # Languages are not serialized against each other: each catalog entry names its own originals pack, so a phone reading
 # one entry stays consistent, and originals.json is last-writer-wins between valid builds. (A shared job-level group
 # would not do: GitHub keeps one pending job per group and cancels the older pending ones.)
+# Parts runs queue apart from whole runs of the same language (packs-<target>-parts-<lang>): they write other keys, and a
+# whole run queued behind a build would otherwise cancel a pending parts run the Worker had marked `running`, a mark
+# that later counts as a failure. A whole run's group name is as before.
 concurrency:
-  group: packs-${{ inputs.target || 'staging' }}-${{ inputs.language }}
+  group: packs-${{ inputs.target || 'staging' }}${{ inputs.parts && '-parts' || '' }}-${{ inputs.language }}
   cancel-in-progress: false
 
 defaults:
@@ -126,21 +130,23 @@ jobs:
       # The Worker asks for builds of the compat it was deployed with. Code that builds another one (a compat bump not yet
       # followed by a v2 redeploy) would publish where the Worker never looks and be dispatched again every hour: it marks
       # the requested compat failed instead, which the Worker's guard reads, and builds nothing.
-      # Not for a parts run: parts have their own compat (PARTS_FORMAT_VERSION, f2.0), which no Worker asks for yet,
-      # and a parts run publishes nothing the Worker reads (staging only, and its own status).
+      # A parts run is checked against the parts compat (PARTS_FORMAT_VERSION, f2.0), the Worker's CURRENT_PARTS_COMPAT.
       - name: Check compat
-        if: inputs.compat != '' && !inputs.parts
+        if: inputs.compat != ''
         env:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
-          built="$(bun packages/resource-pipeline/cli/packs-status.ts --print-compat)"
+          kind=()
+          constant=CURRENT_PACK_COMPAT
+          if [ "$PARTS" = true ]; then kind=(--parts); constant=CURRENT_PARTS_COMPAT; fi
+          built="$(bun packages/resource-pipeline/cli/packs-status.ts --print-compat "${kind[@]}")"
           if [ "$REQUESTED_COMPAT" = "$built" ]; then exit 0; fi
-          echo "::error::asked for compat $REQUESTED_COMPAT, this code builds $built: update CURRENT_PACK_COMPAT in translation-helps-mcp (v2) and redeploy"
+          echo "::error::asked for compat $REQUESTED_COMPAT, this code builds $built: update $constant in translation-helps-mcp (v2) and redeploy"
           if [ "$MODE" = publish ]; then
-            bun packages/resource-pipeline/cli/packs-status.ts --lang "$LANGUAGE" --state failed --run "$RUN_URL" --compat "$REQUESTED_COMPAT"
+            bun packages/resource-pipeline/cli/packs-status.ts --lang "$LANGUAGE" --state failed --run "$RUN_URL" --compat "$REQUESTED_COMPAT" "${kind[@]}"
           fi
           exit 1
 
@@ -160,6 +166,27 @@ jobs:
           status=(--lang "$LANGUAGE" --state running --run "$RUN_URL")
           if [ "$PARTS" = true ]; then status+=(--parts); fi
           bun packages/resource-pipeline/cli/packs-status.ts "${status[@]}"
+
+      # The code this run builds with, which the Worker compares with each published parts list's code (packs-builder.yml
+      # writes it on every push to master; a run that publishes says so too). Only from master: a branch's code is not
+      # what the Worker's own dispatches (ref master) build. Nor once master has moved on: packs-builder.yml may already
+      # have written the newer code, which this older checkout must not put back. A failed write does not stop the build
+      # it only describes.
+      - name: Builder code
+        if: inputs.mode == 'publish' && inputs.parts && github.ref == 'refs/heads/master'
+        continue-on-error: true
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          head="$(git ls-remote origin refs/heads/master | cut -f1)"
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::notice::master is at ${head:-?} now, not $GITHUB_SHA: the builder file is left to packs-builder.yml"
+            exit 0
+          fi
+          bun packages/resource-pipeline/cli/packs-status.ts --builder --commit "$GITHUB_SHA"
 
       # A no-upload run is given no bucket: against the real one it would stop at «unchanged» and measure nothing.
       - name: Build and publish

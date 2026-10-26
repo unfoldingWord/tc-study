@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { compatKeyOf, PACK_FORMAT_VERSION, PARTS_FORMAT_VERSION } from '@bt-synergy/language-pack'
 import { PACK_VERSIONS } from '../src/language/packVersions'
+import { partsCode } from '../src/language/partsCode'
 
 const R2 = { R2_ENDPOINT: 'https://r2.invalid', R2_BUCKET: 'b', R2_ACCESS_KEY_ID: 'k', R2_SECRET_ACCESS_KEY: 's' }
 
@@ -71,4 +72,30 @@ describe('packs-status --print-compat', () => {
     expect(out.stdout).toBe(compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS))
     expect(out.stdout).toStartWith('f2.0-')
   })
+})
+
+describe('packs-status: the builder file', () => {
+  test('--print-code prints the code a parts build of this checkout writes in its lists, and needs no bucket', async () => {
+    const out = run('packs-status.ts', ['--print-code'])
+    expect(out.code).toBe(0)
+    expect(out.stdout).toBe(await partsCode())
+    expect(out.stdout).toMatch(new RegExp(`^${compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS).replace(/\./g, '\\.')}\\+[0-9a-f]{16}$`))
+  })
+
+  const COMMIT = '0123456789abcdef0123456789abcdef01234567'
+  const refused: Array<[string, string[], Partial<typeof R2>, string]> = [
+    ['--builder without --commit', ['--builder'], R2, 'Falta --commit'],
+    ['--builder with a commit that is not a whole sha', ['--builder', '--commit', 'abc123'], R2, '--commit no es un commit'],
+    ['--builder with --compat (it writes the compat this code builds)', ['--builder', '--commit', COMMIT, '--compat', compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)], R2, '--builder no lleva --compat'],
+    ['--builder with R2 half set', ['--builder', '--commit', COMMIT], { R2_ENDPOINT: R2.R2_ENDPOINT, R2_BUCKET: R2.R2_BUCKET }, 'Faltan R2_ENDPOINT'],
+    ['--builder without R2', ['--builder', '--commit', COMMIT], {}, 'Faltan R2_ENDPOINT'],
+  ]
+  for (const [what, args, r2, why] of refused) {
+    test(`${what}: exit 2, saying why`, () => {
+      const out = run('packs-status.ts', args, r2)
+      expect(out.stderr).toContain(why)
+      expect(out.code).toBe(2)
+      expect(out.stdout).toBe('')
+    })
+  }
 })

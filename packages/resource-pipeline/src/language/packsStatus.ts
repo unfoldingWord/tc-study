@@ -56,3 +56,31 @@ export async function packsStatus(o: {
   const status: PackStatus = { state: o.state, at, failures, run: o.run, ...(started ? { started } : {}) }
   await o.bucket.put(key, JSON.stringify(status), { contentType: 'application/json', cacheControl: 'no-cache' })
 }
+
+/**
+ * The code master's parts build runs with, for the serving Worker: a published list whose `code` differs from it was
+ * built by older code, and the Worker asks for its rebuild (`compat` must equal the Worker's own parts compat, else it
+ * only logs the drift). Written by the packs-builder workflow on every push to master that touches the build, and by
+ * every parts publish run from master.
+ */
+export const builderPath = 'status/builder.json'
+
+/** `at`: when this code was first written here, the date the Worker gives the code change. */
+export type PartsBuilder = { compat: string; code: string; commit: string; at: string }
+
+const COMMIT_RE = /^[0-9a-f]{40}$/
+
+/** The same compat and code keep the stored `at`, so a later push that changes no code does not move the change's date. */
+export async function writeBuilder(o: { bucket: PackBucket; compat: string; code: string; commit: string; now?: Date }): Promise<void> {
+  if (!isCompatKey(o.compat)) throw new Error(`Not a compat key: ${JSON.stringify(o.compat)}`)
+  if (!o.code.startsWith(`${o.compat}+`)) throw new Error(`Not a code of ${o.compat}: ${JSON.stringify(o.code)}`)
+  if (!COMMIT_RE.test(o.commit)) throw new Error(`Not a commit sha: ${JSON.stringify(o.commit)}`)
+  const previous = await o.bucket.getJson<Partial<PartsBuilder>>(builderPath).catch((e: unknown) => {
+    if (e instanceof SyntaxError) return null
+    throw e
+  })
+  const same = previous?.compat === o.compat && previous?.code === o.code
+  const kept = same && typeof previous?.at === 'string' && !Number.isNaN(Date.parse(previous.at)) ? previous.at : undefined
+  const builder: PartsBuilder = { compat: o.compat, code: o.code, commit: o.commit, at: kept ?? (o.now ?? new Date()).toISOString() }
+  await o.bucket.put(builderPath, JSON.stringify(builder), { contentType: 'application/json', cacheControl: 'no-cache' })
+}
