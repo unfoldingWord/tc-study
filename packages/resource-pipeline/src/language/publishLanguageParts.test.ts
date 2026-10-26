@@ -10,7 +10,7 @@ import { PACK_VERSIONS } from './packVersions'
 import { partsCode } from './partsCode'
 import { maculaIdentity } from '../../cli/maculaIdentity'
 import { discoverWith, fakeDoor43, GLT, LANG, lexiconFetch, lexiconFetchOf, LEXICONS_REF, MACULA_STAMP, maculaFolder, reposCopy, UHL, UHL_COMMIT, type CatalogOverrides } from './partsFixture'
-import { memoryBucket, type PackBucket } from './publishLanguage'
+import { IMMUTABLE, memoryBucket, type PackBucket } from './publishLanguage'
 import { publishLanguageParts } from './publishLanguageParts'
 
 const COMPAT = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
@@ -99,7 +99,7 @@ describe('publishLanguageParts', () => {
     const shas = new Set(namedParts(bucket))
     expect(new Set(keys.slice(0, firstCatalog))).toEqual(new Set([...shas].map(partPath)))
     expect(firstCatalog).toBe(shas.size)
-    expect(result.parts).toEqual({ language: list.parts.length, originals: bucket.json<PartsList>(ORIGINALS_LATEST)!.parts.length, put: shas.size, present: 0 })
+    expect(result.parts).toEqual({ language: list.parts.length, originals: bucket.json<PartsList>(ORIGINALS_LATEST)!.parts.length, put: shas.size, present: 0, refreshed: 0 })
     expect(result.units.carried).toBe(0)
     expect(result.units.built).toBe(list.units!.length)
     expect(result.failures).toBe(0)
@@ -346,6 +346,150 @@ describe('publishLanguageParts', () => {
     expect(result.outcome).toBe('unchanged')
     expect(bucket.puts.length).toBe(before)
     expect(await bucket.has(ours)).toBe(true)
+  })
+})
+
+// The Worker's cleanup deletes a part no list has named for 30 days whose R2 upload is 30 days old too (delivery 3
+// Task 8). A run refreshes the old parts its lists name and asks R2 again for every part it did not put before writing
+// a list, so a part the cleanup takes in the meantime fails the run instead of being named.
+describe('publish against the cleanup', () => {
+  const DAY = 86_400_000
+
+  /** A bucket after one publish, both on a clock the test moves. */
+  async function publishedAt() {
+    const clock = { now: new Date('2026-07-01T00:00:00Z') }
+    const bucket = memoryBucket({}, { now: () => clock.now })
+    await publish(bucket, { now: () => clock.now }).run
+    const later = (days: number) => (clock.now = new Date(clock.now.getTime() + days * DAY))
+    return { bucket, clock, later, shas: [...new Set(namedParts(bucket))] }
+  }
+
+  /** The bucket, counting the reads that bypass nothing: each stat and each download. */
+  function watched(inner: ReturnType<typeof memoryBucket>, vanish: (key: string, asked: number) => boolean = () => false) {
+    const stats = new Map<string, number>()
+    const gets: string[] = []
+    const bucket: PackBucket = {
+      ...inner,
+      async stat(key) {
+        const asked = (stats.get(key) ?? 0) + 1
+        stats.set(key, asked)
+        return vanish(key, asked) ? null : inner.stat(key)
+      },
+      async getBytes(key) {
+        gets.push(key)
+        return inner.getBytes(key)
+      },
+    }
+    return { bucket, stats, gets }
+  }
+
+  test('a part R2 wrote more than 20 days ago is put again with the same bytes; a carried one is read back from the bucket', async () => {
+    const { bucket, clock, later, shas } = await publishedAt()
+    const bytes = new Map(shas.map((sha) => [sha, bucket.bytes(partPath(sha))]))
+    later(21)
+    const before = bucket.puts.length
+    const w = watched(bucket)
+
+    const result = await publish(w.bucket, { now: () => clock.now }).run
+
+    // Every unit carried: none of the parts is in the work folder, so each comes from the bucket.
+    expect(result.units.built).toBe(0)
+    expect(result.outcome).toBe('unchanged')
+    expect(result.parts).toMatchObject({ put: 0, present: shas.length, refreshed: shas.length })
+    expect(new Set(w.gets)).toEqual(new Set(shas.map(partPath)))
+    const refreshed = bucket.puts.slice(before)
+    expect(refreshed.map((p) => p.key).sort()).toEqual(shas.map(partPath).sort())
+    for (const p of refreshed) expect(`${p.contentType} | ${p.cacheControl}`).toBe('application/gzip | public, max-age=31536000, immutable')
+    for (const sha of shas) {
+      expect(bucket.bytes(partPath(sha))).toEqual(bytes.get(sha)!)
+      expect(await bucket.stat(partPath(sha))).toEqual({ uploaded: clock.now })
+    }
+  })
+
+  test('a part 20 days old is left alone, and nothing is put', async () => {
+    const { bucket, clock, later } = await publishedAt()
+    later(20)
+    const before = bucket.puts.length
+
+    const result = await publish(bucket, { now: () => clock.now }).run
+
+    expect(result.outcome).toBe('unchanged')
+    expect(result.parts.refreshed).toBe(0)
+    expect(bucket.puts.length).toBe(before)
+  })
+
+  test('an old part this run built is put again from the work folder, and the old originals address too', async () => {
+    const { bucket, clock, later, shas } = await publishedAt()
+    const originalsPath = bucket.json<PartsList>(LANGUAGE_LIST)!.originals!.path
+    later(21)
+    const before = bucket.puts.length
+    const w = watched(bucket)
+
+    const { run, workDir } = publish(w.bucket, { now: () => clock.now, force: true })
+    const result = await run
+
+    expect(result.units.carried).toBe(0)
+    expect(result.parts).toMatchObject({ put: 0, present: shas.length, refreshed: shas.length })
+    expect(w.gets).toEqual([])
+    const sha = shas[0]
+    expect(bucket.bytes(partPath(sha))).toEqual(new Uint8Array(readFileSync(join(workDir, partPath(sha)))))
+    expect(keysOf(bucket).slice(before)).toContain(originalsPath)
+    expect(await bucket.stat(originalsPath)).toEqual({ uploaded: clock.now })
+    expect(keysOf(bucket).at(-1)).toBe(LANGUAGE_LIST)
+  })
+
+  test('a carried part whose bytes in the bucket are not the ones its name says: refused, and not put again', async () => {
+    const { bucket, clock, later, shas } = await publishedAt()
+    await bucket.put(partPath(shas[0]), new Uint8Array([31, 139, 8, 0]), { contentType: 'application/gzip', cacheControl: IMMUTABLE })
+    later(21)
+    const before = bucket.puts.length
+
+    await expect(publish(bucket, { now: () => clock.now }).run).rejects.toThrow(`${partPath(shas[0])} in the bucket is not the part its name says`)
+
+    expect(keysOf(bucket).slice(before)).not.toContain(partPath(shas[0]))
+  })
+
+  test('before the lists, R2 is asked again for every part the run found there and for the originals address', async () => {
+    const { bucket, clock, later, shas } = await publishedAt()
+    const originalsPath = bucket.json<PartsList>(LANGUAGE_LIST)!.originals!.path
+    later(1)
+    const w = watched(bucket)
+
+    const result = await publish(w.bucket, { now: () => clock.now, fixture: { catalog: { tags: { [GLT]: 'v13' } } } }).run
+
+    expect(result.outcome).toBe('published')
+    // Once for the build and the upload (one answer, kept), once more right before the lists.
+    for (const sha of shas) expect(w.stats.get(partPath(sha))).toBe(2)
+    expect(w.stats.get(originalsPath)).toBe(2)
+  })
+
+  test('a part gone when asked again: the run fails and the language list stays the earlier one', async () => {
+    const { bucket, clock, shas } = await publishedAt()
+    const listText = bucket.text(LANGUAGE_LIST)
+    const gone = partPath(shas[0])
+    const w = watched(bucket, (key, asked) => key === gone && asked > 1)
+
+    await expect(publish(w.bucket, { now: () => clock.now, fixture: { catalog: { tags: { [GLT]: 'v13' } } } }).run).rejects.toThrow(`Not publishing ${LANG}: 1 parts vanished while publishing (${gone})`)
+
+    expect(bucket.text(LANGUAGE_LIST)).toBe(listText)
+  })
+
+  test('the originals address gone when asked again: the run fails before originals.json and the language list', async () => {
+    const { bucket, clock } = await publishedAt()
+    const originalsPath = bucket.json<PartsList>(LANGUAGE_LIST)!.originals!.path
+    const before = bucket.puts.length
+    const w = watched(bucket, (key, asked) => key === originalsPath && asked > 1)
+
+    await expect(publish(w.bucket, { now: () => clock.now, fixture: { catalog: { tags: { [GLT]: 'v13' } } } }).run).rejects.toThrow('1 parts vanished while publishing')
+
+    expect(catalogKeys({ puts: bucket.puts.slice(before) })).toEqual([])
+  })
+
+  test('an unchanged run whose part is gone when asked again fails too: it must not end ok', async () => {
+    const { bucket, clock, shas } = await publishedAt()
+    const w = watched(bucket, (key, asked) => key === partPath(shas.at(-1)!) && asked > 1)
+
+    await expect(publish(w.bucket, { now: () => clock.now }).run).rejects.toThrow('1 parts vanished while publishing')
   })
 })
 
