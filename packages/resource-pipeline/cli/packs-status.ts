@@ -3,6 +3,7 @@
  * publish-language. See packages/resource-pipeline/src/language/packsStatus.ts.
  *
  *   bun packages/resource-pipeline/cli/packs-status.ts --lang es-419 --state running|ok|failed --run <url> [--compat <key>] [--parts]
+ *   bun packages/resource-pipeline/cli/packs-status.ts --lang es-419 --state ok --parts --code <code> --run <url>
  *   bun packages/resource-pipeline/cli/packs-status.ts --print-compat [--parts]
  *   bun packages/resource-pipeline/cli/packs-status.ts --print-code
  *   bun packages/resource-pipeline/cli/packs-status.ts --builder --commit <sha>
@@ -11,6 +12,8 @@
  * compat it cannot build as failed). --print-compat prints the compat this code builds, to stdout, and needs no bucket.
  * --parts: the compat of parts (PARTS_FORMAT_VERSION, f2.0-…) instead of whole packs' (f1.1-…), so a parts run writes
  * status/f2.0-…/<lang>.json and never touches the status the Worker reads.
+ * --code, with --state ok --parts only: the code the run built with (the `code` of its result and lists), recorded in
+ * the status so the Worker can tell a code change was built, even when the list came out unchanged.
  * --print-code prints the code a parts build of this checkout writes in its lists (`partsCode`), and needs no bucket.
  * --builder writes status/builder.json, that code under the parts compat and the commit it was built from, which the
  * Worker compares with each published list's code.
@@ -21,7 +24,7 @@
 
 import { compatKeyOf, PACK_FORMAT_VERSION, PARTS_FORMAT_VERSION } from '@bt-synergy/language-pack'
 import { PACK_VERSIONS } from '../src/language/packVersions'
-import { isCompatKey, packsStatus, writeBuilder, type PackState } from '../src/language/packsStatus'
+import { isCodeOf, isCompatKey, packsStatus, writeBuilder, type PackState } from '../src/language/packsStatus'
 import { isLanguageCode, oneLine, r2Bucket } from '../src/language/publishLanguage'
 
 function arg(name: string): string | undefined {
@@ -31,7 +34,7 @@ function arg(name: string): string | undefined {
 
 function usage(why: string): never {
   console.error(why)
-  console.error('Uso: packs-status --lang <código> --state running|ok|failed --run <url> [--compat <clave>] [--parts] | --print-compat [--parts] | --print-code | --builder --commit <sha>')
+  console.error('Uso: packs-status --lang <código> --state running|ok|failed --run <url> [--compat <clave>] [--parts] [--code <código>, con ok y --parts] | --print-compat [--parts] | --print-code | --builder --commit <sha>')
   process.exit(2)
 }
 
@@ -84,16 +87,23 @@ const run = arg('run')
 if (!run) usage('Falta --run')
 const compatArg = arg('compat')
 if (compatArg !== undefined && !isCompatKey(compatArg)) usage('--compat no es una clave de compatibilidad')
+const compat = compatArg ?? builtCompat
+// Only a parts run has a code, and only its ok status names what it built.
+const code = process.argv.includes('--code') ? (arg('code') ?? '') : undefined
+if (code !== undefined) {
+  if (state !== 'ok' || !process.argv.includes('--parts')) usage('--code solo va con --state ok --parts')
+  if (!isCodeOf(compat, code)) usage(`--code no es un código de ${compat}: ${JSON.stringify(code)}`)
+}
 
 try {
   const bucket = bucketFromEnv()
-  const compat = compatArg ?? builtCompat
   await packsStatus({
     bucket,
     compat,
     language,
     state: state as PackState,
     run,
+    ...(code !== undefined ? { code } : {}),
   })
   console.error(`status/${compat}/${language}.json: ${state}`)
   process.exit(0)

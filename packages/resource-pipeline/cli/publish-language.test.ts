@@ -99,3 +99,75 @@ describe('packs-status: the builder file', () => {
     })
   }
 })
+
+/** A local S3 that has no object until one is put, and keeps what is put; the CLI reaches it with presigned URLs. */
+function fakeS3() {
+  const objects = new Map<string, { body: string; contentType: string | null; cacheControl: string | null }>()
+  const server = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      const key = decodeURIComponent(new URL(req.url).pathname).replace(/^\/b\//, '')
+      if (req.method === 'PUT') {
+        objects.set(key, { body: await req.text(), contentType: req.headers.get('content-type'), cacheControl: req.headers.get('cache-control') })
+        return new Response(null, { status: 200 })
+      }
+      const object = objects.get(key)
+      return object ? new Response(object.body) : new Response('<Error><Code>NoSuchKey</Code></Error>', { status: 404 })
+    },
+  })
+  return { objects, endpoint: `http://127.0.0.1:${server.port}`, stop: () => server.stop(true) }
+}
+
+/** `run`, without blocking the event loop the fake S3 answers on. */
+async function runAsync(script: string, args: string[], r2: Partial<typeof R2>) {
+  const env: Record<string, string> = {}
+  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !k.startsWith('R2_')) env[k] = v
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, script), ...args], { env: { ...env, ...r2 }, stdout: 'pipe', stderr: 'pipe' })
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  return { code, stdout: stdout.trim(), stderr }
+}
+
+describe('packs-status: the code an ok parts status records', () => {
+  const parts = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
+  const whole = compatKeyOf(PACK_FORMAT_VERSION, PACK_VERSIONS)
+  const CODE = `${parts}+0123456789abcdef`
+  const RUN_URL = 'https://github.com/unfoldingWord/tc-study/actions/runs/1'
+  const status = (state: string, ...more: string[]) => ['--lang', 'es-419', '--state', state, '--run', RUN_URL, ...more]
+
+  const refused: Array<[string, string[], string]> = [
+    ['--code without --parts (a whole status records none)', status('ok', '--code', CODE), '--code solo va con --state ok --parts'],
+    ['--code with --state running', status('running', '--parts', '--code', CODE), '--code solo va con --state ok --parts'],
+    ['--code with --state failed', status('failed', '--parts', '--code', CODE), '--code solo va con --state ok --parts'],
+    ['--code with no value', status('ok', '--parts', '--code'), '--code no es un código de'],
+    ['a code of another compat', status('ok', '--parts', '--code', `${whole}+0123456789abcdef`), '--code no es un código de'],
+  ]
+  for (const [what, args, why] of refused) {
+    test(`${what}: exit 2, saying why`, () => {
+      const out = run('packs-status.ts', args, R2)
+      expect(out.stderr).toContain(why)
+      expect(out.code).toBe(2)
+    })
+  }
+
+  test('--state ok --parts --code writes the code into status/<f2.0>/<lang>.json; a whole ok status is written as before', async () => {
+    const s3 = fakeS3()
+    try {
+      const r2 = { ...R2, R2_ENDPOINT: s3.endpoint }
+      const partsRun = await runAsync('packs-status.ts', status('ok', '--parts', '--code', CODE), r2)
+      expect(partsRun.stderr).toContain(`status/${parts}/es-419.json: ok`)
+      expect(partsRun.code).toBe(0)
+      const wholeRun = await runAsync('packs-status.ts', status('ok'), r2)
+      expect(wholeRun.code).toBe(0)
+
+      const written = s3.objects.get(`status/${parts}/es-419.json`)!
+      expect(written.contentType).toBe('application/json')
+      expect(written.cacheControl).toBe('no-cache')
+      expect(JSON.parse(written.body)).toEqual({ state: 'ok', at: expect.any(String), failures: 0, run: RUN_URL, code: CODE })
+      expect(Object.keys(JSON.parse(written.body))).toEqual(['state', 'at', 'failures', 'run', 'code'])
+      expect(Object.keys(JSON.parse(s3.objects.get(`status/${whole}/es-419.json`)!.body))).toEqual(['state', 'at', 'failures', 'run'])
+      expect([...s3.objects.keys()].sort()).toEqual([`status/${parts}/es-419.json`, `status/${whole}/es-419.json`].sort())
+    } finally {
+      s3.stop()
+    }
+  })
+})

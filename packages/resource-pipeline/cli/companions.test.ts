@@ -26,7 +26,7 @@ describe('addMacula', () => {
 })
 
 /** A Door43 that has the repositories given, each with the refs given (ref → commit). */
-function door43(repos: Record<string, Record<string, { sha: string; created: string }>>) {
+function door43(repos: Record<string, Record<string, { sha: string; created?: string; commit?: { committer?: { date?: string } } }>>) {
   const asked: string[] = []
   const fetchFn = async (url: string) => {
     asked.push(url)
@@ -52,6 +52,14 @@ describe('lexiconStamps', () => {
     expect(await lexiconStamps({ language: 'es-419', owner: 'es-419_gl', ref: 'master', fetch: fetchFn })).toEqual({
       'es-419_gl/es-419/uhl': '6cca967498#2026-10-19T19_52_42-04_00',
       'es-419_gl/es-419/ugl': '0123456789#2026-09-01T10_00_00Z',
+    })
+  })
+
+  test("a commit without `created` is dated by its committer's date, its offset kept as Door43 wrote it", async () => {
+    const byCommitter = { sha: uhl.sha, commit: { committer: { date: '2026-07-01T02:00:00+02:00' } } }
+    const { fetchFn } = door43({ 'es-419_gl/es-419_uhl': { master: byCommitter } })
+    expect(await lexiconStamps({ language: 'es-419', owner: 'es-419_gl', ref: 'master', fetch: fetchFn })).toEqual({
+      'es-419_gl/es-419/uhl': '6cca967498#2026-07-01T02_00_00+02_00',
     })
   })
 

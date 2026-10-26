@@ -111,10 +111,52 @@ describe('packsStatus', () => {
     expect(bucket.json<PackStatus>(statusPath(compat, 'es-419'))).not.toHaveProperty('started')
   })
 
+  test('a whole (f1.1) ok status is written as before, with no code', async () => {
+    const bucket = memoryBucket({ [statusPath(compat, 'es-419')]: { state: 'running', at: '2026-10-21T12:00:00.000Z', failures: 0, run: RUN, started: '2026-10-21T12:00:00.000Z' } })
+    await packsStatus({ bucket, compat, language: 'es-419', state: 'ok', run: RUN, now: new Date('2026-10-21T14:00:00Z') })
+    expect(bucket.text(statusPath(compat, 'es-419'))).toBe(
+      `{"state":"ok","at":"2026-10-21T14:00:00.000Z","failures":0,"run":"${RUN}","started":"2026-10-21T12:00:00.000Z"}`
+    )
+  })
+
   test('a read that fails for another reason stops the run and writes nothing', async () => {
     const bucket = memoryBucket()
     const down = { ...bucket, getJson: async () => { throw new Error('GET status: 503') } }
     await expect(packsStatus({ bucket: down, compat, language: 'es-419', state: 'running', run: RUN })).rejects.toThrow('503')
+    expect(bucket.puts).toHaveLength(0)
+  })
+})
+
+// The Worker compares a parts language's ok status with status/builder.json: the code the run built is what tells it
+// that a code change was already built, even when the list came out unchanged.
+describe('packsStatus: the code a parts run built', () => {
+  const parts = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
+  const code = `${parts}+0123456789abcdef`
+
+  test('ok records the code, after the fields a whole status has', async () => {
+    const bucket = memoryBucket()
+    await packsStatus({ bucket, compat: parts, language: 'es-419', state: 'running', run: RUN, now: new Date('2026-10-26T12:00:00Z') })
+    await packsStatus({ bucket, compat: parts, language: 'es-419', state: 'ok', run: RUN, code, now: new Date('2026-10-26T13:00:00Z') })
+    expect(bucket.text(statusPath(parts, 'es-419'))).toBe(
+      `{"state":"ok","at":"2026-10-26T13:00:00.000Z","failures":0,"run":"${RUN}","started":"2026-10-26T12:00:00.000Z","code":"${code}"}`
+    )
+  })
+
+  test('running and failed carry no code, not even the one an earlier ok recorded', async () => {
+    for (const state of ['running', 'failed'] as const) {
+      const bucket = memoryBucket({ [statusPath(parts, 'es-419')]: { state: 'ok', at: '2026-10-26T13:00:00.000Z', failures: 0, run: RUN, code } })
+      await packsStatus({ bucket, compat: parts, language: 'es-419', state, run: RUN })
+      expect(bucket.json<PackStatus>(statusPath(parts, 'es-419'))).not.toHaveProperty('code')
+    }
+  })
+
+  test('refuses a code with running or failed, and a code of another compat', async () => {
+    const bucket = memoryBucket()
+    for (const state of ['running', 'failed'] as const) {
+      await expect(packsStatus({ bucket, compat: parts, language: 'es-419', state, run: RUN, code })).rejects.toThrow('Only an ok status records a code')
+    }
+    await expect(packsStatus({ bucket, compat, language: 'es-419', state: 'ok', run: RUN, code })).rejects.toThrow('Not a code of')
+    await expect(packsStatus({ bucket, compat: parts, language: 'es-419', state: 'ok', run: RUN, code: '' })).rejects.toThrow('Not a code of')
     expect(bucket.puts).toHaveLength(0)
   })
 })

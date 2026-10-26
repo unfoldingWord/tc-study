@@ -1,12 +1,15 @@
 import 'fake-indexeddb/auto'
 import { afterAll, describe, expect, test } from 'bun:test'
+import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compatKeyOf, partPath, partsListPath, PARTS_FORMAT_VERSION, serializePartsList, type PartsList } from '@bt-synergy/language-pack'
 import { buildLanguageParts } from './buildLanguageParts'
 import { PACK_VERSIONS } from './packVersions'
-import { discoverWith, fakeDoor43, GLT, LANG, lexiconFetch, LEXICONS_REF, MACULA_STAMP, maculaFolder, reposCopy, type CatalogOverrides } from './partsFixture'
+import { partsCode } from './partsCode'
+import { maculaIdentity } from '../../cli/maculaIdentity'
+import { discoverWith, fakeDoor43, GLT, LANG, lexiconFetch, lexiconFetchOf, LEXICONS_REF, MACULA_STAMP, maculaFolder, reposCopy, UHL, UHL_COMMIT, type CatalogOverrides } from './partsFixture'
 import { memoryBucket, type PackBucket } from './publishLanguage'
 import { publishLanguageParts } from './publishLanguageParts'
 
@@ -26,14 +29,19 @@ function freshDir(name: string) {
   return dir
 }
 
-type Fixture = { repos?: Record<string, Record<string, string>>; catalog?: CatalogOverrides; fail?: (repo: string) => Error | undefined }
+type Fixture = {
+  repos?: Record<string, Record<string, string>>
+  catalog?: CatalogOverrides
+  fail?: (repo: string) => Error | undefined
+  lexiconFetch?: typeof lexiconFetch
+}
 
 /** The real parts build, over the fixture's Door43 (changed by `f`) instead of the real one. */
 function fixtureBuild(f: Fixture = {}): typeof buildLanguageParts {
   return (o) =>
     buildLanguageParts({
       ...o,
-      fetch: lexiconFetch,
+      fetch: f.lexiconFetch ?? lexiconFetch,
       door43Client: fakeDoor43({ repos: f.repos, catalog: f.catalog, fail: f.fail }) as never,
       discover: discoverWith(f.catalog),
       wait: async () => {},
@@ -96,6 +104,9 @@ describe('publishLanguageParts', () => {
     expect(result.units.built).toBe(list.units!.length)
     expect(result.failures).toBe(0)
     expect(result.compat).toBe(COMPAT)
+    // The code the lists were built with, as published: what the workflow records in the ok status.
+    expect(result.code).toBe(list.code)
+    expect(result.code).toBe(await partsCode())
 
     const meta = Object.fromEntries(bucket.puts.map((p) => [p.key, `${p.contentType} | ${p.cacheControl}`]))
     for (const key of keys.slice(0, firstCatalog)) expect(meta[key]).toBe('application/gzip | public, max-age=31536000, immutable')
@@ -118,6 +129,7 @@ describe('publishLanguageParts', () => {
     const result = await publish(bucket).run
 
     expect(result.outcome).toBe('unchanged')
+    expect(result.code).toBe(bucket.json<PartsList>(LANGUAGE_LIST)!.code)
     expect(bucket.puts.length).toBe(before)
     expect(result.units.built).toBe(0)
     expect(result.units.carried).toBe(bucket.json<PartsList>(LANGUAGE_LIST)!.units!.length)
@@ -254,8 +266,10 @@ describe('publishLanguageParts', () => {
   })
 
   test('no upload and no bucket: everything built, nothing to put anywhere', async () => {
-    const result = await publish(undefined, { noUpload: true }).run
+    const { run, workDir } = publish(undefined, { noUpload: true })
+    const result = await run
     expect(result.outcome).toBe('built')
+    expect(result.code).toBe(JSON.parse(readFileSync(join(workDir, LANGUAGE_LIST), 'utf8')).code)
     expect(result.units.carried).toBe(0)
     expect(result.parts.put).toBe(0)
   })
@@ -332,5 +346,37 @@ describe('publishLanguageParts', () => {
     expect(result.outcome).toBe('unchanged')
     expect(bucket.puts.length).toBe(before)
     expect(await bucket.has(ours)).toBe(true)
+  })
+})
+
+// The dates in the stamps as the Worker computes them from GitHub and Door43 (delivery 3), from the strings git and
+// Door43 give, offsets included.
+describe('the dates in the stamps', () => {
+  test("MACULA's %cI with an offset is stamped in UTC; a lexicon commit without `created` is dated by its committer, offset kept", async () => {
+    // Taller's MACULA committed at 02:00 in UTC+2, as `git log --format=%cI` prints it.
+    const folder = maculaFolder(freshDir('macula-git'))
+    const date = '2026-08-01T02:00:00+02:00'
+    const git = (args: string[]) => {
+      const env = { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date }
+      const out = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...args], { cwd: folder, env, encoding: 'utf8' })
+      if (out.status !== 0) throw new Error(out.stderr)
+    }
+    git(['init', '-q'])
+    git(['add', '.'])
+    git(['commit', '-q', '-m', 'MACULA'])
+    const macula = maculaIdentity(folder, {})
+    expect(macula.date).toBe(date)
+
+    // Door43's commit with no `created`: the date is the committer's, as Door43 wrote it.
+    const lexiconCommit = { sha: UHL_COMMIT.sha, commit: { committer: { date: '2026-07-01T02:00:00+02:00' } } }
+    const { run, workDir } = publish(undefined, { noUpload: true, macula: { folder, ...macula }, fixture: { lexiconFetch: lexiconFetchOf({ commit: lexiconCommit }) } })
+    const result = await run
+    expect(result.failures).toBe(0)
+
+    const list = JSON.parse(readFileSync(join(workDir, LANGUAGE_LIST), 'utf8')) as PartsList
+    const maculaStamp = `${macula.commit.slice(0, 10)}#2026-08-01T00_00_00.000Z`
+    expect(list.stamps?.['Biblica/hbo/macula']).toBe(maculaStamp)
+    expect(list.stamps?.['Biblica/el-x-koine/macula']).toBe(maculaStamp)
+    expect(list.stamps?.[UHL]).toBe('0123456789#2026-07-01T02_00_00+02_00')
   })
 })

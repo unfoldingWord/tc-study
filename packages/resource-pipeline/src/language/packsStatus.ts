@@ -13,7 +13,11 @@ import { isLanguageCode, type PackBucket } from './publishLanguage'
 
 export type PackState = 'running' | 'ok' | 'failed'
 
-export type PackStatus = { state: PackState; at: string; failures: number; run: string; started?: string }
+/**
+ * `code`: on a parts language's `ok` only, the code the run built with (its lists' `code`). The Worker compares it with
+ * status/builder.json, so a code change counts as built even when the list came out unchanged. Whole statuses have none.
+ */
+export type PackStatus = { state: PackState; at: string; failures: number; run: string; started?: string; code?: string }
 
 export const statusPath = (compat: string, language: string) => `status/${compat}/${language}.json`
 
@@ -25,9 +29,13 @@ export const COMPAT_RE = /^f\d+\.\d+-u[\w.]+-p\d+-q\d+-a\d+-t\d+$/
 
 export const isCompatKey = (s: string) => COMPAT_RE.test(s)
 
+/** A parts code of `compat`, as partsCode writes it: the compat, `+`, a hash. */
+export const isCodeOf = (compat: string, code: string) => code.startsWith(`${compat}+`) && /^[0-9a-f]+$/.test(code.slice(compat.length + 1))
+
 /**
  * `failed` adds one to the failures in a row, `ok` clears them, and `running` leaves them as they were. `running`
- * sets `started` to now; `ok` and `failed` keep the stored one, so it names the start of the run they end.
+ * sets `started` to now; `ok` and `failed` keep the stored one, so it names the start of the run they end. `code` only
+ * with `ok`; `running` and `failed` drop the one an earlier `ok` recorded.
  */
 export async function packsStatus(o: {
   bucket: PackBucket
@@ -36,10 +44,16 @@ export async function packsStatus(o: {
   state: PackState
   /** URL of the workflow run, for whoever reads the status. */
   run: string
+  /** The code an ok parts run built with. */
+  code?: string
   now?: Date
 }): Promise<void> {
   if (!isLanguageCode(o.language)) throw new Error(`Not a language code: ${JSON.stringify(o.language)}`)
   if (!isCompatKey(o.compat)) throw new Error(`Not a compat key: ${JSON.stringify(o.compat)}`)
+  if (o.code !== undefined) {
+    if (o.state !== 'ok') throw new Error(`Only an ok status records a code, not ${o.state}`)
+    if (!isCodeOf(o.compat, o.code)) throw new Error(`Not a code of ${o.compat}: ${JSON.stringify(o.code)}`)
+  }
   const key = statusPath(o.compat, o.language)
   // A status that does not parse (a hand edit gone wrong) would otherwise make the language unbuildable: the next run
   // could not write `running`. Network and HTTP errors still stop the run.
@@ -53,7 +67,7 @@ export async function packsStatus(o: {
   const at = (o.now ?? new Date()).toISOString()
   const kept = typeof previous?.started === 'string' && !Number.isNaN(Date.parse(previous.started)) ? previous.started : undefined
   const started = o.state === 'running' ? at : kept
-  const status: PackStatus = { state: o.state, at, failures, run: o.run, ...(started ? { started } : {}) }
+  const status: PackStatus = { state: o.state, at, failures, run: o.run, ...(started ? { started } : {}), ...(o.code !== undefined ? { code: o.code } : {}) }
   await o.bucket.put(key, JSON.stringify(status), { contentType: 'application/json', cacheControl: 'no-cache' })
 }
 
@@ -73,7 +87,7 @@ const COMMIT_RE = /^[0-9a-f]{40}$/
 /** The same compat and code keep the stored `at`, so a later push that changes no code does not move the change's date. */
 export async function writeBuilder(o: { bucket: PackBucket; compat: string; code: string; commit: string; now?: Date }): Promise<void> {
   if (!isCompatKey(o.compat)) throw new Error(`Not a compat key: ${JSON.stringify(o.compat)}`)
-  if (!o.code.startsWith(`${o.compat}+`)) throw new Error(`Not a code of ${o.compat}: ${JSON.stringify(o.code)}`)
+  if (!isCodeOf(o.compat, o.code)) throw new Error(`Not a code of ${o.compat}: ${JSON.stringify(o.code)}`)
   if (!COMMIT_RE.test(o.commit)) throw new Error(`Not a commit sha: ${JSON.stringify(o.commit)}`)
   const previous = await o.bucket.getJson<Partial<PartsBuilder>>(builderPath).catch((e: unknown) => {
     if (e instanceof SyntaxError) return null

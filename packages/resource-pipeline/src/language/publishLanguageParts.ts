@@ -43,6 +43,8 @@ export type PartsPublishResult = {
   language: string
   outcome: PartsPublishOutcome
   compat: string
+  /** The code the lists were built with (their `code`): what the workflow records in the ok status. */
+  code: string
   units: { built: number; carried: number }
   /** `put`: parts uploaded by this run; `present`: parts the bucket (or the previous work folder) already had. */
   parts: { language: number; originals: number; put: number; present: number }
@@ -235,6 +237,7 @@ export async function publishLanguageParts(o: {
     language,
     outcome,
     compat,
+    code: list.code,
     units,
     parts: { language: list.parts.length, originals: originals.parts.length, put, present },
     peakRssMb: built.peakRssMb,
