@@ -329,7 +329,10 @@ export const LEXICON_FILES: Readonly<Record<string, string>> = {
  * Door43's HTTP for the lexicons: es-419_gl has a Hebrew lexicon (`files`, default LEXICON_FILES, at `commit`), and
  * no Greek one.
  */
-export function lexiconFetchOf(o: { files?: Readonly<Record<string, string>>; commit?: { sha: string; created: string } } = {}) {
+/** `commit` as Door43's commits API gives it: `created`, or only `commit.committer.date`. */
+export function lexiconFetchOf(
+  o: { files?: Readonly<Record<string, string>>; commit?: { sha: string; created?: string; commit?: { committer?: { date?: string } } } } = {}
+) {
   const files = o.files ?? LEXICON_FILES
   const commit = o.commit ?? UHL_COMMIT
   return async (url: string): Promise<Response> => {

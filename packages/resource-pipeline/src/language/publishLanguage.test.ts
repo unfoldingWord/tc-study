@@ -375,6 +375,21 @@ describe('publishLanguage', () => {
   })
 })
 
+describe('memoryBucket', () => {
+  test('stat: when each key was put by its clock (a seed at creation), or null; getBytes: the bytes put', async () => {
+    let now = new Date('2026-07-01T00:00:00Z')
+    const bucket = memoryBucket({ 'catalog/c/seed.json': { a: 1 } }, { now: () => now })
+    now = new Date('2026-07-05T00:00:00Z')
+    await bucket.put('parts/x.part.gz', new Uint8Array([1, 2]), { contentType: 'application/gzip', cacheControl: IMMUTABLE })
+
+    expect(await bucket.stat('catalog/c/seed.json')).toEqual({ uploaded: new Date('2026-07-01T00:00:00Z') })
+    expect(await bucket.stat('parts/x.part.gz')).toEqual({ uploaded: new Date('2026-07-05T00:00:00Z') })
+    expect(await bucket.stat('parts/missing.part.gz')).toBeNull()
+    expect(await bucket.getBytes('parts/x.part.gz')).toEqual(new Uint8Array([1, 2]))
+    expect(await bucket.getBytes('parts/missing.part.gz')).toBeNull()
+  })
+})
+
 describe('r2Bucket', () => {
   test('puts with its content type and cache control, and reads a missing key as null', async () => {
     const seen: Array<{ method: string; path: string; type: string | null; cache: string | null; body: string }> = []
@@ -517,6 +532,49 @@ describe('r2Bucket', () => {
       expect(denied.seen.length).toBe(1)
     } finally {
       denied.server.stop(true)
+    }
+  })
+
+  test('stat: a HEAD of the key, its upload time from Last-Modified; 404 is null, another status an error', async () => {
+    const seen: string[] = []
+    const server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const path = new URL(req.url).pathname
+        seen.push(`${req.method} ${path}`)
+        if (path.endsWith('/there.part.gz')) return new Response(null, { headers: { 'last-modified': 'Wed, 01 Jul 2026 10:20:30 GMT' } })
+        if (path.endsWith('/undated.part.gz')) return new Response(null)
+        if (path.endsWith('/denied.part.gz')) return new Response(null, { status: 403 })
+        return new Response(null, { status: 404 })
+      },
+    })
+    try {
+      const bucket = r2Bucket({ endpoint: `http://127.0.0.1:${server.port}`, bucket: 'packs', accessKeyId: 'a', secretAccessKey: 's', retryDelaysMs: [0, 0] })
+      expect(await bucket.stat('parts/there.part.gz')).toEqual({ uploaded: new Date('2026-07-01T10:20:30Z') })
+      expect(await bucket.stat('parts/missing.part.gz')).toBeNull()
+      // An answer that does not say when is taken as old: refreshing costs a put, trusting it could lose the part.
+      expect(await bucket.stat('parts/undated.part.gz')).toEqual({ uploaded: new Date(0) })
+      await expect(bucket.stat('parts/denied.part.gz')).rejects.toThrow('403')
+      expect(seen.slice(0, 2)).toEqual(['HEAD /packs/parts/there.part.gz', 'HEAD /packs/parts/missing.part.gz'])
+    } finally {
+      server.stop(true)
+    }
+  })
+
+  test('getBytes: the object as it is stored, and a missing key as null', async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch(req) {
+        if (req.method !== 'GET') return new Response(null, { status: 405 })
+        return new URL(req.url).pathname.endsWith('/there.part.gz') ? new Response(new Uint8Array([31, 139, 8, 0])) : new Response('<Error/>', { status: 404 })
+      },
+    })
+    try {
+      const bucket = r2Bucket({ endpoint: `http://127.0.0.1:${server.port}`, bucket: 'packs', accessKeyId: 'a', secretAccessKey: 's', retryDelaysMs: [0, 0] })
+      expect(await bucket.getBytes('parts/there.part.gz')).toEqual(new Uint8Array([31, 139, 8, 0]))
+      expect(await bucket.getBytes('parts/missing.part.gz')).toBeNull()
+    } finally {
+      server.stop(true)
     }
   })
 

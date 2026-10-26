@@ -146,6 +146,15 @@ describe('fingerprints and units in the list', () => {
     expect(JSON.parse(serializePartsList(rest)).units).toBeUndefined()
   })
 
+  test("a language list's stamps serialize alike whatever order they were added in, and a list without them has none", () => {
+    const stamps = { 'unfoldingWord/hbo/uhb': 'v2.1.30#2026-09-01T00_00_00Z', 'Biblica/hbo/macula': 'abc1234567#2026-08-01T00_00_00.000Z', 'unfoldingWord/en/tn': 'v80#2026-01-01T00_00_00Z' }
+    const reversed = Object.fromEntries(Object.entries(stamps).reverse())
+    const text = serializePartsList({ ...list(PARTS), stamps })
+    expect(serializePartsList({ ...list(PARTS), stamps: reversed })).toBe(text)
+    expect(Object.keys((JSON.parse(text) as PartsList).stamps!)).toEqual(['Biblica/hbo/macula', 'unfoldingWord/en/tn', 'unfoldingWord/hbo/uhb'])
+    expect('stamps' in JSON.parse(serializePartsList(list(PARTS)))).toBe(false)
+  })
+
   test('the originals list a language names lives at its content address', () => {
     const sha = '0123456789abcdef'.repeat(4)
     expect(originalsListPath('f2.0-u2.3.0-p6000230-q9-a12-t1', sha)).toBe(`catalog/f2.0-u2.3.0-p6000230-q9-a12-t1/originals/${sha}.json`)

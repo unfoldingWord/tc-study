@@ -164,6 +164,51 @@ describe('buildLanguageParts', () => {
   }, 120_000)
 })
 
+// What the Worker compares with Door43 and GitHub now (delivery 3): the strings must be those it computes.
+describe('the stamps in the list', () => {
+  test('the language list has the stamp of every resource the build read, the originals, lexicon and MACULA included', async () => {
+    const workDir = freshDir('parts-stamps')
+    const { list, originals, failures } = await build(workDir)
+    expect(failures).toEqual([])
+    const release = 'v12#2026-09-01T00_00_00Z'
+    const original = 'v2.1.30#2026-09-01T00_00_00Z'
+    expect(list.stamps).toEqual({
+      [GLT]: release,
+      [GST]: release,
+      [TA]: release,
+      [TN]: release,
+      [TQ]: release,
+      [TW]: release,
+      [TWL]: release,
+      [UHB]: original,
+      [UGNT]: original,
+      // `lexiconStampOf`: the commit's first ten characters and its date.
+      [UHL]: '0123456789#2026-07-01T00_00_00Z',
+      // The MACULA commit and its date as `toISOString` writes it, for both keys.
+      'Biblica/hbo/macula': 'abc1234567#2026-08-01T00_00_00.000Z',
+      'Biblica/el-x-koine/macula': 'abc1234567#2026-08-01T00_00_00.000Z',
+    })
+    // The catalog's stamps are the ones the list's resources carry.
+    for (const r of [...list.resources, ...originals.resources]) expect(list.stamps?.[r.key]).toBe(r.stamp)
+    expect(originals.stamps).toBeUndefined()
+    const compat = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
+    expect(JSON.parse(readFileSync(join(workDir, partsListPath(compat, LANG)), 'utf8')).stamps).toEqual(list.stamps)
+  }, 120_000)
+
+  test('a resource that writes no part is still in the stamps, and one left out is not', async () => {
+    // TQ's release without its files: no book of it is present, so it gets no part and no entry in `resources`.
+    const repos = reposCopy()
+    for (const path of Object.keys(repos['test_gl/es-419_tq'])) if (path.endsWith('.tsv')) delete repos['test_gl/es-419_tq'][path]
+    const door43 = fakeDoor43({ repos, fail: (repo) => (repo === 'test_gl/es-419_tn' ? new Error('Door43 answered 503') : undefined) })
+    const { list, failures } = await build(freshDir('parts-stamps-gaps'), { door43, wait: async () => {} })
+    expect(failures).toEqual([{ unit: 'catalog', error: `${TN}: its release zip did not download after 4 tries, so it is left out: Door43 answered 503` }])
+    expect(list.parts.some((p) => p.resource === TQ)).toBe(false)
+    expect(list.resources.some((r) => r.key === TQ)).toBe(false)
+    expect(list.stamps?.[TQ]).toBe('v12#2026-09-01T00_00_00Z')
+    expect(list.stamps && TN in list.stamps).toBe(false)
+  }, 120_000)
+})
+
 const HEX64 = /^[0-9a-f]{64}$/
 
 /** Door43 resources the fixture's build reads, each checked against its tree: 9 zips (OBS off) and the lexicon. */

@@ -35,6 +35,10 @@ export interface PackBucket {
   getJson<T>(key: string): Promise<T | null>
   /** Whether the bucket has the key; an answer that is neither yes nor no throws. */
   has(key: string): Promise<boolean>
+  /** When the bucket last wrote the key (R2's `uploaded`, what the Worker's cleanup reads), or null when it has none. */
+  stat(key: string): Promise<{ uploaded: Date } | null>
+  /** An object's bytes as stored, or null. */
+  getBytes(key: string): Promise<Uint8Array | null>
   put(key: string, body: Uint8Array | string, o: { contentType: string; cacheControl: string }): Promise<void>
 }
 
@@ -287,8 +291,11 @@ export async function publishLanguage(o: {
   return { language, outcome: 'published', entry, originals: originalsChanged ? 'published' : 'unchanged' }
 }
 
-/** A bucket in memory: for tests, and for a dry run with no bucket to read. */
-export function memoryBucket(seed: Record<string, unknown> = {}): PackBucket & {
+/**
+ * A bucket in memory: for tests, and for a dry run with no bucket to read. `now` dates each put (the seed at creation),
+ * as R2's `uploaded`.
+ */
+export function memoryBucket(seed: Record<string, unknown> = {}, o: { now?: () => Date } = {}): PackBucket & {
   puts: Array<{ key: string; contentType: string; cacheControl: string; bytes: number }>
   json<T>(key: string): T | null
   /** An object as text, or null. */
@@ -296,7 +303,9 @@ export function memoryBucket(seed: Record<string, unknown> = {}): PackBucket & {
   /** An object's bytes, or null. */
   bytes(key: string): Uint8Array | null
 } {
+  const now = o.now ?? (() => new Date())
   const objects = new Map<string, string | Uint8Array>(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]))
+  const uploaded = new Map<string, Date>(Object.keys(seed).map((k) => [k, now()]))
   const puts: Array<{ key: string; contentType: string; cacheControl: string; bytes: number }> = []
   const json = <T>(key: string): T | null => {
     const body = objects.get(key)
@@ -322,8 +331,16 @@ export function memoryBucket(seed: Record<string, unknown> = {}): PackBucket & {
     async has(key) {
       return objects.has(key)
     },
+    async stat(key) {
+      const at = uploaded.get(key)
+      return at ? { uploaded: at } : null
+    },
+    async getBytes(key) {
+      return bytes(key)
+    },
     async put(key, body, m) {
       objects.set(key, body)
+      uploaded.set(key, now())
       puts.push({ key, ...m, bytes: typeof body === 'string' ? body.length : body.length })
     },
   }
@@ -343,8 +360,11 @@ const retryable = (status: number) => status === 429 || status >= 500
 /**
  * Cloudflare R2 through Bun's S3 client, used only to sign: Bun 1.3's `write` sends no Cache-Control, so the request
  * is a plain fetch to a presigned URL that carries the headers itself. Each request has a timeout (ten minutes for a
- * pack or a part) and is tried again after a network error, a 429 or a 5xx. `has` is a presigned HEAD (Bun signs the
- * method, checked against SigV4 by hand), so asking costs no download.
+ * pack or a part) and is tried again after a network error, a 429 or a 5xx. `has` and `stat` are a presigned HEAD (Bun
+ * signs the method, checked against SigV4 by hand), so asking costs no download.
+ *
+ * There is no copy: S3's CopyObject needs `x-amz-copy-source` signed, and Bun's presign signs only `host` (its options
+ * add query parameters, never a header), so a part is refreshed by a GET and a PUT.
  */
 export function r2Bucket(o: {
   endpoint: string
@@ -381,6 +401,19 @@ export function r2Bucket(o: {
     }
   }
 
+  async function stat(key: string): Promise<{ uploaded: Date } | null> {
+    const res = await withRetries('HEAD', key, () =>
+      fetch(client.presign(key, { method: 'HEAD', expiresIn: 600 }), { method: 'HEAD', signal: AbortSignal.timeout(JSON_TIMEOUT_MS) })
+    )
+    if (res.status === 404) return null
+    // A 403 or a 5xx after the retries is not «missing»: a part taken for missing is only uploaded again, but a list
+    // must never be written on a guess.
+    if (res.status !== 200) throw await failure('HEAD', key, res)
+    // An answer that does not say when is taken as old: refreshing costs a put, trusting it could lose the part.
+    const at = new Date(res.headers.get('last-modified') ?? '')
+    return { uploaded: Number.isNaN(at.getTime()) ? new Date(0) : at }
+  }
+
   return {
     async getJson<T>(key: string) {
       const res = await withRetries('GET', key, () =>
@@ -390,15 +423,15 @@ export function r2Bucket(o: {
       if (!res.ok) throw await failure('GET', key, res)
       return (await res.json()) as T
     },
-    async has(key) {
-      const res = await withRetries('HEAD', key, () =>
-        fetch(client.presign(key, { method: 'HEAD', expiresIn: 600 }), { method: 'HEAD', signal: AbortSignal.timeout(JSON_TIMEOUT_MS) })
+    has: async (key) => (await stat(key)) !== null,
+    stat,
+    async getBytes(key) {
+      const res = await withRetries('GET', key, () =>
+        fetch(client.presign(key, { method: 'GET', expiresIn: 3600 }), { signal: AbortSignal.timeout(PACK_TIMEOUT_MS) })
       )
-      if (res.status === 200) return true
-      if (res.status === 404) return false
-      // A 403 or a 5xx after the retries is not «missing»: a part taken for missing is only uploaded again, but a list
-      // must never be written on a guess.
-      throw await failure('HEAD', key, res)
+      if (res.status === 404) return null
+      if (!res.ok) throw await failure('GET', key, res)
+      return new Uint8Array(await res.arrayBuffer())
     },
     async put(key, body, m) {
       const timeout = m.contentType === 'application/json' ? JSON_TIMEOUT_MS : PACK_TIMEOUT_MS

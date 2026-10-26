@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { compatKeyOf, PACK_FORMAT_VERSION, PARTS_FORMAT_VERSION } from '@bt-synergy/language-pack'
 import { PACK_VERSIONS } from '../src/language/packVersions'
+import { partsCode } from '../src/language/partsCode'
 
 const R2 = { R2_ENDPOINT: 'https://r2.invalid', R2_BUCKET: 'b', R2_ACCESS_KEY_ID: 'k', R2_SECRET_ACCESS_KEY: 's' }
 
@@ -70,5 +71,130 @@ describe('packs-status --print-compat', () => {
     expect(out.code).toBe(0)
     expect(out.stdout).toBe(compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS))
     expect(out.stdout).toStartWith('f2.0-')
+  })
+})
+
+describe('packs-status: the builder file', () => {
+  test('--print-code prints the code a parts build of this checkout writes in its lists, and needs no bucket', async () => {
+    const out = run('packs-status.ts', ['--print-code'])
+    expect(out.code).toBe(0)
+    expect(out.stdout).toBe(await partsCode())
+    expect(out.stdout).toMatch(new RegExp(`^${compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS).replace(/\./g, '\\.')}\\+[0-9a-f]{16}$`))
+  })
+
+  const COMMIT = '0123456789abcdef0123456789abcdef01234567'
+  const refused: Array<[string, string[], Partial<typeof R2>, string]> = [
+    ['--builder without --commit', ['--builder'], R2, 'Falta --commit'],
+    ['--builder with a commit that is not a whole sha', ['--builder', '--commit', 'abc123'], R2, '--commit no es un commit'],
+    ['--builder with --compat (it writes the compat this code builds)', ['--builder', '--commit', COMMIT, '--compat', compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)], R2, '--builder no lleva --compat'],
+    ['--builder with R2 half set', ['--builder', '--commit', COMMIT], { R2_ENDPOINT: R2.R2_ENDPOINT, R2_BUCKET: R2.R2_BUCKET }, 'Faltan R2_ENDPOINT'],
+    ['--builder without R2', ['--builder', '--commit', COMMIT], {}, 'Faltan R2_ENDPOINT'],
+  ]
+  for (const [what, args, r2, why] of refused) {
+    test(`${what}: exit 2, saying why`, () => {
+      const out = run('packs-status.ts', args, r2)
+      expect(out.stderr).toContain(why)
+      expect(out.code).toBe(2)
+      expect(out.stdout).toBe('')
+    })
+  }
+
+  test('--builder --commit writes status/builder.json; written again with the same code, `at` is kept and the commit moves', async () => {
+    const s3 = fakeS3()
+    try {
+      const r2 = { ...R2, R2_ENDPOINT: s3.endpoint }
+      const code = await partsCode()
+      const first = await runAsync('packs-status.ts', ['--builder', '--commit', COMMIT], r2)
+      expect(first.stderr).toContain(`status/builder.json: ${code} (${COMMIT})`)
+      expect(first.code).toBe(0)
+
+      const written = s3.objects.get('status/builder.json')!
+      expect(written.contentType).toBe('application/json')
+      expect(written.cacheControl).toBe('no-cache')
+      const builder = JSON.parse(written.body)
+      expect(Object.keys(builder)).toEqual(['compat', 'code', 'commit', 'at'])
+      expect(builder).toEqual({ compat: compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS), code, commit: COMMIT, at: expect.any(String) })
+      expect(Number.isNaN(Date.parse(builder.at))).toBe(false)
+
+      const NEXT = 'fedcba9876543210fedcba9876543210fedcba98'
+      const second = await runAsync('packs-status.ts', ['--builder', '--commit', NEXT], r2)
+      expect(second.code).toBe(0)
+      expect(JSON.parse(s3.objects.get('status/builder.json')!.body)).toEqual({ ...builder, commit: NEXT })
+      expect([...s3.objects.keys()]).toEqual(['status/builder.json'])
+    } finally {
+      s3.stop()
+    }
+  })
+})
+
+/** A local S3 that has no object until one is put, and keeps what is put; the CLI reaches it with presigned URLs. */
+function fakeS3() {
+  const objects = new Map<string, { body: string; contentType: string | null; cacheControl: string | null }>()
+  const server = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      const key = decodeURIComponent(new URL(req.url).pathname).replace(/^\/b\//, '')
+      if (req.method === 'PUT') {
+        objects.set(key, { body: await req.text(), contentType: req.headers.get('content-type'), cacheControl: req.headers.get('cache-control') })
+        return new Response(null, { status: 200 })
+      }
+      const object = objects.get(key)
+      return object ? new Response(object.body) : new Response('<Error><Code>NoSuchKey</Code></Error>', { status: 404 })
+    },
+  })
+  return { objects, endpoint: `http://127.0.0.1:${server.port}`, stop: () => server.stop(true) }
+}
+
+/** `run`, without blocking the event loop the fake S3 answers on. */
+async function runAsync(script: string, args: string[], r2: Partial<typeof R2>) {
+  const env: Record<string, string> = {}
+  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !k.startsWith('R2_')) env[k] = v
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, script), ...args], { env: { ...env, ...r2 }, stdout: 'pipe', stderr: 'pipe' })
+  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  return { code, stdout: stdout.trim(), stderr }
+}
+
+describe('packs-status: the code an ok parts status records', () => {
+  const parts = compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)
+  const whole = compatKeyOf(PACK_FORMAT_VERSION, PACK_VERSIONS)
+  const CODE = `${parts}+0123456789abcdef`
+  const RUN_URL = 'https://github.com/unfoldingWord/tc-study/actions/runs/1'
+  const status = (state: string, ...more: string[]) => ['--lang', 'es-419', '--state', state, '--run', RUN_URL, ...more]
+
+  const refused: Array<[string, string[], string]> = [
+    ['--code without --parts (a whole status records none)', status('ok', '--code', CODE), '--code solo va con --state ok --parts'],
+    ['--code with --state running', status('running', '--parts', '--code', CODE), '--code solo va con --state ok --parts'],
+    ['--code with --state failed', status('failed', '--parts', '--code', CODE), '--code solo va con --state ok --parts'],
+    ['--code with no value', status('ok', '--parts', '--code'), '--code no es un código de'],
+    ['a code of another compat', status('ok', '--parts', '--code', `${whole}+0123456789abcdef`), '--code no es un código de'],
+  ]
+  for (const [what, args, why] of refused) {
+    test(`${what}: exit 2, saying why`, () => {
+      const out = run('packs-status.ts', args, R2)
+      expect(out.stderr).toContain(why)
+      expect(out.code).toBe(2)
+    })
+  }
+
+  test('--state ok --parts --code writes the code into status/<f2.0>/<lang>.json; a whole ok status is written as before', async () => {
+    const s3 = fakeS3()
+    try {
+      const r2 = { ...R2, R2_ENDPOINT: s3.endpoint }
+      const partsRun = await runAsync('packs-status.ts', status('ok', '--parts', '--code', CODE), r2)
+      expect(partsRun.stderr).toContain(`status/${parts}/es-419.json: ok`)
+      expect(partsRun.code).toBe(0)
+      const wholeRun = await runAsync('packs-status.ts', status('ok'), r2)
+      expect(wholeRun.code).toBe(0)
+
+      const written = s3.objects.get(`status/${parts}/es-419.json`)!
+      expect(written.contentType).toBe('application/json')
+      expect(written.cacheControl).toBe('no-cache')
+      expect(JSON.parse(written.body)).toEqual({ state: 'ok', at: expect.any(String), failures: 0, run: RUN_URL, code: CODE })
+      expect(Object.keys(JSON.parse(written.body))).toEqual(['state', 'at', 'failures', 'run', 'code'])
+      expect(Object.keys(JSON.parse(s3.objects.get(`status/${whole}/es-419.json`)!.body))).toEqual(['state', 'at', 'failures', 'run'])
+      expect([...s3.objects.keys()].sort()).toEqual([`status/${parts}/es-419.json`, `status/${whole}/es-419.json`].sort())
+    } finally {
+      s3.stop()
+    }
   })
 })

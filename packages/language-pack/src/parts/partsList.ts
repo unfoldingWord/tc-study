@@ -61,6 +61,13 @@ export type PartsList = {
   originals?: { path: string; sha256: string }
   /** A language's list: every unit built or carried, so the next build can tell which changed. */
   units?: PartsUnit[]
+  /**
+   * Language list only: the stamp of every resource the build read, the originals, lexicons and MACULA included, by
+   * key (`resourceContentStamp` of a catalog row, `lexiconStampOf`, MACULA's `<sha10>#<date>`). The Worker compares
+   * them with what Door43 and GitHub have now, and asks for a build when one moved; it covers resources that got no
+   * part, which `resources` does not list.
+   */
+  stamps?: Record<string, string>
 }
 
 export const SHARED_UNIT = 'shared'

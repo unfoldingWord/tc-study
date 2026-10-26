@@ -232,6 +232,16 @@ describe('a build with the previous lists', () => {
     expect(sizes(again)).toEqual(sizes(baseline))
   }, 120_000)
 
+  test('a previous list written before lists had stamps carries every unit, and the new list has them', async () => {
+    // Lists published before `stamps`: their fingerprints are the same, so nothing is built, only the list rewritten.
+    expect(Object.keys(baseline.list.stamps ?? {}).length).toBeGreaterThan(0)
+    const reuse = await build({}, previousOf(baseline, { list: ({ stamps: _, ...l }) => l }))
+    expect(reuse.failures).toEqual([])
+    expect(builtUnits(reuse)).toEqual([])
+    expect(partFiles(reuse.workDir)).toEqual([])
+    expect(reuse.texts).toEqual(baseline.texts)
+  }, 120_000)
+
   test("a previous list lacking a resource's part of a book (a silent gap) is not carried on: that book is built", async () => {
     const gltRuth = (p: PartEntry) => p.kind === 'book' && p.book === 'rut' && p.resource === GLT
     const reuse = await build({}, previousOf(baseline, { list: (l) => ({ ...l, parts: l.parts.filter((p) => !gltRuth(p)) }) }))
@@ -267,16 +277,18 @@ describe('a build with the previous lists', () => {
     }, 120_000)
   }
 
-  test('a GLT tag bump changes only its entry in the list', async () => {
+  test('a GLT tag bump changes only its entry in the list, and its stamp', async () => {
     const bumped = await build(MUTATIONS.find((m) => m.name.startsWith('GLT release tag'))!.fixture, previousOf(baseline))
     const without = (text: string) => {
+      const { [GLT]: _, ...stamps } = (JSON.parse(text) as PartsList).stamps!
       const list = JSON.parse(text) as PartsList
-      return { ...list, resources: list.resources.filter((r) => r.key !== GLT) }
+      return { ...list, resources: list.resources.filter((r) => r.key !== GLT), stamps }
     }
     expect(without(bumped.texts.language)).toEqual(without(baseline.texts.language))
     expect(bumped.texts.originals).toBe(baseline.texts.originals)
     const glt = (text: string) => (JSON.parse(text) as PartsList).resources.find((r) => r.key === GLT)!
     expect(glt(bumped.texts.language).stamp).not.toBe(glt(baseline.texts.language).stamp)
+    expect(bumped.list.stamps![GLT]).toBe(glt(bumped.texts.language).stamp)
   }, 120_000)
 
   test("a TW tag bump changes only TW's titles: no other row carries the release", async () => {

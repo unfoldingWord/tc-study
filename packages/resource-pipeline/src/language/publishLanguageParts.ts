@@ -10,12 +10,18 @@
  * 3. `catalog/<compat>/originals.json`, the latest originals list (last writer wins between languages);
  * 4. `catalog/<compat>/<language>.json` last, once every part both lists name is known to be in the bucket.
  *
- * Until step 4 the bucket names the previous build, whose parts nothing deletes. Nothing is decided from Door43's
+ * Until step 4 the bucket names the previous build, whose parts nothing deletes.
+ *
+ * The Worker's cleanup deletes a part no list has named for 30 days once R2 wrote it 30 days ago too, and a run may name
+ * such a part again (a carried unit, or a build that comes out as an old one). So a part or originals address the run
+ * finds there is put again when R2 wrote it more than `PART_REFRESH_DAYS` ago, and before any list is written R2 is
+ * asked again, past the answers kept for the run, for each one: a part taken in between fails the run instead of being
+ * named. Nothing is decided from Door43's
  * stamps: every run downloads and recomputes, and is `unchanged` when the language list comes out as the stored one.
  * A build with any failure is never published: a carried unit would freeze a resource dropped by a failed download.
  */
 
-import { copyFileSync, existsSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   compatKeyOf,
@@ -43,15 +49,35 @@ export type PartsPublishResult = {
   language: string
   outcome: PartsPublishOutcome
   compat: string
+  /** The code the lists were built with (their `code`): what the workflow records in the ok status. */
+  code: string
   units: { built: number; carried: number }
-  /** `put`: parts uploaded by this run; `present`: parts the bucket (or the previous work folder) already had. */
-  parts: { language: number; originals: number; put: number; present: number }
+  /**
+   * `put`: parts uploaded by this run; `present`: parts the bucket (or the previous work folder) already had;
+   * `refreshed`: those of `present` put again because R2 wrote them more than `PART_REFRESH_DAYS` ago.
+   */
+  parts: { language: number; originals: number; put: number; present: number; refreshed: number }
   peakRssMb: number
   /** The build's failures and any reason the lists are not whole; more than 0 is never published. */
   failures: number
 }
 
 const PART_UPLOADS_AT_ONCE = 16
+
+/**
+ * A part (or an originals address) R2 wrote longer ago than this is put again when a run names it. The cleanup wants
+ * 30 days since R2 wrote it as well as 30 unnamed, so «written 30 days ago» comes to mean «no build named it for 30
+ * days», and a part a run found there cannot be due for at least the 10 days after: far longer than any run.
+ */
+export const PART_REFRESH_DAYS = 20
+const PART_REFRESH_MS = PART_REFRESH_DAYS * 86_400_000
+
+/** At most this many keys are named in the error of a run whose parts vanished. */
+const VANISHED_LISTED = 3
+
+const GZIP = { contentType: 'application/gzip', cacheControl: IMMUTABLE }
+
+type Found = { uploaded: Date } | null
 
 /** At most this many reasons are named in the error of a build that is not whole. */
 const GAPS_LISTED = 10
@@ -151,6 +177,8 @@ export async function publishLanguageParts(o: {
   previousDir?: string
   /** Read no previous list: every unit is built (the parts the bucket has are still not put again). */
   force?: boolean
+  /** The clock a part's age is read against (tests). */
+  now?: () => Date
   build?: typeof buildLanguageParts
   log?: (line: string) => void
 }): Promise<PartsPublishResult> {
@@ -172,23 +200,29 @@ export async function publishLanguageParts(o: {
   const latestPath = partsListPath(compat, 'originals')
 
   const source = o.previousDir ? folderSource(o.previousDir) : bucket ? bucketSource(bucket) : null
-  const partHere: ((sha256: string) => Promise<boolean>) | null = o.previousDir
-    ? async (sha) => existsSync(join(o.previousDir!, partPath(sha)))
+  const now = o.now ?? (() => new Date())
+  const partHere: ((sha256: string) => Promise<Found>) | null = o.previousDir
+    ? async (sha) => {
+        const file = join(o.previousDir!, partPath(sha))
+        return existsSync(file) ? { uploaded: statSync(file).mtime } : null
+      }
     : bucket
-      ? (sha) => bucket.has(partPath(sha))
+      ? (sha) => bucket.stat(partPath(sha))
       : null
   // Asked once per part for the run: the build asks for the parts of the units it may carry, the upload for the rest.
-  const known = new Map<string, Promise<boolean>>()
-  const has = (sha: string): Promise<boolean> => {
+  const known = new Map<string, Promise<Found>>()
+  const found = (sha: string): Promise<Found> => {
     let answer = known.get(sha)
     if (!answer) {
-      answer = partHere ? partHere(sha) : Promise.resolve(false)
+      answer = partHere ? partHere(sha) : Promise.resolve(null)
       known.set(sha, answer)
       // A failed answer is not remembered: the next ask tries again.
       answer.catch(() => known.delete(sha))
     }
     return answer
   }
+  const has = async (sha: string): Promise<boolean> => (await found(sha)) !== null
+  const old = (there: { uploaded: Date }) => now().getTime() - there.uploaded.getTime() > PART_REFRESH_MS
 
   let stored: { list: PartsList | null; originals: PartsList | null } = { list: null, originals: null }
   if (o.force) say(`${language}: forzado, no se lee la lista anterior`)
@@ -231,21 +265,22 @@ export async function publishLanguageParts(o: {
 
   const gaps = [...built.failures.map((f) => `${f.unit}${f.job ? ` ${f.job}` : ''}: ${f.error}`), ...partsGaps(list, originals)]
   const units = { built: built.units.filter((u) => u.outcome === 'built').length, carried: built.carried.length }
-  const result = (outcome: PartsPublishOutcome, put: number, present: number): PartsPublishResult => ({
+  const result = (outcome: PartsPublishOutcome, counts: { put: number; present: number; refreshed: number }): PartsPublishResult => ({
     language,
     outcome,
     compat,
+    code: list.code,
     units,
-    parts: { language: list.parts.length, originals: originals.parts.length, put, present },
+    parts: { language: list.parts.length, originals: originals.parts.length, ...counts },
     peakRssMb: built.peakRssMb,
     failures: gaps.length,
   })
 
   if (o.noUpload) {
     for (const gap of gaps) say(`  no está entero: ${gap}`)
-    const present = (await Promise.all([...known.values()].map((a) => a.catch(() => false)))).filter(Boolean).length
+    const present = (await Promise.all([...known.values()].map((a) => a.then(Boolean, () => false)))).filter(Boolean).length
     say(`${language}: --no-upload, ${shas.length} partes y las listas en ${workDir}; no se sube nada`)
-    return result('built', 0, present)
+    return result('built', { put: 0, present, refreshed: 0 })
   }
   if (gaps.length) {
     const more = gaps.length > GAPS_LISTED ? ` and ${gaps.length - GAPS_LISTED} more` : ''
@@ -253,38 +288,87 @@ export async function publishLanguageParts(o: {
   }
   const target = bucket!
 
+  /**
+   * A part's file in the work folder, checked against its name, or null when the folder has none. The build keeps a part
+   * file already in the folder, so a bad one (an interrupted run's) survives a rerun over the same folder; put, phones
+   * would refuse it under a name the cache keeps for good.
+   */
+  async function workFileBytes(sha: string): Promise<Uint8Array | null> {
+    const key = partPath(sha)
+    const file = join(workDir, key)
+    if (!existsSync(file)) return null
+    const bytes = readFileSync(file)
+    const got = await sha256Hex(bytes)
+    if (got !== sha) throw new Error(`${file} is not the part its name says (its sha256 is ${got}): not publishing ${language}, and nothing is put under ${key}; delete that file and run again`)
+    return bytes
+  }
+
+  /** A part's bytes to put again: this run's file, or for a carried part the bucket's own; either checked against the name. */
+  async function bytesToRefresh(sha: string): Promise<Uint8Array> {
+    const key = partPath(sha)
+    const mine = await workFileBytes(sha)
+    if (mine) return mine
+    const bytes = await target.getBytes(key)
+    if (!bytes) throw new Error(`Not publishing ${language}: ${key} vanished while publishing`)
+    const got = await sha256Hex(bytes)
+    if (got !== sha) throw new Error(`${key} in the bucket is not the part its name says (its sha256 is ${got}): not publishing ${language}; run again with force, which builds its unit and puts its own bytes over this object`)
+    return bytes
+  }
+
+  /** R2 asked again, past the answers kept for the run: the cleanup may have taken a key the run found there. */
+  async function stillThere(keys: string[]): Promise<void> {
+    const gone: string[] = []
+    await eachLimit(keys, PART_UPLOADS_AT_ONCE, async (key) => {
+      if (!(await target.stat(key))) gone.push(key)
+    })
+    if (!gone.length) return
+    const more = gone.length > VANISHED_LISTED ? ` and ${gone.length - VANISHED_LISTED} more` : ''
+    throw new Error(`Not publishing ${language}: ${gone.length} parts vanished while publishing (${gone.slice(0, VANISHED_LISTED).join(', ')}${more}); a new run puts them again`)
+  }
+
   // 1. The parts. Each one is put or known there before any list: the lists may name only those.
   const there = new Set<string>()
+  const foundThere: string[] = []
   let put = 0
-  let present = 0
+  let refreshed = 0
   await eachLimit(shas, PART_UPLOADS_AT_ONCE, async (sha) => {
-    if (await has(sha)) {
-      present++
+    const key = partPath(sha)
+    const before = await found(sha)
+    if (before) {
+      foundThere.push(key)
+      if (old(before)) {
+        await target.put(key, await bytesToRefresh(sha), GZIP)
+        refreshed++
+      }
     } else {
-      const file = join(workDir, partPath(sha))
-      if (!existsSync(file)) throw new Error(`${partPath(sha)} is neither in the bucket nor in ${workDir}: not publishing ${language}`)
-      await target.put(partPath(sha), readFileSync(file), { contentType: 'application/gzip', cacheControl: IMMUTABLE })
-      known.set(sha, Promise.resolve(true))
+      const bytes = await workFileBytes(sha)
+      if (!bytes) throw new Error(`${key} is neither in the bucket nor in ${workDir}: not publishing ${language}`)
+      await target.put(key, bytes, GZIP)
       put++
     }
     there.add(sha)
   })
   const unknown = shas.filter((sha) => !there.has(sha))
   if (unknown.length) throw new Error(`Not publishing ${language}: ${unknown.length} parts its lists name are not known to be in the bucket (${unknown.slice(0, 3).join(', ')})`)
-  say(`${language}: ${put} partes subidas, ${present} ya estaban`)
+  const counts = { put, present: foundThere.length, refreshed }
+  say(`${language}: ${put} partes subidas, ${counts.present} ya estaban${refreshed ? ` (${refreshed} subidas otra vez: R2 las escribió hace más de ${PART_REFRESH_DAYS} días)` : ''}`)
 
   // The stored list is the one just made: its originals list is at its address (it was read from there).
   if (stored.list && stored.originals && serializePartsList(stored.list) === languageText) {
+    // Nothing is written, but the run must not end ok over a part that is gone.
+    await stillThere(foundThere)
     say(`${language}: la lista no cambió${put ? `; se subieron ${put} partes que faltaban` : ''}`)
-    return result(put ? 'published' : 'unchanged', put, present)
+    return result(put ? 'published' : 'unchanged', counts)
   }
 
   // 2–3. The originals list, by content (immutable: the same key is the same text), then as the latest. The latest is
   // left alone when this language's originals did not change: another language may have written newer ones since.
-  if (!(await target.has(originalsPath))) {
+  const originalsThere = await target.stat(originalsPath)
+  if (!originalsThere || old(originalsThere)) {
     await target.put(originalsPath, originalsText, { contentType: 'application/json', cacheControl: IMMUTABLE })
-    say(`subido ${originalsPath}`)
+    say(`subido ${originalsPath}${originalsThere ? ' otra vez' : ''}`)
   }
+  await stillThere(originalsThere ? [...foundThere, originalsPath] : foundThere)
   if (stored.list?.originals?.sha256 !== originalsSha || !(await target.has(latestPath))) {
     await target.put(latestPath, originalsText, { contentType: 'application/json', cacheControl: NO_CACHE })
     say(`subido ${latestPath}`)
@@ -292,5 +376,5 @@ export async function publishLanguageParts(o: {
   // 4. The language list, last.
   await target.put(languagePath, languageText, { contentType: 'application/json', cacheControl: NO_CACHE })
   say(`subido ${languagePath}`)
-  return result('published', put, present)
+  return result('published', counts)
 }

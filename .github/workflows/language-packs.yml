@@ -4,6 +4,8 @@ name: Language packs
 # and reports the build state next to the catalog (status/<compat>/<lang>.json) for the serving Worker's dispatch guard.
 # With `parts` it builds the language one book at a time and publishes the parts (staging only, until the Worker serves
 # them) under the parts compat (f2.0-…), with that compat's status: nothing a whole build or the Worker reads changes.
+# Parts are published only from master, which also writes the code it builds with to status/builder.json (as
+# packs-builder.yml does) and records that code in the ok status; a parts measurement (no-upload) may run from a branch.
 # Dispatched by hand, or by the Worker (a GitHub App with actions: write on this repository only).
 
 run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }}${{ inputs.parts && ', parts' || '' }}${{ inputs.compare && ', compare' || '' }})
@@ -60,8 +62,12 @@ permissions:
 # Languages are not serialized against each other: each catalog entry names its own originals pack, so a phone reading
 # one entry stays consistent, and originals.json is last-writer-wins between valid builds. (A shared job-level group
 # would not do: GitHub keeps one pending job per group and cancels the older pending ones.)
+# Parts runs queue apart from whole runs of the same language (packs-<target>-parts-<lang>): they write other keys, and a
+# whole run queued behind a build would otherwise cancel a pending parts run the Worker had marked `running`, a mark
+# that later counts as a failure. A parts measurement (no-upload) queues apart again (…-parts-measure-<lang>): it writes
+# nothing, and must not cancel a pending parts publish either. A whole run's group name is as before.
 concurrency:
-  group: packs-${{ inputs.target || 'staging' }}-${{ inputs.language }}
+  group: packs-${{ inputs.target || 'staging' }}${{ inputs.parts && (inputs.mode == 'no-upload' && '-parts-measure' || '-parts') || '' }}-${{ inputs.language }}
   cancel-in-progress: false
 
 defaults:
@@ -97,6 +103,12 @@ jobs:
             echo "::error::parts publish to production waits for the Worker (delivery 3)"
             exit 1
           fi
+          # Published parts are what the Worker serves and compares with the code master builds (status/builder.json):
+          # a branch's lists would carry a code nothing else builds. A measurement (no-upload) may run from any branch.
+          if [ "$PARTS" = true ] && [ "$MODE" = publish ] && [ "$GITHUB_REF" != refs/heads/master ]; then
+            echo "::error::parts publish runs only from master; use mode no-upload to measure a branch"
+            exit 1
+          fi
           # The comparison builds the whole packs beside the parts, into the runner: nothing of it is published.
           if [ "$COMPARE" = true ] && { [ "$PARTS" != true ] || [ "$MODE" != no-upload ]; }; then
             echo "::error::compare needs parts and mode no-upload"
@@ -126,21 +138,27 @@ jobs:
       # The Worker asks for builds of the compat it was deployed with. Code that builds another one (a compat bump not yet
       # followed by a v2 redeploy) would publish where the Worker never looks and be dispatched again every hour: it marks
       # the requested compat failed instead, which the Worker's guard reads, and builds nothing.
-      # Not for a parts run: parts have their own compat (PARTS_FORMAT_VERSION, f2.0), which no Worker asks for yet,
-      # and a parts run publishes nothing the Worker reads (staging only, and its own status).
+      # A parts run is checked against the parts compat (PARTS_FORMAT_VERSION, f2.0), the Worker's CURRENT_PARTS_COMPAT.
       - name: Check compat
-        if: inputs.compat != '' && !inputs.parts
+        if: inputs.compat != ''
         env:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
         run: |
-          built="$(bun packages/resource-pipeline/cli/packs-status.ts --print-compat)"
+          kind=()
+          constant=CURRENT_PACK_COMPAT
+          if [ "$PARTS" = true ]; then kind=(--parts); constant=CURRENT_PARTS_COMPAT; fi
+          built="$(bun packages/resource-pipeline/cli/packs-status.ts --print-compat "${kind[@]}")"
           if [ "$REQUESTED_COMPAT" = "$built" ]; then exit 0; fi
-          echo "::error::asked for compat $REQUESTED_COMPAT, this code builds $built: update CURRENT_PACK_COMPAT in translation-helps-mcp (v2) and redeploy"
-          if [ "$MODE" = publish ]; then
-            bun packages/resource-pipeline/cli/packs-status.ts --lang "$LANGUAGE" --state failed --run "$RUN_URL" --compat "$REQUESTED_COMPAT"
+          echo "::error::asked for compat $REQUESTED_COMPAT, this code builds $built: update $constant in translation-helps-mcp (v2) and redeploy"
+          # A parts run marks only a parts compat (f2 and later, the Worker's isPartsCompat): an f1.1 compat names whole
+          # packs' status, which a parts run never writes.
+          if [ "$PARTS" = true ] && ! [[ "$REQUESTED_COMPAT" =~ ^f([2-9]|[0-9]{2,})\. ]]; then
+            echo "::warning::$REQUESTED_COMPAT is not a parts compat: its status is left as it is"
+          elif [ "$MODE" = publish ]; then
+            bun packages/resource-pipeline/cli/packs-status.ts --lang "$LANGUAGE" --state failed --run "$RUN_URL" --compat "$REQUESTED_COMPAT" "${kind[@]}"
           fi
           exit 1
 
@@ -160,6 +178,34 @@ jobs:
           status=(--lang "$LANGUAGE" --state running --run "$RUN_URL")
           if [ "$PARTS" = true ]; then status+=(--parts); fi
           bun packages/resource-pipeline/cli/packs-status.ts "${status[@]}"
+
+      # The code this run builds with, which the Worker compares with each published parts list's code (packs-builder.yml
+      # writes it on every push to master; a run that publishes says so too). Only from master: a branch's code is not
+      # what the Worker's own dispatches (ref master) build. Nor once master has moved on: packs-builder.yml may already
+      # have written the newer code, which this older checkout must not put back. A failed write does not stop the build
+      # it only describes.
+      - name: Builder code
+        if: inputs.mode == 'publish' && inputs.parts && github.ref == 'refs/heads/master'
+        continue-on-error: true
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          # Not knowing where master is counts as having moved: nothing is written.
+          head="$(git ls-remote origin refs/heads/master | cut -f1)" || head=''
+          if [ -z "$head" ] || [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::notice::master is at ${head:-? (git ls-remote failed)} now, not $GITHUB_SHA: the builder file is left to packs-builder.yml"
+            exit 0
+          fi
+          bun packages/resource-pipeline/cli/packs-status.ts --builder --commit "$GITHUB_SHA"
+          # The check and the write are not one: a push landing between them may have had its code written first, and
+          # this run's older code just went over it. Asked again, master names the newer commit; the step still passes.
+          after="$(git ls-remote origin refs/heads/master | cut -f1)" || after=''
+          if [ "$after" != "$GITHUB_SHA" ]; then
+            echo "::warning::master is at ${after:-?} now, not $GITHUB_SHA, whose builder code this run just wrote: packs-builder.yml (which runs on that push) or the next parts publish from master writes the newer code"
+          fi
 
       # A no-upload run is given no bucket: against the real one it would stop at «unchanged» and measure nothing.
       - name: Build and publish
@@ -214,8 +260,9 @@ jobs:
             echo "### Parts"
             if [ -n "$line" ] && printf '%s\n' "$line" | jq -e 'type == "object"' > /dev/null 2>&1; then
               printf '%s\n' "$line" | jq -r '
+                "Code: \(.code? // "?")",
                 "Units: \(.units.built? // "?") built, \(.units.carried? // "?") carried",
-                "Parts: \(.parts.put? // "?") put, \(.parts.present? // "?") already there (\(.parts.language? // "?") of the language, \(.parts.originals? // "?") originals)",
+                "Parts: \(.parts.put? // "?") put, \(.parts.present? // "?") already there (\(.parts.language? // "?") of the language, \(.parts.originals? // "?") originals), \(.parts.refreshed? // "?") refreshed",
                 "Peak: \(.peakRssMb? // "?") MB; failures: \(.failures? // "?")"' || true
             else
               echo "No result line: the build stopped before printing it."
@@ -268,6 +315,8 @@ jobs:
           exit "$status"
 
       # A cancelled or timed-out run counts as a failed one: left at «running» it would hold the dispatch for hours.
+      # An ok parts status records the code the run built, from its result line (its lists' `code`, the one published),
+      # which the Worker compares with status/builder.json: a code change counts as built even when no list moved.
       - name: Status result
         if: always() && inputs.mode == 'publish' && steps.running.outcome == 'success'
         env:
@@ -280,7 +329,23 @@ jobs:
           state=failed
           if [ "$PUBLISH_OUTCOME" = success ]; then state=ok; fi
           status=(--lang "$LANGUAGE" --state "$state" --run "$RUN_URL")
-          if [ "$PARTS" = true ]; then status+=(--parts); fi
+          if [ "$PARTS" = true ]; then
+            status+=(--parts)
+            if [ "$state" = ok ]; then
+              code="$(jq -r 'if (.code | type) == "string" then .code else empty end' "$RUNNER_TEMP/packs-out/result.json" 2> /dev/null || true)"
+              if [ -n "$code" ]; then
+                # A code packs-status refuses (exit 2) must not leave `running` to count as a failure after 5.5 hours:
+                # the ok status is then written without it, as when the result line names none.
+                refused=0
+                bun packages/resource-pipeline/cli/packs-status.ts "${status[@]}" --code "$code" || refused=$?
+                if [ "$refused" = 0 ]; then exit 0; fi
+                if [ "$refused" != 2 ]; then exit "$refused"; fi
+                echo "::warning::packs-status refused the result line's code: the ok status records none"
+              else
+                echo "::warning::the result line names no code: the ok status records none"
+              fi
+            fi
+          fi
           bun packages/resource-pipeline/cli/packs-status.ts "${status[@]}"
 
       - name: Upload result
