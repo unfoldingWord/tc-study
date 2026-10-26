@@ -438,15 +438,22 @@ describe('publish against the cleanup', () => {
     expect(keysOf(bucket).at(-1)).toBe(LANGUAGE_LIST)
   })
 
-  test('a carried part whose bytes in the bucket are not the ones its name says: refused, and not put again', async () => {
+  test('a carried part whose bytes in the bucket are not the ones its name says: refused, and not put again; force mends it', async () => {
     const { bucket, clock, later, shas } = await publishedAt()
     await bucket.put(partPath(shas[0]), new Uint8Array([31, 139, 8, 0]), { contentType: 'application/gzip', cacheControl: IMMUTABLE })
     later(21)
     const before = bucket.puts.length
 
-    await expect(publish(bucket, { now: () => clock.now }).run).rejects.toThrow(`${partPath(shas[0])} in the bucket is not the part its name says`)
+    const refused = publish(bucket, { now: () => clock.now }).run
+    await expect(refused).rejects.toThrow(`${partPath(shas[0])} in the bucket is not the part its name says`)
+    await expect(refused).rejects.toThrow('run again with force, which builds its unit and puts its own bytes over this object')
 
     expect(keysOf(bucket).slice(before)).not.toContain(partPath(shas[0]))
+
+    // What the message says to do: a forced run builds the unit and puts its own bytes over the bad object.
+    const { run, workDir } = publish(bucket, { now: () => clock.now, force: true })
+    await run
+    expect(bucket.bytes(partPath(shas[0]))).toEqual(new Uint8Array(readFileSync(join(workDir, partPath(shas[0])))))
   })
 
   test('before the lists, R2 is asked again for every part the run found there and for the originals address', async () => {

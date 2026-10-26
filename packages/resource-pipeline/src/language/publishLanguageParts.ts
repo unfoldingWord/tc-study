@@ -296,7 +296,7 @@ export async function publishLanguageParts(o: {
     const bytes = await target.getBytes(key)
     if (!bytes) throw new Error(`Not publishing ${language}: ${key} vanished while publishing`)
     const got = await sha256Hex(bytes)
-    if (got !== sha) throw new Error(`${key} in the bucket is not the part its name says (its sha256 is ${got}): not publishing ${language}`)
+    if (got !== sha) throw new Error(`${key} in the bucket is not the part its name says (its sha256 is ${got}): not publishing ${language}; run again with force, which builds its unit and puts its own bytes over this object`)
     return bytes
   }
 

@@ -199,6 +199,12 @@ jobs:
             exit 0
           fi
           bun packages/resource-pipeline/cli/packs-status.ts --builder --commit "$GITHUB_SHA"
+          # The check and the write are not one: a push landing between them may have had its code written first, and
+          # this run's older code just went over it. Asked again, master names the newer commit; the step still passes.
+          after="$(git ls-remote origin refs/heads/master | cut -f1)" || after=''
+          if [ "$after" != "$GITHUB_SHA" ]; then
+            echo "::warning::master is at ${after:-?} now, not $GITHUB_SHA, whose builder code this run just wrote: packs-builder.yml (which runs on that push) or the next parts publish from master writes the newer code"
+          fi
 
       # A no-upload run is given no bucket: against the real one it would stop at «unchanged» and measure nothing.
       - name: Build and publish
@@ -253,8 +259,9 @@ jobs:
             echo "### Parts"
             if [ -n "$line" ] && printf '%s\n' "$line" | jq -e 'type == "object"' > /dev/null 2>&1; then
               printf '%s\n' "$line" | jq -r '
+                "Code: \(.code? // "?")",
                 "Units: \(.units.built? // "?") built, \(.units.carried? // "?") carried",
-                "Parts: \(.parts.put? // "?") put, \(.parts.present? // "?") already there (\(.parts.language? // "?") of the language, \(.parts.originals? // "?") originals)",
+                "Parts: \(.parts.put? // "?") put, \(.parts.present? // "?") already there (\(.parts.language? // "?") of the language, \(.parts.originals? // "?") originals), \(.parts.refreshed? // "?") refreshed",
                 "Peak: \(.peakRssMb? // "?") MB; failures: \(.failures? // "?")"' || true
             else
               echo "No result line: the build stopped before printing it."
@@ -325,7 +332,17 @@ jobs:
             status+=(--parts)
             if [ "$state" = ok ]; then
               code="$(jq -r 'if (.code | type) == "string" then .code else empty end' "$RUNNER_TEMP/packs-out/result.json" 2> /dev/null || true)"
-              if [ -n "$code" ]; then status+=(--code "$code"); else echo "::warning::the result line names no code: the ok status records none"; fi
+              if [ -n "$code" ]; then
+                # A code packs-status refuses (exit 2) must not leave `running` to count as a failure after 5.5 hours:
+                # the ok status is then written without it, as when the result line names none.
+                refused=0
+                bun packages/resource-pipeline/cli/packs-status.ts "${status[@]}" --code "$code" || refused=$?
+                if [ "$refused" = 0 ]; then exit 0; fi
+                if [ "$refused" != 2 ]; then exit "$refused"; fi
+                echo "::warning::packs-status refused the result line's code: the ok status records none"
+              else
+                echo "::warning::the result line names no code: the ok status records none"
+              fi
             fi
           fi
           bun packages/resource-pipeline/cli/packs-status.ts "${status[@]}"
