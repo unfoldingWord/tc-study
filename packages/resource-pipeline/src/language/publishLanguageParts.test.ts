@@ -180,6 +180,32 @@ describe('publishLanguageParts', () => {
     expect(result.parts.put).toBe(new Set(namedParts(bucket)).size - 1)
   })
 
+  test('a new part whose file in the work folder is not the one its name says: refused, nothing put under its name, no list written', async () => {
+    const bucket = memoryBucket()
+    let spoiled = ''
+    // As an interrupted run over the same folder leaves one: the build keeps the file, the upload would put it.
+    const spoiling: typeof buildLanguageParts = async (o) => {
+      const built = await fixtureBuild()(o)
+      spoiled = `parts/${readdirSync(join(o.workDir, 'parts')).sort()[0]}`
+      writeFileSync(join(o.workDir, spoiled), new Uint8Array([31, 139, 8, 0]))
+      return built
+    }
+
+    const { run, workDir } = publish(bucket, { build: spoiling })
+    const refused = await run.then(
+      () => null,
+      (e: unknown) => e,
+    )
+    // Read once the run has ended: only the build names the spoiled part.
+    expect(refused).toBeInstanceOf(Error)
+    expect((refused as Error).message).toContain(`${join(workDir, spoiled)} is not the part its name says`)
+    expect((refused as Error).message).toContain(`nothing is put under ${spoiled}; delete that file and run again`)
+
+    expect(spoiled).toMatch(/^parts\/[0-9a-f]{64}\.part\.gz$/)
+    expect(keysOf(bucket)).not.toContain(spoiled)
+    expect(catalogKeys(bucket)).toEqual([])
+  })
+
   test('a put that fails on the 3rd part: the error goes up and no catalog key is written', async () => {
     const inner = memoryBucket()
     let partPuts = 0

@@ -288,17 +288,26 @@ export async function publishLanguageParts(o: {
   }
   const target = bucket!
 
+  /**
+   * A part's file in the work folder, checked against its name, or null when the folder has none. The build keeps a part
+   * file already in the folder, so a bad one (an interrupted run's) survives a rerun over the same folder; put, phones
+   * would refuse it under a name the cache keeps for good.
+   */
+  async function workFileBytes(sha: string): Promise<Uint8Array | null> {
+    const key = partPath(sha)
+    const file = join(workDir, key)
+    if (!existsSync(file)) return null
+    const bytes = readFileSync(file)
+    const got = await sha256Hex(bytes)
+    if (got !== sha) throw new Error(`${file} is not the part its name says (its sha256 is ${got}): not publishing ${language}, and nothing is put under ${key}; delete that file and run again`)
+    return bytes
+  }
+
   /** A part's bytes to put again: this run's file, or for a carried part the bucket's own; either checked against the name. */
   async function bytesToRefresh(sha: string): Promise<Uint8Array> {
     const key = partPath(sha)
-    const file = join(workDir, key)
-    if (existsSync(file)) {
-      // The build keeps a part file already in the folder, so a bad one survives a rerun over the same folder.
-      const bytes = readFileSync(file)
-      const got = await sha256Hex(bytes)
-      if (got !== sha) throw new Error(`${file} is not the part its name says (its sha256 is ${got}): not publishing ${language}, and the bucket's ${key} is left as it was; delete that file and run again`)
-      return bytes
-    }
+    const mine = await workFileBytes(sha)
+    if (mine) return mine
     const bytes = await target.getBytes(key)
     if (!bytes) throw new Error(`Not publishing ${language}: ${key} vanished while publishing`)
     const got = await sha256Hex(bytes)
@@ -332,9 +341,9 @@ export async function publishLanguageParts(o: {
         refreshed++
       }
     } else {
-      const file = join(workDir, key)
-      if (!existsSync(file)) throw new Error(`${key} is neither in the bucket nor in ${workDir}: not publishing ${language}`)
-      await target.put(key, readFileSync(file), GZIP)
+      const bytes = await workFileBytes(sha)
+      if (!bytes) throw new Error(`${key} is neither in the bucket nor in ${workDir}: not publishing ${language}`)
+      await target.put(key, bytes, GZIP)
       put++
     }
     there.add(sha)
