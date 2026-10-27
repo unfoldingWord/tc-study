@@ -4,13 +4,15 @@
  */
 
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
-import type { CacheRow, PackSource, PackTarget } from './types'
+import type { CacheRow, PackSource, PackTarget, RawFound, RawRead, RawWrite } from './types'
 
 /** The cache adapter methods a pack uses: raw rows by prefix to make one, raw writes to open one. */
 export type RawCacheStore = {
   getByPrefix(prefix: string): Promise<CacheRow[]>
   putRawMany?(rows: CacheRow[]): Promise<void>
   hasRawKeys?(keys: string[]): Promise<Set<string>>
+  /** One readwrite transaction that reads, decides and writes: what applying parts needs (`PackTarget.transactRaw`). */
+  transactRaw?(read: RawRead, decide: (found: RawFound) => RawWrite): Promise<void>
 }
 
 /**
@@ -51,5 +53,6 @@ export function packTargetFrom(stores: { cache: RawCacheStore; catalog: CatalogS
       for (const row of rows) await catalog.set!(row.key, row.metadata)
     },
     catalogRow: (key) => catalog.get(key),
+    ...(cache.transactRaw ? { transactRaw: (read: RawRead, decide: (found: RawFound) => RawWrite) => cache.transactRaw!(read, decide) } : {}),
   }
 }

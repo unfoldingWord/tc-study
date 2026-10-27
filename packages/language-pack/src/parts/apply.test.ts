@@ -1,0 +1,392 @@
+import { describe, expect, test } from 'bun:test'
+import { gzip, ungzip } from 'pako'
+import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import { packTargetFrom } from '../stores'
+import type { PackLayer, PackVersions } from '../types'
+import { applyParts, type ApplyInput } from './apply'
+import { sha256Hex, writePart, type PartRow } from './partFile'
+import type { PartEntry, PartKind, PartsList } from './partsList'
+import { slotId, slotOfEntry, twGroupOf } from './partSlots'
+import { planParts } from './plan'
+import { REGISTER_PREFIX, readRegister, type Register } from './register'
+import { memoryByteStore, stagingFrom, type PartsStaging } from './staging'
+import { memoryTarget, type MemoryTarget } from './testTarget'
+
+const NOW = Date.parse('2026-10-27T12:00:00.000Z')
+const VERSIONS: PackVersions = { sot: { usjProcessing: '2.3.0-usj' }, quote: { helpsQuote: 5 } }
+
+const TN = 'o/es-419/tn'
+const TW = 'o/es-419/tw'
+const UHB = 'unfoldingWord/hbo/uhb'
+const OL = `${UHB}@gabc+2.3.0-usj`
+const KT = twGroupOf('bible/kt/god')!
+
+const meta = (key: string, type: string, subject: string): ResourceMetadata =>
+  ({ resourceKey: key, type, subject, title: key, release: { tag_name: 'v1' } }) as unknown as ResourceMetadata
+
+const RESOURCES = {
+  [TN]: meta(TN, 'notes', 'TSV Translation Notes'),
+  [TW]: meta(TW, 'words', 'Translation Words'),
+  [UHB]: meta(UHB, 'scripture', 'Hebrew Old Testament'),
+}
+
+const value = (text: string) => ({ content: text, metadata: { note: text } })
+const row = (layer: PackLayer, key: string, text = key): PartRow => ({ layer, key, value: value(text) })
+
+type Built = { entry: PartEntry; bytes: Uint8Array }
+
+async function built(kind: PartKind, resource: string, rows: PartRow[], where: { book?: string; group?: string } = {}): Promise<Built> {
+  const part = await writePart(rows)
+  const entry: PartEntry = {
+    sha256: part.sha256,
+    bytes: part.bytes.byteLength,
+    rows: part.rows,
+    kind,
+    resource,
+    ...where,
+    fingerprint: 'f'.repeat(64),
+    layers: [...new Set(rows.map((r) => r.layer))],
+  }
+  return { entry, bytes: part.bytes }
+}
+
+const alignKey = (book: string, stamp = 'v1') => `helps-align:${TN}@${stamp}#2026:${OL}:o/es-419/ult@v1+1:${book}:1`
+
+const TN_RUT = () =>
+  built('book', TN, [row('sot', `tn:${TN}:rut`), row('sot', `tn:${TN}:rut:1`), row('prepared', `prepared:notes:${TN}:rut:1:full`)], { book: 'rut' })
+const TN_RUT_ALIGN = (stamp = 'v1') => built('alignments', TN, [row('align', alignKey('rut', stamp))], { book: 'rut' })
+const TN_JON = () => built('book', TN, [row('sot', `tn:${TN}:jon`), row('sot', `tn:${TN}:jon:1`)], { book: 'jon' })
+const UHB_RUT = (text = 'uhb') => built('original', UHB, [row('sot', `scripture-usj:${UHB}:rut:1`, text)], { book: 'rut' })
+const TW_KT = () => built('tw', TW, [row('sot', `${TW}/bible/kt/god`)], { group: KT })
+const TW_TITLES = () => built('titles', TW, [row('text', `helps-text:titles:${TW}@v1:all`)])
+
+function listOf(language: string, parts: Built[], keys: string[], extra: Partial<PartsList> = {}): PartsList {
+  return {
+    schema: 2,
+    language,
+    compat: 'c',
+    code: 'c+0',
+    versions: VERSIONS,
+    resources: keys.map((key) => ({ key, stamp: 's', role: language === 'originals' ? 'original' : 'language', subject: String(RESOURCES[key as keyof typeof RESOURCES].subject), title: key, metadata: RESOURCES[key as keyof typeof RESOURCES] })),
+    parts: parts.map((p) => p.entry),
+    ...extra,
+  }
+}
+
+const ORIGINALS_REF = { path: 'catalog/c/originals/o.json', sha256: 'o' }
+
+async function lists(language: Built[], originals: Built[]) {
+  return {
+    list: listOf('es-419', language, [TN, TW], { originals: ORIGINALS_REF }),
+    originals: listOf('originals', originals, [UHB]),
+  }
+}
+
+async function stagingWith(parts: Built[]): Promise<PartsStaging> {
+  const staging = stagingFrom(memoryByteStore())
+  for (const p of parts) await staging.put(p.entry.sha256, p.bytes)
+  return staging
+}
+
+const registerOf = (target: MemoryTarget): Register => readRegister([...target.rows].map(([key, entry]) => ({ key, entry })))
+const idOf = (p: Built) => slotId(slotOfEntry(p.entry))
+
+async function run(target: MemoryTarget, staging: PartsStaging, list: PartsList, originals: PartsList | undefined, chosen: string[], extra: Partial<ApplyInput> = {}) {
+  const register = registerOf(target)
+  const plan = planParts({ list, originals, register, chosen })
+  return applyParts({ target, staging, plan, list, originals, register, chosen, versions: VERSIONS, now: () => NOW, ...extra })
+}
+
+const ALL = ['book rut', 'book jon', 'shared']
+
+describe('applyParts', () => {
+  test('a first download writes every row, the register and the catalog, one transaction per unit', async () => {
+    const parts = { tnRut: await TN_RUT(), align: await TN_RUT_ALIGN(), tnJon: await TN_JON(), uhb: await UHB_RUT(), kt: await TW_KT(), titles: await TW_TITLES() }
+    const { list, originals } = await lists([parts.tnRut, parts.align, parts.tnJon, parts.kt, parts.titles], [parts.uhb])
+    const staging = await stagingWith(Object.values(parts))
+    const target = memoryTarget()
+
+    const result = await run(target, staging, list, originals, ALL)
+
+    expect(result.failed).toEqual([])
+    expect(result.applied).toEqual(['book rut', 'book jon', 'shared'])
+    expect(target.committed).toBe(3)
+    expect(result.bytesApplied).toBe(Object.values(parts).reduce((n, p) => n + p.entry.bytes, 0))
+    expect(result.originalsReplaced).toBe(false)
+    expect(result.completed.sort()).toEqual([TN, TW, UHB].sort())
+
+    // Rows as the part had them, dated now, without a lifetime.
+    expect(target.rows.get(`tn:${TN}:rut:1`)).toEqual({ ...value(`tn:${TN}:rut:1`), timestamp: NOW })
+    expect(target.rows.get(alignKey('rut'))).toEqual({ ...value(alignKey('rut')), timestamp: NOW })
+    for (const [key, entry] of target.rows) {
+      expect((entry as { timestamp?: number }).timestamp).toBe(NOW)
+      expect(entry as object).not.toHaveProperty('expiresAt')
+      expect(key.startsWith('resource:')).toBe(false)
+    }
+
+    const register = registerOf(target)
+    expect(register.get(idOf(parts.tnRut))).toEqual({
+      sha256: parts.tnRut.entry.sha256,
+      keys: [`tn:${TN}:rut`, `tn:${TN}:rut:1`, `prepared:notes:${TN}:rut:1:full`].sort(),
+      list: 'es-419',
+      at: new Date(NOW).toISOString(),
+    })
+    // Review Focus 2: the original is held once, and the register says the originals list put it there.
+    expect(register.get(idOf(parts.uhb))?.list).toBe('originals')
+    expect(register.size).toBe(6)
+
+    for (const key of [TN, TW, UHB]) {
+      const row = target.catalog.get(key)!
+      expect(row.catalogedAt).toBe(new Date(NOW).toISOString())
+      expect(row.availability.offline).toBe(true)
+    }
+    expect(await staging.list()).toEqual([])
+  })
+
+  test('a resource chosen in part is offline when every chosen part is in, and not completed', async () => {
+    const parts = { tnRut: await TN_RUT(), align: await TN_RUT_ALIGN(), tnJon: await TN_JON(), uhb: await UHB_RUT() }
+    const { list, originals } = await lists([parts.tnRut, parts.align, parts.tnJon], [parts.uhb])
+    const target = memoryTarget()
+
+    const result = await run(target, await stagingWith(Object.values(parts)), list, originals, ['book rut'])
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(target.rows.has(`tn:${TN}:jon:1`)).toBe(false)
+    expect(target.catalog.get(TN)!.availability.offline).toBe(true)
+    expect(result.completed).toEqual([UHB])
+  })
+
+  test('a replaced slot deletes the keys its new part no longer has and writes the new ones', async () => {
+    const tnRut = await TN_RUT()
+    const old = await TN_RUT_ALIGN('v1')
+    const uhb = await UHB_RUT()
+    const target = memoryTarget()
+    const first = await lists([tnRut, old], [uhb])
+    await run(target, await stagingWith([tnRut, old, uhb]), first.list, first.originals, ['book rut'])
+
+    const next = await TN_RUT_ALIGN('v2')
+    const second = await lists([tnRut, next], [uhb])
+    target.rows.set('warm-coverage:v1', { content: 1 })
+    const result = await run(target, await stagingWith([next]), second.list, second.originals, ['book rut'])
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(target.rows.has(alignKey('rut', 'v1'))).toBe(false)
+    expect(target.rows.has(alignKey('rut', 'v2'))).toBe(true)
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(true)
+    expect(target.rows.has('warm-coverage:v1')).toBe(true)
+    expect(registerOf(target).get(idOf(next))).toMatchObject({ sha256: next.entry.sha256, keys: [alignKey('rut', 'v2')] })
+  })
+
+  test('a slot the list no longer names loses its keys and its register row', async () => {
+    const tnRut = await TN_RUT()
+    const tnJon = await TN_JON()
+    const target = memoryTarget()
+    const first = await lists([tnRut, tnJon], [])
+    await run(target, await stagingWith([tnRut, tnJon]), first.list, first.originals, ALL)
+    expect(target.rows.has(`tn:${TN}:jon:1`)).toBe(true)
+
+    const second = await lists([tnRut], [])
+    const register = registerOf(target)
+    const plan = planParts({ list: second.list, originals: second.originals, register, chosen: ALL })
+    expect(plan.remove).toEqual([idOf(tnJon)])
+    const result = await applyParts({ target, staging: await stagingWith([]), plan, ...second, register, chosen: ALL, versions: VERSIONS, now: () => NOW })
+
+    expect(result.applied).toEqual(['book jon'])
+    expect(target.rows.has(`tn:${TN}:jon`)).toBe(false)
+    expect(target.rows.has(`tn:${TN}:jon:1`)).toBe(false)
+    expect(target.rows.has(REGISTER_PREFIX + idOf(tnJon))).toBe(false)
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(true)
+    expect(registerOf(target).has(idOf(tnRut))).toBe(true)
+  })
+
+  test('the first time a slot is applied, rows from a whole pack of that slot only are deleted', async () => {
+    const tnRut = await TN_RUT()
+    const align = await TN_RUT_ALIGN('v2')
+    const { list } = await lists([tnRut, align], [])
+    const whole = { content: 'old', timestamp: 1, expiresAt: '2026-11-01T00:00:00.000Z' }
+    const target = memoryTarget({
+      rows: [
+        // Of the Ruth book slot, not in the new part: deleted.
+        { key: `tn:${TN}:rut:2`, entry: whole },
+        { key: `prepared:notes:${TN}:rut:2:full`, entry: whole },
+        // Of the Ruth book slot and in the new part: replaced.
+        { key: `tn:${TN}:rut:1`, entry: whole },
+        // Of the Ruth alignments slot: deleted.
+        { key: alignKey('rut', 'v1'), entry: whole },
+        // Another slot of the same resource (Jonah), its receipt, other resources and keys of no resource: kept.
+        { key: `tn:${TN}:jon:1`, entry: whole },
+        { key: `prepared:notes:${TN}:jon:1:full`, entry: whole },
+        { key: `resource:${TN}`, entry: whole },
+        { key: `tn:${TN}-extra:rut:1`, entry: whole },
+        { key: `prepared:notes:${TN}-extra:rut:1:full`, entry: whole },
+        { key: `scripture-usj:${UHB}:rut:1`, entry: whole },
+        { key: 'warm-coverage:v1', entry: whole },
+      ],
+    })
+
+    const result = await applyParts({
+      target,
+      staging: await stagingWith([tnRut, align]),
+      plan: planParts({ list, register: new Map(), chosen: ['book rut'], originals: listOf('originals', [], []) }),
+      list,
+      originals: listOf('originals', [], []),
+      register: new Map(),
+      chosen: ['book rut'],
+      versions: VERSIONS,
+      now: () => NOW,
+    })
+
+    expect(result.failed).toEqual([])
+    for (const gone of [`tn:${TN}:rut:2`, `prepared:notes:${TN}:rut:2:full`, alignKey('rut', 'v1')]) expect(target.rows.has(gone)).toBe(false)
+    expect(target.rows.get(`tn:${TN}:rut:1`)).toEqual({ ...value(`tn:${TN}:rut:1`), timestamp: NOW })
+    for (const kept of [`tn:${TN}:jon:1`, `prepared:notes:${TN}:jon:1:full`, `resource:${TN}`, `tn:${TN}-extra:rut:1`, `prepared:notes:${TN}-extra:rut:1:full`, `scripture-usj:${UHB}:rut:1`, 'warm-coverage:v1']) {
+      expect(target.rows.get(kept)).toEqual(whole)
+    }
+  })
+
+  test('a book with a row outside its slot fails alone: the other book stays applied, its register untouched', async () => {
+    const tnRut = await TN_RUT()
+    const bad = await built('book', TN, [row('sot', `tn:${TN}:jon:1`), row('sot', `tn:${TN}:rut:9`)], { book: 'jon' })
+    const { list, originals } = await lists([tnRut, bad], [])
+    const staging = await stagingWith([tnRut, bad])
+    const target = memoryTarget()
+
+    const result = await run(target, staging, list, originals, ['book rut', 'book jon'])
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(result.failed).toEqual([{ unit: 'book jon', reason: 'invalid', message: expect.stringContaining(`tn:${TN}:rut:9`) }])
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(true)
+    expect(target.rows.has(`tn:${TN}:jon:1`)).toBe(false)
+    expect(target.rows.has(`tn:${TN}:rut:9`)).toBe(false)
+    expect(registerOf(target).has(idOf(bad))).toBe(false)
+    // Its part waits in staging; the applied one is gone. TN is not offline: a chosen part is missing.
+    expect((await staging.list()).map((s) => s.sha)).toEqual([bad.entry.sha256])
+    expect(target.catalog.get(TN)!.availability.offline).toBe(false)
+    expect(result.completed).toEqual([])
+  })
+
+  test('staged bytes that no longer hash to their name refuse their unit (Review Focus 4)', async () => {
+    const tnRut = await TN_RUT()
+    const tnJon = await TN_JON()
+    const { list, originals } = await lists([tnRut, tnJon], [])
+    const inner = await stagingWith([tnRut, tnJon])
+    // The same rows, compressed otherwise: every row is in its slot, only the hash tells.
+    const changed = gzip(ungzip(tnRut.bytes), { level: 1 })
+    const staging: PartsStaging = { ...inner, get: async (sha) => (sha === tnRut.entry.sha256 ? changed : inner.get(sha)) }
+    const target = memoryTarget()
+
+    const result = await run(target, staging, list, originals, ['book rut', 'book jon'])
+
+    expect(result.failed).toEqual([{ unit: 'book rut', reason: 'invalid', message: expect.any(String) }])
+    expect(result.applied).toEqual(['book jon'])
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
+  })
+
+  test('a full disk in one unit is reported as quota; the other units go on (Review Focus 5)', async () => {
+    const tnRut = await TN_RUT()
+    const tnJon = await TN_JON()
+    const { list, originals } = await lists([tnRut, tnJon], [])
+    const target = memoryTarget()
+    target.failNextTransaction('QuotaExceededError')
+
+    const result = await run(target, await stagingWith([tnRut, tnJon]), list, originals, ['book rut', 'book jon'])
+
+    expect(result.failed).toEqual([{ unit: 'book rut', reason: 'quota', message: expect.any(String) }])
+    expect(result.applied).toEqual(['book jon'])
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
+    expect(registerOf(target).has(idOf(tnRut))).toBe(false)
+    expect(registerOf(target).has(idOf(tnJon))).toBe(true)
+  })
+
+  test('a planned part not in staging: nothing is applied and the result names it', async () => {
+    const tnRut = await TN_RUT()
+    const tnJon = await TN_JON()
+    const { list, originals } = await lists([tnRut, tnJon], [])
+    const target = memoryTarget()
+
+    const result = await run(target, await stagingWith([tnRut]), list, originals, ['book rut', 'book jon'])
+
+    expect(result.applied).toEqual([])
+    expect(result.failed).toEqual([{ unit: 'book jon', reason: 'missing', message: expect.stringContaining(tnJon.entry.sha256) }])
+    expect(target.rows.size).toBe(0)
+    expect(target.catalog.size).toBe(0)
+    expect(target.committed).toBe(0)
+  })
+
+  test('a list made with other versions is refused whole', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+
+    const result = await run(target, await stagingWith([tnRut]), list, originals, ['book rut'], { versions: { ...VERSIONS, quote: { helpsQuote: 6 } } })
+
+    expect(result.applied).toEqual([])
+    expect(result.failed).toEqual([{ unit: 'book rut', reason: 'versions', message: expect.stringContaining('quote') }])
+    expect(target.rows.size).toBe(0)
+    expect(target.catalog.size).toBe(0)
+  })
+
+  test('a target without transactRaw is refused at once, nothing written (Review Focus 3)', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget({ transactRaw: false })
+
+    await expect(run(target, await stagingWith([tnRut]), list, originals, ['book rut'])).rejects.toThrow(/transactRaw/)
+    expect(target.rows.size).toBe(0)
+    expect(target.catalog.size).toBe(0)
+  })
+
+  test('originals held with another sha are replaced, and the result says so', async () => {
+    const old = await UHB_RUT('old')
+    const target = memoryTarget()
+    const first = await lists([], [old])
+    expect((await run(target, await stagingWith([old]), first.list, first.originals, ['book rut'])).originalsReplaced).toBe(false)
+
+    const next = await UHB_RUT('new')
+    const second = await lists([], [next])
+    const result = await run(target, await stagingWith([next]), second.list, second.originals, ['book rut'])
+
+    expect(result.originalsReplaced).toBe(true)
+    expect(target.rows.get(`scripture-usj:${UHB}:rut:1`)).toEqual({ ...value('new'), timestamp: NOW })
+    expect(registerOf(target).get(idOf(next))).toMatchObject({ sha256: next.entry.sha256, list: 'originals' })
+  })
+
+  test('a row value with a lifetime is written without it', async () => {
+    const line = JSON.stringify({ layer: 'sot', key: `tn:${TN}:rut:1`, value: { content: 'x', expiresAt: '2026-11-01T00:00:00.000Z' } })
+    const bytes = gzip(new TextEncoder().encode(`${line}\n`))
+    const tnRut = await TN_RUT()
+    const odd: Built = { entry: { ...tnRut.entry, sha256: await sha256Hex(bytes), bytes: bytes.byteLength, rows: 1 }, bytes }
+    const { list, originals } = await lists([odd], [])
+    const target = memoryTarget()
+
+    const result = await run(target, await stagingWith([odd]), list, originals, ['book rut'])
+
+    expect(result.failed).toEqual([])
+    expect(target.rows.get(`tn:${TN}:rut:1`)).toEqual({ content: 'x', timestamp: NOW })
+  })
+
+  test('defensive: a planned removal of a slot another list holds deletes nothing', async () => {
+    const uhb = await UHB_RUT()
+    const target = memoryTarget()
+    const first = await lists([], [uhb])
+    await run(target, await stagingWith([uhb]), first.list, first.originals, ['book rut'])
+    const before = new Map(target.rows)
+    const register = registerOf(target)
+
+    const plan = { download: [], remove: [idOf(uhb)], units: ['book rut'], bytes: 0 }
+    const result = await applyParts({ target, staging: await stagingWith([]), plan, ...first, register, chosen: ['book rut'], versions: VERSIONS, now: () => NOW })
+
+    expect(result.failed).toEqual([])
+    expect(target.rows).toEqual(before)
+  })
+
+  test('packTargetFrom carries the cache store’s transactRaw', async () => {
+    const calls: unknown[] = []
+    const catalog = { get: async () => null, getAll: async () => [], set: async () => {} }
+    const cache = { getByPrefix: async () => [], putRawMany: async () => {} }
+    expect(packTargetFrom({ cache, catalog }).transactRaw).toBeUndefined()
+    const target = packTargetFrom({ cache: { ...cache, transactRaw: async (read: unknown) => void calls.push(read) }, catalog })
+    await target.transactRaw!({ keys: ['a'], prefixes: [] }, () => ({ puts: [], deletes: [] }))
+    expect(calls).toEqual([{ keys: ['a'], prefixes: [] }])
+  })
+})
