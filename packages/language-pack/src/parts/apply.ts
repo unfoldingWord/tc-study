@@ -11,7 +11,8 @@
  * catalog rows of named resources are refreshed when their release stamp or their `offline`/`partial` flags are not
  * what the list and the register say, so receipts match the device's rows and a flag a cut-short call left heals.
  * A plan with parts not yet staged applies no unit but still runs the refresh and the receipts pass (the startup
- * heal); a call refused for other versions, or a target without `transactRaw` or `catalogRow`, writes nothing.
+ * heal), leaving out the resources the plan changes until their parts arrive; a call refused for other versions, or a
+ * target without `transactRaw` or `catalogRow`, writes nothing.
  */
 
 import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
@@ -29,8 +30,9 @@ import type { PartsStaging } from './staging'
  * One call applies one plan. Apps also call it at startup, which heals what an interrupted call left (a receipt not
  * written, an `offline` flag not set): read the register (the cache store's `getByPrefix(REGISTER_PREFIX)` → `readRegister`),
  * `planParts` with the lists and the chosen units, then `applyParts` with that plan, whatever it holds. With parts not
- * yet staged (a download in progress) it applies no unit, heals the catalog and the receipts, and says `refused:
- * missing`. The app downloads the plan's parts into `staging` and calls it again.
+ * yet staged (a download in progress) it applies no unit, heals the catalog and the receipts of the other resources,
+ * leaves the resources still downloading (every resource the plan changes) as they are until their parts arrive, and
+ * says `refused: missing`. The app downloads the plan's parts into `staging` and calls it again.
  */
 export type ApplyInput = {
   target: PackTarget
@@ -68,7 +70,8 @@ export type ApplyResult = {
   /**
    * Set when the call applied no unit at all. `versions`: a list was made with other processing versions than the
    * app's (show "update the app"); nothing at all was written. `missing`: a part of the plan is not in staging; no unit
-   * was applied, but the catalog refresh and the receipts pass ran (`failed` names the units with parts missing).
+   * was applied, but the catalog refresh and the receipts pass ran for the resources the plan does not change; those
+   * it changes are left as they are (`failed` names the units with parts missing).
    */
   refused?: { reason: 'versions' | 'missing'; message: string }
   /** Units whose transaction committed, in apply order. */
@@ -248,17 +251,23 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   }
 
   // Every planned part must be staged before any unit is applied. If one is not (a download in progress), no unit is,
-  // but the catalog refresh and the receipts pass below still run: that is the startup heal (spec §4).
+  // but the catalog refresh and the receipts pass below still run: that is the startup heal (spec §4). They leave out
+  // every resource the plan changes (a part to put or a slot to remove, in any of its units, all of them waiting
+  // now): its device rows are still the previous ones, and a catalog row or receipt decided from the new list would
+  // misdescribe them (a new stamp over old rows, or a complete resource read as incomplete for the whole download).
   const missing = new Map<string, string[]>()
   for (const [unit, parts] of byUnit) {
     for (const p of parts) {
       if (!(await staging.has(p.entry.sha256))) missing.set(unit, [...(missing.get(unit) ?? []), `${p.id} (${p.entry.sha256})`])
     }
   }
+  const pending = new Set<string>()
   if (missing.size > 0) {
     const waiting = plan.units.filter((unit) => missing.has(unit))
     result.refused = { reason: 'missing', message: `Parts of ${waiting.join(', ')} are not in staging; no unit was applied` }
     result.failed = waiting.map((unit) => ({ scope: 'unit', unit, reason: 'missing', message: `Not in staging: ${missing.get(unit)!.join(', ')}` }))
+    for (const entry of plan.download) pending.add(entry.resource)
+    for (const id of plan.remove) pending.add(resourceOfSlotId(id))
   }
 
   const resources = catalogOf(lists)
@@ -409,11 +418,12 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   // the lists name with a held part in the chosen units gets the list's row when its stamp differs from the device's,
   // or when its `offline` or `partial` flag is not what the register says: a call stopped between a unit's commit and
   // its flags (or whose flag write failed) left them stale, and nothing else would set them before the next release.
-  const kept = new Set<string>()
+  // Resources still downloading (`pending`) are left as they are, here and in the receipts pass.
+  const kept = new Set<string>(pending)
   const refreshAt = clock()
   const stale: string[] = []
   for (const [key, c] of coverage) {
-    if (c.present === 0 || !catalog.has(key)) continue
+    if (c.present === 0 || !catalog.has(key) || kept.has(key)) continue
     try {
       const row = await catalogRow(key)
       const has = storedAvailability(row)

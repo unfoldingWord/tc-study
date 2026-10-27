@@ -740,6 +740,47 @@ describe('applyParts', () => {
     expect(target.rows.has(`resource:${TN}`)).toBe(false)
   })
 
+  test('a startup call while a new release of one book downloads leaves that resource as it is', async () => {
+    const tnRut = await TN_RUT()
+    const tnJon = await TN_JON()
+    const target = memoryTarget()
+    const first = await lists([tnRut, tnJon], [])
+    await run(target, await stagingWith([tnRut, tnJon]), first.list, first.originals, ALL)
+    const receipt = target.rows.get(`resource:${TN}`)
+    const stored = structuredClone(target.catalog.get(TN))
+
+    // Release v2 changes only Jonah's part; it is not in staging yet.
+    const nextJon = await built('book', TN, [row('sot', `tn:${TN}:jon`), row('sot', `tn:${TN}:jon:1`, 'v2')], { book: 'jon' })
+    const second = await lists([tnRut, nextJon], [])
+    const result = await run(target, await stagingWith([]), restamped(second.list, 'v2'), second.originals, ALL)
+
+    expect(result.refused?.reason).toBe('missing')
+    expect(result.failed).toEqual([{ scope: 'unit', unit: 'book jon', reason: 'missing', message: expect.stringContaining(nextJon.entry.sha256) }])
+    // Jonah's v1 rows are still there: the row stays v1 and offline, the receipt stays, until the part arrives.
+    expect(target.catalog.get(TN)).toEqual(stored)
+    expect(target.rows.get(`resource:${TN}`)).toEqual(receipt)
+  })
+
+  test('a startup call while a builder change downloads keeps the receipt of the complete data held', async () => {
+    const tnRut = await TN_RUT()
+    const tnJon = await TN_JON()
+    const target = memoryTarget()
+    const first = await lists([tnRut, tnJon], [])
+    await run(target, await stagingWith([tnRut, tnJon]), first.list, first.originals, ALL)
+    const receipt = target.rows.get(`resource:${TN}`)
+    const stored = structuredClone(target.catalog.get(TN))
+
+    // The same release, every part of TN with a new sha (a builder change); none staged yet.
+    const nextRut = await built('book', TN, [row('sot', `tn:${TN}:rut`), row('sot', `tn:${TN}:rut:1`, 'built again')], { book: 'rut' })
+    const nextJon = await built('book', TN, [row('sot', `tn:${TN}:jon`), row('sot', `tn:${TN}:jon:1`, 'built again')], { book: 'jon' })
+    const second = await lists([nextRut, nextJon], [])
+    const result = await run(target, await stagingWith([]), second.list, second.originals, ALL)
+
+    expect(result.refused?.reason).toBe('missing')
+    expect(target.rows.get(`resource:${TN}`)).toEqual(receipt)
+    expect(target.catalog.get(TN)).toEqual(stored)
+  })
+
   test('a target that cannot read catalog rows is refused at once, nothing written', async () => {
     const tnRut = await TN_RUT()
     const { list, originals } = await lists([tnRut], [])

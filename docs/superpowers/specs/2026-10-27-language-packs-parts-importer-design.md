@@ -77,7 +77,7 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 
 - `applyParts` applies units only when every part of the plan is in staging; otherwise it applies no unit, names what
   is missing (`refused: missing`, and each unit in `failed`), and still runs the catalog refresh and the receipts pass
-  below (§4: the startup heal).
+  below for the resources the plan does not change (§4: the startup heal).
 - **One transaction per unit**: a book (its book, alignments and original parts) or the shared unit. Not one per
   whole update: a builder code change gives every part a new sha, so an update can be a whole language, too big for
   one transaction on a phone. Everything that depends on each other is in one unit (a book's alignments are made on
@@ -126,8 +126,12 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 - **Startup**: apps call `applyParts` at startup, so what an interrupted call left (a receipt not written, an
   `offline` flag not set) heals then: read the register (`getByPrefix('parts-slot:')` → `readRegister`) →
   `planParts` with the lists and the chosen units → `applyParts` with that plan, whatever it holds. With parts not
-  yet staged (a download in progress) it applies no unit, heals the catalog and the receipts, and returns
-  `refused: missing`; the app goes on downloading into staging and calls it again.
+  yet staged (a download in progress) it applies no unit, heals the catalog rows and receipts of the other resources,
+  and returns `refused: missing`; the app goes on downloading into staging and calls it again. Resources still
+  downloading (every resource with a part to put or a slot to remove in the plan) are left as they are until their
+  parts arrive: the device still holds their previous rows, so a catalog row of the new release would put new stamps
+  over old rows, and a receipt decided from the new list would read a complete resource as incomplete for the whole
+  download.
 - Receipts are decided against the device's stored catalog row, read after the refresh above: a receipt is written
   only when that row's release stamp is the list's, since readers compare the receipt with that row. Otherwise the
   receipt there is left as it is.

@@ -102,7 +102,8 @@ const result = await applyParts({ target, staging, plan, list, originals, regist
   register rows; then the catalog rows' flags (`offline`, and `partial` for a resource chosen for some books), and
   after the last unit the receipts of the resources held whole.
 - **At startup**, call the same sequence even with nothing to download: it heals what an interrupted call left (a
-  receipt not written, an `offline` flag not set). With parts still downloading it applies no unit, heals, and returns
+  receipt not written, an `offline` flag not set). With parts still downloading it applies no unit, heals the other
+  resources, leaves the resources still downloading as they are until their parts arrive, and returns
   `refused: { reason: 'missing' }`.
 - **`refused`**: no unit was applied. `versions`: the list was made with other processing versions than the app's;
   nothing at all was written; show "update the app". `missing`: a part of the plan is not in staging yet.
