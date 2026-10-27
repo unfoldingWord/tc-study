@@ -19,3 +19,7 @@ export { REGISTER_PREFIX, registerRow, readRegister, unitOfSlotId } from './part
 export type { SlotRecord, Register } from './parts/register'
 export { CANON_BOOK_ORDER, compareUnits, namedParts, planParts, partsCoverage } from './parts/plan'
 export type { PlanInput, PartsPlan, Coverage } from './parts/plan'
+export { stagingFrom, memoryByteStore } from './parts/staging'
+export type { PartsStaging, ByteStore } from './parts/staging'
+export { applyParts } from './parts/apply'
+export type { ApplyInput, ApplyResult, ApplyFailure } from './parts/apply'
