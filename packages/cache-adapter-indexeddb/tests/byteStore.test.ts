@@ -17,6 +17,16 @@ describe('IndexedDBByteStore', () => {
     expect(await store.get('missing')).toBeNull()
   })
 
+  test('a view into a larger buffer is stored and returned as just the view', async () => {
+    const store = new IndexedDBByteStore({ dbName: 'bytes-subarray' })
+    const big = new Uint8Array([9, 9, 1, 2, 3, 9])
+    await store.put('v', big.subarray(2, 5))
+    const back = await store.get('v')
+    expect(Array.from(back!)).toEqual([1, 2, 3])
+    expect(back!.byteOffset).toBe(0)
+    expect((await store.list())[0].size).toBe(3)
+  })
+
   test('has tells present from absent', async () => {
     const store = new IndexedDBByteStore({ dbName: 'bytes-has' })
     await store.put('a', new Uint8Array([1]))

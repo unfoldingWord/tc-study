@@ -1,5 +1,7 @@
 /**
- * IndexedDB byte store: raw bytes by key, in a database of their own (one store per database name). It knows nothing about what the bytes are;
+ * IndexedDB byte store: raw bytes by key, in a database of their own (one store per database name). The store is
+ * created only when the database is new: a store missing from an existing database is not created, and the first use
+ * fails with a NotFoundError naming it. It knows nothing about what the bytes are;
  * whoever puts them checks them (language-pack's parts staging checks the sha256 that names each one).
  */
 
@@ -26,7 +28,15 @@ export class IndexedDBByteStore {
       const request = indexedDB.open(this.dbName, 1)
       request.onerror = () => reject(request.error)
       request.onupgradeneeded = () => request.result.createObjectStore(this.storeName, { keyPath: 'key' })
-      request.onsuccess = () => resolve(request.result)
+      request.onsuccess = () => {
+        const db = request.result
+        // A closed or superseded connection is dropped, so that the next call opens a fresh one.
+        db.onclose = db.onversionchange = () => {
+          db.close()
+          if (this.db === opening) this.db = null
+        }
+        resolve(db)
+      }
     })
     this.db = opening
     // A failed open must not be remembered: the next call tries again.

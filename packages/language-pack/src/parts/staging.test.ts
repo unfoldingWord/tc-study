@@ -33,6 +33,17 @@ describe('parts staging', () => {
     expect(await staging.list()).toEqual([])
   })
 
+  test('put keeps what it verified even if the caller changes its array while the hash is computed', async () => {
+    const store = memoryByteStore()
+    const staging = stagingFrom(store)
+    const mine = new Uint8Array([1, 2, 3])
+    const sha = await sha256Hex(mine)
+    const pending = staging.put(sha, mine)
+    mine[0] = 99
+    await pending
+    expect(Array.from((await store.get(sha))!)).toEqual([1, 2, 3])
+  })
+
   test('the memory store keeps its own copy of what was put', async () => {
     const store = memoryByteStore()
     const mine = new Uint8Array([1, 2])

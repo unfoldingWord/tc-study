@@ -25,9 +25,12 @@ export interface PartsStaging {
 export function stagingFrom(store: ByteStore): PartsStaging {
   return {
     async put(sha, bytes) {
-      const actual = await sha256Hex(bytes)
-      if (actual !== sha) throw new Error(`Part bytes hash to ${actual}, not to ${sha}; not staged`)
-      await store.put(sha, bytes)
+      // Our own copy first: the caller may change its array while the hash is computed, and what is hashed must be
+      // exactly what is stored.
+      const own = new Uint8Array(bytes)
+      const actual = await sha256Hex(own)
+      if (actual !== sha) throw new Error(`Part bytes hash to ${actual}, not to ${sha} (names are lowercase hex); not staged`)
+      await store.put(sha, own)
     },
     get: (sha) => store.get(sha),
     has: (sha) => store.has(sha),
