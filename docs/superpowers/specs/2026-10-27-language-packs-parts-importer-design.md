@@ -43,7 +43,8 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
   register.
 - **Target:** `PackTarget` gains an optional atomic method (below, §5); `IndexedDBCacheAdapter` implements it; tests
   use an in-memory target with the same contract.
-- **`partsCoverage(list, register, chosen)`**: per resource, chosen parts present and missing, in count and bytes.
+- **`partsCoverage({ list, originals, register, chosen })`** (the same input as `planParts`): per resource, chosen
+  parts present and missing, in count and bytes, and whether every part the lists name for it is present (`whole`).
 
 ### 2. The register and replacing a slot
 

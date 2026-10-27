@@ -123,6 +123,14 @@ describe('planParts', () => {
     expect(plan.remove).toEqual([])
   })
 
+  test('a slot recorded under this language that the originals list names is not removed', () => {
+    const register = registerOf(LATEST)
+    register.set(idOf(UHB_RUT), record(UHB_RUT.sha256, 'es-419'))
+    register.set(idOf(MACULA_RUT), record(MACULA_RUT.sha256, 'es-419'))
+    const plan = planParts({ list: LIST, originals: ORIGINALS, register, chosen: ALL })
+    expect(plan).toEqual({ download: [], remove: [], units: [], bytes: 0 })
+  })
+
   test('a list that names an originals list cannot be planned without it', () => {
     expect(() => planParts({ list: LIST, register: new Map(), chosen: ALL })).toThrow(/originals/)
     expect(() => partsCoverage({ list: LIST, register: new Map(), chosen: ALL })).toThrow(/originals/)

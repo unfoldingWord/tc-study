@@ -170,7 +170,8 @@ commits: `putCatalogRows` for the unit's resources from the list (`restoreCatalo
   `timestamp` = now and no `expiresAt`; a second book fails (`invalid` row) and the first stays applied, the second's
   register untouched; `quota` from the memory target's simulated error; `missing` when a sha is not staged (nothing
   written); `versions`; no `transactRaw` → refused; catalog rows restored with `catalogedAt` and `offline` true only
-  when whole; staging emptied of applied parts; `originalsReplaced`.
+  when every part of that resource within the chosen units is present (`missing === 0 && present > 0`), also when the
+  resource is not whole; staging emptied of applied parts; `originalsReplaced`.
 - [ ] **Step 2: Run** FAIL. **Step 3: Implement** (and the memory target: same contract as Task 1, with a switch to
   throw a `QuotaExceededError` on the next transaction). **Step 4: Run** language-pack `bun test` and
   `bun run type-check`, PASS; rebuild tools.
