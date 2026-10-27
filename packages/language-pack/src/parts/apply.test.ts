@@ -13,7 +13,7 @@ import { sha256Hex, writePart, type PartRow } from './partFile'
 import type { PartEntry, PartKind, PartsList } from './partsList'
 import { slotId, slotOfEntry, twGroupOf } from './partSlots'
 import { planParts } from './plan'
-import { REGISTER_PREFIX, readRegister, type Register } from './register'
+import { REGISTER_PREFIX, readRegister, registerRow, type Register } from './register'
 import { memoryByteStore, stagingFrom, type PartsStaging } from './staging'
 import { memoryTarget, type MemoryTarget } from './testTarget'
 
@@ -337,7 +337,8 @@ describe('applyParts', () => {
     expect(failed.applied).toEqual([])
     expect(failed.failed).toEqual([{ unit: 'book rut', reason: 'error', message: expect.stringContaining('catalog closed') }])
     expect(target.rows.size).toBe(0)
-    expect(target.committed).toBe(0)
+    // Only the receipts pass, which found nothing to write.
+    expect(target.committed).toBe(1)
     expect(target.catalog.get(TN)).toEqual(old)
     expect((await staging.list()).map((s) => s.sha)).toEqual([tnRut.entry.sha256])
 
@@ -539,6 +540,35 @@ describe('applyParts', () => {
     expect(result.failed).toEqual([{ unit: 'receipts', reason: 'quota', message: expect.any(String) }])
     expect(target.rows.has(`resource:${TN}`)).toBe(false)
     expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(true)
+
+    // The next call (an app starting) has nothing to download; its receipts pass writes what the failed one left out.
+    target.transactRaw = transact
+    const next = await run(target, await stagingWith([]), list, originals, ALL)
+
+    expect(next.applied).toEqual([])
+    expect(next.failed).toEqual([])
+    expect(target.rows.get(`resource:${TN}`)).toMatchObject({ content: {}, metadata: { downloadMethod: 'parts', releaseStamp: 'v1' } })
+  })
+
+  test('receipts follow the register read inside their transaction, not the one the call started from', async () => {
+    const tnRut = await TN_RUT()
+    const tnJon = await TN_JON()
+    const { list, originals } = await lists([tnRut, tnJon], [])
+    const target = memoryTarget()
+    const transact = target.transactRaw!
+    target.transactRaw = async (read, decide) => {
+      // Another window applied Jonah between this call's last unit and its receipts.
+      if (read.keys.includes(`resource:${TN}`)) {
+        const other = registerRow(idOf(tnJon), { sha256: tnJon.entry.sha256, keys: [], list: 'es-419', at: '' }, NOW)
+        target.rows.set(other.key, other.entry)
+      }
+      return transact(read, decide)
+    }
+
+    const result = await run(target, await stagingWith([tnRut]), list, originals, ['book rut'])
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(target.rows.get(`resource:${TN}`)).toMatchObject({ metadata: { downloadMethod: 'parts' } })
   })
 
   test('packTargetFrom carries the cache store’s transactRaw', async () => {

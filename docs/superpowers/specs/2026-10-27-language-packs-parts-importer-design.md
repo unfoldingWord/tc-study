@@ -95,13 +95,18 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 ### 4. Receipts and completeness
 
 - When every part a list names for a resource is in the register (the whole resource), the importer writes its
-  receipt `resource:{key}` in a small transaction after the last unit that completes it, in today's shape:
+  receipt `resource:{key}` in a small transaction after the last unit, in today's shape:
   `downloadComplete: true` and its date, `releaseStamp` (the catalog row's release stamp), `ingestSchema`
   (`usj:{version}` for scripture, `helps:1` otherwise, with the existing helpers), and `downloadMethod: 'parts'`.
   Existing readers (`isResourceMarkedComplete`, the completeness checker, loaders, Servos) keep working.
+- That pass runs on every `applyParts` call that is not refused (an empty plan included), over every resource the lists
+  name plus those the call touched, reading the receipts and the register inside its transaction. A receipt readers
+  already accept for the release is left as it is (no rewrite); `absentFromRelease` is carried from a receipt of the
+  same release. Apps call `applyParts` at startup, so a receipt a failed pass left out is written then.
 - On a new release the receipt is written again with the new stamp when the resource is complete again; until then it
   reads as the previous release.
-- If a resource stops being complete (a slot that the list no longer names was removed), its receipt is deleted.
+- If a resource stops being complete (a slot that the list no longer names was removed), its receipt is deleted, only
+  if parts wrote it (`downloadMethod: 'parts'`); receipts a whole pack or a download wrote are left alone.
 - A resource chosen in part (some books) gets no receipt: "complete" would mislead bt-synergy's readers. Apps use
   `partsCoverage` for "41 MB left" and for what Servos calls interrupted.
 

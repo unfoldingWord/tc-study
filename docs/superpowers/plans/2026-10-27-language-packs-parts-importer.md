@@ -187,7 +187,11 @@ unit stays applied), then `staging.delete` each applied sha (ignore errors). `or
 — a receipt `resource:{key}` (`entry: { content: {}, metadata: buildIngestReceiptFromCatalog(...) }`, as the whole
 pack's receipts are shaped — check one in `pack.test.ts` fixtures and match it) for each resource whose parts in the
 lists are all in the register; a delete for each resource that has a receipt with `downloadMethod: 'parts'` and is
-no longer whole. `applyParts` applies these in one more `transactRaw` after the last unit.
+no longer whole. `applyParts` applies these in one more `transactRaw` after the last unit. (As built, fix round 1:
+the input also takes `touched`, `existing` — the receipts read in that transaction — and `now`; the pass runs on every
+call not refused, an empty plan included, over the resources the lists name plus those touched, with the register
+read inside the transaction; it skips a receipt `isMatchingIngestReceipt` already accepts and carries
+`absentFromRelease` from a receipt of the same release. Apps call `applyParts` at startup, so receipts heal.)
 
 - [ ] **Step 1: Tests**: whole resource → receipt with `releaseStamp` of its catalog row, `ingestSchema`
   `usj:{version}` for scripture and `helps:1` for notes, `downloadMethod: 'parts'`; a resource chosen in part → none;

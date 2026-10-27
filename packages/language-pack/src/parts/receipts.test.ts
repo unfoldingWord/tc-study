@@ -113,7 +113,7 @@ describe('receiptChanges', () => {
 
   test('a touched resource the lists no longer name any part of loses its receipt from parts', () => {
     const existing = new Map<string, unknown>([[receiptKey(TN), receiptFrom('parts')]])
-    const { puts, deletes } = changes({ lists: [listOf('es-419', [ULT_RUT]), listOf('originals', [])], register: held(ULT_RUT), touched: [TN], existing })
+    const { puts, deletes } = changes({ lists: [listOf('es-419', [ULT_RUT]), listOf('originals', [])], register: new Map(), touched: [TN], existing })
 
     expect(puts).toEqual([])
     expect(deletes).toEqual([receiptKey(TN)])
@@ -128,12 +128,48 @@ describe('receiptChanges', () => {
     expect(puts[0].entry).toMatchObject({ content: {}, metadata: { releaseStamp: STAMP, downloadMethod: 'parts' } })
   })
 
-  test('receipts of resources this apply did not touch are left alone', () => {
+  test('a resource the lists do not name and this call did not touch is left alone', () => {
     const existing = new Map<string, unknown>([[receiptKey(TN), receiptFrom('parts')]])
-    const { puts, deletes } = changes({ register: held(ULT_RUT, UHB_RUT), touched: [], existing })
+    const { puts, deletes } = changes({ lists: [listOf('es-419', [ULT_RUT]), listOf('originals', [UHB_RUT])], register: new Map(), touched: [], existing })
 
     expect(puts).toEqual([])
     expect(deletes).toEqual([])
+  })
+
+  test('a named whole resource without a receipt gets one though this call touched nothing (a failed pass heals)', () => {
+    const { puts, deletes } = changes({ register: held(ULT_RUT, UHB_RUT), touched: [] })
+
+    expect(puts.map((p) => p.key)).toEqual([receiptKey(ULT), receiptKey(UHB)])
+    expect(deletes).toEqual([])
+  })
+
+  test('a named resource held in part loses its receipt from parts though this call touched nothing', () => {
+    const existing = new Map<string, unknown>([[receiptKey(TN), receiptFrom('parts')]])
+    const { deletes } = changes({ register: held(TN_RUT), touched: [], existing })
+
+    expect(deletes).toEqual([receiptKey(TN)])
+  })
+
+  test('a receipt readers already accept for this release is not written again, whoever wrote it', () => {
+    const matching = { content: {}, metadata: { downloadComplete: true, releaseStamp: STAMP, ingestSchema: 'helps:1', downloadMethod: 'zip' } }
+    const existing = new Map<string, unknown>([[receiptKey(TN), matching]])
+    const { puts } = changes({ register: held(TN_RUT, TN_JON), touched: [TN], existing })
+
+    expect(puts).toEqual([])
+  })
+
+  test('books absent from the release are carried from a receipt of the same release', () => {
+    const sameRelease = { content: {}, metadata: { downloadComplete: true, releaseStamp: STAMP, ingestSchema: 'usj:2.2.0-usj', absentFromRelease: ['oba'] } }
+    const olderRelease = { content: {}, metadata: { downloadComplete: true, releaseStamp: 'v0', ingestSchema: 'usj:2.3.0-usj', absentFromRelease: ['jon'] } }
+    const existing = new Map<string, unknown>([
+      [receiptKey(ULT), sameRelease],
+      [receiptKey(UHB), olderRelease],
+    ])
+    const { puts } = changes({ register: held(ULT_RUT, UHB_RUT), existing })
+
+    const metaOf = (key: string) => (puts.find((p) => p.key === receiptKey(key))!.entry as { metadata: Record<string, unknown> }).metadata
+    expect(metaOf(ULT)).toMatchObject({ releaseStamp: STAMP, ingestSchema: 'usj:2.3.0-usj', downloadMethod: 'parts', absentFromRelease: ['oba'] })
+    expect(metaOf(UHB)).not.toHaveProperty('absentFromRelease')
   })
 
   test('a catalog row without a release stamp gets no receipt, and a receipt from parts is not deleted for it', () => {
