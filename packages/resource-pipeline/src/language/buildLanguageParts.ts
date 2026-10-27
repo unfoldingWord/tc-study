@@ -60,6 +60,7 @@ import {
   sha256Hex,
   SHARED_UNIT,
   slotId,
+  slotOfEntry,
   slotOfRow,
   unitInputs,
   unitOfPart,
@@ -771,13 +772,6 @@ export async function buildLanguageParts(o: {
   /** The previous lists, once step 1 found them usable. */
   let previous: PreviousParts | undefined
   const carried: string[] = []
-
-  const slotOfEntry = (p: PartEntry): PartSlot => ({
-    kind: p.kind,
-    resource: p.resource,
-    ...(p.book !== undefined ? { book: p.book } : {}),
-    ...(p.group !== undefined ? { group: p.group } : {}),
-  })
 
   /**
    * A unit's parts in the previous lists, when it can be carried: they record the fingerprint the unit has now, every

@@ -5,7 +5,7 @@
 
 import { ORIGINAL_LANGUAGE_KEYS, belongsTo, bookOfRow, isBookScoped, scansFor } from '../keys'
 import type { PackLayer } from '../types'
-import type { PartKind } from './partsList'
+import type { PartEntry, PartKind } from './partsList'
 
 export type PartSlot = { kind: PartKind; resource: string; book?: string; group?: string }
 
@@ -27,6 +27,16 @@ export function fnv1a32(text: string): number {
 
 export function slotId(slot: PartSlot): string {
   return [slot.kind, slot.resource, ...(slot.book ? [slot.book] : []), ...(slot.group ? [slot.group] : [])].join(':')
+}
+
+/** The slot a list entry fills: the builder and the importer place a part by this one rule. */
+export function slotOfEntry(entry: PartEntry): PartSlot {
+  return {
+    kind: entry.kind,
+    resource: entry.resource,
+    ...(entry.book !== undefined ? { book: entry.book } : {}),
+    ...(entry.group !== undefined ? { group: entry.group } : {}),
+  }
 }
 
 type Resource = { key: string; type?: string; subject?: string }
