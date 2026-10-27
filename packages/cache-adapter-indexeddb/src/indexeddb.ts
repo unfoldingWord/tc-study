@@ -23,6 +23,11 @@ export interface IndexedDBStorageOptions {
   version?: number
 }
 
+export type RawRead = { keys: string[]; prefixes: string[] }
+/** `rows`: key to the stored entry (absent keys are missing); `prefixKeys`: prefix to the keys that start with it. */
+export type RawFound = { rows: Map<string, unknown>; prefixKeys: Map<string, string[]> }
+export type RawWrite = { puts: Array<{ key: string; entry: unknown }>; deletes: string[] }
+
 /**
  * IndexedDB adapter for web browsers. Book-organized resources (scripture, TN, TQ) are stored as manifest + chapter entries.
  * API-compatible with CacheStorageAdapter (get/set/has/delete/keys/size/count etc.).
@@ -163,6 +168,73 @@ export class IndexedDBCacheAdapter {
       for (const row of rows) store.put({ key: row.key, entry: row.entry })
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
+    })
+  }
+
+  /**
+   * Read keys and key prefixes, decide, then put and delete, all in one readwrite transaction: a reader sees none of
+   * it or all of it. `decide` runs synchronously once every read is back (the transaction would commit if we waited
+   * on anything else in between). Rows are put exactly as given and keys are deleted exactly as listed: no chunk
+   * splitting or expansion. If `decide` throws, the transaction is aborted and the call rejects with that error.
+   */
+  async transactRaw(read: RawRead, decide: (found: RawFound) => RawWrite): Promise<void> {
+    const db = await this.initDB()
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this.storeName, 'readwrite')
+      const store = tx.objectStore(this.storeName)
+      const found: RawFound = { rows: new Map(), prefixKeys: new Map() }
+      let pending = read.keys.length + read.prefixes.length
+      let failure: unknown
+
+      const fail = (error: unknown) => {
+        if (failure === undefined) failure = error
+        try {
+          tx.abort()
+        } catch {
+          // already finished or aborting
+        }
+      }
+
+      const writeAll = () => {
+        let write: RawWrite
+        try {
+          write = decide(found)
+        } catch (error) {
+          fail(error)
+          return
+        }
+        for (const { key, entry } of write.puts) store.put({ key, entry })
+        for (const key of write.deletes) store.delete(key)
+      }
+
+      const oneDone = () => {
+        pending -= 1
+        if (pending === 0) writeAll()
+      }
+
+      for (const key of read.keys) {
+        const request = store.get(key)
+        request.onsuccess = () => {
+          const row = request.result as { key: string; entry: unknown } | undefined
+          if (row !== undefined) found.rows.set(key, row.entry)
+          oneDone()
+        }
+      }
+      for (const prefix of read.prefixes) {
+        const request = store.getAllKeys(IDBKeyRange.bound(prefix, prefix + '￿'))
+        request.onsuccess = () => {
+          found.prefixKeys.set(prefix, (request.result ?? []) as string[])
+          oneDone()
+        }
+      }
+      if (pending === 0) writeAll()
+
+      tx.oncomplete = () => resolve()
+      // A failed request or a full disk aborts the transaction; keep the error's name (e.g. QuotaExceededError).
+      tx.onerror = () => {
+        if (failure === undefined) failure = tx.error
+      }
+      tx.onabort = () => reject(failure ?? tx.error ?? new DOMException('Transaction aborted', 'AbortError'))
     })
   }
 

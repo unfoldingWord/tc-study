@@ -5,4 +5,4 @@
  */
 
 export { IndexedDBCacheAdapter } from './indexeddb'
-export type { IndexedDBStorageOptions } from './indexeddb'
+export type { IndexedDBStorageOptions, RawRead, RawFound, RawWrite } from './indexeddb'
