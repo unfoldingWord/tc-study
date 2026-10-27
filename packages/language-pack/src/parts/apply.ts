@@ -1,7 +1,7 @@
 /**
  * Applying a plan (spec §2–§3): the staged parts go into the device's store one unit at a time (a book, or the shared
  * unit), each unit in one transaction with its register rows, so a reader never sees new notes over old alignments of
- * the same book. After each unit, the catalog rows of its resources.
+ * the same book. Before each unit, the catalog rows of its resources; after it, their `offline` flag.
  *
  * What may be deleted, and nothing else: keys a slot's previous part wrote (its register row says which) that the new
  * part no longer has; the first time a slot is filled, rows of that slot's resource found by its key prefixes that
@@ -15,7 +15,7 @@ import type { CacheRow, PackLayer, PackTarget, PackVersions } from '../types'
 import { PART_LAYERS, readPart, sha256Hex, type PartRow } from './partFile'
 import { restoreCatalogBookkeeping, unitOfPart, type PartEntry, type PartsList } from './partsList'
 import { slotId, slotOfEntry, slotOfRow } from './partSlots'
-import { namedParts, partsCoverage, type PartsPlan } from './plan'
+import { namedParts, partsCoverage, type Coverage, type PartsPlan } from './plan'
 import { REGISTER_PREFIX, readRegister, registerRow, unitOfSlotId, type Register, type SlotRecord } from './register'
 import type { PartsStaging } from './staging'
 
@@ -41,8 +41,8 @@ export type ApplyResult = {
   /** Units whose transaction committed, in apply order. */
   applied: string[]
   /**
-   * Units not applied, with why; their parts stay in staging. A unit whose rows committed but whose catalog rows could
-   * not be written is in `applied` and here too (`error`).
+   * Units not applied, with why; their parts stay in staging. A unit that committed but whose catalog rows could not
+   * be written again with their `offline` flag is in `applied` and here too (`error`): only that flag is stale.
    */
   failed: ApplyFailure[]
   /** Resources an applied unit touched that are whole afterwards: every part the lists name for them is held. */
@@ -54,6 +54,12 @@ export type ApplyResult = {
 }
 
 const ORIGINALS_KINDS = new Set(['original', 'macula'])
+
+/** A resource is offline when every part of it within the chosen units is held (whole or not). */
+function isOffline(coverage: Coverage, key: string): boolean {
+  const c = coverage.get(key)
+  return Boolean(c && c.missing === 0 && c.present > 0)
+}
 
 /** The layers whose versions differ, as `importLanguagePack` compares them: names both sides have, as text. */
 function differingLayers(theirs: PackVersions | undefined, mine: PackVersions | undefined): PackLayer[] {
@@ -198,6 +204,18 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   }
 
   const resources = catalogOf(lists)
+  /** The lists' catalog rows of these resources (those they carry), dated now, with `offline` as given. */
+  const catalogRows = async (keys: string[], now: number, offline: (key: string) => Promise<boolean>) => {
+    const rows: Array<{ key: string; metadata: ResourceMetadata }> = []
+    for (const key of keys) {
+      const found = resources.get(key)
+      if (!found) continue
+      const metadata = restoreCatalogBookkeeping(found.metadata, now)
+      metadata.availability = { ...metadata.availability, offline: await offline(key) }
+      rows.push({ key, metadata })
+    }
+    return rows
+  }
   const register: Register = new Map(input.register)
   const touched = new Set<string>()
 
@@ -213,6 +231,24 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
       for (const p of parts) ready.push(await readyPart(p.entry, p.id, p.list, staging, resources))
     } catch (error) {
       result.failed.push(failureOf(unit, error))
+      continue
+    }
+
+    // The catalog rows first, from the list: the unit's derived keys (aligned quotes) carry the per-book stamps of
+    // these rows, so rows that committed under an old catalog row would miss until the next release. If this fails,
+    // nothing of the unit is written and its parts stay staged; the next plan does it again. `offline` keeps what the
+    // device says unless the parts already held make it true; it is set again once the unit commits.
+    const unitResources = [...new Set([...ready.map((p) => p.entry.resource), ...removes.map(resourceOfSlotId)])]
+    try {
+      const before = partsCoverage({ list, originals, register, chosen })
+      const rows = await catalogRows(unitResources, now, async (key) => {
+        if (isOffline(before, key)) return true
+        const current = target.catalogRow ? await target.catalogRow(key) : null
+        return Boolean((current as { availability?: { offline?: unknown } } | null)?.availability?.offline)
+      })
+      if (rows.length) await target.putCatalogRows(rows)
+    } catch (error) {
+      result.failed.push({ unit, reason: 'error', message: `Catalog rows not written, unit not applied: ${failureOf(unit, error).message}` })
       continue
     }
 
@@ -283,23 +319,14 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
     result.bytesApplied += ready.reduce((n, p) => n + p.entry.bytes, 0)
     if (replacedOriginals) result.originalsReplaced = true
 
-    // The catalog rows of the unit's resources, offline when every chosen part of the resource is now held.
-    const unitResources = [...new Set([...ready.map((p) => p.entry.resource), ...removes.map(resourceOfSlotId)])]
+    // The catalog rows again, now only to say whether each resource is offline: every chosen part of it is held.
     for (const key of unitResources) touched.add(key)
-    const coverage = partsCoverage({ list, originals, register, chosen })
-    const rows: Array<{ key: string; metadata: ResourceMetadata }> = []
-    for (const key of unitResources) {
-      const found = resources.get(key)
-      if (!found) continue
-      const metadata = restoreCatalogBookkeeping(found.metadata, now)
-      const c = coverage.get(key)
-      metadata.availability = { ...metadata.availability, offline: Boolean(c && c.missing === 0 && c.present > 0) }
-      rows.push({ key, metadata })
-    }
     try {
+      const after = partsCoverage({ list, originals, register, chosen })
+      const rows = await catalogRows(unitResources, now, async (key) => isOffline(after, key))
       if (rows.length) await target.putCatalogRows(rows)
     } catch (error) {
-      result.failed.push({ unit, reason: 'error', message: `Rows applied, catalog rows not written: ${failureOf(unit, error).message}` })
+      result.failed.push({ unit, reason: 'error', message: `Unit applied with its catalog rows; their offline flag not updated: ${failureOf(unit, error).message}` })
     }
 
     for (const p of ready) {

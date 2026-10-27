@@ -288,14 +288,89 @@ describe('applyParts', () => {
     const { list, originals } = await lists([tnRut, tnJon], [])
     const target = memoryTarget()
     target.failNextTransaction('QuotaExceededError')
+    const staging = await stagingWith([tnRut, tnJon])
 
-    const result = await run(target, await stagingWith([tnRut, tnJon]), list, originals, ['book rut', 'book jon'])
+    const result = await run(target, staging, list, originals, ['book rut', 'book jon'])
 
     expect(result.failed).toEqual([{ unit: 'book rut', reason: 'quota', message: expect.any(String) }])
     expect(result.applied).toEqual(['book jon'])
     expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
     expect(registerOf(target).has(idOf(tnRut))).toBe(false)
     expect(registerOf(target).has(idOf(tnJon))).toBe(true)
+    // The failed unit's part waits in staging for the next apply.
+    expect((await staging.list()).map((s) => s.sha)).toEqual([tnRut.entry.sha256])
+  })
+
+  test('catalog rows that cannot be written before a unit leave it unapplied, to be done again', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    const old = { ...RESOURCES[TN], release: { tag_name: 'v0' } } as unknown as ResourceMetadata
+    await target.putCatalogRows([{ key: TN, metadata: old }])
+    const putCatalogRows = target.putCatalogRows
+    target.putCatalogRows = async () => {
+      throw new Error('catalog closed')
+    }
+    const staging = await stagingWith([tnRut])
+
+    const failed = await run(target, staging, list, originals, ['book rut'])
+
+    expect(failed.applied).toEqual([])
+    expect(failed.failed).toEqual([{ unit: 'book rut', reason: 'error', message: expect.stringContaining('catalog closed') }])
+    expect(target.rows.size).toBe(0)
+    expect(target.committed).toBe(0)
+    expect(target.catalog.get(TN)).toEqual(old)
+    expect((await staging.list()).map((s) => s.sha)).toEqual([tnRut.entry.sha256])
+
+    target.putCatalogRows = putCatalogRows
+    const again = await run(target, staging, list, originals, ['book rut'])
+
+    expect(again.applied).toEqual(['book rut'])
+    expect(again.failed).toEqual([])
+    expect((target.catalog.get(TN) as unknown as { release: { tag_name: string } }).release.tag_name).toBe('v1')
+    expect(target.catalog.get(TN)!.availability.offline).toBe(true)
+    expect(registerOf(target).has(idOf(tnRut))).toBe(true)
+  })
+
+  test('the catalog has the new rows before a unit commits; a failed offline update after it is reported', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    const putCatalogRows = target.putCatalogRows
+    const seen: Array<{ committed: number; offline: boolean }> = []
+    target.putCatalogRows = async (rows) => {
+      seen.push({ committed: target.committed, offline: rows[0].metadata.availability.offline })
+      if (seen.length > 1) throw new Error('catalog closed')
+      return putCatalogRows(rows)
+    }
+
+    const result = await run(target, await stagingWith([tnRut]), list, originals, ['book rut'])
+
+    // First the rows from the list (not offline yet: nothing of TN was held), then the offline flag, which failed.
+    expect(seen).toEqual([{ committed: 0, offline: false }, { committed: 1, offline: true }])
+    expect(result.applied).toEqual(['book rut'])
+    expect(result.failed).toEqual([{ unit: 'book rut', reason: 'error', message: expect.stringContaining('catalog closed') }])
+    expect((target.catalog.get(TN) as unknown as { release: { tag_name: string } }).release.tag_name).toBe('v1')
+    expect(target.catalog.get(TN)!.catalogedAt).toBe(new Date(NOW).toISOString())
+    expect(target.catalog.get(TN)!.availability.offline).toBe(false)
+  })
+
+  test('before a unit, a resource the device already has offline stays offline', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    const mine = { ...RESOURCES[TN], availability: { online: true, offline: true, bundled: false, partial: false } } as unknown as ResourceMetadata
+    await target.putCatalogRows([{ key: TN, metadata: mine }])
+    const putCatalogRows = target.putCatalogRows
+    const offline: boolean[] = []
+    target.putCatalogRows = async (rows) => {
+      offline.push(rows[0].metadata.availability.offline)
+      return putCatalogRows(rows)
+    }
+
+    await run(target, await stagingWith([tnRut]), list, originals, ['book rut'])
+
+    expect(offline).toEqual([true, true])
   })
 
   test('a planned part not in staging: nothing is applied and the result names it', async () => {

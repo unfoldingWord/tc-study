@@ -158,11 +158,13 @@ check `sha256Hex` again (Review Focus 4), `readPart`, check every row's slot wit
 register does not know yet, its key prefixes (`tn:{rk}:`, `prepared:` … — derive from `scansFor`/`belongsTo` in
 `keys.ts`); decide: deletes = old register keys not in the new part + (first time) prefix keys whose `slotOfRow` is
 this slot and not in the new part + all keys and the register row of `plan.remove` slots of this unit; puts = rows
-with `timestamp` = now and no `expiresAt` + the register rows. A `QuotaExceededError` → `quota`. After the unit
-commits: `putCatalogRows` for the unit's resources from the list (`restoreCatalogBookkeeping(metadata, now)`, with
-`availability.offline` = every part of that resource within the chosen units present after this unit: coverage
-`missing === 0 && present > 0`), then `staging.delete` each applied sha
-(ignore errors). `originalsReplaced` = an `original`/`macula` slot already held another sha.
+with `timestamp` = now and no `expiresAt` + the register rows. A `QuotaExceededError` → `quota`. Before the
+unit's `transactRaw` (after its parts are checked): `putCatalogRows` for the unit's resources from the list
+(`restoreCatalogBookkeeping(metadata, now)`, `availability.offline` = the device's current value unless coverage before
+the unit already makes it true); if it fails, the unit fails (`error`) with nothing written and its parts staged. After
+the unit commits: `putCatalogRows` again only to set `availability.offline` = every part of that resource within the
+chosen units present after this unit (coverage `missing === 0 && present > 0`; a failure is reported as `error`, the
+unit stays applied), then `staging.delete` each applied sha (ignore errors). `originalsReplaced` = an `original`/`macula` slot already held another sha.
 
 - [ ] **Step 1: Tests** (memory target, hand-made parts built with `writePart`): first download of two books + shared;
   a replaced slot whose old alignment keys are deleted and new ones written; a `remove`d slot; first-time cleanup

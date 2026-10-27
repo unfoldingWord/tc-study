@@ -80,10 +80,15 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 - Inside a unit's transaction: read the register rows and the keys to delete (§5), write and delete rows, write the
   register. Parts are gunzipped one at a time to build the transaction; peak memory is the largest unit (a few MB per
   book for English).
-- **The catalog, after each unit**: the catalog rows of that unit's resources, from the list, through
-  `restoreCatalogBookkeeping`. Between the unit's transaction and its catalog rows an aligned quote may miss for a
-  moment (the book stamp is still the old one); it is never wrong. `availability.offline = true` when every part
-  of that resource within the chosen units is present.
+- **The catalog, before each unit, and `offline` after it**: the catalog rows of that unit's resources, from the
+  list, through `restoreCatalogBookkeeping`, are written before the unit's transaction, keeping the device's
+  `availability.offline` unless the parts already held make it true. Derived keys carry the per-book stamps of these
+  rows, so rows committed under an old catalog row would miss until the next release; written first, a failed catalog
+  write fails the unit before any row is written (its parts stay staged, the register lacks it, the next plan does it
+  again). Between the catalog rows and the unit's transaction an aligned quote may miss for a moment; it is never
+  wrong. After the unit commits the rows are written again only to set `availability.offline = true` when every
+  part of that resource within the chosen units is present; if that fails, only the flag is stale (reported as an
+  error, the unit is applied).
 - After each unit commits, its parts are deleted from staging (a failed delete is harmless).
 - **Result**: units applied, units failed (with the reason), resources completed, `originalsReplaced`, bytes applied.
 
