@@ -79,6 +79,41 @@ written last for each resource, so a pack cut short never marks an incomplete re
 Pass the app's processing versions (`versions`) when making and opening a pack: an app with another source version
 refuses it (it would throw the rows away), and one with other derived versions skips those layers and rebuilds them.
 
+## Parts importer
+
+Packs are also published as parts (format 2.0): a language list names content-addressed parts, one per slot, and an
+app downloads only the parts it lacks (design: `docs/superpowers/specs/2026-10-27-language-packs-parts-importer-design.md`).
+The app owns downloading: it fetches the parts into staging; this package plans and applies them.
+
+```ts
+import { IndexedDBByteStore } from '@bt-synergy/cache-adapter-indexeddb'
+import { REGISTER_PREFIX, applyParts, packTargetFrom, planParts, readRegister, stagingFrom } from '@bt-synergy/language-pack'
+
+const target = packTargetFrom(stores) // the same stores as above
+const staging = stagingFrom(new IndexedDBByteStore({ dbName: 'servos-partes' }))
+const register = readRegister(await stores.cache.getByPrefix(REGISTER_PREFIX)) // what the device holds
+const plan = planParts({ list, originals, register, chosen })                   // chosen: ['shared', 'book rut', …]
+for (const part of plan.download) await staging.put(part.sha256, await download(part)) // the app's
+const result = await applyParts({ target, staging, plan, list, originals, register, chosen, versions })
+```
+
+- **Order**: read the register, `planParts`, download the plan's parts into staging (`put` refuses bytes whose sha256
+  is not their name), `applyParts`. Each unit (a book, or the shared unit) goes in in one transaction with its
+  register rows; then the catalog rows' flags (`offline`, and `partial` for a resource chosen for some books), and
+  after the last unit the receipts of the resources held whole.
+- **At startup**, call the same sequence even with nothing to download: it heals what an interrupted call left (a
+  receipt not written, an `offline` flag not set). With parts still downloading it applies no unit, heals, and returns
+  `refused: { reason: 'missing' }`.
+- **`refused`**: no unit was applied. `versions`: the list was made with other processing versions than the app's;
+  nothing at all was written; show "update the app". `missing`: a part of the plan is not in staging yet.
+- **`failed`**: by `scope`. `unit`: that unit was not applied (`reason` `invalid`, `quota` for a full disk, `missing`,
+  `error`); its parts stay in staging and the next plan names it again. `catalog`: catalog rows not written or read
+  (with `unit`, that unit is applied and only its flags are stale). `receipts`: receipts not written. The next call
+  heals `catalog` and `receipts` failures.
+- `partsCoverage` (same input as `planParts`) gives per resource what is held and missing, for "41 MB left". Cleaning
+  parts that wait too long in staging is the app's (`staging.list()` gives their sizes and dates).
+- Between languages, plan originals only from the newest originals list among the languages held (spec §2).
+
 ## Tests
 
-`bun test` (`src/pack.test.ts`, `src/pack.kinds.test.ts`).
+`bun test` (`src/pack.test.ts`, `src/pack.kinds.test.ts`, and the parts importer in `src/parts/`).

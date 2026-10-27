@@ -3,6 +3,9 @@
  * created only when the database is new: a store missing from an existing database is not created, and the first use
  * fails with a NotFoundError naming it. It knows nothing about what the bytes are;
  * whoever puts them checks them (language-pack's parts staging checks the sha256 that names each one).
+ *
+ * Each key has two rows in that one store, put and deleted together in one transaction: `data:{key}` with the bytes
+ * and `meta:{key}` with their size and date, so that `list()` reads the small rows only (staged parts are megabytes).
  */
 
 export interface IndexedDBByteStoreOptions {
@@ -10,7 +13,13 @@ export interface IndexedDBByteStoreOptions {
   storeName?: string
 }
 
-type ByteRow = { key: string; bytes: Uint8Array; at: string }
+type DataRow = { key: string; bytes: Uint8Array }
+type MetaRow = { key: string; size: number; at: string }
+
+const DATA = 'data:'
+const META = 'meta:'
+/** Every meta row and nothing else: from `meta:` up to `meta;`, excluded (`;` is the character after `:`). */
+const metaRange = () => IDBKeyRange.bound(META, 'meta;', false, true)
 
 export class IndexedDBByteStore {
   private dbName: string
@@ -58,26 +67,34 @@ export class IndexedDBByteStore {
   }
 
   async put(key: string, bytes: Uint8Array): Promise<void> {
-    const row: ByteRow = { key, bytes: new Uint8Array(bytes), at: new Date().toISOString() }
-    await this.run('readwrite', (store) => store.put(row))
+    const data: DataRow = { key: DATA + key, bytes: new Uint8Array(bytes) }
+    const meta: MetaRow = { key: META + key, size: data.bytes.byteLength, at: new Date().toISOString() }
+    await this.run('readwrite', (store) => {
+      store.put(meta)
+      return store.put(data)
+    })
   }
 
   async get(key: string): Promise<Uint8Array | null> {
-    const row = await this.run<ByteRow | undefined>('readonly', (store) => store.get(key))
+    const row = await this.run<DataRow | undefined>('readonly', (store) => store.get(DATA + key))
     return row ? new Uint8Array(row.bytes) : null
   }
 
   async has(key: string): Promise<boolean> {
-    const found = await this.run<IDBValidKey | undefined>('readonly', (store) => store.getKey(key))
+    const found = await this.run<IDBValidKey | undefined>('readonly', (store) => store.getKey(DATA + key))
     return found !== undefined
   }
 
   async delete(key: string): Promise<void> {
-    await this.run('readwrite', (store) => store.delete(key))
+    await this.run('readwrite', (store) => {
+      store.delete(META + key)
+      return store.delete(DATA + key)
+    })
   }
 
+  /** Key, byte size and date of each entry, from the meta rows alone: no bytes are read. */
   async list(): Promise<Array<{ key: string; size: number; at: string }>> {
-    const rows = await this.run<ByteRow[]>('readonly', (store) => store.getAll())
-    return rows.map((row) => ({ key: row.key, size: row.bytes.byteLength, at: row.at }))
+    const rows = await this.run<MetaRow[]>('readonly', (store) => store.getAll(metaRange()))
+    return rows.map((row) => ({ key: row.key.slice(META.length), size: row.size, at: row.at }))
   }
 }

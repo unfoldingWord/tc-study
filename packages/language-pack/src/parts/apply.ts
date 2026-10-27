@@ -1,16 +1,17 @@
 /**
  * Applying a plan (spec §2–§3): the staged parts go into the device's store one unit at a time (a book, or the shared
  * unit), each unit in one transaction with its register rows, so a reader never sees new notes over old alignments of
- * the same book. Before each unit, the catalog rows of its resources; after it, their `offline` flag.
+ * the same book. Before each unit, the catalog rows of its resources; after it, their `offline` and `partial` flags.
  *
  * What may be deleted, and nothing else: keys a slot's previous part wrote (its register row says which) that the new
  * part no longer has; the first time a slot is filled, rows of that slot's resource found by its key prefixes that
  * `slotOfRow` places in that very slot; and the keys of a slot this language's list put there and no longer names.
  * Units never touch receipts: after the last unit, one more transaction writes the receipts of the named or touched
  * resources that are whole and deletes the receipts from parts of those that are not (`receipts.ts`); before it, the
- * catalog rows of named resources whose release stamp changed are refreshed, so receipts match the device's rows. A
- * call refused whole (other versions, parts not staged, a target without `transactRaw` or `catalogRow`) writes
- * nothing, receipts included.
+ * catalog rows of named resources are refreshed when their release stamp or their `offline`/`partial` flags are not
+ * what the list and the register say, so receipts match the device's rows and a flag a cut-short call left heals.
+ * A plan with parts not yet staged applies no unit but still runs the refresh and the receipts pass (the startup
+ * heal); a call refused for other versions, or a target without `transactRaw` or `catalogRow`, writes nothing.
  */
 
 import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
@@ -24,6 +25,13 @@ import { receiptChanges, receiptKey, receiptScope } from './receipts'
 import { REGISTER_PREFIX, readRegister, registerRow, unitOfSlotId, type Register, type SlotRecord } from './register'
 import type { PartsStaging } from './staging'
 
+/**
+ * One call applies one plan. Apps also call it at startup, which heals what an interrupted call left (a receipt not
+ * written, an `offline` flag not set): read the register (the cache store's `getByPrefix(REGISTER_PREFIX)` → `readRegister`),
+ * `planParts` with the lists and the chosen units, then `applyParts` with that plan, whatever it holds. With parts not
+ * yet staged (a download in progress) it applies no unit, heals the catalog and the receipts, and says `refused:
+ * missing`. The app downloads the plan's parts into `staging` and calls it again.
+ */
 export type ApplyInput = {
   target: PackTarget
   staging: PartsStaging
@@ -32,7 +40,7 @@ export type ApplyInput = {
   originals?: PartsList
   /** The register the plan was made from: says which slots are filled for the first time. */
   register: Register
-  /** The units the person chose (the plan's input), for `availability.offline`. */
+  /** The units the person chose (the plan's input), for `availability.offline` and `partial`. */
   chosen: string[]
   /** This app's processing versions, by layer. */
   versions: PackVersions
@@ -40,15 +48,34 @@ export type ApplyInput = {
   now?: () => number
 }
 
-/** `unit` is `receipts` when the units applied but the receipts transaction after them failed. */
-export type ApplyFailure = { unit: string; reason: 'missing' | 'quota' | 'invalid' | 'versions' | 'error'; message: string }
+/** Why: `quota` is a full disk (`QuotaExceededError`), from the store or the catalog. */
+export type ApplyFailureReason = 'missing' | 'quota' | 'invalid' | 'versions' | 'error'
+
+/**
+ * What failed, by `scope`:
+ * - `unit`: that unit was not applied; its parts stay in staging and the next plan names it again.
+ * - `catalog`: catalog rows not written or not read. With `unit`, that unit is applied and only its rows' `offline`
+ *   and `partial` flags are stale; without, the refresh at the end of the call. The next call writes them.
+ * - `receipts`: the receipts pass failed, or a resource's stored catalog row could not be read for it; the receipts
+ *   there are left as they are and the next call decides them again.
+ */
+export type ApplyFailure =
+  | { scope: 'unit'; unit: string; reason: ApplyFailureReason; message: string }
+  | { scope: 'catalog'; unit?: string; reason: ApplyFailureReason; message: string }
+  | { scope: 'receipts'; reason: ApplyFailureReason; message: string }
 
 export type ApplyResult = {
+  /**
+   * Set when the call applied no unit at all. `versions`: a list was made with other processing versions than the
+   * app's (show "update the app"); nothing at all was written. `missing`: a part of the plan is not in staging; no unit
+   * was applied, but the catalog refresh and the receipts pass ran (`failed` names the units with parts missing).
+   */
+  refused?: { reason: 'versions' | 'missing'; message: string }
   /** Units whose transaction committed, in apply order. */
   applied: string[]
   /**
-   * Units not applied, with why; their parts stay in staging. A unit that committed but whose catalog rows could not
-   * be written again with their `offline` flag is in `applied` and here too (`error`): only that flag is stale.
+   * What failed, with why (see `ApplyFailure`). A unit whose transaction committed but whose catalog rows could not be
+   * written again with their flags is in `applied` and here too (scope `catalog`).
    */
   failed: ApplyFailure[]
   /** Resources an applied unit touched that are whole afterwards: every part the lists name for them is held. */
@@ -65,6 +92,21 @@ const ORIGINALS_KINDS = new Set(['original', 'macula'])
 function isOffline(coverage: Coverage, key: string): boolean {
   const c = coverage.get(key)
   return Boolean(c && c.missing === 0 && c.present > 0)
+}
+
+/**
+ * A catalog row's flags from the register: `offline` as `isOffline`, and `partial` when offline but not whole (chosen
+ * for some books only): tc-study reads `offline` without `partial` as downloaded whole.
+ */
+function availabilityOf(coverage: Coverage, key: string): { offline: boolean; partial: boolean } {
+  const offline = isOffline(coverage, key)
+  return { offline, partial: offline && coverage.get(key)?.whole !== true }
+}
+
+/** The flags a stored catalog row has (absent: false). */
+function storedAvailability(row: ResourceMetadata | null): { offline: boolean; partial: boolean } {
+  const availability = (row as { availability?: { offline?: unknown; partial?: unknown } } | null)?.availability
+  return { offline: Boolean(availability?.offline), partial: Boolean(availability?.partial) }
 }
 
 /** The layers whose versions differ, as `importLanguagePack` compares them: names both sides have, as text. */
@@ -112,7 +154,7 @@ const resourceOfSlotId = (id: string): string => id.split(':')[1] ?? ''
 const cleanupScans = (resourceKey: string) => scansFor(resourceKey).filter((scan) => !scan.exact && scan.layer !== 'receipt')
 
 class UnitError extends Error {
-  constructor(readonly reason: ApplyFailure['reason'], message: string) {
+  constructor(readonly reason: ApplyFailureReason, message: string) {
     super(message)
   }
 }
@@ -150,11 +192,15 @@ async function readyPart(entry: PartEntry, id: string, list: string, staging: Pa
   return { entry, id, list, rows, keys: [...keys].sort() }
 }
 
-function failureOf(unit: string, error: unknown): ApplyFailure {
-  if (error instanceof UnitError) return { unit, reason: error.reason, message: error.message }
+/**
+ * Why an error happened, its message after `what` when given: a full disk (`QuotaExceededError`, from the store or the
+ * catalog) is `quota`.
+ */
+function causeOf(error: unknown, what?: string): { reason: ApplyFailureReason; message: string } {
   const name = (error as { name?: unknown } | null)?.name
+  const reason = error instanceof UnitError ? error.reason : name === 'QuotaExceededError' ? 'quota' : 'error'
   const message = String((error as { message?: unknown } | null)?.message ?? error)
-  return { unit, reason: name === 'QuotaExceededError' ? 'quota' : 'error', message }
+  return { reason, message: what ? `${what}: ${message}` : message }
 }
 
 export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
@@ -177,7 +223,9 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
     const differ = differingLayers(l.versions, input.versions)
     if (differ.length === 0) continue
     const message = `The ${l.language} parts list was made with other versions (${differ.join(', ')}) than this app's; update the app`
-    result.failed = plan.units.map((unit) => ({ unit, reason: 'versions', message }))
+    // Refused whole: rows, catalog and receipts decided with other versions would be thrown away by this app.
+    result.refused = { reason: 'versions', message }
+    result.failed = plan.units.map((unit) => ({ scope: 'unit', unit, reason: 'versions', message }))
     return result
   }
 
@@ -199,7 +247,8 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
     byUnit.set(unit, parts)
   }
 
-  // Every planned part must be staged before anything is applied.
+  // Every planned part must be staged before any unit is applied. If one is not (a download in progress), no unit is,
+  // but the catalog refresh and the receipts pass below still run: that is the startup heal (spec §4).
   const missing = new Map<string, string[]>()
   for (const [unit, parts] of byUnit) {
     for (const p of parts) {
@@ -207,21 +256,21 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
     }
   }
   if (missing.size > 0) {
-    result.failed = plan.units
-      .filter((unit) => missing.has(unit))
-      .map((unit) => ({ unit, reason: 'missing', message: `Not in staging: ${missing.get(unit)!.join(', ')}` }))
-    return result
+    const waiting = plan.units.filter((unit) => missing.has(unit))
+    result.refused = { reason: 'missing', message: `Parts of ${waiting.join(', ')} are not in staging; no unit was applied` }
+    result.failed = waiting.map((unit) => ({ scope: 'unit', unit, reason: 'missing', message: `Not in staging: ${missing.get(unit)!.join(', ')}` }))
   }
 
   const resources = catalogOf(lists)
-  /** The lists' catalog rows of these resources (those they carry), dated now, with `offline` as given. */
-  const catalogRows = async (keys: string[], now: number, offline: (key: string) => Promise<boolean>) => {
+  type Availability = { offline: boolean; partial: boolean }
+  /** The lists' catalog rows of these resources (those they carry), dated now, with `offline` and `partial` as given. */
+  const catalogRows = async (keys: string[], now: number, availability: (key: string) => Promise<Availability>) => {
     const rows: Array<{ key: string; metadata: ResourceMetadata }> = []
     for (const key of keys) {
       const found = resources.get(key)
       if (!found) continue
       const metadata = restoreCatalogBookkeeping(found.metadata, now)
-      metadata.availability = { ...metadata.availability, offline: await offline(key) }
+      metadata.availability = { ...metadata.availability, ...(await availability(key)) }
       rows.push({ key, metadata })
     }
     return rows
@@ -229,7 +278,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   const register: Register = new Map(input.register)
   const touched = new Set<string>()
 
-  for (const unit of plan.units) {
+  for (const unit of result.refused ? [] : plan.units) {
     const parts = byUnit.get(unit) ?? []
     const removes = plan.remove.filter((id) => unitOfSlotId(id) === unit)
     const now = clock()
@@ -240,25 +289,24 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
       // One part at a time is gunzipped; a unit's rows are held until its transaction (spec §3: peak is one unit).
       for (const p of parts) ready.push(await readyPart(p.entry, p.id, p.list, staging, resources))
     } catch (error) {
-      result.failed.push(failureOf(unit, error))
+      result.failed.push({ scope: 'unit', unit, ...causeOf(error) })
       continue
     }
 
     // The catalog rows first, from the list: the unit's derived keys (aligned quotes) carry the per-book stamps of
     // these rows, so rows that committed under an old catalog row would miss until the next release. If this fails,
-    // nothing of the unit is written and its parts stay staged; the next plan does it again. `offline` keeps what the
-    // device says unless the parts already held make it true; it is set again once the unit commits.
+    // nothing of the unit is written and its parts stay staged; the next plan does it again. `offline` and `partial`
+    // keep what the device says unless the parts already held make it offline; they are set again once the unit
+    // commits.
     const unitResources = [...new Set([...ready.map((p) => p.entry.resource), ...removes.map(resourceOfSlotId)])]
     try {
       const before = partsCoverage({ list, originals, register, chosen })
-      const rows = await catalogRows(unitResources, now, async (key) => {
-        if (isOffline(before, key)) return true
-        const current = target.catalogRow ? await target.catalogRow(key) : null
-        return Boolean((current as { availability?: { offline?: unknown } } | null)?.availability?.offline)
-      })
+      const rows = await catalogRows(unitResources, now, async (key) =>
+        isOffline(before, key) ? availabilityOf(before, key) : storedAvailability(await catalogRow(key)),
+      )
       if (rows.length) await target.putCatalogRows(rows)
     } catch (error) {
-      result.failed.push({ unit, reason: 'error', message: `Catalog rows not written, unit not applied: ${failureOf(unit, error).message}` })
+      result.failed.push({ scope: 'unit', unit, ...causeOf(error, 'Catalog rows not written, unit not applied') })
       continue
     }
 
@@ -319,7 +367,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
         return { puts, deletes: [...deletes] }
       })
     } catch (error) {
-      result.failed.push(failureOf(unit, error))
+      result.failed.push({ scope: 'unit', unit, ...causeOf(error) })
       continue
     }
 
@@ -329,14 +377,16 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
     result.bytesApplied += ready.reduce((n, p) => n + p.entry.bytes, 0)
     if (replacedOriginals) result.originalsReplaced = true
 
-    // The catalog rows again, now only to say whether each resource is offline: every chosen part of it is held.
+    // The catalog rows again, now only to set their flags from the register: offline when every chosen part of the
+    // resource is held, partial when it is not whole. If this fails (or the app stops here), the refresh at the end of
+    // this call or of the next one sets them.
     for (const key of unitResources) touched.add(key)
     try {
       const after = partsCoverage({ list, originals, register, chosen })
-      const rows = await catalogRows(unitResources, now, async (key) => isOffline(after, key))
+      const rows = await catalogRows(unitResources, now, async (key) => availabilityOf(after, key))
       if (rows.length) await target.putCatalogRows(rows)
     } catch (error) {
-      result.failed.push({ unit, reason: 'error', message: `Unit applied with its catalog rows; their offline flag not updated: ${failureOf(unit, error).message}` })
+      result.failed.push({ scope: 'catalog', unit, ...causeOf(error, 'Unit applied with its catalog rows; their offline and partial flags not updated') })
     }
 
     for (const p of ready) {
@@ -356,40 +406,50 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
 
   // Catalog rows of a new release (spec §3): a release that changed tags but no part gives no unit, yet the device's
   // row must name it, or the loaders' stamps and the receipts below would compare against the old one. Every resource
-  // the lists name with a held part in the chosen units gets the list's row when its stamp differs from the device's.
+  // the lists name with a held part in the chosen units gets the list's row when its stamp differs from the device's,
+  // or when its `offline` or `partial` flag is not what the register says: a call stopped between a unit's commit and
+  // its flags (or whose flag write failed) left them stale, and nothing else would set them before the next release.
   const kept = new Set<string>()
   const refreshAt = clock()
   const stale: string[] = []
   for (const [key, c] of coverage) {
     if (c.present === 0 || !catalog.has(key)) continue
     try {
-      if (resourceContentStamp(await catalogRow(key)) !== resourceContentStamp(catalog.get(key))) stale.push(key)
+      const row = await catalogRow(key)
+      const has = storedAvailability(row)
+      const wants = availabilityOf(coverage, key)
+      if (resourceContentStamp(row) !== resourceContentStamp(catalog.get(key)) || has.offline !== wants.offline || has.partial !== wants.partial) {
+        stale.push(key)
+      }
     } catch (error) {
       kept.add(key)
-      result.failed.push({ unit: 'catalog', reason: 'error', message: `Catalog row of ${key} not read: ${failureOf('catalog', error).message}` })
+      result.failed.push({ scope: 'catalog', ...causeOf(error, `Catalog row of ${key} not read`) })
     }
   }
   if (stale.length) {
     try {
-      await target.putCatalogRows(await catalogRows(stale, refreshAt, async (key) => isOffline(coverage, key)))
+      await target.putCatalogRows(await catalogRows(stale, refreshAt, async (key) => availabilityOf(coverage, key)))
     } catch (error) {
       for (const key of stale) kept.add(key)
-      result.failed.push({ unit: 'catalog', reason: 'error', message: `Catalog rows of ${stale.join(', ')} not refreshed to their new release: ${failureOf('catalog', error).message}` })
+      result.failed.push({ scope: 'catalog', ...causeOf(error, `Catalog rows of ${stale.join(', ')} not refreshed`) })
     }
   }
 
-  // Receipts (spec §4): one more transaction after the last unit, on every call that gets this far (an empty plan
-  // included), over the resources the lists name and those touched, so a receipt a failed pass left out is written by
-  // the next call. Their receipts and the register rows of every slot the lists name are read inside it, so what is
-  // decided is what is stored (another window may have applied since). A receipt is written only against the device's
-  // catalog row as it is now: readers compare it with that row's stamp.
+  // Receipts (spec §4): one more transaction after the last unit, on every call that gets this far (an empty plan and
+  // a plan refused for parts not staged included), over the resources the lists name and those touched, so a receipt
+  // a failed pass left out is written by the next call. Their receipts and the register rows of every slot the lists
+  // name are read inside it, so what is decided is what is stored (another window may have applied since). A receipt
+  // is written only against the device's catalog row as it is now: readers compare it with that row's stamp.
   const scope = receiptScope(lists, touched)
   const stored = new Map<string, ResourceMetadata | null>()
   for (const key of scope) {
+    // Already left as it is (its row could not be read or refreshed above): reported there.
+    if (kept.has(key)) continue
     try {
       stored.set(key, await catalogRow(key))
-    } catch {
+    } catch (error) {
       kept.add(key)
+      result.failed.push({ scope: 'receipts', ...causeOf(error, `Catalog row of ${key} not read; its receipt left as it is`) })
     }
   }
   const slotKeys = [...named.keys()].map((id) => REGISTER_PREFIX + id)
@@ -409,8 +469,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
       }),
     )
   } catch (error) {
-    const failure = failureOf('receipts', error)
-    result.failed.push({ ...failure, message: `Units applied; their receipts not written: ${failure.message}` })
+    result.failed.push({ scope: 'receipts', ...causeOf(error, 'Receipts not written') })
   }
 
   return result

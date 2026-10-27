@@ -152,7 +152,7 @@ describe('applyParts', () => {
     for (const key of [TN, TW, UHB]) {
       const row = target.catalog.get(key)!
       expect(row.catalogedAt).toBe(new Date(NOW).toISOString())
-      expect(row.availability.offline).toBe(true)
+      expect(row.availability).toMatchObject({ offline: true, partial: false })
     }
     expect(await staging.list()).toEqual([])
   })
@@ -166,11 +166,20 @@ describe('applyParts', () => {
 
     expect(result.applied).toEqual(['book rut'])
     expect(target.rows.has(`tn:${TN}:jon:1`)).toBe(false)
-    expect(target.catalog.get(TN)!.availability.offline).toBe(true)
+    // Offline for what was chosen, and partial: tc-study reads `partial: false` as downloaded whole.
+    expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: true, partial: true })
+    expect(target.catalog.get(UHB)!.availability).toMatchObject({ offline: true, partial: false })
     expect(result.completed).toEqual([UHB])
     // "Complete" would mislead bt-synergy's readers about a resource held in part.
     expect(target.rows.has(`resource:${TN}`)).toBe(false)
     expect(target.rows.has(`resource:${UHB}`)).toBe(true)
+
+    // A row an older importer wrote with `partial: false` is set right by the next call, with nothing to apply.
+    target.catalog.set(TN, { ...target.catalog.get(TN)!, availability: { online: true, offline: true, bundled: false, partial: false } })
+    const next = await run(target, await stagingWith([]), list, originals, ['book rut'])
+    expect(next.applied).toEqual([])
+    expect(next.failed).toEqual([])
+    expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: true, partial: true })
   })
 
   test('a replaced slot deletes the keys its new part no longer has and writes the new ones', async () => {
@@ -273,7 +282,7 @@ describe('applyParts', () => {
     const result = await run(target, staging, list, originals, ['book rut', 'book jon'])
 
     expect(result.applied).toEqual(['book rut'])
-    expect(result.failed).toEqual([{ unit: 'book jon', reason: 'invalid', message: expect.stringContaining(`tn:${TN}:rut:9`) }])
+    expect(result.failed).toEqual([{ scope: 'unit', unit: 'book jon', reason: 'invalid', message: expect.stringContaining(`tn:${TN}:rut:9`) }])
     expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(true)
     expect(target.rows.has(`tn:${TN}:jon:1`)).toBe(false)
     expect(target.rows.has(`tn:${TN}:rut:9`)).toBe(false)
@@ -296,7 +305,7 @@ describe('applyParts', () => {
 
     const result = await run(target, staging, list, originals, ['book rut', 'book jon'])
 
-    expect(result.failed).toEqual([{ unit: 'book rut', reason: 'invalid', message: expect.any(String) }])
+    expect(result.failed).toEqual([{ scope: 'unit', unit: 'book rut', reason: 'invalid', message: expect.any(String) }])
     expect(result.applied).toEqual(['book jon'])
     expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
   })
@@ -311,7 +320,7 @@ describe('applyParts', () => {
 
     const result = await run(target, staging, list, originals, ['book rut', 'book jon'])
 
-    expect(result.failed).toEqual([{ unit: 'book rut', reason: 'quota', message: expect.any(String) }])
+    expect(result.failed).toEqual([{ scope: 'unit', unit: 'book rut', reason: 'quota', message: expect.any(String) }])
     expect(result.applied).toEqual(['book jon'])
     expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
     expect(registerOf(target).has(idOf(tnRut))).toBe(false)
@@ -335,7 +344,7 @@ describe('applyParts', () => {
     const failed = await run(target, staging, list, originals, ['book rut'])
 
     expect(failed.applied).toEqual([])
-    expect(failed.failed).toEqual([{ unit: 'book rut', reason: 'error', message: expect.stringContaining('catalog closed') }])
+    expect(failed.failed).toEqual([{ scope: 'unit', unit: 'book rut', reason: 'error', message: expect.stringContaining('catalog closed') }])
     expect(target.rows.size).toBe(0)
     // Only the receipts pass, which found nothing to write.
     expect(target.committed).toBe(1)
@@ -366,13 +375,56 @@ describe('applyParts', () => {
 
     const result = await run(target, await stagingWith([tnRut]), list, originals, ['book rut'])
 
-    // First the rows from the list (not offline yet: nothing of TN was held), then the offline flag, which failed.
-    expect(seen).toEqual([{ committed: 0, offline: false }, { committed: 1, offline: true }])
+    // First the rows from the list (not offline yet: nothing of TN was held), then the offline flag, which failed,
+    // then the end of the call trying again (the stored flag is not what the register says), which failed too.
+    expect(seen).toEqual([{ committed: 0, offline: false }, { committed: 1, offline: true }, { committed: 1, offline: true }])
     expect(result.applied).toEqual(['book rut'])
-    expect(result.failed).toEqual([{ unit: 'book rut', reason: 'error', message: expect.stringContaining('catalog closed') }])
+    expect(result.failed).toEqual([
+      { scope: 'catalog', unit: 'book rut', reason: 'error', message: expect.stringContaining('catalog closed') },
+      { scope: 'catalog', reason: 'error', message: expect.stringContaining('catalog closed') },
+    ])
     expect((target.catalog.get(TN) as unknown as { release: { tag_name: string } }).release.tag_name).toBe('v1')
     expect(target.catalog.get(TN)!.catalogedAt).toBe(new Date(NOW).toISOString())
     expect(target.catalog.get(TN)!.availability.offline).toBe(false)
+  })
+
+  test('an offline flag not written after a unit (the app killed, or the write failed) is healed by the next call', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    const putCatalogRows = target.putCatalogRows
+    let writes = 0
+    target.putCatalogRows = async (rows) => {
+      // Only the write before the unit gets through: as if the app stopped once the unit committed.
+      if (++writes > 1) throw new Error('catalog closed')
+      return putCatalogRows(rows)
+    }
+    const first = await run(target, await stagingWith([tnRut]), list, originals, ['book rut'])
+    expect(first.applied).toEqual(['book rut'])
+    expect(target.catalog.get(TN)!.availability.offline).toBe(false)
+
+    // The app starts again: nothing to download, the release unchanged.
+    target.putCatalogRows = putCatalogRows
+    const next = await run(target, await stagingWith([]), list, originals, ['book rut'])
+
+    expect(next.applied).toEqual([])
+    expect(next.failed).toEqual([])
+    expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: true, partial: false })
+    expect((target.catalog.get(TN) as unknown as { release: { tag_name: string } }).release.tag_name).toBe('v1')
+  })
+
+  test('a full disk while writing catalog rows is reported as quota', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    target.putCatalogRows = async () => {
+      throw new DOMException('disk full', 'QuotaExceededError')
+    }
+
+    const result = await run(target, await stagingWith([tnRut]), list, originals, ['book rut'])
+
+    expect(result.applied).toEqual([])
+    expect(result.failed).toEqual([{ scope: 'unit', unit: 'book rut', reason: 'quota', message: expect.stringContaining('disk full') }])
   })
 
   test('before a unit, a resource the device already has offline stays offline', async () => {
@@ -402,10 +454,36 @@ describe('applyParts', () => {
     const result = await run(target, await stagingWith([tnRut]), list, originals, ['book rut', 'book jon'])
 
     expect(result.applied).toEqual([])
-    expect(result.failed).toEqual([{ unit: 'book jon', reason: 'missing', message: expect.stringContaining(tnJon.entry.sha256) }])
+    expect(result.refused).toEqual({ reason: 'missing', message: expect.stringContaining('book jon') })
+    expect(result.failed).toEqual([{ scope: 'unit', unit: 'book jon', reason: 'missing', message: expect.stringContaining(tnJon.entry.sha256) }])
+    // Ruth is staged and not applied either: no unit goes in while a part of the plan is missing.
     expect(target.rows.size).toBe(0)
     expect(target.catalog.size).toBe(0)
-    expect(target.committed).toBe(0)
+    // Only the receipts pass, which found nothing to write.
+    expect(target.committed).toBe(1)
+  })
+
+  test('a startup call with a part still downloading applies no unit, yet heals the catalog and the receipts', async () => {
+    const tnRut = await TN_RUT()
+    const kt = await TW_KT()
+    const target = memoryTarget()
+    const first = await lists([tnRut], [])
+    await run(target, await stagingWith([tnRut]), first.list, first.originals, ALL)
+    // What a call cut short leaves: the receipt not written, the offline flag not set.
+    target.rows.delete(`resource:${TN}`)
+    target.catalog.set(TN, { ...target.catalog.get(TN)!, availability: { online: true, offline: false, bundled: false, partial: false } })
+
+    // The next list adds a Translation Words part, which the app is still downloading into staging.
+    const second = await lists([tnRut, kt], [])
+    const result = await run(target, await stagingWith([]), second.list, second.originals, ALL)
+
+    expect(result.refused).toEqual({ reason: 'missing', message: expect.stringContaining('shared') })
+    expect(result.applied).toEqual([])
+    expect(result.failed).toEqual([{ scope: 'unit', unit: 'shared', reason: 'missing', message: expect.stringContaining(kt.entry.sha256) }])
+    expect(registerOf(target).has(idOf(kt))).toBe(false)
+    expect(target.catalog.has(TW)).toBe(false)
+    expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: true, partial: false })
+    expect(target.rows.get(`resource:${TN}`)).toMatchObject({ content: {}, metadata: { downloadMethod: 'parts', releaseStamp: 'v1' } })
   })
 
   test('a list made with other versions is refused whole', async () => {
@@ -416,9 +494,31 @@ describe('applyParts', () => {
     const result = await run(target, await stagingWith([tnRut]), list, originals, ['book rut'], { versions: { ...VERSIONS, quote: { helpsQuote: 6 } } })
 
     expect(result.applied).toEqual([])
-    expect(result.failed).toEqual([{ unit: 'book rut', reason: 'versions', message: expect.stringContaining('quote') }])
+    expect(result.refused).toEqual({ reason: 'versions', message: expect.stringContaining('quote') })
+    expect(result.failed).toEqual([{ scope: 'unit', unit: 'book rut', reason: 'versions', message: expect.stringContaining('quote') }])
     expect(target.rows.size).toBe(0)
     expect(target.catalog.size).toBe(0)
+  })
+
+  test('other versions with nothing to download: refused, and nothing at all is written', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    await run(target, await stagingWith([tnRut]), list, originals, ['book rut'])
+    target.rows.delete(`resource:${TN}`)
+    target.catalog.set(TN, { ...target.catalog.get(TN)!, availability: { online: true, offline: false, bundled: false, partial: false } })
+    const rows = new Map(target.rows)
+    const catalog = structuredClone(target.catalog)
+    const committed = target.committed
+
+    const result = await run(target, await stagingWith([]), list, originals, ['book rut'], { versions: { ...VERSIONS, quote: { helpsQuote: 6 } } })
+
+    expect(result.refused).toEqual({ reason: 'versions', message: expect.stringContaining('quote') })
+    expect(result.applied).toEqual([])
+    expect(result.failed).toEqual([])
+    expect(target.committed).toBe(committed)
+    expect(target.rows).toEqual(rows)
+    expect(target.catalog).toEqual(catalog)
   })
 
   test('a target without transactRaw is refused at once, nothing written (Review Focus 3)', async () => {
@@ -537,7 +637,7 @@ describe('applyParts', () => {
     expect(reads).toHaveLength(2)
     expect(reads[1]).toContain(`resource:${TN}`)
     expect(reads[1]).toContain(REGISTER_PREFIX + idOf(tnRut))
-    expect(result.failed).toEqual([{ unit: 'receipts', reason: 'quota', message: expect.any(String) }])
+    expect(result.failed).toEqual([{ scope: 'receipts', reason: 'quota', message: expect.any(String) }])
     expect(target.rows.has(`resource:${TN}`)).toBe(false)
     expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(true)
 
@@ -613,11 +713,31 @@ describe('applyParts', () => {
 
     const result = await run(target, await stagingWith([]), restamped(first.list, 'v2'), first.originals, ALL)
 
-    expect(result.failed).toEqual([{ unit: 'catalog', reason: 'error', message: expect.stringContaining('catalog closed') }])
+    expect(result.failed).toEqual([{ scope: 'catalog', reason: 'error', message: expect.stringContaining('catalog closed') }])
     const row = target.catalog.get(TN)!
     expect(row.release?.tag_name).toBe('v1')
     expect(target.rows.get(`resource:${TN}`)).toEqual(receipt)
     expect(isMatchingIngestReceipt(receipt, expectedIngestReleaseStamp(row), schemaOf(row))).toBe(true)
+  })
+
+  test('a catalog row the receipts pass cannot read is reported, and that receipt left as it is', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    await run(target, await stagingWith([tnRut]), list, originals, ALL)
+    target.rows.delete(`resource:${TN}`)
+    const catalogRow = target.catalogRow!
+    let reads = 0
+    target.catalogRow = async (key) => {
+      // The refresh reads it; the receipts pass, after it, cannot.
+      if (key === TN && ++reads > 1) throw new Error('catalog unreadable')
+      return catalogRow(key)
+    }
+
+    const result = await run(target, await stagingWith([]), list, originals, ALL)
+
+    expect(result.failed).toEqual([{ scope: 'receipts', reason: 'error', message: expect.stringContaining('catalog unreadable') }])
+    expect(target.rows.has(`resource:${TN}`)).toBe(false)
   })
 
   test('a target that cannot read catalog rows is refused at once, nothing written', async () => {

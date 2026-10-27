@@ -65,11 +65,19 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 - Originals are shared by all languages (their slots carry no language): one register entry. A language whose list
   names originals with another sha replaces them, and the result says so (`originalsReplaced`): another language's
   aligned quotes built on the previous originals may miss until that language updates.
+- **Originals between languages (a rule for apps; no code in B).** Before planning, an app refreshes the list of every
+  language it holds, and plans originals only from the newest originals list among them. Planned from an older list,
+  a language would put older originals back over the newer ones, and the next language the newer ones again: the
+  shared originals would go back and forth (tens of MB each time) and their receipts flip with them. A language whose
+  list was built on an older originals list then has aligned quotes that may miss, as above, until its list is
+  rebuilt. Two windows applying with different originals lists at the same time leave the catalog rows of the
+  originals with the stamps of the last caller; the next call (with the newest list) heals them.
 
 ### 3. Applying
 
-- `applyParts` starts only when every part of the plan is in staging; otherwise it changes nothing and names what is
-  missing.
+- `applyParts` applies units only when every part of the plan is in staging; otherwise it applies no unit, names what
+  is missing (`refused: missing`, and each unit in `failed`), and still runs the catalog refresh and the receipts pass
+  below (§4: the startup heal).
 - **One transaction per unit**: a book (its book, alignments and original parts) or the shared unit. Not one per
   whole update: a builder code change gives every part a new sha, so an update can be a whole language, too big for
   one transaction on a phone. Everything that depends on each other is in one unit (a book's alignments are made on
@@ -80,22 +88,28 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 - Inside a unit's transaction: read the register rows and the keys to delete (§5), write and delete rows, write the
   register. Parts are gunzipped one at a time to build the transaction; peak memory is the largest unit (a few MB per
   book for English).
-- **The catalog, before each unit, and `offline` after it**: the catalog rows of that unit's resources, from the
+- **The catalog, before each unit, and its flags after it**: the catalog rows of that unit's resources, from the
   list, through `restoreCatalogBookkeeping`, are written before the unit's transaction, keeping the device's
-  `availability.offline` unless the parts already held make it true. Derived keys carry the per-book stamps of these
-  rows, so rows committed under an old catalog row would miss until the next release; written first, a failed catalog
-  write fails the unit before any row is written (its parts stay staged, the register lacks it, the next plan does it
-  again). Between the catalog rows and the unit's transaction an aligned quote may miss for a moment; it is never
-  wrong. After the unit commits the rows are written again only to set `availability.offline = true` when every
-  part of that resource within the chosen units is present; if that fails, only the flag is stale (reported as an
-  error, the unit is applied).
+  `availability.offline` and `partial` unless the parts already held make the resource offline. Derived keys carry
+  the per-book stamps of these rows, so rows committed under an old catalog row would miss until the next release;
+  written first, a failed catalog write fails the unit before any row is written (its parts stay staged, the register
+  lacks it, the next plan does it again). From the catalog rows to the unit's commit an aligned quote of that book may
+  miss; if the unit's transaction fails, the rows keep the new stamps over the old rows until the unit is applied
+  again (misses, never a wrong quote). After the unit commits the rows are written again to set the flags the
+  register gives: `availability.offline` is true when every part of that resource within the chosen units is present
+  (and false otherwise: the value written is the computed one, which can turn the device's `true` into `false`), and
+  `availability.partial` is `offline` and not whole (the resource was chosen for some books only: tc-study reads
+  `offline` without `partial` as downloaded whole). If that write fails, or the app stops before it, only the flags
+  are stale: reported (scope `catalog`, the unit is applied) and set by the refresh below, in this call or the next.
 - After each unit commits, its parts are deleted from staging (a failed delete is harmless).
 - **The catalog of a new release, on every call**: a release may change tags and no part (the common case), which
-  gives no unit. So after the units, every call that is not refused rewrites the catalog row of each resource the
-  lists name that has a held part in the chosen units, when the device's row (`catalogRow`) has another release stamp
-  than the list's (through `restoreCatalogBookkeeping`, `offline` as above). A failed write is reported (`catalog`,
-  an error) and that resource's receipt is left as it is in this call. A target without `catalogRow` is refused.
-- **Result**: units applied, units failed (with the reason), resources completed, `originalsReplaced`, bytes applied.
+  gives no unit. So after the units, every call not refused for its versions rewrites the catalog row of each resource
+  the lists name that has a held part in the chosen units, when the device's row (`catalogRow`) has another release
+  stamp than the list's, or `offline` or `partial` flags other than the register gives (through
+  `restoreCatalogBookkeeping`, the flags as above). A failed read or write is reported (scope `catalog`; a full disk
+  is `quota`) and that resource's receipt is left as it is in this call. A target without `catalogRow` is refused.
+- **Result**: `refused` (`versions` or `missing`, when no unit was applied for that reason), units applied, failures
+  (`scope` `unit`, `catalog` or `receipts`, with the reason), resources completed, `originalsReplaced`, bytes applied.
 
 ### 4. Receipts and completeness
 
@@ -104,10 +118,16 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
   `downloadComplete: true` and its date, `releaseStamp` (the catalog row's release stamp), `ingestSchema`
   (`usj:{version}` for scripture, `helps:1` otherwise, with the existing helpers), and `downloadMethod: 'parts'`.
   Existing readers (`isResourceMarkedComplete`, the completeness checker, loaders, Servos) keep working.
-- That pass runs on every `applyParts` call that is not refused (an empty plan included), over every resource the lists
-  name plus those the call touched, reading the receipts and the register inside its transaction. A receipt readers
-  already accept for the release is left as it is (no rewrite); `absentFromRelease` is carried from a receipt of the
-  same release. Apps call `applyParts` at startup, so a receipt a failed pass left out is written then.
+- That pass runs on every `applyParts` call not refused for its versions (an empty plan, and a plan with parts not yet
+  staged, included), over every resource the lists name plus those the call touched, reading the receipts and the
+  register inside its transaction. A receipt readers already accept for the release is left as it is (no rewrite);
+  `absentFromRelease` is carried from a receipt of the same release. A stored catalog row that cannot be read leaves
+  that receipt as it is and is reported (scope `receipts`).
+- **Startup**: apps call `applyParts` at startup, so what an interrupted call left (a receipt not written, an
+  `offline` flag not set) heals then: read the register (`getByPrefix('parts-slot:')` → `readRegister`) →
+  `planParts` with the lists and the chosen units → `applyParts` with that plan, whatever it holds. With parts not
+  yet staged (a download in progress) it applies no unit, heals the catalog and the receipts, and returns
+  `refused: missing`; the app goes on downloading into staging and calls it again.
 - Receipts are decided against the device's stored catalog row, read after the refresh above: a receipt is written
   only when that row's release stamp is the list's, since readers compare the receipt with that row. Otherwise the
   receipt there is left as it is.
@@ -121,14 +141,15 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 ### 5. Staging, the atomic method, errors
 
 - **Staging**: bytes per sha with size and date; `put` checks the sha256. Cleaning parts that wait too long is the
-  app's (`list()`).
+  app's (`list()`, which reads the sizes and dates only, never the bytes: the IndexedDB store keeps them in a row of
+  their own beside each part's bytes).
 - **The atomic method** on the target: given keys and key prefixes to read, a function of what was found returns the
   puts and deletes, and all of it runs in one IndexedDB readwrite transaction (the register and the keys to delete
   are read inside it). Two windows applying at once then serialize per unit and leave a consistent register; no lock
   is needed. On any error nothing of that transaction is written.
 - **Errors**:
-  - the list's versions differ from the app's (any layer): nothing is applied, the result says so (the app shows
-    "update the app");
+  - the list's versions differ from the app's (any layer): nothing at all is written, receipts and catalog included;
+    the result says so (`refused: versions`, even with an empty plan; the app shows "update the app");
   - a unit cannot be applied (an unreadable part, a row outside its slot, a full disk — `quota` reported apart): that
     unit is not written, its parts stay in staging, the other units go on;
   - the app closes midway: what was applied is in the register; planning again yields only the missing units.

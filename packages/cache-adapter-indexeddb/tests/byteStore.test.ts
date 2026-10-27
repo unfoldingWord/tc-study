@@ -43,6 +43,50 @@ describe('IndexedDBByteStore', () => {
     for (const e of list) expect(new Date(e.at).toISOString()).toBe(e.at)
   })
 
+  test('list reads sizes and dates only, never the bytes, and follows puts and deletes', async () => {
+    const store = new IndexedDBByteStore({ dbName: 'bytes-list-meta' })
+    await store.put('a', new Uint8Array(3))
+    await store.put('b', new Uint8Array(10))
+    const firstAt = (await store.list()).find((e) => e.key === 'a')!.at
+    await Bun.sleep(5)
+    // Put again: the size and the date follow the new bytes.
+    await store.put('a', new Uint8Array(5))
+    await store.delete('b')
+    await store.put('c', new Uint8Array(1))
+
+    // Every value a store request hands back while list() runs (staged parts are megabytes each).
+    const seen: unknown[] = []
+    const proto = IDBObjectStore.prototype as unknown as Record<string, (...args: unknown[]) => IDBRequest>
+    const originals = { get: proto.get, getAll: proto.getAll, openCursor: proto.openCursor }
+    for (const [name, original] of Object.entries(originals)) {
+      proto[name] = function (this: IDBObjectStore, ...args: unknown[]) {
+        const request = original.apply(this, args)
+        request.addEventListener('success', () => {
+          const value = request.result as unknown
+          seen.push(value && typeof value === 'object' && 'value' in value ? (value as { value: unknown }).value : value)
+        })
+        return request
+      }
+    }
+    let list: Awaited<ReturnType<IndexedDBByteStore['list']>>
+    try {
+      list = await store.list()
+    } finally {
+      Object.assign(proto, originals)
+    }
+
+    const sorted = list.sort((x, y) => (x.key < y.key ? -1 : 1))
+    expect(sorted.map((e) => [e.key, e.size])).toEqual([['a', 5], ['c', 1]])
+    for (const e of sorted) expect(new Date(e.at).toISOString()).toBe(e.at)
+    expect(sorted[0].at > firstAt).toBe(true)
+    const values = seen.flatMap((v) => (Array.isArray(v) ? v : [v]))
+    expect(values.length).toBeGreaterThan(0)
+    expect(values.filter((v) => v && typeof v === 'object' && 'bytes' in v)).toEqual([])
+    // The bytes are still there for get.
+    expect((await store.get('a'))!.byteLength).toBe(5)
+    expect(await store.get('b')).toBeNull()
+  })
+
   test('delete removes the entry and is quiet about absent keys', async () => {
     const store = new IndexedDBByteStore({ dbName: 'bytes-delete' })
     await store.put('a', new Uint8Array([1]))
