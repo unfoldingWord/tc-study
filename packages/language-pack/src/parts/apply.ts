@@ -6,7 +6,8 @@
  * What may be deleted, and nothing else: keys a slot's previous part wrote (its register row says which) that the new
  * part no longer has; the first time a slot is filled, rows of that slot's resource found by its key prefixes that
  * `slotOfRow` places in that very slot; and the keys of a slot this language's list put there and no longer names.
- * Receipts are never touched here.
+ * Units never touch receipts: after the last unit, one more transaction writes the receipts of the touched resources
+ * that are whole and deletes the receipts from parts of those that are not (`receipts.ts`).
  */
 
 import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
@@ -16,6 +17,7 @@ import { PART_LAYERS, readPart, sha256Hex, type PartRow } from './partFile'
 import { restoreCatalogBookkeeping, unitOfPart, type PartEntry, type PartsList } from './partsList'
 import { slotId, slotOfEntry, slotOfRow } from './partSlots'
 import { namedParts, partsCoverage, type Coverage, type PartsPlan } from './plan'
+import { receiptChanges, receiptKey } from './receipts'
 import { REGISTER_PREFIX, readRegister, registerRow, unitOfSlotId, type Register, type SlotRecord } from './register'
 import type { PartsStaging } from './staging'
 
@@ -35,6 +37,7 @@ export type ApplyInput = {
   now?: () => number
 }
 
+/** `unit` is `receipts` when the units applied but the receipts transaction after them failed. */
 export type ApplyFailure = { unit: string; reason: 'missing' | 'quota' | 'invalid' | 'versions' | 'error'; message: string }
 
 export type ApplyResult = {
@@ -341,7 +344,31 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   const coverage = partsCoverage({ list, originals, register, chosen })
   result.completed = [...touched].filter((key) => coverage.get(key)?.whole === true).sort()
 
-  // Receipts (spec §4) go here: one more transaction after the last unit, for the resources whole or no longer whole.
+  // Receipts (spec §4): one more transaction after the last unit, for the touched resources only. Their receipts and
+  // the register rows of every slot the lists name for them are read inside it, so what is decided is what is stored
+  // (another window may have applied since).
+  if (touched.size > 0) {
+    const slotKeys = [...named].filter(([, n]) => touched.has(n.entry.resource)).map(([id]) => REGISTER_PREFIX + id)
+    const catalog = new Map<string, ResourceMetadata>()
+    for (const [key, found] of resources) if (found.metadata) catalog.set(key, found.metadata as ResourceMetadata)
+    const now = clock()
+    try {
+      await transactRaw({ keys: [...[...touched].sort().map(receiptKey), ...slotKeys], prefixes: [] }, (found) =>
+        receiptChanges({
+          lists,
+          register: readRegister([...found.rows].map(([key, entry]) => ({ key, entry }))),
+          catalog,
+          versions: input.versions,
+          touched,
+          existing: found.rows,
+          now,
+        }),
+      )
+    } catch (error) {
+      const failure = failureOf('receipts', error)
+      result.failed.push({ ...failure, message: `Units applied; their receipts not written: ${failure.message}` })
+    }
+  }
 
   return result
 }

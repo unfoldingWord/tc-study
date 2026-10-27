@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { gzip, ungzip } from 'pako'
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import {
+  expectedIngestReleaseStamp,
+  ingestSchemaForResourceType,
+  isMatchingIngestReceipt,
+  type ResourceMetadata,
+} from '@bt-synergy/resource-catalog'
 import { packTargetFrom } from '../stores'
 import type { PackLayer, PackVersions } from '../types'
 import { applyParts, type ApplyInput } from './apply'
@@ -110,7 +115,8 @@ describe('applyParts', () => {
 
     expect(result.failed).toEqual([])
     expect(result.applied).toEqual(['book rut', 'book jon', 'shared'])
-    expect(target.committed).toBe(3)
+    // One per unit, and one for the receipts after the last.
+    expect(target.committed).toBe(4)
     expect(result.bytesApplied).toBe(Object.values(parts).reduce((n, p) => n + p.entry.bytes, 0))
     expect(result.originalsReplaced).toBe(false)
     expect(result.completed.sort()).toEqual([TN, TW, UHB].sort())
@@ -119,9 +125,17 @@ describe('applyParts', () => {
     expect(target.rows.get(`tn:${TN}:rut:1`)).toEqual({ ...value(`tn:${TN}:rut:1`), timestamp: NOW })
     expect(target.rows.get(alignKey('rut'))).toEqual({ ...value(alignKey('rut')), timestamp: NOW })
     for (const [key, entry] of target.rows) {
+      if (key.startsWith('resource:')) continue
       expect((entry as { timestamp?: number }).timestamp).toBe(NOW)
       expect(entry as object).not.toHaveProperty('expiresAt')
-      expect(key.startsWith('resource:')).toBe(false)
+    }
+    // Every resource is whole: each has the receipt existing readers look for.
+    expect([...target.rows.keys()].filter((key) => key.startsWith('resource:')).sort()).toEqual([TN, TW, UHB].map((key) => `resource:${key}`).sort())
+    for (const key of [TN, TW, UHB]) {
+      const m = RESOURCES[key]
+      const receipt = target.rows.get(`resource:${key}`)
+      expect(isMatchingIngestReceipt(receipt, expectedIngestReleaseStamp(m), ingestSchemaForResourceType(m.type, '2.3.0-usj'))).toBe(true)
+      expect(receipt).toMatchObject({ content: {}, metadata: { downloadMethod: 'parts', downloadCompletedAt: new Date(NOW).toISOString() } })
     }
 
     const register = registerOf(target)
@@ -154,6 +168,9 @@ describe('applyParts', () => {
     expect(target.rows.has(`tn:${TN}:jon:1`)).toBe(false)
     expect(target.catalog.get(TN)!.availability.offline).toBe(true)
     expect(result.completed).toEqual([UHB])
+    // "Complete" would mislead bt-synergy's readers about a resource held in part.
+    expect(target.rows.has(`resource:${TN}`)).toBe(false)
+    expect(target.rows.has(`resource:${UHB}`)).toBe(true)
   })
 
   test('a replaced slot deletes the keys its new part no longer has and writes the new ones', async () => {
@@ -213,7 +230,7 @@ describe('applyParts', () => {
         { key: `tn:${TN}:rut:1`, entry: whole },
         // Of the Ruth alignments slot: deleted.
         { key: alignKey('rut', 'v1'), entry: whole },
-        // Another slot of the same resource (Jonah), its receipt, other resources and keys of no resource: kept.
+        // Another slot of the same resource (Jonah), other resources and keys of no resource: kept. The receipt: below.
         { key: `tn:${TN}:jon:1`, entry: whole },
         { key: `prepared:notes:${TN}:jon:1:full`, entry: whole },
         { key: `resource:${TN}`, entry: whole },
@@ -239,9 +256,11 @@ describe('applyParts', () => {
     expect(result.failed).toEqual([])
     for (const gone of [`tn:${TN}:rut:2`, `prepared:notes:${TN}:rut:2:full`, alignKey('rut', 'v1')]) expect(target.rows.has(gone)).toBe(false)
     expect(target.rows.get(`tn:${TN}:rut:1`)).toEqual({ ...value(`tn:${TN}:rut:1`), timestamp: NOW })
-    for (const kept of [`tn:${TN}:jon:1`, `prepared:notes:${TN}:jon:1:full`, `resource:${TN}`, `tn:${TN}-extra:rut:1`, `prepared:notes:${TN}-extra:rut:1:full`, `scripture-usj:${UHB}:rut:1`, 'warm-coverage:v1']) {
+    for (const kept of [`tn:${TN}:jon:1`, `prepared:notes:${TN}:jon:1:full`, `tn:${TN}-extra:rut:1`, `prepared:notes:${TN}-extra:rut:1:full`, `scripture-usj:${UHB}:rut:1`, 'warm-coverage:v1']) {
       expect(target.rows.get(kept)).toEqual(whole)
     }
+    // The units leave the receipt; the list names Ruth only, so the resource is whole and its receipt is from parts.
+    expect(target.rows.get(`resource:${TN}`)).toMatchObject({ content: {}, metadata: { downloadMethod: 'parts', releaseStamp: 'v1' } })
   })
 
   test('a book with a row outside its slot fails alone: the other book stays applied, its register untouched', async () => {
@@ -453,6 +472,73 @@ describe('applyParts', () => {
 
     expect(result.failed).toEqual([])
     expect(target.rows).toEqual(before)
+  })
+
+  test('a resource that stops being whole loses its receipt from parts; a whole pack’s receipt stays', async () => {
+    const tnRut = await TN_RUT()
+    const tnJon = await TN_JON()
+    const uhb = await UHB_RUT()
+    const target = memoryTarget()
+    const first = await lists([tnRut, tnJon], [uhb])
+    await run(target, await stagingWith([tnRut, tnJon, uhb]), first.list, first.originals, ALL)
+    expect(target.rows.get(`resource:${TN}`)).toMatchObject({ metadata: { downloadMethod: 'parts' } })
+    // UHB's receipt as a whole pack left it.
+    const whole = { content: {}, metadata: { downloadComplete: true, releaseStamp: 'v1', ingestSchema: 'usj:2.3.0-usj', downloadMethod: 'zip' } }
+    target.rows.set(`resource:${UHB}`, whole)
+
+    // A new release changes both books and the original; only Ruth is applied.
+    const nextRut = await built('book', TN, [row('sot', `tn:${TN}:rut`), row('sot', `tn:${TN}:rut:1`, 'new')], { book: 'rut' })
+    const nextJon = await built('book', TN, [row('sot', `tn:${TN}:jon`), row('sot', `tn:${TN}:jon:1`, 'new')], { book: 'jon' })
+    const nextUhb = await UHB_RUT('new')
+    const second = await lists([nextRut, nextJon], [nextUhb])
+    const register = registerOf(target)
+    const plan = { ...planParts({ list: second.list, originals: second.originals, register, chosen: ALL }), units: ['book rut'] }
+    plan.download = plan.download.filter((p) => p.book === 'rut' && p.resource === TN)
+    const result = await applyParts({ target, staging: await stagingWith([nextRut]), plan, ...second, register, chosen: ALL, versions: VERSIONS, now: () => NOW })
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(result.completed).toEqual([])
+    expect(target.rows.has(`resource:${TN}`)).toBe(false)
+    expect(target.rows.get(`resource:${UHB}`)).toEqual(whole)
+  })
+
+  test('a resource whose every slot is removed loses its receipt from parts', async () => {
+    const tnRut = await TN_RUT()
+    const target = memoryTarget()
+    const first = await lists([tnRut], [])
+    await run(target, await stagingWith([tnRut]), first.list, first.originals, ALL)
+    expect(target.rows.has(`resource:${TN}`)).toBe(true)
+
+    const second = await lists([], [])
+    const result = await run(target, await stagingWith([]), second.list, second.originals, ALL)
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
+    expect(target.rows.has(`resource:${TN}`)).toBe(false)
+  })
+
+  test('receipts are read and written in one transaction after the last unit; its failure is reported', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    const reads: string[][] = []
+    const transact = target.transactRaw!
+    target.transactRaw = async (read, decide) => {
+      reads.push(read.keys)
+      if (read.keys.includes(`resource:${TN}`)) target.failNextTransaction()
+      return transact(read, decide)
+    }
+
+    const result = await run(target, await stagingWith([tnRut]), list, originals, ALL)
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(result.completed).toEqual([TN])
+    expect(reads).toHaveLength(2)
+    expect(reads[1]).toContain(`resource:${TN}`)
+    expect(reads[1]).toContain(REGISTER_PREFIX + idOf(tnRut))
+    expect(result.failed).toEqual([{ unit: 'receipts', reason: 'quota', message: expect.any(String) }])
+    expect(target.rows.has(`resource:${TN}`)).toBe(false)
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(true)
   })
 
   test('packTargetFrom carries the cache store’s transactRaw', async () => {
