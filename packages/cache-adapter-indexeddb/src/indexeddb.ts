@@ -196,15 +196,15 @@ export class IndexedDBCacheAdapter {
       }
 
       const writeAll = () => {
-        let write: RawWrite
+        // Anything thrown here (decide, or a put that cannot be cloned) aborts the whole transaction and rejects with
+        // that error: nothing of the unit is left behind.
         try {
-          write = decide(found)
+          const write = decide(found)
+          for (const { key, entry } of write.puts) store.put({ key, entry })
+          for (const key of write.deletes) store.delete(key)
         } catch (error) {
           fail(error)
-          return
         }
-        for (const { key, entry } of write.puts) store.put({ key, entry })
-        for (const key of write.deletes) store.delete(key)
       }
 
       const oneDone = () => {
@@ -221,7 +221,7 @@ export class IndexedDBCacheAdapter {
         }
       }
       for (const prefix of read.prefixes) {
-        const request = store.getAllKeys(IDBKeyRange.bound(prefix, prefix + '￿'))
+        const request = store.getAllKeys(IDBKeyRange.bound(prefix, prefix + '\uffff'))
         request.onsuccess = () => {
           found.prefixKeys.set(prefix, (request.result ?? []) as string[])
           oneDone()
@@ -231,8 +231,8 @@ export class IndexedDBCacheAdapter {
 
       tx.oncomplete = () => resolve()
       // A failed request or a full disk aborts the transaction; keep the error's name (e.g. QuotaExceededError).
-      tx.onerror = () => {
-        if (failure === undefined) failure = tx.error
+      tx.onerror = (event) => {
+        if (failure === undefined) failure = (event.target as IDBRequest | null)?.error ?? undefined
       }
       tx.onabort = () => reject(failure ?? tx.error ?? new DOMException('Transaction aborted', 'AbortError'))
     })

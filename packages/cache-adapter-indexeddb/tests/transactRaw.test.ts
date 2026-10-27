@@ -77,4 +77,25 @@ describe('IndexedDBCacheAdapter.transactRaw', () => {
     expect((await store.getByPrefix('tn:u/es/tn:')).map((r) => r.key)).toEqual(['tn:u/es/tn:tit'])
     expect((await store.getByPrefix('tn:u/es/tn:'))[0].entry).toEqual(bookShaped as never)
   })
+
+  test.each([
+    ['empty reads', { keys: [], prefixes: [] }],
+    ['non-empty reads', { keys: ['a'], prefixes: ['b'] }],
+  ])('a write that fails midway leaves the store exactly as it was (%s)', async (_name, read) => {
+    const store = await seeded(`tx-atomic-${_name.replace(' ', '-')}`, [row('a', 1), row('b', 2)])
+    const before = await store.getByPrefix('')
+
+    const failure = await store
+      .transactRaw(read, () => ({
+        puts: [row('c', 3), { key: 'd', entry: { content: () => 'a function cannot be cloned' } as never }],
+        deletes: ['a'],
+      }))
+      .then(
+        () => undefined,
+        (error: unknown) => error as { name?: string },
+      )
+
+    expect(failure?.name).toBe('DataCloneError')
+    expect(await store.getByPrefix('')).toEqual(before)
+  })
 })
