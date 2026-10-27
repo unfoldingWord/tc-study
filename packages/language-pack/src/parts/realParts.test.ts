@@ -7,8 +7,9 @@
  * store with all units chosen. The rows of the part layers must be the same, keys and values, volatile fields left out.
  * Receipts and register rows are not compared: they are written by different paths on purpose (`receipts.ts`); they
  * are counted. Any other row outside the part layers fails the test, listed by family. The catalog rows must be the
- * same too, bookkeeping left out, except the release fields of a resource the whole pack has at another release than
- * the list's stamp (a release published between the two builds whose rows did not change): those are printed.
+ * same too, bookkeeping left out, except `version`, `release.tag_name` and `release.published_at` of a resource the
+ * whole pack has at another release than the list's stamp (a release published between the two builds whose rows did
+ * not change): those are printed.
  */
 
 import { describe, expect, test } from 'bun:test'
@@ -126,8 +127,10 @@ describe.skipIf(!FOLDER)('the q9-a12 whole packs and their parts', () => {
       // A catalog row may differ only in its release, and only when the inputs are of another release.
       const listStamps = { ...originals.stamps, ...list.stamps }
       const withoutRelease = (row: unknown) => {
-        const { version: _version, release: _release, ...rest } = withoutBookkeeping(row) as Record<string, unknown>
-        return stableJson(rest)
+        const { version: _version, release, ...rest } = withoutBookkeeping(row) as Record<string, unknown>
+        if (release === undefined) return stableJson(rest)
+        const { tag_name: _tag, published_at: _published, ...releaseRest } = release as Record<string, unknown>
+        return stableJson({ ...rest, release: releaseRest })
       }
       const catalogDiffer: string[] = []
       const catalogMoved: string[] = []
