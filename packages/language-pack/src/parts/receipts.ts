@@ -43,6 +43,13 @@ export type ReceiptInput = {
   register: Register
   /** Catalog rows by resource key (the originals list's for the resources it carries): the release stamp and type. */
   catalog: Map<string, ResourceMetadata>
+  /**
+   * The device's catalog rows as they are after this call refreshed them (absent or null: none). Readers compare a
+   * receipt with these, so a receipt is written only when the device's row has the list's release stamp.
+   */
+  stored: Map<string, ResourceMetadata | null>
+  /** Resources whose receipts this call leaves as they are: their catalog row could not be refreshed or read. */
+  kept?: Iterable<string>
   /** This app's processing versions: `sot.usjProcessing` names the scripture schema. */
   versions: PackVersions
   /**
@@ -57,24 +64,30 @@ export type ReceiptInput = {
 }
 
 /**
- * The receipts to write and delete in the pass's scope: a receipt for each whole resource whose catalog row has a
- * release stamp, unless the one there already matches that stamp and schema; a delete for each resource not whole
- * (the lists naming none of its parts included) whose receipt is from parts.
+ * The receipts to write and delete in the pass's scope (`kept` left out): a receipt for each whole resource whose
+ * catalog row in the list has a release stamp and the device's row the same one, unless the one there already matches
+ * that stamp and schema; a delete for each resource not whole (the lists naming none of its parts included) whose
+ * receipt is from parts.
  */
 export function receiptChanges(input: ReceiptInput): { puts: CacheRow[]; deletes: string[] } {
   const [list, originals] = input.lists
   const coverage = partsCoverage({ list, originals, register: input.register, chosen: [] })
   const usj = input.versions.sot?.usjProcessing
+  const kept = new Set(input.kept ?? [])
   const puts: CacheRow[] = []
   const deletes: string[] = []
   for (const key of receiptScope(input.lists, input.touched)) {
+    if (kept.has(key)) continue
     const existing = input.existing.get(receiptKey(key))
     const existingMeta = readIngestReceiptMeta(existing)
     if (coverage.get(key)?.whole === true) {
       const metadata = input.catalog.get(key)
+      const stamp = expectedIngestReleaseStamp(metadata)
+      // The device's row names another release (or none): a receipt of the list's would read as stale; leave it.
+      if (!stamp || expectedIngestReleaseStamp(input.stored.get(key)) !== stamp) continue
       const ingestSchema = ingestSchemaForResourceType(metadata?.type, usj === undefined ? undefined : String(usj))
       // Already a receipt readers accept for this release: nothing to write.
-      if (isMatchingIngestReceipt(existing, expectedIngestReleaseStamp(metadata), ingestSchema)) continue
+      if (isMatchingIngestReceipt(existing, stamp, ingestSchema)) continue
       const receipt = buildIngestReceiptFromCatalog(metadata, { ingestSchema, downloadMethod: PARTS_DOWNLOAD_METHOD })
       // No release stamp: no receipt a reader could match, and nothing known to be stale.
       if (!receipt) continue

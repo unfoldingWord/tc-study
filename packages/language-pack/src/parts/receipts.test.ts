@@ -53,7 +53,7 @@ const held = (...entries: PartEntry[]): Register =>
   new Map(entries.map((e) => [slotId(slotOfEntry(e)), { sha256: e.sha256, keys: [], list: e.kind === 'original' ? 'originals' : 'es-419', at: '' }]))
 
 const changes = (extra: Partial<ReceiptInput>) =>
-  receiptChanges({ lists: LISTS, register: new Map(), catalog: CATALOG, versions: VERSIONS, touched: [TN, ULT, UHB], existing: new Map(), now: NOW, ...extra })
+  receiptChanges({ lists: LISTS, register: new Map(), catalog: CATALOG, stored: CATALOG, versions: VERSIONS, touched: [TN, ULT, UHB], existing: new Map(), now: NOW, ...extra })
 
 const receiptFrom = (method: string) => ({
   content: {},
@@ -178,6 +178,26 @@ describe('receiptChanges', () => {
     const { puts, deletes } = changes({ register: held(TN_RUT, TN_JON), catalog, touched: [TN], existing })
 
     expect(puts).toEqual([])
+    expect(deletes).toEqual([])
+  })
+
+  test('a whole resource whose device catalog row names another release keeps the receipt it has', () => {
+    const v0 = { content: {}, metadata: { downloadComplete: true, releaseStamp: 'v0', ingestSchema: 'helps:1', downloadMethod: 'parts' } }
+    const existing = new Map<string, unknown>([[receiptKey(TN), v0]])
+    const stored = new Map<string, ResourceMetadata | null>(CATALOG).set(TN, meta(TN, 'notes', { tag_name: 'v0' }))
+    stored.delete(ULT)
+    const { puts, deletes } = changes({ register: held(TN_RUT, TN_JON, ULT_RUT, UHB_RUT), stored, existing })
+
+    // TN: the device still says v0; ULT: the device has no row. Only UHB's matches.
+    expect(puts.map((p) => p.key)).toEqual([receiptKey(UHB)])
+    expect(deletes).toEqual([])
+  })
+
+  test('resources kept by the call are neither written nor deleted', () => {
+    const existing = new Map<string, unknown>([[receiptKey(TN), receiptFrom('parts')]])
+    const { puts, deletes } = changes({ register: held(TN_RUT, ULT_RUT, UHB_RUT), kept: [TN, ULT], existing })
+
+    expect(puts.map((p) => p.key)).toEqual([receiptKey(UHB)])
     expect(deletes).toEqual([])
   })
 

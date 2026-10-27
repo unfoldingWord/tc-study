@@ -7,11 +7,13 @@
  * part no longer has; the first time a slot is filled, rows of that slot's resource found by its key prefixes that
  * `slotOfRow` places in that very slot; and the keys of a slot this language's list put there and no longer names.
  * Units never touch receipts: after the last unit, one more transaction writes the receipts of the named or touched
- * resources that are whole and deletes the receipts from parts of those that are not (`receipts.ts`). A call refused
- * whole (other versions, parts not staged) writes nothing, receipts included.
+ * resources that are whole and deletes the receipts from parts of those that are not (`receipts.ts`); before it, the
+ * catalog rows of named resources whose release stamp changed are refreshed, so receipts match the device's rows. A
+ * call refused whole (other versions, parts not staged, a target without `transactRaw` or `catalogRow`) writes
+ * nothing, receipts included.
  */
 
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { belongsTo, scansFor } from '../keys'
 import type { CacheRow, PackLayer, PackTarget, PackVersions } from '../types'
 import { PART_LAYERS, readPart, sha256Hex, type PartRow } from './partFile'
@@ -160,6 +162,10 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   const transactRaw = target.transactRaw?.bind(target)
   if (!transactRaw) {
     throw new Error('This store cannot apply parts: it has no transactRaw (one transaction per unit). Update the cache adapter.')
+  }
+  const catalogRow = target.catalogRow?.bind(target)
+  if (!catalogRow) {
+    throw new Error('This store cannot apply parts: it cannot read catalog rows (catalogRow), which receipts are decided against.')
   }
   const clock = input.now ?? Date.now
   const result: ApplyResult = { applied: [], failed: [], completed: [], originalsReplaced: false, bytesApplied: 0 }
@@ -345,23 +351,59 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   const coverage = partsCoverage({ list, originals, register, chosen })
   result.completed = [...touched].filter((key) => coverage.get(key)?.whole === true).sort()
 
+  const catalog = new Map<string, ResourceMetadata>()
+  for (const [key, found] of resources) if (found.metadata) catalog.set(key, found.metadata as ResourceMetadata)
+
+  // Catalog rows of a new release (spec §3): a release that changed tags but no part gives no unit, yet the device's
+  // row must name it, or the loaders' stamps and the receipts below would compare against the old one. Every resource
+  // the lists name with a held part in the chosen units gets the list's row when its stamp differs from the device's.
+  const kept = new Set<string>()
+  const refreshAt = clock()
+  const stale: string[] = []
+  for (const [key, c] of coverage) {
+    if (c.present === 0 || !catalog.has(key)) continue
+    try {
+      if (resourceContentStamp(await catalogRow(key)) !== resourceContentStamp(catalog.get(key))) stale.push(key)
+    } catch (error) {
+      kept.add(key)
+      result.failed.push({ unit: 'catalog', reason: 'error', message: `Catalog row of ${key} not read: ${failureOf('catalog', error).message}` })
+    }
+  }
+  if (stale.length) {
+    try {
+      await target.putCatalogRows(await catalogRows(stale, refreshAt, async (key) => isOffline(coverage, key)))
+    } catch (error) {
+      for (const key of stale) kept.add(key)
+      result.failed.push({ unit: 'catalog', reason: 'error', message: `Catalog rows of ${stale.join(', ')} not refreshed to their new release: ${failureOf('catalog', error).message}` })
+    }
+  }
+
   // Receipts (spec §4): one more transaction after the last unit, on every call that gets this far (an empty plan
   // included), over the resources the lists name and those touched, so a receipt a failed pass left out is written by
   // the next call. Their receipts and the register rows of every slot the lists name are read inside it, so what is
-  // decided is what is stored (another window may have applied since).
-  const catalog = new Map<string, ResourceMetadata>()
-  for (const [key, found] of resources) if (found.metadata) catalog.set(key, found.metadata as ResourceMetadata)
-  const receiptKeys = receiptScope(lists, touched).map(receiptKey)
+  // decided is what is stored (another window may have applied since). A receipt is written only against the device's
+  // catalog row as it is now: readers compare it with that row's stamp.
+  const scope = receiptScope(lists, touched)
+  const stored = new Map<string, ResourceMetadata | null>()
+  for (const key of scope) {
+    try {
+      stored.set(key, await catalogRow(key))
+    } catch {
+      kept.add(key)
+    }
+  }
   const slotKeys = [...named.keys()].map((id) => REGISTER_PREFIX + id)
   const receiptsAt = clock()
   try {
-    await transactRaw({ keys: [...receiptKeys, ...slotKeys], prefixes: [] }, (found) =>
+    await transactRaw({ keys: [...scope.map(receiptKey), ...slotKeys], prefixes: [] }, (found) =>
       receiptChanges({
         lists,
         register: readRegister([...found.rows].map(([key, entry]) => ({ key, entry }))),
         catalog,
+        stored,
         versions: input.versions,
         touched,
+        kept,
         existing: found.rows,
         now: receiptsAt,
       }),

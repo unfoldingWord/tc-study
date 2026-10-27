@@ -191,7 +191,11 @@ no longer whole. `applyParts` applies these in one more `transactRaw` after the 
 the input also takes `touched`, `existing` — the receipts read in that transaction — and `now`; the pass runs on every
 call not refused, an empty plan included, over the resources the lists name plus those touched, with the register
 read inside the transaction; it skips a receipt `isMatchingIngestReceipt` already accepts and carries
-`absentFromRelease` from a receipt of the same release. Apps call `applyParts` at startup, so receipts heal.)
+`absentFromRelease` from a receipt of the same release. Apps call `applyParts` at startup, so receipts heal.
+Fix round 2: before the pass, each call refreshes the catalog rows of named resources with a held chosen part whose
+release stamp changed (a tags-only release gives no unit); a failed write is `failed` unit `catalog` and keeps that
+resource's receipt. Receipts are decided against the device's stored row (`stored`, `kept` inputs): written only when
+its stamp equals the list's. A target without `catalogRow` is refused.)
 
 - [ ] **Step 1: Tests**: whole resource → receipt with `releaseStamp` of its catalog row, `ingestSchema`
   `usj:{version}` for scripture and `helps:1` for notes, `downloadMethod: 'parts'`; a resource chosen in part → none;

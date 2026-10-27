@@ -90,6 +90,11 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
   part of that resource within the chosen units is present; if that fails, only the flag is stale (reported as an
   error, the unit is applied).
 - After each unit commits, its parts are deleted from staging (a failed delete is harmless).
+- **The catalog of a new release, on every call**: a release may change tags and no part (the common case), which
+  gives no unit. So after the units, every call that is not refused rewrites the catalog row of each resource the
+  lists name that has a held part in the chosen units, when the device's row (`catalogRow`) has another release stamp
+  than the list's (through `restoreCatalogBookkeeping`, `offline` as above). A failed write is reported (`catalog`,
+  an error) and that resource's receipt is left as it is in this call. A target without `catalogRow` is refused.
 - **Result**: units applied, units failed (with the reason), resources completed, `originalsReplaced`, bytes applied.
 
 ### 4. Receipts and completeness
@@ -103,6 +108,9 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
   name plus those the call touched, reading the receipts and the register inside its transaction. A receipt readers
   already accept for the release is left as it is (no rewrite); `absentFromRelease` is carried from a receipt of the
   same release. Apps call `applyParts` at startup, so a receipt a failed pass left out is written then.
+- Receipts are decided against the device's stored catalog row, read after the refresh above: a receipt is written
+  only when that row's release stamp is the list's, since readers compare the receipt with that row. Otherwise the
+  receipt there is left as it is.
 - On a new release the receipt is written again with the new stamp when the resource is complete again; until then it
   reads as the previous release.
 - If a resource stops being complete (a slot that the list no longer names was removed), its receipt is deleted, only

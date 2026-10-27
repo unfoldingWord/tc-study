@@ -571,6 +571,66 @@ describe('applyParts', () => {
     expect(target.rows.get(`resource:${TN}`)).toMatchObject({ metadata: { downloadMethod: 'parts' } })
   })
 
+  const restamped = (l: PartsList, tag: string): PartsList => ({
+    ...l,
+    resources: l.resources.map((r) => ({ ...r, metadata: { ...(r.metadata as object), release: { tag_name: tag } } })),
+  })
+  const schemaOf = (m: ResourceMetadata) => ingestSchemaForResourceType(m.type, '2.3.0-usj')
+
+  test('a release that changed tags and no part: the catalog rows and receipts follow it, matching each other', async () => {
+    const tnRut = await TN_RUT()
+    const uhb = await UHB_RUT()
+    const target = memoryTarget()
+    const first = await lists([tnRut], [uhb])
+    await run(target, await stagingWith([tnRut, uhb]), first.list, first.originals, ALL)
+    expect(target.rows.get(`resource:${TN}`)).toMatchObject({ metadata: { releaseStamp: 'v1' } })
+
+    const list = restamped(first.list, 'v2')
+    const originals = restamped(first.originals, 'v2')
+    const result = await run(target, await stagingWith([]), list, originals, ALL)
+
+    expect(result.applied).toEqual([])
+    expect(result.failed).toEqual([])
+    for (const key of [TN, UHB]) {
+      const row = target.catalog.get(key)!
+      expect(row.release?.tag_name).toBe('v2')
+      expect(row.availability.offline).toBe(true)
+      const receipt = target.rows.get(`resource:${key}`)
+      expect(receipt).toMatchObject({ metadata: { releaseStamp: 'v2', downloadMethod: 'parts' } })
+      expect(isMatchingIngestReceipt(receipt, expectedIngestReleaseStamp(row), schemaOf(row))).toBe(true)
+    }
+  })
+
+  test('a catalog row that cannot be refreshed to the new release keeps its receipt, matching the old row', async () => {
+    const tnRut = await TN_RUT()
+    const target = memoryTarget()
+    const first = await lists([tnRut], [])
+    await run(target, await stagingWith([tnRut]), first.list, first.originals, ALL)
+    const receipt = target.rows.get(`resource:${TN}`)
+    target.putCatalogRows = async () => {
+      throw new Error('catalog closed')
+    }
+
+    const result = await run(target, await stagingWith([]), restamped(first.list, 'v2'), first.originals, ALL)
+
+    expect(result.failed).toEqual([{ unit: 'catalog', reason: 'error', message: expect.stringContaining('catalog closed') }])
+    const row = target.catalog.get(TN)!
+    expect(row.release?.tag_name).toBe('v1')
+    expect(target.rows.get(`resource:${TN}`)).toEqual(receipt)
+    expect(isMatchingIngestReceipt(receipt, expectedIngestReleaseStamp(row), schemaOf(row))).toBe(true)
+  })
+
+  test('a target that cannot read catalog rows is refused at once, nothing written', async () => {
+    const tnRut = await TN_RUT()
+    const { list, originals } = await lists([tnRut], [])
+    const target = memoryTarget()
+    delete (target as { catalogRow?: unknown }).catalogRow
+
+    await expect(run(target, await stagingWith([tnRut]), list, originals, ALL)).rejects.toThrow('catalogRow')
+    expect(target.rows.size).toBe(0)
+    expect(target.catalog.size).toBe(0)
+  })
+
   test('packTargetFrom carries the cache store’s transactRaw', async () => {
     const calls: unknown[] = []
     const catalog = { get: async () => null, getAll: async () => [], set: async () => {} }
