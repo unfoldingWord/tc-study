@@ -5,8 +5,10 @@
  *
  * The whole packs go into one store with `importLanguagePack`; every part is staged and `applyParts` fills another
  * store with all units chosen. The rows of the part layers must be the same, keys and values, volatile fields left out.
- * Receipts and register rows are not compared: they are written by different paths on purpose (`receipts.ts`). Rows
- * of the whole packs outside the part layers are listed by family, not hidden.
+ * Receipts and register rows are not compared: they are written by different paths on purpose (`receipts.ts`); they
+ * are counted. Any other row outside the part layers fails the test, listed by family. The catalog rows must be the
+ * same too, bookkeeping left out, except the release fields of a resource the whole pack has at another release than
+ * the list's stamp (a release published between the two builds whose rows did not change): those are printed.
  */
 
 import { describe, expect, test } from 'bun:test'
@@ -17,7 +19,7 @@ import { importLanguagePack, readPackManifest } from '../pack'
 import type { PackLayer } from '../types'
 import { applyParts } from './apply'
 import { PART_LAYERS, stableJson, stripVolatile } from './partFile'
-import { unitOfPart, type PartsList } from './partsList'
+import { unitOfPart, withoutBookkeeping, type PartsList } from './partsList'
 import { planParts } from './plan'
 import { REGISTER_PREFIX } from './register'
 import { memoryByteStore, stagingFrom } from './staging'
@@ -54,9 +56,11 @@ describe.skipIf(!FOLDER)('the q9-a12 whole packs and their parts', () => {
 
       // A: the whole packs, each with its own versions (the parts list's must be the same, or apply refuses).
       const whole = memoryTarget()
+      const packStamps = new Map<string, string | undefined>()
       for (const name of ['originals.langpack.zip', 'es-419.langpack.zip']) {
         const bytes = read(name)
         const manifest = await readPackManifest(bytes)
+        for (const r of manifest.resources) packStamps.set(r.key, r.stamp)
         const imported = await importLanguagePack({ bytes, target: whole, versions: manifest.versions })
         console.log(`${name}: ${imported.written} rows written, ${imported.keptExisting} kept, skipped layers [${imported.skippedLayers.join(', ')}], skipped resources [${imported.skippedResources.join(', ')}]`)
         expect(imported.skippedLayers).toEqual([])
@@ -75,6 +79,8 @@ describe.skipIf(!FOLDER)('the q9-a12 whole packs and their parts', () => {
       const plan = planParts({ list, originals, register: new Map(), chosen })
       const applied = await applyParts({ target: parts, staging, plan, list, originals, register: new Map(), chosen, versions: list.versions! })
       console.log(`parts: ${shas.size} staged, ${plan.download.length} planned in ${plan.units.length} units, ${applied.applied.length} applied, ${applied.completed.length} resources whole`)
+      expect(plan.download.length).toBeGreaterThan(0)
+      expect(applied.applied.length).toBeGreaterThan(0)
       expect(applied.failed).toEqual([])
       expect(applied.applied).toEqual(plan.units)
 
@@ -117,12 +123,33 @@ describe.skipIf(!FOLDER)('the q9-a12 whole packs and their parts', () => {
       console.log(`rows compared: whole ${a.size}, parts ${b.size}; equal by layer ${JSON.stringify(Object.fromEntries([...perLayer].sort()))}`)
       console.log(`not compared (receipts, register): ${JSON.stringify(Object.fromEntries([...skipped].sort()))}`)
       console.log(`left out: ${ignored.size ? JSON.stringify(Object.fromEntries([...ignored].sort())) : 'nothing'}`)
-      console.log(`catalog: whole ${whole.catalog.size} rows, parts ${parts.catalog.size} rows; only in whole [${[...whole.catalog.keys()].filter((k) => !parts.catalog.has(k)).join(', ')}], only in parts [${[...parts.catalog.keys()].filter((k) => !whole.catalog.has(k)).join(', ')}]`)
+      // A catalog row may differ only in its release, and only when the inputs are of another release.
+      const listStamps = { ...originals.stamps, ...list.stamps }
+      const withoutRelease = (row: unknown) => {
+        const { version: _version, release: _release, ...rest } = withoutBookkeeping(row) as Record<string, unknown>
+        return stableJson(rest)
+      }
+      const catalogDiffer: string[] = []
+      const catalogMoved: string[] = []
+      for (const [key, row] of whole.catalog) {
+        const other = parts.catalog.get(key)
+        if (!other || stableJson(withoutBookkeeping(row)) === stableJson(withoutBookkeeping(other))) continue
+        const moved = packStamps.get(key) !== undefined && listStamps[key] !== undefined && packStamps.get(key) !== listStamps[key]
+        if (moved && withoutRelease(row) === withoutRelease(other)) catalogMoved.push(`${key} (whole ${packStamps.get(key)}, list ${listStamps[key]})`)
+        else catalogDiffer.push(key)
+      }
+      console.log(`catalog: whole ${whole.catalog.size} rows, parts ${parts.catalog.size} rows; different without bookkeeping [${catalogDiffer.join(', ')}]`)
+      console.log(`catalog: at another release in the inputs, rows the same, release fields differ [${catalogMoved.join(', ')}]`)
       for (const [name, keys] of [['only in the whole packs', onlyWhole], ['only in the parts', onlyParts], ['different values', differ]] as const) {
         if (keys.length) console.log(`${name}: ${keys.length}\n  ${keys.sort().slice(0, 20).join('\n  ')}`)
       }
       expect({ onlyWhole: onlyWhole.length, onlyParts: onlyParts.length, differ: differ.length }).toEqual({ onlyWhole: 0, onlyParts: 0, differ: 0 })
+      // Only receipts and register rows may be left out of the comparison.
+      expect(Object.fromEntries(ignored)).toEqual({})
+      expect([...parts.catalog.keys()].sort()).toEqual([...whole.catalog.keys()].sort())
+      expect(catalogDiffer).toEqual([])
     },
-    { timeout: 900_000 },
+    // About 130 s on an idle machine; ten minutes were seen on a loaded one.
+    { timeout: 1_800_000 },
   )
 })
