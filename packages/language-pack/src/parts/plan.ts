@@ -34,6 +34,9 @@ export function compareUnits(a: string, b: string): number {
   return ra - rb || (na < nb ? -1 : na > nb ? 1 : 0)
 }
 
+/** The originals list's `language`, and the `list` of the register records it wrote. */
+const ORIGINALS_LIST = 'originals'
+
 /** The kinds the originals list owns: when both lists name one of these slots, the originals list's entry wins. */
 const ORIGINALS_KINDS = new Set(['original', 'macula'])
 
@@ -66,7 +69,10 @@ export type PlanInput = {
 export type PartsPlan = {
   /** Parts of the chosen units whose slot the device lacks or holds with another sha, one per slot. */
   download: PartEntry[]
-  /** Slot ids the device holds in the chosen units that neither list names any more. */
+  /**
+   * Slot ids this language's list put on the device (`record.list` is its `language`) in the chosen units that the
+   * lists no longer name. Another language's slots and the originals' are never removed by a plan.
+   */
   remove: string[]
   /** The chosen units `download` or `remove` touch, in apply order (`compareUnits`). */
   units: string[]
@@ -74,7 +80,18 @@ export type PartsPlan = {
   bytes: number
 }
 
+/**
+ * A language list that names an originals list was built against it: planned without it, every original and MACULA
+ * part it holds would be missed (the builder puts them in the originals list only).
+ */
+function requireOriginals(input: PlanInput): void {
+  if (input.list.originals && !input.originals) {
+    throw new Error(`The ${input.list.language} parts list names an originals list (${input.list.originals.path}); pass it as \`originals\``)
+  }
+}
+
 export function planParts(input: PlanInput): PartsPlan {
+  requireOriginals(input)
   const chosen = new Set(input.chosen)
   const named = namedParts(input.list, input.originals)
   const touched = new Set<string>()
@@ -86,7 +103,10 @@ export function planParts(input: PlanInput): PartsPlan {
     touched.add(unit)
   }
   const remove: string[] = []
-  for (const id of input.register.keys()) {
+  for (const [id, record] of input.register) {
+    // Only this language's own slots: the register is shared by every language on the device, and the originals are
+    // shared by all of them (replaced when a list names another sha, never removed).
+    if (record.list !== input.list.language || input.list.language === ORIGINALS_LIST) continue
     const unit = unitOfSlotId(id)
     if (!chosen.has(unit) || named.has(id)) continue
     remove.push(id)
@@ -107,6 +127,7 @@ export type Coverage = Map<string, { present: number; missing: number; missingBy
  * sha) and missing, the missing ones' bytes, and whether every part the lists name for it is held, chosen or not.
  */
 export function partsCoverage(input: PlanInput): Coverage {
+  requireOriginals(input)
   const chosen = new Set(input.chosen)
   const coverage: Coverage = new Map()
   for (const [id, { entry }] of namedParts(input.list, input.originals)) {

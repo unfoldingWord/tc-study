@@ -34,8 +34,8 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 
 - **`planParts(input) → PartsPlan`** (pure, `language-pack/src/parts/`). Input: the language list, the originals list,
   the register (what the device holds), and the chosen units (`shared`, `book <b>`). Output: the parts to download
-  (missing slots, or slots whose sha differs), the slots the list no longer names within the chosen units, and the
-  total bytes. It touches nothing.
+  (missing slots, or slots whose sha differs), this language's slots the list no longer names within the chosen
+  units (§2), and the total bytes. It touches nothing.
 - **`PartsStaging`** (interface in `language-pack`): `put(sha, bytes)` (refuses bytes whose sha256 is not `sha`),
   `get(sha)`, `has(sha)`, `delete(sha)`, `list()`. IndexedDB implementation in `cache-adapter-indexeddb`, in its own
   database with a configurable name (Servos: `servos-partes`), so the resources database keeps its version.
@@ -51,8 +51,11 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
   part's row keys (chapter chunks included); `list` is the language or `originals`. The slot id includes the group.
 - Replacing a slot, in one transaction: delete the old register's keys the new part no longer has; put every row of
   the new part; put the register row. Shared keys are overwritten.
-- A slot in the register that the new list no longer names, within the chosen units: its keys and its register row
-  are deleted. Slots outside the chosen units are not touched.
+- A slot in the register that this language's list put there (its record's `list` is the list's language) and that
+  the new lists no longer name, within the chosen units: its keys and its register row are deleted. Slots outside
+  the chosen units are not touched, nor are another language's slots (the register is shared by every language on
+  the device). Slots from the originals list (`list` is `originals`) are never removed by a plan, since every
+  language shares them; they are only replaced when a list names another sha.
 - Every row written gets `timestamp` = apply time and no `expiresAt`: part rows do not expire; the register removes
   them when a part replaces them.
 - Rows from before parts (whole packs): the first time a resource's slot is applied by parts, rows of that resource
@@ -78,8 +81,8 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
   book for English).
 - **The catalog, after each unit**: the catalog rows of that unit's resources, from the list, through
   `restoreCatalogBookkeeping`. Between the unit's transaction and its catalog rows an aligned quote may miss for a
-  moment (the book stamp is still the old one); it is never wrong. `availability.offline = true` when every chosen
-  part of that resource is in the register.
+  moment (the book stamp is still the old one); it is never wrong. `availability.offline = true` when every part
+  of that resource within the chosen units is present.
 - After each unit commits, its parts are deleted from staging (a failed delete is harmless).
 - **Result**: units applied, units failed (with the reason), resources completed, `originalsReplaced`, bytes applied.
 

@@ -123,7 +123,9 @@ function partsCoverage(input: PlanInput): Coverage   // whole: every part the li
 ```
 Rules: a part is in scope when `unitOfPart(entry)` is chosen; `download` = in-scope parts whose slot is absent or has
 another sha (deduplicated by slot; the originals list's entry wins for `original`/`macula`); `remove` = register slots
-in chosen units that neither list names; `units` = chosen units touched by `download` or `remove`, in the order of
+whose `record.list === list.language`, in chosen units, that neither list names (another language's slots and
+`originals` slots are never removed by a plan; originals are only replaced by another sha); `planParts` and
+`partsCoverage` throw when `list.originals` is set and `originals` is not given; `units` = chosen units touched by `download` or `remove`, in the order of
 Global Constraints; `bytes` = sum of `download[].bytes`.
 
 - [ ] **Step 1: Tests** with small hand-made lists (two books, one shared group, an originals list): first plan (all
@@ -158,7 +160,8 @@ register does not know yet, its key prefixes (`tn:{rk}:`, `prepared:` … — de
 this slot and not in the new part + all keys and the register row of `plan.remove` slots of this unit; puts = rows
 with `timestamp` = now and no `expiresAt` + the register rows. A `QuotaExceededError` → `quota`. After the unit
 commits: `putCatalogRows` for the unit's resources from the list (`restoreCatalogBookkeeping(metadata, now)`, with
-`availability.offline` = coverage `whole` for that resource after this unit), then `staging.delete` each applied sha
+`availability.offline` = every part of that resource within the chosen units present after this unit: coverage
+`missing === 0 && present > 0`), then `staging.delete` each applied sha
 (ignore errors). `originalsReplaced` = an `original`/`macula` slot already held another sha.
 
 - [ ] **Step 1: Tests** (memory target, hand-made parts built with `writePart`): first download of two books + shared;
