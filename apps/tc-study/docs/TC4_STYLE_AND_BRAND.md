@@ -1,7 +1,7 @@
 # tC Study on the translationCore family style and brand — design spec
 
-Status: **design, approved in conversation 2026-10-28; awaiting review of this written spec.**
-Nothing here is built yet. An implementation plan follows once this spec is approved.
+Status: **approved by the owner 2026-10-28.** Plan: `apps/tc-study/docs/TC4_STYLE_AND_BRAND_PLAN.md`.
+Nothing here is built yet.
 
 Sources read on 2026-10-28:
 - this repository at `868a7cc`;
@@ -25,7 +25,7 @@ family, by its name, its colours, its type and its controls. Nothing the app doe
 | D1 | The app is named **tC Study**. Its full name is **translationCore Study**. |
 | D2 | **Dark mode stays.** Its values come from tC4's own dark-ground rules (§5.3), not from a palette invented here. |
 | D3 | Scope is **`apps/tc-study` only**. `apps/tc-study-next`, `apps/mobile` (Expo) and the packages are not touched. |
-| D4 | **No logo until unfoldingWord approves one.** The wordmark is text. The broken favicon link goes. A later PR adds the approved mark. |
+| D4 | **The logo is designed by this project, on its own track.** It is modelled on the tC4 mark and informed by the tC Admin favicon and the tC Mobile icon. The project owner approves it; nobody else needs to. Until it lands, the wordmark is text and the broken favicon link goes. The logo PR adds the mark. |
 | D5 | **Approach A:** tC4's token values go *under the token names tc-study already uses*. Components are migrated screen by screen. tC4's components are not ported; they are a visual reference only. |
 
 Out of scope, and to be decided separately if wanted:
@@ -50,8 +50,8 @@ Naming rules:
 - Write "translationCore" with a lower-case t and a capital C, with no space.
 - The short form is "tC" + name.
 - Marketing copy carries ®.
-- tC4's licence says the translationCore name and logo need unfoldingWord's written permission. D4
-  follows from that.
+- tC Study is an unfoldingWord project, so it uses the translationCore name and designs its own mark
+  in the family's style (D4).
 
 ## 4. The tC4 style, as tokens
 
@@ -240,9 +240,7 @@ values are composited to solid hex, so Tailwind opacity modifiers (`bg-muted/50`
 | overlay | `rgb(0 10 16 / 0.65)` | darker scrim over a dark app |
 
 Every pair in this table that carries text clears 4.5:1. The values were measured with the WCAG
-formula; PR 2 rechecks them in the browser. The dark theme is new to the family, so PR 2's
-description asks for the tC4 design-system owner's opinion. A change they ask for is a value edit in
-`index.css`.
+formula; PR 2 rechecks them in the browser. Any later change is a value edit in `index.css`.
 
 ### 5.4 Shape (PR 3)
 
@@ -359,8 +357,8 @@ plain ban.
   CI. PRs 2 and 3 should be merged together, so the app is never half-way between palettes and shapes.
   Between PR 3 and PR 5e, screens not yet migrated show tC4 colours on the old component shapes. That
   is acceptable for a beta, but it is the owner's call when to start merging.
-- **The design system has an owner.** tC Study becomes a second copy of the tokens, as tC Admin is.
-  Before PR 2 merges, the tC4 owner is told, and is shown the dark theme (§5.3).
+- **Token drift.** tC Study holds a copy of the tC4 tokens, as tC Admin does. Each block in
+  `tc4-tokens.css` names its tC4 source file, so a later tC4 change can be compared and copied.
 
 ## 8. Order, size and testing
 
@@ -371,7 +369,7 @@ plain ban.
 | 3 | Radius, shadows, scrollbars, focus (§5.4) | 1 day |
 | 4 | Base components, adopted on Settings (§5.5) | 2–3 days |
 | 5a–5e | Screens (§5.6) | 3–5 days |
-| later | Approved logo: favicon, manifest icons, wordmark mark (D4) | 0.5 day |
+| logo | The mark from the logo track: favicon, manifest icons, symbol beside the wordmark (D4) | 0.5 day after the design |
 
 The total is about 9–12 days.
 
