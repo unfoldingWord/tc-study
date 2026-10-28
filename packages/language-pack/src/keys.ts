@@ -8,6 +8,7 @@
  * - quote     `helps-quote:{key}@…` (the helps resource comes first)
  * - align     `helps-align:{key}@…`
  * - text      `helps-text:{kind}:{key}@…`
+ * - index     `index:verses:{key}:{book}`, `index:strong:{key}:{code}:{book}` (originals only)
  */
 
 import type { PackLayer } from './types'
@@ -25,7 +26,19 @@ export function scansFor(resourceKey: string): Array<{ prefix: string; layer: Pa
     { prefix: `helps-quote:${resourceKey}@`, layer: 'quote' },
     { prefix: `helps-align:${resourceKey}@`, layer: 'align' },
     { prefix: 'helps-text:', layer: 'text' },
+    { prefix: `index:verses:${resourceKey}:`, layer: 'index' },
+    { prefix: `index:strong:${resourceKey}:`, layer: 'index' },
   ]
+}
+
+/** The row of an original's book that numbers its verses: where each verse's words start. */
+export function indexVersesKey(originalKey: string, book: string): string {
+  return `index:verses:${originalKey}:${book.toLowerCase()}`
+}
+
+/** The row that lists the words of one Strong code (`strongCodesOf`) in one book of an original. */
+export function indexStrongKey(originalKey: string, code: string, book: string): string {
+  return `index:strong:${originalKey}:${code}:${book.toLowerCase()}`
 }
 
 /**
@@ -64,7 +77,8 @@ export function isBookScoped(metadata: { type?: unknown; subject?: unknown }): b
 /**
  * The book a row of `resourceKey` is about, lowercase, or null for rows that are not about one book (receipts,
  * articles, titles). Source rows carry it right after the resource key (`tn:{key}:{book}…`), prepared rows in their
- * fourth part (`prepared:{type}:{key}:{book}:…`), quotes and aligned quotes before the chapter (`…:{book}:{chapter}`).
+ * fourth part (`prepared:{type}:{key}:{book}:…`), quotes and aligned quotes before the chapter (`…:{book}:{chapter}`),
+ * index rows last (`index:…:{book}`).
  */
 export function bookOfRow(key: string, layer: PackLayer, resourceKey: string): string | null {
   if (layer === 'sot') {
@@ -78,6 +92,10 @@ export function bookOfRow(key: string, layer: PackLayer, resourceKey: string): s
   if (layer === 'quote' || layer === 'align') {
     const parts = key.split(':')
     return parts.length >= 2 ? parts[parts.length - 2].toLowerCase() : null
+  }
+  if (layer === 'index') {
+    const colon = key.lastIndexOf(':')
+    return colon < 0 ? null : key.slice(colon + 1).toLowerCase() || null
   }
   return null
 }
