@@ -117,9 +117,11 @@ export interface PackTarget {
   catalogRow?(resourceKey: string): Promise<ResourceMetadata | null>
   /**
    * Read keys and key prefixes, decide, then put and delete, all in one readwrite transaction
-   * (`IndexedDBCacheAdapter.transactRaw`): applying parts needs it, so a reader never sees half of a unit. `decide` runs
-   * synchronously; if it throws or a write fails, nothing is written and the call rejects with that error (a full disk
-   * keeps its name, `QuotaExceededError`). Puts are raw and go before the deletes; deletes are exact keys.
+   * (`IndexedDBCacheAdapter.transactRaw`): applying parts needs it, so the store holds a unit's rows all as before or
+   * all as after, and a read made in one transaction sees one or the other. A reader whose reads span transactions (one
+   * per `get`) can still read one row before a unit and the next after it. `decide` runs synchronously; if it throws or
+   * a write fails, nothing is written and the call rejects with that error (a full disk keeps its name,
+   * `QuotaExceededError`). Puts are raw and go before the deletes; deletes are exact keys.
    */
   transactRaw?(read: RawRead, decide: (found: RawFound) => RawWrite): Promise<void>
 }
