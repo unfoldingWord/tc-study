@@ -167,6 +167,12 @@ describe('the licences of the lexicons and MACULA', () => {
     expect('license' in rows.get('es-419_gl/es-419/ugl')!).toBe(false)
   })
 
+  test("a lexicon whose manifest's rights is empty gets no licence, not the next line's key", async () => {
+    const rows = await lexiconRows("dublin_core:\n  language:\n    identifier: 'es-419'\n  rights:\n  subject: Greek Lexicon\n")
+    expect(rows.get('es-419_gl/es-419/ugl')).toBeDefined()
+    expect('license' in rows.get('es-419_gl/es-419/ugl')!).toBe(false)
+  })
+
   /**
    * A MACULA folder as Taller has it: one book in each part, and an `index.json` in each naming `licenses[part]`, or
    * holding `raw[part]` as it is.
