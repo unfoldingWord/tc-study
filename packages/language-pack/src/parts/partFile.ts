@@ -13,8 +13,8 @@ export const VOLATILE_FIELDS: readonly string[] = ['timestamp', 'expiresAt', 'pr
 
 const VOLATILE = new Set(VOLATILE_FIELDS)
 
-/** Receipts never travel in parts: the list says when a resource is complete. */
-export const PART_LAYERS: readonly PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text']
+/** Receipts never travel in parts: the list says when a resource is complete. `index` is optional (`OPTIONAL_LAYERS`). */
+export const PART_LAYERS: readonly PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text', 'index']
 
 /** What JSON.stringify would write for the value: `toJSON` first (a Date becomes its ISO text). */
 export function toJsonValue(value: unknown): unknown {

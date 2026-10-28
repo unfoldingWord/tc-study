@@ -41,7 +41,13 @@ export type PackRequirement = {
 }
 
 /** What a cache row is, for a pack: which layer of §2 it belongs to. */
-export type PackLayer = 'receipt' | 'sot' | 'prepared' | 'quote' | 'align' | 'text'
+export type PackLayer = 'receipt' | 'sot' | 'prepared' | 'quote' | 'align' | 'text' | 'index'
+
+/**
+ * Layers a reader may go without: a part carrying one is used only when the app states that layer's versions and they
+ * are the list's; otherwise it is skipped and everything else is applied (parts `planParts`).
+ */
+export const OPTIONAL_LAYERS: readonly PackLayer[] = ['index']
 
 /** The layers a pack carries unless told otherwise: everything that makes it open "already warmed". */
 export const ALL_LAYERS: readonly PackLayer[] = ['receipt', 'sot', 'prepared', 'quote', 'align', 'text']

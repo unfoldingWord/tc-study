@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import type { PartEntry, PartsList } from './partsList'
+import type { PackLayer, PackVersions } from '../types'
+import type { PartEntry, PartKind, PartsList } from './partsList'
 import { slotId, slotOfEntry } from './partSlots'
 import { CANON_BOOK_ORDER, compareUnits, partsCoverage, planParts } from './plan'
 import type { Register, SlotRecord } from './register'
@@ -65,7 +66,7 @@ describe('planParts', () => {
 
   test('nothing to do when the register matches the lists', () => {
     const plan = planParts({ list: LIST, originals: ORIGINALS, register: registerOf(LATEST), chosen: ALL })
-    expect(plan).toEqual({ download: [], remove: [], units: [], bytes: 0 })
+    expect(plan).toEqual({ download: [], remove: [], units: [], bytes: 0, skipped: [] })
   })
 
   test('a slot with another sha is downloaded again, and only its unit is touched', () => {
@@ -112,7 +113,7 @@ describe('planParts', () => {
     register.set(slotId({ kind: 'book', resource: 'o/pt-br/tn', book: 'rut' }), record('pt-tn-rut', 'pt-br'))
     register.set(slotId({ kind: 'tw', resource: 'o/pt-br/tw', group: 'kt:1' }), record('pt-tw-kt1', 'pt-br'))
     const plan = planParts({ list: LIST, originals: ORIGINALS, register, chosen: ['book rut', 'shared'] })
-    expect(plan).toEqual({ download: [], remove: [], units: [], bytes: 0 })
+    expect(plan).toEqual({ download: [], remove: [], units: [], bytes: 0, skipped: [] })
   })
 
   test('an originals slot this originals list does not name is never removed by a plan', () => {
@@ -128,7 +129,7 @@ describe('planParts', () => {
     register.set(idOf(UHB_RUT), record(UHB_RUT.sha256, 'es-419'))
     register.set(idOf(MACULA_RUT), record(MACULA_RUT.sha256, 'es-419'))
     const plan = planParts({ list: LIST, originals: ORIGINALS, register, chosen: ALL })
-    expect(plan).toEqual({ download: [], remove: [], units: [], bytes: 0 })
+    expect(plan).toEqual({ download: [], remove: [], units: [], bytes: 0, skipped: [] })
   })
 
   test('a list that names an originals list cannot be planned without it', () => {
@@ -186,5 +187,88 @@ describe('partsCoverage', () => {
     const stale = new Map([[idOf(UHB_RUT), record('uhb-rut-old', 'originals')], [idOf(UHB_JON), record('uhb-jon', 'originals')]])
     const coverage = partsCoverage({ list: LIST, originals: ORIGINALS, register: stale, chosen: ALL })
     expect(coverage.get(UHB)).toEqual({ present: 1, missing: 1, missingBytes: 50, whole: false })
+  })
+})
+
+describe('what this reader cannot use is skipped, not applied', () => {
+  const CONCORDANCE = part('concordance', 9, { kind: 'concordance' as PartKind, resource: TW, group: 'all' })
+  const FUTURE = part('future', 9, { kind: 'tw', resource: TW, group: 'kt:9', layers: ['sot', 'future' as PackLayer] })
+  const INDEX_RUT = part('index-rut', 4, { kind: 'index', resource: UHB, book: 'rut', layers: ['index'] })
+  const INDEX_TN = part('index-tn-rut', 2, { kind: 'index', resource: TN, book: 'rut', layers: ['index'] })
+  const index = (helpsIndex: number): PackVersions => ({ index: { helpsIndex } })
+  const originalsAt = (helpsIndex: number): PartsList => ({ ...listOf('originals', [UHB_RUT, MACULA_RUT, INDEX_RUT]), versions: index(helpsIndex) })
+
+  test('a part of a kind it does not know', () => {
+    const list = listOf('es-419', [TW_KT3, CONCORDANCE])
+    const plan = planParts({ list, register: new Map(), chosen: ['shared'] })
+    expect(shas(plan.download)).toEqual(['tw-kt3'])
+    expect(plan.skipped).toEqual([{ entry: CONCORDANCE, reason: 'kind' }])
+    expect(plan.units).toEqual(['shared'])
+  })
+
+  test('a part with a layer it does not know', () => {
+    const plan = planParts({ list: listOf('es-419', [TW_KT3, FUTURE]), register: new Map(), chosen: ['shared'] })
+    expect(shas(plan.download)).toEqual(['tw-kt3'])
+    expect(plan.skipped).toEqual([{ entry: FUTURE, reason: 'layer' }])
+  })
+
+  test('an index part of another index version', () => {
+    const plan = planParts({ list: LIST, originals: originalsAt(2), register: new Map(), chosen: ALL, versions: index(1) })
+    expect(shas(plan.download)).toContain('macula-rut')
+    expect(shas(plan.download)).not.toContain('index-rut')
+    expect(plan.skipped).toEqual([{ entry: INDEX_RUT, reason: 'version' }])
+  })
+
+  test('an index part when the app does not say which index it reads', () => {
+    const plan = planParts({ list: LIST, originals: originalsAt(1), register: new Map(), chosen: ALL })
+    expect(plan.skipped).toEqual([{ entry: INDEX_RUT, reason: 'version' }])
+  })
+
+  test('an index part of the same version is downloaded', () => {
+    const plan = planParts({ list: LIST, originals: originalsAt(1), register: new Map(), chosen: ALL, versions: index(1) })
+    expect(shas(plan.download)).toContain('index-rut')
+    expect(plan.skipped).toEqual([])
+  })
+
+  test('an index part already on the device stays when the new one is skipped', () => {
+    const list: PartsList = { ...listOf('es-419', [TN_RUT, INDEX_TN]), versions: index(2) }
+    const register = registerOf([TN_RUT])
+    register.set(idOf(INDEX_TN), record('index-tn-rut-old'))
+    const plan = planParts({ list, register, chosen: ['book rut', 'shared'], versions: index(1) })
+    expect(plan.download).toEqual([])
+    expect(plan.remove).toEqual([])
+    expect(plan.skipped).toEqual([{ entry: INDEX_TN, reason: 'version' }])
+  })
+
+  test('a skipped part that is not only optional leaves its resource incomplete', () => {
+    const list = listOf('es-419', [TW_KT3, FUTURE, CONCORDANCE])
+    const register = registerOf([TW_KT3])
+    const coverage = partsCoverage({ list, register, chosen: ['shared'] })
+    expect(coverage.get(TW)).toEqual({ present: 1, missing: 2, missingBytes: 18, whole: false })
+    const plan = planParts({ list, register, chosen: ['shared'] })
+    expect(plan.download).toEqual([])
+  })
+
+  test('an index part is judged as index even when its entry does not list the layer', () => {
+    const bare = part('index-bare', 3, { kind: 'index', resource: UHB, book: 'jon', layers: ['sot'] })
+    const plan = planParts({ list: listOf('es-419', []), originals: { ...listOf('originals', [bare]), versions: index(1) }, register: new Map(), chosen: ['shared'] })
+    expect(plan.download).toEqual([])
+    expect(plan.skipped).toEqual([{ entry: bare, reason: 'version' }])
+  })
+
+  test('an original the originals list names but this reader skips is not taken from the language list', () => {
+    const fromLanguage = part('uhb-rut-language', 50, { kind: 'original', resource: UHB, book: 'rut' })
+    const future = part('uhb-rut-future', 50, { kind: 'original', resource: UHB, book: 'rut', layers: ['sot', 'future' as PackLayer] })
+    const list = listOf('es-419', [TN_RUT, fromLanguage], { path: 'catalog/c/originals/o.json', sha256: 'o' })
+    const register = new Map([[idOf(UHB_RUT), record('uhb-rut', 'originals')]])
+    const plan = planParts({ list, originals: listOf('originals', [future]), register, chosen: ['book rut'] })
+    expect(shas(plan.download)).toEqual(['tn-rut'])
+    expect(plan.remove).toEqual([])
+    expect(plan.skipped).toEqual([{ entry: future, reason: 'layer' }])
+  })
+
+  test('a skipped part does not keep its resource from being whole', () => {
+    const coverage = partsCoverage({ list: LIST, originals: originalsAt(2), register: registerOf(LATEST), chosen: ALL, versions: index(1) })
+    expect(coverage.get(UHB)?.whole).toBe(true)
   })
 })
