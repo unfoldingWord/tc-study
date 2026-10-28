@@ -1,7 +1,8 @@
 /*
  * translationCore 4 design-system tokens that tC Study uses, under tC4's own names.
  * Copied, not linked, as tC Admin does: the master is tC4's design system, vendored in
- * unfoldingWord/translationCore4 at crates/tc-ui/assets/ds/tokens/ (read at bc510508).
+ * unfoldingWord/translationCore4, branch main, at crates/tc-ui/assets/ds/tokens/ (read at
+ * bc510508). Older tC4 branches keep the same files under src/ds/tokens/.
  * To follow a tC4 change, compare the block with the file named above it and copy the value.
  * index.css maps these onto tc-study's --theme-* names. See docs/TC4_STYLE_AND_BRAND.md §4.
  */

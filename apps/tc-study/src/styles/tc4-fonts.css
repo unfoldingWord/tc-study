@@ -1,6 +1,7 @@
 /*
  * tC4's interface and scripture faces, self-hosted so tC Study works offline.
- * Rules copied from unfoldingWord/translationCore4 src/ds/tokens/fonts.css (11437da9), keeping only
+ * Rules copied from unfoldingWord/translationCore4 main, crates/tc-ui/assets/ds/tokens/fonts.css
+ * (bc510508; identical to src/ds/tokens/fonts.css at 11437da9), keeping only
  * the subsets tC Study ships; files and OFL licences in public/fonts/. Each face loads only for the
  * characters in its unicode-range, so a Latin page fetches Mulish latin and, where verses show,
  * Charis SIL latin. Greek and Hebrew come from Noto Serif / Noto Serif Hebrew.

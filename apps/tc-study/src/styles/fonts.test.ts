@@ -51,4 +51,19 @@ describe('tc4 fonts', () => {
     expect(indexCss).toMatch(/--font-ui:\s*"Mulish"/)
     expect(indexCss).toMatch(/--font-scripture:\s*"Charis SIL"[^;]*"Noto Serif"[^;]*"Noto Serif Hebrew"/)
   })
+
+  test('body uses font-ui', () => {
+    const body = indexCss.match(/(?:^|\n)\s*body\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(body).toMatch(/@apply[^;]*\bfont-ui\b/)
+  })
+
+  test.each([
+    ['scripture', 'components/resources/ScriptureViewer/index.tsx'],
+    ['OBS', 'components/resources/ObsViewer/ObsViewer.tsx'],
+  ])('the %s pane root uses font-scripture', (_, path) => {
+    const src = readFileSync(join(STYLES, '..', path), 'utf8')
+    const roots = [...src.matchAll(/className="([^"]*\bbg-scripture\b[^"]*)"/g)].map((m) => m[1])
+    expect(roots.length).toBe(1)
+    expect(roots[0]).toMatch(/\bfont-scripture\b/)
+  })
 })
