@@ -8,6 +8,7 @@
  */
 
 import { inferDoor43ResourceTypeId } from '@bt-synergy/resource-catalog'
+import { manifestRights } from './manifestRights'
 import { readResponseArrayBufferWithProgress } from './readResponseArrayBufferWithProgress'
 
 // ============================================================================
@@ -636,10 +637,9 @@ export class Door43ApiClient {
       if (manifestResponse.ok) {
         const manifestText = await manifestResponse.text();
         
-        // Simple YAML parsing for rights field
-        const rightsMatch = manifestText.match(/rights:\s*['"]?([^'";\n]+)['"]?/i);
-        if (rightsMatch) {
-          enriched.license = rightsMatch[1].trim();
+        const rights = manifestRights(manifestText);
+        if (rights) {
+          enriched.license = rights;
           
           if (this.config.debug) {
             console.log(`✅ Got license from manifest: ${enriched.license}`);
