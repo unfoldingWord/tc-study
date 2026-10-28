@@ -272,12 +272,24 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
 
   const resources = catalogOf(lists)
   type Availability = { offline: boolean; partial: boolean }
-  /** The lists' catalog rows of these resources (those they carry), dated now, with `offline` and `partial` as given. */
+  /**
+   * The lists' catalog rows of these resources, dated now, with `offline` and `partial` as given. A resource no list
+   * carries (a unit removes its slots) keeps the device's row, with both flags off: it is not held any more, or soon
+   * will not be, and a reader that saw it offline would never offer it again. That holds before its unit too, so an
+   * app stopped after the unit commits leaves no flag to heal; the call that removes it is the last that knows it.
+   */
   const catalogRows = async (keys: string[], now: number, availability: (key: string) => Promise<Availability>) => {
     const rows: Array<{ key: string; metadata: ResourceMetadata }> = []
     for (const key of keys) {
       const found = resources.get(key)
-      if (!found) continue
+      if (!found) {
+        const stored = await catalogRow(key)
+        const has = storedAvailability(stored)
+        if (stored && (has.offline || has.partial)) {
+          rows.push({ key, metadata: { ...stored, availability: { ...stored.availability, offline: false, partial: false } } })
+        }
+        continue
+      }
       const metadata = restoreCatalogBookkeeping(found.metadata, now)
       metadata.availability = { ...metadata.availability, ...(await availability(key)) }
       rows.push({ key, metadata })

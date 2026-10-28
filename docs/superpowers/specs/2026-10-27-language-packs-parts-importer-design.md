@@ -101,6 +101,9 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
   `availability.partial` is `offline` and not whole (the resource was chosen for some books only: tc-study reads
   `offline` without `partial` as downloaded whole). If that write fails, or the app stops before it, only the flags
   are stale: reported (scope `catalog`, the unit is applied) and set by the refresh below, in this call or the next.
+- **A resource no list carries any more** (a unit removes its slots): its catalog row is not the lists' to rewrite, so
+  the device's row stays, with `offline` and `partial` set to false, already in the write before the unit. After the
+  unit no list names it and the register holds none of it, so no later call would know to clear a flag left on.
 - After each unit commits, its parts are deleted from staging (a failed delete is harmless).
 - **The catalog of a new release, on every call**: a release may change tags and no part (the common case), which
   gives no unit. So after the units, every call not refused for its versions rewrites the catalog row of each resource

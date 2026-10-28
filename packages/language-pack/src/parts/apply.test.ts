@@ -781,6 +781,52 @@ describe('applyParts', () => {
     expect(target.catalog.get(TN)).toEqual(stored)
   })
 
+  /** The lists of a release that dropped TN: neither its catalog row nor any part of it. */
+  const withoutTn = () => ({
+    list: listOf('es-419', [], [TW], { originals: ORIGINALS_REF }),
+    originals: listOf('originals', [], [UHB]),
+  })
+
+  test('a resource the lists stop carrying is no longer offline once its slots are removed', async () => {
+    const tnRut = await TN_RUT()
+    const target = memoryTarget()
+    const first = await lists([tnRut], [])
+    await run(target, await stagingWith([tnRut]), first.list, first.originals, ALL)
+    expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: true, partial: false })
+
+    const second = withoutTn()
+    const result = await run(target, await stagingWith([]), second.list, second.originals, ALL)
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(result.failed).toEqual([])
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
+    expect(target.rows.has(`resource:${TN}`)).toBe(false)
+    // The device keeps its row (it still knows the resource), no longer read as downloaded.
+    expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: false, partial: false })
+    expect(target.catalog.get(TN)!.release?.tag_name).toBe('v1')
+  })
+
+  test('the flag of a resource the lists stop carrying is cleared before its rows go, so a stop after the unit leaves it right', async () => {
+    const tnRut = await TN_RUT()
+    const target = memoryTarget()
+    const first = await lists([tnRut], [])
+    await run(target, await stagingWith([tnRut]), first.list, first.originals, ALL)
+
+    const putCatalogRows = target.putCatalogRows
+    let writes = 0
+    target.putCatalogRows = async (rows) => {
+      // Only the write before the unit gets through: as if the app stopped once the unit committed.
+      if (++writes > 1) throw new Error('catalog closed')
+      return putCatalogRows(rows)
+    }
+    const second = withoutTn()
+    const result = await run(target, await stagingWith([]), second.list, second.originals, ALL)
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
+    expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: false, partial: false })
+  })
+
   test('a target that cannot read catalog rows is refused at once, nothing written', async () => {
     const tnRut = await TN_RUT()
     const { list, originals } = await lists([tnRut], [])
