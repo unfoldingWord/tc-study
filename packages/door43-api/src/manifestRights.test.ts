@@ -31,6 +31,12 @@ describe('manifestRights', () => {
     expect(manifestRights('dublin_core:\n  rights:\n\n  subject: Greek Lexicon\n')).toBeUndefined()
   })
 
+  test('only a rights key names the licence, not rights: inside another key or value', () => {
+    expect(manifestRights("dublin_core:\n  description: 'All rights: reserved'\n")).toBeUndefined()
+    expect(manifestRights("dublin_core:\r\n  rights:\r\n  description: 'All rights: reserved'\r\n")).toBeUndefined()
+    expect(manifestRights('dublin_core:\n  copyrights: x\n')).toBeUndefined()
+  })
+
   test('rights with no value on the last line of the file names none', () => {
     expect(manifestRights('dublin_core:\n  title: x\n  rights:')).toBeUndefined()
     expect(manifestRights('dublin_core:\n  title: x\n  rights:\n')).toBeUndefined()
