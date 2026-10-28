@@ -6,6 +6,8 @@ name: Language packs
 # that compat's status: nothing a whole build (f1.1) reads or writes changes.
 # Parts are published only from master, which also writes the code it builds with to status/builder.json (as
 # packs-builder.yml does) and records that code in the ok status; a parts measurement (no-upload) may run from a branch.
+# A production parts publish, and packs-builder.yml's production job, both require the repository variable
+# PACKS_PARTS_PRODUCTION = true (delivery 3, Task 14).
 # Dispatched by hand, or by the Worker (a GitHub App with actions: write on this repository only).
 
 run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }}${{ inputs.parts && ', parts' || '' }}${{ inputs.compare && ', compare' || '' }})
@@ -90,12 +92,19 @@ jobs:
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
       - name: Validate inputs
+        env:
+          TARGET: ${{ inputs.target }}
+          PACKS_PARTS_PRODUCTION: ${{ vars.PACKS_PARTS_PRODUCTION }}
         run: |
           if ! [[ "$LANGUAGE" =~ ^[a-z]{2,3}(-[A-Za-z0-9]+)*$ ]]; then
             echo "::error::language is not a language code"
             exit 1
           fi
           case "$MODE" in publish | no-upload) ;; *) echo "::error::mode must be publish or no-upload"; exit 1 ;; esac
+          if [ "$PARTS" = true ] && [ "$MODE" = publish ] && [ "$TARGET" = production ] && [ "$PACKS_PARTS_PRODUCTION" != true ]; then
+            echo "::error::parts publish to production needs the repository variable PACKS_PARTS_PRODUCTION = true (delivery 3, Task 14)"
+            exit 1
+          fi
           # Published parts are what the Worker serves and compares with the code master builds (status/builder.json):
           # a branch's lists would carry a code nothing else builds. A measurement (no-upload) may run from any branch.
           if [ "$PARTS" = true ] && [ "$MODE" = publish ] && [ "$GITHUB_REF" != refs/heads/master ]; then
