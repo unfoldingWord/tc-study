@@ -1,7 +1,8 @@
 /**
  * Applying a plan (spec §2–§3): the staged parts go into the device's store one unit at a time (a book, or the shared
- * unit), each unit in one transaction with its register rows, so a reader never sees new notes over old alignments of
- * the same book. Before each unit, the catalog rows of its resources; after it, their `offline` and `partial` flags.
+ * unit), each unit in one transaction with its register rows, so the store never holds new notes over old alignments
+ * of the same book (a reader whose reads span transactions can still read one before a unit and one after it). Before
+ * each unit, the catalog rows of its resources; after it, their `offline` and `partial` flags.
  *
  * What may be deleted, and nothing else: keys a slot's previous part wrote (its register row says which) that the new
  * part no longer has; the first time a slot is filled, rows of that slot's resource found by its key prefixes that
@@ -23,7 +24,7 @@ import { restoreCatalogBookkeeping, unitOfPart, type PartEntry, type PartsList }
 import { slotId, slotOfEntry, slotOfRow } from './partSlots'
 import { namedParts, partsCoverage, type Coverage, type PartsPlan } from './plan'
 import { receiptChanges, receiptKey, receiptScope } from './receipts'
-import { REGISTER_PREFIX, readRegister, registerRow, unitOfSlotId, type Register, type SlotRecord } from './register'
+import { REGISTER_PREFIX, readRegister, registerRow, resourceOfSlotId, unitOfSlotId, type Register, type SlotRecord } from './register'
 import type { PartsStaging } from './staging'
 
 /**
@@ -167,9 +168,6 @@ function catalogOf(lists: PartsList[]): Map<string, { metadata: unknown; resourc
   return out
 }
 
-/** The resource a slot id is of: `{kind}:{resource}[:{book}][:{group}]`, resource keys hold no `:`. */
-const resourceOfSlotId = (id: string): string => id.split(':')[1] ?? ''
-
 /** The scans that find a resource's rows, receipts left out: they are never deleted here. */
 const cleanupScans = (resourceKey: string) => scansFor(resourceKey).filter((scan) => !scan.exact && scan.layer !== 'receipt')
 
@@ -290,12 +288,24 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
 
   const resources = catalogOf(lists)
   type Availability = { offline: boolean; partial: boolean }
-  /** The lists' catalog rows of these resources (those they carry), dated now, with `offline` and `partial` as given. */
+  /**
+   * The lists' catalog rows of these resources, dated now, with `offline` and `partial` as given. A resource no list
+   * carries (a unit removes its slots) keeps the device's row, with both flags off: it is not held any more, or soon
+   * will not be, and a reader that saw it offline would never offer it again. That holds before its unit too, so an
+   * app stopped after the unit commits leaves no flag to heal; the call that removes it is the last that knows it.
+   */
   const catalogRows = async (keys: string[], now: number, availability: (key: string) => Promise<Availability>) => {
     const rows: Array<{ key: string; metadata: ResourceMetadata }> = []
     for (const key of keys) {
       const found = resources.get(key)
-      if (!found) continue
+      if (!found) {
+        const stored = await catalogRow(key)
+        const has = storedAvailability(stored)
+        if (stored && (has.offline || has.partial)) {
+          rows.push({ key, metadata: { ...stored, availability: { ...stored.availability, offline: false, partial: false } } })
+        }
+        continue
+      }
       const metadata = restoreCatalogBookkeeping(found.metadata, now)
       metadata.availability = { ...metadata.availability, ...(await availability(key)) }
       rows.push({ key, metadata })
@@ -367,6 +377,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
             continue
           }
           // First time: rows of this slot that whole packs or online downloads left, which the register never knew.
+          // Rows of an original there already are replaced by the part's: whether they were the same is not known.
           const resource = resources.get(p.entry.resource)?.resource ?? { key: p.entry.resource }
           for (const scan of cleanupScans(p.entry.resource)) {
             for (const key of found.prefixKeys.get(scan.prefix) ?? []) {
@@ -378,7 +389,9 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
               } catch {
                 // A row no rule places is not known to be this slot's: it stays.
               }
-              if (slot === p.id) drop(key)
+              if (slot !== p.id) continue
+              drop(key)
+              if (ORIGINALS_KINDS.has(p.entry.kind)) replacedOriginals = true
             }
           }
         }
