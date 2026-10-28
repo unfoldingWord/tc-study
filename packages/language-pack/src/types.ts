@@ -115,4 +115,18 @@ export interface PackTarget {
   putCatalogRows(rows: Array<{ key: string; metadata: ResourceMetadata }>): Promise<void>
   /** The catalog row the device already has for a resource, to compare its version with the pack's. */
   catalogRow?(resourceKey: string): Promise<ResourceMetadata | null>
+  /**
+   * Read keys and key prefixes, decide, then put and delete, all in one readwrite transaction
+   * (`IndexedDBCacheAdapter.transactRaw`): applying parts needs it, so a reader never sees half of a unit. `decide` runs
+   * synchronously; if it throws or a write fails, nothing is written and the call rejects with that error (a full disk
+   * keeps its name, `QuotaExceededError`). Puts are raw and go before the deletes; deletes are exact keys.
+   */
+  transactRaw?(read: RawRead, decide: (found: RawFound) => RawWrite): Promise<void>
 }
+
+/** What a `transactRaw` reads: rows by exact key, and the keys under each prefix. */
+export type RawRead = { keys: string[]; prefixes: string[] }
+/** `rows`: key to the stored entry (absent keys are missing); `prefixKeys`: prefix to the keys that start with it. */
+export type RawFound = { rows: Map<string, unknown>; prefixKeys: Map<string, string[]> }
+/** What a `transactRaw` writes. */
+export type RawWrite = { puts: CacheRow[]; deletes: string[] }
