@@ -6,6 +6,7 @@ import { Clapperboard, FileText, FolderOpen, Library } from 'lucide-react'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePackageStore } from '../lib/stores'
+import { BRAND_SHORT } from '../config/brand'
 
 export default function Home() {
   const navigate = useNavigate()
@@ -29,7 +30,7 @@ export default function Home() {
       {/* Hero Section */}
       <div className="mb-16 text-center">
         <h1 className="mb-4 text-4xl font-bold tracking-tight text-gray-900">
-          Welcome to TC Study
+          Welcome to {BRAND_SHORT}
         </h1>
         <p className="mx-auto max-w-2xl text-gray-600">
           Your Bible study and translation platform

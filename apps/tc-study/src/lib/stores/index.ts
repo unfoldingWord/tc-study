@@ -1,5 +1,5 @@
 /**
- * Store exports — Zustand stores for TC Study.
+ * Store exports — Zustand stores for tC Study.
  *
  * Ownership map: see `./stateOwnership.ts`.
  */

@@ -1,5 +1,5 @@
 /**
- * Configuration and constants for TC Study
+ * Configuration and constants for tC Study
  */
 
 // Door43 API Configuration
