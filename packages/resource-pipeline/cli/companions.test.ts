@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { addLexicons, addMacula, lexiconOwnerOf, lexiconRowPath, lexiconStamps } from './companions'
+import { addLexicons, addMacula, lexiconOwnerOf, lexiconRowPath, lexiconStamps, maculaCatalogRows } from './companions'
 
 describe('addMacula', () => {
   test('the catalog rows carry the version and the date it is given, not one cut from the other', async () => {
@@ -137,5 +137,81 @@ describe("lexicons in translationCore's layout", () => {
     expect(rows.get('test_org/en/ugl/content/1.json')).toEqual(alpha)
     expect([...rows.keys()]).toEqual(['test_org/en/ugl/content/1.json'])
     expect(done).toContainEqual({ key: 'test_org/en/ugl', entries: 1 })
+  })
+})
+
+describe('the licences of the lexicons and MACULA', () => {
+  const commit = { sha: '6cca967498146d8ebe12c1fe9124f56baa309e27', created: '2026-10-19T19:52:42-04:00' }
+
+  /** The catalog rows `addLexicons` writes for es-419's Greek lexicon, its archive holding `manifest`. */
+  async function lexiconRows(manifest: string) {
+    const archive = tarGz({ 'es-419_ugl/manifest.yaml': manifest, 'es-419_ugl/content/G1.json': '{}' })
+    const { fetchFn: api } = door43({ 'es-419_gl/es-419_ugl': { master: commit } })
+    const fetchFn = async (url: string) => (url.endsWith(`/es-419_gl/es-419_ugl/archive/${commit.sha}.tar.gz`) ? new Response(archive) : api(url))
+    const rows = new Map<string, Record<string, unknown>>()
+    const catalog = { set: async (key: string, value: never) => void rows.set(key, value) }
+    await addLexicons({ putRawMany: async () => {}, set: async () => {} } as never, catalog as never, 'es-419', 'es-419_gl', 'master', fetchFn)
+    return rows
+  }
+
+  test("a lexicon's catalog row carries the licence its manifest's rights name", async () => {
+    // As es-419_ugl's manifest has it: the language's title and the rights in dublin_core.
+    const manifest = "dublin_core:\n  language:\n    identifier: 'es-419'\n    title: 'Español Latinoamericano'\n  rights: 'CC BY-SA 4.0'\n  subject: 'Greek Lexicon'\n"
+    const rows = await lexiconRows(manifest)
+    expect(rows.get('es-419_gl/es-419/ugl')?.license).toEqual({ id: 'CC BY-SA 4.0' })
+  })
+
+  test('a lexicon whose manifest names no rights gets no licence', async () => {
+    const rows = await lexiconRows('dublin_core:\n  title: Léxico griego\n')
+    expect(rows.get('es-419_gl/es-419/ugl')).toBeDefined()
+    expect('license' in rows.get('es-419_gl/es-419/ugl')!).toBe(false)
+  })
+
+  /** A MACULA folder as Taller has it: one book in each part, and an `index.json` in each naming `licenses[part]`. */
+  function maculaWith(licenses: { trees?: string; referents?: string }) {
+    const folder = mkdtempSync(join(tmpdir(), 'macula-'))
+    for (const part of ['trees', 'referents'] as const) {
+      mkdirSync(join(folder, part))
+      writeFileSync(join(folder, part, 'RUT.json'), '{}')
+      writeFileSync(join(folder, part, 'TIT.json'), '{}')
+      const license = licenses[part]
+      if (license) writeFileSync(join(folder, part, 'index.json'), JSON.stringify({ source: 'MACULA, Biblica', license, books: ['RUT', 'TIT'] }))
+    }
+    return folder
+  }
+
+  const STAMP = { version: 'f1e2d3c4b5', publishedAt: '2026-10-01T14:00:00.000Z' }
+
+  async function maculaRows(folder: string) {
+    const rows = new Map<string, Record<string, unknown>>()
+    const catalog = { set: async (key: string, value: never) => void rows.set(key, value) }
+    await addMacula({ putRawMany: async () => {}, set: async () => {} } as never, catalog as never, folder, STAMP)
+    return rows
+  }
+
+  test("MACULA's catalog rows carry the licence its index.json files name, from addMacula and from maculaCatalogRows", async () => {
+    const folder = maculaWith({ trees: 'CC BY 4.0', referents: 'CC BY 4.0' })
+    const rows = await maculaRows(folder)
+    for (const key of ['Biblica/hbo/macula', 'Biblica/el-x-koine/macula']) expect(rows.get(key)?.license).toEqual({ id: 'CC BY 4.0' })
+    // What a parts build whose shared unit was carried writes in their place.
+    expect(maculaCatalogRows(folder, STAMP)).toEqual([...rows.values()] as never)
+  })
+
+  test('one index.json naming the licence is enough', async () => {
+    const rows = await maculaRows(maculaWith({ trees: 'CC BY 4.0' }))
+    expect(rows.get('Biblica/hbo/macula')?.license).toEqual({ id: 'CC BY 4.0' })
+  })
+
+  test('a MACULA folder that names no licence gives rows without one', async () => {
+    const folder = maculaWith({})
+    const rows = await maculaRows(folder)
+    expect([...rows.values()].some((row) => 'license' in row)).toBe(false)
+    expect(maculaCatalogRows(folder, STAMP).some((row) => 'license' in row)).toBe(false)
+  })
+
+  test('index.json files that name different licences fail, naming both', async () => {
+    const folder = maculaWith({ trees: 'CC BY 4.0', referents: 'CC BY-SA 4.0' })
+    await expect(maculaRows(folder)).rejects.toThrow(/CC BY 4\.0.*CC BY-SA 4\.0/)
+    expect(() => maculaCatalogRows(folder, STAMP)).toThrow(/CC BY 4\.0.*CC BY-SA 4\.0/)
   })
 })

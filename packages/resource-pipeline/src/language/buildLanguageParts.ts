@@ -38,7 +38,7 @@ import { dirname, join } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
 import { IndexedDBCatalogAdapter } from '@bt-synergy/catalog-adapter-indexeddb'
 import { CatalogManager } from '@bt-synergy/catalog-manager/core'
-import { getDoor43ApiClient } from '@bt-synergy/door43-api'
+import { getDoor43ApiClient, manifestRights } from '@bt-synergy/door43-api'
 import {
   bookUnit,
   compatKeyOf,
@@ -320,14 +320,14 @@ export const OBS_PARTS_REFUSED = 'OBS parts wait for the OBS loader to read the 
 
 /**
  * What discovery's enrichment (Door43ApiClient.enrichResourceMetadata) gets from a repository's root files, as the
- * row's `readme` and `license`: README.md when not empty, and the `rights:` of manifest.yaml. A failed request there
- * leaves the field empty with no error, so the build compares the row with the zip's root files.
+ * row's `readme` and `license`: README.md when not empty, and the `rights:` of manifest.yaml (`manifestRights`, which
+ * the enrichment reads it with). A failed request there leaves the field empty with no error, so the build compares
+ * the row with the zip's root files.
  */
 export function discoveryReadsOf(root: { readme?: string; manifest?: string }): { readme: boolean; license: boolean } {
   return {
     readme: !!root.readme,
-    // The regex enrichResourceMetadata parses the manifest with.
-    license: !!root.manifest && /rights:\s*['"]?([^'";\n]+)['"]?/i.test(root.manifest),
+    license: !!root.manifest && manifestRights(root.manifest) !== undefined,
   }
 }
 
@@ -1113,7 +1113,7 @@ export async function buildLanguageParts(o: {
         })
         lexicons.set(lexicon.key, commit.sha.slice(0, 10))
         stepMeter.check()
-        companionRows.push(companionCatalogRow(lexiconResourceOf(lexicon, language, commit, read.title)))
+        companionRows.push(companionCatalogRow(lexiconResourceOf(lexicon, language, commit, { title: read.title, license: read.license })))
       }
     }
 
