@@ -48,6 +48,9 @@ export function readRegister(rows: Iterable<{ key: string; entry: unknown }>): R
   return register
 }
 
+/** The resource a slot id is of: `{kind}:{resource}[:{book}][:{group}]`, resource keys hold no `:`. */
+export const resourceOfSlotId = (id: string): string => id.split(':')[1] ?? ''
+
 /**
  * The unit a slot id belongs to, as `unitOfPart` places its part: a book kind's id ends with its book (`slotId` puts no
  * group after it), every other kind is shared. The register keeps ids only, so removals are placed by this.

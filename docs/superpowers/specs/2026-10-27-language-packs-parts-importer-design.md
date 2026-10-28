@@ -62,6 +62,12 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 - Rows from before parts (whole packs): the first time a resource's slot is applied by parts, rows of that resource
   the register does not know are also deleted, found by the resource's key prefixes and placed with `slotOfRow` so
   only that slot's rows go, and only within the units being applied.
+- **A whole pack over parts**: `importLanguagePack` with `overwrite` that replaces a resource first deletes that
+  resource's register rows in the units the pack writes (its books, and the shared unit; every unit for a pack that is
+  not a `book` pack), before any of its rows, in one `transactRaw`. Left there, the register would go on saying the
+  slots hold the parts' release over the pack's rows, and the next `applyParts` would stamp those rows with that
+  release and write a receipt calling them complete. Without them the next plan downloads the slots again, and the
+  first-time rule above replaces the pack's rows.
 - Originals are shared by all languages (their slots carry no language): one register entry. A language whose list
   names originals with another sha replaces them, and the result says so (`originalsReplaced`): another language's
   aligned quotes built on the previous originals may miss until that language updates.

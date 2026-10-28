@@ -22,6 +22,8 @@ import {
 } from '@bt-synergy/resource-catalog'
 import { ORIGINAL_LANGUAGE_KEYS, belongsTo, bookOfRow, fileSafe, isBookScoped, originalOfDerivedRow, scansFor } from './keys'
 import { chunksOf, linesFrom } from './lines'
+import { SHARED_UNIT, bookUnit } from './parts/partsList'
+import { REGISTER_PREFIX, resourceOfSlotId, unitOfSlotId } from './parts/register'
 import {
   ALL_LAYERS,
   PACK_FORMAT,
@@ -322,6 +324,25 @@ const replacing = (overwrite: ImportPackParams['overwrite'], key: string): boole
   Array.isArray(overwrite) ? overwrite.includes(key) : overwrite === true
 
 /**
+ * Gives up the parts slots (`parts-slot:` register rows) of a resource that a pack is about to overwrite, in the units
+ * it writes: the books given (all of them when null) and the shared unit. Left in place, the register would go on
+ * saying those slots hold the parts' release over the pack's rows, and the next `applyParts` would stamp the pack's
+ * rows with that release and call them complete. Without the slots, the next plan downloads them again, and their
+ * first-time cleanup replaces the pack's rows. A target without `transactRaw` cannot apply parts, so it has no register.
+ */
+async function forgetSlots(target: PackTarget, resourceKey: string, books: string[] | null): Promise<void> {
+  if (!target.transactRaw) return
+  const units = books ? new Set([SHARED_UNIT, ...books.map((book) => bookUnit(book.toLowerCase()))]) : null
+  await target.transactRaw({ keys: [], prefixes: [REGISTER_PREFIX] }, (found) => ({
+    puts: [],
+    deletes: (found.prefixKeys.get(REGISTER_PREFIX) ?? []).filter((key) => {
+      const id = key.slice(REGISTER_PREFIX.length)
+      return resourceOfSlotId(id) === resourceKey && (!units || units.has(unitOfSlotId(id)))
+    }),
+  }))
+}
+
+/**
  * Opens a pack into an app's store. Catalog rows go first, then receipts last of all for each resource, so a pack cut
  * short never leaves a receipt saying "complete" for a resource whose rows did not all arrive.
  */
@@ -413,6 +434,10 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
   for (const resource of manifest.resources) {
     if (skip.has(resource.key)) continue
     const overwrite = replacing(params.overwrite, resource.key) || replace.has(resource.key)
+    // Before any of its rows: a pack cut short then leaves the slots to plan again, never claimed over the pack's rows.
+    if (overwrite && order.some((layer) => layers.has(layer) && resource.rows[layer])) {
+      await forgetSlots(target, resource.key, manifest.kind === 'book' ? (manifest.books ?? []) : null)
+    }
     for (const layer of order) {
       if (!layers.has(layer) || !resource.rows[layer]) continue
       const file = zip.file(`rows/${layer}/${fileSafe(resource.key)}.jsonl`)

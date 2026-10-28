@@ -23,7 +23,7 @@ import { restoreCatalogBookkeeping, unitOfPart, type PartEntry, type PartsList }
 import { slotId, slotOfEntry, slotOfRow } from './partSlots'
 import { namedParts, partsCoverage, type Coverage, type PartsPlan } from './plan'
 import { receiptChanges, receiptKey, receiptScope } from './receipts'
-import { REGISTER_PREFIX, readRegister, registerRow, unitOfSlotId, type Register, type SlotRecord } from './register'
+import { REGISTER_PREFIX, readRegister, registerRow, resourceOfSlotId, unitOfSlotId, type Register, type SlotRecord } from './register'
 import type { PartsStaging } from './staging'
 
 /**
@@ -149,9 +149,6 @@ function catalogOf(lists: PartsList[]): Map<string, { metadata: unknown; resourc
   }
   return out
 }
-
-/** The resource a slot id is of: `{kind}:{resource}[:{book}][:{group}]`, resource keys hold no `:`. */
-const resourceOfSlotId = (id: string): string => id.split(':')[1] ?? ''
 
 /** The scans that find a resource's rows, receipts left out: they are never deleted here. */
 const cleanupScans = (resourceKey: string) => scansFor(resourceKey).filter((scan) => !scan.exact && scan.layer !== 'receipt')

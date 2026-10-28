@@ -6,8 +6,9 @@ import {
   isMatchingIngestReceipt,
   type ResourceMetadata,
 } from '@bt-synergy/resource-catalog'
+import { buildLanguagePack, importLanguagePack } from '../pack'
 import { packTargetFrom } from '../stores'
-import type { PackLayer, PackVersions } from '../types'
+import type { PackLayer, PackSource, PackVersions } from '../types'
 import { applyParts, type ApplyInput } from './apply'
 import { sha256Hex, writePart, type PartRow } from './partFile'
 import type { PartEntry, PartKind, PartsList } from './partsList'
@@ -825,6 +826,86 @@ describe('applyParts', () => {
     expect(result.applied).toEqual(['book rut'])
     expect(target.rows.has(`tn:${TN}:rut:1`)).toBe(false)
     expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: false, partial: false })
+  })
+
+  /** A whole pack of TN made on another device from what it holds. */
+  async function wholePackOf(device: MemoryTarget, extra: { kind?: 'book'; books?: string[] } = {}) {
+    const source: PackSource = {
+      rowsByPrefix: async (prefix) =>
+        [...device.rows].filter(([key]) => key >= prefix && key <= prefix + '￿').map(([key, entry]) => ({ key, entry })),
+      catalogRow: async (key) => device.catalog.get(key) ?? null,
+      catalogRows: async () => [...device.catalog.values()],
+    }
+    const pack = await buildLanguagePack({ source, language: 'es-419', resourceKeys: [TN], versions: VERSIONS, ...extra })
+    expect(pack.skipped).toEqual([])
+    return pack.bytes
+  }
+
+  test('a whole pack of another release opened with overwrite over parts: its slots are planned again, the old release kept until they arrive', async () => {
+    // Another device holds Ruth's notes from parts of v1 and packs them whole.
+    const v1 = await TN_RUT()
+    const old = await lists([v1], [])
+    const other = memoryTarget()
+    await run(other, await stagingWith([v1]), old.list, old.originals, ALL)
+    const bytes = await wholePackOf(other)
+
+    // This device holds them from parts of v2.
+    const v2 = await built('book', TN, [row('sot', `tn:${TN}:rut`), row('sot', `tn:${TN}:rut:1`, 'v2')], { book: 'rut' })
+    const next = await lists([v2], [])
+    const list = restamped(next.list, 'v2')
+    const target = memoryTarget()
+    await run(target, await stagingWith([v2]), list, next.originals, ALL)
+    expect(target.catalog.get(TN)!.release?.tag_name).toBe('v2')
+
+    const opened = await importLanguagePack({ bytes, target, overwrite: true, versions: VERSIONS })
+    expect(opened.skippedResources).toEqual([])
+    expect(target.rows.get(`tn:${TN}:rut:1`)).toMatchObject({ content: `tn:${TN}:rut:1` })
+
+    // The app starts: the register no longer says v2 fills Ruth, so its part is planned again; until it arrives, the
+    // catalog row and the receipt still name v1, as the rows on the device are.
+    const register = registerOf(target)
+    expect(register.has(idOf(v2))).toBe(false)
+    const plan = planParts({ list, originals: next.originals, register, chosen: ALL })
+    expect(plan.download.map((p) => p.sha256)).toEqual([v2.entry.sha256])
+    const result = await applyParts({ target, staging: await stagingWith([]), plan, list, originals: next.originals, register, chosen: ALL, versions: VERSIONS, now: () => NOW })
+
+    expect(result.refused?.reason).toBe('missing')
+    expect(target.catalog.get(TN)!.release?.tag_name).toBe('v1')
+    expect(target.rows.get(`resource:${TN}`)).toMatchObject({ metadata: { releaseStamp: 'v1' } })
+
+    // Once the part is staged, v2 comes back whole.
+    const done = await run(target, await stagingWith([v2]), list, next.originals, ALL)
+    expect(done.applied).toEqual(['book rut'])
+    expect(target.catalog.get(TN)!.release?.tag_name).toBe('v2')
+    expect(target.rows.get(`tn:${TN}:rut:1`)).toEqual({ ...value('v2'), timestamp: NOW })
+    expect(target.rows.get(`resource:${TN}`)).toMatchObject({ metadata: { releaseStamp: 'v2', downloadMethod: 'parts' } })
+  })
+
+  test('a book pack opened with overwrite gives back only the slots of its books, of that resource only', async () => {
+    const v1 = await TN_RUT()
+    const old = await lists([v1], [])
+    const other = memoryTarget()
+    await run(other, await stagingWith([v1]), old.list, old.originals, ALL)
+    const bytes = await wholePackOf(other, { kind: 'book', books: ['rut'] })
+
+    const rut = await built('book', TN, [row('sot', `tn:${TN}:rut`), row('sot', `tn:${TN}:rut:1`, 'v2')], { book: 'rut' })
+    const jon = await TN_JON()
+    const kt = await TW_KT()
+    const next = await lists([rut, jon, kt], [])
+    const list = restamped(next.list, 'v2')
+    const target = memoryTarget()
+    await run(target, await stagingWith([rut, jon, kt]), list, next.originals, ALL)
+    // A resource whose key starts like TN's is another resource.
+    const foreign = registerRow('book:o/es-419/tn-x:rut', { sha256: 'x', keys: [], list: 'pt-br', at: '' }, NOW)
+    target.rows.set(foreign.key, foreign.entry)
+
+    await importLanguagePack({ bytes, target, overwrite: true, versions: VERSIONS })
+
+    const register = registerOf(target)
+    expect(register.has(idOf(rut))).toBe(false)
+    expect(register.has(idOf(jon))).toBe(true)
+    expect(register.has(idOf(kt))).toBe(true)
+    expect(register.has('book:o/es-419/tn-x:rut')).toBe(true)
   })
 
   test('a target that cannot read catalog rows is refused at once, nothing written', async () => {
