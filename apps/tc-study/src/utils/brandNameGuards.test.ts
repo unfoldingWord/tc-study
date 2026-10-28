@@ -19,27 +19,35 @@ const DEV_ALLOWLIST = [
   'components/WorkerTestPanel.tsx',
 ]
 
-const OFF_BRAND = [/Translation Companion/, /Translation Core\b/, /BT Synergy/]
+/** The old name ("TC Study") and the wrong expansions of TC. */
+const OFF_BRAND = [/\bTC Study\b/, /Translation Companion/, /Translation Core\b/, /BT Synergy/]
 
-async function offBrandHits(): Promise<string[]> {
+/** src holds about a thousand production files; a scan below this found the wrong folder. */
+const MIN_FILES_SCANNED = 500
+
+async function offBrandScan(): Promise<{ hits: string[]; scanned: number }> {
   const hits: string[] = []
+  let scanned = 0
   const glob = new Glob('**/*.{ts,tsx}')
   for await (const path of glob.scan(SRC)) {
     const rel = path.replace(/\\/g, '/')
     if (rel.includes('.test.') || rel.includes('.spec.') || rel.includes('__tests__')) continue
     if (rel.includes('node_modules')) continue
     if (DEV_ALLOWLIST.some((prefix) => rel.startsWith(prefix))) continue
+    scanned++
     const lines = readFileSync(join(SRC, path), 'utf8').split(/\r?\n/)
     lines.forEach((line, i) => {
       if (OFF_BRAND.some((re) => re.test(line))) hits.push(`${rel}:${i + 1}: ${line.trim()}`)
     })
   }
-  return hits
+  return { hits, scanned }
 }
 
 describe('brandNameGuards', () => {
-  test('production sources never expand TC wrongly or say BT Synergy', async () => {
-    expect(await offBrandHits()).toEqual([])
+  test('production sources never use the old name, expand TC wrongly or say BT Synergy', async () => {
+    const { hits, scanned } = await offBrandScan()
+    expect(scanned).toBeGreaterThan(MIN_FILES_SCANNED)
+    expect(hits).toEqual([])
   })
 
   test('index.html is titled tC Study, has a description and no missing favicon', () => {
