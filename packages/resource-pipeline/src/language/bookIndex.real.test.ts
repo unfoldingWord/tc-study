@@ -113,9 +113,22 @@ describe.skipIf(!PACKS_DIR)('buildBookIndex on the real originals', () => {
       const median = (sizes[(sizes.length - 1) >> 1]!.bytes + sizes[sizes.length >> 1]!.bytes) / 2
       const largest = sizes[sizes.length - 1]!
       const smallest = sizes[0]!
+      expect(largest.book).toBe('psa')
       console.log(
         `rows as JSONL, gzip -9: ${total} bytes (${kb(total)}) in all; median ${kb(median)}; ` +
           `largest ${largest.book} ${kb(largest.bytes)}; smallest ${smallest.book} ${kb(smallest.bytes)}`
+      )
+      /** Oct 28 script: Strong word lists alone, gzip -9 (KB = 1024 bytes). */
+      const baselineTotal = 691 * 1024
+      const baselineMedian = 6 * 1024
+      const baselinePsalms = 33 * 1024
+      const diffKb = (bytes: number, baselineBytes: number) => ((bytes - baselineBytes) / 1024).toFixed(1)
+      const ratio = (bytes: number, baselineBytes: number) => (bytes / baselineBytes).toFixed(2)
+      console.log(
+        `vs Strong lists alone (691 KB total, 6 KB median, 33 KB psa; KB = 1024 bytes): ` +
+          `total +${diffKb(total, baselineTotal)} KB (${ratio(total, baselineTotal)}×); ` +
+          `median +${diffKb(median, baselineMedian)} KB (${ratio(median, baselineMedian)}×); ` +
+          `psa +${diffKb(largest.bytes, baselinePsalms)} KB (${ratio(largest.bytes, baselinePsalms)}×)`
       )
       console.log(`built 66 books in ${buildMs} ms`)
     },
