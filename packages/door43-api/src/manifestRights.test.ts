@@ -11,5 +11,7 @@ describe('manifestRights', () => {
   test('a manifest that names no rights gives none', () => {
     expect(manifestRights('dublin_core:\n  title: Léxico hebreo\n')).toBeUndefined()
     expect(manifestRights('')).toBeUndefined()
+    expect(manifestRights("dublin_core:\n  rights: '   '\n")).toBeUndefined()
+    expect(manifestRights("dublin_core:\n  rights: ''\n  subject: x\n")).toBeUndefined()
   })
 })

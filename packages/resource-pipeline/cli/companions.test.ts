@@ -167,8 +167,11 @@ describe('the licences of the lexicons and MACULA', () => {
     expect('license' in rows.get('es-419_gl/es-419/ugl')!).toBe(false)
   })
 
-  /** A MACULA folder as Taller has it: one book in each part, and an `index.json` in each naming `licenses[part]`. */
-  function maculaWith(licenses: { trees?: string; referents?: string }) {
+  /**
+   * A MACULA folder as Taller has it: one book in each part, and an `index.json` in each naming `licenses[part]`, or
+   * holding `raw[part]` as it is.
+   */
+  function maculaWith(licenses: { trees?: string; referents?: string }, raw: { trees?: string; referents?: string } = {}) {
     const folder = mkdtempSync(join(tmpdir(), 'macula-'))
     for (const part of ['trees', 'referents'] as const) {
       mkdirSync(join(folder, part))
@@ -176,16 +179,17 @@ describe('the licences of the lexicons and MACULA', () => {
       writeFileSync(join(folder, part, 'TIT.json'), '{}')
       const license = licenses[part]
       if (license) writeFileSync(join(folder, part, 'index.json'), JSON.stringify({ source: 'MACULA, Biblica', license, books: ['RUT', 'TIT'] }))
+      if (raw[part] !== undefined) writeFileSync(join(folder, part, 'index.json'), raw[part]!)
     }
     return folder
   }
 
   const STAMP = { version: 'f1e2d3c4b5', publishedAt: '2026-10-01T14:00:00.000Z' }
 
-  async function maculaRows(folder: string) {
+  async function maculaRows(folder: string, warn?: (line: string) => void) {
     const rows = new Map<string, Record<string, unknown>>()
     const catalog = { set: async (key: string, value: never) => void rows.set(key, value) }
-    await addMacula({ putRawMany: async () => {}, set: async () => {} } as never, catalog as never, folder, STAMP)
+    await addMacula({ putRawMany: async () => {}, set: async () => {} } as never, catalog as never, folder, STAMP, warn)
     return rows
   }
 
@@ -214,4 +218,32 @@ describe('the licences of the lexicons and MACULA', () => {
     await expect(maculaRows(folder)).rejects.toThrow(/CC BY 4\.0.*CC BY-SA 4\.0/)
     expect(() => maculaCatalogRows(folder, STAMP)).toThrow(/CC BY 4\.0.*CC BY-SA 4\.0/)
   })
+
+  const BROKEN_INDEXES = {
+    truncated: '{"source":"MACULA, Biblica","license":"CC BY 4.0","books":["RUT",',
+    'with a trailing comma': '{"license":"CC BY 4.0",}',
+  }
+
+  for (const [how, raw] of Object.entries(BROKEN_INDEXES)) {
+    test(`an index.json ${how} names no licence: the build goes on, and its log names the file`, async () => {
+      const folder = maculaWith({}, { trees: raw })
+      const warned: string[] = []
+      const rows = await maculaRows(folder, (line) => warned.push(line))
+      expect(rows.size).toBe(2)
+      expect([...rows.values()].some((row) => 'license' in row)).toBe(false)
+      expect(maculaCatalogRows(folder, STAMP, (line) => warned.push(line)).some((row) => 'license' in row)).toBe(false)
+      expect(warned).toHaveLength(2)
+      for (const line of warned) expect(line).toContain(join(folder, 'trees', 'index.json'))
+    })
+
+    test(`an index.json ${how} beside a readable one: the rows carry the readable one's licence`, async () => {
+      const folder = maculaWith({ referents: 'CC BY 4.0' }, { trees: raw })
+      const warned: string[] = []
+      const rows = await maculaRows(folder, (line) => warned.push(line))
+      for (const key of ['Biblica/hbo/macula', 'Biblica/el-x-koine/macula']) expect(rows.get(key)?.license).toEqual({ id: 'CC BY 4.0' })
+      expect(maculaCatalogRows(folder, STAMP, (line) => warned.push(line))).toEqual([...rows.values()] as never)
+      expect(warned).toHaveLength(2)
+      for (const line of warned) expect(line).toContain(join(folder, 'trees', 'index.json'))
+    })
+  }
 })

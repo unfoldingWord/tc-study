@@ -396,6 +396,8 @@ describe('a degraded discovery', () => {
       { manifest: 'dublin_core:\n  title: x\n' },
       { manifest: `dublin_core:\n  rights: '${RIGHTS}'\n` },
       { manifest: 'dublin_core:\n  rights: CC0\n', readme: 'x' },
+      { manifest: "dublin_core:\n  rights: ''\n  subject: x\n" },
+      { manifest: "dublin_core:\n  rights: '   '\n" },
     ]
     const processFetch = globalThis.fetch
     try {
@@ -409,6 +411,12 @@ describe('a degraded discovery', () => {
       }
     } finally {
       globalThis.fetch = processFetch
+    }
+  })
+
+  test('a blank rights is no licence, so a zip whose manifest has one expects none from discovery', () => {
+    for (const manifest of ["dublin_core:\n  rights: ''\n  subject: x\n", "dublin_core:\n  rights: '   '\n", 'dublin_core:\r\n  rights: ""\r\n']) {
+      expect(discoveryReadsOf({ manifest }).license).toBe(false)
     }
   })
 })

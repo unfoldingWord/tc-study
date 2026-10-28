@@ -1143,7 +1143,7 @@ export async function buildLanguageParts(o: {
         resourceFiles.set(key, { key, type: 'original-syntax', subject: 'Original Language Syntax', stamp, files })
         maculaKeys.push(key)
       }
-      companionRows.push(...maculaCatalogRows(o.macula.folder, o.macula))
+      companionRows.push(...maculaCatalogRows(o.macula.folder, o.macula, say))
       stepMeter.check()
     }
 
@@ -1235,7 +1235,7 @@ export async function buildLanguageParts(o: {
       }
       const macula: string[] = []
       if (o.macula) {
-        for (const r of await addMacula(cache as never, catalog as never, o.macula.folder, o.macula)) macula.push(r.key)
+        for (const r of await addMacula(cache as never, catalog as never, o.macula.folder, o.macula, say)) macula.push(r.key)
       }
       m.check()
 

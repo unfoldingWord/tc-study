@@ -273,16 +273,27 @@ function maculaFilesOf(folder: string): Map<string, { files: Array<{ part: 'tree
   return byKey
 }
 
+/** Where a MACULA build says what it did not read: the build's log, or the console when given none. */
+type Warn = (line: string) => void
+
 /**
  * The licence a MACULA folder names: the `license` of the `index.json` Taller keeps in its part folders (`trees/`,
- * `referents/`), if any. Two that differ throw: which one MACULA's rows carry is for a person to say.
+ * `referents/`), if any. One that cannot be read or parsed names none, and `warn` names it: it holds no rows, so it
+ * does not fail the build. Two that differ throw: which one MACULA's rows carry is for a person to say.
  */
-export function maculaLicenseOf(folder: string): string | undefined {
+export function maculaLicenseOf(folder: string, warn: Warn = console.warn): string | undefined {
   const named = new Set<string>()
   for (const part of ['trees', 'referents']) {
     const path = join(folder, part, 'index.json')
     if (!existsSync(path)) continue
-    const { license } = JSON.parse(readFileSync(path, 'utf8')) as { license?: unknown }
+    let index: unknown
+    try {
+      index = JSON.parse(readFileSync(path, 'utf8'))
+    } catch (error) {
+      warn(`  MACULA: no se pudo leer ${path} (${error instanceof Error ? error.message : String(error)}); no cuenta para la licencia`)
+      continue
+    }
+    const license = index && typeof index === 'object' ? (index as { license?: unknown }).license : undefined
     if (typeof license === 'string' && license.trim()) named.add(license.trim())
   }
   if (named.size > 1) throw new Error(`MACULA's index.json files in ${folder} name different licences: ${[...named].join(', ')}`)
@@ -307,8 +318,8 @@ function maculaResourceOf(key: string, books: Set<string>, stamp: { version: str
 }
 
 /** The catalog rows `addMacula` writes for a folder, read from its file names and its `index.json` files alone. */
-export function maculaCatalogRows(folder: string, stamp: { version: string; publishedAt: string }): Array<ReturnType<typeof companionCatalogRow>> {
-  const license = maculaLicenseOf(folder)
+export function maculaCatalogRows(folder: string, stamp: { version: string; publishedAt: string }, warn?: Warn): Array<ReturnType<typeof companionCatalogRow>> {
+  const license = maculaLicenseOf(folder, warn)
   return [...maculaFilesOf(folder)]
     .filter(([, { files }]) => files.length)
     .map(([key, { books }]) => companionCatalogRow(maculaResourceOf(key, books, stamp, license)))
@@ -323,10 +334,11 @@ export async function addMacula(
   cache: Store,
   catalog: Catalog,
   folder: string,
-  stamp: { version: string; publishedAt: string }
+  stamp: { version: string; publishedAt: string },
+  warn?: Warn
 ): Promise<Array<{ key: string; books: number }>> {
   const done: Array<{ key: string; books: number }> = []
-  const license = maculaLicenseOf(folder)
+  const license = maculaLicenseOf(folder, warn)
   for (const [key, { files, books }] of maculaFilesOf(folder)) {
     if (!files.length) continue
     const rows = files.map(({ part, name, book }) => ({ key: `${key}/${part}/${book}`, entry: JSON.parse(readFileSync(join(folder, part, name), 'utf8')) }))
