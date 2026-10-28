@@ -61,7 +61,9 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
   them when a part replaces them.
 - Rows from before parts (whole packs): the first time a resource's slot is applied by parts, rows of that resource
   the register does not know are also deleted, found by the resource's key prefixes and placed with `slotOfRow` so
-  only that slot's rows go, and only within the units being applied.
+  only that slot's rows go, and only within the units being applied. If the slot is an original's (or MACULA's) and
+  such rows were there, the result says originals were replaced (`originalsReplaced`): whether they were the same is
+  not known.
 - **A whole pack over parts**: `importLanguagePack` with `overwrite` that replaces a resource first deletes that
   resource's register rows in the units the pack writes (its books, and the shared unit; every unit for a pack that is
   not a `book` pack), before any of its rows, in one `transactRaw`. Left there, the register would go on saying the
@@ -87,8 +89,10 @@ B lives in bt-synergy and knows nothing of Servos. In this delivery only Servos 
 - **One transaction per unit**: a book (its book, alignments and original parts) or the shared unit. Not one per
   whole update: a builder code change gives every part a new sha, so an update can be a whole language, too big for
   one transaction on a phone. Everything that depends on each other is in one unit (a book's alignments are made on
-  that book's text and original), so a reader never sees new notes with old alignments of the same book; two
-  different books may differ for a moment, which breaks nothing. The first download follows the same rule. The
+  that book's text and original), so the store never holds new notes with old alignments of the same book, and a read
+  made in one transaction never sees them (a reader whose reads span transactions, one per `get`, can still read one
+  row before a unit and the next after it, as with any write); two different books may differ for a moment, which
+  breaks nothing. The first download follows the same rule. The
   originals list's parts are applied in the units they belong to (an `original` part in its book's unit, MACULA in
   the shared unit, as `unitOfPart` says). Order: book units in canonical order, then the shared unit.
 - Inside a unit's transaction: read the register rows and the keys to delete (§5), write and delete rows, write the

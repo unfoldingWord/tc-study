@@ -828,6 +828,19 @@ describe('applyParts', () => {
     expect(target.catalog.get(TN)!.availability).toMatchObject({ offline: false, partial: false })
   })
 
+  test('the first time an original slot is filled over rows already there, the result says originals were replaced', async () => {
+    const uhb = await UHB_RUT('parts')
+    // The Hebrew of Ruth as a whole pack left it.
+    const target = memoryTarget({ rows: [{ key: `scripture-usj:${UHB}:rut:1`, entry: { content: 'whole', timestamp: 1 } }] })
+    const { list, originals } = await lists([], [uhb])
+
+    const result = await run(target, await stagingWith([uhb]), list, originals, ['book rut'])
+
+    expect(result.applied).toEqual(['book rut'])
+    expect(result.originalsReplaced).toBe(true)
+    expect(target.rows.get(`scripture-usj:${UHB}:rut:1`)).toEqual({ ...value('parts'), timestamp: NOW })
+  })
+
   /** A whole pack of TN made on another device from what it holds. */
   async function wholePackOf(device: MemoryTarget, extra: { kind?: 'book'; books?: string[] } = {}) {
     const source: PackSource = {

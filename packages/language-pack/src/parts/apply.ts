@@ -1,7 +1,8 @@
 /**
  * Applying a plan (spec §2–§3): the staged parts go into the device's store one unit at a time (a book, or the shared
- * unit), each unit in one transaction with its register rows, so a reader never sees new notes over old alignments of
- * the same book. Before each unit, the catalog rows of its resources; after it, their `offline` and `partial` flags.
+ * unit), each unit in one transaction with its register rows, so the store never holds new notes over old alignments
+ * of the same book (a reader whose reads span transactions can still read one before a unit and one after it). Before
+ * each unit, the catalog rows of its resources; after it, their `offline` and `partial` flags.
  *
  * What may be deleted, and nothing else: keys a slot's previous part wrote (its register row says which) that the new
  * part no longer has; the first time a slot is filled, rows of that slot's resource found by its key prefixes that
@@ -358,6 +359,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
             continue
           }
           // First time: rows of this slot that whole packs or online downloads left, which the register never knew.
+          // Rows of an original there already are replaced by the part's: whether they were the same is not known.
           const resource = resources.get(p.entry.resource)?.resource ?? { key: p.entry.resource }
           for (const scan of cleanupScans(p.entry.resource)) {
             for (const key of found.prefixKeys.get(scan.prefix) ?? []) {
@@ -369,7 +371,9 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
               } catch {
                 // A row no rule places is not known to be this slot's: it stays.
               }
-              if (slot === p.id) drop(key)
+              if (slot !== p.id) continue
+              drop(key)
+              if (ORIGINALS_KINDS.has(p.entry.kind)) replacedOriginals = true
             }
           }
         }
