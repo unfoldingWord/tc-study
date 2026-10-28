@@ -509,6 +509,7 @@ describe('applyParts', () => {
     expect(result.applied).toEqual(['book rut'])
     expect(target.rows.has(`index:strong:${UHB}:H0853:rut`)).toBe(false)
     expect(target.catalog.get(UHB)!.availability).toMatchObject({ offline: true, partial: false })
+    expect(target.rows.get(`resource:${UHB}`)).toMatchObject({ metadata: { downloadMethod: 'parts' } })
   })
 
   test('a plan made without versions is applied as it was planned: its skipped index part does not leave the original incomplete', async () => {
@@ -528,6 +529,23 @@ describe('applyParts', () => {
 
     expect(result.failed).toEqual([])
     expect(target.catalog.get(UHB)!.availability).toMatchObject({ offline: true, partial: false })
+  })
+
+  test('a part of a layer this reader does not know is skipped and its resource stays incomplete, without a receipt', async () => {
+    const tnRut = await TN_RUT()
+    const kt = await TW_KT()
+    const titles = await TW_TITLES()
+    const future = { ...kt, entry: { ...kt.entry, sha256: 'future-tw', group: 'kt:7', layers: ['sot', 'future' as PackLayer] } }
+    const { list, originals } = await lists([tnRut, kt, titles, future], [])
+    const target = memoryTarget()
+
+    const result = await run(target, await stagingWith([tnRut, kt, titles]), list, originals, ['book rut', 'shared'])
+
+    expect(result.failed).toEqual([])
+    expect(result.applied).toEqual(['book rut', 'shared'])
+    expect(target.catalog.get(TW)!.availability).toMatchObject({ offline: false })
+    expect(target.rows.has(`resource:${TW}`)).toBe(false)
+    expect(target.rows.has(`resource:${TN}`)).toBe(true)
   })
 
   test('a list made with other versions is refused whole', async () => {

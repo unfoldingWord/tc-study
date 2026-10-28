@@ -194,9 +194,13 @@ export function partsCoverage(input: PlanInput): Coverage {
   requireOriginals(input)
   const chosen = new Set(input.chosen)
   const coverage: Coverage = new Map()
+  const rowOf = (resource: string) => {
+    let row = coverage.get(resource)
+    if (!row) coverage.set(resource, (row = { present: 0, missing: 0, missingBytes: 0, whole: true }))
+    return row
+  }
   for (const [id, { entry }] of namedParts(input.list, input.originals, input.versions)) {
-    let row = coverage.get(entry.resource)
-    if (!row) coverage.set(entry.resource, (row = { present: 0, missing: 0, missingBytes: 0, whole: true }))
+    const row = rowOf(entry.resource)
     const held = input.register.get(id)?.sha256 === entry.sha256
     if (!held) row.whole = false
     if (!chosen.has(unitOfPart(entry))) continue
@@ -206,5 +210,22 @@ export function partsCoverage(input: PlanInput): Coverage {
       row.missingBytes += entry.bytes
     }
   }
+  // A skipped part whose rows the resource needs (any layer that is not optional) leaves it incomplete: no
+  // receipt, not offline. Only a part of optional layers alone is left out as if it were not listed.
+  for (const { entry } of skippedParts(input.list, input.originals, input.versions)) {
+    if (optionalOnly(entry)) continue
+    const row = rowOf(entry.resource)
+    row.whole = false
+    if (!chosen.has(unitOfPart(entry))) continue
+    row.missing++
+    row.missingBytes += entry.bytes
+  }
   return coverage
+}
+
+/** A part that carries only optional layers (an `index` part): a resource is whole without it. */
+export function optionalOnly(entry: PartEntry): boolean {
+  if (entry.kind === 'index') return true
+  const layers = entry.layers ?? []
+  return layers.length > 0 && layers.every((layer) => OPTIONAL_LAYERS.includes(layer))
 }

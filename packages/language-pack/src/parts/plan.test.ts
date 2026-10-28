@@ -240,6 +240,15 @@ describe('what this reader cannot use is skipped, not applied', () => {
     expect(plan.skipped).toEqual([{ entry: INDEX_TN, reason: 'version' }])
   })
 
+  test('a skipped part that is not only optional leaves its resource incomplete', () => {
+    const list = listOf('es-419', [TW_KT3, FUTURE, CONCORDANCE])
+    const register = registerOf([TW_KT3])
+    const coverage = partsCoverage({ list, register, chosen: ['shared'] })
+    expect(coverage.get(TW)).toEqual({ present: 1, missing: 2, missingBytes: 18, whole: false })
+    const plan = planParts({ list, register, chosen: ['shared'] })
+    expect(plan.download).toEqual([])
+  })
+
   test('an index part is judged as index even when its entry does not list the layer', () => {
     const bare = part('index-bare', 3, { kind: 'index', resource: UHB, book: 'jon', layers: ['sot'] })
     const plan = planParts({ list: listOf('es-419', []), originals: { ...listOf('originals', [bare]), versions: index(1) }, register: new Map(), chosen: ['shared'] })

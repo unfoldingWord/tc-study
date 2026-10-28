@@ -104,7 +104,11 @@ const result = await applyParts({ target, staging, plan, list, originals, regist
 - **What the app cannot use is skipped**, not applied: a part of a kind or a layer this code does not know, and a part of
   an optional layer (`OPTIONAL_LAYERS`, today `index`) unless `versions` states that layer with the list's values
   (`skipReason`). `plan.skipped` says which and why; a slot held from an earlier list stays. A list whose optional
-  layer versions differ is not refused. Pass the same `versions` to `planParts` and `applyParts`.
+  layer versions differ is not refused. A skipped part of optional layers alone (`optionalOnly`) is left out as if it
+  were not listed; any other skipped part leaves its resource incomplete (no receipt, not `offline`), so an app that
+  needs an update is not told it has the resource. Pass the same `versions` to `planParts` and `applyParts`
+  (`applyParts` judges optional layers by `plan.versions`). **No app should state `versions.index` yet**: index
+  rows cannot be placed until the index reader lands, and an index part would fail its unit.
 - **At startup**, call the same sequence even with nothing to download: it heals what an interrupted call left (a
   receipt not written, an `offline` flag not set). With parts still downloading it applies no unit, heals the other
   resources, leaves the resources still downloading as they are until their parts arrive, and returns
