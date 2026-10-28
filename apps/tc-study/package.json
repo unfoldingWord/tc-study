@@ -2,7 +2,7 @@
   "name": "tc-study",
   "private": true,
   "version": "1.1.1-beta.1",
-  "description": "Translation Companion Study - Web app for Bible translation resources with offline capability",
+  "description": "translationCore Study — web app for Bible translation resources with offline capability",
   "type": "module",
   "scripts": {
     "predev": "node scripts/write-app-version.cjs",

@@ -5,6 +5,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Settings as SettingsIcon, Sun, Database, Info, HardDrive } from 'lucide-react'
 import { ThemePreferenceButtons } from '../features/theme'
+import { BRAND_FULL, BRAND_SHORT } from '../config/brand'
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -98,7 +99,7 @@ export default function Settings() {
             </div>
             <div className="space-y-2 text-sm text-fg-secondary">
               <p>
-                <strong className="text-fg">TC Study</strong> - Translation Companion
+                <strong className="text-fg">{BRAND_SHORT}</strong> — {BRAND_FULL}
               </p>
               <p className="text-xs">Version 0.1.0</p>
               <p className="text-xs">Bible study and translation platform</p>

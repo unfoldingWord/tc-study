@@ -1,6 +1,8 @@
-# tc-study
+# tC Study
 
-Translation Core study app in the bt-synergy monorepo.
+tC Study (translationCore Study) is the study app of the translationCore family, in the bt-synergy
+monorepo. TC stands for translationCore. Its style and naming follow
+[docs/TC4_STYLE_AND_BRAND.md](docs/TC4_STYLE_AND_BRAND.md).
 
 ```bash
 bun install

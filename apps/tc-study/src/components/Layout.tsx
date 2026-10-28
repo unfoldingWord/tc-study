@@ -1,6 +1,7 @@
-import { BookOpen, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { BRAND_SHORT } from '../config/brand'
 import { navItems } from '../config/navItems'
 import { ThemeToggle } from '../features/theme'
 
@@ -18,11 +19,8 @@ export default function Layout() {
       {!isReadPage && (
         <header className="flex-shrink-0 border-b border-border-subtle bg-surface/80 backdrop-blur-sm relative z-[110]">
           <nav className="flex items-center justify-between px-3 py-1.5">
-            <div className="flex items-center gap-1.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-accent to-accent-hover">
-                <BookOpen className="h-3.5 w-3.5 text-white" />
-              </div>
-              <span className="text-base font-semibold text-fg">TC Study</span>
+            <div className="flex items-center">
+              <span className="text-base font-semibold text-fg">{BRAND_SHORT}</span>
             </div>
 
             <div className="flex items-center gap-0.5">

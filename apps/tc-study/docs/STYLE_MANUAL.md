@@ -1,4 +1,4 @@
-# TC Study — Style Manual
+# tC Study — Style Manual
 
 Broader visual language for `apps/tc-study`: palette, type, layers, and reading/chrome conventions.
 

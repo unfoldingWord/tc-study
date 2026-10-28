@@ -1,9 +1,10 @@
 {
-  "name": "TC Study",
-  "short_name": "TC Study",
+  "name": "translationCore Study",
+  "short_name": "tC Study",
+  "description": "Study the Bible with translation resources, offline.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "theme_color": "#014263",
   "icons": []
 }
