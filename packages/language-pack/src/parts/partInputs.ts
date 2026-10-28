@@ -84,6 +84,8 @@ const KIND_FAMILIES: Record<PartKind, readonly ResourceFamily[]> = {
   titles: ['tw', 'ta'],
   lexicon: ['lexicon'],
   obs: ['obs'],
+  // Not built yet: the builder makes no index part until it can place index rows.
+  index: [],
 }
 
 function resourceOf(ctx: InputsContext, key: string): ResourceFiles {

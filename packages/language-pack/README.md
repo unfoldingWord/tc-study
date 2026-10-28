@@ -92,7 +92,7 @@ import { REGISTER_PREFIX, applyParts, packTargetFrom, planParts, readRegister, s
 const target = packTargetFrom(stores) // the same stores as above
 const staging = stagingFrom(new IndexedDBByteStore({ dbName: 'servos-partes' }))
 const register = readRegister(await stores.cache.getByPrefix(REGISTER_PREFIX)) // what the device holds
-const plan = planParts({ list, originals, register, chosen })                   // chosen: ['shared', 'book rut', …]
+const plan = planParts({ list, originals, register, chosen, versions })         // chosen: ['shared', 'book rut', …]
 for (const part of plan.download) await staging.put(part.sha256, await download(part)) // the app's
 const result = await applyParts({ target, staging, plan, list, originals, register, chosen, versions })
 ```
@@ -101,6 +101,10 @@ const result = await applyParts({ target, staging, plan, list, originals, regist
   is not their name), `applyParts`. Each unit (a book, or the shared unit) goes in in one transaction with its
   register rows; then the catalog rows' flags (`offline`, and `partial` for a resource chosen for some books), and
   after the last unit the receipts of the resources held whole.
+- **What the app cannot use is skipped**, not applied: a part of a kind or a layer this code does not know, and a part of
+  an optional layer (`OPTIONAL_LAYERS`, today `index`) unless `versions` states that layer with the list's values
+  (`skipReason`). `plan.skipped` says which and why; a slot held from an earlier list stays. A list whose optional
+  layer versions differ is not refused. Pass the same `versions` to `planParts` and `applyParts`.
 - **At startup**, call the same sequence even with nothing to download: it heals what an interrupted call left (a
   receipt not written, an `offline` flag not set). With parts still downloading it applies no unit, heals the other
   resources, leaves the resources still downloading as they are until their parts arrive, and returns

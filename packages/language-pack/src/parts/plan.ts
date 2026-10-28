@@ -3,7 +3,9 @@
  * device holds. Pure: it reads the lists and the register and touches nothing.
  */
 
-import { SHARED_UNIT, unitOfPart, type PartEntry, type PartsList } from './partsList'
+import { OPTIONAL_LAYERS, type PackVersions } from '../types'
+import { PART_LAYERS } from './partFile'
+import { KNOWN_PART_KINDS, SHARED_UNIT, unitOfPart, type PartEntry, type PartsList } from './partsList'
 import { slotId, slotOfEntry } from './partSlots'
 import { unitOfSlotId, type Register } from './register'
 
@@ -40,22 +42,68 @@ const ORIGINALS_LIST = 'originals'
 /** The kinds the originals list owns: when both lists name one of these slots, the originals list's entry wins. */
 const ORIGINALS_KINDS = new Set(['original', 'macula'])
 
+/** Why a reader leaves a listed part out: a kind or a layer it does not know, or an optional layer of other versions. */
+export type SkipReason = 'kind' | 'layer' | 'version'
+
 /**
- * Every slot the lists name, once, with the part that fills it and the list that named it (its `language`, or
- * `originals`). A language list also names the originals it was built against; for `original` and `macula` slots the
- * originals list's entry wins, for any other slot the language list's.
+ * Why this reader cannot use a part of `list`, or null when it can. A part of an optional layer (`OPTIONAL_LAYERS`) is
+ * usable only when the app states that layer's versions and the list has each of them, the same as text: an app that
+ * does not read the layer, or reads another version of it, goes on without it.
  */
-export function namedParts(list: PartsList, originals?: PartsList): Map<string, { entry: PartEntry; list: string }> {
+export function skipReason(entry: PartEntry, list: PartsList, versions: PackVersions | undefined): SkipReason | null {
+  if (!KNOWN_PART_KINDS.has(entry.kind)) return 'kind'
+  const layers = new Set(entry.layers ?? [])
+  // An index part carries index rows whatever its entry says: judged by the index's versions.
+  if (entry.kind === 'index') layers.add('index')
+  if ([...layers].some((layer) => !PART_LAYERS.includes(layer))) return 'layer'
+  for (const layer of layers) {
+    if (!OPTIONAL_LAYERS.includes(layer)) continue
+    const mine = versions?.[layer]
+    const theirs = list.versions?.[layer]
+    if (!mine || !theirs || Object.keys(mine).length === 0) return 'version'
+    if (Object.keys(mine).some((name) => !(name in theirs) || String(theirs[name]) !== String(mine[name]))) return 'version'
+  }
+  return null
+}
+
+/**
+ * Every slot the lists name that this reader can use (`skipReason`), once, with the part that fills it and the list
+ * that named it (its `language`, or `originals`). A language list also names the originals it was built against; for
+ * `original` and `macula` slots the originals list's entry wins, for any other slot the language list's.
+ */
+export function namedParts(list: PartsList, originals?: PartsList, versions?: PackVersions): Map<string, { entry: PartEntry; list: string }> {
   const named = new Map<string, { entry: PartEntry; list: string }>()
   for (const entry of list.parts) {
     const id = slotId(slotOfEntry(entry))
-    if (!named.has(id)) named.set(id, { entry, list: list.language })
+    if (!named.has(id) && !skipReason(entry, list, versions)) named.set(id, { entry, list: list.language })
   }
   for (const entry of originals?.parts ?? []) {
     const id = slotId(slotOfEntry(entry))
+    if (skipReason(entry, originals!, versions)) {
+      // The originals list owns its slots: one it names and this reader skips is not filled from the language list.
+      if (ORIGINALS_KINDS.has(entry.kind)) named.delete(id)
+      continue
+    }
     if (!named.has(id) || ORIGINALS_KINDS.has(entry.kind)) named.set(id, { entry, list: originals!.language })
   }
   return named
+}
+
+/** The parts the lists name that this reader leaves out, with why; a slot another usable part fills is not one. */
+export function skippedParts(list: PartsList, originals?: PartsList, versions?: PackVersions): Array<{ entry: PartEntry; reason: SkipReason }> {
+  const named = namedParts(list, originals, versions)
+  const seen = new Set<string>()
+  const skipped: Array<{ entry: PartEntry; reason: SkipReason }> = []
+  for (const [l, entries] of [[list, list.parts], [originals, originals?.parts ?? []]] as const) {
+    for (const entry of entries) {
+      const id = slotId(slotOfEntry(entry))
+      const reason = skipReason(entry, l!, versions)
+      if (!reason || named.has(id) || seen.has(id)) continue
+      seen.add(id)
+      skipped.push({ entry, reason })
+    }
+  }
+  return skipped
 }
 
 export type PlanInput = {
@@ -64,6 +112,11 @@ export type PlanInput = {
   register: Register
   /** Unit ids: `shared`, `book <b>`. */
   chosen: string[]
+  /**
+   * This app's processing versions, by layer: the same the app gives `applyParts`. Without them, parts of optional
+   * layers are skipped (`skipReason`).
+   */
+  versions?: PackVersions
 }
 
 export type PartsPlan = {
@@ -78,6 +131,13 @@ export type PartsPlan = {
   units: string[]
   /** Sum of `download[].bytes`. */
   bytes: number
+  /**
+   * Parts the lists name that this reader cannot use (`skippedParts`): neither downloaded nor removed, so a slot held
+   * from an earlier list stays as it is.
+   */
+  skipped: Array<{ entry: PartEntry; reason: SkipReason }>
+  /** The versions the plan judged parts by (`PlanInput.versions`); `applyParts` judges optional layers by the same. */
+  versions?: PackVersions
 }
 
 /**
@@ -93,7 +153,9 @@ function requireOriginals(input: PlanInput): void {
 export function planParts(input: PlanInput): PartsPlan {
   requireOriginals(input)
   const chosen = new Set(input.chosen)
-  const named = namedParts(input.list, input.originals)
+  const named = namedParts(input.list, input.originals, input.versions)
+  const skipped = skippedParts(input.list, input.originals, input.versions)
+  const skippedIds = new Set(skipped.map(({ entry }) => slotId(slotOfEntry(entry))))
   const touched = new Set<string>()
   const download: PartEntry[] = []
   for (const [id, { entry }] of named) {
@@ -108,7 +170,7 @@ export function planParts(input: PlanInput): PartsPlan {
     // shared by all of them (replaced when a list names another sha, never removed).
     if (record.list !== input.list.language || input.list.language === ORIGINALS_LIST) continue
     const unit = unitOfSlotId(id)
-    if (!chosen.has(unit) || named.has(id)) continue
+    if (!chosen.has(unit) || named.has(id) || skippedIds.has(id)) continue
     remove.push(id)
     touched.add(unit)
   }
@@ -117,6 +179,8 @@ export function planParts(input: PlanInput): PartsPlan {
     remove,
     units: [...touched].sort(compareUnits),
     bytes: download.reduce((n, p) => n + p.bytes, 0),
+    skipped,
+    ...(input.versions ? { versions: input.versions } : {}),
   }
 }
 
@@ -130,7 +194,7 @@ export function partsCoverage(input: PlanInput): Coverage {
   requireOriginals(input)
   const chosen = new Set(input.chosen)
   const coverage: Coverage = new Map()
-  for (const [id, { entry }] of namedParts(input.list, input.originals)) {
+  for (const [id, { entry }] of namedParts(input.list, input.originals, input.versions)) {
     let row = coverage.get(entry.resource)
     if (!row) coverage.set(entry.resource, (row = { present: 0, missing: 0, missingBytes: 0, whole: true }))
     const held = input.register.get(id)?.sha256 === entry.sha256

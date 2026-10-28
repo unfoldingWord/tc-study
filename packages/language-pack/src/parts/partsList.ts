@@ -9,7 +9,12 @@ import { catalogPath } from '../catalog'
 import type { PackLayer, PackResourceRole, PackVersions } from '../types'
 import { PART_LAYERS, VOLATILE_FIELDS, stableJson, toJsonValue } from './partFile'
 
-export type PartKind = 'book' | 'alignments' | 'original' | 'macula' | 'tw' | 'ta' | 'titles' | 'lexicon' | 'obs'
+export type PartKind = 'book' | 'alignments' | 'original' | 'macula' | 'tw' | 'ta' | 'titles' | 'lexicon' | 'obs' | 'index'
+
+/** The kinds this reader can place; a list entry of any other kind is skipped (`planParts`), not applied. */
+export const KNOWN_PART_KINDS: ReadonlySet<PartKind> = new Set<PartKind>([
+  'book', 'alignments', 'original', 'macula', 'tw', 'ta', 'titles', 'lexicon', 'obs', 'index',
+])
 
 export type PartEntry = {
   sha256: string

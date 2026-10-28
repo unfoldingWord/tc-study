@@ -17,7 +17,7 @@
 
 import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { belongsTo, scansFor } from '../keys'
-import type { CacheRow, PackLayer, PackTarget, PackVersions } from '../types'
+import { OPTIONAL_LAYERS, type CacheRow, type PackLayer, type PackTarget, type PackVersions } from '../types'
 import { PART_LAYERS, readPart, sha256Hex, type PartRow } from './partFile'
 import { restoreCatalogBookkeeping, unitOfPart, type PartEntry, type PartsList } from './partsList'
 import { slotId, slotOfEntry, slotOfRow } from './partSlots'
@@ -112,15 +112,32 @@ function storedAvailability(row: ResourceMetadata | null): { offline: boolean; p
   return { offline: Boolean(availability?.offline), partial: Boolean(availability?.partial) }
 }
 
-/** The layers whose versions differ, as `importLanguagePack` compares them: names both sides have, as text. */
+/**
+ * The layers whose versions differ, as `importLanguagePack` compares them: names both sides have, as text. Optional
+ * layers are left out: their parts are skipped, not the list (`skipReason`).
+ */
 function differingLayers(theirs: PackVersions | undefined, mine: PackVersions | undefined): PackLayer[] {
   if (!theirs || !mine) return []
   const out: PackLayer[] = []
   for (const layer of Object.keys(mine) as PackLayer[]) {
+    if (OPTIONAL_LAYERS.includes(layer)) continue
     const a = theirs[layer]
     const b = mine[layer]
     if (!a || !b) continue
     if (Object.keys(b).some((name) => name in a && String(a[name]) !== String(b[name]))) out.push(layer)
+  }
+  return out
+}
+
+/**
+ * The versions this call judges parts by: the app's, with the optional layers as the plan had them, so a part the plan
+ * skipped is not counted as missing here (and one it chose is not counted as unnamed).
+ */
+function judgedVersions(app: PackVersions, planned: PackVersions | undefined): PackVersions {
+  const out: PackVersions = { ...app }
+  for (const layer of OPTIONAL_LAYERS) {
+    delete out[layer]
+    if (planned?.[layer]) out[layer] = planned[layer]
   }
   return out
 }
@@ -218,8 +235,9 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   }
   const clock = input.now ?? Date.now
   const result: ApplyResult = { applied: [], failed: [], completed: [], originalsReplaced: false, bytesApplied: 0 }
+  const judged = judgedVersions(input.versions, plan.versions)
   // Throws, before anything is written, when the list needs its originals list and was not given it.
-  partsCoverage({ list, originals, register: input.register, chosen })
+  partsCoverage({ list, originals, versions: judged, register: input.register, chosen })
 
   const lists = originals ? [list, originals] : [list]
   for (const l of lists) {
@@ -233,7 +251,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   }
 
   // Every slot once, with the list that named it (Review Focus 2).
-  const named = namedParts(list, originals)
+  const named = namedParts(list, originals, judged)
   const byUnit = new Map<string, Array<{ entry: PartEntry; id: string; list: string }>>()
   const unnamed = new Map<string, string[]>()
   for (const entry of plan.download) {
@@ -309,7 +327,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
     // commits.
     const unitResources = [...new Set([...ready.map((p) => p.entry.resource), ...removes.map(resourceOfSlotId)])]
     try {
-      const before = partsCoverage({ list, originals, register, chosen })
+      const before = partsCoverage({ list, originals, versions: judged, register, chosen })
       const rows = await catalogRows(unitResources, now, async (key) =>
         isOffline(before, key) ? availabilityOf(before, key) : storedAvailability(await catalogRow(key)),
       )
@@ -391,7 +409,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
     // this call or of the next one sets them.
     for (const key of unitResources) touched.add(key)
     try {
-      const after = partsCoverage({ list, originals, register, chosen })
+      const after = partsCoverage({ list, originals, versions: judged, register, chosen })
       const rows = await catalogRows(unitResources, now, async (key) => availabilityOf(after, key))
       if (rows.length) await target.putCatalogRows(rows)
     } catch (error) {
@@ -407,7 +425,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
     }
   }
 
-  const coverage = partsCoverage({ list, originals, register, chosen })
+  const coverage = partsCoverage({ list, originals, versions: judged, register, chosen })
   result.completed = [...touched].filter((key) => coverage.get(key)?.whole === true).sort()
 
   const catalog = new Map<string, ResourceMetadata>()
@@ -450,7 +468,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
   // a failed pass left out is written by the next call. Their receipts and the register rows of every slot the lists
   // name are read inside it, so what is decided is what is stored (another window may have applied since). A receipt
   // is written only against the device's catalog row as it is now: readers compare it with that row's stamp.
-  const scope = receiptScope(lists, touched)
+  const scope = receiptScope(lists, touched, judged)
   const stored = new Map<string, ResourceMetadata | null>()
   for (const key of scope) {
     // Already left as it is (its row could not be read or refreshed above): reported there.
@@ -471,7 +489,7 @@ export async function applyParts(input: ApplyInput): Promise<ApplyResult> {
         register: readRegister([...found.rows].map(([key, entry]) => ({ key, entry }))),
         catalog,
         stored,
-        versions: input.versions,
+        versions: judged,
         touched,
         kept,
         existing: found.rows,

@@ -29,10 +29,10 @@ export const PARTS_DOWNLOAD_METHOD = 'parts'
 export const receiptKey = (resourceKey: string) => `resource:${resourceKey}`
 
 /** The resources whose receipts a pass decides: those the lists name a part of, and those this call touched. */
-export function receiptScope(lists: PartsList[], touched: Iterable<string>): string[] {
+export function receiptScope(lists: PartsList[], touched: Iterable<string>, versions?: PackVersions): string[] {
   const [list, originals] = lists
   const scope = new Set(touched)
-  for (const { entry } of namedParts(list, originals).values()) scope.add(entry.resource)
+  for (const { entry } of namedParts(list, originals, versions).values()) scope.add(entry.resource)
   return [...scope].sort()
 }
 
@@ -71,12 +71,12 @@ export type ReceiptInput = {
  */
 export function receiptChanges(input: ReceiptInput): { puts: CacheRow[]; deletes: string[] } {
   const [list, originals] = input.lists
-  const coverage = partsCoverage({ list, originals, register: input.register, chosen: [] })
+  const coverage = partsCoverage({ list, originals, register: input.register, chosen: [], versions: input.versions })
   const usj = input.versions.sot?.usjProcessing
   const kept = new Set(input.kept ?? [])
   const puts: CacheRow[] = []
   const deletes: string[] = []
-  for (const key of receiptScope(input.lists, input.touched)) {
+  for (const key of receiptScope(input.lists, input.touched, input.versions)) {
     if (kept.has(key)) continue
     const existing = input.existing.get(receiptKey(key))
     const existingMeta = readIngestReceiptMeta(existing)
