@@ -44,13 +44,25 @@ export type PackRequirement = {
 export type PackLayer = 'receipt' | 'sot' | 'prepared' | 'quote' | 'align' | 'text' | 'index'
 
 /**
- * Layers a reader may go without: a part carrying one is used only when the app states that layer's versions and they
- * are the list's; otherwise it is skipped and everything else is applied (parts `planParts`).
+ * Layers a reader may go without: a part or a pack's layer of one is used only when the app states that layer's
+ * versions and they are the list's or the pack's (`readsLayer`); otherwise it is skipped and everything else is
+ * applied (parts `planParts`, packs `importLanguagePack`).
  */
 export const OPTIONAL_LAYERS: readonly PackLayer[] = ['index']
 
+/**
+ * Whether an app with versions `mine` reads `layer` as made with versions `theirs`: it states that layer's versions,
+ * and `theirs` has each of them, the same as text. The rule for an optional layer, in parts and in packs alike.
+ */
+export function readsLayer(layer: PackLayer, mine: PackVersions | undefined, theirs: PackVersions | undefined): boolean {
+  const a = mine?.[layer]
+  const b = theirs?.[layer]
+  if (!a || !b || Object.keys(a).length === 0) return false
+  return Object.keys(a).every((name) => name in b && String(b[name]) === String(a[name]))
+}
+
 /** The layers a pack carries unless told otherwise: everything that makes it open "already warmed". */
-export const ALL_LAYERS: readonly PackLayer[] = ['receipt', 'sot', 'prepared', 'quote', 'align', 'text']
+export const ALL_LAYERS: readonly PackLayer[] = ['receipt', 'sot', 'prepared', 'quote', 'align', 'text', 'index']
 
 /** Without these the pack cannot be read offline at all (§6, "minimum offline-useful pack"). */
 export const REQUIRED_LAYERS: readonly PackLayer[] = ['receipt', 'sot']

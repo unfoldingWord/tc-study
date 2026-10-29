@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { partPath, partsListPath, readPack, readPart, serializePartsList, writePart, type PartsList } from '@bt-synergy/language-pack'
+import JSZip from 'jszip'
+import { fileSafe, indexVersesKey, partPath, partsListPath, readPack, readPackManifest, readPart, serializePartsList, writePart, type PackManifest, type PartsList } from '@bt-synergy/language-pack'
 import { buildLanguageParts } from './buildLanguageParts'
 import { compareParts, formatComparison, type PartsComparison } from './compareParts'
 import {
@@ -95,7 +96,34 @@ describe('compareParts', () => {
     // Receipts of every resource of both packs; parts never carry them.
     expect(c.ignored.receipts).toBeGreaterThanOrEqual(7)
     expect(c.rows.every((r) => r.layer !== 'receipt')).toBe(true)
+    // The originals' word index: Titus of UGNT (its verses row and one code), Ruth and Jonah of UHB (four rows each).
+    expect(c.ignored.index).toBe(10)
+    expect(c.rows.every((r) => r.layer !== 'index')).toBe(true)
     expect(formatComparison(c)).toContain('No differences')
+  }, 60_000)
+
+  test('the whole build puts the word index in the originals pack only', async () => {
+    const originals = await readPackManifest(packs.originals)
+    expect(originals.layers).toContain('index')
+    expect(originals.versions?.index).toEqual({ helpsIndex: 1 })
+    const rows = Object.fromEntries(originals.resources.map((r) => [r.key, r.rows.index ?? 0]))
+    expect(rows).toEqual({ 'Biblica/el-x-koine/macula': 0, 'Biblica/hbo/macula': 0, 'unfoldingWord/el-x-koine/ugnt': 2, 'unfoldingWord/hbo/uhb': 8 })
+    expect((await readPackManifest(packs.language)).resources.every((r) => !r.rows.index)).toBe(true)
+  })
+
+  test('an index row of a resource that is not an original is a difference, not left out', async () => {
+    const zip = await JSZip.loadAsync(packs.language)
+    const manifest = JSON.parse(await zip.file('manifest.json')!.async('string')) as PackManifest
+    manifest.resources.find((r) => r.key === GLT)!.rows.index = 1
+    zip.file('manifest.json', JSON.stringify(manifest))
+    const key = indexVersesKey(GLT, 'rut')
+    zip.file(`rows/index/${fileSafe(GLT)}.jsonl`, `${JSON.stringify({ key, entry: { v: 1, stamp: 'x', words: 1, timestamp: 1 } })}\n`)
+    const pack = await zip.generateAsync({ type: 'uint8array' })
+
+    const c = await compareParts({ pack, originals: packs.originals, workDir: built })
+    expect(bucket(c, GLT, 'index').onlyInWhole).toEqual([key])
+    expect(c.ignored.index).toBe(10)
+    expect(c.differences).toBe(1)
   }, 60_000)
 
   test('with Open Bible Stories, both builds carry the same stories', async () => {

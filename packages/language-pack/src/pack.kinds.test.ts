@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test'
 import { resourceContentStamp, type ResourceMetadata } from '@bt-synergy/resource-catalog'
-import { bookOfRow, originalOfDerivedRow } from './keys'
+import { bookOfRow, indexStrongKey, indexVersesKey, originalOfDerivedRow } from './keys'
 import { buildLanguagePack, importLanguagePack } from './pack'
-import type { CacheRow, PackSource, PackTarget } from './types'
+import type { CacheRow, PackSource, PackTarget, PackVersions } from './types'
+import { encodeWords } from './wordIndex/wordList'
 
 const TN = 'es-419_gl/es-419/tn'
 const GLT = 'es-419_gl/es-419/glt'
@@ -261,5 +262,65 @@ describe('abrir un paquete que necesita originales', () => {
     const { target: t } = target()
     const result = await importLanguagePack({ bytes, target: t, versions: VERSIONS })
     expect(result.originals.map((o) => o.status)).toEqual(['in-pack', 'in-pack'])
+  })
+})
+
+describe('the word index in the originals pack', () => {
+  const WITH_INDEX: PackVersions = { ...VERSIONS, index: { helpsIndex: 1 } }
+  const INDEX_ROWS: CacheRow[] = [
+    { key: indexVersesKey(UGNT, 'tit'), entry: { v: 1, stamp: 'g0123456789', words: 7, verses: '1:1 2:11', starts: encodeWords([0, 3]), timestamp: 1 } },
+    { key: indexStrongKey(UGNT, 'G5485', 'tit'), entry: { v: 1, stamp: 'g0123456789', lemma: 'χάρις', words: encodeWords([5]), timestamp: 1 } },
+  ]
+  /** The fixture store with UGNT's index rows of Titus beside its receipt and source. */
+  function withIndex(): PackSource {
+    const base = store()
+    return { ...base, rowsByPrefix: async (prefix) => [...(await base.rowsByPrefix(prefix)), ...INDEX_ROWS.filter((r) => r.key.startsWith(prefix))] }
+  }
+  const originalsPack = () => buildLanguagePack({ source: withIndex(), language: 'es-419', kind: 'originals', versions: WITH_INDEX })
+
+  async function expectIndexSkipped(versions: PackVersions) {
+    const { bytes, manifest } = await originalsPack()
+    expect(manifest.resources.find((r) => r.key === UGNT)?.rows.index).toBe(2)
+    const { target: t, rows } = target()
+    const result = await importLanguagePack({ bytes, target: t, versions })
+    expect(result.skippedLayers).toEqual(['index'])
+    expect([...rows.keys()].filter((k) => k.startsWith('index:'))).toEqual([])
+    expect(result.byLayer.index).toBeUndefined()
+    expect(rows.has(`scripture-usj:${UGNT}:tit:1`)).toBe(true)
+    expect(rows.has(`resource:${UGNT}`)).toBe(true)
+  }
+
+  it('an originals pack carries the index layer', async () => {
+    const { manifest } = await originalsPack()
+    expect(manifest.layers).toContain('index')
+    expect(manifest.versions?.index?.helpsIndex).toBe(1)
+    expect(manifest.resources.find((r) => r.key === UGNT)?.rows.index).toBe(2)
+    expect(manifest.resources.find((r) => r.key === UHB)?.rows.index).toBeUndefined()
+  })
+
+  it('the index is imported when the app reads its version', async () => {
+    const { bytes } = await originalsPack()
+    const { target: t, rows } = target()
+    const result = await importLanguagePack({ bytes, target: t, versions: WITH_INDEX })
+    expect(result.skippedLayers).toEqual([])
+    expect(result.byLayer.index).toBe(2)
+    for (const row of INDEX_ROWS) expect(rows.get(row.key)).toEqual(row.entry)
+  })
+
+  it('the index is skipped when the app does not state it', async () => {
+    await expectIndexSkipped(VERSIONS)
+  })
+
+  it('the index is skipped when its version differs', async () => {
+    await expectIndexSkipped({ ...VERSIONS, index: { helpsIndex: 2 } })
+  })
+
+  it('a language pack is unchanged', async () => {
+    const { bytes, manifest } = await buildLanguagePack({ source: store(), language: 'es-419', versions: WITH_INDEX })
+    expect(manifest.resources.every((r) => r.rows.index === undefined)).toBe(true)
+    // `layers` lists what was asked for, rows or not; with no index rows, an app that does not read the index skips nothing.
+    expect(manifest.layers).toContain('index')
+    const result = await importLanguagePack({ bytes, target: target().target, versions: VERSIONS })
+    expect(result.skippedLayers).toEqual([])
   })
 })

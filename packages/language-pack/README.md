@@ -36,7 +36,8 @@ catalog.json                        [{ key, metadata }] for every packed resourc
 rows/{layer}/{resource}.jsonl       one {"key", "entry"} per line, raw as the cache store keeps it
 ```
 
-Layers: `receipt`, `sot` (always included), `prepared`, `quote`, `align`, `text`. Rows are raw store rows, chapter
+Layers: `receipt`, `sot` (always included), `prepared`, `quote`, `align`, `text`, `index` (the originals' word index:
+`index:verses:…` and `index:strong:…` rows, optional). Rows are raw store rows, chapter
 chunks included, so opening a pack needs no parsing and no rebuild. Every derived key keeps its stamp: an app that no
 longer accepts a stamp or a version treats the row as a miss and rebuilds it from the source of truth. Zips are made at
 DEFLATE level 9 unless `compressionLevel` says otherwise.
@@ -78,6 +79,9 @@ written last for each resource, so a pack cut short never marks an incomplete re
 
 Pass the app's processing versions (`versions`) when making and opening a pack: an app with another source version
 refuses it (it would throw the rows away), and one with other derived versions skips those layers and rebuilds them.
+An optional layer (`OPTIONAL_LAYERS`, today `index`) is opened only when `versions` states it with the pack's values
+(`readsLayer`, the parts rule); otherwise it is skipped (in `skippedLayers` when the pack has rows of it) and the rest
+comes.
 
 ## Parts importer
 
