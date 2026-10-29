@@ -39,6 +39,9 @@
   --color-danger-soft: var(--theme-danger-soft);
   --color-warning: var(--theme-warning);
   --color-warning-fg: var(--theme-warning-fg);
+  --color-warning-soft: var(--theme-warning-soft);
+  --color-valid-soft: var(--theme-valid-soft);
+  --color-valid-fg: var(--theme-valid-fg);
   --color-panel-1-soft: var(--theme-panel-1-soft);
   --color-panel-1: var(--theme-panel-1);
   --color-panel-1-fg: var(--theme-panel-1-fg);
@@ -138,6 +141,10 @@
   /* Kindle — CVD-safe pair with the accent (TW vs TA footers) */
   --theme-warning: var(--uw-kindle);
   --theme-warning-fg: var(--tc-warn-text);
+  --theme-warning-soft: var(--tc-warn-surface);
+
+  --theme-valid-soft: var(--tc-valid-surface);
+  --theme-valid-fg: var(--tc-valid-strong);
 
   --theme-panel-1-soft: var(--uw-inspire-50);
   --theme-panel-1: var(--uw-inspire);
@@ -211,6 +218,10 @@
 
   --theme-warning: var(--uw-kindle);
   --theme-warning-fg: #f2ce99; /* Kindle's light end */
+  --theme-warning-soft: #313b48;
+
+  --theme-valid-soft: #184246; /* valid 16% on surface */
+  --theme-valid-fg: #9bdaaf; /* valid's light end */
 
   --theme-panel-1-soft: #144761;
   --theme-panel-1: var(--uw-inspire);

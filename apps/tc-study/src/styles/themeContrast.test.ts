@@ -57,6 +57,7 @@ const EXPECTED: Record<'light' | 'dark', Record<string, string>> = {
     scripture: '#FFFFFF', 'scripture-fg': '#231F20', 'scripture-muted': '#626F78',
     highlight: '#FFF1B8', 'highlight-strong': '#FDD910', underline: '#B7C2C9',
     danger: '#A21309', 'danger-soft': '#FAEDEB', warning: '#E59D33', 'warning-fg': '#8A5B12',
+    'warning-soft': '#FCF6EA', 'valid-soft': '#E8F7ED', 'valid-fg': '#327547',
     'panel-1': '#31ADE3', 'panel-1-soft': '#EAF6FC', 'panel-1-fg': '#156D91',
     'panel-2': '#E59D33', 'panel-2-soft': '#FCF6EA', 'panel-2-fg': '#8A5B12',
     helps: '#014263', 'helps-soft': '#ECF2F5', 'helps-fg': '#014263', 'helps-border': '#014263',
@@ -73,6 +74,7 @@ const EXPECTED: Record<'light' | 'dark', Record<string, string>> = {
     scripture: '#0F3044', 'scripture-fg': '#FFFFFF', 'scripture-muted': '#9EAAB1',
     highlight: '#5B4B12', 'highlight-strong': '#7A641C', underline: '#9EAAB1',
     danger: '#F2938A', 'danger-soft': '#313B48', warning: '#E59D33', 'warning-fg': '#F2CE99',
+    'warning-soft': '#313B48', 'valid-soft': '#184246', 'valid-fg': '#9BDAAF',
     'panel-1': '#31ADE3', 'panel-1-soft': '#144761', 'panel-1-fg': '#CFECF8',
     'panel-2': '#E59D33', 'panel-2-soft': '#333F3A', 'panel-2-fg': '#F2CE99',
     helps: '#A8DEF4', 'helps-soft': '#1F3B4C', 'helps-fg': '#FFFFFF', 'helps-border': '#415967',
@@ -88,6 +90,7 @@ const TEXT_PAIRS: [string, string][] = [
   ['scripture-fg', 'scripture'], ['scripture-muted', 'scripture'], ['danger', 'danger-soft'],
   ['warning-fg', 'surface'], ['panel-1-fg', 'panel-1-soft'], ['panel-2-fg', 'panel-2-soft'],
   ['helps-fg', 'helps-soft'], ['chip-quote-fg', 'chip-quote'], ['scripture-fg', 'highlight'],
+  ['valid-fg', 'valid-soft'], ['warning-fg', 'warning-soft'],
 ]
 
 function luminance(hex: string): number {
