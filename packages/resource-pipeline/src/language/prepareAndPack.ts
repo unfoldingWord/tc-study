@@ -16,6 +16,7 @@ import { buildLanguagePack, ORIGINAL_LANGUAGE_KEYS, packSourceFrom, type PackMan
 import { addLexicons, addMacula, lexiconOwnerOf, MACULA_KEYS } from '../../cli/companions'
 import { isObs, keyOfRow, literalTextOf } from './door43Stamps'
 import { closeAndDelete } from './fakeDatabases'
+import { addOriginalsIndex } from './originalsIndex'
 import { PACK_VERSIONS } from './packVersions'
 import { prepareLanguage, type DiscoverInto, type PrepareLanguageProgress } from './prepareLanguage'
 
@@ -153,6 +154,10 @@ export async function prepareAndPack(o: {
   const languagePack = await writePack(`${language}.langpack.zip`, { kind: 'language' })
   let originalsPack: PackResult | undefined
   if (o.originals) {
+    // Into the store only now: the packs written before take no original, and the base and book packs after take none.
+    for (const index of await addOriginalsIndex({ cache: cacheAdapter, catalog: catalogAdapter }, ORIGINAL_LANGUAGE_KEYS)) {
+      say(`[${elapsed()}] Índice de palabras de ${index.key}: ${index.books} libros, ${index.rows} filas`)
+    }
     originalsPack = await writePack('originals.langpack.zip', {
       kind: 'originals',
       resourceKeys: undefined,
