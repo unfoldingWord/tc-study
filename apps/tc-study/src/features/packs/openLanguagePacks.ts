@@ -94,11 +94,11 @@ export async function openLanguagePacks(
   const unreadable: OpenedPack[] = []
   const readable: Array<PackFile & { manifest: PackManifest }> = []
   for (const file of files) {
-    const pack = await bytesOf(file)
     try {
+      const pack = await bytesOf(file)
       readable.push({ ...pack, manifest: await readPackManifest(pack.bytes) })
     } catch (error) {
-      unreadable.push({ name: pack.name, refused: 'not-a-pack', detail: messageOf(error) })
+      unreadable.push({ name: file.name, refused: 'not-a-pack', detail: messageOf(error) })
     }
   }
   readable.sort((a, b) => OPEN_ORDER[kindOf(a.manifest)] - OPEN_ORDER[kindOf(b.manifest)])

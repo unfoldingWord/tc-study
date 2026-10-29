@@ -29,6 +29,7 @@ import {
 import { availabilitySubjectSetsFromRegistry } from '../features/read/compositionAvailabilitySubjects'
 import { fetchLanguageAvailabilityByCode } from '../features/read/languageAvailability'
 import { resolveLanguageListKind } from '../features/read/languageListKind'
+import { catalogLanguageRows, localPickerLanguages } from '../features/read/localPickerLanguages'
 import {
   loadLanguagesCache,
   saveLanguagesCache,
@@ -132,8 +133,20 @@ export function LanguagePicker({
       setDisplayedLanguages(display)
       setAvailableLanguages(global)
     } catch (err) {
-      console.error('❌ Failed to revalidate languages:', err)
-      setError(err as Error)
+      const onDevice = localPickerLanguages({
+        rows: await catalogLanguageRows(catalogManager).catch(() => []),
+        sets: availabilitySubjectSetsFromRegistry(resourceTypeRegistry, panelEntryRegistry),
+        kind: listKind,
+      })
+      if (onDevice.length > 0) {
+        setDisplayedLanguages((shown) => [
+          ...shown,
+          ...onDevice.filter((lang) => !shown.some((listed) => listed.code === lang.code)),
+        ])
+      } else {
+        console.error('❌ Failed to revalidate languages:', err)
+        setError(err as Error)
+      }
     } finally {
       setIsRevalidating(false)
     }
