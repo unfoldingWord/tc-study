@@ -20,7 +20,7 @@ const INDICATOR = {
     idle: 'border-transparent text-fg-secondary hover:text-fg',
   },
   pill: {
-    list: 'inline-flex rounded-full bg-muted p-1',
+    list: 'inline-flex items-center rounded-full bg-muted p-1 pointer-coarse:p-1.5',
     tab: 'h-7 rounded-full px-3',
     selected: 'bg-surface shadow-xs text-fg',
     idle: 'text-fg-secondary hover:text-fg',

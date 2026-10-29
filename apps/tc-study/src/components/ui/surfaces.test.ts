@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { Badge, type BadgeTone } from './Badge'
 import { Card } from './Card'
 import { SectionLabel } from './SectionLabel'
+import { expectNoRawPalette } from './noRawPalette.test-helper'
 
 describe('Badge', () => {
   const PAIRS: Record<BadgeTone, [string, string]> = {
@@ -30,6 +31,12 @@ describe('Badge', () => {
       expect(html).toContain(cls)
     }
   })
+
+  test('every tone avoids raw palette classes', () => {
+    for (const tone of Object.keys(PAIRS) as BadgeTone[]) {
+      expectNoRawPalette(renderToStaticMarkup(createElement(Badge, { tone }, 'x')))
+    }
+  })
 })
 
 describe('Card', () => {
@@ -53,6 +60,10 @@ describe('Card', () => {
     expect(html).toContain('space-y-4')
     expect(html).toContain('bg-surface')
   })
+
+  test('markup avoids raw palette classes', () => {
+    expectNoRawPalette(renderToStaticMarkup(createElement(Card, null, 'x')))
+  })
 })
 
 describe('SectionLabel', () => {
@@ -67,5 +78,9 @@ describe('SectionLabel', () => {
   test('renders as a heading when asked', () => {
     const html = renderToStaticMarkup(createElement(SectionLabel, { as: 'h2' }, 'Storage'))
     expect(html.startsWith('<h2')).toBe(true)
+  })
+
+  test('markup avoids raw palette classes', () => {
+    expectNoRawPalette(renderToStaticMarkup(createElement(SectionLabel, null, 'Storage')))
   })
 })

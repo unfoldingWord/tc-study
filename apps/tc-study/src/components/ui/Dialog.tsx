@@ -71,7 +71,7 @@ export function Dialog({ open, ...content }: DialogContent & { open: boolean }) 
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     panelRef.current?.focus()
     return () => {
-      if (previous) previous.focus()
+      if (previous?.isConnected) previous.focus()
       else document.body.focus()
     }
   }, [open])

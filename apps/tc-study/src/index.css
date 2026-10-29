@@ -160,7 +160,7 @@
   --theme-helps: var(--uw-ocean);
   --theme-helps-soft: var(--uw-frost);
   --theme-helps-fg: var(--uw-ocean);
-  /* Outline button stroke: tC4 --t-ocean-border */
+  /* Outline button stroke: solid Ocean in light (dark uses composited white 40% below) */
   --theme-helps-border: var(--uw-ocean);
 
   /* Helps reading chips (scripture / OBS quotes) — verse headers use muted/50 */

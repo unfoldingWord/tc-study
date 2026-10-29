@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { TextField } from './TextField'
+import { expectNoRawPalette } from './noRawPalette.test-helper'
 
 type TextFieldProps = Parameters<typeof TextField>[0]
 
@@ -38,5 +39,9 @@ describe('TextField', () => {
     expect(input).toContain('type="search"')
     expect(input).toContain('placeholder="Search..."')
     expect(input).toContain('required=""')
+  })
+
+  test('markup avoids raw palette classes', () => {
+    expectNoRawPalette(render())
   })
 })

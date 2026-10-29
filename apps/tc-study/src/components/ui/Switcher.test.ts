@@ -3,6 +3,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Switcher } from './Switcher'
 import { nextSwitcherIndex } from './switcherKeys'
+import { expectNoRawPalette } from './noRawPalette.test-helper'
 
 describe('nextSwitcherIndex', () => {
   test('arrows move by one and wrap around', () => {
@@ -110,11 +111,17 @@ describe('Switcher', () => {
 
   test('pill is a segmented control with a raised selected segment', () => {
     const html = render('pill')
-    expect(html).toMatch(/^<div[^>]*class="[^"]*rounded-full bg-muted p-1/)
+    expect(html).toMatch(/^<div[^>]*class="[^"]*items-center[^"]*rounded-full bg-muted p-1/)
+    expect(html).toContain('pointer-coarse:p-1.5')
     const [read, study] = tabs(html).map(classes)
     expect(study).toEqual(expect.arrayContaining(['rounded-full', 'bg-surface', 'shadow-xs', 'text-fg']))
     expect(read).toContain('text-fg-secondary')
     expect(read).not.toContain('bg-surface')
     expect(html).not.toContain('border-accent')
+  })
+
+  test('underline and pill markup avoid raw palette classes', () => {
+    expectNoRawPalette(render())
+    expectNoRawPalette(render('pill'))
   })
 })

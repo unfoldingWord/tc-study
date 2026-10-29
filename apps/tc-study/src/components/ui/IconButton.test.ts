@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { IconButton } from './IconButton'
+import { expectNoRawPalette } from './noRawPalette.test-helper'
 
 type IconButtonProps = Parameters<typeof IconButton>[0]
 
@@ -41,5 +42,11 @@ describe('IconButton', () => {
     const html = render({ className: 'ml-auto' })
     expect(html).toContain('ml-auto')
     expect(html).toContain('rounded-md')
+  })
+
+  test('markup avoids raw palette classes at every size', () => {
+    for (const size of ['sm', 'md', 'lg'] as const) {
+      expectNoRawPalette(render({ size }))
+    }
   })
 })

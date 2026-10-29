@@ -2,14 +2,13 @@ import { describe, expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Button } from './Button'
+import { expectNoRawPalette } from './noRawPalette.test-helper'
 
 type ButtonProps = Parameters<typeof Button>[0]
 
 function render(props: Partial<ButtonProps> = {}): string {
   return renderToStaticMarkup(createElement(Button, props as ButtonProps, 'Go'))
 }
-
-const RAW_PALETTE = /(?<![\w-])(?:bg|text|border)-(?:white|black|[a-z]+-\d{2,3})(?![\w-])/
 
 describe('Button', () => {
   test('defaults to a fill pill of tC4 action type, type="button"', () => {
@@ -52,7 +51,7 @@ describe('Button', () => {
 
   test('no variant uses a raw palette class', () => {
     for (const variant of ['fill', 'outline', 'quiet', 'danger'] as const) {
-      expect(render({ variant })).not.toMatch(RAW_PALETTE)
+      expectNoRawPalette(render({ variant }))
     }
   })
 

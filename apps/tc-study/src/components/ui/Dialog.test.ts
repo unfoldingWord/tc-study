@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from 'bun:test'
 import { createElement, type ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { Dialog, DialogFrame } from './Dialog'
+import { expectNoRawPalette } from './noRawPalette.test-helper'
 
 type FrameProps = Parameters<typeof DialogFrame>[0]
 
@@ -83,5 +84,9 @@ describe('DialogFrame', () => {
     expect(onClose).not.toHaveBeenCalled()
     scrim.props.onClick({ target: scrimNode, currentTarget: scrimNode })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('markup avoids raw palette classes', () => {
+    expectNoRawPalette(renderFrame())
   })
 })
