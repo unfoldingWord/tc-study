@@ -9,6 +9,7 @@ import { ResourceTypeInitializer } from './components/ResourceTypeInitializer'
 import { AppProvider } from './contexts'
 import { useCatalogReady, useResourceTypesError } from './contexts/CatalogContext'
 import { NavigationProvider } from './contexts/NavigationContext'
+import { PwaUpdateNotice } from './features/pwa/PwaUpdateNotice'
 import { useWorkspaceStore } from './lib/stores/workspaceStore'
 import { useWizardStore } from './lib/stores/wizardStore'
 import { door43ToListNameFields } from './features/read/languageListDisplayName'
@@ -86,6 +87,7 @@ function App() {
   return (
     <>
       <ResourceTypeInitializer />
+      <PwaUpdateNotice />
       {resourceTypesError ? (
         <div
           className="flex flex-col items-center justify-center min-h-screen gap-3"
