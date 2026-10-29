@@ -124,7 +124,7 @@ export async function prepareAndPack(o: {
   }
   if (o.macula) {
     say(`[${elapsed()}] MACULA desde ${o.macula}…`)
-    companions.macula = await addMacula(cacheAdapter as never, catalogAdapter as never, resolve(o.macula), o.maculaStamp ?? builtNow())
+    companions.macula = await addMacula(cacheAdapter as never, catalogAdapter as never, resolve(o.macula), o.maculaStamp ?? builtNow(), say)
     for (const m of companions.macula as Array<{ key: string; books: number }>) say(`[${elapsed()}]   ${m.key}: ${m.books} libros`)
   }
   // Open Bible Stories and their helps left out when asked: only the Bible is translated.

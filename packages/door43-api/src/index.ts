@@ -20,6 +20,8 @@ export {
 
 export type { ByteProgressCallback } from './readResponseArrayBufferWithProgress'
 
+export { manifestRights } from './manifestRights'
+
 export {
     getContentUrl,
     getUSFMUrl,
