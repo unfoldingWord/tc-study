@@ -43,39 +43,64 @@ test.describe('Journey 11: Offline shell', () => {
           if (navigator.serviceWorker.controller) return 'controlled'
           return registration.active ? 'active' : 'pending'
         })
-      })
-      .toMatch(/active|controlled/)
+      }, { timeout: 30_000 })
+      .toMatch(/controlled|active/)
 
-    const controlledBeforeReload = await page.evaluate(
-      () => Boolean(navigator.serviceWorker.controller)
-    )
-    if (!controlledBeforeReload) {
+    if (
+      !(await page.evaluate(async () => {
+        await navigator.serviceWorker.ready
+        return Boolean(navigator.serviceWorker.controller)
+      }))
+    ) {
       await page.reload()
       await waitForCatalogReady(page)
-      await expect
-        .poll(async () => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
-        .toBe(true)
     }
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(async () => {
+            await navigator.serviceWorker.ready
+            return Boolean(navigator.serviceWorker.controller)
+          }),
+        { timeout: 30_000 }
+      )
+      .toBe(true)
 
     await context.setOffline(true)
 
     await page.goto('/')
     await page.reload()
-    await expect(page.locator('#root')).toBeVisible()
+    await waitForCatalogReady(page)
     await expect(page).toHaveURL(/\/read/)
+    await expect(page.locator('.read-panel-header').first()).toBeVisible({
+      timeout: 30_000,
+    })
 
     const prepareWorkerResponse = page.waitForResponse(
       (response) =>
         response.url().includes('prepare.worker') && response.status() === 200,
       { timeout: 30_000 }
     )
+    const warmWorkerResponse = page
+      .waitForResponse(
+        (response) => response.url().includes('warm.worker') && response.status() === 200,
+        { timeout: 15_000 }
+      )
+      .catch(() => null)
     await page.goto('/read/e2e/ult/chapter/tit.1')
     await waitForCatalogReady(page)
+    await expect(page.locator('.read-panel-header').first()).toBeVisible({
+      timeout: 30_000,
+    })
     await expect(page.getByText(E2E_QUOTE_EN, { exact: true }).first()).toBeVisible({
       timeout: 30_000,
     })
     const workerResp = await prepareWorkerResponse
     expect(await workerResp.fromServiceWorker()).toBe(true)
+    const warmResp = await warmWorkerResponse
+    if (warmResp) {
+      expect(await warmResp.fromServiceWorker()).toBe(true)
+    }
 
     await page.goto('/data')
     await waitForCatalogReady(page)

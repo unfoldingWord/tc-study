@@ -5,8 +5,7 @@ import {
   type UpdateServiceWorker,
   PwaUpdateNoticeBanner,
 } from './PwaUpdateNoticeBanner'
-
-const SW_UPDATE_CHECK_MS = 60 * 60 * 1000
+import { buildPwaRegisterOptions } from './pwaRegisterOptions'
 
 export function PwaUpdateNotice() {
   const [needRefresh, setNeedRefresh] = useState(false)
@@ -17,21 +16,14 @@ export function PwaUpdateNotice() {
   useEffect(() => {
     let updateIntervalId: ReturnType<typeof setInterval> | undefined
 
-    const update = registerSW({
-      immediate: true,
-      onNeedRefresh() {
-        setNeedRefresh(true)
-      },
-      onOfflineReady() {
-        // No UX surface needed for offline-ready; shell stays quiet unless an update waits.
-      },
-      onRegisteredSW(_swScriptUrl, registration) {
-        if (!registration) return
-        updateIntervalId = setInterval(() => {
-          void registration.update()
-        }, SW_UPDATE_CHECK_MS)
-      },
-    })
+    const update = registerSW(
+      buildPwaRegisterOptions({
+        setNeedRefresh,
+        setUpdateIntervalId: (id) => {
+          updateIntervalId = id
+        },
+      })
+    )
     setUpdateServiceWorker(() => update)
 
     return () => {
