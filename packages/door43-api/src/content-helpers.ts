@@ -6,6 +6,7 @@
  */
 
 import type { Door43Resource } from './Door43ApiClient'
+import { door43Fetch } from './door43Fetch'
 
 export interface ContentUrlOptions {
   bookCode?: string
@@ -126,7 +127,7 @@ export function getTarballUrl(resource: Door43Resource): string {
  * Fetch raw content from URL
  */
 export async function fetchContent(url: string): Promise<string> {
-  const response = await fetch(url)
+  const response = await door43Fetch(url)
   
   if (!response.ok) {
     throw new Error(`Failed to fetch content from ${url}: ${response.status} ${response.statusText}`)

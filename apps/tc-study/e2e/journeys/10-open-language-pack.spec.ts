@@ -32,6 +32,14 @@ async function goOffline(page: Page): Promise<string[]> {
   })
   await page.addInitScript(() => {
     Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => false })
+    // Workers have their own navigator: on a device with no signal it says offline too.
+    const RealWorker = window.Worker
+    window.Worker = function (url: string | URL, options?: WorkerOptions) {
+      const script = new URL(String(url), location.href).href
+      const offline = "Object.defineProperty(WorkerNavigator.prototype, 'onLine', { configurable: true, get: () => false });"
+      const body = options?.type === 'module' ? `${offline}\nawait import(${JSON.stringify(script)})` : `${offline}\nimportScripts(${JSON.stringify(script)})`
+      return new RealWorker(URL.createObjectURL(new Blob([body], { type: 'text/javascript' })), options)
+    } as unknown as typeof Worker
   })
   return left
 }
@@ -80,21 +88,19 @@ test.describe('Journey 10: a language pack opens and reads with no internet', ()
     await expectNoDownloadErrors(page)
 
     console.log(`[journey-10] opened es-419 + originals in ${openMs} ms; Titus 1:1 shown in ${readMs} ms`)
-    const wanted = new Map<string, number>()
-    for (const href of left) {
-      const url = new URL(href)
-      const where = `${url.host}${url.pathname.split('/').slice(0, 3).join('/')}`
-      wanted.set(where, (wanted.get(where) ?? 0) + 1)
-    }
-    console.log(`[journey-10] requests that wanted the network (all aborted): ${left.length}`, Object.fromEntries(wanted))
+    // With the device offline nothing asks the network: every request that tried is listed if any did.
+    const paths = left.map((href) => { const url = new URL(href); return `${url.host}${url.pathname}` })
+    expect(paths, `requests that wanted the network: ${paths.join(' | ')}`).toEqual([])
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
   })
 
   test('base plus the Titus book pack: Titus reads, and nothing is an error', async ({ page }) => {
     const errors = trackPageErrors(page)
-    await goOffline(page)
+    const left = await goOffline(page)
 
     const openMs = await openPacks(page, ['es-419-tit', 'es-419-base', 'originals'])
+    // The Titus pack's resources say which book the device holds of them.
+    await expect(page.locator('[data-testid="device-resource"][data-held-books="TIT"]').first()).toBeVisible()
     const readMs = await readTitus(page)
     await expectNoDownloadErrors(page)
 
@@ -108,6 +114,7 @@ test.describe('Journey 10: a language pack opens and reads with no internet', ()
     await expect(page.getByText('Error loading content')).toHaveCount(0)
     await expect(page.getByText('Failed to fetch')).toHaveCount(0)
     await expectNoDownloadErrors(page)
+    expect(left.map((href) => new URL(href).pathname), 'requests that wanted the network').toEqual([])
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
   })
 })

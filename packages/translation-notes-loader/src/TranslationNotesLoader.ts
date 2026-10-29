@@ -6,6 +6,7 @@
  * with links to Translation Academy articles for further training.
  */
 
+import { door43Fetch } from '@bt-synergy/door43-api'
 import type {
     ProgressCallback,
     ResourceLoader,
@@ -205,7 +206,7 @@ export class TranslationNotesLoader implements ResourceLoader {
         console.log(`📥 Fetching TN TSV from: ${tsvUrl}`)
       }
 
-      const response = await fetch(tsvUrl)
+      const response = await door43Fetch(tsvUrl)
       if (!response.ok) {
         if (response.status === 404) {
           if (this.debug) console.log(`⚠️ TN file not found (book not in repo): ${bookCode}`)

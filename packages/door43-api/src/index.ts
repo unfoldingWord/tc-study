@@ -21,6 +21,7 @@ export {
 export type { ByteProgressCallback } from './readResponseArrayBufferWithProgress'
 
 export { manifestRights } from './manifestRights'
+export { door43Fetch } from './door43Fetch'
 
 export {
     getContentUrl,

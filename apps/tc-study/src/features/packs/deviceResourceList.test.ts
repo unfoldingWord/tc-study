@@ -32,3 +32,17 @@ describe('deviceResourcesByLanguage', () => {
     expect(deviceResourcesByLanguage([null, 'x', { title: 'no key' }])).toEqual([])
   })
 })
+
+describe('held books', () => {
+  const tn = { resourceKey: 'es-419_gl/es-419/tn', language: 'es-419', resourceId: 'tn', title: 'Notas', version: 'v66', contentMetadata: { downloadedIngredients: ['tit', 'rut'] } }
+
+  test('a resource with no complete receipt says which books the device holds', () => {
+    const [group] = deviceResourcesByLanguage([tn])
+    expect(group.resources[0].heldBooks).toEqual(['RUT', 'TIT'])
+  })
+
+  test('a complete resource does not, whatever its bookkeeping says', () => {
+    const [group] = deviceResourcesByLanguage([tn], new Set(['es-419_gl/es-419/tn']))
+    expect(group.resources[0].heldBooks).toBeUndefined()
+  })
+})

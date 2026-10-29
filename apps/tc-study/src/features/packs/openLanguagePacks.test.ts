@@ -130,6 +130,26 @@ describe('openLanguagePacks', () => {
     expect(bookResult.result.originals.map((o) => o.status)).toEqual(['present'])
   })
 
+  it('a book pack records the books it brought on each resource it brought, and two packs add up', async () => {
+    const { stores, catalog } = device()
+    const books = (key: string) => (catalog.get(key)?.contentMetadata as { downloadedIngredients?: string[] } | undefined)?.downloadedIngredients
+
+    await openLanguagePacks(stores, [await pack('es-419-tit.langpack.zip', { kind: 'book', books: ['tit'] })])
+    expect(books(GLT)).toEqual(['tit'])
+    expect(books(TN)).toEqual(['tit'])
+
+    const held = catalog.get(GLT)!
+    catalog.set(GLT, { ...held, contentMetadata: { ...held.contentMetadata, downloadedIngredients: ['rut'] } } as ResourceMetadata)
+    await openLanguagePacks(stores, [await pack('es-419-tit.langpack.zip', { kind: 'book', books: ['tit'] })])
+    expect(books(GLT)).toEqual(['rut', 'tit'])
+  })
+
+  it('a language pack does not touch the books held: its receipt says the resource is complete', async () => {
+    const { stores, catalog } = device()
+    await openLanguagePacks(stores, [await pack('es-419.langpack.zip')])
+    expect((catalog.get(GLT)?.contentMetadata as { downloadedIngredients?: string[] } | undefined)?.downloadedIngredients).toBeUndefined()
+  })
+
   it('refuses a pack made with another source-text version and writes nothing', async () => {
     const { stores, rows, catalog } = device()
     const other = await pack('es-419.langpack.zip', {

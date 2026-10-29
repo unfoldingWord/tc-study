@@ -80,6 +80,42 @@ async function dropUnfinishedReceipts(stores: PackStores, manifest: PackManifest
   }
 }
 
+/**
+ * A book pack brings some books of each resource and no receipt, so the resource stays incomplete. The books it
+ * brought go on the catalog row's `downloadedIngredients` (the device's own bookkeeping, which parts lists drop), so
+ * Data › Resources and the download details can say "held for these books" instead of incomplete or failed.
+ */
+/** The books each resource of the pack already holds, read before the import (which writes the pack's row over it). */
+async function heldBooksBefore(stores: PackStores, manifest: PackManifest): Promise<Map<string, string[]>> {
+  const held = new Map<string, string[]>()
+  for (const resource of manifest.resources) {
+    const row = await stores.catalog.get(resource.key)
+    held.set(resource.key, row?.contentMetadata?.downloadedIngredients ?? [])
+  }
+  return held
+}
+
+async function recordHeldBooks(
+  stores: PackStores,
+  manifest: PackManifest,
+  result: ImportPackResult,
+  before: Map<string, string[]>
+): Promise<void> {
+  const books = (manifest.books ?? []).map((book) => book.toLowerCase())
+  if (books.length === 0 || !stores.catalog.set) return
+  const kept = new Set(result.skippedResources.map((r) => r.key))
+  for (const resource of manifest.resources) {
+    if (kept.has(resource.key) || !Object.values(resource.rows).some((n) => (n ?? 0) > 0)) continue
+    const row = await stores.catalog.get(resource.key)
+    if (!row) continue
+    const held = new Set([...(before.get(resource.key) ?? []), ...(row.contentMetadata?.downloadedIngredients ?? []), ...books])
+    await stores.catalog.set(resource.key, {
+      ...row,
+      contentMetadata: { ...row.contentMetadata, downloadedIngredients: [...held].sort() },
+    })
+  }
+}
+
 async function bytesOf(file: File | PackFile): Promise<PackFile> {
   if (!('arrayBuffer' in file)) return file
   return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }
@@ -117,6 +153,8 @@ export async function openLanguagePacks(
     const started = Date.now()
     try {
       await dropUnfinishedReceipts(stores, manifest)
+      const isBook = kindOf(manifest) === 'book'
+      const before = isBook ? await heldBooksBefore(stores, manifest) : new Map<string, string[]>()
       const result = await importLanguagePack({
         bytes,
         target,
@@ -124,6 +162,7 @@ export async function openLanguagePacks(
         overwrite: options.overwrite ?? false,
         onProgress: (done, total) => options.onProgress?.({ name, index, count: readable.length, done, total }),
       })
+      if (isBook) await recordHeldBooks(stores, manifest, result, before)
       opened.push({ name, kind: kindOf(manifest), result, ms: Date.now() - started })
     } catch (error) {
       const noSpace = (error as { name?: unknown } | null)?.name === 'QuotaExceededError'
