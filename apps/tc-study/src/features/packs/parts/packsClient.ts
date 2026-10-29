@@ -185,6 +185,9 @@ export async function fetchList(server: string, compat: string, lang: string, et
       }
       case 304:
         return { kind: 'same' }
+      case 409:
+        // A list made for a newer app (the contract's own status for it).
+        return { kind: 'update-app' }
       case 202:
         return { kind: 'preparing', retryAfter: retryAfterOf(res, RETRY.preparing) }
       case 429:

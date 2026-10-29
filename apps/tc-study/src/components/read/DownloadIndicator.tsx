@@ -1,11 +1,13 @@
-import { AlertCircle, ListOrdered, Loader2, RotateCcw } from 'lucide-react'
+import { AlertCircle, ListOrdered, Loader2, PackageOpen, RotateCcw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
   displayDownloadPercent,
   displayIngredientCounts,
 } from '../../features/download/backgroundDownloadRun'
 import { backgroundDownloadSession } from '../../features/download/backgroundDownloadSession'
+import { usePartsModeStore } from '../../features/packs/parts/partsMode'
 import { shouldShowDownloadIndicator } from './downloadIndicatorVisibility'
+import { partsProgressView } from './partsProgressView'
 import { useProcessDebugPresentationStore } from './processDebugPresentationStore'
 
 const MENU_ROW =
@@ -18,8 +20,9 @@ const MENU_ROW =
 export function DownloadBusyBadge() {
   const [stats, setStats] = useState(() => backgroundDownloadSession.getStats())
   useEffect(() => backgroundDownloadSession.subscribe(setStats), [])
+  const partsBusy = usePartsModeStore((s) => Object.keys(s.progress).length > 0)
 
-  if (!stats.isDownloading) return null
+  if (!stats.isDownloading && !partsBusy) return null
 
   return (
     <span
@@ -71,6 +74,7 @@ export function DownloadIndicator({ onClose }: { onClose?: () => void }) {
     queue,
   })
   const showRetry = showIndicator && !isDownloading
+  const parts = partsProgressView(usePartsModeStore((s) => s.progress))
 
   const openProcessDebug = () => {
     dispatchPresentation('open')
@@ -98,6 +102,15 @@ export function DownloadIndicator({ onClose }: { onClose?: () => void }) {
             </span>
           )}
         </button>
+      ) : null}
+
+      {parts ? (
+        <span className={MENU_ROW} role="status" title={parts.label} aria-label={parts.label} data-testid="parts-progress">
+          <PackageOpen className="w-4 h-4 text-accent animate-pulse" />
+          <span className="absolute -top-0.5 -right-0.5 bg-accent-soft text-accent-fg text-[9px] font-semibold rounded-full min-w-[1.25rem] px-0.5 h-3.5 flex items-center justify-center">
+            {parts.percent}%
+          </span>
+        </span>
       ) : null}
 
       {showRetry ? (

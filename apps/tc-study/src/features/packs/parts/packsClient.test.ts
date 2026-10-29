@@ -52,6 +52,10 @@ describe('fetchList', () => {
     expect((await fetchList(SERVER, COMPAT, 'en', null, fake(404, JSON.stringify({ state: 'unavailable', reason: 'parts-off' })))).kind).toBe('unavailable')
   })
 
+  test('409 says the app must be updated', async () => {
+    expect(await fetchList(SERVER, COMPAT, 'en', null, fake(409, '{}'))).toEqual({ kind: 'update-app' })
+  })
+
   test('429 waits; 503 waits longer when the server says a person must act', async () => {
     expect(await fetchList(SERVER, COMPAT, 'en', null, fake(429, '{}'))).toEqual({ kind: 'wait', retryAfter: RETRY.rateLimited })
     expect(await fetchList(SERVER, COMPAT, 'en', null, fake(503, JSON.stringify({ reason: 'paused' })))).toEqual({ kind: 'unavailable', retryAfter: RETRY.stopped })

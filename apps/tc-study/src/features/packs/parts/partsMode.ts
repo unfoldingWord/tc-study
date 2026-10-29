@@ -35,7 +35,25 @@ export function modeAfter(before: PartsMode | undefined, result: SyncResult): Pa
   return before === 'parts' ? 'parts' : 'door43'
 }
 
-export const usePartsModeStore = create<{ modes: PartsModes; setMode: (language: string, mode: PartsMode) => void }>((set) => ({
+/** What a language is downloading as parts now: the unit (`book tit`, `shared`) and its parts done of total. */
+export type PartsProgress = { unit: string; done: number; total: number }
+
+export const usePartsModeStore = create<{
+  modes: PartsModes
+  progress: Readonly<Record<string, PartsProgress>>
+  setMode: (language: string, mode: PartsMode) => void
+  setProgress: (language: string, progress: PartsProgress | null) => void
+}>((set) => ({
   modes: {},
+  progress: {},
   setMode: (language, mode) => set((s) => (s.modes[language] === mode ? s : { modes: { ...s.modes, [language]: mode } })),
+  setProgress: (language, progress) =>
+    set((s) => {
+      if (!progress) {
+        if (!(language in s.progress)) return s
+        const { [language]: _gone, ...rest } = s.progress
+        return { progress: rest }
+      }
+      return { progress: { ...s.progress, [language]: progress } }
+    }),
 }))

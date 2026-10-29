@@ -45,20 +45,30 @@ export function syncLanguageForRead(language: string, book: string, stores: Read
   const deps: SyncDeps = {
     server: PACKS_SERVER,
     compat: PARTS_COMPAT,
-    target: packTargetFrom(stores),
-    registerRows: (prefix) => stores.cache.getByPrefix(prefix),
-    staging: stagingStore(),
     versions: PACK_VERSIONS,
     ...overrides,
+    target: overrides.target ?? packTargetFrom(stores),
+    registerRows: overrides.registerRows ?? ((prefix) => stores.cache.getByPrefix(prefix)),
+    staging: overrides.staging ?? stagingStore(),
   }
   const books = book ? [book] : []
   const before = lastOfLanguage.get(language) ?? Promise.resolve()
+  const progress = (unit: string) => ({
+    ...deps,
+    onProgress: (p: { done: number; total: number }) => {
+      usePartsModeStore.getState().setProgress(language, { unit, done: p.done, total: p.total })
+      overrides.onProgress?.({ ...p, bytes: 0 })
+    },
+  })
   const run = (async () => {
     await before.catch(() => {})
     // The book alone first; a language the server does not serve says so here, and the shared unit is not asked for.
-    const first = books.length ? await syncLanguageParts(language, books, deps, { withShared: false }) : null
+    const first = books.length ? await syncLanguageParts(language, books, progress(`book ${book.toLowerCase()}`), { withShared: false }) : null
     if (first && first.kind !== 'applied' && first.kind !== 'up-to-date') return first
-    const all = await syncLanguageParts(language, books, deps)
+    // The server serves it: from now on the language is parts, even if the shared unit fails for a while (a 429),
+    // so the background Door43 download does not take every book whole again.
+    if (first) usePartsModeStore.getState().setMode(language, 'parts')
+    const all = await syncLanguageParts(language, books, progress('shared'))
     return all.kind === 'up-to-date' && first?.kind === 'applied' ? first : all
   })()
     .catch((error): SyncResult => {
@@ -73,7 +83,10 @@ export function syncLanguageForRead(language: string, book: string, stores: Read
       store.setMode(language, modeAfter(store.modes[language], result))
       return result
     })
-    .finally(() => inFlight.delete(id))
+    .finally(() => {
+      inFlight.delete(id)
+      usePartsModeStore.getState().setProgress(language, null)
+    })
   inFlight.set(id, run)
   lastOfLanguage.set(language, run)
   return run
