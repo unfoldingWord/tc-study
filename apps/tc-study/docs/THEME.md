@@ -26,11 +26,38 @@ Switching mechanism: `class="dark"` on `<html>` (also `data-theme` and `color-sc
 - Read chrome / app header: `ThemeToggle` (Sun/Moon; sets explicit light/dark)
 - Settings: `ThemePreferenceButtons` (Sun / Moon / Monitor)
 
+## Where the values come from
+
+The colours are translationCore 4's ([TC4_STYLE_AND_BRAND.md](./TC4_STYLE_AND_BRAND.md) §5.2 light,
+§5.3 dark).
+
+- `src/styles/tc4-tokens.css` copies the tC4 design-system values tC Study uses, under tC4's own
+  names (`--uw-ocean`, `--uw-inspire-700`, `--tc-invalid`, `--tc4-shadow-card`, …).
+- `src/index.css` maps them onto the `--theme-*` names the components use. A straight tC4 value is
+  a `var(--uw-…)`. A dark value, which is a tC4 translucent value composited on the surface, is a
+  solid hex, so opacity modifiers like `bg-muted/50` keep their meaning.
+- `src/styles/themeContrast.test.ts` pins every value and checks that each text pair reaches 4.5:1
+  in both themes.
+
+To follow a tC4 change:
+1. Compare the block in `tc4-tokens.css` with the tC4 file named above it, and copy the value.
+2. Run `bun test src/styles/themeContrast.test.ts`.
+
+Faces: `src/styles/tc4-fonts.css` self-hosts Mulish (interface), Charis SIL (scripture), and Noto
+Serif and Noto Serif Hebrew (Greek and Hebrew) from `public/fonts/`. The utilities are `font-ui`
+(the body default) and `font-scripture` (scripture panes).
+
 ## Add a token
 
-1. Add `--theme-my-token` under `:root` and `.dark` in `src/index.css`.
+1. Add `--theme-my-token` under `:root` and `.dark` in `src/index.css`. Prefer a tC4 value from
+   `tc4-tokens.css`.
 2. Map it in `@theme`: `--color-my-token: var(--theme-my-token);`
-3. Use utilities: `bg-my-token`, `text-my-token`, `border-my-token`, etc.
+3. Add it to `EXPECTED` in `src/styles/themeContrast.test.ts`, plus its text pair if it carries
+   text.
+4. Use utilities: `bg-my-token`, `text-my-token`, `border-my-token`, etc.
+
+Never use Tailwind's palette (`gray-*`, `blue-*`, `bg-white`…) in components:
+`utils/rawPaletteFreeze.test.ts` only lets that count go down.
 
 Prefer semantic tokens over scattering `dark:` one-offs or baking theme into business logic.
 
@@ -54,7 +81,7 @@ Quote buttons on Combined Helps / TN / TWL cards use dedicated chip tokens (soli
 | `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `bg-chip-quote`, `hover:bg-chip-quote-hover`, `text-chip-quote-fg` | Scripture / OBS quote chips on note & word-link cards |
 | `highlight` / `scripture-fg` | `bg-highlight`, `text-scripture-fg` | Helps header filter value pill (`TokenFilterBanner`) — same tokens as highlighted scripture (`TokenRenderer`); × uses `text-scripture-fg/70` + `hover:bg-highlight-strong/70` |
 
-Helps list panels (`HELPS_LIST_PANEL`) and `ResourceViewerHeader` both use `bg-surface` so verse headers sit on white/elevated charcoal (not cool `canvas` gray). Header strip keeps a hairline `border-b` for chrome separation.
+Helps list panels (`HELPS_LIST_PANEL`) and `ResourceViewerHeader` both use `bg-surface` so verse headers sit on white (dark: the Ocean surface), not the `canvas` paper. Header strip keeps a hairline `border-b` for chrome separation.
 
 Pair with shared `surface`, `fg`, `fg-secondary`, `fg-muted`, `border`, `helps*` for card chrome and entry links. Selected TN/TWL cards use `HELPS_CARD_SELECTED` (`bg-highlight/15` + even `border-border`).
 

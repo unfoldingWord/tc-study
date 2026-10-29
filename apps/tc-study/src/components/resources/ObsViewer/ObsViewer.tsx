@@ -131,7 +131,7 @@ export function ObsViewer({ resourceId, resourceKey, resource }: ObsViewerProps)
       />
       <div
         ref={paneRef}
-        className="flex-1 min-h-0 overflow-auto p-content-lg bg-scripture text-scripture-fg"
+        className="flex-1 min-h-0 overflow-auto p-content-lg bg-scripture text-scripture-fg font-scripture"
       >
         <div className="max-w-2xl mx-auto w-full">
           {loading && (

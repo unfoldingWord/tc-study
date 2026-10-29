@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "./styles/tc4-tokens.css";
+@import "./styles/tc4-fonts.css";
 
 /*
  * Theme tokens (boneless): semantic CSS variables → Tailwind color utilities.
@@ -23,6 +25,9 @@
   --color-accent-hover: var(--theme-accent-hover);
   --color-accent-soft: var(--theme-accent-soft);
   --color-accent-fg: var(--theme-accent-fg);
+  --color-accent-fill: var(--theme-accent-fill);
+  --color-accent-fill-hover: var(--theme-accent-fill-hover);
+  --color-accent-fill-press: var(--theme-accent-fill-press);
   --color-scripture: var(--theme-scripture);
   --color-scripture-fg: var(--theme-scripture-fg);
   --color-scripture-muted: var(--theme-scripture-muted);
@@ -60,123 +65,144 @@
   --text-micro: 0.625rem; /* 10px — badges */
   --text-caption: 0.6875rem; /* 11px — chrome labels */
   --text-chrome: 0.75rem; /* 12px — tabs / compact UI */
+
+  /* tC4 faces (styles/tc4-fonts.css): Mulish for the interface, Charis SIL for scripture,
+     with Noto Serif for Greek and Noto Serif Hebrew for Hebrew by unicode-range */
+  --font-ui: "Mulish", "Avenir Next", "Avenir", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-scripture: "Charis SIL", "Noto Serif", "Noto Serif Hebrew", "PT Serif", Georgia, "Times New Roman", serif;
 }
 
-/* —— Light (default): warm study paper / soft gray shell —— */
+/* —— Light (default): tC4's paper, ink and Ocean (docs/TC4_STYLE_AND_BRAND.md §5.2) —— */
 :root {
   color-scheme: light;
 
-  --theme-canvas: #f4f2ef;
+  --theme-canvas: var(--uw-paper);
   --theme-surface: #ffffff;
   --theme-elevated: #ffffff;
   /* Selected resource tab on panel-*-soft strip — elevated white in light */
   --theme-tab-selected: #ffffff;
-  --theme-muted: #ebe8e4;
-  --theme-border: #e0dcd6;
-  --theme-border-subtle: #efece8;
+  --theme-muted: var(--uw-frost);
+  /* tC4 --border (black 10%) and --border-hair (black 7%), composited on paper */
+  --theme-border: #e2e4e6;
+  --theme-border-subtle: #e8ebed;
 
-  --theme-fg: #1c1917;
-  --theme-fg-secondary: #57534e;
-  --theme-fg-muted: #a8a29e;
+  --theme-fg: var(--uw-ink);
+  --theme-fg-secondary: var(--uw-slate);
+  --theme-fg-muted: var(--uw-steel);
 
-  --theme-accent: #2563eb;
-  --theme-accent-hover: #1d4ed8;
-  --theme-accent-soft: #eff6ff;
-  --theme-accent-fg: #1e40af;
+  /* Accent as text, links and focus ring: Inspire 700. Inspire itself is 2.6:1 on paper. */
+  --theme-accent: var(--uw-inspire-700);
+  --theme-accent-hover: var(--uw-inspire-800);
+  --theme-accent-soft: var(--uw-inspire-50);
+  --theme-accent-fg: var(--uw-ocean);
+  /* Filled pill buttons: Inspire, with white at display weight (tC4's brand pairing) */
+  --theme-accent-fill: var(--uw-inspire);
+  --theme-accent-fill-hover: var(--tc-accent-hover);
+  --theme-accent-fill-press: var(--uw-inspire-600);
 
-  --theme-scripture: #fffef9;
-  --theme-scripture-fg: #1c1917;
-  --theme-scripture-muted: #78716c;
+  --theme-scripture: #ffffff;
+  --theme-scripture-fg: var(--uw-black);
+  --theme-scripture-muted: var(--uw-steel);
 
-  --theme-highlight: #fef08a;
-  --theme-highlight-strong: #fde047;
-  --theme-underline: #a8a29e;
+  --theme-highlight: var(--tc-highlight-soft);
+  --theme-highlight-strong: var(--tc-highlight);
+  --theme-underline: var(--uw-haze);
 
-  --theme-danger: #dc2626;
-  --theme-danger-soft: #fef2f2;
+  --theme-danger: var(--tc-invalid);
+  --theme-danger-soft: var(--tc-invalid-surface);
 
-  /* Amber — CVD-safe pair with accent blue (TW vs TA footers) */
-  --theme-warning: #d97706;
-  --theme-warning-fg: #92400e;
+  /* Kindle — CVD-safe pair with the accent (TW vs TA footers) */
+  --theme-warning: var(--uw-kindle);
+  --theme-warning-fg: var(--tc-warn-text);
 
-  --theme-panel-1-soft: #eff6ff;
-  --theme-panel-1: #2563eb;
-  --theme-panel-1-fg: #1d4ed8;
+  --theme-panel-1-soft: var(--uw-inspire-50);
+  --theme-panel-1: var(--uw-inspire);
+  --theme-panel-1-fg: var(--uw-inspire-700);
 
-  --theme-panel-2-soft: #f5f3ff;
-  --theme-panel-2: #7c3aed;
-  --theme-panel-2-fg: #6d28d9;
+  /* Kindle tone: Inspire beside Cultivate strips fall under a just-noticeable difference
+     under tritanopia (ΔE 1.2); Inspire beside Kindle stays apart (ΔE 7+) in every simulation */
+  --theme-panel-2-soft: var(--tc-warn-surface);
+  --theme-panel-2: var(--uw-kindle);
+  --theme-panel-2-fg: var(--tc-warn-text);
 
-  --theme-helps: #7c3aed;
-  --theme-helps-soft: #f5f3ff;
-  --theme-helps-fg: #5b21b6;
+  /* Ocean, as tC4's helps panel headings */
+  --theme-helps: var(--uw-ocean);
+  --theme-helps-soft: var(--uw-frost);
+  --theme-helps-fg: var(--uw-ocean);
 
   /* Helps reading chips (scripture / OBS quotes) — verse headers use muted/50 */
-  --theme-chip-quote: #eef4ff;
-  --theme-chip-quote-hover: #e0eaff;
-  --theme-chip-quote-fg: #1e40af;
+  --theme-chip-quote: var(--uw-inspire-50);
+  --theme-chip-quote-hover: var(--uw-inspire-100);
+  --theme-chip-quote-fg: var(--uw-ocean);
 
-  /* Modal / dialog scrim */
-  --theme-overlay: rgb(0 0 0 / 0.5);
+  /* Modal / dialog scrim: tC4 --scrim-modal */
+  --theme-overlay: rgb(1 38 56 / 0.55);
 }
 
-/* —— Dark: calm charcoal with clearer surface steps (not OLED / not muddy) —— */
+/*
+ * —— Dark: tC4's dark-ground rules (tokens/context.css [data-on="dark"]) spread over Ocean
+ * surfaces (§5.3). White text; muted white for secondary; each tone at its light end.
+ * Translucent tC4 values are composited to solid hex on the surface they sit on, so
+ * opacity modifiers (bg-muted/50, bg-highlight/15) keep their meaning.
+ */
 .dark {
   color-scheme: dark;
 
-  /* Shell: deeper canvas so surface / scripture / soft fills read as distinct layers */
-  --theme-canvas: #121417;
-  --theme-surface: #1e2228;
-  --theme-elevated: #2c3138;
-  /* Selected tab — darker than panel-*-soft strip (surface reads too light there) */
-  --theme-tab-selected: #0e1013;
-  --theme-muted: #3a4049;
-  --theme-border: #4a515a;
-  --theme-border-subtle: #323840;
+  --theme-canvas: #071e2c;
+  --theme-surface: #0c2a3c;
+  --theme-elevated: #12364c;
+  /* Selected tab — darker than the panel-*-soft strip */
+  --theme-tab-selected: #05141e;
+  --theme-muted: #1f3b4c; /* white 8% on surface */
+  --theme-border: #415967; /* white 22% on surface */
+  --theme-border-subtle: #294453; /* white 12% on surface */
 
-  --theme-fg: #f0ebe6;
-  --theme-fg-secondary: #c2bbb3;
-  --theme-fg-muted: #8a837c;
+  --theme-fg: #ffffff;
+  --theme-fg-secondary: #c2cace; /* white 75% on surface */
+  --theme-fg-muted: #9eaab1; /* white 60% on surface */
 
-  --theme-accent: #7bb8ff;
-  --theme-accent-hover: #a5d0ff;
-  /* Soft fill must clear canvas — used by BCV pill + accent chips */
-  --theme-accent-soft: #335578;
-  /* High-contrast text on accent-soft (BCV pill, badges) */
-  --theme-accent-fg: #e8f1ff;
+  --theme-accent: var(--uw-inspire);
+  --theme-accent-hover: var(--uw-inspire-300);
+  --theme-accent-soft: #144761; /* Inspire 22% on surface */
+  --theme-accent-fg: var(--uw-inspire-100);
+  --theme-accent-fill: var(--uw-inspire);
+  --theme-accent-fill-hover: var(--tc-accent-hover);
+  --theme-accent-fill-press: var(--uw-inspire-600);
 
-  /* Scripture paper lifted above canvas for readable reading pane */
-  --theme-scripture: #2a3038;
-  --theme-scripture-fg: #f2eee8;
-  --theme-scripture-muted: #a8a29a;
+  /* Reading paper, between surface and elevated */
+  --theme-scripture: #0f3044;
+  --theme-scripture-fg: #ffffff;
+  --theme-scripture-muted: #9eaab1;
 
-  --theme-highlight: #5c4a14;
+  /* A solid dark gold: a yellow tint over blue reads olive */
+  --theme-highlight: #5b4b12;
   --theme-highlight-strong: #7a641c;
-  --theme-underline: #a8a29a;
+  --theme-underline: #9eaab1;
 
-  --theme-danger: #f87171;
-  --theme-danger-soft: #3f1d1d;
+  --theme-danger: var(--tc-invalid-on-dark);
+  --theme-danger-soft: #313b48;
 
-  --theme-warning: #fbbf24;
-  --theme-warning-fg: #fde68a;
+  --theme-warning: var(--uw-kindle);
+  --theme-warning-fg: #f2ce99; /* Kindle's light end */
 
-  --theme-panel-1-soft: #335578;
-  --theme-panel-1: #7bb8ff;
-  --theme-panel-1-fg: #dbeafe;
+  --theme-panel-1-soft: #144761;
+  --theme-panel-1: var(--uw-inspire);
+  --theme-panel-1-fg: var(--uw-inspire-100);
 
-  --theme-panel-2-soft: #322b45;
-  --theme-panel-2: #b39dfa;
-  --theme-panel-2-fg: #ddd6fe;
+  --theme-panel-2-soft: #333f3a; /* Kindle 18% on surface */
+  --theme-panel-2: var(--uw-kindle);
+  --theme-panel-2-fg: #f2ce99;
 
-  --theme-helps: #b39dfa;
-  --theme-helps-soft: #322b45;
-  --theme-helps-fg: #ddd6fe;
+  /* Ocean has no identity on an Ocean ground; it degrades to light Inspire on a quiet fill */
+  --theme-helps: var(--uw-inspire-200);
+  --theme-helps-soft: #1f3b4c;
+  --theme-helps-fg: #ffffff;
 
-  --theme-chip-quote: #334866;
-  --theme-chip-quote-hover: #3d5678;
-  --theme-chip-quote-fg: #e8f1ff;
+  --theme-chip-quote: #123f57; /* Inspire 16% on surface */
+  --theme-chip-quote-hover: #154964; /* Inspire 24% on surface */
+  --theme-chip-quote-fg: var(--uw-inspire-100);
 
-  --theme-overlay: rgb(0 0 0 / 0.55);
+  --theme-overlay: rgb(0 10 16 / 0.65);
 }
 
 @layer base {
@@ -185,7 +211,7 @@
   }
 
   body {
-    @apply bg-canvas text-fg;
+    @apply bg-canvas text-fg font-ui;
   }
 
   html {

@@ -16,7 +16,7 @@ export function LanguagePackOpener() {
         type="button"
         onClick={() => inputRef.current?.click()}
         disabled={busy}
-        className="p-2 rounded-lg bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50"
+        className="p-2 rounded-lg bg-accent-soft text-accent-fg hover:bg-accent-soft/70 transition-colors disabled:opacity-50"
         title={OPEN_LABEL}
         aria-label={OPEN_LABEL}
         data-testid="open-language-pack-btn"
