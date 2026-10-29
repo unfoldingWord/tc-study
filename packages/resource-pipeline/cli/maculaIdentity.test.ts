@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { maculaIdentity } from './maculaIdentity'
+import { maculaDateUtc, maculaIdentity, maculaStamp } from './maculaIdentity'
 
 function git(cwd: string, args: string[], date?: string): string {
   const env = { ...process.env, ...(date ? { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } : {}) }
@@ -49,5 +49,25 @@ describe('maculaIdentity', () => {
   test('a folder outside any git repository fails, naming the folder', () => {
     const folder = mkdtempSync(join(tmpdir(), 'no-git-'))
     expect(() => maculaIdentity(folder, {})).toThrow(folder)
+  })
+
+  test('a folder outside any git repository, with the commit and the date given: they are kept, git is not asked', () => {
+    const folder = mkdtempSync(join(tmpdir(), 'no-git-'))
+    const given = { commit: 'f1e2d3c4b5a69788f1e2d3c4b5a69788f1e2d3c4', date: '2026-10-01T09:00:00-05:00' }
+    expect(maculaIdentity(folder, given)).toEqual(given)
+  })
+})
+
+describe('maculaStamp', () => {
+  test('uses the same short commit and UTC date publishLanguage used before', () => {
+    expect(maculaStamp({ commit: 'f1e2d3c4b5a69788f1e2d3c4b5a69788f1e2d3c4', date: '2026-10-01T09:00:00-05:00' })).toEqual({
+      version: 'f1e2d3c4b5',
+      publishedAt: '2026-10-01T14:00:00.000Z',
+    })
+  })
+
+  test('refuses a date that is not ISO 8601', () => {
+    expect(() => maculaStamp({ commit: 'f1e2d3c4b5a69788f1e2d3c4b5a69788f1e2d3c4', date: 'yesterday' })).toThrow('yesterday')
+    expect(() => maculaDateUtc('15/10/2026')).toThrow('15/10/2026')
   })
 })
