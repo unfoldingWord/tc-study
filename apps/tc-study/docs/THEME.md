@@ -47,6 +47,17 @@ Faces: `src/styles/tc4-fonts.css` self-hosts Mulish (interface), Charis SIL (scr
 Serif and Noto Serif Hebrew (Greek and Hebrew) from `public/fonts/`. The utilities are `font-ui`
 (the body default) and `font-scripture` (scripture panes).
 
+Shape (§5.4): `@theme` points Tailwind's `--radius-*` and `--shadow-*` at tC4's corners and
+shadows, so `rounded-*` and `shadow-*` follow tC4 with no component edit. The shadows are
+`var(--tc4-shadow-*)`, Ocean-tinted in light and restated in black under `.dark`, so:
+- a `.dark` shadow value is a whole shadow (offsets, blur, colour), never a bare colour, or the
+  utility's `box-shadow` turns invalid and takes the focus ring with it;
+- shadow colour modifiers (`shadow-black/20`, `shadow-accent`, `shadow-md/50`) have no effect.
+  Add a token instead.
+
+Scrollbars are tC4's capsule (`tokens/base.css`): a transparent track and an Ocean thumb, white
+under `.dark`. `src/styles/shape.test.ts` pins the corners, the shadows and the scrollbars.
+
 ## Add a token
 
 1. Add `--theme-my-token` under `:root` and `.dark` in `src/index.css`. Prefer a tC4 value from

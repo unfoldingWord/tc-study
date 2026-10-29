@@ -224,11 +224,14 @@
 
   --theme-overlay: rgb(0 10 16 / 0.65);
 
-  --tc4-shadow-chip: rgb(0 0 0 / 0.1);
-  --tc4-shadow-card: rgb(0 0 0 / 0.06);
-  --tc4-shadow-hover: rgb(0 0 0 / 0.12);
-  --tc4-shadow-hero: rgb(0 0 0 / 0.18);
-  --tc4-shadow-modal: rgb(0 0 0 / 0.4);
+  /* tC4's shadows in black at the same alpha: an Ocean tint is invisible on Ocean (§5.4).
+     Tailwind puts these inside one box-shadow with the focus ring, so each must stay a whole
+     shadow; a bare colour makes the box-shadow invalid and drops the ring with it. */
+  --tc4-shadow-chip: 0 1px 2px rgb(0 0 0 / 0.1);
+  --tc4-shadow-card: 0 2px 6px rgb(0 0 0 / 0.06);
+  --tc4-shadow-hover: 0 6px 16px rgb(0 0 0 / 0.12);
+  --tc4-shadow-hero: 0 8px 20px rgb(0 0 0 / 0.18);
+  --tc4-shadow-modal: 0 24px 64px rgb(0 0 0 / 0.4);
 }
 
 @layer base {
