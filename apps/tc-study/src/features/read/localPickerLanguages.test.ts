@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { localPickerLanguages } from './localPickerLanguages'
+import { appendDeviceLanguages, localPickerLanguages } from './localPickerLanguages'
 
 const SETS = {
   bible: ['Bible', 'Aligned Bible'],
@@ -29,5 +29,20 @@ describe('localPickerLanguages', () => {
     const langs = localPickerLanguages({ rows: ROWS, sets: SETS, kind: 'helps' })
 
     expect(langs.map((l) => l.code).sort()).toEqual(['es-419', 'fr'])
+  })
+})
+
+describe('appendDeviceLanguages', () => {
+  const en = { code: 'en', name: 'English' } as never
+  const es = { code: 'es-419', name: 'Español Latinoamérica' } as never
+
+  test('a language the device holds is listed even when Door43 does not list it (or lists nothing)', () => {
+    expect(appendDeviceLanguages([], [es]).map((l: { code: string }) => l.code)).toEqual(['es-419'])
+    expect(appendDeviceLanguages([en], [es]).map((l: { code: string }) => l.code)).toEqual(['en', 'es-419'])
+  })
+
+  test("Door43's entry wins for a language both have", () => {
+    const fromDoor43 = { code: 'es-419', name: 'Spanish (Latin America)' } as never
+    expect(appendDeviceLanguages([fromDoor43], [es])).toEqual([fromDoor43])
   })
 })

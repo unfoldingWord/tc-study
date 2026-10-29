@@ -57,3 +57,9 @@ export function localPickerLanguages(options: {
     includeAvailabilityOnlyCodes: false,
   })
 }
+
+/** Door43's list plus every language the device holds that it lacks (all of them when Door43 lists nothing). */
+export function appendDeviceLanguages(shown: readonly ListedLanguage[], onDevice: readonly ListedLanguage[]): ListedLanguage[] {
+  const listed = new Set(shown.map((lang) => lang.code))
+  return [...shown, ...onDevice.filter((lang) => !listed.has(lang.code))]
+}
