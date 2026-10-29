@@ -14,7 +14,7 @@ export interface SwitcherItem<T extends string> {
 
 const INDICATOR = {
   underline: {
-    list: 'flex items-end gap-1 border-b border-border-subtle',
+    list: 'flex items-end gap-1 border-b border-border-subtle pointer-coarse:items-center pointer-coarse:py-1',
     tab: 'h-9 border-b-2 px-3 -mb-px',
     selected: 'border-accent text-fg',
     idle: 'border-transparent text-fg-secondary hover:text-fg',

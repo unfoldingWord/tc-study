@@ -101,6 +101,7 @@ describe('Switcher', () => {
 
   test('underline (the default) marks the selected tab with a 2 px accent bar', () => {
     const html = render()
+    expect(html).toContain('pointer-coarse:py-1')
     const [read, study] = tabs(html).map(classes)
     expect(study).toEqual(expect.arrayContaining(['border-b-2', 'border-accent', 'text-fg']))
     expect(read).toContain('text-fg-secondary')

@@ -1,8 +1,9 @@
 import { expect } from 'bun:test'
+import { RAW_PALETTE_CLASS } from '../../utils/rawPalettePattern'
 
-/** Same pattern as rawPaletteFreeze.test.ts — blocks Tailwind default palette classes in UI markup. */
-export const RAW_PALETTE = /(?<![\w-])(?:bg|text|border)-(?:white|black|[a-z]+-\d{2,3})(?![\w-])/
+export { RAW_PALETTE_CLASS }
 
 export function expectNoRawPalette(html: string): void {
-  expect(html).not.toMatch(RAW_PALETTE)
+  RAW_PALETTE_CLASS.lastIndex = 0
+  expect(html).not.toMatch(RAW_PALETTE_CLASS)
 }

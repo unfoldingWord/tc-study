@@ -8,6 +8,7 @@ import { describe, expect, test } from 'bun:test'
 import { Glob } from 'bun'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { RAW_PALETTE_CLASS } from './rawPalettePattern'
 
 const SRC = join(import.meta.dir, '..')
 
@@ -22,14 +23,7 @@ const DEV_ALLOWLIST = [
   'components/WorkerTestPanel.tsx',
 ]
 
-const PALETTE =
-  'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose'
-const UTILITY = 'bg|text|border|ring|from|to|via|fill|stroke|divide|outline|placeholder'
-/** Any variant prefix (hover:, dark:, md:…) is allowed by the leading class boundary; /NN opacity too. */
-const RAW_CLASS = new RegExp(
-  `(?<![\\w-])(?:${UTILITY})-(?:(?:${PALETTE})-\\d{2,3}|white|black)(?:\\/\\d{1,3})?(?![\\w-])`,
-  'g'
-)
+const RAW_CLASS = RAW_PALETTE_CLASS
 
 async function countRawPalette(): Promise<{ count: number; scanned: number }> {
   let count = 0
