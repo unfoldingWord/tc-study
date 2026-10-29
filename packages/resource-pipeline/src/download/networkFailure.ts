@@ -11,7 +11,8 @@
  */
 
 const NO_ANSWER = /failed to fetch|networkerror when attempting|load failed|network request failed/i
-const HTTP_STATUS = /\b[1-5]\d\d\b/
+/** "404 Not Found", "HTTP 500", "status 503": a status as servers and fetch wrappers write it, not any 3 digits. */
+const HTTP_STATUS = /\b(?:HTTP|status)\s*[1-5]\d\d\b|\b[1-5]\d\d\s+[A-Z][a-z]/
 
 /** The navigator says offline; `undefined` (Node, no navigator) is not offline. */
 export function isOffline(nav: { onLine?: boolean } | undefined = globalThis.navigator): boolean {
@@ -29,7 +30,10 @@ function messagesOf(error: unknown): string[] {
 }
 
 export function isNetworkFailure(error: unknown, online: boolean | undefined = globalThis.navigator?.onLine): boolean {
-  if (online === false) return true
+  // The server answered with a status: a real failure of the resource, online or not.
   if ((error as { status?: unknown } | null)?.status !== undefined) return false
-  return messagesOf(error).some((message) => NO_ANSWER.test(message) && !HTTP_STATUS.test(message))
+  const messages = messagesOf(error)
+  if (messages.some((message) => HTTP_STATUS.test(message))) return false
+  if (online === false) return true
+  return messages.some((message) => NO_ANSWER.test(message))
 }

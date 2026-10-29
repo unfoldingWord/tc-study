@@ -8,6 +8,7 @@
 
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
+import { isOffline } from '@bt-synergy/resource-pipeline/download/networkFailure'
 import type { ResourceTypeRegistry } from '@bt-synergy/resource-types'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
@@ -161,6 +162,7 @@ export async function loadReadLanguageCatalog(
         request,
         searchDoor43: () => searchCatalogHitsForTarget(door43Client, request),
         deviceRows: () => deviceCatalogRows(catalogManager),
+        offline: isOffline(),
       })
       return { search, ...found }
     })

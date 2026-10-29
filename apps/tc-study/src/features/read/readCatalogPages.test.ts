@@ -46,6 +46,32 @@ describe('readCatalogPagesOrDevice', () => {
     expect(got.pages.flatMap((page) => page.catalogResults.map((hit) => hit.identifier))).toEqual(['glt', 'tn'])
   })
 
+  test('the device says offline: Door43 is not asked at all', async () => {
+    let asked = 0
+    const got = await readCatalogPagesOrDevice({
+      request,
+      offline: true,
+      searchDoor43: async () => {
+        asked++
+        return [door43Page]
+      },
+      deviceRows: async () => [glt],
+    })
+    expect(asked).toBe(0)
+    expect(got.fromDevice).toBe(true)
+  })
+
+  test('offline with nothing on the device: empty pages, not an error', async () => {
+    const got = await readCatalogPagesOrDevice({
+      request,
+      offline: true,
+      searchDoor43: async () => [door43Page],
+      deviceRows: async () => [],
+    })
+    expect(got.fromDevice).toBe(false)
+    expect(got.pages.every((page) => page.catalogResults.length === 0)).toBe(true)
+  })
+
   test('Door43 finds nothing: the device catalog is used', async () => {
     const got = await readCatalogPagesOrDevice({
       request,

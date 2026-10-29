@@ -31,20 +31,24 @@ export async function readCatalogPagesOrDevice(options: {
   request: ReadCatalogRequest
   searchDoor43: () => Promise<ReadCatalogPage[]>
   deviceRows: () => Promise<LocalCatalogRow[]>
+  /** The device says it is offline: Door43 is not asked (every request would fail, and slowly on some networks). */
+  offline?: boolean
 }): Promise<{ pages: ReadCatalogPage[]; fromDevice: boolean }> {
   let door43: ReadCatalogPage[] = []
   let failure: unknown
-  try {
-    door43 = await options.searchDoor43()
-    if (hasHits(door43)) return { pages: door43, fromDevice: false }
-  } catch (error) {
-    failure = error
+  if (!options.offline) {
+    try {
+      door43 = await options.searchDoor43()
+      if (hasHits(door43)) return { pages: door43, fromDevice: false }
+    } catch (error) {
+      failure = error
+    }
   }
   const rows = await options.deviceRows().catch(() => [])
   const local = localCatalogHitsForTarget(rows, options.request)
   if (hasHits(local)) return { pages: local, fromDevice: true }
   if (failure !== undefined) throw failure
-  return { pages: door43, fromDevice: false }
+  return { pages: options.offline ? local : door43, fromDevice: false }
 }
 
 /** Every catalog row the device holds. */

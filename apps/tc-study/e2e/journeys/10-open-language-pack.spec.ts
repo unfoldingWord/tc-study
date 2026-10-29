@@ -70,6 +70,11 @@ test.describe('Journey 10: a language pack opens and reads with no internet', ()
     const left = await goOffline(page)
 
     const openMs = await openPacks(page, ['es-419', 'originals'])
+    // Data › Resources lists what the device now holds, with no reload.
+    const es419 = page.locator('[data-testid="device-language"][data-language="es-419"]')
+    await expect(es419).toBeVisible()
+    await expect(es419.getByTestId('device-resource').filter({ hasText: 'GLT' })).toBeVisible()
+    await expect(page.locator('[data-testid="device-language"][data-language="el-x-koine"]')).toBeVisible()
     const readMs = await readTitus(page)
     await expect(page.getByText(TIT_1_1_NOTE).first()).toBeVisible({ timeout: 60_000 })
     await expectNoDownloadErrors(page)
@@ -94,6 +99,15 @@ test.describe('Journey 10: a language pack opens and reads with no internet', ()
     await expectNoDownloadErrors(page)
 
     console.log(`[journey-10] opened es-419-base + es-419-tit + originals in ${openMs} ms; Titus shown in ${readMs} ms`)
+
+    // Ruth is in the GLT release but no pack brought it: "not on this device", in both panes, never an error.
+    await page.goto('/read/es-419/bible/ref/rut')
+    await waitForCatalogReady(page)
+    await expect(page.getByTestId('book-not-on-device').first()).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByTestId('helps-not-on-device').first()).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Error loading content')).toHaveCount(0)
+    await expect(page.getByText('Failed to fetch')).toHaveCount(0)
+    await expectNoDownloadErrors(page)
     expect(errors, `pageerrors: ${errors.join('; ')}`).toEqual([])
   })
 })

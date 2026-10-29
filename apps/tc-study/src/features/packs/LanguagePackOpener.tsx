@@ -1,5 +1,6 @@
 import { PackageOpen } from 'lucide-react'
 import { useRef } from 'react'
+import { DeviceResources } from './DeviceResources'
 import { LanguagePackResult } from './LanguagePackResult'
 import { useOpenLanguagePacks } from './useOpenLanguagePacks'
 
@@ -36,6 +37,7 @@ export function LanguagePackOpener() {
         }}
       />
       <LanguagePackResult progress={progress} opened={opened} />
+      <DeviceResources refreshKey={opened} />
     </div>
   )
 }
