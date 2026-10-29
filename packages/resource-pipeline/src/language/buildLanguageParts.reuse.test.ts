@@ -14,8 +14,10 @@ import {
   LEXICON_FILES,
   lexiconFetchOf,
   LEXICONS_REF,
+  LICENSED_LEXICON_FILES,
   MACULA_STAMP,
   maculaFolder,
+  maculaIndexes,
   manifestOf,
   reposCopy,
   TW,
@@ -170,6 +172,8 @@ const MUTATIONS: Array<{ name: string; fixture: Fixture; built: string[]; differ
   },
   { name: 'MACULA trees/RUT.json', fixture: { macula: (dir) => writeFileSync(join(dir, 'trees', 'RUT.json'), JSON.stringify({ sentences: ['Rut 1:1', 'Rut 1:2'] })) }, built: ['shared'] },
   { name: 'MACULA commit only (same files)', fixture: { maculaStamp: { version: 'def7654321', publishedAt: '2026-09-15T00:00:00.000Z' } }, built: [], differs: true },
+  // Its licence is in the lists' catalog rows, never in a part.
+  { name: 'MACULA index.json names its licence', fixture: { macula: (dir) => maculaIndexes(dir) }, built: [], differs: true },
   { name: 'lexicon commit only (same files)', fixture: { lexiconCommit: NEW_COMMIT }, built: [], differs: true },
   {
     name: 'TN manifest: version, modified, issued only',
@@ -257,6 +261,20 @@ describe('a build with the previous lists', () => {
     expect(builtUnits(reuse)).toEqual(['shared'])
     expect(reuse.lines).toContainEqual(expect.stringContaining(`shared: se construye (the previous lists have no part of ${UHL})`))
     expect(reuse.texts).toEqual(baseline.texts)
+  }, 120_000)
+
+  test("a build that carries the shared unit gives the lexicon and MACULA the licences their sources name", async () => {
+    const licensed: Fixture = { lexicon: { ...LICENSED_LEXICON_FILES }, macula: (dir) => maculaIndexes(dir, 'CC BY 4.0') }
+    const full = await build(licensed)
+    expect(full.failures).toEqual([])
+    const reuse = await build(licensed, previousOf(full))
+    expect(reuse.failures).toEqual([])
+    expect(builtUnits(reuse)).toEqual([])
+    expect(reuse.texts).toEqual(full.texts)
+    const licenceOf = (text: string, key: string) =>
+      ((JSON.parse(text) as PartsList).resources.find((r) => r.key === key)?.metadata as { license?: unknown } | undefined)?.license
+    expect(licenceOf(reuse.texts.language, UHL)).toEqual({ id: 'CC BY-SA 4.0' })
+    for (const key of ['Biblica/hbo/macula', 'Biblica/el-x-koine/macula']) expect(licenceOf(reuse.texts.originals, key)).toEqual({ id: 'CC BY 4.0' })
   }, 120_000)
 
   test("an original's part or a MACULA part the bucket no longer has makes its unit built", async () => {

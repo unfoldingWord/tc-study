@@ -28,6 +28,14 @@ describe('LanguagePicker (issue #24 helps list)', () => {
     expect(navSrc).not.toContain('listMode=')
   })
 
+  test('offline it asks Door43 nothing; online it still lists the languages the device holds', () => {
+    const revalidate = pickerSrc.slice(pickerSrc.indexOf('const revalidate = useCallback'))
+    const offlineAt = revalidate.indexOf('if (isOffline())')
+    expect(offlineAt).toBeGreaterThan(-1)
+    expect(offlineAt).toBeLessThan(revalidate.indexOf('getDoor43ApiClient()'))
+    expect(revalidate).toContain('appendDeviceLanguages(display, await deviceLanguages())')
+  })
+
   test('stays under godSize budget', () => {
     expect(pickerSrc.split(/\r?\n/).length).toBeLessThanOrEqual(400)
   })

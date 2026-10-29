@@ -1,5 +1,6 @@
 import { Library, Upload } from 'lucide-react'
 import type { RefObject } from 'react'
+import { LanguagePackOpener } from '../packs/LanguagePackOpener'
 
 interface DataResourcesTabProps {
   inputRef: RefObject<HTMLInputElement | null>
@@ -9,6 +10,9 @@ interface DataResourcesTabProps {
 export function DataResourcesTab({ inputRef, onImport }: DataResourcesTabProps) {
   return (
     <div className="space-y-4">
+      <div className="p-4 rounded-lg border border-border bg-surface">
+        <LanguagePackOpener />
+      </div>
       <div className="p-8 bg-gray-50 rounded-lg text-center">
         <Library className="w-12 h-12 text-gray-300 mx-auto mb-3" />
         <p className="text-gray-600 font-medium">Resource Packages</p>

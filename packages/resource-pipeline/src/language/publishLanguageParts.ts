@@ -35,6 +35,7 @@ import {
   type PartsList,
 } from '@bt-synergy/language-pack'
 import { MACULA_KEYS } from '../../cli/companions'
+import { maculaStamp } from '../../cli/maculaIdentity'
 import { buildLanguageParts, PARTS_REPORT, type PartsReport, type PreviousParts } from './buildLanguageParts'
 import { PACK_VERSIONS } from './packVersions'
 import { eachLimit, IMMUTABLE, isLanguageCode, NO_CACHE, oneLine, type PackBucket } from './publishLanguage'
@@ -184,10 +185,7 @@ export async function publishLanguageParts(o: {
 }): Promise<PartsPublishResult> {
   const { language, workDir, bucket } = o
   if (!isLanguageCode(language)) throw new Error(`Not a language code: ${JSON.stringify(language)}`)
-  const maculaDate = new Date(o.macula.date)
-  if (!/^\d{4}-\d{2}-\d{2}/.test(o.macula.date) || Number.isNaN(maculaDate.getTime())) {
-    throw new Error(`Not an ISO 8601 date for MACULA's commit: ${JSON.stringify(o.macula.date)}`)
-  }
+  const stamp = maculaStamp(o.macula)
   if (!o.noUpload && !bucket) throw new Error('No bucket to publish to: give one, or noUpload')
   // What a work folder has says nothing of what the bucket has: a list published on that word could name a missing part.
   if (o.previousDir && !o.noUpload) throw new Error('previousDir goes only with noUpload: its parts are not the bucket’s')
@@ -233,7 +231,7 @@ export async function publishLanguageParts(o: {
     language,
     workDir,
     // The whole commit too: MACULA's files are checked against Taller's git tree at it.
-    macula: { folder: o.macula.folder, version: o.macula.commit.slice(0, 10), publishedAt: maculaDate.toISOString(), commit: o.macula.commit },
+    macula: { folder: o.macula.folder, ...stamp, commit: o.macula.commit },
     lexiconsRef: o.lexiconsRef,
     obs: o.obs ?? false,
     log: say,

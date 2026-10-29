@@ -8,6 +8,8 @@
  */
 
 import { inferDoor43ResourceTypeId } from '@bt-synergy/resource-catalog'
+import { door43Fetch } from './door43Fetch';
+import { manifestRights } from './manifestRights'
 import { readResponseArrayBufferWithProgress } from './readResponseArrayBufferWithProgress'
 
 // ============================================================================
@@ -632,14 +634,13 @@ export class Door43ApiClient {
         console.log(`📄 Fetching manifest from: ${resource.metadata_url}`);
       }
       
-      const manifestResponse = await fetch(resource.metadata_url);
+      const manifestResponse = await door43Fetch(resource.metadata_url);
       if (manifestResponse.ok) {
         const manifestText = await manifestResponse.text();
         
-        // Simple YAML parsing for rights field
-        const rightsMatch = manifestText.match(/rights:\s*['"]?([^'";\n]+)['"]?/i);
-        if (rightsMatch) {
-          enriched.license = rightsMatch[1].trim();
+        const rights = manifestRights(manifestText);
+        if (rights) {
+          enriched.license = rights;
           
           if (this.config.debug) {
             console.log(`✅ Got license from manifest: ${enriched.license}`);
@@ -661,7 +662,7 @@ export class Door43ApiClient {
         console.log(`📖 Fetching README from: ${readmeUrl}`);
       }
       
-      const readmeResponse = await fetch(readmeUrl);
+      const readmeResponse = await door43Fetch(readmeUrl);
       if (readmeResponse.ok) {
         const readmeText = await readmeResponse.text();
         if (readmeText && readmeText.length > 0) {
@@ -859,7 +860,7 @@ export class Door43ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await fetch(url, {
+      const response = await door43Fetch(url, {
         ...options,
         headers: {
           ...this.config.headers,
@@ -1072,7 +1073,7 @@ export class Door43ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await fetch(url, {
+      const response = await door43Fetch(url, {
         headers: this.config.headers,
         signal: controller.signal,
       });
@@ -1180,7 +1181,7 @@ export class Door43ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await fetch(url, {
+      const response = await door43Fetch(url, {
         headers: this.config.headers,
         signal: controller.signal,
       });
@@ -1293,7 +1294,7 @@ export class Door43ApiClient {
       // Door43 cuts a large tree into pages (12 000 entries) and says `truncated: true` until the last one. es-419_tq
       // keeps its books after an `_old/` folder of 11 000 files: reading only page 1 made every book look absent.
       for (let page = 1; page <= 50; page++) {
-        const response = await fetch(`${baseUrl}&page=${page}`, {
+        const response = await door43Fetch(`${baseUrl}&page=${page}`, {
           headers: this.config.headers,
           signal: controller.signal,
         });
@@ -1453,7 +1454,7 @@ export class Door43ApiClient {
           console.log(`🔍 Trying ${endpoint.name} endpoint: ${endpoint.url}`);
         }
 
-        const response = await fetch(endpoint.url, {
+        const response = await door43Fetch(endpoint.url, {
           method: 'GET',
           headers: {
             ...this.config.headers,
@@ -1538,7 +1539,7 @@ export class Door43ApiClient {
     }
 
     try {
-      const response = await fetch(url, {
+      const response = await door43Fetch(url, {
         method: 'GET',
         headers: {
           ...this.config.headers,
@@ -1643,7 +1644,7 @@ export class Door43ApiClient {
           console.log(`🔍 Checking if file exists: ${checkUrl}`);
         }
         
-        const checkResponse = await fetch(checkUrl, {
+        const checkResponse = await door43Fetch(checkUrl, {
           method: 'GET',
           headers: {
             ...this.config.headers,
@@ -1710,7 +1711,7 @@ export class Door43ApiClient {
     }
 
     try {
-      const response = await fetch(url, {
+      const response = await door43Fetch(url, {
         method: httpMethod,
         headers: {
           ...this.config.headers,
@@ -1825,7 +1826,7 @@ export class Door43ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await fetch(url, {
+      const response = await door43Fetch(url, {
         headers: this.config.headers,
         signal: controller.signal,
       });
@@ -1941,7 +1942,7 @@ export class Door43ApiClient {
     }
 
     try {
-      const branchResponse = await fetch(createBranchUrl, {
+      const branchResponse = await door43Fetch(createBranchUrl, {
         method: 'POST',
         headers: {
           ...this.config.headers,
@@ -2060,7 +2061,7 @@ export class Door43ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await fetch(url, {
+      const response = await door43Fetch(url, {
         method: 'POST',
         headers: {
           ...this.config.headers,
@@ -2150,7 +2151,7 @@ export class Door43ApiClient {
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
     try {
-      const response = await fetch(url, {
+      const response = await door43Fetch(url, {
         headers: this.config.headers,
         signal: controller.signal,
       });

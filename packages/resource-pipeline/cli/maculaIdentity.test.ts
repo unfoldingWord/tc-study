@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { maculaIdentity } from './maculaIdentity'
+import { maculaDateUtc, maculaFlagsProblem, maculaIdentity, maculaStamp } from './maculaIdentity'
 
 function git(cwd: string, args: string[], date?: string): string {
   const env = { ...process.env, ...(date ? { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } : {}) }
@@ -49,5 +49,71 @@ describe('maculaIdentity', () => {
   test('a folder outside any git repository fails, naming the folder', () => {
     const folder = mkdtempSync(join(tmpdir(), 'no-git-'))
     expect(() => maculaIdentity(folder, {})).toThrow(folder)
+  })
+
+  test('a folder outside any git repository, with the commit and the date given: they are kept, git is not asked', () => {
+    const folder = mkdtempSync(join(tmpdir(), 'no-git-'))
+    const given = { commit: 'f1e2d3c4b5a69788f1e2d3c4b5a69788f1e2d3c4', date: '2026-10-01T09:00:00-05:00' }
+    expect(maculaIdentity(folder, given)).toEqual(given)
+  })
+})
+
+describe('maculaStamp', () => {
+  test('uses the same short commit and UTC date publishLanguage used before', () => {
+    expect(maculaStamp({ commit: 'f1e2d3c4b5a69788f1e2d3c4b5a69788f1e2d3c4', date: '2026-10-01T09:00:00-05:00' })).toEqual({
+      version: 'f1e2d3c4b5',
+      publishedAt: '2026-10-01T14:00:00.000Z',
+    })
+  })
+
+  test('refuses a date that is not ISO 8601', () => {
+    expect(() => maculaStamp({ commit: 'f1e2d3c4b5a69788f1e2d3c4b5a69788f1e2d3c4', date: 'yesterday' })).toThrow('yesterday')
+    expect(() => maculaDateUtc('15/10/2026')).toThrow('15/10/2026')
+  })
+
+  test('a time with no zone is refused: it would be read as the machine\'s local time', () => {
+    expect(() => maculaDateUtc('2026-10-15T02:19:35')).toThrow('2026-10-15T02:19:35')
+  })
+
+  test('an offset is that instant in UTC', () => {
+    expect(maculaDateUtc('2026-10-14T22:19:35-04:00')).toBe('2026-10-15T02:19:35.000Z')
+  })
+})
+
+describe('maculaFlagsProblem', () => {
+  const sha = '3b8aa380e8d8ce1f5efc61c3269a7b08cb3a21d5'
+  const commitProblem = (commit: string) => `--macula-commit no es un commit (40 caracteres hexadecimales): ${JSON.stringify(commit)}`
+  const dateProblem = (date: string) => `--macula-date no es una fecha ISO 8601 con zona (Z o -04:00): ${JSON.stringify(date)}`
+
+  test('a full sha and a zoned instant: nothing is wrong', () => {
+    expect(maculaFlagsProblem({ commit: sha, date: '2026-10-15T02:19:35Z' })).toBeNull()
+  })
+
+  test('nothing given: nothing is wrong', () => {
+    expect(maculaFlagsProblem({})).toBeNull()
+  })
+
+  test('a short sha: the commit message', () => {
+    expect(maculaFlagsProblem({ commit: '3b8aa38' })).toBe(commitProblem('3b8aa38'))
+  })
+
+  test('a flag read as the commit: the commit message', () => {
+    expect(maculaFlagsProblem({ commit: '--macula-date' })).toBe(commitProblem('--macula-date'))
+  })
+
+  test('a time with no zone: the date message', () => {
+    expect(maculaFlagsProblem({ date: '2026-10-15T02:19:35' })).toBe(dateProblem('2026-10-15T02:19:35'))
+  })
+
+  test('a date with no time: the date message', () => {
+    expect(maculaFlagsProblem({ date: '2026-10-15' })).toBe(dateProblem('2026-10-15'))
+  })
+
+  test('a date that is not ISO: the date message', () => {
+    expect(maculaFlagsProblem({ date: '15/10/2026' })).toBe(dateProblem('15/10/2026'))
+  })
+
+  test('an offset: nothing is wrong', () => {
+    expect(maculaFlagsProblem({ date: '2026-10-14T22:19:35-04:00' })).toBeNull()
   })
 })

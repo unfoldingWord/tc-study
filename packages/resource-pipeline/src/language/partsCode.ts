@@ -39,6 +39,7 @@ import { SCRIPTURE_PREPARE_SCHEMA, SCRIPTURE_PREPARE_VERSION } from '../scriptur
 import { WORDS_PREPARE_VERSION } from '../words/wordsPreparer'
 import { WORDS_LINKS_PREPARE_VERSION } from '../wordsLinks/wordsLinksPreparer'
 import { ARTICLE_TITLES_VERSION } from './buildLanguageArtifacts'
+import { HELPS_INDEX_VERSION } from './bookIndex'
 import { PACK_VERSIONS } from './packVersions'
 
 /** The workspace's packages folder (`packages/`). */
@@ -165,6 +166,8 @@ export function partsCodeVersions(): Record<string, string | number> {
     HELPS_ALIGN_VERSION,
     HELPS_TEXT_VERSION,
     ARTICLE_TITLES_VERSION,
+    // Index rows.
+    HELPS_INDEX_VERSION,
     // The stamps keys and rows carry, for a fixed row.
     'stamp resourceContentStamp': resourceContentStamp(STAMP_SAMPLE),
     'stamp bookContentStamp': bookContentStamp(STAMP_SAMPLE, 'RUT'),
