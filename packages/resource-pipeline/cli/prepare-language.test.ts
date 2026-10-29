@@ -109,6 +109,12 @@ describe('prepare-language', () => {
     expect(run).toThrow('15/10/2026')
   })
 
+  test('a --macula-date with no zone is a usage error', () => {
+    const run = () => optionsFromArgs(['--lang', 'es-419', '--macula', '/taller/public', '--macula-commit', COMMIT, '--macula-date', '2026-10-15T02:19:35'], noIdentity)
+    expect(run).toThrow(UsageError)
+    expect(run).toThrow('con zona')
+  })
+
   test('as a script, a usage error exits with 2 and the usage line, without a stack trace', () => {
     const { code, stderr } = cli(['--lang', 'es-419', '--macula', tmpdir(), '--macula-commit', COMMIT, '--macula-date', '15/10/2026'])
     expect(code).toBe(2)

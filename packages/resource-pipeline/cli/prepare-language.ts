@@ -29,7 +29,7 @@
 import 'fake-indexeddb/auto'
 import { resolve } from 'node:path'
 import { requireFreshBuilds } from './freshBuilds'
-import { maculaDateUtc, maculaIdentity, maculaStamp, type MaculaIdentity } from './maculaIdentity'
+import { maculaFlagsProblem, maculaIdentity, maculaStamp, type MaculaIdentity } from './maculaIdentity'
 import { prepareAndPack } from '../src/language/prepareAndPack'
 
 type PrepareAndPackOptions = Parameters<typeof prepareAndPack>[0]
@@ -66,16 +66,8 @@ export function optionsFromArgs(argv: string[], readMaculaIdentity: ReadMaculaId
   const maculaDate = arg(argv, 'macula-date')
   if ((maculaCommit || maculaDate) && !maculaArg) throw new UsageError('--macula-commit y --macula-date requieren --macula <taller>/public')
   // A short sha would stamp fewer characters than production's ten, and look like another MACULA.
-  if (maculaCommit && !/^[0-9a-f]{40}$/.test(maculaCommit)) {
-    throw new UsageError(`--macula-commit no es un commit (40 caracteres hexadecimales): ${JSON.stringify(maculaCommit)}`)
-  }
-  if (maculaDate) {
-    try {
-      maculaDateUtc(maculaDate)
-    } catch {
-      throw new UsageError(`--macula-date no es una fecha ISO 8601: ${JSON.stringify(maculaDate)}`)
-    }
-  }
+  const problem = maculaFlagsProblem({ commit: maculaCommit, date: maculaDate })
+  if (problem) throw new UsageError(problem)
   const maculaFolder = maculaArg ? resolve(maculaArg) : undefined
 
   // MACULA goes only in the originals pack: without it, its stamp is never written.

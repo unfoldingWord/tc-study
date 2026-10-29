@@ -28,13 +28,35 @@ export function maculaIdentity(folder: string, given: { commit?: string; date?: 
   return { commit, date }
 }
 
+/** ISO 8601 with a time and a zone. A time with no zone is the machine's local time, so the stamp would not match production. */
+const MACULA_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/
+
 /** MACULA's commit date as its rows carry it. In UTC: apps compare the dates as text, and two offsets would not sort. */
 export function maculaDateUtc(date: string): string {
   const when = new Date(date)
-  if (!/^\d{4}-\d{2}-\d{2}/.test(date) || Number.isNaN(when.getTime())) {
+  if (!MACULA_INSTANT.test(date) || Number.isNaN(when.getTime())) {
     throw new Error(`Not an ISO 8601 date for MACULA's commit: ${JSON.stringify(date)}`)
   }
   return when.toISOString()
+}
+
+/**
+ * What is wrong with `--macula-commit` and `--macula-date` as given, in the words a CLI prints, or null when nothing is.
+ * Both CLIs use it (prepare-language, publish-language), so a pack and a production list stamp MACULA alike.
+ */
+export function maculaFlagsProblem(given: { commit?: string; date?: string }): string | null {
+  const { commit, date } = given
+  if (commit !== undefined && !/^[0-9a-f]{40}$/.test(commit)) {
+    return `--macula-commit no es un commit (40 caracteres hexadecimales): ${JSON.stringify(commit)}`
+  }
+  if (date !== undefined) {
+    try {
+      maculaDateUtc(date)
+    } catch {
+      return `--macula-date no es una fecha ISO 8601 con zona (Z o -04:00): ${JSON.stringify(date)}`
+    }
+  }
+  return null
 }
 
 /** The stamp of MACULA's rows: the commit's first ten characters and its date in UTC. */
