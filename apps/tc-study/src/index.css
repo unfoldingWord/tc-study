@@ -235,7 +235,7 @@
   --theme-helps: var(--uw-inspire-200);
   --theme-helps-soft: #1f3b4c;
   --theme-helps-fg: #ffffff;
-  --theme-helps-border: #415967; /* white 22% on surface */
+  --theme-helps-border: #6d7f8a; /* white 40% on surface: 3:1 on surface and elevated */
 
   --theme-chip-quote: #123f57; /* Inspire 16% on surface */
   --theme-chip-quote-hover: #154964; /* Inspire 24% on surface */

@@ -77,7 +77,7 @@ const EXPECTED: Record<'light' | 'dark', Record<string, string>> = {
     'warning-soft': '#313B48', 'valid-soft': '#184246', 'valid-fg': '#9BDAAF',
     'panel-1': '#31ADE3', 'panel-1-soft': '#144761', 'panel-1-fg': '#CFECF8',
     'panel-2': '#E59D33', 'panel-2-soft': '#333F3A', 'panel-2-fg': '#F2CE99',
-    helps: '#A8DEF4', 'helps-soft': '#1F3B4C', 'helps-fg': '#FFFFFF', 'helps-border': '#415967',
+    helps: '#A8DEF4', 'helps-soft': '#1F3B4C', 'helps-fg': '#FFFFFF', 'helps-border': '#6D7F8A',
     'chip-quote': '#123F57', 'chip-quote-hover': '#154964', 'chip-quote-fg': '#CFECF8',
     overlay: 'RGB(0 10 16 / 0.65)',
   },
@@ -92,6 +92,9 @@ const TEXT_PAIRS: [string, string][] = [
   ['helps-fg', 'helps-soft'], ['chip-quote-fg', 'chip-quote'], ['scripture-fg', 'highlight'],
   ['valid-fg', 'valid-soft'], ['warning-fg', 'warning-soft'],
 ]
+
+/** Strokes that mark a control's edge (WCAG 1.4.11, 3:1): [stroke, background]. */
+const UI_PAIRS: [string, string][] = [['helps-border', 'surface'], ['helps-border', 'elevated']]
 
 function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
@@ -115,6 +118,12 @@ for (const mode of ['light', 'dark'] as const) {
     for (const [fg, bg] of TEXT_PAIRS) {
       test(`${fg} on ${bg} reaches 4.5:1`, () => {
         expect(contrast(theme(scope, fg), theme(scope, bg))).toBeGreaterThanOrEqual(4.5)
+      })
+    }
+
+    for (const [stroke, bg] of UI_PAIRS) {
+      test(`${stroke} on ${bg} reaches 3:1`, () => {
+        expect(contrast(theme(scope, stroke), theme(scope, bg))).toBeGreaterThanOrEqual(3)
       })
     }
   })

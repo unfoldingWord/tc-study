@@ -82,7 +82,9 @@ The colours are translationCore 4's, from its design system. Light values are tC
 | `panel-1` / `panel-1-soft` / `panel-1-fg` | `#31ade3` / `#eaf6fc` / `#156d91` | `#31ade3` / `#144761` / `#cfecf8` | Panel 1 chrome (Inspire) |
 | `panel-2` / `panel-2-soft` / `panel-2-fg` | `#e59d33` / `#fcf6ea` / `#8a5b12` | `#e59d33` / `#333f3a` / `#f2ce99` | Panel 2 chrome (Kindle) |
 | `helps` / `helps-soft` / `helps-fg` | `#014263` / `#ecf2f5` / `#014263` | `#a8def4` / `#1f3b4c` / `#ffffff` | Combined Helps accents (Ocean, as tC4's helps panel) |
-| `helps-border` | `#014263` | `#415967` | Outline `Button` stroke: Ocean, white 22% in dark |
+| `helps-border` | `#014263` | `#6d7f8a` | Outline `Button` stroke: Ocean, white 40% in dark (see below) |
+
+`helps-border` in dark is white 40% on `surface`, more than the spec's 22% for dark lines and tC4's 32%, by Abel's decision, so the outline stroke reaches 3:1 (WCAG 1.4.11) on `surface` (3.58:1) and `elevated` (3.05:1). `themeContrast.test.ts` pins both.
 
 Panel 2 is Kindle rather than Cultivate. Under simulated tritanopia (Machado 2009), the Inspire and Cultivate strips sit at ΔE 1.2, below a just-noticeable difference. Inspire and Kindle stay at ΔE ≥ 7.4 under normal vision, deuteranopia and tritanopia.
 
