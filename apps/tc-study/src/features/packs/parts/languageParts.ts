@@ -105,8 +105,14 @@ async function stage(plan: PartsPlan, deps: SyncDeps): Promise<'staged' | 'gone'
   return 'staged'
 }
 
-export async function syncLanguageParts(language: string, books: readonly string[], deps: SyncDeps): Promise<SyncResult> {
-  const chosen = [SHARED_UNIT, ...books.map(bookUnit)]
+/** `withShared: false` asks for the books alone (small, and what the screen shows), before the heavy shared unit. */
+export async function syncLanguageParts(
+  language: string,
+  books: readonly string[],
+  deps: SyncDeps,
+  { withShared = true }: { withShared?: boolean } = {}
+): Promise<SyncResult> {
+  const chosen = [...(withShared ? [SHARED_UNIT] : []), ...books.map(bookUnit)]
   for (let attempt = 0; attempt < 2; attempt++) {
     const got = await listOf(language, deps, attempt > 0)
     if (isResult(got)) return got

@@ -150,6 +150,17 @@ describe('syncLanguageParts', () => {
     expect([...target.catalog.keys()].sort()).toEqual([TN, TW, UGNT].sort())
   })
 
+  test('the book alone first: no shared part is downloaded, the book and its Greek are', async () => {
+    const p = await fixture()
+    const { fetch, asked } = await server([p.tnTit, p.tnRut, p.tw], [p.ugntTit])
+    const target = memoryTarget()
+
+    expect(await syncLanguageParts('en', ['tit'], depsFor(target, fetch), { withShared: false })).toMatchObject({ kind: 'applied', parts: 2 })
+    expect(asked.filter((a) => a.startsWith('parts/')).sort()).toEqual([p.tnTit, p.ugntTit].map((x) => `parts/${x.entry.sha256}`).sort())
+    expect(target.rows.has(`tn:${TN}:tit:1`)).toBe(true)
+    expect(target.rows.has(`helps-text:titles:${TW}@v1:all`)).toBe(false)
+  })
+
   test('asked again, nothing is downloaded: the list comes back unchanged (ETag) and the plan is empty', async () => {
     const p = await fixture()
     const { fetch, asked } = await server([p.tnTit, p.tw], [p.ugntTit])
