@@ -34,6 +34,7 @@
     "@bt-synergy/catalog-adapter-indexeddb": "workspace:*",
     "@bt-synergy/catalog-manager": "workspace:*",
     "@bt-synergy/door43-api": "workspace:*",
+    "@bt-synergy/language-pack": "workspace:*",
     "@bt-synergy/navigation": "workspace:*",
     "@bt-synergy/package-storage": "workspace:*",
     "@bt-synergy/passage-sets": "workspace:*",
