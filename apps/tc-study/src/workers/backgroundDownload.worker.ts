@@ -43,6 +43,7 @@ import { registerWorkerLoaders } from '../features/download/workerLoaderRegistry
 import { LoaderRegistry } from '../lib/loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from '../lib/services/BackgroundDownloadManager'
 import { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
+import { isNetworkFailure } from '@bt-synergy/resource-pipeline/download/networkFailure'
 
 // NOTE: We don't import ResourceTypeRegistry or resource type definitions here
 // because they include React components (viewers) which try to access window/document
@@ -790,8 +791,8 @@ async function downloadSpecificResources(
             : 0,
       })
 
-      // ❌ Mark error in cache
-      if (completenessChecker) {
+      // ❌ Mark error in cache (not for no network: a pack's rows stay as they are, and the next check retries)
+      if (completenessChecker && !isNetworkFailure(error)) {
         await completenessChecker.markError(
           resourceKey,
           error instanceof Error ? error.message : String(error)

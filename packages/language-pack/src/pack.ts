@@ -26,9 +26,11 @@ import { SHARED_UNIT, bookUnit } from './parts/partsList'
 import { REGISTER_PREFIX, resourceOfSlotId, unitOfSlotId } from './parts/register'
 import {
   ALL_LAYERS,
+  OPTIONAL_LAYERS,
   PACK_FORMAT,
   PACK_FORMAT_VERSION,
   REQUIRED_LAYERS,
+  readsLayer,
   type CacheRow,
   type PackLayer,
   type PackKind,
@@ -263,7 +265,10 @@ export type ImportPackParams = {
   overwrite?: boolean | readonly string[]
   /** Rows written per batch. */
   batch?: number
-  /** This app's processing versions, by layer, to compare with the pack's (see `PackManifest.versions`). */
+  /**
+   * This app's processing versions, by layer, to compare with the pack's (see `PackManifest.versions`). An optional
+   * layer (`OPTIONAL_LAYERS`) comes only when they state it with the pack's values (`readsLayer`).
+   */
   versions?: PackVersions
   /** When the pack is opened; rows with a cache lifetime start it again from here. */
   now?: Date
@@ -289,7 +294,10 @@ export type ImportPackResult = {
   written: number
   keptExisting: number
   byLayer: Partial<Record<PackLayer, number>>
-  /** Layers left out: built with another processing version than this app's. They are rebuilt from the source. */
+  /**
+   * Layers left out: built with another processing version than this app's, and rebuilt from the source; then each
+   * optional layer the pack has rows of that this app does not read (`readsLayer`).
+   */
   skippedLayers: PackLayer[]
   /**
    * The originals the pack's quotes need, and whether the device has them: `present` (same release), `in-pack`,
@@ -306,11 +314,12 @@ export type ImportPackResult = {
   droppedRows: Record<string, Partial<Record<PackLayer, number>>>
 }
 
-/** The layers whose versions differ between the pack and this app. */
+/** The layers whose versions differ between the pack and this app. Optional layers go by `readsLayer` instead. */
 function differingLayers(pack: PackVersions | undefined, mine: PackVersions | undefined): PackLayer[] {
   if (!pack || !mine) return []
   const out: PackLayer[] = []
   for (const layer of Object.keys(mine) as PackLayer[]) {
+    if (OPTIONAL_LAYERS.includes(layer)) continue
     const a = pack[layer]
     const b = mine[layer]
     if (!a || !b) continue
@@ -356,13 +365,16 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
   }
   const layers = new Set<PackLayer>([...REQUIRED_LAYERS, ...(params.layers ?? manifest.layers)])
   for (const layer of differ) layers.delete(layer)
+  // Every pack names its optional layers, rows or not: one is said to be skipped only when the pack has rows of it.
+  const unread = OPTIONAL_LAYERS.filter((layer) => layers.has(layer) && !readsLayer(layer, params.versions, manifest.versions))
+  for (const layer of unread) layers.delete(layer)
   const batch = params.batch ?? 200
   const result: ImportPackResult = {
     manifest,
     written: 0,
     keptExisting: 0,
     byLayer: {},
-    skippedLayers: [...differ],
+    skippedLayers: [...differ, ...unread.filter((layer) => manifest.resources.some((resource) => resource.rows[layer]))],
     skippedResources: [],
     originals: [],
     droppedRows: {},
@@ -425,7 +437,7 @@ export async function importLanguagePack(params: ImportPackParams): Promise<Impo
     return !meta || bookContentStamp(meta as BookStampSource, original.book) === original.stamp
   }
 
-  const order: PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text', 'receipt']
+  const order: PackLayer[] = ['sot', 'prepared', 'quote', 'align', 'text', 'index', 'receipt']
   const total = manifest.resources
     .filter((resource) => !skip.has(resource.key))
     .reduce((n, resource) => n + order.filter((layer) => layers.has(layer)).reduce((m, layer) => m + (resource.rows[layer] ?? 0), 0), 0)

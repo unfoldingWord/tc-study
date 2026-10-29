@@ -14,6 +14,7 @@ import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { LoaderRegistry } from '../loaders/LoaderRegistry'
 import { BackgroundDownloadManager } from './BackgroundDownloadManager'
+import { isNetworkFailure } from './networkFailure'
 import { ResourceCompletenessChecker, type ResourceCompletenessCheckerOptions } from './ResourceCompletenessChecker'
 import { recordBlobsAfterComplete } from './recordBlobsAfterComplete'
 import { registerWorkerLoaders } from './workerLoaderRegistry'
@@ -306,7 +307,8 @@ export async function runDownload(args: {
       const message = error instanceof Error ? error.message : String(error)
       if (books) {
         if (isCurrentRun()) post({ type: 'error', runId, payload: { resourceKey, error: message } })
-      } else {
+      } else if (!isNetworkFailure(error)) {
+        // With no network the resource keeps what it holds (a language pack's rows); the next check retries it.
         await completenessChecker.markError(resourceKey, message)
       }
     }

@@ -26,6 +26,7 @@ import {
   type PackManifest,
 } from '@bt-synergy/language-pack'
 import { MACULA_KEYS } from '../../cli/companions'
+import { maculaStamp } from '../../cli/maculaIdentity'
 import { door43Stamps } from './door43Stamps'
 import { PACK_VERSIONS } from './packVersions'
 import { prepareAndPack } from './prepareAndPack'
@@ -171,12 +172,7 @@ export async function publishLanguage(o: {
 }): Promise<PublishResult> {
   const { language, bucket } = o
   if (!isLanguageCode(language)) throw new Error(`Not a language code: ${JSON.stringify(language)}`)
-  const maculaDate = new Date(o.macula.date)
-  if (!/^\d{4}-\d{2}-\d{2}/.test(o.macula.date) || Number.isNaN(maculaDate.getTime())) {
-    throw new Error(`Not an ISO 8601 date for MACULA's commit: ${JSON.stringify(o.macula.date)}`)
-  }
-  // In UTC: apps compare the dates as text, and two offsets would not sort.
-  const maculaStamp = { version: o.macula.commit.slice(0, 10), publishedAt: maculaDate.toISOString() }
+  const stamp = maculaStamp(o.macula)
   const obs = o.obs ?? false
   const write = o.log ?? (() => {})
   const say = (line: string) => write(oneLine(line))
@@ -220,7 +216,7 @@ export async function publishLanguage(o: {
     outDir: join(o.workDir, 'packs'),
     originals: true,
     macula: o.macula.folder,
-    maculaStamp,
+    maculaStamp: stamp,
     lexicons: { ref: o.lexiconsRef },
     obs,
     log: say,

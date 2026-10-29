@@ -24,68 +24,71 @@ Switching: `class="dark"` on `<html>` (also `data-theme` and `color-scheme`). Pr
 
 ## Color palette
 
-Values below match `src/index.css` as of the dark-mode theme work. Utilities are Tailwind v4 `@theme` names: `--color-X` → `bg-X` / `text-X` / `border-X`.
+The colours are translationCore 4's, from its design system. Light values are tC4's own; dark values follow tC4's dark-ground rules on Ocean surfaces ([TC4_STYLE_AND_BRAND.md](./TC4_STYLE_AND_BRAND.md) §5.2, §5.3). The source of truth is `src/index.css`, whose `var(--uw-…)` / `var(--tc-…)` names resolve in `src/styles/tc4-tokens.css`. `src/styles/themeContrast.test.ts` pins every value below and checks the text pairs reach 4.5:1. Utilities are Tailwind v4 `@theme` names: `--color-X` → `bg-X` / `text-X` / `border-X`.
 
 ### Shell & surfaces
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `canvas` | `#f4f2ef` | `#121417` | App background (`body`) |
-| `surface` | `#ffffff` | `#1e2228` | Cards, modal panels, resource viewer headers (`ResourceViewerHeader`) |
-| `elevated` | `#ffffff` | `#2c3138` | Raised panels / dialogs |
-| `tab-selected` | `#ffffff` | `#0e1013` | Active `SortableTab` on `panel-*-soft` strip (elevated in light; darker than strip in dark) |
-| `muted` | `#ebe8e4` | `#3a4049` | Soft fills, hover chips, scrollbar track |
-| `border` | `#e0dcd6` | `#4a515a` | Primary borders |
-| `border-subtle` | `#efece8` | `#323840` | Hairline / soft separators |
+| `canvas` | `#f7fafc` paper | `#071e2c` | App background (`body`) |
+| `surface` | `#ffffff` | `#0c2a3c` | Cards, modal panels, resource viewer headers (`ResourceViewerHeader`) |
+| `elevated` | `#ffffff` | `#12364c` | Raised panels / dialogs |
+| `tab-selected` | `#ffffff` | `#05141e` | Active `SortableTab` on `panel-*-soft` strip (elevated in light; darker than strip in dark) |
+| `muted` | `#ecf2f5` frost | `#1f3b4c` | Soft fills, hover chips |
+| `border` | `#e2e4e6` | `#415967` | Primary borders |
+| `border-subtle` | `#e8ebed` | `#294453` | Hairline / soft separators |
 
 ### Foreground
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `fg` | `#1c1917` | `#f0ebe6` | Primary text |
-| `fg-secondary` | `#57534e` | `#c2bbb3` | Secondary labels, inactive tab text on soft strips |
-| `fg-muted` | `#a8a29e` | `#8a837c` | Placeholders, disabled, de-emphasized |
+| `fg` | `#1e2c36` ink | `#ffffff` | Primary text |
+| `fg-secondary` | `#4f5e6a` slate | `#c2cace` | Secondary labels, inactive tab text on soft strips |
+| `fg-muted` | `#626f78` steel | `#9eaab1` | Placeholders, disabled, de-emphasized (still 4.5:1 on surface and muted) |
 
 ### Accent & feedback
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `accent` | `#2563eb` | `#7bb8ff` | Primary actions, focus ring, `rc://` links |
-| `accent-hover` | `#1d4ed8` | `#a5d0ff` | Hover on accent |
-| `accent-soft` | `#eff6ff` | `#335578` | Soft accent fill (BCV pill, badges) — must clear canvas in dark |
-| `accent-fg` | `#1e40af` | `#e8f1ff` | High-contrast text on accent-soft |
-| `danger` | `#dc2626` | `#f87171` | Errors / destructive |
-| `danger-soft` | `#fef2f2` | `#3f1d1d` | Soft error fill |
-| `warning` | `#d97706` | `#fbbf24` | Amber hover / saturated warning |
-| `warning-fg` | `#92400e` | `#fde68a` | High-contrast amber text (TA footers; pair with `accent-fg` for TW) |
-| `highlight` | `#fef08a` | `#5c4a14` | Verse / note selection wash; Helps filter value pill fill |
-| `highlight-strong` | `#fde047` | `#7a641c` | Stronger selection border/fill; filter × hover wash |
-| `underline` | `#a8a29e` | `#a8a29a` | Dotted scripture underlines |
-| `overlay` | `rgb(0 0 0 / 0.5)` | `rgb(0 0 0 / 0.55)` | Modal/dialog scrim (`bg-overlay`) |
+| `accent` | `#156d91` Inspire 700 | `#31ade3` Inspire | Accent text, focus ring, `rc://` links. Inspire itself is never text on light (2.6:1). |
+| `accent-hover` | `#0c4f6b` | `#7acded` | Hover on accent |
+| `accent-soft` | `#eaf6fc` | `#144761` | Soft accent fill (BCV pill, badges) |
+| `accent-fg` | `#014263` Ocean | `#cfecf8` | High-contrast text on accent-soft |
+| `accent-fill` / `-hover` / `-press` | `#31ade3` / `#2599cc` / `#1f8cba` | same | Filled pill buttons, white label at weight 800 (tC4's brand pairing) |
+| `danger` | `#a21309` | `#f2938a` | Errors / destructive |
+| `danger-soft` | `#faedeb` | `#313b48` | Soft error fill |
+| `warning` | `#e59d33` Kindle | `#e59d33` | Saturated warning |
+| `warning-fg` | `#8a5b12` | `#f2ce99` | High-contrast amber text (TA footers; pair with `accent-fg` for TW) |
+| `highlight` | `#fff1b8` | `#5b4b12` | Verse / note selection wash; Helps filter value pill fill |
+| `highlight-strong` | `#fdd910` | `#7a641c` | Stronger selection border/fill; filter × hover wash |
+| `underline` | `#b7c2c9` haze | `#9eaab1` | Dotted scripture underlines (decorative) |
+| `overlay` | `rgb(1 38 56 / 0.55)` | `rgb(0 10 16 / 0.65)` | Modal/dialog scrim (`bg-overlay`) |
 
 ### Scripture paper
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `scripture` | `#fffef9` | `#2a3038` | Scripture pane background (lifted above canvas in dark) |
-| `scripture-fg` | `#1c1917` | `#f2eee8` | Scripture body text |
-| `scripture-muted` | `#78716c` | `#a8a29a` | Empty / italic / secondary scripture |
+| `scripture` | `#ffffff` | `#0f3044` | Scripture pane background |
+| `scripture-fg` | `#231f20` | `#ffffff` | Scripture body text |
+| `scripture-muted` | `#626f78` | `#9eaab1` | Empty / italic / secondary scripture |
 
 ### Panels & helps
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `panel-1` / `panel-1-soft` / `panel-1-fg` | `#2563eb` / `#eff6ff` / `#1d4ed8` | `#7bb8ff` / `#335578` / `#dbeafe` | Panel 1 chrome (blue scheme) |
-| `panel-2` / `panel-2-soft` / `panel-2-fg` | `#7c3aed` / `#f5f3ff` / `#6d28d9` | `#b39dfa` / `#322b45` / `#ddd6fe` | Panel 2 chrome (purple scheme) |
-| `helps` / `helps-soft` / `helps-fg` | `#7c3aed` / `#f5f3ff` / `#5b21b6` | `#b39dfa` / `#322b45` / `#ddd6fe` | Combined Helps accents |
+| `panel-1` / `panel-1-soft` / `panel-1-fg` | `#31ade3` / `#eaf6fc` / `#156d91` | `#31ade3` / `#144761` / `#cfecf8` | Panel 1 chrome (Inspire) |
+| `panel-2` / `panel-2-soft` / `panel-2-fg` | `#e59d33` / `#fcf6ea` / `#8a5b12` | `#e59d33` / `#333f3a` / `#f2ce99` | Panel 2 chrome (Kindle) |
+| `helps` / `helps-soft` / `helps-fg` | `#014263` / `#ecf2f5` / `#014263` | `#a8def4` / `#1f3b4c` / `#ffffff` | Combined Helps accents (Ocean, as tC4's helps panel) |
+
+Panel 2 is Kindle rather than Cultivate. Under simulated tritanopia (Machado 2009), the Inspire and Cultivate strips sit at ΔE 1.2, below a just-noticeable difference. Inspire and Kindle stay at ΔE ≥ 7.4 under normal vision, deuteranopia and tritanopia.
 
 ### Reading chips
 
 | Token | Light | Dark | Typical use |
 |-------|-------|------|-------------|
-| `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `#eef4ff` / `#e0eaff` / `#1e40af` | `#334866` / `#3d5678` / `#e8f1ff` | Scripture / OBS quote chips |
+| `chip-quote` / `chip-quote-hover` / `chip-quote-fg` | `#eaf6fc` / `#cfecf8` / `#014263` | `#123f57` / `#154964` / `#cfecf8` | Scripture / OBS quote chips |
 
-Verse/ref group headers use shared `muted/50` + `fg-secondary` (see `helpsCardStyles` — `HELPS_VERSE_HEADER`), not a lavender chip.
+Verse/ref group headers use shared `muted/50` + `fg-secondary` (see `helpsCardStyles` — `HELPS_VERSE_HEADER`), not a tinted chip.
 
 Ring offset uses `canvas` (`--color-ring-offset`).
 
@@ -95,13 +98,13 @@ Ring offset uses `canvas` (`--color-ring-offset`).
 
 ### Fonts
 
-The app does **not** load a custom webfont today. UI and scripture use the **browser / Tailwind default sans** stack (effectively system UI sans). Body applies `antialiased`.
+tC4's faces, self-hosted in `public/fonts/` with their OFL licences so the app works offline (`src/styles/tc4-fonts.css`). Each face loads only for the characters in its `unicode-range`.
 
-- **UI chrome:** default sans via Tailwind text utilities.
-- **Scripture:** same sans family; distinguished by `text-scripture-fg` / `bg-scripture` and layout (verse blocks / USJ para styles), not a separate face.
+- **UI chrome:** Mulish, the `font-ui` utility, set on `body`.
+- **Scripture:** Charis SIL, the `font-scripture` utility, on the scripture and OBS panes. Greek falls to Noto Serif and Hebrew to Noto Serif Hebrew. Arabic-script text keeps the system fallback for now.
 - **Mono:** `font-mono` for code / raw USFM snippets in cards and admin tools.
 
-If a branded or reading-optimized face is added later, define it as a boneless token (e.g. `--font-ui` / `--font-scripture`) in `index.css` and map through `@theme` — do not hard-code faces in components.
+Do not hard-code faces in components; use `font-ui` / `font-scripture`.
 
 ### Size scale (as used today)
 
@@ -146,7 +149,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 
 - **Scripture pane:** `bg-scripture text-scripture-fg`; selection via `highlight` / `highlight-strong`; underlines via `underline`. In dark, scripture paper must sit clearly above `canvas` (avoid near-black-on-black).
 - **BCV pill (`NavigationBarCompact`):** `bg-accent-soft` + `text-accent-fg` — soft fill must clear canvas; accent-fg is the readable chrome text on that fill (not `text-accent` alone).
-- **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` with a hairline `border-b`; Helps list panels also use `bg-surface` (`HELPS_LIST_PANEL`) so verse chips sit on white/elevated charcoal — not cool `canvas` gray.
+- **Resource viewer headers:** `ResourceViewerHeader` uses `bg-surface` with a hairline `border-b`; Helps list panels also use `bg-surface` (`HELPS_LIST_PANEL`) so verse chips sit on white (dark: the Ocean surface) — not the `canvas` paper.
 - **Helps verse headers:** `bg-muted/50` + `text-fg-secondary` (+ book icon, ref, count on `bg-surface`) — neutral muted chips (lighter than full `muted`), not lavender `chip-verse`.
 - **Helps cards:** idle `surface` + border; quote chips use `chip-quote*`; selected TN/TWL use light yellow `bg-highlight/15` + even `border-border` (no left bar / ring / blue or purple wash). TA vs TW footers use `warning-fg` (amber) vs `accent-fg` (blue) — not `helps-fg` purple (blue/purple fails tritanopia). Prose links per [THEME.md](./THEME.md) (accent / fg-secondary — not rainbow hover chips).
 - **Helps filter pill:** `bg-highlight text-scripture-fg` (borderless `h-7` capsule) — same wash as highlighted scripture tokens (`TokenRenderer`), so filter ↔ selection feel related.
@@ -163,3 +166,15 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 - [ ] Icon-first actions with `title` + `aria-label`
 - [ ] Scripture vs UI contrast preserved in both themes
 - [ ] Spot-check light and dark after chrome density changes
+
+---
+
+## Restyle progress
+
+Screens moving from raw palette classes to tokens ([TC4_STYLE_AND_BRAND_PLAN.md](./TC4_STYLE_AND_BRAND_PLAN.md), PR 5). `utils/rawPaletteFreeze.test.ts` holds the count; each PR lowers it.
+
+- [ ] 5a Shell and shared pieces
+- [ ] 5b Read
+- [ ] 5c Home, Library, Collections, Passage sets
+- [ ] 5d Studio
+- [ ] 5e Settings remainder, wizards, Catalog, Create package, Data

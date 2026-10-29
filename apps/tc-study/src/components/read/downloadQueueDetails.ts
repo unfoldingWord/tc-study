@@ -32,6 +32,13 @@ export interface DownloadQueueRow {
   /** Canonical short type id when known (`scripture`, `notes`, …); null if unknown. */
   typeId: string | null
   status: DownloadQueueRowStatus
+  /** Books the device already holds (from a language pack), upper case: the rest is what is downloading. */
+  heldBooks?: string[]
+}
+
+/** "held: TIT, RUT", or nothing. */
+export function formatHeldBooks(heldBooks: readonly string[] | undefined): string {
+  return heldBooks?.length ? `held: ${heldBooks.join(', ')}` : ''
 }
 
 export interface DownloadQueueDetailsModel {
@@ -89,7 +96,13 @@ export function buildDownloadQueueDetails(input: {
   error?: string | null
   /** Coarse run phase — used so completeness checks are not labeled downloading. */
   phase?: string | null
+  /** Books each resource already holds (catalog `downloadedIngredients`, written when a book pack is opened). */
+  heldBooksByKey?: Readonly<Record<string, readonly string[]>>
 }): DownloadQueueDetailsModel {
+  const withHeld = (row: DownloadQueueRow): DownloadQueueRow => {
+    const held = input.heldBooksByKey?.[row.resourceKey]
+    return held?.length ? { ...row, heldBooks: held.map((b) => b.toUpperCase()) } : row
+  }
   const completedSet = new Set(input.completedResourceKeys ?? [])
   const currentKey = input.currentResource?.trim() || null
   const queue =
@@ -120,7 +133,7 @@ export function buildDownloadQueueDetails(input: {
       // Idle failure with no current pointer — leave remaining as queued.
       status = 'queued'
     }
-    return downloadQueueRowFromKey(resourceKey, status)
+    return withHeld(downloadQueueRowFromKey(resourceKey, status))
   })
 
   // Current may be set before queue-updated arrives.
@@ -129,7 +142,7 @@ export function buildDownloadQueueDetails(input: {
       input.error && !input.isDownloading
         ? 'failed'
         : activeStatus('downloading')
-    rows.unshift(downloadQueueRowFromKey(currentKey, status))
+    rows.unshift(withHeld(downloadQueueRowFromKey(currentKey, status)))
   }
 
   const current =

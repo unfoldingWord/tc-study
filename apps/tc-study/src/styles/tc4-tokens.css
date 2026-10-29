@@ -1,0 +1,54 @@
+/*
+ * translationCore 4 design-system tokens that tC Study uses, under tC4's own names.
+ * Copied, not linked, as tC Admin does: the master is tC4's design system, vendored in
+ * unfoldingWord/translationCore4, branch main, at crates/tc-ui/assets/ds/tokens/ (read at
+ * bc510508). Older tC4 branches keep the same files under src/ds/tokens/.
+ * To follow a tC4 change, compare the block with the file named above it and copy the value.
+ * index.css maps these onto tc-study's --theme-* names. See docs/TC4_STYLE_AND_BRAND.md §4.
+ */
+:root {
+  /* tokens/colors.css — unfoldingWord brand palette */
+  --uw-black: #231f20;
+  --uw-ocean: #014263;
+  --uw-inspire: #31ade3;
+  --uw-kindle: #e59d33;
+
+  /* tokens/colors.css — Inspire tonal scale */
+  --uw-inspire-50: #eaf6fc;
+  --uw-inspire-100: #cfecf8;
+  --uw-inspire-200: #a8def4;
+  --uw-inspire-300: #7acded;
+  --uw-inspire-600: #1f8cba;
+  --uw-inspire-700: #156d91;
+  --uw-inspire-800: #0c4f6b;
+
+  /* tokens/colors.css — Ocean-tinted neutrals */
+  --uw-paper: #f7fafc;
+  --uw-frost: #ecf2f5;
+  --uw-mist: #d9e2e8;
+  --uw-haze: #b7c2c9; /* decorative and disabled only: 1.7:1 on paper */
+  --uw-steel: #626f78;
+  --uw-slate: #4f5e6a;
+  --uw-ink: #1e2c36;
+
+  /* tokens/colors.css — translationCore status colours */
+  --tc-valid: #58c17a;
+  --tc-valid-strong: #327547;
+  --tc-valid-surface: #e8f7ed;
+  --tc-invalid: #a21309;
+  --tc-invalid-surface: #faedeb;
+  --tc-invalid-on-dark: #f2938a;
+  --tc-highlight: #fdd910;
+  --tc-highlight-soft: #fff1b8;
+  --tc-warn-surface: #fcf6ea;
+  --tc-warn-text: #8a5b12;
+  --tc-accent-hover: #2599cc; /* tC4 --accent-hover */
+
+  /* tokens/elevation.css — shadows, always tinted with Ocean.
+     Renamed --tc4-shadow-* so they do not collide with Tailwind's --shadow-*. */
+  --tc4-shadow-chip: 0 1px 2px rgba(1, 66, 99, 0.1);
+  --tc4-shadow-card: 0 2px 6px rgba(1, 66, 99, 0.06);
+  --tc4-shadow-hover: 0 6px 16px rgba(1, 66, 99, 0.12);
+  --tc4-shadow-hero: 0 8px 20px rgba(1, 66, 99, 0.18);
+  --tc4-shadow-modal: 0 24px 64px rgba(1, 38, 56, 0.4);
+}

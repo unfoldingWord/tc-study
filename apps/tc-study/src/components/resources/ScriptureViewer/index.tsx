@@ -431,7 +431,7 @@ export function ScriptureViewer({
       />
 
       {/* Owned scrollport; edge cues live at content start/end (scroll with document). */}
-      <div className="flex-1 min-h-0 bg-scripture text-scripture-fg">
+      <div className="flex-1 min-h-0 bg-scripture text-scripture-fg font-scripture">
         <div
           ref={contentRootRef}
           className="h-full overflow-auto p-content-lg cursor-pointer"
