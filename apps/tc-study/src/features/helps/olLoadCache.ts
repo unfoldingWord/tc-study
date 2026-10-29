@@ -109,8 +109,11 @@ export function loadOriginalLanguageChapters(args: {
   })()
 
   inflight.set(key, promise)
-  void promise.finally(() => {
-    if (inflight.get(key) === promise) inflight.delete(key)
-  })
+  // `finally` makes a second promise that rejects with the first: caught here, so only the callers' copy rejects.
+  promise
+    .finally(() => {
+      if (inflight.get(key) === promise) inflight.delete(key)
+    })
+    .catch(() => {})
   return promise
 }

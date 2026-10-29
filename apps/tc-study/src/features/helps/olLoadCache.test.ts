@@ -50,3 +50,26 @@ describe('olLoadCache', () => {
     expect(calls).toBe(1)
   })
 })
+
+describe('olLoadCache failures', () => {
+  test('a load that fails rejects for its callers only: no second, unhandled rejection', async () => {
+    clearOlLoadCacheForTests()
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => unhandled.push(reason)
+    process.on('unhandledRejection', onUnhandled)
+    try {
+      const loader = {
+        loadViewModel: async () => {
+          throw new Error('Resource metadata not found for unfoldingWord/hbo/uhb')
+        },
+      }
+      await expect(
+        loadOriginalLanguageChapters({ loader: loader as never, olKey: 'unfoldingWord/hbo/uhb', bookId: 'rut', startChapter: 1, endChapter: 1 })
+      ).rejects.toThrow('Resource metadata not found')
+      await new Promise((r) => setTimeout(r, 20))
+      expect(unhandled).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
+  })
+})
