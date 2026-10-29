@@ -53,12 +53,14 @@ const EXPECTED: Record<'light' | 'dark', Record<string, string>> = {
     fg: '#1E2C36', 'fg-secondary': '#4F5E6A', 'fg-muted': '#626F78',
     accent: '#156D91', 'accent-hover': '#0C4F6B', 'accent-soft': '#EAF6FC', 'accent-fg': '#014263',
     'accent-fill': '#31ADE3', 'accent-fill-hover': '#2599CC', 'accent-fill-press': '#1F8CBA',
+    'accent-fill-fg': '#FFFFFF',
     scripture: '#FFFFFF', 'scripture-fg': '#231F20', 'scripture-muted': '#626F78',
     highlight: '#FFF1B8', 'highlight-strong': '#FDD910', underline: '#B7C2C9',
     danger: '#A21309', 'danger-soft': '#FAEDEB', warning: '#E59D33', 'warning-fg': '#8A5B12',
+    'warning-soft': '#FCF6EA', 'valid-soft': '#E8F7ED', 'valid-fg': '#327547',
     'panel-1': '#31ADE3', 'panel-1-soft': '#EAF6FC', 'panel-1-fg': '#156D91',
     'panel-2': '#E59D33', 'panel-2-soft': '#FCF6EA', 'panel-2-fg': '#8A5B12',
-    helps: '#014263', 'helps-soft': '#ECF2F5', 'helps-fg': '#014263',
+    helps: '#014263', 'helps-soft': '#ECF2F5', 'helps-fg': '#014263', 'helps-border': '#014263',
     'chip-quote': '#EAF6FC', 'chip-quote-hover': '#CFECF8', 'chip-quote-fg': '#014263',
     overlay: 'RGB(1 38 56 / 0.55)',
   },
@@ -68,12 +70,14 @@ const EXPECTED: Record<'light' | 'dark', Record<string, string>> = {
     fg: '#FFFFFF', 'fg-secondary': '#C2CACE', 'fg-muted': '#9EAAB1',
     accent: '#31ADE3', 'accent-hover': '#7ACDED', 'accent-soft': '#144761', 'accent-fg': '#CFECF8',
     'accent-fill': '#31ADE3', 'accent-fill-hover': '#2599CC', 'accent-fill-press': '#1F8CBA',
+    'accent-fill-fg': '#FFFFFF',
     scripture: '#0F3044', 'scripture-fg': '#FFFFFF', 'scripture-muted': '#9EAAB1',
     highlight: '#5B4B12', 'highlight-strong': '#7A641C', underline: '#9EAAB1',
     danger: '#F2938A', 'danger-soft': '#313B48', warning: '#E59D33', 'warning-fg': '#F2CE99',
+    'warning-soft': '#313B48', 'valid-soft': '#184246', 'valid-fg': '#9BDAAF',
     'panel-1': '#31ADE3', 'panel-1-soft': '#144761', 'panel-1-fg': '#CFECF8',
     'panel-2': '#E59D33', 'panel-2-soft': '#333F3A', 'panel-2-fg': '#F2CE99',
-    helps: '#A8DEF4', 'helps-soft': '#1F3B4C', 'helps-fg': '#FFFFFF',
+    helps: '#A8DEF4', 'helps-soft': '#1F3B4C', 'helps-fg': '#FFFFFF', 'helps-border': '#6D7F8A',
     'chip-quote': '#123F57', 'chip-quote-hover': '#154964', 'chip-quote-fg': '#CFECF8',
     overlay: 'RGB(0 10 16 / 0.65)',
   },
@@ -86,7 +90,11 @@ const TEXT_PAIRS: [string, string][] = [
   ['scripture-fg', 'scripture'], ['scripture-muted', 'scripture'], ['danger', 'danger-soft'],
   ['warning-fg', 'surface'], ['panel-1-fg', 'panel-1-soft'], ['panel-2-fg', 'panel-2-soft'],
   ['helps-fg', 'helps-soft'], ['chip-quote-fg', 'chip-quote'], ['scripture-fg', 'highlight'],
+  ['valid-fg', 'valid-soft'], ['warning-fg', 'warning-soft'],
 ]
+
+/** Strokes that mark a control's edge (WCAG 1.4.11, 3:1): [stroke, background]. */
+const UI_PAIRS: [string, string][] = [['helps-border', 'surface'], ['helps-border', 'elevated']]
 
 function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
@@ -112,6 +120,12 @@ for (const mode of ['light', 'dark'] as const) {
         expect(contrast(theme(scope, fg), theme(scope, bg))).toBeGreaterThanOrEqual(4.5)
       })
     }
+
+    for (const [stroke, bg] of UI_PAIRS) {
+      test(`${stroke} on ${bg} reaches 3:1`, () => {
+        expect(contrast(theme(scope, stroke), theme(scope, bg))).toBeGreaterThanOrEqual(3)
+      })
+    }
   })
 }
 
@@ -121,6 +135,14 @@ describe('token rules', () => {
       .filter((k) => k !== 'overlay')
       .filter((k) => !/^#[0-9A-F]{6}$/.test(theme(dark, k)))
     expect(notHex).toEqual([])
+  })
+
+  test('every token is mapped to a Tailwind colour in @theme', () => {
+    const mapped = declarations(ruleBody(indexCss, '@theme'))
+    const unmapped = Object.keys(EXPECTED.light).filter(
+      (k) => mapped[`--color-${k}`] !== `var(--theme-${k})`
+    )
+    expect(unmapped).toEqual([])
   })
 
   test('Inspire is never the light accent text colour (2.6:1 on paper)', () => {
