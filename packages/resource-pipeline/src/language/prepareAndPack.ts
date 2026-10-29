@@ -156,7 +156,8 @@ export async function prepareAndPack(o: {
   if (o.originals) {
     // Into the store only now: the packs written before take no original, and the base and book packs after take none.
     for (const index of await addOriginalsIndex({ cache: cacheAdapter, catalog: catalogAdapter }, ORIGINAL_LANGUAGE_KEYS)) {
-      say(`[${elapsed()}] Índice de palabras de ${index.key}: ${index.books} libros, ${index.rows} filas`)
+      if (index.reason) say(`[${elapsed()}] Índice de palabras de ${index.key}: 0 libros (${index.reason})`)
+      else say(`[${elapsed()}] Índice de palabras de ${index.key}: ${index.books} libros, ${index.rows} filas`)
     }
     originalsPack = await writePack('originals.langpack.zip', {
       kind: 'originals',

@@ -91,7 +91,10 @@ describe('addOriginalsIndex', () => {
     const { cache, catalog } = stores()
     const result = await addOriginalsIndex({ cache, catalog }, [UGNT, UHB])
     // Titus: 6 codes and its verses row; 3 John: 4 codes and its verses row.
-    expect(result).toEqual([{ key: UGNT, books: 2, rows: 12 }])
+    expect(result).toEqual([
+      { key: UGNT, books: 2, rows: 12 },
+      { key: UHB, books: 0, rows: 0, reason: 'sin fila en el catálogo' },
+    ])
 
     const expected = Object.entries(CHAPTERS).flatMap(([book, chapters]) => buildBookIndex(UGNT, book, chapters, `g${BLOBS[book]!.slice(0, 10)}`))
     expect(indexKeysOf(cache.store, UGNT)).toEqual(expected.map((r) => r.key).sort())
@@ -146,5 +149,34 @@ describe('addOriginalsIndex', () => {
     const { cache, catalog } = stores([bookRows(UGNT, 'jud', [{ chapter: 1, usj: usj() }])[0]!])
     expect(await addOriginalsIndex({ cache, catalog }, [UGNT])).toEqual([{ key: UGNT, books: 2, rows: 12 }])
     expect(indexKeysOf(cache.store, UGNT).some((k) => k.endsWith(':jud'))).toBe(false)
+  })
+
+  test('an original with no catalog row is reported and not indexed', async () => {
+    const { cache, catalog } = stores()
+    expect(await addOriginalsIndex({ cache, catalog }, [UHB])).toEqual([{ key: UHB, books: 0, rows: 0, reason: 'sin fila en el catálogo' }])
+    expect(indexKeysOf(cache.store, UHB)).toEqual([UHB_ROW.key])
+  })
+
+  test('refuses before writing when a later original cannot clear its old index', async () => {
+    const uhbMeta: BookStampSource = {
+      version: 'v3.0.0',
+      release: { tag_name: 'v3.0.0', published_at: '2020-01-01T00:00:00Z' },
+      contentMetadata: { bookBlobs: { rut: 'abc123def4567890abcd1234567890abcd1234' }, bookBlobsRef: 'v3.0.0' },
+    }
+    const rutUsj = usj(c('1'), p(v('1'), w('וַיְהִי', 'H19610', 'היה')))
+    const uhbBooks = bookRows(UHB, 'rut', [{ chapter: 1, usj: rutUsj }])
+    const { cache: full, catalog } = {
+      cache: memoryCache([...bookRows(UGNT, 'tit', CHAPTERS.tit!), ...uhbBooks]),
+      catalog: { get: async (key: string) => (key === UGNT ? UGNT_ROW : key === UHB ? uhbMeta : null) },
+    }
+    await addOriginalsIndex({ cache: full, catalog }, [UHB])
+    expect(indexKeysOf(full.store, UHB).length).toBeGreaterThan(0)
+    expect(indexKeysOf(full.store, UGNT)).toEqual([])
+
+    const cache = withoutTransaction(full, 'none')
+    const before = new Map(full.store)
+    await expect(addOriginalsIndex({ cache, catalog }, [UGNT, UHB])).rejects.toThrow(`filas de índice de ${UHB}`)
+    expect(full.store).toEqual(before)
+    expect(indexKeysOf(full.store, UGNT)).toEqual([])
   })
 })

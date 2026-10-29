@@ -19,14 +19,39 @@ type IndexCache = Pick<RawCacheStore, 'getByPrefix' | 'transactRaw'> &
     delete?(key: string): Promise<void>
   }
 
+export type OriginalsIndexResult = { key: string; books: number; rows: number; reason?: string }
+
+const NO_CATALOG = 'sin fila en el catálogo'
+
+function indexScanPrefixes(original: string): string[] {
+  return scansFor(original)
+    .filter((scan) => scan.layer === 'index')
+    .map((scan) => scan.prefix)
+}
+
+async function staleIndexKeys(cache: IndexCache, original: string): Promise<string[]> {
+  const held = indexScanPrefixes(original)
+  const keysUnder = async (prefix: string) => (await cache.getByPrefix(prefix)).map((row) => row.key)
+  return (await Promise.all(held.map(keysUnder))).flat()
+}
+
+/** Throws when the store already holds index rows of this original and cannot remove them. */
+async function assertCanClearIndex(cache: IndexCache, original: string): Promise<void> {
+  const stale = await staleIndexKeys(cache, original)
+  if (!stale.length) return
+  if (cache.transactRaw) return
+  if (cache.deleteMany || cache.delete) return
+  throw new Error(
+    `El almacén de la caché ya tiene ${stale.length} filas de índice de ${original} y no puede borrarlas (falta transactRaw, deleteMany o delete).`
+  )
+}
+
 /**
  * The keys of an original's scripture rows, once the index rows the store holds of it are gone, so a book or a code
  * it no longer has leaves no row behind. With `transactRaw`, keys only and in one go; otherwise by reading the rows.
  */
 async function scriptureKeysWithoutIndex(cache: IndexCache, original: string, scripture: string): Promise<string[]> {
-  const held = scansFor(original)
-    .filter((scan) => scan.layer === 'index')
-    .map((scan) => scan.prefix)
+  const held = indexScanPrefixes(original)
   if (cache.transactRaw) {
     let keys: string[] = []
     await cache.transactRaw({ keys: [], prefixes: [scripture, ...held] }, (found) => {
@@ -36,7 +61,7 @@ async function scriptureKeysWithoutIndex(cache: IndexCache, original: string, sc
     return keys
   }
   const keysUnder = async (prefix: string) => (await cache.getByPrefix(prefix)).map((row) => row.key)
-  const stale = (await Promise.all(held.map(keysUnder))).flat()
+  const stale = await staleIndexKeys(cache, original)
   if (stale.length) {
     if (cache.deleteMany) await cache.deleteMany(stale)
     else if (cache.delete) for (const key of stale) await cache.delete(key)
@@ -52,13 +77,24 @@ async function scriptureKeysWithoutIndex(cache: IndexCache, original: string, sc
 export async function addOriginalsIndex(
   stores: { cache: IndexCache; catalog: { get(key: string): Promise<BookStampSource | null> } },
   originalKeys: readonly string[]
-): Promise<Array<{ key: string; books: number; rows: number }>> {
+): Promise<OriginalsIndexResult[]> {
   const { cache, catalog } = stores
   const timestamp = Date.now()
-  const out: Array<{ key: string; books: number; rows: number }> = []
+  const out: OriginalsIndexResult[] = []
+
+  const planned: Array<{ key: string; meta: BookStampSource | null }> = []
   for (const key of originalKeys) {
-    const meta = await catalog.get(key)
-    if (!meta) continue
+    planned.push({ key, meta: await catalog.get(key) })
+  }
+  for (const { key, meta } of planned) {
+    if (meta) await assertCanClearIndex(cache, key)
+  }
+
+  for (const { key, meta } of planned) {
+    if (!meta) {
+      out.push({ key, books: 0, rows: 0, reason: NO_CATALOG })
+      continue
+    }
     const scripture = `${USJ_SCRIPTURE_PREFIX}${key}:`
     // The books are the book rows: no `:` after the book.
     const books = (await scriptureKeysWithoutIndex(cache, key, scripture))
