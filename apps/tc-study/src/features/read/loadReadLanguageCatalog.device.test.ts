@@ -31,6 +31,8 @@ if (!g.localStorage) {
 const ES = 'es-419'
 const GLT = 'es-419_gl/es-419/glt'
 const TN = 'es-419_gl/es-419/tn'
+const GST = 'es-419_gl/es-419/gst'
+const HELPS = ['tq', 'twl', 'tw', 'ta'].map((id) => `es-419_gl/es-419/${id}`)
 const UGNT = 'unfoldingWord/el-x-koine/ugnt'
 
 const row = (resourceKey: string, subject: string, title: string, version: string, type: string) => {
@@ -51,12 +53,21 @@ const DEVICE: Record<string, ReturnType<typeof row>> = {
   [GLT]: row(GLT, 'Aligned Bible', 'Texto Puente Literal', 'v42', 'scripture'),
   [TN]: row(TN, 'TSV Translation Notes', 'Notas de traducción', 'v66', 'notes'),
   [UGNT]: row(UGNT, 'Greek New Testament', 'unfoldingWord Greek New Testament', 'v0.34', 'scripture'),
+  [GST]: row(GST, 'Aligned Bible', 'Texto Puente Simplificado', 'v40', 'scripture'),
+  [HELPS[0]]: row(HELPS[0], 'TSV Translation Questions', 'Preguntas', 'v38', 'questions'),
+  [HELPS[1]]: row(HELPS[1], 'TSV Translation Words Links', 'Enlaces de palabras', 'v18', 'words-links'),
+  [HELPS[2]]: row(HELPS[2], 'Translation Words', 'Palabras', 'v37', 'words'),
+  [HELPS[3]]: row(HELPS[3], 'Translation Academy', 'Academia', 'v4', 'academy'),
 }
 
 const TYPES: Record<string, { type: string; contentRole: string }> = {
   'Aligned Bible': { type: 'scripture', contentRole: 'primary' },
   'Greek New Testament': { type: 'scripture', contentRole: 'primary' },
   'TSV Translation Notes': { type: 'notes', contentRole: 'companion' },
+  'TSV Translation Questions': { type: 'questions', contentRole: 'companion' },
+  'TSV Translation Words Links': { type: 'words-links', contentRole: 'companion' },
+  'Translation Words': { type: 'words', contentRole: 'companion' },
+  'Translation Academy': { type: 'academy', contentRole: 'companion' },
 }
 const registry = {
   getTypeForSubject: (subject: string) => TYPES[subject]?.type,
@@ -145,10 +156,12 @@ describe('loadReadLanguageCatalog with a language from a pack', () => {
     const { deps, counts } = setup()
     const result = await loadReadLanguageCatalog(deps)
 
-    expect(result.textKeys).toEqual(expect.arrayContaining([GLT, UGNT]))
-    expect(result.helpsKeys).toEqual(expect.arrayContaining([TN]))
-    expect(panelKeys('panel-1')).toEqual(expect.arrayContaining([GLT, UGNT]))
-    expect(panelKeys('panel-2')).toEqual(expect.arrayContaining([TN]))
+    expect(result.textKeys).toEqual(expect.arrayContaining([GLT, GST, UGNT]))
+    expect(result.helpsKeys).toEqual(expect.arrayContaining([TN, ...HELPS]))
+    expect(panelKeys('panel-1')).toEqual(expect.arrayContaining([GLT, GST, UGNT]))
+    expect(panelKeys('panel-2')).toEqual(expect.arrayContaining([TN, ...HELPS]))
+    // Nothing of another language, and no helps in the text panel.
+    expect(panelKeys('panel-1').some((key) => [TN, ...HELPS].includes(key))).toBe(false)
 
     expect(await loadedTitle(GLT, 'Texto Puente Literal')).toBe('Texto Puente Literal')
     expect(await loadedTitle(UGNT, 'unfoldingWord Greek New Testament')).toBe('unfoldingWord Greek New Testament')

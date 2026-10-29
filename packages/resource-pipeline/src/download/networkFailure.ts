@@ -5,9 +5,10 @@
  * resource may hold rows from a language pack, and the error would show it as broken until a new download. The next
  * check with network downloads it as usual.
  *
- * Door43's client wraps nearly every failure as `NETWORK_ERROR`, so the code alone says little: what counts is the
- * device saying it is offline, or fetch's own messages for a request that got no answer. A message with an HTTP
- * status means the server answered, and stays an error.
+ * Door43's client wraps nearly every failure as `NETWORK_ERROR`, so the code alone says little: what counts is fetch's
+ * own messages for a request that got no answer (`door43Fetch` fails with one at once when the device is offline). A
+ * message with an HTTP status means the server answered, and stays an error; so does anything else (a bad file, a
+ * bug), online or not.
  */
 
 const NO_ANSWER = /failed to fetch|networkerror when attempting|load failed|network request failed/i
@@ -29,11 +30,10 @@ function messagesOf(error: unknown): string[] {
   return out
 }
 
-export function isNetworkFailure(error: unknown, online: boolean | undefined = globalThis.navigator?.onLine): boolean {
+export function isNetworkFailure(error: unknown): boolean {
   // The server answered with a status: a real failure of the resource, online or not.
   if ((error as { status?: unknown } | null)?.status !== undefined) return false
   const messages = messagesOf(error)
   if (messages.some((message) => HTTP_STATUS.test(message))) return false
-  if (online === false) return true
   return messages.some((message) => NO_ANSWER.test(message))
 }

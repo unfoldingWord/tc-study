@@ -6,9 +6,6 @@ import { isNetworkFailure } from '@bt-synergy/resource-pipeline/download/network
  */
 export type HelpsLoadErrorView = { kind: 'not-on-device' } | { kind: 'error'; message: string }
 
-export function helpsLoadErrorView(
-  message: string,
-  online: boolean | undefined = globalThis.navigator?.onLine
-): HelpsLoadErrorView {
-  return isNetworkFailure(new Error(message), online) ? { kind: 'not-on-device' } : { kind: 'error', message }
+export function helpsLoadErrorView(message: string): HelpsLoadErrorView {
+  return isNetworkFailure(new Error(message)) ? { kind: 'not-on-device' } : { kind: 'error', message }
 }
