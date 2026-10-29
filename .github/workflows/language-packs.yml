@@ -2,10 +2,12 @@ name: Language packs
 
 # Builds one language's packs and publishes them to the packs bucket (packages/resource-pipeline/cli/publish-language.ts),
 # and reports the build state next to the catalog (status/<compat>/<lang>.json) for the serving Worker's dispatch guard.
-# With `parts` it builds the language one book at a time and publishes the parts (staging only, until the Worker serves
-# them) under the parts compat (f2.0-…), with that compat's status: nothing a whole build or the Worker reads changes.
+# With `parts` it builds the language one book at a time and publishes the parts under the parts compat (f2.0-…), with
+# that compat's status: nothing a whole build (f1.1) reads or writes changes.
 # Parts are published only from master, which also writes the code it builds with to status/builder.json (as
 # packs-builder.yml does) and records that code in the ok status; a parts measurement (no-upload) may run from a branch.
+# A production parts publish, and packs-builder.yml's production job, both require the repository variable
+# PACKS_PARTS_PRODUCTION = true (delivery 3, Task 14).
 # Dispatched by hand, or by the Worker (a GitHub App with actions: write on this repository only).
 
 run-name: Packs ${{ inputs.language }} (${{ inputs.mode }}, ${{ inputs.target }}${{ inputs.parts && ', parts' || '' }}${{ inputs.compare && ', compare' || '' }})
@@ -44,7 +46,7 @@ on:
         type: boolean
         default: false
       parts:
-        description: 'Build as parts, one book at a time (publish: staging only, until the Worker serves parts)'
+        description: Build as parts, one book at a time
         required: false
         type: boolean
         default: false
@@ -92,15 +94,15 @@ jobs:
       - name: Validate inputs
         env:
           TARGET: ${{ inputs.target }}
+          PACKS_PARTS_PRODUCTION: ${{ vars.PACKS_PARTS_PRODUCTION }}
         run: |
           if ! [[ "$LANGUAGE" =~ ^[a-z]{2,3}(-[A-Za-z0-9]+)*$ ]]; then
             echo "::error::language is not a language code"
             exit 1
           fi
           case "$MODE" in publish | no-upload) ;; *) echo "::error::mode must be publish or no-upload"; exit 1 ;; esac
-          # The Worker reads no part yet: parts in production would be bytes nobody serves, under keys nothing cleans.
-          if [ "$PARTS" = true ] && [ "$MODE" = publish ] && [ "$TARGET" = production ]; then
-            echo "::error::parts publish to production waits for the Worker (delivery 3)"
+          if [ "$PARTS" = true ] && [ "$MODE" = publish ] && [ "$TARGET" = production ] && [ "$PACKS_PARTS_PRODUCTION" != true ]; then
+            echo "::error::parts publish to production needs the repository variable PACKS_PARTS_PRODUCTION = true (delivery 3, Task 14)"
             exit 1
           fi
           # Published parts are what the Worker serves and compares with the code master builds (status/builder.json):
@@ -165,7 +167,7 @@ jobs:
       # Runs that fail before this step leave no status of their own; the Worker writes `running` when it dispatches
       # (plan 2, Task 5), and counts a `running` mark it replaces after 5.5 hours as a failure, so they still count.
       # Only a publish run owns the language's status: a measurement must not flip it, nor count as a failure.
-      # A parts publish writes the parts compat's status (status/f2.0-…), never the f1.1 one the Worker reads.
+      # A parts publish writes the parts compat's status (status/f2.0-…), never the whole packs' (f1.1) one.
       - name: Status running
         id: running
         if: inputs.mode == 'publish'
