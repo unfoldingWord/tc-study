@@ -68,6 +68,21 @@ test.describe('Journey 11: Offline shell', () => {
 
     await context.setOffline(true)
 
+    const prepareWorkerResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('prepare.worker') && response.status() === 200,
+      { timeout: 30_000 }
+    )
+    const expectsDedicatedWarmWorker = await page.evaluate(
+      () => (navigator.hardwareConcurrency ?? 0) >= 4
+    )
+    const warmWorkerResponse = expectsDedicatedWarmWorker
+      ? page.waitForResponse(
+          (response) => response.url().includes('warm.worker') && response.status() === 200,
+          { timeout: 30_000 }
+        )
+      : null
+
     await page.goto('/')
     await page.reload()
     await waitForCatalogReady(page)
@@ -75,21 +90,16 @@ test.describe('Journey 11: Offline shell', () => {
     await expect(page.locator('.read-panel-header').first()).toBeVisible({
       timeout: 30_000,
     })
+    await expect(page.getByRole('region', { name: 'E2E ULT' })).toBeVisible({
+      timeout: 30_000,
+    })
 
-    const prepareWorkerResponse = page.waitForResponse(
-      (response) =>
-        response.url().includes('prepare.worker') && response.status() === 200,
-      { timeout: 30_000 }
-    )
-    const warmWorkerResponse = page
-      .waitForResponse(
-        (response) => response.url().includes('warm.worker') && response.status() === 200,
-        { timeout: 15_000 }
-      )
-      .catch(() => null)
     await page.goto('/read/e2e/ult/chapter/tit.1')
     await waitForCatalogReady(page)
     await expect(page.locator('.read-panel-header').first()).toBeVisible({
+      timeout: 30_000,
+    })
+    await expect(page.getByRole('region', { name: 'E2E ULT' })).toBeVisible({
       timeout: 30_000,
     })
     await expect(page.getByText(E2E_QUOTE_EN, { exact: true }).first()).toBeVisible({
@@ -97,8 +107,8 @@ test.describe('Journey 11: Offline shell', () => {
     })
     const workerResp = await prepareWorkerResponse
     expect(await workerResp.fromServiceWorker()).toBe(true)
-    const warmResp = await warmWorkerResponse
-    if (warmResp) {
+    if (expectsDedicatedWarmWorker) {
+      const warmResp = await warmWorkerResponse!
       expect(await warmResp.fromServiceWorker()).toBe(true)
     }
 

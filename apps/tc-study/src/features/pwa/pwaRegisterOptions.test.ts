@@ -40,4 +40,30 @@ describe('buildPwaRegisterOptions', () => {
   test('uses hourly update interval', () => {
     expect(SW_UPDATE_CHECK_MS).toBe(60 * 60 * 1000)
   })
+
+  test('scheduled interval callback invokes registration.update', () => {
+    let intervalCallback: (() => void) | undefined
+    const originalSetInterval = globalThis.setInterval
+    globalThis.setInterval = ((handler: TimerHandler) => {
+      if (typeof handler === 'function') intervalCallback = handler as () => void
+      return 0 as unknown as ReturnType<typeof setInterval>
+    }) as typeof setInterval
+
+    try {
+      const update = mock(async () => undefined)
+      const registration = { update } as unknown as ServiceWorkerRegistration
+      const options = buildPwaRegisterOptions({
+        setNeedRefresh: () => undefined,
+        setUpdateIntervalId: () => undefined,
+      })
+
+      options.onRegisteredSW('/sw.js', registration)
+
+      expect(intervalCallback).toBeDefined()
+      intervalCallback!()
+      expect(update).toHaveBeenCalledTimes(1)
+    } finally {
+      globalThis.setInterval = originalSetInterval
+    }
+  })
 })
