@@ -67,8 +67,11 @@ describe.skipIf(!PACKS_DIR)('the word index in the rebuilt originals pack', () =
       console.log(`originals.langpack.zip (Oct 27): ${old.written} rows opened in ${seconds(started)}`)
       expect(old.skippedLayers).toEqual([])
       expect(old.skippedResources).toEqual([])
+      // The new pack carries what the old one does, whatever its MACULA keys are.
       const keys = old.manifest.resources.map((r) => r.key)
-      expect(keys).toEqual(expect.arrayContaining([...ORIGINAL_LANGUAGE_KEYS, 'Biblica/hbo/macula', 'Biblica/el-x-koine/macula']))
+      const others = keys.filter((key) => !(ORIGINAL_LANGUAGE_KEYS as readonly string[]).includes(key))
+      console.log(`resources: ${keys.join(', ')}`)
+      expect(keys).toEqual(expect.arrayContaining([...ORIGINAL_LANGUAGE_KEYS]))
 
       started = Date.now()
       const indexed = await addOriginalsIndex({ cache: store.cache, catalog: store.catalog }, ORIGINAL_LANGUAGE_KEYS)
@@ -104,7 +107,7 @@ describe.skipIf(!PACKS_DIR)('the word index in the rebuilt originals pack', () =
       expect(manifest.resources.map((r) => r.key)).toEqual(keys)
       const indexOf = (key: string) => manifest.resources.find((r) => r.key === key)?.rows.index ?? 0
       expect(ORIGINAL_LANGUAGE_KEYS.reduce((n, key) => n + indexOf(key), 0)).toBe(INDEX_ROWS)
-      expect(indexOf('Biblica/hbo/macula') + indexOf('Biblica/el-x-koine/macula')).toBe(0)
+      expect(others.reduce((n, key) => n + indexOf(key), 0)).toBe(0)
 
       // An app that reads the index.
       const reader = freshStore()

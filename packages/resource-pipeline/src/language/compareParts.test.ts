@@ -3,7 +3,8 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { partPath, partsListPath, readPackManifest, readPart, serializePartsList, writePart, type PartsList } from '@bt-synergy/language-pack'
+import JSZip from 'jszip'
+import { fileSafe, indexVersesKey, partPath, partsListPath, readPackManifest, readPart, serializePartsList, writePart, type PackManifest, type PartsList } from '@bt-synergy/language-pack'
 import { buildLanguageParts } from './buildLanguageParts'
 import { compareParts, formatComparison, type PartsComparison } from './compareParts'
 import { discover, fakeDoor43, GLT, LANG, lexiconFetch, LEXICONS_REF, MACULA_STAMP, maculaFolder, OBS, TA, TN, TQ, UHL, wholePacks } from './partsFixture'
@@ -91,6 +92,21 @@ describe('compareParts', () => {
     expect(rows).toEqual({ 'Biblica/el-x-koine/macula': 0, 'Biblica/hbo/macula': 0, 'unfoldingWord/el-x-koine/ugnt': 2, 'unfoldingWord/hbo/uhb': 8 })
     expect((await readPackManifest(packs.language)).resources.every((r) => !r.rows.index)).toBe(true)
   })
+
+  test('an index row of a resource that is not an original is a difference, not left out', async () => {
+    const zip = await JSZip.loadAsync(packs.language)
+    const manifest = JSON.parse(await zip.file('manifest.json')!.async('string')) as PackManifest
+    manifest.resources.find((r) => r.key === GLT)!.rows.index = 1
+    zip.file('manifest.json', JSON.stringify(manifest))
+    const key = indexVersesKey(GLT, 'rut')
+    zip.file(`rows/index/${fileSafe(GLT)}.jsonl`, `${JSON.stringify({ key, entry: { v: 1, stamp: 'x', words: 1, timestamp: 1 } })}\n`)
+    const pack = await zip.generateAsync({ type: 'uint8array' })
+
+    const c = await compareParts({ pack, originals: packs.originals, workDir: built })
+    expect(bucket(c, GLT, 'index').onlyInWhole).toEqual([key])
+    expect(c.ignored.index).toBe(10)
+    expect(c.differences).toBe(1)
+  }, 60_000)
 
   test('with Open Bible Stories, both builds carry the same stories', async () => {
     const macula = maculaFolder(freshDir('macula-obs'))

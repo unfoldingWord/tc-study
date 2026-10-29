@@ -9,8 +9,45 @@ import { bookContentStamp, type BookStampSource } from '@bt-synergy/resource-cat
 import { isUsjScriptureChapterKey, unwrapUsjEntry, USJ_SCRIPTURE_PREFIX } from '@bt-synergy/scripture-loader'
 import { buildBookIndex } from './bookIndex'
 
-/** The cache adapter methods it needs (`IndexedDBCacheAdapter` has them). */
-type IndexCache = Pick<RawCacheStore, 'getByPrefix'> & Required<Pick<RawCacheStore, 'putRawMany' | 'transactRaw'>>
+/**
+ * The cache adapter methods it needs (`IndexedDBCacheAdapter` has them all). Without `transactRaw`, the old index rows
+ * go with `deleteMany` or `delete`; a store with neither can only be given an index it does not have yet.
+ */
+type IndexCache = Pick<RawCacheStore, 'getByPrefix' | 'transactRaw'> &
+  Required<Pick<RawCacheStore, 'putRawMany'>> & {
+    deleteMany?(keys: string[]): Promise<void>
+    delete?(key: string): Promise<void>
+  }
+
+/**
+ * The keys of an original's scripture rows, once the index rows the store holds of it are gone, so a book or a code
+ * it no longer has leaves no row behind. With `transactRaw`, keys only and in one go; otherwise by reading the rows.
+ */
+async function scriptureKeysWithoutIndex(cache: IndexCache, original: string, scripture: string): Promise<string[]> {
+  const held = scansFor(original)
+    .filter((scan) => scan.layer === 'index')
+    .map((scan) => scan.prefix)
+  if (cache.transactRaw) {
+    let keys: string[] = []
+    await cache.transactRaw({ keys: [], prefixes: [scripture, ...held] }, (found) => {
+      keys = found.prefixKeys.get(scripture) ?? []
+      return { puts: [], deletes: held.flatMap((prefix) => found.prefixKeys.get(prefix) ?? []) }
+    })
+    return keys
+  }
+  const keysUnder = async (prefix: string) => (await cache.getByPrefix(prefix)).map((row) => row.key)
+  const stale = (await Promise.all(held.map(keysUnder))).flat()
+  if (stale.length) {
+    if (cache.deleteMany) await cache.deleteMany(stale)
+    else if (cache.delete) for (const key of stale) await cache.delete(key)
+    else {
+      throw new Error(
+        `El almacén de la caché ya tiene ${stale.length} filas de índice de ${original} y no puede borrarlas (falta transactRaw, deleteMany o delete).`
+      )
+    }
+  }
+  return keysUnder(scripture)
+}
 
 export async function addOriginalsIndex(
   stores: { cache: IndexCache; catalog: { get(key: string): Promise<BookStampSource | null> } },
@@ -23,16 +60,10 @@ export async function addOriginalsIndex(
     const meta = await catalog.get(key)
     if (!meta) continue
     const scripture = `${USJ_SCRIPTURE_PREFIX}${key}:`
-    const held = scansFor(key)
-      .filter((scan) => scan.layer === 'index')
-      .map((scan) => scan.prefix)
-    // Keys only, in one go: the books are the book rows (no `:` after the book), and the index rows the store holds go
-    // first, so a book or a code it no longer has leaves no row behind.
-    let books: string[] = []
-    await cache.transactRaw({ keys: [], prefixes: [scripture, ...held] }, (found) => {
-      books = (found.prefixKeys.get(scripture) ?? []).map((k) => k.slice(scripture.length)).filter((rest) => rest && !rest.includes(':'))
-      return { puts: [], deletes: held.flatMap((prefix) => found.prefixKeys.get(prefix) ?? []) }
-    })
+    // The books are the book rows: no `:` after the book.
+    const books = (await scriptureKeysWithoutIndex(cache, key, scripture))
+      .map((k) => k.slice(scripture.length))
+      .filter((rest) => rest && !rest.includes(':'))
 
     let built = 0
     let rows = 0

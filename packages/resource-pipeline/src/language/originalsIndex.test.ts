@@ -64,6 +64,16 @@ function memoryCache(rows: CacheRow[]) {
   }
 }
 
+/** The same store without `transactRaw`: deleting with `deleteMany`, with `delete`, or unable to delete. */
+function withoutTransaction(cache: ReturnType<typeof memoryCache>, deletes: 'deleteMany' | 'delete' | 'none') {
+  const { transactRaw: _transactRaw, ...rest } = cache
+  return {
+    ...rest,
+    ...(deletes === 'deleteMany' ? { deleteMany: async (keys: string[]) => keys.forEach((k) => cache.store.delete(k)) } : {}),
+    ...(deletes === 'delete' ? { delete: async (key: string) => void cache.store.delete(key) } : {}),
+  }
+}
+
 // Of another original the catalog does not name: never touched.
 const UHB_ROW: CacheRow = { key: indexStrongKey(UHB, 'H0853', 'rut'), entry: { v: 1, stamp: 'g3d230a0aca', lemma: 'אֵת', words: 'AA==', timestamp: 1 } }
 
@@ -106,6 +116,30 @@ describe('addOriginalsIndex', () => {
     expect(left.some((k) => k.includes(':G1050:'))).toBe(false)
     expect(left).toEqual(buildBookIndex(UGNT, 'tit', CHAPTERS.tit!, 'x').map((r) => r.key).sort())
     expect(cache.store.get(UHB_ROW.key)).toEqual(UHB_ROW.entry)
+  })
+
+  for (const deletes of ['deleteMany', 'delete'] as const) {
+    test(`without transactRaw, a second run removes the old rows with ${deletes}`, async () => {
+      const { cache: full, catalog } = stores()
+      const cache = withoutTransaction(full, deletes)
+      expect(await addOriginalsIndex({ cache, catalog }, [UGNT])).toEqual([{ key: UGNT, books: 2, rows: 12 }])
+      for (const key of [...full.store.keys()]) if (key.startsWith(usjScriptureKey(UGNT, '3jn'))) full.store.delete(key)
+
+      expect(await addOriginalsIndex({ cache, catalog }, [UGNT])).toEqual([{ key: UGNT, books: 1, rows: 7 }])
+      expect(indexKeysOf(full.store, UGNT)).toEqual(buildBookIndex(UGNT, 'tit', CHAPTERS.tit!, 'x').map((r) => r.key).sort())
+      expect(full.store.get(UHB_ROW.key)).toEqual(UHB_ROW.entry)
+    })
+  }
+
+  test('a store that cannot delete gets a first index, and refuses a second before writing anything', async () => {
+    const { cache: full, catalog } = stores()
+    const cache = withoutTransaction(full, 'none')
+    expect(await addOriginalsIndex({ cache, catalog }, [UGNT])).toEqual([{ key: UGNT, books: 2, rows: 12 }])
+    expect(indexKeysOf(full.store, UGNT)).toHaveLength(12)
+
+    const before = new Map(full.store)
+    await expect(addOriginalsIndex({ cache, catalog }, [UGNT])).rejects.toThrow(`12 filas de índice de ${UGNT}`)
+    expect(full.store).toEqual(before)
   })
 
   test('a book row whose chapters are not in the store gets no index', async () => {
