@@ -20,6 +20,8 @@ export default defineConfig({
   use: {
     // Dedicated E2E port (avoids colliding with leftover :4173 previews)
     baseURL: 'http://127.0.0.1:4179',
+    // Existing journeys rely on deterministic route mocking; keep SW disabled by default.
+    serviceWorkers: 'block',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },

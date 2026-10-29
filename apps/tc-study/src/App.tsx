@@ -9,6 +9,7 @@ import { ResourceTypeInitializer } from './components/ResourceTypeInitializer'
 import { AppProvider } from './contexts'
 import { useCatalogReady, useResourceTypesError } from './contexts/CatalogContext'
 import { NavigationProvider } from './contexts/NavigationContext'
+import { PwaUpdateNotice } from './features/pwa/PwaUpdateNotice'
 import { useWorkspaceStore } from './lib/stores/workspaceStore'
 import { useWizardStore } from './lib/stores/wizardStore'
 import { door43ToListNameFields } from './features/read/languageListDisplayName'
@@ -221,6 +222,7 @@ function App() {
             </AppProvider>
           </NavigationProvider>
 
+          <PwaUpdateNotice />
           {import.meta.env.DEV && <AdminPanel />}
         </Router>
       )}

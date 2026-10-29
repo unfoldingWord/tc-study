@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import checker from 'vite-plugin-checker'
+import { VitePWA } from 'vite-plugin-pwa'
 import { getSharedBuildConfig } from '../../config/vite-build'
 
 const require = createRequire(import.meta.url)
@@ -53,6 +54,14 @@ function resolveDecodeNamedCharRef(): string {
   }
 }
 const decodeNamedCharRefEntry = resolveDecodeNamedCharRef()
+const pwaPrecacheIgnores = ['**/preloaded/**', '**/passage-sets/**']
+const pwaNavigateFallbackDenylist = [
+  /^\/assets\//,
+  /^\/fonts\//,
+  /^\/manifest\.json$/,
+  /^\/sw\.js$/,
+  /^\/workbox-[^/]+\.js$/,
+]
 
 /** Also rewrite any lingering index.dom.js resolves (worker shared chunks). */
 function forceDecodeNamedCharRefNode() {
@@ -79,6 +88,20 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    VitePWA({
+      strategies: 'generateSW',
+      registerType: 'prompt',
+      injectRegister: false,
+      devOptions: { enabled: false },
+      workbox: {
+        cleanupOutdatedCaches: true,
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: pwaNavigateFallbackDenylist,
+        runtimeCaching: [],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json,woff,woff2,ttf}'],
+        globIgnores: pwaPrecacheIgnores,
+      },
+    }),
     forceDecodeNamedCharRefNode(),
     // Run TypeScript in a worker; errors show in browser overlay + terminal and update on save (HMR)
     checker({
