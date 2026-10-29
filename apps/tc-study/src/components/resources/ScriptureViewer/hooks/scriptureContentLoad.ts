@@ -4,6 +4,14 @@
  * a miss must not become a sticky error once metadata lands.
  */
 
+import { isNetworkFailure } from '@bt-synergy/resource-pipeline/download/networkFailure'
+
+/**
+ * The book is not on the device and could not be fetched (no network): what a language pack did not bring. Shown
+ * as a state of its own, like `BOOK_NOT_AVAILABLE`, not as an error.
+ */
+export const NOT_ON_DEVICE = 'NOT_ON_DEVICE'
+
 export function isTransientMetadataMiss(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
   return /Resource metadata not found/i.test(message)
@@ -50,6 +58,9 @@ export function applyScriptureContentLoadFailure(
 ): { error: string | null; isLoading: boolean; retryWhenMetadataArrives: boolean } {
   if (isTransientMetadataMiss(error) && !allowHardMiss) {
     return { error: null, isLoading: true, retryWhenMetadataArrives: true }
+  }
+  if (isNetworkFailure(error)) {
+    return { error: NOT_ON_DEVICE, isLoading: false, retryWhenMetadataArrives: false }
   }
   return {
     error: error instanceof Error ? error.message : 'Unknown error',

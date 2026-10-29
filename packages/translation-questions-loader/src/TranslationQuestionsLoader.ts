@@ -6,6 +6,7 @@
  * specific Bible passages, helping translators verify understanding.
  */
 
+import { door43Fetch } from '@bt-synergy/door43-api'
 import type {
     ProgressCallback,
     ResourceLoader,
@@ -181,7 +182,7 @@ export class TranslationQuestionsLoader implements ResourceLoader {
         console.log(`📥 Fetching TQ TSV from: ${tsvUrl}`)
       }
 
-      const response = await fetch(tsvUrl)
+      const response = await door43Fetch(tsvUrl)
       if (!response.ok) {
         if (response.status === 404) {
           if (this.debug) console.log(`⚠️ TQ file not found (book not in repo): ${bookCode}`)

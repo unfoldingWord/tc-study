@@ -5,7 +5,8 @@ import {
   type UsjScriptureViewModel,
   type UsjWordToken,
 } from '@bt-synergy/scripture-loader'
-import { BookX } from 'lucide-react'
+import { BookX, CloudOff } from 'lucide-react'
+import { NOT_ON_DEVICE } from '../hooks/scriptureContentLoad'
 import { useEffect, useMemo, useRef } from 'react'
 import { useCacheAdapter } from '../../../../contexts'
 import type { BCVReference, BookInfo, ReferenceState } from '../../../../contexts/types-only'
@@ -427,6 +428,19 @@ export function ScriptureContent({
           title="Book not available in this resource"
         >
           <BookX className="w-16 h-16 text-fg-muted" />
+        </div>
+      )
+    }
+    if (error === NOT_ON_DEVICE) {
+      return (
+        <div
+          className="flex items-center justify-center h-full"
+          role="status"
+          aria-label="Not on this device: open its language pack, or connect to download it"
+          title="Not on this device: open its language pack, or connect to download it"
+          data-testid="book-not-on-device"
+        >
+          <CloudOff className="w-16 h-16 text-fg-muted" />
         </div>
       )
     }
