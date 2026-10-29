@@ -69,7 +69,10 @@ export function Switcher<T extends string>({
             role="tab"
             aria-selected={selected}
             tabIndex={index === tabStop ? 0 : -1}
-            onClick={() => onChange(item.value)}
+            onClick={() => {
+              onChange(item.value)
+              tabRefs.current[index]?.focus()
+            }}
             className={clsx(
               'inline-flex items-center gap-2 text-sm font-bold transition-colors pointer-coarse:h-11',
               style.tab,

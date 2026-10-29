@@ -94,4 +94,12 @@ test.describe('Switcher', () => {
     await page.keyboard.press('ArrowRight')
     await expectCurrent(page, 'View rtl', 'Read')
   })
+
+  test('clicking a tab selects it and moves focus to that tab', async ({ page }) => {
+    await openHarness(page)
+    const list = page.getByRole('tablist', { name: 'View', exact: true })
+    await list.getByRole('tab', { name: 'Read' }).focus()
+    await list.getByRole('tab', { name: 'Notes' }).click()
+    await expectCurrent(page, 'View', 'Notes')
+  })
 })

@@ -32,7 +32,7 @@ describe('Button', () => {
     expect(lg).toContain('pointer-coarse:h-11')
   })
 
-  test('outline is a 1.5 px Ocean stroke (white 22% in dark) with Ocean text', () => {
+  test('outline is a 1.5 px helps-border stroke with helps-fg text', () => {
     const html = render({ variant: 'outline' })
     expect(html).toContain('border-[1.5px]')
     expect(html).toContain('border-helps-border')
