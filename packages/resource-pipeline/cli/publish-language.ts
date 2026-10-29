@@ -44,7 +44,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { requireFreshBuilds } from './freshBuilds'
-import { maculaIdentity } from './maculaIdentity'
+import { maculaFlagsProblem, maculaIdentity } from './maculaIdentity'
 import type { PackBucket } from '../src/language/publishLanguage'
 
 // The pipeline's libraries print with console.log, some as they load: stdout is kept for the result line alone.
@@ -55,6 +55,15 @@ const { isLanguageCode, memoryBucket, oneLine, publishLanguage, r2Bucket } = awa
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(`--${name}`)
   return i >= 0 ? process.argv[i + 1] : undefined
+}
+
+/** A flag's value, or a usage error when the flag is there with no value (the next token is missing or is another flag). */
+function value(name: string): string | undefined {
+  const i = process.argv.indexOf(`--${name}`)
+  if (i < 0) return undefined
+  const v = process.argv[i + 1]
+  if (v === undefined || v.startsWith('--')) usage(`Falta el valor de --${name}`)
+  return v
 }
 
 function usage(why: string): never {
@@ -98,9 +107,13 @@ if (given !== 4 && (given !== 0 || !(dryRun || noUpload))) {
 }
 
 const maculaFolder = resolve(required.macula!)
+const maculaCommit = value('macula-commit')
+const maculaDate = value('macula-date')
+const problem = maculaFlagsProblem({ commit: maculaCommit, date: maculaDate })
+if (problem) usage(problem)
 let macula: { commit: string; date: string }
 try {
-  macula = maculaIdentity(maculaFolder, { commit: arg('macula-commit'), date: arg('macula-date') })
+  macula = maculaIdentity(maculaFolder, { commit: maculaCommit, date: maculaDate })
 } catch (e) {
   usage(`No se pudo leer el commit de MACULA en ${maculaFolder}: ${e instanceof Error ? e.message : String(e)}`)
 }
