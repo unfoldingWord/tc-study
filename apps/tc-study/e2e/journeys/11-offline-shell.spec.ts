@@ -13,7 +13,12 @@ test.describe('Journey 11: Offline shell', () => {
     page.on('console', (msg) => {
       if (msg.type() !== 'warning' && msg.type() !== 'error') return
       const text = msg.text()
-      if (text.includes('failed to start worker') || text.includes('Worker unavailable')) {
+      const lower = text.toLowerCase()
+      if (
+        lower.includes('failed to start worker') ||
+        lower.includes('worker unavailable') ||
+        lower.includes('worker error')
+      ) {
         workerFailures.push(text)
       }
     })
@@ -59,14 +64,22 @@ test.describe('Journey 11: Offline shell', () => {
     await expect(page.locator('#root')).toBeVisible()
     await expect(page).toHaveURL(/\/read/)
 
+    const prepareWorkerResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('prepare.worker') && response.status() === 200,
+      { timeout: 30_000 }
+    )
     await page.goto('/read/e2e/ult/chapter/tit.1')
     await waitForCatalogReady(page)
     await expect(page.getByText(E2E_QUOTE_EN, { exact: true }).first()).toBeVisible({
       timeout: 30_000,
     })
+    const workerResp = await prepareWorkerResponse
+    expect(await workerResp.fromServiceWorker()).toBe(true)
 
     await page.goto('/data')
     await waitForCatalogReady(page)
+    await expect(page.locator('header')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Data Management' })).toBeVisible({
       timeout: 30_000,
     })

@@ -87,6 +87,7 @@ function App() {
   return (
     <>
       <ResourceTypeInitializer />
+      <PwaUpdateNotice />
       {resourceTypesError ? (
         <div
           className="flex flex-col items-center justify-center min-h-screen gap-3"
@@ -222,7 +223,6 @@ function App() {
             </AppProvider>
           </NavigationProvider>
 
-          <PwaUpdateNotice />
           {import.meta.env.DEV && <AdminPanel />}
         </Router>
       )}

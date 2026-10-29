@@ -3,7 +3,8 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import {
   createPwaReloadHandler,
-  PWA_UPDATE_NOTICE_TEXT,
+  getPwaUpdateReloadButtonProps,
+  PWA_UPDATE_NOTICE_LABEL,
   PwaUpdateNoticeBanner,
 } from './PwaUpdateNoticeBanner'
 
@@ -18,16 +19,18 @@ describe('PwaUpdateNoticeBanner', () => {
     expect(html).toBe('')
   })
 
-  test('renders notice when update is waiting', () => {
+  test('renders icon-only notice with live region when update is waiting', () => {
     const html = renderToStaticMarkup(
       createElement(PwaUpdateNoticeBanner, {
         needRefresh: true,
         onReload: () => undefined,
       })
     )
-    expect(html).toContain(PWA_UPDATE_NOTICE_TEXT)
-    expect(html).toContain('aria-label="Reload with new version"')
-    expect(html).toContain('title="Reload with new version"')
+    expect(html).not.toContain('<span>')
+    expect(html).toContain(`aria-label="${PWA_UPDATE_NOTICE_LABEL}"`)
+    expect(html).toContain(`title="${PWA_UPDATE_NOTICE_LABEL}"`)
+    expect(html).toContain('role="status"')
+    expect(html).toContain('aria-live="polite"')
   })
 
   test('reload handler only calls updater when pressed', async () => {
@@ -38,5 +41,14 @@ describe('PwaUpdateNoticeBanner', () => {
     await onReload()
     expect(updateServiceWorker).toHaveBeenCalledTimes(1)
     expect(updateServiceWorker).toHaveBeenCalledWith(true)
+  })
+
+  test('reload button props invoke onReload only when clicked', async () => {
+    const onReload = mock(async () => undefined)
+    const props = getPwaUpdateReloadButtonProps(onReload)
+
+    expect(onReload).toHaveBeenCalledTimes(0)
+    await props.onClick()
+    expect(onReload).toHaveBeenCalledTimes(1)
   })
 })
