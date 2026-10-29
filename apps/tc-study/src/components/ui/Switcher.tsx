@@ -44,9 +44,10 @@ export function Switcher<T extends string>({
 }) {
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
   const style = INDICATOR[indicator]
+  const current = items.findIndex((item) => item.value === value)
+  const tabStop = Math.max(current, 0)
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const current = items.findIndex((item) => item.value === value)
     const next = nextSwitcherIndex(current, event.key, items.length, dir)
     if (next === null) return
     event.preventDefault()
@@ -67,7 +68,7 @@ export function Switcher<T extends string>({
             type="button"
             role="tab"
             aria-selected={selected}
-            tabIndex={selected ? 0 : -1}
+            tabIndex={index === tabStop ? 0 : -1}
             onClick={() => onChange(item.value)}
             className={clsx(
               'inline-flex items-center gap-2 text-sm font-bold transition-colors pointer-coarse:h-11',

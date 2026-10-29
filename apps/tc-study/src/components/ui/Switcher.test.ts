@@ -29,6 +29,15 @@ describe('nextSwitcherIndex', () => {
     expect(nextSwitcherIndex(0, 'Enter', 3, 'ltr')).toBeNull()
     expect(nextSwitcherIndex(0, 'ArrowRight', 0, 'ltr')).toBeNull()
   })
+
+  test('with no current tab (-1), forward enters at the first tab and back at the last', () => {
+    expect(nextSwitcherIndex(-1, 'ArrowRight', 3, 'ltr')).toBe(0)
+    expect(nextSwitcherIndex(-1, 'ArrowLeft', 3, 'ltr')).toBe(2)
+    expect(nextSwitcherIndex(-1, 'ArrowLeft', 3, 'rtl')).toBe(0)
+    expect(nextSwitcherIndex(-1, 'ArrowRight', 3, 'rtl')).toBe(2)
+    expect(nextSwitcherIndex(-1, 'Home', 3, 'ltr')).toBe(0)
+    expect(nextSwitcherIndex(-1, 'End', 3, 'ltr')).toBe(2)
+  })
 })
 
 const ITEMS = [
@@ -37,11 +46,11 @@ const ITEMS = [
   { value: 'notes', label: 'Notes' },
 ] as const
 
-function render(indicator?: 'underline' | 'pill'): string {
+function render(indicator?: 'underline' | 'pill', value = 'study'): string {
   return renderToStaticMarkup(
-    createElement(Switcher<'read' | 'study' | 'notes'>, {
+    createElement(Switcher<string>, {
       items: [...ITEMS],
-      value: 'study',
+      value,
       onChange: () => {},
       label: 'View',
       indicator,
@@ -80,6 +89,13 @@ describe('Switcher', () => {
       expect(other).toContain('tabindex="-1"')
     }
     expect(render().match(/tabindex="0"/g)).toHaveLength(1)
+  })
+
+  test('a value missing from items keeps the first tab in the tab order, unselected', () => {
+    const [read, study, notes] = tabs(render(undefined, 'gone'))
+    expect(read).toContain('tabindex="0"')
+    for (const other of [study, notes]) expect(other).toContain('tabindex="-1"')
+    for (const tab of [read, study, notes]) expect(tab).toContain('aria-selected="false"')
   })
 
   test('underline (the default) marks the selected tab with a 2 px accent bar', () => {
