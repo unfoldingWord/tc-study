@@ -34,7 +34,7 @@ The colours are translationCore 4's, from its design system. Light values are tC
 | `surface` | `#ffffff` | `#0c2a3c` | Cards, modal panels, resource viewer headers (`ResourceViewerHeader`) |
 | `elevated` | `#ffffff` | `#12364c` | Raised panels / dialogs |
 | `tab-selected` | `#ffffff` | `#05141e` | Active `SortableTab` on `panel-*-soft` strip (elevated in light; darker than strip in dark) |
-| `muted` | `#ecf2f5` frost | `#1f3b4c` | Soft fills, hover chips, scrollbar track |
+| `muted` | `#ecf2f5` frost | `#1f3b4c` | Soft fills, hover chips |
 | `border` | `#e2e4e6` | `#415967` | Primary borders |
 | `border-subtle` | `#e8ebed` | `#294453` | Hairline / soft separators |
 

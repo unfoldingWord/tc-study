@@ -53,6 +53,26 @@
   --color-overlay: var(--theme-overlay);
   --color-ring-offset: var(--theme-canvas);
 
+  /* tC4 shape table (docs/TC4_STYLE_AND_BRAND.md §5.4). */
+  --radius-xs: 4px;
+  --radius: 4px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 16px;
+  --radius-4xl: 16px;
+
+  --shadow-2xs: var(--tc4-shadow-chip);
+  --shadow-xs: var(--tc4-shadow-chip);
+  --shadow: var(--tc4-shadow-card);
+  --shadow-sm: var(--tc4-shadow-card);
+  --shadow-md: var(--tc4-shadow-hover);
+  --shadow-lg: var(--tc4-shadow-hero);
+  --shadow-xl: var(--tc4-shadow-modal);
+  --shadow-2xl: var(--tc4-shadow-modal);
+
   /* Hierarchy: chrome / content spacing + caption type (iOS-like density) */
   --spacing-chrome: 0.5rem; /* 8px — bar & header insets */
   --spacing-chrome-tight: 0.375rem; /* 6px — compact vertical chrome */
@@ -203,6 +223,15 @@
   --theme-chip-quote-fg: var(--uw-inspire-100);
 
   --theme-overlay: rgb(0 10 16 / 0.65);
+
+  /* tC4's shadows in black at the same alpha: an Ocean tint is invisible on Ocean (§5.4).
+     Tailwind puts these inside one box-shadow with the focus ring, so each must stay a whole
+     shadow; a bare colour makes the box-shadow invalid and drops the ring with it. */
+  --tc4-shadow-chip: 0 1px 2px rgb(0 0 0 / 0.1);
+  --tc4-shadow-card: 0 2px 6px rgb(0 0 0 / 0.06);
+  --tc4-shadow-hover: 0 6px 16px rgb(0 0 0 / 0.12);
+  --tc4-shadow-hero: 0 8px 20px rgb(0 0 0 / 0.18);
+  --tc4-shadow-modal: 0 24px 64px rgb(0 0 0 / 0.4);
 }
 
 @layer base {
@@ -222,22 +251,64 @@
     @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-canvas rounded-lg;
   }
 
+  @supports not selector(::-webkit-scrollbar-thumb) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgb(1 66 99 / 0.28) transparent;
+    }
+
+    .dark,
+    .dark * {
+      scrollbar-color: rgb(255 255 255 / 0.32) transparent;
+    }
+  }
+
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--theme-muted);
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: var(--theme-fg-muted);
+    background: rgb(1 66 99 / 0.18);
     border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--theme-fg-secondary);
+    background: rgb(1 66 99 / 0.32);
+    background-clip: padding-box;
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    background: rgb(1 66 99 / 0.42);
+    background-clip: padding-box;
+  }
+
+  .dark::-webkit-scrollbar-thumb,
+  .dark *::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.22);
+    background-clip: padding-box;
+  }
+
+  .dark::-webkit-scrollbar-thumb:hover,
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background: rgb(255 255 255 / 0.38);
+    background-clip: padding-box;
+  }
+
+  .dark::-webkit-scrollbar-thumb:active,
+  .dark *::-webkit-scrollbar-thumb:active {
+    background: rgb(255 255 255 / 0.5);
+    background-clip: padding-box;
   }
 }
 
