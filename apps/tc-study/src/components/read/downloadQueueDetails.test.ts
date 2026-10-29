@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   buildDownloadQueueDetails,
+  formatHeldBooks,
   downloadQueueRowFromKey,
   formatDownloadQueueRowLabel,
   windowDownloadQueueSlice,
@@ -121,5 +122,23 @@ describe('windowDownloadQueueSlice', () => {
         rowHeight: 40,
       })
     ).toEqual({ start: 0, end: 0, offsetY: 0, totalHeight: 0 })
+  })
+})
+
+describe('held books in the queue', () => {
+  test('a queued resource a book pack brought says which books the device already holds', () => {
+    const model = buildDownloadQueueDetails({
+      queue: ['es-419_gl/es-419/tn', 'es-419_gl/es-419/tq'],
+      currentResource: 'es-419_gl/es-419/tn',
+      isDownloading: true,
+      heldBooksByKey: { 'es-419_gl/es-419/tn': ['tit'] },
+    })
+    expect(model.rows.find((r) => r.resourceId === 'tn')?.heldBooks).toEqual(['TIT'])
+    expect(model.rows.find((r) => r.resourceId === 'tq')?.heldBooks).toBeUndefined()
+  })
+
+  test('the label says it', () => {
+    expect(formatHeldBooks(['TIT', 'RUT'])).toBe('held: TIT, RUT')
+    expect(formatHeldBooks(undefined)).toBe('')
   })
 })

@@ -4,7 +4,9 @@
  * parts replace the whole packs only if nothing is lost or added on the way.
  *
  * Receipts (`resource:{key}`) and `warm-coverage:v1` are left out of the whole side: parts never carry them (the list
- * says when a resource is complete), so they are only counted.
+ * says when a resource is complete), so they are only counted. So are the originals' `index` rows, which no part
+ * carries yet; a parts build that carries them shows them as only in the parts until they are compared too. An
+ * `index` row of any other resource is compared, so one that gets there by mistake is a difference.
  *
  * Values are compared by a hash of their stable JSON without volatile fields, so a language as large as es-419 fits in
  * memory: each row costs its key and a hash.
@@ -14,6 +16,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  ORIGINAL_LANGUAGE_KEYS,
   partPath,
   partsListPath,
   readPack,
@@ -45,8 +48,8 @@ export type PartsComparison = {
   compat: string
   /** By resource, then layer; every pair either side has, with or without differences. */
   rows: RowDifferences[]
-  /** Whole-pack rows parts do not carry by design. */
-  ignored: { receipts: number; warmCoverage: number }
+  /** Whole-pack rows parts do not carry: by design (receipts, warm coverage), or not yet (the originals' index). */
+  ignored: { receipts: number; warmCoverage: number; index: number }
   /** Catalog row, stamp, role or books (when the whole pack names them) that differ, or a resource only one side has. */
   resources: ResourceDifference[]
   /** Part files missing or not as the list says, and rows carried by two parts. */
@@ -123,7 +126,7 @@ export async function compareParts(o: {
 
   // The whole side.
   const whole: Side = new Map()
-  const ignored = { receipts: 0, warmCoverage: 0 }
+  const ignored = { receipts: 0, warmCoverage: 0, index: 0 }
   const resources: ResourceDifference[] = []
   const wholeResources = new Map<string, { role: string; stamp: string; books?: string[]; metadata?: unknown }>()
   for (const pack of packs) {
@@ -134,6 +137,7 @@ export async function compareParts(o: {
     for await (const { resource, layer, row } of pack.rows()) {
       if (layer === 'receipt') ignored.receipts += 1
       else if (row.key === WARM_COVERAGE) ignored.warmCoverage += 1
+      else if (layer === 'index' && (ORIGINAL_LANGUAGE_KEYS as readonly string[]).includes(resource)) ignored.index += 1
       else if (!put(whole, resource, layer, row.key, hashOf(row.entry))) {
         resources.push({ resource, problem: `the whole packs carry ${layer} ${row.key} twice` })
       }
@@ -234,7 +238,10 @@ export async function compareParts(o: {
 export function formatComparison(c: PartsComparison, examples = 10): string {
   const out: string[] = []
   out.push(`${c.language} (${c.compat}): ${c.partsChecked} parts checked`)
-  out.push(`Left out of the whole packs (parts never carry them): ${c.ignored.receipts} receipts, ${c.ignored.warmCoverage} warm-coverage rows`)
+  out.push(
+    `Left out of the whole packs: ${c.ignored.receipts} receipts and ${c.ignored.warmCoverage} warm-coverage rows (parts never carry them), ` +
+      `${c.ignored.index} index rows (parts do not carry them yet)`
+  )
   out.push('')
   const header = ['resource', 'layer', 'whole', 'parts', 'only-whole', 'only-parts', 'differ']
   const table = c.rows.map((d) => [d.resource, d.layer, d.whole, d.parts, d.onlyInWhole.length, d.onlyInParts.length, d.differ.length].map(String))

@@ -21,6 +21,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
+import { isOffline } from '@bt-synergy/resource-pipeline/download/networkFailure'
 import type { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
 import {
   discoveredIngredientCount,
@@ -159,6 +160,11 @@ export function useCatalogBackgroundDownload(
       }
     }
     if (!enabled || !catalogManager || !completenessChecker) {
+      return
+    }
+    // No network: every download would fail; what a language pack brought stays as it is. `online` checks again.
+    if (isOffline()) {
+      if (typeof window !== 'undefined') window.__bgdlLast = { phase: 'offline', enabled }
       return
     }
     if (!shouldWalkUiIdbDuringExtract(isDownloading)) {
@@ -368,6 +374,14 @@ export function useCatalogBackgroundDownload(
       void checkCatalogAndDownload()
     }, 500)
   }, [enabled, catalogTrigger, expectedResources, checkCatalogAndDownload])
+
+  // Back online: what was skipped (or failed) with no network is checked again.
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return
+    const onOnline = () => void checkCatalogAndDownload()
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [enabled, checkCatalogAndDownload])
 
   useEffect(() => {
     return () => {
