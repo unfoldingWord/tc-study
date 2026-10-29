@@ -15,6 +15,7 @@ import type { DownloadRunPhase } from './backgroundDownloadRun'
 import type { LoaderRegistry } from '../loaders/LoaderRegistry'
 import type { ResourceCompletenessChecker } from './ResourceCompletenessChecker'
 import { DependencyResolver, type ResolvedResource } from './DependencyResolver'
+import { isNetworkFailure } from './networkFailure'
 import { recordBlobsAfterComplete } from './recordBlobsAfterComplete'
 
 /** CatalogManager plus optional legacy bulk listing used by download-all. */
@@ -320,8 +321,8 @@ export class BackgroundDownloadManager {
       task.message = 'Download failed'
       this.notifyProgress()
 
-      // ❌ Mark resource error in cache metadata
-      if (this.completenessChecker) {
+      // ❌ Mark resource error in cache metadata (not for no network: the resource keeps what it holds)
+      if (this.completenessChecker && !isNetworkFailure(error)) {
         await this.completenessChecker.markError(
           resourceKey,
           error instanceof Error ? error.message : String(error)
