@@ -1,0 +1,3 @@
+# The root .gitignore ignores every folder named build/ (compiler output). Here src/build/ is source: the builders of
+# the segments. Without this line git would skip them silently.
+!/src/build/
