@@ -879,6 +879,40 @@ describe('the segment, byte by byte', () => {
   })
 })
 
+describe('a book as long as Psalms', () => {
+  // 30 000 words (60 000 pieces with the blanks), one aligned position each, a verse every 20 words. Every step has to be linear in the
+  // words and the pieces: a pass over all the pieces for each word takes 30 000 x 60 000 steps, and the bound below is far from it.
+  const WORDS = 30_000
+  const BOUND_MS = 3_000
+  const model = (): BookModel => {
+    const pieces: Piece[] = []
+    const events: Event[] = [[0, 'chapter', '1']]
+    const align: number[][] = []
+    for (let i = 0; i < WORDS; i++) {
+      if (i % 20 === 0) events.push([pieces.length, 'verse', String(i / 20 + 1)])
+      if (i > 0) pieces.push([' ', false])
+      pieces.push([`w${i % 3000}`, true])
+      align.push([i])
+    }
+    return { lang: 'es-419', book: 'psa', orig: [UGNT, 'g987ab2025a'], res: [[GLT, 'v42']], texts: [{ res: GLT, pieces, events, align }] }
+  }
+  const time = async <T>(step: () => T | Promise<T>): Promise<[T, number]> => {
+    const start = performance.now()
+    const result = await step()
+    return [result, performance.now() - start]
+  }
+
+  test('bookSegment, writeSegment, readSegment and bookView take well under three seconds on 30 000 words, and nothing is lost', async () => {
+    const m = model()
+    const [seg, building] = await time(() => bookSegment(m))
+    const [written, writing] = await time(() => writeSegment(seg))
+    const [read, reading] = await time(() => readSegment(written.bytes, { known: KNOWN }))
+    const [view, viewing] = await time(() => bookView(read.seg))
+    for (const ms of [building, writing, reading, viewing]) expect(ms).toBeLessThan(BOUND_MS)
+    expect(view).toEqual(m)
+  })
+})
+
 describe('bookSegment refuses a model the segment cannot hold', () => {
   const base = (): BookModel => ({
     lang: 'es-419',

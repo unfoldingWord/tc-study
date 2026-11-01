@@ -123,7 +123,9 @@ function encodeText(text: TextModel, res: number, index: ReadonlyMap<string, num
 function encodeAlign(text: TextModel): CborValue {
   const words: number[] = []
   let previous = 0
-  for (let word = 0; word < wordCount(text); word++) {
+  // Counted once: a count inside the loop condition is a pass over all the pieces for each word.
+  const count = wordCount(text)
+  for (let word = 0; word < count; word++) {
     const positions = text.align?.[word] ?? []
     words.push(positions.length)
     for (const position of positions) {
