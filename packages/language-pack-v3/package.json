@@ -1,0 +1,31 @@
+{
+  "name": "@bt-synergy/language-pack-v3",
+  "version": "0.1.0",
+  "description": "Language packs format 3: builders and readers for the segment and transfer files described in spec/",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test",
+    "type-check": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "cbor-x": "^1.6.8",
+    "jszip": "^3.10.1",
+    "pako": "2.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/pako": "^2.0.4",
+    "typescript": "^5.3.3"
+  }
+}
