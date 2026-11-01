@@ -156,12 +156,18 @@ export function strongKey(published: string): string {
 
 // Concepts
 
-const TA_ADDRESS = /^rc:\/\/\*\/ta\/man\/([a-z0-9_-]+)\/([a-z0-9_-]+)$/
-const TW_ADDRESS = /^rc:\/\/\*\/tw\/dict\/bible\/(kt|names|other)\/([a-z0-9_-]+)$/
+/**
+ * The language part of an `rc://` address: `*` (any language) or a language code (`es-419`). The SupportReference column
+ * of a tN row writes `*`; the links inside the text of a translated note write the language of the note.
+ */
+const RC_LANGUAGE = String.raw`(?:\*|[a-z]{2,3}(?:-[a-z0-9]+)*)`
+
+const TA_ADDRESS = new RegExp(String.raw`^rc://${RC_LANGUAGE}/ta/man/([a-z0-9_-]+)/([a-z0-9_-]+)$`)
+const TW_ADDRESS = new RegExp(String.raw`^rc://${RC_LANGUAGE}/tw/dict/bible/(kt|names|other)/([a-z0-9_-]+)$`)
 
 /**
- * The concept of a SupportReference: `rc://*\/ta/man/translate/figs-metaphor` is `ta:translate/figs-metaphor`. `null`
- * for any other text.
+ * The concept of a SupportReference: `rc://*\/ta/man/translate/figs-metaphor` is `ta:translate/figs-metaphor`. A language
+ * code in place of the `*` (`rc://es-419/ta/man/...`) means the same. `null` for any other text.
  */
 export function conceptOfSupportReference(s: string): string | null {
   const m = TA_ADDRESS.exec(s)
@@ -179,7 +185,7 @@ export function conceptOfTwLink(s: string): string | null {
 
 // Links inside text
 
-const TN_ADDRESS = /^rc:\/\/\*\/tn\/help\/([a-z0-9]{3})\/(\d{1,3})\/(\d{1,3})$/
+const TN_ADDRESS = new RegExp(String.raw`^rc://${RC_LANGUAGE}/tn/help/([a-z0-9]{3})/(\d{1,3})/(\d{1,3})$`)
 const RELATIVE_ADDRESS = /^\.\.\/(\d{1,3})\/(\d{1,3})\.md$/
 
 /** One pass over both link forms: `[[rc://...]]` and `[text](target)`. */
@@ -198,6 +204,8 @@ function verseLink(book: string, chapter: string, verse: string): string | null 
  * - `[[rc://*\/tw/dict/bible/kt/grace]]` becomes `[[tw:kt/grace]]`;
  * - `[text](rc://*\/tn/help/tit/02/03)` becomes `[text](ref:tit 2:3)`;
  * - `[text](../02/03.md)` becomes `[text](ref:{book} 2:3)`, where `book` is the book the text belongs to.
+ *
+ * In the three `rc://` forms the `*` may be a language code: a translated note writes `[[rc://es-419/ta/man/...]]`.
  *
  * A link in any other form is kept as it is, and so is any text outside a link. With `book === null` the relative
  * links are kept, because there is no book to resolve them against. The text is read once, so what the rewrite

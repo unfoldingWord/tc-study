@@ -64,11 +64,21 @@ export type TextModel = {
   alignMissing?: [word: number, verse: number, original: string, occurrence: number][]
 }
 
+/** The columns of a helps table that hold long text, which the segment keeps as `texts` (`book.cddl`, "cols"). */
+export const LONG_TEXT_COLUMNS: readonly string[] = ['note', 'question', 'response']
+
 /**
- * A note, question or word link of a book (`spec/cddl/book.cddl`, "Notes, questions and word links"). `from` and `to`
- * are verse ids, both included. `quote` is the original positions of the words of the quote (`-1` for a word the
- * original does not have), `quoteKinds` names the pieces of the quote that are not words, and `quoteMissing` the words
- * the original does not have.
+ * A note, question or word link of a book (`spec/cddl/book.cddl`, "Notes, questions and word links"). `ref` is the
+ * reference text as published; `from` and `to` are verse ids, both included. `cols` holds the other fields of the row
+ * (a field a row lacks is not a key).
+ *
+ * `quote` is the original positions of the words of the quote, in the order of the quote (`-1` for a piece that has no
+ * position: a word the original does not have, or a piece that is not a word). `quoteKinds` names the pieces of the quote
+ * that are not words (`[piece, kind]`, an ellipsis), and `quoteMissing` the words the original does not have
+ * (`[piece, verse, word, occurrence]`); each `-1` is in exactly one of them. Both are there only when they have entries.
+ *
+ * A table has `quote` on every row (`[]` for a row with no quote, or whose quote was not found) or on none: the segment
+ * keeps the quotes of a table if some row has a piece. Whether a row has a quote at all is in `cols.quote`, the text.
  */
 export type HelpRow = {
   id: string

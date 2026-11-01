@@ -253,11 +253,20 @@ describe('concepts', () => {
       '[[rc://*/ta/man/translate/figs-metaphor]]',
       ' rc://*/ta/man/translate/figs-metaphor',
       'rc://*/tw/dict/bible/kt/grace',
-      'rc://es-419/ta/man/translate/figs-metaphor',
       'rc://*/ta/man/Translate/figs-metaphor',
+      'rc://ES-419/ta/man/translate/figs-metaphor',
+      'rc://es_419/ta/man/translate/figs-metaphor',
+      'rc:///ta/man/translate/figs-metaphor',
+      'rc://es-419//ta/man/translate/figs-metaphor',
     ]) {
       expect(conceptOfSupportReference(s)).toBeNull()
     }
+  })
+
+  test('a language code in place of the * is the same address', () => {
+    expect(conceptOfSupportReference('rc://es-419/ta/man/translate/figs-metaphor')).toBe('ta:translate/figs-metaphor')
+    expect(conceptOfSupportReference('rc://en/ta/man/checking/headings')).toBe('ta:checking/headings')
+    expect(conceptOfTwLink('rc://es-419/tw/dict/bible/kt/grace')).toBe('tw:kt/grace')
   })
 
   test('conceptOfTwLink', () => {
@@ -300,6 +309,16 @@ describe('rewriteLinks', () => {
 
   test('[text](../02/03.md) in a note of Tito becomes [text](ref:tit 2:3)', () => {
     expect(rewriteLinks('Read [Titus 2:3](../02/03.md).', 'tit')).toBe('Read [Titus 2:3](ref:tit 2:3).')
+  })
+
+  test('a language code in place of the * is rewritten the same way (translated notes write it)', () => {
+    expect(rewriteLinks('See [[rc://es-419/ta/man/translate/figs-metaphor]].', 'tit')).toBe('See [[ta:translate/figs-metaphor]].')
+    expect(rewriteLinks('See [[rc://es-419/tw/dict/bible/names/paul]].', 'tit')).toBe('See [[tw:names/paul]].')
+    expect(rewriteLinks('Read [Titus 2:3](rc://es-419/tn/help/tit/02/03).', 'tit')).toBe('Read [Titus 2:3](ref:tit 2:3).')
+    // not a language code: kept as it is
+    for (const md of ['[[rc://ES-419/ta/man/translate/figs-metaphor]]', '[[rc://es_419/ta/man/translate/figs-metaphor]]']) {
+      expect(rewriteLinks(md, 'tit')).toBe(md)
+    }
   })
 
   test('a tN address names its own book, not the book of the note', () => {
