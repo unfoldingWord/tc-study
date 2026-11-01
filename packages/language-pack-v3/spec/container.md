@@ -119,7 +119,7 @@ Each class's schema says which tables are required and what each optional one de
 | --- | --- |
 | Header length `H` | 65 536 bytes |
 | `ulen` and `clen` | 67 108 864 bytes (64 MiB) each |
-| Nesting of CBOR arrays and maps | 16 levels |
+| Nesting of CBOR arrays and maps | 64 levels |
 
 A reader MAY reject anything beyond them (`E_LIMIT`).
 
@@ -152,7 +152,7 @@ this order and stops at the first defect:
    reserved byte and the minor version are not checked: a reader ignores the reserved byte and reads any minor version
    of its major.
 2. `H` over the limit (`E_LIMIT`). Then fewer than `12 + H` bytes (`E_TRUNCATED`). Then the header (`E_HEADER`; CBOR
-   nested deeper than 16 levels is `E_LIMIT`).
+   nested deeper than 64 levels is `E_LIMIT`).
 3. `clen` or `ulen` over the limit (`E_LIMIT`). Then the file's length against `12 + H + clen`: shorter is `E_TRUNCATED`,
    longer is `E_TRAILING`.
 4. Then, in this order: `E_CODEC`, `E_INFLATE`, `E_ID`, `E_BODY`, `E_HMISMATCH`, `E_TABLE`.
