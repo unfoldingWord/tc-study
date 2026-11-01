@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import minimal from '../../spec/tests/container/minimal.expected.json'
-import { type CborValue, decodeCbor, encodeDeterministic } from './cbor'
+import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic } from './cbor'
 import { ColumnError, encodeUvarints, stringTable } from './columns'
 
 const bytes = (...b: number[]) => Uint8Array.from(b)
@@ -257,6 +257,13 @@ describe('decodeCbor', () => {
     const arrays = (levels: number) => bytes(...new Array(levels - 1).fill(0x81), 0x80)
     expect(decodeCbor(arrays(16))).toEqual(nestedArrays(16))
     expect(() => decodeCbor(arrays(17))).toThrow(ColumnError)
+    expect(() => decodeCbor(arrays(17))).toThrow(CborNestingError) // the container maps this one to E_LIMIT
+    expect(() => decodeCbor(bytes(0xf6))).toThrow(ColumnError)
+    try {
+      decodeCbor(bytes(0xf6))
+    } catch (error) {
+      expect(error).not.toBeInstanceOf(CborNestingError) // other failures stay E_HEADER or E_BODY
+    }
     const maps = (levels: number) => bytes(...new Array(levels - 1).fill([0xa1, 0x61, 0x61]).flat(), 0xa0)
     expect(() => decodeCbor(maps(16))).not.toThrow()
     expect(() => decodeCbor(maps(17))).toThrow(ColumnError)

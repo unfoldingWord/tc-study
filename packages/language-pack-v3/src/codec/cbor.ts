@@ -16,7 +16,18 @@ import { ColumnError } from './columns'
 export type CborValue = number | string | boolean | Uint8Array | CborValue[] | { [key: string]: CborValue }
 
 /** Nesting of arrays and maps a header or body may have (`spec/container.md`, "Limits"). */
-const MAX_DEPTH = 16
+export const MAX_DEPTH = 16
+
+/**
+ * Thrown by {@link decodeCbor} for nesting beyond the limit. It is a {@link ColumnError} too, but the container maps it
+ * to `E_LIMIT` and the other decode failures to `E_HEADER` or `E_BODY`.
+ */
+export class CborNestingError extends ColumnError {
+  constructor() {
+    super(`CBOR: nesting is deeper than ${MAX_DEPTH}`)
+    this.name = 'CborNestingError'
+  }
+}
 
 /** Integers go from -2^53 to 2^53 - 1, so that JavaScript reads them exactly. */
 const MAX_INT = Number.MAX_SAFE_INTEGER // 2^53 - 1
@@ -271,7 +282,7 @@ class Reader {
         return this.text(this.argument(info))
       case 4: {
         const count = this.argument(info)
-        if (depth + 1 > MAX_DEPTH) throw new ColumnError(`CBOR: nesting is deeper than ${MAX_DEPTH}`)
+        if (depth + 1 > MAX_DEPTH) throw new CborNestingError()
         // Every item takes a byte at least, so a count beyond the rest of the data is cut short.
         this.need(count)
         const items: CborValue[] = []
@@ -280,7 +291,7 @@ class Reader {
       }
       case 5: {
         const count = this.argument(info)
-        if (depth + 1 > MAX_DEPTH) throw new ColumnError(`CBOR: nesting is deeper than ${MAX_DEPTH}`)
+        if (depth + 1 > MAX_DEPTH) throw new CborNestingError()
         this.need(count * 2)
         const map: { [key: string]: CborValue } = {}
         for (let i = 0; i < count; i++) {
