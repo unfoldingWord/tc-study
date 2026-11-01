@@ -99,15 +99,23 @@ function rawWords(chunks: unknown[][]): { form: string; verse: number; stack: st
   return out
 }
 
-/** The pieces joined, with one space between two word pieces that follow each other (format 2.0 shows them that way). */
-function spaced(pieces: Piece[]): string {
-  let out = ''
-  let previousIsWord = false
-  for (const [text, isWord] of pieces) {
-    if (isWord && previousIsWord) out += ' '
-    out += text
-    previousIsWord = isWord
+/**
+ * The pieces of the raw rows in document order, with the one blank the builder adds (unless `blank` is false): a `" "` between
+ * two word pieces that follow each other with nothing between them. The text nodes are pieces, a `w` is a word piece, nodes are walked into.
+ */
+function rawPieces(chunks: unknown[][], blank = true): [string, boolean][] {
+  const out: [string, boolean][] = []
+  const push = (text: string, isWord: boolean) => {
+    if (blank && isWord && out.length > 0 && out[out.length - 1][1]) out.push([' ', false])
+    out.push([text, isWord])
   }
+  const walk = (node: unknown): void => {
+    if (typeof node === 'string') return push(node, false)
+    const n = node as { type: string; marker?: string; content?: unknown[] }
+    if (n.type === 'char' && n.marker === 'w') return push(rawText(n), true)
+    for (const child of n.content ?? []) walk(child)
+  }
+  for (const chunk of chunks) for (const node of chunk) walk(node)
   return out
 }
 
@@ -182,20 +190,20 @@ const wd = (form: string) => ({ type: 'char', marker: 'w', 'x-occurrence': '1', 
 const textOf = (index: OrigIndex, ...content: unknown[]) => extractText([chapterRow(GLT, 1, content)], 'tit', GLT, index)
 
 describe('es-419 Titus from the data folder', () => {
-  test('GLT has 1 416 pieces, 953 words, 953 aligned, 69 events', async () => {
+  test('GLT has 1 913 pieces (1 416 and the 497 blanks between words), 953 words, 953 aligned, 69 events', async () => {
     const { glt1 } = await titus()
     expect(glt1.res).toBe(GLT)
-    expect(glt1.pieces.length).toBe(1416)
+    expect(glt1.pieces.length).toBe(1913)
     expect(wordsOf(glt1)).toBe(953)
     expect(glt1.align?.length).toBe(953)
     expect(alignedOf(glt1)).toBe(953)
     expect(glt1.events.length).toBe(69)
   })
 
-  test('GST has 3 075 pieces, 1 732 words, 1 732 aligned, 69 events', async () => {
+  test('GST has 3 471 pieces (3 075 and the 396 blanks between words), 1 732 words, 1 732 aligned, 69 events', async () => {
     const { gst1 } = await titus()
     expect(gst1.res).toBe(GST)
-    expect(gst1.pieces.length).toBe(3075)
+    expect(gst1.pieces.length).toBe(3471)
     expect(wordsOf(gst1)).toBe(1732)
     expect(gst1.align?.length).toBe(1732)
     expect(alignedOf(gst1)).toBe(1732)
@@ -208,39 +216,66 @@ describe('es-419 Titus from the data folder', () => {
     expect(gst1.alignMissing).toBeUndefined()
   })
 
-  test('the pieces of verse 1:1 of GLT read "Pablo, siervo de Dios": the rows have no piece between two words that follow each other', async () => {
+  test('joining the pieces of verse 1:1 of GLT starts with "Pablo, siervo de Dios"', async () => {
     const { glt1 } = await titus()
     const verses = glt1.events.filter((event) => event[1] === 'verse')
     const first = verses.findIndex((event) => event[2] === '1')
     const pieces = glt1.pieces.slice(verses[first][0], verses[first + 1][0])
-    expect(pieces.slice(0, 6)).toEqual([['Pablo', true], [', ', false], ['siervo', true], ['de', true], [' ', false], ['Dios', true]])
-    // The USJ of format 2.0 drops the blank between two milestones, so words that follow each other have no piece between
-    // them: 497 of the 953 words of GLT. The plain join runs them together.
-    expect(pieces.map(([text]) => text).join('').startsWith('Pablo, siervode Dios')).toBe(true)
-    // Format 2.0 shows a space between them, and so does this join: it starts with "Pablo, siervo de Dios".
-    expect(spaced(pieces).startsWith('Pablo, siervo de Dios')).toBe(true)
-    let together = 0
-    glt1.pieces.forEach(([, isWord], i) => void (isWord && i > 0 && glt1.pieces[i - 1][1] && together++))
-    expect(together).toBe(497)
+    expect(pieces.map(([text]) => text).join('').startsWith('Pablo, siervo de Dios')).toBe(true)
+    expect(pieces.slice(0, 7)).toEqual([['Pablo', true], [', ', false], ['siervo', true], [' ', false], ['de', true], [' ', false], ['Dios', true]])
   })
 
-  test('the text of verse 1:1 with a space between two words in a row is the text of the prepared row of format 2.0', async () => {
-    const { glt1 } = await titus()
-    const prepared = (await collect((await source()).rows({ lang: 'es-419', book: 'tit', resource: GLT, layer: 'prepared' }))).find((row) =>
-      row.key.endsWith(':tit:1:light'),
-    )!
-    const inline = (prepared.value as any).content.blocks[0].inline as { kind: string; text?: string }[]
-    const verses = glt1.events.filter((event) => event[1] === 'verse')
-    expect(spaced(glt1.pieces.slice(verses[0][0], verses[1][0])).trim()).toBe(inline.find((item) => item.kind === 'text')!.text!.trim())
+  test('no word piece follows a word piece: the 497 and 396 words of the rows that followed another word have a blank before them', async () => {
+    const { glt, glt1, gst, gst1 } = await titus()
+    for (const [rows, res, text, plain, blanks] of [[glt, GLT, glt1, 1416, 497], [gst, GST, gst1, 3075, 396]] as const) {
+      text.pieces.forEach(([, isWord], i) => expect(isWord && i > 0 && text.pieces[i - 1][1]).toBe(false))
+      // The pieces of the rows are the 1 416 and 3 075 of the spec before this rule; the rule adds one piece per pair.
+      expect(rawPieces(rawChunks(rows, res), false).length).toBe(plain)
+      expect(text.pieces.length).toBe(plain + blanks)
+    }
   })
 
-  test('joining all the pieces gives the strings of the rows, in order: chunk 0 included, and the text of every node', async () => {
+  test('joining all the pieces gives the text of the rows, in order, chunk 0 included, and one blank between words that follow each other', async () => {
     const { glt, glt1, gst, gst1 } = await titus()
     for (const [rows, res, text] of [[glt, GLT, glt1], [gst, GST, gst1]] as const) {
       const raw = rawChunks(rows, res)
       expect(raw.length).toBe(4)
-      expect(text.pieces.map(([piece]) => piece).join('')).toBe(raw.map((chunk) => chunk.map(rawText).join('')).join(''))
+      expect(text.pieces).toEqual(rawPieces(raw))
     }
+  })
+
+  test('the text of every verse of GLT is the text of the prepared row of format 2.0, but for a blank after « that only 2.0 adds', async () => {
+    const { glt1 } = await titus()
+    const prepared = await collect((await source()).rows({ lang: 'es-419', book: 'tit', resource: GLT, layer: 'prepared' }))
+    // The text of each verse in the prepared rows, by "chapter:verse".
+    const expected = new Map<string, string>()
+    for (const chapter of [1, 2, 3]) {
+      const row = prepared.find((r) => r.key.endsWith(`:tit:${chapter}:light`))!
+      let key = ''
+      for (const block of (row.value as any).content.blocks) {
+        for (const item of block.inline as { kind: string; verseNumber?: number; text?: string }[]) {
+          if (item.kind === 'verse') key = `${chapter}:${item.verseNumber}`
+          else if (item.kind === 'text') expected.set(key, (expected.get(key) ?? '') + item.text)
+        }
+      }
+    }
+    // The text of each verse here: the pieces from its verse event to the next one.
+    const actual = new Map<string, string>()
+    const verses = glt1.events.filter((event) => event[1] === 'verse' || event[1] === 'chapter')
+    let chapter = ''
+    verses.forEach(([position, kind, arg], i) => {
+      if (kind === 'chapter') return void (chapter = arg)
+      const next = verses.slice(i + 1).find((event) => event[1] === 'verse')
+      actual.set(`${chapter}:${arg}`, glt1.pieces.slice(position, next?.[0] ?? glt1.pieces.length).map(([text]) => text).join(''))
+    })
+    expect([...actual.keys()]).toEqual([...expected.keys()])
+    expect(actual.size).toBe(46)
+    // 2.0 trims nothing but puts its own blank at the start of a verse: compare without the blanks at both ends.
+    const differ = [...actual.keys()].filter((key) => actual.get(key)!.trim() !== expected.get(key)!.trim())
+    // One verse differs: the rows have "dijo: «Los cretenses" (no blank, as the USFM) and the prepared text "« Los".
+    expect(differ).toEqual([...actual.keys()].filter((key) => expected.get(key)!.includes('« ')))
+    expect(differ.length).toBe(1)
+    for (const key of differ) expect(actual.get(key)!.trim()).toBe(expected.get(key)!.trim().replace(/« /g, '«'))
   })
 
   test('chunk 0 is the start of the text: the book code, its identification and the titles', async () => {
@@ -327,7 +362,7 @@ describe('es-419 Titus from the data folder', () => {
     expect(read.seg.h.tables).toEqual({ strings: [1, true], texts: [1, true], align: [1, false] })
     expect(bookView(read.seg)).toEqual(m)
     expect(bookView(read.seg).texts.map((t) => t.res)).toEqual([GLT, GST])
-    // 10 456 bytes when measured: the two texts with their alignment, without the helps (phase 0: 35.4 KB with them).
+    // 10 496 bytes when measured: the two texts with their alignment and the blanks, without the helps (phase 0: 35.4 KB with them).
     expect(bytes.length).toBeLessThan(12_000)
   })
 
@@ -587,6 +622,99 @@ describe('the document, node by node', () => {
     expect(() => extractText([{ layer: 'sot', key: `scripture-usj:${GLT}:tit:1`, value: { content: {} } }], 'tit', GLT, index)).toThrow(/USJ/)
     expect(() => extractText([chapterRow(GLT, 1, [{ marker: 'p' }])], 'tit', GLT, index)).toThrow(/type/)
     expect(() => extractText([chapterRow(GLT, 1, [{ type: 'para', marker: 'p', style: 1, content: [] }])], 'tit', GLT, index)).toThrow(/style/)
+  })
+})
+
+describe('the blank between two words that follow each other', () => {
+  const index = origIndex([['1', '1', ['Παῦλος', 'δοῦλος', 'Θεοῦ']]])
+  const blank: Piece = [' ', false]
+
+  test('two words with only alignment milestones between them get a blank piece, which is not a word', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('1'), zs('Παῦλος'), wd('Pablo'), ze, zs('δοῦλος'), wd('siervo'), ze))
+    expect(t.pieces).toEqual([['Pablo', true], blank, ['siervo', true]])
+    // The words are counted as before: the blank is not a word, and the alignment goes by words.
+    expect(t.align).toEqual([[0], [1]])
+  })
+
+  test('three in a row, a word that opens two milestones, and words that are not aligned', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('1'), zs('Θεοῦ'), zs('Παῦλος'), wd('a'), ze, wd('b'), ze, wd('c')))
+    expect(t.pieces).toEqual([['a', true], blank, ['b', true], blank, ['c', true]])
+    expect(t.align).toEqual([[2, 0], [2], []])
+  })
+
+  test('a word followed by punctuation or by text gets no extra blank, and the blank is not doubled where one is already', () => {
+    const t = textOf(
+      index,
+      chapterNode('1'),
+      para(verseNode('1'), wd('a'), ', ', wd('b'), ' ', wd('c'), wd('d'), '.', wd('e'), ' ', wd('f')),
+    )
+    expect(t.pieces).toEqual([
+      ['a', true],
+      [', ', false],
+      ['b', true],
+      [' ', false],
+      ['c', true],
+      blank,
+      ['d', true],
+      ['.', false],
+      ['e', true],
+      [' ', false],
+      ['f', true],
+    ])
+  })
+
+  test('a word followed by a note that begins with text gets no blank; the last word of the note and the word after it, one', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('1'), wd('a'), { type: 'note', marker: 'f', content: ['See ', wd('x')] }, wd('b')))
+    expect(t.pieces).toEqual([['a', true], ['See ', false], ['x', true], blank, ['b', true]])
+    expect(t.events.filter((event) => event[1] !== 'chapter' && event[1] !== 'verse')).toEqual([
+      [0, 'open', 'para:p'],
+      [1, 'open', 'note:f'],
+      // The note closes before the blank, which is outside it.
+      [3, 'close', ''],
+      [5, 'close', ''],
+    ])
+  })
+
+  test('the events keep their meaning, pieces before them, and shift past the blanks', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('1'), wd('a'), wd('b'), { type: 'ms', marker: 'ts' }, wd('c')))
+    expect(t.pieces).toEqual([['a', true], blank, ['b', true], blank, ['c', true]])
+    expect(t.events).toEqual([
+      [0, 'chapter', '1'],
+      [0, 'open', 'para:p'],
+      [0, 'verse', '1'],
+      // The milestone is between "b" and the blank before "c": it is after 3 pieces.
+      [3, 'open', 'ms:ts'],
+      [3, 'close', ''],
+      [5, 'close', ''],
+    ])
+  })
+
+  test('an event between two words comes before the blank: a verse that starts with a word after a word starts with the blank', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('1'), wd('a'), verseNode('2'), wd('b')))
+    expect(t.pieces).toEqual([['a', true], blank, ['b', true]])
+    expect(t.events.filter((event) => event[1] === 'verse')).toEqual([
+      [0, 'verse', '1'],
+      [1, 'verse', '2'],
+    ])
+  })
+
+  test('across the chunks of a chapter, and across paragraphs: a word piece after a word piece gets the blank wherever it is', () => {
+    const t = extractText(
+      [chapterRow(GLT, 1, [chapterNode('1'), para(verseNode('1'), wd('a'))]), chapterRow(GLT, 2, [chapterNode('2'), para(verseNode('1'), wd('b'))])],
+      'tit',
+      GLT,
+      index,
+    )
+    expect(t.pieces).toEqual([['a', true], blank, ['b', true]])
+    const p = textOf(index, chapterNode('1'), para(verseNode('1'), wd('a')), para(wd('b')))
+    expect(p.pieces).toEqual([['a', true], blank, ['b', true]])
+  })
+
+  test('the blank is a piece like any other in the segment: it round-trips, and counts as one use of the string " "', async () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('1'), zs('Παῦλος'), wd('Pablo'), ze, zs('δοῦλος'), wd('siervo'), ze))
+    const m: BookModel = { lang: 'es-419', book: 'tit', orig: [UGNT, 'g987ab2025a'], res: [[GLT, 'v42']], texts: [t] }
+    expect(bookView(bookSegment(m))).toEqual(m)
+    expect(bookSegment(m).t.strings).toContain(' ')
   })
 })
 

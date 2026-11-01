@@ -45,6 +45,10 @@ function chunksOf(rows: Row[], book: string, res: string): { where: string; cont
  *   matter), read in chapter order whatever the order of the rows. The book row `scripture-usj:{res}:{book}` is not text.
  * - A `char` node with marker `w` is a word: a piece with `isWord`, whose text is all the text inside it. Its
  *   attributes (`x-occurrence`, `x-occurrences`) are not kept. Text between nodes is a piece that is not a word.
+ * - The USJ of format 2.0 drops the blank between two alignment milestones, so two words can follow each other with no
+ *   piece between them. The builder puts one `" "` piece (not a word) before a word piece when the piece before it is a
+ *   word piece, as format 2.0 does when it shows the text: joining the pieces gives the text. Text that is a blank
+ *   already, punctuation, or the start of a note is a piece between the words, and nothing is added.
  * - A chapter is the event `chapter` with its number as published, a verse the event `verse` (`"1"`, `"1-2"`), and every
  *   other node, a milestone included, the events `open` (`"type:marker"`) and `close`; a milestone opens and closes at
  *   the same position. Their attributes, other than `type`, `marker`, `content`, `sid` and `eid`, go to `attrs`.
@@ -89,6 +93,10 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
       }
       if (stack.length > 0) aligned = true
       align.push(positions)
+      // The USJ of format 2.0 drops the blank that the USFM has between two alignment milestones, so two words can follow
+      // each other with nothing between them. A blank piece goes between them, and the pieces join into the text. Events
+      // already written stay before it: a verse that starts with a word right after a word starts with the blank.
+      if (pieces.length > 0 && pieces[pieces.length - 1][1]) pieces.push([' ', false])
       pieces.push([textOf(node), true])
       return
     }
