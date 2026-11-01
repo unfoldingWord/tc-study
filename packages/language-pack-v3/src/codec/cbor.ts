@@ -16,7 +16,7 @@ import { ColumnError } from './columns'
 export type CborValue = number | string | boolean | Uint8Array | CborValue[] | { [key: string]: CborValue }
 
 /** Nesting of arrays and maps a header or body may have (`spec/container.md`, "Limits"). */
-export const MAX_DEPTH = 16
+export const MAX_DEPTH = 64
 
 /**
  * Thrown by {@link decodeCbor} for nesting beyond the limit. It is a {@link ColumnError} too, but the container maps it
@@ -196,7 +196,7 @@ function encodeInto(out: Writer, value: unknown, depth: number): void {
 /**
  * Encodes a value as core deterministic CBOR. Throws `TypeError` on a number that is not an integer between -2^53 and
  * 2^53 - 1, on `null` and `undefined`, on text with a lone surrogate, on anything that is not a plain object, and on
- * nesting deeper than 16.
+ * nesting deeper than {@link MAX_DEPTH}.
  */
 export function encodeDeterministic(value: CborValue): Uint8Array {
   const out = new Writer()
@@ -335,7 +335,7 @@ class Reader {
  * Decodes one CBOR item that is a {@link CborValue}. Byte strings come back as plain `Uint8Array`. Throws
  * {@link ColumnError} on floats (in every width, even for a whole number), tags, `null`, `undefined`, other simple
  * values, integers outside -2^53 .. 2^53 - 1, indefinite lengths, map keys that are not text or are repeated, text that
- * is not valid UTF-8, nesting deeper than 16, data cut short and bytes after the item.
+ * is not valid UTF-8, nesting deeper than {@link MAX_DEPTH}, data cut short and bytes after the item.
  *
  * It does not check that heads are the shortest form or that map keys are sorted: the identity of a body is the
  * sha256 of its bytes, and a reader need not encode again to check it.

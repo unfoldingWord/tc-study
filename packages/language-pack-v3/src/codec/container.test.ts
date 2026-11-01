@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { deflateRaw, Inflate, inflateRaw } from 'pako'
 import minimal from '../../spec/tests/container/minimal.expected.json'
-import { type CborValue, decodeCbor, encodeDeterministic } from './cbor'
+import { type CborValue, decodeCbor, encodeDeterministic, MAX_DEPTH } from './cbor'
 import { encodeUvarints } from './columns'
 import {
   hex,
@@ -448,17 +448,18 @@ describe('the limits', () => {
     expect(await codeOf(read(mutate({ header: (h) => (h.ulen = MAX_UNCOMPRESSED_BYTES) })))).toBe('E_INFLATE')
   })
 
-  test('E_LIMIT: nesting of 17 levels in the header and in the body', async () => {
-    // Header: the map (1) and 16 arrays (2..17). Body: the map (1), t (2) and 15 arrays (3..17).
-    const deepHeader = cborBytes([0xa1], text('h'), new Array(15).fill(0x81), [0x80])
+  test('E_LIMIT: nesting of MAX_DEPTH + 1 levels in the header and in the body', async () => {
+    // Header: the map (1) and MAX_DEPTH arrays (2..MAX_DEPTH + 1). Body: the map (1), t (2) and MAX_DEPTH - 1 arrays
+    // (3..MAX_DEPTH + 1).
+    const deepHeader = cborBytes([0xa1], text('h'), new Array(MAX_DEPTH - 1).fill(0x81), [0x80])
     expect(await codeOf(read(assemble({ ...original, header: deepHeader })))).toBe('E_LIMIT')
-    const deepT = cborBytes([0xa1], text('x'), new Array(14).fill(0x81), [0x80])
+    const deepT = cborBytes([0xa1], text('x'), new Array(MAX_DEPTH - 2).fill(0x81), [0x80])
     expect(await codeOf(read(await fileFromBody(bodyOf(goodH, deepT))))).toBe('E_LIMIT')
   })
 
-  test('nesting of exactly 16 levels in the body is not a limit', async () => {
-    // The body map (1), t (2) and 14 arrays (3..16).
-    const t = cborBytes([0xa1], text('x'), new Array(13).fill(0x81), [0x80])
+  test('nesting of exactly MAX_DEPTH levels in the body is not a limit', async () => {
+    // The body map (1), t (2) and MAX_DEPTH - 2 arrays (3..MAX_DEPTH).
+    const t = cborBytes([0xa1], text('x'), new Array(MAX_DEPTH - 3).fill(0x81), [0x80])
     const h = encodeDeterministic({ ...(original.header.h as CborMap), tables: { x: [1, true] } })
     const result = await read(await fileFromBody(bodyOf(h, t), decodeCbor(h) as CborMap), { x: [1] })
     expect(keys(result.seg.t)).toEqual(['x'])

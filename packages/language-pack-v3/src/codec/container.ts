@@ -15,21 +15,21 @@
  *    before one of these bytes is `E_TRUNCATED`. The reserved byte is not checked.
  * 2. `E_LIMIT` if `H` is over 65 536, before the header bytes are read. `E_TRUNCATED` if fewer than `12 + H` bytes.
  * 3. `E_HEADER`: not a map, or `h`, `codec`, `clen`, `ulen` or `id` missing or of the wrong type. `E_LIMIT` for CBOR
- *    nested deeper than 16.
+ *    nested deeper than `MAX_DEPTH`.
  * 4. `E_LIMIT` if `clen` or `ulen` is over 64 MiB. Then the exact length `12 + H + clen`: shorter is `E_TRUNCATED`,
  *    longer is `E_TRAILING`.
  * 5. `E_CODEC`.
  * 6. `E_INFLATE`: the stream fails, does not end exactly at the end of the body, or gives other than `ulen` bytes.
  * 7. `E_ID`: the sha256 of the inflated body is not the header's `id`, or not `expectedId`.
  * 8. `E_BODY`: the body is not `{h, t}` with both maps, does not decode, has a malformed `h` or `h.tables`, or has
- *    tables that differ from the ones `h.tables` lists. `E_LIMIT` for CBOR nested deeper than 16.
+ *    tables that differ from the ones `h.tables` lists. `E_LIMIT` for CBOR nested deeper than `MAX_DEPTH`.
  * 9. `E_HMISMATCH`: the body's `h` and the header's `h` differ.
  * 10. `E_TABLE`: a required table, or its version, is not one the caller knows.
  *
  * No Node module is used, so builders and readers run in a browser and in a Worker.
  */
 import { deflateRaw, Inflate } from 'pako'
-import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic } from './cbor'
+import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic, MAX_DEPTH } from './cbor'
 import { ColumnError } from './columns'
 import { FormatError, type FormatErrorCode } from './errors'
 
@@ -131,7 +131,7 @@ async function sha256(data: Uint8Array): Promise<Uint8Array> {
 
 /** A decode failure of the header or the body becomes a FormatError: a limit for nesting, `code` for the rest. */
 function decodeFailure(error: unknown, code: FormatErrorCode, what: string): never {
-  if (error instanceof CborNestingError) throw new FormatError('E_LIMIT', `${what} is nested deeper than 16 levels`)
+  if (error instanceof CborNestingError) throw new FormatError('E_LIMIT', `${what} is nested deeper than ${MAX_DEPTH} levels`)
   if (error instanceof ColumnError) throw new FormatError(code, `${what} is not valid CBOR: ${error.message}`)
   throw error
 }

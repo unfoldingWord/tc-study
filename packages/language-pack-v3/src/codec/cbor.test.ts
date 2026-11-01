@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import minimal from '../../spec/tests/container/minimal.expected.json'
-import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic } from './cbor'
+import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic, MAX_DEPTH } from './cbor'
 import { ColumnError, encodeUvarints, stringTable } from './columns'
 
 const bytes = (...b: number[]) => Uint8Array.from(b)
@@ -113,11 +113,15 @@ describe('encodeDeterministic', () => {
     expect(encodeDeterministic('\u{1D538}')).toEqual(bytes(0x64, 0xf0, 0x9d, 0x94, 0xb8))
   })
 
-  test('nesting: 16 levels pass, 17 throw', () => {
-    expect(() => encodeDeterministic(nestedArrays(16))).not.toThrow()
-    expect(() => encodeDeterministic(nestedArrays(17))).toThrow(TypeError)
+  test('MAX_DEPTH is the 64 levels of spec/container.md', () => {
+    expect(MAX_DEPTH).toBe(64)
+  })
+
+  test('nesting: MAX_DEPTH levels pass, MAX_DEPTH + 1 throw', () => {
+    expect(() => encodeDeterministic(nestedArrays(MAX_DEPTH))).not.toThrow()
+    expect(() => encodeDeterministic(nestedArrays(MAX_DEPTH + 1))).toThrow(TypeError)
     let map: CborValue = {}
-    for (let i = 1; i < 16; i++) map = { a: map }
+    for (let i = 1; i < MAX_DEPTH; i++) map = { a: map }
     expect(() => encodeDeterministic(map)).not.toThrow()
     expect(() => encodeDeterministic({ a: map })).toThrow(TypeError)
   })
@@ -253,11 +257,11 @@ describe('decodeCbor', () => {
     expect(() => decodeCbor(bytes(0xff))).toThrow(ColumnError)
   })
 
-  test('rejects nesting deeper than 16', () => {
+  test('rejects nesting deeper than MAX_DEPTH', () => {
     const arrays = (levels: number) => bytes(...new Array(levels - 1).fill(0x81), 0x80)
-    expect(decodeCbor(arrays(16))).toEqual(nestedArrays(16))
-    expect(() => decodeCbor(arrays(17))).toThrow(ColumnError)
-    expect(() => decodeCbor(arrays(17))).toThrow(CborNestingError) // the container maps this one to E_LIMIT
+    expect(decodeCbor(arrays(MAX_DEPTH))).toEqual(nestedArrays(MAX_DEPTH))
+    expect(() => decodeCbor(arrays(MAX_DEPTH + 1))).toThrow(ColumnError)
+    expect(() => decodeCbor(arrays(MAX_DEPTH + 1))).toThrow(CborNestingError) // the container maps this one to E_LIMIT
     expect(() => decodeCbor(bytes(0xf6))).toThrow(ColumnError)
     try {
       decodeCbor(bytes(0xf6))
@@ -265,8 +269,17 @@ describe('decodeCbor', () => {
       expect(error).not.toBeInstanceOf(CborNestingError) // other failures stay E_HEADER or E_BODY
     }
     const maps = (levels: number) => bytes(...new Array(levels - 1).fill([0xa1, 0x61, 0x61]).flat(), 0xa0)
-    expect(() => decodeCbor(maps(16))).not.toThrow()
-    expect(() => decodeCbor(maps(17))).toThrow(ColumnError)
+    expect(() => decodeCbor(maps(MAX_DEPTH))).not.toThrow()
+    expect(() => decodeCbor(maps(MAX_DEPTH + 1))).toThrow(ColumnError)
+    expect(() => decodeCbor(maps(MAX_DEPTH + 1))).toThrow(CborNestingError)
+  })
+
+  test('nesting far beyond MAX_DEPTH fails fast with the nesting error, not a stack overflow', () => {
+    // 100 000 opening array heads and nothing else: the decoder must stop at the first level over the limit.
+    expect(() => decodeCbor(new Uint8Array(100_000).fill(0x81))).toThrow(CborNestingError)
+    const mapHeads = new Uint8Array(300_000)
+    for (let i = 0; i < mapHeads.length; i += 3) mapHeads.set([0xa1, 0x61, 0x61], i)
+    expect(() => decodeCbor(mapHeads)).toThrow(CborNestingError)
   })
 
   test('rejects indefinite lengths', () => {

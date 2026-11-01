@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { decodeUvarints } from '../codec/columns'
+import { MAX_DEPTH } from '../codec/cbor'
 import { readSegment, type Segment, writeSegment } from '../codec/container'
 import { FormatError } from '../codec/errors'
 import type { OrigModel } from '../model'
@@ -728,17 +729,26 @@ describe('MACULA', () => {
     expect(origView(seg)).toEqual(m)
   })
 
-  test('the writer refuses a table nested past the 16 levels a reader accepts', async () => {
-    // The body, `t` and `macula` take 3 levels, so `trees` may be 13 containers deep. The Titus trees of the phase 0
-    // sample are 14 deep ({sentences: ...} counts as one): that value does not fit, and the report says so.
+  test('the writer refuses a table nested past the MAX_DEPTH levels a reader accepts', async () => {
+    // The body, `t` and `macula` take 3 levels, so `trees` may be MAX_DEPTH - 3 containers deep: the whole body is then
+    // exactly MAX_DEPTH deep and is written. One container more is refused. The Titus trees of the phase 0 sample are
+    // 14 deep ({sentences: ...} counts as one): they fit with room to spare.
     let deep: unknown = 1
-    for (let i = 0; i < 14; i++) deep = [deep]
+    for (let i = 0; i < MAX_DEPTH - 2; i++) deep = [deep]
     const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', trees: deep } }
     await expect(writeSegment(origSegment(m))).rejects.toThrow()
     let fits: unknown = 1
-    for (let i = 0; i < 13; i++) fits = [fits]
+    for (let i = 0; i < MAX_DEPTH - 3; i++) fits = [fits]
     const ok: OrigModel = { ...m, macula: { release: 'r', trees: fits } }
     expect((await throughFile(ok)).model).toEqual(ok)
+  })
+
+  test('trees as deep as the real Titus ones (14 containers) are written and read back', async () => {
+    // With the body, `t` and `macula` that is 17 levels: over the old limit of 16, inside the limit of 64.
+    let trees: unknown = 1
+    for (let i = 0; i < 14; i++) trees = [trees]
+    const m: OrigModel = { book: 'tit', key: UGNT, stamp: 's', words: [], pieces: [], events: [], macula: { release: 'r', trees } }
+    expect((await throughFile(m)).model).toEqual(m)
   })
 
   test('MACULA rows of two resources, or a release the source does not list, are refused', async () => {
