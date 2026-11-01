@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import JSZip from 'jszip'
-import { ungzip } from 'pako'
+import { gzip, ungzip } from 'pako'
 import { partsSource } from '../node/partsSource'
-import type { ResourceRef, Row, RowSource } from './rows'
+import { lines, partRows, type ResourceRef, type Row, type RowSource } from './rows'
 import { zipSource } from './zipSource'
 
 // The data is a sample of real files (spec/tests/data/README.md): es-419 Titus of staging, UGNT Titus, three common
@@ -256,6 +256,29 @@ describe('what a source refuses', () => {
     await expect(collect(parts.rows({ lang: 'es-419' }))).rejects.toThrow(sha)
   })
 
+  test('partsSource: a part a filter excludes is never opened; one it keeps, and the folder lacks, fails naming it', async () => {
+    // The folder does not exist: any part that is opened fails. The sample's `parts/` lacks parts that the full list names,
+    // and a run with `book` or `resource` must not trip over them.
+    const dir = join(DATA, 'no-such-folder')
+    const parts = await partsSource({ list: LIST, partsDir: dir, originals: ORIGINALS })
+    const listed = (await Bun.file(LIST).json()) as { parts: Array<{ sha256: string; resource: string; book?: string; layers: string[] }> }
+    const tq = listed.parts.filter((part) => part.resource === 'es-419_gl/es-419/tq')
+    expect(tq.length).toBe(1)
+    const excluded: Array<Parameters<RowSource['rows']>[0]> = [
+      { lang: 'es-419', book: 'gen' },
+      { lang: 'es-419', resource: 'es-419_gl/es-419/nope' },
+      { lang: 'es-419', layer: 'index' },
+      { lang: 'es-419', resource: 'es-419_gl/es-419/tq', book: 'gen' },
+      { lang: 'es-419', resource: 'es-419_gl/es-419/tq', layer: 'align' },
+      { lang: 'originals', book: 'gen' },
+      { lang: 'fr' },
+    ]
+    for (const filter of excluded) expect(await collect(parts.rows(filter))).toEqual([])
+    for (const filter of [{ lang: 'es-419', resource: 'es-419_gl/es-419/tq' }, { lang: 'es-419', resource: 'es-419_gl/es-419/tq', book: 'tit' }, { lang: 'es-419', book: 'tit', layer: 'sot', resource: 'es-419_gl/es-419/tq' }]) {
+      await expect(collect(parts.rows(filter))).rejects.toThrow(tq[0].sha256)
+    }
+  })
+
   test('partsSource: a file that is not a parts list', async () => {
     await expect(partsSource({ list: join(DATA, 'es-419-tit.langpack.zip'), partsDir: PARTS })).rejects.toThrow()
     await expect(partsSource({ list: join(DATA, 'no-such-list.json'), partsDir: PARTS })).rejects.toThrow()
@@ -352,5 +375,36 @@ describe('zip: the book of a row, from its key', () => {
     expect((await both.resources('xx')).map((r) => r.key)).toEqual([RES])
     expect((await both.resources('originals')).map((r) => r.key)).toEqual(['o/el/ugnt'])
     expect((await collect(both.rows({ lang: 'originals' }))).map((r) => r.key)).toEqual(['scripture-usj:o/el/ugnt:tit'])
+  })
+})
+
+describe('lines of a part file', () => {
+  const a = { layer: 'sot', key: 'k:1', value: { n: 1 } }
+  const b = { layer: 'prepared', key: 'k:2', value: 'text\nwith a break' }
+  const jsonl = (rows: object[], eol: string) => rows.map((row) => JSON.stringify(row)).join(eol)
+
+  test('LF and CRLF end a line, the last line needs no end, blank lines are skipped', () => {
+    expect(lines('a\nb\n')).toEqual(['a', 'b'])
+    expect(lines('a\nb')).toEqual(['a', 'b'])
+    expect(lines('a\r\nb\r\n')).toEqual(['a', 'b'])
+    expect(lines('a\r\nb')).toEqual(['a', 'b'])
+    expect(lines('a\r\n\r\nb\n\n')).toEqual(['a', 'b'])
+    expect(lines('a\n\r\n \r\nb')).toEqual(['a', 'b'])
+    expect(lines('')).toEqual([])
+    expect(lines('\r\n')).toEqual([])
+  })
+
+  test('partRows reads a part whose lines end in CRLF, or in nothing', () => {
+    const rows = [a, b]
+    const texts = [
+      jsonl(rows, '\n'),
+      jsonl(rows, '\n') + '\n',
+      jsonl(rows, '\r\n'),
+      jsonl(rows, '\r\n') + '\r\n',
+      jsonl(rows, '\r\n\r\n') + '\r\n',
+    ]
+    for (const text of texts) expect(partRows(gzip(new TextEncoder().encode(text)))).toEqual(rows)
+    // A break inside a value is escaped in JSONL, so it never splits a row.
+    expect(partRows(gzip(new TextEncoder().encode(jsonl([b], '\r\n'))))[0].value).toBe('text\nwith a break')
   })
 })

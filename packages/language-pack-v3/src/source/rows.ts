@@ -54,9 +54,9 @@ export const ORIGINALS = 'originals'
 /** The layers a source reads, in the order a pack gives them. Receipts say a release is complete: no row of a part has one. */
 export const LAYERS: readonly string[] = ['sot', 'prepared', 'quote', 'align', 'text', 'index']
 
-/** The non-empty lines of a text. */
+/** The lines of a text that are not blank: `\n` or `\r\n` ends a line, and a last line needs no end. */
 export function lines(text: string): string[] {
-  return text.split('\n').filter((line) => line.length > 0)
+  return text.split(/\r?\n/).filter((line) => line.trim().length > 0)
 }
 
 /** The rows of a part file (`parts/<sha256>.part.gz`): gzip of JSONL `{"layer","key","value"}`. */
