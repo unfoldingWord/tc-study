@@ -10,16 +10,20 @@ import { syncLanguageForRead, type ReadPartsStores } from './readParts'
  */
 export function usePartsForCurrentBook(): void {
   const book = useNavigationStore((s) => s.currentReference.book) || ''
-  const modes = usePartsModeStore((s) => s.modes)
+  // The languages checking or served as parts, as one string: a language going from checking to parts changes nothing.
+  const partsLanguages = usePartsModeStore((s) =>
+    Object.keys(s.modes)
+      .filter((language) => s.modes[language] !== 'door43')
+      .sort()
+      .join(',')
+  )
   const cache = useCacheAdapter()
   const catalogManager = useCatalogManager()
 
   useEffect(() => {
-    if (!book) return
+    if (!book || !partsLanguages) return
     const stores: ReadPartsStores = { cache, catalog: catalogManager.catalogAdapter as ReadPartsStores['catalog'] }
     // Checking too: a language still being asked for gets this book queued after its first sync.
-    for (const [language, mode] of Object.entries(modes)) {
-      if (mode !== 'door43') void syncLanguageForRead(language, book, stores)
-    }
-  }, [book, modes, cache, catalogManager])
+    for (const language of partsLanguages.split(',')) void syncLanguageForRead(language, book, stores)
+  }, [book, partsLanguages, cache, catalogManager])
 }
