@@ -1,8 +1,8 @@
 /**
  * The shared model types of format 3: what a builder reads from the sources and what a reader gives back.
  *
- * Plain data, with no code and no import, so that builders and readers can both depend on it. Each segment class adds
- * its model here as its task is written.
+ * Plain data, with no import, so that builders and readers can both depend on it. Each segment class adds its model here
+ * as its task is written.
  */
 
 /**
@@ -20,6 +20,9 @@ export type Piece = [text: string, isWord: boolean]
  * the key the source publishes it with.
  */
 export type OrigWord = { form: string; lemma: string; strong: string; morph: string; other?: Record<string, string> }
+
+/** The four attributes of a word that have a table of their own (`orig.cddl`, `orig-words`), in the order the segment lists them. */
+export const WORD_ATTRIBUTES = ['form', 'lemma', 'strong', 'morph'] as const satisfies readonly (keyof OrigWord)[]
 
 /**
  * One book of the original (UGNT or UHB). A word's position is its index in `words`; `pieces` has one word piece per

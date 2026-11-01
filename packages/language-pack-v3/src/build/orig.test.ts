@@ -16,6 +16,8 @@ const UGNT = 'unfoldingWord/el-x-koine/ugnt'
 const UHB = 'unfoldingWord/hbo/uhb'
 const MACULA = 'Biblica/el-x-koine/macula'
 const KNOWN = { words: [1], text: [1], macula: [1] }
+/** U+2060, which `find` takes out of a text. Built from its code point so that an editor cannot strip it. */
+const WORD_JOINER = String.fromCodePoint(0x2060)
 
 const realSource = () => partsSource({ list: join(DATA, 'originals', 'list.json'), partsDir: join(DATA, 'parts') })
 
@@ -30,9 +32,48 @@ function rawText(node: unknown): string {
   return content.map(rawText).join('')
 }
 
+/** The chapter chunks of the sample, in chapter order, as the rows hold them: the independent side of the tests. */
+async function rawChunks(): Promise<{ chapter: number; content: unknown[] }[]> {
+  const chunks: { chapter: number; content: unknown[] }[] = []
+  for await (const row of (await realSource()).rows({ lang: 'originals', book: 'tit', layer: 'sot' })) {
+    const match = /:tit:(\d+)$/.exec(row.key)
+    if (match) chunks.push({ chapter: Number(match[1]), content: (row.value as any).content.usj.content })
+  }
+  return chunks.sort((a, b) => a.chapter - b.chapter)
+}
+
+/** Every `\w` of the raw rows in document order with the verse id its chapter and verse nodes give (Titus is book 56). */
+function rawWords(chunks: { content: unknown[] }[]): { form: string; verse: number }[] {
+  const out: { form: string; verse: number }[] = []
+  let chapter = 0
+  let verse = 0
+  const walk = (node: unknown): void => {
+    if (typeof node === 'string') return
+    const n = node as { type: string; marker?: string; number?: string; content?: unknown[] }
+    if (n.type === 'chapter') {
+      chapter = Number(n.number)
+      verse = 0
+    } else if (n.type === 'verse') {
+      verse = Number(n.number)
+    } else if (n.type === 'char' && n.marker === 'w') {
+      out.push({ form: rawText(n), verse: 56_000_000 + chapter * 1000 + verse })
+      return
+    }
+    for (const child of n.content ?? []) walk(child)
+  }
+  for (const chunk of chunks) for (const node of chunk.content) walk(node)
+  return out
+}
+
 // A source made by hand, for what the sample does not hold: another attribute of a word, MACULA, a broken book.
 
-const ref = (key: string, stamp: string, books: string[]): ResourceRef => ({ key, stamp, kind: 'Original', books })
+const ref = (key: string, stamp: string, books: string[], bookStamps?: Record<string, string>): ResourceRef => ({
+  key,
+  stamp,
+  kind: 'Original',
+  books,
+  ...(bookStamps === undefined ? {} : { bookStamps }),
+})
 
 function fake(rows: Row[], resources: ResourceRef[]): RowSource {
   return {
@@ -102,13 +143,13 @@ describe('UGNT Titus from the data folder', () => {
     expect(m.words[658]).toEqual({ form: 'ὑμῶν', lemma: 'σύ', strong: 'G47710', morph: 'Gr,RP,,,2G,P,' })
   })
 
-  test('names the book by its key, and the stamp is the resource stamp (the rows carry no blob)', async () => {
+  test('names the book by its key, and the stamp is the blob of the book file as format 2.0 records it', async () => {
     const m = await titus()
     expect(m.book).toBe('tit')
     expect(m.key).toBe('unfoldingWord/el-x-koine/ugnt')
-    // The UGNT rows of format 2.0 do not record the book's blob (`g987ab2025a`, which the tN and tWL quote keys name):
-    // it is only in the originals list. So the stamp is the resource's own, `v0.34` released on 2023-09-27.
-    expect(m.stamp).toBe('v0.34#2023-09-27T02_19_31Z')
+    // `g` and the first 10 digits of the blob in `bookBlobs.tit` of the originals list: the stamp the tN and tWL quote
+    // keys name (`ugnt@g987ab2025a+2.3.0-usj`). The rows themselves do not carry it; the source's resources do.
+    expect(m.stamp).toBe('g987ab2025a')
     expect(m.macula).toBeUndefined()
   })
 
@@ -123,13 +164,7 @@ describe('UGNT Titus from the data folder', () => {
 
   test('keeps the text of the document: its pieces joined are the strings of the rows', async () => {
     const m = await titus()
-    const source = await realSource()
-    const chunks: { chapter: number; content: unknown[] }[] = []
-    for await (const row of source.rows({ lang: 'originals', book: 'tit', layer: 'sot' })) {
-      const match = /:tit:(\d+)$/.exec(row.key)
-      if (match) chunks.push({ chapter: Number(match[1]), content: (row.value as any).content.usj.content })
-    }
-    chunks.sort((a, b) => a.chapter - b.chapter)
+    const chunks = await rawChunks()
     expect(chunks.map((c) => c.chapter)).toEqual([0, 1, 2, 3])
     const expected = chunks.map((c) => c.content.map(rawText).join('')).join('')
     expect(expected.length).toBe(4638)
@@ -198,7 +233,7 @@ describe('UGNT Titus from the data folder', () => {
       v: 1,
       tables: { words: [1, true], text: [1, true] },
       book: 'tit',
-      orig: ['unfoldingWord/el-x-koine/ugnt', 'v0.34#2023-09-27T02_19_31Z'],
+      orig: ['unfoldingWord/el-x-koine/ugnt', 'g987ab2025a'],
     })
   })
 
@@ -211,6 +246,44 @@ describe('UGNT Titus from the data folder', () => {
     // And extracting twice gives the same model, so the same id.
     const again = await extractOrig(await realSource(), 'tit')
     expect((await writeSegment(origSegment(again))).id).toBe(a.id)
+  })
+})
+
+describe('the stamp of the book', () => {
+  const para = { type: 'para', marker: 'p', content: [w('a')] }
+  const rows = [chapterRow(UGNT, 'tit', 1, [para])]
+  const release = 'v0.34#2023-09-27T02_19_31Z'
+
+  test('is the blob stamp the resource gives for the book', async () => {
+    const m = await extractOrig(fake(rows, [ref(UGNT, release, ['tit'], { tit: 'g987ab2025a' })]), 'tit')
+    expect(m.stamp).toBe('g987ab2025a')
+    expect(origSegment(m).h.orig).toEqual([UGNT, 'g987ab2025a'])
+  })
+
+  test('is the stamp of the resource (its release) when the source records no blobs', async () => {
+    const m = await extractOrig(fake(rows, [ref(UGNT, release, ['tit'])]), 'tit')
+    expect(m.stamp).toBe(release)
+    expect(origSegment(m).h.orig).toEqual([UGNT, release])
+  })
+
+  test('is the stamp of the resource when the blobs it has are of other books', async () => {
+    for (const bookStamps of [{ rom: 'gaaaaaaaaaa' }, {}]) {
+      const m = await extractOrig(fake(rows, [ref(UGNT, release, ['tit'], bookStamps)]), 'tit')
+      expect(m.stamp).toBe(release)
+    }
+  })
+
+  test('a name of the prototype is not a book with a stamp', async () => {
+    const m = await extractOrig(fake([chapterRow(UGNT, 'toString', 1, [para])], [ref(UGNT, release, [], {})]), 'toString')
+    expect(m.stamp).toBe(release)
+  })
+
+  test('the stamp of MACULA is the release of its resource, whatever blobs the originals have', async () => {
+    const macula = ref(MACULA, '3b8aa380e8#2026-10-15T02_19_35.000Z', ['tit'], { tit: 'gbbbbbbbbbb' })
+    const treesRow: Row = { layer: 'sot', key: `${MACULA}/trees/TIT`, value: { sentences: [] } }
+    const m = await extractOrig(fake([...rows, treesRow], [ref(UGNT, release, ['tit'], { tit: 'g987ab2025a' }), macula]), 'tit')
+    expect(m.stamp).toBe('g987ab2025a')
+    expect(m.macula!.release).toBe('3b8aa380e8#2026-10-15T02_19_35.000Z')
   })
 })
 
@@ -232,8 +305,8 @@ describe('OrigIndex on Titus', () => {
     expect(nfd).not.toBe(text)
     expect(index.find(56001006, nfd, 1)).toBe(87)
     expect(index.find(56001006, 'ἀνέ/γκλητος', 1)).toBe(87)
-    expect(index.find(56001006, 'ἀνέ⁠γκλητος', 1)).toBe(87)
-    expect(index.find(56001006, `${nfd.slice(0, 3)}/⁠${nfd.slice(3)}`, 1)).toBe(87)
+    expect(index.find(56001006, 'ἀνέ\u2060γκλητος', 1)).toBe(87)
+    expect(index.find(56001006, `${nfd.slice(0, 3)}/\u2060${nfd.slice(3)}`, 1)).toBe(87)
   })
 
   test('counts occurrences inside the verse: Θεοῦ is the third and the eleventh word', async () => {
@@ -266,6 +339,27 @@ describe('OrigIndex on Titus', () => {
     const index = new OrigIndex(await titus())
     for (const position of [-1, 659, 1000, 1.5, Number.NaN]) expect(() => index.verseOf(position)).toThrow(RangeError)
   })
+
+  test('all 659 words: the verse is the one of the raw rows, and its form is found again at its position', async () => {
+    const m = await titus()
+    const index = new OrigIndex(m)
+    const raw = rawWords(await rawChunks())
+    expect(raw.length).toBe(659)
+    const seen = new Map<string, number>()
+    raw.forEach(({ form, verse }, position) => {
+      expect(form).toBe(m.words[position].form)
+      expect(index.verseOf(position)).toBe(verse)
+      // k is the form's number among the words of its verse with that form, counted here from the raw rows.
+      const key = `${verse}|${form}`
+      const k = (seen.get(key) ?? 0) + 1
+      seen.set(key, k)
+      expect(index.find(verse, form, k)).toBe(position)
+      expect(index.find(verse, form.normalize('NFD'), k)).toBe(position)
+    })
+    // Some form repeats inside a verse (Θεοῦ in 1:1), so k is not always 1.
+    expect([...seen.values()].some((k) => k > 1)).toBe(true)
+    expect(new Set(raw.map((word) => word.verse)).size).toBe(46)
+  })
 })
 
 describe('OrigIndex on a small model', () => {
@@ -295,6 +389,20 @@ describe('OrigIndex on a small model', () => {
     expect(index.verseOf(3)).toBe(56002003)
     expect(index.find(56002000, 'b', 1)).toBe(1)
     expect(index.find(56002001, 'c', 1)).toBe(2)
+  })
+
+  test('a text that folds to nothing names no word, even when a word has that very form', () => {
+    const index = new OrigIndex(
+      small(
+        [
+          [0, 'chapter', '1'],
+          [0, 'verse', '1'],
+        ],
+        ['/', '', 'a'],
+      ),
+    )
+    for (const text of ['', '/', '//', WORD_JOINER, `/${WORD_JOINER}`]) expect(index.find(56001001, text, 1)).toBeNull()
+    expect(index.find(56001001, 'a', 1)).toBe(2)
   })
 
   test('a chapter or verse label that is not a number is refused', () => {
@@ -385,7 +493,7 @@ describe('words that differ from the four attributes, by hand', () => {
     const verse2 = 1001002
     expect(index.find(verse1, 'בְּ/רֵאשִׁ֖ית', 1)).toBe(0)
     expect(index.find(verse1, 'בְּרֵאשִׁ֖ית', 1)).toBe(0)
-    expect(index.find(verse1, 'בְּ⁠רֵאשִׁ֖ית', 1)).toBe(0)
+    expect(index.find(verse1, 'בְּ\u2060רֵאשִׁ֖ית', 1)).toBe(0)
     expect(index.find(verse1, 'אֱלֹהִ֑ים', 1)).toBe(2) // inside the footnote, still verse 1
     expect(index.find(verse2, 'וְהָאָ֗רֶץ', 1)).toBe(3)
     expect(index.find(verse2, 'וְהָאָ֗רֶץ', 2)).toBe(4)
@@ -394,8 +502,8 @@ describe('words that differ from the four attributes, by hand', () => {
 
   test('a form whose marks are not in canonical order is found by either order', () => {
     // Published as dagesh (ccc 21) before sheva (ccc 10): NFC puts the sheva first.
-    const published = 'בְּ'
-    const canonical = 'בְּ'
+    const published = '\u05D1\u05BC\u05B0'
+    const canonical = '\u05D1\u05B0\u05BC'
     expect(published.normalize('NFC')).toBe(canonical)
     const m: OrigModel = {
       book: 'gen',
@@ -530,6 +638,41 @@ describe('the segment, byte by byte', () => {
     expect(origView(origSegment(m))).toEqual(m)
   })
 
+  test('same bytes and id whatever the order the keys of `other`, `attrs` and `trees` were added in', async () => {
+    const reverseKeys = (value: unknown): unknown =>
+      Array.isArray(value)
+        ? value.map(reverseKeys)
+        : value !== null && typeof value === 'object'
+          ? Object.fromEntries(Object.entries(value).reverse().map(([key, item]) => [key, reverseKeys(item)]))
+          : value
+    const trees = { sentences: [['*', ['s', 1, 2]]], extra: { b: 1, a: [{ y: 'y', x: 'x' }] } }
+    const referents = { words: [], verses: { '1:2': [], '1:1': [] } }
+    const a: OrigModel = {
+      ...tiny,
+      words: [{ ...tiny.words[0], other: { c: '3', a: '1', b: '2' } }, tiny.words[1], tiny.words[2]],
+      attrs: { 1: { z: '1', a: '2', m: '3' }, 3: { y: '1', b: '2' } },
+      macula: { release: 'r', trees, referents },
+    }
+    const b: OrigModel = {
+      ...a,
+      words: a.words.map((word) => (word.other === undefined ? word : { ...word, other: reverseKeys(word.other) as Record<string, string> })),
+      attrs: Object.fromEntries(Object.entries(a.attrs!).map(([event, attrs]) => [event, reverseKeys(attrs) as Record<string, string>])),
+      macula: { release: 'r', trees: reverseKeys(trees), referents: reverseKeys(referents) },
+    }
+    // The two really differ in the order of their keys.
+    expect(Object.keys(a.words[0].other!)).not.toEqual(Object.keys(b.words[0].other!))
+    expect(Object.keys(a.words[1].other!)).not.toEqual(Object.keys(b.words[1].other!))
+    expect(Object.keys(a.attrs![1])).not.toEqual(Object.keys(b.attrs![1]))
+    expect(Object.keys(trees.extra)).not.toEqual(Object.keys((b.macula!.trees as typeof trees).extra))
+    expect(Object.keys(referents.verses)).not.toEqual(Object.keys((b.macula!.referents as typeof referents).verses))
+    const first = await writeSegment(origSegment(a))
+    const second = await writeSegment(origSegment(b))
+    expect(second.id).toBe(first.id)
+    expect(second.body).toEqual(first.body)
+    expect(second.bytes).toEqual(first.bytes)
+    expect((await throughFile(b)).model).toEqual(a)
+  })
+
   test('strings outside the BMP sort by code point in the tables', () => {
     const m: OrigModel = {
       book: 'tit',
@@ -538,11 +681,11 @@ describe('the segment, byte by byte', () => {
       words: [],
       pieces: [
         ['\u{1D538}', false],
-        ['￿', false],
+        ['\uFFFF', false],
       ],
       events: [],
     }
-    expect((origSegment(m).t.text as any).seps).toEqual(['￿', '\u{1D538}'])
+    expect((origSegment(m).t.text as any).seps).toEqual(['\uFFFF', '\u{1D538}'])
   })
 })
 

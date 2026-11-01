@@ -32,6 +32,7 @@ import { deflateRaw, Inflate } from 'pako'
 import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic, MAX_DEPTH } from './cbor'
 import { ColumnError } from './columns'
 import { FormatError, type FormatErrorCode } from './errors'
+import { type CborMap, hasOwn, isMap } from './values'
 
 // Limits and fixed values (`container.md`, "Layout" and "Limits")
 
@@ -79,15 +80,7 @@ export type LogicalHeader = {
 
 export type Segment = { h: LogicalHeader; t: Record<string, CborValue> }
 
-type CborMap = { [key: string]: CborValue }
-
 // Small helpers
-
-const hasOwn = (object: object, key: string): boolean => Object.prototype.hasOwnProperty.call(object, key)
-
-function isMap(value: unknown): value is CborMap {
-  return typeof value === 'object' && value !== null && !(value instanceof Uint8Array) && !Array.isArray(value)
-}
 
 /** A non-negative integer, as the decoder gives every CBOR unsigned integer. */
 const isUint = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0

@@ -13,22 +13,16 @@
 import type { CborValue } from '../codec/cbor'
 import { encodeUvarints, stringTable } from '../codec/columns'
 import type { Segment } from '../codec/container'
+import { hasOwn, isMap } from '../codec/values'
+import { eventCode } from '../events'
 import { verseId } from '../ids'
-import type { Event, OrigModel, OrigWord, Piece } from '../model'
+import { type Event, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
 import { ORIGINALS, type RowSource } from '../source/rows'
-
-/** The event codes of `book.cddl`, "Texts". */
-const EVENT_CODES: Readonly<Record<Event[1], number>> = { chapter: 0, verse: 1, open: 2, close: 3 }
-
-const WORD_ATTRIBUTES = ['form', 'lemma', 'strong', 'morph'] as const
-
-const hasOwn = (object: object, key: string): boolean => Object.prototype.hasOwnProperty.call(object, key)
 
 // Extraction
 
+/** A JSON object of a row. `isMap` checks the shape only; every value is checked where it is read. */
 type Json = Record<string, unknown>
-
-const isRecord = (value: unknown): value is Json => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** `scripture-usj:{resource}:{book}` (the book) and `scripture-usj:{resource}:{book}:{chapter}` (a chapter chunk). */
 const SCRIPTURE_KEY = /^scripture-usj:([^:]+):([^:]+)(?::(\d+))?$/
@@ -53,7 +47,7 @@ const recordOf = (entries: [string, string][]): Record<string, string> | undefin
 /** All the text inside a node, in order. */
 function textOf(node: unknown): string {
   if (typeof node === 'string') return node
-  if (!isRecord(node) || !Array.isArray(node.content)) return ''
+  if (!isMap(node) || !Array.isArray(node.content)) return ''
   return node.content.map(textOf).join('')
 }
 
@@ -83,7 +77,7 @@ function readDocument(chapters: { where: string; content: unknown[] }[]): Pick<O
       pieces.push([node, false])
       return
     }
-    if (!isRecord(node) || typeof node.type !== 'string') throw new Error(`${where}: a node has to be text or have a type`)
+    if (!isMap(node) || typeof node.type !== 'string') throw new Error(`${where}: a node has to be text or have a type`)
     const type = node.type
     const marker = typeof node.marker === 'string' ? node.marker : undefined
     if (type === 'char' && marker === 'w') {
@@ -122,8 +116,9 @@ function readDocument(chapters: { where: string; content: unknown[] }[]): Pick<O
  *   document order, footnotes included. Everything else becomes pieces and events as in `orig.cddl`.
  * - The book row `scripture-usj:{resource}:{book}` lists the chapters the book has: if a chunk is missing, or one is
  *   not listed, extraction fails, because every later position would have moved.
- * - `stamp` is the stamp of the resource that `source.resources('originals')` gives. The rows of format 2.0 do not
- *   record the blob of the book file (`ids.md` prefers it); the originals list does, but not through a row source.
+ * - `stamp` is the book file's blob as format 2.0 records it (`g987ab2025a`), which the resource's `bookStamps` gives
+ *   for this book (`ids.md`, "Positions in the original"). A source that does not record blobs has none, and then the
+ *   stamp is the resource's own (`v0.34#2023-09-27T02_19_31Z`), its release.
  * - MACULA rows `{resource}/trees/{BOOK}` and `{resource}/referents/{BOOK}` go to `macula` as they are, and `release`
  *   is the stamp of the MACULA resource.
  *
@@ -146,8 +141,8 @@ export async function extractOrig(source: RowSource, book: string): Promise<Orig
         throw new Error(`Two originals have the book ${book}: ${resource} and ${key}`)
       }
       resource = key
-      const value = isRecord(row.value) ? row.value : {}
-      const content = isRecord(value.content) ? value.content : {}
+      const value: Json = isMap(row.value) ? row.value : {}
+      const content: Json = isMap(value.content) ? value.content : {}
       if (chapter === undefined) {
         if (!Array.isArray(content.chapterNumbers) || !content.chapterNumbers.every(Number.isInteger)) {
           throw new Error(`${row.key}: the book row lists no chapters`)
@@ -155,7 +150,7 @@ export async function extractOrig(source: RowSource, book: string): Promise<Orig
         listed = content.chapterNumbers as number[]
         continue
       }
-      const usj = isRecord(content.usj) ? content.usj : {}
+      const usj: Json = isMap(content.usj) ? content.usj : {}
       if (!Array.isArray(usj.content)) throw new Error(`${row.key}: the row has no USJ document (content.usj.content)`)
       const number = Number(chapter)
       if (chunks.has(number)) throw new Error(`${row.key}: the chapter is in the source twice`)
@@ -184,16 +179,18 @@ export async function extractOrig(source: RowSource, book: string): Promise<Orig
   }
 
   const resources = await source.resources(ORIGINALS)
-  const stampOf = (key: string): string => {
+  const refOf = (key: string) => {
     const found = resources.find((r) => r.key === key)
     if (found === undefined) throw new Error(`The source does not list the resource ${key} among the originals`)
-    return found.stamp
+    return found
   }
+  const original = refOf(resource)
+  const stamp = original.bookStamps !== undefined && hasOwn(original.bookStamps, book) ? original.bookStamps[book] : original.stamp
 
   const ordered = [...chunks.entries()].sort(([a], [b]) => a - b).map(([, chunk]) => chunk)
-  const model: OrigModel = { book, key: resource, stamp: stampOf(resource), ...readDocument(ordered) }
+  const model: OrigModel = { book, key: resource, stamp, ...readDocument(ordered) }
   if (macula.resource !== undefined) {
-    model.macula = { release: stampOf(macula.resource) }
+    model.macula = { release: refOf(macula.resource).stamp }
     if (macula.trees !== undefined) model.macula.trees = macula.trees
     if (macula.referents !== undefined) model.macula.referents = macula.referents
   }
@@ -219,7 +216,7 @@ function checkModel(m: OrigModel): void {
   if (word !== m.words.length) throw new Error(`The model has ${m.words.length} words and ${word} word pieces`)
   let last = 0
   m.events.forEach(([position, kind, arg], i) => {
-    if (!hasOwn(EVENT_CODES, kind)) throw new Error(`Event ${i}: ${JSON.stringify(kind)} is not an event kind`)
+    if (eventCode(kind) === undefined) throw new Error(`Event ${i}: ${JSON.stringify(kind)} is not an event kind`)
     if (!isInteger(position) || position < last || position > m.pieces.length) {
       throw new Error(`Event ${i}: position ${String(position)} is not between the previous event (${last}) and the ${m.pieces.length} pieces`)
     }
@@ -267,7 +264,7 @@ export function origSegment(m: OrigModel): Segment {
   const ev: number[] = []
   let last = 0
   for (const [position, kind, arg] of m.events) {
-    ev.push(position - last, EVENT_CODES[kind], kind === 'close' ? 0 : seps.index.get(arg)!)
+    ev.push(position - last, eventCode(kind)!, kind === 'close' ? 0 : seps.index.get(arg)!)
     last = position
   }
   text.ev = encodeUvarints(ev)
@@ -295,7 +292,7 @@ export function origSegment(m: OrigModel): Segment {
 /** What `find` compares when the exact form does not match: without `/` and U+2060, then in NFC. */
 function fold(s: string): string {
   // The characters go first: one between a letter and its accent would stop NFC from composing them.
-  return s.replace(/[/⁠]/g, '').normalize('NFC')
+  return s.replace(/[/\u2060]/g, '').normalize('NFC')
 }
 
 /** The number a chapter or verse label starts with: `"1-2"` is 1 (`ids.md`, "Verses as published"). */
@@ -345,11 +342,13 @@ export class OrigIndex {
   /**
    * The position of the `occurrence`-th word (counting from 1) of verse `verse` whose form is `text`, or `null`. The
    * exact form is tried first; if it has no such occurrence, the folded one (NFC, without `/` and U+2060, on both
-   * sides) is.
+   * sides) is. A text that folds to nothing (`""` or `"/"`) names no word: `null`.
    */
   find(verse: number, text: string, occurrence: number): number | null {
     const positions = this.byVerse.get(verse)
     if (positions === undefined || !Number.isInteger(occurrence) || occurrence < 1) return null
+    const folded = fold(text)
+    if (folded === '') return null
     const nth = (same: (form: string) => boolean): number | null => {
       let seen = 0
       for (const position of positions) {
@@ -359,7 +358,6 @@ export class OrigIndex {
     }
     const exact = nth((form) => form === text)
     if (exact !== null) return exact
-    const folded = fold(text)
     return nth((form) => fold(form) === folded)
   }
 

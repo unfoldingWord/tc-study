@@ -38,6 +38,13 @@ export type ResourceRef = {
   kind: string
   /** The books (lowercase, sorted) this source has rows for; empty for a resource that is not about one book. */
   books: string[]
+  /**
+   * The stamp of each book's file as format 2.0 records it: `g` and the first 10 hex digits of the git blob of the book
+   * (`g987ab2025a`), by book code. These are the stamps the `helps-quote` and `helps-align` keys name, and the ones a
+   * position in the original is tied to (`ids.md`, "Positions in the original"). Only for the books this source has rows
+   * for; absent when the source does not record blobs (a format 1.1 pack does not) or none of its books has one.
+   */
+  bookStamps?: Record<string, string>
 }
 
 export type RowFilter = { lang: string; book?: string; resource?: string; layer?: string }

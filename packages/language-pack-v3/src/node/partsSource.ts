@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { partRows, type ResourceRef, type Row, type RowFilter, type RowSource } from '../source/rows'
 
 type ListPart = { sha256: string; kind: string; resource: string; book?: string; group?: string; layers: string[] }
-type ListResource = { key: string; stamp: string; subject?: string }
+type ListResource = { key: string; stamp: string; subject?: string; metadata?: { contentMetadata?: { bookBlobs?: unknown } } }
 type List = { language: string; resources: ListResource[]; parts: ListPart[] }
 
 /** The parts list at `path`: `schema 2`, with the fields this source reads. The rest of the list (`code`, `units`...) is not read. */
@@ -34,6 +34,25 @@ async function readList(path: string): Promise<List> {
     }
   }
   return list as List
+}
+
+/** A git blob as the list writes it: lowercase hex (40 digits in practice); the stamp keeps the first 10. */
+const BLOB = /^[0-9a-f]{10,}$/
+
+/**
+ * The stamp of each of `books` as format 2.0 records it: `g` and the first 10 digits of the book's blob, read from the
+ * list's `metadata.contentMetadata.bookBlobs` (book code to blob) of the resource. A book the list has no well formed blob
+ * for gets none; `undefined` when no book has one.
+ */
+function bookStampsOf(resource: ListResource, books: string[]): Record<string, string> | undefined {
+  const blobs = resource.metadata?.contentMetadata?.bookBlobs
+  if (typeof blobs !== 'object' || blobs === null || Array.isArray(blobs)) return undefined
+  const stamps: [string, string][] = []
+  for (const book of books) {
+    const blob = Object.prototype.hasOwnProperty.call(blobs, book) ? (blobs as Record<string, unknown>)[book] : undefined
+    if (typeof blob === 'string' && BLOB.test(blob)) stamps.push([book, `g${blob.slice(0, 10)}`])
+  }
+  return stamps.length > 0 ? Object.fromEntries(stamps) : undefined
 }
 
 /**
@@ -93,7 +112,11 @@ export async function partsSource(o: { list: string; partsDir: string; originals
         // The books this source has parts for, which a trimmed list holds fewer of than the resource's own `books`.
         const books = new Set<string>()
         for (const part of list.parts) if (part.resource === resource.key && part.book) books.add(part.book)
-        return { key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books: [...books].sort() }
+        const sorted = [...books].sort()
+        const ref: ResourceRef = { key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books: sorted }
+        const bookStamps = bookStampsOf(resource, sorted)
+        if (bookStamps) ref.bookStamps = bookStamps
+        return ref
       })
     },
   }

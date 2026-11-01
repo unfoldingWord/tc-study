@@ -6,25 +6,16 @@
  * wrong shape, a column of another length, a number outside its string table, word pieces that do not match the words,
  * an event out of the pieces. It imports no builder code and no Node module.
  */
-import type { CborValue } from '../codec/cbor'
 import { ColumnError, decodeUvarints } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
-import type { Event, OrigModel, OrigWord, Piece } from '../model'
-
-/** The event kinds by code (`book.cddl`, "Texts"). */
-const EVENT_KINDS: readonly Event[1][] = ['chapter', 'verse', 'open', 'close']
-
-const WORD_ATTRIBUTES = ['form', 'lemma', 'strong', 'morph'] as const
-
-type CborMap = { [key: string]: CborValue }
+import { type CborMap, isMap } from '../codec/values'
+import { eventKind } from '../events'
+import { type Event, type OrigModel, type OrigWord, type Piece, WORD_ATTRIBUTES } from '../model'
 
 function bad(what: string): never {
   throw new FormatError('E_BODY', `the original segment is malformed: ${what}`)
 }
-
-const isMap = (value: unknown): value is CborMap =>
-  typeof value === 'object' && value !== null && !(value instanceof Uint8Array) && !Array.isArray(value)
 
 function map(value: unknown, what: string): CborMap {
   if (!isMap(value)) bad(`${what} is not a map`)
@@ -117,7 +108,7 @@ function readText(
   let position = 0
   for (let i = 0; i < ev.length; i += 3) {
     const [since, code, argument] = [ev[i], ev[i + 1], ev[i + 2]]
-    const kind = EVENT_KINDS[code]
+    const kind = eventKind(code)
     if (kind === undefined) bad(`event ${i / 3} has the code ${code}`)
     position += since
     if (position > pieces.length) bad(`event ${i / 3} is at piece ${position}, and there are ${pieces.length}`)

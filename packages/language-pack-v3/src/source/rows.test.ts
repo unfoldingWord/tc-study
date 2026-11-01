@@ -112,6 +112,46 @@ describe('es-419 Titus, five resources: parts and the format 1.1 pack', () => {
     }
   })
 
+  test('resources give the stamp of each book as format 2.0 records it: g and 10 digits of the blob', async () => {
+    const { parts, zip } = await sources()
+    const originals = byKey(await parts.resources('originals'))
+    expect(originals.get('unfoldingWord/el-x-koine/ugnt')!.bookStamps).toEqual({ tit: 'g987ab2025a' })
+    // `bookBlobs` of the list has 27 books for the UGNT; the source has rows for one, and says only that one.
+    expect(originals.get('unfoldingWord/el-x-koine/ugnt')!.books).toEqual(['tit'])
+    const found = byKey(await parts.resources('es-419'))
+    const BLOBS: Record<string, string> = {
+      'es-419_gl/es-419/glt': 'g9c65570ffd',
+      'es-419_gl/es-419/gst': 'gbde5d47ec7',
+      'es-419_gl/es-419/tn': 'gbb0c56a52f',
+      'es-419_gl/es-419/tq': 'gb5c5eb1dc4',
+      'es-419_gl/es-419/twl': 'ge970df02e3',
+    }
+    for (const key of FIVE) expect(found.get(key)!.bookStamps).toEqual({ tit: BLOBS[key] })
+    // A resource of no book (tW) or without blobs in its list (uGL) has none, and no empty map.
+    for (const key of ['es-419_gl/es-419/tw', 'es-419_gl/es-419/ugl']) expect('bookStamps' in found.get(key)!).toBe(false)
+    // A format 1.1 pack does not record them.
+    for (const ref of await zip.resources('es-419')) expect('bookStamps' in ref).toBe(false)
+  })
+
+  test('the stamps of the books are those that the quote and align keys of the sample name after "@"', async () => {
+    const { parts } = await sources()
+    const stamps = new Map<string, string>()
+    for (const lang of ['es-419', 'originals']) {
+      for (const ref of await parts.resources(lang)) if (ref.bookStamps?.tit) stamps.set(ref.key, ref.bookStamps.tit)
+    }
+    const named = new Map<string, string>()
+    for (const layer of ['quote', 'align']) {
+      for await (const row of parts.rows({ lang: 'es-419', layer })) {
+        for (const match of row.key.matchAll(/([a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+){2})@(g[0-9a-f]{10})/g)) named.set(match[1], match[2])
+      }
+    }
+    // tN, tWL, UGNT (quote and align keys) and GLT, GST (align keys).
+    expect([...named.keys()].sort()).toEqual(
+      ['es-419_gl/es-419/glt', 'es-419_gl/es-419/gst', 'es-419_gl/es-419/tn', 'es-419_gl/es-419/twl', 'unfoldingWord/el-x-koine/ugnt'].sort(),
+    )
+    for (const [key, stamp] of named) expect(stamps.get(key)).toBe(stamp)
+  })
+
   test('the parts list also names the common resources, with a stamp each', async () => {
     const { parts } = await sources()
     const found = byKey(await parts.resources('es-419'))
@@ -227,7 +267,13 @@ describe('the originals', () => {
     expect(rows.every((r) => r.key.includes('unfoldingWord/el-x-koine/ugnt'))).toBe(true)
     expect(rows.map((r) => r.key)).toContain('scripture-usj:unfoldingWord/el-x-koine/ugnt:tit:1')
     expect(await parts.resources('originals')).toEqual([
-      { key: 'unfoldingWord/el-x-koine/ugnt', stamp: 'v0.34#2023-09-27T02_19_31Z', kind: 'Greek New Testament', books: ['tit'] },
+      {
+        key: 'unfoldingWord/el-x-koine/ugnt',
+        stamp: 'v0.34#2023-09-27T02_19_31Z',
+        kind: 'Greek New Testament',
+        books: ['tit'],
+        bookStamps: { tit: 'g987ab2025a' },
+      },
     ])
     // A language the source does not hold is not an error: it has nothing.
     expect(await parts.resources('fr')).toEqual([])
@@ -276,6 +322,30 @@ describe('what a source refuses', () => {
     for (const filter of excluded) expect(await collect(parts.rows(filter))).toEqual([])
     for (const filter of [{ lang: 'es-419', resource: 'es-419_gl/es-419/tq' }, { lang: 'es-419', resource: 'es-419_gl/es-419/tq', book: 'tit' }, { lang: 'es-419', book: 'tit', layer: 'sot', resource: 'es-419_gl/es-419/tq' }]) {
       await expect(collect(parts.rows(filter))).rejects.toThrow(tq[0].sha256)
+    }
+  })
+
+  test('partsSource: a blob the list writes badly gives no stamp, and no stamps gives no map', async () => {
+    const list = (await Bun.file(ORIGINALS).json()) as { resources: Array<{ metadata: { contentMetadata: Record<string, unknown> } }> }
+    const dir = join(process.env.TEMP ?? process.env.TMPDIR ?? '/tmp', `langpack-v3-${crypto.randomUUID()}`)
+    let n = 0
+    const bookStamps = async (blobs: unknown): Promise<Record<string, string> | undefined> => {
+      const copy = structuredClone(list)
+      if (blobs === undefined) delete copy.resources[0].metadata.contentMetadata.bookBlobs
+      else copy.resources[0].metadata.contentMetadata.bookBlobs = blobs
+      const path = join(dir, `${n++}.json`)
+      await Bun.write(path, JSON.stringify(copy))
+      const [ugnt] = await (await partsSource({ list: path, partsDir: PARTS })).resources('originals')
+      return ugnt.bookStamps
+    }
+    try {
+      expect(await bookStamps({ tit: '0123456789abcdef0123' })).toEqual({ tit: 'g0123456789' })
+      // Not well formed: no stamp for the book. Without a stamp the map is left out, not empty.
+      for (const bad of [undefined, null, [], 'text', {}, { rom: '0123456789abcdef' }, { tit: '' }, { tit: '0123' }, { tit: 'ABCDEF0123456789' }, { tit: 'xyz0123456789' }, { tit: 12345678901 }]) {
+        expect(await bookStamps(bad)).toBeUndefined()
+      }
+    } finally {
+      await Bun.$`rm -rf ${dir}`.quiet()
     }
   })
 
