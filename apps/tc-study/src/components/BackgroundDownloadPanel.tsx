@@ -8,13 +8,14 @@ import { Download, CheckCircle, XCircle, Loader, AlertCircle } from 'lucide-reac
 import { useEffect, useState } from 'react'
 import { useBackgroundDownloadManager } from '../contexts'
 import type { DownloadProgress } from '../lib/services/BackgroundDownloadManager'
+import { Button } from './ui/Button'
+import { Card } from './ui/Card'
 
 export function BackgroundDownloadPanel() {
   const downloadManager = useBackgroundDownloadManager()
   const [progress, setProgress] = useState<DownloadProgress | null>(null)
   const [isActive, setIsActive] = useState(false)
 
-  // Set up progress monitoring
   useEffect(() => {
     downloadManager.onProgress((newProgress) => {
       setProgress(newProgress)
@@ -38,162 +39,126 @@ export function BackgroundDownloadPanel() {
   }
 
   if (!progress && !isActive) {
-    // Initial state - no downloads started yet
     return (
-      <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200">
+      <Card className="shadow-sm">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-blue-50 rounded-lg">
-            <Download className="w-6 h-6 text-blue-600" />
+          <div className="rounded-lg bg-accent-soft p-3">
+            <Download className="h-6 w-6 text-accent" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Background Download
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <h3 className="mb-2 text-lg font-semibold text-fg">Background Download</h3>
+            <p className="mb-4 text-sm text-fg-secondary">
               Download all resources in the background for offline access. Resources will be downloaded in priority order and cached locally.
             </p>
-            <button
-              onClick={handleStartDownload}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Start Background Download
-            </button>
+            <Button onClick={handleStartDownload} className="rounded-lg">
+              <Download className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-      </div>
+      </Card>
     )
   }
 
-  // Download in progress or completed
   return (
-    <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200">
+    <Card className="shadow-sm">
       <div className="space-y-4">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {isActive ? (
               <>
-                <Loader className="w-5 h-5 text-blue-600 animate-spin" />
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Downloading Resources...
-                </h3>
+                <Loader className="h-5 w-5 animate-spin text-accent" />
+                <h3 className="text-lg font-semibold text-fg">Downloading Resources...</h3>
               </>
             ) : (
               <>
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Download Complete
-                </h3>
+                <CheckCircle className="h-5 w-5 text-valid-fg" />
+                <h3 className="text-lg font-semibold text-fg">Download Complete</h3>
               </>
             )}
           </div>
           {isActive && (
-            <button
-              onClick={handleCancel}
-              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 border border-gray-300 hover:border-gray-400 rounded transition-colors"
-            >
+            <Button variant="outline" size="md" onClick={handleCancel} className="h-auto rounded-md px-3 py-1.5 text-sm">
               Cancel
-            </button>
+            </Button>
           )}
         </div>
 
-        {/* Overall Progress */}
         {progress && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">
+              <span className="text-fg-secondary">
                 {progress.completedResources} of {progress.totalResources} resources
               </span>
-              <span className="font-medium text-gray-900">
-                {progress.overallProgress}%
-              </span>
+              <span className="font-medium text-fg">{progress.overallProgress}%</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div className="h-2.5 w-full rounded-full bg-muted">
               <div
-                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                className="h-2.5 rounded-full bg-accent-fill transition-all duration-300"
                 style={{ width: `${progress.overallProgress}%` }}
               />
             </div>
           </div>
         )}
 
-        {/* Current Resource */}
         {progress?.currentResource && isActive && (
-          <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
-            <div className="text-sm text-gray-600 mb-1">Current:</div>
-            <div className="font-medium text-gray-900 mb-2">
-              {progress.currentResource}
-            </div>
-            <div className="w-full bg-blue-200 rounded-full h-1.5">
+          <div className="rounded-lg border border-border-subtle bg-accent-soft p-3">
+            <div className="mb-1 text-sm text-fg-secondary">Current:</div>
+            <div className="mb-2 font-medium text-fg">{progress.currentResource}</div>
+            <div className="h-1.5 w-full rounded-full bg-accent-soft">
               <div
-                className="bg-blue-600 h-1.5 rounded-full transition-all duration-150"
+                className="h-1.5 rounded-full bg-accent-fill transition-all duration-150"
                 style={{ width: `${progress.currentResourceProgress}%` }}
               />
             </div>
           </div>
         )}
 
-        {/* Stats */}
         {progress && (
           <div className="flex gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-green-600" />
-              <span className="text-gray-600">
-                {progress.completedResources} completed
-              </span>
+              <CheckCircle className="h-4 w-4 text-valid-fg" />
+              <span className="text-fg-secondary">{progress.completedResources} completed</span>
             </div>
             {progress.failedResources > 0 && (
               <div className="flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-red-600" />
-                <span className="text-gray-600">
-                  {progress.failedResources} failed
-                </span>
+                <XCircle className="h-4 w-4 text-danger" />
+                <span className="text-fg-secondary">{progress.failedResources} failed</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Task List (collapsible) */}
         {progress && progress.tasks.length > 0 && (
           <details className="mt-4">
-            <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-900 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
+            <summary className="flex cursor-pointer items-center gap-2 text-sm text-fg-secondary hover:text-fg">
+              <AlertCircle className="h-4 w-4" />
               View detailed progress ({progress.tasks.length} resources)
             </summary>
-            <div className="mt-3 space-y-1 max-h-64 overflow-y-auto">
+            <div className="mt-3 max-h-64 space-y-1 overflow-y-auto">
               {progress.tasks.map((task) => (
                 <div
                   key={task.resourceKey}
-                  className="flex items-center gap-3 p-2 text-sm rounded hover:bg-gray-50"
+                  className="flex items-center gap-3 rounded p-2 text-sm hover:bg-muted"
                 >
                   {task.status === 'completed' && (
-                    <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    <CheckCircle className="h-4 w-4 shrink-0 text-valid-fg" />
                   )}
                   {task.status === 'downloading' && (
-                    <Loader className="w-4 h-4 text-blue-600 animate-spin flex-shrink-0" />
+                    <Loader className="h-4 w-4 shrink-0 animate-spin text-accent" />
                   )}
                   {task.status === 'failed' && (
-                    <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                    <XCircle className="h-4 w-4 shrink-0 text-danger" />
                   )}
                   {task.status === 'pending' && (
-                    <div className="w-4 h-4 rounded-full border-2 border-gray-300 flex-shrink-0" />
+                    <div className="h-4 w-4 shrink-0 rounded-full border-2 border-border" />
                   )}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 truncate">
-                      {task.resourceKey}
-                    </div>
-                    {task.message && (
-                      <div className="text-xs text-gray-500">{task.message}</div>
-                    )}
-                    {task.error && (
-                      <div className="text-xs text-red-600">{task.error}</div>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium text-fg">{task.resourceKey}</div>
+                    {task.message && <div className="text-xs text-fg-muted">{task.message}</div>}
+                    {task.error && <div className="text-xs text-danger">{task.error}</div>}
                   </div>
                   {task.status === 'downloading' && (
-                    <div className="text-xs text-gray-600 flex-shrink-0">
-                      {task.progress}%
-                    </div>
+                    <div className="shrink-0 text-xs text-fg-secondary">{task.progress}%</div>
                   )}
                 </div>
               ))}
@@ -201,6 +166,6 @@ export function BackgroundDownloadPanel() {
           </details>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

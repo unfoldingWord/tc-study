@@ -130,7 +130,7 @@ export function MarkdownRenderer({
         console.error('Markdown rendering error:', err)
         setError(err instanceof Error ? err.message : 'Unknown error')
         setRenderedContent(
-          <span className="text-red-500">Error rendering markdown</span>
+          <span className="text-danger">Error rendering markdown</span>
         )
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -157,7 +157,7 @@ export function MarkdownRenderer({
 
   if (error) {
     return (
-      <div className={`text-red-600 ${className}`}>
+      <div className={`text-danger ${className}`}>
         <p className="font-semibold">Error rendering markdown</p>
         <p className="text-sm mt-1">{error}</p>
       </div>

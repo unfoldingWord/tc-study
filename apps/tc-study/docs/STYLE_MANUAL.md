@@ -196,7 +196,7 @@ Prefer these over ad-hoc `p-2` / `text-[10px]` in reading chrome. Avoid double b
 
 Screens moving from raw palette classes to tokens ([TC4_STYLE_AND_BRAND_PLAN.md](./TC4_STYLE_AND_BRAND_PLAN.md), PR 5). `utils/rawPaletteFreeze.test.ts` holds the count; each PR lowers it.
 
-- [ ] 5a Shell and shared pieces
+- [x] 5a Shell and shared pieces
 - [ ] 5b Read
 - [ ] 5c Home, Library, Collections, Passage sets
 - [ ] 5d Studio

@@ -1,7 +1,7 @@
 /**
  * Shared loading spinner for resource panels/viewers and related UI.
  * Uses Lucide Loader2 so animation, stroke, and sizing stay consistent.
- * Panel accent color via className (e.g. text-blue-600 / text-violet-500).
+ * Panel accent color via className (e.g. text-accent / text-helps-fg).
  *
  * Lives under src/shared (not components/) so features/ may import it
  * without violating the features→components import-direction guard.
@@ -27,7 +27,7 @@ export interface LoadingSpinnerProps {
   label?: string
   /** When true, render a short visible label under the icon. Default false. */
   showLabel?: boolean
-  /** Color / extra classes on the icon (e.g. text-blue-600). Default text-gray-400. */
+  /** Color / extra classes on the icon (e.g. text-accent). Default text-fg-muted. */
   className?: string
   /** When true, wrap in a centered flex container. */
   centered?: boolean
@@ -45,7 +45,7 @@ export function LoadingSpinner({
 }: LoadingSpinnerProps) {
   const icon = (
     <Loader2
-      className={clsx('animate-spin', SIZE_CLASS[size], className ?? 'text-gray-400')}
+      className={clsx('animate-spin', SIZE_CLASS[size], className ?? 'text-fg-muted')}
       aria-hidden
     />
   )
@@ -69,7 +69,7 @@ export function LoadingSpinner({
       aria-label={label}
     >
       {icon}
-      {showLabel ? <span className="text-sm text-gray-600">{label}</span> : null}
+      {showLabel ? <span className="text-sm text-fg-secondary">{label}</span> : null}
     </div>
   )
 }

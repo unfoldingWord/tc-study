@@ -169,7 +169,7 @@ export function EntryResourceModal({ onEntryLinkClick }: EntryResourceModalProps
           {/* Restore button */}
           <button
             onClick={restoreModal}
-            className="relative flex items-center gap-2 pl-4 pr-4 py-3 bg-accent hover:bg-accent-hover text-white rounded-full shadow-lg transition-all hover:shadow-xl"
+            className="relative flex items-center gap-2 rounded-full bg-accent-fill py-3 pl-4 pr-4 text-accent-fill-fg shadow-lg transition-all hover:bg-accent-fill-hover hover:shadow-xl"
             title="Restore entry modal"
           >
             {/* Navigation status badge */}

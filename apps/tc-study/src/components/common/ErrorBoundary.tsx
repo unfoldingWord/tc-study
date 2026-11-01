@@ -4,6 +4,7 @@
  */
 
 import React, { Component, ErrorInfo, ReactNode } from 'react'
+import { Button } from '../ui/Button'
 
 interface Props {
   children: ReactNode
@@ -37,17 +38,18 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback
       }
-      
+
       return (
-        <div className="p-6 text-red-600">
-          <p className="font-semibold mb-2">Something went wrong</p>
+        <div className="p-6 text-danger">
+          <p className="mb-2 font-semibold">Something went wrong</p>
           <p className="text-sm">{this.state.error?.message || 'Unknown error'}</p>
-          <button
+          <Button
+            variant="danger"
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="mt-4 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200"
+            className="mt-4 rounded-lg bg-danger-soft px-4 py-2"
           >
             Try again
-          </button>
+          </Button>
         </div>
       )
     }
