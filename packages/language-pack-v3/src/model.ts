@@ -110,3 +110,42 @@ export type BookModel = {
   questions?: HelpTable
   links?: HelpTable
 }
+
+/** What a section of an article is for (`spec/cddl/art.cddl`, `section-role`). `intro` is the text before the first heading. */
+export const ROLES = [
+  'intro',
+  'definition',
+  'facts',
+  'translation-suggestions',
+  'examples',
+  'strategies',
+  'description',
+  'reason',
+  'bible-references',
+  'word-data',
+  'unknown',
+] as const
+
+export type Role = (typeof ROLES)[number]
+
+/**
+ * A section of an article (`art.cddl`, `section`). `level` is 0 for the text before the first heading, else the heading's
+ * level; `title` is the heading as published; `lang` is the language the section is written in; `md` is the text of the
+ * section without its heading line, with the links rewritten (`ids.md`); `aliases` are the sids it had before it was
+ * split, merged or renamed.
+ */
+export type SectionModel = { sid: string; level: number; role: Role; title?: string; lang: string; md: string; aliases?: string[] }
+
+/**
+ * An article of the word (tW) or the Academy (tA) (`art.cddl`, `article`). `id` is its concept (`tw:kt/grace`,
+ * `ta:translate/figs-metaphor`); `res` is the key of the resource that published it (`es-419_gl/es-419/tw`).
+ */
+export type ArticleModel = {
+  id: string
+  res: string
+  title: string
+  subtitle?: string
+  related?: string[]
+  aliases?: string[]
+  sections: SectionModel[]
+}
