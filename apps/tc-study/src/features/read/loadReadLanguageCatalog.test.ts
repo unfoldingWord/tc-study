@@ -29,6 +29,12 @@ describe('loadReadLanguageCatalog (split text vs helps)', () => {
     expect(src).toContain('page.hydrateTarget')
   })
 
+  test('with no Door43, the language comes from the device catalog, and its rows are not rewritten', () => {
+    expect(src).toContain('readCatalogPagesOrDevice')
+    expect(src).toContain('deviceCatalogRows(catalogManager)')
+    expect(src).toMatch(/fromDevice\s*\?\s*deviceMetadataPromises/)
+  })
+
   test('text and helps catalog searches run in parallel', () => {
     expect(src).toContain('Promise.all')
     expect(src).toContain('searchPages')

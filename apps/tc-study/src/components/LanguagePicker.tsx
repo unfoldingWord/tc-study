@@ -29,6 +29,8 @@ import {
 import { availabilitySubjectSetsFromRegistry } from '../features/read/compositionAvailabilitySubjects'
 import { fetchLanguageAvailabilityByCode } from '../features/read/languageAvailability'
 import { resolveLanguageListKind } from '../features/read/languageListKind'
+import { appendDeviceLanguages, catalogLanguageRows, localPickerLanguages } from '../features/read/localPickerLanguages'
+import { isOffline } from '@bt-synergy/resource-pipeline/download/networkFailure'
 import {
   loadLanguagesCache,
   saveLanguagesCache,
@@ -108,10 +110,23 @@ export function LanguagePicker({
   const [isRevalidating, setIsRevalidating] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
+  // Languages this device can read (e.g. from a language pack), listed with Door43's or without it.
+  const deviceLanguages = useCallback(
+    async () =>
+      localPickerLanguages({
+        rows: await catalogLanguageRows(catalogManager).catch(() => []),
+        sets: availabilitySubjectSetsFromRegistry(resourceTypeRegistry, panelEntryRegistry),
+        kind: listKind,
+      }),
+    [catalogManager, resourceTypeRegistry, panelEntryRegistry, listKind]
+  )
+
   const revalidate = useCallback(async () => {
     setIsRevalidating(true)
     setError(null)
     try {
+      // Offline: no Door43 request at all, only what the device holds.
+      if (isOffline()) throw new Error('This device is offline')
       const client = getDoor43ApiClient()
       const [availabilityByCode, catalogStats] = await Promise.all([
         fetchLanguageAvailabilityByCode(
@@ -129,15 +144,20 @@ export function LanguagePicker({
         availabilityByCode,
       })
       saveLanguagesCache(global, globalSubjects)
-      setDisplayedLanguages(display)
+      setDisplayedLanguages(appendDeviceLanguages(display, await deviceLanguages()))
       setAvailableLanguages(global)
     } catch (err) {
-      console.error('❌ Failed to revalidate languages:', err)
-      setError(err as Error)
+      const onDevice = await deviceLanguages()
+      if (onDevice.length > 0) {
+        setDisplayedLanguages((shown) => appendDeviceLanguages(shown, onDevice))
+      } else {
+        console.error('❌ Failed to revalidate languages:', err)
+        setError(err as Error)
+      }
     } finally {
       setIsRevalidating(false)
     }
-  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager, resourceTypeRegistry, panelEntryRegistry])
+  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager, resourceTypeRegistry, panelEntryRegistry, deviceLanguages])
 
   const revalidateRef = useRef(revalidate)
   revalidateRef.current = revalidate

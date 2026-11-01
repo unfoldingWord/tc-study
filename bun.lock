@@ -198,6 +198,7 @@
         "@bt-synergy/catalog-adapter-indexeddb": "workspace:*",
         "@bt-synergy/catalog-manager": "workspace:*",
         "@bt-synergy/door43-api": "workspace:*",
+        "@bt-synergy/language-pack": "workspace:*",
         "@bt-synergy/navigation": "workspace:*",
         "@bt-synergy/package-storage": "workspace:*",
         "@bt-synergy/passage-sets": "workspace:*",
@@ -255,6 +256,7 @@
         "vite": "^7.2.4",
         "vite-plugin-checker": "^0.12.0",
         "vite-plugin-pwa": "^1.2.0",
+        "workbox-window": "^7.4.0",
         "wrangler": "^4.62.0",
       },
     },
@@ -896,6 +898,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@bt-synergy/catalog-manager": "workspace:*",
+        "@bt-synergy/door43-api": "workspace:*",
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
         "jszip": "^3.10.1",

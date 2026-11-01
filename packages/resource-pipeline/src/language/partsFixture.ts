@@ -299,6 +299,13 @@ export function maculaFolder(dir: string) {
   return dir
 }
 
+/** The `index.json` Taller keeps in each of MACULA's part folders, naming its source and `license`. */
+export function maculaIndexes(dir: string, license = 'CC BY 4.0') {
+  for (const part of ['trees', 'referents']) {
+    writeFileSync(join(dir, part, 'index.json'), JSON.stringify({ source: 'MACULA Hebrew and Greek Linguistic Datasets, Biblica', license }))
+  }
+}
+
 /** A `.tar.gz` (ustar) of the files given, as Door43 serves an archive. */
 export function tarGz(files: Record<string, string>): Uint8Array<ArrayBuffer> {
   const blocks: Uint8Array[] = []
@@ -323,6 +330,12 @@ export const LEXICON_FILES: Readonly<Record<string, string>> = {
   'content/H1961.json': JSON.stringify({ brief: 'ser, estar' }),
   'content/H5281.json': JSON.stringify({ brief: 'Noemí' }),
   'manifest.yaml': 'dublin_core:\n  title: Léxico hebreo\n',
+}
+
+/** LEXICON_FILES with a manifest that names its licence, as es-419_gl's lexicons have it. */
+export const LICENSED_LEXICON_FILES: Readonly<Record<string, string>> = {
+  ...LEXICON_FILES,
+  'manifest.yaml': "dublin_core:\n  rights: 'CC BY-SA 4.0'\n  title: Léxico hebreo\n",
 }
 
 /**
@@ -356,7 +369,10 @@ export const LEXICONS_REF = 'master'
  * language's and both originals' jobs, the lexicons, MACULA), with the fake Door43 and HTTP. Its language pack and
  * originals pack.
  */
-export async function wholePacks(macula: string, o: { obs?: boolean } = {}): Promise<{ language: Uint8Array; originals: Uint8Array }> {
+export async function wholePacks(
+  macula: string,
+  o: { obs?: boolean; lexicon?: Readonly<Record<string, string>> } = {}
+): Promise<{ language: Uint8Array; originals: Uint8Array }> {
   const outDir = mkdtempSync(join(tmpdir(), 'whole-packs-'))
   try {
     const built = await prepareAndPack({
@@ -367,9 +383,9 @@ export async function wholePacks(macula: string, o: { obs?: boolean } = {}): Pro
       maculaStamp: MACULA_STAMP,
       lexicons: { ref: LEXICONS_REF },
       obs: o.obs ?? false,
-      door43Client: fakeDoor43(),
+      door43Client: fakeDoor43({ lexicon: o.lexicon }),
       discover,
-      fetch: lexiconFetch,
+      fetch: o.lexicon ? lexiconFetchOf({ files: o.lexicon }) : lexiconFetch,
       databases: { cache: 'whole-cache', catalog: 'whole-catalog' },
     })
     for (const pack of [built.language, built.originals]) {

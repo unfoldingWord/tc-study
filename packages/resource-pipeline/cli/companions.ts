@@ -4,16 +4,17 @@
  *
  * - The lexicons of a language (`{owner}/{lang}_uhl` and `{owner}/{lang}_ugl` on Door43, one entry a Strong
  *   number): resources of the language, kept by entry, so they go in its `language` and `base` packs.
- * - What MACULA says of the originals (Biblica, CC BY 4.0), as Taller builds it (`public/trees`, `public/referents`):
- *   how each sentence is put together, and whom each word refers to, one file a book. Resources beside the originals,
- *   so they go in the `originals` pack.
+ * - What MACULA says of the originals (Biblica, under the licence Taller's `index.json` files name), as Taller builds
+ *   it (`public/trees`, `public/referents`): how each sentence is put together, and whom each word refers to, one
+ *   file a book. Resources beside the originals, so they go in the `originals` pack.
  *
  * Their rows are the files as they are, under the resource's key (`{key}/content/1.json`, `{key}/trees/JON`), the way
  * articles are kept; nothing in the pack format changes.
  */
 
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { manifestRights } from '@bt-synergy/door43-api'
 import { buildIngestReceiptFromCatalog, ingestSchemaForResourceType, resourceContentStamp } from '@bt-synergy/resource-catalog'
 
 type Store = { set(key: string, entry: unknown): Promise<void>; putRawMany(rows: Array<{ key: string; entry: unknown }>): Promise<void> }
@@ -40,7 +41,20 @@ export function untar(gz: Uint8Array): Array<{ path: string; bytes: Uint8Array }
   return out
 }
 
-type CompanionResource = { key: string; owner: string; language: string; resourceId: string; subject: string; title: string; type: string; version: string; publishedAt: string; books?: string[] }
+type CompanionResource = {
+  key: string
+  owner: string
+  language: string
+  resourceId: string
+  subject: string
+  title: string
+  type: string
+  version: string
+  publishedAt: string
+  books?: string[]
+  /** The licence its source names, if it names one: never made up, since CC BY and CC BY-SA must be named. */
+  license?: string
+}
 
 /**
  * The catalog row `addLexicons` and `addMacula` write for a resource. A parts build writes it in its catalog step too,
@@ -57,6 +71,8 @@ export function companionCatalogRow(resource: CompanionResource) {
     version: resource.version,
     title: resource.title,
     type: resource.type,
+    // As a Door43 resource's row has it.
+    ...(resource.license ? { license: { id: resource.license } } : {}),
     format: 'json',
     contentType: 'application/json',
     contentStructure: 'entry',
@@ -152,18 +168,34 @@ export async function lexiconStamps(o: { language: string; owner: string; ref: s
 /** Bump when the rows `addLexicons` writes (their row paths or entries) change: it is in every part fingerprint. */
 export const LEXICON_ROWS_VERSION = 1
 
-/** The title `addLexicons` gives a lexicon: its archive's manifest's `title`, if any. */
-export function lexiconTitleOf(files: ReadonlyArray<{ path: string; bytes: Uint8Array }>): string | undefined {
+type ArchiveFiles = ReadonlyArray<{ path: string; bytes: Uint8Array }>
+
+/** The manifest a lexicon's archive names its title and licence in: the first `manifest.yaml` it holds. */
+function lexiconManifestOf(files: ArchiveFiles): string | undefined {
   const manifest = files.find((f) => /\/manifest\.yaml$/.test(f.path))
-  return manifest ? new TextDecoder().decode(manifest.bytes).match(/^\s*title:\s*['"]?(.+?)['"]?\s*$/m)?.[1] : undefined
+  return manifest && new TextDecoder().decode(manifest.bytes)
 }
 
-/** The resource `addLexicons` adds for a lexicon read at `commit`; `named` is `lexiconTitleOf` its archive's files. */
+/** The title `addLexicons` gives a lexicon: its archive's manifest's `title`, if any. */
+export function lexiconTitleOf(files: ArchiveFiles): string | undefined {
+  return lexiconManifestOf(files)?.match(/^\s*title:\s*['"]?(.+?)['"]?\s*$/m)?.[1]
+}
+
+/** The licence `addLexicons` gives a lexicon: its archive's manifest's `rights`, if any. */
+export function lexiconLicenseOf(files: ArchiveFiles): string | undefined {
+  const manifest = lexiconManifestOf(files)
+  return manifest === undefined ? undefined : manifestRights(manifest)
+}
+
+/**
+ * The resource `addLexicons` adds for a lexicon read at `commit`; `named` is `lexiconTitleOf` and `lexiconLicenseOf`
+ * its archive's files.
+ */
 export function lexiconResourceOf(
   lexicon: { key: string; owner: string; subject: string; title: string },
   language: string,
   commit: { sha: string; date: string },
-  named: string | undefined
+  named: { title?: string; license?: string }
 ): CompanionResource {
   return {
     key: lexicon.key,
@@ -171,10 +203,11 @@ export function lexiconResourceOf(
     language,
     resourceId: lexicon.key.split('/')[2],
     subject: lexicon.subject,
-    title: named ?? lexicon.title,
+    title: named.title ?? lexicon.title,
     type: 'lexicon',
     version: commit.sha.slice(0, 10),
     publishedAt: commit.date,
+    ...(named.license ? { license: named.license } : {}),
   }
 }
 
@@ -205,7 +238,8 @@ export async function addLexicons(cache: Store, catalog: Catalog, language: stri
       rows.push({ key: `${key}/${path}`, entry: JSON.parse(new TextDecoder().decode(file.bytes)) })
       if (path.startsWith('content/')) entries++
     }
-    await addResource(cache, catalog, lexiconResourceOf({ key, owner, subject, title }, language, commit, lexiconTitleOf(files)), rows)
+    const named = { title: lexiconTitleOf(files), license: lexiconLicenseOf(files) }
+    await addResource(cache, catalog, lexiconResourceOf({ key, owner, subject, title }, language, commit, named), rows)
     done.push({ key, entries })
   }
   return done
@@ -239,7 +273,34 @@ function maculaFilesOf(folder: string): Map<string, { files: Array<{ part: 'tree
   return byKey
 }
 
-function maculaResourceOf(key: string, books: Set<string>, stamp: { version: string; publishedAt: string }): CompanionResource {
+/** Where a MACULA build says what it did not read: the build's log, or the console when given none. */
+type Warn = (line: string) => void
+
+/**
+ * The licence a MACULA folder names: the `license` of the `index.json` Taller keeps in its part folders (`trees/`,
+ * `referents/`), if any. One that cannot be read or parsed names none, and `warn` names it: it holds no rows, so it
+ * does not fail the build. Two that differ throw: which one MACULA's rows carry is for a person to say.
+ */
+export function maculaLicenseOf(folder: string, warn: Warn = console.warn): string | undefined {
+  const named = new Set<string>()
+  for (const part of ['trees', 'referents']) {
+    const path = join(folder, part, 'index.json')
+    if (!existsSync(path)) continue
+    let index: unknown
+    try {
+      index = JSON.parse(readFileSync(path, 'utf8'))
+    } catch (error) {
+      warn(`  MACULA: no se pudo leer ${path} (${error instanceof Error ? error.message : String(error)}); no cuenta para la licencia`)
+      continue
+    }
+    const license = index && typeof index === 'object' ? (index as { license?: unknown }).license : undefined
+    if (typeof license === 'string' && license.trim()) named.add(license.trim())
+  }
+  if (named.size > 1) throw new Error(`MACULA's index.json files in ${folder} name different licences: ${[...named].join(', ')}`)
+  return [...named][0]
+}
+
+function maculaResourceOf(key: string, books: Set<string>, stamp: { version: string; publishedAt: string }, license: string | undefined): CompanionResource {
   const [owner, language] = key.split('/')
   return {
     key,
@@ -252,12 +313,16 @@ function maculaResourceOf(key: string, books: Set<string>, stamp: { version: str
     version: stamp.version,
     publishedAt: stamp.publishedAt,
     books: [...books].sort(),
+    ...(license ? { license } : {}),
   }
 }
 
-/** The catalog rows `addMacula` writes for a folder, read from its file names alone (no file is parsed). */
-export function maculaCatalogRows(folder: string, stamp: { version: string; publishedAt: string }): Array<ReturnType<typeof companionCatalogRow>> {
-  return [...maculaFilesOf(folder)].filter(([, { files }]) => files.length).map(([key, { books }]) => companionCatalogRow(maculaResourceOf(key, books, stamp)))
+/** The catalog rows `addMacula` writes for a folder, read from its file names and its `index.json` files alone. */
+export function maculaCatalogRows(folder: string, stamp: { version: string; publishedAt: string }, warn?: Warn): Array<ReturnType<typeof companionCatalogRow>> {
+  const license = maculaLicenseOf(folder, warn)
+  return [...maculaFilesOf(folder)]
+    .filter(([, { files }]) => files.length)
+    .map(([key, { books }]) => companionCatalogRow(maculaResourceOf(key, books, stamp, license)))
 }
 
 /**
@@ -269,13 +334,15 @@ export async function addMacula(
   cache: Store,
   catalog: Catalog,
   folder: string,
-  stamp: { version: string; publishedAt: string }
+  stamp: { version: string; publishedAt: string },
+  warn?: Warn
 ): Promise<Array<{ key: string; books: number }>> {
   const done: Array<{ key: string; books: number }> = []
+  const license = maculaLicenseOf(folder, warn)
   for (const [key, { files, books }] of maculaFilesOf(folder)) {
     if (!files.length) continue
     const rows = files.map(({ part, name, book }) => ({ key: `${key}/${part}/${book}`, entry: JSON.parse(readFileSync(join(folder, part, name), 'utf8')) }))
-    await addResource(cache, catalog, maculaResourceOf(key, books, stamp), rows)
+    await addResource(cache, catalog, maculaResourceOf(key, books, stamp, license), rows)
     done.push({ key, books: books.size })
   }
   return done

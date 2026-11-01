@@ -22,10 +22,12 @@ import { getWarmQueueStats } from '../../workers/warmClient'
 import { ModalPortal } from '../shared/ModalPortal'
 import {
   formatDownloadQueueRowLabel,
+  formatHeldBooks,
   windowDownloadQueueSlice,
   type DownloadQueueRow,
   type DownloadQueueRowStatus,
 } from './downloadQueueDetails'
+import { useHeldBooks } from './useHeldBooks'
 import {
   buildProcessDebugModel,
   type ProcessWorkerSection,
@@ -109,6 +111,9 @@ function QueueRowView({
             <span className="shrink-0 px-1 rounded bg-muted text-fg-secondary font-mono">
               {row.typeId}
             </span>
+          ) : null}
+          {row.heldBooks?.length ? (
+            <span className="shrink-0 font-mono" data-testid="download-row-held">{formatHeldBooks(row.heldBooks)}</span>
           ) : null}
           {ingredient ? <span className="truncate">→ {ingredient}</span> : null}
           {typeof resourceProgress === 'number' && resourceProgress > 0 ? (
@@ -322,6 +327,8 @@ export function DownloadQueueDetailsModal({
     }
   }, [open])
 
+  const heldBooksByKey = useHeldBooks(queue, open)
+
   const model = useMemo(
     () =>
       buildProcessDebugModel({
@@ -337,6 +344,7 @@ export function DownloadQueueDetailsModal({
         warmWorkerQueue,
         prepare: prepareStats,
         now,
+        heldBooksByKey,
       }),
     [
       queue,
@@ -351,6 +359,7 @@ export function DownloadQueueDetailsModal({
       warmWorkerQueue,
       prepareStats,
       now,
+      heldBooksByKey,
     ]
   )
 

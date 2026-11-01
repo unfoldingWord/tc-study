@@ -284,6 +284,8 @@ export function buildProcessDebugModel(input: {
   warmWorkerQueue?: WarmWorkerQueueStats | null
   prepare: PrepareQueueStats | null
   now?: number
+  /** Books each queued resource already holds (from a language pack). */
+  heldBooksByKey?: Readonly<Record<string, readonly string[]>>
 }): ProcessDebugModel {
   const now = input.now ?? Date.now()
   const phase = inferDownloadPhase({
@@ -299,6 +301,7 @@ export function buildProcessDebugModel(input: {
     isDownloading: input.isDownloading,
     error: input.error,
     phase,
+    heldBooksByKey: input.heldBooksByKey,
   })
   const useIngredients =
     input.progress?.totalIngredients !== undefined && input.progress.totalIngredients > 0

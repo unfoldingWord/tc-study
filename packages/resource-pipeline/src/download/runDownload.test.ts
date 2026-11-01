@@ -184,6 +184,65 @@ describe('runDownload records the book blobs', () => {
   })
 })
 
+describe('runDownload with no network', () => {
+  const KEY = 'es-419_gl/es-419/tn'
+  const spies: Array<{ mockRestore(): void }> = []
+  afterEach(() => {
+    for (const spy of spies.splice(0)) spy.mockRestore()
+  })
+
+  /** A whole-resource download whose loader throws `failure`, over a device that holds a book from a pack. */
+  async function runFailing(failure: Error) {
+    const catalog = memoryStore()
+    catalog.rows.set(KEY, {
+      resourceKey: KEY,
+      owner: 'es-419_gl',
+      language: 'es-419',
+      resourceId: 'tn',
+      type: 'notes',
+      release: { tag_name: 'v66' },
+      contentMetadata: { ingredients: [{ identifier: 'tit', path: './tn_TIT.tsv' }] },
+    })
+    const cache = memoryStore()
+    spies.push(
+      spyOn(LoaderRegistry.prototype, 'getLoaderForResource').mockReturnValue({
+        downloadResource: async () => {
+          throw failure
+        },
+      } as never),
+      spyOn(ResourceCompletenessChecker.prototype, 'checkResource').mockResolvedValue({
+        isComplete: false,
+        status: 'partial',
+      } as never)
+    )
+    const messages: DownloadThreadMessage[] = []
+    await runDownload({
+      resourceKeys: [KEY],
+      skipExisting: true,
+      runId: 1,
+      post: (m) => messages.push(m),
+      isCurrentRun: () => true,
+      cacheAdapter: cache as never,
+      catalogAdapter: catalog as never,
+      door43Client: {},
+    })
+    const done = messages.find((m) => m.type === 'complete')!.payload as { failedResources: number }
+    return { receipt: cache.rows.get(`resource:${KEY}`) as any, failed: done.failedResources }
+  }
+
+  test('a request that got no answer leaves no error receipt: the resource stays as the pack left it', async () => {
+    const { receipt, failed } = await runFailing(new TypeError('Failed to fetch'))
+    expect(receipt).toBeUndefined()
+    expect(failed).toBe(1)
+  })
+
+  test('any other failure still leaves its error on the receipt, as before', async () => {
+    const { receipt, failed } = await runFailing(new Error('tn_TIT.tsv: 404 Not Found'))
+    expect(receipt?.metadata).toMatchObject({ downloadError: 'tn_TIT.tsv: 404 Not Found', downloadComplete: false })
+    expect(failed).toBe(1)
+  })
+})
+
 describe('runDownload one book at a time', () => {
   const KEY = 'unfoldingWord/en/tn'
   const spies: Array<{ mockRestore(): void }> = []
