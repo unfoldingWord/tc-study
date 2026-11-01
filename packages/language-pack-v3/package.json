@@ -19,7 +19,6 @@
   },
   "license": "MIT",
   "dependencies": {
-    "cbor-x": "^1.6.8",
     "jszip": "^3.10.1",
     "pako": "2.1.0"
   },
