@@ -135,14 +135,27 @@ cases expect.
 | `E_KIND` | The kind is not the one expected (a transfer file where a segment was expected, or the reverse) |
 | `E_TRUNCATED` | The file is shorter than `12 + H + clen` |
 | `E_TRAILING` | The file is longer than `12 + H + clen` |
-| `E_HEADER` | The header is not a CBOR map, or lacks `h`, `codec`, `clen`, `ulen` or `id` |
+| `E_HEADER` | The header (the `H` bytes) is not exactly one CBOR map, or lacks `h`, `codec`, `clen`, `ulen` or `id`, or one of them has the wrong type (`id` is not 32 bytes, `clen` is not an unsigned integer, ...) |
 | `E_CODEC` | The codec is not `deflate-raw` |
 | `E_INFLATE` | Inflating fails, does not end exactly at the end of the body, or gives other than `ulen` bytes |
 | `E_ID` | The sha256 of the uncompressed body is not `id`, or not the id the catalog gives |
-| `E_BODY` | The body does not match its class's schema |
+| `E_BODY` | The body does not match its class's schema. The logical header must have the types of the "Logical header" table, and table names are lowercase ASCII letters, digits and `-`, starting with a letter. A table listed in `tables` and missing from `t` (or the reverse) is `E_BODY` too |
 | `E_HMISMATCH` | The body's `h` differs from the header's `h` |
 | `E_TABLE` | A required table, or its version, is unknown |
 | `E_LIMIT` | A limit above is exceeded |
+
+**Order of checks.** A file can have more than one defect. So that two readers give the same code, a reader checks in
+this order and stops at the first defect:
+
+1. The fixed bytes, each one as soon as it is present: the magic number (`E_MAGIC`), the major version (`E_VERSION`),
+   the kind (`E_KIND`). A file that ends before byte 12, while every byte present matches, is `E_TRUNCATED`. The
+   reserved byte and the minor version are not checked: a reader ignores the reserved byte and reads any minor version
+   of its major.
+2. `H` over the limit (`E_LIMIT`). Then fewer than `12 + H` bytes (`E_TRUNCATED`). Then the header (`E_HEADER`; CBOR
+   nested deeper than 16 levels is `E_LIMIT`).
+3. `clen` or `ulen` over the limit (`E_LIMIT`). Then the file's length against `12 + H + clen`: shorter is `E_TRUNCATED`,
+   longer is `E_TRAILING`.
+4. Then, in this order: `E_CODEC`, `E_INFLATE`, `E_ID`, `E_BODY`, `E_HMISMATCH`, `E_TABLE`.
 
 A file that came cut short over Bluetooth or a full SD card fails `E_TRUNCATED` or `E_INFLATE`. The app keeps what it
 had and asks for the file again.
