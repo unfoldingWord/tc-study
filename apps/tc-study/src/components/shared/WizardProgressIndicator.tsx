@@ -43,7 +43,7 @@ export function WizardProgressIndicator<T extends string = string>({
                 key={step.id}
                 className={clsx(
                   'size-2 rounded-full',
-                  filled ? 'bg-accent-fill' : 'bg-muted border border-border'
+                  filled ? 'bg-accent-fill' : 'bg-muted'
                 )}
                 title={step.label}
                 aria-label={step.label}

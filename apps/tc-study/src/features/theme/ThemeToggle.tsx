@@ -4,6 +4,7 @@
  */
 
 import { Monitor, Moon, Sun } from 'lucide-react'
+import { OCEAN_BAR_ICON } from '../../styles/oceanBarChrome'
 import { useTheme } from './useTheme'
 
 interface ThemeToggleProps {
@@ -29,7 +30,7 @@ export function ThemeToggle({
     variant === 'menu'
       ? 'flex items-center justify-center p-2 w-full text-fg-secondary hover:text-fg hover:bg-muted transition-colors'
       : variant === 'ocean'
-        ? `${padClass} rounded-md text-accent-fill-fg/60 hover:text-accent-fill-fg hover:bg-accent-fill-fg/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-fill-fg/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--uw-ocean)] transition-colors`
+        ? `${padClass} rounded-md ${OCEAN_BAR_ICON} transition-colors`
         : `${padClass} rounded-full text-fg-secondary hover:text-fg hover:bg-muted transition-colors`
 
   const title =

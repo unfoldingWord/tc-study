@@ -5,12 +5,9 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { BRAND_SHORT } from '../config/brand'
 import { navItems } from '../config/navItems'
 import { ThemeToggle } from '../features/theme'
+import { OCEAN_BAR_BG, OCEAN_BAR_SECTION_SHORTCUT } from '../styles/oceanBarChrome'
 import { Card } from './ui/Card'
 import { IconButton } from './ui/IconButton'
-
-const OCEAN_BAR = 'bg-[var(--uw-ocean)]'
-const ON_OCEAN_ICON =
-  'text-accent-fill-fg hover:bg-accent-fill-fg/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-fill-fg/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--uw-ocean)]'
 
 export default function Layout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -26,7 +23,7 @@ export default function Layout() {
         <header
           className={clsx(
             'flex-shrink-0 relative z-[110] h-14 border-b border-accent-fill-fg/15',
-            OCEAN_BAR
+            OCEAN_BAR_BG
           )}
         >
           <nav className="flex h-full items-center justify-between px-3">
@@ -41,7 +38,7 @@ export default function Layout() {
                 to={activeNavItem.path}
                 className={clsx(
                   'inline-flex items-center justify-center rounded-md p-1.5 transition-colors',
-                  ON_OCEAN_ICON
+                  OCEAN_BAR_SECTION_SHORTCUT
                 )}
                 title={activeNavItem.name}
                 aria-label={activeNavItem.name}

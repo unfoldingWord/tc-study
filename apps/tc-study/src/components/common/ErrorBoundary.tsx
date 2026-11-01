@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <Button
             variant="danger"
             onClick={() => this.setState({ hasError: false, error: null })}
-            className="mt-4 rounded-lg bg-danger-soft px-4 py-2"
+            className="mt-4"
           >
             Try again
           </Button>

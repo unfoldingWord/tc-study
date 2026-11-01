@@ -50,7 +50,11 @@ export function BackgroundDownloadPanel() {
             <p className="mb-4 text-sm text-fg-secondary">
               Download all resources in the background for offline access. Resources will be downloaded in priority order and cached locally.
             </p>
-            <Button onClick={handleStartDownload} className="rounded-lg">
+            <Button
+              onClick={handleStartDownload}
+              aria-label="Start Background Download"
+              title="Start Background Download"
+            >
               <Download className="h-4 w-4" />
             </Button>
           </div>

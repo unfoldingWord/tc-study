@@ -49,4 +49,11 @@ describe('IconButton', () => {
       expectNoRawPalette(render({ size }))
     }
   })
+
+  test('onOcean tone uses Ocean bar icon and focus ring classes', () => {
+    const html = render({ tone: 'onOcean' })
+    expect(html).toContain('text-accent-fill-fg/60')
+    expect(html).toContain('focus-visible:ring-accent-fill-fg/60')
+    expect(html).toContain('focus-visible:ring-offset-[var(--uw-ocean)]')
+  })
 })
