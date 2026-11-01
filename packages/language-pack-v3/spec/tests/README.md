@@ -60,5 +60,11 @@ Keys are sorted, so that two readers' outputs can be compared as text.
 | 12 | `idioma-parcial` | Zero against no source | An es-419 map whose tN covers tit, rut, 3jn and jon | Use of `ta:translate/figs-metaphor` in Titus: the count. In Jonah with no such note: zero. In Isaiah: no source |
 | 13 | `paquete-viejo` | The bridge from an old pack | `es-419-tit.langpack.zip`, format 1.1, with the originals from case 4 | The same book segment as case 4, with the same id; a local catalog (`origin` "local", unsigned) |
 
-The fixed queries of the common map (G5485, `tw:names/abraham`, notes on metaphor by book, Isaiah, the key terms of
-Ruth) are added in phase 2, with the answers phase 0 measured.
+Cases 6, 11 and 12, and the map half of case 5, need the maps, so they are built in phase 2.
+
+Phase 2 also adds the fixed queries of the common map, with the answers phase 0 measured:
+- G5485;
+- `tw:names/abraham`;
+- the notes on metaphor by book;
+- Isaiah;
+- the key terms of Ruth.
