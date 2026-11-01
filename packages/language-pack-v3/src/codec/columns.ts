@@ -72,7 +72,7 @@ export function decodeUvarints(bytes: Uint8Array): number[] {
 // svarints
 
 /** Zigzag: n >= 0 becomes 2n, n < 0 becomes -2n - 1. The result has to stay within 2^53 - 1. */
-function zigzag(n: number): number {
+export function zigzag(n: number): number {
   if (!Number.isSafeInteger(n)) {
     throw new ColumnError(`svarint: ${String(n)} is not an integer within 2^53 - 1`)
   }
@@ -81,7 +81,7 @@ function zigzag(n: number): number {
   return z
 }
 
-function unzigzag(z: number): number {
+export function unzigzag(z: number): number {
   return z % 2 === 0 ? z / 2 : -(z + 1) / 2
 }
 

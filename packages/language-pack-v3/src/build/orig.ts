@@ -22,7 +22,7 @@ import { ORIGINALS, type RowSource } from '../source/rows'
 // Extraction
 
 /** A JSON object of a row. `isMap` checks the shape only; every value is checked where it is read. */
-type Json = Record<string, unknown>
+export type Json = Record<string, unknown>
 
 /** `scripture-usj:{resource}:{book}` (the book) and `scripture-usj:{resource}:{book}:{chapter}` (a chapter chunk). */
 const SCRIPTURE_KEY = /^scripture-usj:([^:]+):([^:]+)(?::(\d+))?$/
@@ -30,7 +30,7 @@ const SCRIPTURE_KEY = /^scripture-usj:([^:]+):([^:]+)(?::(\d+))?$/
 const MACULA_KEY = /^(.+\/macula)\/(trees|referents)\/([A-Za-z0-9]{3})$/
 
 /** The attributes of a USJ node: every key but the ones that make the node (`type`, `marker`, `content`) and `skip`. */
-function attributesOf(node: Json, skip: string[], where: string): [string, string][] {
+export function attributesOf(node: Json, skip: string[], where: string): [string, string][] {
   const entries: [string, string][] = []
   for (const [name, value] of Object.entries(node)) {
     if (name === 'type' || name === 'marker' || name === 'content' || skip.includes(name)) continue
@@ -41,11 +41,11 @@ function attributesOf(node: Json, skip: string[], where: string): [string, strin
 }
 
 /** The attributes as a record. `fromEntries` defines the keys, so one named "__proto__" is kept like any other. */
-const recordOf = (entries: [string, string][]): Record<string, string> | undefined =>
+export const recordOf = (entries: [string, string][]): Record<string, string> | undefined =>
   entries.length === 0 ? undefined : Object.fromEntries(entries)
 
 /** All the text inside a node, in order. */
-function textOf(node: unknown): string {
+export function textOf(node: unknown): string {
   if (typeof node === 'string') return node
   if (!isMap(node) || !Array.isArray(node.content)) return ''
   return node.content.map(textOf).join('')
@@ -296,7 +296,7 @@ function fold(s: string): string {
 }
 
 /** The number a chapter or verse label starts with: `"1-2"` is 1 (`ids.md`, "Verses as published"). */
-function leadingNumber(label: string, what: string): number {
+export function leadingNumber(label: string, what: string): number {
   const match = /^[0-9]+/.exec(label)
   if (match === null) throw new RangeError(`The ${what} label ${JSON.stringify(label)} does not start with a number`)
   return Number(match[0])

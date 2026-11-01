@@ -41,3 +41,62 @@ export type OrigModel = {
   attrs?: Record<number, Record<string, string>>
   macula?: { release: string; trees?: unknown; referents?: unknown }
 }
+
+/**
+ * A bridge text of a book (`spec/cddl/book.cddl`, "Texts"): its pieces and events as in {@link OrigModel}, and which
+ * words of the original each of its words translates.
+ *
+ * - `res` is the resource key of the text (`es-419_gl/es-419/glt`).
+ * - `align` has one list per word (the word's ordinal among the word pieces, not the index of its piece): the positions
+ *   in the original (`ids.md`) of the words it translates, in the order of the milestones that enclose it, outer first.
+ *   An empty list is a word that is not aligned.
+ * - `alignMissing` has one entry per word and milestone that the source aligns to a word this original edition does not
+ *   have: the word's ordinal, the verse id, the `x-content` and the `x-occurrence` the source names.
+ * - `align` is there if and only if some word has a position or `alignMissing` has an entry: a text with neither is
+ *   a text without alignment, and has neither field.
+ */
+export type TextModel = {
+  res: string
+  pieces: Piece[]
+  events: Event[]
+  attrs?: Record<number, Record<string, string>>
+  align?: number[][]
+  alignMissing?: [word: number, verse: number, original: string, occurrence: number][]
+}
+
+/**
+ * A note, question or word link of a book (`spec/cddl/book.cddl`, "Notes, questions and word links"). `from` and `to`
+ * are verse ids, both included. `quote` is the original positions of the words of the quote (`-1` for a word the
+ * original does not have), `quoteKinds` names the pieces of the quote that are not words, and `quoteMissing` the words
+ * the original does not have.
+ */
+export type HelpRow = {
+  id: string
+  ref: string
+  from: number
+  to: number
+  concept?: string
+  cols: Record<string, string | boolean>
+  quote?: number[]
+  quoteKinds?: [piece: number, kind: string][]
+  quoteMissing?: [piece: number, verse: number, word: string, occurrence: number][]
+}
+
+/** The rows of one helps resource (notes, questions or word links) of a book, in the order of the source. */
+export type HelpTable = { res: string; rows: HelpRow[] }
+
+/**
+ * A book segment (`spec/cddl/book.cddl`). `orig` is the `[key, stamp]` of the original book the positions of the
+ * alignment and the quotes belong to. `res` is exactly what the header holds: the key of each resource and its release
+ * tag (`v42`, the part of the stamp before the `#`). A text or a table names its resource by the key.
+ */
+export type BookModel = {
+  lang: string
+  book: string
+  orig: [string, string]
+  res: [string, string][]
+  texts: TextModel[]
+  notes?: HelpTable
+  questions?: HelpTable
+  links?: HelpTable
+}
