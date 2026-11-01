@@ -31,6 +31,10 @@ book-tables = {
 ; A text is the sequence of its pieces in order: words (\w in the USFM) and what lies between them (spaces,
 ; punctuation, headings, footnote text). Joining the pieces gives the text. Structure is a list of events that say,
 ; at a position in that sequence, "a chapter starts", "a verse starts", "a node opens" or "the last node closes".
+;
+; The USJ of format 2.0 drops the blank that the USFM has between two alignment milestones, so two words can follow each
+; other with nothing between them. The builder puts one space piece (" ", not a word) between two word pieces that follow
+; each other with nothing between them, as format 2.0 does when it shows the text. Joining the pieces gives the text.
 book-text = {
   "res": res-index,
   "tok": uvarints,             ; per piece: string number × 2, plus 1 when the piece is a word
