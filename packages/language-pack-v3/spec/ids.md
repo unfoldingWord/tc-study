@@ -131,6 +131,8 @@ without a network and across segments:
 | `[text](rc://*/tn/help/tit/02/03)` | `[text](ref:tit 2:3)` |
 | `[text](../02/03.md)` in a note of Tito | `[text](ref:tit 2:3)` |
 
+The `*` of an address can also be a language tag (`rc://es-419/ta/man/…`), and the builder rewrites both the same way.
+
 A link in any other form is kept as it is.
 
 ## Groups

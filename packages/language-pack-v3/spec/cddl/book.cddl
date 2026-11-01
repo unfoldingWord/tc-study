@@ -74,7 +74,8 @@ helps = {
 }
 ; "cols" keeps every other field of the source row by its TSV column name in lower camel case: "tags", "quote",
 ; "occurrence", "note", "question", "response", "origWords". Long text ("note", "question", "response") is "texts";
-; the rest "strings".
+; the rest "strings". Two fields format 2.0 adds to its rows are kept too: `articlePath` (links) and `isIntro` (notes, a
+; `flags` column).
 ; Notes: SupportReference becomes "concept" (rc://*/ta/man/translate/figs-metaphor -> ta:translate/figs-metaphor).
 ; Links: TWLink becomes "concept" (rc://*/tw/dict/bible/kt/grace -> tw:kt/grace). A link that does not have that form
 ;   keeps TWLink in "cols" and has no concept.
