@@ -1,0 +1,51 @@
+; Format 3: the original segment. One book of the UHB or the UGNT, the same for every language. A word's position is
+; its index in "words" (ids.md).
+
+orig-segment = body<orig-header, orig-tables>
+
+orig-header = {
+  "class": "orig",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "book": book-code,
+  "orig": [tstr, tstr],        ; this book's own key and stamp: what other segments name
+}
+
+orig-tables = {
+  "words": orig-words,         ; required, v1
+  "text": orig-text,           ; required, v1
+  ? "macula": macula,          ; optional, v1
+}
+
+orig-words = {
+  "form": strtab,              ; distinct values of each attribute, most used first, ties by code point
+  "lemma": strtab,
+  "strong": strtab,
+  "morph": strtab,
+  "cols": {                    ; per word, in book order: the value's number in its table
+    "form": uvarints,
+    "lemma": uvarints,
+    "strong": uvarints,
+    "morph": uvarints,
+  },
+  ? "other": [* [word: uint, { * tstr => tstr }]],   ; any other attribute of a word, as published
+}
+; A word without one of the four attributes has the empty string "" there; every table holds "" when a word uses it.
+; Strong numbers are kept as published ("H7462b", "b:H4999", "G54850"); ids.md says how a map key is made from them.
+
+orig-text = {
+  "seps": strtab,              ; what lies between words, and every structure argument; most used first
+  "tok": uvarints,             ; per piece: 0 for the next word, n for separator n - 1
+  "ev": uvarints,              ; events as in the book segment's texts; arguments are numbers in "seps"
+  ? "attrs": [* [event: uint, { * tstr => tstr }]],
+}
+; Words inside footnotes count like any other word, in document order. The ketiv and qere marks are kept as
+; published (as nodes, or as attributes in "other").
+
+macula = {
+  "release": tstr,             ; the MACULA release the data comes from
+  ? "trees": any,              ; v1: the value published today (clause trees per verse)
+  ? "referents": any,          ; v1: the value published today (who each pronoun refers to)
+}
+; v1 keeps MACULA as it is published, under its own license. Phase 0 measured it at 193 KB for Psalms after
+; compression. A columnar layout is a later version of this table.

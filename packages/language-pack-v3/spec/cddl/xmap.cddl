@@ -1,0 +1,50 @@
+; Format 3: the common map. The same for every language: where every Strong number, concept and Academy article appears,
+; book by book and verse by verse, from the original and the English resources; topics and relations. A core with the
+; counts, and one part per book with the verses behind them.
+
+xmap-segment = body<xmap-header, xmap-tables>
+xmap-tables = xmap-core-tables / xmap-part-tables
+
+xmap-header = {
+  "class": "xmap",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "part": "core" / book-code,
+  ? "book": book-code,         ; equal to "part" in a book's part
+  "res": [+ [tstr, tstr]],     ; every source with its release; tables name them by index
+}
+
+xmap-core-tables = {
+  "coverage": coverage,        ; required, v1; per source key: the books it covers
+  "strong": counts,            ; required, v1; unit "occurrences": words of the original with that Strong key
+  "concepts": concepts,        ; required, v1
+  ? "links": counts,           ; optional, v1; unit "links": the English word links of each concept
+  ? "notes": counts,           ; optional, v1; unit "notes": the English notes that point to each Academy article
+  ? "relations": relations,    ; optional, v1
+  ? "aliases": { * concept-id => concept-id },   ; optional, v1; ids that moved (other/ -> kt/), to their new id
+  ? "topics": any,             ; optional; defined in phase 2 (TIPNR, Theographic, OBS)
+}
+
+concepts = {
+  "ids": strtab,               ; every concept id, sorted by code point
+  "kind": uvarints,            ; per id: 0 none, 1 person, 2 place, 3 event, 4 topic, 5 story
+  "tw": uvarints,              ; per id: its tW category: 0 none, 1 kt (key term), 2 names, 3 other
+  "source": uvarints,          ; per id: the index in "res" of the source that defines it
+}
+
+; Typed relations between concepts, each with where it comes from and how sure it is. Concepts are never merged:
+; "same as" is a relation like any other.
+relations = {
+  "types": strtab,             ; "same-as", "part-of", "parent-of", "occurs-in", "related", ...
+  "from": uvarints,            ; per relation: a concept's number in "concepts"
+  "to": uvarints,
+  "type": uvarints,            ; a number in "types"
+  "source": uvarints,          ; an index in "res"
+  "confidence": uvarints,      ; 0 to 100
+}
+
+xmap-part-tables = {
+  "strong": verse-lists,       ; required, v1
+  ? "links": verse-lists,      ; optional, v1
+  ? "notes": verse-lists,      ; optional, v1
+}

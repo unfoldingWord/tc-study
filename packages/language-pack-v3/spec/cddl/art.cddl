@@ -1,0 +1,46 @@
+; Format 3: the article segment. One language, one group of word (tW) or Academy (tA) articles, each in sections with
+; stable ids. Articles travel in groups because one segment per article weighed 50 % more in phase 0 (es-419:
+; 1 094 KB against 725 KB).
+
+art-segment = body<art-header, art-tables>
+
+art-header = {
+  "class": "art",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "lang": tstr,
+  "group": art-group,
+  "res": [+ [tstr, tstr]],
+}
+
+; tW: one group per category. tA: one group per manual.
+art-group = "tw:kt" / "tw:names" / "tw:other" / "ta:translate" / "ta:checking" / "ta:process" / "ta:intro" / tstr
+
+art-tables = {
+  "articles": [* article],     ; required, v1; ordered by id
+}
+
+article = {
+  "id": concept-id,            ; "tw:kt/grace", "ta:translate/figs-metaphor"
+  "res": res-index,
+  "title": tstr,               ; tW: the article's heading; tA: title.md
+  ? "subtitle": tstr,          ; tA: sub-title.md, the question the article answers
+  ? "related": [* concept-id], ; tA: the articles its config lists as related
+  ? "aliases": [* concept-id], ; ids this article had before (other/ moved to kt/): they still lead here
+  "sections": [+ section],     ; in reading order
+}
+
+section = {
+  "sid": tstr,                 ; stable id within the article (ids.md)
+  "level": uint,               ; 0: the text before the first heading; else the heading's level
+  "role": section-role,
+  ? "title": tstr,             ; the heading as published
+  "lang": tstr,                ; the language the section is written in: es-419 tA has some sections in English
+  "md": tstr,                  ; the text, as minimal markdown (no HTML); links rewritten (ids.md)
+  ? "aliases": [* tstr],       ; sids this section had before it was split, merged or renamed
+}
+
+; What a section is for, so that a reader can show the definition first and the rest on request. A heading the
+; builder cannot place is "unknown": the section keeps its sid and stays readable.
+section-role = "intro" / "definition" / "facts" / "translation-suggestions" / "examples" / "strategies" /
+  "description" / "reason" / "bible-references" / "word-data" / "unknown"

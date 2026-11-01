@@ -1,0 +1,19 @@
+; Format 3: the index of a transfer file (transfer.md).
+
+transfer-index = {
+  "mode": "full" / "update",
+  "catalogs": [+ sha256],      ; ids of the catalog entries; they come first
+  ? "base": [* [catalog: tstr, revision: uint]],   ; update mode only
+  "entries": [+ transfer-entry],   ; in offset order
+  ? "made": tstr,              ; RFC 3339; informative
+  ? "by": tstr,                ; informative
+  * tstr => any,               ; keys a later minor version adds
+}
+
+transfer-entry = {
+  "id": sha256,                ; a segment's id, or the sha256 of a complement's bytes
+  "kind": "segment" / "complement",
+  ? "class": class-name,       ; segments only
+  "offset": uint,              ; from the end of the index
+  "size": uint,
+}

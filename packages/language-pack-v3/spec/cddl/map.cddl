@@ -1,0 +1,41 @@
+; Format 3: the language map. A core with what the language calls things and what it has, and one part per book with
+; the verses behind its counts.
+
+map-segment = body<map-header, map-tables>
+map-tables = map-core-tables / map-part-tables
+
+map-header = {
+  "class": "map",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "lang": tstr,
+  "part": "core" / book-code,
+  ? "book": book-code,         ; equal to "part" in a book's part
+  "res": [* [tstr, tstr]],
+}
+
+map-core-tables = {
+  "books": [66*66 book-name],  ; required, v1; in canonical order (ids.md)
+  "names": { * concept-id => [+ tstr] },   ; required, v1; the title first, then other names
+  ? "subtitles": { * concept-id => tstr }, ; optional, v1; tA: the question each article answers
+  "coverage": coverage,        ; required, v1; per resource key: the books it has
+  ? "usage": counts,           ; optional, v1; unit "notes": Academy articles used by this language's notes
+  ? "obs": [* [story: uint, title: tstr]], ; optional, v1
+  ? "topics": local-topics,    ; optional, v1; defined in phase 2
+  ? "numbering": any,          ; optional; reserved for verse equivalences, defined in phase 2
+}
+
+; A book's names. "source" says where they came from: the language's own text (\toc1, \toc2, \toc3), the language's
+; list of book names (for books it has no text of), or nowhere (a reader shows the book code).
+book-name = [name: tstr, short: tstr, abbreviation: tstr, source: "text" / "list" / "none"]
+
+; "names": tW titles split at their commas ("gracia, amable" -> ["gracia", "amable"]); tA titles; names of concepts
+; and topics of the common map (per:, lug:, ev:, tema:) in this language. A concept the language does not name is
+; absent: a reader falls back to another language's name and says so.
+
+local-topics = { * tstr => { "names": [+ tstr], ? "refs": [* [verse-id, verse-id]], ? "related": [* concept-id] } }
+; A topic only this language has ("es-419:tema/..."), from its own book outlines.
+
+map-part-tables = {
+  ? "usage": verse-lists,      ; optional, v1; the verses behind the core's "usage" in this book
+}

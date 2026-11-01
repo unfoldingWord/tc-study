@@ -1,0 +1,92 @@
+; Format 3: the book segment. One language, one book: the bridge texts with their marks and alignment, and the notes,
+; questions and word links with their quotes found in the original.
+
+book-segment = body<book-header, book-tables>
+
+book-header = {
+  "class": "book",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "lang": tstr,
+  "book": book-code,
+  "orig": [tstr, tstr],        ; the original book the alignment and quote positions refer to
+  "res": [+ [tstr, tstr]],
+}
+
+book-tables = {
+  "strings": strtab,           ; required, v1
+  "texts": [* book-text],           ; required, v1 (may be empty: a language with notes and no text of this book)
+  ? "align": [* text-align],   ; optional, v1; depends on "texts"; one entry per text, same order
+  ? "notes": helps,            ; optional, v1 (tN)
+  ? "questions": helps,        ; optional, v1 (tQ)
+  ? "links": helps,            ; optional, v1 (tWL)
+  ? "quotes": quotes,          ; optional, v1; depends on "notes" and/or "links"
+}
+
+; "strings": every text piece of the texts, every structure argument and every short value of the helps, once.
+; Order: most used first; ties by code point order.
+
+; ---- Texts ----
+
+; A text is the sequence of its pieces in order: words (\w in the USFM) and what lies between them (spaces,
+; punctuation, headings, footnote text). Joining the pieces gives the text. Structure is a list of events that say,
+; at a position in that sequence, "a chapter starts", "a verse starts", "a node opens" or "the last node closes".
+book-text = {
+  "res": res-index,
+  "tok": uvarints,             ; per piece: string number × 2, plus 1 when the piece is a word
+  "ev": uvarints,              ; per event, three numbers: pieces since the previous event, code, argument
+  ? "attrs": [* [event: uint, { * tstr => tstr }]],   ; attributes of the few nodes that have them (book code, caller)
+}
+; Event codes and their argument (a string number):
+;   0  chapter starts; its number ("1")
+;   1  verse starts; its number as published ("1", "1-2")
+;   2  a node opens; "type:marker" as in USJ ("para:p", "para:q1", "para:s1", "note:f", "char:add", "ms:ts")
+;   3  the last open node closes; argument 0
+; A milestone (other than the alignment ones) opens and closes at the same position. Alignment milestones
+; (zaln-s, zaln-e) are not events: they are the "align" table. x-occurrence and x-occurrences of \w are not kept: a
+; reader counts them within the verse.
+
+text-align = {
+  "words": uvarints,           ; per word piece of the text, in order: k, the number of original words it
+                               ; translates, then k numbers: each original position (ids.md) minus the previous
+                               ; position written in this column, as svarints. k = 0: not aligned
+  ? "missing": [* [word: uint, verse: verse-id, original: tstr, occurrence: uint]],
+                               ; aligned in the source to an original word that this original edition does not have
+}
+; The original word's Strong, lemma and morphology are not kept: they are in the orig segment at that position.
+
+; ---- Notes, questions and word links ----
+
+helps = {
+  "res": res-index,
+  "n": uint,                   ; rows, in the order of the source TSV
+  "id": { "ascii4": bstr } / { "strings": uvarints },
+                               ; ascii4 when every id is 4 ASCII characters (4 bytes per row); else string numbers
+  "ref": ranges,
+  ? "refText": [* [row: uint, tstr]],     ; rows whose Reference text is not the canonical form of its range
+  ? "concept": column,         ; the Academy article (notes) or the word article (links) the row points to, as a
+                               ; concept id in the string table
+  "cols": { * tstr => column },
+}
+; "cols" keeps every other field of the source row by its TSV column name in lower camel case: "tags", "quote",
+; "occurrence", "note", "question", "response", "origWords". Long text ("note", "question", "response") is "texts";
+; the rest "strings".
+; Notes: SupportReference becomes "concept" (rc://*/ta/man/translate/figs-metaphor -> ta:translate/figs-metaphor).
+; Links: TWLink becomes "concept" (rc://*/tw/dict/bible/kt/grace -> tw:kt/grace). A link that does not have that form
+;   keeps TWLink in "cols" and has no concept.
+; In "note", "question" and "response", the TSV escapes become what they stand for ("\n" and <br> are line breaks),
+; and rc:// links are rewritten as concept ids (ids.md, "Links inside text").
+
+quotes = {
+  ? "notes": quote-positions,
+  ? "links": quote-positions,
+}
+quote-positions = {
+  "n": uvarints,               ; per row of the table: how many pieces its quote has (0: no quote, or not found)
+  "pos": deltas,               ; per piece: its original position + 1, minus the previous value in this column
+  ? "kinds": [* [row: uint, piece: uint, tstr]],    ; pieces that are not a word (an ellipsis "…"): their kind
+  ? "missing": [* [row: uint, piece: uint, verse: verse-id, word: tstr, occurrence: uint]],
+                               ; words the quote names that this original edition does not have (position + 1 = 0)
+}
+; Which words of each bridge text a note covers ("helps-align" in format 2.0) is not kept: a reader computes it from
+; the text's alignment and the note's original positions.
