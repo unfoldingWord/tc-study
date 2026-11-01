@@ -39,6 +39,19 @@ For a file it accepts, it prints a JSON object:
     - in a part, each verse list as `{key: [verse ids]}`;
     - `coverage` as `{source: {"whole": [books], "partial": [books]}}`.
   - **`catalog`**: as its schema, with ids in hex.
+  - **A transfer file** (kind `02`, `transfer.md`):
+    - `index`: the index as it is (`cddl/transfer.cddl`), with ids in lowercase hex;
+    - `entries`: one object per index entry, in the index's order: `id` (hex), `kind`, `class` when the entry is a
+      segment, and `status`:
+      - `"ok"` when the whole entry is in the file and it verifies like a downloaded file (a segment as in
+        `container.md`, a complement by the sha256 of its bytes);
+      - `"missing"` when the file ends before the entry's end;
+      - otherwise the error code the entry fails with (`E_ID`, `E_INFLATE`, ...);
+    - `catalogs`: the reader output of each catalog entry (as for a segment file), in the order of the index's
+      `catalogs`;
+    - a file cut inside its index, or before the end of any catalog, is `{"error": "E_TRUNCATED"}`.
+
+    Activating units is the app's job and is not part of the output: it also depends on what the device already has.
 
 Keys are sorted, so that two readers' outputs can be compared as text.
 
@@ -55,7 +68,7 @@ Keys are sorted, so that two readers' outputs can be compared as text.
 | 7 | `seccion-insertada` | Section ids that last | An article built twice with the registry in between. The first time it has an intro, a definition and translation suggestions. The second time it has an examples section before the suggestions, and its definition heading is corrected | First build: `intro`, `definition`, `translation-suggestions`. Second build: `intro`, `definition`, `examples`, `translation-suggestions`, with the first three unchanged |
 | 8 | `articulo-mal-titulado` | Articles that do not follow the pattern | An es-419 article with text before any heading, a heading no rule places, and a section whose heading is in English | `intro` with role `intro`; `s1` with role `unknown`; the English section with `lang` "en". Every section readable |
 | 9 | `tabla-desconocida` | Tables a reader does not know | Case 1 with an extra optional table `future-x`, and again with an extra required table `future-y` | The first gives case 1's output plus nothing; the second gives `E_TABLE` |
-| 10 | `transferencia-cortada` | A transfer file cut inside an entry | A `full` transfer file of cases 1 and 4 and their catalog, cut in the middle of case 4's segment | The catalog and case 1 are kept; case 4 is reported missing; its unit is not activated |
+| 10 | `transferencia-cortada` | A transfer file cut inside an entry | A `full` transfer file of cases 1 and 4 and their catalog, cut in the middle of case 4's segment | The catalog and case 1 have status `ok`; case 4 has status `missing` |
 | 11 | `revisiones-mixtas` | Published against installed | Catalog and language map of revision 4, where Ruth has 15 notes on metaphor; Ruth's book segment of revision 3, where it had 14 | From the map: 15, "revision 4". From the installed book: 14 |
 | 12 | `idioma-parcial` | Zero against no source | An es-419 map whose tN covers tit, rut, 3jn and jon | Use of `ta:translate/figs-metaphor` in Titus: the count. In Jonah with no such note: zero. In Isaiah: no source |
 | 13 | `paquete-viejo` | The bridge from an old pack | `es-419-tit.langpack.zip`, format 1.1, with the originals from case 4 | The same book segment as case 4, with the same id; a local catalog (`origin` "local", unsigned) |
