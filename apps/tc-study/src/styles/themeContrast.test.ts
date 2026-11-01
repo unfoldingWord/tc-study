@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { OCEAN_BAR_FOCUS_RING_OPACITY } from './oceanBarChrome'
 
 const STYLES = import.meta.dir
 const SRC = join(STYLES, '..')
@@ -166,9 +167,12 @@ describe('Ocean app bar contrast', () => {
     }
   })
 
-  test('Ocean bar focus ring (accent-fill-fg at 60% over ocean) reaches 3:1 against ocean', () => {
-    const ringOnOcean = blend(theme(light, 'accent-fill-fg'), UW_OCEAN, 0.6)
-    expect(contrast(ringOnOcean, UW_OCEAN)).toBeGreaterThanOrEqual(3)
+  test('Ocean bar focus ring (accent-fill-fg at bar ring opacity over ocean) reaches 3:1 against ocean', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      const scope = mode === 'light' ? light : dark
+      const ringOnOcean = blend(theme(scope, 'accent-fill-fg'), UW_OCEAN, OCEAN_BAR_FOCUS_RING_OPACITY)
+      expect(contrast(ringOnOcean, UW_OCEAN)).toBeGreaterThanOrEqual(3)
+    }
   })
 })
 

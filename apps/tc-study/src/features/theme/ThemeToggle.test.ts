@@ -9,7 +9,8 @@ describe('ThemeToggle', () => {
   test('ocean variant reuses shared Ocean bar chrome classes', () => {
     expect(toggleSrc).toContain("from '../../styles/oceanBarChrome'")
     expect(toggleSrc).toContain('OCEAN_BAR_ICON')
-    expect(chromeSrc).toContain('focus-visible:ring-accent-fill-fg/60')
+    expect(chromeSrc).toContain('OCEAN_BAR_FOCUS_RING_OPACITY')
+    expect(chromeSrc).toContain('OCEAN_BAR_FOCUS_RING_OPACITY_PERCENT')
     expect(chromeSrc).toContain('focus-visible:ring-offset-[var(--uw-ocean)]')
   })
 })

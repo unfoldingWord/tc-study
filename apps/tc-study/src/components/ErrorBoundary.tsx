@@ -58,9 +58,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 {this.state.error.stack}
               </pre>
             </div>
-            <Button onClick={() => window.location.reload()} className="rounded-lg">
-              Reload Page
-            </Button>
+            <Button onClick={() => window.location.reload()}>Reload Page</Button>
           </Card>
         </div>
       )

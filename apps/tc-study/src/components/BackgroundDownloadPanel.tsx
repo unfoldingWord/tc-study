@@ -81,7 +81,7 @@ export function BackgroundDownloadPanel() {
             )}
           </div>
           {isActive && (
-            <Button variant="outline" size="md" onClick={handleCancel} className="h-auto rounded-md px-3 py-1.5 text-sm">
+            <Button variant="outline" size="md" onClick={handleCancel} className="h-auto px-3 py-1.5 text-sm">
               Cancel
             </Button>
           )}
