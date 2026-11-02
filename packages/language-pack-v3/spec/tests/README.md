@@ -421,8 +421,8 @@ types, these are `E_BODY` too:
     a reader of the part alone.
   - `concepts`: columns of different lengths; `kind` above 5; `tw` above 3; a `source` outside `h.res`.
   - `relations`: a concept outside `concepts`, a type outside `types`, a `source` outside `h.res`; a `confidence` above 100.
-  - `xmap` `strongs`: keys not sorted or repeated, or not in `concepts`; a list of Strong keys that is empty, not sorted by code
-    point or has a repeat. `aliases`: keys not sorted or repeated; a value that is not in `concepts` (a key need not be: it is
+  - `xmap` `strongs`: keys repeated or not in `concepts`; a list of Strong keys that is empty, not sorted by code
+    point or has a repeat. `aliases`: keys repeated; a value that is not in `concepts` (a key need not be: it is
     an id that moved).
   - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
