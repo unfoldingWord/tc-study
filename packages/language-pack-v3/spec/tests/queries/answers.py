@@ -163,7 +163,7 @@ def ta_id(ref):
 
 def load(sample):
     world = {"coverage": {}, "tables": {"strong": Counts(), "links": Counts(), "notes": Counts()}, "originals": {},
-             "links": [], "unreadable": defaultdict(int), "odd": []}
+             "links": [], "partial": {}, "unreadable": defaultdict(int), "odd": []}
     for res in (UHB, UGNT):
         parts = sample.select("originals", res, "original")
         world["coverage"][res] = {p["book"] for p in parts}
@@ -214,7 +214,9 @@ def load(sample):
 def cell(world, table, source, key, book):
     cov = world["coverage"].get(source, set())
     row = world["tables"][table].data.get(key, {}).get(book)
-    # partial: this sample's sources list whole books only, so rule 1 never applies; kept for the rule's order
+    if book in world["partial"].get(source, set()):
+        n, vs = row if row else (0, ())
+        return {"state": "partial", "count": n, "verses": len(vs)}
     if book not in cov:
         return {"state": "none"}
     if row is None:
@@ -324,6 +326,8 @@ def answer_keyterms(world, q, strongs):
     present = {k for k, rows in world["tables"]["strong"].data.items() if b in rows}
     cands = []
     for cid, keys in strongs.items():
+        if not cid.startswith("tw:kt/"):
+            continue
         matched = sorted(present & set(keys))
         if matched:
             cands.append({"concept": cid, "strongs": keys, "matched": matched})
@@ -336,28 +340,44 @@ def totals(counts, key):
     return sum(r[0] for r in rows.values()), sum(len(r[1]) for r in rows.values()), len(rows)
 
 
+def expect(label, got, want):
+    if got != want:
+        raise AssertionError(f"{label}: got {got!r}, phase 0 says {want!r}")
+
+
 def checks(world, strongs, missed):
     T = world["tables"]
     out = []
+    expect("partial sources", {s for s in world["partial"].values() if s}, set())
     n, v, b = totals(T["strong"], "G54850")
     out.append(f"G5485: {n} occurrences in {v} verses of {b} books")
+    expect("G5485", (n, v, b), (156, 148, 23))
     n, v, b = totals(T["links"], "tw:names/abraham")
     gen = T["links"].data["tw:names/abraham"].get("gen", [0, ()])[0]
     out.append(f"tw:names/abraham: {n} links in {v} verses of {b} books (gen {gen})")
+    expect("abraham", (n, v, b, gen), (291, 259, 21, 190))
     met = T["notes"].data["ta:translate/figs-metaphor"]
     psa, tit = met.get("psa", [0, ()]), met.get("tit", [0, ()])
     out.append(f"figs-metaphor: psa {psa[0]} notes in {len(psa[1])} verses, tit {tit[0]} in {len(tit[1])}")
+    expect("metaphor psa/tit", (psa[0], len(psa[1]), tit[0], len(tit[1])), (1175, 949, 22, 21))
     none = [x for x in ("num 1ch 2ch ecc isa jer ezk".split()) if x not in world["coverage"][TN]]
     out.append(f"figs-metaphor none in tN: {' '.join(none)}")
-    out.append("isa coverage: " + ", ".join(f"{s.rsplit('/', 1)[-1]}={'whole' if 'isa' in c else 'none'}"
-                                           for s, c in world["coverage"].items()))
+    expect("tN without source", none, "num 1ch 2ch ecc isa jer ezk".split())
+    expect("figs-metaphor in tN books", [x for x in "num 1ch 2ch ecc isa jer ezk".split() if x in met], [])
+    out.append("isa coverage: " + ", ".join(f"{s.rsplit('/', 1)[-1]}={'whole' if 'isa' in cv else 'none'}"
+                                           for s, cv in world["coverage"].items()))
+    expect("isa coverage", {s.rsplit("/", 1)[-1]: "isa" in cv for s, cv in world["coverage"].items()},
+           {"uhb": True, "ugnt": False, "twl": False, "tn": False})
     kt = sorted(((k, r["rut"][0]) for k, r in T["links"].data.items() if "rut" in r and k.startswith("tw:kt/")),
                 key=lambda kv: (-kv[1], kv[0]))
     out.append(f"rut tw:kt links: {len(kt)} concepts: " + ", ".join(f"{k[6:]} {n}" for k, n in kt[:6]))
+    expect("rut key terms", (len(kt), [(k[6:], n) for k, n in kt[:4]]),
+           (22, [("redeem", 23), ("yahweh", 18), ("good", 6), ("bless", 5)]))
     out.append(f"unreadable references (counted, no verse): {dict(world['unreadable'])}")
     nl = sum(1 for c, *_ in world["links"] if c.startswith("tw:"))
     out.append(f"quotes not found in the original: {len(missed)} of {nl} tw links; "
                f"concepts with strongs: {len(strongs)}")
+    expect("links without a found quote", (len(missed), nl), (57, 85764))
     return out
 
 
