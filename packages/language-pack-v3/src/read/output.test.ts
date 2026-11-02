@@ -608,6 +608,27 @@ describe('the sample (es-419 Titus)', () => {
     expect(await readerOutput(file.subarray(0, 20))).toEqual({ error: 'E_TRUNCATED' })
   })
 
+  test('keys of the index: an unknown top-level key is kept (bytes in hex); an unlisted key of an entry is not output', async () => {
+    const file = writeTransfer({ mode: 'full', catalogs: [lang.catalog], entries: [segmentOf(lang, 'book')], made: '2026-11-01T10:00:00Z', by: 'test 1' })
+    const tweaked = withHeader(file, (index) => {
+      index.future = new Uint8Array([1, 0xab])
+      index.nested = { z: new Uint8Array([255]), n: [1, 2] }
+      for (const entry of index.entries as Record<string, CborValue>[]) {
+        entry.extra = 'x'
+        entry.blob = new Uint8Array([9])
+      }
+    })
+    const result = await out(tweaked)
+    expect(result.index.future).toBe('01ab')
+    expect(result.index.nested).toEqual({ n: [1, 2], z: 'ff' })
+    expect(Object.keys(result.index)).toEqual(['by', 'catalogs', 'entries', 'future', 'made', 'mode', 'nested'])
+    for (const entry of result.index.entries) expect(Object.keys(entry)).toEqual(['class', 'id', 'kind', 'offset', 'size'])
+    for (const entry of result.entries) expect(Object.keys(entry)).toEqual(['class', 'id', 'kind', 'status'])
+    expect(result.entries.map((e: any) => e.status)).toEqual(['ok', 'ok'])
+    // Without the extra keys the output is the same.
+    expect(canonicalJson(result.entries)).toBe(canonicalJson((await out(file)).entries))
+  })
+
   test('an entry that fails says why and does not discard the others; a class phase 1 does not read is E_TABLE', async () => {
     const book = segmentOf(lang, 'book')
     const lex = segmentOf(lang, 'lex')

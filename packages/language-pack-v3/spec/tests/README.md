@@ -177,7 +177,7 @@ Piece 0 is the ellipsis, piece 1 is the original word 5, piece 2 is a word the o
 | `words[].other` | object of text | `other`; an empty map in the file is output as it is (`"other": {}`) | the word is not listed in `other` |
 | `pieces` | list of `[text, is word]` | `text.tok`: 0 is the next word (its `form`, a word); a number `n > 0` is the string `seps[n - 1]` (not a word) | never |
 | `events` | list of `[position, kind, argument]` | `text.ev`, as in a book; the argument of an event is the string `seps[arg]`, with **no** `- 1` (the number 0 is a string of `seps` too, and `"close"` has `""` as in a book) | never |
-| `attrs` | list of `[event, {name: value}]` | `text.attrs`, as in a book | no node has attributes |
+| `attrs` | list of `[event, {name: value}]` | `text.attrs`, as in a book | no node has attributes (an empty map counts as a node with attributes, as in a book) |
 | `macula` | object | `macula` | the table is not in the file or not read |
 | `macula.release` | text | `macula.release` | never |
 | `macula.trees`, `.referents` | any | as the file has them, bytes in hex, objects sorted | the file lacks them |
@@ -254,7 +254,7 @@ The output has three keys and no `id` or `h`:
 
 | Key | Type | What |
 | --- | --- | --- |
-| `index` | object | The index as the file has it (`cddl/transfer.cddl`): `mode`, `catalogs` (list of hex ids), `entries` (list of `{id, kind, offset, size}` and `class` when the entry has it; `id` in hex), and when the file has them `base` (list of `[catalog, revision]`), `made`, `by`, and every other top-level key of the index as it is: those are not checked, and a byte string in one is hex. A key of an index **entry** that `transfer.cddl` does not list is not output (the entry is closed: only `id`, `kind`, `class`, `offset`, `size`) |
+| `index` | object | The index as the file has it (`cddl/transfer.cddl`): `mode`, `catalogs` (list of hex ids), `entries` (list of `{id, kind, offset, size}` and `class` when the entry has it; `id` in hex), and when the file has them `base` (list of `[catalog, revision]`), `made`, `by`, and every other top-level key of the index as it is: those are not checked, and a byte string in one is hex. A key inside an index **entry** that `transfer.cddl` does not list is ignored and not output: an entry has only `id`, `kind`, `class`, `offset` and `size` in the output |
 | `entries` | list of objects | One per entry of the index, in its order: `id` (hex), `kind`, `class` (when the index entry has it) and `status` |
 | `catalogs` | list of objects | The reader output of each catalog entry, as for a segment file, in the order of the index's `catalogs` |
 
