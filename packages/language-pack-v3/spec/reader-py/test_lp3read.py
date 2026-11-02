@@ -183,8 +183,8 @@ def header_h(h: dict) -> dict:
 @pytest.mark.parametrize("name", ["minimal", "truncated", "bad-id"])
 def test_container_examples(name):
     data = (CONTAINER / f"{name}.seg").read_bytes()
-    # spec/.gitattributes keeps these files LF; a checkout made before it existed may still have CRLF.
-    expected = (CONTAINER / f"{name}.expected.json").read_bytes().replace(b"\r\n", b"\n").decode("utf-8")
+    # spec/.gitattributes keeps these files LF in every checkout
+    expected = (CONTAINER / f"{name}.expected.json").read_bytes().decode("utf-8")
     assert canonical_text(read_file(data)) == expected
     # outputs are compared as the canonical text of the parsed value (tests/README.md)
     assert compact_text(read_file(data)) == compact_text(json.loads(expected))
@@ -194,7 +194,7 @@ def test_cli(tmp_path):
     for name, code in (("minimal", 0), ("truncated", 1), ("bad-id", 1)):
         proc = subprocess.run([sys.executable, "-X", "utf8", str(HERE / "lp3read.py"),
                                str(CONTAINER / f"{name}.seg")], capture_output=True)
-        expected = (CONTAINER / f"{name}.expected.json").read_bytes().replace(b"\r\n", b"\n")
+        expected = (CONTAINER / f"{name}.expected.json").read_bytes()
         assert proc.returncode == code
         assert proc.stdout == expected
 
@@ -475,7 +475,13 @@ def test_e_limit_h_field_before_truncation():
 def test_e_limit_clen_ulen():
     err(with_header(clen=67108865), "E_LIMIT")
     err(with_header(ulen=67108865), "E_LIMIT")
-    err(with_header(clen=2 ** 60), "E_LIMIT")
+    err(with_header(clen=2 ** 53 - 1), "E_LIMIT")         # inside the integer range, over the limit
+    err(with_header(ulen=2 ** 53 - 1), "E_LIMIT")
+    # outside the integer range it is E_HEADER: the range rule is checked with the header (container.md, "Integers have
+    # one range"), before the limits of step 3
+    err(with_header(clen=2 ** 53), "E_HEADER")
+    err(with_header(ulen=2 ** 60), "E_HEADER")
+    err(with_header(clen=2 ** 64 - 1), "E_HEADER")
     # limits come before the file length is compared with 12 + H + clen
     err(assemble(dict(MIN_HDR, clen=67108865), b""), "E_LIMIT")
 
@@ -2004,3 +2010,95 @@ def test_cli_unexpected_exception_is_not_exit_1(monkeypatch, capsys, tmp_path):
     captured = capsys.readouterr()
     assert captured.out == "" and "internal error" in captured.err and "RuntimeError" in captured.err
     assert lp3read.main(["lp3read.py", str(tmp_path / "missing")]) == 2
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# 7. One range for every integer (container.md, "Integers have one range") and the conformance case files
+# ---------------------------------------------------------------------------------------------------------------
+
+TESTS_DIR = HERE.parent / "tests"
+OUT_OF_RANGE = [2 ** 60, -(2 ** 53), 2 ** 53, 2 ** 64 - 1, -(2 ** 64)]
+BOUNDARY = [2 ** 53 - 1, -(2 ** 53 - 1)]
+
+
+def case_files():
+    found = []
+    for pattern in ("*.seg", "*.tcpack"):
+        for f in sorted(TESTS_DIR.rglob(pattern)):
+            if "data" not in f.relative_to(TESTS_DIR).parts:
+                found.append(f)
+    return found
+
+
+@pytest.mark.parametrize("path", case_files(), ids=lambda f: str(f.relative_to(TESTS_DIR)).replace("\\", "/"))
+def test_every_conformance_case_file_gives_its_expected_output(path):
+    expected = path.with_name(path.name.rsplit(".", 1)[0] + ".expected.json").read_bytes().decode("utf-8")
+    out = read_file(path.read_bytes())
+    assert canonical_text(out) == expected                    # byte for byte
+    assert compact_text(out) == compact_text(json.loads(expected))
+
+
+def test_the_case_files_of_integers_out_of_range():
+    folder = TESTS_DIR / "entero-fuera-de-rango"
+    assert read_file((folder / "header.seg").read_bytes()) == {"error": "E_HEADER"}
+    assert read_file((folder / "body.seg").read_bytes()) == {"error": "E_BODY"}
+    assert (folder / "header.expected.json").read_bytes() == b'{"error": "E_HEADER"}\n'
+    assert (folder / "body.expected.json").read_bytes() == b'{"error": "E_BODY"}\n'
+
+
+@pytest.mark.parametrize("n", OUT_OF_RANGE)
+def test_integer_out_of_range_in_the_segment_header_is_e_header(n):
+    err(with_header(x=n), "E_HEADER")                              # a key the reader does not know
+    err(with_header(x=[{"y": n}]), "E_HEADER")                     # nested in it
+    err(with_header(sig=[{"key": "k", "alg": "ed25519", "n": n}]), "E_HEADER")   # sig is ignored, not exempt
+    h = dict(MIN_HDR["h"], **{"v": n})                             # inside the header's own h
+    err(with_header(h=h), "E_HEADER")
+
+
+@pytest.mark.parametrize("n", BOUNDARY)
+def test_integer_on_the_boundary_is_accepted_in_the_header(n):
+    assert canon(read_file(with_header(x=n))) == canon(min_expected())
+
+
+@pytest.mark.parametrize("n", OUT_OF_RANGE)
+def test_integer_out_of_range_in_the_body_is_e_body(n):
+    # in a root key of the body that the reader ignores
+    err(swap_body(enc(dict(MIN_DOC, x=n))), "E_BODY")
+    err(swap_body(enc(dict(MIN_DOC, x=[[n]]))), "E_BODY")
+    # in a table it skips
+    h = json.loads(json.dumps(MIN_DOC["h"]))
+    h["tables"]["future-x"] = [1, False]
+    err(build(h, dict(MIN_DOC["t"], **{"future-x": {"a": [n]}})).data, "E_BODY")
+    # in the logical header of the body (the file header keeps the valid one, so only the body has the integer)
+    err(build(dict(MIN_DOC["h"], v=n), dict(MIN_DOC["t"]), header_h=MIN_DOC["h"]).data, "E_BODY")
+    # and in both: the file header is read first
+    err(build(dict(MIN_DOC["h"], v=n), dict(MIN_DOC["t"])).data, "E_HEADER")
+
+
+@pytest.mark.parametrize("n", BOUNDARY)
+def test_integer_on_the_boundary_is_accepted_in_the_body(n):
+    body = enc(dict(MIN_DOC, x=n))
+    expected = min_expected()
+    expected["id"] = hashlib.sha256(body).hexdigest()
+    assert canon(read_file(swap_body(body))) == canon(expected)
+
+
+@pytest.mark.parametrize("n", OUT_OF_RANGE)
+def test_integer_out_of_range_in_the_transfer_index_is_e_header(n):
+    cat, _, _ = catalog_fixture(with_sig=False)
+    cid = bytes.fromhex(cat.id)
+    good = {"mode": "full", "catalogs": [cid],
+            "entries": [{"id": cid, "kind": "segment", "class": "catalog", "offset": 0, "size": len(cat.data)}]}
+    err(raw_transfer(dict(good, future=n), cat.data), "E_HEADER")
+    err(raw_transfer(dict(good, future={"a": [n]}), cat.data), "E_HEADER")
+    err(raw_transfer(dict(good, entries=[dict(good["entries"][0], extra=n)]), cat.data), "E_HEADER")
+
+
+@pytest.mark.parametrize("n", BOUNDARY)
+def test_integer_on_the_boundary_is_accepted_in_the_transfer_index(n):
+    cat, _, _ = catalog_fixture(with_sig=False)
+    cid = bytes.fromhex(cat.id)
+    good = {"mode": "full", "catalogs": [cid],
+            "entries": [{"id": cid, "kind": "segment", "class": "catalog", "offset": 0, "size": len(cat.data)}]}
+    out = read_file(raw_transfer(dict(good, future=n), cat.data))
+    assert "error" not in out and out["index"]["future"] == n

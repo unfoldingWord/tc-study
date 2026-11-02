@@ -56,7 +56,8 @@ From `packages/language-pack-v3`:
 python -m pytest spec/reader-py -q
 ```
 
-- the three files of `tests/container/` give their `*.expected.json`, compared as text;
+- every `.seg` and `.tcpack` of the conformance cases under `tests/` (`container/`, `entero-fuera-de-rango/` and the
+  rest, not `data/`) gives its `*.expected.json`, compared as text byte for byte and as parsed values;
 - every error code has a test whose file is made from `minimal.seg` with exactly one defect, and the order of checks
   has tests of its own;
 - every class has files built in the test (an encoder written from the cddl files) and the output written by hand;
@@ -66,5 +67,5 @@ python -m pytest spec/reader-py -q
 ## Status
 
 Complete for phase 1. Not done: `map`, `xmap` and `gen` (phase 2), checking the signatures of a catalog (phase 3).
-The `expected.json` files of the container examples may be checked out with CRLF line ends on Windows (git
-`autocrlf`); the tests compare after turning `\r\n` into `\n`.
+`../.gitattributes` makes git check the `*.expected.json` files out with LF line ends on every platform, so the tests
+compare the text of the output with the file byte for byte.

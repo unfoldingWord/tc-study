@@ -446,6 +446,8 @@ def parse_segment(data: bytes, expect_id: bytes | None = None, must_class: str |
         _fail("E_HEADER")
     if type(header) is not dict:
         _fail("E_HEADER")
+    if not _ints_in_range(header):
+        _fail("E_HEADER")                   # one range for every integer, also in keys this reader does not know
     hh = header.get("h")
     codec, clen, ulen, id_ = header.get("codec"), header.get("clen"), header.get("ulen"), header.get("id")
     if type(hh) is not dict or not is_str(codec) or not is_uint(clen) or not is_uint(ulen) or not is_bytes(id_, 32):
