@@ -1,0 +1,30 @@
+{
+  "expected": {
+    "book": "isa",
+    "coverage": {
+      "unfoldingWord/el-x-koine/ugnt": "none",
+      "unfoldingWord/en/tn": "none",
+      "unfoldingWord/en/twl": "none",
+      "unfoldingWord/hbo/uhb": "whole"
+    },
+    "kind": "book",
+    "tables": {
+      "links": {
+        "keys": 0,
+        "unit": "links"
+      },
+      "notes": {
+        "keys": 0,
+        "unit": "notes"
+      },
+      "strong": {
+        "keys": 2551,
+        "unit": "occurrences"
+      }
+    }
+  },
+  "query": {
+    "book": "isa",
+    "kind": "book"
+  }
+}

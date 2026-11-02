@@ -1,0 +1,331 @@
+{
+  "expected": {
+    "books": {
+      "1ch": {
+        "state": "none"
+      },
+      "1co": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "1jn": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "1ki": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "1pe": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "1sa": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "1th": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "1ti": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "2ch": {
+        "state": "none"
+      },
+      "2co": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "2jn": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "2ki": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "2pe": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "2sa": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "2th": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "2ti": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "3jn": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "act": {
+        "count": 7,
+        "state": "count",
+        "verses": 7
+      },
+      "amo": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "col": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "dan": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "deu": {
+        "count": 7,
+        "state": "count",
+        "verses": 7
+      },
+      "ecc": {
+        "state": "none"
+      },
+      "eph": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "est": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "exo": {
+        "count": 9,
+        "state": "count",
+        "verses": 9
+      },
+      "ezk": {
+        "state": "none"
+      },
+      "ezr": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "gal": {
+        "count": 9,
+        "state": "count",
+        "verses": 9
+      },
+      "gen": {
+        "count": 190,
+        "state": "count",
+        "verses": 163
+      },
+      "hab": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "hag": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "heb": {
+        "count": 10,
+        "state": "count",
+        "verses": 10
+      },
+      "hos": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "isa": {
+        "state": "none"
+      },
+      "jas": {
+        "count": 2,
+        "state": "count",
+        "verses": 2
+      },
+      "jdg": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jer": {
+        "state": "none"
+      },
+      "jhn": {
+        "count": 11,
+        "state": "count",
+        "verses": 9
+      },
+      "job": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jol": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jon": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jos": {
+        "count": 2,
+        "state": "count",
+        "verses": 2
+      },
+      "jud": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "lam": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "lev": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "luk": {
+        "count": 15,
+        "state": "count",
+        "verses": 14
+      },
+      "mal": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "mat": {
+        "count": 7,
+        "state": "count",
+        "verses": 6
+      },
+      "mic": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "mrk": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "nam": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "neh": {
+        "count": 2,
+        "state": "count",
+        "verses": 1
+      },
+      "num": {
+        "state": "none"
+      },
+      "oba": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "phm": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "php": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "pro": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "psa": {
+        "count": 4,
+        "state": "count",
+        "verses": 4
+      },
+      "rev": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "rom": {
+        "count": 9,
+        "state": "count",
+        "verses": 9
+      },
+      "rut": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "sng": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "tit": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "zec": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "zep": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      }
+    },
+    "concept": "tw:names/abraham",
+    "kind": "usage",
+    "source": "unfoldingWord/en/twl",
+    "unit": "links"
+  },
+  "query": {
+    "concept": "tw:names/abraham",
+    "kind": "usage",
+    "source": "unfoldingWord/en/twl"
+  }
+}
