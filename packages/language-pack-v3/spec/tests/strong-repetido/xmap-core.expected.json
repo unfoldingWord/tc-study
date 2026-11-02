@@ -1,0 +1,47 @@
+{
+  "concepts": {},
+  "coverage": {
+    "unfoldingWord/el-x-koine/ugnt": {
+      "whole": [
+        "tit"
+      ]
+    }
+  },
+  "h": {
+    "class": "xmap",
+    "part": "core",
+    "res": [
+      [
+        "unfoldingWord/el-x-koine/ugnt",
+        "v0"
+      ]
+    ],
+    "tables": {
+      "concepts": [
+        1,
+        true
+      ],
+      "coverage": [
+        1,
+        true
+      ],
+      "strong": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "92eb18165cb8ea4d21e38ce9b644c2fa563bfa177d42e25679a1c5cfa3692444",
+  "strong": {
+    "rows": {
+      "G54850": {
+        "tit": [
+          3,
+          1
+        ]
+      }
+    },
+    "unit": "occurrences"
+  }
+}
