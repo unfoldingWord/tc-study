@@ -32,6 +32,14 @@ const SOURCES: Record<HelpsKind, { subject: string; prefix: string; field: strin
 const HELPS_KINDS: readonly HelpsKind[] = ['notes', 'questions', 'links']
 const TEXT_SUBJECT = 'Aligned Bible'
 
+/**
+ * Whether a resource is one `extractBook` reads: an Aligned Bible, TSV Translation Notes, Questions or Words Links. A resource of any other
+ * subject (a plain `Bible` such as t4t, a lexicon, tW) has nothing a book segment keeps, even when it has the book.
+ */
+export function isBookResource(resource: { kind: string }): boolean {
+  return resource.kind === TEXT_SUBJECT || HELPS_KINDS.some((kind) => SOURCES[kind].subject === resource.kind)
+}
+
 const DIGITS = /^[0-9]+$/
 const BOOK_FACTOR = 1_000_000
 const CHAPTER_FACTOR = 1_000
@@ -366,16 +374,32 @@ export function extractHelps(rows: Row[], book: string, res: string, kind: Helps
  *   before the `#`. `orig` is `[orig.key, orig.stamp]`.
  * - **No text.** A language with notes of a book and no text of it gives `texts: []`.
  *
+ * `read`, when given, gets the layer and key of every row read (the `sot` and `quote` rows of the resources used): the inputs of the
+ * segment are made of them, and they are not asked for a second time.
+ *
  * Throws `Error` when the source has no resource of the book at all, or when a reader of the rows does (`extractText`,
  * `extractHelps`).
  */
-export async function extractBook(source: RowSource, lang: string, book: string, orig: OrigModel, issues: string[] = []): Promise<BookModel> {
+export async function extractBook(
+  source: RowSource,
+  lang: string,
+  book: string,
+  orig: OrigModel,
+  issues: string[] = [],
+  read: { layer: string; key: string }[] = [],
+): Promise<BookModel> {
   const index = new OrigIndex(orig)
   const resources = (await source.resources(lang)).filter((resource) => resource.books.includes(book)).sort((a, b) => compareCodePoints(a.key, b.key))
 
+  // Only the layers that are read are asked for, so that a source does not open the others (a zip pack has a file per layer and resource).
   const collect = async (resource: ResourceRef, layers: string[]): Promise<Row[]> => {
     const out: Row[] = []
-    for await (const row of source.rows({ lang, book, resource: resource.key })) if (layers.includes(row.layer)) out.push(row)
+    for (const layer of layers) {
+      for await (const row of source.rows({ lang, book, resource: resource.key, layer })) {
+        out.push(row)
+        read.push({ layer: row.layer, key: row.key })
+      }
+    }
     return out
   }
 
@@ -402,7 +426,7 @@ export async function extractBook(source: RowSource, lang: string, book: string,
     res: used.map((resource): [string, string] => [resource.key, resource.stamp.split('#')[0]]),
     texts: [],
   }
-  for (const resource of texts) model.texts.push(extractText(await collect(resource, ['sot']), book, resource.key, index, issues))
+  for (const resource of texts) model.texts.push(extractText(await collect(resource, ['sot', 'quote']), book, resource.key, index, issues))
   for (const [kind, resource] of helps) model[kind] = extractHelps(await collect(resource, ['sot', 'quote']), book, resource.key, kind, index, issues)
   return model
 }

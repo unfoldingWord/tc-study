@@ -33,7 +33,7 @@ import { BOOKS, bookNumber, bookSet } from '../ids'
 import type { About, ArticleModel, CatalogResource, LexEntry } from '../model'
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
 import { articleOfPath, articleResources, artSegment, extractArticles, type Kind } from './art'
-import { extractBook } from './bookHelps'
+import { extractBook, isBookResource } from './bookHelps'
 import { bookSegment } from './book'
 import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOfBook } from './catalog'
 import { extractLexicon, lexResources, lexSegment } from './lex'
@@ -66,12 +66,9 @@ async function addKeys(into: RowKey[], rows: AsyncIterable<Row>): Promise<void> 
   for await (const row of rows) into.push({ layer: row.layer, key: row.key })
 }
 
-/** The `sot` and `quote` rows a book segment is read from (`extractBook`, `extractOrig`), as keys. */
-async function bookRowKeys(source: RowSource, lang: string, book: string, resources: string[]): Promise<RowKey[]> {
+/** The `sot` rows of the originals of a book, as keys: what `extractOrig` reads, and part of the inputs of a book segment. */
+async function originalRowKeys(source: RowSource, book: string): Promise<RowKey[]> {
   const keys: RowKey[] = []
-  for (const resource of resources) {
-    for (const layer of ['sot', 'quote']) await addKeys(keys, source.rows({ lang, book, resource, layer }))
-  }
   await addKeys(keys, source.rows({ lang: ORIGINALS, book, layer: 'sot' }))
   return keys
 }
@@ -243,16 +240,23 @@ export async function buildLanguage(o: {
       report.push(`book ${book}: ${lang} has no resource of this book: left out`)
       continue
     }
+    // A resource of another subject (a plain Bible such as t4t) has the book and gives a book segment nothing: `extractBook` would throw.
+    if (!refs.some((ref) => isBookResource(ref) && ref.books.includes(book))) {
+      report.push(`book ${book}: ${lang} has resources of this book, but none of the subjects a book segment keeps (Aligned Bible, TSV Translation Notes, TSV Translation Questions, TSV Translation Words Links): left out`)
+      continue
+    }
     if (!originals.some((ref) => ref.books.includes(book))) {
       report.push(`book ${book}: the source has no originals of this book, and the positions of the book need them: left out (the pack waits for them)`)
       continue
     }
     const issues: string[] = []
     const orig = await extractOrig(source, book)
-    const model = await extractBook(source, lang, book, orig, issues)
+    // The rows `extractBook` reads are the ones the inputs name: they are read once.
+    const read: RowKey[] = []
+    const model = await extractBook(source, lang, book, orig, issues, read)
     report.push(...issues.map((line) => `book ${book}: ${line}`))
     const keys = model.res.map(([key]) => key)
-    const inputs = inputsOf(await bookRowKeys(source, lang, book, keys), [...stampsOf(keys), { key: orig.key, stamp: orig.stamp }])
+    const inputs = inputsOf([...read, ...(await originalRowKeys(source, book))], [...stampsOf(keys), { key: orig.key, stamp: orig.stamp }])
     const built = await add(bookSegment(model), inputs, keys)
     needs.set(built.id, needsOfBook(model))
   }

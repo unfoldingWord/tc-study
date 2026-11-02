@@ -1,9 +1,11 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
+import JSZip from 'jszip'
 import { hex, readHeader, readSegment } from '../codec/container'
 import type { About, CatalogModel } from '../model'
 import { partsSource } from '../node/partsSource'
 import { CATALOG_TABLES, catalogView } from '../read/catalog'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../source/rows'
+import { zipSource } from '../source/zipSource'
 import { type BuiltSegment } from './catalog'
 import { BUILDER, buildCommon, buildLanguage, inputsOf, licenseId } from './language'
 
@@ -215,6 +217,27 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
     const rut = await buildLanguage({ source: await sample(), lang: ES, books: ['rut', 'tit', 'rut'], registry: registry(), about })
     expect(idsOf(byClass(rut.segments, 'book'))).toEqual(idsOf(byClass(first.segments, 'book')))
     expect(rut.report).toContain('book rut: es-419 has no resource of this book: left out')
+  })
+
+  test('a book that only a plain Bible (t4t) has is left out with a line: it is not a throw, and the rest is built', async () => {
+    const t4t: ResourceRef = { key: 'es-419_gl/es-419/t4t', stamp: 'v1#2026-01-01T00_00_00Z', kind: 'Bible', books: ['tit'] }
+    // The resources that make a book segment lose the book, and a Bible keeps it.
+    const inner = tweak(await sample(), { ref: (_ref, lang) => (lang === ES ? { books: [] } : {}) })
+    const source: RowSource = {
+      rows: (f) => inner.rows(f),
+      async resources(lang) {
+        const refs = await inner.resources(lang)
+        return lang === ES ? [...refs, t4t] : refs
+      },
+    }
+    const built = await buildLanguage({ source, lang: ES, registry: registry(), about })
+    expect(byClass(built.segments, 'book')).toEqual([])
+    expect(built.report).toContain(
+      'book tit: es-419 has resources of this book, but none of the subjects a book segment keeps (Aligned Bible, TSV Translation Notes, TSV Translation Questions, TSV Translation Words Links): left out',
+    )
+    // The same with the book named.
+    const named = await buildLanguage({ source, lang: ES, books: ['tit'], registry: registry(), about })
+    expect(byClass(named.segments, 'book')).toEqual([])
   })
 
   test('a code that is not one of the 66 books is refused', async () => {
@@ -459,4 +482,89 @@ describe('buildCommon: the original of Titus', () => {
     expect(catalog.units).toEqual([])
     expect(catalog.resources).toEqual([])
   })
+})
+
+describe('a language read from a zip pack: each layer file is read once, however many books', () => {
+  const XX = 'xx'
+  const GLT_KEY = 'o_gl/xx/glt'
+  const UGNT_KEY = 'unfoldingWord/el-x-koine/ugnt'
+  const BOOKS = ['mat', 'mrk', 'luk', 'jhn', 'act', 'rom', '1co', '2co', 'gal', 'eph']
+  const enc = (key: string) => encodeURIComponent(key).replace(/%/g, '~')
+  const word = (form: string) => ({ type: 'char', marker: 'w', 'x-occurrence': '1', 'x-occurrences': '1', content: [form] })
+  const chapter = (content: unknown[]) => ({ content: { usj: { type: 'USJ', version: '3.1', content } } })
+  const body = (...nodes: unknown[]) => [{ type: 'chapter', marker: 'c', number: '1' }, { type: 'para', marker: 'p', content: [{ type: 'verse', marker: 'v', number: '1' }, ...nodes] }]
+  const milestone = { type: 'ms', marker: 'zaln-s', 'x-content': 'Παῦλος', 'x-occurrence': '1', 'x-occurrences': '1' }
+
+  async function pack(): Promise<Uint8Array> {
+    const zip = new JSZip()
+    const resource = (key: string, role: string, subject: string, rows: Record<string, number>) => ({ key, role, stamp: 'v1#2026-01-01T00_00_00Z', subject, rows, books: BOOKS })
+    zip.file(
+      'manifest.json',
+      JSON.stringify({
+        format: 'bt-synergy-language-pack',
+        formatVersion: '1.1.0',
+        language: XX,
+        kind: 'language',
+        resources: [resource(GLT_KEY, 'language', 'Aligned Bible', { sot: BOOKS.length, prepared: BOOKS.length }), resource(UGNT_KEY, 'original', 'Greek New Testament', { sot: 2 * BOOKS.length })],
+      }),
+    )
+    const file = (layer: string, key: string, rows: [string, unknown][]) => zip.file(`rows/${layer}/${enc(key)}.jsonl`, rows.map(([k, entry]) => JSON.stringify({ key: k, entry })).join('\n') + '\n')
+    file('sot', GLT_KEY, BOOKS.map((book) => [`scripture-usj:${GLT_KEY}:${book}:1`, chapter(body(milestone, word('Pablo'), { type: 'ms', marker: 'zaln-e' }))]))
+    // A layer no builder asks for: a file nobody should open.
+    file('prepared', GLT_KEY, BOOKS.map((book) => [`prepared:text:${GLT_KEY}:${book}:1`, { junk: true }]))
+    file(
+      'sot',
+      UGNT_KEY,
+      BOOKS.flatMap((book): [string, unknown][] => [
+        [`scripture-usj:${UGNT_KEY}:${book}`, { content: { chapterNumbers: [1] } }],
+        [`scripture-usj:${UGNT_KEY}:${book}:1`, chapter(body(word('Παῦλος')))],
+      ]),
+    )
+    return zip.generateAsync({ type: 'uint8array' })
+  }
+
+  test('a build of 10 books inflates each layer file once at most, never the layer it does not read, and gives the ids of ten builds of one book', async () => {
+    const bytes = await pack()
+    const reads: Record<string, number> = {}
+    const loadAsync = JSZip.loadAsync
+    ;(JSZip as any).loadAsync = async (data: unknown, options: unknown) => {
+      const zip = await loadAsync.call(JSZip, data as Uint8Array, options as never)
+      const file = zip.file.bind(zip) as (name: unknown) => any
+      ;(zip as any).file = (name: unknown) => {
+        const entry = file(name)
+        if (typeof name === 'string' && entry) {
+          const inflate = entry.async.bind(entry)
+          entry.async = (...args: unknown[]) => {
+            reads[name] = (reads[name] ?? 0) + 1
+            return inflate(...args)
+          }
+        }
+        return entry
+      }
+      return zip
+    }
+    let all: Awaited<ReturnType<typeof buildLanguage>>
+    try {
+      all = await buildLanguage({ source: await zipSource(bytes), lang: XX, registry: registry(), about })
+    } finally {
+      ;(JSZip as any).loadAsync = loadAsync
+    }
+    const books = byClass(all.segments, 'book')
+    expect(books.map((s) => s.seg.h.book)).toEqual(BOOKS)
+    expect(books.every((s) => s.seg.t.align !== undefined)).toBe(true)
+
+    const layerFiles = Object.entries(reads).filter(([name]) => name.startsWith('rows/'))
+    expect(layerFiles.length).toBeGreaterThan(0)
+    for (const [name, count] of layerFiles) expect(`${name}: ${count}`).toBe(`${name}: 1`)
+    expect(Object.keys(reads).some((name) => name.startsWith('rows/prepared/'))).toBe(false)
+
+    // The cache changes nothing: one build per book, each from a source of its own, gives the same segments and inputs.
+    for (const book of BOOKS) {
+      const one = await buildLanguage({ source: await zipSource(bytes), lang: XX, books: [book], registry: registry(), about })
+      const [alone] = byClass(one.segments, 'book')
+      const together = books.find((s) => s.seg.h.book === book)!
+      expect(alone.id).toBe(together.id)
+      expect(alone.inputs).toBe(together.inputs)
+    }
+  }, 60_000)
 })

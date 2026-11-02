@@ -77,6 +77,17 @@ function carriedBooks(manifest: Manifest, resource: ManifestResource): string[] 
   return [...new Set(resource.books)].filter((book) => !wanted || wanted.has(book)).sort()
 }
 
+/** The start of a line the pack writes: `{"key":"…","entry":…}`. The key is read without parsing the entry. */
+const LINE_KEY = /^\s*{\s*"key"\s*:\s*("(?:[^"\\]|\\.)*")/
+
+/** The key of a row line: cheap for a line as the pack writes it, a full parse for any other. */
+function keyOf(line: string, layer: string, resource: string): string {
+  const found = LINE_KEY.exec(line)
+  const key = found === null ? (JSON.parse(line) as { key?: unknown }).key : JSON.parse(found[1])
+  if (typeof key !== 'string') throw new Error(`A row of ${layer} of ${resource} has no key`)
+  return key
+}
+
 /** A source over a pack, which also says the pack's own language (`manifest.language`). */
 export type ZipSource = RowSource & { language: string }
 
@@ -105,18 +116,31 @@ export async function zipSource(zip: Uint8Array, originals?: RowSource): Promise
     return []
   }
 
+  // A layer file of a resource is inflated and split once, however many books are asked of it: a language of many books would otherwise
+  // read every file again for each book. What is kept are the lines and their keys; a line is parsed only for a book that is asked for.
+  const files = new Map<string, Promise<{ key: string; line: string }[]>>()
+  const fileOf = (resource: ManifestResource, layer: string): Promise<{ key: string; line: string }[]> => {
+    const id = `${layer}/${resource.key}`
+    let found = files.get(id)
+    if (found === undefined) {
+      found = (async () => {
+        const entry = archive.file(`rows/${layer}/${fileSafe(resource.key)}.jsonl`)
+        if (!entry) throw new Error(`The pack lacks ${layer} of ${resource.key}`)
+        return lines(await entry.async('string')).map((line) => ({ key: keyOf(line, layer, resource.key), line }))
+      })()
+      files.set(id, found)
+    }
+    return found
+  }
+
   async function* rowsOf(resource: ManifestResource, f: RowFilter): AsyncGenerator<Row> {
     const scoped = isBookScoped(resource)
     for (const layer of LAYERS) {
       if (f.layer !== undefined && f.layer !== layer) continue
       if (!resource.rows?.[layer]) continue
-      const entry = archive.file(`rows/${layer}/${fileSafe(resource.key)}.jsonl`)
-      if (!entry) throw new Error(`The pack lacks ${layer} of ${resource.key}`)
-      for (const line of lines(await entry.async('string'))) {
-        const row = JSON.parse(line) as { key?: unknown; entry?: unknown }
-        if (typeof row.key !== 'string') throw new Error(`A row of ${layer} of ${resource.key} has no key`)
-        if (f.book !== undefined && (!scoped || bookOfRow(row.key, layer, resource.key) !== f.book)) continue
-        yield { layer, key: row.key, value: row.entry }
+      for (const { key, line } of await fileOf(resource, layer)) {
+        if (f.book !== undefined && (!scoped || bookOfRow(key, layer, resource.key) !== f.book)) continue
+        yield { layer, key, value: (JSON.parse(line) as { entry?: unknown }).entry }
       }
     }
   }

@@ -7,7 +7,7 @@ import { partsSource } from '../node/partsSource'
 import { BOOK_TABLES, bookView } from '../read/book'
 import type { ResourceRef, Row, RowSource } from '../source/rows'
 import { bookSegment } from './book'
-import { extractBook, extractHelps } from './bookHelps'
+import { extractBook, extractHelps, isBookResource } from './bookHelps'
 import { extractOrig, OrigIndex } from './orig'
 
 // The data is a sample of real files (spec/tests/data/README.md): es-419 Titus, the GLT and the GST, the tN, tQ and tWL, and the UGNT.
@@ -504,9 +504,32 @@ describe('extractBook', () => {
   /** A source with these resources and rows, whatever the filter. */
   const fake = (resources: ResourceRef[], rows: Row[] = []): RowSource => ({
     async *rows(filter) {
-      for (const row of rows) if (filter.resource === undefined || row.key.includes(filter.resource)) yield row
+      for (const row of rows) {
+        if ((filter.resource === undefined || row.key.includes(filter.resource)) && (filter.layer === undefined || row.layer === filter.layer)) yield row
+      }
     },
     resources: async () => resources,
+  })
+
+  test('isBookResource: the four subjects extractBook reads, and no other', () => {
+    for (const kind of ['Aligned Bible', 'TSV Translation Notes', 'TSV Translation Questions', 'TSV Translation Words Links']) expect(isBookResource({ kind })).toBe(true)
+    for (const kind of ['Bible', 'Greek New Testament', 'Translation Words', 'Greek Lexicon', 'Open Bible Stories', '']) expect(isBookResource({ kind })).toBe(false)
+  })
+
+  test('the rows are asked for by layer, and read lists the layer and key of each one', async () => {
+    const asked: string[] = []
+    const rows = [tnChunk(1, [noteRow('a1b2', '1:1')]), { layer: 'prepared', key: 'prepared:notes:x', value: {} }, { layer: 'quote', key: `helps-quote:${TN}@g:tit:1`, value: { content: {} } }]
+    const src: RowSource = {
+      async *rows(filter) {
+        asked.push(filter.layer ?? 'all')
+        for (const row of rows) if (filter.layer === row.layer) yield row
+      },
+      resources: async () => [resource(TN, 'TSV Translation Notes')],
+    }
+    const read: { layer: string; key: string }[] = []
+    await extractBook(src, 'es-419', 'tit', mini(), [], read)
+    expect(asked).toEqual(['sot', 'quote'])
+    expect(read.map((row) => row.layer)).toEqual(['sot', 'quote'])
   })
 
   test('two resources of the same helps: the first by key is used, and a line says so', async () => {
