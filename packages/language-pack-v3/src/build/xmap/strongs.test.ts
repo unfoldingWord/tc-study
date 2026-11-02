@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import type { OrigModel } from '../../model'
 import type { Row } from '../../source/rows'
 import { partsSource } from '../../node/partsSource'
-import { extractOrig } from '../orig'
+import { verseId } from '../../ids'
+import { extractOrig, OrigIndex } from '../orig'
 import { strongsOfQuotes, strongsRecord } from './strongs'
 
 const join = (...path: string[]) => path.join('/')
@@ -44,6 +45,28 @@ describe('strongsOfQuotes', () => {
     expect(into.size).toBe(0)
     strongsOfQuotes(linkRows([{ ...base, origWords: real.origWords }]), 'tit', TWL, orig, into)
     expect(into.size).toBe(1)
+  })
+
+  test('the mark-free form is tried only when the exact form has no run', async () => {
+    const { orig, rows } = await titus()
+    const real = (rows.find((r) => r.key.startsWith('twl:')) as unknown as { value: { links: Record<string, string>[] } }).value.links[0]
+    const index = new OrigIndex(orig)
+    const [c, v] = real.reference.split(':').map(Number)
+    const at = orig.words.map((_, i) => i).filter((i) => index.verseOf(i) === verseId('tit', c, v))
+    // Three words of the verse: one exact (no marks) and two with an accent, so the exact form has 1 run and the mark-free form 3.
+    const words = orig.words.map((w) => ({ ...w }))
+    at.slice(0, 3).forEach((i, k) => {
+      words[i].form = k === 0 ? 'λογος' : 'λόγος'
+      words[i].strong = 'G30560'
+    })
+    const changed = { ...orig, words }
+    const ask = (occurrence: string): number => {
+      const into = new Map<string, Set<string>>()
+      strongsOfQuotes(linkRows([{ id: 'a', reference: real.reference, twLink: real.twLink, origWords: 'λογος', occurrence }]), 'tit', TWL, changed, into)
+      return into.size
+    }
+    expect(ask('1')).toBe(1)
+    expect(ask('2')).toBe(0)
   })
 
   test('an occurrence beyond the runs finds nothing', async () => {

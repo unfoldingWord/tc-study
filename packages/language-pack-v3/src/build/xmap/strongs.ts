@@ -54,9 +54,10 @@ export function strongsOfQuotes(rows: Row[], book: string, res: string, orig: Or
       for (const norm of [fold, loose]) {
         const q = quote.map(norm)
         const starts = runs(words.map((w) => norm(w.form)), q)
-        if (starts.length > 0 && occurrence === -1) run = starts.map((i) => [i, q.length])
-        else if (starts.length > 0 && occurrence >= 1 && occurrence <= starts.length) run = [[starts[occurrence - 1], q.length]]
-        if (run !== undefined) break
+        if (starts.length === 0) continue // the second form only when the first finds no run at all (README step 3)
+        if (occurrence === -1) run = starts.map((i) => [i, q.length])
+        else if (occurrence >= 1 && occurrence <= starts.length) run = [[starts[occurrence - 1], q.length]]
+        break
       }
       if (run === undefined) {
         all = false
