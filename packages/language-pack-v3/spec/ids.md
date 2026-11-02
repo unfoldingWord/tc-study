@@ -24,7 +24,9 @@ Numbers 67 to 99 are reserved for other books (deuterocanonical, front and back 
 A verse is the integer `LLCCCVVV`: book number, chapter, verse. Tito 2:11 is `56002011`.
 
 - **Introductions.** Verse 0 is a chapter's introduction (`56002000`); chapter 0 is the book's (`56000000`). A note
-  whose reference is `front:intro` points to `56000000`, and `2:intro` points to `56002000`.
+  whose reference is `front:intro` points to `56000000`, and `2:intro` points to `56002000`. The notes and links of
+  Psalms publish the title of a psalm as `3:front`: a builder reads it as `3:intro` (the title is the words of the original
+  before `\v 1`, verse 0) and keeps the published text in `refText`.
 - **Verses as published.** A verse published as `1-2` takes the id of its first number; the text keeps its label
   `1-2`.
 - **Ranges.** A range is two ids, both included; a list (`1:1,3`) is several ranges.
