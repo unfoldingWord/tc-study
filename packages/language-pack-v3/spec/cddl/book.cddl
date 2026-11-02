@@ -55,7 +55,8 @@ text-align = {
                                ; translates, then k numbers: each original position (ids.md) minus the previous
                                ; position written in this column, as svarints. k = 0: not aligned
   ? "missing": [* [word: uint, verse: verse-id, original: tstr, occurrence: uint]],
-                               ; aligned in the source to an original word that this original edition does not have
+                               ; aligned in the source to an original word that this original edition does not have;
+                               ; occurrence 0: the source gives no usable x-occurrence for it (it is 1 or more otherwise)
 }
 ; The original word's Strong, lemma and morphology are not kept: they are in the orig segment at that position.
 
