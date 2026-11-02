@@ -97,7 +97,8 @@ and how much of it the device already has, by reading only the index and the cat
 An app may still receive a format 2.0 or 1.1 `.langpack.zip`. It converts it on the device (`src/bridge/fromV2.ts`,
 phase 1):
 
-- The converted segments are byte for byte what the publisher's builder would make from the same inputs.
+- The converted segments have the same uncompressed body, so the same id, as what the publisher's builder would make from the same
+  inputs (`container.md`: the compressed bytes are not part of the identity).
 - They go into a **local catalog** (`origin: local`, `publisher: local:` and the device), unsigned, with coverage
   partial where the old pack lacked something.
 - A later published catalog replaces them.

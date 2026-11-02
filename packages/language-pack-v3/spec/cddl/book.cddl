@@ -14,13 +14,13 @@ book-header = {
 }
 
 book-tables = {
-  "strings": strtab,           ; required, v1
-  "texts": [* book-text],           ; required, v1 (may be empty: a language with notes and no text of this book)
-  ? "align": [* text-align],   ; optional, v1; depends on "texts"; one entry per text, same order
-  ? "notes": helps,            ; optional, v1 (tN)
-  ? "questions": helps,        ; optional, v1 (tQ)
-  ? "links": helps,            ; optional, v1 (tWL)
-  ? "quotes": quotes,          ; optional, v1; depends on "notes" and/or "links"
+  "strings": strtab,            ; required, v1
+  "texts": [* book-text],       ; required, v1 (may be empty: a language with notes and no text of this book)
+  ? "align": [* text-align],    ; optional, v1; depends on "texts"; one entry per text, same order
+  ? "notes": helps,             ; optional, v1 (tN)
+  ? "questions": helps,         ; optional, v1 (tQ)
+  ? "links": helps,             ; optional, v1 (tWL)
+  ? "quotes": quotes,           ; optional, v1; depends on "notes" and/or "links"
 }
 
 ; "strings": every text piece of the texts, every structure argument and every short value of the helps, once.
@@ -34,7 +34,7 @@ book-tables = {
 ;
 ; The USJ of format 2.0 drops the blank that the USFM has between two alignment milestones, so two words can follow each
 ; other with nothing between them. The builder puts one space piece (" ", not a word) between two word pieces that follow
-; each other with nothing between them, as format 2.0 does when it shows the text. Joining the pieces gives the text.
+; each other with nothing between them, as format 2.0 does when it shows the text.
 book-text = {
   "res": res-index,
   "tok": uvarints,             ; per piece: string number × 2, plus 1 when the piece is a word
@@ -83,6 +83,8 @@ helps = {
 ; In "note", "question" and "response", the TSV escapes become what they stand for ("\n" and <br> are line breaks),
 ; and rc:// links are rewritten as concept ids (ids.md, "Links inside text").
 
+; The words of a quote are looked up in the verse the quote layer names, the occurrence counted as format 2.0 counts it. A ketiv that is
+; not found is looked up by its qere (the quote layer keeps both), and the position is the qere's.
 quotes = {
   ? "notes": quote-positions,
   ? "links": quote-positions,

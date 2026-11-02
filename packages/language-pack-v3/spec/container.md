@@ -34,7 +34,8 @@ contents cheaply.
 | `id` | bytes (32) | sha256 of the uncompressed body: the segment's identity |
 | `sig` | array | Only in the catalog: its signatures (`catalog.md`) |
 
-A reader ignores header keys it does not know: a minor version can add them.
+A reader ignores header keys it does not know: a minor version can add them. A `sig` of the wrong type, or in a segment that is not a
+catalog, is ignored the same way: phase 3, which checks signatures, decides what it does with them.
 
 ## Body
 
@@ -96,6 +97,10 @@ an integer that is not in its shortest form and map keys that are not sorted. A 
 (`E_HEADER`) or in the body (`E_BODY`): indefinite lengths, floats, tags, `null`, `undefined` and any other simple value
 (only `false` and `true` are accepted), a map key that is not text, and a map with the same key twice. The body is decoded
 as a whole before any table is skipped, so these rules also apply inside an unknown optional table.
+
+**Integers have one range.** A CBOR integer outside -(2^53 - 1) .. 2^53 - 1 (the numbers JavaScript reads exactly, the same distance each
+way) is rejected anywhere: `E_HEADER` in a segment's header and in the index of a transfer file, `E_BODY` in the body. That includes a
+header key the reader does not know, a root key of the body it ignores, and a table it skips. Builders write no integer outside it.
 
 ## Column encodings
 
@@ -166,7 +171,8 @@ this order and stops at the first defect:
    longer is `E_TRAILING`.
 4. Then, in this order: `E_CODEC`, `E_INFLATE`, `E_ID`, `E_BODY`, `E_HMISMATCH`, `E_TABLE`. Here `E_BODY` is the general shape of the
    body: a map with `h` and `t` (other keys are ignored), the logical header, and `h.tables` and `t` listing the same
-   tables. A catalog inside a transfer file has one more check here: its class (`transfer.md`).
+   tables. The whole body is decoded here, so CBOR nested deeper than 64 levels in it is `E_LIMIT`, raised while it is decoded, in the
+   place of `E_BODY`. A catalog inside a transfer file has one more check here: its class (`transfer.md`).
 5. Then the tables of the class, which only a reader that knows the class can check: each table against its schema
    (`cddl/`) and the further checks `tests/README.md` lists ("Checks of the tables"), `E_BODY` again. A segment of a class
    the reader does not decode (in phase 1: `map`, `xmap` and `gen`) is `E_TABLE` at this step if it was not before, because

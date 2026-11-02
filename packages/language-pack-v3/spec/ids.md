@@ -3,7 +3,7 @@
 Everything has a name that does not change between builds or between languages. That is what lets the map of one
 language talk about the book of another, and a citation still resolve after an update.
 
-Ids are lowercase ASCII: letters, digits and `- . _ / : #`.
+Ids are lowercase ASCII: letters, digits and `- . _ / : # ~` (`~` marks a repeated row id: `a1b2~2`).
 
 ## Books
 
