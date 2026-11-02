@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 // The public API, without a Node module
@@ -75,7 +75,10 @@ describe('index.ts', () => {
   test('the subpath for partsSource is in package.json, next to ".", and index.ts says that path', () => {
     const pkg = JSON.parse(readFileSync(join(SRC, '..', 'package.json'), 'utf8'))
     expect(Object.keys(pkg.exports)).toEqual(['.', './node/partsSource'])
-    expect(pkg.exports['./node/partsSource']).toEqual({ types: './dist/node/partsSource.d.ts', import: './dist/node/partsSource.js' })
+    // The package is used from its sources, as resource-pipeline is (`"main": "./src/index.ts"`): `dist/` is not built in a checkout.
+    expect(pkg.exports['.']).toBe('./src/index.ts')
+    expect(pkg.exports['./node/partsSource']).toBe('./src/node/partsSource.ts')
+    expect(existsSync(join(SRC, '..', pkg.exports['./node/partsSource']))).toBe(true)
     expect(readFileSync(join(SRC, 'index.ts'), 'utf8')).toContain('@bt-synergy/language-pack-v3/node/partsSource')
   })
 })

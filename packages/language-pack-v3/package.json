@@ -3,18 +3,12 @@
   "version": "0.1.0",
   "description": "Language packs format 3: builders and readers for the segment and transfer files described in spec/",
   "type": "module",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./node/partsSource": {
-      "types": "./dist/node/partsSource.d.ts",
-      "import": "./dist/node/partsSource.js"
-    }
+    ".": "./src/index.ts",
+    "./node/partsSource": "./src/node/partsSource.ts"
   },
   "scripts": {
     "build": "tsc",
