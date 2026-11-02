@@ -531,3 +531,9 @@ become an addendum written once part A is complete; the addendum goes to Abel be
   Details: the side-session note `lp3-fase2-nombres-por-alineacion.md`.
 - B5 Python reader of the module; the fixed queries `per:abraham` and `ev:plagas-egipto`; the size gate again, with the
   module measured on its own for es-419 and en.
+- B6 Spec of the complements `images` and `basemap` (`catalog.md`, `cddl/catalog.cddl`; the open item in `spec/README.md`
+  says what Abel approved). No change to the maps or the units. Building them comes after part B, in this order: UBS
+  animals and plants (360 px by default, 600 px optional), then the OBS images, then our own basemap. Left out: AI-made
+  images (163 in UBS), Pixabay images that cannot be verified, FIA Images until their origin is confirmed, Biblica's
+  English maps. Source: `docs/INVESTIGACION_MAPAS_E_IMAGENES.md` section 4 in the Servos worktree
+  `elastic-montalcini-929ef9` (read only).

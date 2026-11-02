@@ -74,6 +74,7 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | An OBS help's `frame` (story × 100 + frame) is not checked against story 1–50 and frame 0–99: both readers print "51:1" for 5101 | Phase 2 |
 | `needs: "map"` in the units of a catalog is dangling until phase 2 builds the `map` unit: a phase 1 catalog cannot activate a book on a device that enforces it, so phase 1 catalogs are not published | Phase 2 |
 | Signatures (`sig`): a reader ignores them today | Phase 3 |
+| Two complement kinds, `images` (an image archive with an index: file, size, concepts, verse ranges and a credit per piece) and `basemap` (background layers with no place names; relief is a separate `basemap`; the app places the `lug:` points of the topics with the language's names). In the catalog: both in `complement.kind`, `license` for the whole set with each piece's license in the index, `lang` only when an image has text burned in, `for` names the `xmap` revision. No change to the maps or the units. Approved by Abel on 2026-11-02 | With part B of phase 2; built after it |
 | The frozen case bytes include the deflate output of pako 2.1.0: a compressor upgrade needs `build-cases.ts --refreeze` (ids and reader outputs do not change) | When pako is upgraded |
 | The MACULA trees are kept as published, under MACULA's own license | Before the common pack is published |
 | Equal headings in one article: the tie-break of the section ids | Phase 2 |
