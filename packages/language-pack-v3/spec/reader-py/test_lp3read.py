@@ -2348,6 +2348,26 @@ def test_map_part():
     ok(b, expected)
 
 
+def test_key_named_proto_is_kept_in_names_subtitles_aliases_strongs():
+    # the same as map.test.ts and xmap.test.ts pin for the TS readers
+    _, _, (h, t) = map_core()
+    t["names"] = {"__proto__": ["x"]}
+    t["subtitles"] = {"__proto__": "y"}
+    out = read_file(build(h, t).data)
+    assert list(out["names"]) == ["__proto__"] and out["names"]["__proto__"] == ["x"]
+    assert list(out["subtitles"]) == ["__proto__"] and out["subtitles"]["__proto__"] == "y"
+    _, _, (h, t) = xmap_core()
+    t["concepts"] = {"ids": ["__proto__", "per:abraham", "tw:kt/grace", "tw:names/abraham"], "kind": uv([0, 1, 0, 1]),
+                     "tw": uv([0, 0, 1, 2]), "source": uv([0, 0, 1, 1])}
+    t["relations"] = {"types": ["same-as"], "from": uv([1]), "to": uv([3]), "type": uv([0]), "source": uv([1]),
+                      "confidence": uv([90])}
+    t["aliases"] = {"__proto__": "tw:kt/grace"}
+    t["strongs"] = {"__proto__": ["G54850"]}
+    out = read_file(build(h, t).data)
+    assert list(out["aliases"]) == ["__proto__"] and out["aliases"]["__proto__"] == "tw:kt/grace"
+    assert list(out["strongs"]) == ["__proto__"] and out["strongs"]["__proto__"] == ["G54850"]
+
+
 def test_map_part_without_tables():
     _, _, (h, t) = map_part()
     h["tables"] = {}

@@ -26,6 +26,7 @@ const SOURCES = ['text', 'list', 'none']
 function bad(what: string): never {
   throw new FormatError('E_BODY', `the map segment is malformed: ${what}`)
 }
+
 function isText(v: unknown): v is string {
   return typeof v === 'string'
 }
