@@ -316,7 +316,7 @@ export async function buildLanguage(o: {
     await add(mapSegment(built.core), inputsOf(coreRows, stampsOf(all)), all)
     for (const part of built.parts) {
       const keys = refs.filter((ref) => ref.books.includes(part.part)).map((ref) => ref.key)
-      await add(mapSegment(part), inputsOf(mapRows.get(part.part) ?? [], stampsOf(keys)), keys)
+      await add(mapSegment(part), inputsOf(mapRows.get(part.part) ?? [], []), keys)
     }
   }
 

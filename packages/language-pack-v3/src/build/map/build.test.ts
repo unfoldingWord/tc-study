@@ -54,6 +54,15 @@ describe('buildMap, es-419 Titus', () => {
     expect(parts).toEqual([])
   })
 
+  test('a book that is not built is not covered: no source, not zero', async () => {
+    const { refs, model, verses, articles, obs } = await setup()
+    const wide = refs.map((ref) => (ref.key === 'es-419_gl/es-419/tn' ? { ...ref, books: ['tit', 'rut'] } : ref))
+    const { core } = buildMap({ lang: 'es-419', refs: wide, books: [{ model, verses }], articles, obs })
+    expect(core.coverage.get('es-419_gl/es-419/tn')).toEqual({ whole: ['tit'], partial: [] })
+    const none = buildMap({ lang: 'es-419', refs: wide, books: [], articles, obs })
+    expect(none.core.coverage.get('es-419_gl/es-419/tn')).toEqual({ whole: [], partial: [] })
+  })
+
   test('building twice gives equal results', async () => {
     const { refs, model, verses, articles, obs } = await setup()
     const o = { lang: 'es-419', refs, books: [{ model, verses }], articles, obs }
