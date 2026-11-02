@@ -389,7 +389,10 @@ export async function extractBook(
   read: { layer: string; key: string }[] = [],
 ): Promise<BookModel> {
   const index = new OrigIndex(orig)
-  const resources = (await source.resources(lang)).filter((resource) => resource.books.includes(book)).sort((a, b) => compareCodePoints(a.key, b.key))
+  // The resources with the book that a book segment keeps (`isBookResource`, the predicate `buildLanguage` uses to leave a book out), in the order of their keys.
+  const resources = (await source.resources(lang))
+    .filter((resource) => resource.books.includes(book) && isBookResource(resource))
+    .sort((a, b) => compareCodePoints(a.key, b.key))
 
   // Only the layers that are read are asked for, so that a source does not open the others (a zip pack has a file per layer and resource).
   const collect = async (resource: ResourceRef, layers: string[]): Promise<Row[]> => {

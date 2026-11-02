@@ -947,10 +947,10 @@ describe('the segment, byte by byte', () => {
   test('strings outside the BMP sort by code point in the string table', () => {
     const m: BookModel = {
       ...tiny,
-      texts: [{ res: GLT, pieces: [['\u{1D538}', false], ['￿', false], ['\u{1D538}￿', true]], events: [] }],
+      texts: [{ res: GLT, pieces: [['\u{1D538}', false], ['\uFFFF', false], ['\u{1D538}\uFFFF', true]], events: [] }],
     }
-    // UTF-16 order would put "\u{1D538}" before "￿".
-    expect(bookSegment(m).t.strings).toEqual(['￿', '\u{1D538}', '\u{1D538}￿'])
+    // UTF-16 order would put "\u{1D538}" before "\uFFFF".
+    expect(bookSegment(m).t.strings).toEqual(['\uFFFF', '\u{1D538}', '\u{1D538}\uFFFF'])
   })
 
   test('the words of every text share one table: a string used by two texts counts twice', () => {

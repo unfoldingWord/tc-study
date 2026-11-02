@@ -35,9 +35,9 @@ describe('sortKeys and canonicalJson', () => {
   })
 
   test('keys are sorted by code point, not by UTF-16 code unit', () => {
-    const data = { '\u{1D538}': 1, '￿': 2, a: 3 }
-    expect(Object.keys(sortKeys(data) as object)).toEqual(['a', '￿', '\u{1D538}'])
-    expect(canonicalJson(data)).toBe('{"a":3,"￿":2,"\u{1D538}":1}')
+    const data = { '\u{1D538}': 1, '\uFFFF': 2, a: 3 }
+    expect(Object.keys(sortKeys(data) as object)).toEqual(['a', '\uFFFF', '\u{1D538}'])
+    expect(canonicalJson(data)).toBe('{"a":3,"\uFFFF":2,"\u{1D538}":1}')
   })
 
   test('the canonical text sorts keys that an engine lists as array indexes ("10" before "9")', () => {

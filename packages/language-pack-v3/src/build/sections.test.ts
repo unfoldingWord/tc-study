@@ -592,8 +592,8 @@ describe('the registry is canonical', () => {
   })
 
   test('the articles are ordered by code point, not by UTF-16 code unit', () => {
-    const registry = assignSids('\u{1d538}', ES, parts, assignSids('￿', ES, parts, assignSids('a', ES, parts, {}).registry).registry).registry
-    expect(Object.keys(registry)).toEqual(['a', '￿', '\u{1d538}'])
+    const registry = assignSids('\u{1d538}', ES, parts, assignSids('\uFFFF', ES, parts, assignSids('a', ES, parts, {}).registry).registry).registry
+    expect(Object.keys(registry)).toEqual(['a', '\uFFFF', '\u{1d538}'])
   })
 
   test('the fields of an entry are in a fixed order, also in the entries the build did not touch', () => {

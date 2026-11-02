@@ -210,8 +210,8 @@ describe('texts', () => {
 
 describe('string tables', () => {
   test('stringTable sorts by code point, not by UTF-16 code unit', () => {
-    const { list, index } = stringTable(['b', 'a', 'b', '\u{1D538}', '￿'])
-    expect(list).toEqual(['b', 'a', '￿', '\u{1D538}'])
+    const { list, index } = stringTable(['b', 'a', 'b', '\u{1D538}', '\uFFFF'])
+    expect(list).toEqual(['b', 'a', '\uFFFF', '\u{1D538}'])
     expect(index.get('b')).toBe(0)
     expect(index.get('\u{1D538}')).toBe(3)
     expect(index.size).toBe(4)
@@ -228,8 +228,8 @@ describe('string tables', () => {
   })
 
   test('compareCodePoints orders by code point', () => {
-    expect(compareCodePoints('￿', '\u{1D538}')).toBeLessThan(0)
-    expect(compareCodePoints('\u{1D538}', '￿')).toBeGreaterThan(0)
+    expect(compareCodePoints('\uFFFF', '\u{1D538}')).toBeLessThan(0)
+    expect(compareCodePoints('\u{1D538}', '\uFFFF')).toBeGreaterThan(0)
     expect(compareCodePoints('a', 'a')).toBe(0)
     expect(compareCodePoints('a', 'ab')).toBeLessThan(0)
     expect(compareCodePoints('ab', 'a')).toBeGreaterThan(0)

@@ -534,9 +534,9 @@ describe('artSegment', () => {
   })
 
   test('the ids are ordered by code point, not by UTF-16 code unit', () => {
-    const ids = ['tw:kt/\u{1d538}', 'tw:kt/￿', 'tw:kt/a']
+    const ids = ['tw:kt/\u{1d538}', 'tw:kt/\uFFFF', 'tw:kt/a']
     const seg = artSegment(ES, 'tw:kt', RES, ids.map((id) => ({ ...plain, id })))
-    expect((seg.t.articles as any[]).map((a) => a.id)).toEqual(['tw:kt/a', 'tw:kt/￿', 'tw:kt/\u{1d538}'])
+    expect((seg.t.articles as any[]).map((a) => a.id)).toEqual(['tw:kt/a', 'tw:kt/\uFFFF', 'tw:kt/\u{1d538}'])
   })
 
   test('the body is deterministic CBOR that decodes to the same map', async () => {
