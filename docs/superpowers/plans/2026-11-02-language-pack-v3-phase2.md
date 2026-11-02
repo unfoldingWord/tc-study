@@ -34,6 +34,7 @@ Everything in the phase 1 Global Constraints still holds (`.superpowers/sdd/2026
 - English notes (`xmap` `notes`) and a language's notes (`map` `usage`) are never added together.
 - Book numbers and verse ids: `ids.md` (`tit` is 56; verse id `LLCCCVVV`). Strong keys: `strongKey` of `src/ids.ts` (Hebrew after the last `:`, with its letter suffix; Greek as published, `G54850`). A lookup of `G5485` also tries `G54850`.
 - Keys of every map table and every `names`, `subtitles`, `aliases` and `strongs` map are sorted by code point (`compareCodePoints`).
+- Sources outside unfoldingWord (part B, approved by Abel on 2026-11-02; `spec/fuentes.md`, "Conditions of use"): never commit or ship the TIPNR file itself, only extracted data, with small fixtures; no AI-written TIPNR `@Brief`, `@Short` or `@Article`; no Easton text and no dates from Theographic; no unfoldingWord® mark on derived work.
 - Size gate: the common map (core and 66 parts) plus the es-419 map (core and parts) ≤ 2 MB compressed (2 097 152 bytes), measured on the sample.
 
 ## Review Focus
@@ -501,12 +502,32 @@ Why: the translation-helps MCP and BT Servant need cross-book lookups from a gat
 - Append "Deviations from this plan" at the end of this file from the ledger's rulings.
 - Report to the supervisor: commits, gate numbers (sizes, queries), open items. The supervisor asks Abel whether to push.
 
-## Part B (outline, detailed after Abel approves `spec/fuentes.md`)
+## Part B (outline, detailed after part A is complete)
 
-Each becomes one or two tasks of an addendum to this plan, written once the files are downloaded and their shapes are known:
+Abel approved its sources on 2026-11-02 (`spec/fuentes.md`): STEPBible TIPNR, Theographic (events only), English OBS
+v9 (story references only); Nave's is left out. He also approved two additions the same day: the names of people and
+places of each language taken from its alignment, and the topics as a catalog module of their own. The tasks below
+become an addendum written once part A is complete; the addendum goes to Abel before any of it runs.
 
-- B1 Source readers for TIPNR and Theographic (string parsers under `src/source/`, Node-free) and fixture subsets with their licenses.
-- B2 People and places (`per:`, `lug:`) and events (`ev:`) as concepts of the xmap, with `kind`; relations with type, source and confidence, never merged (`same-as` between `tw:names/abraham` and `per:abraham` only from a declared source, else in a review list).
-- B3 Topics: the schema of `topics` in both maps (spec commit first), from English OBS story ranges (`obs:` with refs; the phase 1 deferral of OBS `refs`), outline sections `sec:` from the English tN introductions, events from Theographic; the five categories navigable.
+- B0 Spec of the topics module: its own unit (or class) in `catalog.md` and the CDDL, with its own version, the
+  release of each source and its own `needs`; the map core never depends on it, so a new TIPNR (almost weekly) changes
+  no id of the word and article maps. Downloaded by default; a transfer file may carry it or leave it out; each source's
+  license and credit travel with the module. Readers tell "no topics for this" from "the topics module is not on this
+  device", with the four states of `counts.md`. Heavy media (map drawings, images) stay out: later complements.
+- B1 Source readers for TIPNR and Theographic (string parsers under `src/source/`, Node-free) and small fixture subsets
+  with their licenses. Theographic verses converted from KJV versification to the original's, the ones that cannot be
+  converted listed.
+- B2 People and places (`per:`, `lug:`) and events (`ev:`) as concepts of the topics module, with `kind`; relations with
+  type, source and confidence, never merged (`same-as` between `tw:names/abraham` and `per:abraham` only from a declared
+  source, else in a review list).
+- B3 Topics: English OBS story ranges (`obs:` with refs; the phase 1 deferral of OBS `refs`), outline sections `sec:`
+  from the English tN introductions, events from Theographic; the five categories navigable.
 - B4 Language topics (`{lang}:tema/…`) from the language's own outlines, and topic names in `map` `names`.
-- B5 Python reader of `topics` and `relations`; the fixed queries `per:abraham` and `ev:plagas-egipto`; the size gate again.
+- B4b Names of people and places per language from the alignment: TIPNR's Strong keys **and** its verse lists (so a
+  proper-noun Strong used as a common noun is skipped) against the language's aligned bridge text; every variant kept,
+  most frequent first, with counts and books, marked as coming from the alignment (not a tW title); a fixed rule for
+  one-to-many alignments; a reader falls back to English and says so. Measure, for es-419 and en, how many TIPNR people
+  and places get a name and the bytes added, against 2 MB. `ev:` gets no names this way: an open item of the spec.
+  Details: the side-session note `lp3-fase2-nombres-por-alineacion.md`.
+- B5 Python reader of the module; the fixed queries `per:abraham` and `ev:plagas-egipto`; the size gate again, with the
+  module measured on its own for es-419 and en.
