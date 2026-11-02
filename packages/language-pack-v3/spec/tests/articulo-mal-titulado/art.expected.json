@@ -1,0 +1,61 @@
+{
+  "articles": [
+    {
+      "id": "tw:kt/faith",
+      "res": "es-419_gl/es-419/tw",
+      "sections": [
+        {
+          "lang": "es-419",
+          "level": 0,
+          "md": "Este texto está antes de cualquier encabezado.",
+          "role": "intro",
+          "sid": "intro"
+        },
+        {
+          "lang": "es-419",
+          "level": 2,
+          "md": "La fe es confiar en alguien.",
+          "role": "definition",
+          "sid": "definition",
+          "title": "Definición"
+        },
+        {
+          "lang": "es-419",
+          "level": 2,
+          "md": "Un texto bajo un encabezado desconocido.",
+          "role": "unknown",
+          "sid": "s1",
+          "title": "Un encabezado que ninguna regla coloca"
+        },
+        {
+          "lang": "en",
+          "level": 2,
+          "md": "This section is written in English in an article of es-419.",
+          "role": "translation-suggestions",
+          "sid": "translation-suggestions",
+          "title": "Translation Suggestions"
+        }
+      ],
+      "title": "fe"
+    }
+  ],
+  "h": {
+    "class": "art",
+    "group": "tw:kt",
+    "lang": "es-419",
+    "res": [
+      [
+        "es-419_gl/es-419/tw",
+        "v37"
+      ]
+    ],
+    "tables": {
+      "articles": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "5847b99a649ea32fcc809320ba24992e69ff8f1e0e37e0beab7a64349dc52460"
+}

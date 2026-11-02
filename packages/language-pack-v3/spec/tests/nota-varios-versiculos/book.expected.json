@@ -1,0 +1,1262 @@
+{
+  "h": {
+    "book": "tit",
+    "class": "book",
+    "lang": "es-419",
+    "orig": [
+      "unfoldingWord/el-x-koine/ugnt",
+      "g987ab2025a"
+    ],
+    "res": [
+      [
+        "es-419_gl/es-419/glt",
+        "v42"
+      ],
+      [
+        "es-419_gl/es-419/tn",
+        "v66"
+      ]
+    ],
+    "tables": {
+      "align": [
+        1,
+        false
+      ],
+      "notes": [
+        1,
+        false
+      ],
+      "quotes": [
+        1,
+        false
+      ],
+      "strings": [
+        1,
+        true
+      ],
+      "texts": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "95056db559e41695abdbd6c15118458a8aa31d17120343c95693a790b7412224",
+  "notes": {
+    "res": "es-419_gl/es-419/tn",
+    "rows": [
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Pablo habla de la esperanza como si fuera una cosa que se puede tener en las manos.\nEs una metáfora.",
+          "quote": "ἐπ’ ἐλπίδι ζωῆς",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 56001002,
+        "id": "f3a9",
+        "quote": [
+          17,
+          18,
+          19
+        ],
+        "ref": "1:2-4",
+        "to": 56001004
+      }
+    ]
+  },
+  "texts": [
+    {
+      "align": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          2
+        ],
+        [
+          4
+        ],
+        [
+          3
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          7
+        ],
+        [
+          8
+        ],
+        [
+          8
+        ],
+        [
+          8
+        ],
+        [
+          9
+        ],
+        [
+          9
+        ],
+        [
+          9
+        ],
+        [
+          10
+        ],
+        [
+          10
+        ],
+        [
+          11
+        ],
+        [
+          12
+        ],
+        [
+          12
+        ],
+        [
+          13
+        ],
+        [
+          13
+        ],
+        [
+          13
+        ],
+        [
+          14
+        ],
+        [
+          15
+        ],
+        [
+          15
+        ],
+        [
+          15
+        ],
+        [
+          15
+        ],
+        [
+          16
+        ],
+        [
+          16
+        ],
+        [
+          17
+        ],
+        [
+          18
+        ],
+        [
+          18
+        ],
+        [
+          19
+        ],
+        [
+          19
+        ],
+        [
+          19
+        ],
+        [
+          20
+        ],
+        [
+          21
+        ],
+        [
+          21
+        ],
+        [
+          25
+        ],
+        [
+          23,
+          24
+        ],
+        [
+          23,
+          24
+        ],
+        [
+          23,
+          24
+        ],
+        [
+          22
+        ],
+        [
+          26
+        ],
+        [
+          27
+        ],
+        [
+          27
+        ],
+        [
+          27
+        ],
+        [
+          28
+        ],
+        [
+          28
+        ],
+        [
+          28
+        ],
+        [
+          30
+        ],
+        [
+          29
+        ],
+        [
+          31
+        ],
+        [
+          31
+        ],
+        [
+          31
+        ],
+        [
+          32
+        ],
+        [
+          35
+        ],
+        [
+          33,
+          34
+        ],
+        [
+          36
+        ],
+        [
+          37
+        ],
+        [
+          37
+        ],
+        [
+          38
+        ],
+        [
+          40
+        ],
+        [
+          39
+        ],
+        [
+          39
+        ],
+        [
+          41
+        ],
+        [
+          42
+        ],
+        [
+          42
+        ],
+        [
+          46
+        ],
+        [
+          46
+        ],
+        [
+          45
+        ],
+        [
+          43,
+          44
+        ],
+        [
+          47
+        ],
+        [
+          47
+        ],
+        [
+          48
+        ],
+        [
+          49
+        ],
+        [
+          50
+        ],
+        [
+          50
+        ],
+        [
+          51
+        ],
+        [
+          52
+        ],
+        [
+          51
+        ],
+        [
+          53
+        ],
+        [
+          54
+        ],
+        [
+          55
+        ],
+        [
+          56
+        ],
+        [
+          57
+        ],
+        [
+          58
+        ],
+        [
+          59
+        ],
+        [
+          60
+        ],
+        [
+          60
+        ],
+        [
+          61
+        ],
+        [
+          64
+        ],
+        [
+          62,
+          63
+        ]
+      ],
+      "attrs": [
+        [
+          0,
+          {
+            "code": "TIT"
+          }
+        ]
+      ],
+      "events": [
+        [
+          0,
+          "open",
+          "book:id"
+        ],
+        [
+          1,
+          "close",
+          ""
+        ],
+        [
+          1,
+          "open",
+          "para:ide"
+        ],
+        [
+          2,
+          "close",
+          ""
+        ],
+        [
+          2,
+          "open",
+          "para:h"
+        ],
+        [
+          3,
+          "close",
+          ""
+        ],
+        [
+          3,
+          "open",
+          "para:toc1"
+        ],
+        [
+          4,
+          "close",
+          ""
+        ],
+        [
+          4,
+          "open",
+          "para:toc2"
+        ],
+        [
+          5,
+          "close",
+          ""
+        ],
+        [
+          5,
+          "open",
+          "para:toc3"
+        ],
+        [
+          6,
+          "close",
+          ""
+        ],
+        [
+          6,
+          "open",
+          "para:mt"
+        ],
+        [
+          7,
+          "close",
+          ""
+        ],
+        [
+          7,
+          "chapter",
+          "1"
+        ],
+        [
+          7,
+          "open",
+          "para:p"
+        ],
+        [
+          7,
+          "verse",
+          "1"
+        ],
+        [
+          67,
+          "verse",
+          "2"
+        ],
+        [
+          109,
+          "verse",
+          "3"
+        ],
+        [
+          153,
+          "verse",
+          "4"
+        ],
+        [
+          195,
+          "close",
+          ""
+        ]
+      ],
+      "pieces": [
+        [
+          "EN_TPL es-419_Español⋅Latin⋅America_ltr Tue Jul 26 2022 19:01:30 GMT-0400 (Venezuela Time) tc",
+          false
+        ],
+        [
+          "UTF-8",
+          false
+        ],
+        [
+          "Tito",
+          false
+        ],
+        [
+          "La carta de Pablo a Tito",
+          false
+        ],
+        [
+          "Tito",
+          false
+        ],
+        [
+          "Tit",
+          false
+        ],
+        [
+          "Tito",
+          false
+        ],
+        [
+          "Pablo",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "siervo",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Dios",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "y",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "apóstol",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Jesucristo",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "conforme",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "a",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "la",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "fe",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "los",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "elegidos",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Dios",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "y",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "al",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "conocimiento",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "la",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "verdad",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "que",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "es",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "acuerdo",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "con",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "la",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "piedad",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "sobre",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "la",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "esperanza",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "la",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "vida",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "eterna",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "la",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "cual",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Dios",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "que",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "no",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "miente",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "prometió",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "antes",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "los",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "tiempos",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "los",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "siglos",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "pero",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "reveló",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "en",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "los",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "tiempos",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "apropiados",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "su",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "palabra",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "por",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "la",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "predicación",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "que",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "me",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "fue",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "confiada",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "conforme",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "al",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "mandato",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Dios",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "nuestro",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "salvador",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "a",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Tito",
+          true
+        ],
+        [
+          ", ",
+          false
+        ],
+        [
+          "verdadero",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "hijo",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "conforme",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "a",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "nuestra",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "fe",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "común",
+          true
+        ],
+        [
+          ". ",
+          false
+        ],
+        [
+          "Gracia",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "y",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "paz",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Dios",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Padre",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "y",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "de",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Cristo",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "Jesús",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "nuestro",
+          true
+        ],
+        [
+          " ",
+          false
+        ],
+        [
+          "salvador",
+          true
+        ],
+        [
+          ". ",
+          false
+        ]
+      ],
+      "res": "es-419_gl/es-419/glt"
+    }
+  ]
+}
