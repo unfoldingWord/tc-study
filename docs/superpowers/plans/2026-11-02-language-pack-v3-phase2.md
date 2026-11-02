@@ -543,3 +543,28 @@ become an addendum written once part A is complete; the addendum goes to Abel be
   images (163 in UBS), Pixabay images that cannot be verified, FIA Images until their origin is confirmed, Biblica's
   English maps. Source: `docs/INVESTIGACION_MAPAS_E_IMAGENES.md` section 4 in the Servos worktree
   `elastic-montalcini-929ef9` (read only).
+
+## Deviations from this plan
+
+Written after part A (Tasks 1–21) and its final review, from the controller's ledger. The spec is the authority; each line says what was decided and why.
+
+- **Task 2 brief.** It said "verses greater than count throws". The spec allows it, so the codec accepts it.
+- **CBOR map key order.** Keys of `names`, `subtitles`, `aliases` and `strongs` are in encoded-byte order, written by the encoder. Readers (TypeScript and Python) check only repeats, never order; lists, string tables and column keys stay in code point order. The earlier text in `tests/README.md` could not be implemented and was corrected.
+- **Concepts table.** The xmap `concepts` table holds every tW/tA title row plus the ids named by tN and tWL (1195 on Titus), kind `none`, because the CDDL says "every concept id". The core is larger than "referenced only".
+- **Help resources in the common catalog.** With a map language, the catalog `resources` also lists tN, tWL, tW and tA, which the xmap read (attribution and licence).
+- **Unreadable references.** A note whose reference cannot be read is counted at verse 0 (the phase 1 model cannot tell it from `front:intro`). The note count is right; the verse count may be one high. `cddl/common.cddl` now says so.
+- **Case 13.** Refrozen after the bridge began to build the map unit (catalog.seg 965 bytes, expected.json 2878).
+- **OBS rows.** The OBS builder leaves out a help row whose reference is unreadable or whose story is above 50, with an issue line. Such rows are lost from the pack and reported.
+- **Coverage entries that decide.** Map `usage` is decided by the language's `tn` entry only; xmap notes = `tn`, links = `twl`, strong = the `uhb`/`ugnt`-type keys. Stated in `counts.md` and `tests/README.md` (final review: the revision query and the `usage` query now use one rule).
+- **Book-set bits 66..71.** Rejected only in map and xmap coverage book sets, by both readers; the catalog `books` set is length-checked only.
+- **Python reader readings** (Task 13): `concepts.ids` must be sorted; an empty `names` list is E_BODY; `relations` columns have equal length.
+- **Queries (Tasks 17–18).** `keyterms` candidates are restricted to `tw:kt/` concepts, with no threshold; the derivation of `strongs` from tWL quotes is written normatively in `queries/README.md` and the builder agrees; the `revision` answer names the revision it describes; the fixed queries are asked of the common map alone. The gate was built from the sample's lists filtered to the parts that exist, with `--books` over all 66 originals.
+- **`link_strongs`.** `answers.py` accepts `N:intro` and a leading space, as the TypeScript does.
+- **Task 20.** `sections.ts` was unchanged (`assignSids` already had the tie-break); a test pins it. The bridged-registry open-items row stays (the bridge starts empty).
+- **Task 21.** Measurement only. Abel decided to measure the aligned-phrase index over whole languages before deciding; that is B7 in part B.
+- **Final review (changes to rulings above).**
+  - Map part `inputs` now carry the stamp of the tN of their book (the Task 12 ruling "map parts carry no stamps" was wrong: catalog.md says a new tN row rebuilds the part; the segment id stays the same when rows are equal). xmap core and parts take their own book's original stamp.
+  - A bridged book lists as `needs` only the article groups the catalog actually builds; the rest are reported.
+  - A map core with `res: []` is valid; a part's `book` is optional but must equal its `part`; a part's `res` must be `[]` in both readers.
+  - `__proto__` keys in names, subtitles, aliases and strongs are kept by both readers.
+  - A book listed both whole and partial in one source is E_BODY in both readers.
