@@ -45,6 +45,16 @@ export type ResourceRef = {
    * for; absent when the source does not record blobs (a format 1.1 pack does not) or none of its books has one.
    */
   bookStamps?: Record<string, string>
+  /**
+   * What the catalog says of the resource (`catalog.cddl`, `resource`), as the source states it and only when it does: the
+   * title (`Notas de Traducción`), the license text (`CC BY-SA 4.0`, not an SPDX id: the catalog maps it), the holder of the
+   * rights and the credit line. A parts list gives the title and the license (`title`, `metadata.license.id`); a format 1.1
+   * pack gives the title. No source carries `rights` or `attribution` today.
+   */
+  title?: string
+  license?: string
+  rights?: string
+  attribution?: string
 }
 
 export type RowFilter = { lang: string; book?: string; resource?: string; layer?: string }

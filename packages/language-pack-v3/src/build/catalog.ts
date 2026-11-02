@@ -178,7 +178,8 @@ function sortKey(built: BuiltSegment): [number, number, number, string, string] 
   ]
 }
 
-function compareSegments(a: BuiltSegment, b: BuiltSegment): number {
+/** The order `buildCatalog` lists segments in (the top of this file): a caller that returns segments in it uses this. */
+export function compareSegments(a: BuiltSegment, b: BuiltSegment): number {
   const [ka, kb] = [sortKey(a), sortKey(b)]
   return ka[0] - kb[0] || ka[1] - kb[1] || ka[2] - kb[2] || compareCodePoints(ka[3], kb[3]) || compareCodePoints(ka[4], kb[4])
 }

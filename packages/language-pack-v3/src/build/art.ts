@@ -43,7 +43,7 @@ import { articlePath, assignArticle, canonicalRegistry, type SectionPart, type S
 const TW_SUBJECT = 'Translation Words'
 const TA_SUBJECT = 'Translation Academy'
 
-type Kind = 'tw' | 'ta'
+export type Kind = 'tw' | 'ta'
 
 /** `{kind}-title` and `{kind}-sub-title` rows of the layer `text`: the resource, the stamp it names and the article path. */
 const TEXT_KEY = /^helps-text:(tw-title|ta-title|ta-sub-?title):([^@]+)@[^:]*:(.+)$/
@@ -51,6 +51,18 @@ const TEXT_KEY = /^helps-text:(tw-title|ta-title|ta-sub-?title):([^@]+)@[^:]*:(.
 // The name may be published with capitals (the tA `translate/figs-orderHeb`); the id is lowercase (`ids.md`, "Concepts").
 const TW_PATH = /^bible\/(kt|names|other)\/([A-Za-z0-9_-]+)$/
 const TA_PATH = /^([a-z0-9_-]+)\/([A-Za-z0-9_-]+)$/
+
+/**
+ * The article a path under a resource's key names (`bible/kt/Grace` for tW, `translate/figs-orderHeb` for tA), or `null` when
+ * the path is not one of an article. `published` is the name as published (`kt/Grace`), `id` the lowercase concept
+ * (`tw:kt/grace`) and `group` the group of the segment (`tw:kt`).
+ */
+export function articleOfPath(kind: Kind, path: string): { id: string; group: string; published: string } | null {
+  const m = (kind === 'tw' ? TW_PATH : TA_PATH).exec(path)
+  if (m === null) return null
+  const published = `${m[1]}/${m[2]}`
+  return { id: `${kind}:${published.toLowerCase()}`, group: `${kind}:${m[1]}`, published }
+}
 
 /** Raw text joined by a blank line, leaving out what is empty. */
 const joinText = (a: string, b: string): string => (a === '' ? b : b === '' ? a : `${a}\n\n${b}`)
@@ -117,14 +129,13 @@ export async function extractArticles(
     const { titles, subtitles } = await readTexts(source, lang, ref)
     for await (const row of source.rows({ lang, resource: ref.key, layer: 'sot' })) {
       const path = row.key.startsWith(`${ref.key}/`) ? row.key.slice(ref.key.length + 1) : undefined
-      const m = path === undefined ? null : (kind === 'tw' ? TW_PATH : TA_PATH).exec(path)
-      if (path === undefined || m === null) {
+      const named = path === undefined ? null : articleOfPath(kind, path)
+      if (path === undefined || named === null) {
         issues.push(`${row.key} is not the key of an article of ${ref.key}: left out`)
         continue
       }
       // The id is lowercase; the title rows name the article as it is published.
-      const published = `${m[1]}/${m[2]}`
-      const id = `${kind}:${published.toLowerCase()}`
+      const { id, group, published } = named
       if (id !== `${kind}:${published}`) issues.push(`${id} (${ref.key}): published as ${JSON.stringify(published)}, and ids are lowercase (ids.md)`)
       if (typeof row.value !== 'string') {
         issues.push(`${id} (${ref.key}): its text is not markdown (a string): left out`)
@@ -139,7 +150,7 @@ export async function extractArticles(
         )
         continue
       }
-      found.set(id, { id, group: `${kind}:${m[1]}`, kind, ref, published, rowKey: row.key, md: row.value, title: titles.get(published), subtitle: subtitles.get(published) })
+      found.set(id, { id, group, kind, ref, published, rowKey: row.key, md: row.value, title: titles.get(published), subtitle: subtitles.get(published) })
     }
   }
 

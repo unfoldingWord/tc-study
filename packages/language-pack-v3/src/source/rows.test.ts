@@ -156,7 +156,14 @@ describe('es-419 Titus, five resources: parts and the format 1.1 pack', () => {
     const { parts } = await sources()
     const found = byKey(await parts.resources('es-419'))
     expect([...found.keys()].sort()).toEqual([...FIVE, 'es-419_gl/es-419/tw', 'es-419_gl/es-419/ugl'].sort())
-    expect(found.get('es-419_gl/es-419/tw')).toEqual({ key: 'es-419_gl/es-419/tw', stamp: 'v37#2024-07-17T20_12_37Z', kind: 'Translation Words', books: [] })
+    expect(found.get('es-419_gl/es-419/tw')).toEqual({
+      key: 'es-419_gl/es-419/tw',
+      stamp: 'v37#2024-07-17T20_12_37Z',
+      kind: 'Translation Words',
+      books: [],
+      title: 'Palabras de Traducción',
+      license: 'CC BY-SA 4.0',
+    })
     expect(found.get('es-419_gl/es-419/ugl')!.kind).toBe('Greek Lexicon')
     for (const ref of found.values()) expect(ref.stamp.length).toBeGreaterThan(0)
   })
@@ -259,6 +266,19 @@ describe('filters', () => {
 })
 
 describe('the originals', () => {
+  test('resources give the title and the license text the list states, and a pack gives the title; none gives rights or a credit line', async () => {
+    const { parts, zip } = await sources()
+    const fromList = byKey(await parts.resources('es-419'))
+    expect(fromList.get('es-419_gl/es-419/tn')).toMatchObject({ title: 'Notas de Traducción', license: 'CC BY-SA 4.0' })
+    const fromPack = byKey(await zip.resources('es-419'))
+    expect(fromPack.get('es-419_gl/es-419/tn')!.title).toBe('Notas de Traducción')
+    expect('license' in fromPack.get('es-419_gl/es-419/tn')!).toBe(false)
+    for (const ref of [...fromList.values(), ...fromPack.values()]) {
+      expect('rights' in ref).toBe(false)
+      expect('attribution' in ref).toBe(false)
+    }
+  })
+
   test('partsSource gives the UGNT Titus rows and its stamp', async () => {
     const { parts } = await sources()
     const rows = await collect(parts.rows({ lang: 'originals', book: 'tit' }))
@@ -273,6 +293,8 @@ describe('the originals', () => {
         kind: 'Greek New Testament',
         books: ['tit'],
         bookStamps: { tit: 'g987ab2025a' },
+        title: 'unfoldingWord® Greek New Testament',
+        license: 'CC BY-SA 4.0',
       },
     ])
     // A language the source does not hold is not an error: it has nothing.

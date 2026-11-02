@@ -9,7 +9,13 @@ import { join } from 'node:path'
 import { partRows, type ResourceRef, type Row, type RowFilter, type RowSource } from '../source/rows'
 
 type ListPart = { sha256: string; kind: string; resource: string; book?: string; group?: string; layers: string[] }
-type ListResource = { key: string; stamp: string; subject?: string; metadata?: { contentMetadata?: { bookBlobs?: unknown } } }
+type ListResource = {
+  key: string
+  stamp: string
+  subject?: string
+  title?: unknown
+  metadata?: { title?: unknown; license?: unknown; contentMetadata?: { bookBlobs?: unknown } }
+}
 type List = { language: string; resources: ListResource[]; parts: ListPart[] }
 
 /** The parts list at `path`: `schema 2`, with the fields this source reads. The rest of the list (`code`, `units`...) is not read. */
@@ -35,6 +41,8 @@ async function readList(path: string): Promise<List> {
   }
   return list as List
 }
+
+const isText = (value: unknown): value is string => typeof value === 'string' && value.trim() !== ''
 
 /** A git blob as the list writes it: lowercase hex (40 digits in practice); the stamp keeps the first 10. */
 const BLOB = /^[0-9a-f]{10,}$/
@@ -116,6 +124,12 @@ export async function partsSource(o: { list: string; partsDir: string; originals
         const ref: ResourceRef = { key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books: sorted }
         const bookStamps = bookStampsOf(resource, sorted)
         if (bookStamps) ref.bookStamps = bookStamps
+        // The list's own `title` (the one the resource is shown by), else the metadata's; the license is `metadata.license.id`.
+        const title = [resource.title, resource.metadata?.title].find(isText)
+        if (title !== undefined) ref.title = title
+        const license = resource.metadata?.license
+        const licenseId = typeof license === 'object' && license !== null ? (license as { id?: unknown }).id : undefined
+        if (isText(licenseId)) ref.license = licenseId
         return ref
       })
     },

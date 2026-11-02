@@ -17,6 +17,7 @@ type ManifestResource = {
   role?: string
   stamp: string
   subject?: string
+  title?: unknown
   rows?: Record<string, number>
   books?: string[]
 }
@@ -76,15 +77,19 @@ function carriedBooks(manifest: Manifest, resource: ManifestResource): string[] 
   return [...new Set(resource.books)].filter((book) => !wanted || wanted.has(book)).sort()
 }
 
+/** A source over a pack, which also says the pack's own language (`manifest.language`). */
+export type ZipSource = RowSource & { language: string }
+
 /**
  * `zip`: the bytes of a format 1.1 pack. `originals`: the source for `lang: 'originals'`; without it the pack answers for
  * the original languages with the resources it carries itself as `role: 'original'` (a pack of the originals, or a 1.0
  * pack), if any.
  *
- * The pack's own language is `manifest.language`. Receipts (`rows/receipt/`) are not rows of a source and are not read.
- * The `kind` of a resource is its manifest `subject`; its `stamp` is the manifest's `stamp`.
+ * The pack's own language is `manifest.language`, and the source's `language` says it. Receipts (`rows/receipt/`) are not
+ * rows of a source and are not read. The `kind` of a resource is its manifest `subject`; its `stamp` is the manifest's
+ * `stamp`; its `title` is the manifest's `title` when it has one (the manifest has no license, rights or credit line).
  */
-export async function zipSource(zip: Uint8Array, originals?: RowSource): Promise<RowSource> {
+export async function zipSource(zip: Uint8Array, originals?: RowSource): Promise<ZipSource> {
   const archive = await JSZip.loadAsync(zip)
   const file = archive.file('manifest.json')
   if (!file) throw new Error('This is not a language pack: it has no manifest.json')
@@ -128,12 +133,15 @@ export async function zipSource(zip: Uint8Array, originals?: RowSource): Promise
   }
 
   return {
+    language: manifest.language,
     rows,
     async resources(lang) {
       if (lang === ORIGINALS && originals) return originals.resources(lang)
-      return resourcesOf(lang).map(
-        (resource): ResourceRef => ({ key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books: carriedBooks(manifest, resource) }),
-      )
+      return resourcesOf(lang).map((resource): ResourceRef => {
+        const ref: ResourceRef = { key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books: carriedBooks(manifest, resource) }
+        if (typeof resource.title === 'string' && resource.title.trim() !== '') ref.title = resource.title
+        return ref
+      })
     },
   }
 }
