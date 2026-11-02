@@ -504,6 +504,8 @@ Why: the translation-helps MCP and BT Servant need cross-book lookups from a gat
 
 ## Part B (outline, detailed after part A is complete)
 
+Detailed in `docs/superpowers/plans/2026-11-02-language-pack-v3-phase2-partB.md` (Tasks P1–P16).
+
 Abel approved its sources on 2026-11-02 (`spec/fuentes.md`): STEPBible TIPNR, Theographic (events only), English OBS
 v9 (story references only); Nave's is left out. He also approved two additions the same day: the names of people and
 places of each language taken from its alignment, and the topics as a catalog module of their own. The tasks below
