@@ -18,6 +18,8 @@ export type MapSet = {
 
 type Cover = { whole: Set<string>; partial: Set<string> }
 
+const NO_COVER: Cover = { whole: new Set(), partial: new Set() }
+
 /** The last segment of a resource key (`unfoldingWord/en/tn` is `tn`). */
 const idOf = (key: string): string => key.slice(key.lastIndexOf('/') + 1)
 
@@ -29,12 +31,12 @@ function cover(coverage: Map<string, { whole: string[]; partial: string[] }> | u
     for (const b of c.whole) whole.add(b)
     for (const b of c.partial) partial.add(b)
   }
-  for (const b of whole) partial.delete(b)
   return { whole, partial }
 }
 
 /** The sources a table of the common map is covered by: the notes by tN, the links by tWL, the occurrences by the originals. */
 function xmapCover(core: XmapCore, table: 'strong' | 'links' | 'notes'): Cover {
+  // `strong` is whatever is neither tN nor tWL: the originals (the builder's coverage holds only those three kinds).
   return cover(core.coverage, (key) => {
     const id = idOf(key)
     return table === 'notes' ? id === 'tn' : table === 'links' ? id === 'twl' : id !== 'tn' && id !== 'twl'
@@ -49,13 +51,14 @@ function cell(book: string, c: Cover, rows: CountRows | undefined, key: string):
   return { book, state: 'count', count: pair[0], verses: pair[1] }
 }
 
-function withCount(rows: CountRows | undefined, key: string): BookAnswer[] {
+/** The books with a row: `partial` ("at least") when the source covers the book only in part, else `count`. */
+function withCount(rows: CountRows | undefined, key: string, c: Cover): BookAnswer[] {
   const out: BookAnswer[] = []
   const byBook = rows?.get(key)
   if (byBook === undefined) return out
   for (const book of BOOKS) {
     const pair = byBook.get(book)
-    if (pair !== undefined) out.push({ book, state: 'count', count: pair[0], verses: pair[1] })
+    if (pair !== undefined) out.push({ book, state: c.partial.has(book) ? 'partial' : 'count', count: pair[0], verses: pair[1] })
   }
   return out
 }
@@ -66,22 +69,27 @@ export function strongWhere(m: MapSet, key: string): { key: string; books: BookA
   const rows = m.xmap?.core.strong.rows
   let found = key
   if (rows?.has(key) !== true && /^G\d{4}$/.test(key) && rows?.has(`${key}0`) === true) found = `${key}0`
-  const books = withCount(rows, found)
+  const books = withCount(rows, found, m.xmap === undefined ? NO_COVER : xmapCover(m.xmap.core, 'strong'))
   return { key: found, books, count: sum(books, 'count'), verses: sum(books, 'verses') }
 }
 
 export function conceptWhere(m: MapSet, id: string): { id: string; links: BookAnswer[]; notes: BookAnswer[] } {
-  return { id, links: withCount(m.xmap?.core.links?.rows, id), notes: withCount(m.xmap?.core.notes?.rows, id) }
+  const core = m.xmap?.core
+  return {
+    id,
+    links: withCount(core?.links?.rows, id, core === undefined ? NO_COVER : xmapCover(core, 'links')),
+    notes: withCount(core?.notes?.rows, id, core === undefined ? NO_COVER : xmapCover(core, 'notes')),
+  }
 }
 
 export function usage(m: MapSet, concept: string, source: 'xmap' | 'map'): { source: string; revision: number; books: BookAnswer[] } {
   let c: Cover
   let rows: CountRows | undefined
   if (source === 'xmap') {
-    c = m.xmap === undefined ? { whole: new Set(), partial: new Set() } : xmapCover(m.xmap.core, 'notes')
+    c = m.xmap === undefined ? NO_COVER : xmapCover(m.xmap.core, 'notes')
     rows = m.xmap?.core.notes?.rows
   } else {
-    c = cover(m.map?.core.coverage, () => true)
+    c = cover(m.map?.core.coverage, (key) => idOf(key) === 'tn')
     rows = m.map?.core.usage?.rows
   }
   return { source, revision: m.revision, books: BOOKS.map((book) => cell(book, c, rows, concept)) }

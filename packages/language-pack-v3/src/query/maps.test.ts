@@ -82,6 +82,38 @@ describe('usage', () => {
   })
 })
 
+describe('several coverage keys and bridged packs', () => {
+  const x2: XmapCore = {
+    ...xcore,
+    coverage: new Map([
+      ['o/en/ult', { whole: ['tit', 'mat'], partial: [] }],
+      [TN, { whole: [], partial: ['tit'] }],
+      ['o/en/twl', { whole: [], partial: ['rom'] }],
+    ]),
+    notes: { unit: 'notes', rows: new Map([[MET, new Map([['tit', [2, 2]]])]]) },
+  }
+  const m2: MapSet = {
+    xmap: { core: x2, parts: new Map() },
+    map: {
+      core: { ...mcore, coverage: new Map([['es/ult', { whole: ['jon', 'rut'], partial: [] }], ['es/tn', { whole: [], partial: ['tit'] }]]) },
+      parts: new Map(),
+    },
+    revision: 1,
+  }
+  test('only tN decides the map usage', () => {
+    const b = usage(m2, MET, 'map').books
+    expect(b.find((x) => x.book === 'jon')).toEqual({ book: 'jon', state: 'none' })
+    expect(b.find((x) => x.book === 'tit')).toEqual({ book: 'tit', state: 'partial', count: 4, verses: 4 })
+  })
+  test('a partial book is partial through strongWhere and conceptWhere', () => {
+    expect(conceptWhere(m2, MET).notes).toEqual([{ book: 'tit', state: 'partial', count: 2, verses: 2 }])
+    expect(conceptWhere(m2, GRACE).links.find((b) => b.book === 'rom')).toEqual({ book: 'rom', state: 'partial', count: 5, verses: 4 })
+    expect(conceptWhere(m2, GRACE).links.find((b) => b.book === 'tit')).toEqual({ book: 'tit', state: 'count', count: 2, verses: 2 })
+    const bridged: MapSet = { ...m2, xmap: { core: { ...x2, coverage: new Map([['o/en/ult', { whole: [], partial: ['tit'] }]]) }, parts: new Map() } }
+    expect(strongWhere(bridged, 'G5485').books).toEqual([{ book: 'tit', state: 'partial', count: 3, verses: 2 }])
+  })
+})
+
 describe('where', () => {
   test('G5485 finds G54850', () => {
     expect(strongWhere(m, 'G5485')).toEqual({ key: 'G54850', books: [{ book: 'tit', state: 'count', count: 3, verses: 2 }], count: 3, verses: 2 })
