@@ -128,6 +128,9 @@ function readText(
   return { pieces, events, attrs }
 }
 
+/** The tables this reader knows, as `readSegment` takes them in `known`. */
+export const ORIG_TABLES: Readonly<Record<string, number[]>> = { words: [1], text: [1], macula: [1] }
+
 /**
  * The model of an original segment. The words' texts come from the `form` table, so the word pieces are rebuilt from
  * them. `macula.trees` and `macula.referents` are the decoded values of the segment, not copies.
