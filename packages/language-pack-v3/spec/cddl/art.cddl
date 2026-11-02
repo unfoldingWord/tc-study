@@ -36,7 +36,7 @@ section = {
   "role": section-role,
   ? "title": tstr,             ; the heading as published
   "lang": tstr,                ; the language the section is written in: es-419 tA has some sections in English
-  "md": tstr,                  ; the text, as minimal markdown (no HTML); links rewritten (ids.md)
+  "md": tstr,                  ; the text as published, links rewritten (ids.md); a few articles keep inline HTML (<sup>, <br>, <u>)
   ? "aliases": [* tstr],       ; sids this section had before it was split, merged or renamed
 }
 

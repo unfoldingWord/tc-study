@@ -87,6 +87,9 @@ name a person sees comes from each language's map.
 - **People and places with the same name** (there are several Zechariahs) take TIPNR's id, which tells them apart.
 - **An article that moved** (`other/` to `kt/`) keeps its old id as an alias in the common map: the old id still
   leads to it.
+- **Ids are lowercase.** An article whose published name has capitals (`figs-orderHeb`) gets the lowercase id
+  (`ta:translate/figs-orderheb`), and a link to it (`[[rc://*/ta/man/translate/figs-orderHeb]]`) is rewritten with the
+  lowercase id (`[[ta:translate/figs-orderheb]]`).
 
 ## Strong keys
 
@@ -103,7 +106,9 @@ A section id (`sid`) names a section within its article (`es-419_gl/es-419/tw/kt
 once and kept between builds, even when the heading is corrected, translated or moved.
 
 - **The registry.** The builder keeps a registry per language and resource in the pipeline's output (not in the
-  pack): for each article, its sections with their sid, heading, level, role and a fingerprint of their text.
+  pack): for each article, its sections with their sid, heading, level, role and a fingerprint of their text. It also
+  holds each section's aliases and its word trigrams (a sorted list of the first 32 bits of the sha256 of each
+  distinct word trigram), so that the third rule can be checked without the old text.
 - **A new section** takes its role as sid if the article does not use it yet (`definition`), else the role and a
   number (`examples-2`). A section whose role is unknown takes `s` and the next free number (`s3`). The text before the
   first heading is `intro`.
