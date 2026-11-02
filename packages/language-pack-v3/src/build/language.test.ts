@@ -689,8 +689,9 @@ describe('buildLanguage: the map unit', () => {
     expect(map).toBeDefined()
     expect(map.segments.map((i) => built.segments[i].seg.h.part).sort()).toEqual(['core', 'tit'])
     const ids = new Set(catalog.units.map((u) => u.id))
-    // The sample has no article group of ta, tw:names or tw:other: those needs name units the sample lacks.
-    const absent = new Set(['art:ta:translate', 'art:tw:names', 'art:tw:other'])
-    for (const unit of catalog.units) for (const need of unit.needs ?? []) expect(ids.has(need) || need.startsWith('orig:') || absent.has(need)).toBe(true)
+    // The sample has no article group of ta, tw:names or tw:other: the book does not need them (it could never activate), and says so.
+    for (const unit of catalog.units) for (const need of unit.needs ?? []) expect(ids.has(need) || need.startsWith('orig:')).toBe(true)
+    expect(catalog.units.find((u) => u.id === 'book:tit')!.needs).toEqual(['art:tw:kt', 'map', 'orig:tit'])
+    expect(built.report.some((line) => line.startsWith('book tit: its notes point to art:ta:translate, art:tw:names, art:tw:other, which this catalog does not build'))).toBe(true)
   })
 })

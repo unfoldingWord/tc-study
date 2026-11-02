@@ -58,7 +58,8 @@ describe('bridgeZip: the format 1.1 pack of es-419 Titus', () => {
   test('the pack brings the book and the map of what it had', () => {
     expect(bridged.segments.map((s) => [s.seg.h.class, s.seg.h.part ?? s.seg.h.book])).toEqual([['map', 'core'], ['map', 'tit'], ['book', 'tit']])
     expect(catalog.units.map((u) => u.id)).toEqual(['book:tit', 'map'])
-    expect(catalog.units[0].needs).toEqual(expect.arrayContaining(['orig:tit', 'map']))
+    // The pack has no tW or tA: the book needs no article group, so it can activate (a need no unit of the catalog meets would block it).
+    expect(catalog.units[0].needs).toEqual(['map', 'orig:tit'])
     expect(catalog.segments.map((s) => hex(s.id))).toEqual(bridged.segments.map((s) => s.id))
   })
 

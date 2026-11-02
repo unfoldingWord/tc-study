@@ -85,17 +85,17 @@ describe('invalidation of the segment ids', () => {
     expect(built.catalog.id).not.toBe(base.catalog.id)
   })
 
-  test('the release stamp of es-419 tN, same rows: the book, the map core and the catalog change; the map part tit keeps its id', async () => {
+  test('the release stamp of es-419 tN, same rows: the book, the map core and the catalog change; the map part tit keeps its id but not its inputs', async () => {
     const built = await language({ ref: (ref) => (ref.key === TN_ES ? { stamp: 'v67#2030-01-01T00_00_00Z' } : {}) })
     // Same rows, another release: the ids of the book and of the core follow it (v66 -> v67), the part does not.
-    const changedIds = changed(base.segments, built.segments)
-    expect(changedIds).toContain('map:core')
-    expect(changedIds).toContain('book:tit')
-    expect(changedIds).not.toContain('map:tit')
+    expect(changed(base.segments, built.segments).sort()).toEqual(['book:tit', 'map:core'])
     expect(built.catalog.id).not.toBe(base.catalog.id)
     const inputs = (b: typeof base, l: string) => b.segments.find((s) => label(s) === l)!.inputs
     expect(inputs(built, 'book:tit')).not.toBe(inputs(base, 'book:tit'))
-    expect(inputs(built, 'map:tit')).toBe(inputs(base, 'map:tit'))
+    // The part carries the stamp of the tN of its book: its id stays, its inputs say it must be looked at again.
+    expect(inputs(built, 'map:tit')).not.toBe(inputs(base, 'map:tit'))
+    const inputsChanged = base.segments.filter((s) => inputs(built, label(s)) !== s.inputs).map(label)
+    expect(inputsChanged.sort()).toEqual(['book:tit', 'map:core', 'map:tit'])
   })
 
   test('the SupportReference of an English note changes the xmap core, its part tit and the common catalog; no es-419 segment changes', async () => {
@@ -104,8 +104,9 @@ describe('invalidation of the segment ids', () => {
     expect(changed(baseCommon.segments, built.segments).sort()).toEqual(['xmap:core', 'xmap:tit'])
     expect(built.catalog.id).not.toBe(baseCommon.catalog.id)
     // The es-419 build does not read the English rows.
-    const es = await buildLanguage({ source: tweak(await source(ES), {}), lang: ES, registry: {}, about })
+    const es = await language(edit)
     expect(changed(base.segments, es.segments)).toEqual([])
+    expect(es.segments.map((s) => s.inputs)).toEqual(base.segments.map((s) => s.inputs))
     expect(es.catalog.id).toBe(base.catalog.id)
   })
 })

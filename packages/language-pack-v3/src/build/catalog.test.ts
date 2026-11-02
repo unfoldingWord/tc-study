@@ -108,6 +108,13 @@ describe('needsOfBook', () => {
     expect(needs).toEqual(['art:ta:checking', 'art:ta:translate', 'art:tw:kt', 'art:tw:names', 'map', 'orig:tit'])
   })
 
+  test('with the article groups the catalog builds, the others are left out (a book could never activate on them)', () => {
+    const m = model([row('a', 'ta:translate/figs-metaphor')], [row('e', 'tw:kt/grace'), row('f', 'tw:names/paul')])
+    expect(needsOfBook(m, new Set(['art:tw:kt']))).toEqual(['art:tw:kt', 'map', 'orig:tit'])
+    expect(needsOfBook(m, new Set())).toEqual(['map', 'orig:tit'])
+    expect(needsOfBook(m)).toEqual(['art:ta:translate', 'art:tw:kt', 'art:tw:names', 'map', 'orig:tit'])
+  })
+
   test('a book without helps needs its original and the map', () => {
     expect(needsOfBook({ lang: 'es-419', book: 'rut', orig: ['x', 'y'], res: [], texts: [] })).toEqual(['map', 'orig:rut'])
   })

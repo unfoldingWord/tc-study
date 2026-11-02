@@ -231,7 +231,7 @@ export async function buildLanguage(o: {
   const originals = await source.resources(ORIGINALS)
 
   const segments: BuiltSegment[] = []
-  const needs = new Map<string, string[]>()
+  const bookModels = new Map<string, BookModel>()
   const used = new Set<string>()
   const add = async (seg: Segment, inputs: string, uses: Iterable<string>): Promise<BuiltSegment> => {
     const built = await builtSegment(seg, inputs)
@@ -267,7 +267,7 @@ export async function buildLanguage(o: {
     const keys = model.res.map(([key]) => key)
     const inputs = inputsOf([...read, ...(await originalRowKeys(source, book))], [...stampsOf(keys), { key: orig.key, stamp: orig.stamp }])
     const built = await add(bookSegment(model), inputs, keys)
-    needs.set(built.id, needsOfBook(model))
+    bookModels.set(built.id, model)
     mapBooks.push({ model, verses: versesOf(orig) })
     mapRows.set(book, [...read, ...(await originalRowKeys(source, book))])
   }
@@ -281,6 +281,17 @@ export async function buildLanguage(o: {
     const res = articleResources(list, refs)
     const keys = res.map(([key]) => key)
     await add(artSegment(lang, group, res, list), inputsOf(artRows.get(group) ?? [], stampsOf(keys)), keys)
+  }
+
+  // The article groups a book's notes point to that this catalog does not build are not needs: the book would never activate.
+  const groupUnits = new Set([...articles.keys()].map((group) => `art:${group}`))
+  const needs = new Map<string, string[]>()
+  for (const [id, model] of bookModels) {
+    const wanted = needsOfBook(model)
+    const kept = needsOfBook(model, groupUnits)
+    needs.set(id, kept)
+    const left = wanted.filter((unit) => !kept.includes(unit))
+    if (left.length > 0) report.push(`book ${model.book}: its notes point to ${left.join(', ')}, which this catalog does not build: not listed as needs`)
   }
 
   // Lexicon

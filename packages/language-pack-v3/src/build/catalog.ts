@@ -149,13 +149,17 @@ const ARTICLE_CONCEPT = /^(tw|ta):([^/:]+)\//
  * notes and word links point to (`tw:kt/grace` is `art:tw:kt`, `ta:translate/figs-metaphor` is `art:ta:translate`). Sorted by code
  * point, without repeats. A concept of another kind (`per:abraham`) needs no article group. The links inside the text of a note are
  * not read: the concept of the row is what the note is about.
+ *
+ * With `groups` (the units `art:...` the catalog builds) a need on another article group is left out: a unit activates only when
+ * every unit it needs is complete (`catalog.md`), and a group no segment of this catalog supplies would keep the book from ever
+ * activating. Without it every group is listed.
  */
-export function needsOfBook(book: BookModel): string[] {
+export function needsOfBook(book: BookModel, groups?: ReadonlySet<string>): string[] {
   const needs = new Set<string>([`orig:${book.book}`, 'map'])
   for (const table of [book.notes, book.links]) {
     for (const row of table?.rows ?? []) {
       const m = row.concept === undefined ? null : ARTICLE_CONCEPT.exec(row.concept)
-      if (m !== null) needs.add(`art:${m[1]}:${m[2]}`)
+      if (m !== null && (groups === undefined || groups.has(`art:${m[1]}:${m[2]}`))) needs.add(`art:${m[1]}:${m[2]}`)
     }
   }
   return [...needs].sort(compareCodePoints)
