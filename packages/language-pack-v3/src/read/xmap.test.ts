@@ -133,7 +133,19 @@ describe('xmapView rejects', () => {
   test('a core with a book', () => rejects((s) => (s.h.book = 'tit')))
   test('a core with a count table of the wrong unit', () => rejects((s) => (bodyOf(s, 'links').unit = 'notes')))
   test('a part with the shape of a core table', () => rejects((s) => (s.t.strong = fresh().t.strong), part))
-  test('aliases not sorted', () => rejects((s) => (s.t.aliases = { b: 'x', a: 'y' })))
+  test('aliases and strongs with keys of different lengths round-trip through the file', async () => {
+    const cs = new Map(concepts)
+    cs.set('tw:names/a', { kind: 'none', tw: 'names', source: TWL })
+    cs.set('tw:kt/zzzzzzzz', { kind: 'none', tw: 'kt', source: TWL })
+    const m: XmapCore = {
+      ...core,
+      concepts: cs,
+      aliases: { 'tw:kt/zzzzzzzzzz': 'tw:kt/x', 'tw:o/a': 'tw:kt/x' },
+      strongs: { 'tw:names/a': ['G1'], 'tw:kt/zzzzzzzz': ['G2'] },
+    }
+    const { bytes } = await writeSegment(xmapSegment(m))
+    expect(xmapView((await readSegment(bytes, { known: XMAP_TABLES })).seg)).toEqual(m)
+  })
   test('strongs with an empty list', () => rejects((s) => (s.t.strongs = { a: [] })))
   test('strongs with a key that is not a concept', () => rejects((s) => (s.t.strongs = { 'tw:kt/none': ['G1'] })))
   test('an alias to a concept that does not exist', () => rejects((s) => (s.t.aliases = { 'tw:other/x': 'tw:kt/none' })))

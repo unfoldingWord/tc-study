@@ -105,7 +105,6 @@ function readCore(seg: Segment): XmapCore {
   if (hasOwn(t, 'relations')) core.relations = readRelations(t.relations, [...concepts.keys()], res)
   if (hasOwn(t, 'aliases')) {
     const a = table(t.aliases, 'aliases')
-    sortedUnique(Object.keys(a), 'aliases keys')
     const out: Record<string, string> = {}
     for (const [k, v] of Object.entries(a)) {
       if (typeof v !== 'string') bad(`aliases[${JSON.stringify(k)}] is not text`)
@@ -116,7 +115,6 @@ function readCore(seg: Segment): XmapCore {
   }
   if (hasOwn(t, 'strongs')) {
     const s = table(t.strongs, 'strongs')
-    sortedUnique(Object.keys(s), 'strongs keys')
     const out: Record<string, string[]> = {}
     for (const [k, v] of Object.entries(s)) {
       const list = texts(v, `strongs[${JSON.stringify(k)}]`)
