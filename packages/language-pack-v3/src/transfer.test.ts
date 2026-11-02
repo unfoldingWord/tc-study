@@ -548,9 +548,21 @@ describe('readTransfer', () => {
         expect(await statuses([CATALOG, MINIMAL], { known: { book: BOOK_TABLES } })).toEqual(['ok', 'ok'])
       })
 
-      test('with known, an optional table that is not known is skipped: ok', async () => {
-        expect(await statuses([CATALOG, specOf(optionalObs)], { known: { obs: {} } })).toEqual(['ok', 'ok'])
-        expect(await statuses([CATALOG, specOf(optionalObs)], { known: {} })).toEqual(['ok', 'ok'])
+      test('with known, an optional table that is not known is skipped: ok, if the class has some table the receiver knows', async () => {
+        expect(await statuses([CATALOG, specOf(optionalObs)], { known: { obs: { 'future-x': [9] } } })).toEqual(['ok', 'ok'])
+        expect(await statuses([CATALOG, specOf(optionalObs)])).toEqual(['ok', 'ok'])
+      })
+
+      test('with known, a class the receiver knows no table of is E_TABLE even when all its tables are optional (step 5)', async () => {
+        expect(await statuses([CATALOG, specOf(optionalObs)], { known: { obs: {} } })).toEqual(['ok', 'E_TABLE'])
+        expect(await statuses([CATALOG, specOf(optionalObs)], { known: {} })).toEqual(['ok', 'E_TABLE'])
+        const map = await builtSegment({ h: { class: 'map', v: 1, tables: { 'future-y': [3, false] }, lang: 'es-419' }, t: { 'future-y': [] } }, fingerprint(12))
+        expect(await statuses([CATALOG, specOf(map), MINIMAL], { known: { book: BOOK_TABLES, map: {} } })).toEqual(['ok', 'E_TABLE', 'ok'])
+        // Without known the entry is read with the tables its own header lists: structure only.
+        expect(await statuses([CATALOG, specOf(map), MINIMAL])).toEqual(['ok', 'ok', 'ok'])
+        // A defect of the container comes before it: step 4 before step 5.
+        const flippedMap = { ...specOf(map), bytes: flipped(map.bytes, map.bytes.length - 2) }
+        expect(await statuses([CATALOG, flippedMap], { known: {} })).toEqual(['ok', expect.stringMatching(/^E_(INFLATE|ID)$/)])
       })
 
       test('known does not change what a catalog is read with: always the tables of catalogView', async () => {

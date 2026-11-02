@@ -284,6 +284,8 @@ export type KnownTables = Partial<Record<ClassName, Record<string, number[]>>>
  * - A catalog is checked against {@link CATALOG_TABLES}, the tables `catalogView` understands.
  * - Another segment is checked against `known[class]` (its own `h.class`; no tables if the class is missing) when `known` is given,
  *   and against the tables its own header lists, which checks its structure only, when it is not.
+ * - With `known`, a class the receiver knows no tables of is `E_TABLE` (step 5 of the order of checks), also when all the tables of
+ *   the segment are optional: the receiver cannot read a segment of that class. The checks of the tables' shape are the app's.
  */
 async function verify(entry: TransferIndexEntry, data: Uint8Array, isCatalog: boolean, known?: KnownTables): Promise<void> {
   if (entry.kind === 'complement') {
@@ -302,6 +304,9 @@ async function verify(entry: TransferIndexEntry, data: Uint8Array, isCatalog: bo
     tables = knownOf(header.h)
   }
   await readSegment(data, { known: tables, expectedId: entry.id })
+  if (!isCatalog && known !== undefined && Object.keys(tables).length === 0) {
+    throw new FormatError('E_TABLE', 'the receiver knows no table of this class of segment')
+  }
 }
 
 /**
@@ -322,8 +327,8 @@ async function verify(entry: TransferIndexEntry, data: Uint8Array, isCatalog: bo
  *
  * **Tables.** A catalog is always checked against the tables `catalogView` understands (`CATALOG_TABLES`): a catalog with a required
  * table it does not know throws `E_TABLE`. With `opts.known`, every other segment is checked against `known[class]` as a receiver
- * would: a class missing from `known` has no known tables, and a required table gives the status `E_TABLE`; an optional one is
- * skipped. Without `opts.known` the check is of structure only (the segment is read with the tables its own header lists, so no
+ * would: a class missing from `known` has no known tables, and its segments are `E_TABLE` (also when all their tables are optional); a
+ * required table of a class that has some gives the status `E_TABLE`; an optional one is skipped. Without `opts.known` the check is of structure only (the segment is read with the tables its own header lists, so no
  * `E_TABLE` can arise): pass `known` to verify as a receiver would.
  */
 export async function readTransfer(

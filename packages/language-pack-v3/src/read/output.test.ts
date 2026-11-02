@@ -365,6 +365,15 @@ describe('the output of a book', () => {
     expect(result.links.rows[1].cols).toEqual({ origWords: 'x', twLink: 'kt/grace' })
   })
 
+  test('an attribute map that is empty in the file is output as it is; a text with no pair has no attrs', async () => {
+    const seg = structuredClone(bookSegment(tiny))
+    ;(seg.t.texts as any[])[0].attrs = [[2, {}]]
+    ;(seg.t.texts as any[])[1].attrs = []
+    const result = await out((await writeSegment(seg)).bytes)
+    expect(result.texts[0].attrs).toEqual([[2, {}]])
+    expect('attrs' in result.texts[1]).toBe(false)
+  })
+
   test('a table the output does not have is not a key: no questions, no null', async () => {
     const result = await out((await writeSegment(bookSegment(tiny))).bytes)
     expect('questions' in result).toBe(false)
@@ -495,6 +504,32 @@ describe('the sample (es-419 Titus)', () => {
     expect(wordPieces.map((p: [string, boolean]) => p[0])).toEqual(result.words.map((w: any) => w.form))
     expect(result.attrs).toEqual([[0, { code: 'TIT' }]])
     expect(result.h.orig).toEqual(['unfoldingWord/el-x-koine/ugnt', expect.stringMatching(/^g[0-9a-f]{10}$/)])
+  })
+
+  test('orig: an empty attribute map of a node or of a word is output as it is', async () => {
+    const seg = structuredClone(segmentOf(common, 'orig').seg)
+    ;(seg.t.text as any).attrs = [[0, {}]]
+    ;(seg.t.words as any).other = [[1, {}]]
+    const result = await out((await writeSegment(seg)).bytes)
+    expect(result.attrs).toEqual([[0, {}]])
+    expect(result.words[1].other).toEqual({})
+    expect('other' in result.words[0]).toBe(false)
+    expect(Object.keys(result.words[1])).toEqual(['form', 'lemma', 'morph', 'other', 'strong'])
+  })
+
+  test('orig: macula is output with its bytes in hex, and its keys that look like numbers in the canonical order', async () => {
+    const seg = structuredClone(segmentOf(common, 'orig').seg)
+    seg.h.tables.macula = [1, false]
+    seg.t.macula = { release: 'r1', trees: { 9: new Uint8Array([1, 255]), 10: [2], b: { z: true } } }
+    const result = await out((await writeSegment(seg)).bytes)
+    expect(result.macula).toEqual({ release: 'r1', trees: { 9: '01ff', 10: [2], b: { z: true } } })
+    expect(canonicalJson(result.macula)).toBe('{"release":"r1","trees":{"10":[2],"9":"01ff","b":{"z":true}}}')
+  })
+
+  test('a segment of a class phase 1 does not read is E_TABLE in a transfer file, even when all its tables are optional', async () => {
+    const optionalMap = await builtOf({ h: { class: 'map', v: 1, tables: { core: [1, false] } }, t: { core: {} } })
+    const file = writeTransfer({ mode: 'full', catalogs: [lang.catalog], entries: [segmentOf(lang, 'book'), optionalMap], made: '2026-11-01T10:00:00Z', by: 'test 1' })
+    expect((await out(file)).entries.map((e: any) => [e.class, e.status])).toEqual([['catalog', 'ok'], ['book', 'ok'], ['map', 'E_TABLE']])
   })
 
   test('the articles: the group, each article with its sections and the resource key', async () => {

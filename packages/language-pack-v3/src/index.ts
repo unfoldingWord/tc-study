@@ -2,7 +2,7 @@
  * `@bt-synergy/language-pack-v3`: builders and readers for the segment files and the transfer file of format 3 (`spec/`).
  *
  * Nothing here imports a Node module, so the package runs in a browser and in a Worker. `partsSource`, which reads format 2.0 parts from
- * a disk, is the one Node-only piece: import it by its path, `@bt-synergy/language-pack-v3/dist/node/partsSource`, from a script or a test.
+ * a disk, is the one Node-only piece: import it by its subpath, `@bt-synergy/language-pack-v3/node/partsSource`, from a script or a test.
  */
 
 // Container and errors

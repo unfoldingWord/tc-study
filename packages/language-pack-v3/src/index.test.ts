@@ -27,6 +27,24 @@ describe('index.ts', () => {
     expect(names.filter((name) => /test|fixture|mock/i.test(name))).toEqual([])
   })
 
+  /** The module specifiers a file imports or re-exports: `import … from 'x'` and `export … from 'x'` (also over several lines), `import 'x'` and `import('x')`. */
+  const specifiersOf = (text: string): string[] => [
+    ...[...text.matchAll(/(?:import|export)[\s\S]*?from\s*['"]([^'"]+)['"]/g)].map((m) => m[1]),
+    ...[...text.matchAll(/^\s*import\s+['"]([^'"]+)['"]/gm)].map((m) => m[1]),
+    ...[...text.matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1]),
+  ]
+
+  test('the scan of imports finds every import of index.ts, also the ones over several lines', () => {
+    const text = readFileSync(join(SRC, 'index.ts'), 'utf8')
+    const found = specifiersOf(text)
+    // Every `from '…'` of the file, counted without the regex above.
+    expect(found).toHaveLength(text.split(/\bfrom\s*'/).length - 1)
+    expect(found.length).toBeGreaterThan(20)
+    expect(found.every((spec) => spec.startsWith('./'))).toBe(true)
+    // A multi-line export is found.
+    expect(specifiersOf("export {\n  a,\n  b,\n} from './x'\nimport 'y'\nconst z = import('w')\n").sort()).toEqual(['./x', 'w', 'y'])
+  })
+
   test('no file in its import graph imports a Node module', () => {
     const seen = new Set<string>()
     const bare = new Set<string>()
@@ -34,8 +52,7 @@ describe('index.ts', () => {
       if (seen.has(path)) return
       seen.add(path)
       const text = readFileSync(path, 'utf8')
-      for (const m of text.matchAll(/(?:^|\n)\s*(?:import|export)\b[^'"\n]*?from\s+'([^']+)'|(?:^|\n)\s*import\s+'([^']+)'|\bimport\(\s*'([^']+)'\s*\)/g)) {
-        const spec = m[1] ?? m[2] ?? m[3]
+      for (const spec of specifiersOf(text)) {
         if (spec.startsWith('.')) visit(resolveSource(resolve(dirname(path), spec)))
         else bare.add(spec)
       }
@@ -53,5 +70,12 @@ describe('index.ts', () => {
     expect([...bare].sort()).toEqual(['jszip', 'pako'])
     expect([...seen].some((path) => path.replace(/\\/g, '/').includes('/src/node/'))).toBe(false)
     expect(seen.size).toBeGreaterThan(20)
+  })
+
+  test('the subpath for partsSource is in package.json, next to ".", and index.ts says that path', () => {
+    const pkg = JSON.parse(readFileSync(join(SRC, '..', 'package.json'), 'utf8'))
+    expect(Object.keys(pkg.exports)).toEqual(['.', './node/partsSource'])
+    expect(pkg.exports['./node/partsSource']).toEqual({ types: './dist/node/partsSource.d.ts', import: './dist/node/partsSource.js' })
+    expect(readFileSync(join(SRC, 'index.ts'), 'utf8')).toContain('@bt-synergy/language-pack-v3/node/partsSource')
   })
 })
