@@ -135,10 +135,12 @@ Each class's schema says which tables are required and what each optional one de
 | `ulen` and `clen` | 67 108 864 bytes (64 MiB) each |
 | Nesting of CBOR arrays and maps | 64 levels |
 
-Nesting counts the outermost map or array as level 1. A reader MUST reject anything beyond these limits (`E_LIMIT`).
+Nesting counts the outermost map or array as level 1. A reader MUST reject anything beyond the three limits of this
+table (`E_LIMIT`).
 
-A table whose declared row count `n` is larger than the segment's `ulen` is not a limit error: it is `E_BODY` (checked
-with the tables, `tests/README.md`), because a reader allocates no more rows than the body has bytes.
+The row count of a table is not a limit of this table. A table whose declared row count `n` is larger than the
+segment's `ulen` is `E_BODY`, not `E_LIMIT` (checked with the tables, `tests/README.md`), because a reader allocates no
+more rows than the body has bytes.
 
 ## Errors
 

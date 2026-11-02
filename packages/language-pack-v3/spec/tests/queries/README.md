@@ -52,14 +52,25 @@ that is truly empty is `{}`. An empty list never stands for "absent".
 - **Partial.** No source of the sample is partial (every source lists whole books); `answers.py` asserts it, so rule 1 of
   "States" never applies to the five fixed queries.
 
+The fixed queries of this folder are asked of the common map alone, with no language map: `coverage` and `tables` of a
+`book` answer list only the `xmap`'s sources and tables.
+
+The answers are computed by `answers.py` from the raw parts, not from the builders (Task 17). The TypeScript query
+module (Task 15) must give the same answers (Task 18). `answers.py <sample> <queries dir>` writes `expected` into each
+query file there; it computes the kinds `strong`, `usage`, `book` and `keyterms` (the sample has no TIPNR, aliases or
+relations, so `concept` and `revision` have no fixed query yet).
+
 ## Deriving `strongs` for keyterms
 
 This derivation is **normative for the fixed queries**: the builder's `strongs` table must agree with it, and Task 18
 checks that it does. For a `tw:` concept, its `strongs` is the sorted list of the Strong keys found by these steps over
 every link of the English word links (`unfoldingWord/en/twl`) to it, in any book:
 
-1. The link's verse is the first verse of its reference: the first `C:V` of the text (`5:1,3` gives `5:1`, `1:2-4` gives
-   `1:2`); `N:front` gives verse 0 of chapter N (`N:intro`). The words are those of that verse in the original of the
+1. The link's verse is the first verse of its reference. The reference is read from its start (leading white space is
+   skipped) for its first `C:V`, and the rest of the text is ignored: `5:1,3` gives `5:1`, `1:2-4` gives `1:2`. The accepted
+   spellings of verse 0 are `N:front` and `N:intro`, both giving verse 0 of chapter N. A reference that does not start with
+   `C:V`, `N:front` or `N:intro` finds no verse and gives no key. (`src/build/xmap/strongs.ts` `strongsOfQuotes` accepts both
+   spellings; the sample's tWL rows write only `N:front`, which is all `answers.py` `link_strongs` reads.) The words are those of that verse in the original of the
    book (`unfoldingWord/hbo/uhb` or `unfoldingWord/el-x-koine/ugnt`), in document order.
 2. The quote is `origWords`. It is cut at `&` into pieces. Each piece is cut into words at white space and at U+05BE
    (maqaf); the word U+05C0 (paseq) alone is dropped; empty words are dropped.
@@ -73,11 +84,3 @@ every link of the English word links (`unfoldingWord/en/twl`) to it, in any book
 6. A link with a piece that is not found gives no key at all (its other pieces are dropped too).
 
 Note of the sample: 57 of its 85 764 `tw:` links find no quote and give no key.
-
-The fixed queries of this folder are asked of the common map alone, with no language map: `coverage` and `tables` of a
-`book` answer list only the `xmap`'s sources and tables.
-
-The answers are computed by `answers.py` from the raw parts, not from the builders (Task 17). The TypeScript query
-module (Task 15) must give the same answers (Task 18). `answers.py <sample> <queries dir>` writes `expected` into each
-query file there; it computes the kinds `strong`, `usage`, `book` and `keyterms` (the sample has no TIPNR, aliases or
-relations, so `concept` and `revision` have no fixed query yet).
