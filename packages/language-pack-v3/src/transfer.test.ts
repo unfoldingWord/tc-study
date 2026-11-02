@@ -367,6 +367,7 @@ describe('readTransfer', () => {
       ['a catalog that is not among the first entries', (i) => void (i.catalogs = [bytesOfHex(MINIMAL.id)])],
       ['a catalog entry that is a complement', (i) => void (i.entries[0].kind = 'complement')],
       ['a catalog entry of another class', (i) => void (i.entries[0].class = 'book')],
+      ['a catalog entry without class', (i) => void delete i.entries[0].class],
       ['no entries', (i) => void delete i.entries],
       ['an empty list of entries', (i) => void (i.entries = [])],
       ['entries that is not a list', (i) => void (i.entries = {})],
@@ -411,6 +412,24 @@ describe('readTransfer', () => {
     test('E_HEADER: an index that is not CBOR, or has bytes after the map', async () => {
       expect(await codeOf(readTransfer(assemble(Uint8Array.from([0xff, 0xff]), [])))).toBe('E_HEADER')
       expect(await codeOf(readTransfer(assemble(Uint8Array.from([...encodeDeterministic({}), 0]), [])))).toBe('E_HEADER')
+    })
+
+    test('E_BODY: a catalog whose own header class is not catalog, before its tables and after its id', async () => {
+      // The index says class catalog; the file is a book (its required tables are not those of a catalog: E_TABLE without the check),
+      // an obs with only an optional table no reader knows (it would be read as a catalog), and an orig.
+      const asCatalog = (built: BuiltSegment): Spec => ({ id: built.id, class: 'catalog', bytes: built.bytes })
+      for (const other of [minimal, optionalObs, orig]) {
+        expect(await codeOf(readTransfer(craft([asCatalog(other), COMPLEMENT])))).toBe('E_BODY')
+      }
+      // Its id comes first, then the class.
+      expect(await codeOf(readTransfer(craft([{ ...asCatalog(minimal), id: fingerprint(3) }, ORIG])))).toBe('E_ID')
+      // Only the catalogs are held to it: any other entry may be of any class its own header says.
+      const read = await readTransfer(craft([CATALOG, MINIMAL, ORIG]))
+      expect(read.entries.map((e) => e.status)).toEqual(['ok', 'ok', 'ok'])
+      // A second catalog is a catalog too.
+      const second = await buildCatalog({ about: { ...about, catalog: 'common' }, resources: [], segments: [orig] })
+      expect(await codeOf(readTransfer(craft([CATALOG, specOf(second), ORIG], undefined, 2)))).toBe('none')
+      expect(await codeOf(readTransfer(craft([CATALOG, asCatalog(minimal), ORIG], undefined, 2)))).toBe('E_BODY')
     })
 
     test('the status of a catalog that is not whole: its own error, nothing else is returned', async () => {

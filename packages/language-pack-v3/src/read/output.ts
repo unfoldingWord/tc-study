@@ -168,9 +168,9 @@ async function segmentOutput(bytes: Uint8Array): Promise<Json> {
   return sortKeys({ id, h: seg.h, ...bodyOut(seg) })
 }
 
-/** The output of a catalog entry of a transfer file: a catalog, whatever class the entry says. */
+/** The output of a catalog entry of a transfer file: its own header must say class catalog (`readTransfer` has checked it too). */
 async function catalogOutput(bytes: Uint8Array): Promise<Json> {
-  const { seg, id } = await readSegment(bytes, { known: KNOWN.catalog })
+  const { seg, id } = await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
   const m = catalogView(seg)
   return sortKeys({ id, h: seg.h, about: m.about, resources: m.resources, segments: m.segments, units: m.units, requires: m.requires, complements: m.complements })
 }

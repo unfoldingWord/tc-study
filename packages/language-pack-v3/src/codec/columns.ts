@@ -57,7 +57,7 @@ export function decodeUvarints(bytes: Uint8Array): number[] {
       count++
       value += (byte % 128) * scale
       if (byte < 128) {
-        if (byte === 0 && count > 1) throw new ColumnError('uvarint: not minimal (trailing 0x80 bytes)')
+        if (byte === 0 && count > 1) throw new ColumnError('uvarint: not minimal (the last byte of a number of two or more bytes is 00)')
         break
       }
       if (count === MAX_VARINT_BYTES) throw new ColumnError(`uvarint: longer than ${MAX_VARINT_BYTES} bytes`)

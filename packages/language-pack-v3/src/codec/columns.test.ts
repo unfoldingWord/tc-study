@@ -36,8 +36,10 @@ describe('uvarints', () => {
     expect(() => decodeUvarints(bytes(0x80, 0x00))).toThrow(ColumnError)
   })
 
-  test('a zero written with a trailing 80 byte is not minimal', () => {
+  test('a number of two or more bytes whose last byte is 00 is not minimal; any other last byte is', () => {
     expect(() => decodeUvarints(bytes(0x01, 0x81, 0x80, 0x00))).toThrow(ColumnError)
+    expect(() => decodeUvarints(bytes(0x80, 0x00))).toThrow(ColumnError)
+    expect(decodeUvarints(bytes(0x80, 0x01, 0x00))).toEqual([128, 0]) // a lone 00 is the number 0
   })
 
   test('a varint cut short throws ColumnError', () => {

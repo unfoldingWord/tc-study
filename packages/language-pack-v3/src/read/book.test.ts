@@ -349,6 +349,8 @@ describe('bookView: notes, questions, links and quotes', () => {
     ['a texts column whose lengths run past utf8', (s) => void (notesT(s).cols.note.texts.len = bytes(99, 1, 1))],
     ['a texts column whose utf8 is longer than its lengths', (s) => void (notesT(s).cols.note.texts.utf8 = new Uint8Array([...notesT(s).cols.note.texts.utf8, 65]))],
     ['a texts column that is not valid UTF-8', (s) => void (notesT(s).cols.note.texts = { utf8: bytes(0xff), len: bytes(1, 0, 0) })],
+    // 'é' is c3 a9: each string must be valid UTF-8 by itself, so a boundary between the two bytes is E_BODY
+    ['a texts column with a boundary inside a multi-byte character', (s) => void (notesT(s).cols.note.texts = { utf8: bytes(0xc3, 0xa9), len: bytes(1, 1, 0) })],
     ['a flags column of the wrong length', (s) => void (notesT(s).cols.isIntro.flags = bytes(0, 0))],
     ['a flags column with a bit past its rows', (s) => void (notesT(s).cols.isIntro.flags = bytes(0x07))],
     ['a flags column that is not bytes', (s) => void (notesT(s).cols.isIntro.flags = [true])],
@@ -379,6 +381,11 @@ describe('bookView: notes, questions, links and quotes', () => {
     ['a missing word that is not text', (s) => void (quotesN(s).missing = [[2, 2, 56_001_003, 7, 1]])],
     ['a missing occurrence below 0', (s) => void (quotesN(s).missing = [[2, 2, 56_001_003, 'x', -1]])],
     ['quotes of the links of the wrong length', (s) => void (quotesL(s).n = bytes(2, 0, 0))],
+    // every -1 is in exactly one of kinds and missing: the row [-1, 5, -1] has piece 0 in kinds and piece 2 in missing
+    ['a -1 position that is in neither kinds nor missing', (s) => void ((quotesN(s).kinds = []), (quotesN(s).missing = []))],
+    ['a -1 position that is in neither: kinds and missing absent', (s) => void (delete quotesN(s).kinds, delete quotesN(s).missing)],
+    ['a -1 position that is only in kinds (the last one is in neither)', (s) => void delete quotesN(s).missing],
+    ['a -1 position that is only in missing (the first one is in neither)', (s) => void delete quotesN(s).kinds],
   ]
   for (const [name, change] of broken) {
     test(name, () => {
@@ -398,13 +405,16 @@ describe('bookView: notes, questions, links and quotes', () => {
   test('an empty refText, an empty kinds and an empty missing are read as having none', () => {
     const s = fresh2()
     notesT(s).refText = []
+    // the quotes are [3], [] and [4, 5, 6] (the file keeps each plus 1, as differences): no -1, so nothing to explain
+    quotesN(s).pos = bytes(8, 2, 2, 2)
     quotesN(s).kinds = []
     quotesN(s).missing = []
     const view = bookView(s)
-    // the rows without refText read their canonical text; the quote pieces without a listing are still -1
+    // the rows without refText read their canonical text
     expect(view.notes!.rows[2].ref).toBe('1:1-3')
     expect(view.notes!.rows[2].quoteKinds).toBeUndefined()
-    expect(view.notes!.rows[2].quote).toEqual([-1, 5, -1])
+    expect(view.notes!.rows[2].quoteMissing).toBeUndefined()
+    expect(view.notes!.rows[2].quote).toEqual([4, 5, 6])
   })
 
   test('a column some rows lack lists only the others, and a row gets the keys of the columns it has', () => {

@@ -574,17 +574,83 @@ describe('the identity', () => {
 })
 
 describe('the body', () => {
-  test('E_BODY: not a map, or not a map of exactly h and t', async () => {
+  test('E_BODY: not a map, or a map without h or without t', async () => {
     const bodies: Uint8Array[] = [
       encodeDeterministic([1, 2]),
       encodeDeterministic('body'),
       cborBytes([0xa1], text('h'), goodH),
       cborBytes([0xa1], text('t'), goodT),
-      cborBytes([0xa3], text('h'), goodH, text('t'), goodT, text('x'), [0x00]),
       cborBytes([0xa2], text('h'), goodH, text('u'), goodT),
+      cborBytes([0xa3], text('h'), goodH, text('u'), goodT, text('x'), [0x00]),
       new Uint8Array(0),
     ]
     for (const body of bodies) expect(await codeOf(read(await fileFromBody(body)))).toBe('E_BODY')
+  })
+
+  test('a body with a root key besides h and t reads: the key is ignored and is not in seg', async () => {
+    // `container.md`, "Body": a later minor version may add keys; h and t are the only ones a reader needs. Keys are sorted: h, t, x.
+    const body = cborBytes([0xa3], text('h'), goodH, text('t'), goodT, text('x'), encodeDeterministic({ later: [1, 'two', true] }))
+    const result = await read(await fileFromBody(body))
+    expect(Object.keys(result.seg).sort()).toEqual(['h', 't'])
+    expect(result.seg.h).toEqual(minimal.h as unknown as Segment['h'])
+    expect(result.seg.t).toEqual((decodeCbor(original.body) as CborMap).t as Segment['t'])
+    // The identity is the sha256 of the body as it is, so the extra key changes it.
+    expect(result.id).not.toBe(MINIMAL_ID)
+  })
+
+  test('E_BODY: an extra root key is decoded too (a float in it)', async () => {
+    const body = cborBytes([0xa3], text('h'), goodH, text('t'), goodT, text('x'), [0xfb, 0x3f, 0xf0, 0, 0, 0, 0, 0, 0])
+    expect(await codeOf(read(await fileFromBody(body)))).toBe('E_BODY')
+  })
+
+  // `container.md`, "What a reader accepts": what is rejected anywhere, and what only builders are bound by.
+  const unacceptable: [string, number[]][] = [
+    ['an indefinite array', [0x9f, 0x01, 0xff]],
+    ['an indefinite map', [0xbf, 0x61, 0x61, 0x01, 0xff]],
+    ['an indefinite byte string', [0x5f, 0x41, 0x01, 0xff]],
+    ['an indefinite text', [0x7f, 0x61, 0x61, 0xff]],
+    ['an indefinite integer head', [0x1f]],
+    ['a float', [0xfb, 0x3f, 0xf0, 0, 0, 0, 0, 0, 0]],
+    ['a half float', [0xf9, 0x3c, 0x00]],
+    ['a tag', [0xc1, 0x00]],
+    ['null', [0xf6]],
+    ['undefined', [0xf7]],
+    ['another simple value', [0xf0]],
+    ['a map key that is not text', [0xa1, 0x01, 0x02]],
+    ['a map with a key twice', [0xa2, 0x61, 0x61, 0x01, 0x61, 0x61, 0x02]],
+  ]
+
+  test('E_BODY: every kind of CBOR the format does not use is rejected inside an unknown optional table', async () => {
+    // The body is decoded as a whole before any table is skipped.
+    const base = original.header.h as CborMap
+    const h = { ...base, tables: { ...(base.tables as CborMap), 'future-x': [1, false] } }
+    const t = (decodeCbor(original.body) as CborMap).t as CborMap
+    for (const [, value] of unacceptable) {
+      const tables = cborBytes([0xa3], text('future-x'), value, text('strings'), encodeDeterministic(t.strings), text('texts'), encodeDeterministic(t.texts))
+      const body = cborBytes([0xa2], text('h'), encodeDeterministic(h), text('t'), tables)
+      expect(await codeOf(read(await fileFromBody(body, h)))).toBe('E_BODY')
+    }
+  })
+
+  test('E_HEADER: the same, anywhere in the header, also in a key it does not know', async () => {
+    const head = encodeDeterministic(original.header)
+    expect(head[0]).toBe(0xa5)
+    for (const [, value] of unacceptable) {
+      const header = cborBytes([0xa6], head.subarray(1), text('x'), value)
+      expect(await codeOf(read(assemble({ ...original, header })))).toBe('E_HEADER')
+    }
+  })
+
+  test('a reader accepts integers that are not in the shortest form and keys that are not sorted', async () => {
+    // Header: a sixth key `x` after the five (it sorts before them), holding 1 as 0x18 0x01. Body: the same in a root key, and
+    // the root keys in the order t, h. The id is the sha256 of the body as it is.
+    const head = encodeDeterministic(original.header)
+    const header = cborBytes([0xa6], head.subarray(1), text('x'), [0x18, 0x01])
+    expect((await read(assemble({ ...original, header }))).id).toBe(MINIMAL_ID)
+    const body = cborBytes([0xa3], text('t'), goodT, text('h'), goodH, text('x'), [0x19, 0x00, 0x01])
+    const result = await read(await fileFromBody(body))
+    expect(Object.keys(result.seg).sort()).toEqual(['h', 't'])
+    expect(result.seg.t).toEqual((decodeCbor(original.body) as CborMap).t as Segment['t'])
   })
 
   test('E_BODY: h or t is not a map', async () => {

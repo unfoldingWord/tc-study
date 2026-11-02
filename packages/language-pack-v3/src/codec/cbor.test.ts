@@ -288,6 +288,22 @@ describe('decodeCbor', () => {
     }
   })
 
+  test('rejects indefinite lengths everywhere: well-formed items, nested ones, in a key position, and on integer heads', () => {
+    const items: number[][] = [
+      [0x9f, 0x01, 0xff], // [_ 1]
+      [0xbf, 0x61, 0x61, 0x01, 0xff], // {_ "a": 1}
+      [0x5f, 0x41, 0x01, 0xff], // (_ h'01')
+      [0x7f, 0x61, 0x61, 0xff], // (_ "a")
+    ]
+    for (const item of items) {
+      expect(() => decodeCbor(bytes(...item))).toThrow(ColumnError)
+      expect(() => decodeCbor(bytes(0x81, ...item))).toThrow(ColumnError) // inside an array
+      expect(() => decodeCbor(bytes(0xa1, 0x61, 0x61, ...item))).toThrow(ColumnError) // as a map value
+      expect(() => decodeCbor(bytes(0xa1, ...item, 0x01))).toThrow(ColumnError) // in the place of a key
+    }
+    for (const head of [0x1f, 0x3f, 0xdf]) expect(() => decodeCbor(bytes(head))).toThrow(ColumnError)
+  })
+
   test('rejects map keys that are not text, and repeated keys', () => {
     expect(() => decodeCbor(bytes(0xa1, 0x01, 0x02))).toThrow(ColumnError)
     expect(() => decodeCbor(bytes(0xa1, 0x41, 0x61, 0x02))).toThrow(ColumnError)

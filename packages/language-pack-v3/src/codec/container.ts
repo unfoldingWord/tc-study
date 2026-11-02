@@ -21,8 +21,10 @@
  * 5. `E_CODEC`.
  * 6. `E_INFLATE`: the stream fails, does not end exactly at the end of the body, or gives other than `ulen` bytes.
  * 7. `E_ID`: the sha256 of the inflated body is not the header's `id`, or not `expectedId`.
- * 8. `E_BODY`: the body is not `{h, t}` with both maps, does not decode, has a malformed `h` or `h.tables`, or has
- *    tables that differ from the ones `h.tables` lists. `E_LIMIT` for CBOR nested deeper than `MAX_DEPTH`.
+ * 8. `E_BODY`: the body is not a map with `h` and `t`, both maps (any other key of the root is ignored), does not decode (the
+ *    whole body is decoded, also the tables that will be skipped), has a malformed `h` or `h.tables`, has a class other than
+ *    `opts.expectedClass` when that is given, or has tables that differ from the ones `h.tables` lists. `E_LIMIT` for CBOR
+ *    nested deeper than `MAX_DEPTH`.
  * 9. `E_HMISMATCH`: the body's `h` and the header's `h` differ.
  * 10. `E_TABLE`: a required table, or its version, is not one the caller knows.
  *
@@ -281,21 +283,27 @@ function checkLogicalHeader(h: CborMap): LogicalHeader {
   return h as unknown as LogicalHeader
 }
 
-/** The body is the map `{h, t}`. Checks its shape and that `t` has the tables `h.tables` lists, no more, no fewer. */
-function parseBody(body: Uint8Array): { h: CborMap; t: CborMap; logical: LogicalHeader } {
+/**
+ * The body is a map with `h` and `t`; other keys of the root are ignored (a later minor version may add them). Checks its shape,
+ * the class when one is expected, and that `t` has the tables `h.tables` lists, no more, no fewer.
+ */
+function parseBody(body: Uint8Array, expectedClass?: ClassName): { h: CborMap; t: CborMap; logical: LogicalHeader } {
   let value: CborValue
   try {
     value = decodeCbor(body)
   } catch (error) {
     return decodeFailure(error, 'E_BODY', 'the body')
   }
-  if (!isMap(value) || Object.keys(value).length !== 2 || !hasOwn(value, 'h') || !hasOwn(value, 't')) {
-    throw new FormatError('E_BODY', 'the body is not a map with exactly h and t')
+  if (!isMap(value) || !hasOwn(value, 'h') || !hasOwn(value, 't')) {
+    throw new FormatError('E_BODY', 'the body is not a map with h and t')
   }
   const { h, t } = value
   if (!isMap(h)) throw new FormatError('E_BODY', 'h is not a map')
   if (!isMap(t)) throw new FormatError('E_BODY', 't is not a map')
   const logical = checkLogicalHeader(h)
+  if (expectedClass !== undefined && logical.class !== expectedClass) {
+    throw new FormatError('E_BODY', `the class is "${logical.class}", and "${expectedClass}" is expected`)
+  }
   const listed = Object.keys(logical.tables)
   for (const name of listed) {
     if (!hasOwn(t, name)) throw new FormatError('E_BODY', `table "${name}" is in h.tables and not in t`)
@@ -317,13 +325,14 @@ function parseBody(body: Uint8Array): { h: CborMap; t: CborMap; logical: Logical
  * `skipped`; `seg.h` stays as the file has it. Which other tables depend on a skipped one is class knowledge and
  * belongs to the readers of each class.
  *
- * `expectedId`, when given, is the id the catalog gives, in lowercase hex.
+ * `expectedId`, when given, is the id the catalog gives, in lowercase hex. `expectedClass`, when given, is the class the body's
+ * `h` must have (`E_BODY` otherwise, before `E_HMISMATCH` and the tables): a catalog inside a transfer file must be a catalog.
  *
  * `header` is the file header as it is, with the keys this code does not know and the catalog's `sig`.
  */
 export async function readSegment(
   bytes: Uint8Array,
-  opts: { known: Record<string, number[]>; expectedId?: string },
+  opts: { known: Record<string, number[]>; expectedId?: string; expectedClass?: ClassName },
 ): Promise<{ seg: Segment; id: string; header: Record<string, CborValue>; skipped: string[] }> {
   const { header, headerEnd } = parseHeader(bytes, [KIND_SEGMENT])
   const fields = segmentFields(header)
@@ -349,7 +358,7 @@ export async function readSegment(
     throw new FormatError('E_ID', 'the sha256 of the body is not the id the catalog gives')
   }
 
-  const parsed = parseBody(body)
+  const parsed = parseBody(body, opts.expectedClass)
   if (!cborEqual(parsed.h, fields.h)) throw new FormatError('E_HMISMATCH', "the body's h differs from the header's h")
 
   const skipped: string[] = []

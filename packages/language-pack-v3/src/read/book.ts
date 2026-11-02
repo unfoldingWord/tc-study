@@ -326,6 +326,12 @@ function readQuotes(value: unknown, name: string, rows: HelpRow[]): void {
       ;(rows[row].quoteMissing ??= []).push([at, verse, word, occurrence])
     }
   }
+  // Every -1 is in exactly one of the two lists: `piece` has refused a piece that is in both, and here one that is in neither.
+  rows.forEach((row, i) => {
+    row.quote!.forEach((position, k) => {
+      if (position === -1 && !listed.has(`${i}:${k}`)) bad(`${what}: the piece ${k} of row ${i} has no position and is in neither kinds nor missing`)
+    })
+  })
 }
 
 /** The tables this reader knows, as `readSegment` takes them in `known`. */

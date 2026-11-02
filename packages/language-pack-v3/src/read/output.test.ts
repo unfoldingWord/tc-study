@@ -365,6 +365,17 @@ describe('the output of a book', () => {
     expect(result.links.rows[1].cols).toEqual({ origWords: 'x', twLink: 'kt/grace' })
   })
 
+  test('E_BODY: a -1 of a quote that is in neither quoteKinds nor quoteMissing (a -1 is in exactly one of the two)', async () => {
+    const whole = await out((await writeSegment(bookSegment(tiny))).bytes)
+    expect(whole.notes.rows[2].quote).toEqual([-1, 5, -1])
+    // Piece 0 is explained by `kinds` and piece 2 by `missing`: without either list, one -1 is left alone.
+    for (const list of ['kinds', 'missing'] as const) {
+      const seg = structuredClone(bookSegment(tiny))
+      delete (seg.t.quotes as any).notes[list]
+      expect(await readerOutput((await writeSegment(seg)).bytes)).toEqual({ error: 'E_BODY' })
+    }
+  })
+
   test('an attribute map that is empty in the file is output as it is; a text with no pair has no attrs', async () => {
     const seg = structuredClone(bookSegment(tiny))
     ;(seg.t.texts as any[])[0].attrs = [[2, {}]]
@@ -675,6 +686,25 @@ describe('the sample (es-419 Titus)', () => {
     const result = await readerOutput(broken)
     expect(Object.keys(result as object)).toEqual(['error'])
     expect(FORMAT_ERROR_CODES as readonly string[]).toContain((result as { error: string }).error)
+  })
+
+  test('a catalog must say class catalog in the index (E_HEADER) and in its own header (E_BODY)', async () => {
+    const book = segmentOf(lang, 'book')
+    const file = writeTransfer({ mode: 'full', catalogs: [lang.catalog], entries: [book], made: '2026-11-01T10:00:00Z', by: 'test 1' })
+    expect(await readerOutput(file)).toHaveProperty('catalogs')
+    expect(await readerOutput(withHeader(file, (index) => void delete (index.entries as Record<string, CborValue>[])[0].class))).toEqual({ error: 'E_HEADER' })
+    expect(await readerOutput(withHeader(file, (index) => void ((index.entries as Record<string, CborValue>[])[0].class = 'book')))).toEqual({ error: 'E_HEADER' })
+
+    // The index says catalog and the file is a book: its tables are not those of a catalog, and the class is checked first.
+    const idOf = (id: string) => Uint8Array.from(id.match(/../g)!, (pair) => parseInt(pair, 16))
+    const entry = { id: idOf(book.id), kind: 'segment', class: 'catalog', offset: 0, size: book.bytes.length }
+    const index = encodeDeterministic({ mode: 'full', catalogs: [entry.id], entries: [entry] } as CborValue)
+    const fake = new Uint8Array(12 + index.length + book.bytes.length)
+    fake.set([0x89, 0x54, 0x4c, 0x50, 3, 0, 2, 0])
+    new DataView(fake.buffer).setUint32(8, index.length)
+    fake.set(index, 12)
+    fake.set(book.bytes, 12 + index.length)
+    expect(await readerOutput(fake)).toEqual({ error: 'E_BODY' })
   })
 
   test('the output is the same on every run', async () => {

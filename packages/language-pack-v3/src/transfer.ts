@@ -237,7 +237,7 @@ function parseIndex(index: CborMap): TransferIndex {
     if (at === undefined) throw malformed(`catalogs[${i}] is not one of the entries`)
     if (at >= catalogs.length) throw malformed(`the catalog ${id} is not among the first ${catalogs.length} entries`)
     const entry = entries[at]
-    if (entry.kind !== 'segment' || (entry.class !== undefined && entry.class !== 'catalog')) throw malformed(`the catalog ${id} is not a segment of class catalog`)
+    if (entry.kind !== 'segment' || entry.class !== 'catalog') throw malformed(`the catalog ${id} is not a segment that says class catalog`)
   })
 
   const out: TransferIndex = { mode: index.mode, catalogs, entries, extra: {} }
@@ -281,7 +281,8 @@ export type KnownTables = Partial<Record<ClassName, Record<string, number[]>>>
  * Checks one entry as if it had been downloaded (`container.md`, "Order of checks"); throws the {@link FormatError} it fails with.
  * The id of the index is checked by `readSegment` where the container puts `E_ID`, after `E_INFLATE`.
  *
- * - A catalog is checked against {@link CATALOG_TABLES}, the tables `catalogView` understands.
+ * - A catalog is checked against {@link CATALOG_TABLES}, the tables `catalogView` understands, and its own header must say class
+ *   `catalog` (`E_BODY`, before the tables: `transfer.md`, "Order of checks", step 5).
  * - Another segment is checked against `known[class]` (its own `h.class`; no tables if the class is missing) when `known` is given,
  *   and against the tables its own header lists, which checks its structure only, when it is not.
  * - With `known`, a class the receiver knows no tables of is `E_TABLE` (step 5 of the order of checks), also when all the tables of
@@ -303,7 +304,7 @@ async function verify(entry: TransferIndexEntry, data: Uint8Array, isCatalog: bo
   } else {
     tables = knownOf(header.h)
   }
-  await readSegment(data, { known: tables, expectedId: entry.id })
+  await readSegment(data, { known: tables, expectedId: entry.id, ...(isCatalog ? { expectedClass: 'catalog' as const } : {}) })
   if (!isCatalog && known !== undefined && Object.keys(tables).length === 0) {
     throw new FormatError('E_TABLE', 'the receiver knows no table of this class of segment')
   }
