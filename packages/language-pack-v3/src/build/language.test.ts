@@ -430,7 +430,7 @@ describe('buildCommon: the original of Titus', () => {
 
     const catalog = await catalogOf(built.catalog)
     expect(catalog.lang).toBeUndefined()
-    expect(readSegment(built.catalog.bytes, { known: CATALOG_TABLES }).then((r) => r.seg.h.lang)).resolves.toBeUndefined()
+    await expect(readSegment(built.catalog.bytes, { known: CATALOG_TABLES }).then((r) => r.seg.h.lang)).resolves.toBeUndefined()
     expect(catalog.about).toEqual({ ...about, catalog: 'common' })
     expect(catalog.requires).toBeUndefined()
     expect(catalog.units).toEqual([{ id: 'orig:tit', segments: [0] }])

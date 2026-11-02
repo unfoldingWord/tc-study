@@ -128,7 +128,7 @@ describe('encodeDeterministic', () => {
   })
 
   test('the text of the translator is kept as written', () => {
-    const text = '﻿é   \n'
+    const text = '\ufeffé \u00a0 \n'
     expect(decodeCbor(encodeDeterministic(text))).toBe(text)
   })
 
@@ -204,7 +204,7 @@ describe('decodeCbor', () => {
   })
 
   test('keeps a byte order mark at the start of a text', () => {
-    expect(decodeCbor(encodeDeterministic('﻿abc'))).toBe('﻿abc')
+    expect(decodeCbor(encodeDeterministic('\ufeffabc'))).toBe('\ufeffabc')
   })
 
   test('a key called __proto__ is a key', () => {

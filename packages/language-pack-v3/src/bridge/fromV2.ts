@@ -3,7 +3,7 @@
  * segments and a local catalog. A browser or a Worker can run it: jszip and pako only.
  *
  * Bridging is building from the rows of the pack: {@link bridgeZip} is {@link buildLanguage} over {@link zipSource}, so a book segment
- * made here is byte for byte the one the publisher's builder makes from the same rows (test case 13). What differs is the catalog: it
+ * made here has the same body, so the same id, as the one the publisher's builder makes from the same rows (test case 13). What differs is the catalog: it
  * is the device's (`origin: local`, `publisher: local:` and the device name, revision 1), unsigned, and it lists only what the pack
  * brought. A later published catalog replaces it.
  *

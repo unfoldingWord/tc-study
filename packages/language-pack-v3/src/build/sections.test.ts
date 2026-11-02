@@ -96,8 +96,8 @@ describe('splitSections', () => {
   })
 
   test('the text is not changed inside a part: spaces, a trailing space and Unicode as published', () => {
-    const md = '## A\n\n  sangría  \né ñ  \n'
-    expect(splitSections(md)[0].md).toBe('  sangría  \né ñ  ')
+    const md = '## A\n\n  sangría  \né ñ \u00a0\n'
+    expect(splitSections(md)[0].md).toBe('  sangría  \né ñ \u00a0')
   })
 })
 
@@ -183,7 +183,7 @@ describe('roleOf', () => {
     expect(normalizeHeading('  **Definición:**  ')).toBe('definición')
     expect(normalizeHeading('Definición')).toBe('definición')
     expect(roleOf('DEFINICIÓN')).toEqual({ role: 'definition', lang: 'es' })
-    expect(roleOf('Translation  Suggestions .')).toEqual({ role: 'translation-suggestions', lang: 'en' })
+    expect(roleOf('Translation\u00a0 Suggestions .')).toEqual({ role: 'translation-suggestions', lang: 'en' })
   })
 })
 

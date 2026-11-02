@@ -171,7 +171,7 @@ describe('texts', () => {
   })
 
   test('texts keeps a leading byte order mark', () => {
-    const withBom = ['﻿abc']
+    const withBom = ['\ufeffabc']
     expect(decodeTexts(encodeTexts(withBom))).toEqual(withBom)
   })
 

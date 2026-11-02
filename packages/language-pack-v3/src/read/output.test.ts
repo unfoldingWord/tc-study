@@ -51,7 +51,7 @@ describe('sortKeys and canonicalJson', () => {
   })
 
   test('strings are written as JSON writes them: only quotes, backslashes and controls are escaped', () => {
-    expect(canonicalJson({ t: 'a"b\\c\n\t\u0001é ' })).toBe('{"t":"a\\"b\\\\c\\n\\t\\u0001é "}')
+    expect(canonicalJson({ t: 'a"b\\c\n\t\u0001é\u2028' })).toBe('{"t":"a\\"b\\\\c\\n\\t\\u0001é\u2028"}')
   })
 
   test.each([

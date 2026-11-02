@@ -603,7 +603,7 @@ describe('what the milestones give a word', () => {
     const first = 'בְּ/רֵאשִׁ֖ית'
     const second = `ב${WORD_JOINER}ָּרָ֣א`
     const hebrew = origIndex([['1', '1', [first, second]]])
-    const decomposed = (s: string) => s.replace(/[/⁠]/g, '').normalize('NFD')
+    const decomposed = (s: string) => s.replace(/[/\u2060]/g, '').normalize('NFD')
     const t = textOf(
       hebrew,
       chapterNode('1'),

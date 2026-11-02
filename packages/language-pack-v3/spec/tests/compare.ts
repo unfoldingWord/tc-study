@@ -88,7 +88,13 @@ const isError = (output: Json): boolean => isObject(output) && Object.hasOwn(out
 
 /** The line to print when the readers disagree on `bytes` (the file at `file`), or `null` when they agree. */
 async function disagreement(name: string, bytes: Uint8Array, file: string, python: string, reader: string): Promise<string | null> {
-  const ts = sortKeys(await readerOutput(bytes))
+  // A TypeScript exception (not a FormatError, which readerOutput turns into an error object) is a mismatch of this file, not the end of the run.
+  let ts: Json
+  try {
+    ts = sortKeys(await readerOutput(bytes))
+  } catch (error) {
+    return `${name}: the TypeScript reader threw: ${(error as Error).message}`
+  }
   const py = pythonOn(python, reader, file)
   if ('failure' in py) return `${name}: ${py.failure}`
   let normal: Json

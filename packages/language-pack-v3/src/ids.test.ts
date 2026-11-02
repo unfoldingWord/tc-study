@@ -19,7 +19,7 @@ const bit = (set: Uint8Array, n: number) => (set[n >> 3] >> (n & 7)) & 1
 describe('books', () => {
   test('there are 66, in the order of the list in ids.md', () => {
     // The first code block of ids.md is the canonical list: "1 gen   2 exo ...".
-    const block = /```\n([\s\S]*?)```/.exec(idsSpec)
+    const block = /```\r?\n([\s\S]*?)```/.exec(idsSpec)
     expect(block).not.toBeNull()
     const listed = [...(block as RegExpExecArray)[1].matchAll(/(\d+)\s+([0-9a-z]{3})/g)]
     expect(listed.length).toBe(66)
