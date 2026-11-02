@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { articleIdOfRow, fnv1a32, slotId, slotOfRow } from './partSlots'
+import { unitOfPart } from './partsList'
 
 const ULT = { key: 'unfoldingWord/en/ult', type: 'scripture', subject: 'Aligned Bible' }
 const TN = { key: 'unfoldingWord/en/tn', type: 'notes', subject: 'TSV Translation Notes' }
@@ -7,6 +8,7 @@ const TN = { key: 'unfoldingWord/en/tn', type: 'notes', subject: 'TSV Translatio
 const TWL = { key: 'unfoldingWord/en/twl', type: 'unknown', subject: 'TSV Translation Words Links' }
 const TQ = { key: 'unfoldingWord/en/tq', type: 'questions', subject: 'TSV Translation Questions' }
 const UHB = { key: 'unfoldingWord/hbo/uhb', type: 'scripture', subject: 'Hebrew Old Testament' }
+const UGNT = { key: 'unfoldingWord/el-x-koine/ugnt', type: 'scripture', subject: 'Greek New Testament' }
 const MACULA = { key: 'Biblica/hbo/macula', type: 'original-syntax', subject: 'Original Language Syntax' }
 const TW = { key: 'unfoldingWord/en/tw', type: 'words', subject: 'Translation Words' }
 const TA = { key: 'unfoldingWord/en/ta', type: 'academy', subject: 'Translation Academy' }
@@ -44,6 +46,21 @@ describe('which part a row belongs to', () => {
   test('an original’s book is a part of its own', () => {
     expect(slotOfRow({ layer: 'sot', key: 'scripture-usj:unfoldingWord/hbo/uhb:rut:1' }, UHB)).toEqual({ kind: 'original', resource: UHB.key, book: 'rut' })
     expect(slotOfRow({ layer: 'prepared', key: 'prepared:scripture:unfoldingWord/hbo/uhb:rut:1:light' }, UHB)).toEqual({ kind: 'original', resource: UHB.key, book: 'rut' })
+  })
+
+  test('the index rows of an original’s book are that book’s index part, in the shared unit', () => {
+    const strong = slotOfRow({ layer: 'index', key: 'index:strong:unfoldingWord/el-x-koine/ugnt:G5485:tit' }, UGNT)
+    expect(strong).toEqual({ kind: 'index', resource: UGNT.key, book: 'tit' })
+    expect(slotId(strong!)).toBe('index:unfoldingWord/el-x-koine/ugnt:tit')
+    expect(slotOfRow({ layer: 'index', key: 'index:verses:unfoldingWord/el-x-koine/ugnt:tit' }, UGNT)).toEqual(strong)
+    // The book's text stays in its original part.
+    expect(slotId(slotOfRow({ layer: 'sot', key: 'scripture-usj:unfoldingWord/el-x-koine/ugnt:tit:1' }, UGNT)!)).toBe('original:unfoldingWord/el-x-koine/ugnt:tit')
+    expect(unitOfPart(strong!)).toBe('shared')
+  })
+
+  test('an index row goes in an index part whatever the resource’s family, and one with no book is an error', () => {
+    expect(slotOfRow({ layer: 'index', key: 'index:strong:unfoldingWord/en/ult:G5485:tit' }, ULT)).toEqual({ kind: 'index', resource: ULT.key, book: 'tit' })
+    expect(() => slotOfRow({ layer: 'index', key: 'index:verses:unfoldingWord/el-x-koine/ugnt:' }, UGNT)).toThrow(/index:verses/)
   })
 
   test('MACULA’s trees and referents of a book are that book’s macula part', () => {

@@ -5,6 +5,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { getSharedBuildConfig } from '../../config/vite-build'
+import { createTcStudyPwaPlugin } from './scripts/vite-pwa-plugin.mjs'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -81,7 +82,12 @@ export default defineConfig({
     __DEPLOY_VERSION__: JSON.stringify(deployVersion),
     'import.meta.env.VITE_DEBUG_BUILD': JSON.stringify(isDebugBuild ? '1' : ''),
   },
-  plugins: [react(), tailwindcss(), forceDecodeNamedCharRefNode()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    createTcStudyPwaPlugin(),
+    forceDecodeNamedCharRefNode(),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

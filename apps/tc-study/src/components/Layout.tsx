@@ -1,9 +1,13 @@
 import { Menu, X } from 'lucide-react'
+import clsx from 'clsx'
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { BRAND_SHORT } from '../config/brand'
 import { navItems } from '../config/navItems'
 import { ThemeToggle } from '../features/theme'
+import { OCEAN_BAR_BG, OCEAN_BAR_SECTION_SHORTCUT } from '../styles/oceanBarChrome'
+import { Card } from './ui/Card'
+import { IconButton } from './ui/IconButton'
 
 export default function Layout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -11,24 +15,31 @@ export default function Layout() {
 
   const activeNavItem = navItems.find((item) => location.pathname.startsWith(item.path)) || navItems[0]
 
-  // Hide app bar on read page for immersive reading experience
   const isReadPage = location.pathname.startsWith('/read')
 
   return (
     <div className="flex h-dynamic-screen flex-col bg-canvas overflow-hidden">
       {!isReadPage && (
-        <header className="flex-shrink-0 border-b border-border-subtle bg-surface/80 backdrop-blur-sm relative z-[110]">
-          <nav className="flex items-center justify-between px-3 py-1.5">
+        <header
+          className={clsx(
+            'flex-shrink-0 relative z-[110] h-14 border-b border-accent-fill-fg/15',
+            OCEAN_BAR_BG
+          )}
+        >
+          <nav className="flex h-full items-center justify-between px-3">
             <div className="flex items-center">
-              <span className="text-base font-semibold text-fg">{BRAND_SHORT}</span>
+              <span className="font-extrabold text-[15.5px] text-accent-fill-fg">{BRAND_SHORT}</span>
             </div>
 
             <div className="flex items-center gap-0.5">
-              <ThemeToggle size="sm" />
+              <ThemeToggle size="sm" variant="ocean" />
 
               <NavLink
                 to={activeNavItem.path}
-                className="p-1.5 rounded-md bg-accent-soft text-accent hover:opacity-90 transition-colors"
+                className={clsx(
+                  'inline-flex items-center justify-center rounded-md p-1.5 transition-colors',
+                  OCEAN_BAR_SECTION_SHORTCUT
+                )}
                 title={activeNavItem.name}
                 aria-label={activeNavItem.name}
               >
@@ -36,32 +47,32 @@ export default function Layout() {
               </NavLink>
 
               <div className="relative">
-                <button
+                <IconButton
+                  label={isMenuOpen ? 'Close menu' : 'Open menu'}
+                  size="sm"
+                  tone="onOcean"
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="p-1.5 rounded-md hover:bg-muted transition-colors"
-                  title={isMenuOpen ? 'Close menu' : 'Open menu'}
-                  aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
                 >
-                  {isMenuOpen ? (
-                    <X className="h-4 w-4 text-fg-secondary" />
-                  ) : (
-                    <Menu className="h-4 w-4 text-fg-secondary" />
-                  )}
-                </button>
+                  {isMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+                </IconButton>
 
                 {isMenuOpen && (
-                  <div className="absolute top-full right-0 mt-1.5 z-[100] bg-elevated rounded-lg shadow-xl border border-border py-1 w-[40px]">
+                  <Card
+                    padded={false}
+                    className="absolute top-full right-0 z-[100] mt-1.5 w-[52px] border-border-subtle py-1 shadow-xl"
+                  >
                     {navItems.map((item) => (
                       <NavLink
                         key={item.name}
                         to={item.path}
                         onClick={() => setIsMenuOpen(false)}
                         className={({ isActive }) =>
-                          `flex items-center justify-center py-2 transition-colors ${
+                          clsx(
+                            'flex items-center justify-center py-2 transition-colors',
                             isActive
                               ? 'bg-accent-soft text-accent'
                               : 'text-fg-secondary hover:bg-muted'
-                          }`
+                          )
                         }
                         title={item.name}
                         aria-label={item.name}
@@ -69,14 +80,13 @@ export default function Layout() {
                         <item.icon className="h-4 w-4" />
                       </NavLink>
                     ))}
-                  </div>
+                  </Card>
                 )}
               </div>
             </div>
           </nav>
         </header>
       )}
-      {/* Read needs overflow-hidden + h-full chain so docked debug can shrink panels */}
       <main className={`flex-1 min-h-0 ${isReadPage ? 'overflow-hidden' : 'overflow-auto'}`}>
         <Outlet />
       </main>

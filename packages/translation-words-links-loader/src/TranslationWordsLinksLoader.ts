@@ -3,6 +3,7 @@
  * Implements ResourceLoader interface for plugin architecture
  */
 
+import { door43Fetch } from '@bt-synergy/door43-api'
 import type {
     ProgressCallback,
     ResourceLoader,
@@ -201,7 +202,7 @@ export class TranslationWordsLinksLoader implements ResourceLoader {
         console.log(`📥 Fetching TWL TSV from: ${tsvUrl}`)
       }
 
-      const response = await fetch(tsvUrl)
+      const response = await door43Fetch(tsvUrl)
       if (!response.ok) {
         if (response.status === 404) {
           if (this.debug) console.log(`⚠️ TWL file not found (book not in repo): ${bookCode}`)

@@ -58,6 +58,12 @@ describe('brandNameGuards', () => {
     expect(description?.[1]).toContain('translationCore Study')
   })
 
+  test('index.html links to public manifest.json, not vite-plugin webmanifest', () => {
+    const html = readFileSync(join(APP, 'index.html'), 'utf8')
+    expect(html).toMatch(/<link\s+rel="manifest"\s+href="\/manifest\.json"\s*\/?>/)
+    expect(html).not.toMatch(/manifest\.webmanifest/)
+  })
+
   test('the web manifest names the app as the translationCore family does', () => {
     const manifest = JSON.parse(readFileSync(join(APP, 'public/manifest.json'), 'utf8'))
     expect(manifest.name).toBe('translationCore Study')

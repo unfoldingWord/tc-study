@@ -34,11 +34,10 @@ function metadataForSpec(
   const resourceKey = `unfoldingWord/${orig.lang}/${orig.id}`
   return (async (): Promise<ResourceInfo[]> => {
     try {
-      const metadata = await ensureOriginalLanguageInCatalog(
-        orig,
-        catalogManager,
-        resourceTypeRegistry
-      )
+      // Already in the catalog (a download, or the originals language pack): its row is the metadata.
+      const metadata =
+        (await ensureOriginalLanguageInCatalog(orig, catalogManager, resourceTypeRegistry)) ??
+        (await catalogManager.getResourceMetadata(resourceKey))
       if (metadata) {
         return loadedResourcesForCatalogKey(
           useAppStore.getState().loadedResources,

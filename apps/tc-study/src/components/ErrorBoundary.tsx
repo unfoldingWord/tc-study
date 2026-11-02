@@ -1,4 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Button } from './ui/Button'
+import { Card } from './ui/Card'
 
 interface Props {
   children: ReactNode
@@ -33,40 +35,31 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-          <div className="w-full max-w-2xl rounded-lg border border-red-200 bg-white p-8 shadow-lg">
-            <h1 className="mb-4 text-2xl font-bold text-red-600">
-              Something went wrong
-            </h1>
+        <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+          <Card className="w-full max-w-2xl border-danger/30 shadow-lg">
+            <h1 className="mb-4 text-2xl font-bold text-danger">Something went wrong</h1>
             <div className="mb-4">
-              <h2 className="mb-2 font-semibold text-gray-900">Error:</h2>
-              <pre className="overflow-auto rounded bg-gray-100 p-4 text-sm">
+              <h2 className="mb-2 font-semibold text-fg">Error:</h2>
+              <pre className="overflow-auto rounded bg-muted p-4 text-sm text-fg">
                 {this.state.error.toString()}
               </pre>
             </div>
             {this.state.errorInfo && (
               <div className="mb-4">
-                <h2 className="mb-2 font-semibold text-gray-900">
-                  Component Stack:
-                </h2>
-                <pre className="overflow-auto rounded bg-gray-100 p-4 text-xs">
+                <h2 className="mb-2 font-semibold text-fg">Component Stack:</h2>
+                <pre className="overflow-auto rounded bg-muted p-4 text-xs text-fg">
                   {this.state.errorInfo.componentStack}
                 </pre>
               </div>
             )}
             <div className="mb-4">
-              <h2 className="mb-2 font-semibold text-gray-900">Stack Trace:</h2>
-              <pre className="overflow-auto rounded bg-gray-100 p-4 text-xs">
+              <h2 className="mb-2 font-semibold text-fg">Stack Trace:</h2>
+              <pre className="overflow-auto rounded bg-muted p-4 text-xs text-fg">
                 {this.state.error.stack}
               </pre>
             </div>
-            <button
-              onClick={() => window.location.reload()}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
-            >
-              Reload Page
-            </button>
-          </div>
+            <Button onClick={() => window.location.reload()}>Reload Page</Button>
+          </Card>
         </div>
       )
     }

@@ -29,6 +29,8 @@ import {
 import { availabilitySubjectSetsFromRegistry } from '../features/read/compositionAvailabilitySubjects'
 import { fetchLanguageAvailabilityByCode } from '../features/read/languageAvailability'
 import { resolveLanguageListKind } from '../features/read/languageListKind'
+import { appendDeviceLanguages, catalogLanguageRows, localPickerLanguages } from '../features/read/localPickerLanguages'
+import { isOffline } from '@bt-synergy/resource-pipeline/download/networkFailure'
 import {
   loadLanguagesCache,
   saveLanguagesCache,
@@ -42,6 +44,7 @@ import { supportedSubjectsFromRegistry } from '../features/read/scriptureLanguag
 import { useWizardStore } from '../lib/stores/wizardStore'
 import { LanguagePickerGrid } from './LanguagePickerGrid'
 import { LanguagePickerTextKindFilter } from './LanguagePickerTextKindFilter'
+import { Button } from './ui/Button'
 import { ModalPortal } from './shared/ModalPortal'
 import { useLanguagePickerOpen } from './useLanguagePickerOpen'
 
@@ -108,10 +111,23 @@ export function LanguagePicker({
   const [isRevalidating, setIsRevalidating] = useState(false)
   const [error, setError] = useState<Error | null>(null)
 
+  // Languages this device can read (e.g. from a language pack), listed with Door43's or without it.
+  const deviceLanguages = useCallback(
+    async () =>
+      localPickerLanguages({
+        rows: await catalogLanguageRows(catalogManager).catch(() => []),
+        sets: availabilitySubjectSetsFromRegistry(resourceTypeRegistry, panelEntryRegistry),
+        kind: listKind,
+      }),
+    [catalogManager, resourceTypeRegistry, panelEntryRegistry, listKind]
+  )
+
   const revalidate = useCallback(async () => {
     setIsRevalidating(true)
     setError(null)
     try {
+      // Offline: no Door43 request at all, only what the device holds.
+      if (isOffline()) throw new Error('This device is offline')
       const client = getDoor43ApiClient()
       const [availabilityByCode, catalogStats] = await Promise.all([
         fetchLanguageAvailabilityByCode(
@@ -129,15 +145,20 @@ export function LanguagePicker({
         availabilityByCode,
       })
       saveLanguagesCache(global, globalSubjects)
-      setDisplayedLanguages(display)
+      setDisplayedLanguages(appendDeviceLanguages(display, await deviceLanguages()))
       setAvailableLanguages(global)
     } catch (err) {
-      console.error('❌ Failed to revalidate languages:', err)
-      setError(err as Error)
+      const onDevice = await deviceLanguages()
+      if (onDevice.length > 0) {
+        setDisplayedLanguages((shown) => appendDeviceLanguages(shown, onDevice))
+      } else {
+        console.error('❌ Failed to revalidate languages:', err)
+        setError(err as Error)
+      }
     } finally {
       setIsRevalidating(false)
     }
-  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager, resourceTypeRegistry, panelEntryRegistry])
+  }, [listKind, listSubjectsKey, globalSubjectsKey, catalogManager, resourceTypeRegistry, panelEntryRegistry, deviceLanguages])
 
   const revalidateRef = useRef(revalidate)
   revalidateRef.current = revalidate
@@ -199,7 +220,7 @@ export function LanguagePicker({
       <button
         onClick={() => setOpen(true)}
         className={`flex items-center justify-center rounded transition-colors ${
-          compact ? 'p-1 text-fg-secondary hover:bg-muted' : 'px-3 py-1.5 bg-accent text-white hover:bg-accent-hover shadow-md'
+          compact ? 'p-1 text-fg-secondary hover:bg-muted' : 'px-3 py-1.5 bg-accent-fill text-accent-fill-fg hover:bg-accent-fill-hover shadow-md'
         } ${triggerClassName ?? ''}`}
         title={triggerLabel}
         aria-label={triggerLabel}
@@ -259,14 +280,14 @@ export function LanguagePicker({
               {error && (
                 <div className="flex flex-col items-center justify-center py-20">
                   <AlertCircle className="w-12 h-12 text-danger mb-4" />
-                  <button
+                  <Button
                     onClick={retry}
-                    className="flex items-center justify-center p-3 bg-accent text-white rounded-full hover:bg-accent-hover transition-colors"
+                    className="rounded-full p-3"
                     title="Retry loading languages"
                     aria-label="Retry loading languages"
                   >
-                    <RefreshCw className="w-5 h-5" />
-                  </button>
+                    <RefreshCw className="h-5 w-5" />
+                  </Button>
                 </div>
               )}
 

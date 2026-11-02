@@ -8,6 +8,16 @@ import * as prod from 'react/jsx-runtime'
 import rehypeReact from 'rehype-react'
 import { unified } from 'unified'
 import type { HastRoot } from './markdownToHast'
+import {
+  MD_HR,
+  MD_INLINE_CODE,
+  MD_PRE,
+  MD_TABLE,
+  MD_TD,
+  MD_TH,
+  MD_THEAD,
+  MD_TR,
+} from './markdownElementClasses'
 import { getRcLinkDisplayName, isRelativeLink, parseRcLink } from './rc-link-parser'
 
 type MdElementProps = React.HTMLAttributes<HTMLElement> & {
@@ -151,7 +161,7 @@ function buildComponents(options: HastToReactOptions) {
         return (
           <code
             {...props}
-            className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800 dark:text-gray-200"
+            className={MD_INLINE_CODE}
           />
         )
       }
@@ -160,7 +170,7 @@ function buildComponents(options: HastToReactOptions) {
     pre: (props: MdElementProps) => (
       <pre
         {...props}
-        className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg overflow-x-auto mb-4 text-sm"
+        className={MD_PRE}
       />
     ),
     blockquote: (props: MdElementProps) => (
@@ -172,33 +182,33 @@ function buildComponents(options: HastToReactOptions) {
     strong: (props: MdElementProps) => <strong {...props} className="font-semibold" />,
     em: (props: MdElementProps) => <em {...props} className="italic" />,
     hr: (props: MdElementProps) => (
-      <hr {...props} className="my-6 border-t border-gray-300" />
+      <hr {...props} className={MD_HR} />
     ),
     table: (props: MdElementProps) => (
       <div className="overflow-x-auto mb-4">
         <table
           {...props}
-          className="min-w-full border-collapse border border-gray-300 dark:border-gray-700"
+          className={MD_TABLE}
         />
       </div>
     ),
     thead: (props: MdElementProps) => (
-      <thead {...props} className="bg-gray-50 dark:bg-gray-800" />
+      <thead {...props} className={MD_THEAD} />
     ),
     tbody: (props: MdElementProps) => <tbody {...props} />,
     tr: (props: MdElementProps) => (
-      <tr {...props} className="border-b border-gray-200 dark:border-gray-700" />
+      <tr {...props} className={MD_TR} />
     ),
     th: (props: MdElementProps) => (
       <th
         {...props}
-        className="border border-gray-300 dark:border-gray-700 px-4 py-2 text-left font-semibold"
+        className={MD_TH}
       />
     ),
     td: (props: MdElementProps) => (
       <td
         {...props}
-        className="border border-gray-300 dark:border-gray-700 px-4 py-2"
+        className={MD_TD}
       />
     ),
     ...options.customComponents,

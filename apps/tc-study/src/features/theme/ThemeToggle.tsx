@@ -4,6 +4,7 @@
  */
 
 import { Monitor, Moon, Sun } from 'lucide-react'
+import { OCEAN_BAR_ICON } from '../../styles/oceanBarChrome'
 import { useTheme } from './useTheme'
 
 interface ThemeToggleProps {
@@ -11,8 +12,8 @@ interface ThemeToggleProps {
   cycle?: boolean
   className?: string
   size?: 'sm' | 'md'
-  /** `menu` matches NavigationBarCompact overflow rows. */
-  variant?: 'chrome' | 'menu'
+  /** `menu` matches NavigationBarCompact overflow rows. `ocean` is white-on-Ocean app bar. */
+  variant?: 'chrome' | 'menu' | 'ocean'
 }
 
 export function ThemeToggle({
@@ -28,7 +29,9 @@ export function ThemeToggle({
   const skin =
     variant === 'menu'
       ? 'flex items-center justify-center p-2 w-full text-fg-secondary hover:text-fg hover:bg-muted transition-colors'
-      : `${padClass} rounded-full text-fg-secondary hover:text-fg hover:bg-muted transition-colors`
+      : variant === 'ocean'
+        ? `${padClass} rounded-md ${OCEAN_BAR_ICON} transition-colors`
+        : `${padClass} rounded-full text-fg-secondary hover:text-fg hover:bg-muted transition-colors`
 
   const title =
     preference === 'system'

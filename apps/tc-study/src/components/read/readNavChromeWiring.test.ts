@@ -56,6 +56,6 @@ describe('Read nav chrome: DownloadIndicator + ThemeToggle', () => {
     expect(compactSrc).toContain('<NavigationBarMenu')
     expect(menuSrc).toContain('<ThemeToggle size="sm" variant="menu" />')
     expect(menuSrc).toContain("from '../../features/theme'")
-    expect(layoutSrc).toContain('<ThemeToggle size="sm" />')
+    expect(layoutSrc).toContain('<ThemeToggle size="sm" variant="ocean" />')
   })
 })

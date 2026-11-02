@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 declare const __DEPLOY_VERSION__: string
 

@@ -8,6 +8,7 @@
 
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import { getDoor43ApiClient } from '@bt-synergy/door43-api'
+import { isOffline } from '@bt-synergy/resource-pipeline/download/networkFailure'
 import type { ResourceTypeRegistry } from '@bt-synergy/resource-types'
 import { useAppStore } from '../../contexts/AppContext'
 import type { ResourceInfo } from '../../contexts/types'
@@ -27,6 +28,7 @@ import { hydrateReadCatalogHits } from './hydrateReadCatalogHits'
 import { collectCatalogMetadataPromises } from './hydrateReadCatalogMetadata'
 import { catalogTargetsForLoad, type CatalogLoadTarget } from './readCatalogPanelPolicy'
 import type { ReadPanelId } from './readPanelModel'
+import { deviceCatalogRows, deviceMetadataPromises, readCatalogPagesOrDevice } from './readCatalogPages'
 import { searchCatalogHitsForTarget } from './readCatalogSearch'
 import {
   mergeExpectedResourceKeys,
@@ -152,19 +154,21 @@ export async function loadReadLanguageCatalog(
   const nextHelpsKeys: string[] = []
   const metadataPromises: Array<Promise<ResourceInfo[]>> = []
 
+  // Door43 first; with no network (or no hits) the language comes from the device catalog, e.g. a language pack.
   const searchPages = await Promise.all(
-    searches.map(async (search) => ({
-      search,
-      pages: await searchCatalogHitsForTarget(door43Client, {
-        languageCode: search.languageCode,
-        target: search.target,
-        navigationScope,
-        helpsSubjects,
-      }),
-    }))
+    searches.map(async (search) => {
+      const request = { languageCode: search.languageCode, target: search.target, navigationScope, helpsSubjects }
+      const found = await readCatalogPagesOrDevice({
+        request,
+        searchDoor43: () => searchCatalogHitsForTarget(door43Client, request),
+        deviceRows: () => deviceCatalogRows(catalogManager),
+        offline: isOffline(),
+      })
+      return { search, ...found }
+    })
   )
 
-  for (const { search, pages } of searchPages) {
+  for (const { search, pages, fromDevice } of searchPages) {
 
     if (pages.every((page) => page.catalogResults.length === 0)) {
       console.warn(
@@ -194,15 +198,22 @@ export async function loadReadLanguageCatalog(
       nextTextKeys.push(...hydrated.expectedTextKeys)
       nextHelpsKeys.push(...hydrated.expectedHelpsKeys)
       metadataPromises.push(
-        ...collectCatalogMetadataPromises({
-          catalogResults: page.catalogResults,
-          languageCode: search.languageCode,
-          target: page.hydrateTarget,
-          destPanelId: hitDest,
-          catalogManager,
-          resourceTypeRegistry,
-          viewerRegistry,
-        })
+        ...(fromDevice
+          ? deviceMetadataPromises({
+              catalogResults: page.catalogResults,
+              languageCode: search.languageCode,
+              getResourceMetadata: (key) => catalogManager.getResourceMetadata(key),
+              loadedResources: () => useAppStore.getState().loadedResources,
+            })
+          : collectCatalogMetadataPromises({
+              catalogResults: page.catalogResults,
+              languageCode: search.languageCode,
+              target: page.hydrateTarget,
+              destPanelId: hitDest,
+              catalogManager,
+              resourceTypeRegistry,
+              viewerRegistry,
+            }))
       )
     }
   }

@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { compatKeyOf, fingerprintOf, PARTS_FORMAT_VERSION } from '@bt-synergy/language-pack'
+import { compatKeyOf, fingerprintOf, PACK_FORMAT_VERSION, PARTS_FORMAT_VERSION } from '@bt-synergy/language-pack'
 import { USJ_TOOL_VERSIONS } from '@bt-synergy/usj-processor'
+import { HELPS_INDEX_VERSION } from './bookIndex'
 import { PACK_VERSIONS } from './packVersions'
 import {
   installedVersions,
@@ -100,6 +101,12 @@ describe('the code of a parts build', () => {
     expect(versions.HELPS_QUOTE_VERSION).toBe(PACK_VERSIONS.quote.helpsQuote)
     expect(versions.HELPS_ALIGN_VERSION).toBe(PACK_VERSIONS.align.helpsAlign)
     expect(versions.HELPS_TEXT_VERSION).toBe(PACK_VERSIONS.text.helpsText)
+  })
+
+  test('states the index version, which the compatibility key leaves out', () => {
+    expect(PACK_VERSIONS.index).toEqual({ helpsIndex: HELPS_INDEX_VERSION })
+    expect(compatKeyOf(PARTS_FORMAT_VERSION, PACK_VERSIONS)).toBe('f2.0-u2.3.0-p6000230-q9-a12-t1')
+    expect(compatKeyOf(PACK_FORMAT_VERSION, PACK_VERSIONS)).toBe('f1.1-u2.3.0-p6000230-q9-a12-t1')
   })
 
   test('holds every version, versions or schema constant of the row producers, or says why one is not row code', async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { OCEAN_BAR_FOCUS_RING } from '../../styles/oceanBarChrome'
 import { IconButton } from './IconButton'
 import { expectNoRawPalette } from './noRawPalette.test-helper'
 
@@ -47,6 +48,14 @@ describe('IconButton', () => {
   test('markup avoids raw palette classes at every size', () => {
     for (const size of ['sm', 'md', 'lg'] as const) {
       expectNoRawPalette(render({ size }))
+    }
+  })
+
+  test('onOcean tone uses Ocean bar icon and focus ring classes', () => {
+    const html = render({ tone: 'onOcean' })
+    expect(html).toContain('text-accent-fill-fg/60')
+    for (const token of OCEAN_BAR_FOCUS_RING.split(' ')) {
+      expect(html).toContain(token)
     }
   })
 })

@@ -3,7 +3,7 @@
  * device holds. Pure: it reads the lists and the register and touches nothing.
  */
 
-import { OPTIONAL_LAYERS, type PackVersions } from '../types'
+import { OPTIONAL_LAYERS, readsLayer, type PackVersions } from '../types'
 import { PART_LAYERS } from './partFile'
 import { KNOWN_PART_KINDS, SHARED_UNIT, unitOfPart, type PartEntry, type PartsList } from './partsList'
 import { slotId, slotOfEntry } from './partSlots'
@@ -57,11 +57,7 @@ export function skipReason(entry: PartEntry, list: PartsList, versions: PackVers
   if (entry.kind === 'index') layers.add('index')
   if ([...layers].some((layer) => !PART_LAYERS.includes(layer))) return 'layer'
   for (const layer of layers) {
-    if (!OPTIONAL_LAYERS.includes(layer)) continue
-    const mine = versions?.[layer]
-    const theirs = list.versions?.[layer]
-    if (!mine || !theirs || Object.keys(mine).length === 0) return 'version'
-    if (Object.keys(mine).some((name) => !(name in theirs) || String(theirs[name]) !== String(mine[name]))) return 'version'
+    if (OPTIONAL_LAYERS.includes(layer) && !readsLayer(layer, versions, list.versions)) return 'version'
   }
   return null
 }

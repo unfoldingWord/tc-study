@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { OCEAN_BAR_FOCUS_RING_OPACITY } from './oceanBarChrome'
 
 const STYLES = import.meta.dir
 const SRC = join(STYLES, '..')
@@ -107,6 +108,35 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
+function parseHex(hex: string): [number, number, number] {
+  const h = hex.replace('#', '')
+  return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number]
+}
+
+function toHex(r: number, g: number, b: number): string {
+  return (
+    '#' +
+    [r, g, b]
+      .map((c) =>
+        Math.round(Math.min(255, Math.max(0, c)))
+          .toString(16)
+          .padStart(2, '0')
+      )
+      .join('')
+      .toUpperCase()
+  )
+}
+
+/** Foreground at `alpha` over background (same as CSS color-mix / opacity on solid bg). */
+function blend(fgHex: string, bgHex: string, alpha: number): string {
+  const [fr, fgC, fb] = parseHex(fgHex)
+  const [br, bgc, bb] = parseHex(bgHex)
+  const a = alpha
+  return toHex(fr * a + br * (1 - a), fgC * a + bgc * (1 - a), fb * a + bb * (1 - a))
+}
+
+const UW_OCEAN = tc4['--uw-ocean'].toUpperCase()
+
 for (const mode of ['light', 'dark'] as const) {
   const scope = mode === 'light' ? light : dark
   describe(`${mode} theme tokens`, () => {
@@ -128,6 +158,23 @@ for (const mode of ['light', 'dark'] as const) {
     }
   })
 }
+
+describe('Ocean app bar contrast', () => {
+  test('accent-fill-fg on uw-ocean reaches 4.5:1 in light and dark', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      const scope = mode === 'light' ? light : dark
+      expect(contrast(theme(scope, 'accent-fill-fg'), UW_OCEAN)).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  test('Ocean bar focus ring (accent-fill-fg at bar ring opacity over ocean) reaches 3:1 against ocean', () => {
+    for (const mode of ['light', 'dark'] as const) {
+      const scope = mode === 'light' ? light : dark
+      const ringOnOcean = blend(theme(scope, 'accent-fill-fg'), UW_OCEAN, OCEAN_BAR_FOCUS_RING_OPACITY)
+      expect(contrast(ringOnOcean, UW_OCEAN)).toBeGreaterThanOrEqual(3)
+    }
+  })
+})
 
 describe('token rules', () => {
   test('every dark value except the overlay is solid hex, so opacity modifiers keep their look', () => {

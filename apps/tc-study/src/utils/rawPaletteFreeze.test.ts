@@ -13,7 +13,7 @@ import { RAW_PALETTE_CLASS } from './rawPalettePattern'
 const SRC = join(import.meta.dir, '..')
 
 /** Measured when the ratchet landed; lower it as screens move to tokens, never raise it. */
-const RAW_PALETTE_BASELINE = 707
+const RAW_PALETTE_BASELINE = 599
 
 /** Dev-only paths that are not part of the product and are not restyled. */
 const DEV_ALLOWLIST = [

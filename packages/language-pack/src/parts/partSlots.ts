@@ -138,6 +138,11 @@ export function familyOf(resource: Resource): ResourceFamily | null {
 
 function placeRow(row: { layer: PackLayer; key: string }, resource: Resource): PartSlot | null {
   const rk = resource.key
+  // Before the family rules: an original's index rows would otherwise land in its book's `original` part.
+  if (row.layer === 'index') {
+    const book = bookOfRow(row.key, row.layer, rk)
+    return book ? { kind: 'index', resource: rk, book } : null
+  }
   const family = familyOf(resource)
   if (family === 'original') {
     const book = bookOfRow(row.key, row.layer, rk)

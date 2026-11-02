@@ -14,6 +14,15 @@ describe('useCatalogBackgroundDownload', () => {
     expect(src).toContain('listedCountByKey')
   })
 
+  test('queues nothing while the device is offline, and checks again when the network comes back', () => {
+    const src = readFileSync(join(import.meta.dir, 'useCatalogBackgroundDownload.ts'), 'utf8')
+    const check = src.slice(src.indexOf('const checkCatalogAndDownload'), src.indexOf('setIsChecking(true)'))
+    expect(check).toContain('isOffline()')
+    expect(check).toContain("phase: 'offline'")
+    expect(src).toMatch(/addEventListener\('online'/)
+    expect(src).toMatch(/removeEventListener\('online'/)
+  })
+
   test('catalog getAll timeout does not enqueue all expected keys as incomplete', () => {
     const src = readFileSync(join(import.meta.dir, 'useCatalogBackgroundDownload.ts'), 'utf8')
     expect(src).toContain('catalog-keys-timeout')

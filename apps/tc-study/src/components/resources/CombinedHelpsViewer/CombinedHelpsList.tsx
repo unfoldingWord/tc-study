@@ -19,6 +19,7 @@ import type { LanguageListNameFields } from '../../../features/read/languageList
 import { HelpsKindFilterMenu } from './HelpsKindFilterMenu'
 import { HelpsSourcesMenu } from './HelpsSourcesMenu'
 import { CombinedHelpsEmptyState } from './CombinedHelpsEmptyState'
+import { HelpsLoadError } from './HelpsLoadError'
 import { taArticleIdFromSupportRef } from './combinedHelpsUtils'
 import { helpsFilterIdentity, scrollHelpsToTop } from './scrollHelpsToTop'
 import {
@@ -354,8 +355,8 @@ export function CombinedHelpsList({
           />
         ) : (
           <>
-            {tnError && tnKey ? <p className="text-chrome text-danger mb-stack">{tnError}</p> : null}
-            {twlError && twlKey ? <p className="text-chrome text-danger mb-stack">{twlError}</p> : null}
+            {tnError && tnKey ? <HelpsLoadError message={tnError} /> : null}
+            {twlError && twlKey ? <HelpsLoadError message={twlError} /> : null}
             {mergedGroups.length === 0 ? (
               shouldShowHelpsFilterEmpty(emptyReason) ? (
                 <div

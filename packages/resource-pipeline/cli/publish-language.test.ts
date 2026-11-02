@@ -31,6 +31,9 @@ describe('publish-language refuses the combinations that would do something othe
     ['--parts with --obs (its loader reads each story from Door43)', ['--parts', '--no-upload', '--obs'], {}, 'OBS parts wait for the OBS loader to read the hashed zip'],
     ['--dry-run with --no-upload (as before)', ['--generator', 'g', '--dry-run', '--no-upload'], {}, '--dry-run y --no-upload no van juntos'],
     ['a whole publish without --generator (as before)', [], R2, 'Faltan --generator'],
+    ['a short --macula-commit', ['--parts', '--no-upload', '--macula-commit', '3b8aa38', '--macula-date', '2026-10-15T02:19:35Z'], {}, '--macula-commit no es un commit'],
+    ['--macula-commit with no value', ['--parts', '--no-upload', '--macula-commit', '--macula-date', '2026-10-15T02:19:35Z'], {}, 'Falta el valor de --macula-commit'],
+    ['a --macula-date with no zone', ['--parts', '--no-upload', '--macula-commit', '3b8aa380e8d8ce1f5efc61c3269a7b08cb3a21d5', '--macula-date', '2026-10-15T02:19:35'], {}, 'con zona'],
   ]
   for (const [what, args, r2, why] of refused) {
     test(`${what}: exit 2, saying why`, () => {
