@@ -353,11 +353,16 @@ export async function buildCommon(o: {
   }
 
   const report: string[] = []
+  const listed = [...refs]
   const lang = o.mapLang
   if (lang !== undefined && origs.length > 0) {
     const built = await buildXmap({ source: o.source, origs, lang })
     report.push(...built.report)
     const helps = (await o.source.resources(lang)).filter((ref) => XMAP_SUBJECTS.has(ref.kind))
+    for (const ref of helps) {
+      listed.push(ref)
+      used.add(ref.key)
+    }
     const noteLike = (ref: ResourceRef): boolean => ref.kind === TN_KIND || ref.kind === TWL_KIND
     const stampOf = (ref: ResourceRef): { key: string; stamp: string } => ({ key: ref.key, stamp: origs.find((orig) => orig.key === ref.key)?.stamp ?? ref.stamp })
     const originalsUsed = refs.filter((ref) => origs.some((orig) => orig.key === ref.key))
@@ -383,6 +388,6 @@ export async function buildCommon(o: {
   }
 
   segments.sort(compareSegments)
-  const catalog = await buildCatalog({ about: { ...o.about, catalog: 'common' }, resources: catalogResources(refs, used), segments })
+  const catalog = await buildCatalog({ about: { ...o.about, catalog: 'common' }, resources: catalogResources(listed, used), segments })
   return { segments, catalog, report }
 }

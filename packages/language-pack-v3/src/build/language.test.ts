@@ -514,6 +514,29 @@ describe('buildCommon: the xmap unit', () => {
     expect(one.catalog.id).not.toBe(a.catalog.id)
   })
 
+  test('the catalog lists the helps the map read, with their licenses; without mapLang only the originals', async () => {
+    const mapped = await catalogOf((await buildCommon({ source: await english(), about, mapLang: 'en' })).catalog)
+    const plain = await catalogOf((await buildCommon({ source: await english(), about })).catalog)
+    expect(plain.resources.map((r) => r.key)).toEqual(['unfoldingWord/el-x-koine/ugnt'])
+    const keys = mapped.resources.map((r) => r.key)
+    expect(keys).toEqual([...keys].sort())
+    for (const suffix of ['/tn', '/twl', '/tw', '/ta']) expect(keys.some((k) => k.endsWith(suffix))).toBe(true)
+    for (const r of mapped.resources) expect(r.license).not.toBe('unknown')
+  })
+
+  test('the core inputs follow the help rows and stamps', async () => {
+    const base = await buildCommon({ source: await english(), about, mapLang: 'en' })
+    const core = (b: typeof base) => b.segments.find((s) => s.seg.h.class === 'xmap' && s.seg.h.part === 'core')!
+    const moved = await buildCommon({
+      source: tweak(await english(), { ref: (ref, lang) => (lang === 'en' && ref.key.endsWith('/tw') ? { stamp: 'v99#2030-01-01T00_00_00Z' } : {}) }),
+      about,
+      mapLang: 'en',
+    })
+    expect(core(moved).inputs).not.toBe(core(base).inputs)
+    const fewer = await buildCommon({ source: tweak(await english(), { row: (row, f) => (f.resource?.endsWith('/tn') && f.book === 'tit' && row.key.endsWith(':1') ? null : row) }), about, mapLang: 'en' })
+    expect(core(fewer).inputs).not.toBe(core(base).inputs)
+  })
+
   test('a new release of a source changes inputs, not the id of the part', async () => {
     const base = await buildCommon({ source: await english(), about, mapLang: 'en' })
     const moved = await buildCommon({
