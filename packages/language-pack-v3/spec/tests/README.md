@@ -335,7 +335,7 @@ Example, for a file cut inside its last entry:
 
 What decides coverage, in the `xmap`: the `notes` table is covered by `unfoldingWord/en/tn`, `links` by
 `unfoldingWord/en/twl`, and `strong` by the keys of the originals (`unfoldingWord/hbo/uhb`, `unfoldingWord/el-x-koine/ugnt`).
-In the `map`, the `usage` table is read for any source that is not the English `tn` or `twl` and that the map's `coverage` lists; the `revision` query decides the coverage of a language's usage by its `tn` entry alone.
+In the `map`, the `usage` table is covered by the language's `tn` entry alone (the source of `coverage` whose last segment is `tn`, not the English `unfoldingWord/en/tn`): every `usage` cell, in the `usage` and the `revision` queries, is judged by that entry. A source that is not a language's `tn` has no `usage`.
 
 A **counts table** (`strong`, `links`, `notes` of `xmap`; `usage` of `map`) is `{"unit": text, "rows": {key: {book:
 [count, verses]}}}`: `count` is the number of occurrences, links or notes, and `verses` the number of distinct verses.
