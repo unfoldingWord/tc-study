@@ -46,14 +46,14 @@ function readStory(value: unknown, i: number, res: [string, string][]): ObsStory
   const what = `stories[${i}]`
   const fields = map(value, what)
   if (!isUint(fields.res) || fields.res >= res.length) bad(`${what}.res names the resource ${String(fields.res)}, and the header has ${res.length}`)
-  if (!isUint(fields.n) || fields.n < 1) bad(`${what}.n is not a story number (an integer from 1)`)
+  if (!isUint(fields.n) || fields.n < 1 || fields.n > 50) bad(`${what}.n is not a story number (an integer from 1 to 50)`)
   if (!Array.isArray(fields.frames) || fields.frames.length === 0) bad(`${what}.frames is not a list with at least one frame`)
 
   const numbersSeen = new Set<number>()
   const frames = fields.frames.map((item, k): ObsFrame => {
     const here = `${what}.frames[${k}]`
     const frame = map(item, here)
-    if (!isUint(frame.n)) bad(`${here}.n is not an integer from 0 to 2^53 - 1`)
+    if (!isUint(frame.n) || frame.n > 99) bad(`${here}.n is not a frame number (an integer from 0 to 99)`)
     if (numbersSeen.has(frame.n)) bad(`${what} has the frame ${frame.n} twice`)
     numbersSeen.add(frame.n)
     const out: ObsFrame = { n: frame.n, text: text(frame.text, `${here}.text`) }

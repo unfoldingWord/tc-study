@@ -117,6 +117,39 @@ describe('extractObs', () => {
     expect(issues).toEqual([`obs:${OBS}:intro is not the key of a story of ${OBS}: left out`])
   })
 
+  test('helps that have rows and no stories are left out with a line: no stories resource, or no story that can be kept', async () => {
+    const none = await build([{ ref: tnRef(), rows: tnRows() }, { ref: tqRef(), rows: [{ layer: 'sot', key: `tq:${TQ}:obs:1`, value: { content: { questions: [{ reference: '1:1', id: 'q001', question: 'x' }] } } }] }])
+    expect(none.model).toBeNull()
+    expect(none.issues).toEqual([`The OBS helps ${TN}, ${TQ} have rows, and the language has no stories for them to point to: left out`])
+    const invalid = await build([{ ref: obsRef(), rows: [storyRow('51', { title: 't', frames: [{ frameNumber: 1, text: 'x' }] })] }, { ref: twlRef(), rows: [{ layer: 'sot', key: `twl:${TWL}:obs`, value: { links: [{ reference: '1:1', id: 'l001' }] } }] }])
+    expect(invalid.model).toBeNull()
+    expect(invalid.issues).toEqual([`${OBS} story 51: the story number is above 50: left out`, `The OBS helps ${TWL} have rows, and the language has no stories for them to point to: left out`])
+    // Helps with no row of OBS, or no helps at all, add no line.
+    expect((await build([{ ref: tnRef(), rows: [{ layer: 'sot', key: `tn:${TN}:tit`, value: {} }] }])).issues).toEqual([])
+  })
+
+  test('a story above 50 and a frame above 99 are left out with a line; 50 and 99 are kept', async () => {
+    const frame = (frameNumber: number) => ({ frameNumber, text: `f${frameNumber}`, imageUrl: '' })
+    const { model, issues } = await build([
+      {
+        ref: obsRef(),
+        rows: [
+          storyRow('50', { title: 't50', frames: [frame(1), frame(99), frame(100), frame(250)] }),
+          storyRow('51', { title: 't51', frames: [frame(1)] }),
+          storyRow('07', { title: 't7', frames: [frame(100)] }),
+        ],
+      },
+    ])
+    expect(model!.stories.map((s) => [s.n, s.frames.map((f) => f.n)])).toEqual([[50, [1, 99]]])
+    expect(issues).toEqual([
+      `${OBS} story 50: frame 2 has the number 100, above 99: left out`,
+      `${OBS} story 50: frame 3 has the number 250, above 99: left out`,
+      `${OBS} story 51: the story number is above 50: left out`,
+      `${OBS} story 7: frame 0 has the number 100, above 99: left out`,
+      `${OBS} story 7 has no frames that can be kept: left out`,
+    ])
+  })
+
   test('the stories, ordered by number: resolvedSrc is dropped, an empty image is left out, a null reference is no reference', async () => {
     const { model, issues } = await build([{ ref: obsRef(), rows: [story10(), story01()] }])
     expect(model).toEqual({
@@ -381,6 +414,34 @@ describe('obsSegment', () => {
       { ref: tnRef(), rows: tnRows() },
     ])
     expect((await roundTrip(extracted!)).view).toEqual(extracted!)
+  })
+
+  test('the canonical text of a frame needs no refText, and any other text of the same frame is kept in it', async () => {
+    const m = model()
+    m.notes!.rows = [
+      { id: 'a001', ref: '10:3', frame: 1003, cols: { note: 'x' } },
+      { id: 'a002', ref: '10:intro', frame: 1000, cols: { note: 'x' } },
+      { id: 'a003', ref: '10:0', frame: 1000, cols: { note: 'x' } },
+      { id: 'a004', ref: '10:front', frame: 1000, cols: { note: 'x' } },
+      { id: 'a005', ref: '10:03', frame: 1003, cols: { note: 'x' } },
+      { id: 'a006', ref: '', frame: 0, cols: { note: 'x' } },
+    ]
+    const { seg, view } = await roundTrip(m)
+    expect((seg.t.notes as Record<string, unknown>).refText).toEqual([[2, '10:0'], [3, '10:front'], [4, '10:03'], [5, '']])
+    expect(view.notes!.rows.map((row) => row.ref)).toEqual(['10:3', '10:intro', '10:0', '10:front', '10:03', ''])
+  })
+
+  test('story 50 and frame 99 are the last ones; story 51 and frame 100 are a RangeError', async () => {
+    const m = model()
+    m.stories = [{ res: OBS, n: 50, title: 't', frames: [{ n: 0, text: 'a' }, { n: 99, text: 'b' }] }]
+    expect((await roundTrip(m)).view.stories).toEqual(m.stories)
+    const tooBigStory = model()
+    tooBigStory.stories[0].n = 51
+    expect(() => obsSegment(tooBigStory)).toThrow(RangeError)
+    const tooBigFrame = model()
+    tooBigFrame.stories[0].frames[1].n = 100
+    expect(() => obsSegment(tooBigFrame)).toThrow(RangeError)
+    expect(() => obsSegment(tooBigFrame)).toThrow('the frame number 100 is above 99')
   })
 
   test('throws for what the segment cannot hold', () => {

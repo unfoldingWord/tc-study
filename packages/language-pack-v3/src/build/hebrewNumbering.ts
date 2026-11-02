@@ -17,6 +17,12 @@
  * both numberings. The lexicon lists the verses of each sense in the Hebrew Bible's numbering, and the segment holds them in
  * the original's, so the builder needs the inverse: {@link fromHebrewNumbering}.
  *
+ * ## The titles that take two verses there
+ *
+ * The table maps the UHB's `PSA 51:0` (the title) to the Hebrew `PSA 51:2`, and so for Psalms 52, 54 and 60: in the Hebrew
+ * Bible the title of these four psalms is verses 1 and 2, and the table lists only the second. Verse 1 is the first line of the
+ * same title, so it is also the UHB's verse 0: the inverse maps both Hebrew places to it.
+ *
  * No Node module is used.
  */
 
@@ -175,7 +181,10 @@ const SIDE = /^([1-3A-Z][A-Z]{2}) ([0-9]+):([0-9]+)(?:-([0-9]+))?$/
 
 let inverse: Map<string, Place> | undefined
 
-/** A place of the Hebrew Bible (`GEN 32:2`) to the same place in the UHB's numbering, for every place the table lists. Built once. */
+/**
+ * A place of the Hebrew Bible (`GEN 32:2`) to the same place in the UHB's numbering, for every place the table lists, and for
+ * verse 1 of a chapter whose title the table maps from verse 0 to verse 2 (it is the title too: UHB verse 0). Built once.
+ */
 function inverseTable(): Map<string, Place> {
   if (inverse !== undefined) return inverse
   const built = new Map<string, Place>()
@@ -190,6 +199,12 @@ function inverseTable(): Map<string, Place> {
       if (built.has(key)) throw new Error(`The Hebrew numbering table maps two places of the UHB to ${key}`)
       built.set(key, { chapter: Number(a[2]), verse: Number(a[3]) + i })
     }
+    // The title of the UHB is verses 1 and 2 there, and the table lists the second.
+    if (Number(a[3]) === 0 && Number(b[3]) === 2) {
+      const first = `${b[1]} ${Number(b[2])}:1`
+      if (built.has(first)) throw new Error(`The Hebrew numbering table maps a place of the UHB to ${first}, the first line of a title`)
+      built.set(first, { chapter: Number(a[2]), verse: 0 })
+    }
   }
   inverse = built
   return built
@@ -198,8 +213,9 @@ function inverseTable(): Map<string, Place> {
 /**
  * A place in the Hebrew Bible's numbering, as the UHB numbers it: `PSA 3:1` is `PSA 3:0` (the title is verse 0 in the UHB),
  * `PSA 51:2` is `51:0`, `JON 2:1` is `JON 1:17`. The inverse of the table, well defined because no two places of the UHB map
- * to the same Hebrew place (a test checks it). A place the table does not list, and any place outside the Old Testament, comes
- * back unchanged. `book` is a USFM code in any case (`1CH` or `1ch`).
+ * to the same Hebrew place (a test checks it); in the four psalms whose title is verses 1 and 2 there (51, 52, 54 and 60), both
+ * are the UHB's verse 0 (`PSA 51:1` is `51:0` too), so the inverse is not one-to-one there. A place the table does not list, and
+ * any place outside the Old Testament, comes back unchanged. `book` is a USFM code in any case (`1CH` or `1ch`).
  */
 export function fromHebrewNumbering(book: string, place: Place): Place {
   return inverseTable().get(`${book.trim().toUpperCase()} ${place.chapter}:${place.verse}`) ?? { chapter: place.chapter, verse: place.verse }

@@ -157,5 +157,64 @@
    ],
    "long": "1) = apariencia externa de un objeto: forma 2) su significado exacto es incierto; probablemente: = la extremidad más baja de un objeto de la naturaleza: pie, raíz"
   }
+ },
+ {
+  "layer": "sot",
+  "key": "es-419_gl/es-419/uhl/content/5058.json",
+  "value": {
+   "brief": "instrumento de cuerda, cántico, burla",
+   "entries": [
+    {
+     "lemma": "נְגִינָה",
+     "pos": [
+      "sust. f."
+     ],
+     "senses": [
+      {
+       "definition": "= instrumento musical con cuerdas, como un laúd o lira",
+       "domain": "Instrumentos musicales",
+       "domainCode": "001003001001013",
+       "glosses": [
+        "instrumento de cuerda"
+       ],
+       "refs": {
+        "PSA": "4:1;6:1;54:1;55:1;61:1;67:1;76:1"
+       }
+      },
+      {
+       "definition": "= acción mediante la cual los seres humanos tocan un instrumento con cuerdas, como un laúd o una lira, que puede ser para la meditación silenciosa o para acompañar el canto y el baile.",
+       "domain": "Jugar?",
+       "domainCode": "002003001013",
+       "glosses": [
+        "cántico",
+        "instrumento de cuerda"
+       ],
+       "refs": {
+        "HAB": "3:19",
+        "ISA": "38:20",
+        "LAM": "5:14",
+        "PSA": "77:7"
+       }
+      },
+      {
+       "definition": "= canción, ► escrita y cantada para burlarse de alguien",
+       "domain": "Cantar",
+       "domainCode": "002004001009006",
+       "glosses": [
+        "burla",
+        "canción"
+       ],
+       "refs": {
+        "JOB": "30:9",
+        "LAM": "3:14",
+        "PSA": "69:13;77:7"
+       }
+      }
+     ],
+     "strong": "H5058"
+    }
+   ],
+   "long": "1) = instrumento musical con cuerdas, como un laúd o lira: instrumento de cuerda 2) = acción mediante la cual los seres humanos tocan un instrumento con cuerdas, como un laúd o una lira, que puede ser para la meditación silenciosa o para acompañar el canto y el baile: cántico, instrumento de cuerda 3) = canción, ► escrita y cantada para burlarse de alguien: burla, canción"
+  }
  }
 ]

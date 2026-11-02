@@ -80,7 +80,7 @@ describe('the Hebrew numbering', () => {
     for (const [ours, theirs] of entries) expect(expand(ours).length).toBe(expand(theirs).length)
   })
 
-  test('the inverse is well defined: 2031 places of the UHB, 2031 different places of the Hebrew Bible, and each one comes back', () => {
+  test('the table is one-to-one (2031 places of the UHB, 2031 different places of the Hebrew Bible) and the inverse gives each one back', () => {
     const hebrew = new Set<string>()
     const ours = new Set<string>()
     for (const [o, h] of Object.entries(HEBREW_NUMBERING)) {
@@ -94,6 +94,37 @@ describe('the Hebrew numbering', () => {
     }
     expect(ours.size).toBe(2031)
     expect(hebrew.size).toBe(2031)
+  })
+
+  test('the inverse is not one-to-one in four titles: Hebrew 51:1 and 51:2 (and the same in 52, 54 and 60) are both the UHB verse 0', () => {
+    // The table maps the UHB's X:0 to the Hebrew X:2 in exactly these four psalms, and the title is verses 1 and 2 there.
+    const titles = Object.entries(HEBREW_NUMBERING).filter(([o, h]) => /^PSA \d+:0$/.test(o) && /:2$/.test(h))
+    expect(titles.map(([o]) => o)).toEqual(['PSA 51:0', 'PSA 52:0', 'PSA 54:0', 'PSA 60:0'])
+    for (const chapter of [51, 52, 54, 60]) {
+      expect(fromHebrewNumbering('PSA', { chapter, verse: 1 })).toEqual({ chapter, verse: 0 })
+      expect(fromHebrewNumbering('PSA', { chapter, verse: 2 })).toEqual({ chapter, verse: 0 })
+      expect(fromHebrewNumbering('PSA', { chapter, verse: 3 })).toEqual({ chapter, verse: 1 })
+    }
+    // In the other psalms with a title the title is the single Hebrew verse 1 (PSA 3:0 = PSA 3:1) and verse 2 is the UHB's verse 1.
+    expect(fromHebrewNumbering('PSA', { chapter: 3, verse: 1 })).toEqual({ chapter: 3, verse: 0 })
+    expect(fromHebrewNumbering('PSA', { chapter: 3, verse: 2 })).toEqual({ chapter: 3, verse: 1 })
+  })
+
+  test('in the books of the table, only those four titles have two Hebrew places for one UHB place', () => {
+    const seen = new Map<string, string>()
+    let extra = 0
+    for (const book of new Set(Object.keys(HEBREW_NUMBERING).map((key) => key.slice(0, 3)))) {
+      for (let chapter = 1; chapter <= 150; chapter++) {
+        for (let verse = 0; verse <= 80; verse++) {
+          const found = fromHebrewNumbering(book, { chapter, verse })
+          if (found.chapter === chapter && found.verse === verse) continue
+          const key = `${book} ${found.chapter}:${found.verse}`
+          if (seen.has(key)) extra++
+          seen.set(key, `${book} ${chapter}:${verse}`)
+        }
+      }
+    }
+    expect(extra).toBe(4)
   })
 
   test('the title of a psalm is verse 0, and Jonah 2:1 is 1:17', () => {
@@ -110,8 +141,9 @@ describe('the Hebrew numbering', () => {
     expect(fromHebrewNumbering('GEN', { chapter: 1, verse: 1 })).toEqual({ chapter: 1, verse: 1 })
     expect(fromHebrewNumbering('PSA', { chapter: 23, verse: 1 })).toEqual({ chapter: 23, verse: 1 })
     expect(fromHebrewNumbering('JON', { chapter: 3, verse: 4 })).toEqual({ chapter: 3, verse: 4 })
-    // A Hebrew place the table has as a UHB place only (the first line of a psalm's title) has no counterpart: unchanged.
-    expect(fromHebrewNumbering('PSA', { chapter: 51, verse: 1 })).toEqual({ chapter: 51, verse: 1 })
+    // A Hebrew place that the table lists as a UHB place only has no counterpart: unchanged (the Hebrew Bible has no such verse).
+    expect(fromHebrewNumbering('JOL', { chapter: 3, verse: 6 })).toEqual({ chapter: 3, verse: 6 })
+    expect(fromHebrewNumbering('EXO', { chapter: 8, verse: 29 })).toEqual({ chapter: 8, verse: 29 })
     expect(fromHebrewNumbering('MAT', { chapter: 1, verse: 1 })).toEqual({ chapter: 1, verse: 1 })
     expect(fromHebrewNumbering('ROM', { chapter: 3, verse: 23 })).toEqual({ chapter: 3, verse: 23 })
   })
@@ -159,6 +191,18 @@ describe('readRefs', () => {
     expect(readRefs('jon', '2:1-3', true)).toEqual([[id('jon', 1, 17), id('jon', 2, 2)]])
     // The same text in a lexicon that is not Hebrew is not converted.
     expect(readRefs('psa', '3:1,2', false)).toEqual([one('psa', 3, 1), one('psa', 3, 2)])
+  })
+
+  test('the four psalms whose title is verses 1 and 2 in the Hebrew Bible: verse 1 is the title, and a range that starts there keeps it', () => {
+    for (const chapter of [51, 52, 54, 60]) {
+      expect(readRefs('psa', `${chapter}:1`, true)).toEqual([one('psa', chapter, 0)])
+      expect(readRefs('psa', `${chapter}:2`, true)).toEqual([one('psa', chapter, 0)])
+      expect(readRefs('psa', `${chapter}:1-3`, true)).toEqual([[id('psa', chapter, 0), id('psa', chapter, 1)]])
+    }
+    // Hebrew 51:3 is the UHB's 51:1, the first verse after the title.
+    expect(readRefs('psa', '51:1-3', true)).toEqual([[19051000, 19051001]])
+    expect(readRefs('psa', '51:1-2', true)).toEqual([[19051000, 19051000]])
+    expect(readRefs('psa', '51:1,3', true)).toEqual([one('psa', 51, 0), one('psa', 51, 1)])
   })
 
   test('what is not one of the forms gives null', () => {
@@ -483,10 +527,14 @@ describe('real rows of the es-419 Hebrew lexicon', () => {
 
   test('the Hebrew numbering is applied: Psalm 51:7 is 51:5, Jonah 2:7 is 2:6, and what the table does not list stays', async () => {
     const { groups, issues } = await build([{ ref: uhl(), rows }])
-    expect([...groups.keys()]).toEqual(['H0', 'H1', 'H3', 'H7'])
+    expect([...groups.keys()]).toEqual(['H0', 'H1', 'H3', 'H5', 'H7'])
     const refsOf = (strong: string) => [...groups.values()].flat().find((e) => e.strong === strong)!.senses.flatMap((s) => s.refs ?? [])
     expect(refsOf('H3179')).toEqual([one('gen', 30, 38), one('gen', 30, 39), one('gen', 30, 41), one('gen', 31, 10), one('psa', 51, 5)])
     expect(refsOf('H7095')).toEqual([one('1ki', 6, 25), one('1ki', 7, 37), one('jon', 2, 6)])
+    // H5058 lists Hebrew 54:1, the first line of the title of Psalm 54 (and the single title verse of 4, 6, 55, 61, 67 and 76).
+    const [first] = [...groups.values()].flat().find((e) => e.strong === 'H5058')!.senses
+    expect(first.refs).toEqual([4, 6, 54, 55, 61, 67, 76].map((chapter) => one('psa', chapter, 0)))
+    expect(refsOf('H5058').slice(7)).toEqual([one('hab', 3, 19), one('isa', 38, 20), one('lam', 5, 14), one('psa', 77, 6), one('job', 30, 9), one('lam', 3, 14), one('psa', 69, 12), one('psa', 77, 6)])
     expect(refsOf('H1791a')).toEqual([one('ezr', 5, 16), one('ezr', 5, 17), one('ezr', 6, 7), one('ezr', 6, 8), one('ezr', 6, 12)])
     expect(issues.filter((line) => line.includes('cannot be read'))).toEqual([])
   })

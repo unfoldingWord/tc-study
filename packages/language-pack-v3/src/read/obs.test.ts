@@ -112,6 +112,8 @@ describe('obsView', () => {
     ['a negative story res', (s) => void (stories(s)[0].res = -1)],
     ['a story number 0', (s) => void (stories(s)[0].n = 0)],
     ['a story number that is not a number', (s) => void (stories(s)[0].n = '1')],
+    ['a story number above 50', (s) => void (stories(s)[1].n = 51)],
+    ['a frame number above 99', (s) => void (stories(s)[1].frames[1].n = 100)],
     ['a story number twice', (s) => void (stories(s)[1].n = 1)],
     ['no title', (s) => void delete stories(s)[0].title],
     ['a title that is not text', (s) => void (stories(s)[0].title = 1)],

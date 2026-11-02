@@ -46,6 +46,9 @@ const OBS_BOOK = 'obs'
 
 const DIGITS = /^[0-9]+$/
 const FRAME_FACTOR = 100
+/** The last story (1 to 50) and the last frame (0 to 99, so that `story × 100 + frame` names one frame). */
+const MAX_STORY = 50
+const MAX_FRAME = FRAME_FACTOR - 1
 
 // Frames
 
@@ -99,6 +102,10 @@ function extractStories(rows: Row[], ref: ResourceRef, issues: string[]): ObsSto
     }
     const n = Number(tail)
     const where = `${ref.key} story ${n}`
+    if (n > MAX_STORY) {
+      issues.push(`${where}: the story number is above ${MAX_STORY}: left out`)
+      continue
+    }
     const value = isMap(row.value) ? row.value : undefined
     const content = value !== undefined && isMap(value.content) ? value.content : undefined
     if (content === undefined) throw new Error(`${row.key}: the row has no content`)
@@ -112,7 +119,8 @@ function extractStories(rows: Row[], ref: ResourceRef, issues: string[]): ObsSto
       issues.push(`${where}: the row says it is story ${String(content.storyNumber)}; the number of the key is used`)
     }
 
-    const frames = content.frames.map((frame, i) => {
+    const frames: ObsStory['frames'] = []
+    for (const [i, frame] of content.frames.entries()) {
       if (!isMap(frame)) throw new Error(`${row.key}: frame ${i} is not an object`)
       if (typeof frame.text !== 'string') throw new Error(`${row.key}: the text of frame ${i} is not text`)
       let number = i + 1
@@ -123,10 +131,14 @@ function extractStories(rows: Row[], ref: ResourceRef, issues: string[]): ObsSto
         if (typeof frame.imageUrl !== 'string') throw new Error(`${row.key}: the image of frame ${i} is not text`)
         if (frame.imageUrl !== '') out.image = frame.imageUrl
       }
-      return out
-    })
+      if (number > MAX_FRAME) {
+        issues.push(`${where}: frame ${i} has the number ${number}, above ${MAX_FRAME}: left out`)
+        continue
+      }
+      frames.push(out)
+    }
     if (frames.length === 0) {
-      issues.push(`${where} has no frames: left out`)
+      issues.push(`${where} has no frames${content.frames.length > 0 ? ' that can be kept' : ''}: left out`)
       continue
     }
     const numbers = new Set<number>()
@@ -180,6 +192,21 @@ function extractHelps(rows: Row[], ref: ResourceRef, kind: HelpsKind, issues: st
 }
 
 /**
+ * Puts one line in `issues` for the OBS helps that have rows when there are no stories to point to: they are left out, and the
+ * language would otherwise lose them without a word.
+ */
+async function reportHelpsWithoutStories(source: RowSource, lang: string, resources: ResourceRef[], issues: string[]): Promise<void> {
+  const found: string[] = []
+  for (const kind of HELPS_KINDS) {
+    const ref = pick(resources, HELPS_SUBJECTS[kind], [])
+    if (ref === undefined) continue
+    const bookKey = `${PREFIXES[kind]}:${ref.key}:${OBS_BOOK}`
+    if ((await collect(source, lang, ref)).some((row) => row.key === bookKey || row.key.startsWith(`${bookKey}:`))) found.push(ref.key)
+  }
+  if (found.length > 0) issues.push(`The OBS helps ${found.join(', ')} have rows, and the language has no stories for them to point to: left out`)
+}
+
+/**
  * The Open Bible Stories of a language: its stories and the notes, questions and word links the source has of them, or
  * `null` when the language has no story rows.
  *
@@ -196,9 +223,11 @@ function extractHelps(rows: Row[], ref: ResourceRef, kind: HelpsKind, issues: st
 export async function extractObs(source: RowSource, lang: string, issues: string[] = []): Promise<ObsModel | null> {
   const resources = await source.resources(lang)
   const storiesRef = pick(resources, [STORIES_SUBJECT], issues)
-  if (storiesRef === undefined) return null
-  const stories = extractStories(await collect(source, lang, storiesRef), storiesRef, issues)
-  if (stories.length === 0) return null
+  const stories = storiesRef === undefined ? [] : extractStories(await collect(source, lang, storiesRef), storiesRef, issues)
+  if (storiesRef === undefined || stories.length === 0) {
+    await reportHelpsWithoutStories(source, lang, resources, issues)
+    return null
+  }
 
   const model: ObsModel = { lang, res: [], stories }
   const used: ResourceRef[] = [storiesRef]
@@ -225,6 +254,7 @@ const isCount = (value: unknown): value is number => typeof value === 'number' &
 function encodeStory(story: ObsStory, resIndex: ReadonlyMap<string, number>): CborValue {
   const where = `The story ${String(story.n)}`
   if (!isCount(story.n) || story.n < 1) throw new Error(`${where}: the number is not an integer from 1 to 2^53 - 1`)
+  if (story.n > MAX_STORY) throw new RangeError(`${where}: the number is above ${MAX_STORY}`)
   const res = resIndex.get(story.res)
   if (res === undefined) throw new Error(`${where} is of a resource that res does not list`)
   if (typeof story.title !== 'string') throw new Error(`${where} has no title`)
@@ -233,6 +263,7 @@ function encodeStory(story: ObsStory, resIndex: ReadonlyMap<string, number>): Cb
   const numbers = new Set<number>()
   const frames = story.frames.map((frame): CborValue => {
     if (!isCount(frame.n)) throw new Error(`${where}: a frame number is not an integer from 0 to 2^53 - 1`)
+    if (frame.n > MAX_FRAME) throw new RangeError(`${where}: the frame number ${frame.n} is above ${MAX_FRAME}`)
     if (numbers.has(frame.n)) throw new Error(`${where} has the frame ${frame.n} twice`)
     numbers.add(frame.n)
     if (typeof frame.text !== 'string') throw new Error(`${where}, frame ${frame.n}: the text is not text`)
@@ -325,7 +356,7 @@ function helpsPart(name: string, table: ObsHelpTable, resIndex: ReadonlyMap<stri
  * header's `res` is the model's, as it is: the caller gives the release tag of each resource (`v42`), not its whole stamp.
  *
  * Throws `Error` when the model is not one the segment can hold: no resource or one twice, a story or a table of a resource the
- * header does not list, a story number twice or below 1, a story without frames, a frame number twice, a row without id or with an
+ * header does not list, a story number twice or below 1, `RangeError` for a story number above 50 or a frame number above 99, a story without frames, a frame number twice, a row without id or with an
  * id twice, a frame that is not a whole number, a column of mixed values.
  */
 export function obsSegment(m: ObsModel): Segment {
