@@ -85,6 +85,7 @@ describe('frame references', () => {
     expect(parseFrameRef('1:3')).toBe(103)
     expect(parseFrameRef('50:16')).toBe(5016)
     expect(parseFrameRef(' 10:3 ')).toBe(1003)
+    expect(parseFrameRef('51:1')).toBeNull()
   })
 
   test('intro, front and 0 as the frame are frame 0', () => {
@@ -181,7 +182,7 @@ describe('extractObs', () => {
     expect(issues).toEqual([`${OBS} story 2: the row says it is story 5; the number of the key is used`, `${OBS} story 3 has no frames: left out`])
   })
 
-  test('the notes: ids, frames, concept, escapes and links; a repeated id gets ~2; a reference that cannot be read puts the row at frame 0', async () => {
+  test('the notes: ids, frames, concept, escapes and links; a repeated id gets ~2; a reference that cannot be read leaves the row out', async () => {
     const { model, issues } = await build([
       { ref: obsRef(), rows: [story10()] },
       { ref: tnRef(), rows: tnRows() },
@@ -196,7 +197,6 @@ describe('extractObs', () => {
       ['ef56', '10:intro', 1000],
       ['gh78', '10:front', 1000],
       ['ij90', '10:0', 1000],
-      ['kl12', 'see below', 0],
       ['ab12~2', '10:3', 1003],
     ])
     expect(notes.rows[1]).toEqual({
@@ -210,7 +210,7 @@ describe('extractObs', () => {
     expect(notes.rows[2]).toEqual({ id: 'cd34', ref: '10:03', frame: 1003, cols: { tags: 'x', quote: '', occurrence: '0', note: 'padded' } })
     expect(notes.rows[3].cols).toEqual({ tags: '', supportReference: 'translate/figs-x', quote: '', occurrence: '0', note: 'intro', isIntro: true })
     expect(notes.rows[3].concept).toBeUndefined()
-    expect(issues).toContain(`${TN} kl12: the reference "see below" is not story:frame; the row is placed at frame 0`)
+    expect(issues).toContain(`${TN} kl12: the reference "see below" is not story:frame; the row is left out`)
     expect(issues).toContain(`${TN} ab12~2: the id "ab12" is in the source twice; this row is "ab12~2"`)
     expect(issues.some((line) => line.includes('ef56') && line.includes('is not an address that becomes a concept'))).toBe(true)
   })
@@ -227,7 +227,7 @@ describe('extractObs', () => {
     const onlyBook = await build([{ ref: obsRef(), rows: [story01()] }, { ref: tnRef(), rows: [whole] }])
     expect(onlyBook.model!.notes!.rows.map((r) => [r.id, r.frame])).toEqual([['aa11', 502]])
     const both = await build([{ ref: obsRef(), rows: [story01()] }, { ref: tnRef(), rows: [whole, ...tnRows()] }])
-    expect(both.model!.notes!.rows).toHaveLength(8)
+    expect(both.model!.notes!.rows).toHaveLength(7)
   })
 
   test('the questions and the links', async () => {
@@ -325,7 +325,6 @@ const model = (): ObsModel => ({
     rows: [
       { id: 'ab12', ref: '10:3', frame: 1003, concept: 'ta:translate/figs-metaphor', cols: { tags: '', quote: 'hardened', occurrence: '1', note: 'A figure.\nSee [[ta:translate/figs-simile]].' } },
       { id: 'cd34', ref: '10:03', frame: 1003, cols: { tags: 'x', quote: '', occurrence: '0', note: 'padded', isIntro: false } },
-      { id: 'kl12', ref: 'see below', frame: 0, cols: { tags: '', quote: '', occurrence: '0', note: 'unreadable' } },
     ],
   },
   questions: { res: TQ, rows: [{ id: 'q001', ref: '10:2', frame: 1002, cols: { tags: '', quote: '', occurrence: '0', question: 'Who?', response: 'God.' } }] },
@@ -355,10 +354,10 @@ describe('obsSegment', () => {
     })
     const notes = seg.t.notes as Record<string, unknown>
     expect(Object.keys(notes).sort()).toEqual(['cols', 'concept', 'frame', 'id', 'n', 'refText', 'res'])
-    // The canonical text is not stored; the padded one and the unreadable one are.
-    expect(notes.refText).toEqual([[1, '10:03'], [2, 'see below']])
+    // The canonical text is not stored; the padded one is.
+    expect(notes.refText).toEqual([[1, '10:03']])
     expect(notes.res).toBe(3)
-    expect(notes.n).toBe(3)
+    expect(notes.n).toBe(2)
   })
 
   test('a model without helps has the two required tables only; the strings table is there and empty', async () => {
@@ -424,7 +423,7 @@ describe('obsSegment', () => {
       { id: 'a003', ref: '10:0', frame: 1000, cols: { note: 'x' } },
       { id: 'a004', ref: '10:front', frame: 1000, cols: { note: 'x' } },
       { id: 'a005', ref: '10:03', frame: 1003, cols: { note: 'x' } },
-      { id: 'a006', ref: '', frame: 0, cols: { note: 'x' } },
+      { id: 'a006', ref: '', frame: 1003, cols: { note: 'x' } },
     ]
     const { seg, view } = await roundTrip(m)
     expect((seg.t.notes as Record<string, unknown>).refText).toEqual([[2, '10:0'], [3, '10:front'], [4, '10:03'], [5, '']])

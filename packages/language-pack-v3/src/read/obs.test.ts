@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { obsSegment } from '../build/obs'
+import { encodeUvarints } from '../codec/columns'
 import { readSegment, type Segment, writeSegment } from '../codec/container'
 import { FormatError } from '../codec/errors'
 import type { ObsModel } from '../model'
 import { OBS_TABLES, obsView } from './obs'
+import { readerOutput } from './output'
 
 const OBS = 'unfoldingWord/en/obs'
 const TN = 'unfoldingWord/en/obs-tn'
@@ -167,4 +169,30 @@ describe('obsView', () => {
       expect((error as FormatError).code).toBe('E_BODY')
     })
   }
+})
+
+describe('obsView: limits', () => {
+  const frameOf = async (frame: number) => {
+    const seg = fresh()
+    notes(seg).frame = encodeUvarints([frame, 1003])
+    return readerOutput((await writeSegment(seg)).bytes)
+  }
+
+  test('a help row in story 51 (frame 5101) is E_BODY', async () => {
+    expect(await frameOf(5101)).toEqual({ error: 'E_BODY' })
+  })
+
+  test('a help row in story 0 is E_BODY', async () => {
+    expect(await frameOf(99)).toEqual({ error: 'E_BODY' })
+  })
+
+  test('frame 1003 and the edges 100 and 5099 read', async () => {
+    for (const frame of [1003, 100, 5099, 5000]) expect(await frameOf(frame)).not.toHaveProperty('error')
+  })
+
+  test('a table that declares more rows than ulen is E_BODY', () => {
+    const seg = fresh()
+    seg.ulen = notes(seg).n - 1
+    expect(() => obsView(seg)).toThrow(expect.objectContaining({ code: 'E_BODY' }))
+  })
 })

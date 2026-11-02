@@ -80,7 +80,8 @@ export type LogicalHeader = {
   res?: [string, string][]
 }
 
-export type Segment = { h: LogicalHeader; t: Record<string, CborValue> }
+/** `ulen` is the length of the body; `readSegment` sets it so the views can bound a table's row count by it. */
+export type Segment = { h: LogicalHeader; t: Record<string, CborValue>; ulen?: number }
 
 // Small helpers
 
@@ -365,7 +366,10 @@ export async function readSegment(
   }
   for (const name of skipped) delete parsed.t[name]
 
-  return { seg: { h: parsed.logical, t: parsed.t }, id, header, skipped }
+  // `ulen` is not an enumerable key: a segment read equals the segment written, and only the views look at it.
+  const seg: Segment = { h: parsed.logical, t: parsed.t }
+  Object.defineProperty(seg, 'ulen', { value: fields.ulen, enumerable: false })
+  return { seg, id, header, skipped }
 }
 
 // Writer

@@ -198,7 +198,7 @@ export type ObsStory = { res: string; n: number; title: string; reference?: stri
 
 /**
  * A note, question, word link, study note or study question of Open Bible Stories (`obs.cddl`, `obs-helps`). `frame` is
- * story × 100 + frame (frame 0 is the story's title or introduction, and the place of a row whose reference cannot be read);
+ * story × 100 + frame (frame 0 is the story's title or introduction);
  * `ref` is the reference text as published (`10:3`, or `10:03`); `cols` and `concept` are as in {@link HelpRow}.
  */
 export type ObsHelpRow = { id: string; ref: string; frame: number; concept?: string; cols: Record<string, string | boolean> }

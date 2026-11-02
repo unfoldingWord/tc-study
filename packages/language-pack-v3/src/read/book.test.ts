@@ -427,3 +427,26 @@ describe('bookView: notes, questions, links and quotes', () => {
     ])
   })
 })
+
+describe('bookView: row counts', () => {
+  test('a notes table that declares n = ulen + 1 is E_BODY', () => {
+    const s = fresh2()
+    s.ulen = notesT(s).n - 1
+    expect(() => bookView(s)).toThrow(expect.objectContaining({ code: 'E_BODY' }))
+  })
+
+  test('n = ulen is fine, and a segment with no ulen is not checked', () => {
+    const s = fresh2()
+    s.ulen = 1_000_000
+    expect(bookView(s)).toEqual(withHelps)
+    delete s.ulen
+    expect(bookView(s)).toEqual(withHelps)
+  })
+
+  test('readSegment passes ulen to the view', async () => {
+    const { bytes } = await writeSegment(fresh2())
+    const { seg } = await readSegment(bytes, { known: BOOK_TABLES })
+    expect(typeof seg.ulen).toBe('number')
+    expect(bookView(seg)).toEqual(withHelps)
+  })
+})
