@@ -70,7 +70,7 @@ function readConcepts(value: unknown, res: [string, string][]): Map<string, Conc
 function readRelations(value: unknown, ids: string[], res: [string, string][]): Relation[] {
   const r = table(value, 'relations')
   const types = texts(r.types, 'relations.types')
-  const from = column(r.from, 'relations.from')
+  const from = column(r.from, 'the from column of relations')
   const to = column(r.to, 'relations.to')
   const type = column(r.type, 'relations.type')
   const source = column(r.source, 'relations.source')
