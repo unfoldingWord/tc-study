@@ -149,3 +149,74 @@ export type ArticleModel = {
   aliases?: string[]
   sections: SectionModel[]
 }
+
+/**
+ * A sense of a lexicon entry (`spec/cddl/lex.cddl`, `lex-sense`), as the lexicon publishes it. `refs` are verse ranges
+ * `[from, to]` (both included) in the original's numbering.
+ */
+export type LexSense = {
+  code?: string
+  definition?: string
+  glosses?: string[]
+  domain?: string
+  domainCode?: string
+  comments?: string
+  etymology?: string
+  lang?: string
+  definitionLang?: string
+  refs?: [number, number][]
+}
+
+/**
+ * An entry of the lexicon (`lex.cddl`, `lex-entry`). `res` is the key of the resource that published it
+ * (`es-419_gl/es-419/ugl`); `strong` is as the lexicon publishes it (`G976`, `H0001`, `G127a`). `brief` and `long` belong to
+ * the file the entry came from, and every entry of that file has them.
+ */
+export type LexEntry = {
+  res: string
+  strong: string
+  lemma: string
+  brief?: string
+  long?: string
+  pos?: string[]
+  senses: LexSense[]
+  notes?: string[]
+  aramaic?: boolean
+  source?: string
+  review?: string
+}
+
+/** A frame of an Open Bible Story (`spec/cddl/obs.cddl`, `frame`): `text` is minimal markdown, `image` the image's URL as published. */
+export type ObsFrame = { n: number; text: string; image?: string }
+
+/**
+ * A story of Open Bible Stories (`obs.cddl`, `story`). `res` is the key of the resource (`unfoldingWord/en/obs`), `reference` the
+ * closing line as published. `refs` (the same as verse ranges) is in the schema and the builder does not build it yet.
+ */
+export type ObsStory = { res: string; n: number; title: string; reference?: string; refs?: [number, number][]; frames: ObsFrame[] }
+
+/**
+ * A note, question, word link, study note or study question of Open Bible Stories (`obs.cddl`, `obs-helps`). `frame` is
+ * story × 100 + frame (frame 0 is the story's title or introduction, and the place of a row whose reference cannot be read);
+ * `ref` is the reference text as published (`10:3`, or `10:03`); `cols` and `concept` are as in {@link HelpRow}.
+ */
+export type ObsHelpRow = { id: string; ref: string; frame: number; concept?: string; cols: Record<string, string | boolean> }
+
+/** The rows of one helps resource of Open Bible Stories, in the order of the source. */
+export type ObsHelpTable = { res: string; rows: ObsHelpRow[] }
+
+/**
+ * The Open Bible Stories segment of a language (`obs.cddl`). `res` is exactly what the header holds: the key of each resource
+ * and its release tag. A story or a table names its resource by the key. Study notes and study questions have no rows in
+ * format 2.0: only a model can carry them.
+ */
+export type ObsModel = {
+  lang: string
+  res: [string, string][]
+  stories: ObsStory[]
+  notes?: ObsHelpTable
+  questions?: ObsHelpTable
+  links?: ObsHelpTable
+  studyNotes?: ObsHelpTable
+  studyQuestions?: ObsHelpTable
+}

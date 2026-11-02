@@ -1,0 +1,161 @@
+[
+ {
+  "layer": "sot",
+  "key": "es-419_gl/es-419/uhl/content/230.json",
+  "value": {
+   "brief": "promulgado",
+   "entries": [
+    {
+     "aramaic": true,
+     "lemma": "אַזְדָּא",
+     "pos": [
+      "adv."
+     ],
+     "senses": [
+      {
+       "domain": "Pensar",
+       "glosses": [
+        "promulgado"
+       ]
+      }
+     ],
+     "strong": "H0230"
+    }
+   ],
+   "long": "promulgado"
+  }
+ },
+ {
+  "layer": "sot",
+  "key": "es-419_gl/es-419/uhl/content/1791.json",
+  "value": {
+   "brief": "esto",
+   "entries": [
+    {
+     "aramaic": true,
+     "lemma": "דֵּךְ",
+     "pos": [
+      "pron. dem."
+     ],
+     "senses": [
+      {
+       "domain": "Identificadores",
+       "domainCode": "004003",
+       "glosses": [
+        "esto",
+        "esta"
+       ],
+       "refs": {
+        "EZR": "5:16,17;6:7,8,12"
+       }
+      }
+     ],
+     "strong": "H1791a"
+    },
+    {
+     "aramaic": true,
+     "lemma": "דָּךְ",
+     "pos": [
+      "pron. dem."
+     ],
+     "senses": [
+      {
+       "domain": "Identificadores",
+       "domainCode": "004003",
+       "glosses": [
+        "esto",
+        "esta"
+       ],
+       "refs": {
+        "EZR": "4:13,15,16,19,21;5:8"
+       }
+      }
+     ],
+     "strong": "H1791b"
+    }
+   ],
+   "long": "1) esto, esta 2) esto, esta"
+  }
+ },
+ {
+  "layer": "sot",
+  "key": "es-419_gl/es-419/uhl/content/3179.json",
+  "value": {
+   "brief": "estar en celo, concebir",
+   "entries": [
+    {
+     "lemma": "יחם",
+     "pos": [
+      "verbo"
+     ],
+     "senses": [
+      {
+       "definition": "= proceso en el que los animales hembra se encuentran en el estado físico requerido para concebir",
+       "domain": "Copular",
+       "domainCode": "002003001004",
+       "glosses": [
+        "estar en celo"
+       ],
+       "refs": {
+        "GEN": "30:38,39,41;31:10"
+       }
+      },
+      {
+       "definition": "= proceso en el que las mujeres humanas quedan embarazadas",
+       "domain": "Embarazada",
+       "domainCode": "002001001045",
+       "glosses": [
+        "concebir"
+       ],
+       "refs": {
+        "PSA": "51:7"
+       }
+      }
+     ],
+     "strong": "H3179"
+    }
+   ],
+   "long": "1) = proceso en el que los animales hembra se encuentran en el estado físico requerido para concebir: estar en celo 2) = proceso en el que las mujeres humanas quedan embarazadas: concebir"
+  }
+ },
+ {
+  "layer": "sot",
+  "key": "es-419_gl/es-419/uhl/content/7095.json",
+  "value": {
+   "brief": "forma, pie",
+   "entries": [
+    {
+     "lemma": "קֶצֶב",
+     "pos": [
+      "sust. m."
+     ],
+     "senses": [
+      {
+       "definition": "= apariencia externa de un objeto",
+       "domain": "Forma",
+       "domainCode": "002001001052",
+       "glosses": [
+        "forma"
+       ],
+       "refs": {
+        "1KI": "6:25;7:37"
+       }
+      },
+      {
+       "definition": "su significado exacto es incierto; probablemente: = la extremidad más baja de un objeto de la naturaleza",
+       "glosses": [
+        "pie",
+        "raíz"
+       ],
+       "refs": {
+        "JON": "2:7"
+       }
+      }
+     ],
+     "strong": "H7095"
+    }
+   ],
+   "long": "1) = apariencia externa de un objeto: forma 2) su significado exacto es incierto; probablemente: = la extremidad más baja de un objeto de la naturaleza: pie, raíz"
+  }
+ }
+]
