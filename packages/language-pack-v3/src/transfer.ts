@@ -15,9 +15,10 @@
  */
 import type { BuiltSegment } from './build/catalog'
 import { type CborValue, encodeDeterministic } from './codec/cbor'
-import { CLASS_NAMES, FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, KIND_TRANSFER, readHeader, readSegment } from './codec/container'
+import { CLASS_NAMES, type ClassName, FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, KIND_TRANSFER, readHeader, readSegment } from './codec/container'
 import { FormatError, type FormatErrorCode } from './codec/errors'
 import { type CborMap, hasOwn, isMap } from './codec/values'
+import { CATALOG_TABLES } from './read/catalog'
 
 /** `\x89TLP`, as in `container.ts`. */
 const MAGIC = [0x89, 0x54, 0x4c, 0x50] as const
@@ -262,7 +263,7 @@ async function sha256(data: Uint8Array): Promise<Uint8Array> {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', data as Uint8Array<ArrayBuffer>))
 }
 
-/** The tables the segment's own header lists, so that no `E_TABLE` can arise: a transfer file is not a place to judge what a reader knows. */
+/** The tables the segment's own header lists: the check of its structure, with nothing a reader may not know. */
 function knownOf(h: CborValue): Record<string, number[]> {
   const known: Record<string, number[]> = {}
   const tables = isMap(h) ? h.tables : undefined
@@ -273,16 +274,34 @@ function knownOf(h: CborValue): Record<string, number[]> {
   return known
 }
 
-/** Checks one entry as if it had been downloaded (`container.md`); throws the {@link FormatError} it fails with. */
-async function verify(entry: TransferIndexEntry, data: Uint8Array): Promise<void> {
+/** The tables a reader knows, by class: what `readSegment` takes as `known`, for each class of segment. */
+export type KnownTables = Partial<Record<ClassName, Record<string, number[]>>>
+
+/**
+ * Checks one entry as if it had been downloaded (`container.md`, "Order of checks"); throws the {@link FormatError} it fails with.
+ * The id of the index is checked by `readSegment` where the container puts `E_ID`, after `E_INFLATE`.
+ *
+ * - A catalog is checked against {@link CATALOG_TABLES}, the tables `catalogView` understands.
+ * - Another segment is checked against `known[class]` (its own `h.class`; no tables if the class is missing) when `known` is given,
+ *   and against the tables its own header lists, which checks its structure only, when it is not.
+ */
+async function verify(entry: TransferIndexEntry, data: Uint8Array, isCatalog: boolean, known?: KnownTables): Promise<void> {
   if (entry.kind === 'complement') {
     if (hex(await sha256(data)) !== entry.id) throw new FormatError('E_ID', 'the sha256 of the complement is not the id in the index')
     return
   }
   const { kind, header } = readHeader(data)
   if (kind !== KIND_SEGMENT) throw new FormatError('E_KIND', 'the entry is a transfer file, not a segment file')
-  if (!(header.id instanceof Uint8Array) || hex(header.id) !== entry.id) throw new FormatError('E_ID', 'the id in the entry header is not the id in the index')
-  await readSegment(data, { known: knownOf(header.h), expectedId: entry.id })
+  let tables: Record<string, number[]>
+  if (isCatalog) {
+    tables = CATALOG_TABLES as Record<string, number[]>
+  } else if (known !== undefined) {
+    const cls = isMap(header.h) ? header.h.class : undefined
+    tables = typeof cls === 'string' && hasOwn(known, cls) ? (known[cls as ClassName] ?? {}) : {}
+  } else {
+    tables = knownOf(header.h)
+  }
+  await readSegment(data, { known: tables, expectedId: entry.id })
 }
 
 /**
@@ -298,10 +317,19 @@ async function verify(entry: TransferIndexEntry, data: Uint8Array): Promise<void
  *   {@link TransferEntry}. An entry that fails does not discard the others. `missing` lists, in order, the ids with status `missing`
  *   (the file ends before the entry's end, so every entry after the first one missing is missing too).
  *
- * A segment is `ok` when its header id is the index's, `readSegment` accepts it (with the tables its own header lists, and the id of the
- * index as `expectedId`) and its length is the entry's size; a complement is `ok` when the sha256 of its bytes is the index's id.
+ * A segment is `ok` when `readSegment` accepts it, with the id of the index as `expectedId` (so `E_ID` comes where the container puts
+ * it) and its length is the entry's size; a complement is `ok` when the sha256 of its bytes is the index's id.
+ *
+ * **Tables.** A catalog is always checked against the tables `catalogView` understands (`CATALOG_TABLES`): a catalog with a required
+ * table it does not know throws `E_TABLE`. With `opts.known`, every other segment is checked against `known[class]` as a receiver
+ * would: a class missing from `known` has no known tables, and a required table gives the status `E_TABLE`; an optional one is
+ * skipped. Without `opts.known` the check is of structure only (the segment is read with the tables its own header lists, so no
+ * `E_TABLE` can arise): pass `known` to verify as a receiver would.
  */
-export async function readTransfer(bytes: Uint8Array): Promise<{ index: TransferIndex; entries: TransferEntry[]; missing: string[] }> {
+export async function readTransfer(
+  bytes: Uint8Array,
+  opts?: { known?: KnownTables },
+): Promise<{ index: TransferIndex; entries: TransferEntry[]; missing: string[] }> {
   checkFixed(bytes)
   const { header, headerEnd } = readHeader(bytes)
   const index = parseIndex(header)
@@ -330,7 +358,7 @@ export async function readTransfer(bytes: Uint8Array): Promise<{ index: Transfer
     }
     const data = bytes.subarray(headerEnd + entry.offset, headerEnd + entry.offset + entry.size)
     try {
-      await verify(entry, data)
+      await verify(entry, data, i < index.catalogs.length, opts?.known)
       result.bytes = data
     } catch (error) {
       if (!(error instanceof FormatError)) throw error

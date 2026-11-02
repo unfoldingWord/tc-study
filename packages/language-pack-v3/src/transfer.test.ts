@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { type BuiltSegment, buildCatalog, builtSegment } from './build/catalog'
 import { origSegment, extractOrig } from './build/orig'
 import { type CborValue, decodeCbor, encodeDeterministic } from './codec/cbor'
-import { hex, readSegment } from './codec/container'
+import { hex, readHeader, readSegment } from './codec/container'
 import { FormatError } from './codec/errors'
 import type { About } from './model'
 import { partsSource } from './node/partsSource'
@@ -97,6 +97,21 @@ const flipped = (bytes: Uint8Array, at: number): Uint8Array => {
   out[at] ^= 0xff
   return out
 }
+
+/** A copy of a segment file whose deflate stream cannot be inflated: the first block is of the reserved type 3 (`E_INFLATE`). */
+const damaged = (bytes: Uint8Array): Uint8Array => {
+  const out = bytes.slice()
+  out[readHeader(bytes).headerEnd] = 0x07
+  return out
+}
+
+/** An obs segment with two tables no reader knows: `future-x` (required, version 9) and `future-y` (optional). */
+const futureObs = await builtSegment({ h: { class: 'obs', v: 1, tables: { 'future-x': [9, true], 'future-y': [3, false] }, lang: 'es-419' }, t: { 'future-x': [], 'future-y': [] } }, fingerprint(6))
+/** An obs segment with an optional table no reader knows and nothing else. */
+const optionalObs = await builtSegment({ h: { class: 'obs', v: 1, tables: { 'future-y': [3, false] }, lang: 'es-419' }, t: { 'future-y': [] } }, fingerprint(7))
+/** The catalog with these tables added (or changed, for a table it has) in its header: its own tables stay as they are. */
+const catalogWith = (tables: Record<string, [number, boolean]>, t: Record<string, CborValue>, n: number): Promise<BuiltSegment> =>
+  builtSegment({ h: { ...catalog.seg.h, tables: { ...catalog.seg.h.tables, ...tables } }, t: { ...catalog.seg.t, ...t } }, fingerprint(n))
 
 const full = () => writeTransfer({ mode: 'full', catalogs: [catalog], entries: [minimal, orig, complement], made: MADE, by: BY })
 
@@ -402,8 +417,7 @@ describe('readTransfer', () => {
       // A catalog with another id in the index, with the body changed, and one that is not a segment file at all.
       const wrongId = craft([{ ...CATALOG, id: fingerprint(3) }, MINIMAL])
       expect(await codeOf(readTransfer(wrongId))).toBe('E_ID')
-      const body = CATALOG.bytes.length - 3
-      expect(['E_INFLATE', 'E_ID']).toContain(await codeOf(readTransfer(craft([{ ...CATALOG, bytes: flipped(CATALOG.bytes, body) }, MINIMAL]))))
+      expect(await codeOf(readTransfer(craft([{ ...CATALOG, bytes: damaged(CATALOG.bytes) }, MINIMAL])))).toBe('E_INFLATE')
       expect(await codeOf(readTransfer(craft([{ ...CATALOG, bytes: new Uint8Array(40).fill(7) }, MINIMAL])))).toBe('E_MAGIC')
     })
   })
@@ -455,13 +469,28 @@ describe('readTransfer', () => {
   })
 
   describe('an entry that fails loses only itself', () => {
-    test('a body changed inside: E_ID or E_INFLATE, and the others are ok', async () => {
-      const bytes = craft([CATALOG, MINIMAL, { ...ORIG, bytes: flipped(ORIG.bytes, ORIG.bytes.length - 20) }, COMPLEMENT])
-      const read = await readTransfer(bytes)
-      expect(['E_ID', 'E_INFLATE']).toContain(read.entries[2].status)
-      expect(read.entries.map((e) => e.status).filter((_, i) => i !== 2)).toEqual(['ok', 'ok', 'ok'])
+    test('a deflate stream that cannot be inflated: E_INFLATE, and the others are ok', async () => {
+      const read = await readTransfer(craft([CATALOG, MINIMAL, { ...ORIG, bytes: damaged(ORIG.bytes) }, COMPLEMENT]))
+      expect(read.entries.map((e) => e.status)).toEqual(['ok', 'ok', 'E_INFLATE', 'ok'])
       expect(read.entries[2].bytes).toBeUndefined()
       expect(read.missing).toEqual([])
+    })
+
+    test('a body that is not the one of the id the file header and the index agree on: E_ID', async () => {
+      // The id is changed in the file header and in the index alike (as bad-id.seg does for a file): the body hashes to another id.
+      const at = Buffer.from(ORIG.bytes).indexOf(bytesOfHex(orig.id))
+      const altered = flipped(ORIG.bytes, at)
+      const read = await readTransfer(craft([CATALOG, { ...ORIG, id: hex(altered.subarray(at, at + 32)), bytes: altered }, MINIMAL]))
+      expect(read.entries.map((e) => e.status)).toEqual(['ok', 'E_ID', 'ok'])
+    })
+
+    test('an entry with two defects gives the first of the container: E_INFLATE comes before E_ID', async () => {
+      // The index gives another id to the entry, and its deflate stream is damaged.
+      const read = await readTransfer(craft([CATALOG, { ...MINIMAL, id: fingerprint(4), bytes: damaged(MINIMAL.bytes) }, ORIG]))
+      expect(read.entries.map((e) => e.status)).toEqual(['ok', 'E_INFLATE', 'ok'])
+      // The same entry with an intact stream gives E_ID.
+      const intact = await readTransfer(craft([CATALOG, { ...MINIMAL, id: fingerprint(4) }, ORIG]))
+      expect(intact.entries[1].status).toBe('E_ID')
     })
 
     test('the id in the file header is not the index’s: E_ID', async () => {
@@ -495,10 +524,75 @@ describe('readTransfer', () => {
       expect(read.entries.map((e) => e.status)).toEqual(['ok', 'E_TRUNCATED', 'E_TRAILING', 'ok'])
     })
 
-    test('a segment with a table the reader does not know, required or not, is ok: no E_TABLE inside a transfer file', async () => {
-      const future = await builtSegment({ h: { class: 'obs', v: 1, tables: { 'future-x': [9, true], 'future-y': [3, false] }, lang: 'es-419' }, t: { 'future-x': [], 'future-y': [] } }, fingerprint(6))
-      const read = await readTransfer(craft([CATALOG, specOf(future)]))
-      expect(read.entries.map((e) => e.status)).toEqual(['ok', 'ok'])
+    describe('the tables of the entries', () => {
+      const statuses = async (specs: Spec[], opts?: Parameters<typeof readTransfer>[1]) => (await readTransfer(craft(specs), opts)).entries.map((e) => e.status)
+
+      test('without known an entry is read with the tables its own header lists: structure only, no E_TABLE', async () => {
+        expect(await statuses([CATALOG, specOf(futureObs), specOf(optionalObs)])).toEqual(['ok', 'ok', 'ok'])
+      })
+
+      test('with known, an entry with a required table the class does not know has the status E_TABLE', async () => {
+        expect(await statuses([CATALOG, specOf(futureObs), MINIMAL], { known: { obs: {}, book: BOOK_TABLES } })).toEqual(['ok', 'E_TABLE', 'ok'])
+        // Known, but not in that version.
+        expect(await statuses([CATALOG, specOf(futureObs)], { known: { obs: { 'future-x': [1], 'future-y': [3] } } })).toEqual(['ok', 'E_TABLE'])
+      })
+
+      test('with known, a class missing from known has no known tables', async () => {
+        expect(await statuses([CATALOG, specOf(futureObs)], { known: {} })).toEqual(['ok', 'E_TABLE'])
+        expect(await statuses([CATALOG, MINIMAL, ORIG], { known: { book: BOOK_TABLES } })).toEqual(['ok', 'ok', 'E_TABLE'])
+        expect(await statuses([CATALOG, MINIMAL], { known: {} })).toEqual(['ok', 'E_TABLE'])
+      })
+
+      test('with known, the tables of the class are the ones that count', async () => {
+        expect(await statuses([CATALOG, specOf(futureObs)], { known: { obs: { 'future-x': [9] } } })).toEqual(['ok', 'ok'])
+        expect(await statuses([CATALOG, MINIMAL], { known: { book: BOOK_TABLES } })).toEqual(['ok', 'ok'])
+      })
+
+      test('with known, an optional table that is not known is skipped: ok', async () => {
+        expect(await statuses([CATALOG, specOf(optionalObs)], { known: { obs: {} } })).toEqual(['ok', 'ok'])
+        expect(await statuses([CATALOG, specOf(optionalObs)], { known: {} })).toEqual(['ok', 'ok'])
+      })
+
+      test('known does not change what a catalog is read with: always the tables of catalogView', async () => {
+        expect(await statuses([CATALOG], { known: {} })).toEqual(['ok'])
+        expect(await statuses([CATALOG], { known: { catalog: {} } })).toEqual(['ok'])
+      })
+
+      test('a catalog with a required table catalogView does not know throws E_TABLE, whatever known says', async () => {
+        const future = await catalogWith({ 'future-z': [1, true] }, { 'future-z': [] }, 30)
+        expect(await codeOf(readTransfer(craft([specOf(future), MINIMAL])))).toBe('E_TABLE')
+        expect(await codeOf(readTransfer(craft([specOf(future), MINIMAL]), { known: { catalog: { 'future-z': [1] } } }))).toBe('E_TABLE')
+      })
+
+      test('a catalog with a required table in a version catalogView does not know throws E_TABLE', async () => {
+        const future = await catalogWith({ about: [2, true] }, {}, 31)
+        expect(await codeOf(readTransfer(craft([specOf(future), MINIMAL])))).toBe('E_TABLE')
+      })
+
+      test('a catalog with an optional table catalogView does not know is ok', async () => {
+        const future = await catalogWith({ 'future-z': [1, false] }, { 'future-z': [] }, 32)
+        const read = await readTransfer(craft([specOf(future), MINIMAL]))
+        expect(read.entries.map((e) => e.status)).toEqual(['ok', 'ok'])
+      })
+    })
+
+    describe('an index with sizes at the limit of the integers', () => {
+      const MAX = Number.MAX_SAFE_INTEGER
+
+      test('a last entry that ends at 2^53 - 1 is missing', async () => {
+        const read = await readTransfer(craft([CATALOG, { ...MINIMAL, size: MAX - CATALOG.bytes.length }]))
+        expect(read.entries.map((e) => e.status)).toEqual(['ok', 'missing'])
+        expect(read.missing).toEqual([minimal.id])
+      })
+
+      test('sizes that add up to more than 2^53 - 1 are E_HEADER', async () => {
+        expect(await codeOf(readTransfer(craft([CATALOG, { ...MINIMAL, size: MAX - CATALOG.bytes.length + 1 }])))).toBe('E_HEADER')
+        expect(await codeOf(readTransfer(craft([{ ...CATALOG, size: MAX }, MINIMAL])))).toBe('E_HEADER')
+      })
+
+      test('a catalog of 2^53 - 1 bytes is E_TRUNCATED', async () => {
+        expect(await codeOf(readTransfer(craft([{ ...CATALOG, size: MAX }])))).toBe('E_TRUNCATED')
+      })
     })
 
     test('a complement: ok when its sha256 is the id, E_ID when a byte changed', async () => {
@@ -527,7 +621,6 @@ describe('readTransfer', () => {
     const started = performance.now()
     const read = await readTransfer(bytes)
     const elapsed = performance.now() - started
-    console.log(`transfer file of 300 small entries: ${bytes.length} bytes, read in ${elapsed.toFixed(0)} ms`)
     expect(read.entries).toHaveLength(301)
     expect(read.entries.every((e) => e.status === 'ok')).toBe(true)
     expect(elapsed).toBeLessThan(1000)
