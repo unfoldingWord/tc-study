@@ -658,3 +658,48 @@ The phase passes when:
 - the bridge converts today's Titus with the same counts and the same id (Task 12).
 
 Then the controller asks Abel to push and to open the PR, and Abel merges it.
+
+## Deviations from this plan
+
+What the work changed while it was built, from the rulings taken task by task (the text above is left as it was written; where the two differ, the
+specification in `packages/language-pack-v3/spec/` and the code win).
+
+- **Commit trailer.** `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`, not "Claude Opus 5.5".
+- **Task 1 test constant.** The UTF-8 length of "ἀνέγκλητος" is 21, so the lengths are `[0, 5, 21]`, not 20.
+- **cbor-x dropped.** It reads a float64 `1.0` as 1 and returns `Buffer`, so it cannot tell a body that breaks "no floats". `codec/cbor.ts` is a
+  strict encoder and decoder written by hand; cbor-x is out of `package.json` and `bun.lock`. The decoder rejects every float width, tags, `null`,
+  `undefined`, indefinite lengths, repeated keys, and returns plain `Uint8Array`.
+- **Nesting 64, not 16.** Real MACULA trees of Titus are 14 deep and the container adds 3 levels. `MAX_DEPTH` and the spec (Limits, Order of checks) say 64.
+  Integers have one range, -(2^53 - 1) .. 2^53 - 1, in the encoder, the decoder and the spec (final fix).
+- **Stamps.** The stamp of an `orig` book is its git blob as format 2.0 records it (`bookBlobs` of the originals list: `g` and 10 hex digits), exposed as
+  `ResourceRef.bookStamps`; without blobs it is the release tag (the part before `#`). The `res` entries of the headers carry the release tag only.
+- **The blank piece and case 4.** The builder puts one `" "` piece between two word pieces that follow each other, so joining the pieces gives the text.
+  `book.cddl` and the case 4 counts change (GLT 1 416 to 1 913 pieces, GST 3 075 to 3 471). `align` is written when some word has a position or
+  `alignMissing` has an entry.
+- **Registry fields.** An entry of the section registry keeps `trigrams` (sorted distinct 32-bit prefixes of the sha256 of each word trigram) beside
+  `fingerprint`, because matching rule 3 needs the old text's trigrams; `codec/sha256.ts` is a synchronous sha256 for it. The key is the article path
+  `{resource key}/{id}`. `extractArticles(source, lang, registry = {})` returns `{ groups, registry }`.
+- **Lowercase ids.** Article ids are lowercased and never skipped (`ta:translate/figs-orderheb`), with one report line per id. The tA subtitle is the
+  `##` line right after the title.
+- **Catalog rulings.** The catalog model mirrors `catalog.cddl` (ids and book sets as bytes, hex only in `BuiltSegment` and in reader output); segments are
+  ordered by class, book, part and group; two segments for one unit id are an error except `map`/`xmap`. `buildLanguage` takes `requires`; `ResourceRef`
+  may carry `title`, `license`, `rights` and `attribution`, and the catalog maps a license text to its SPDX id.
+- **Transfer entries and `known`.** `readTransfer` returns every index entry with a status (`ok`, `missing` or an error code) and the bytes only when `ok`;
+  `tests/README.md` defines the output of a transfer file and case 10 expects case 4's entry `missing` (activating units is the app's). `opts.known`
+  checks entries as a receiver would; a class with no known tables (`map`, `xmap`, `gen`) is `E_TABLE`. A `catalogs` entry of the index must say class
+  `catalog` (`E_HEADER`), and a catalog entry whose own class is not `catalog` is `E_BODY`.
+- **Body root.** `h` and `t` are required and other root keys are ignored, like unknown header keys.
+- **Dangling `needs: "map"`.** Kept as the plan and `catalog.md` say until phase 2 builds the `map` unit: a phase 1 catalog cannot activate a book on a strict
+  device, so none is published.
+- **Phase 1 readers.** Both decode `book`, `orig`, `art`, `lex`, `obs`, `catalog` and transfer files; `map`, `xmap` and `gen` come in phase 2 (their `KNOWN`
+  list is empty).
+- **The cases.** Each case is a folder under `spec/tests/` with its `.seg` or `.tcpack` and an `.expected.json`; `build-cases.ts` builds and freezes them
+  and refuses to overwrite; `compare.ts` runs both readers; cases 6, 11 and 12 and the map half of case 5 wait for phase 2; case 14 (an integer out of range)
+  was added.
+- **Source exports of the package.** `main`, `module`, `types` and `exports` of `package.json` point at the sources (`./src/index.ts`, `./node/partsSource`
+  to `./src/node/partsSource.ts`), as `resource-pipeline` does, so consumers need no build; the package `.gitignore` un-ignores `src/build/`.
+- **Helps and lexicon.** `extractHelps` and `extractBook` take an optional `issues` list for report lines; an unreadable reference never drops a row. The
+  Hebrew numbering table is a read-only copy (CC BY-SA 4.0) with its inverse; lexicon `strong` is kept as published, `brief` and `long` go on every
+  entry of a file, six more optional lexicon keys are in `lex.cddl`; OBS story `refs` are not built in phase 1.
+- **Reviews and checks.** Each implementer also runs `bun run type-check` in the package. The review of Task 3 was done by Opus and the one of Task 13 by Codex
+  and Sonnet together.
