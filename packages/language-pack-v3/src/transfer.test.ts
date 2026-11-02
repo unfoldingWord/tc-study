@@ -286,6 +286,19 @@ describe('readTransfer', () => {
   })
 
   describe('rejects the whole file with', () => {
+    test('E_HEADER: an integer outside -(2^53 - 1) .. 2^53 - 1 in a key of the index it does not know', async () => {
+      // The index of a file with a key "zz" holding 0 (0x62 0x7a 0x7a 0x00), the 0 replaced by the bytes of the integer.
+      const good = craft([CATALOG, MINIMAL], (index) => void (index.zz = 0))
+      const length = new DataView(good.buffer).getUint32(8)
+      const index = good.subarray(12, 12 + length)
+      const at = index.findIndex((_, i) => index[i] === 0x62 && index[i + 1] === 0x7a && index[i + 2] === 0x7a && index[i + 3] === 0x00)
+      expect(at).toBeGreaterThan(0)
+      const withValue = (value: number[]) => assemble(Uint8Array.from([...index.subarray(0, at + 3), ...value, ...index.subarray(at + 4)]), [CATALOG.bytes, MINIMAL.bytes])
+      expect(await codeOf(readTransfer(withValue([0x1b, 0x10, 0, 0, 0, 0, 0, 0, 0])))).toBe('E_HEADER') // 2^60
+      expect(await codeOf(readTransfer(withValue([0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])))).toBe('E_HEADER') // -2^53
+      expect((await readTransfer(withValue([0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe]))).index.extra).toEqual({ zz: -(2 ** 53 - 1) })
+    })
+
     test('E_MAGIC, E_VERSION and E_KIND, in the order of the container', async () => {
       const bytes = full()
       expect(await codeOf(readTransfer(flipped(bytes, 0)))).toBe('E_MAGIC')

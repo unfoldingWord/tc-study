@@ -35,6 +35,8 @@ describe('the case files', () => {
       'container/bad-id.seg',
       'container/minimal.seg',
       'container/truncated.seg',
+      'entero-fuera-de-rango/body.seg',
+      'entero-fuera-de-rango/header.seg',
       'nota-varios-versiculos/book.seg',
       'paquete-viejo/catalog.seg',
       'seccion-insertada/build1.seg',
@@ -260,6 +262,13 @@ describe('case 10: transferencia-cortada', () => {
   })
 })
 
+describe('case 14: entero-fuera-de-rango', () => {
+  test('an integer outside -(2^53 - 1) .. 2^53 - 1 in a header key the reader does not know is E_HEADER; in an ignored root key of the body, E_BODY', async () => {
+    expect(await outputOf('entero-fuera-de-rango/header.seg')).toEqual({ error: 'E_HEADER' })
+    expect(await outputOf('entero-fuera-de-rango/body.seg')).toEqual({ error: 'E_BODY' })
+  })
+})
+
 describe('case 13: paquete-viejo', () => {
   test('the bridge gives the same book segment as case 4, with the same id and the same bytes', async () => {
     const fromPack = await bridgeBook()
@@ -338,6 +347,7 @@ describe('the cross-reader check (compare.ts)', () => {
       expect(run.text.trim().split('\n')).toEqual([
         'container/minimal.seg: $.texts[0].pieces[0][0]: TypeScript "Pablo" / Python "Pablox"',
         'container/truncated.seg: $.error: TypeScript "E_TRUNCATED" / Python "E_ID"',
+        'compare: left out until the Python reader has the integer-range rule (NOT_YET_IN_PYTHON): entero-fuera-de-rango/body.seg, entero-fuera-de-rango/header.seg',
         'compare: 12 files compared (12 cases), 2 mismatches',
       ])
     } finally {

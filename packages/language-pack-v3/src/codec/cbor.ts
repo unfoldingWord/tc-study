@@ -29,9 +29,9 @@ export class CborNestingError extends ColumnError {
   }
 }
 
-/** Integers go from -2^53 to 2^53 - 1, so that JavaScript reads them exactly. */
+/** Integers go from -(2^53 - 1) to 2^53 - 1, the same distance each way, so that JavaScript reads them exactly. */
 const MAX_INT = Number.MAX_SAFE_INTEGER // 2^53 - 1
-const MIN_INT = -(2 ** 53)
+const MIN_INT = -MAX_INT
 
 const TWO_32 = 2 ** 32
 
@@ -144,7 +144,7 @@ function encodeInto(out: Writer, value: unknown, depth: number): void {
   switch (typeof value) {
     case 'number': {
       if (!Number.isInteger(value) || value > MAX_INT || value < MIN_INT) {
-        throw new TypeError(`CBOR number ${String(value)} is not an integer between -2^53 and 2^53 - 1`)
+        throw new TypeError(`CBOR number ${String(value)} is not an integer between -(2^53 - 1) and 2^53 - 1`)
       }
       if (value >= 0) out.head(0, value)
       else out.head(1, -1 - value)
@@ -194,7 +194,7 @@ function encodeInto(out: Writer, value: unknown, depth: number): void {
 }
 
 /**
- * Encodes a value as core deterministic CBOR. Throws `TypeError` on a number that is not an integer between -2^53 and
+ * Encodes a value as core deterministic CBOR. Throws `TypeError` on a number that is not an integer between -(2^53 - 1) and
  * 2^53 - 1, on `null` and `undefined`, on text with a lone surrogate, on anything that is not a plain object, and on
  * nesting deeper than {@link MAX_DEPTH}.
  */
@@ -274,8 +274,12 @@ class Reader {
     switch (major) {
       case 0:
         return this.argument(info)
-      case 1:
-        return -1 - this.argument(info)
+      case 1: {
+        const n = this.argument(info)
+        // -1 - n goes below -(2^53 - 1) from n = 2^53 - 1: the range is the same on both sides.
+        if (n >= MAX_INT) throw new ColumnError('CBOR: integer below -(2^53 - 1)')
+        return -1 - n
+      }
       case 2:
         return this.take(this.argument(info))
       case 3:
@@ -334,7 +338,7 @@ class Reader {
 /**
  * Decodes one CBOR item that is a {@link CborValue}. Byte strings come back as plain `Uint8Array`. Throws
  * {@link ColumnError} on floats (in every width, even for a whole number), tags, `null`, `undefined`, other simple
- * values, integers outside -2^53 .. 2^53 - 1, indefinite lengths, map keys that are not text or are repeated, text that
+ * values, integers outside -(2^53 - 1) .. 2^53 - 1, indefinite lengths, map keys that are not text or are repeated, text that
  * is not valid UTF-8, nesting deeper than {@link MAX_DEPTH}, data cut short and bytes after the item.
  *
  * It does not check that heads are the shortest form or that map keys are sorted: the identity of a body is the

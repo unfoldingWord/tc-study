@@ -603,6 +603,16 @@ describe('the body', () => {
     expect(await codeOf(read(await fileFromBody(body)))).toBe('E_BODY')
   })
 
+  test('E_BODY: an extra root key is decoded too (an integer out of range in it)', async () => {
+    for (const value of [[0x1b, 0x10, 0, 0, 0, 0, 0, 0, 0], [0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]]) {
+      const body = cborBytes([0xa3], text('h'), goodH, text('t'), goodT, text('x'), value)
+      expect(await codeOf(read(await fileFromBody(body)))).toBe('E_BODY')
+    }
+    // The ends of the range are fine.
+    const edge = cborBytes([0xa3], text('h'), goodH, text('t'), goodT, text('x'), [0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe])
+    expect((await read(await fileFromBody(edge))).seg.h.class).toBe('book')
+  })
+
   // `container.md`, "What a reader accepts": what is rejected anywhere, and what only builders are bound by.
   const unacceptable: [string, number[]][] = [
     ['an indefinite array', [0x9f, 0x01, 0xff]],
@@ -618,6 +628,8 @@ describe('the body', () => {
     ['another simple value', [0xf0]],
     ['a map key that is not text', [0xa1, 0x01, 0x02]],
     ['a map with a key twice', [0xa2, 0x61, 0x61, 0x01, 0x61, 0x61, 0x02]],
+    ['an integer above 2^53 - 1 (2^60)', [0x1b, 0x10, 0, 0, 0, 0, 0, 0, 0]],
+    ['-2^53, one below -(2^53 - 1)', [0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]],
   ]
 
   test('E_BODY: every kind of CBOR the format does not use is rejected inside an unknown optional table', async () => {

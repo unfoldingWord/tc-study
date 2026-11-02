@@ -18,6 +18,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { deflateRaw } from 'pako'
 import { bridgeZip } from '../../src/bridge/fromV2'
 import { articleResources, artSegment, extractArticles } from '../../src/build/art'
 import { bookSegment } from '../../src/build/book'
@@ -25,8 +26,9 @@ import { type BuiltSegment, buildCatalog, builtSegment } from '../../src/build/c
 import { BUILDER, buildCommon, buildLanguage, type LanguageBuild } from '../../src/build/language'
 import { extractObs, obsSegment } from '../../src/build/obs'
 import { extractOrig } from '../../src/build/orig'
+import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
-import { readSegment, type Segment, writeSegment } from '../../src/codec/container'
+import { FORMAT_MAJOR, FORMAT_MINOR, KIND_SEGMENT, readSegment, type Segment, writeSegment } from '../../src/codec/container'
 import { verseId } from '../../src/ids'
 import type { BookModel, HelpRow, TextModel } from '../../src/model'
 import { partsSource } from '../../src/node/partsSource'
@@ -273,6 +275,67 @@ async function cutTransfer(): Promise<Uint8Array> {
   return cutMiddleOfLast(whole, book.bytes.length)
 }
 
+// Case 14: an integer out of range in a key the reader does not know
+
+/** CBOR for 2^60, which is above 2^53 - 1: the encoder refuses it, so the bytes are written here. */
+const TWO_POW_60 = Uint8Array.of(0x1b, 0x10, 0, 0, 0, 0, 0, 0, 0)
+/** CBOR for -2^53, one below -(2^53 - 1). */
+const MINUS_TWO_POW_53 = Uint8Array.of(0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff)
+
+const compareBytes = (a: Uint8Array, b: Uint8Array): number => {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i]
+  return a.length - b.length
+}
+
+/** A CBOR map (fewer than 24 keys) from already encoded values, the keys in the order of the bytes of their encoding. */
+function rawMap(entries: [string, Uint8Array][]): Uint8Array {
+  const pairs = entries.map(([key, value]) => ({ key: encodeDeterministic(key), value })).sort((a, b) => compareBytes(a.key, b.key))
+  const parts = [Uint8Array.of(0xa0 | pairs.length), ...pairs.flatMap((pair) => [pair.key, pair.value])]
+  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0))
+  let at = 0
+  for (const part of parts) {
+    out.set(part, at)
+    at += part.length
+  }
+  return out
+}
+
+/** A segment file for these exact body bytes, with one more key in the file header: `extra` is its name and its encoded value. */
+async function fileOfBody(h: Uint8Array, body: Uint8Array, extra?: [string, Uint8Array]): Promise<Uint8Array> {
+  const compressed = deflateRaw(body, { level: 9 })
+  const id = new Uint8Array(await crypto.subtle.digest('SHA-256', body as Uint8Array<ArrayBuffer>))
+  const entries: [string, Uint8Array][] = [
+    ['h', h],
+    ['codec', encodeDeterministic('deflate-raw')],
+    ['clen', encodeDeterministic(compressed.length)],
+    ['ulen', encodeDeterministic(body.length)],
+    ['id', encodeDeterministic(id)],
+  ]
+  if (extra !== undefined) entries.push(extra)
+  const header = rawMap(entries)
+  const out = new Uint8Array(12 + header.length + compressed.length)
+  out.set([0x89, 0x54, 0x4c, 0x50, FORMAT_MAJOR, FORMAT_MINOR, KIND_SEGMENT, 0])
+  new DataView(out.buffer).setUint32(8, header.length)
+  out.set(header, 12)
+  out.set(compressed, 12 + header.length)
+  return out
+}
+
+/**
+ * Case 14: case 1 twice. `header.seg` has a key `x` in its file header holding 2^60, and `body.seg` a root key `x` in its body holding
+ * -2^53: the reader does not know either key, and an integer outside -(2^53 - 1) .. 2^53 - 1 is rejected anywhere (`container.md`):
+ * `E_HEADER` for the first, `E_BODY` for the second.
+ */
+async function integerOutOfRange(): Promise<{ header: Uint8Array; body: Uint8Array }> {
+  const { seg } = await readSegment(bytesOf(join(TESTS_DIR, 'container', 'minimal.seg')), { known: BOOK_TABLES })
+  const h = encodeDeterministic(seg.h as never)
+  const t = encodeDeterministic(seg.t)
+  return {
+    header: await fileOfBody(h, rawMap([['h', h], ['t', t]]), ['x', TWO_POW_60]),
+    body: await fileOfBody(h, rawMap([['h', h], ['t', t], ['x', MINUS_TWO_POW_53]])),
+  }
+}
+
 // All the frozen cases
 
 /** The bytes of every frozen file the script builds, by path relative to `spec/tests`. The files of `container/` are not among them. */
@@ -288,6 +351,9 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('tabla-desconocida/future-y.seg', await withTable('future-y', true))
   out.set('transferencia-cortada/cut.tcpack', await cutTransfer())
   out.set('paquete-viejo/catalog.seg', (await bridgeCatalog()).bytes)
+  const outOfRange = await integerOutOfRange()
+  out.set('entero-fuera-de-rango/header.seg', outOfRange.header)
+  out.set('entero-fuera-de-rango/body.seg', outOfRange.body)
   return out
 }
 

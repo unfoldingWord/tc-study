@@ -35,7 +35,7 @@ describe('encodeDeterministic', () => {
       [-1, [0x20]],
       [-24, [0x37]],
       [-25, [0x38, 0x18]],
-      [-(2 ** 53), [0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]],
+      [-(2 ** 53 - 1), [0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe]],
     ]
     for (const [value, expected] of cases) {
       expect(Array.from(encodeDeterministic(value))).toEqual(expected)
@@ -89,6 +89,7 @@ describe('encodeDeterministic', () => {
     expect(() => encodeDeterministic(Number.NaN)).toThrow(TypeError)
     expect(() => encodeDeterministic(Number.POSITIVE_INFINITY)).toThrow(TypeError)
     expect(() => encodeDeterministic(2 ** 53)).toThrow(TypeError)
+    expect(() => encodeDeterministic(-(2 ** 53))).toThrow(TypeError)
     expect(() => encodeDeterministic(-(2 ** 53) - 2)).toThrow(TypeError)
   })
 
@@ -170,7 +171,7 @@ describe('decodeCbor', () => {
     v: 1,
     flags: [true, false, true],
     tok: bytes(0, 1, 2, 255),
-    nested: { list: [1, -1, 500, 2 ** 40, 2 ** 53 - 1, -(2 ** 53)], text: 'Pablo, siervo de Dios', empty: [] },
+    nested: { list: [1, -1, 500, 2 ** 40, 2 ** 53 - 1, -(2 ** 53 - 1)], text: 'Pablo, siervo de Dios', empty: [] },
     acentos: 'ñandú \u{1D538}',
   }
 
@@ -217,11 +218,13 @@ describe('decodeCbor', () => {
 
   test('integers at the edges of 2^53', () => {
     expect(decodeCbor(bytes(0x1b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff))).toBe(2 ** 53 - 1)
-    expect(decodeCbor(bytes(0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff))).toBe(-(2 ** 53))
+    expect(decodeCbor(bytes(0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe))).toBe(-(2 ** 53 - 1))
     expect(decodeCbor(bytes(0x1b, 0, 0, 0, 1, 0, 0, 0, 0))).toBe(2 ** 32)
   })
 
-  test('rejects an integer above 2^53 - 1 or below -2^53', () => {
+  test('rejects an integer above 2^53 - 1 or below -(2^53 - 1)', () => {
+    // -2^53 is the one value the encoding of a negative integer has beyond the range: both signs are cut at the same distance.
+    expect(() => decodeCbor(bytes(0x3b, 0x00, 0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff))).toThrow(ColumnError)
     expect(() => decodeCbor(bytes(0x1b, 0x00, 0x20, 0, 0, 0, 0, 0, 0))).toThrow(ColumnError)
     expect(() => decodeCbor(bytes(0x3b, 0x00, 0x20, 0, 0, 0, 0, 0, 0))).toThrow(ColumnError)
     expect(() => decodeCbor(bytes(0x1b, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff))).toThrow(ColumnError)
