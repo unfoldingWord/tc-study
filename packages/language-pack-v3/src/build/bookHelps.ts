@@ -92,7 +92,7 @@ const chapterOf = (id: number): number => Math.floor((id % BOOK_FACTOR) / CHAPTE
  * (a comma ends a part), with spaces and leading zeros left out; a part that is only verses (`3`, `3-5`) is in the chapter
  * of the part before it. A part that cannot be read is skipped.
  */
-function looseRange(book: string, text: string): [number, number] | null {
+export function looseRange(book: string, text: string): [number, number] | null {
   let low: number | undefined
   let high: number | undefined
   let chapter: number | undefined
