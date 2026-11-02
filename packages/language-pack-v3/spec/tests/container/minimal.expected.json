@@ -1,8 +1,18 @@
 {
-  "id": "644fd73e8b75f16563e6adf91301f5f7727339f3e405ab9ce9ebf3dfe7e52ea7",
   "h": {
+    "book": "tit",
     "class": "book",
-    "v": 1,
+    "lang": "es-419",
+    "orig": [
+      "unfoldingWord/el-x-koine/ugnt",
+      "g987ab2025a"
+    ],
+    "res": [
+      [
+        "es-419_gl/es-419/glt",
+        "v42"
+      ]
+    ],
     "tables": {
       "strings": [
         1,
@@ -13,22 +23,33 @@
         true
       ]
     },
-    "lang": "es-419",
-    "book": "tit",
-    "orig": [
-      "unfoldingWord/el-x-koine/ugnt",
-      "g987ab2025a"
-    ],
-    "res": [
-      [
-        "es-419_gl/es-419/glt",
-        "v42"
-      ]
-    ]
+    "v": 1
   },
+  "id": "644fd73e8b75f16563e6adf91301f5f7727339f3e405ab9ce9ebf3dfe7e52ea7",
   "texts": [
     {
-      "res": "es-419_gl/es-419/glt",
+      "events": [
+        [
+          0,
+          "chapter",
+          "1"
+        ],
+        [
+          0,
+          "open",
+          "para:p"
+        ],
+        [
+          0,
+          "verse",
+          "1"
+        ],
+        [
+          7,
+          "close",
+          ""
+        ]
+      ],
       "pieces": [
         [
           "Pablo",
@@ -59,28 +80,7 @@
           true
         ]
       ],
-      "events": [
-        [
-          0,
-          "chapter",
-          "1"
-        ],
-        [
-          0,
-          "open",
-          "para:p"
-        ],
-        [
-          0,
-          "verse",
-          "1"
-        ],
-        [
-          7,
-          "close",
-          ""
-        ]
-      ]
+      "res": "es-419_gl/es-419/glt"
     }
   ]
 }

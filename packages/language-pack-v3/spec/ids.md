@@ -31,6 +31,24 @@ A verse is the integer `LLCCCVVV`: book number, chapter, verse. Tito 2:11 is `56
 - **Numbering.** Ids in a book segment follow that text's numbering, and quotes and alignment follow the original's.
   The equivalences between them go in the language map (`numbering`, defined in phase 2).
 
+### Reference text
+
+The canonical text of the range of verse ids `from` to `to` in a book (`from` ≤ `to`, both in that book) is:
+
+| Range | Text | Example |
+| --- | --- | --- |
+| The book's introduction (chapter 0, verse 0) | `front:intro` | `front:intro` |
+| A chapter's introduction (verse 0) | `C:intro` | `2:intro` |
+| One verse | `C:V` | `2:11` |
+| Verses of one chapter | `C:V1-V2` | `1:2-4` |
+| Verses across chapters | `C1:V1-C2:V2` | `1:12-2:3` |
+
+Numbers have no leading zeros and the text has no spaces. A range has no canonical text when its ends are not both in the
+book, when `from` is after `to`, when an introduction (chapter 0 or verse 0) lies inside a range of several verses, or
+when it is a verse of chapter 0 other than `front:intro`. A row whose reference text is not the canonical text of its
+range (a list `1:1,3`, `1:1b`, `10:03`) keeps its text as published (`refText` in the schemas). A reader that needs the
+text of a row that has no `refText` and finds no canonical text for its range rejects the segment (`E_BODY`).
+
 ## Positions in the original
 
 A word of the original is its position in the book: its index, from 0, among all the `\w` of that book of the UHB or

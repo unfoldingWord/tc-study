@@ -155,7 +155,12 @@ this order and stops at the first defect:
    nested deeper than 64 levels is `E_LIMIT`).
 3. `clen` or `ulen` over the limit (`E_LIMIT`). Then the file's length against `12 + H + clen`: shorter is `E_TRUNCATED`,
    longer is `E_TRAILING`.
-4. Then, in this order: `E_CODEC`, `E_INFLATE`, `E_ID`, `E_BODY`, `E_HMISMATCH`, `E_TABLE`.
+4. Then, in this order: `E_CODEC`, `E_INFLATE`, `E_ID`, `E_BODY`, `E_HMISMATCH`, `E_TABLE`. Here `E_BODY` is the general shape of the
+   body: the map `{h, t}`, the logical header, and `h.tables` and `t` listing the same tables.
+5. Then the tables of the class, which only a reader that knows the class can check: each table against its schema
+   (`cddl/`) and the further checks `tests/README.md` lists ("Checks of the tables"), `E_BODY` again. A segment of a class
+   the reader does not decode (in phase 1: `map`, `xmap` and `gen`) is `E_TABLE` at this step if it was not before, because
+   the reader has no known table for it.
 
 A file that came cut short over Bluetooth or a full SD card fails `E_TRUNCATED` or `E_INFLATE`. The app keeps what it
 had and asks for the file again.

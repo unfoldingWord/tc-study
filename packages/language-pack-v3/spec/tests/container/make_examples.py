@@ -86,7 +86,7 @@ def main():
             'events': [[pos, names[code], arg or ''] for pos, code, arg in events],
         }],
     }
-    (HERE / 'minimal.expected.json').write_text(json.dumps(expected, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    (HERE / 'minimal.expected.json').write_text(json.dumps(expected, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
 
     (HERE / 'truncated.seg').write_bytes(data[:-10])
     (HERE / 'truncated.expected.json').write_text(json.dumps({'error': 'E_TRUNCATED'}) + '\n', encoding='utf-8')

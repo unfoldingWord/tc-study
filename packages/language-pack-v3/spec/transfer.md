@@ -53,6 +53,35 @@ and how much of it the device already has, by reading only the index and the cat
    (`E_ID`).
 4. Activate the units that are complete (`catalog.md`).
 
+**Order of checks.** A reader of a transfer file checks in this order and stops at the first defect of the file:
+
+1. The first 12 bytes, as for a segment file (`container.md`): `E_MAGIC`, `E_VERSION`, `E_KIND` (the kind is not `02`),
+   and `E_TRUNCATED` for a file that ends before byte 12 while every byte present matches.
+2. The index: fewer than `12 + I` bytes is `E_TRUNCATED`. There is no limit on `I` in 3.0. Then a CBOR map that is not
+   exactly the `I` bytes, or not a map, is `E_HEADER`; nested deeper than 64 levels is `E_LIMIT`.
+3. The index against `cddl/transfer.cddl` and the layout, `E_HEADER` for any of these:
+   - `mode` is not `full` or `update`;
+   - `catalogs` is not a list of at least one id of 32 bytes, or repeats an id;
+   - `entries` is not a list of at least one map; an entry has no `id` of 32 bytes, repeats the `id` of another, has a
+     `kind` other than `segment` and `complement`, or an `offset` or a `size` that is not an unsigned integer;
+   - an entry's `offset` is not the sum of the sizes of the entries before it (the first is 0), or that sum goes beyond
+     2^53 − 1;
+   - an entry has a `class` and is a complement, or the `class` is not a class name;
+   - an id of `catalogs` is not an entry, is not among the first as many entries as `catalogs` has, is a complement, or
+     has a `class` other than `catalog`;
+   - `base` is not a list of `[text, unsigned integer]`, or `made` or `by` is not text.
+
+   Keys of the index that are not listed are ignored. A reader does not check that an `update` has its `base`: that is the
+   app's job.
+4. The length of the file against the entries, with `available` the bytes after the index: less than the end of the last
+   catalog (`offset + size`) is `E_TRUNCATED`; more than the end of the last entry is `E_TRAILING`.
+5. Every entry in the order of the index, each one whole in the file: the catalogs first. A catalog is checked as a segment
+   file (`container.md`) with its `id` of the index as the id the catalog gives, against the tables of a catalog; its
+   error, whichever it is, rejects the file. Any other entry only gets its status (`tests/README.md`), and does not stop
+   the others.
+6. Then the tables of each catalog against `catalog.cddl`, in the order of `catalogs` (`E_BODY`; their tables were known in
+   step 5): the first that fails rejects the file.
+
 **A file cut short.** Each entry checks itself, so a cut file loses only what was cut.
 
 - A receiver MAY keep every complete entry whose id is right, and report the rest as missing.
