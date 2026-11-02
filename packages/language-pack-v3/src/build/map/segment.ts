@@ -7,12 +7,13 @@ import { compareCodePoints } from '../../codec/columns'
 import type { Segment } from '../../codec/container'
 import { encodeCounts, encodeCoverage, encodeVerseLists } from '../../codec/counts'
 import type { MapCore, MapPart } from '../../model'
+import { put } from '../../codec/values'
 
 type Built = { tables: Record<string, [number, boolean]>; t: Record<string, CborValue> }
 
 function sortedRecord<T>(r: Record<string, T>): Record<string, T> {
   const out: Record<string, T> = {}
-  for (const key of Object.keys(r).sort(compareCodePoints)) out[key] = r[key]
+  for (const key of Object.keys(r).sort(compareCodePoints)) put(out, key, r[key])
   return out
 }
 
@@ -23,7 +24,7 @@ function coreTables(m: MapCore): Built {
   const names: Record<string, string[]> = {}
   for (const [k, v] of Object.entries(sortedRecord(m.names))) {
     if (v.length === 0) throw new Error(`names of ${JSON.stringify(k)} is empty`)
-    names[k] = [...v]
+    put(names, k, [...v])
   }
   const t: Built['t'] = {
     books: m.books.map((b) => [...b]),

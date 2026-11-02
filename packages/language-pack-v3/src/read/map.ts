@@ -6,7 +6,7 @@ import { ColumnError } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { decodeCounts, decodeCoverage, decodeVerseLists } from '../codec/counts'
 import { FormatError } from '../codec/errors'
-import { hasOwn, isMap } from '../codec/values'
+import { hasOwn, isMap, put } from '../codec/values'
 import { bookNumber } from '../ids'
 import type { BookName, MapCore, MapPart } from '../model'
 
@@ -26,8 +26,6 @@ const SOURCES = ['text', 'list', 'none']
 function bad(what: string): never {
   throw new FormatError('E_BODY', `the map segment is malformed: ${what}`)
 }
-
-
 function isText(v: unknown): v is string {
   return typeof v === 'string'
 }
@@ -44,13 +42,13 @@ function readBooks(value: unknown): BookName[] {
 function readCore(seg: Segment): MapCore {
   const { h, t } = seg
   if (h.book !== undefined) bad('a core has a book')
-  if (h.res === undefined || h.res.length === 0) bad('the header of a core has no resource (res)')
+  if (h.res === undefined) bad('the header of a core has no resource (res)')
   for (const key of ['books', 'names', 'coverage']) if (!hasOwn(t, key)) bad(`the table "${key}" is missing`)
   if (!isMap(t.names)) bad('names is not a map')
   const names: Record<string, string[]> = {}
   for (const [k, v] of Object.entries(t.names)) {
     if (!Array.isArray(v) || v.length === 0 || !v.every(isText)) bad(`names[${JSON.stringify(k)}] is not a non-empty list of text`)
-    names[k] = [...v]
+    put(names, k, [...v])
   }
   const core: MapCore = {
     lang: h.lang!,
@@ -65,7 +63,7 @@ function readCore(seg: Segment): MapCore {
     const out: Record<string, string> = {}
     for (const [k, v] of Object.entries(t.subtitles)) {
       if (!isText(v)) bad(`subtitles[${JSON.stringify(k)}] is not text`)
-      out[k] = v
+      put(out, k, v)
     }
     core.subtitles = out
   }
@@ -89,8 +87,8 @@ function readPart(seg: Segment, part: string): MapPart {
   } catch {
     bad(`the part ${JSON.stringify(part)} is not a book code`)
   }
-  if (h.book !== part) bad(`the part is ${JSON.stringify(part)} and the book ${JSON.stringify(h.book)}`)
-  if (h.res !== undefined && h.res.length > 0) bad('a part has resources (res)')
+  if (h.book !== undefined && h.book !== part) bad(`the part is ${JSON.stringify(part)} and the book ${JSON.stringify(h.book)}`)
+  if (!Array.isArray(h.res) || h.res.length > 0) bad('a part has resources (res), or none is written')
   for (const key of CORE_ONLY) if (hasOwn(t, key)) bad(`the table "${key}" belongs to the core`)
   const out: MapPart = { lang: h.lang!, part }
   if (hasOwn(t, 'usage')) out.usage = decodeVerseLists(part, t.usage)

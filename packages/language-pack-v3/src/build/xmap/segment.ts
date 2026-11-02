@@ -7,12 +7,13 @@ import { compareCodePoints, encodeUvarints } from '../../codec/columns'
 import type { Segment } from '../../codec/container'
 import { encodeCounts, encodeCoverage, encodeVerseLists } from '../../codec/counts'
 import { CONCEPT_KINDS, type CountTable, TW_CATEGORIES, type XmapCore, type XmapPart } from '../../model'
+import { put } from '../../codec/values'
 
 type Built = { tables: Record<string, [number, boolean]>; t: Record<string, CborValue> }
 
 function sortedRecord<T>(r: Record<string, T>): Record<string, T> {
   const out: Record<string, T> = {}
-  for (const key of Object.keys(r).sort(compareCodePoints)) out[key] = r[key]
+  for (const key of Object.keys(r).sort(compareCodePoints)) put(out, key, r[key])
   return out
 }
 
@@ -84,7 +85,7 @@ function coreTables(m: XmapCore): Built {
   }
   if (m.strongs !== undefined) {
     const out: Record<string, string[]> = {}
-    for (const [k, v] of Object.entries(sortedRecord(m.strongs))) out[k] = [...v].sort(compareCodePoints)
+    for (const [k, v] of Object.entries(sortedRecord(m.strongs))) put(out, k, [...v].sort(compareCodePoints))
     tables.strongs = [1, false]
     t.strongs = out
   }

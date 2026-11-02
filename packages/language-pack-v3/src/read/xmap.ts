@@ -6,7 +6,7 @@ import { ColumnError, compareCodePoints, decodeUvarints } from '../codec/columns
 import type { Segment } from '../codec/container'
 import { decodeCounts, decodeCoverage, decodeVerseLists } from '../codec/counts'
 import { FormatError } from '../codec/errors'
-import { type CborMap, hasOwn, isMap } from '../codec/values'
+import { type CborMap, hasOwn, isMap, put } from '../codec/values'
 import { bookNumber } from '../ids'
 import { CONCEPT_KINDS, type Concept, type Relation, TW_CATEGORIES, type XmapCore, type XmapPart } from '../model'
 
@@ -109,7 +109,7 @@ function readCore(seg: Segment): XmapCore {
     for (const [k, v] of Object.entries(a)) {
       if (typeof v !== 'string') bad(`aliases[${JSON.stringify(k)}] is not text`)
       if (!concepts.has(v)) bad(`aliases[${JSON.stringify(k)}] names ${JSON.stringify(v)}, which is not a concept`)
-      out[k] = v
+      put(out, k, v)
     }
     core.aliases = out
   }
@@ -121,7 +121,7 @@ function readCore(seg: Segment): XmapCore {
       if (list.length === 0) bad(`strongs[${JSON.stringify(k)}] is empty`)
       if (!concepts.has(k)) bad(`strongs names ${JSON.stringify(k)}, which is not a concept`)
       sortedUnique(list, `strongs[${JSON.stringify(k)}]`)
-      out[k] = [...list]
+      put(out, k, [...list])
     }
     core.strongs = out
   }
@@ -135,8 +135,8 @@ function readPart(seg: Segment, part: string): XmapPart {
   } catch {
     bad(`the part ${JSON.stringify(part)} is not a book code`)
   }
-  if (h.book !== part) bad(`the part is ${JSON.stringify(part)} and the book ${JSON.stringify(h.book)}`)
-  if (h.res !== undefined && h.res.length > 0) bad('a part has resources (res)')
+  if (h.book !== undefined && h.book !== part) bad(`the part is ${JSON.stringify(part)} and the book ${JSON.stringify(h.book)}`)
+  if (!Array.isArray(h.res) || h.res.length > 0) bad('a part has resources (res), or none is written')
   for (const key of CORE_ONLY) if (hasOwn(t, key)) bad(`the table "${key}" belongs to the core`)
   if (!hasOwn(t, 'strong')) bad('the table "strong" is missing')
   const out: XmapPart = { part, strong: decodeVerseLists(part, t.strong) }

@@ -105,6 +105,24 @@ describe('xmapView', () => {
   })
 })
 
+describe('xmapView keys', () => {
+  test('a key named __proto__ is kept in aliases and strongs', async () => {
+    const cs = new Map(concepts)
+    cs.set('__proto__', { kind: 'none', tw: 'none', source: TWL })
+    const m: XmapCore = {
+      ...core,
+      concepts: cs,
+      aliases: JSON.parse('{"__proto__": "__proto__"}'),
+      strongs: JSON.parse('{"__proto__": ["G1"]}'),
+    }
+    const { bytes } = await writeSegment(xmapSegment(m))
+    const { seg } = await readSegment(bytes, { known: XMAP_TABLES })
+    const view = xmapView(seg) as XmapCore
+    expect(Object.keys(view.aliases!)).toEqual(['__proto__'])
+    expect(Object.keys(view.strongs!)).toEqual(['__proto__'])
+  })
+})
+
 describe('xmapView rejects', () => {
   const rejects = (mutate: (s: Segment) => void, m: XmapCore | XmapPart = core) => {
     const s = fresh(m)
@@ -129,6 +147,12 @@ describe('xmapView rejects', () => {
   test('a relation source outside res', () => rejects((s) => (bodyOf(s, 'relations').source = encodeUvarints([2]))))
   test('confidence 101', () => rejects((s) => (bodyOf(s, 'relations').confidence = encodeUvarints([101]))))
   test('a part whose book differs from part', () => rejects((s) => (s.h.book = 'gen'), part))
+  test('a part without book is accepted, one without res is rejected', () => {
+    const s = fresh(part)
+    delete s.h.book
+    expect(xmapView(s)).toEqual(part)
+    rejects((x) => void delete x.h.res, part)
+  })
   test('a part with a core table', () => rejects((s) => (s.t.concepts = {}), part))
   test('a core with a book', () => rejects((s) => (s.h.book = 'tit')))
   test('a core with a count table of the wrong unit', () => rejects((s) => (bodyOf(s, 'links').unit = 'notes')))

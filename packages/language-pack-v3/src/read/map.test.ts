@@ -87,12 +87,36 @@ describe('mapView', () => {
     rejects(s)
   })
 
-  test('a core with empty res is rejected', () => {
+  test('a core with empty res is accepted (map.cddl allows it)', () => {
     const s = fresh()
     s.h.res = []
-    rejects(s)
+    expect((mapView(s) as MapCore).res).toEqual([])
   })
 
+  test('a part without book is accepted, one with another book or without res is rejected', () => {
+    const s = fresh(part)
+    delete s.h.book
+    expect(mapView(s)).toEqual(part)
+    const other = fresh(part)
+    other.h.book = 'gen'
+    rejects(other)
+    const noRes = fresh(part)
+    delete noRes.h.res
+    rejects(noRes)
+    const withRes = fresh(part)
+    withRes.h.res = [[TN, 'v1']]
+    rejects(withRes)
+  })
+
+  test('a key named __proto__ is kept in names and subtitles', () => {
+    const s = fresh()
+    s.t.names = JSON.parse('{"__proto__": ["x"]}')
+    s.t.subtitles = JSON.parse('{"__proto__": "y"}')
+    const view = mapView(s) as MapCore
+    expect(Object.keys(view.names)).toEqual(['__proto__'])
+    expect(Object.keys(view.subtitles!)).toEqual(['__proto__'])
+    expect(Object.getPrototypeOf(view.names)).toBe(Object.prototype)
+  })
 
   test('an empty names list is rejected', () => {
     const s = fresh()

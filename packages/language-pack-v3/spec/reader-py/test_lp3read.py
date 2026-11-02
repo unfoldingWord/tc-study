@@ -2354,6 +2354,25 @@ def test_map_part_without_tables():
     ok(build(h, {}), {"h": header_h(h)})
 
 
+def test_map_part_without_book_is_read_and_without_res_is_rejected():
+    # tests/README.md, map and xmap checks: `book` is optional in a part, `res` is required and `[]`
+    b, expected, (h, t) = map_part()
+    h2 = dict(h)
+    del h2["book"]
+    assert read_file(build(h2, t).data)["h"]["part"] == h["part"]
+    for make in (map_part, xmap_part):
+        _, _, (h, t) = make()
+        h3 = dict(h)
+        del h3["res"]
+        err(build(h3, t).data, "E_BODY")
+
+
+def test_map_core_with_empty_res_is_read():
+    _, _, (h, t) = map_core()
+    h2 = dict(h, res=[])
+    assert read_file(build(h2, t).data)["h"]["res"] == []
+
+
 def test_counts_verses_above_count_and_zero_are_valid():
     _, _, (h, t) = xmap_core()
     t["strong"] = counts("occurrences", {"G1": [(1, 1, 5)], "G2": [(1, 1, 0)]})
