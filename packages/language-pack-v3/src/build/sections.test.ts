@@ -289,6 +289,19 @@ describe('assignSids: new sids', () => {
     expect(sids(assignSids(ART, ES, parts, {}).sections)).toEqual(['examples', 'examples-2', 'examples-3'])
   })
 
+  test('two equal Ejemplos headings: examples and examples-2, kept with the registry and when a section comes before', () => {
+    const ex: SectionPart[] = [
+      { level: 2, title: 'Ejemplos de la Biblia', md: words('uno', 12) },
+      { level: 2, title: 'Ejemplos de la Biblia', md: words('dos', 12) },
+    ]
+    const one = assignSids(ART, ES, ex, {})
+    expect(sids(one.sections)).toEqual(['examples', 'examples-2'])
+    const two = assignSids(ART, ES, ex, one.registry)
+    expect(sids(two.sections)).toEqual(['examples', 'examples-2'])
+    const three = assignSids(ART, ES, [{ level: 2, title: 'Definición', md: words('d', 12) }, ...ex], two.registry)
+    expect(sids(three.sections)).toEqual(['definition', 'examples', 'examples-2'])
+  })
+
   test('unknown headings take s and the next number', () => {
     const parts: SectionPart[] = [1, 2, 3].map((n) => ({ level: 3, title: `Raro ${n}`, md: `texto ${n}` }))
     expect(sids(assignSids(ART, ES, parts, {}).sections)).toEqual(['s1', 's2', 's3'])

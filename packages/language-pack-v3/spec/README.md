@@ -1,7 +1,7 @@
 # Language packs, format 3: specification
 
 Status: **phase 1 is implemented**: the TypeScript reader and builders (`packages/language-pack-v3`), an independent Python reader
-(`spec/reader-py/`) and the frozen conformance cases (`tests/`). Phase 2 (the maps, `xmap`, `map`, `gen`) and phase 3 (signatures) are not.
+(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). Part B (topics, people, places, events, relations) and phase 3 (signatures) are not.
 
 Format 3 is the next major version of the tc-language-packs. Format 2.0 (`packages/language-pack`, parts per book)
 keeps being published, frozen, until each app version that reads it has a retirement date. Format 3 keeps what 2.0
@@ -68,8 +68,8 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | Item | When |
 | --- | --- |
 | The transfer file's extension (`.tcpack` is a proposal) and the format's name | Abel decides before the builder publishes |
-| Topics, people, places and events (TIPNR, Theographic, OBS) in the common map | Phase 2 |
-| Verse equivalences between a text's numbering and the original's (`map`, `numbering`) | Phase 2 |
+| Part B of phase 2: topics, people, places, events and relations (TIPNR, Theographic, OBS) in the common map | After Abel approves `fuentes.md` |
+| Verse equivalences between a text's numbering and the original's (`map`, `numbering`) | A later version |
 | MACULA and the lexicon in columns | A later version of their tables |
 | An OBS help's `frame` (story × 100 + frame) is not checked against story 1–50 and frame 0–99: both readers print "51:1" for 5101 | Phase 2 |
 | `needs: "map"` in the units of a catalog is dangling until phase 2 builds the `map` unit: a phase 1 catalog cannot activate a book on a device that enforces it, so phase 1 catalogs are not published | Phase 2 |
@@ -77,7 +77,6 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | Two complement kinds, `images` (an image archive with an index: file, size, concepts, verse ranges and a credit per piece) and `basemap` (background layers with no place names; relief is a separate `basemap`; the app places the `lug:` points of the topics with the language's names). In the catalog: both in `complement.kind`, `license` for the whole set with each piece's license in the index, `lang` only when an image has text burned in, `for` names the `xmap` revision. No change to the maps or the units. Approved by Abel on 2026-11-02 | With part B of phase 2; built after it |
 | The frozen case bytes include the deflate output of pako 2.1.0: a compressor upgrade needs `build-cases.ts --refreeze` (ids and reader outputs do not change) | When pako is upgraded |
 | The MACULA trees are kept as published, under MACULA's own license | Before the common pack is published |
-| Equal headings in one article: the tie-break of the section ids | Phase 2 |
 | A bridged article's section ids depend on the registry, and a bridge starts with an empty one | Phase 2 |
 | A view allocates its rows from a body within the byte limits; a cap on the rows is not set | Phase 2 |
 | The lexicon carries no `domains` rows in phase 1 | A later version of its tables |
