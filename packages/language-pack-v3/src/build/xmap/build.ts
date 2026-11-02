@@ -1,17 +1,15 @@
 import { compareCodePoints } from '../../codec/columns'
 import type { VerseLists } from '../../codec/counts'
 import { bookNumber } from '../../ids'
-import type { Concept, CountTable, HelpTable, OrigModel, XmapCore, XmapPart } from '../../model'
+import type { Concept, CountTable, OrigModel, XmapCore, XmapPart } from '../../model'
 import type { ResourceRef, Row, RowFilter, RowSource } from '../../source/rows'
 import { ORIGINALS } from '../../source/rows'
-import { extractHelps } from '../bookHelps'
 import { conceptRefs, tallyRefs } from '../maps/conceptRefs'
 import { coverageOf } from '../maps/coverage'
 import { Tally } from '../maps/tally'
 import { versesOf } from '../maps/verses'
-import { OrigIndex } from '../orig'
 import { strongTally } from './strong'
-import { strongsOfLinks, strongsRecord } from './strongs'
+import { strongsOfQuotes, strongsRecord } from './strongs'
 
 export type XmapBuild = { core: XmapCore; parts: XmapPart[]; report: string[] }
 
@@ -93,7 +91,6 @@ export async function buildXmap(o: { source: RowSource; origs: OrigModel[]; lang
   const strongs = new Map<string, Set<string>>()
   for (const orig of origs) {
     const verses = versesOf(orig)
-    const index = new OrigIndex(orig)
     for (const ref of tns) {
       if (!ref.books.includes(orig.book)) continue
       const rows = await collect(source, { lang, book: orig.book, resource: ref.key })
@@ -103,8 +100,7 @@ export async function buildXmap(o: { source: RowSource; origs: OrigModel[]; lang
       if (!ref.books.includes(orig.book)) continue
       const rows = await collect(source, { lang, book: orig.book, resource: ref.key })
       tallyRefs(links, orig.book, conceptRefs(rows, orig.book, ref.key, 'links', report), verses)
-      const table: HelpTable = extractHelps(rows, orig.book, ref.key, 'links', index, report)
-      strongsOfLinks(table, orig, strongs)
+      strongsOfQuotes(rows, orig.book, ref.key, orig, strongs)
     }
   }
 

@@ -1,27 +1,32 @@
 import { describe, expect, test } from 'bun:test'
-import type { HelpTable, OrigModel } from '../../model'
+import type { OrigModel } from '../../model'
+import type { Row } from '../../source/rows'
 import { partsSource } from '../../node/partsSource'
-import { extractHelps } from '../bookHelps'
-import { extractOrig, OrigIndex } from '../orig'
-import { strongsOfLinks, strongsRecord } from './strongs'
+import { extractOrig } from '../orig'
+import { strongsOfQuotes, strongsRecord } from './strongs'
 
 const join = (...path: string[]) => path.join('/')
 const DATA = join(import.meta.dir, '..', '..', '..', 'spec', 'tests', 'data')
 const TWL = 'es-419_gl/es-419/twl'
 
-async function titus(): Promise<{ orig: OrigModel; links: HelpTable }> {
+async function titus(): Promise<{ orig: OrigModel; rows: Row[] }> {
   const src = await partsSource({ list: join(DATA, 'es-419', 'list.json'), partsDir: join(DATA, 'parts'), originals: join(DATA, 'originals', 'list.json') })
   const orig = await extractOrig(src, 'tit')
-  const rows = []
+  const rows: Row[] = []
   for await (const row of src.rows({ lang: 'es-419', book: 'tit', resource: TWL })) rows.push(row)
-  return { orig, links: extractHelps(rows, 'tit', TWL, 'links', new OrigIndex(orig)) }
+  return { orig, rows }
 }
 
-describe('strongsOfLinks', () => {
+/** The rows of a link list of Titus, as the part files hold them. */
+const linkRows = (items: Record<string, string>[]): Row[] => [
+  { layer: 'sot', key: `twl:${TWL}:tit:1`, value: { links: items } } as unknown as Row,
+]
+
+describe('strongsOfQuotes', () => {
   test('es-419 Titus: grace has G54850, every set is non-empty and every key is Greek', async () => {
-    const { orig, links } = await titus()
+    const { orig, rows } = await titus()
     const into = new Map<string, Set<string>>()
-    strongsOfLinks(links, orig, into)
+    strongsOfQuotes(rows, 'tit', TWL, orig, into)
     expect(into.get('tw:kt/grace')?.has('G54850')).toBe(true)
     expect(into.size).toBeGreaterThan(0)
     for (const set of into.values()) {
@@ -30,11 +35,22 @@ describe('strongsOfLinks', () => {
     }
   })
 
-  test('a quote of -1 only adds nothing', async () => {
-    const { orig } = await titus()
-    const links: HelpTable = { res: TWL, rows: [{ id: 'a', ref: '1:1', from: 56001001, to: 56001001, concept: 'tw:kt/grace', cols: {}, quote: [-1, -1] }] }
+  test('a quote that is not in the verse, or a piece of it, gives no key', async () => {
+    const { orig, rows } = await titus()
+    const real = (rows.find((r) => r.key.startsWith('twl:')) as unknown as { value: { links: Record<string, string>[] } }).value.links[0]
+    const base = { id: 'a', reference: real.reference, twLink: real.twLink, occurrence: '1' }
     const into = new Map<string, Set<string>>()
-    strongsOfLinks(links, orig, into)
+    strongsOfQuotes(linkRows([{ ...base, origWords: 'zzzz' }, { ...base, origWords: `${real.origWords} & zzzz` }]), 'tit', TWL, orig, into)
+    expect(into.size).toBe(0)
+    strongsOfQuotes(linkRows([{ ...base, origWords: real.origWords }]), 'tit', TWL, orig, into)
+    expect(into.size).toBe(1)
+  })
+
+  test('an occurrence beyond the runs finds nothing', async () => {
+    const { orig, rows } = await titus()
+    const real = (rows.find((r) => r.key.startsWith('twl:')) as unknown as { value: { links: Record<string, string>[] } }).value.links[0]
+    const into = new Map<string, Set<string>>()
+    strongsOfQuotes(linkRows([{ id: 'a', reference: real.reference, twLink: real.twLink, origWords: real.origWords, occurrence: '9' }]), 'tit', TWL, orig, into)
     expect(into.size).toBe(0)
   })
 })
