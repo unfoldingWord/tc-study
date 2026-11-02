@@ -484,6 +484,48 @@ describe('buildCommon: the original of Titus', () => {
   })
 })
 
+describe('buildCommon: the xmap unit', () => {
+  const english = () => partsSource({ list: join(DATA, 'en', 'list.json'), partsDir: PARTS, originals: ORIGINALS_LIST })
+  const partOf = (b: { segments: BuiltSegment[] }) => b.segments.find((s) => s.seg.h.class === 'xmap' && s.seg.h.part === 'tit')!
+
+  test('lists the unit xmap (core and the part of Titus, no needs); the orig unit is unchanged', async () => {
+    const plain = await buildCommon({ source: await english(), about })
+    const mapped = await buildCommon({ source: await english(), about, mapLang: 'en' })
+    expect(plain.segments.map((s) => s.seg.h.class)).toEqual(['orig'])
+    const catalog = await catalogOf(mapped.catalog)
+    const xmap = catalog.units.find((u) => u.id === 'xmap')!
+    expect(xmap.needs).toBeUndefined()
+    expect(xmap.segments.map((i) => mapped.segments[i].seg.h.part).sort()).toEqual(['core', 'tit'])
+    expect(catalog.units.map((u) => u.id)).toEqual(['orig:tit', 'xmap'])
+    expect(catalog.units[0].needs).toBeUndefined()
+    const orig = mapped.segments.find((s) => s.seg.h.class === 'orig')!
+    expect(orig.id).toBe(plain.segments[0].id)
+    expect(orig.inputs).toBe(plain.segments[0].inputs)
+  })
+
+  test('without mapLang the catalog is the phase 1 one; with it, twice gives the same catalog id', async () => {
+    const a = await buildCommon({ source: await english(), about })
+    const b = await buildCommon({ source: await originalsOnly(), about })
+    expect(a.catalog.id).toBe(b.catalog.id)
+    expect(a.report).toEqual([])
+    const one = await buildCommon({ source: await english(), about, mapLang: 'en' })
+    const two = await buildCommon({ source: await english(), about, mapLang: 'en' })
+    expect(two.catalog.id).toBe(one.catalog.id)
+    expect(one.catalog.id).not.toBe(a.catalog.id)
+  })
+
+  test('a new release of a source changes inputs, not the id of the part', async () => {
+    const base = await buildCommon({ source: await english(), about, mapLang: 'en' })
+    const moved = await buildCommon({
+      source: tweak(await english(), { ref: (ref, lang) => (lang === 'en' && ref.key.endsWith('/tn') ? { stamp: 'v99#2030-01-01T00_00_00Z' } : {}) }),
+      about,
+      mapLang: 'en',
+    })
+    expect(partOf(moved).inputs).not.toBe(partOf(base).inputs)
+    expect(partOf(moved).id).toBe(partOf(base).id)
+  })
+})
+
 describe('a language read from a zip pack: each layer file is read once, however many books', () => {
   const XX = 'xx'
   const GLT_KEY = 'o_gl/xx/glt'

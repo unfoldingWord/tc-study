@@ -30,7 +30,7 @@ import { compareCodePoints } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { sha256Hex } from '../codec/sha256'
 import { BOOKS, bookNumber, bookSet } from '../ids'
-import type { About, ArticleModel, CatalogResource, LexEntry } from '../model'
+import type { About, ArticleModel, CatalogResource, LexEntry, OrigModel } from '../model'
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
 import { articleOfPath, articleResources, artSegment, extractArticles, type Kind } from './art'
 import { extractBook, isBookResource } from './bookHelps'
@@ -39,6 +39,8 @@ import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOf
 import { extractLexicon, lexResources, lexSegment } from './lex'
 import { extractObs, obsSegment } from './obs'
 import { extractOrig, origSegment } from './orig'
+import { buildXmap } from './xmap/build'
+import { xmapSegment } from './xmap/segment'
 import type { SectionRegistry } from './sections'
 
 /** The name and version `about.builder` carries when this package builds. A constant, not read from `package.json` at run time. */
@@ -307,11 +309,21 @@ export async function buildLanguage(o: {
 
 // Common
 
+const TN_KIND = 'TSV Translation Notes'
+const TWL_KIND = 'TSV Translation Words Links'
+const XMAP_SUBJECTS: ReadonlySet<string> = new Set([TN_KIND, TWL_KIND, 'Translation Words', 'Translation Academy'])
+const TITLE_ROW = /^helps-text:(tw|ta)-title:/
+
 /**
  * Builds the `orig` segments (one per book, from {@link extractOrig} and {@link origSegment}) and the common catalog: `about` is
  * `o.about` with `catalog` set to `"common"`, the units are `orig:{book}`, and the resources are the originals that have a book
- * built. `books` defaults to every book the originals of the source have, in the order of the canon. The common map (`xmap`) comes in
- * phase 2.
+ * built. `books` defaults to every book the originals of the source have, in the order of the canon.
+ *
+ * With `mapLang` (the language whose helps make the common map, `"en"`) it also builds the `xmap` core and one part per book
+ * ({@link buildXmap} over the originals just read) and the unit `xmap`, which needs no other unit. The `inputs` of the core are the
+ * rows the map read (the originals of the books, the tN and tWL rows of the books, the title rows of the tW and tA) and the stamps
+ * of every resource of `res`; those of a part are the rows of its book and the stamps of the sources that have the book. Without
+ * `mapLang` the result is what phase 1 gave, with an empty `report`.
  *
  * Throws `Error` for a book the source has no originals of, `RangeError` for a code that is not one of the 66.
  */
@@ -319,22 +331,58 @@ export async function buildCommon(o: {
   source: RowSource
   books?: string[]
   about: Omit<About, 'catalog'>
-}): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment }> {
+  mapLang?: string
+}): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment; report: string[] }> {
   const refs = await o.source.resources(ORIGINALS)
   const books = o.books === undefined ? booksOf(refs) : canonical(o.books)
   const segments: BuiltSegment[] = []
   const used = new Set<string>()
+  const origs: OrigModel[] = []
+  const origRows = new Map<string, RowKey[]>()
   for (const book of books) {
     const orig = await extractOrig(o.source, book)
+    origs.push(orig)
     const having = refs.filter((ref) => ref.books.includes(book))
     const rows: RowKey[] = []
     await addKeys(rows, o.source.rows({ lang: ORIGINALS, book, layer: 'sot' }))
+    origRows.set(book, rows)
     // The original is known by the stamp of its book; another original with rows of the book (MACULA) by its release.
     const resources = having.map((ref) => ({ key: ref.key, stamp: ref.key === orig.key ? orig.stamp : ref.stamp }))
     segments.push(await builtSegment(origSegment(orig), inputsOf(rows, resources)))
     for (const ref of having) used.add(ref.key)
   }
+
+  const report: string[] = []
+  const lang = o.mapLang
+  if (lang !== undefined && origs.length > 0) {
+    const built = await buildXmap({ source: o.source, origs, lang })
+    report.push(...built.report)
+    const helps = (await o.source.resources(lang)).filter((ref) => XMAP_SUBJECTS.has(ref.kind))
+    const noteLike = (ref: ResourceRef): boolean => ref.kind === TN_KIND || ref.kind === TWL_KIND
+    const stampOf = (ref: ResourceRef): { key: string; stamp: string } => ({ key: ref.key, stamp: origs.find((orig) => orig.key === ref.key)?.stamp ?? ref.stamp })
+    const originalsUsed = refs.filter((ref) => origs.some((orig) => orig.key === ref.key))
+    const coreRows: RowKey[] = [...origRows.values()].flat()
+    const bookRows = new Map<string, RowKey[]>()
+    for (const orig of origs) {
+      const rows: RowKey[] = [...(origRows.get(orig.book) ?? [])]
+      const before = rows.length
+      for (const ref of helps) if (noteLike(ref) && ref.books.includes(orig.book)) await addKeys(rows, o.source.rows({ lang, book: orig.book, resource: ref.key }))
+      bookRows.set(orig.book, rows)
+      coreRows.push(...rows.slice(before))
+    }
+    for (const ref of helps) {
+      if (noteLike(ref)) continue
+      for await (const row of o.source.rows({ lang, resource: ref.key, layer: 'text' })) if (TITLE_ROW.test(row.key)) coreRows.push({ layer: row.layer, key: row.key })
+    }
+    segments.push(await builtSegment(xmapSegment(built.core), inputsOf(coreRows, [...originalsUsed, ...helps].map(stampOf))))
+    for (const part of built.parts) {
+      const book = part.part
+      const sources = [...originalsUsed, ...helps.filter(noteLike)].filter((ref) => ref.books.includes(book)).map(stampOf)
+      segments.push(await builtSegment(xmapSegment(part), inputsOf(bookRows.get(book) ?? [], sources)))
+    }
+  }
+
   segments.sort(compareSegments)
   const catalog = await buildCatalog({ about: { ...o.about, catalog: 'common' }, resources: catalogResources(refs, used), segments })
-  return { segments, catalog }
+  return { segments, catalog, report }
 }
