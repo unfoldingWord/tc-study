@@ -275,6 +275,17 @@ describe('concepts', () => {
     expect(conceptOfTwLink('rc://*/tw/dict/bible/other/shepherd')).toBe('tw:other/shepherd')
   })
 
+  test('a slug or a name published with capitals gives a lowercase id (ids.md, "Concepts")', () => {
+    expect(conceptOfSupportReference('rc://*/ta/man/translate/figs-orderHeb')).toBe('ta:translate/figs-orderheb')
+    expect(conceptOfSupportReference('rc://es-419/ta/man/translate/figs-orderGrk')).toBe('ta:translate/figs-ordergrk')
+    expect(conceptOfTwLink('rc://*/tw/dict/bible/names/Abraham')).toBe('tw:names/abraham')
+    expect(conceptOfTwLink('rc://en/tw/dict/bible/kt/GRACE')).toBe('tw:kt/grace')
+    // Only the slug and the name: the manual and the category are lowercase.
+    expect(conceptOfSupportReference('rc://*/ta/man/Translate/figs-orderHeb')).toBeNull()
+    expect(conceptOfTwLink('rc://*/tw/dict/bible/KT/grace')).toBeNull()
+    expect(conceptOfSupportReference('rc://*/ta/man/translate/figs-order Heb')).toBeNull()
+  })
+
   test('conceptOfTwLink gives null for any other form', () => {
     for (const s of [
       '',
@@ -293,6 +304,15 @@ describe('concepts', () => {
 })
 
 describe('rewriteLinks', () => {
+  test('an rc:// address with capitals in the slug or the name is rewritten with the lowercase id', () => {
+    expect(rewriteLinks('See [[rc://*/ta/man/translate/figs-orderHeb]] and [[rc://es-419/ta/man/translate/figs-orderGrk]].', null)).toBe(
+      'See [[ta:translate/figs-orderheb]] and [[ta:translate/figs-ordergrk]].',
+    )
+    expect(rewriteLinks('[[rc://*/tw/dict/bible/names/Abraham]]', 'tit')).toBe('[[tw:names/abraham]]')
+    // Not an address of the form: kept as it is.
+    expect(rewriteLinks('[[rc://*/ta/man/Translate/figs-orderHeb]]', null)).toBe('[[rc://*/ta/man/Translate/figs-orderHeb]]')
+  })
+
   test('[[rc://*/ta/man/...]] becomes [[ta:...]]', () => {
     expect(rewriteLinks('See [[rc://*/ta/man/translate/figs-metaphor]].', 'tit')).toBe(
       'See [[ta:translate/figs-metaphor]].',

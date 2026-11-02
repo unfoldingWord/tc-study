@@ -12,6 +12,9 @@
  * - **tW**: a resource whose Door43 subject is `Translation Words`. Its `sot` rows are keyed `{res}/bible/{category}/{name}`
  *   (`kt`, `names`, `other`), the value is the markdown. The concept is `tw:{category}/{name}`, the group `tw:{category}`.
  *   The title is the row `helps-text:tw-title:{res}@{stamp}:{category}/{name}` (`gracia, amable`).
+ * - **Ids are lowercase** (`ids.md`, "Concepts"): the tA article published as `translate/figs-orderHeb` is
+ *   `ta:translate/figs-orderheb`, and the report has a line for each id lowercased. The registry key uses the
+ *   lowercase id; the title rows are looked up by the published name.
  * - **tA**: a resource whose subject is `Translation Academy`. Its `sot` rows are keyed `{res}/{manual}/{slug}`. The concept
  *   is `ta:{manual}/{slug}`, the group `ta:{manual}`. The title is the row `helps-text:ta-title:…`.
  *
@@ -35,7 +38,7 @@ import type { Segment } from '../codec/container'
 import { rewriteLinks } from '../ids'
 import { type ArticleModel, ROLES, type SectionModel } from '../model'
 import type { ResourceRef, RowSource } from '../source/rows'
-import { articlePath, assignArticle, type SectionPart, type SectionRegistry, splitSections } from './sections'
+import { articlePath, assignArticle, canonicalRegistry, type SectionPart, type SectionRegistry, splitSections } from './sections'
 
 const TW_SUBJECT = 'Translation Words'
 const TA_SUBJECT = 'Translation Academy'
@@ -45,8 +48,9 @@ type Kind = 'tw' | 'ta'
 /** `{kind}-title` and `{kind}-sub-title` rows of the layer `text`: the resource, the stamp it names and the article path. */
 const TEXT_KEY = /^helps-text:(tw-title|ta-title|ta-sub-?title):([^@]+)@[^:]*:(.+)$/
 
-const TW_PATH = /^bible\/(kt|names|other)\/([a-z0-9_-]+)$/
-const TA_PATH = /^([a-z0-9_-]+)\/([a-z0-9_-]+)$/
+// The name may be published with capitals (the tA `translate/figs-orderHeb`); the id is lowercase (`ids.md`, "Concepts").
+const TW_PATH = /^bible\/(kt|names|other)\/([A-Za-z0-9_-]+)$/
+const TA_PATH = /^([a-z0-9_-]+)\/([A-Za-z0-9_-]+)$/
 
 /** Raw text joined by a blank line, leaving out what is empty. */
 const joinText = (a: string, b: string): string => (a === '' ? b : b === '' ? a : `${a}\n\n${b}`)
@@ -84,7 +88,7 @@ function prepareArticle(kind: Kind, md: string): { heading?: string; subtitle?: 
   return { heading: titlePart.title, subtitle, parts: intro === '' ? rest : [{ level: 0, md: intro }, ...rest] }
 }
 
-type Found = { id: string; group: string; kind: Kind; ref: ResourceRef; name: string; md: string; title?: string; subtitle?: string }
+type Found = { id: string; group: string; kind: Kind; ref: ResourceRef; published: string; rowKey: string; md: string; title?: string; subtitle?: string }
 
 /**
  * The tW and tA articles of a language, in sections with ids that last.
@@ -113,30 +117,29 @@ export async function extractArticles(
     const { titles, subtitles } = await readTexts(source, lang, ref)
     for await (const row of source.rows({ lang, resource: ref.key, layer: 'sot' })) {
       const path = row.key.startsWith(`${ref.key}/`) ? row.key.slice(ref.key.length + 1) : undefined
-      const pattern = kind === 'tw' ? TW_PATH : TA_PATH
-      const m = path === undefined ? null : pattern.exec(path)
+      const m = path === undefined ? null : (kind === 'tw' ? TW_PATH : TA_PATH).exec(path)
       if (path === undefined || m === null) {
-        // The two tA articles of the sample that are written with capitals (`figs-orderHeb`) are not ids (ids.md): lowercase only.
-        const capitals = path !== undefined && new RegExp(pattern.source, 'i').test(path)
-        issues.push(
-          capitals
-            ? `${row.key}: its id has capital letters, and ids are lowercase (ids.md): left out`
-            : `${row.key} is not the key of an article of ${ref.key}: left out`,
-        )
+        issues.push(`${row.key} is not the key of an article of ${ref.key}: left out`)
         continue
       }
-      const name = `${m[1]}/${m[2]}`
-      const id = `${kind}:${name}`
+      // The id is lowercase; the title rows name the article as it is published.
+      const published = `${m[1]}/${m[2]}`
+      const id = `${kind}:${published.toLowerCase()}`
+      if (id !== `${kind}:${published}`) issues.push(`${id} (${ref.key}): published as ${JSON.stringify(published)}, and ids are lowercase (ids.md)`)
       if (typeof row.value !== 'string') {
         issues.push(`${id} (${ref.key}): its text is not markdown (a string): left out`)
         continue
       }
       const earlier = found.get(id)
       if (earlier !== undefined) {
-        issues.push(`${id} is in ${earlier.ref.key} and in ${ref.key}: kept the one of ${earlier.ref.key}`)
+        issues.push(
+          earlier.ref.key === ref.key
+            ? `${id} (${ref.key}): the rows ${earlier.rowKey} and ${row.key} give the same id: kept the first`
+            : `${id} is in ${earlier.ref.key} and in ${ref.key}: kept the one of ${earlier.ref.key}`,
+        )
         continue
       }
-      found.set(id, { id, group: `${kind}:${m[1]}`, kind, ref, name, md: row.value, title: titles.get(name), subtitle: subtitles.get(name) })
+      found.set(id, { id, group: `${kind}:${m[1]}`, kind, ref, published, rowKey: row.key, md: row.value, title: titles.get(published), subtitle: subtitles.get(published) })
     }
   }
 
@@ -164,7 +167,7 @@ export async function extractArticles(
 
     let title = article.title ?? prepared.heading
     if (title === undefined) {
-      title = article.name.slice(article.name.lastIndexOf('/') + 1)
+      title = article.published.slice(article.published.lastIndexOf('/') + 1)
       issues.push(`${where} has no title row and no level-1 heading: used ${JSON.stringify(title)}`)
     }
     const model: ArticleModel = { id, res: ref.key, title, sections }
@@ -174,7 +177,7 @@ export async function extractArticles(
     if (list === undefined) groups.set(article.group, [model])
     else list.push(model)
   }
-  return { groups, registry: next }
+  return { groups, registry: canonicalRegistry(next) }
 }
 
 /**

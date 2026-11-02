@@ -71,3 +71,38 @@ describe('sha256Prefix32', () => {
     expect(sha256Prefix32('')).toBe(0xe3b0c442)
   })
 })
+
+describe('sha256Prefix32 against Web Crypto', () => {
+  const expected = async (text: string) => parseInt(toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', utf8(text)))).slice(0, 8), 16)
+  const ascii = (n: number) => Array.from({ length: n }, (_, i) => String.fromCharCode(97 + (i % 26))).join('')
+
+  test('ASCII texts of 0 to 70 bytes, across the 55 bytes of one block', async () => {
+    for (let n = 0; n <= 70; n++) expect(sha256Prefix32(ascii(n))).toBe(await expected(ascii(n)))
+  })
+
+  test('multi-byte characters that end before, at and after the 55-byte limit', async () => {
+    // 2 bytes (é), 3 bytes (€) and 4 bytes (a surrogate pair), at every offset from 40 to 58 bytes.
+    for (const char of ['é', '€', '\u{1d538}']) {
+      for (let offset = 40; offset <= 58; offset++) {
+        for (const text of [`${ascii(offset)}${char}`, `${ascii(offset)}${char}z`, `${char}${ascii(offset)}`]) {
+          expect(sha256Prefix32(text)).toBe(await expected(text))
+        }
+      }
+    }
+  })
+
+  test('lone surrogates, which UTF-8 writes as U+FFFD, in short and in long texts', async () => {
+    for (const text of ['\ud800', '\udfff', 'a\udc00b', `${ascii(52)}\ud800`, `${ascii(53)}\udfff`, `${ascii(54)}\ud800z`, `${ascii(80)}\ud83d`, '\ud83dx\ude00']) {
+      expect(sha256Prefix32(text)).toBe(await expected(text))
+    }
+  })
+
+  test('a text after a longer one does not keep its bytes', async () => {
+    const long = ascii(55)
+    expect(sha256Prefix32(long)).toBe(await expected(long))
+    expect(sha256Prefix32('')).toBe(await expected(''))
+    expect(sha256Prefix32('ab')).toBe(await expected('ab'))
+    expect(sha256Prefix32(ascii(100))).toBe(await expected(ascii(100)))
+    expect(sha256Prefix32('ab')).toBe(await expected('ab'))
+  })
+})

@@ -162,25 +162,27 @@ export function strongKey(published: string): string {
  */
 const RC_LANGUAGE = String.raw`(?:\*|[a-z]{2,3}(?:-[a-z0-9]+)*)`
 
-const TA_ADDRESS = new RegExp(String.raw`^rc://${RC_LANGUAGE}/ta/man/([a-z0-9_-]+)/([a-z0-9_-]+)$`)
-const TW_ADDRESS = new RegExp(String.raw`^rc://${RC_LANGUAGE}/tw/dict/bible/(kt|names|other)/([a-z0-9_-]+)$`)
+// The manual and the category are lowercase; the slug or name may be published with capitals (`figs-orderHeb`) and the id is lowercase.
+const TA_ADDRESS = new RegExp(String.raw`^rc://${RC_LANGUAGE}/ta/man/([a-z0-9_-]+)/([A-Za-z0-9_-]+)$`)
+const TW_ADDRESS = new RegExp(String.raw`^rc://${RC_LANGUAGE}/tw/dict/bible/(kt|names|other)/([A-Za-z0-9_-]+)$`)
 
 /**
  * The concept of a SupportReference: `rc://*\/ta/man/translate/figs-metaphor` is `ta:translate/figs-metaphor`. A language
- * code in place of the `*` (`rc://es-419/ta/man/...`) means the same. `null` for any other text.
+ * code in place of the `*` (`rc://es-419/ta/man/...`) means the same. A slug published with capitals gives a lowercase id
+ * (`rc://*\/ta/man/translate/figs-orderHeb` is `ta:translate/figs-orderheb`, `ids.md`, "Concepts"). `null` for any other text.
  */
 export function conceptOfSupportReference(s: string): string | null {
   const m = TA_ADDRESS.exec(s)
-  return m ? `ta:${m[1]}/${m[2]}` : null
+  return m ? `ta:${m[1]}/${m[2].toLowerCase()}` : null
 }
 
 /**
- * The concept of a TWLink: `rc://*\/tw/dict/bible/kt/grace` is `tw:kt/grace`. `null` for any other text, and for a
- * category other than `kt`, `names` and `other`.
+ * The concept of a TWLink: `rc://*\/tw/dict/bible/kt/grace` is `tw:kt/grace`; a name with capitals gives a lowercase id. `null`
+ * for any other text, and for a category other than `kt`, `names` and `other`.
  */
 export function conceptOfTwLink(s: string): string | null {
   const m = TW_ADDRESS.exec(s)
-  return m ? `tw:${m[1]}/${m[2]}` : null
+  return m ? `tw:${m[1]}/${m[2].toLowerCase()}` : null
 }
 
 // Links inside text

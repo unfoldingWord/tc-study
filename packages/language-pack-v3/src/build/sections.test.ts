@@ -540,3 +540,75 @@ describe('assignSids: the registry', () => {
     expect(sids(assignSids('__proto__', ES, [{ level: 2, title: 'Definición', md: 'x' }], {}).sections)).toEqual(['definition'])
   })
 })
+
+describe('assignSids: a merge keeps the sid of the first old section (ids.md)', () => {
+  const small = words('s', 12)
+  const big = words('g', 60)
+
+  test('the first old section is the smaller one: the merged section takes its sid, and the other becomes its alias', () => {
+    const one = assignSids(ART, ES, [{ level: 2, title: 'Chico', md: small }, { level: 2, title: 'Grande', md: big }], {})
+    expect(sids(one.sections)).toEqual(['s1', 's2'])
+    const two = assignSids(ART, ES, [{ level: 2, title: 'Todo', md: `${small}\n\n${big}` }], one.registry)
+    // The new text is mostly "Grande" (pass 3 matches it), but the first old section is "Chico".
+    expect(sids(two.sections)).toEqual(['s1'])
+    expect(two.sections[0].aliases).toEqual(['s2'])
+    expect(two.registry[ART]).toHaveLength(1)
+    expect(two.registry[ART][0]).toMatchObject({ sid: 's1', aliases: ['s2'] })
+  })
+
+  test('a section found by its heading keeps the sid it matched; the sections it absorbed become aliases', () => {
+    const one = assignSids(ART, ES, [{ level: 2, title: 'Uno', md: small }, { level: 2, title: 'Dos', md: big }], {})
+    const two = assignSids(ART, ES, [{ level: 2, title: 'Dos', md: `${small}\n\n${big}` }], one.registry)
+    expect(sids(two.sections)).toEqual(['s2'])
+    expect(two.sections[0].aliases).toEqual(['s1'])
+  })
+
+  test('the aliases of an absorbed section are not lost', () => {
+    const a = words('a', 30)
+    const b = words('b', 30)
+    const c = words('c', 30)
+    const one = assignSids(ART, ES, [{ level: 2, title: 'Uno', md: a }, { level: 2, title: 'Dos', md: b }, { level: 2, title: 'Tres', md: c }], {})
+    expect(sids(one.sections)).toEqual(['s1', 's2', 's3'])
+    // The second and third merge: s2 with the alias s3.
+    const two = assignSids(ART, ES, [{ level: 2, title: 'Uno', md: a }, { level: 2, title: 'Unidos', md: `${b}\n\n${c}` }], one.registry)
+    expect(two.sections.map((s) => [s.sid, s.aliases])).toEqual([['s1', undefined], ['s2', ['s3']]])
+    // Then everything merges: s1 absorbs s2, and s3 still leads to it.
+    const three = assignSids(ART, ES, [{ level: 2, title: 'Todo', md: `${a}\n\n${b}\n\n${c}` }], two.registry)
+    expect(sids(three.sections)).toEqual(['s1'])
+    expect(three.sections[0].aliases).toEqual(['s2', 's3'])
+    expect(three.registry[ART][0].aliases).toEqual(['s2', 's3'])
+  })
+})
+
+describe('the registry is canonical', () => {
+  const FAITH = 'es-419_gl/es-419/tw/kt/faith'
+  const parts: SectionPart[] = [{ level: 2, title: 'Definición', md: words('d', 10) }]
+
+  test('two histories that end in the same state give the same JSON text', () => {
+    const ab = assignSids(FAITH, ES, parts, assignSids(ART, ES, parts, {}).registry).registry
+    const ba = assignSids(ART, ES, parts, assignSids(FAITH, ES, parts, {}).registry).registry
+    expect(JSON.stringify(ab)).toBe(JSON.stringify(ba))
+    expect(Object.keys(ab)).toEqual([FAITH, ART])
+  })
+
+  test('the articles are ordered by code point, not by UTF-16 code unit', () => {
+    const registry = assignSids('\u{1d538}', ES, parts, assignSids('￿', ES, parts, assignSids('a', ES, parts, {}).registry).registry).registry
+    expect(Object.keys(registry)).toEqual(['a', '￿', '\u{1d538}'])
+  })
+
+  test('the fields of an entry are in a fixed order, also in the entries the build did not touch', () => {
+    const scrambled = { future: 1, trigrams: [1], aliases: ['x'], role: 'unknown', fingerprint: 'f', level: 3, title: 'T', sid: 's9' }
+    const registry = assignSids(ART, ES, [{ level: 3, title: 'Algo', md: 'x' }], { zzz: [scrambled as never] }).registry
+    expect(Object.keys(registry)).toEqual([ART, 'zzz'])
+    expect(Object.keys(registry.zzz[0])).toEqual(['sid', 'title', 'level', 'role', 'fingerprint', 'trigrams', 'aliases', 'future'])
+    expect(Object.keys(registry[ART][0])).toEqual(['sid', 'title', 'level', 'role', 'fingerprint', 'trigrams'])
+  })
+
+  test('an entry with aliases and no heading has the fields in the same order', () => {
+    const a = words('a', 30)
+    const b = words('b', 30)
+    const one = assignSids(ART, ES, [{ level: 0, md: a }, { level: 2, title: 'Uno', md: b }], {})
+    const two = assignSids(ART, ES, [{ level: 0, md: `${a}\n\n${b}` }], one.registry)
+    expect(Object.keys(two.registry[ART][0])).toEqual(['sid', 'level', 'role', 'fingerprint', 'trigrams', 'aliases'])
+  })
+})

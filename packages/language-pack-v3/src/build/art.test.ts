@@ -250,11 +250,26 @@ describe('extractArticles: tW', () => {
     ])
   })
 
-  test('an article written with capitals (figs-orderHeb in the tA) is not an id: left out, with a line in the report', async () => {
+  test('an article published with capitals gets the lowercase id, is not skipped, and the report says so', async () => {
     const md = '# T\n\n## Q\n\n### Descripción\n\nx'
-    const { groups, issues } = await build([ta([{ path: 'translate/figs-orderHeb', md }, { path: 'translate/figs-order', md }])])
-    expect(groups.get('ta:translate')!.map((a) => a.id)).toEqual(['ta:translate/figs-order'])
-    expect(issues).toEqual(['es-419_gl/es-419/ta/translate/figs-orderHeb: its id has capital letters, and ids are lowercase (ids.md): left out'])
+    const { groups, registry, issues } = await build([ta([{ path: 'translate/figs-orderHeb', md, title: 'Orden hebreo' }, { path: 'translate/figs-order', md }])])
+    // The title row is found by the published name; the id and the registry key are lowercase.
+    expect(groups.get('ta:translate')!.map((a) => [a.id, a.title])).toEqual([
+      ['ta:translate/figs-order', 'T'],
+      ['ta:translate/figs-orderheb', 'Orden hebreo'],
+    ])
+    expect(Object.keys(registry)).toEqual(['es-419_gl/es-419/ta/translate/figs-order', 'es-419_gl/es-419/ta/translate/figs-orderheb'])
+    expect(issues).toEqual(['ta:translate/figs-orderheb (es-419_gl/es-419/ta): published as "translate/figs-orderHeb", and ids are lowercase (ids.md)'])
+  })
+
+  test('a tW name with capitals is lowercased the same way, and two rows that give one id keep the first', async () => {
+    const md = '# T\n\n## Definición\n\nx'
+    const { groups, issues } = await build([tw([{ path: 'names/Abraham', md: '# Primero\n\n## Definición\n\nx' }, { path: 'names/abraham', md }])])
+    expect(groups.get('tw:names')!.map((a) => [a.id, a.title])).toEqual([['tw:names/abraham', 'Primero']])
+    expect(issues).toEqual([
+      'tw:names/abraham (es-419_gl/es-419/tw): published as "names/Abraham", and ids are lowercase (ids.md)',
+      'tw:names/abraham (es-419_gl/es-419/tw): the rows es-419_gl/es-419/tw/bible/names/Abraham and es-419_gl/es-419/tw/bible/names/abraham give the same id: kept the first',
+    ])
   })
 
   test('resources of other kinds are not read', async () => {
@@ -375,6 +390,24 @@ describe('extractArticles: the registry', () => {
     const two = await build([tw([{ path: 'kt/grace', md: '# t\n\n## Definición\n\nLa palabra gracia se refiere a la ayuda que se da.' }])], one.registry)
     expect(two.registry['es-419_gl/es-419/tw/kt/grace'].map((e) => e.sid)).toEqual(['definition'])
     expect(two.registry[other]).toEqual(kept)
+  })
+
+  test('the registry is canonical: the same state gives the same JSON text, whatever the history', async () => {
+    const a = { path: 'kt/a', md: v1('Definition') }
+    const b = { path: 'kt/b', md: v2 }
+    const kept = [{ sid: 'description', level: 3, role: 'description' as const, fingerprint: 'f', trigrams: [1, 2] }]
+    const k1 = 'es-419_gl/es-419/ta/translate/not-built-now'
+    const k2 = 'es-419_gl/es-419/tw/kt/zzz'
+
+    const x = await build([tw([a, b])], { [k1]: kept, [k2]: kept })
+    const y = await build([tw([b, a])], { [k2]: kept, [k1]: kept })
+    expect(JSON.stringify(x.registry)).toBe(JSON.stringify(y.registry))
+    expect(Object.keys(x.registry)).toEqual([k1, 'es-419_gl/es-419/tw/kt/a', 'es-419_gl/es-419/tw/kt/b', k2])
+
+    // One build of both, or one after the other, with the registry in between.
+    const first = await build([tw([a])], { [k1]: kept, [k2]: kept })
+    const second = await build([tw([a, b])], first.registry)
+    expect(JSON.stringify(second.registry)).toBe(JSON.stringify(x.registry))
   })
 
   test('the registry given is not changed', async () => {

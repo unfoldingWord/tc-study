@@ -35,8 +35,9 @@
  *
  * - **split**: the old section is matched once, by the first part in reading order; the other parts are new;
  * - **merge**: an old section that no new section matched, and at least half of whose trigrams are in one new section, is
- *   absorbed by it. If that section matched no old section, it takes the sid of the first absorbed one; the sids of
- *   the others go to its `aliases`. (Pass 3 alone cannot see a merge of two sections of the same size: each is only half
+ *   absorbed by it. The merged section keeps the sid of the earliest of the old sections it holds (the one it matched
+ *   and the ones it absorbed; when it matched by heading or by role, the one it matched); the sids of the others, and
+ *   the aliases they had, go to its `aliases`. (Pass 3 alone cannot see a merge of two sections of the same size: each is only half
  *   of the new text, and the junction costs it a few trigrams below the half.)
  *
  * The `aliases` of an old section are kept in the registry, so that a section merged two builds ago still answers to its
@@ -52,6 +53,7 @@
  * A sid is assigned once. A corrected heading, a role that changed or a section that moved keeps the sid of the section
  * it was recognized as; the role is stored apart.
  */
+import { compareCodePoints } from '../codec/columns'
 import { sha256Hex, sha256Prefix32 } from '../codec/sha256'
 import { hasOwn } from '../codec/values'
 import type { Role, SectionModel } from '../model'
@@ -305,6 +307,31 @@ function common(a: number[], b: number[]): number {
   return n
 }
 
+// The registry as the build writes it
+
+const ENTRY_FIELDS = ['sid', 'title', 'level', 'role', 'fingerprint', 'trigrams', 'aliases']
+
+/** An entry with its fields in the fixed order of {@link RegistryEntry}; a field this code does not know goes last, sorted. */
+function canonicalEntry(entry: RegistryEntry): RegistryEntry {
+  const fields = entry as unknown as Record<string, unknown>
+  const out: Record<string, unknown> = {}
+  for (const key of ENTRY_FIELDS) if (hasOwn(fields, key) && fields[key] !== undefined) out[key] = fields[key]
+  for (const key of Object.keys(fields).sort(compareCodePoints)) if (!ENTRY_FIELDS.includes(key) && fields[key] !== undefined) out[key] = fields[key]
+  return out as unknown as RegistryEntry
+}
+
+/**
+ * The registry in its canonical form: the articles by code point of their key, the fields of each entry in a fixed
+ * order. Two histories of builds that end in the same state give the same JSON text. Returns a new registry.
+ */
+export function canonicalRegistry(registry: SectionRegistry): SectionRegistry {
+  return Object.fromEntries(
+    Object.keys(registry)
+      .sort(compareCodePoints)
+      .map((key): [string, RegistryEntry[]] => [key, registry[key].map(canonicalEntry)]),
+  )
+}
+
 // Assigning
 
 type Prepared = { part: SectionPart; role: Role; lang: string; key: string | null; fingerprint: string; trigrams: number[] }
@@ -340,9 +367,12 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
   const n = prepared.length
   const match: number[] = new Array(n).fill(-1)
   const used: boolean[] = new Array(old.length).fill(false)
-  const take = (i: number, o: number) => {
+  // How each new section found its old one: a merge by text gives the sid of the earliest old section it holds.
+  const via: ('heading' | 'role' | 'text' | 'merge')[] = new Array(n).fill('heading')
+  const take = (i: number, o: number, how: 'heading' | 'role' | 'text' | 'merge') => {
     match[i] = o
     used[o] = true
+    via[i] = how
   }
 
   // 1. The same heading.
@@ -353,7 +383,7 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
   })
   prepared.forEach(({ key }, i) => {
     const o = key === null ? undefined : byHeading.get(key)?.shift()
-    if (o !== undefined) take(i, o)
+    if (o !== undefined) take(i, o, 'heading')
   })
 
   // 2. The same role and the same place among the sections of that role.
@@ -365,7 +395,7 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
     seen.set(role, place + 1)
     if (match[i] !== -1 || role === 'unknown') return
     const o = oldByRole.get(role)?.[place]
-    if (o !== undefined && !used[o]) take(i, o)
+    if (o !== undefined && !used[o]) take(i, o, 'role')
   })
 
   // 3. Its text: at least half of its trigrams are in the old section; the most in common wins.
@@ -381,11 +411,11 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
         bestCommon = shared
       }
     })
-    if (best !== -1) take(i, best)
+    if (best !== -1) take(i, best, 'text')
   })
 
   // Merges: an old section nobody matched whose text lives (at least half of its trigrams) in one new section.
-  const absorbed: string[][] = prepared.map(() => [])
+  const absorbed: number[][] = prepared.map(() => [])
   old.forEach((entry, o) => {
     if (used[o] || entry.trigrams.length === 0) return
     let best = -1
@@ -399,9 +429,11 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
       }
     })
     if (best === -1) return
-    used[o] = true
-    if (match[best] === -1) match[best] = o
-    else absorbed[best].push(entry.sid)
+    if (match[best] === -1) take(best, o, 'merge')
+    else {
+      used[o] = true
+      absorbed[best].push(o)
+    }
   })
 
   // Sids. Every sid and alias the registry has had for the article is taken, those of dropped sections too.
@@ -425,16 +457,26 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
   const sections: SectionModel[] = []
   const entries: RegistryEntry[] = []
   prepared.forEach(({ part, role, lang, fingerprint, trigrams }, i) => {
-    const before = match[i] === -1 ? undefined : old[match[i]]
-    const sid = before !== undefined ? before.sid : fresh(role)
+    // The old sections this one holds: the one it matched and those it absorbed (ids.md: a merged section keeps the sid
+    // of the first). One found by its heading or its role keeps the sid it matched; one found by its text takes the
+    // sid of the earliest of them. The sids and aliases of the others become its aliases.
+    const olds = match[i] === -1 ? [] : [match[i], ...absorbed[i]]
+    const primary = olds.length === 0 ? undefined : via[i] === 'text' ? Math.min(...olds) : olds[0]
+    const sid = primary !== undefined ? old[primary].sid : fresh(role)
     reserve(sid)
-    const aliases = [...new Set([...(before?.aliases ?? []), ...absorbed[i]])].filter((alias) => alias !== sid)
+    const others = olds.filter((o) => o !== primary).sort((a, b) => a - b)
+    const aliases = [
+      ...new Set([
+        ...(primary === undefined ? [] : (old[primary].aliases ?? [])),
+        ...others.flatMap((o) => [old[o].sid, ...(old[o].aliases ?? [])]),
+      ]),
+    ].filter((alias) => alias !== sid)
     const section: SectionModel = { sid, level: part.level, role, lang, md: part.md }
     if (part.title !== undefined) section.title = part.title
     if (aliases.length > 0) section.aliases = aliases
     sections.push(section)
-    const entry: RegistryEntry = { sid, level: part.level, role, fingerprint, trigrams }
-    if (part.title !== undefined) entry.title = part.title
+    const entry: RegistryEntry =
+      part.title === undefined ? { sid, level: part.level, role, fingerprint, trigrams } : { sid, title: part.title, level: part.level, role, fingerprint, trigrams }
     if (aliases.length > 0) entry.aliases = [...aliases]
     entries.push(entry)
   })
@@ -446,8 +488,8 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
  * `articleLang` its language, `parts` its sections in reading order (the markdown as it will be stored: the fingerprint
  * and the trigrams are of this text), `registry` the one of the last build.
  *
- * Returns the sections, with their sid, role and language, and a new registry: `registry` with the entry of this
- * article replaced. `registry` itself is not changed.
+ * Returns the sections, with their sid, role and language, and a new registry in its canonical form
+ * ({@link canonicalRegistry}): `registry` with the entry of this article replaced. `registry` itself is not changed.
  *
  * A section's language is the article's, unless the table that placed its heading belongs to another language family
  * (`en` in an `es-419` article gives `en`; `es` in an `es-419` one does not).
@@ -459,7 +501,7 @@ export function assignSids(
   registry: SectionRegistry,
 ): { sections: SectionModel[]; registry: SectionRegistry } {
   const { sections, entries } = assign(articleLang, parts, hasOwn(registry, articleId) ? registry[articleId] : [])
-  return { sections, registry: { ...registry, [articleId]: entries } }
+  return { sections, registry: canonicalRegistry({ ...registry, [articleId]: entries }) }
 }
 
 /** What {@link assignSids} does for one article, without copying the whole registry: for a builder that goes through thousands of articles. */
