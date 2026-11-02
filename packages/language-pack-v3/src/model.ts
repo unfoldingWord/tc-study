@@ -324,3 +324,24 @@ export type XmapCore = {
 
 /** The part of one book: the verses behind the counts of the core. `part` is the book code. */
 export type XmapPart = { part: string; strong: VerseLists; links?: VerseLists; notes?: VerseLists }
+
+// The language map (`spec/cddl/map.cddl`)
+
+/** A book's names: the name, the short name, the abbreviation, and where they came from. */
+export type BookName = [name: string, short: string, abbreviation: string, source: 'text' | 'list' | 'none']
+
+/** The core of a language's map: what the language calls things and what it has. */
+export type MapCore = {
+  lang: string
+  part: 'core'
+  res: [string, string][]
+  books: BookName[]
+  names: Record<string, string[]>
+  subtitles?: Record<string, string>
+  coverage: Coverage
+  usage?: CountTable
+  obs?: [number, string][]
+}
+
+/** The part of one book: the verses behind the core's `usage`. `part` is the book code. */
+export type MapPart = { lang: string; part: string; usage?: VerseLists }
