@@ -51,7 +51,7 @@ function listOf(row: Row, field: string): unknown[] | undefined {
  * The rows of the source in file order: the chapter chunks `{prefix}:{res}:{book}:{chapter}` in chapter order whatever the
  * order they come in, or, when the resource has no chunk, the list of the book row `{prefix}:{res}:{book}`.
  */
-function sourceRows(rows: Row[], book: string, res: string, kind: HelpsKind): { where: string; item: unknown }[] {
+export function sourceRows(rows: Row[], book: string, res: string, kind: HelpsKind): { where: string; item: unknown }[] {
   const { prefix, field } = SOURCES[kind]
   const bookKey = `${prefix}:${res}:${book}`
   const chunks = new Map<number, { where: string; list: unknown[] }>()
@@ -201,6 +201,79 @@ function quotePieces(
 // Extraction
 
 /**
+ * A function that gives the id of each row of a table: the published one, or, when it is taken, the published one with `~2`,
+ * `~3`… (`ids.md`, "Resources and pieces"), in the order the rows are given.
+ */
+export function uniqueIds(): (id: string) => string {
+  const taken = new Set<string>()
+  const repeats = new Map<string, number>()
+  return (id) => {
+    if (!taken.has(id)) {
+      taken.add(id)
+      return id
+    }
+    let n = repeats.get(id) ?? 1
+    let candidate: string
+    do {
+      n++
+      candidate = `${id}~${n}`
+    } while (taken.has(candidate))
+    repeats.set(id, n)
+    taken.add(candidate)
+    return candidate
+  }
+}
+
+/**
+ * The fields of a row of notes, questions or links that are not its id and its reference, as the row keeps them: `cols`, and
+ * the `concept` (notes: SupportReference, links: TWLink). A value that is an address (`rc://*\/ta/man/…`) becomes `concept` and
+ * its column is left out; an empty one is left out; any other form stays in `cols` and the row has no concept. `note`, `question`
+ * and `response` have their TSV escapes undone and their links rewritten (`unescapeTsv`, then `rewriteLinks`, with `book`
+ * `null` for Open Bible Stories, which has no book to resolve the relative links against). `report` receives a line for each
+ * anomaly. Throws `Error` for a field that is not text or true and false; `where` and `published` (the row's id) name the row.
+ */
+export function helpColumns(
+  item: Record<string, unknown>,
+  kind: HelpsKind,
+  book: string | null,
+  where: string,
+  published: string,
+  report: (text: string) => void,
+): { cols: Record<string, string | boolean>; concept?: string } {
+  const { concept: conceptSource } = SOURCES[kind]
+  const cols: [string, string | boolean][] = []
+  let concept: string | undefined
+  for (const [name, value] of Object.entries(item)) {
+    if (name === 'id' || name === 'reference' || value === undefined || value === null) continue
+    if (conceptSource !== undefined && name === conceptSource.column && typeof value === 'string') {
+      if (value === '') continue
+      const found = conceptSource.of(value)
+      if (found !== null) {
+        concept = found
+        continue
+      }
+      report(`the ${name} ${JSON.stringify(value)} is not an address that becomes a concept; it stays in cols`)
+      cols.push([name, value])
+    } else if (typeof value === 'string') {
+      if (!LONG_TEXT_COLUMNS.includes(name)) {
+        cols.push([name, value])
+        continue
+      }
+      const text = rewriteLinks(unescapeTsv(value), book)
+      cols.push([name, text])
+      const left = [...new Set(text.match(UNREWRITTEN) ?? [])]
+      if (left.length > 0) report(`${name} has links in a form that is kept as it is: ${left.slice(0, 3).join(' ')}${left.length > 3 ? ` (and ${left.length - 3} more)` : ''}`)
+    } else if (typeof value === 'boolean') {
+      cols.push([name, value])
+    } else {
+      throw new Error(`${where}: the field ${JSON.stringify(name)} of the row ${JSON.stringify(published)} is not text or true and false`)
+    }
+  }
+  // `fromEntries` defines every key, a field named "__proto__" included.
+  return concept === undefined ? { cols: Object.fromEntries(cols) } : { cols: Object.fromEntries(cols), concept }
+}
+
+/**
  * Reads the notes, questions or word links of a book from rows of a source (the caller has filtered them to the language
  * and the book; rows of other resources and of other layers are ignored). `res` is the key of the resource.
  *
@@ -225,28 +298,10 @@ function quotePieces(
  * resource, a chapter twice, a row without an id, a field that is not text or true and false.
  */
 export function extractHelps(rows: Row[], book: string, res: string, kind: HelpsKind, orig: OrigIndex, issues: string[] = []): HelpTable {
-  const { concept: conceptSource } = SOURCES[kind]
   const source = sourceRows(rows, book, res, kind)
   const layer = kind === 'questions' ? new Map<string, unknown[]>() : quoteLayer(rows, book, res, issues)
 
-  const taken = new Set<string>()
-  const repeats = new Map<string, number>()
-  /** The id of a row: the published one, or, when it is taken, with `~2`, `~3`… */
-  const unique = (id: string): string => {
-    if (!taken.has(id)) {
-      taken.add(id)
-      return id
-    }
-    let n = repeats.get(id) ?? 1
-    let candidate: string
-    do {
-      n++
-      candidate = `${id}~${n}`
-    } while (taken.has(candidate))
-    repeats.set(id, n)
-    taken.add(candidate)
-    return candidate
-  }
+  const unique = uniqueIds()
 
   const table: HelpRow[] = []
   for (const [index, { where, item }] of source.entries()) {
@@ -270,37 +325,8 @@ export function extractHelps(rows: Row[], book: string, res: string, kind: Helps
       }
     }
 
-    const cols: [string, string | boolean][] = []
-    let concept: string | undefined
-    for (const [name, value] of Object.entries(item)) {
-      if (name === 'id' || name === 'reference' || value === undefined || value === null) continue
-      if (conceptSource !== undefined && name === conceptSource.column && typeof value === 'string') {
-        if (value === '') continue
-        const found = conceptSource.of(value)
-        if (found !== null) {
-          concept = found
-          continue
-        }
-        report(`the ${name} ${JSON.stringify(value)} is not an address that becomes a concept; it stays in cols`)
-        cols.push([name, value])
-      } else if (typeof value === 'string') {
-        if (!LONG_TEXT_COLUMNS.includes(name)) {
-          cols.push([name, value])
-          continue
-        }
-        const text = rewriteLinks(unescapeTsv(value), book)
-        cols.push([name, text])
-        const left = [...new Set(text.match(UNREWRITTEN) ?? [])]
-        if (left.length > 0) report(`${name} has links in a form that is kept as it is: ${left.slice(0, 3).join(' ')}${left.length > 3 ? ` (and ${left.length - 3} more)` : ''}`)
-      } else if (typeof value === 'boolean') {
-        cols.push([name, value])
-      } else {
-        throw new Error(`${where}: the field ${JSON.stringify(name)} of the row ${JSON.stringify(published)} is not text or true and false`)
-      }
-    }
-
-    // `fromEntries` defines every key, a field named "__proto__" included.
-    const row: HelpRow = { id, ref: reference, from: range[0], to: range[1], cols: Object.fromEntries(cols) }
+    const { cols, concept } = helpColumns(item, kind, book, where, published, report)
+    const row: HelpRow = { id, ref: reference, from: range[0], to: range[1], cols }
     if (concept !== undefined) row.concept = concept
     const pieces = layer.get(published)
     if (pieces !== undefined) Object.assign(row, quotePieces(pieces, book, range[0], orig, report))

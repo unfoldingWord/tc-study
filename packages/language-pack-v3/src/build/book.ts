@@ -36,7 +36,7 @@ const isInteger = (value: unknown): value is number => typeof value === 'number'
 const isCount = (value: unknown): value is number => isInteger(value) && value >= 0
 
 /** The index in `h.res` of each resource key. Throws `Error` when the header has no resource or lists one twice. */
-export function resIndexOf(m: BookModel): Map<string, number> {
+export function resIndexOf(m: { res: [string, string][] }): Map<string, number> {
   if (m.res.length === 0) throw new Error('The header needs at least one resource (res)')
   const index = new Map<string, number>()
   m.res.forEach(([key], i) => {
@@ -180,10 +180,10 @@ function canonicalRef(book: string, from: number, to: number): string | null {
 }
 
 /** One column of a helps table: which rows have a value (`present`), and the values of those rows, in row order. */
-type ColumnPlan = { name: string; kind: 'strings' | 'texts' | 'flags'; present: boolean[]; values: (string | boolean)[] }
+export type ColumnPlan = { name: string; kind: 'strings' | 'texts' | 'flags'; present: boolean[]; values: (string | boolean)[] }
 
 /** `column` of `common.cddl`: `has` only when some row lacks the value, then the values of the rows that have it. */
-function encodeColumn(plan: Omit<ColumnPlan, 'name'>, index: ReadonlyMap<string, number>): CborValue {
+export function encodeColumn(plan: Omit<ColumnPlan, 'name'>, index: ReadonlyMap<string, number>): CborValue {
   const out: Record<string, CborValue> = {}
   if (plan.present.some((has) => !has)) out.has = encodeBits(plan.present)
   if (plan.kind === 'strings') out.strings = encodeUvarints((plan.values as string[]).map((value) => index.get(value)!))
@@ -193,7 +193,7 @@ function encodeColumn(plan: Omit<ColumnPlan, 'name'>, index: ReadonlyMap<string,
 }
 
 /** The columns of the rows' `cols`, by name in code point order. A column is `texts` for a long text, `flags` for true or false. */
-function columnPlans(name: HelpsName, rows: HelpRow[]): ColumnPlan[] {
+export function columnPlans(name: string, rows: { cols: HelpRow['cols'] }[]): ColumnPlan[] {
   const names = new Set<string>()
   for (const row of rows) for (const key of Object.keys(row.cols)) if (row.cols[key] !== undefined) names.add(key)
   return [...names].sort(compareCodePoints).map((column) => {
