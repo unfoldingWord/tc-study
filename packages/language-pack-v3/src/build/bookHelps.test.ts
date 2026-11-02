@@ -586,6 +586,17 @@ describe('extractHelps: references', () => {
     expect(ref('front:intro')).toMatchObject({ from: 56_000_000, to: 56_000_000 })
   })
 
+  // Real data: the TWL and the TN of Psalms (en) have 78 rows with a reference like "3:front", the title of the psalm.
+  test('C:front is the introduction of chapter C (the title of a psalm), keeps its text and adds a line', () => {
+    const issues: string[] = []
+    expect(ref('3:front', issues)).toMatchObject({ ref: '3:front', from: 56_003_000, to: 56_003_000 })
+    expect(issues).toHaveLength(1)
+    expect(issues[0]).toContain('"3:front"')
+    expect(issues[0]).toContain('introduction of chapter 3')
+    // Not a chapter: front alone, 0:front and front:front still name no verse and go to the book introduction.
+    for (const text of ['front', '0:front', 'front:front', '3:fronts']) expect(ref(text)).toMatchObject({ from: 56_000_000, to: 56_000_000 })
+  })
+
   test('a list (1:1,3) covers the lowest to the highest verse it names, keeps its text and adds a line', () => {
     const issues: string[] = []
     expect(ref('1:1,3', issues)).toMatchObject({ ref: '1:1,3', from: 56_001_001, to: 56_001_003 })
@@ -828,6 +839,44 @@ describe('extractHelps: quotes', () => {
     expect(row.quoteKinds).toBeUndefined()
     expect(issues.length).toBe(3)
     expect(issues[0]).toContain('"x"')
+  })
+
+  // Real data: the quote layer of Psalms (en) says verse 1 for the words of a psalm title, which the original writes before \v 1 (verse 0),
+  // and counts the occurrences over the title and the verse together ("id" 5 of 3:1 is the fifth word of the title).
+  test('verse 1 of a chapter whose original has an introduction: the words of the introduction come first, with the occurrences counted over both', () => {
+    // Chapter 1: introduction τ σ (positions 0 1), verse 1 α τ β (2 3 4), verse 2 γ τ (5 6).
+    const titled: OrigModel = {
+      book: 'tit',
+      key: UGNT,
+      stamp: 'g987ab2025a',
+      words: ['τ', 'σ', 'α', 'τ', 'β', 'γ', 'τ'].map((form) => ({ form, lemma: '', strong: '', morph: '' })),
+      pieces: ['τ', ' ', 'σ', ' ', 'α', ' ', 'τ', ' ', 'β', ' ', 'γ', ' ', 'τ'].map((s): [string, boolean] => [s, s !== ' ']),
+      events: [[0, 'chapter', '1'], [4, 'verse', '1'], [10, 'verse', '2']],
+    }
+    const issues: string[] = []
+    const table = notesOf(
+      [
+        tnChunk(1, [noteRow('aaaa', '1:1'), noteRow('bbbb', '1:2')]),
+        quoteLayer(1, {
+          // σ is in the title; the first τ of 1:1 is the title's, the second is the verse's own; α is the verse's; a third τ is nowhere in 1:1.
+          aaaa: [token('σ', 1), token('τ', 1, 1), token('τ', 1, 2), token('α', 1), token('τ', 1, 3)],
+          // Verse 2 does not look in the introduction.
+          bbbb: [token('τ', 2), token('σ', 2)],
+        }),
+      ],
+      issues,
+      titled,
+    )
+    expect(table.rows.map((row) => row.quote)).toEqual([[1, 0, 3, 2, -1], [6, -1]])
+    expect(table.rows[0].quoteMissing).toEqual([[4, TIT + 1001, 'τ', 3]])
+    expect(table.rows[1].quoteMissing).toEqual([[1, TIT + 1002, 'σ', 1]])
+    expect(issues).toHaveLength(2)
+  })
+
+  test('a chapter with no introduction is looked up in the verse alone', () => {
+    // mini() has no words before verse 1: τ is not in verse 1, whatever the introduction of other chapters holds.
+    const table = notesOf([tnChunk(1, [noteRow('aaaa', '1:1')]), quoteLayer(1, { aaaa: [token('α', 1, 2), token('γ', 1)] })])
+    expect(table.rows[0].quote).toEqual([2, -1])
   })
 
   test('a piece that is not a word (an ellipsis) is -1, listed in quoteKinds as [piece, kind]', () => {

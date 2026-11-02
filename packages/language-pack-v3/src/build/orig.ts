@@ -345,7 +345,21 @@ export class OrigIndex {
    * sides) is. A text that folds to nothing (`""` or `"/"`) names no word: `null`.
    */
   find(verse: number, text: string, occurrence: number): number | null {
-    const positions = this.byVerse.get(verse)
+    return this.locate(this.byVerse.get(verse), text, occurrence)
+  }
+
+  /**
+   * {@link find} as format 2.0's quote layer counts: for the first verse of a chapter, the words of the chapter's introduction (verse 0,
+   * what the original writes before `\v 1`: the title of a psalm) come first, and the occurrences are counted over them and the verse
+   * together. Any other verse is {@link find}.
+   */
+  findWithIntro(verse: number, text: string, occurrence: number): number | null {
+    const intro = verse % 1000 === 1 ? this.byVerse.get(verse - 1) : undefined
+    const own = this.byVerse.get(verse)
+    return this.locate(intro === undefined ? own : own === undefined ? intro : [...intro, ...own], text, occurrence)
+  }
+
+  private locate(positions: number[] | undefined, text: string, occurrence: number): number | null {
     if (positions === undefined || !Number.isInteger(occurrence) || occurrence < 1) return null
     const folded = fold(text)
     if (folded === '') return null

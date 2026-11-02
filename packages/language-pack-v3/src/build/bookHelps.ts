@@ -147,8 +147,8 @@ const countOr = (value: unknown, fallback: number): number => (typeof value === 
 
 /**
  * The pieces of a quote as the quote layer holds them, turned into positions. A word is found with
- * `orig.find(verse, word, occurrence)`, the verse being the piece's own (`chapter` and `verse`), or the first verse of the
- * row when the piece has none. A word that is not found gets `-1` and an entry in `missing`; a piece whose `type` is not
+ * `orig.findWithIntro(verse, word, occurrence)`, the verse being the piece's own (`chapter` and `verse`), or the first verse of the
+ * row when the piece has none (for verse 1 the words of the chapter's introduction, a psalm's title, come first: the quote layer counts them so). A word that is not found gets `-1` and an entry in `missing`; a piece whose `type` is not
  * `word`, or that is an ellipsis, gets `-1` and an entry in `kinds`.
  */
 function quotePieces(
@@ -179,10 +179,10 @@ function quotePieces(
       }
     }
     const occurrence = typeof token.occurrence === 'number' ? token.occurrence : 1
-    let position = orig.find(verse, content, occurrence)
+    let position = orig.findWithIntro(verse, content, occurrence)
     // A ketiv is found by its qere too (the layer keeps both).
     if (position === null && typeof token.qere === 'string' && token.qere !== '') {
-      position = orig.find(verse, token.qere, typeof token.qereOccurrence === 'number' ? token.qereOccurrence : occurrence)
+      position = orig.findWithIntro(verse, token.qere, typeof token.qereOccurrence === 'number' ? token.qereOccurrence : occurrence)
     }
     if (position !== null) {
       quote.push(position)
@@ -315,13 +315,21 @@ export function extractHelps(rows: Row[], book: string, res: string, kind: Helps
     const reference = typeof item.reference === 'string' ? item.reference : ''
     let range = parseRef(book, reference)
     if (range === null) {
-      range = looseRange(book, reference)
-      if (range === null) {
-        const intro = verseId(book, 0, 0)
-        range = [intro, intro]
-        report(`the reference ${JSON.stringify(reference)} names no verse; the row is placed at the book introduction`)
+      // "3:front", the title of a psalm: the introduction of the chapter.
+      const front = /^([1-9][0-9]{0,2}):front$/.exec(reference.trim())
+      const title = front === null ? null : parseRef(book, `${front[1]}:intro`)
+      if (title !== null) {
+        range = title
+        report(`the reference ${JSON.stringify(reference)} is read as the introduction of chapter ${front![1]}`)
       } else {
-        report(`the reference ${JSON.stringify(reference)} is not one range in the usual form; the row covers ${showRange(book, range[0], range[1])}`)
+        range = looseRange(book, reference)
+        if (range === null) {
+          const intro = verseId(book, 0, 0)
+          range = [intro, intro]
+          report(`the reference ${JSON.stringify(reference)} names no verse; the row is placed at the book introduction`)
+        } else {
+          report(`the reference ${JSON.stringify(reference)} is not one range in the usual form; the row covers ${showRange(book, range[0], range[1])}`)
+        }
       }
     }
 
