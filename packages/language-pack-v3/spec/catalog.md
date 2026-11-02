@@ -34,7 +34,7 @@ A **unit** is what a device installs or replaces at once:
 | `obs` | Open Bible Stories |
 
 Each unit lists the units it needs (`needs`). A book needs its original, the language map (`needs: "map"`, now satisfied by its own catalog) and the article groups its
-notes and links point to. The lexicon is not needed to read; an app downloads it when asked.
+notes and links point to that the catalog builds (the others are reported and not listed). The lexicon is not needed to read; an app downloads it when asked.
 
 A bridged book names the original's stamp, so its unit needs `orig:<book>` like any book: a device without that
 original does not activate it.
@@ -66,7 +66,7 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 | An English note or word link | the English `book` segment; the `xmap` part of that book and its core, if a count or the Strong keys of a link's quote (`strongs`) changed; both catalogs |
 | A tW or tA article | its `art` group, the `map` core if its title changed, the catalog |
 | One book of the original | `orig` of that book, and every `book` segment of that book in every language (their positions); the `xmap` part of that book |
-| A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog; no map part |
+| A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog. A map part keeps its segment id, but its `inputs` carry the tN stamp of its book and so change: the part is re-checked, not re-published |
 | TIPNR, Theographic or the alias list | the `xmap` core and the parts whose books they touch |
 
 ## Signatures

@@ -413,7 +413,7 @@ types, these are `E_BODY` too:
   article; an `id` twice in the group.
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.
-- **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part whose `book` is not its `part`; a core with a `book`; a
+- **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part without `book` is valid; a part whose `book` differs from its `part` is E_BODY; a core with a `book`; a
   known core table in a part, or a part table shape in a core.
   - Coverage: a book set (`whole` or `partial` of a source) of another length than 9 bytes, or with any of the bits 66 to 71 set, or a book in both sets of one source (both readers reject it; the book sets of a catalog's `books` are checked for length only).
   - Counts: keys not sorted or repeated; a `counts` column cut short, or with numbers left over; a book number outside 1..66 or not
