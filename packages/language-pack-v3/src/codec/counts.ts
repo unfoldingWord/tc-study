@@ -27,7 +27,7 @@ function checkKeys(keys: unknown, what: string): string[] {
 }
 
 function asRecord(t: unknown, what: string): Record<string, unknown> {
-  if (typeof t !== 'object' || t === null || Array.isArray(t)) throw new ColumnError(`${what}: not a table`)
+  if (typeof t !== 'object' || t === null || Array.isArray(t) || t instanceof Uint8Array || t instanceof Map) throw new ColumnError(`${what}: not a table`)
   return t as Record<string, unknown>
 }
 
@@ -41,12 +41,13 @@ export function encodeCounts(unit: CountUnit, rows: CountRows): { unit: CountUni
   const nums: number[] = []
   for (const key of keys) {
     const books = [...rows.get(key)!.entries()]
-      .map(([code, pair]) => ({ n: bookNumber(code), pair }))
+      .map(([code, pair]) => ({ n: bookNumber(code), code, pair }))
       .sort((a, b) => a.n - b.n)
     if (books.length === 0) throw new ColumnError(`counts: key ${JSON.stringify(key)} has no book`)
     nums.push(books.length)
     let previous = 0
-    for (const { n, pair } of books) {
+    for (const { n, code, pair } of books) {
+      if (pair[0] < 1) throw new ColumnError(`counts: count of ${code} is below 1`)
       nums.push(n - previous, pair[0], pair[1])
       previous = n
     }

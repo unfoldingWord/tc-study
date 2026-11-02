@@ -25,8 +25,8 @@ describe('counts', () => {
   })
   test('keys by code point', () => {
     const one = new Map<string, [number, number]>([['tit', [1, 1]]])
-    const e = encodeCounts('notes', new Map([['\u{1D538}', one], ['￿', one]]))
-    expect(e.keys).toEqual(['￿', '\u{1D538}'])
+    const e = encodeCounts('notes', new Map([['\u{1D538}', one], [String.fromCodePoint(0xffff), one]]))
+    expect(e.keys).toEqual([String.fromCodePoint(0xffff), '\u{1D538}'])
   })
   test('rejects bad tables', () => {
     expect(() => bad([2, 45, 1, 1, 0, 1, 1])).toThrow(ColumnError)
@@ -71,5 +71,50 @@ describe('coverage', () => {
     const p: Coverage = new Map([['x', { whole: ['tit'], partial: ['rut'] }]])
     expect(encodeCoverage(p).x).toEqual([bookSet(['tit']), bookSet(['rut'])])
     expect(decodeCoverage(encodeCoverage(p))).toEqual(p)
+  })
+})
+
+describe('fix round 1', () => {
+  test('encodeCounts rejects count below 1', () => {
+    const r: CountRows = new Map([['k', new Map<string, [number, number]>([['tit', [0, 0]]])]])
+    expect(() => encodeCounts('notes', r)).toThrow(ColumnError)
+  })
+  test('multi-key round trip resets deltas per key', () => {
+    const r: CountRows = new Map([
+      ['a', new Map<string, [number, number]>([['gen', [1, 1]], ['rev', [5, 9]]])],
+      ['b', new Map<string, [number, number]>([['mat', [2, 0]]])],
+    ])
+    const e = encodeCounts('links', r)
+    expect(e.counts).toEqual(encodeUvarints([2, 1, 1, 1, 65, 5, 9, 1, 40, 2, 0]))
+    expect(decodeCounts(e, 'links')).toEqual(r)
+    const lists = new Map([['a', [56000000, 56001001]], ['b', [56001001]]])
+    expect(decodeVerseLists('tit', encodeVerseLists('tit', lists))).toEqual(lists)
+  })
+  test('decodeCounts rejects an unknown unit and non-tables', () => {
+    const t = { unit: 'words', keys: [], counts: new Uint8Array() }
+    expect(() => decodeCounts(t, 'notes')).toThrow(ColumnError)
+    expect(() => decodeCounts(t, 'words' as never)).not.toThrow()
+    expect(() => decodeCounts(new Uint8Array(), 'notes')).toThrow(ColumnError)
+  })
+  test('verse lists: repeated keys, overflow', () => {
+    expect(() => decodeVerseLists('tit', { keys: ['a', 'a'], verses: encodeUvarints([1, 1, 1, 1]) })).toThrow(ColumnError)
+    expect(() => decodeVerseLists('tit', { keys: ['a'], verses: encodeUvarints([2, 999_999, 1]) })).toThrow(ColumnError)
+    expect(() => decodeVerseLists('tit', { keys: ['a'], verses: encodeUvarints([2, 999_998, 1]) })).not.toThrow()
+  })
+  test('coverage rejections', () => {
+    const ok = bookSet(['tit'])
+    const cases: unknown[] = [
+      { k: [] },
+      { k: [ok, ok, ok] },
+      { k: [[1, 2]] },
+      { k: ['x'] },
+      { k: [new Uint8Array(8)] },
+      { k: [ok, new Uint8Array(10)] },
+      { k: [Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 4])] },
+      { k: 'x' },
+      new Uint8Array(),
+      [],
+    ]
+    for (const c of cases) expect(() => decodeCoverage(c)).toThrow(ColumnError)
   })
 })
