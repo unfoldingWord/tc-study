@@ -23,13 +23,16 @@ lex-tables = {
 
 lex-entry = {
   "res": res-index,
-  "strong": tstr,              ; as the lexicon publishes it ("G5485", "H1")
+  "strong": tstr,              ; as the lexicon publishes it ("G5485", "H0001", and "G127a" for a homonym)
   "lemma": tstr,
-  ? "brief": tstr,
-  ? "long": tstr,
+  ? "brief": tstr,             ; "brief" and "long" belong to the lexicon's file, which can hold several entries (homonyms):
+  ? "long": tstr,              ; each of its entries repeats them
   ? "pos": [* tstr],
   "senses": [* lex-sense],
   ? "notes": [* tstr],
+  ? "aramaic": bool,           ; Hebrew lexicon: the word is Aramaic
+  ? "source": tstr,            ; kept as published: where the entry's text comes from ("en_uhl") and its review state ("pending")
+  ? "review": tstr,
 }
 
 lex-sense = {
@@ -39,6 +42,9 @@ lex-sense = {
   ? "domain": tstr,
   ? "domainCode": tstr,
   ? "comments": tstr,
+  ? "etymology": tstr,
+  ? "lang": tstr,              ; the language of the sense's text when it is not the lexicon's ("en")
+  ? "definitionLang": tstr,
   ? "refs": [* [verse-id, verse-id]],   ; every reference as a range, in the original's numbering
 }
 ; The Hebrew lexicon numbers verses as the Hebrew Bible does, and the UHB as the English one does. The builder converts
