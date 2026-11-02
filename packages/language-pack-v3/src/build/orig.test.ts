@@ -260,22 +260,22 @@ describe('the stamp of the book', () => {
     expect(origSegment(m).h.orig).toEqual([UGNT, 'g987ab2025a'])
   })
 
-  test('is the stamp of the resource (its release) when the source records no blobs', async () => {
+  test('is the release tag of the resource (no date) when the source records no blobs', async () => {
     const m = await extractOrig(fake(rows, [ref(UGNT, release, ['tit'])]), 'tit')
-    expect(m.stamp).toBe(release)
-    expect(origSegment(m).h.orig).toEqual([UGNT, release])
+    expect(m.stamp).toBe('v0.34')
+    expect(origSegment(m).h.orig).toEqual([UGNT, 'v0.34'])
   })
 
-  test('is the stamp of the resource when the blobs it has are of other books', async () => {
+  test('is the release tag of the resource when the blobs it has are of other books', async () => {
     for (const bookStamps of [{ rom: 'gaaaaaaaaaa' }, {}]) {
       const m = await extractOrig(fake(rows, [ref(UGNT, release, ['tit'], bookStamps)]), 'tit')
-      expect(m.stamp).toBe(release)
+      expect(m.stamp).toBe('v0.34')
     }
   })
 
   test('a name of the prototype is not a book with a stamp', async () => {
     const m = await extractOrig(fake([chapterRow(UGNT, 'toString', 1, [para])], [ref(UGNT, release, [], {})]), 'toString')
-    expect(m.stamp).toBe(release)
+    expect(m.stamp).toBe('v0.34')
   })
 
   test('the stamp of MACULA is the release of its resource, whatever blobs the originals have', async () => {

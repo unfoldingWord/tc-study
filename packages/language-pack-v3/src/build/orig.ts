@@ -118,7 +118,7 @@ function readDocument(chapters: { where: string; content: unknown[] }[]): Pick<O
  *   not listed, extraction fails, because every later position would have moved.
  * - `stamp` is the book file's blob as format 2.0 records it (`g987ab2025a`), which the resource's `bookStamps` gives
  *   for this book (`ids.md`, "Positions in the original"). A source that does not record blobs has none, and then the
- *   stamp is the resource's own (`v0.34#2023-09-27T02_19_31Z`), its release.
+ *   stamp is the release tag of the resource (`v0.34` of `v0.34#2023-09-27T02_19_31Z`: `ids.md` names the tag, with no date).
  * - MACULA rows `{resource}/trees/{BOOK}` and `{resource}/referents/{BOOK}` go to `macula` as they are, and `release`
  *   is the stamp of the MACULA resource.
  *
@@ -185,7 +185,7 @@ export async function extractOrig(source: RowSource, book: string): Promise<Orig
     return found
   }
   const original = refOf(resource)
-  const stamp = original.bookStamps !== undefined && hasOwn(original.bookStamps, book) ? original.bookStamps[book] : original.stamp
+  const stamp = original.bookStamps !== undefined && hasOwn(original.bookStamps, book) ? original.bookStamps[book] : original.stamp.split('#')[0]
 
   const ordered = [...chunks.entries()].sort(([a], [b]) => a - b).map(([, chunk]) => chunk)
   const model: OrigModel = { book, key: resource, stamp, ...readDocument(ordered) }
