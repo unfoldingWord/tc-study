@@ -1,16 +1,49 @@
 # Conformance cases
 
 Every reader of format 3 MUST give, for each case, the output written here. The TypeScript reader and the Python reader
-(`spec/reader-py/`) are written apart, and the two must agree on every case. A case is a folder with its file or files
-and `expected.json`.
+(`spec/reader-py/`) are written apart, and the two must agree on every case. A case is a folder with its `.seg` or
+`.tcpack` files and, beside each file, a `<name>.expected.json` with the output a reader gives for it (`minimal.seg`
+and `minimal.expected.json`).
 
 ## Where the bytes come from
 
 - **Container examples** (`container/`) come from `make_examples.py`, a small encoder kept apart from the builder.
   Status: written.
-- **The other cases** are built in step 1.7 from the inputs described below. Their bytes are frozen once both readers
-  give the expected output. From then on a builder change that alters them fails the tests, until someone decides the
-  new bytes are right and freezes them again.
+- **The other cases** are built by `build-cases.ts` from the inputs described below: the sample of `data/` (its
+  README says where each file comes from) and, for cases 9 and 10, `container/minimal.seg`. The build has no clock:
+  every date, device name and registry in it is fixed in the script, so the same builders give the same bytes. Their
+  bytes are frozen once both readers give the expected output. From then on a builder change that alters them fails the
+  tests, until someone decides the new bytes are right and freezes them again (`--refreeze`, below).
+
+## Building and comparing
+
+From `packages/language-pack-v3`:
+
+```
+bun spec/tests/build-cases.ts [--refreeze] [--check]
+bun spec/tests/compare.ts [--python <path>] [--built]
+```
+
+- **`build-cases.ts`** builds the files of every case but those of `container/`, and writes each one with its
+  `<name>.expected.json`: what the TypeScript reader (`readerOutput`) says of it, in the form of "Reader output" below.
+  It **refuses to overwrite a frozen case**: if a file exists and the bytes now built differ, or an `.expected.json`
+  exists and the output now read differs, it prints which one and exits 1, and writes nothing for it. `--refreeze`
+  writes the new bytes and outputs; use it when somebody has decided that they are right, and say why in the commit.
+  `--check` writes nothing and also reports a file that is missing. Running it twice changes nothing.
+- **`compare.ts`** runs both readers on every `.seg` and `.tcpack` under `spec/tests/` (not `data/`): `readerOutput`
+  and `spec/reader-py/lp3read.py`. It compares the parsed values by their canonical text, and the exit code of the
+  Python reader with whether the TypeScript output is an error object. It prints one line per file that disagrees (the
+  file, the first JSON path that differs, both values cut to 80 characters) and exits 0 when all agree, 1 when one does
+  not, and 2 when the interpreter is missing or older than Python 3.11. The interpreter is `--python`, else the
+  environment variable `LP3_PYTHON`, else `python`. With `--built` it also builds the big segments of the sample in
+  memory (the Titus original, the `tw:kt` art group, the lexicon group `G0`, the language catalog and the common
+  catalog, an OBS segment from a synthetic story, and a `full` transfer file of them, whole and cut in the middle of
+  its last entry), writes them under the temporary folder of the system and compares them the same way. Those are not
+  frozen and have no expected file.
+- **`src/conformance.test.ts`** checks that `readerOutput` gives each `.expected.json`, that `build-cases.ts` finds the
+  frozen bytes when it builds again, the numbers of the table below, and that `compare.ts` finds no difference (this
+  last one needs Python 3.11 or later: it runs with `LP3_PYTHON`, or with `python` if that is new enough, and is skipped
+  with a message otherwise).
 
 ## Reader output
 
@@ -348,16 +381,16 @@ The order of the checks between a defect in the container and one in a table is 
 | 1 | `container/minimal` | The container and the smallest valid book | Titus 1:1, "Pablo, siervo de Dios": one text, no helps | `minimal.expected.json` |
 | 2 | `container/truncated` | A file cut short | `minimal.seg` without its last 10 bytes | `E_TRUNCATED` |
 | 3 | `container/bad-id` | A wrong id | `minimal.seg` with its id changed | `E_ID` |
-| 4 | `tito-es419` | A real book, whole | The es-419 Titus of the format 2.0 parts on staging (GLT, GST, tN, tQ, tWL) | GLT: 1 913 pieces, 953 words, all aligned, 69 events. GST: 3 471 pieces, 1 732 words, all aligned, 69 events. 216 notes (212 with quote text, 203 of them with positions found in the original), 36 questions, 223 links (223 with quote text, all with positions). Both readers give the same output |
-| 5 | `nota-varios-versiculos` | A range | Titus 1:1-4 in one text; one note on `1:2-4` pointing to `ta:translate/figs-metaphor` | The note: `ref` "1:2-4", `from` 56001002, `to` 56001004. In the language map: 1 note, 3 distinct verses |
+| 4 | `tito-es419` (`book.seg`) | A real book, whole | The es-419 Titus of the format 2.0 parts on staging (GLT, GST, tN, tQ, tWL) | GLT: 1 913 pieces, 953 words, all aligned, 69 events. GST: 3 471 pieces, 1 732 words, all aligned, 69 events. 216 notes (212 with quote text, 203 of them with positions found in the original), 36 questions, 223 links (223 with quote text, all with positions). Both readers give the same output |
+| 5 | `nota-varios-versiculos` (`book.seg`) | A range | Titus 1:1-4 in one text (the pieces, events and alignment of the real GLT, cut after verse 4); one note on `1:2-4` pointing to `ta:translate/figs-metaphor`, with a quote of three original words. This is the book half; the map half is phase 2 | The note: `ref` "1:2-4", `from` 56001002, `to` 56001004. In the language map: 1 note, 3 distinct verses |
 | 6 | `strong-repetido` | Counting occurrences against verses | An original verse where one Strong key appears three times | In the common map: 3 occurrences, 1 distinct verse |
-| 7 | `seccion-insertada` | Section ids that last | An article built twice with the registry in between. The first time it has an intro, a definition and translation suggestions. The second time it has an examples section before the suggestions, and its definition heading is corrected | First build: `intro`, `definition`, `translation-suggestions`. Second build: `intro`, `definition`, `examples`, `translation-suggestions`, with the first three unchanged |
-| 8 | `articulo-mal-titulado` | Articles that do not follow the pattern | An es-419 article with text before any heading, a heading no rule places, and a section whose heading is in English | `intro` with role `intro`; `s1` with role `unknown`; the English section with `lang` "en". Every section readable |
-| 9 | `tabla-desconocida` | Tables a reader does not know | Case 1 with an extra optional table `future-x`, and again with an extra required table `future-y` | The first gives case 1's output, except for `h.tables` (which lists `future-x` too) and `id` (the body has another table); the second gives `E_TABLE` |
-| 10 | `transferencia-cortada` | A transfer file cut inside an entry | A `full` transfer file of cases 1 and 4 and their catalog, cut in the middle of case 4's segment | The catalog and case 1 have status `ok`; case 4 has status `missing` |
+| 7 | `seccion-insertada` (`build1.seg`, `build2.seg`) | Section ids that last | An article built twice with the registry in between. The first time it has an intro, a definition and translation suggestions. The second time it has an examples section before the suggestions, and its definition heading is corrected | First build: `intro`, `definition`, `translation-suggestions`. Second build: `intro`, `definition`, `examples`, `translation-suggestions`, with the first three unchanged |
+| 8 | `articulo-mal-titulado` (`art.seg`) | Articles that do not follow the pattern | An es-419 article with text before any heading, a heading no rule places, and a section whose heading is in English | `intro` with role `intro`; `s1` with role `unknown`; the English section with `lang` "en". Every section readable |
+| 9 | `tabla-desconocida` (`future-x.seg`, `future-y.seg`) | Tables a reader does not know | Case 1 with an extra optional table `future-x` (`future-x.seg`), and again with an extra required table `future-y` (`future-y.seg`); each table is version 1 and holds a map | The first gives case 1's output, except for `h.tables` (which lists `future-x` too) and `id` (the body has another table); the second gives `E_TABLE` |
+| 10 | `transferencia-cortada` (`cut.tcpack`) | A transfer file cut inside an entry | A `full` transfer file with three entries: a catalog that lists case 4's book segment as the unit `book:tit`, case 1's segment (it travels beside it: the catalog does not list it) and case 4's segment; `made` "2026-11-01T10:00:00Z", `by` "build-cases 1". Cut in the middle of case 4's segment | The catalog and case 1 have status `ok`; case 4 has status `missing` |
 | 11 | `revisiones-mixtas` | Published against installed | Catalog and language map of revision 4, where Ruth has 15 notes on metaphor; Ruth's book segment of revision 3, where it had 14 | From the map: 15, "revision 4". From the installed book: 14 |
 | 12 | `idioma-parcial` | Zero against no source | An es-419 map whose tN covers tit, rut, 3jn and jon | Use of `ta:translate/figs-metaphor` in Titus: the count. In Jonah with no such note: zero. In Isaiah: no source |
-| 13 | `paquete-viejo` | The bridge from an old pack | `es-419-tit.langpack.zip`, format 1.1, with the originals from case 4 | The same book segment as case 4, with the same id; a local catalog (`origin` "local", unsigned) |
+| 13 | `paquete-viejo` (`catalog.seg`) | The bridge from an old pack | `data/es-419-tit.langpack.zip`, format 1.1, with the originals from case 4, bridged on the device `test-device` at "2026-11-01T10:00:00Z" | The same book segment as case 4, with the same id; a local catalog (`origin` "local", `publisher` "local:test-device", unsigned). The folder holds only the catalog, `catalog.seg`: the book segment the bridge makes is not stored, because the test asserts that its bytes are those of case 4's `book.seg` |
 
 Cases 6, 11 and 12, and the map half of case 5, need the maps, so they are built in phase 2.
 
