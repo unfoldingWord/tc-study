@@ -316,7 +316,10 @@ export async function buildLanguage(o: {
     await add(mapSegment(built.core), inputsOf(coreRows, stampsOf(all)), all)
     for (const part of built.parts) {
       const keys = refs.filter((ref) => ref.books.includes(part.part)).map((ref) => ref.key)
-      await add(mapSegment(part), inputsOf(mapRows.get(part.part) ?? [], []), keys)
+      // The usage counts come from the SupportReference of the notes, which the row keys do not show: the stamp of the tN of the
+      // book stands for them (catalog.md, "What changes"), so a new release of the notes rebuilds the part.
+      const notes = refs.filter((ref) => ref.kind === TN_KIND && ref.books.includes(part.part)).map((ref) => ref.key)
+      await add(mapSegment(part), inputsOf(mapRows.get(part.part) ?? [], stampsOf(notes)), keys)
     }
   }
 
@@ -388,7 +391,11 @@ export async function buildCommon(o: {
       used.add(ref.key)
     }
     const noteLike = (ref: ResourceRef): boolean => ref.kind === TN_KIND || ref.kind === TWL_KIND
-    const stampOf = (ref: ResourceRef): { key: string; stamp: string } => ({ key: ref.key, stamp: origs.find((orig) => orig.key === ref.key)?.stamp ?? ref.stamp })
+    // An original is known by the stamp of each book (`orig.stamp`); a part lists the stamp of its own book, the core one per book.
+    const stampOf = (ref: ResourceRef, book?: string): { key: string; stamp: string }[] => {
+      const mine = origs.filter((orig) => orig.key === ref.key && (book === undefined || orig.book === book))
+      return mine.length === 0 ? [{ key: ref.key, stamp: ref.stamp }] : mine.map((orig) => ({ key: ref.key, stamp: orig.stamp }))
+    }
     const originalsUsed = refs.filter((ref) => origs.some((orig) => orig.key === ref.key))
     const coreRows: RowKey[] = [...origRows.values()].flat()
     const bookRows = new Map<string, RowKey[]>()
@@ -403,10 +410,10 @@ export async function buildCommon(o: {
       if (noteLike(ref)) continue
       for await (const row of o.source.rows({ lang, resource: ref.key, layer: 'text' })) if (TITLE_ROW.test(row.key)) coreRows.push({ layer: row.layer, key: row.key })
     }
-    segments.push(await builtSegment(xmapSegment(built.core), inputsOf(coreRows, [...originalsUsed, ...helps].map(stampOf))))
+    segments.push(await builtSegment(xmapSegment(built.core), inputsOf(coreRows, [...originalsUsed, ...helps].flatMap((ref) => stampOf(ref)))))
     for (const part of built.parts) {
       const book = part.part
-      const sources = [...originalsUsed, ...helps.filter(noteLike)].filter((ref) => ref.books.includes(book)).map(stampOf)
+      const sources = [...originalsUsed, ...helps.filter(noteLike)].filter((ref) => ref.books.includes(book)).flatMap((ref) => stampOf(ref, book))
       segments.push(await builtSegment(xmapSegment(part), inputsOf(bookRows.get(book) ?? [], sources)))
     }
   }

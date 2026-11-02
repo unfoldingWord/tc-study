@@ -272,6 +272,11 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
     })
     const build = async (t: Tweak) => buildLanguage({ source: tweak(await sample(), t), lang: ES, registry: registry(), about })
 
+    const changedUnits = (segments: BuiltSegment[]) => {
+      const now = inputsByUnit(segments)
+      return Object.keys(base).filter((k) => now[k] !== base[k]).sort()
+    }
+
     test('are 64 hex digits and differ from one segment to another', () => {
       expect(Object.keys(base)).toEqual(['map:core', 'map:tit', 'tit', 'tw:kt', 'G0'])
       for (const value of Object.values(base)) expect(value).toMatch(/^[0-9a-f]{64}$/)
@@ -288,6 +293,8 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
       // The same release (v66) with another date: the segment is the same, its inputs are not.
       const notes = await build({ ref: (ref) => (ref.key === TN ? { stamp: 'v66#2030-01-01T00_00_00Z' } : {}) })
       expect(inputsByUnit(notes.segments)['tit']).not.toBe(base.tit)
+      // the map part of the book carries the stamp of its tN, as the segment id does not change (catalog.md, "What changes")
+      expect(changedUnits(notes.segments)).toEqual(['map:core', 'map:tit', 'tit'])
       expect(inputsByUnit(notes.segments)['tw:kt']).toBe(base['tw:kt'])
       expect(inputsByUnit(notes.segments)['G0']).toBe(base.G0)
       expect(notes.segments.find((s) => s.seg.h.class === 'book')!.id).toBe(first.segments.find((s) => s.seg.h.class === 'book')!.id)
@@ -323,6 +330,7 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
       })
       expect(dropped).toBeGreaterThan(0)
       expect(inputsByUnit(fewer.segments)['tit']).not.toBe(base.tit)
+      expect(changedUnits(fewer.segments)).toEqual(['map:core', 'map:tit', 'tit'])
 
       // Another word in a question: another segment with the same inputs (the stamp stands for the contents).
       const edited = await build({
@@ -541,6 +549,39 @@ describe('buildCommon: the xmap unit', () => {
     expect(core(moved).inputs).not.toBe(core(base).inputs)
     const fewer = await buildCommon({ source: tweak(await english(), { row: (row, f) => (f.resource?.endsWith('/tn') && f.book === 'tit' && row.key.endsWith(':1') ? null : row) }), about, mapLang: 'en' })
     expect(core(fewer).inputs).not.toBe(core(base).inputs)
+  })
+
+  /** `source` with a second book, Matthew, that is Titus under another code (rows copied with the key rewritten). */
+  function withMatthew(source: RowSource, titStamp?: string): RowSource {
+    const base = tweak(source, {
+      ref: (ref, lang) => {
+        if (!ref.books.includes('tit')) return {}
+        const out: Partial<ResourceRef> = { books: ['mat', 'tit'] }
+        if (lang === ORIGINALS && ref.bookStamps !== undefined) {
+          out.bookStamps = { ...ref.bookStamps, mat: ref.bookStamps.tit, ...(titStamp === undefined ? {} : { tit: titStamp }) }
+        }
+        return out
+      },
+    })
+    return {
+      resources: (lang) => base.resources(lang),
+      async *rows(f) {
+        if (f.book !== 'mat') return yield* base.rows(f)
+        for await (const row of base.rows({ ...f, book: 'tit' })) yield { ...row, key: row.key.replaceAll(':tit', ':mat') }
+      },
+    }
+  }
+
+  test('each part carries the stamp of its own book of the original; the core one stamp per book', async () => {
+    const base = await buildCommon({ source: withMatthew(await english()), about, mapLang: 'en', books: ['mat', 'tit'] })
+    const moved = await buildCommon({ source: withMatthew(await english(), 'gffffffffff'), about, mapLang: 'en', books: ['mat', 'tit'] })
+    const inputs = (b: typeof base) =>
+      Object.fromEntries(b.segments.map((s) => [s.seg.h.class === 'xmap' || s.seg.h.class === 'orig' ? `${s.seg.h.class}:${s.seg.h.part ?? s.seg.h.book}` : s.seg.h.class, s.inputs]))
+    const was = inputs(base)
+    const now = inputs(moved)
+    expect(Object.keys(was).sort()).toEqual(['orig:mat', 'orig:tit', 'xmap:core', 'xmap:mat', 'xmap:tit'])
+    const changed = Object.keys(was).filter((k) => was[k] !== now[k]).sort()
+    expect(changed).toEqual(['orig:tit', 'xmap:core', 'xmap:tit'])
   })
 
   test('a new release of a source changes inputs, not the id of the part', async () => {
