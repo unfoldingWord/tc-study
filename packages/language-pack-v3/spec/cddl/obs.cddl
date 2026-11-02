@@ -31,13 +31,15 @@ story = {
 }
 
 frame = {
-  "n": uint,
+  "n": uint,                   ; 0 to 99, so that story × 100 + frame names one frame
   "text": tstr,                ; minimal markdown
   ? "image": tstr,             ; the image's URL as published; images do not travel in the segment
 }
 
 ; As the book segment's helps (book.cddl), with frames in place of verse ranges: story × 100 + frame, and frame 0 for
-; the story's title or introduction.
+; the story's title or introduction. The canonical reference text of a row is "N:F" ("10:3"), and "N:intro" for frame 0;
+; any other text of a row ("10:03", "10:0", "10:front", or one that names no frame, which is placed at frame 0) is kept in
+; "refText".
 obs-helps = {
   "res": res-index,
   "n": uint,
