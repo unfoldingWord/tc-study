@@ -1398,6 +1398,8 @@ def _coverage(c) -> dict:
         o = {"whole": _book_set(entry[0])}
         if len(entry) == 2:
             partial = _book_set(entry[1])
+            if set(partial) & set(o["whole"]):
+                _bad()                      # a book both whole and partial
             if partial:
                 o["partial"] = partial
         out[source] = o

@@ -110,6 +110,7 @@ describe('fix round 1', () => {
       { k: ['x'] },
       { k: [new Uint8Array(8)] },
       { k: [ok, new Uint8Array(10)] },
+      { k: [ok, ok] }, // a book both whole and partial
       { k: [Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 0, 4])] },
       { k: 'x' },
       new Uint8Array(),

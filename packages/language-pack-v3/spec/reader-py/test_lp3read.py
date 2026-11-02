@@ -2414,6 +2414,7 @@ XMAP_CORE_MUTATIONS = {
     "strong is a verse list": lambda h, t: t.update(strong=vlists({"G1": [1]})),
     "coverage not a map": lambda h, t: t.update(coverage=[]),
     "book set of 8 bytes": lambda h, t: t.update(coverage={"a": [bytes(8)]}),
+    "a book both whole and partial": lambda h, t: t.update(coverage={"a": [bset(["tit"]), bset(["tit"])]}),
     "book set with a bit for book 67": lambda h, t: t.update(coverage={"a": [bytes(8) + b"\x04"]}),
     "coverage entry empty": lambda h, t: t.update(coverage={"a": []}),
     "coverage entry of three": lambda h, t: t.update(coverage={"a": [bytes(9)] * 3}),
@@ -2515,6 +2516,7 @@ MAP_CORE_MUTATIONS = {
     "usage in the shape of a part": lambda h, t: t.update(usage=vlists({"a": [1]})),
     "usage keys unsorted": lambda h, t: t["usage"].update(keys=["b", "a"]),
     "usage count 0": lambda h, t: t.update(usage=counts("notes", {"a": [(8, 0, 0)]})),
+    "a book both whole and partial": lambda h, t: t.update(coverage={"a": [bset(["tit"]), bset(["tit"])]}),
     "obs entry not a pair": lambda h, t: t.update(obs=[[1]]),
     "obs title not text": lambda h, t: t.update(obs=[[1, 2]]),
 }

@@ -177,7 +177,10 @@ export function decodeCoverage(t: unknown): Coverage {
     if (!Array.isArray(sets) || sets.length < 1 || sets.length > 2) {
       throw new ColumnError(`coverage: ${JSON.stringify(key)} is not [whole, partial?]`)
     }
-    out.set(key, { whole: booksOf(sets[0]), partial: sets.length === 2 ? booksOf(sets[1]) : [] })
+    const whole = booksOf(sets[0])
+    const partial = sets.length === 2 ? booksOf(sets[1]) : []
+    if (partial.some((book) => whole.includes(book))) throw new ColumnError(`coverage: ${JSON.stringify(key)} lists a book as whole and as partial`)
+    out.set(key, { whole, partial })
   }
   return out
 }
