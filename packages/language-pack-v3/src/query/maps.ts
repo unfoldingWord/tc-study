@@ -1,146 +1,167 @@
 /**
- * Answers from the maps (`spec/counts.md`, `spec/tests/queries/README.md`). Every answer says its state: a count, zero
- * (the source covers the book whole and has no row), none (the source does not cover it) or partial (it covers it in
- * part: the count is "at least"). Imports no Node module.
+ * Answers from the maps, in the shapes of `spec/tests/queries/README.md` (the authority; `spec/counts.md` for the counting). A
+ * cell is the answer for one key, one source and one book: `count`, `zero` (the source covers the book whole and has no row),
+ * `none` (the source does not cover it) or `partial` (it covers it in part: the count is "at least"). Every answer is a plain
+ * value that {@link canonicalJson} writes as the reader output does. Imports no Node module.
  */
-import type { CountRows } from '../codec/counts'
-import { BOOKS, strongKey } from '../ids'
-import type { BookModel, MapCore, MapPart, XmapCore, XmapPart } from '../model'
+import { compareCodePoints } from '../codec/columns'
+import type { CountRows, Coverage } from '../codec/counts'
+import { BOOKS, bookNumber } from '../ids'
+import type { MapCore, MapPart, XmapCore, XmapPart } from '../model'
 
 export type State = 'count' | 'zero' | 'none' | 'partial'
-export type BookAnswer = { book: string; state: State; count?: number; verses?: number }
+export type Cell = { state: State; count?: number; verses?: number }
 export type MapSet = {
   xmap?: { core: XmapCore; parts: Map<string, XmapPart> }
   map?: { core: MapCore; parts: Map<string, MapPart> }
+  /** The revision of the catalog the maps belong to. */
   revision: number
-  installed?: Map<string, BookModel>
 }
 
-type Cover = { whole: Set<string>; partial: Set<string> }
-
-const NO_COVER: Cover = { whole: new Set(), partial: new Set() }
+export const TWL = 'unfoldingWord/en/twl'
+export const TN = 'unfoldingWord/en/tn'
+export const UHB = 'unfoldingWord/hbo/uhb'
+export const UGNT = 'unfoldingWord/el-x-koine/ugnt'
 
 /** The last segment of a resource key (`unfoldingWord/en/tn` is `tn`). */
 const idOf = (key: string): string => key.slice(key.lastIndexOf('/') + 1)
 
-function cover(coverage: Map<string, { whole: string[]; partial: string[] }> | undefined, keep: (key: string) => boolean): Cover {
-  const whole = new Set<string>()
-  const partial = new Set<string>()
-  for (const [key, c] of coverage ?? []) {
-    if (!keep(key)) continue
-    for (const b of c.whole) whole.add(b)
-    for (const b of c.partial) partial.add(b)
-  }
-  return { whole, partial }
-}
+/** The original that covers a book: the Hebrew Bible for the 39 books of the Old Testament, the Greek New Testament for the rest. */
+const originalOf = (book: string): string => (bookNumber(book) <= 39 ? UHB : UGNT)
 
-/** The sources a table of the common map is covered by: the notes by tN, the links by tWL, the occurrences by the originals. */
-function xmapCover(core: XmapCore, table: 'strong' | 'links' | 'notes'): Cover {
-  // `strong` is whatever is neither tN nor tWL: the originals (the builder's coverage holds only those three kinds).
-  return cover(core.coverage, (key) => {
-    const id = idOf(key)
-    return table === 'notes' ? id === 'tn' : table === 'links' ? id === 'twl' : id !== 'tn' && id !== 'twl'
-  })
-}
-
-function cell(book: string, c: Cover, rows: CountRows | undefined, key: string): BookAnswer {
+function cell(book: string, coverage: Coverage | undefined, source: string, rows: CountRows | undefined, key: string): Cell {
+  const c = coverage?.get(source)
   const pair = rows?.get(key)?.get(book)
-  if (c.partial.has(book)) return { book, state: 'partial', count: pair?.[0] ?? 0, verses: pair?.[1] ?? 0 }
-  if (!c.whole.has(book)) return { book, state: 'none' }
-  if (pair === undefined) return { book, state: 'zero' }
-  return { book, state: 'count', count: pair[0], verses: pair[1] }
+  if (c?.partial.includes(book)) return { state: 'partial', count: pair?.[0] ?? 0, verses: pair?.[1] ?? 0 }
+  if (c === undefined || !c.whole.includes(book)) return { state: 'none' }
+  if (pair === undefined) return { state: 'zero', count: 0, verses: 0 }
+  return { state: 'count', count: pair[0], verses: pair[1] }
 }
 
-/** The books with a row: `partial` ("at least") when the source covers the book only in part, else `count`. */
-function withCount(rows: CountRows | undefined, key: string, c: Cover): BookAnswer[] {
-  const out: BookAnswer[] = []
-  const byBook = rows?.get(key)
-  if (byBook === undefined) return out
-  for (const book of BOOKS) {
-    const pair = byBook.get(book)
-    if (pair !== undefined) out.push({ book, state: c.partial.has(book) ? 'partial' : 'count', count: pair[0], verses: pair[1] })
-  }
-  return out
-}
-
-const sum = (list: BookAnswer[], f: 'count' | 'verses'): number => list.reduce((n, b) => n + (b[f] ?? 0), 0)
-
-export function strongWhere(m: MapSet, key: string): { key: string; books: BookAnswer[]; count: number; verses: number } {
+function strongAnswer(m: MapSet, key: string): unknown {
   const rows = m.xmap?.core.strong.rows
   let found = key
   if (rows?.has(key) !== true && /^G\d{4}$/.test(key) && rows?.has(`${key}0`) === true) found = `${key}0`
-  const books = withCount(rows, found, m.xmap === undefined ? NO_COVER : xmapCover(m.xmap.core, 'strong'))
-  return { key: found, books, count: sum(books, 'count'), verses: sum(books, 'verses') }
+  const books: Record<string, Cell> = {}
+  for (const book of BOOKS) books[book] = cell(book, m.xmap?.core.coverage, originalOf(book), rows, found)
+  return { kind: 'strong', key: found, unit: m.xmap?.core.strong.unit ?? 'occurrences', books }
 }
 
-export function conceptWhere(m: MapSet, id: string): { id: string; links: BookAnswer[]; notes: BookAnswer[] } {
-  const core = m.xmap?.core
-  return {
-    id,
-    links: withCount(core?.links?.rows, id, core === undefined ? NO_COVER : xmapCover(core, 'links')),
-    notes: withCount(core?.notes?.rows, id, core === undefined ? NO_COVER : xmapCover(core, 'notes')),
-  }
+/** Where a usage source reads from: its coverage, its table (`links`, `notes`, `usage`) and that table's rows. */
+function tableOf(m: MapSet, source: string): { coverage: Coverage; unit: string; rows: CountRows | undefined } | undefined {
+  const x = m.xmap?.core
+  if (x !== undefined && source === TWL && x.coverage.has(source)) return { coverage: x.coverage, unit: x.links?.unit ?? 'links', rows: x.links?.rows }
+  if (x !== undefined && source === TN && x.coverage.has(source)) return { coverage: x.coverage, unit: x.notes?.unit ?? 'notes', rows: x.notes?.rows }
+  const c = m.map?.core
+  if (c !== undefined && source !== TN && source !== TWL && c.coverage.has(source)) return { coverage: c.coverage, unit: c.usage?.unit ?? 'notes', rows: c.usage?.rows }
+  return undefined
 }
 
-export function usage(m: MapSet, concept: string, source: 'xmap' | 'map'): { source: string; revision: number; books: BookAnswer[] } {
-  let c: Cover
-  let rows: CountRows | undefined
-  if (source === 'xmap') {
-    c = m.xmap === undefined ? NO_COVER : xmapCover(m.xmap.core, 'notes')
-    rows = m.xmap?.core.notes?.rows
-  } else {
-    c = cover(m.map?.core.coverage, (key) => idOf(key) === 'tn')
-    rows = m.map?.core.usage?.rows
-  }
-  return { source, revision: m.revision, books: BOOKS.map((book) => cell(book, c, rows, concept)) }
+function usageAnswer(m: MapSet, concept: string, source: string): unknown {
+  const t = tableOf(m, source)
+  const books: Record<string, Cell> = {}
+  for (const book of BOOKS) books[book] = t === undefined ? { state: 'none' } : cell(book, t.coverage, source, t.rows, concept)
+  return t === undefined ? { kind: 'usage', concept, source, books } : { kind: 'usage', concept, source, unit: t.unit, books }
 }
 
-export function bookCoverage(m: MapSet, book: string): Record<string, State> {
-  const out: Record<string, State> = {}
-  for (const coverage of [m.xmap?.core.coverage, m.map?.core.coverage]) {
-    for (const [key, c] of coverage ?? []) {
-      const state: State = c.whole.includes(book) ? 'count' : c.partial.includes(book) ? 'partial' : 'none'
-      if (out[key] === undefined || state === 'count' || (state === 'partial' && out[key] === 'none')) out[key] = state
+function bookAnswer(m: MapSet, book: string): unknown {
+  bookNumber(book)
+  const coverage: Record<string, string> = {}
+  for (const cov of [m.xmap?.core.coverage, m.map?.core.coverage]) {
+    for (const [source, c] of cov ?? []) {
+      const state = c.whole.includes(book) ? 'whole' : c.partial.includes(book) ? 'partial' : 'none'
+      if (coverage[source] === undefined || state === 'whole' || (state === 'partial' && coverage[source] === 'none')) coverage[source] = state
     }
   }
-  return out
-}
-
-export function keyTerms(m: MapSet, book: string): { concept: string; links: [number, number]; candidates: number; otherBooks: string[] }[] {
-  const core = m.xmap?.core
-  const part = m.xmap?.parts.get(book)
-  const out: { concept: string; links: [number, number]; candidates: number; otherBooks: string[] }[] = []
-  for (const [concept, byBook] of core?.links?.rows ?? []) {
-    if (!concept.startsWith('tw:kt/')) continue
-    const here = byBook.get(book)
-    if (here === undefined) continue
-    const verses = new Set<number>()
-    for (const s of core?.strongs?.[concept] ?? []) for (const v of part?.strong.get(strongKey(s)) ?? []) verses.add(v)
-    out.push({ concept, links: [here[0], here[1]], candidates: verses.size, otherBooks: BOOKS.filter((b) => b !== book && byBook.has(b)) })
+  const tables: Record<string, { unit: string; keys: number }> = {}
+  const keysOf = (rows: CountRows): number => [...rows.values()].filter((byBook) => byBook.has(book)).length
+  const x = m.xmap?.core
+  if (x !== undefined) {
+    tables.strong = { unit: x.strong.unit, keys: keysOf(x.strong.rows) }
+    if (x.links !== undefined) tables.links = { unit: x.links.unit, keys: keysOf(x.links.rows) }
+    if (x.notes !== undefined) tables.notes = { unit: x.notes.unit, keys: keysOf(x.notes.rows) }
   }
-  return out.sort((a, b) => b.links[0] - a.links[0] || (a.concept < b.concept ? -1 : a.concept > b.concept ? 1 : 0))
+  const u = m.map?.core.usage
+  if (u !== undefined) tables.usage = { unit: u.unit, keys: keysOf(u.rows) }
+  return { kind: 'book', book, coverage, tables }
 }
 
-export function revisionAnswer(m: MapSet, concept: string, book: string): { fromMap: number; revision: number; installed?: number } {
-  const fromBook = usage(m, concept, 'map').books.find((b) => b.book === book)
-  const out: { fromMap: number; revision: number; installed?: number } = { fromMap: fromBook?.count ?? 0, revision: m.revision }
-  const seg = m.installed?.get(book)
-  if (seg !== undefined) out.installed = (seg.notes?.rows ?? []).filter((r) => r.concept === concept).length
+function keytermsAnswer(m: MapSet, book: string): unknown {
+  bookNumber(book)
+  const core = m.xmap?.core
+  const present = new Set<string>()
+  for (const [key, byBook] of core?.strong.rows ?? []) if (byBook.has(book)) present.add(key)
+  const candidates: { concept: string; strongs: string[]; matched: string[] }[] = []
+  for (const [concept, list] of Object.entries(core?.strongs ?? {})) {
+    if (!concept.startsWith('tw:kt/')) continue
+    const matched = list.filter((s) => present.has(s)).sort(compareCodePoints)
+    if (matched.length > 0) candidates.push({ concept, strongs: [...list].sort(compareCodePoints), matched })
+  }
+  candidates.sort((a, b) => b.matched.length - a.matched.length || compareCodePoints(a.concept, b.concept))
+  return { kind: 'keyterms', book, candidates }
+}
+
+function conceptAnswer(m: MapSet, asked: string): unknown {
+  const core = m.xmap?.core
+  const moved = core?.aliases?.[asked]
+  const id = moved !== undefined && core?.concepts.has(moved) ? moved : asked
+  const concept = core?.concepts.get(id)
+  if (concept === undefined) return { kind: 'concept', id: asked, found: false }
+  const relations = (core?.relations ?? [])
+    .filter((r) => r.from === id || r.to === id)
+    .map((r) => ({ from: r.from, to: r.to, type: r.type, source: r.source, confidence: r.confidence }))
+    .sort((a, b) => compareCodePoints(a.type, b.type) || compareCodePoints(a.from, b.from) || compareCodePoints(a.to, b.to))
+  const out: Record<string, unknown> = {
+    kind: 'concept',
+    id,
+    found: true,
+    concept: { kind: concept.kind, tw: concept.tw, source: concept.source },
+    names: m.map?.core.names[id] ?? [],
+    relations,
+  }
+  if (id !== asked) out.alias = asked
   return out
 }
 
+function revisionAnswer(m: MapSet, concept: string, book: string): unknown {
+  bookNumber(book)
+  const sources: Record<string, Cell> = {}
+  const verses = new Set<number>()
+  const take = (lists: Map<string, number[]> | undefined): void => {
+    for (const v of lists?.get(concept) ?? []) verses.add(v)
+  }
+  const cellOf = (source: string): Cell => {
+    const t = tableOf(m, source)
+    return t === undefined ? { state: 'none' } : cell(book, t.coverage, source, t.rows, concept)
+  }
+  if (concept.startsWith('tw:')) {
+    sources[TWL] = cellOf(TWL)
+    take(m.xmap?.parts.get(book)?.links)
+  } else if (concept.startsWith('ta:')) {
+    sources[TN] = cellOf(TN)
+    take(m.xmap?.parts.get(book)?.notes)
+    for (const source of m.map?.core.coverage.keys() ?? []) {
+      if (idOf(source) !== 'tn') continue
+      sources[source] = cellOf(source)
+      take(m.map?.parts.get(book)?.usage)
+    }
+  }
+  return { kind: 'revision', concept, book, revision: m.revision, verses: [...verses].sort((a, b) => a - b), sources }
+}
+
+/** The answer to a fixed query (`spec/tests/queries/README.md`): a plain value, written with `canonicalJson`. */
 export function answer(m: MapSet, query: { kind: string; [k: string]: unknown }): unknown {
   switch (query.kind) {
     case 'strong':
-      return strongWhere(m, String(query.key))
+      return strongAnswer(m, String(query.key))
     case 'concept':
-      return conceptWhere(m, String(query.id))
+      return conceptAnswer(m, String(query.id))
     case 'usage':
-      return usage(m, String(query.concept), query.source === 'map' ? 'map' : 'xmap')
+      return usageAnswer(m, String(query.concept), String(query.source))
     case 'book':
-      return bookCoverage(m, String(query.book))
+      return bookAnswer(m, String(query.book))
     case 'keyterms':
-      return keyTerms(m, String(query.book))
+      return keytermsAnswer(m, String(query.book))
     case 'revision':
       return revisionAnswer(m, String(query.concept), String(query.book))
     default:

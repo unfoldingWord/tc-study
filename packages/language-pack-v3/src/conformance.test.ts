@@ -225,8 +225,8 @@ describe('case 5: nota-varios-versiculos (the map half)', () => {
     const part = mapView(await segmentOf('nota-varios-versiculos/map-tit.seg', MAP_TABLES)) as MapPart
     expect(core.usage!.rows.get(MET)!.get('tit')).toEqual([1, 3])
     expect(part.usage!.get(MET)).toEqual([56001002, 56001003, 56001004])
-    const found = answer({ map: { core, parts: new Map([['tit', part]]) }, revision: 1 }, { kind: 'usage', concept: MET, source: 'map' }) as any
-    expect(found.books.find((b: any) => b.book === 'tit')).toEqual({ book: 'tit', state: 'count', count: 1, verses: 3 })
+    const found = answer({ map: { core, parts: new Map([['tit', part]]) }, revision: 1 }, { kind: 'usage', concept: MET, source: 'es-419_gl/es-419/tn' }) as any
+    expect(found.books.tit).toEqual({ state: 'count', count: 1, verses: 3 })
   })
 })
 
@@ -238,8 +238,7 @@ describe('case 6: strong-repetido', () => {
     expect(part.strong.get('G54850')).toEqual([56001001])
     const found = answer({ xmap: { core, parts: new Map([['tit', part]]) }, revision: 1 }, { kind: 'strong', key: 'G5485' }) as any
     expect(found.key).toBe('G54850')
-    expect(found.books).toEqual([{ book: 'tit', state: 'count', count: 3, verses: 1 }])
-    expect(found).toMatchObject({ count: 3, verses: 1 })
+    expect(found.books.tit).toEqual({ state: 'count', count: 3, verses: 1 })
   })
 })
 
@@ -249,20 +248,24 @@ describe('case 11: revisiones-mixtas', () => {
     const installed = bookView(await segmentOf('revisiones-mixtas/book-rut.seg', BOOK_TABLES))
     const catalog = (await readerOutput(bytesOf(join(TESTS_DIR, 'revisiones-mixtas/catalog.seg')))) as Out
     expect(catalog.about.revision).toBe(4)
-    const set: MapSet = { map: { core, parts: new Map() }, revision: catalog.about.revision, installed: new Map([['rut', installed]]) }
-    expect(answer(set, { kind: 'revision', concept: MET, book: 'rut' })).toEqual({ fromMap: 15, revision: 4, installed: 14 })
+    const set: MapSet = { map: { core, parts: new Map() }, revision: catalog.about.revision }
+    // The answer from the map names the revision it describes; the installed book is counted from its own segment (counts.md).
+    const found = answer(set, { kind: 'revision', concept: MET, book: 'rut' }) as any
+    expect(found.revision).toBe(4)
+    expect(found.sources['es-419_gl/es-419/tn']).toMatchObject({ state: 'count', count: 15 })
+    expect((installed.notes?.rows ?? []).filter((r) => r.concept === MET)).toHaveLength(14)
   })
 })
 
 describe('case 12: idioma-parcial', () => {
   test('Titus has the count, Jonah zero, Isaiah no source', async () => {
     const core = await mapOf('idioma-parcial/map-core.seg')
-    const found = answer({ map: { core, parts: new Map() }, revision: 1 }, { kind: 'usage', concept: MET, source: 'map' }) as any
-    const of = (book: string) => found.books.find((b: any) => b.book === book)
-    expect(of('tit')).toEqual({ book: 'tit', state: 'count', count: 1, verses: 3 })
-    expect(of('jon')).toEqual({ book: 'jon', state: 'zero' })
-    expect(of('isa')).toEqual({ book: 'isa', state: 'none' })
-    expect(of('rut')).toEqual({ book: 'rut', state: 'zero' })
+    const found = answer({ map: { core, parts: new Map() }, revision: 1 }, { kind: 'usage', concept: MET, source: 'es-419_gl/es-419/tn' }) as any
+    const of = (book: string) => found.books[book]
+    expect(of('tit')).toEqual({ state: 'count', count: 1, verses: 3 })
+    expect(of('jon')).toEqual({ state: 'zero', count: 0, verses: 0 })
+    expect(of('isa')).toEqual({ state: 'none' })
+    expect(of('rut')).toEqual({ state: 'zero', count: 0, verses: 0 })
     expect(core.coverage.get('es-419_gl/es-419/tn')).toEqual({ whole: ['rut', 'jon', 'tit', '3jn'], partial: [] })
   })
 })
