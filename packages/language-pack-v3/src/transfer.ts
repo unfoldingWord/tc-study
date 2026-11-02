@@ -15,7 +15,7 @@
  */
 import type { BuiltSegment } from './build/catalog'
 import { type CborValue, encodeDeterministic } from './codec/cbor'
-import { CLASS_NAMES, type ClassName, FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, KIND_TRANSFER, readHeader, readSegment } from './codec/container'
+import { CLASS_NAMES, type ClassName, FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, KIND_TRANSFER, readFixed, readHeader, readSegment } from './codec/container'
 import { FormatError, type FormatErrorCode } from './codec/errors'
 import { type CborMap, hasOwn, isMap } from './codec/values'
 import { CATALOG_TABLES } from './read/catalog'
@@ -254,7 +254,8 @@ function parseIndex(index: CborMap): TransferIndex {
   const by = optionalText(index, 'by')
   if (by !== undefined) out.by = by
   for (const [key, value] of Object.entries(index)) {
-    if (!KNOWN_KEYS.includes(key)) out.extra[key] = value
+    // defineProperty and not `=`: assigning to "__proto__" would set the prototype and lose the key.
+    if (!KNOWN_KEYS.includes(key)) Object.defineProperty(out.extra, key, { value, enumerable: true, writable: true, configurable: true })
   }
   return out
 }
@@ -293,8 +294,9 @@ async function verify(entry: TransferIndexEntry, data: Uint8Array, isCatalog: bo
     if (hex(await sha256(data)) !== entry.id) throw new FormatError('E_ID', 'the sha256 of the complement is not the id in the index')
     return
   }
-  const { kind, header } = readHeader(data)
-  if (kind !== KIND_SEGMENT) throw new FormatError('E_KIND', 'the entry is a transfer file, not a segment file')
+  // The kind byte comes before any header is parsed: a transfer file is E_KIND whatever its index holds (`container.md`, step 1).
+  readFixed(data, [KIND_SEGMENT])
+  const { header } = readHeader(data)
   let tables: Record<string, number[]>
   if (isCatalog) {
     tables = CATALOG_TABLES as Record<string, number[]>

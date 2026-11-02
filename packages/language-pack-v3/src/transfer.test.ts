@@ -549,6 +549,26 @@ describe('readTransfer', () => {
       expect(read.entries.map((e) => e.status)).toEqual(['ok', 'E_MAGIC', 'E_VERSION', 'E_KIND'])
     })
 
+    test('an entry that is itself a transfer file is E_KIND, whatever its index holds', async () => {
+      // Kind byte 2 and an index that would be E_HEADER (cut short), E_TRUNCATED (not there) or fine: the kind comes first.
+      const cutIndex = assemble(Uint8Array.of(0xa1, 0x61), [])
+      const noIndex = cutIndex.slice(0, 12 + 1)
+      const nested = full()
+      for (const bytes of [cutIndex, noIndex, nested]) {
+        const read = await readTransfer(craft([CATALOG, { ...MINIMAL, id: fingerprint(9), bytes }, ORIG]))
+        expect(read.entries.map((e) => e.status)).toEqual(['ok', 'E_KIND', 'ok'])
+      }
+      // With known tables, which read the header for the class, the same.
+      const known = await readTransfer(craft([CATALOG, { ...MINIMAL, id: fingerprint(9), bytes: cutIndex }]), { known: { book: { strings: [1], texts: [1] } } })
+      expect(known.entries[1].status).toBe('E_KIND')
+    })
+
+    test('a catalog entry that is a transfer file is E_KIND, whatever its index holds', async () => {
+      const cutIndex = assemble(Uint8Array.of(0xa1, 0x61), [])
+      expect(await codeOf(readTransfer(craft([{ ...CATALOG, bytes: cutIndex }, MINIMAL])))).toBe('E_KIND')
+      expect(await codeOf(readTransfer(craft([{ ...CATALOG, bytes: full() }, MINIMAL])))).toBe('E_KIND')
+    })
+
     test('an entry whose file is shorter or longer than the size says: E_TRUNCATED, E_TRAILING', async () => {
       const read = await readTransfer(
         craft([CATALOG, { ...MINIMAL, bytes: MINIMAL.bytes.subarray(0, MINIMAL.bytes.length - 10) }, { ...ORIG, bytes: new Uint8Array([...ORIG.bytes, 1, 2, 3]) }, COMPLEMENT]),

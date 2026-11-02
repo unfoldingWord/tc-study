@@ -619,6 +619,19 @@ describe('the sample (es-419 Titus)', () => {
     expect(await readerOutput(file.subarray(0, 20))).toEqual({ error: 'E_TRUNCATED' })
   })
 
+  test('an unknown top-level key named __proto__ is kept as a key, it does not become the prototype', async () => {
+    const file = writeTransfer({ mode: 'full', catalogs: [lang.catalog], entries: [segmentOf(lang, 'book')], made: '2026-11-01T10:00:00Z', by: 'test 1' })
+    const tweaked = withHeader(file, (index) => {
+      Object.defineProperty(index, '__proto__', { value: { x: [1, 2] }, enumerable: true, writable: true, configurable: true })
+      index.future = 1
+    })
+    const result = await out(tweaked)
+    expect(Object.keys(result.index)).toEqual(['__proto__', 'by', 'catalogs', 'entries', 'future', 'made', 'mode'])
+    expect(Object.getOwnPropertyDescriptor(result.index, '__proto__')?.value).toEqual({ x: [1, 2] })
+    expect(Object.getPrototypeOf(result.index)).toBe(Object.prototype)
+    expect(result.entries.map((e: any) => e.status)).toEqual(['ok', 'ok'])
+  })
+
   test('keys of the index: an unknown top-level key is kept (bytes in hex); an unlisted key of an entry is not output', async () => {
     const file = writeTransfer({ mode: 'full', catalogs: [lang.catalog], entries: [segmentOf(lang, 'book')], made: '2026-11-01T10:00:00Z', by: 'test 1' })
     const tweaked = withHeader(file, (index) => {

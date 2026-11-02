@@ -133,8 +133,11 @@ function decodeFailure(error: unknown, code: FormatErrorCode, what: string): nev
 
 // Header
 
-/** The first 12 bytes. The checks go in file order; a byte that is not there yet makes the file `E_TRUNCATED`. */
-function readFixed(bytes: Uint8Array, kinds: readonly number[]): { kind: number; length: number } {
+/**
+ * The first 12 bytes. The checks go in file order (`E_MAGIC`, `E_VERSION`, `E_KIND`); a byte that is not there yet makes the file
+ * `E_TRUNCATED`. `kinds` are the kinds the caller reads.
+ */
+export function readFixed(bytes: Uint8Array, kinds: readonly number[]): { kind: number; length: number } {
   const truncated = () => new FormatError('E_TRUNCATED', 'the file ends inside the first 12 bytes')
   // A file shorter than the magic is cut short only if what is there matches the start of the magic.
   for (let i = 0; i < Math.min(bytes.length, MAGIC.length); i++) {
