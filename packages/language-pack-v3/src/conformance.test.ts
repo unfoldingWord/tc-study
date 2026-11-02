@@ -347,8 +347,7 @@ describe('the cross-reader check (compare.ts)', () => {
       expect(run.text.trim().split('\n')).toEqual([
         'container/minimal.seg: $.texts[0].pieces[0][0]: TypeScript "Pablo" / Python "Pablox"',
         'container/truncated.seg: $.error: TypeScript "E_TRUNCATED" / Python "E_ID"',
-        'compare: left out until the Python reader has the integer-range rule (NOT_YET_IN_PYTHON): entero-fuera-de-rango/body.seg, entero-fuera-de-rango/header.seg',
-        'compare: 12 files compared (12 cases), 2 mismatches',
+        'compare: 14 files compared (14 cases), 2 mismatches',
       ])
     } finally {
       rmSync(folder, { recursive: true, force: true })

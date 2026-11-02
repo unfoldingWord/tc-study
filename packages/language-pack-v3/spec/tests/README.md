@@ -40,8 +40,7 @@ bun spec/tests/compare.ts [--python <path>] [--built] [--reader <path>]
   file, the first JSON path that differs, both values cut to 80 characters) and exits 0 when all agree, 1 when one does
   not, and 2 when the interpreter is missing or older than Python 3.11. The interpreter is `--python`, else the
   environment variable `LP3_PYTHON`, else `python`. `--reader` is the Python script to run, `spec/reader-py/lp3read.py` unless given
-  (the tests use it to show that a difference is found). The constant `NOT_YET_IN_PYTHON` of `compare.ts` lists case files the Python
-  reader does not read yet; they are left out of the comparison, and a line says so. With `--built` it also builds the big segments of the sample in
+  (the tests use it to show that a difference is found). With `--built` it also builds the big segments of the sample in
   memory (the Titus original, the `tw:kt` art group, the lexicon group `G0`, the language catalog and the common
   catalog, an OBS segment from a synthetic story, and a `full` transfer file of them, whole and cut in the middle of
   its last entry), writes them under the temporary folder of the system and compares them the same way. Those are not
