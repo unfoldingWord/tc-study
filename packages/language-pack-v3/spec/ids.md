@@ -141,6 +141,10 @@ once and kept between builds, even when the heading is corrected, translated or 
   When none applies, it is new.
 - **Splits and merges.** A section that splits keeps its sid in the first part. A merged section keeps the sid of the
   first, and takes the other as an alias.
+- **Equal headings.** When two sections of one article would get the same sid, the later one (in the order of the
+  article) gets `-2`, the next `-3`, unless the registry already gave it a sid.
+- **A bridged article** starts with an empty registry: its section ids are those of a first build, local to the device,
+  and a later published catalog replaces them. A map never names a section, so the maps do not depend on them.
 - **The role is apart from the sid.** Correcting a role does not change the sid.
 - A heading the builder cannot place gets the role `unknown`, and the builder's report lists it. The section stays
   readable and citable.

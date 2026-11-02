@@ -11,7 +11,9 @@ map-header = {
   "lang": tstr,
   "part": "core" / book-code,
   ? "book": book-code,         ; equal to "part" in a book's part
-  "res": [* [tstr, tstr]],
+  "res": [* [tstr, tstr]],     ; the same as in the core: the release of each source is in the core and in the
+                               ; catalog, so a part has "res": []. A new release of English tN must not change the
+                               ; parts whose verses did not change
 }
 
 map-core-tables = {

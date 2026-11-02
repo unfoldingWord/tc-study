@@ -27,14 +27,17 @@ A **unit** is what a device installs or replaces at once:
 | --- | --- |
 | `book:tit` | The language's book segment for Titus |
 | `orig:tit` | The original of Titus (common catalog) |
-| `map` | The language map: its core and its 66 parts |
-| `xmap` | The common map: its core and its 66 parts (common catalog) |
+| `map` | The language map: its core and its parts. Needs nothing |
+| `xmap` | The common map: its core and its parts (common catalog). Needs nothing |
 | `art:tw:kt`, `art:ta:translate`… | A group of articles |
 | `lex:G5`… | A group of lexicon entries |
 | `obs` | Open Bible Stories |
 
-Each unit lists the units it needs (`needs`). A book needs its original, the language map and the article groups its
+Each unit lists the units it needs (`needs`). A book needs its original, the language map (`needs: "map"`, now satisfied by its own catalog) and the article groups its
 notes and links point to. The lexicon is not needed to read; an app downloads it when asked.
+
+A bridged book names the original's stamp, so its unit needs `orig:<book>` like any book: a device without that
+original does not activate it.
 
 **Activation.**
 - A device activates a unit when the unit and every unit it needs are complete and verified.
@@ -63,6 +66,7 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 | An English note or word link | the English `book` segment; the `xmap` part of that book and its core, if a count changed; both catalogs |
 | A tW or tA article | its `art` group, the `map` core if its title changed, the catalog |
 | One book of the original | `orig` of that book, and every `book` segment of that book in every language (their positions); the `xmap` part of that book |
+| A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog; no map part |
 | TIPNR, Theographic or the alias list | the `xmap` core and the parts whose books they touch |
 
 ## Signatures

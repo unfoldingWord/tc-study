@@ -123,8 +123,9 @@ required table it does not know is `E_TABLE`.
 | any table of any class that is not in the schema | nothing (it is only in `h.tables`) |
 
 **What a phase 1 reader knows.** Every table of `cddl/<class>.cddl`, at version 1, for the classes `book`, `orig`, `art`,
-`lex`, `obs` and `catalog`. For `map`, `xmap` and `gen` (read in phase 2) it knows no table at all, so **a segment of
-these classes is `E_TABLE`**, even if its tables are all optional, once the checks of `container.md` up to
+`lex`, `obs` and `catalog`. For `map`, `xmap` and `gen` it knows no table at all (a phase 2 reader knows those of `map` and `xmap`: see
+"`map`, `xmap`" below), so **a segment of
+these classes is `E_TABLE`** for a phase 1 reader, even if its tables are all optional, once the checks of `container.md` up to
 `E_HMISMATCH` have passed. The same holds for a segment inside a transfer file (below).
 
 The case 9 files are built this way.
@@ -327,13 +328,49 @@ Example, for a file cut inside its last entry:
  "catalogs": [{"id": "9ee2…", "h": {…}, "about": {…}, "resources": […], "segments": […], "units": […]}]}
 ```
 
-### `map`, `xmap` (phase 2)
+### `map`, `xmap`
 
-Phase 1 readers do not decode these classes (`E_TABLE`, above). Phase 2 will give:
+`coverage` (both cores) is `{source: {"whole": [books], "partial": [books]}}`: books as codes in canonical order
+(`ids.md`); `partial` is absent when the file has none. The source is the resource key.
 
-- each counts table as `{"unit", "rows": {key: {book: [count, distinct verses]}}}`;
-- in a part, each verse list as `{key: [verse ids]}`;
-- `coverage` as `{source: {"whole": [books], "partial": [books]}}`.
+A **counts table** (`strong`, `links`, `notes` of `xmap`; `usage` of `map`) is `{"unit": text, "rows": {key: {book:
+[count, verses]}}}`: `count` is the number of occurrences, links or notes, and `verses` the number of distinct verses.
+The book is its code. Example: `{"unit": "notes", "rows": {"ta:translate/figs-metaphor": {"tit": [1, 3]}}}`.
+
+**`xmap` core** (`part` is `"core"`):
+
+| Key | Type | Absent when |
+| --- | --- | --- |
+| `coverage` | as above | never |
+| `strong` | counts table | never |
+| `concepts` | `{id: {"kind": k, "tw": t, "source": res key}}` | never. `k` is one of `none person place event topic story` (0 to 5), `t` one of `none kt names other` (0 to 3) |
+| `links`, `notes` | counts tables | the table is not in the file |
+| `relations` | list of `{"from", "to", "type", "source", "confidence"}`: `from`, `to` the concept ids, `type` the type's text, `source` the res key (text), `confidence` an integer 0 to 100 | the table is not in the file |
+| `aliases` | `{id: id}` as the file has it | the table is not in the file |
+| `strongs` | `{concept id: [Strong keys]}` as the file has it | the table is not in the file |
+| `topics` | as the file has it (`any`; bytes in hex) | the table is not in the file or not read |
+
+**`xmap` part** (`part` is a book code): `strong`, `links`, `notes` as `{key: [verse ids]}`, each verse id the full
+`LLCCCVVV` (the book number times 1 000 000 plus the stored value), in the order of the file. `links` and `notes` are
+absent when the file lacks them.
+
+**`map` core**:
+
+| Key | Type | Absent when |
+| --- | --- | --- |
+| `books` | list of 66 `[name, short, abbreviation, source]`, in canonical order | never |
+| `names` | `{id: [names]}` as the file has it | never |
+| `subtitles` | `{id: text}` as the file has it | the table is not in the file |
+| `coverage` | as above | never |
+| `usage` | counts table | the table is not in the file |
+| `obs` | list of `[story, title]` | the table is not in the file |
+| `topics`, `numbering` | as the file has them (bytes in hex) | the table is not in the file or not read |
+
+**`map` part**: `usage` as `{key: [verse ids]}`, full ids; absent when the file lacks it.
+
+**What a phase 2 reader knows.** `map`: `books names subtitles coverage usage obs` at version 1. `xmap`: `coverage strong
+concepts links notes relations aliases strongs` at version 1. `topics` and `numbering` are not known yet: they are optional,
+so they are skipped (listed in `h.tables`, not in the output). `gen` stays `E_TABLE`.
 
 ### Checks of the tables (`E_BODY`)
 
@@ -342,6 +379,8 @@ is not what its schema says is `E_BODY`, and nothing of the file is used. The sc
 keys the schema does not list (a later minor version adds them): they are ignored and are not in the output. Beyond the
 types, these are `E_BODY` too:
 
+- **Rows.** A table whose declared row count `n` is larger than the segment's `ulen`: a reader allocates no more rows than
+  the body has bytes.
 - **Columns.** A `uvarints` column that is cut short, longer than 8 bytes for a number, not minimal (the last byte of a number of two or more bytes is `00`)
   or above 2^53 − 1. An `ev` column whose length is not a multiple of 3. A `bits` column that is not `ceil(n / 8)` bytes
   or has an unused bit set. A `texts` column whose
@@ -363,13 +402,23 @@ types, these are `E_BODY` too:
   position of a quote that is in neither list (every `-1` is in exactly one of `quoteKinds` and `quoteMissing`).
 - **`orig`.** `words.cols` columns of different lengths; a number outside a word table; word pieces in `text.tok` that
   are not as many as the words; `macula.release` that is not text.
-- **`obs`.** A story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
+- **`obs`.** A help row whose story is outside 1 to 50 or whose frame is outside 0 to 99; a story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
   table of helps with an empty id, an id twice, `id.strings` with a count other than `n`, a `concept` column that is
   `flags`, or a `frame` column of another length than `n`.
 - **`art`.** An article with an empty `id`; an article with no section; a role that is not in the list of `art.cddl`; an empty `sid`; a `sid` twice in an
   article; an `id` twice in the group.
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.
+- **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `book` is not its `part`; a core with a `book`; a
+  core table in a part, or a part table shape in a core.
+  - Counts: keys not sorted or repeated; a `counts` column cut short, or with numbers left over; a book number outside 1..66 or not
+    increasing within its key; `count = 0` or `verses > count`; a key with no book; a `unit` other than the table's (`xmap`
+    `strong` "occurrences", `links` "links", `notes` "notes"; `map` `usage` "notes").
+  - Verse lists: `keys` not sorted or repeated; a key with `n = 0`; a value whose verse id does not increase within its key;
+    a `verses` column cut short or with numbers left over.
+  - `concepts`: columns of different lengths; `kind` above 5; `tw` above 3; a `source` outside `h.res`.
+  - `relations`: a concept outside `concepts`, a type outside `types`, a `source` outside `h.res`; a `confidence` above 100.
+  - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
   bytes; a `books` of another length than 9; a unit that names a segment outside `segments`, or has none; a segment, a unit
   or a resource listed twice; a header `lang` that differs from `about.catalog` (the common catalog has none).

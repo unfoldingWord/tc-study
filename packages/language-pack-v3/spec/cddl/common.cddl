@@ -79,7 +79,13 @@ coverage = { * tstr => [whole: book-set, ? partial: book-set] }
 counts = { "unit": count-unit, "keys": strtab, "counts": uvarints }
 count-unit = "occurrences" / "links" / "notes"
 
-; The verses behind the counts, for one book: per key the book has, in key order: the key's number minus the previous
-; key number written (the first minus 0), then its distinct verses (as many as the core says), each as
-; LLCCCVVV mod 1 000 000, minus the previous one (the first minus 0).
-verse-lists = uvarints
+; Rules of counts: a key lists at least one book; the book numbers of a key strictly increase (so the first delta is
+; at least 1, and so are the others); 1 <= count; 0 <= verses <= count. The "unit" of each table is fixed:
+; xmap "strong" is "occurrences", "links" is "links", "notes" is "notes"; map "usage" is "notes".
+
+; The verses behind the counts, for one book. "keys" are the keys this book has, sorted by code point. "verses" holds,
+; per key in that order: the number of distinct verses n (n >= 1), then n values, each the verse id mod 1 000 000
+; minus the previous value of the same key (the first minus 0). The book is the header's "book".
+; Why the keys are written here and not as numbers of the core's key table: a part numbered against the core's table
+; would change in all 66 books whenever one key is added anywhere.
+verse-lists = { "keys": strtab, "verses": uvarints }
