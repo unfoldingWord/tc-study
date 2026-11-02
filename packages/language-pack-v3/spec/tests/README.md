@@ -15,13 +15,17 @@ and `expected.json`.
 ## Reader output
 
 What a reader prints for a file, so that two readers can be compared on the same bytes. The TypeScript reader
-(`readerOutput` in `src/read/output.ts`) is the first; the Python reader follows this section and nothing else.
+(`readerOutput` in `src/read/output.ts`) is the first; the Python reader follows this section together with
+`container.md`, `ids.md`, `transfer.md` and `cddl/`, and nothing else.
 
 A reader prints one JSON value. For a file it rejects, that is `{"error": "<code>"}` with the code of `container.md`
 (and `transfer.md` for a transfer file). For a file it accepts, it is the object below.
 
 The kind byte (offset 6) says how to read the file: `01` is a segment file and `02` a transfer file. Any other kind is
 `E_KIND`, once the magic number and the major version have been checked.
+
+Two readers' outputs are compared as the **canonical text** defined below, never as the `JSON.stringify` of an object: an
+engine lists keys that look like array indexes (`"10"`) before the others, whatever order they were added in.
 
 ### Rules for every output
 
@@ -77,9 +81,12 @@ required table it does not know is `E_TABLE`.
 | `catalog` / `requires`, `complements` | the key of that table |
 | any table of any class that is not in the schema | nothing (it is only in `h.tables`) |
 
-The case 9 files are built this way. The classes `map`, `xmap` and `gen` are read in phase 2: a phase 1 reader has no
-known table for them, so **a segment of these classes is `E_TABLE`**, even if its tables are all optional, once the
-checks of `container.md` up to `E_HMISMATCH` have passed.
+**What a phase 1 reader knows.** Every table of `cddl/<class>.cddl`, at version 1, for the classes `book`, `orig`, `art`,
+`lex`, `obs` and `catalog`. For `map`, `xmap` and `gen` (read in phase 2) it knows no table at all, so **a segment of
+these classes is `E_TABLE`**, even if its tables are all optional, once the checks of `container.md` up to
+`E_HMISMATCH` have passed. The same holds for a segment inside a transfer file (below).
+
+The case 9 files are built this way.
 
 ### `book`
 
@@ -101,7 +108,9 @@ checks of `container.md` up to `E_HMISMATCH` have passed.
   there, and any other number is `E_BODY`). Example: `[[0, "chapter", "1"], [0, "open", "para:p"], [0, "verse", "1"],
   [7, "close", ""]]`.
 - **`attrs`.** One pair per node that has attributes: the **index of the event** in `events` (from 0) that opens the node,
-  and its attributes as an object of text. In the order of the event index. Example: `[[2, {"caller": "+"}]]`.
+  and its attributes as an object of text. In the order of the event index. Example: `[[2, {"caller": "+"}]]`. An
+  attribute map that is empty in the file is output as it is (`[2, {}]`): a builder never writes one, but a reader
+  reproduces what the file has. Only a text with no pair at all (no `attrs` key, or an empty list) has no `attrs`.
 - **`align`.** One list per **word** of the text (a piece that is a word, in order; the n-th item is the n-th word, not
   the n-th piece): the original positions it translates, as the numbers they stand for (the file writes them as
   differences). An empty list is a word that is not aligned. Example: `[[3], [], [1, 0]]` is three words: the first
@@ -165,9 +174,9 @@ Piece 0 is the ellipsis, piece 1 is the original word 5, piece 2 is a word the o
 | --- | --- | --- | --- |
 | `words` | list of objects | `words`, `cols` | never |
 | `words[].form`, `.lemma`, `.strong`, `.morph` | text | the word's number in each table; `""` when the word lacks the attribute | never |
-| `words[].other` | object of text | `other` | the word has no other attribute |
-| `pieces` | list of `[text, is word]` | `text.tok`: 0 is the next word (its `form`, a word); `n` is `seps[n - 1]` (not a word) | never |
-| `events` | list of `[position, kind, argument]` | `text.ev`, as in a book; arguments are strings of `seps` | never |
+| `words[].other` | object of text | `other`; an empty map in the file is output as it is (`"other": {}`) | the word is not listed in `other` |
+| `pieces` | list of `[text, is word]` | `text.tok`: 0 is the next word (its `form`, a word); a number `n > 0` is the string `seps[n - 1]` (not a word) | never |
+| `events` | list of `[position, kind, argument]` | `text.ev`, as in a book; the argument of an event is the string `seps[arg]`, with **no** `- 1` (the number 0 is a string of `seps` too, and `"close"` has `""` as in a book) | never |
 | `attrs` | list of `[event, {name: value}]` | `text.attrs`, as in a book | no node has attributes |
 | `macula` | object | `macula` | the table is not in the file or not read |
 | `macula.release` | text | `macula.release` | never |
@@ -245,16 +254,19 @@ The output has three keys and no `id` or `h`:
 
 | Key | Type | What |
 | --- | --- | --- |
-| `index` | object | The index as the file has it (`cddl/transfer.cddl`): `mode`, `catalogs` (list of hex ids), `entries` (list of `{id, kind, offset, size}` and `class` when the entry has it; `id` in hex), and when the file has them `base` (list of `[catalog, revision]`), `made`, `by`, and every other key of the index as it is |
+| `index` | object | The index as the file has it (`cddl/transfer.cddl`): `mode`, `catalogs` (list of hex ids), `entries` (list of `{id, kind, offset, size}` and `class` when the entry has it; `id` in hex), and when the file has them `base` (list of `[catalog, revision]`), `made`, `by`, and every other top-level key of the index as it is: those are not checked, and a byte string in one is hex. A key of an index **entry** that `transfer.cddl` does not list is not output (the entry is closed: only `id`, `kind`, `class`, `offset`, `size`) |
 | `entries` | list of objects | One per entry of the index, in its order: `id` (hex), `kind`, `class` (when the index entry has it) and `status` |
 | `catalogs` | list of objects | The reader output of each catalog entry, as for a segment file, in the order of the index's `catalogs` |
 
 `status` is:
 
-- `"ok"` when the whole entry is in the file and it verifies like a downloaded file. A segment is checked as in
-  `container.md`, with the entry's `id` as the id the catalog gives and the known tables of the class named in the
-  segment's own header; `E_KIND` for another kind than 01. The check stops at `E_TABLE`: the shape of the tables against
-  their schema is not part of the status. A complement is `ok` when the sha256 of its bytes is its `id`.
+- `"ok"` when the whole entry is in the file and it verifies like a downloaded file. A segment gets the same checks as a
+  downloaded one (`container.md`, "Order of checks"), with the entry's `id` as the id the catalog gives and the known
+  tables of the class named in the segment's own header (not the `class` of the index entry); `E_KIND` for another kind
+  than 01. That includes step 5 as far as `E_TABLE`: a segment of a class the reader knows no tables of (`map`, `xmap`,
+  `gen` in phase 1) is `E_TABLE` even when all its tables are optional. The shape of the tables against their schema (the
+  `E_BODY` checks of step 5) is the one check that is not part of the status: the app makes it when it opens the segment.
+  A complement is `ok` when the sha256 of its bytes is its `id`.
 - `"missing"` when the file ends before the entry's end (`offset + size`, from the end of the index).
 - Otherwise the code the entry fails with: `E_ID`, `E_INFLATE`, `E_TABLE`, …
 
@@ -290,7 +302,8 @@ keys the schema does not list (a later minor version adds them): they are ignore
 types, these are `E_BODY` too:
 
 - **Columns.** A `uvarints` column that is cut short, longer than 8 bytes for a number, not minimal (trailing `80` bytes)
-  or above 2^53 − 1. A `bits` column that is not `ceil(n / 8)` bytes or has an unused bit set. A `texts` column whose
+  or above 2^53 − 1. An `ev` column whose length is not a multiple of 3. A `bits` column that is not `ceil(n / 8)` bytes
+  or has an unused bit set. A `texts` column whose
   lengths do not add up to the bytes of `utf8`, or that is not valid UTF-8. A column whose number of values is not the
   number of rows that have one. A `deltas` column that leaves 0 … 2^53 − 1 where a position, a quote piece or a verse id is expected.
   A column with none, or more than one, of `strings`, `texts`, `flags` and `uints`.
@@ -299,15 +312,18 @@ types, these are `E_BODY` too:
   exist, or one twice; a text piece of `tok` that is not in the table.
 - **`book`.** `align` with a number of entries other than `texts`; a `words` column that does not give exactly `k` and its
   numbers for each word of the text, or has numbers left over; a position that is negative; an `alignMissing` entry whose
-  word is outside the text; `ascii4` ids that are not 4 bytes per row or have a byte above 127; a `refText` row outside
+  word is outside the text; `ascii4` ids that are not 4 bytes per row or have a byte above 127, or `id.strings` with a
+  count other than `n`; `ref.from` or `ref.span` with a count other than `n`; a `concept` column that is `flags` (a
+  concept is text); a `refText` row outside
   the table or twice; a row with no `refText` whose range has no canonical text in the book (`ids.md`); `quotes` where
   `n` has not one number per row, or `pos` has not as many numbers as `n` adds up to, or a position below 0; a `kinds` or
   `missing` entry that names a piece that does not exist, has a position, or is listed twice (in either list).
 - **`orig`.** `words.cols` columns of different lengths; a number outside a word table; word pieces in `text.tok` that
   are not as many as the words; `macula.release` that is not text.
 - **`obs`.** A story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
-  table of helps with an empty id, an id twice, or a `frame` column of another length than `n`.
-- **`art`.** An article with no section; a role that is not in the list of `art.cddl`; an empty `sid`; a `sid` twice in an
+  table of helps with an empty id, an id twice, `id.strings` with a count other than `n`, a `concept` column that is
+  `flags`, or a `frame` column of another length than `n`.
+- **`art`.** An article with an empty `id`; an article with no section; a role that is not in the list of `art.cddl`; an empty `sid`; a `sid` twice in an
   article; an `id` twice in the group.
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.

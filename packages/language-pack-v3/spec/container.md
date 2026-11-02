@@ -160,7 +160,9 @@ this order and stops at the first defect:
 5. Then the tables of the class, which only a reader that knows the class can check: each table against its schema
    (`cddl/`) and the further checks `tests/README.md` lists ("Checks of the tables"), `E_BODY` again. A segment of a class
    the reader does not decode (in phase 1: `map`, `xmap` and `gen`) is `E_TABLE` at this step if it was not before, because
-   the reader has no known table for it.
+   the reader has no known table for it, even if all its tables are optional. A segment inside a transfer file
+   (`transfer.md`) gets this `E_TABLE` too, but not the rest of the step: the shape of its tables is checked when the
+   app opens it.
 
 A file that came cut short over Bluetooth or a full SD card fails `E_TRUNCATED` or `E_INFLATE`. The app keeps what it
 had and asks for the file again.

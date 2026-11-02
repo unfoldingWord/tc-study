@@ -71,14 +71,16 @@ and how much of it the device already has, by reading only the index and the cat
      has a `class` other than `catalog`;
    - `base` is not a list of `[text, unsigned integer]`, or `made` or `by` is not text.
 
-   Keys of the index that are not listed are ignored. A reader does not check that an `update` has its `base`: that is the
-   app's job.
+   Keys of the top level of the index that are not listed are not checked: they are ignored, and the reader output keeps them
+   as they are. A key of an entry that is not listed is ignored and not output. A reader does not check that an `update`
+   has its `base`: that is the app's job.
 4. The length of the file against the entries, with `available` the bytes after the index: less than the end of the last
    catalog (`offset + size`) is `E_TRUNCATED`; more than the end of the last entry is `E_TRAILING`.
 5. Every entry in the order of the index, each one whole in the file: the catalogs first. A catalog is checked as a segment
    file (`container.md`) with its `id` of the index as the id the catalog gives, against the tables of a catalog; its
    error, whichever it is, rejects the file. Any other entry only gets its status (`tests/README.md`), and does not stop
-   the others.
+   the others: the checks of a downloaded segment (`container.md`, "Order of checks") up to step 5's `E_TABLE` for a
+   class the reader knows no tables of; the shape of its tables is not checked here.
 6. Then the tables of each catalog against `catalog.cddl`, in the order of `catalogs` (`E_BODY`; their tables were known in
    step 5): the first that fails rejects the file.
 
