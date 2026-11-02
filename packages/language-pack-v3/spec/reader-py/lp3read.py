@@ -7,15 +7,16 @@ Written from the specification alone (``packages/language-pack-v3/spec/``): ``co
     python lp3read.py <file>
 
 prints the reader output of the file as the canonical text of ``tests/README.md`` and exits 0, or prints
-``{"error": "<code>"}`` and exits 1 when the file is rejected.
+``{"error": "<code>"}`` and exits 1 when the file is rejected (2: the file cannot be read; 3: an unexpected exception,
+a bug of this reader and not a verdict on the file).
 
 As a library: ``read_file(data) -> dict`` (the reader output, or ``{"error": code}``), ``canonical_text(obj)``
 (the indented text the ``*.expected.json`` files hold) and ``compact_text(obj)`` (the canonical text without
 whitespace).
 
 Only the standard library is needed. The CBOR decoder is written here rather than taken from ``cbor2`` because the
-specification forbids floats, tags, ``null`` and ``undefined`` and limits the nesting to 64 levels, and a general
-decoder hides tags (a bignum tag comes back as an ``int``) and recurses without a limit. ``cbor2`` is used by the
+specification makes a reader reject indefinite lengths, floats, tags, ``null`` and ``undefined`` and limits the nesting
+to 64 levels, and a general decoder hides tags (a bignum tag comes back as an ``int``) and recurses without a limit. ``cbor2`` is used by the
 tests, to build files and to check this decoder against it.
 """
 from __future__ import annotations
@@ -85,9 +86,9 @@ def _bad():
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# CBOR (RFC 8949), strict: no floats, tags, null, undefined or other simple values; text must be valid UTF-8; map
-# keys are text and not repeated; nesting at most 64 levels. Anything else well formed is accepted, whatever its
-# form (shortest integers, definite lengths and key order are rules for builders; a reader does not check them).
+# CBOR (RFC 8949), strict as container.md says ("What a reader accepts"): no indefinite lengths, floats, tags, null,
+# undefined or other simple values (only false and true); text must be valid UTF-8; map keys are text and not repeated;
+# nesting at most 64 levels. Integers not in their shortest form and map keys not sorted are accepted.
 # ---------------------------------------------------------------------------------------------------------------
 
 
@@ -112,7 +113,7 @@ class _Decoder:
         return s
 
     def head(self):
-        """Returns (major, argument or None for indefinite length)."""
+        """Returns (major, argument). Indefinite lengths (additional information 31) are rejected."""
         if self.i >= len(self.b):
             raise _Malformed("cut short")
         ib = self.b[self.i]
@@ -122,9 +123,7 @@ class _Decoder:
             return major, info
         if 24 <= info <= 27:
             return major, int.from_bytes(self.take(1 << (info - 24)), "big")
-        if info == 31 and major in (2, 3, 4, 5):
-            return major, None
-        raise _Malformed("reserved additional information")
+        raise _Malformed("indefinite length or reserved additional information")
 
     def item(self, depth: int):
         if self.i < len(self.b) and self.b[self.i] >> 5 == 7:
@@ -143,21 +142,7 @@ class _Decoder:
         if major == 6:
             raise _Malformed("tag")
         if major in (2, 3):
-            if arg is None:
-                chunks = []
-                while True:
-                    if self.i >= len(self.b):
-                        raise _Malformed("cut short")
-                    if self.b[self.i] == 0xFF:
-                        self.i += 1
-                        break
-                    m, n = self.head()
-                    if m != major or n is None:
-                        raise _Malformed("bad chunk")
-                    chunks.append(self.take(n))
-                raw = b"".join(chunks)
-            else:
-                raw = self.take(arg)
+            raw = self.take(arg)
             if major == 2:
                 return bytes(raw)
             try:
@@ -167,44 +152,16 @@ class _Decoder:
         # arrays and maps
         if depth + 1 > MAX_DEPTH:
             raise _TooDeep()
+        if arg > len(self.b) - self.i:
+            raise _Malformed("cut short")
         if major == 4:
-            out = []
-            if arg is None:
-                while True:
-                    if self.i >= len(self.b):
-                        raise _Malformed("cut short")
-                    if self.b[self.i] == 0xFF:
-                        self.i += 1
-                        break
-                    out.append(self.item(depth + 1))
-            else:
-                if arg > len(self.b) - self.i:
-                    raise _Malformed("cut short")
-                for _ in range(arg):
-                    out.append(self.item(depth + 1))
-            return out
-        # major 5
+            return [self.item(depth + 1) for _ in range(arg)]
         out = {}
-
-        def pair():
+        for _ in range(arg):
             k = self.item(depth + 1)
             if type(k) is not str or k in out:
                 raise _Malformed("map key")
             out[k] = self.item(depth + 1)
-
-        if arg is None:
-            while True:
-                if self.i >= len(self.b):
-                    raise _Malformed("cut short")
-                if self.b[self.i] == 0xFF:
-                    self.i += 1
-                    break
-                pair()
-        else:
-            if arg > len(self.b) - self.i:
-                raise _Malformed("cut short")
-            for _ in range(arg):
-                pair()
         return out
 
 
@@ -406,9 +363,8 @@ def decode_column(col, n: int, strings: list[str] | None = None, allow_flags: bo
 
 
 class Segment:
-    def __init__(self, id_hex, header, h, t, skip):
+    def __init__(self, id_hex, h, t, skip):
         self.id = id_hex
-        self.header = header
         self.h = h
         self.t = t
         self.skip = skip
@@ -469,8 +425,12 @@ def _validate_logical_header(h) -> None:
             _bad()
 
 
-def parse_segment(data: bytes, expect_id: bytes | None = None) -> Segment:
-    """A segment file up to and including E_TABLE (container.md, steps 1 to 4); step 5 is ``decode_segment``."""
+def parse_segment(data: bytes, expect_id: bytes | None = None, must_class: str | None = None) -> Segment:
+    """A segment file up to and including E_TABLE (container.md, steps 1 to 4); step 5 is ``decode_segment``.
+
+    ``must_class`` is the class the body's ``h`` must have (a catalog inside a transfer file): another class is
+    E_BODY, as part of the general shape of the body (after E_ID, before E_HMISMATCH).
+    """
     _check_fixed(data, (1,))
     hlen = int.from_bytes(data[8:12], "big")
     # step 2
@@ -525,6 +485,8 @@ def parse_segment(data: bytes, expect_id: bytes | None = None) -> Segment:
     _validate_logical_header(h)
     if type(t) is not dict or t.keys() != h["tables"].keys():
         _bad()
+    if must_class is not None and h["class"] != must_class:
+        _bad()
     if not deep_equal(h, hh):
         _fail("E_HMISMATCH")
     cls = h["class"]
@@ -538,7 +500,7 @@ def parse_segment(data: bytes, expect_id: bytes | None = None) -> Segment:
         if required or name in REQUIRED_TABLES[cls]:
             _fail("E_TABLE")
         skip.add(name)
-    return Segment(digest.hex(), header, h, t, skip)
+    return Segment(digest.hex(), h, t, skip)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -810,6 +772,9 @@ def _decode_quotes(q, name: str, nrows: int, rows: list) -> None:
             _bad()
         piece_ok(e[0], e[1])
         rows[e[0]].setdefault("quoteMissing", []).append([e[1], e[2], e[3], e[4]])
+    # every -1 is in exactly one of the two lists (each listed piece is a -1 and is listed once: see piece_ok)
+    if sum(1 for v in values if v == 0) != len(used):
+        _bad()
 
 
 def _decode_book_helps(p: Segment, name: str, strings: list[str], book: int | None) -> dict:
@@ -979,9 +944,8 @@ def _decode_art(p: Segment) -> dict:
             _bad()
         ids.add(aid)
         art = {"id": aid, "res": p.res_key(_need(a, "res", is_uint)), "title": _need(a, "title", is_str)}
-        for key in ("subtitle",):
-            if _opt(a, key, is_str) is not None:
-                art[key] = a[key]
+        if _opt(a, "subtitle", is_str) is not None:
+            art["subtitle"] = a["subtitle"]
         for key in ("related", "aliases"):
             if _opt(a, key, is_strlist) is not None:
                 art[key] = a[key]
@@ -1012,6 +976,17 @@ def _decode_art(p: Segment) -> dict:
 # ---------------------------------------------------------------------------------------------------------------
 
 
+def _digits_value(digits: str) -> str:
+    """The value of a string of ASCII digits as a digit string without leading zeros (no ``int()``: Python limits
+    the digits it converts, and the text comes from the file)."""
+    return digits.lstrip("0") or "0"
+
+
+def _thousands(digits: str) -> str:
+    """``n div 1000`` of the number written in ``digits``, as ``_digits_value``."""
+    return _digits_value(digits[:-3])
+
+
 def _decode_lex(p: Segment) -> dict:
     _header_needs(p, "lang", "group", "res", nonempty_res=True)
     group = _LEX_GROUP.fullmatch(p.h["group"])
@@ -1028,7 +1003,7 @@ def _decode_lex(p: Segment) -> dict:
             _bad()
         strong = _need(e, "strong", is_str)
         m = _STRONG.fullmatch(strong)
-        if not m or m.group(1) != p.h["group"][0] or int(m.group(2)) // 1000 != int(p.h["group"][1:]):
+        if not m or m.group(1) != p.h["group"][0] or _thousands(m.group(2)) != _digits_value(p.h["group"][1:]):
             _bad()
         entry = {"res": p.res_key(_need(e, "res", is_uint)), "strong": strong, "lemma": _need(e, "lemma", is_str)}
         senses = []
@@ -1352,7 +1327,7 @@ def _read_transfer(data: bytes) -> dict:
 
     parsed = {}
     for e in entries[:len(catalogs)]:
-        parsed[e["id"]] = parse_segment(entry_bytes(e), e["id"])
+        parsed[e["id"]] = parse_segment(entry_bytes(e), e["id"], must_class="catalog")
     statuses = []
     for i, e in enumerate(entries):
         if e["offset"] + e["size"] > available:
@@ -1440,8 +1415,14 @@ def main(argv: list[str]) -> int:
     except OSError as e:
         sys.stderr.write(f"lp3read: {e}\n")
         return 2
-    out = read_file(data)
-    sys.stdout.buffer.write(canonical_text(out).encode("utf-8"))
+    try:
+        out = read_file(data)
+        text = canonical_text(out)
+    except Exception as e:  # a bug of this reader, never a verdict on the file: exit 3, not 1
+        sys.stderr.write(f"lp3read: internal error ({type(e).__name__}: {e}); this is a bug of the reader, "
+                         "not a rejection of the file\n")
+        return 3
+    sys.stdout.buffer.write(text.encode("utf-8"))
     return 1 if "error" in out and list(out) == ["error"] else 0
 
 

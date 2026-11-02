@@ -9,6 +9,7 @@ does not depend on the order of a string table.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import struct
@@ -182,9 +183,11 @@ def header_h(h: dict) -> dict:
 @pytest.mark.parametrize("name", ["minimal", "truncated", "bad-id"])
 def test_container_examples(name):
     data = (CONTAINER / f"{name}.seg").read_bytes()
-    # The files may be checked out with CRLF line ends (git autocrlf); in the repository they are LF.
+    # spec/.gitattributes keeps these files LF; a checkout made before it existed may still have CRLF.
     expected = (CONTAINER / f"{name}.expected.json").read_bytes().replace(b"\r\n", b"\n").decode("utf-8")
     assert canonical_text(read_file(data)) == expected
+    # outputs are compared as the canonical text of the parsed value (tests/README.md)
+    assert compact_text(read_file(data)) == compact_text(json.loads(expected))
 
 
 def test_cli(tmp_path):
@@ -396,8 +399,7 @@ def test_e_body_integer_beyond_2_53():
 
 
 def test_body_root_keys_beyond_h_and_t_are_ignored():
-    # container.md: "a CBOR map with two keys"; tests/README.md: "a map may have keys the schema does not list ...
-    # they are ignored". This reader ignores them (a finding about the spec, see the report).
+    # container.md, "Body": "Any other key of the body map is ignored and is not output".
     body = enc({"h": MIN_DOC["h"], "t": MIN_DOC["t"], "x": [1, 2]})
     expected = min_expected()
     expected["id"] = hashlib.sha256(body).hexdigest()
@@ -743,15 +745,19 @@ def test_book_links_lose_quotes_when_links_is_unknown_but_notes_keep_theirs():
     assert out["notes"]["rows"][1]["quote"] == [-1, 5, -1]
 
 
-def test_quote_piece_without_position_that_is_in_neither_list_is_accepted():
-    # tests/README.md says every -1 is in exactly one of kinds and missing, but its list of E_BODY checks does not
-    # include a -1 in neither: this reader accepts it (a finding about the spec, see the report).
+def test_quote_piece_without_position_that_is_in_neither_list_is_e_body():
+    # tests/README.md, "Checks of the tables": a -1 position of a quote that is in neither list is E_BODY.
+    for drop in (("kinds",), ("missing",), ("kinds", "missing")):
+        b, expected, (h, t) = book_helps()
+        for k in drop:
+            del t["quotes"]["notes"][k]
+        err(build(h, t).data, "E_BODY")
+    # and a -1 that is in both lists is E_BODY too ("listed twice")
     b, expected, (h, t) = book_helps()
-    del t["quotes"]["notes"]["kinds"]
-    del t["quotes"]["notes"]["missing"]
-    out = read_file(build(h, t).data)
-    row = out["notes"]["rows"][1]
-    assert row["quote"] == [-1, 5, -1] and "quoteKinds" not in row and "quoteMissing" not in row
+    t["quotes"]["notes"]["missing"].append([1, 0, 56001001, "x", 1])
+    err(build(h, t).data, "E_BODY")
+    # the file of the fixture has every -1 listed once
+    ok(*book_helps()[:2])
 
 
 def test_book_quotes_without_notes_or_links_are_ignored():
@@ -1103,6 +1109,28 @@ def lex_fixture():
 def test_lex_group_with_senses_and_refs():
     b, expected, _ = lex_fixture()
     ok(b, expected)
+
+
+def test_lex_huge_digit_strings_are_e_body_and_never_raise():
+    # Python 3.11 refuses int() of more than 4300 digits: the reader must not convert text of the file
+    for strong, group in (("G" + "5" * 5000, "G5"), ("G5" + "0" * 5000, "G5"), ("G5485", "G" + "5" * 5000),
+                          ("G" + "9" * 5000, "G" + "9" * 4999)):
+        _, _, (h, t) = lex_fixture()
+        t["entries"][0]["strong"] = strong
+        t["entries"][1]["strong"] = "G5486a"
+        h["group"] = group
+        err(build(h, t).data, "E_BODY")
+    # a group and a Strong number with the same huge thousands are fine, and leading zeros do not count
+    _, expected, (h, t) = lex_fixture()
+    big = "1" * 5000
+    h["group"] = "G" + big
+    t["entries"] = [{"res": 0, "strong": "G" + big + "485", "lemma": "x", "senses": []}]
+    out = read_file(build(h, t).data)
+    assert "error" not in out and out["entries"][0]["strong"] == "G" + big + "485"
+    _, expected, (h, t) = lex_fixture()
+    h["group"] = "G0005"
+    t["entries"] = [{"res": 0, "strong": "G05485", "lemma": "x", "senses": []}]
+    assert "error" not in read_file(build(h, t).data)
 
 
 def test_lex_aramaic_true_and_other_group_letter():
@@ -1476,10 +1504,20 @@ def test_cbor_decoder_agrees_with_cbor2():
         assert type(lp3read._cbor_one(enc(s))) is type(s)
 
 
+INDEFINITE = {
+    "text": b"\x7f\x61\xc3\x61\xa9\xff",             # chunks that join into a valid "é"
+    "text, empty": b"\x7f\xff",
+    "bytes": b"\x5f\x41a\x41b\xff",
+    "array": b"\x9f\x01\x02\xff",
+    "map": b"\xbf\x61a\x01\xff",
+    "array, empty": b"\x9f\xff",
+}
+
+
 def test_cbor_decoder_rejects():
     bad = [b"\xf6", b"\xf7", b"\xf9\x00\x00", b"\xfa\x00\x00\x00\x00", b"\xfb" + bytes(8), b"\xc0\x60", b"\xc2\x41\x01",
            b"\xf0", b"\xf8\x20", b"\xff", b"\x1c", b"\x18", b"\x62a", b"\x62\xc3\x28", b"\x82\x01", b"\xa1\x01\x02",
-           b"\xa2\x61a\x01\x61a\x02", b"\x9f\x01", b"\x5f\x41a", b"\x01\x01"]
+           b"\xa2\x61a\x01\x61a\x02", b"\x01\x01", b"\xa1\x01\x01", b"\xa1\x41a\x01"] + list(INDEFINITE.values())
     for raw in bad:
         with pytest.raises(lp3read._Malformed):
             lp3read._cbor_one(raw)
@@ -1489,12 +1527,53 @@ def test_cbor_decoder_rejects():
 
 
 def test_cbor_decoder_accepts_other_forms_of_the_same_data():
-    # a reader does not check the shortest form, definite lengths or key order (those are rules for builders)
+    # container.md, "What a reader accepts": an integer not in its shortest form and unsorted keys are accepted
     assert lp3read._cbor_one(b"\x18\x05") == 5
-    assert lp3read._cbor_one(b"\x9f\x01\x02\xff") == [1, 2]
-    assert lp3read._cbor_one(b"\xbf\x61a\x01\xff") == {"a": 1}
-    assert lp3read._cbor_one(b"\x5f\x41a\x41b\xff") == b"ab"
+    assert lp3read._cbor_one(b"\x19\x00\x05") == 5
     assert lp3read._cbor_one(b"\xa2\x61b\x01\x61a\x02") == {"b": 1, "a": 2}
+    assert lp3read._cbor_one(b"\xf5") is True and lp3read._cbor_one(b"\xf4") is False
+
+
+def with_extra_item(encoded_map: bytes, item: bytes) -> bytes:
+    """A definite map with one more pair, ``"x"`` and the raw ``item`` (which may be indefinite)."""
+    head = encoded_map[0]
+    assert head & 0xE0 == 0xA0 and head & 0x1F < 23
+    return bytes([head + 1]) + encoded_map[1:] + enc("x") + item
+
+
+@pytest.mark.parametrize("name", list(INDEFINITE))
+def test_indefinite_lengths_are_rejected_in_the_header_the_body_and_the_index(name):
+    item = INDEFINITE[name]
+    # header: E_HEADER
+    err(assemble(with_extra_item(MIN_HEADER, item), MIN_COMP), "E_HEADER")
+    # body, at the root and inside an unknown optional table: E_BODY
+    err(swap_body(with_extra_item(MIN_BODY, item)), "E_BODY")
+    h = json.loads(json.dumps(MIN_DOC["h"]))
+    h["tables"]["future-x"] = [1, False]
+    body = enc({"h": h, "t": dict(MIN_DOC["t"], **{"future-x": 0})})
+    assert body[-1:] == b"\x00"
+    raw = body[:-1] + item
+    comp = deflate(raw)
+    header = dict(MIN_HDR, h=h, clen=len(comp), ulen=len(raw), id=hashlib.sha256(raw).digest())
+    err(assemble(header, comp), "E_BODY")
+    # transfer index: E_HEADER
+    cat, _, _ = catalog_fixture(with_sig=False)
+    cid = bytes.fromhex(cat.id)
+    index = enc({"mode": "full", "catalogs": [cid],
+                 "entries": [{"id": cid, "kind": "segment", "class": "catalog", "offset": 0, "size": len(cat.data)}]})
+    err(raw_transfer(with_extra_item(index, item), cat.data), "E_HEADER")
+
+
+def test_indefinite_map_or_array_as_the_whole_header_or_body():
+    inner = enc(MIN_HDR)[1:]
+    err(assemble(b"\xbf" + inner + b"\xff", MIN_COMP), "E_HEADER")
+    inner = enc(MIN_DOC)[1:]
+    err(swap_body(b"\xbf" + inner + b"\xff"), "E_BODY")
+
+
+def test_forbidden_items_in_the_header_are_e_header():
+    for item in (b"\xf6", b"\xf7", b"\xf9\x3c\x00", b"\xc1\x00", b"\xf8\x20"):
+        err(assemble(with_extra_item(MIN_HEADER, item), MIN_COMP), "E_HEADER")
 
 
 def test_canonical_text():
@@ -1682,6 +1761,31 @@ def test_transfer_catalog_error_rejects_the_file():
                        [bytes.fromhex(bad_cat.id), bytes.fromhex("55" * 32)]), "E_ID")
 
 
+def test_transfer_catalog_class_is_checked_with_the_shape_of_the_body():
+    # transfer.md step 5: a catalog entry whose own class is not "catalog" is E_BODY, after E_ID and before E_HMISMATCH
+    # and E_TABLE.
+    other = dict(MIN_DOC["h"], lang="es-ES")
+    mismatched = build(json.loads(json.dumps(MIN_DOC["h"])), dict(MIN_DOC["t"]), header_h=other)
+    required_unknown = future_table_file(True, "future-y")
+    map_seg = build({"class": "map", "v": 1, "tables": {"future-y": [1, True]}, "lang": "es-419", "part": "core"},
+                    {"future-y": 1})
+    for seg in (mismatched, required_unknown, map_seg):
+        sid = bytes.fromhex(seg.id)
+        # as a catalog entry: E_BODY for the class
+        err(transfer_bytes([(sid, "segment", "catalog", seg.data)], [sid]), "E_BODY")
+        # E_ID comes first
+        err(transfer_bytes([(bytes(32), "segment", "catalog", seg.data)], [bytes(32)]), "E_ID")
+    # the same files as other entries only get their status
+    cat, _, _ = catalog_fixture(with_sig=False)
+    entries = [(bytes.fromhex(cat.id), "segment", "catalog", cat.data)] + [
+        (bytes.fromhex(seg.id), "segment", "book", seg.data) for seg in (mismatched, required_unknown, map_seg)]
+    out = read_file(transfer_bytes(entries, [bytes.fromhex(cat.id)]))
+    assert [e["status"] for e in out["entries"]] == ["ok", "E_HMISMATCH", "E_TABLE", "E_TABLE"]
+    # a catalog entry that does not say its class in the index is E_HEADER, whatever the file is
+    sid = bytes.fromhex(cat.id)
+    err(transfer_bytes([(sid, "segment", None, cat.data)], [sid]), "E_HEADER")
+
+
 def test_transfer_two_catalogs_output_in_the_order_of_catalogs():
     c1, e1, _ = catalog_fixture(with_sig=False)
     c2, e2, _ = catalog_fixture(lang=None, with_sig=False)
@@ -1782,3 +1886,121 @@ def test_transfer_file_read_as_segment_cli(tmp_path):
     proc = subprocess.run([sys.executable, "-X", "utf8", str(HERE / "lp3read.py"), str(p)], capture_output=True)
     assert proc.returncode == 0
     assert json.loads(proc.stdout.decode("utf-8")) == json.loads(compact_text(transfer_expected(t, ["ok"] * 4)))
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# 6. Robustness: read_file returns an output or an error object, whatever the input
+# ---------------------------------------------------------------------------------------------------------------
+
+ERROR_CODES = {"E_MAGIC", "E_VERSION", "E_KIND", "E_TRUNCATED", "E_TRAILING", "E_HEADER", "E_CODEC", "E_INFLATE",
+               "E_ID", "E_BODY", "E_HMISMATCH", "E_TABLE", "E_LIMIT"}
+
+JUNK = [0, -1, 1, 255, 2 ** 31, 2 ** 53, 2 ** 64 - 1, -(2 ** 63), "", "x", "x" * 1000, "9" * 5000, "G" + "9" * 5000,
+        "G5485", "é", b"", b"\x00", b"\x80", b"\xff" * 9, b"\x80" * 100, bytes(range(256)), [], {}, [[]],
+        {"a": "b"}, [1, 2, 3], True, False, 1.5, None]
+
+
+def _nodes(doc):
+    out, stack = [], [doc]
+    while stack:
+        n = stack.pop()
+        if isinstance(n, dict):
+            for k, v in n.items():
+                out.append((n, k))
+                stack.append(v)
+        elif isinstance(n, list):
+            for i, v in enumerate(n):
+                out.append((n, i))
+                stack.append(v)
+    return out
+
+
+def _mutate(rng, doc) -> None:
+    container, key = rng.choice(_nodes(doc))
+    v = container[key]
+    op = rng.randrange(7)
+    if op <= 1:
+        container[key] = copy.deepcopy(rng.choice(JUNK))
+    elif op == 2 and isinstance(v, bytes) and v:
+        b = bytearray(v)
+        if rng.random() < 0.5:
+            b[rng.randrange(len(b))] = rng.randrange(256)
+        else:
+            del b[rng.randrange(len(b)):]
+        container[key] = bytes(b)
+    elif op == 3 and isinstance(container, dict):
+        del container[key]
+    elif op == 4 and isinstance(container, list):
+        if rng.random() < 0.5:
+            del container[key]
+        else:
+            container.insert(key, v)
+    elif op == 5 and type(v) is int:
+        container[key] = v + rng.choice([-2, -1, 1, 2, 2 ** 20, 2 ** 40])
+    elif op == 6 and isinstance(v, str):
+        container[key] = rng.choice([v + "x", v + "é", v + "9" * 10, v + ":", v[:-1], v + "9" * 5000,
+                                     v[:1] + "9" * 5000, v[:2] + "0" * 5000 + v[2:]])
+    else:
+        container[key] = copy.deepcopy(rng.choice(JUNK))
+
+
+def structural_fuzz(n: int, seed: int) -> dict:
+    """Mutates the decoded CBOR of valid files of every class (types, huge integers, long strings and digit strings,
+    wrong lengths), re-encodes them with a consistent header and reads them. Returns how many gave each result."""
+    import random
+    rng = random.Random(seed)
+    bodies = [book_align()[0].body, book_helps()[0].body, orig_fixture()[0].body, art_fixture()[0].body,
+              lex_fixture()[0].body, obs_fixture()[0].body, catalog_fixture()[0].body, MIN_BODY]
+    results: dict[str, int] = {}
+    for i in range(n):
+        doc = cbor2.loads(bodies[i % len(bodies)])
+        for _ in range(rng.choice([1, 1, 2, 3])):
+            _mutate(rng, doc)
+        try:
+            body = cbor2.dumps(doc)
+        except (ValueError, OverflowError, TypeError):
+            continue
+        c = zlib.compressobj(1, zlib.DEFLATED, -15)
+        comp = c.compress(body) + c.flush()
+        hh = doc.get("h") if isinstance(doc, dict) else None
+        header = {"h": hh if isinstance(hh, dict) else {}, "codec": "deflate-raw", "clen": len(comp),
+                  "ulen": len(body), "id": hashlib.sha256(body).digest()}
+        out = read_file(assemble(header, comp))
+        assert isinstance(out, dict)
+        key = out["error"] if list(out) == ["error"] else "ok"
+        assert key == "ok" or key in ERROR_CODES, out
+        results[key] = results.get(key, 0) + 1
+    return results
+
+
+def test_structural_fuzz_never_raises():
+    results = structural_fuzz(2000, seed=20261101)
+    assert sum(results.values()) > 1900
+    assert results.get("E_BODY", 0) > 100 and results.get("ok", 0) > 10
+
+
+def test_read_file_never_raises_on_odd_bytes():
+    import random
+    rng = random.Random(7)
+    for data in (b"", b"\x00", MAGIC, PREFIX, PREFIX + b"\xff" * 4, TRANSFER_PREFIX + b"\xff" * 4,
+                 TRANSFER_PREFIX + b"\x00\x00\x00\x01\xa0"):
+        for expect in (None, "segment", "transfer"):
+            out = read_file(data, expect)
+            assert list(out) == ["error"] and out["error"] in ERROR_CODES
+    for _ in range(200):
+        data = PREFIX + bytes(rng.randrange(256) for _ in range(rng.randrange(60)))
+        assert "error" in read_file(data)
+
+
+def test_cli_unexpected_exception_is_not_exit_1(monkeypatch, capsys, tmp_path):
+    p = tmp_path / "x.seg"
+    p.write_bytes(MIN)
+
+    def boom(data, expect=None):
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(lp3read, "read_file", boom)
+    assert lp3read.main(["lp3read.py", str(p)]) == 3
+    captured = capsys.readouterr()
+    assert captured.out == "" and "internal error" in captured.err and "RuntimeError" in captured.err
+    assert lp3read.main(["lp3read.py", str(tmp_path / "missing")]) == 2

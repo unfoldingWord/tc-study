@@ -4,8 +4,9 @@ An independent reader of language pack format 3, **written from the specificatio
 `../container.md`, `../ids.md`, `../catalog.md`, `../transfer.md`, `../cddl/` and `../tests/README.md`). It was
 written without looking at the TypeScript reader in `packages/language-pack-v3/src/`, so that the two can be compared:
 where they differ on a file, one of them misreads the specification, or the specification is not clear. Each point
-where the text left a choice open is listed in the report of its task (`task-13-report.md`) as a finding about the
-specification.
+where the text left a choice open was a question about the specification; the answers are in the specification itself
+(`container.md`, `ids.md`, `transfer.md`, `tests/README.md`; see the spec commits "answers to the questions of the second
+reader" in the history of `packages/language-pack-v3/spec`), and the reader follows them.
 
 ## What it needs
 
@@ -22,8 +23,9 @@ python lp3read.py <file>
 
 prints the reader output of a segment file (kind `01`) or a transfer file (kind `02`) as the canonical text that
 `tests/README.md` defines (the form the `*.expected.json` files hold: keys sorted by code point, UTF-8 not escaped,
-two-space indent) and exits 0. A rejected file prints `{"error": "<code>"}` and exits 1. A file that cannot be read
-exits 2.
+two-space indent) and exits 0. A rejected file prints `{"error": "<code>"}` (on one line) and exits 1. A file that cannot be read
+exits 2. An unexpected exception inside the reader (a bug, never a verdict on the file) prints one line on stderr and
+exits 3, so that it cannot be taken for a format error.
 
 As a library:
 
