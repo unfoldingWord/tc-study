@@ -480,13 +480,38 @@ describe('what the milestones give a word', () => {
     expect(t.align).toEqual([[], [0]])
   })
 
-  test('a milestone without x-content, or with an occurrence that is not a number, is refused', () => {
+  test('a milestone without x-content is refused', () => {
     const noContent = { type: 'ms', marker: 'zaln-s', 'x-occurrence': '1' }
     expect(() => textOf(index, chapterNode('1'), para(verseNode('1'), noContent, wd('a'), ze))).toThrow(/x-content/)
-    expect(() => textOf(index, chapterNode('1'), para(verseNode('1'), { ...zs('Παῦλος'), 'x-occurrence': 'uno' }, wd('a'), ze))).toThrow(/x-occurrence/)
-    expect(() => textOf(index, chapterNode('1'), para(verseNode('1'), { ...zs('Παῦλος'), 'x-occurrence': undefined }, wd('a'), ze))).toThrow(
-      /x-occurrence/,
-    )
+    expect(() => textOf(index, chapterNode('1'), para(verseNode('1'), { ...noContent, 'x-content': 7 }, wd('a'), ze))).toThrow(/x-content/)
+  })
+
+  // Real data: the GST of Ruth (es-419, chapter 4) has a zaln-s of "שֵׁ֖ם" without x-occurrence, which went into x-morph ("x-occurrence1").
+  test('a milestone without a usable x-occurrence does not stop the build: its words are in alignMissing with occurrence 0, and a line says so', async () => {
+    const broken = { type: 'ms', marker: 'zaln-s', 'x-content': 'Παῦλος', 'x-lemma': 'λ', 'x-morph': 'x-occurrence1', 'x-occurrences': '1', 'x-strong': 'G1' }
+    const issues: string[] = []
+    const rows = [
+      chapterRow(GLT, 1, [
+        chapterNode('1'),
+        para(verseNode('1'), broken, wd('Pablo'), ze, { ...zs('Παῦλος'), 'x-occurrence': 'uno' }, wd('es'), ze, { ...zs('δοῦλος'), 'x-occurrence': '' }, wd('siervo'), ze, zs('Παῦλος'), wd('ok'), ze),
+      ]),
+    ]
+    const t = extractText(rows, 'tit', GLT, index, issues)
+    expect(t.align).toEqual([[], [], [], [0]])
+    expect(t.alignMissing).toEqual([
+      [0, 56_001_001, 'Παῦλος', 0],
+      [1, 56_001_001, 'Παῦλος', 0],
+      [2, 56_001_001, 'δοῦλος', 0],
+    ])
+    expect(issues).toHaveLength(3)
+    expect(issues[0]).toContain(`scripture-usj:${GLT}:tit:1`)
+    expect(issues[0]).toContain('Παῦλος')
+    expect(issues[0]).toContain('x-occurrence')
+    expect(issues[1]).toContain('"uno"')
+    // The text still goes through the whole way: the segment holds the missing words and a reader gives them back.
+    const { bytes } = await writeSegment(bookSegment({ lang: 'es-419', book: 'tit', orig: ['o', 'v1'], res: [[GLT, 'v42']], texts: [t] }))
+    const view = bookView((await readSegment(bytes, { known: KNOWN })).seg)
+    expect(view.texts[0].alignMissing).toEqual(t.alignMissing)
   })
 
   test('a broken Hebrew form still finds its word: the original has "/" and U+2060, the text NFD', () => {

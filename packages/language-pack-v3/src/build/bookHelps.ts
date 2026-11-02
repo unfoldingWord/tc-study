@@ -394,7 +394,7 @@ export async function extractBook(source: RowSource, lang: string, book: string,
     res: used.map((resource): [string, string] => [resource.key, resource.stamp.split('#')[0]]),
     texts: [],
   }
-  for (const resource of texts) model.texts.push(extractText(await collect(resource, ['sot']), book, resource.key, index))
+  for (const resource of texts) model.texts.push(extractText(await collect(resource, ['sot']), book, resource.key, index, issues))
   for (const [kind, resource] of helps) model[kind] = extractHelps(await collect(resource, ['sot', 'quote']), book, resource.key, kind, index, issues)
   return model
 }

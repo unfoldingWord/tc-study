@@ -56,15 +56,17 @@ function chunksOf(rows: Row[], book: string, res: string): { where: string; cont
  *   it translates, outer first and not sorted: each is looked for in `orig` with `find(verse, x-content, x-occurrence)`,
  *   the verse being the one open when the milestone starts (before the first chapter and the first verse, the
  *   introduction of the book, then of the chapter). One that `orig` does not have gives no position and an entry in
- *   `alignMissing` for each word it encloses. A `zaln-e` with nothing open, and a `zaln-s` that never closes, are ignored.
+ *   `alignMissing` for each word it encloses. A `zaln-s` without an `x-occurrence` that is a whole number (the source loses it now
+ *   and then) is not placed either: its entries in `alignMissing` have occurrence 0, and a line in `issues` names it. A `zaln-e` with
+ *   nothing open, and a `zaln-s` that never closes, are ignored.
  * - `align` is there when some word had a milestone around it, that is, when some word has a position or `alignMissing`
  *   has an entry; a text without milestones has neither.
  *
  * Throws `Error` for rows that are not what format 2.0 writes: a chunk twice or with no USJ document, a node with no
- * type or with an attribute that is not text, a chapter or verse without a number, a milestone without `x-content` or
- * with an `x-occurrence` that is not a whole number, or no chunk of this text at all.
+ * type or with an attribute that is not text, a chapter or verse without a number, a milestone without `x-content`, or no
+ * chunk of this text at all.
  */
-export function extractText(rows: Row[], book: string, res: string, orig: OrigIndex): TextModel {
+export function extractText(rows: Row[], book: string, res: string, orig: OrigIndex, issues: string[] = []): TextModel {
   const pieces: Piece[] = []
   const events: Event[] = []
   const attrs: Record<number, Record<string, string>> = {}
@@ -103,12 +105,16 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
     if (type === 'ms' && marker === 'zaln-s') {
       const content = node['x-content']
       if (typeof content !== 'string') throw new Error(`${where}: a zaln-s milestone has no x-content as text`)
-      const occurrence = node['x-occurrence']
-      if (typeof occurrence !== 'string' || !DIGITS.test(occurrence)) {
-        throw new Error(`${where}: the x-occurrence ${JSON.stringify(occurrence)} of the zaln-s of ${JSON.stringify(content)} is not a whole number`)
+      const given = node['x-occurrence']
+      // Published texts have milestones whose x-occurrence is lost (it went into x-morph as "x-occurrence1" in the GST of Ruth): the
+      // word cannot be told from its twins in the verse, so it is not placed, and the occurrence is 0 (`find` takes none below 1).
+      const usable = typeof given === 'string' && DIGITS.test(given)
+      if (!usable) {
+        issues.push(`${where}: the zaln-s of ${JSON.stringify(content)} has no x-occurrence that is a whole number (${given === undefined ? 'none' : JSON.stringify(given)}): its words are not placed`)
       }
+      const occurrence = usable ? Number(given) : 0
       const id = verseId(book, chapter, verse)
-      stack.push({ position: orig.find(id, content, Number(occurrence)), verse: id, content, occurrence: Number(occurrence) })
+      stack.push({ position: orig.find(id, content, occurrence), verse: id, content, occurrence })
       return
     }
     if (type === 'ms' && marker === 'zaln-e') {
