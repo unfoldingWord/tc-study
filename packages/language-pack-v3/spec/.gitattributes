@@ -1,0 +1,7 @@
+# The conformance files are compared byte for byte or parsed by readers on every platform: a checkout that converts
+# line ends (core.autocrlf on Windows) must not touch them.
+*.expected.json text eol=lf
+*.seg binary
+*.tcpack binary
+*.part.gz binary
+*.zip binary

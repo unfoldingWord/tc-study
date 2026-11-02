@@ -67,8 +67,8 @@ and how much of it the device already has, by reading only the index and the cat
    - an entry's `offset` is not the sum of the sizes of the entries before it (the first is 0), or that sum goes beyond
      2^53 − 1;
    - an entry has a `class` and is a complement, or the `class` is not a class name;
-   - an id of `catalogs` is not an entry, is not among the first as many entries as `catalogs` has, is a complement, or
-     has a `class` other than `catalog`;
+   - an id of `catalogs` is not an entry, is not among the first as many entries as `catalogs` has, is a complement, has no
+     `class`, or has a `class` other than `catalog` (an entry listed in `catalogs` must say `class` `catalog`);
    - `base` is not a list of `[text, unsigned integer]`, or `made` or `by` is not text.
 
    Keys of the top level of the index that are not listed are not checked: they are ignored, and the reader output keeps them
@@ -78,8 +78,10 @@ and how much of it the device already has, by reading only the index and the cat
    catalog (`offset + size`) is `E_TRUNCATED`; more than the end of the last entry is `E_TRAILING`.
 5. Every entry in the order of the index, each one whole in the file: the catalogs first. A catalog is checked as a segment
    file (`container.md`) with its `id` of the index as the id the catalog gives, against the tables of a catalog; its
-   error, whichever it is, rejects the file. Any other entry only gets its status (`tests/README.md`), and does not stop
-   the others: the checks of a downloaded segment (`container.md`, "Order of checks") up to step 5's `E_TABLE` for a
+   error, whichever it is, rejects the file. A catalog entry whose own header `class` (the `class` of the body's `h`) is not
+   `catalog` is `E_BODY`. It is part of the general shape of the body (`container.md`, "Order of checks", step 4), so it comes
+   after `E_ID` and before `E_HMISMATCH` and the tables (`E_TABLE`, and the `E_BODY` of step 6). Any other entry only gets
+   its status (`tests/README.md`), and does not stop the others: the checks of a downloaded segment (`container.md`, "Order of checks") up to step 5's `E_TABLE` for a
    class the reader knows no tables of; the shape of its tables is not checked here.
 6. Then the tables of each catalog against `catalog.cddl`, in the order of `catalogs` (`E_BODY`; their tables were known in
    step 5): the first that fails rejects the file.

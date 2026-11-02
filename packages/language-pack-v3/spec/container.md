@@ -38,10 +38,13 @@ A reader ignores header keys it does not know: a minor version can add them.
 
 ## Body
 
-The body, before compression, is a CBOR map with two keys:
+The body, before compression, is a CBOR map that has the keys `h` and `t`:
 
 - `h`: the logical header;
 - `t`: the tables, a map from table name to table.
+
+Any other key of the body map is ignored and is not output: a later minor version may add them. A body that lacks `h` or
+`t`, or whose `h` or `t` is not a map, is `E_BODY`.
 
 It is compressed with deflate-raw (RFC 1951, no zlib or gzip wrapper). Builders SHOULD use the highest compression level.
 The compressed bytes are not part of the identity, so a better compressor never changes an id.
@@ -88,6 +91,12 @@ They MUST also follow these rules:
 - **Ids are ASCII** (`ids.md`).
 - **String tables** are in the order their schema gives: usually most used first, ties by code point.
 
+**What a reader accepts.** Only builders are bound by the rules above about shortest forms and sorted keys: a reader accepts
+an integer that is not in its shortest form and map keys that are not sorted. A reader rejects, anywhere in the header
+(`E_HEADER`) or in the body (`E_BODY`): indefinite lengths, floats, tags, `null`, `undefined` and any other simple value
+(only `false` and `true` are accepted), a map key that is not text, and a map with the same key twice. The body is decoded
+as a whole before any table is skipped, so these rules also apply inside an unknown optional table.
+
 ## Column encodings
 
 Tables keep their data by columns, so that alike data sits together and compresses well. These encodings are used in
@@ -95,11 +104,11 @@ the schemas (`cddl/common.cddl`):
 
 | Name | Encoding |
 | --- | --- |
-| `uvarints` | Unsigned LEB128 numbers, one after the other in a byte string: 7 bits per byte, low bits first, high bit set on every byte but the last. Minimal form: no trailing `80` bytes. Values up to 2^53 − 1, so that JavaScript reads them exactly |
+| `uvarints` | Unsigned LEB128 numbers, one after the other in a byte string: 7 bits per byte, low bits first, high bit set on every byte but the last. Minimal form: the last byte of a number of two or more bytes is not `00`. Values up to 2^53 − 1, so that JavaScript reads them exactly |
 | `svarints` | Signed numbers as `uvarints` after zigzag: `n ≥ 0 → 2n`, `n < 0 → −2n − 1` |
 | `deltas` | `svarints` of each value minus the previous one; the first minus 0 |
 | `bits` | A byte string of `ceil(n / 8)` bytes; row `i` is bit `i mod 8` (least significant first) of byte `i div 8`. Unused bits are 0 |
-| `texts` | `{ "utf8": bytes, "len": uvarints }`: the strings joined in UTF-8, and the byte length of each |
+| `texts` | `{ "utf8": bytes, "len": uvarints }`: the strings joined in UTF-8, and the byte length of each. Each string must be valid UTF-8 by itself: a boundary inside a multi-byte character is `E_BODY` |
 | `strtab` | An array of text strings, numbered from 0 |
 
 **Absent values.** A column that some rows lack has a `has` bit column. Its values list only the rows whose bit is 1.
@@ -121,7 +130,7 @@ Each class's schema says which tables are required and what each optional one de
 | `ulen` and `clen` | 67 108 864 bytes (64 MiB) each |
 | Nesting of CBOR arrays and maps | 64 levels |
 
-A reader MAY reject anything beyond them (`E_LIMIT`).
+Nesting counts the outermost map or array as level 1. A reader MUST reject anything beyond these limits (`E_LIMIT`).
 
 ## Errors
 
@@ -132,7 +141,7 @@ cases expect.
 | --- | --- |
 | `E_MAGIC` | The first four bytes are not the magic number |
 | `E_VERSION` | Unknown major version |
-| `E_KIND` | The kind is not the one expected (a transfer file where a segment was expected, or the reverse) |
+| `E_KIND` | The kind is not the one expected. A reader that is asked for a segment file and finds kind `02` (or the reverse) gives `E_KIND`. A generic reader that accepts both kinds (the conformance readers do) reads the kind byte, dispatches, and gives `E_KIND` only for a kind other than `01` and `02` |
 | `E_TRUNCATED` | The file is shorter than `12 + H + clen` |
 | `E_TRAILING` | The file is longer than `12 + H + clen` |
 | `E_HEADER` | The header (the `H` bytes) is not exactly one CBOR map, or lacks `h`, `codec`, `clen`, `ulen` or `id`, or one of them has the wrong type (`id` is not 32 bytes, `clen` is not an unsigned integer, ...) |
@@ -156,7 +165,8 @@ this order and stops at the first defect:
 3. `clen` or `ulen` over the limit (`E_LIMIT`). Then the file's length against `12 + H + clen`: shorter is `E_TRUNCATED`,
    longer is `E_TRAILING`.
 4. Then, in this order: `E_CODEC`, `E_INFLATE`, `E_ID`, `E_BODY`, `E_HMISMATCH`, `E_TABLE`. Here `E_BODY` is the general shape of the
-   body: the map `{h, t}`, the logical header, and `h.tables` and `t` listing the same tables.
+   body: a map with `h` and `t` (other keys are ignored), the logical header, and `h.tables` and `t` listing the same
+   tables. A catalog inside a transfer file has one more check here: its class (`transfer.md`).
 5. Then the tables of the class, which only a reader that knows the class can check: each table against its schema
    (`cddl/`) and the further checks `tests/README.md` lists ("Checks of the tables"), `E_BODY` again. A segment of a class
    the reader does not decode (in phase 1: `map`, `xmap` and `gen`) is `E_TABLE` at this step if it was not before, because

@@ -51,8 +51,11 @@ engine lists keys that look like array indexes (`"10"`) before the others, whate
   compare them as text, write both in the *canonical text*: JSON without whitespace, keys sorted as above, non-ASCII
   characters written as they are (UTF-8), and in a string only `"`, `\` and the characters up to U+001F escaped: `\b`,
   `\t`, `\n`, `\f` and `\r` by their short names, the others as `\u00xx` in lowercase hex. That is what
-  `json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)` writes in Python. The `expected.json`
-  files of the cases are the same thing indented by two spaces.
+  `json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)` writes in Python. Outputs are compared
+  as the canonical text of the **parsed** value: a reader parses the `expected.json` of a case and writes both in the
+  canonical text, so the whitespace of the file does not matter. The `expected.json` files are the same thing indented by
+  two spaces, except an error object, which is written on **one line**: `{"error": "<code>"}`. Their line ends are LF
+  (`spec/.gitattributes` keeps them so in a checkout that converts text files).
 
 ### Always (a segment file)
 
@@ -301,10 +304,11 @@ is not what its schema says is `E_BODY`, and nothing of the file is used. The sc
 keys the schema does not list (a later minor version adds them): they are ignored and are not in the output. Beyond the
 types, these are `E_BODY` too:
 
-- **Columns.** A `uvarints` column that is cut short, longer than 8 bytes for a number, not minimal (trailing `80` bytes)
+- **Columns.** A `uvarints` column that is cut short, longer than 8 bytes for a number, not minimal (the last byte of a number of two or more bytes is `00`)
   or above 2^53 − 1. An `ev` column whose length is not a multiple of 3. A `bits` column that is not `ceil(n / 8)` bytes
   or has an unused bit set. A `texts` column whose
-  lengths do not add up to the bytes of `utf8`, or that is not valid UTF-8. A column whose number of values is not the
+  lengths do not add up to the bytes of `utf8`, or one of whose strings is not valid UTF-8 by itself (a boundary
+  inside a multi-byte character). A column whose number of values is not the
   number of rows that have one. A `deltas` column that leaves 0 … 2^53 − 1 where a position, a quote piece or a verse id is expected.
   A column with none, or more than one, of `strings`, `texts`, `flags` and `uints`.
 - **Numbers into tables.** A string number outside `strings` (or `seps`); a resource index outside `h.res`; an event whose
@@ -317,7 +321,8 @@ types, these are `E_BODY` too:
   concept is text); a `refText` row outside
   the table or twice; a row with no `refText` whose range has no canonical text in the book (`ids.md`); `quotes` where
   `n` has not one number per row, or `pos` has not as many numbers as `n` adds up to, or a position below 0; a `kinds` or
-  `missing` entry that names a piece that does not exist, has a position, or is listed twice (in either list).
+  `missing` entry that names a piece that does not exist, has a position, or is listed twice (in either list); a `-1`
+  position of a quote that is in neither list (every `-1` is in exactly one of `quoteKinds` and `quoteMissing`).
 - **`orig`.** `words.cols` columns of different lengths; a number outside a word table; word pieces in `text.tok` that
   are not as many as the words; `macula.release` that is not text.
 - **`obs`.** A story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a

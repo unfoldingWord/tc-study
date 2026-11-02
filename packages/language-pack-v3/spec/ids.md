@@ -44,8 +44,9 @@ The canonical text of the range of verse ids `from` to `to` in a book (`from` â‰
 | Verses across chapters | `C1:V1-C2:V2` | `1:12-2:3` |
 
 Numbers have no leading zeros and the text has no spaces. A range has no canonical text when its ends are not both in the
-book, when `from` is after `to`, when an introduction (chapter 0 or verse 0) lies inside a range of several verses, or
-when it is a verse of chapter 0 other than `front:intro`. A row whose reference text is not the canonical text of its
+book, when `from` is after `to`, when an introduction (chapter 0 or verse 0) is at either end (`from` or `to`) of a range
+of several verses, or when it is a verse of chapter 0 other than `front:intro`. A range cannot have an introduction
+inside it, because the ids between `from` and `to` are not verses. A row whose reference text is not the canonical text of its
 range (a list `1:1,3`, `1:1b`, `10:03`) keeps its text as published (`refText` in the schemas). A reader that needs the
 text of a row that has no `refText` and finds no canonical text for its range rejects the segment (`E_BODY`).
 
