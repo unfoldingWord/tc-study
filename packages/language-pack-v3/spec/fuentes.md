@@ -9,7 +9,7 @@ of each source is kept in the core of the maps and in the catalog, never in a pa
 | UHB (`unfoldingWord/hbo/uhb`) | v3.0.0 | CC BY-SA 4.0 | The Hebrew and Aramaic text, with Strong keys | `xmap` (`strong`), `orig` | in the sample |
 | UGNT (`unfoldingWord/el-x-koine/ugnt`) | v0.34 | CC BY-SA 4.0 | The Greek text, with Strong keys | `xmap` (`strong`), `orig` | in the sample |
 | MACULA (`Biblica/hbo/macula`, `Biblica/el-x-koine/macula`) | 3b8aa380e8 (2026-10-15) | CC BY 4.0 | Syntax trees and referents of the original | `orig` (not counted in the maps) | in the sample |
-| English tN (`unfoldingWord/en/tn`) | v91, 59 books | CC BY-SA 4.0 | English notes: which Academy article each points to | `xmap` (`notes`, `strong` of quotes) | in the sample |
+| English tN (`unfoldingWord/en/tn`) | v91, 59 books | CC BY-SA 4.0 | English notes: which Academy article each points to | `xmap` (`notes`) | in the sample |
 | English tWL (`unfoldingWord/en/twl`) | v91, 59 books | CC BY-SA 4.0 | English word links: which tW article each original word points to | `xmap` (`links`, `strongs`, `concepts`) | in the sample |
 | tW (`unfoldingWord/en/tw`) | v91 | CC BY-SA 4.0 | Translation Words articles: the concepts and their category (`kt`, `names`, `other`) | `xmap` (`concepts`), `map` (`names`) | in the sample |
 | tA (`unfoldingWord/en/ta`) | v91 | CC BY-SA 4.0 | Translation Academy articles and their titles and questions | `xmap` (`notes` keys), `map` (`names`, `subtitles`, `usage`) | in the sample |

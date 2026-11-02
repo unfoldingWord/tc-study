@@ -351,7 +351,7 @@ The book is its code. Example: `{"unit": "notes", "rows": {"ta:translate/figs-me
 | `topics` | as the file has it (`any`; bytes in hex) | the table is not in the file or not read |
 
 **`xmap` part** (`part` is a book code): `strong`, `links`, `notes` as `{key: [verse ids]}`, each verse id the full
-`LLCCCVVV` (the book number times 1 000 000 plus the stored value), in the order of the file. `links` and `notes` are
+`LLCCCVVV` (the book number times 1 000 000 plus the verse offset, which is the running sum of the stored values within that key), in the order of the file. `links` and `notes` are
 absent when the file lacks them.
 
 **`map` core**:
@@ -409,15 +409,21 @@ types, these are `E_BODY` too:
   article; an `id` twice in the group.
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.
-- **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `book` is not its `part`; a core with a `book`; a
+- **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part whose `book` is not its `part`; a core with a `book`; a
   core table in a part, or a part table shape in a core.
   - Counts: keys not sorted or repeated; a `counts` column cut short, or with numbers left over; a book number outside 1..66 or not
-    increasing within its key; `count = 0` or `verses > count`; a key with no book; a `unit` other than the table's (`xmap`
+    increasing within its key; `count = 0` (`verses` above `count` is valid: a note on 1:2-4 is 1 note and 3 verses; `verses = 0` is valid too); a key with no book; a `unit` other than the table's (`xmap`
     `strong` "occurrences", `links` "links", `notes` "notes"; `map` `usage` "notes").
-  - Verse lists: `keys` not sorted or repeated; a key with `n = 0`; a value whose verse id does not increase within its key;
-    a `verses` column cut short or with numbers left over.
+  - Verse lists: `keys` not sorted or repeated; a key with `n = 0` (a key with no verse in the book is not in the part); a verse offset, rebuilt as the
+    running sum of the stored values of its key, that is not strictly increasing within its key or reaches 1 000 000 (the
+    first offset may be 0: `front:intro`); a `verses` column cut short or with numbers left over. A part's keys that are not
+    in the core's counts table, or whose number of verses is not the `verses` of the core's row for this book, are not checked by
+    a reader of the part alone.
   - `concepts`: columns of different lengths; `kind` above 5; `tw` above 3; a `source` outside `h.res`.
   - `relations`: a concept outside `concepts`, a type outside `types`, a `source` outside `h.res`; a `confidence` above 100.
+  - `xmap` `strongs`: keys not sorted or repeated, or not in `concepts`; a list of Strong keys that is empty, not sorted by code
+    point or has a repeat. `aliases`: keys not sorted or repeated; a value that is not in `concepts` (a key need not be: it is
+    an id that moved).
   - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
   bytes; a `books` of another length than 9; a unit that names a segment outside `segments`, or has none; a segment, a unit

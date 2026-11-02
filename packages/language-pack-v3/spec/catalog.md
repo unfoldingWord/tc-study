@@ -63,7 +63,7 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 | The wording of a note of Ruth | `book:rut`, the catalog |
 | The SupportReference of a note of Ruth | `book:rut`, the `map` part of Ruth and the `map` core (its counts), the catalog |
 | The introduction of Ruth (its outline) | `book:rut`, the `map` core (topics), the catalog |
-| An English note or word link | the English `book` segment; the `xmap` part of that book and its core, if a count changed; both catalogs |
+| An English note or word link | the English `book` segment; the `xmap` part of that book and its core, if a count or the Strong keys of a link's quote (`strongs`) changed; both catalogs |
 | A tW or tA article | its `art` group, the `map` core if its title changed, the catalog |
 | One book of the original | `orig` of that book, and every `book` segment of that book in every language (their positions); the `xmap` part of that book |
 | A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog; no map part |
