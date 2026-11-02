@@ -442,10 +442,10 @@ def test_known_table_with_unknown_version():
 
 
 def test_class_without_known_tables_is_e_table():
-    for cls in ("map", "xmap", "gen"):
-        h = {"class": cls, "v": 1, "tables": {"future-x": [1, False]}, "lang": "es-419", "part": "core"}
-        err(build(h, {"future-x": 1}).data, "E_TABLE")
-        err(build({"class": cls, "v": 1, "tables": {}}, {}).data, "E_TABLE")
+    # gen has no table a reader knows; map and xmap are read since phase 2 (their tests are further down)
+    h = {"class": "gen", "v": 1, "tables": {"future-x": [1, False]}, "lang": "es-419", "part": "core"}
+    err(build(h, {"future-x": 1}).data, "E_TABLE")
+    err(build({"class": "gen", "v": 1, "tables": {}}, {}).data, "E_TABLE")
 
 
 def test_e_limit_header_over_65536():
@@ -1189,7 +1189,7 @@ def obs_fixture(skip: tuple = ()):
         "cols": {"isIntro": column("flags", [False, False, True]),
                  "note": column("texts", ["A figure.", "padded", "Intro"])},
     }
-    questions = {"res": 1, "n": 1, "id": {"strings": uv([S.add("q-1")])}, "frame": uv([1]),
+    questions = {"res": 1, "n": 1, "id": {"strings": uv([S.add("q-1")])}, "frame": uv([101]),
                  "cols": {"question": column("texts", ["¿Quién?"])}}
     t = {"strings": S.items, "stories": stories, "notes": notes, "questions": questions}
     for name in skip:
@@ -1211,7 +1211,7 @@ def obs_fixture(skip: tuple = ()):
             {"id": "ef56", "frame": "10:intro", "frameId": 1000, "cols": {"isIntro": True, "note": "Intro"}},
         ]},
         "questions": {"res": "es-419_gl/es-419/obs-tn", "rows": [
-            {"id": "q-1", "frame": "0:1", "frameId": 1, "cols": {"question": "¿Quién?"}}]},
+            {"id": "q-1", "frame": "1:1", "frameId": 101, "cols": {"question": "¿Quién?"}}]},
     }
     for name in skip:
         del expected[name]
@@ -1710,8 +1710,8 @@ def test_transfer_entry_statuses():
     minimal_id = bytes.fromhex(min_expected()["id"])
     good_orig = orig_small()
     bad_inflate = MIN[:-2]                                # cut: the entry is whole in the file, its stream is not
-    # a map segment with only an optional table: E_TABLE all the same
-    map_seg = build({"class": "map", "v": 1, "tables": {"future-x": [1, False]}, "lang": "es-419", "part": "core"},
+    # a gen segment with only an optional table: E_TABLE all the same
+    map_seg = build({"class": "gen", "v": 1, "tables": {"future-x": [1, False]}, "lang": "es-419", "part": "core"},
                     {"future-x": 1})
     kind_two = make_transfer_full().data
     wrong_complement = b"abc"
@@ -1720,7 +1720,7 @@ def test_transfer_entry_statuses():
                (bytes(32), "segment", "book", MIN),                                  # E_ID: not the id given
                (bytes.fromhex(good_orig.id), "segment", "book", good_orig.data),    # the class of the entry lies
                (bytes.fromhex("11" * 32), "segment", "orig", bad_inflate),           # E_TRUNCATED as a file
-               (bytes.fromhex(map_seg.id), "segment", "map", map_seg.data),
+               (bytes.fromhex(map_seg.id), "segment", "gen", map_seg.data),
                (bytes.fromhex("22" * 32), "segment", "book", kind_two),              # E_KIND
                (bytes.fromhex("33" * 32), "segment", "book", b"\x89TLP"),            # too short
                (bytes.fromhex("44" * 32), "complement", None, wrong_complement),     # E_ID
@@ -2102,3 +2102,472 @@ def test_integer_on_the_boundary_is_accepted_in_the_transfer_index(n):
             "entries": [{"id": cid, "kind": "segment", "class": "catalog", "offset": 0, "size": len(cat.data)}]}
     out = read_file(raw_transfer(dict(good, future=n), cat.data))
     assert "error" not in out and out["index"]["future"] == n
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Phase 2: the row count, the OBS frame, and the maps (tests/README.md, "map, xmap" and "Checks of the tables")
+# ---------------------------------------------------------------------------------------------------------------
+
+
+def test_table_with_more_rows_than_the_body_has_bytes_is_e_body():
+    _, _, (h, t) = book_helps()
+    t["notes"]["n"] = 10 ** 6
+    err(build(h, t).data, "E_BODY")
+    _, _, (h, t) = obs_fixture()
+    t["notes"]["n"] = 10 ** 6
+    err(build(h, t).data, "E_BODY")
+
+
+@pytest.mark.parametrize("frame_id", [5101, 5100, 99, 0, 12345])
+def test_obs_help_row_with_story_outside_1_to_50_is_e_body(frame_id):
+    _, _, (h, t) = obs_fixture()
+    t["questions"]["frame"] = uv([frame_id])
+    err(build(h, t).data, "E_BODY")
+
+
+def test_obs_help_row_story_50_and_frame_99_are_valid():
+    _, _, (h, t) = obs_fixture()
+    t["questions"]["frame"] = uv([5099])
+    out = read_file(build(h, t).data)
+    assert out["questions"]["rows"][0]["frame"] == "50:99" and out["questions"]["rows"][0]["frameId"] == 5099
+
+
+def bset(codes) -> bytes:
+    out = bytearray(9)
+    for c in codes:
+        i = lp3read.BOOK_NUMBER[c] - 1
+        out[i // 8] |= 1 << (i % 8)
+    return bytes(out)
+
+
+def counts(unit: str, rows: dict) -> dict:
+    """``rows``: key -> [(book number, count, verses)]."""
+    keys = sorted(rows)
+    nums = []
+    for k in keys:
+        nums.append(len(rows[k]))
+        prev = 0
+        for book, count, verses in rows[k]:
+            nums += [book - prev, count, verses]
+            prev = book
+    return {"unit": unit, "keys": keys, "counts": uv(nums)}
+
+
+def vlists(rows: dict) -> dict:
+    """``rows``: key -> [offsets within the book]."""
+    keys = sorted(rows)
+    nums = []
+    for k in keys:
+        nums.append(len(rows[k]))
+        prev = 0
+        for off in rows[k]:
+            nums.append(off - prev)
+            prev = off
+    return {"keys": keys, "verses": uv(nums)}
+
+
+UGNT_RES = ["unfoldingWord/el-x-koine/ugnt", "g987"]
+TW_RES = ["en_gl/en/tw", "v3"]
+
+
+def xmap_core(skip: tuple = ()):
+    h = {"class": "xmap", "v": 1,
+         "tables": {"coverage": [1, True], "strong": [1, True], "concepts": [1, True], "links": [1, False],
+                    "notes": [1, False], "relations": [1, False], "aliases": [1, False], "strongs": [1, False],
+                    "topics": [1, False]},
+         "part": "core", "res": [UGNT_RES, TW_RES]}
+    t = {
+        "coverage": {UGNT_RES[0]: [bset(["rut", "tit"])], TW_RES[0]: [bset(["tit"]), bset(["gen"])]},
+        "strong": counts("occurrences", {"G39720": [(8, 2, 2), (56, 3, 1)], "G54850": [(56, 1, 1)]}),
+        "concepts": {"ids": ["per:abraham", "tw:kt/grace", "tw:names/abraham"], "kind": uv([1, 0, 1]),
+                     "tw": uv([0, 1, 2]), "source": uv([0, 1, 1])},
+        "links": counts("links", {"tw:kt/grace": [(56, 4, 3)]}),
+        "notes": counts("notes", {"ta:translate/figs-metaphor": [(56, 1, 3), (57, 2, 0)]}),
+        "relations": {"types": ["same-as"], "from": uv([0]), "to": uv([2]), "type": uv([0]), "source": uv([1]),
+                      "confidence": uv([90])},
+        "aliases": {"tw:other/grace": "tw:kt/grace"},
+        "strongs": {"tw:kt/grace": ["G54850", "G5485a"]},
+        "topics": {"x": b"\x01"},
+    }
+    for name in skip:
+        h["tables"][name] = [2, False]
+        t[name] = {"later": True}
+    expected = {
+        "h": header_h(h),
+        "coverage": {UGNT_RES[0]: {"whole": ["rut", "tit"]},
+                     TW_RES[0]: {"whole": ["tit"], "partial": ["gen"]}},
+        "strong": {"unit": "occurrences",
+                   "rows": {"G39720": {"rut": [2, 2], "tit": [3, 1]}, "G54850": {"tit": [1, 1]}}},
+        "concepts": {"per:abraham": {"kind": "person", "tw": "none", "source": UGNT_RES[0]},
+                     "tw:kt/grace": {"kind": "none", "tw": "kt", "source": TW_RES[0]},
+                     "tw:names/abraham": {"kind": "person", "tw": "names", "source": TW_RES[0]}},
+        "links": {"unit": "links", "rows": {"tw:kt/grace": {"tit": [4, 3]}}},
+        "notes": {"unit": "notes", "rows": {"ta:translate/figs-metaphor": {"tit": [1, 3], "phm": [2, 0]}}},
+        "relations": [{"from": "per:abraham", "to": "tw:names/abraham", "type": "same-as", "source": TW_RES[0],
+                       "confidence": 90}],
+        "aliases": {"tw:other/grace": "tw:kt/grace"},
+        "strongs": {"tw:kt/grace": ["G54850", "G5485a"]},
+    }
+    for name in skip:
+        del expected[name]
+    return build(h, t), expected, (h, t)
+
+
+def xmap_part():
+    h = {"class": "xmap", "v": 1, "tables": {"strong": [1, True], "links": [1, False], "notes": [1, False]},
+         "part": "tit", "book": "tit", "res": []}
+    t = {"strong": vlists({"G39720": [1001, 1002], "G54850": [0, 2011]}),
+         "links": vlists({"tw:kt/grace": [2011]}),
+         "notes": vlists({"ta:translate/figs-metaphor": [1001, 1002, 1003]})}
+    expected = {"h": header_h(h),
+                "strong": {"G39720": [56001001, 56001002], "G54850": [56000000, 56002011]},
+                "links": {"tw:kt/grace": [56002011]},
+                "notes": {"ta:translate/figs-metaphor": [56001001, 56001002, 56001003]}}
+    return build(h, t), expected, (h, t)
+
+
+def map_core(skip: tuple = ()):
+    h = {"class": "map", "v": 1,
+         "tables": {"books": [1, True], "names": [1, True], "subtitles": [1, False], "coverage": [1, True],
+                    "usage": [1, False], "obs": [1, False], "topics": [1, False], "numbering": [1, False]},
+         "lang": "es-419", "part": "core", "res": [["es-419_gl/es-419/tn", "v7"]]}
+    books = [[f"Libro {i}", f"L{i}", f"l{i}", ["text", "list", "none"][i % 3]] for i in range(66)]
+    t = {
+        "books": books,
+        "names": {"tw:kt/grace": ["gracia", "amable"], "ta:translate/figs-metaphor": ["Metáfora"]},
+        "subtitles": {"ta:translate/figs-metaphor": "¿Qué es una metáfora?"},
+        "coverage": {"es-419_gl/es-419/tn": [bset(["tit", "rut"]), bset(["jon"])]},
+        "usage": counts("notes", {"ta:translate/figs-metaphor": [(8, 14, 12), (56, 1, 3)]}),
+        "obs": [[1, "La creación"], [10, "Diez"]],
+        "topics": {"es-419:tema/x": {"names": ["x"]}},
+        "numbering": {"a": 1},
+    }
+    for name in skip:
+        h["tables"][name] = [2, False]
+        t[name] = {"later": True}
+    expected = {
+        "h": header_h(h), "books": books,
+        "names": t["names"], "subtitles": t["subtitles"],
+        "coverage": {"es-419_gl/es-419/tn": {"whole": ["rut", "tit"], "partial": ["jon"]}},
+        "usage": {"unit": "notes", "rows": {"ta:translate/figs-metaphor": {"rut": [14, 12], "tit": [1, 3]}}},
+        "obs": [[1, "La creación"], [10, "Diez"]],
+    }
+    for name in skip:
+        expected.pop(name, None)
+    return build(h, t), expected, (h, t)
+
+
+def map_part():
+    h = {"class": "map", "v": 1, "tables": {"usage": [1, False]}, "lang": "es-419", "part": "tit", "book": "tit",
+         "res": []}
+    t = {"usage": vlists({"ta:translate/figs-metaphor": [1002, 1003, 1004]})}
+    expected = {"h": header_h(h), "usage": {"ta:translate/figs-metaphor": [56001002, 56001003, 56001004]}}
+    return build(h, t), expected, (h, t)
+
+
+def test_xmap_core():
+    b, expected, _ = xmap_core()
+    ok(b, expected)
+
+
+@pytest.mark.parametrize("skip", [("links",), ("notes",), ("relations",), ("aliases",), ("strongs",),
+                                  ("links", "notes", "relations", "aliases", "strongs")])
+def test_xmap_core_unknown_optional_tables_are_skipped(skip):
+    b, expected, _ = xmap_core(skip)
+    ok(b, expected)
+
+
+def test_xmap_core_without_optional_tables():
+    _, expected, (h, t) = xmap_core()
+    for name in ("links", "notes", "relations", "aliases", "strongs", "topics"):
+        del h["tables"][name]
+        del t[name]
+        expected.pop(name, None)
+    expected["h"] = header_h(h)
+    ok(build(h, t), expected)
+
+
+def test_xmap_topics_are_not_in_the_output_but_in_the_header():
+    b, _, _ = xmap_core()
+    out = read_file(b.data)
+    assert "topics" in out["h"]["tables"] and "topics" not in out
+
+
+def test_xmap_part():
+    b, expected, _ = xmap_part()
+    ok(b, expected)
+
+
+def test_xmap_part_without_links_and_notes():
+    _, expected, (h, t) = xmap_part()
+    for name in ("links", "notes"):
+        del h["tables"][name]
+        del t[name]
+        del expected[name]
+    expected["h"] = header_h(h)
+    ok(build(h, t), expected)
+
+
+def test_xmap_part_without_book_key_and_empty_part_tables():
+    _, _, (h, t) = xmap_part()
+    del h["book"]
+    t["strong"] = {"keys": [], "verses": b""}
+    out = read_file(build(h, t).data)
+    assert out["strong"] == {}
+
+
+def test_map_core():
+    b, expected, _ = map_core()
+    ok(b, expected)
+
+
+@pytest.mark.parametrize("skip", [("subtitles",), ("usage",), ("obs",), ("subtitles", "usage", "obs")])
+def test_map_core_unknown_optional_tables_are_skipped(skip):
+    b, expected, _ = map_core(skip)
+    ok(b, expected)
+
+
+def test_map_core_without_optional_tables():
+    _, expected, (h, t) = map_core()
+    for name in ("subtitles", "usage", "obs", "topics", "numbering"):
+        del h["tables"][name]
+        del t[name]
+        expected.pop(name, None)
+    expected["h"] = header_h(h)
+    ok(build(h, t), expected)
+
+
+def test_map_core_topics_and_numbering_are_listed_in_h_and_not_output():
+    out = read_file(map_core()[0].data)
+    assert "topics" in out["h"]["tables"] and "numbering" in out["h"]["tables"]
+    assert "topics" not in out and "numbering" not in out
+
+
+def test_map_part():
+    b, expected, _ = map_part()
+    ok(b, expected)
+
+
+def test_map_part_without_tables():
+    _, _, (h, t) = map_part()
+    h["tables"] = {}
+    ok(build(h, {}), {"h": header_h(h)})
+
+
+def test_counts_verses_above_count_and_zero_are_valid():
+    _, _, (h, t) = xmap_core()
+    t["strong"] = counts("occurrences", {"G1": [(1, 1, 5)], "G2": [(1, 1, 0)]})
+    out = read_file(build(h, t).data)
+    assert out["strong"]["rows"] == {"G1": {"gen": [1, 5]}, "G2": {"gen": [1, 0]}}
+
+
+def test_map_keys_are_checked_for_repeats_and_never_for_order():
+    # encoded-byte order, code-point order or no order at all: all read; a repeated key is a defect
+    _, _, (h, t) = xmap_core()
+    t["aliases"] = {"tw:other/b": "tw:kt/grace", "tw:other/a": "tw:kt/grace"}
+    body = cbor2.dumps({"h": h, "t": t})                   # not canonical: insertion order
+    assert read_file(swap_body(body, {"h": h}))["aliases"] == t["aliases"]
+    # a repeated key
+    doc = enc({"h": h, "t": dict(t, aliases={"tw:other/a": "tw:kt/grace", "tw:other/b": "tw:kt/grace"})})
+    a = doc.index(enc("tw:other/b"))
+    doc = doc[:a] + enc("tw:other/a") + doc[a + len(enc("tw:other/b")):]
+    err(swap_body(doc, {"h": h}), "E_BODY")
+
+
+def test_names_in_encoded_byte_order_read():
+    # canonical CBOR sorts keys by their encoding: shorter first, so "z" comes before "aa"
+    _, _, (h, t) = map_core()
+    t["names"] = {"aa": ["x"], "z": ["y"], "\U0001F600": ["w"], "￿": ["v"]}
+    out = read_file(build(h, t).data)
+    assert out["names"] == t["names"]
+
+
+XMAP_CORE_MUTATIONS = {
+    "no part": lambda h, t: h.pop("part"),
+    "part not a code": lambda h, t: h.update(part="ZZZ"),
+    "core with a book": lambda h, t: h.update(book="tit"),
+    "core with empty res": lambda h, t: h.update(res=[]),
+    "header without res": lambda h, t: h.pop("res"),
+    "version 2 header": lambda h, t: h.update(v=2),
+    "required coverage missing": lambda h, t: (h["tables"].pop("coverage"), t.pop("coverage"), None)[2],
+    "required strong missing": lambda h, t: (h["tables"].pop("strong"), t.pop("strong"), None)[2],
+    "required concepts missing": lambda h, t: (h["tables"].pop("concepts"), t.pop("concepts"), None)[2],
+    "strong is a verse list": lambda h, t: t.update(strong=vlists({"G1": [1]})),
+    "coverage not a map": lambda h, t: t.update(coverage=[]),
+    "book set of 8 bytes": lambda h, t: t.update(coverage={"a": [bytes(8)]}),
+    "book set with a bit for book 67": lambda h, t: t.update(coverage={"a": [bytes(8) + b"\x04"]}),
+    "coverage entry empty": lambda h, t: t.update(coverage={"a": []}),
+    "coverage entry of three": lambda h, t: t.update(coverage={"a": [bytes(9)] * 3}),
+    "counts keys unsorted": lambda h, t: t["strong"].update(keys=["G54850", "G39720"]),
+    "counts keys repeated": lambda h, t: t["strong"].update(keys=["G39720", "G39720"]),
+    "counts cut short": lambda h, t: t["strong"].update(counts=t["strong"]["counts"][:-1]),
+    "counts numbers left over": lambda h, t: t["strong"].update(counts=t["strong"]["counts"] + b"\x01"),
+    "counts book 67": lambda h, t: t.update(strong=counts("occurrences", {"G1": [(67, 1, 1)]})),
+    "counts book 0": lambda h, t: t["strong"].update(keys=["G1"], counts=uv([1, 0, 1, 1])),
+    "counts books not increasing": lambda h, t: t["strong"].update(keys=["G1"], counts=uv([2, 8, 1, 1, 0, 1, 1])),
+    "counts count 0": lambda h, t: t.update(strong=counts("occurrences", {"G1": [(8, 0, 1)]})),
+    "counts key with no book": lambda h, t: t["strong"].update(keys=["G1"], counts=uv([0])),
+    "counts unit of another table": lambda h, t: t["strong"].update(unit="links"),
+    "counts unit unknown": lambda h, t: t["strong"].update(unit="words"),
+    "links unit occurrences": lambda h, t: t["links"].update(unit="occurrences"),
+    "notes unit links": lambda h, t: t["notes"].update(unit="links"),
+    "counts without unit": lambda h, t: t["strong"].pop("unit"),
+    "concepts columns of different lengths": lambda h, t: t["concepts"].update(kind=uv([1, 0])),
+    "concepts kind 6": lambda h, t: t["concepts"].update(kind=uv([6, 0, 1])),
+    "concepts tw 4": lambda h, t: t["concepts"].update(tw=uv([0, 1, 4])),
+    "concepts source outside res": lambda h, t: t["concepts"].update(source=uv([0, 1, 2])),
+    "concepts ids repeated": lambda h, t: t["concepts"].update(ids=["a", "a", "b"]),
+    "relations concept outside": lambda h, t: t["relations"].update(to=uv([3])),
+    "relations from outside": lambda h, t: t["relations"].update(**{"from": uv([3])}),
+    "relations type outside": lambda h, t: t["relations"].update(type=uv([1])),
+    "relations source outside": lambda h, t: t["relations"].update(source=uv([2])),
+    "relations confidence 101": lambda h, t: t["relations"].update(confidence=uv([101])),
+    "relations columns of different lengths": lambda h, t: t["relations"].update(confidence=uv([1, 2])),
+    "strongs key not a concept": lambda h, t: t.update(strongs={"tw:kt/none": ["G1"]}),
+    "strongs empty list": lambda h, t: t.update(strongs={"tw:kt/grace": []}),
+    "strongs unsorted": lambda h, t: t.update(strongs={"tw:kt/grace": ["G2", "G1"]}),
+    "strongs repeat": lambda h, t: t.update(strongs={"tw:kt/grace": ["G1", "G1"]}),
+    "aliases value not a concept": lambda h, t: t.update(aliases={"tw:other/grace": "tw:kt/none"}),
+    "aliases value not text": lambda h, t: t.update(aliases={"tw:other/grace": 1}),
+    "tables not matching t": lambda h, t: t.pop("links"),
+}
+
+
+@pytest.mark.parametrize("name", list(XMAP_CORE_MUTATIONS))
+def test_xmap_core_that_does_not_match_its_schema(name):
+    _, _, (h, t) = xmap_core()
+    XMAP_CORE_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+XMAP_PART_MUTATIONS = {
+    "res not empty": lambda h, t: h.update(res=[UGNT_RES]),
+    "book is not the part": lambda h, t: h.update(book="rut"),
+    "part is not a book of the canon": lambda h, t: h.update(part="zzz", book="zzz"),
+    "no part": lambda h, t: h.pop("part"),
+    "required strong missing": lambda h, t: (h["tables"].pop("strong"), t.pop("strong"), None)[2],
+    "a core table in a part": lambda h, t: (h["tables"].update(coverage=[1, False]),
+                                            t.update(coverage={"a": [bytes(9)]}), None)[2],
+    "concepts in a part": lambda h, t: (h["tables"].update(concepts=[1, False]), t.update(concepts={}), None)[2],
+    "strong in the shape of a core": lambda h, t: t.update(strong=counts("occurrences", {"G1": [(56, 1, 1)]})),
+    "keys unsorted": lambda h, t: t["strong"].update(keys=["G54850", "G39720"]),
+    "keys repeated": lambda h, t: t["links"].update(keys=["a", "a"], verses=uv([1, 1, 1, 1])),
+    "a key with n = 0": lambda h, t: t["links"].update(keys=["a"], verses=uv([0])),
+    "offset not increasing": lambda h, t: t["notes"].update(keys=["a"], verses=uv([2, 5, 0])),
+    "offset reaches 1 000 000": lambda h, t: t["notes"].update(keys=["a"], verses=uv([1, 1000000])),
+    "offsets add up to 1 000 000": lambda h, t: t["notes"].update(keys=["a"], verses=uv([2, 999999, 1])),
+    "verses cut short": lambda h, t: t["notes"].update(verses=t["notes"]["verses"][:-1]),
+    "verses numbers left over": lambda h, t: t["notes"].update(verses=t["notes"]["verses"] + b"\x01"),
+    "verses n larger than what is left": lambda h, t: t["links"].update(keys=["a"], verses=uv([3, 1])),
+    "verses column missing": lambda h, t: t["links"].pop("verses"),
+}
+
+
+@pytest.mark.parametrize("name", list(XMAP_PART_MUTATIONS))
+def test_xmap_part_that_does_not_match_its_schema(name):
+    _, _, (h, t) = xmap_part()
+    XMAP_PART_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+def test_xmap_part_first_offset_may_be_zero_and_a_key_may_hold_one_verse():
+    _, _, (h, t) = xmap_part()
+    t["links"] = vlists({"a": [0], "b": [999999]})
+    out = read_file(build(h, t).data)
+    assert out["links"] == {"a": [56000000], "b": [56999999]}
+
+
+MAP_CORE_MUTATIONS = {
+    "no lang": lambda h, t: h.pop("lang"),
+    "no part": lambda h, t: h.pop("part"),
+    "core with a book": lambda h, t: h.update(book="tit"),
+    "books 65": lambda h, t: t["books"].pop(),
+    "books 67": lambda h, t: t["books"].append(["a", "b", "c", "none"]),
+    "book source unknown": lambda h, t: t["books"][0].__setitem__(3, "file"),
+    "book entry of 3": lambda h, t: t["books"][0].pop(),
+    "book entry not text": lambda h, t: t["books"][0].__setitem__(0, 1),
+    "names empty list": lambda h, t: t["names"].update({"x": []}),
+    "names not text": lambda h, t: t["names"].update({"x": [1]}),
+    "subtitles not text": lambda h, t: t["subtitles"].update({"x": 1}),
+    "required names missing": lambda h, t: (h["tables"].pop("names"), t.pop("names"), None)[2],
+    "required books missing": lambda h, t: (h["tables"].pop("books"), t.pop("books"), None)[2],
+    "usage unit occurrences": lambda h, t: t["usage"].update(unit="occurrences"),
+    "usage in the shape of a part": lambda h, t: t.update(usage=vlists({"a": [1]})),
+    "usage keys unsorted": lambda h, t: t["usage"].update(keys=["b", "a"]),
+    "usage count 0": lambda h, t: t.update(usage=counts("notes", {"a": [(8, 0, 0)]})),
+    "obs entry not a pair": lambda h, t: t.update(obs=[[1]]),
+    "obs title not text": lambda h, t: t.update(obs=[[1, 2]]),
+}
+
+
+@pytest.mark.parametrize("name", list(MAP_CORE_MUTATIONS))
+def test_map_core_that_does_not_match_its_schema(name):
+    _, _, (h, t) = map_core()
+    MAP_CORE_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+MAP_PART_MUTATIONS = {
+    "no lang": lambda h, t: h.pop("lang"),
+    "res not empty": lambda h, t: h.update(res=[["a", "b"]]),
+    "book is not the part": lambda h, t: h.update(book="rut"),
+    "names in a part": lambda h, t: (h["tables"].update(names=[1, False]), t.update(names={"a": ["b"]}), None)[2],
+    "books in a part": lambda h, t: (h["tables"].update(books=[1, False]), t.update(books=[]), None)[2],
+    "usage in the shape of a core": lambda h, t: t.update(usage=counts("notes", {"a": [(56, 1, 1)]})),
+    "usage key with n = 0": lambda h, t: t["usage"].update(keys=["a"], verses=uv([0])),
+    "usage offset not increasing": lambda h, t: t["usage"].update(keys=["a"], verses=uv([2, 4, 0])),
+}
+
+
+@pytest.mark.parametrize("name", list(MAP_PART_MUTATIONS))
+def test_map_part_that_does_not_match_its_schema(name):
+    _, _, (h, t) = map_part()
+    MAP_PART_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+def test_map_and_xmap_required_table_unknown_is_e_table():
+    for fixture, name in ((xmap_core, "strong"), (xmap_core, "coverage"), (map_core, "books"), (xmap_part, "strong")):
+        _, _, (h, t) = fixture()
+        h["tables"][name] = [2, False]                    # a required table at a version this reader does not know
+        err(build(h, t).data, "E_TABLE")
+
+
+def test_map_part_has_no_required_table_but_xmap_part_has():
+    _, _, (h, t) = map_part()
+    h["tables"]["usage"] = [2, False]                     # optional at a later version: skipped
+    out = read_file(build(h, t).data)
+    assert "usage" not in out and "error" not in out
+
+
+def test_map_with_unknown_required_table_is_e_table():
+    _, _, (h, t) = map_core()
+    h["tables"]["future"] = [1, True]
+    t["future"] = 1
+    err(build(h, t).data, "E_TABLE")
+
+
+def test_gen_is_still_e_table():
+    err(build({"class": "gen", "v": 1, "tables": {}}, {}).data, "E_TABLE")
+
+
+def test_map_in_a_transfer_file_is_ok_and_its_shape_is_not_checked():
+    cat, _, _ = catalog_fixture(with_sig=False)
+    good, _, _ = map_core()
+    _, _, (h, t) = map_core()
+    del h["lang"]                                         # a defect of the tables: not part of the status
+    bad = build(h, t)
+    entries = [(bytes.fromhex(cat.id), "segment", "catalog", cat.data),
+               (bytes.fromhex(good.id), "segment", "map", good.data),
+               (bytes.fromhex(bad.id), "segment", "map", bad.data)]
+    out = read_file(transfer_bytes(entries, [bytes.fromhex(cat.id)]))
+    assert [e["status"] for e in out["entries"]] == ["ok", "ok", "ok"]
+
+
+def test_map_cli_prints_the_canonical_text(tmp_path):
+    b, expected, _ = map_part()
+    f = tmp_path / "part.seg"
+    f.write_bytes(b.data)
+    proc = subprocess.run([sys.executable, "-X", "utf8", str(HERE / "lp3read.py"), str(f)], capture_output=True)
+    assert proc.returncode == 0
+    assert json.loads(proc.stdout.decode("utf-8")) == dict(expected, id=b.id)

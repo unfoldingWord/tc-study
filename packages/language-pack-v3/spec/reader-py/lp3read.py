@@ -44,7 +44,8 @@ BOOK_NUMBER = {code: i + 1 for i, code in enumerate(BOOKS)}
 ROLES = ("intro", "definition", "facts", "translation-suggestions", "examples", "strategies", "description",
          "reason", "bible-references", "word-data", "unknown")
 
-# What a phase 1 reader knows: every table of cddl/<class>.cddl, at version 1.
+# What a phase 2 reader knows: every table of cddl/<class>.cddl, at version 1, but ``topics`` and ``numbering``
+# of the maps ("gen" has none).
 KNOWN_TABLES = {
     "book": {"strings", "texts", "align", "notes", "questions", "links", "quotes"},
     "orig": {"words", "text", "macula"},
@@ -52,6 +53,8 @@ KNOWN_TABLES = {
     "lex": {"entries"},
     "obs": {"strings", "stories", "notes", "questions", "links", "study-notes", "study-questions"},
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
+    "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
+    "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
 }
 REQUIRED_TABLES = {
     "book": {"strings", "texts"},
@@ -61,6 +64,9 @@ REQUIRED_TABLES = {
     "obs": {"strings", "stories"},
     "catalog": {"about", "resources", "segments", "units"},
 }
+# map and xmap: the required tables depend on the segment being a core or a part (see ``required_tables``)
+REQUIRED_MAP_CORE = {"map": {"books", "names", "coverage"}, "xmap": {"coverage", "strong", "concepts"}}
+REQUIRED_MAP_PART = {"map": set(), "xmap": {"strong"}}
 KNOWN_VERSION = 1
 
 _TABLE_NAME = re.compile(r"[a-z][a-z0-9-]*")
@@ -363,8 +369,9 @@ def decode_column(col, n: int, strings: list[str] | None = None, allow_flags: bo
 
 
 class Segment:
-    def __init__(self, id_hex, h, t, skip):
+    def __init__(self, id_hex, h, t, skip, ulen=MAX_LEN):
         self.id = id_hex
+        self.ulen = ulen
         self.h = h
         self.t = t
         self.skip = skip
@@ -423,6 +430,13 @@ def _validate_logical_header(h) -> None:
         r = h["res"]
         if type(r) is not list or not all(is_pair_strs(x) for x in r):
             _bad()
+
+
+def required_tables(cls: str, h: dict) -> set:
+    """The tables the schema of the class requires. A map or an xmap differs between its core and its parts."""
+    if cls in REQUIRED_MAP_CORE:
+        return REQUIRED_MAP_CORE[cls] if h.get("part") == "core" else REQUIRED_MAP_PART[cls]
+    return REQUIRED_TABLES[cls]
 
 
 def parse_segment(data: bytes, expect_id: bytes | None = None, must_class: str | None = None) -> Segment:
@@ -493,16 +507,17 @@ def parse_segment(data: bytes, expect_id: bytes | None = None, must_class: str |
         _fail("E_HMISMATCH")
     cls = h["class"]
     if cls not in KNOWN_TABLES:
-        _fail("E_TABLE")                    # map, xmap, gen: this reader knows no table of them
+        _fail("E_TABLE")                    # gen: this reader knows no table of it
+    schema_required = required_tables(cls, h)
     skip = set()
     for name, (version, required) in h["tables"].items():
         known = name in KNOWN_TABLES[cls] and version == KNOWN_VERSION
         if known:
             continue
-        if required or name in REQUIRED_TABLES[cls]:
+        if required or name in schema_required:
             _fail("E_TABLE")
         skip.add(name)
-    return Segment(digest.hex(), h, t, skip)
+    return Segment(digest.hex(), h, t, skip, ulen)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -646,11 +661,13 @@ def _ref_text(entries, n: int) -> dict[int, str]:
     return out
 
 
-def _common_rows(tab, strings: list[str]):
+def _common_rows(tab, strings: list[str], ulen: int):
     """The parts of a table of helps that books and OBS share. Returns (n, ids, concepts, cols, ref_text)."""
     if type(tab) is not dict:
         _bad()
     n = _need(tab, "n", is_uint)
+    if n > ulen:
+        _bad()                              # a reader allocates no more rows than the body has bytes
     ids = _ids(tab.get("id"), n, strings)
     concept = None
     if "concept" in tab:
@@ -784,7 +801,7 @@ def _decode_book_helps(p: Segment, name: str, strings: list[str], book: int | No
     if type(tab) is not dict:
         _bad()
     res = p.res_key(_need(tab, "res", is_uint))
-    n, rows, ref_text = _common_rows(tab, strings)
+    n, rows, ref_text = _common_rows(tab, strings, p.ulen)
     ranges = _ranges(tab.get("ref"), n)
     out_rows = []
     for i, row in enumerate(rows):
@@ -1051,7 +1068,7 @@ def _decode_obs_helps(p: Segment, name: str, strings: list[str]) -> dict:
     if type(tab) is not dict:
         _bad()
     res = p.res_key(_need(tab, "res", is_uint))
-    n, rows, ref_text = _common_rows(tab, strings)
+    n, rows, ref_text = _common_rows(tab, strings, p.ulen)
     frames = uvarints(_need(tab, "frame", is_bytes))
     if len(frames) != n:
         _bad()
@@ -1062,6 +1079,8 @@ def _decode_obs_helps(p: Segment, name: str, strings: list[str]) -> dict:
             _bad()
         seen.add(row["id"])
         fid = frames[i]
+        if fid // 100 < 1 or fid // 100 > 50:
+            _bad()                          # story outside 1..50 (the frame, fid mod 100, is always 0..99)
         text = ref_text.get(i)
         if text is None:
             story, frame = divmod(fid, 100)
@@ -1241,8 +1260,247 @@ def _decode_catalog(p: Segment) -> dict:
     return out
 
 
+# ---------------------------------------------------------------------------------------------------------------
+# map and xmap (cddl/map.cddl, cddl/xmap.cddl, cddl/common.cddl "Counts of the maps", counts.md)
+# ---------------------------------------------------------------------------------------------------------------
+
+COUNT_UNITS = {("xmap", "strong"): "occurrences", ("xmap", "links"): "links", ("xmap", "notes"): "notes",
+               ("map", "usage"): "notes"}
+CONCEPT_KINDS = ("none", "person", "place", "event", "topic", "story")
+TW_CATEGORIES = ("none", "kt", "names", "other")
+BOOK_SOURCES = ("text", "list", "none")
+# Tables of the core that must not be in a part (the shared names, strong/links/notes/usage, are told apart by shape)
+CORE_ONLY = {"map": {"books", "names", "subtitles", "coverage", "obs"},
+             "xmap": {"coverage", "concepts", "relations", "aliases", "strongs"}}
+
+
+def _map_header(p: Segment) -> tuple[bool, int | None]:
+    """Checks the header of a map or xmap. Returns (is a core, book number of a part)."""
+    is_map = p.cls == "map"
+    h = p.h
+    _header_needs(p, "part", "res", *(("lang",) if is_map else ()))
+    part = h["part"]
+    if part != "core" and not _BOOK_CODE.fullmatch(part):
+        _bad()
+    if part == "core":
+        if "book" in h:
+            _bad()
+        if not is_map and len(h["res"]) == 0:
+            _bad()
+        number = None
+    else:
+        if part not in BOOK_NUMBER:
+            _bad()                          # a verse id needs the book number
+        if "book" in h and h["book"] != part:
+            _bad()
+        if h["res"] != []:
+            _bad()
+        number = BOOK_NUMBER[part]
+    for key in required_tables(p.cls, h):
+        if key not in h["tables"]:
+            _bad()
+    if part != "core":
+        for key in CORE_ONLY[p.cls]:
+            if p.has(key):
+                _bad()                      # a core table in a part
+    return part == "core", number
+
+
+def _sorted_strtab(x) -> list[str]:
+    """A string table of keys: strictly increasing by code point (so not repeated)."""
+    keys = _strtab(x)
+    if any(a >= b for a, b in zip(keys, keys[1:])):
+        _bad()
+    return keys
+
+
+def _counts_table(p: Segment, name: str):
+    tab = p.t[name]
+    if type(tab) is not dict:
+        _bad()
+    unit = _need(tab, "unit", is_str)
+    if unit != COUNT_UNITS[(p.cls, name)]:
+        _bad()
+    keys = _sorted_strtab(tab.get("keys"))
+    nums = uvarints(_need(tab, "counts", is_bytes))
+    at, rows = 0, {}
+    for key in keys:
+        if at >= len(nums):
+            _bad()
+        b = nums[at]
+        at += 1
+        if b == 0 or 3 * b > len(nums) - at:
+            _bad()
+        book, books = 0, {}
+        for _ in range(b):
+            delta, count, verses = nums[at:at + 3]
+            at += 3
+            if delta == 0:
+                _bad()                      # books must strictly increase (the first delta is from 0)
+            book += delta
+            if book > 66 or count == 0:
+                _bad()
+            books[BOOKS[book - 1]] = [count, verses]
+        rows[key] = books
+    if at != len(nums):
+        _bad()
+    return {"unit": unit, "rows": rows}
+
+
+def _verse_lists(tab, number: int) -> dict:
+    if type(tab) is not dict:
+        _bad()
+    keys = _sorted_strtab(tab.get("keys"))
+    nums = uvarints(_need(tab, "verses", is_bytes))
+    at, out = 0, {}
+    for key in keys:
+        if at >= len(nums):
+            _bad()
+        n = nums[at]
+        at += 1
+        if n == 0 or n > len(nums) - at:
+            _bad()
+        offset, ids = 0, []
+        for j in range(n):
+            v = nums[at + j]
+            if j > 0 and v == 0:
+                _bad()                      # not strictly increasing
+            offset += v
+            if offset >= 1000000:
+                _bad()
+            ids.append(number * 1000000 + offset)
+        at += n
+        out[key] = ids
+    if at != len(nums):
+        _bad()
+    return out
+
+
+def _book_set(x) -> list[str]:
+    if not is_bytes(x, 9):
+        _bad()
+    out = []
+    for i in range(72):
+        if (x[i >> 3] >> (i & 7)) & 1:
+            if i >= 66:
+                _bad()                      # a bit for a book that does not exist
+            out.append(BOOKS[i])
+    return out
+
+
+def _coverage(c) -> dict:
+    if type(c) is not dict:
+        _bad()
+    out = {}
+    for source, entry in c.items():
+        if type(entry) is not list or len(entry) not in (1, 2):
+            _bad()
+        o = {"whole": _book_set(entry[0])}
+        if len(entry) == 2:
+            partial = _book_set(entry[1])
+            if partial:
+                o["partial"] = partial
+        out[source] = o
+    return out
+
+
+def _str_map(m, value_test) -> dict:
+    if type(m) is not dict or not all(value_test(v) for v in m.values()):
+        _bad()
+    return m
+
+
+def _decode_xmap_core(p: Segment) -> dict:
+    out = {"coverage": _coverage(p.t["coverage"]), "strong": _counts_table(p, "strong")}
+    c = p.t["concepts"]
+    if type(c) is not dict:
+        _bad()
+    ids = _strtab(c.get("ids"))
+    cols = {k: uvarints(_need(c, k, is_bytes)) for k in ("kind", "tw", "source")}
+    if any(len(v) != len(ids) for v in cols.values()) or len(set(ids)) != len(ids):
+        _bad()
+    if any(x > 5 for x in cols["kind"]) or any(x > 3 for x in cols["tw"]):
+        _bad()
+    concepts = {}
+    for i, cid in enumerate(ids):
+        concepts[cid] = {"kind": CONCEPT_KINDS[cols["kind"][i]], "tw": TW_CATEGORIES[cols["tw"][i]],
+                         "source": p.res_key(cols["source"][i])}
+    out["concepts"] = concepts
+    for name in ("links", "notes"):
+        if p.has(name):
+            out[name] = _counts_table(p, name)
+    if p.has("relations"):
+        r = p.t["relations"]
+        if type(r) is not dict:
+            _bad()
+        types = _strtab(r.get("types"))
+        rc = {k: uvarints(_need(r, k, is_bytes)) for k in ("from", "to", "type", "source", "confidence")}
+        n = len(rc["from"])
+        if any(len(v) != n for v in rc.values()):
+            _bad()
+        rels = []
+        for i in range(n):
+            if (rc["from"][i] >= len(ids) or rc["to"][i] >= len(ids) or rc["type"][i] >= len(types)
+                    or rc["confidence"][i] > 100):
+                _bad()
+            rels.append({"from": ids[rc["from"][i]], "to": ids[rc["to"][i]], "type": types[rc["type"][i]],
+                         "source": p.res_key(rc["source"][i]), "confidence": rc["confidence"][i]})
+        out["relations"] = rels
+    if p.has("aliases"):
+        a = _str_map(p.t["aliases"], is_str)
+        if any(v not in concepts for v in a.values()):
+            _bad()
+        out["aliases"] = a
+    if p.has("strongs"):
+        s = _str_map(p.t["strongs"], lambda v: type(v) is list and len(v) > 0 and all(type(x) is str for x in v)
+                     and all(a < b for a, b in zip(v, v[1:])))
+        if any(k not in concepts for k in s):
+            _bad()
+        out["strongs"] = s
+    return out
+
+
+def _decode_xmap(p: Segment) -> dict:
+    core, number = _map_header(p)
+    if core:
+        return _decode_xmap_core(p)
+    out = {"strong": _verse_lists(p.t["strong"], number)}
+    for name in ("links", "notes"):
+        if p.has(name):
+            out[name] = _verse_lists(p.t[name], number)
+    return out
+
+
+def _decode_map(p: Segment) -> dict:
+    core, number = _map_header(p)
+    if not core:
+        return {"usage": _verse_lists(p.t["usage"], number)} if p.has("usage") else {}
+    books_in = p.t["books"]
+    if type(books_in) is not list or len(books_in) != 66:
+        _bad()
+    books = []
+    for b in books_in:
+        if (type(b) is not list or len(b) != 4 or not all(type(x) is str for x in b)
+                or b[3] not in BOOK_SOURCES):
+            _bad()
+        books.append(list(b))
+    names = _str_map(p.t["names"], lambda v: type(v) is list and len(v) > 0 and all(type(x) is str for x in v))
+    out = {"books": books, "names": names, "coverage": _coverage(p.t["coverage"])}
+    if p.has("subtitles"):
+        out["subtitles"] = _str_map(p.t["subtitles"], is_str)
+    if p.has("usage"):
+        out["usage"] = _counts_table(p, "usage")
+    if p.has("obs"):
+        o = p.t["obs"]
+        if type(o) is not list or not all(type(x) is list and len(x) == 2 and is_uint(x[0]) and is_str(x[1])
+                                          for x in o):
+            _bad()
+        out["obs"] = [list(x) for x in o]
+    return out
+
+
 _DECODERS = {"book": _decode_book, "orig": _decode_orig, "art": _decode_art, "lex": _decode_lex,
-             "obs": _decode_obs, "catalog": _decode_catalog}
+             "obs": _decode_obs, "catalog": _decode_catalog, "map": _decode_map, "xmap": _decode_xmap}
 
 
 def decode_segment(p: Segment, as_class: str | None = None) -> dict:
