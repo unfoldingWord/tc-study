@@ -135,6 +135,7 @@ describe('obsView', () => {
     ['a table n that is not the number of rows', (s) => void (notes(s).n = 3)],
     ['an id that is neither ascii4 nor strings', (s) => void (notes(s).id = {})],
     ['ascii4 of the wrong length', (s) => void (notes(s).id = { ascii4: new Uint8Array(3) })],
+    ['ids with both ascii4 and strings', (s) => void (notes(s).id = { ...notes(s).id, strings: Uint8Array.of(0, 1) })],
     ['ascii4 with a byte above 127', (s) => void (notes(s).id = { ascii4: Uint8Array.of(0xff, 97, 97, 97, 97, 97, 97, 97) })],
     ['an id twice', (s) => void (notes(s).id = { ascii4: Uint8Array.of(97, 97, 97, 97, 97, 97, 97, 97) })],
     ['ids of strings outside the table', (s) => void (s.t['study-notes'] = { ...(s.t['study-notes'] as object), id: { strings: Uint8Array.of(99) } })],

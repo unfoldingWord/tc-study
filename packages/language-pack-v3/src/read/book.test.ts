@@ -311,6 +311,7 @@ describe('bookView: notes, questions, links and quotes', () => {
     ['ascii4 ids of the wrong length', (s) => void (notesT(s).id.ascii4 = bytes(97, 98, 99))],
     ['ascii4 ids that are not bytes', (s) => void (notesT(s).id.ascii4 = 'a1b2c3d4e5f6')],
     ['an ascii4 id with a byte above 127', (s) => void (notesT(s).id.ascii4[0] = 0x80)],
+    ['ids with both ascii4 and strings', (s) => void (notesT(s).id.strings = bytes(0, 1, 2))],
     ['notes with no ref', (s) => void delete notesT(s).ref],
     ['ref.from that is not bytes', (s) => void (notesT(s).ref.from = [1])],
     ['ref.from of the wrong length', (s) => void (notesT(s).ref.from = bytes(2, 2))],

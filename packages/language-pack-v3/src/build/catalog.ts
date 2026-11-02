@@ -23,6 +23,7 @@ import type { CborValue } from '../codec/cbor'
 import { compareCodePoints } from '../codec/columns'
 import { CLASS_NAMES, hex, readHeader, type Segment, writeSegment } from '../codec/container'
 import { sha256 } from '../codec/sha256'
+import { hexToBytes, isUint as isCount } from '../codec/values'
 import { bookNumber } from '../ids'
 import type { About, BookModel, CatalogResource, Complement, Unit } from '../model'
 
@@ -36,13 +37,9 @@ const HEX_ID = /^[0-9a-f]{64}$/
 /** RFC 3339 date and time: `2026-11-01T10:00:00Z`, with optional fraction and offset. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
 
-const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-
 function bytesOfHex(text: unknown, what: string): Uint8Array {
   if (typeof text !== 'string' || !HEX_ID.test(text)) throw new Error(`${what} is not 64 lowercase hex digits`)
-  const out = new Uint8Array(32)
-  for (let i = 0; i < 32; i++) out[i] = parseInt(text.slice(2 * i, 2 * i + 2), 16)
-  return out
+  return hexToBytes(text)
 }
 
 function needText(value: unknown, what: string): string {

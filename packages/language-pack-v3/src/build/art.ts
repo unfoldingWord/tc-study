@@ -35,6 +35,7 @@
 import type { CborValue } from '../codec/cbor'
 import { compareCodePoints } from '../codec/columns'
 import type { Segment } from '../codec/container'
+import { isUint as isCount } from '../codec/values'
 import { rewriteLinks } from '../ids'
 import { type ArticleModel, ROLES, type SectionModel } from '../model'
 import type { ResourceRef, RowSource } from '../source/rows'
@@ -206,7 +207,6 @@ export function articleResources(articles: ArticleModel[], refs: ResourceRef[]):
 
 // Segment
 
-const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 const isTexts = (value: unknown): value is string[] => Array.isArray(value) && value.every((item) => typeof item === 'string')
 
 function encodeSection(section: SectionModel, where: string): CborValue {

@@ -10,14 +10,13 @@
  */
 import { CLASS_NAMES, hex, type Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
-import { type CborMap, hasOwn, isMap } from '../codec/values'
+import { type CborMap, hasOwn, isMap, isUint } from '../codec/values'
 import type { About, CatalogModel, CatalogResource, Complement, SegmentEntry, Unit } from '../model'
 
 function bad(what: string): never {
   throw new FormatError('E_BODY', `the catalog is malformed: ${what}`)
 }
 
-const isUint = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 
 function map(value: unknown, what: string): CborMap {
   if (!isMap(value)) bad(`${what} is not a map`)

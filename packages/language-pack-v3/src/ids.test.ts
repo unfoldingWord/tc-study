@@ -304,6 +304,20 @@ describe('concepts', () => {
 })
 
 describe('rewriteLinks', () => {
+  test('a long text with brackets that never close is read in linear time', () => {
+    for (const text of ['[a]('.repeat(20_000), '[[rc://'.repeat(10_000), '[a'.repeat(20_000), '[a](b'.repeat(20_000)]) {
+      const start = performance.now()
+      expect(rewriteLinks(text, 'tit')).toBe(text)
+      expect(performance.now() - start).toBeLessThan(500)
+    }
+  })
+
+  test('a link inside the text of a broken one is still rewritten, and a text over two lines is a link text', () => {
+    expect(rewriteLinks('[x [a](../02/03.md)', 'tit')).toBe('[x [a](ref:tit 2:3)')
+    expect(rewriteLinks('[a\nb](../02/03.md)', 'tit')).toBe('[a\nb](ref:tit 2:3)')
+    expect(rewriteLinks('[a][b](rc://*/tn/help/tit/02/03) [[rc://*/ta/man/translate/figs-metaphor]]', null)).toBe('[a][b](ref:tit 2:3) [[ta:translate/figs-metaphor]]')
+  })
+
   test('an rc:// address with capitals in the slug or the name is rewritten with the lowercase id', () => {
     expect(rewriteLinks('See [[rc://*/ta/man/translate/figs-orderHeb]] and [[rc://es-419/ta/man/translate/figs-orderGrk]].', null)).toBe(
       'See [[ta:translate/figs-orderheb]] and [[ta:translate/figs-ordergrk]].',

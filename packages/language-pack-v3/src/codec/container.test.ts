@@ -203,6 +203,23 @@ describe('writeSegment', () => {
     await expect(writeSegment({ ...seg, t: withoutTexts })).rejects.toThrow(Error)
   })
 
+  test('refuses a logical header its own reader would reject with E_BODY', async () => {
+    const bad: [string, (h: Record<string, unknown>) => void][] = [
+      ['a class that does not exist', (h) => (h.class = 'chapter')],
+      ['a version that is not a count', (h) => (h.v = -1)],
+      ['a table entry that is not [version, required]', (h) => (h.tables = { strings: [1] })],
+      ['a table name with capitals', (h) => (h.tables = { Strings: [1, true], texts: [1, true] })],
+      ['a lang that is not text', (h) => (h.lang = 7)],
+      ['an orig that is not a pair of texts', (h) => (h.orig = ['a'])],
+      ['a res that is not a list of pairs', (h) => (h.res = [['a', 'b', 'c']])],
+    ]
+    for (const [, change] of bad) {
+      const h = structuredClone(seg.h) as unknown as Record<string, unknown>
+      change(h)
+      expect(await codeOf(writeSegment({ ...seg, h: h as unknown as Segment['h'] }))).toBe('E_BODY')
+    }
+  })
+
   test('refuses a header over 65 536 bytes with E_LIMIT', async () => {
     const big: Segment = { ...seg, h: { ...seg.h, res: [['r'.repeat(MAX_HEADER_BYTES), 'v1']] } }
     expect(await codeOf(writeSegment(big))).toBe('E_LIMIT')
@@ -565,6 +582,12 @@ describe('the identity', () => {
     expect(good.id).toBe(MINIMAL_ID)
     const wrong = MINIMAL_ID.replace(/^6/, '7')
     expect(await codeOf(readSegment(minimalSeg, { known: KNOWN, expectedId: wrong }))).toBe('E_ID')
+  })
+
+  test('the id the catalog gives is compared ignoring case', async () => {
+    const upper = MINIMAL_ID.toUpperCase()
+    expect((await readSegment(minimalSeg, { known: KNOWN, expectedId: upper })).id).toBe(MINIMAL_ID)
+    expect(await codeOf(readSegment(minimalSeg, { known: KNOWN, expectedId: upper.replace(/^6/, '7') }))).toBe('E_ID')
   })
 
   test('hex gives lowercase hex with two digits per byte', () => {

@@ -34,12 +34,12 @@ import { deflateRaw, Inflate } from 'pako'
 import { CborNestingError, type CborValue, decodeCbor, encodeDeterministic, MAX_DEPTH } from './cbor'
 import { ColumnError } from './columns'
 import { FormatError, type FormatErrorCode } from './errors'
-import { type CborMap, hasOwn, isMap } from './values'
+import { type CborMap, hasOwn, isMap, isUint, sha256Digest } from './values'
 
 // Limits and fixed values (`container.md`, "Layout" and "Limits")
 
 /** `\x89TLP`. The first byte is not ASCII, so a text-mode copy fails at once. */
-const MAGIC = [0x89, 0x54, 0x4c, 0x50] as const
+export const MAGIC = [0x89, 0x54, 0x4c, 0x50] as const
 
 /** The only major version this code reads and writes. */
 export const FORMAT_MAJOR = 3
@@ -50,7 +50,7 @@ export const KIND_SEGMENT = 1
 export const KIND_TRANSFER = 2
 
 /** Bytes before the header: magic, major, minor, kind, reserved and the header length. */
-const FIXED_BYTES = 12
+export const FIXED_BYTES = 12
 
 /** Largest header a segment has. */
 export const MAX_HEADER_BYTES = 65_536
@@ -84,9 +84,6 @@ export type Segment = { h: LogicalHeader; t: Record<string, CborValue> }
 
 // Small helpers
 
-/** A non-negative integer, as the decoder gives every CBOR unsigned integer. */
-const isUint = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-
 const isText = (value: unknown): value is string => typeof value === 'string'
 
 /** Lowercase hex, two digits per byte. This is how ids are printed. */
@@ -118,10 +115,6 @@ function cborEqual(a: CborValue, b: CborValue): boolean {
     return keys.every((key) => hasOwn(b, key) && cborEqual(a[key], b[key]))
   }
   return false
-}
-
-async function sha256(data: Uint8Array): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.digest('SHA-256', data as Uint8Array<ArrayBuffer>))
 }
 
 /** A decode failure of the header or the body becomes a FormatError: a limit for nesting, `code` for the rest. */
@@ -328,7 +321,7 @@ function parseBody(body: Uint8Array, expectedClass?: ClassName): { h: CborMap; t
  * `skipped`; `seg.h` stays as the file has it. Which other tables depend on a skipped one is class knowledge and
  * belongs to the readers of each class.
  *
- * `expectedId`, when given, is the id the catalog gives, in lowercase hex. `expectedClass`, when given, is the class the body's
+ * `expectedId`, when given, is the id the catalog gives, in hex (either case is compared as lowercase). `expectedClass`, when given, is the class the body's
  * `h` must have (`E_BODY` otherwise, before `E_HMISMATCH` and the tables): a catalog inside a transfer file must be a catalog.
  *
  * `header` is the file header as it is, with the keys this code does not know and the catalog's `sig`.
@@ -354,10 +347,10 @@ export async function readSegment(
 
   const body = inflateBody(bytes.subarray(headerEnd, fileEnd), fields.ulen)
 
-  const digest = await sha256(body)
+  const digest = await sha256Digest(body)
   const id = hex(digest)
   if (!equalBytes(digest, fields.id)) throw new FormatError('E_ID', 'the sha256 of the body is not the id in the header')
-  if (opts.expectedId !== undefined && opts.expectedId !== id) {
+  if (opts.expectedId !== undefined && opts.expectedId.toLowerCase() !== id) {
     throw new FormatError('E_ID', 'the sha256 of the body is not the id the catalog gives')
   }
 
@@ -392,7 +385,8 @@ function assertSameTables(seg: Segment): void {
 
 /**
  * Writes a segment file. The body is the deterministic CBOR of `{h, t}`, so the same content gives the same id; the
- * compressed bytes are not part of it. Throws `Error` when `h.tables` and `t` list different tables, and a
+ * compressed bytes are not part of it. Throws a {@link FormatError} `E_BODY` when the logical header `h` is not what the reader accepts (the
+ * class, `v`, `tables`, `lang`, `book`, `part`, `group`, `orig`, `res`), `Error` when `h.tables` and `t` list different tables, and a
  * {@link FormatError} `E_LIMIT` when the header, `clen` or `ulen` would be over its limit (a reader would reject it).
  *
  * `extra.sig` is the catalog's list of signatures; it goes in the header and not in the body.
@@ -401,6 +395,8 @@ export async function writeSegment(
   seg: Segment,
   extra?: { sig?: { key: string; alg: 'ed25519'; s: Uint8Array }[] },
 ): Promise<{ bytes: Uint8Array; id: string; body: Uint8Array }> {
+  // The reader's own check of the logical header, so that no file is written that it would reject with E_BODY.
+  checkLogicalHeader(seg.h as unknown as CborMap)
   assertSameTables(seg)
   if (extra?.sig !== undefined && extra.sig.length === 0) throw new Error('sig must list at least one signature')
 
@@ -412,7 +408,7 @@ export async function writeSegment(
   if (compressed.length > MAX_COMPRESSED_BYTES) {
     throw new FormatError('E_LIMIT', `the compressed body is ${compressed.length} bytes, over ${MAX_COMPRESSED_BYTES}`)
   }
-  const digest = await sha256(body)
+  const digest = await sha256Digest(body)
 
   const headerMap: CborMap = {
     h: seg.h as unknown as CborMap,

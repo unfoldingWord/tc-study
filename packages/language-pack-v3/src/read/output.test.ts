@@ -186,6 +186,17 @@ describe('tables a reader does not know (case 9)', () => {
     }
   })
 
+  test('KNOWN cannot be changed: it is frozen, down to the lists of versions', () => {
+    expect(Object.isFrozen(KNOWN)).toBe(true)
+    for (const tables of Object.values(KNOWN)) {
+      expect(Object.isFrozen(tables)).toBe(true)
+      for (const versions of Object.values(tables)) expect(Object.isFrozen(versions)).toBe(true)
+    }
+    expect(() => void (KNOWN.book.future = [1])).toThrow(TypeError)
+    expect(() => KNOWN.book.strings.push(2)).toThrow(TypeError)
+    expect(() => void (KNOWN.map = {})).toThrow(TypeError)
+  })
+
   test('the tables of the classes it reads', () => {
     expect(Object.keys(KNOWN.book).sort()).toEqual(['align', 'links', 'notes', 'questions', 'quotes', 'strings', 'texts'])
     expect(Object.keys(KNOWN.orig).sort()).toEqual(['macula', 'text', 'words'])

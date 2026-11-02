@@ -24,12 +24,21 @@ import { LEX_TABLES, lexView } from './lex'
 import { OBS_TABLES, obsView } from './obs'
 import { ORIG_TABLES, origView } from './orig'
 
+/** `value` and everything inside it frozen: a table that is written to would change what every reader of the process accepts. */
+function deepFreeze<T>(value: T): T {
+  if (typeof value === 'object' && value !== null && !Object.isFrozen(value)) {
+    Object.freeze(value)
+    for (const item of Object.values(value)) deepFreeze(item)
+  }
+  return value
+}
+
 /**
  * The tables and versions this reader understands, per class. A required table that is not here, or in another version, makes the
  * segment `E_TABLE`; an optional one is skipped, with what depends on it. `map`, `xmap` and `gen` are phase 2: a segment of these
  * classes gives `E_TABLE`, because phase 1 readers decode `book`, `orig`, `art`, `lex`, `obs`, `catalog` and transfer files.
  */
-export const KNOWN: Record<ClassName, Record<string, number[]>> = {
+export const KNOWN: Record<ClassName, Record<string, number[]>> = deepFreeze({
   book: { ...BOOK_TABLES },
   orig: { ...ORIG_TABLES },
   art: { ...ART_TABLES },
@@ -39,7 +48,7 @@ export const KNOWN: Record<ClassName, Record<string, number[]>> = {
   map: {},
   xmap: {},
   gen: {},
-}
+})
 
 // JSON data
 

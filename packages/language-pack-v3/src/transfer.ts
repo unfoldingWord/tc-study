@@ -15,15 +15,10 @@
  */
 import type { BuiltSegment } from './build/catalog'
 import { type CborValue, encodeDeterministic } from './codec/cbor'
-import { CLASS_NAMES, type ClassName, FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, KIND_TRANSFER, readFixed, readHeader, readSegment } from './codec/container'
+import { CLASS_NAMES, type ClassName, FIXED_BYTES, FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, KIND_TRANSFER, MAGIC, readFixed, readHeader, readSegment } from './codec/container'
 import { FormatError, type FormatErrorCode } from './codec/errors'
-import { type CborMap, hasOwn, isMap } from './codec/values'
+import { type CborMap, hasOwn, hexToBytes, isMap, isUint, sha256Digest } from './codec/values'
 import { CATALOG_TABLES } from './read/catalog'
-
-/** `\x89TLP`, as in `container.ts`. */
-const MAGIC = [0x89, 0x54, 0x4c, 0x50] as const
-/** Bytes before the index: the 8 of a segment file and the index length. */
-const FIXED_BYTES = 12
 
 const HEX_ID = /^[0-9a-f]{64}$/
 
@@ -61,13 +56,9 @@ export type TransferEntry = {
 
 // Writer
 
-const isUint = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
-
 function idBytes(id: unknown, what: string): Uint8Array {
   if (typeof id !== 'string' || !HEX_ID.test(id)) throw new Error(`${what} is not 64 lowercase hex digits`)
-  const out = new Uint8Array(32)
-  for (let i = 0; i < 32; i++) out[i] = parseInt(id.slice(2 * i, 2 * i + 2), 16)
-  return out
+  return hexToBytes(id)
 }
 
 type Item = { id: string; kind: 'segment' | 'complement'; class?: string; bytes: Uint8Array }
@@ -173,19 +164,6 @@ function malformed(what: string): FormatError {
   return new FormatError('E_HEADER', `the index is malformed: ${what}`)
 }
 
-/** The first bytes of the file, each one as soon as it is there, in the order of `container.md`; kind 2 is the only one this reads. */
-function checkFixed(bytes: Uint8Array): void {
-  const truncated = () => new FormatError('E_TRUNCATED', 'the file ends inside the first 12 bytes')
-  for (let i = 0; i < Math.min(bytes.length, MAGIC.length); i++) {
-    if (bytes[i] !== MAGIC[i]) throw new FormatError('E_MAGIC', 'the file does not start with the magic number')
-  }
-  if (bytes.length < 5) throw truncated()
-  if (bytes[4] !== FORMAT_MAJOR) throw new FormatError('E_VERSION', `major version ${bytes[4]} is not ${FORMAT_MAJOR}`)
-  if (bytes.length < 7) throw truncated()
-  if (bytes[6] !== KIND_TRANSFER) throw new FormatError('E_KIND', `kind ${bytes[6]} is not a transfer file`)
-  if (bytes.length < FIXED_BYTES) throw truncated()
-}
-
 function idOf(value: unknown, what: string): string {
   if (!(value instanceof Uint8Array) || value.length !== 32) throw malformed(`${what} is not 32 bytes`)
   return hex(value)
@@ -260,10 +238,6 @@ function parseIndex(index: CborMap): TransferIndex {
   return out
 }
 
-async function sha256(data: Uint8Array): Promise<Uint8Array> {
-  return new Uint8Array(await crypto.subtle.digest('SHA-256', data as Uint8Array<ArrayBuffer>))
-}
-
 /** The tables the segment's own header lists: the check of its structure, with nothing a reader may not know. */
 function knownOf(h: CborValue): Record<string, number[]> {
   const known: Record<string, number[]> = {}
@@ -291,7 +265,7 @@ export type KnownTables = Partial<Record<ClassName, Record<string, number[]>>>
  */
 async function verify(entry: TransferIndexEntry, data: Uint8Array, isCatalog: boolean, known?: KnownTables): Promise<void> {
   if (entry.kind === 'complement') {
-    if (hex(await sha256(data)) !== entry.id) throw new FormatError('E_ID', 'the sha256 of the complement is not the id in the index')
+    if (hex(await sha256Digest(data)) !== entry.id) throw new FormatError('E_ID', 'the sha256 of the complement is not the id in the index')
     return
   }
   // The kind byte comes before any header is parsed: a transfer file is E_KIND whatever its index holds (`container.md`, step 1).
@@ -338,7 +312,8 @@ export async function readTransfer(
   bytes: Uint8Array,
   opts?: { known?: KnownTables },
 ): Promise<{ index: TransferIndex; entries: TransferEntry[]; missing: string[] }> {
-  checkFixed(bytes)
+  // The first bytes of the file, each one as soon as it is there, in the order of `container.md`; kind 2 is the only one this reads.
+  readFixed(bytes, [KIND_TRANSFER])
   const { header, headerEnd } = readHeader(bytes)
   const index = parseIndex(header)
 

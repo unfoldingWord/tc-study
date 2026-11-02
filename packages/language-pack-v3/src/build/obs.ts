@@ -27,7 +27,7 @@
 import type { CborValue } from '../codec/cbor'
 import { compareCodePoints, encodeUvarints, stringTable } from '../codec/columns'
 import type { Segment } from '../codec/container'
-import { isMap } from '../codec/values'
+import { isMap, isUint as isCount } from '../codec/values'
 import type { ObsHelpRow, ObsHelpTable, ObsModel, ObsStory } from '../model'
 import type { ResourceRef, Row, RowSource } from '../source/rows'
 import { columnPlans, encodeColumn, resIndexOf, type TablePart } from './book'
@@ -249,7 +249,6 @@ export async function extractObs(source: RowSource, lang: string, issues: string
 
 // Segment
 
-const isCount = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 
 function encodeStory(story: ObsStory, resIndex: ReadonlyMap<string, number>): CborValue {
   const where = `The story ${String(story.n)}`

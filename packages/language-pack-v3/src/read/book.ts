@@ -10,7 +10,7 @@
 import { ColumnError, decodeBits, decodeDeltas, decodeTexts, decodeUvarints, unzigzag } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
-import { type CborMap, hasOwn, isMap } from '../codec/values'
+import { type CborMap, hasOwn, isMap, isUint } from '../codec/values'
 import { eventKind } from '../events'
 import { formatRef } from '../ids'
 import type { BookModel, Event, HelpRow, HelpTable, Piece, TextModel } from '../model'
@@ -19,7 +19,6 @@ function bad(what: string): never {
   throw new FormatError('E_BODY', `the book segment is malformed: ${what}`)
 }
 
-const isUint = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 
 function map(value: unknown, what: string): CborMap {
   if (!isMap(value)) bad(`${what} is not a map`)
@@ -204,6 +203,7 @@ function readHelps(value: unknown, name: string, table: string[], res: [string, 
 
   const idFields = map(fields.id, `${what}.id`)
   let ids: string[]
+  if ((idFields.ascii4 !== undefined) === (idFields.strings !== undefined)) bad(`${what}.id has both ascii4 and strings, or neither: it has one`)
   if (idFields.ascii4 !== undefined) {
     const bytes = idFields.ascii4
     if (!(bytes instanceof Uint8Array) || bytes.length !== 4 * n) bad(`${what}.id.ascii4 is not ${4 * n} bytes`)

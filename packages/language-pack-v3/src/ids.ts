@@ -190,8 +190,11 @@ export function conceptOfTwLink(s: string): string | null {
 const TN_ADDRESS = new RegExp(String.raw`^rc://${RC_LANGUAGE}/tn/help/([a-z0-9]{3})/(\d{1,3})/(\d{1,3})$`)
 const RELATIVE_ADDRESS = /^\.\.\/(\d{1,3})\/(\d{1,3})\.md$/
 
-/** One pass over both link forms: `[[rc://...]]` and `[text](target)`. */
-const LINK = /\[\[(rc:\/\/[^\]]*)\]\]|\[([^\]]*)\]\(([^)]*)\)/g
+/**
+ * One pass over both link forms: `[[rc://...]]` and `[text](target)`. None of the three parts holds a `[`: a `[` that never closes
+ * stops the scan at the next one, so the time is linear in the text (and a text over two lines is still a link text).
+ */
+const LINK = /\[\[(rc:\/\/[^\][]*)\]\]|\[([^\][]*)\]\(([^)[]*)\)/g
 
 /** `ref:tit 2:3` for a chapter and a verse written as digits, or `null` if they are not a verse of the book. */
 function verseLink(book: string, chapter: string, verse: string): string | null {
