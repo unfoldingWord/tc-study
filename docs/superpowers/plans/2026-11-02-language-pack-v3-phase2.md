@@ -531,6 +531,12 @@ become an addendum written once part A is complete; the addendum goes to Abel be
   Details: the side-session note `lp3-fase2-nombres-por-alineacion.md`.
 - B5 Python reader of the module; the fixed queries `per:abraham` and `ev:plagas-egipto`; the size gate again, with the
   module measured on its own for es-419 and en.
+- B7 Measure the aligned-phrase index of Task 21 over complete languages before deciding (Abel, 2026-11-02: "Medirlo
+  completo antes"). The sample has only 4 aligned English books and 2 es-419 books (Task 21: en 460 KB for 4 books, es-419
+  37 KB for 2). Fetch the aligned bridge texts of every book of en (ULT, UST) and es-419 (GLT, GST) from the same staging
+  parts the phase 0 sample came from (`fase0-paquetes/scripts/bajar_muestra.ps1`), outside the repo, and rerun
+  `spec/tests/measure/alignedIndex.ts`: whole size, parts by first letter and by Strong group, largest part, and whether
+  it fits as a unit of its own (like the topics module) rather than inside the map core. Abel decides from those numbers.
 - B6 Spec of the complements `images` and `basemap` (`catalog.md`, `cddl/catalog.cddl`; the open item in `spec/README.md`
   says what Abel approved). No change to the maps or the units. Building them comes after part B, in this order: UBS
   animals and plants (360 px by default, 600 px optional), then the OBS images, then our own basemap. Left out: AI-made
