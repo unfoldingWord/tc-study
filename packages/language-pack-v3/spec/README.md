@@ -1,6 +1,7 @@
 # Language packs, format 3: specification
 
-Status: **draft for review** (phase 1, steps 1.1–1.5). Nothing here is implemented yet.
+Status: **phase 1 is implemented**: the TypeScript reader and builders (`packages/language-pack-v3`), an independent Python reader
+(`spec/reader-py/`) and the frozen conformance cases (`tests/`). Phase 2 (the maps, `xmap`, `map`, `gen`) and phase 3 (signatures) are not.
 
 Format 3 is the next major version of the tc-language-packs. Format 2.0 (`packages/language-pack`, parts per book)
 keeps being published, frozen, until each app version that reads it has a retirement date. Format 3 keeps what 2.0
@@ -70,6 +71,17 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | Topics, people, places and events (TIPNR, Theographic, OBS) in the common map | Phase 2 |
 | Verse equivalences between a text's numbering and the original's (`map`, `numbering`) | Phase 2 |
 | MACULA and the lexicon in columns | A later version of their tables |
+| An OBS help's `frame` (story × 100 + frame) is not checked against story 1–50 and frame 0–99: both readers print "51:1" for 5101 | Phase 2 |
+| `needs: "map"` in the units of a catalog is dangling until phase 2 builds the `map` unit: a phase 1 catalog cannot activate a book on a device that enforces it, so phase 1 catalogs are not published | Phase 2 |
+| Signatures (`sig`): a reader ignores them today | Phase 3 |
+| The frozen case bytes include the deflate output of pako 2.1.0: a compressor upgrade needs `build-cases.ts --refreeze` (ids and reader outputs do not change) | When pako is upgraded |
+| The MACULA trees are kept as published, under MACULA's own license | Before the common pack is published |
+| Equal headings in one article: the tie-break of the section ids | Phase 2 |
+| A bridged article's section ids depend on the registry, and a bridge starts with an empty one | Phase 2 |
+| A view allocates its rows from a body within the byte limits; a cap on the rows is not set | Phase 2 |
+| The lexicon carries no `domains` rows in phase 1 | A later version of its tables |
+| Lexicon `refs` stored as `[from, to]` pairs are larger than the source strings: a columnar version is planned | A later version of its tables |
+| A bridged book names the original's stamp, so a device must have (or build) the matching `orig` segment | Phase 2 |
 
 ## Conformance
 

@@ -1,7 +1,7 @@
 # Test data of the row sources
 
 Real files from phase 0, copied as they are (the lists are trimmed, see below). The tests of `src/source/` read them;
-later tasks build segments from them. Whole-language checks use the full phase 0 sample instead (Task 15).
+later tasks build segments from them. Whole-language checks use the full phase 0 sample of the language packs project instead.
 
 ## License
 
@@ -9,6 +9,21 @@ These are unfoldingWord resources (Translation Notes, Translation Questions, Tra
 Words, the Literal and Simplified Bridge Texts of es-419, the Greek Lexicon and the UGNT), under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Whoever reuses them must credit unfoldingWord and keep
 the same license. The package's own license (MIT) does not cover this folder.
+
+## Releases
+
+The resources of the lists, with the release each row was made from (`resources[].stamp`):
+
+| Resource key | Release stamp | Subject |
+| --- | --- | --- |
+| `es-419_gl/es-419/glt` | `v42#2026-08-11T12_22_03Z` | Aligned Bible |
+| `es-419_gl/es-419/gst` | `v40#2024-07-17T20_13_11Z` | Aligned Bible |
+| `es-419_gl/es-419/tn` | `v66#2024-07-17T20_13_08Z` | TSV Translation Notes |
+| `es-419_gl/es-419/tq` | `v38#2024-07-17T20_13_05Z` | TSV Translation Questions |
+| `es-419_gl/es-419/tw` | `v37#2024-07-17T20_12_37Z` | Translation Words |
+| `es-419_gl/es-419/twl` | `v18#2024-07-17T20_13_06Z` | TSV Translation Words Links |
+| `es-419_gl/es-419/ugl` | `60a78e039b#2026-10-27T11_47_33Z` | Greek Lexicon |
+| `unfoldingWord/el-x-koine/ugnt` | `v0.34#2023-09-27T02_19_31Z` | Greek New Testament |
 
 ## Layout
 
@@ -23,13 +38,12 @@ the same license. The package's own license (MIT) does not cover this folder.
 
 ## What is here, and where each file comes from
 
-`P0` is `C:\Users\LENOVO\Git\Github\wt\fase0-paquetes\muestra`; the pack is in
-`C:\Users\LENOVO\Git\Github\wt\paquetes-q9a12`. Sizes are in bytes.
+The files come from the phase 0 sample of the language packs project, which was built from the Door43 releases of the table above
+and of the lists (`resources[].stamp`). Sizes are in bytes; the sha256 of each file is given, so a copy can be checked.
 
 ### Parts
 
-Each one was copied from `C:\Users\LENOVO\Git\Github\wt\fase0-paquetes\muestra\parts\` plus its file name (the same
-name as here). Its sha256 is its name; it was checked when copied.
+Each one is a part file of the phase 0 sample, under its own name (the sha256 of the file; it was checked when copied).
 
 | File | Bytes | sha256 | What it holds |
 | --- | ---: | --- | --- |
@@ -52,9 +66,9 @@ prepared rows). `es-419 ugl G1-G999` is group `0` of the lexicon: `content/1.jso
 
 | File | Bytes | sha256 | Source and what was done |
 | --- | ---: | --- | --- |
-| `es-419/list.json` | 186 072 | `d3c3c4b6741832c8d7d1ceb0aab89102b994dba8e3d86d095e58a5ace0df47fa` | `C:\Users\LENOVO\Git\Github\wt\fase0-paquetes\muestra\es-419\list.json`: trimmed (source sha256 c6077a9f70dc88a8e5a151c39babe04c0bb4b302a2cc9289786bd83c45e65702, 81 parts, 9 resources): 10 parts, 7 resources |
-| `originals/list.json` | 10 317 | `1516a779e6862a1bd846aa4e4fbf6eddd13fe73ab93e914d838d8efa748d5273` | `C:\Users\LENOVO\Git\Github\wt\fase0-paquetes\muestra\originals\list.json`: trimmed (source sha256 f0d6ca889d58fba47a0ad22597791596f6b368b5933931a30d39b037cd4983b8, 132 parts, 4 resources): 1 parts, 1 resources |
-| `es-419-tit.langpack.zip` | 314 931 | `d3ecdff0ee9e329f58ec6652571bbebe6873784aa1c90e943a01e3c5299285c8` | `C:\Users\LENOVO\Git\Github\wt\paquetes-q9a12\es-419-tit.langpack.zip`: format 1.1 pack, es-419 Titus |
+| `es-419/list.json` | 186 072 | `d3c3c4b6741832c8d7d1ceb0aab89102b994dba8e3d86d095e58a5ace0df47fa` | the phase 0 sample's list of es-419: trimmed (source sha256 c6077a9f70dc88a8e5a151c39babe04c0bb4b302a2cc9289786bd83c45e65702, 81 parts, 9 resources): 10 parts, 7 resources |
+| `originals/list.json` | 10 317 | `1516a779e6862a1bd846aa4e4fbf6eddd13fe73ab93e914d838d8efa748d5273` | the phase 0 sample's list of the originals: trimmed (source sha256 f0d6ca889d58fba47a0ad22597791596f6b368b5933931a30d39b037cd4983b8, 132 parts, 4 resources): 1 parts, 1 resources |
+| `es-419-tit.langpack.zip` | 314 931 | `d3ecdff0ee9e329f58ec6652571bbebe6873784aa1c90e943a01e3c5299285c8` | the phase 0 sample's pack: format 1.1 pack, es-419 Titus |
 
 Total: 1 208 794 bytes in 14 files.
 
@@ -62,6 +76,6 @@ Total: 1 208 794 bytes in 14 files.
 
 These are in the phase 0 sample, and a later task may need them:
 
-- the `ta` titles part (`helps-text:ta-title:…`), `P0\parts\57d3a13656ca0886adb91a6fdfc31575666b9d2acb2ec96c966c41824ac0e27f.part.gz`;
-- the MACULA Titus part of `Biblica/el-x-koine/macula`, `P0\parts\0c6f97e1352dbdd0c999e829c389022856aed65a9890ef48338642c8182621dc.part.gz`
+- the `ta` titles part (`helps-text:ta-title:…`), the part `57d3a13656ca0886adb91a6fdfc31575666b9d2acb2ec96c966c41824ac0e27f.part.gz` of the phase 0 sample;
+- the MACULA Titus part of `Biblica/el-x-koine/macula`, the part `0c6f97e1352dbdd0c999e829c389022856aed65a9890ef48338642c8182621dc.part.gz` of the phase 0 sample
   (MACULA is published under its own license; check it before copying).
