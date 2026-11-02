@@ -1415,9 +1415,9 @@ def _decode_xmap_core(p: Segment) -> dict:
     c = p.t["concepts"]
     if type(c) is not dict:
         _bad()
-    ids = _strtab(c.get("ids"))
+    ids = _sorted_strtab(c.get("ids"))
     cols = {k: uvarints(_need(c, k, is_bytes)) for k in ("kind", "tw", "source")}
-    if any(len(v) != len(ids) for v in cols.values()) or len(set(ids)) != len(ids):
+    if any(len(v) != len(ids) for v in cols.values()):
         _bad()
     if any(x > 5 for x in cols["kind"]) or any(x > 3 for x in cols["tw"]):
         _bad()

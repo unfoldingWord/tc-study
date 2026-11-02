@@ -2417,6 +2417,7 @@ XMAP_CORE_MUTATIONS = {
     "concepts tw 4": lambda h, t: t["concepts"].update(tw=uv([0, 1, 4])),
     "concepts source outside res": lambda h, t: t["concepts"].update(source=uv([0, 1, 2])),
     "concepts ids repeated": lambda h, t: t["concepts"].update(ids=["a", "a", "b"]),
+    "concepts ids unsorted": lambda h, t: t["concepts"].update(ids=["tw:kt/grace", "per:abraham", "tw:names/abraham"]),
     "relations concept outside": lambda h, t: t["relations"].update(to=uv([3])),
     "relations from outside": lambda h, t: t["relations"].update(**{"from": uv([3])}),
     "relations type outside": lambda h, t: t["relations"].update(type=uv([1])),
