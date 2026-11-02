@@ -13,6 +13,7 @@ const concepts = new Map<string, Concept>([
   ['obs:10', { kind: 'story', tw: 'none', source: TA }],
   ['ta:translate/figs-metaphor', { kind: 'none', tw: 'none', source: TA }],
   ['tw:kt/grace', { kind: 'none', tw: 'kt', source: TWL }],
+  ['tw:kt/x', { kind: 'none', tw: 'kt', source: TWL }],
 ])
 
 const core: XmapCore = {
@@ -82,7 +83,7 @@ describe('xmapView', () => {
 
   test('the concept ids are sorted by code point', () => {
     const ids = bodyOf(xmapSegment({ ...core, concepts: new Map([...concepts].reverse()) }), 'concepts').ids
-    expect(ids).toEqual(['obs:10', 'ta:translate/figs-metaphor', 'tw:kt/grace'])
+    expect(ids).toEqual(['obs:10', 'ta:translate/figs-metaphor', 'tw:kt/grace', 'tw:kt/x'])
   })
 
   test('a core with no optional table round-trips', () => {
@@ -91,6 +92,7 @@ describe('xmapView', () => {
   })
 
   test('the writer rejects a model that does not hold together', () => {
+    expect(() => xmapSegment({ ...core, res: [] })).toThrow()
     expect(() => xmapSegment({ ...core, relations: [{ from: 'x', to: 'obs:10', type: 't', source: TA, confidence: 1 }] })).toThrow()
     expect(() => xmapSegment({ ...core, relations: [{ from: 'obs:10', to: 'obs:10', type: 't', source: TA, confidence: 101 }] })).toThrow()
     expect(() => xmapSegment({ ...core, concepts: new Map([['a', { kind: 'none', tw: 'none', source: 'nope' }]]) })).toThrow()
@@ -133,5 +135,8 @@ describe('xmapView rejects', () => {
   test('a part with the shape of a core table', () => rejects((s) => (s.t.strong = fresh().t.strong), part))
   test('aliases not sorted', () => rejects((s) => (s.t.aliases = { b: 'x', a: 'y' })))
   test('strongs with an empty list', () => rejects((s) => (s.t.strongs = { a: [] })))
+  test('strongs with a key that is not a concept', () => rejects((s) => (s.t.strongs = { 'tw:kt/none': ['G1'] })))
+  test('an alias to a concept that does not exist', () => rejects((s) => (s.t.aliases = { 'tw:other/x': 'tw:kt/none' })))
+  test('a core with empty res', () => rejects((s) => (s.h.res = [])))
   test('a segment of another class', () => rejects((s) => (s.h.class = 'map')))
 })

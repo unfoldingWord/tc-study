@@ -89,7 +89,7 @@ function readRelations(value: unknown, ids: string[], res: [string, string][]): 
 function readCore(seg: Segment): XmapCore {
   const { h, t } = seg
   if (h.book !== undefined) bad('a core has a book')
-  if (h.res === undefined) bad('the header has no res')
+  if (h.res === undefined || h.res.length === 0) bad('the header of a core has no resource (res)')
   for (const key of ['coverage', 'strong', 'concepts']) if (!hasOwn(t, key)) bad(`the table "${key}" is missing`)
   const res = h.res.map(([k, s]) => [k, s] as [string, string])
   const concepts = readConcepts(t.concepts, res)
@@ -109,6 +109,7 @@ function readCore(seg: Segment): XmapCore {
     const out: Record<string, string> = {}
     for (const [k, v] of Object.entries(a)) {
       if (typeof v !== 'string') bad(`aliases[${JSON.stringify(k)}] is not text`)
+      if (!concepts.has(v)) bad(`aliases[${JSON.stringify(k)}] names ${JSON.stringify(v)}, which is not a concept`)
       out[k] = v
     }
     core.aliases = out
@@ -120,6 +121,7 @@ function readCore(seg: Segment): XmapCore {
     for (const [k, v] of Object.entries(s)) {
       const list = texts(v, `strongs[${JSON.stringify(k)}]`)
       if (list.length === 0) bad(`strongs[${JSON.stringify(k)}] is empty`)
+      if (!concepts.has(k)) bad(`strongs names ${JSON.stringify(k)}, which is not a concept`)
       sortedUnique(list, `strongs[${JSON.stringify(k)}]`)
       out[k] = [...list]
     }

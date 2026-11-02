@@ -17,6 +17,7 @@ function sortedRecord<T>(r: Record<string, T>): Record<string, T> {
 }
 
 function coreTables(m: XmapCore): Built {
+  if (m.res.length === 0) throw new Error('A core needs at least one resource (res)')
   const resIndex = new Map<string, number>()
   m.res.forEach(([key], i) => {
     if (resIndex.has(key)) throw new Error(`The resource ${JSON.stringify(key)} is in res twice`)
