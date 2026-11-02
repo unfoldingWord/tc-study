@@ -53,7 +53,7 @@ function tableOf(m: MapSet, source: string): { coverage: Coverage; unit: string;
   if (x !== undefined && source === TWL && x.coverage.has(source)) return { coverage: x.coverage, unit: x.links?.unit ?? 'links', rows: x.links?.rows }
   if (x !== undefined && source === TN && x.coverage.has(source)) return { coverage: x.coverage, unit: x.notes?.unit ?? 'notes', rows: x.notes?.rows }
   const c = m.map?.core
-  if (c !== undefined && source !== TN && source !== TWL && c.coverage.has(source)) return { coverage: c.coverage, unit: c.usage?.unit ?? 'notes', rows: c.usage?.rows }
+  if (c !== undefined && source !== TN && idOf(source) === 'tn' && c.coverage.has(source)) return { coverage: c.coverage, unit: c.usage?.unit ?? 'notes', rows: c.usage?.rows }
   return undefined
 }
 

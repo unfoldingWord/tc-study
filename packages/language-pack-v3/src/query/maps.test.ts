@@ -122,6 +122,23 @@ describe('usage', () => {
   })
 })
 
+describe('usage and coverage of the map', () => {
+  const GLT = 'es_gl/es/glt'
+  const both: MapSet = { ...m, map: { ...m.map!, core: { ...mcore, coverage: new Map([...mcore.coverage, [GLT, { whole: ['tit'], partial: [] }]]) } } }
+
+  test('only the language tn is judged for usage: a source that is not one answers none whatever its coverage lists', () => {
+    const a = ask({ kind: 'usage', concept: MET, source: GLT }, both)
+    expect('unit' in a).toBe(false)
+    expect(Object.values(a.books).every((c) => (c as { state: string }).state === 'none')).toBe(true)
+    expect(ask({ kind: 'usage', concept: MET, source: ESTN }, both).books.tit).toEqual({ state: 'count', count: 4, verses: 4 })
+    expect(Object.keys(ask({ kind: 'revision', concept: MET, book: 'tit' }, both).sources)).toEqual([TN, ESTN])
+  })
+
+  test('a concept that is neither tw: nor ta: has no sources and no verses in a revision answer', () => {
+    expect(ask({ kind: 'revision', concept: 'per:abraham', book: 'tit' })).toEqual({ kind: 'revision', concept: 'per:abraham', book: 'tit', revision: 7, verses: [], sources: {} })
+  })
+})
+
 describe('book', () => {
   test('coverage of every source and the tables with their keys, with both maps', () => {
     const a = ask({ kind: 'book', book: 'tit' })
