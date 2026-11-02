@@ -4,6 +4,7 @@
  * Plain data, with no import, so that builders and readers can both depend on it. Each segment class adds its model here
  * as its task is written.
  */
+import type { CountRows, CountUnit, Coverage, VerseLists } from './codec/counts'
 
 /**
  * Structure inside a sequence of pieces (`spec/cddl/book.cddl`, "Texts"): at `position`, the number of pieces before
@@ -293,3 +294,33 @@ export type CatalogModel = {
   requires?: [catalog: string, revision: number, id: Uint8Array][]
   complements?: Complement[]
 }
+
+// The common map (`spec/cddl/xmap.cddl`)
+
+export const CONCEPT_KINDS = ['none', 'person', 'place', 'event', 'topic', 'story'] as const
+export const TW_CATEGORIES = ['none', 'kt', 'names', 'other'] as const
+
+/** A concept: its kind, its tW category and the key of the resource (an entry of `res`) that defines it. */
+export type Concept = { kind: (typeof CONCEPT_KINDS)[number]; tw: (typeof TW_CATEGORIES)[number]; source: string }
+
+/** A typed relation between two concepts (ids), where it comes from (a res key) and how sure it is (0 to 100). */
+export type Relation = { from: string; to: string; type: string; source: string; confidence: number }
+
+export type CountTable = { unit: CountUnit; rows: CountRows }
+
+/** The core of the common map. */
+export type XmapCore = {
+  part: 'core'
+  res: [string, string][]
+  coverage: Coverage
+  strong: CountTable
+  concepts: Map<string, Concept>
+  links?: CountTable
+  notes?: CountTable
+  relations?: Relation[]
+  aliases?: Record<string, string>
+  strongs?: Record<string, string[]>
+}
+
+/** The part of one book: the verses behind the counts of the core. `part` is the book code. */
+export type XmapPart = { part: string; strong: VerseLists; links?: VerseLists; notes?: VerseLists }
