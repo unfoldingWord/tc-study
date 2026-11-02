@@ -349,7 +349,7 @@ The book is its code. Example: `{"unit": "notes", "rows": {"ta:translate/figs-me
 | `strong` | counts table | never |
 | `concepts` | `{id: {"kind": k, "tw": t, "source": res key}}` | never. `k` is one of `none person place event topic story` (0 to 5), `t` one of `none kt names other` (0 to 3) |
 | `links`, `notes` | counts tables | the table is not in the file |
-| `relations` | list of `{"from", "to", "type", "source", "confidence"}`: `from`, `to` the concept ids, `type` the type's text, `source` the res key (text), `confidence` an integer 0 to 100 | the table is not in the file |
+| `relations` | list of `{"from", "to", "type", "source", "confidence"}`: `from`, `to` the concept ids, `type` the type's text, `source` the res key (text), `confidence` an integer 0 to 100; the rows in the order of the file | the table is not in the file |
 | `aliases` | `{id: id}` as the file has it | the table is not in the file |
 | `strongs` | `{concept id: [Strong keys]}` as the file has it | the table is not in the file |
 | `topics` | as the file has it (`any`; bytes in hex) | the table is not in the file or not read |
@@ -414,8 +414,8 @@ types, these are `E_BODY` too:
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.
 - **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part whose `book` is not its `part`; a core with a `book`; a
-  core table in a part, or a part table shape in a core.
-  - Coverage: a book set (`whole` or `partial` of a source) of another length than 9 bytes, or with any of the bits 66 to 71 set (both readers reject it; the book sets of a catalog's `books` are checked for length only).
+  known core table in a part, or a part table shape in a core.
+  - Coverage: a book set (`whole` or `partial` of a source) of another length than 9 bytes, or with any of the bits 66 to 71 set, or a book in both sets of one source (both readers reject it; the book sets of a catalog's `books` are checked for length only).
   - Counts: keys not sorted or repeated; a `counts` column cut short, or with numbers left over; a book number outside 1..66 or not
     increasing within its key; `count = 0` (`verses` above `count` is valid: a note on 1:2-4 is 1 note and 3 verses; `verses = 0` is valid too); a key with no book; a `unit` other than the table's (`xmap`
     `strong` "occurrences", `links` "links", `notes` "notes"; `map` `usage` "notes").
@@ -424,7 +424,7 @@ types, these are `E_BODY` too:
     first offset may be 0: `front:intro`); a `verses` column cut short or with numbers left over. A part's keys that are not
     in the core's counts table, or whose number of verses is not the `verses` of the core's row for this book, are not checked by
     a reader of the part alone.
-  - `concepts`: columns of different lengths; `kind` above 5; `tw` above 3; a `source` outside `h.res`.
+  - `concepts`: ids not sorted or repeated; columns of different lengths; `kind` above 5; `tw` above 3; a `source` outside `h.res`.
   - `relations`: a concept outside `concepts`, a type outside `types`, a `source` outside `h.res`; a `confidence` above 100.
   - `xmap` `strongs`: keys repeated or not in `concepts`; a list of Strong keys that is empty, not sorted by code
     point or has a repeat. `aliases`: keys repeated; a value that is not in `concepts` (a key need not be: it is

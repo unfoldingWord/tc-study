@@ -81,11 +81,11 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | Two complement kinds, `images` (an image archive with an index: file, size, concepts, verse ranges and a credit per piece) and `basemap` (background layers with no place names; relief is a separate `basemap`; the app places the `lug:` points of the topics with the language's names). In the catalog: both in `complement.kind`, `license` for the whole set with each piece's license in the index, `lang` only when an image has text burned in, `for` names the `xmap` revision. No change to the maps or the units. Approved by Abel on 2026-11-02 | With part B of phase 2; built after it |
 | The frozen case bytes include the deflate output of pako 2.1.0: a compressor upgrade needs `build-cases.ts --refreeze` (ids and reader outputs do not change) | When pako is upgraded |
 | The MACULA trees are kept as published, under MACULA's own license | Before the common pack is published |
-| A bridged article's section ids depend on the registry, and a bridge starts with an empty one | Phase 2 |
-| A view allocates its rows from a body within the byte limits; a cap on the rows is not set | Phase 2 |
+| A bridged article's section ids depend on the registry, and a bridge starts with an empty one: `ids.md` says so | Done in phase 2 part A |
+| A view allocates its rows from a body within the byte limits; a cap on the rows is not set: the `ulen` rule of `container.md` bounds the rows | Done in phase 2 part A |
 | The lexicon carries no `domains` rows in phase 1 | A later version of its tables |
 | Lexicon `refs` stored as `[from, to]` pairs are larger than the source strings: a columnar version is planned | A later version of its tables |
-| A bridged book names the original's stamp, so a device must have (or build) the matching `orig` segment | Phase 2 |
+| A bridged book names the original's stamp, so a device must have (or build) the matching `orig` segment: a bridged book needs `orig:` (`catalog.md`) | Done in phase 2 part A |
 | One CBOR value with both an integer outside -(2^53 - 1) .. 2^53 - 1 and nesting deeper than 64: the TypeScript reader reports the first defect it meets reading the bytes in order, while the Python reader decodes the value and then checks the integer ranges in a second pass (so it gives `E_LIMIT`). No conformance case has such a file; a third reader may pick either until the specification fixes the order | A later minor version of the specification |
 
 ## Conformance

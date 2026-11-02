@@ -65,10 +65,12 @@ res-index = uint               ; a resource, by its index in the header's "res"
 ; Both ends are included. A range across chapters (1:12-2:3) is still two verse ids; span is their difference.
 ranges = { "from": deltas, "span": uvarints }
 
-; One bit per book of the canonical order (ids.md): bit 0 is gen, bit 65 is rev. 9 bytes.
+; One bit per book of the canonical order (ids.md): bit 0 is gen, bit 65 is rev. 9 bytes. Bits are numbered from the least
+; significant bit of the first byte (bit 8 is the least significant bit of the second byte).
 book-set = bstr .size 9
 
-; What a source covers (counts.md): per source key, the books it covers whole, and the books it covers only in part.
+; What a source covers (counts.md): per source key, the books it covers whole, and the books it covers only in part. A book
+; in both sets is E_BODY.
 coverage = { * tstr => [whole: book-set, ? partial: book-set] }
 
 ; ---- Counts of the maps (counts.md) ----
@@ -81,7 +83,8 @@ count-unit = "occurrences" / "links" / "notes"
 
 ; Rules of counts: a key lists at least one book; the book numbers of a key strictly increase (so the first delta is
 ; at least 1, and so are the others); 1 <= count; 0 <= verses (verses may exceed count: a note on 1:2-4 is 1 note and 3 verses; it is 0 for
-; rows whose reference cannot be read, counts.md). The "unit" of each table is fixed:
+; rows whose reference cannot be read, counts.md: the builder counts such a row at verse 0, so its verse may be counted
+; once more than the readable rows say). The "unit" of each table is fixed:
 ; xmap "strong" is "occurrences", "links" is "links", "notes" is "notes"; map "usage" is "notes".
 
 ; The verses behind the counts, for one book. "keys" are the keys this book has with at least one verse (a key whose

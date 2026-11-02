@@ -10,10 +10,10 @@ map-header = {
   "tables": { * table-name => [uint, bool] },
   "lang": tstr,
   "part": "core" / book-code,
-  ? "book": book-code,         ; equal to "part" in a book's part
-  "res": [* [tstr, tstr]],     ; the same as in the core: the release of each source is in the core and in the
-                               ; catalog, so a part has "res": []. A new release of English tN must not change the
-                               ; parts whose verses did not change
+  ? "book": book-code,         ; absent in the core; in a part, absent or equal to "part"
+  "res": [* [tstr, tstr]],     ; every source in the core (a core may have none); required and empty in a part: the
+                               ; release of each source is in the core and in the catalog. A new release of English tN
+                               ; must not change the parts whose verses did not change
 }
 
 map-core-tables = {
