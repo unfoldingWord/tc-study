@@ -286,11 +286,11 @@ def link_strongs(world):
         if not cid.startswith("tw:"):
             continue
         ref = (link.get("reference") or "").strip()
-        m = re.match(r"(\d+):(\d+|front)", ref)
+        m = re.match(r"(\d+):(\d+|front|intro)", ref)
         if not m or b not in by_verse:
             missed.append((b, ref))
             continue
-        v = vid(b, int(m.group(1)), 0 if m.group(2) == "front" else int(m.group(2)))
+        v = vid(b, int(m.group(1)), 0 if m.group(2) in ("front", "intro") else int(m.group(2)))
         words = by_verse[b].get(v, [])
         occ = int(link.get("occurrence") or 1)
         hit = []

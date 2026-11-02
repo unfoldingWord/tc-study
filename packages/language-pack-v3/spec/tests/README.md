@@ -335,7 +335,7 @@ Example, for a file cut inside its last entry:
 
 What decides coverage, in the `xmap`: the `notes` table is covered by `unfoldingWord/en/tn`, `links` by
 `unfoldingWord/en/twl`, and `strong` by the keys of the originals (`unfoldingWord/hbo/uhb`, `unfoldingWord/el-x-koine/ugnt`).
-In the `map`, the coverage of `usage` is decided by the language's `tn` entry alone.
+In the `map`, the `usage` table is read for any source that is not the English `tn` or `twl` and that the map's `coverage` lists; the `revision` query decides the coverage of a language's usage by its `tn` entry alone.
 
 A **counts table** (`strong`, `links`, `notes` of `xmap`; `usage` of `map`) is `{"unit": text, "rows": {key: {book:
 [count, verses]}}}`: `count` is the number of occurrences, links or notes, and `verses` the number of distinct verses.
@@ -415,6 +415,7 @@ types, these are `E_BODY` too:
   runs backwards.
 - **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part whose `book` is not its `part`; a core with a `book`; a
   core table in a part, or a part table shape in a core.
+  - Coverage: a book set (`whole` or `partial` of a source) of another length than 9 bytes, or with any of the bits 66 to 71 set (both readers reject it; the book sets of a catalog's `books` are checked for length only).
   - Counts: keys not sorted or repeated; a `counts` column cut short, or with numbers left over; a book number outside 1..66 or not
     increasing within its key; `count = 0` (`verses` above `count` is valid: a note on 1:2-4 is 1 note and 3 verses; `verses = 0` is valid too); a key with no book; a `unit` other than the table's (`xmap`
     `strong` "occurrences", `links` "links", `notes` "notes"; `map` `usage` "notes").
@@ -430,7 +431,7 @@ types, these are `E_BODY` too:
     an id that moved).
   - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
-  bytes; a `books` of another length than 9, or with any of the bits 66 to 71 set (both readers reject it); a unit that names a segment outside `segments`, or has none; a segment, a unit
+  bytes; a `books` of another length than 9 (the bits 66 to 71 of this set are not checked); a unit that names a segment outside `segments`, or has none; a segment, a unit
   or a resource listed twice; a header `lang` that differs from `about.catalog` (the common catalog has none).
 - **Every class.** The header must have the keys its class needs (`lang`, `book`, `orig`, `res` for `book`; `book`, `orig`
   for `orig`; `lang`, `group`, `res` for `art`; `lang`, `group` of the form `[GH]` and digits, `res` for `lex`; `lang`, `res` for
@@ -454,7 +455,7 @@ The order of the checks between a defect in the container and one in a table is 
 | 10 | `transferencia-cortada` (`cut.tcpack`) | A transfer file cut inside an entry | A `full` transfer file with three entries: a catalog that lists case 4's book segment as the unit `book:tit`, case 1's segment (it travels beside it: the catalog does not list it) and case 4's segment; `made` "2026-11-01T10:00:00Z", `by` "build-cases 1". Cut in the middle of case 4's segment | The catalog and case 1 have status `ok`; case 4 has status `missing` |
 | 11 | `revisiones-mixtas` (`catalog.seg`, `map-core.seg`, `book-rut.seg`) | Published against installed | Catalog and language map of revision 4, where Ruth has 15 notes on metaphor; Ruth's book segment of revision 3, where it had 14 (Ruth is synthetic: the notes on metaphor of the sample's Titus relabeled to Ruth 1, since the data has no es-419 Ruth; the catalog lists the map core only) | From the map: 15, "revision 4". From the installed book: 14 |
 | 12 | `idioma-parcial` (`map-core.seg`) | Zero against no source | An es-419 map whose tN covers tit, rut, 3jn and jon whole, with notes on metaphor in Titus only (those of case 5) | Use of `ta:translate/figs-metaphor` in Titus: the count. In Jonah with no such note: zero. In Isaiah: no source |
-| 13 | `paquete-viejo` (`catalog.seg`) | The bridge from an old pack | `data/es-419-tit.langpack.zip`, format 1.1, with the originals from case 4, bridged on the device `test-device` at "2026-11-01T10:00:00Z" | The same book segment as case 4, with the same id; a local catalog (`origin` "local", `publisher` "local:test-device", unsigned). The folder holds only the catalog, `catalog.seg`: the book segment the bridge makes is not stored, because the test asserts that its bytes are those of case 4's `book.seg`. Since phase 2 the catalog also has the map unit: `catalog.seg` 758 -> 931 bytes, `expected.json` 2260 -> 2878 bytes |
+| 13 | `paquete-viejo` (`catalog.seg`) | The bridge from an old pack | `data/es-419-tit.langpack.zip`, format 1.1, with the originals from case 4, bridged on the device `test-device` at "2026-11-01T10:00:00Z" | The same book segment as case 4, with the same id; a local catalog (`origin` "local", `publisher` "local:test-device", unsigned). The folder holds only the catalog, `catalog.seg`: the book segment the bridge makes is not stored, because the test asserts that its bytes are those of case 4's `book.seg`. Since phase 2 the catalog also has the map unit: `catalog.seg` 758 -> 965 bytes, `expected.json` 2260 -> 2878 bytes |
 | 14 | `entero-fuera-de-rango` (`header.seg`, `body.seg`) | An integer outside -(2^53 - 1) .. 2^53 - 1 (`container.md`, "What a reader accepts") | Case 1 twice: with a key `x` in the file header that holds 2^60 (`header.seg`), and with a root key `x` in the body that holds -2^53 (`body.seg`); the reader knows neither key | `header.seg`: `E_HEADER`; `body.seg`: `E_BODY` |
 
 Cases 6, 11 and 12 and the map half of case 5 are built from the maps of phase 2; `src/conformance.test.ts` checks their numbers with `answer` (`src/query/maps.ts`).

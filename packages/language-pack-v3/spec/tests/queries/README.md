@@ -67,10 +67,10 @@ checks that it does. For a `tw:` concept, its `strongs` is the sorted list of th
 every link of the English word links (`unfoldingWord/en/twl`) to it, in any book:
 
 1. The link's verse is the first verse of its reference. The reference is read from its start (leading white space is
-   skipped) for its first `C:V`, and the rest of the text is ignored: `5:1,3` gives `5:1`, `1:2-4` gives `1:2`. The accepted
+   skipped, as both do) for its first `C:V`, and the rest of the text is ignored: `5:1,3` gives `5:1`, `1:2-4` gives `1:2`. The accepted
    spellings of verse 0 are `N:front` and `N:intro`, both giving verse 0 of chapter N. A reference that does not start with
-   `C:V`, `N:front` or `N:intro` finds no verse and gives no key. (`src/build/xmap/strongs.ts` `strongsOfQuotes` accepts both
-   spellings; the sample's tWL rows write only `N:front`, which is all `answers.py` `link_strongs` reads.) The words are those of that verse in the original of the
+   `C:V`, `N:front` or `N:intro` finds no verse and gives no key. (`src/build/xmap/strongs.ts` `strongsOfQuotes` and `answers.py`
+   `link_strongs` both do this; the sample's tWL rows write only `N:front`.) The words are those of that verse in the original of the
    book (`unfoldingWord/hbo/uhb` or `unfoldingWord/el-x-koine/ugnt`), in document order.
 2. The quote is `origWords`. It is cut at `&` into pieces. Each piece is cut into words at white space and at U+05BE
    (maqaf); the word U+05C0 (paseq) alone is dropped; empty words are dropped.
