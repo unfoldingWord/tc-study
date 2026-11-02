@@ -31,7 +31,7 @@
     },
     "v": 1
   },
-  "id": "8fa3049b94b84a190260cb89a7717bce499c678b8e42b845a534c7534aa9804e",
+  "id": "739e90668ccb543dcfd2bff30b9cb28641fca08ef0024ff5aaa02dc26de4e330",
   "resources": [
     {
       "books": "000000000000800000",
@@ -87,7 +87,7 @@
       "book": "tit",
       "class": "map",
       "id": "2ecb147f545425624766fd580fc324bc39ba5609fbd313e7a83a9292845c0ac8",
-      "inputs": "effe8e67bbd5e1b68918c2a2cfef0524b9a49e0bf540b5652363ac9db46a6819",
+      "inputs": "0a16b64688a726ec8503291ca2fa60300328b47cb34f8a6fab025f7b04999a19",
       "part": "tit",
       "size": 609,
       "ulen": 981
@@ -105,10 +105,6 @@
     {
       "id": "book:tit",
       "needs": [
-        "art:ta:translate",
-        "art:tw:kt",
-        "art:tw:names",
-        "art:tw:other",
         "map",
         "orig:tit"
       ],
