@@ -461,6 +461,34 @@ Agent: `lp3-pyreader`, from the specification alone.
 - [ ] **Step 5: Run** `bun test`, `bun run type-check`, `bun spec/tests/compare.ts` with `LP3_PYTHON`. Expected: PASS, 0 mismatches.
 - [ ] **Step 6: Commit** `sections: equal headings get -2, -3; spec status after phase 2 part A`.
 
+### Task 21: Measure an index of aligned phrases per language (measurement for Abel)
+
+Added on 2026-11-02 at Abel's request ("Sí, que lo mida"). It measures; it does **not** change the format, the spec or any builder under `src/`. Dispatch it after Task 18 (it needs the sample build) and before Task 19. Abel decides from its numbers whether such an index becomes a `map` table or part.
+
+Why: the translation-helps MCP and BT Servant need cross-book lookups from a gateway-language phrase ("la diestra de Dios", "before his face") to the original's Strong keys. Today only each `book` segment holds its own alignment; there is no cross-book index.
+
+**Files:**
+- Create: `packages/language-pack-v3/spec/tests/measure/alignedIndex.ts` (a Bun script; not imported by `src/`, not run by `bun test`)
+- Output: a report `aligned-index.md` in the scratch folder of the Task 18 build (outside the repo), and a summary line in the ledger
+
+**Interfaces:**
+- Consumes: the book segments of the Task 18 sample build (es-419 and en), read with `bookView` (`src/read/book.ts`); the `orig` segments with `origView`; `strongKey`; `encodeDeterministic`, `stringTable`, `encodeUvarints`, `encodeTexts` and pako `deflateRaw` level 9 (as `writeSegment` does).
+- Produces: numbers only.
+
+- [ ] **Step 1: Define the entries** in a comment at the top of the script:
+  - a **word** entry: each word piece of a text with a non-empty `align` list;
+  - a **phrase** entry: each maximal run of two or more consecutive word pieces (only `" "` pieces between them) whose `align` lists are equal and non-empty, joined with single spaces;
+  - the key is the text normalized with NFC and lowercased (`toLocaleLowerCase(lang)`); the value is the set of Strong keys (`strongKey` of the original words at the aligned positions), and per Strong key: the books, the distinct verses and the occurrences.
+  - Texts: es-419 GLT and GST; en ULT and UST. One index per language, both texts together.
+- [ ] **Step 2: Measure** with `bun spec/tests/measure/alignedIndex.ts <build dir> <out dir>`, output to a file:
+  - distinct word entries and phrase entries per language;
+  - size of one columnar segment per language (keys as `texts`, Strong keys as a string table, per entry `uvarints` of Strong number, book count, then per book: book delta, verses, occurrences), compressed with deflate-raw, through `writeSegment` with class `map` and a table named `aligned` (the segment is measured, never written to the repo or a catalog);
+  - the same split into parts by first letter of the key, and by Strong group (`G5`, `H1`… as the lexicon groups): number of parts, largest part, total;
+  - build time (wall clock of the index build only);
+  - three lookups printed in full: `diestra` (es-419), `right hand` (en), `before his face` (en): Strong keys, books, verses, occurrences.
+- [ ] **Step 3: Report** in `aligned-index.md`: the numbers above, the books each language had in the build (es-419 has text of only a few books, so its index covers only those), and one paragraph on what a `map` table would need (which fields, which unit of the catalog). No recommendation on the format: Abel decides.
+- [ ] **Step 4: Commit** the script only: `measure: aligned-phrase index per language (numbers for Abel)`. The controller writes the summary in the ledger and ends its turn with a note starting `ABEL:` that gives the numbers and asks whether it becomes part of `map`.
+
 ---
 
 ## After Task 20 (controller)
