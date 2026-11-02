@@ -391,6 +391,29 @@ describe('OrigIndex on a small model', () => {
     expect(index.find(56002001, 'c', 1)).toBe(2)
   })
 
+  test('findInVerses counts the occurrences over the verses from the first to the last, exact form first', () => {
+    const index = new OrigIndex(
+      small(
+        [
+          [0, 'chapter', '1'],
+          [0, 'verse', '1'],
+          [2, 'verse', '2'],
+          [4, 'verse', '3'],
+        ],
+        ['a', 'b', 'a', 'c/d', 'a'],
+      ),
+    )
+    expect(index.findInVerses(56001001, 56001002, 'a', 2)).toBe(2)
+    expect(index.findInVerses(56001001, 56001002, 'a', 3)).toBeNull() // the third a is in verse 3
+    expect(index.findInVerses(56001001, 56001003, 'a', 3)).toBe(4)
+    expect(index.findInVerses(56001002, 56001002, 'a', 1)).toBe(2)
+    expect(index.findInVerses(56001001, 56001002, 'cd', 1)).toBe(3) // folded
+    expect(index.findInVerses(56001001, 56001002, 'a', 0)).toBeNull()
+    expect(index.findInVerses(56001003, 56001001, 'a', 1)).toBeNull() // from above to
+    expect(index.findInVerses(56001001, 56001001, 'a', 1)).toBe(index.find(56001001, 'a', 1))
+    expect(index.findInVerses(56001005, 56001009, 'a', 1)).toBeNull() // verses the book lacks
+  })
+
   test('a text that folds to nothing names no word, even when a word has that very form', () => {
     const index = new OrigIndex(
       small(

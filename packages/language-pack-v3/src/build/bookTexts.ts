@@ -15,6 +15,8 @@ import { attributesOf, leadingNumber, type OrigIndex, recordOf, textOf } from '.
 type OpenMilestone = { position: number | null; verse: number; content: string; occurrence: number }
 
 const DIGITS = /^[0-9]+$/
+/** The second number of a verse label that is a bridge: `"13-14"` is 14. */
+const BRIDGE_END = /^[0-9]+-([0-9]+)/
 
 /** The chapter chunks of a resource, in chapter order: `scripture-usj:{res}:{book}:{chapter}`, chunk 0 included. */
 function chunksOf(rows: Row[], book: string, res: string): { where: string; content: unknown[] }[] {
@@ -55,7 +57,8 @@ function chunksOf(rows: Row[], book: string, res: string): { where: string; cont
  * - The milestones `zaln-s` and `zaln-e` are not events. The `zaln-s` that are open when a word is read are the words
  *   it translates, outer first and not sorted: each is looked for in `orig` with `find(verse, x-content, x-occurrence)`,
  *   the verse being the one open when the milestone starts (before the first chapter and the first verse, the
- *   introduction of the book, then of the chapter). One that `orig` does not have gives no position and an entry in
+ *   introduction of the book, then of the chapter; in a verse bridge, the label `13-14`, the word is looked for in all the verses of the label,
+ *   and the occurrence counts over them in order, with `findInVerses`; `alignMissing` names the first verse of the bridge). One that `orig` does not have gives no position and an entry in
  *   `alignMissing` for each word it encloses. A `zaln-s` without an `x-occurrence` that is a whole number (the source loses it now
  *   and then) is not placed either: its entries in `alignMissing` have occurrence 0, and a line in `issues` names it. A `zaln-e` with
  *   nothing open, and a `zaln-s` that never closes, are ignored.
@@ -76,6 +79,8 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
   let aligned = false
   let chapter = 0
   let verse = 0
+  // The last verse of the label that is open (`"13-14"`: 14), the same as `verse` when the label is not a bridge.
+  let verseEnd = 0
 
   const visit = (node: unknown, where: string): void => {
     if (typeof node === 'string') {
@@ -114,7 +119,9 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
       }
       const occurrence = usable ? Number(given) : 0
       const id = verseId(book, chapter, verse)
-      stack.push({ position: orig.find(id, content, occurrence), verse: id, content, occurrence })
+      // In a bridge the milestone's x-occurrence counts over all of its verses, so the word is looked for in all of them.
+      const position = verseEnd > verse ? orig.findInVerses(id, verseId(book, chapter, verseEnd), content, occurrence) : orig.find(id, content, occurrence)
+      stack.push({ position, verse: id, content, occurrence })
       return
     }
     if (type === 'ms' && marker === 'zaln-e') {
@@ -130,8 +137,12 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
       if (type === 'chapter') {
         chapter = number
         verse = 0
+        verseEnd = 0
       } else {
         verse = number
+        const end = Number(BRIDGE_END.exec(node.number)?.[1] ?? number)
+        // A second number a verse id cannot hold (1000 and up) is not a bridge.
+        verseEnd = end > number && end < 1000 ? end : number
       }
       // `sid` and `eid` say the book, chapter and verse again: the events say them already.
       const extra = recordOf(attributesOf(node, ['number', 'sid', 'eid'], where))

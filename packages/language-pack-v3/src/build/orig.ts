@@ -349,6 +349,21 @@ export class OrigIndex {
   }
 
   /**
+   * {@link find} over the verses from `fromVerse` to `toVerse` (verse ids of one chapter, both included): the occurrences are counted over
+   * the words of all of them in order, as a verse bridge (the label `13-14`) counts them. The exact form is tried first, then the folded one, as in
+   * {@link find}. `null` when `toVerse` is below `fromVerse`, or when the verses have no such occurrence.
+   */
+  findInVerses(fromVerse: number, toVerse: number, text: string, occurrence: number): number | null {
+    if (!Number.isInteger(fromVerse) || !Number.isInteger(toVerse) || toVerse < fromVerse || toVerse - fromVerse >= 1000) return null
+    const positions: number[] = []
+    for (let verse = fromVerse; verse <= toVerse; verse++) {
+      const own = this.byVerse.get(verse)
+      if (own !== undefined) positions.push(...own)
+    }
+    return this.locate(positions, text, occurrence)
+  }
+
+  /**
    * {@link find} as format 2.0's quote layer counts: for the first verse of a chapter, the words of the chapter's introduction (verse 0,
    * what the original writes before `\v 1`: the title of a psalm) come first, and the occurrences are counted over them and the verse
    * together. Any other verse is {@link find}.

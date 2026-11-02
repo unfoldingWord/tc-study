@@ -389,6 +389,67 @@ describe('es-419 Titus from the data folder', () => {
   })
 })
 
+describe('a verse bridge', () => {
+  // `verse 13-14`: the milestone's x-occurrence counts over the whole bridge, in order, so a word of the second verse is found.
+  const index = origIndex([
+    ['1', '13', ['α', 'β']],
+    ['1', '14', ['γ', 'β', 'δ']],
+    ['1', '15', ['γ']],
+  ])
+  const BRIDGE = 56_001_013
+  const inBridge = (...content: unknown[]) => textOf(index, chapterNode('1'), para(verseNode('13-14'), ...content))
+
+  test('a word of the second verse of the bridge is placed', () => {
+    const t = inBridge(zs('δ'), wd('x'), ze, zs('α'), wd('y'), ze)
+    expect(t.align).toEqual([[4], [0]])
+    expect('alignMissing' in t).toBe(false)
+  })
+
+  test('the occurrence counts over the whole bridge: the same form in both verses', () => {
+    const t = inBridge(zs('β', '1'), wd('uno'), ze, zs('β', '2'), wd('dos'), ze, zs('β', '3'), wd('tres'), ze)
+    expect(t.align).toEqual([[1], [3], []])
+    expect(t.alignMissing).toEqual([[2, BRIDGE, 'β', 3]])
+  })
+
+  test('a word the bridge lacks is in alignMissing under the first verse of the bridge, and the next verse is not searched', () => {
+    // γ is in verse 14 (once) and in verse 15: the second γ of "13-14" does not exist, the one of verse 15 is not in the bridge.
+    const t = inBridge(zs('γ', '2'), wd('x'), ze)
+    expect(t.align).toEqual([[]])
+    expect(t.alignMissing).toEqual([[0, BRIDGE, 'γ', 2]])
+  })
+
+  test('the folded form is tried over the bridge too, after the exact one', () => {
+    const folded = origIndex([
+      ['1', '13', ['a/b']],
+      ['1', '14', ['ab', 'c/d']],
+    ])
+    const t = textOf(folded, chapterNode('1'), para(verseNode('13-14'), zs('cd'), wd('x'), ze, zs('ab', '1'), wd('y'), ze, zs('ab', '2'), wd('z'), ze))
+    // "ab" exact is the word 1 (verse 14); "ab" occurrence 2 is not exact, so the folded forms are counted: a/b (0), ab (1).
+    expect(t.align).toEqual([[2], [1], [1]])
+  })
+
+  test('a label that is not a range is one verse, as before', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('13'), zs('δ'), wd('x'), ze))
+    expect(t.align).toEqual([[]])
+    expect(t.alignMissing).toEqual([[0, BRIDGE, 'δ', 1]])
+    // A label with a second number that is not above the first, or a letter after it, is one verse too.
+    for (const label of ['13-13', '13-12', '13a', '13-', '13-1000']) {
+      expect(textOf(index, chapterNode('1'), para(verseNode(label), zs('δ'), wd('x'), ze)).align).toEqual([[]])
+    }
+  })
+
+  test('the verse after the bridge is a verse again', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('13-14'), zs('δ'), wd('x'), ze, verseNode('15'), zs('δ'), wd('y'), ze))
+    expect(t.align).toEqual([[4], []])
+    expect(t.alignMissing).toEqual([[1, 56_001_015, 'δ', 1]])
+  })
+
+  test('a bridge does not carry over a chapter', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('13-14')), chapterNode('2'), para(zs('δ'), wd('x'), ze))
+    expect(t.alignMissing).toEqual([[0, 56_002_000, 'δ', 1]])
+  })
+})
+
 describe('what the milestones give a word', () => {
   const index = origIndex([
     ['1', '1', ['Παῦλος', 'δοῦλος', 'Θεοῦ', 'δὲ', 'Θεοῦ']],
