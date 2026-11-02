@@ -66,14 +66,20 @@ function bookStampsOf(resource: ListResource, books: string[]): Record<string, s
 /**
  * - `list`: the parts list of a language, e.g. `es-419/list.json`;
  * - `partsDir`: the folder that holds `<sha256>.part.gz` for every part the lists name;
- * - `originals`: the originals list, for `lang: 'originals'` (without it the source has no originals).
+ * - `originals`: the originals list, for `lang: 'originals'` (without it the source has no originals);
+ * - `extra`: the lists of other languages, read too (a language already given is not replaced).
  *
  * A part is checked against its name (the sha256 of its bytes) when it is read; one that is missing, or does not match,
  * fails the sequence that reaches it, naming the part.
  */
-export async function partsSource(o: { list: string; partsDir: string; originals?: string }): Promise<RowSource> {
+export async function partsSource(o: { list: string; partsDir: string; originals?: string; extra?: string[] }): Promise<RowSource> {
   const lists: List[] = [await readList(o.list)]
   if (o.originals) lists.push(await readList(o.originals))
+  // Lists of other languages (the language whose helps make the common map): the first list of a language is the one used.
+  for (const path of o.extra ?? []) {
+    const list = await readList(path)
+    if (!lists.some((l) => l.language === list.language)) lists.push(list)
+  }
   // The language list says `es-419`; the originals list says `originals`.
   const listOf = (lang: string): List | undefined => lists.find((list) => list.language === lang)
 

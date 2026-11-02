@@ -3,6 +3,7 @@
  *
  *   bun packages/resource-pipeline/cli/build-v3.ts --list <lang list.json> --originals <originals list.json> --parts <dir> --out <dir>
  *     [--books tit,rut] [--registry <dir>] [--revision <n>] [--built <RFC 3339>] [--publisher <name>]
+ *     [--map-lang <lang>] [--map-list <list.json>] [--book-names <file>]
  *
  * The inputs are what phase 0 left on disk: the parts list of a language (`es-419/list.json`, its `language` says which language
  * this is), the list of the originals (`originals/list.json`) and the folder with the `<sha256>.part.gz` files both name. Only the
@@ -48,7 +49,10 @@ export const USAGE =
   '  --revision   the revision of both catalogs (default 1)\n' +
   '  --built      the time the catalogs say they were built (default: now). Pass a fixed value for a reproducible build:\n' +
   '               the same inputs and the same --built give the same bytes\n' +
-  '  --publisher  the publisher of both catalogs (default unfoldingWord)'
+  '  --publisher  the publisher of both catalogs (default unfoldingWord)\n' +
+  '  --map-lang   the language whose helps make the common map (default en; with no list for it, no common map)\n' +
+  '  --map-list   the parts list of the map language, when it is not the language of --list (default: none)\n' +
+  '  --book-names a JSON file {book: [name, short, abbreviation]} for the book names of the language map'
 
 type Io = { log: (line: string) => void; error: (line: string) => void }
 
@@ -62,9 +66,12 @@ type Options = {
   revision: number
   built: string
   publisher: string
+  mapLang: string
+  mapList?: string
+  bookNames?: string
 }
 
-const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher']
+const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -116,12 +123,17 @@ export function optionsFromArgs(argv: string[]): Options {
   const publisher = flags.get('publisher') ?? 'unfoldingWord'
   if (publisher === '') throw new UsageError('--publisher is empty')
 
-  for (const [name, path] of [['list', list], ['originals', originals]]) {
+  const mapLang = flags.get('map-lang') ?? 'en'
+  if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(mapLang)) throw new UsageError(`--map-lang ${JSON.stringify(mapLang)} is not a language code`)
+  const bookNames = flags.get('book-names')
+  const mapList = flags.get('map-list')
+
+  for (const [name, path] of [['list', list], ['originals', originals], ...(bookNames === undefined ? [] : [['book-names', bookNames]]), ...(mapList === undefined ? [] : [['map-list', mapList]])]) {
     if (!existsSync(path) || !statSync(path).isFile()) throw new UsageError(`--${name}: ${path} is not a file`)
   }
   if (!existsSync(parts) || !statSync(parts).isDirectory()) throw new UsageError(`--parts: ${parts} is not a directory`)
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, built, publisher }
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, built, publisher, mapLang, mapList, bookNames }
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -165,6 +177,16 @@ function lineOf(built: BuiltSegment): string {
   return `${h.class.padEnd(7)} ${what.padEnd(10)} ${kb.padStart(9)} KB  ${built.id.slice(0, 12)}`
 }
 
+/** The size of the segments of the map: the core and the parts of the class `xmap` (common) and `map` (the language). */
+function mapSizes(label: string, segments: BuiltSegment[], cls: string): string | undefined {
+  const mine = segments.filter(({ seg }) => seg.h.class === cls)
+  if (mine.length === 0) return undefined
+  const core = mine.find(({ seg }) => seg.h.part === 'core')
+  const parts = mine.filter((s) => s !== core)
+  const sum = (list: BuiltSegment[]): number => list.reduce((n, s) => n + s.bytes.length, 0)
+  return `${label}: core ${core?.bytes.length ?? 0} bytes, ${parts.length} parts ${sum(parts)} bytes, total ${sum(mine)} bytes`
+}
+
 function countsOf(segments: BuiltSegment[]): string {
   const counts = new Map<string, number>()
   for (const { seg } of segments) counts.set(seg.h.class, (counts.get(seg.h.class) ?? 0) + 1)
@@ -178,7 +200,7 @@ async function build(o: Options, io: Io): Promise<void> {
   const originalsLanguage = await languageOf(o.originals)
   if (originalsLanguage !== ORIGINALS) throw new Error(`${o.originals} is not the list of the originals: its language is ${JSON.stringify(originalsLanguage)}`)
 
-  const source = await partsSource({ list: o.list, partsDir: o.parts, originals: o.originals })
+  const source = await partsSource({ list: o.list, partsDir: o.parts, originals: o.originals, extra: o.mapList === undefined ? [] : [o.mapList] })
   const about = { format: '3.0' as const, publisher: o.publisher, origin: 'published' as const, revision: o.revision, built: o.built, builder: BUILDER }
 
   // The books to build: the ones asked for, else those the language has and the originals have (a book without originals is left out).
@@ -193,12 +215,23 @@ async function build(o: Options, io: Io): Promise<void> {
   const registry = registryFile === undefined ? {} : await readRegistry(registryFile)
 
   // Common first: the language catalog names it.
-  const common = await buildCommon({ source, books, about })
+  // The common map needs the helps of the map language: when the source has none (no list for it), there is no map to build.
+  const mapLang = (await source.resources(o.mapLang)).length > 0 ? o.mapLang : undefined
+  const common = await buildCommon({ source, books, about, mapLang })
+  let bookNames: Record<string, [string, string, string]> | undefined
+  if (o.bookNames !== undefined) {
+    try {
+      bookNames = JSON.parse(await readFile(o.bookNames, 'utf8'))
+    } catch (error) {
+      throw new Error(`Cannot read the book names ${o.bookNames}: ${(error as Error).message}`)
+    }
+  }
   const built = await buildLanguage({
     source,
     lang,
     books,
     registry,
+    bookNames,
     about,
     requires: [['common', o.revision, common.catalog.id]],
   })
@@ -218,6 +251,7 @@ async function build(o: Options, io: Io): Promise<void> {
     `${lang}: ${countsOf(built.segments)}, catalog ${built.catalog.id.slice(0, 12)}`,
     registryLine,
     '',
+    ...common.report,
     ...built.report,
   ]
 
@@ -233,6 +267,7 @@ async function build(o: Options, io: Io): Promise<void> {
   }
 
   for (const segment of all) io.log(lineOf(segment))
+  for (const line of [mapSizes('xmap', common.segments, 'xmap'), mapSizes(`map ${lang}`, built.segments, 'map')]) if (line !== undefined) io.log(line)
   const bytes = all.reduce((sum, segment) => sum + segment.bytes.length, 0)
   io.log(`${all.length} segments, ${(bytes / 1024).toFixed(1)} KB, written in ${o.out} (${built.report.length} lines in report.txt)`)
 }

@@ -318,3 +318,33 @@ describe('build-v3: as a script', () => {
     expect(result.stderr).toContain('mat')
   })
 })
+
+describe('build-v3: the maps', () => {
+  const EN_LIST = join(DATA, 'en', 'list.json')
+
+  test('--map-lang en with the English list writes the xmap core and the tit part, and the es-419 map core', async () => {
+    const out = temp()
+    const result = await run(sample(out, ['--map-lang', 'en', '--map-list', EN_LIST]))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    const classes: Record<string, string[]> = {}
+    for (const name of readdirSync(join(out, 'segments'))) {
+      const output = (await readerOutput(read(join(out, 'segments', name)))) as { h?: { class?: string; part?: string } }
+      const h = output.h
+      if (h?.class !== undefined) (classes[h.class] ??= []).push(h.part ?? '-')
+    }
+    expect(classes.xmap?.sort()).toEqual(['core', 'tit'])
+    expect(classes.map).toContain('core')
+    expect(result.out.some((line) => /^xmap: core \d+ bytes, 1 parts \d+ bytes, total \d+ bytes$/.test(line))).toBe(true)
+    expect(result.out.some((line) => /^map es-419: core \d+ bytes/.test(line))).toBe(true)
+  })
+
+  test('--book-names reads a file and a bad flag value is a usage error', async () => {
+    const names = join(temp(), 'names.json')
+    writeFileSync(names, JSON.stringify({ tit: ['Tito', 'Tit', 'Tit'] }))
+    const out = temp()
+    expect((await run(sample(out, ['--map-lang', 'en', '--map-list', EN_LIST, '--book-names', names]))).code).toBe(0)
+    expect((await run(sample(temp(), ['--map-lang', 'x y']))).code).toBe(1)
+    expect((await run(sample(temp(), ['--book-names', join(temp(), 'none.json')]))).code).toBe(1)
+  })
+})
