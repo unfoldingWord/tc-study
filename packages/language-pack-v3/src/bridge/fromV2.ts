@@ -7,8 +7,9 @@
  * is the device's (`origin: local`, `publisher: local:` and the device name, revision 1), unsigned, and it lists only what the pack
  * brought. A later published catalog replaces it.
  *
- * The pack's language is the manifest's (`ZipSource.language`). The pack's originals are those of `originals`, or the ones the pack
- * carries itself, if any: a book without originals is left out with a line in `report`, and waits for them as format 2.0 does.
+ * The pack's language is the manifest's (`ZipSource.language`). The pack's originals are those of `originals`, which is required:
+ * the originals a pack carries itself are not used. A book `originals` lacks is left out with a line in `report`, and waits for them as
+ * format 2.0 does.
  *
  * The section registry (`art` sids that last) is the publisher's, kept next to its output, never in a pack: a device builds with an empty
  * one and the registry it ends with is not returned.

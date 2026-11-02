@@ -113,9 +113,10 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
       const given = node['x-occurrence']
       // Published texts have milestones whose x-occurrence is lost (it went into x-morph as "x-occurrence1" in the GST of Ruth): the
       // word cannot be told from its twins in the verse, so it is not placed, and the occurrence is 0 (`find` takes none below 1).
-      const usable = typeof given === 'string' && DIGITS.test(given)
+      // Usable is a whole number from 1 to 2^53 - 1: "0" is not an occurrence, and a number the segment cannot hold is not either.
+      const usable = typeof given === 'string' && DIGITS.test(given) && Number.isSafeInteger(Number(given)) && Number(given) >= 1
       if (!usable) {
-        issues.push(`${where}: the zaln-s of ${JSON.stringify(content)} has no x-occurrence that is a whole number (${given === undefined ? 'none' : JSON.stringify(given)}): its words are not placed`)
+        issues.push(`${where}: the zaln-s of ${JSON.stringify(content)} has no usable x-occurrence, a whole number from 1 (${given === undefined ? 'none' : JSON.stringify(given)}): its words are not placed`)
       }
       const occurrence = usable ? Number(given) : 0
       const id = verseId(book, chapter, verse)

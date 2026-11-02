@@ -864,6 +864,16 @@ describe('extractHelps: quotes', () => {
     expect(issues[0]).toContain('"x"')
   })
 
+  test('an occurrence that is negative or not a whole number is stored as 0, and the line says 0 too', () => {
+    const issues: string[] = []
+    const table = notesOf(
+      [tnChunk(1, [noteRow('aaaa', '1:1', { quote: 'x x x' })]), quoteLayer(1, { aaaa: [token('x', 1, -1), token('x', 1, 1.5), token('x', 1, 2 ** 53)] })],
+      issues,
+    )
+    expect(table.rows[0].quoteMissing).toEqual([[0, V1, 'x', 0], [1, V1, 'x', 0], [2, V1, 'x', 0]])
+    expect(issues.map((line) => / [(]occurrence ([^)]+)[)]/.exec(line)![1])).toEqual(['0', '0', '0'])
+  })
+
   // Real data: the quote layer of Psalms (en) says verse 1 for the words of a psalm title, which the original writes before \v 1 (verse 0),
   // and counts the occurrences over the title and the verse together ("id" 5 of 3:1 is the fifth word of the title).
   test('verse 1 of a chapter whose original has an introduction: the words of the introduction come first, with the occurrences counted over both', () => {

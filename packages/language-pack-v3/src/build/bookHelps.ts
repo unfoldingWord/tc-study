@@ -198,7 +198,7 @@ function quotePieces(
     }
     quote.push(-1)
     missing.push([piece, verse, content, countOr(occurrence, 0)])
-    report(`the word ${JSON.stringify(content)} (occurrence ${String(occurrence)}) of the quote is not in verse ${verse} of the original`)
+    report(`the word ${JSON.stringify(content)} (occurrence ${countOr(occurrence, 0)}) of the quote is not in verse ${verse} of the original`)
   })
   const out: Pick<HelpRow, 'quote' | 'quoteKinds' | 'quoteMissing'> = { quote }
   if (kinds.length > 0) out.quoteKinds = kinds

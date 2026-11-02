@@ -547,6 +547,30 @@ describe('what the milestones give a word', () => {
     expect(() => textOf(index, chapterNode('1'), para(verseNode('1'), { ...noContent, 'x-content': 7 }, wd('a'), ze))).toThrow(/x-content/)
   })
 
+  test('an x-occurrence of 0, or one above 2^53 - 1, is not usable either: not placed, occurrence 0, one line each', () => {
+    const issues: string[] = []
+    const rows = [
+      chapterRow(GLT, 1, [
+        chapterNode('1'),
+        para(verseNode('1'), zs('Παῦλος', '0'), wd('a'), ze, zs('Παῦλος', '9007199254740993'), wd('b'), ze, zs('Παῦλος', '00'), wd('c'), ze, zs('Παῦλος', '007'), wd('d'), ze, zs('Παῦλος', '9007199254740991'), wd('e'), ze, zs('Παῦλος', '01'), wd('f'), ze),
+      ]),
+    ]
+    const t = extractText(rows, 'tit', GLT, index, issues)
+    // 0, 2^53 + 1 and 00 are not usable (occurrence 0, a line each). 007 is the seventh and 2^53 - 1 the 9007199254740991st: usable, and the verse
+    // has one Παῦλος, so they find nothing. 01 is the first one.
+    expect(t.align).toEqual([[], [], [], [], [], [0]])
+    expect(t.alignMissing).toEqual([
+      [0, 56_001_001, 'Παῦλος', 0],
+      [1, 56_001_001, 'Παῦλος', 0],
+      [2, 56_001_001, 'Παῦλος', 0],
+      [3, 56_001_001, 'Παῦλος', 7],
+      [4, 56_001_001, 'Παῦλος', 9007199254740991],
+    ])
+    expect(issues).toHaveLength(3)
+    expect(issues[0]).toContain('"0"')
+    expect(issues[1]).toContain('"9007199254740993"')
+  })
+
   // Real data: the GST of Ruth (es-419, chapter 4) has a zaln-s of "שֵׁ֖ם" without x-occurrence, which went into x-morph ("x-occurrence1").
   test('a milestone without a usable x-occurrence does not stop the build: its words are in alignMissing with occurrence 0, and a line says so', async () => {
     const broken = { type: 'ms', marker: 'zaln-s', 'x-content': 'Παῦλος', 'x-lemma': 'λ', 'x-morph': 'x-occurrence1', 'x-occurrences': '1', 'x-strong': 'G1' }
