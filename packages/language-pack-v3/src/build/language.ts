@@ -30,7 +30,7 @@ import { compareCodePoints } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { sha256Hex } from '../codec/sha256'
 import { BOOKS, bookNumber, bookSet } from '../ids'
-import type { About, ArticleModel, CatalogResource, LexEntry, OrigModel } from '../model'
+import type { About, ArticleModel, BookModel, CatalogResource, LexEntry, OrigModel } from '../model'
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
 import { articleOfPath, articleResources, artSegment, extractArticles, type Kind } from './art'
 import { extractBook, isBookResource } from './bookHelps'
@@ -39,6 +39,9 @@ import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOf
 import { extractLexicon, lexResources, lexSegment } from './lex'
 import { extractObs, obsSegment } from './obs'
 import { extractOrig, origSegment } from './orig'
+import { buildMap } from './map/build'
+import { mapSegment } from './map/segment'
+import { versesOf } from './maps/verses'
 import { buildXmap } from './xmap/build'
 import { xmapSegment } from './xmap/segment'
 import type { SectionRegistry } from './sections'
@@ -217,6 +220,8 @@ export async function buildLanguage(o: {
   registry: SectionRegistry
   about: Omit<About, 'catalog'>
   requires?: [string, number, string][]
+  bookNames?: Record<string, [string, string, string]>
+  partial?: boolean
 }): Promise<LanguageBuild> {
   const { source, lang } = o
   const report: string[] = []
@@ -237,6 +242,8 @@ export async function buildLanguage(o: {
 
   // Books
   const books = o.books === undefined ? booksOf(refs) : canonical(o.books)
+  const mapBooks: { model: BookModel; verses: number[] }[] = []
+  const mapRows = new Map<string, RowKey[]>()
   for (const book of books) {
     if (!refs.some((ref) => ref.books.includes(book))) {
       report.push(`book ${book}: ${lang} has no resource of this book: left out`)
@@ -261,6 +268,8 @@ export async function buildLanguage(o: {
     const inputs = inputsOf([...read, ...(await originalRowKeys(source, book))], [...stampsOf(keys), { key: orig.key, stamp: orig.stamp }])
     const built = await add(bookSegment(model), inputs, keys)
     needs.set(built.id, needsOfBook(model))
+    mapBooks.push({ model, verses: versesOf(orig) })
+    mapRows.set(book, [...read, ...(await originalRowKeys(source, book))])
   }
 
   // Articles
@@ -294,6 +303,21 @@ export async function buildLanguage(o: {
     const rows: RowKey[] = []
     for (const resource of keys) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
     await add(obsSegment(obs), inputsOf(rows, stampsOf(keys)), keys)
+  }
+
+  // The language map: the notes counted by concept, the names of books and concepts, the coverage of every resource
+  if (refs.length > 0) {
+    const built = buildMap({ lang, refs, books: mapBooks, articles: [...articles.values()].flat(), obs, bookNames: o.bookNames, partial: o.partial })
+    report.push(...built.report)
+    const all = refs.map((ref) => ref.key)
+    const coreRows: RowKey[] = [...mapRows.values()].flat()
+    for (const list of artRows.values()) coreRows.push(...list)
+    if (obs !== null) for (const resource of obs.res.map(([key]) => key)) await addKeys(coreRows, source.rows({ lang, resource, layer: 'sot' }))
+    await add(mapSegment(built.core), inputsOf(coreRows, stampsOf(all)), all)
+    for (const part of built.parts) {
+      const keys = refs.filter((ref) => ref.books.includes(part.part)).map((ref) => ref.key)
+      await add(mapSegment(part), inputsOf(mapRows.get(part.part) ?? [], stampsOf(keys)), keys)
+    }
   }
 
   segments.sort(compareSegments)

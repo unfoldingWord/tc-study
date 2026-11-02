@@ -33,7 +33,8 @@ async function catalogOf(built: BuiltSegment): Promise<CatalogModel> {
 }
 const idsOf = (segments: BuiltSegment[]) => segments.map((s) => s.id)
 const byClass = (segments: BuiltSegment[], cls: string) => segments.filter((s) => s.seg.h.class === cls)
-const inputsByUnit = (segments: BuiltSegment[]) => Object.fromEntries(segments.map((s) => [s.seg.h.book ?? s.seg.h.group ?? s.seg.h.class, s.inputs]))
+const inputsByUnit = (segments: BuiltSegment[]) =>
+  Object.fromEntries(segments.map((s) => [s.seg.h.class === 'map' ? `map:${s.seg.h.part}` : (s.seg.h.book ?? s.seg.h.group ?? s.seg.h.class), s.inputs]))
 
 type Tweak = { ref?: (ref: ResourceRef, lang: string) => Partial<ResourceRef>; row?: (row: Row, f: RowFilter) => Row | null }
 /** A source that is `source` with some resources or rows changed. */
@@ -118,14 +119,16 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
   })
 
   test('has the book of Titus, the tW group of the sample and the Greek lexicon group, in the order of the catalog', () => {
-    expect(first.segments.map((s) => [s.seg.h.class, s.seg.h.book ?? s.seg.h.group])).toEqual([
+    expect(first.segments.map((s) => [s.seg.h.class, s.seg.h.part ?? s.seg.h.book ?? s.seg.h.group])).toEqual([
+      ['map', 'core'],
+      ['map', 'tit'],
       ['book', 'tit'],
       ['art', 'tw:kt'],
       ['lex', 'G0'],
     ])
     // The segments are listed by the catalog in the order they are returned in.
     expect(catalog.segments.map((s) => hex(s.id))).toEqual(idsOf(first.segments))
-    expect(catalog.units.map((u) => u.id)).toEqual(['art:tw:kt', 'book:tit', 'lex:G0'])
+    expect(catalog.units.map((u) => u.id)).toEqual(['art:tw:kt', 'book:tit', 'lex:G0', 'map'])
   })
 
   test('case 4: the Titus book segment is at most 40 KB', () => {
@@ -210,8 +213,8 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
 
     const none = await buildLanguage({ source: await sample(), lang: ES, books: [], registry: registry(), about })
     expect(byClass(none.segments, 'book')).toEqual([])
-    expect(none.segments.map((s) => s.seg.h.class)).toEqual(['art', 'lex'])
-    expect(idsOf(none.segments)).toEqual(idsOf(first.segments).slice(1))
+    expect(none.segments.map((s) => s.seg.h.class)).toEqual(['map', 'art', 'lex'])
+    expect(idsOf(none.segments).slice(1)).toEqual(idsOf(first.segments).slice(3))
 
     // A book the language has no resource of is left out, with a line.
     const rut = await buildLanguage({ source: await sample(), lang: ES, books: ['rut', 'tit', 'rut'], registry: registry(), about })
@@ -251,14 +254,14 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
     const hidden = tweak(await sample(), { ref: (ref, lang) => (lang === ORIGINALS ? { books: [] } : {}), row: (row, f) => (f.lang === ORIGINALS ? null : row) })
     for (const source of [bare, hidden]) {
       const built = await buildLanguage({ source, lang: ES, registry: registry(), about })
-      expect(built.segments.map((s) => s.seg.h.class)).toEqual(['art', 'lex'])
+      expect(built.segments.map((s) => s.seg.h.class)).toEqual(['map', 'art', 'lex'])
       const line = built.report.find((l) => l.startsWith('book tit: the source has no originals'))
       expect(line).toBeDefined()
       expect(line).toContain('waits for them')
       const model = await catalogOf(built.catalog)
-      expect(model.units.map((u) => u.id)).toEqual(['art:tw:kt', 'lex:G0'])
-      // The resources of the book are not listed: no segment used them.
-      expect(model.resources.map((r) => r.key)).toEqual([TW, UGL])
+      expect(model.units.map((u) => u.id)).toEqual(['art:tw:kt', 'lex:G0', 'map'])
+      // The map lists every resource of the language (coverage), with no book in the ones of the book.
+      expect(model.resources.map((r) => r.key)).toEqual(expect.arrayContaining([TW, UGL, TN]))
     }
   })
 
@@ -270,9 +273,9 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
     const build = async (t: Tweak) => buildLanguage({ source: tweak(await sample(), t), lang: ES, registry: registry(), about })
 
     test('are 64 hex digits and differ from one segment to another', () => {
-      expect(Object.keys(base)).toEqual(['tit', 'tw:kt', 'G0'])
+      expect(Object.keys(base)).toEqual(['map:core', 'map:tit', 'tit', 'tw:kt', 'G0'])
       for (const value of Object.values(base)) expect(value).toMatch(/^[0-9a-f]{64}$/)
-      expect(new Set(Object.values(base)).size).toBe(3)
+      expect(new Set(Object.values(base)).size).toBe(5)
     })
 
     test('do not change when nothing does', async () => {
@@ -287,7 +290,7 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
       expect(inputsByUnit(notes.segments)['tit']).not.toBe(base.tit)
       expect(inputsByUnit(notes.segments)['tw:kt']).toBe(base['tw:kt'])
       expect(inputsByUnit(notes.segments)['G0']).toBe(base.G0)
-      expect(notes.segments[0].id).toBe(first.segments[0].id)
+      expect(notes.segments.find((s) => s.seg.h.class === 'book')!.id).toBe(first.segments.find((s) => s.seg.h.class === 'book')!.id)
       expect(notes.catalog.id).not.toBe(first.catalog.id)
 
       const words = await build({ ref: (ref) => (ref.key === TW ? { stamp: 'v37#2030-01-01T00_00_00Z' } : {}) })
@@ -326,7 +329,7 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
         row: (row) => (row.layer === 'sot' && row.key.startsWith(`tq:${TQ}:tit`) ? { ...row, value: JSON.parse(JSON.stringify(row.value).replaceAll('Pablo', 'PABLO')) } : row),
       })
       expect(inputsByUnit(edited.segments)).toEqual(base)
-      expect(edited.segments[0].id).not.toBe(first.segments[0].id)
+      expect(edited.segments.find((s) => s.seg.h.class === 'book')!.id).not.toBe(first.segments.find((s) => s.seg.h.class === 'book')!.id)
     })
   })
 })
@@ -378,6 +381,7 @@ describe('buildLanguage: a language with Open Bible Stories and a lexicon, and n
   test('builds an obs segment and one lexicon segment per group, with the scopes of the report', async () => {
     const built = await buildLanguage({ source: synthetic(), lang: 'en', registry: registry(), about })
     expect(built.segments.map((s) => [s.seg.h.class, s.seg.h.group ?? null])).toEqual([
+      ['map', null],
       ['lex', 'G0'],
       ['lex', 'G2'],
       ['obs', null],
@@ -390,10 +394,11 @@ describe('buildLanguage: a language with Open Bible Stories and a lexicon, and n
     expect(catalog.units.map((u) => [u.id, u.needs])).toEqual([
       ['lex:G0', undefined],
       ['lex:G2', undefined],
+      ['map', undefined],
       ['obs', undefined],
     ])
-    // Only the resources a segment used; the title is the key's last part when the source has none; the license is an SPDX id when it is a known text.
-    expect(catalog.resources).toEqual([
+    // The map lists every resource of the language; the title is the key's last part when the source has none; the license is an SPDX id when it is a known text.
+    expect(catalog.resources.filter((r) => r.key === OBS || r.key === LEX)).toEqual([
       { key: OBS, title: 'obs', subject: 'Open Bible Stories', release: 'v12', license: 'CC-BY-4.0', rights: 'unfoldingWord', attribution: 'Open Bible Stories, by unfoldingWord', books: new Uint8Array(9) },
       { key: LEX, title: 'English Lexicon', subject: 'Greek Lexicon', release: 'a1', license: 'CC0-1.0', books: new Uint8Array(9) },
     ])
@@ -455,7 +460,7 @@ describe('buildCommon: the original of Titus', () => {
     const b = await buildCommon({ source: await originalsOnly(), books: ['tit'], about })
     expect(b.catalog.id).toBe(a.catalog.id)
     expect(idsOf(b.segments)).toEqual(idsOf(a.segments))
-    const book = (await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about })).segments[0]
+    const book = (await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about })).segments.find((s) => s.seg.h.class === 'book')!
     expect(book.seg.h.orig).toEqual(a.segments[0].seg.h.orig)
   })
 
@@ -632,4 +637,16 @@ describe('a language read from a zip pack: each layer file is read once, however
       expect(alone.inputs).toBe(together.inputs)
     }
   }, 60_000)
+})
+
+describe('buildLanguage: the map unit', () => {
+  test('lists the unit map, and every need names a unit of the language or of the common catalog', async () => {
+    const built = await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about })
+    const catalog = await catalogOf(built.catalog)
+    const map = catalog.units.find((u) => u.id === 'map')!
+    expect(map).toBeDefined()
+    expect(map.segments.map((i) => built.segments[i].seg.h.part).sort()).toEqual(['core', 'tit'])
+    const ids = new Set(catalog.units.map((u) => u.id))
+    for (const unit of catalog.units) for (const need of unit.needs ?? []) if (!need.startsWith('art:')) expect(ids.has(need) || need.startsWith('orig:')).toBe(true)
+  })
 })

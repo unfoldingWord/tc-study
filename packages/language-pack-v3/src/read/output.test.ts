@@ -679,7 +679,7 @@ describe('the sample (es-419 Titus)', () => {
     expect(result.resources.find((r: any) => r.key === GLT).books).toBe('000000000000800000')
     expect(result.segments.map((s: any) => s.id)).toEqual(lang.segments.map((s) => s.id))
     expect(result.segments.every((s: any) => /^[0-9a-f]{64}$/.test(s.inputs) && s.size > 0 && s.ulen > 0)).toBe(true)
-    expect(result.units.map((u: any) => u.id)).toEqual(['art:tw:kt', 'book:tit', 'lex:G0'])
+    expect(result.units.map((u: any) => u.id)).toEqual(['art:tw:kt', 'book:tit', 'lex:G0', 'map'])
     expect(result.units.find((u: any) => u.id === 'book:tit').segments).toHaveLength(1)
     const commonResult = await out(common.catalog.bytes)
     expect(commonResult.h.lang).toBeUndefined()
@@ -691,7 +691,7 @@ describe('the sample (es-419 Titus)', () => {
     const file = writeTransfer({ mode: 'full', catalogs: [lang.catalog, common.catalog], entries, made: '2026-11-01T10:00:00Z', by: 'test 1' })
     const whole = await out(file)
     expect(Object.keys(whole)).toEqual(['catalogs', 'entries', 'index'])
-    expect(whole.entries.map((e: any) => e.status)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok'])
+    expect(whole.entries.map((e: any) => e.status)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'])
     expect(whole.catalogs).toEqual([await out(lang.catalog.bytes), await out(common.catalog.bytes)])
     expect(whole.index.mode).toBe('full')
     expect(whole.index.made).toBe('2026-11-01T10:00:00Z')
@@ -700,7 +700,7 @@ describe('the sample (es-419 Titus)', () => {
       [lang.catalog, common.catalog, ...entries].map((b) => [b.id, 'segment', b.seg.h.class]),
     )
     expect(whole.index.entries[0]).toMatchObject({ offset: 0, size: lang.catalog.bytes.length })
-    expect(whole.entries[2]).toEqual({ id: entries[0].id, kind: 'segment', class: 'book', status: 'ok' })
+    expect(whole.entries[2]).toEqual({ id: entries[0].id, kind: 'segment', class: 'map', status: 'ok' })
 
     // Cut in the middle of the article segment (the third of the entries, after the book).
     const art = whole.index.entries.find((e: any) => e.class === 'art')
@@ -710,6 +710,8 @@ describe('the sample (es-419 Titus)', () => {
     expect(result.entries.map((e: any) => [e.class, e.status])).toEqual([
       ['catalog', 'ok'],
       ['catalog', 'ok'],
+      ['map', 'ok'],
+      ['map', 'ok'],
       ['book', 'ok'],
       ['art', 'missing'],
       ['lex', 'missing'],
