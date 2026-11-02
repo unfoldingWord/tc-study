@@ -220,3 +220,76 @@ export type ObsModel = {
   studyNotes?: ObsHelpTable
   studyQuestions?: ObsHelpTable
 }
+
+/**
+ * The `about` of a catalog (`spec/cddl/catalog.cddl`). `catalog` is the language tag, or `"common"`; `previous` is the id of the
+ * revision before (32 bytes); `built` is an RFC 3339 date and time, and the only thing in a catalog that changes with the day.
+ */
+export type About = {
+  format: '3.0'
+  catalog: string
+  publisher: string
+  origin: 'published' | 'local'
+  revision: number
+  previous?: Uint8Array
+  built: string
+  builder: string
+  name?: string
+  direction?: 'ltr' | 'rtl'
+}
+
+/** A resource a catalog lists (`catalog.cddl`, `resource`). `books` is the 9-byte book set (`ids.ts`, `bookSet`): all zeros for a resource without books. */
+export type CatalogResource = {
+  key: string
+  title: string
+  subject: string
+  release: string
+  license: string
+  rights?: string
+  attribution?: string
+  books: Uint8Array
+}
+
+/** A complement (`catalog.cddl`, `complement`): a file a reader is not obliged to read. `id` is the sha256 of its bytes (32 bytes). */
+export type Complement = {
+  kind: string
+  lang?: string
+  id: Uint8Array
+  size: number
+  media: string
+  version: string
+  for?: string
+  license?: string
+}
+
+/**
+ * A segment a catalog lists (`catalog.cddl`, `segment-entry`). `id` and `inputs` are 32 bytes; `size` is the length of the file and
+ * `ulen` the length of its uncompressed body.
+ */
+export type SegmentEntry = {
+  id: Uint8Array
+  class: string
+  book?: string
+  part?: string
+  group?: string
+  size: number
+  ulen: number
+  inputs: Uint8Array
+}
+
+/** A unit (`catalog.cddl`, `unit`): `segments` are indexes in the catalog's `segments`; `needs` are unit ids. */
+export type Unit = { id: string; segments: number[]; needs?: string[] }
+
+/**
+ * A catalog (`catalog.cddl`). `lang` is the header's: set for a language catalog (the same as `about.catalog`), absent in the
+ * common catalog. `requires` is `[catalog, revision, id]` with the id as 32 bytes.
+ */
+export type CatalogModel = {
+  lang?: string
+  about: About
+  resources: CatalogResource[]
+  segments: SegmentEntry[]
+  units: Unit[]
+  requires?: [catalog: string, revision: number, id: Uint8Array][]
+  complements?: Complement[]
+}
