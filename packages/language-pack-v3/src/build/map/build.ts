@@ -12,7 +12,7 @@ import { Tally } from '../maps/tally'
 import { expandRange } from '../maps/verses'
 import { bookNames, conceptNames, obsTitles, subtitlesOf } from './names'
 
-export type MapBuild = { core: MapCore; parts: MapPart[]; report: string[] }
+export type MapBuild = { core: MapCore; parts: MapPart[] }
 
 const BOOK_CODES: ReadonlySet<string> = new Set(BOOKS)
 const tagOf = (stamp: string): string => stamp.split('#')[0]
@@ -34,7 +34,6 @@ export function buildMap(o: {
   bookNames?: Record<string, [string, string, string]>
   partial?: boolean
 }): MapBuild {
-  const report: string[] = []
   const books = [...o.books].sort((a, b) => bookNumber(a.model.book) - bookNumber(b.model.book))
   const usage = new Tally('notes')
   for (const { model, verses } of books) {
@@ -66,5 +65,5 @@ export function buildMap(o: {
     const lists = usage.verseLists(book)
     if (lists.size > 0) parts.push({ lang: o.lang, part: book, usage: lists })
   }
-  return { core, parts, report }
+  return { core, parts }
 }

@@ -319,7 +319,6 @@ export async function buildLanguage(o: {
   // The language map: the notes counted by concept, the names of books and concepts, the coverage of every resource
   if (refs.length > 0) {
     const built = buildMap({ lang, refs, books: mapBooks, articles: [...articles.values()].flat(), obs, bookNames: o.bookNames, partial: o.partial })
-    report.push(...built.report)
     const all = refs.map((ref) => ref.key)
     const coreRows: RowKey[] = [...mapRows.values()].flat()
     for (const list of artRows.values()) coreRows.push(...list)
@@ -393,6 +392,7 @@ export async function buildCommon(o: {
   const report: string[] = []
   const listed = [...refs]
   const lang = o.mapLang
+  if (lang !== undefined && origs.length === 0) report.push(`no original was built, so the xmap of ${lang} is not built: the publisher needs the originals`)
   if (lang !== undefined && origs.length > 0) {
     const built = await buildXmap({ source: o.source, origs, lang })
     report.push(...built.report)

@@ -40,7 +40,9 @@ describe('buildXmap, English Titus', () => {
     const got = new Set<number>()
     for (const list of parts[0].strong.values()) for (const v of list) got.add(v)
     expect(got).toEqual(wanted)
-    expect(versesOf(orig).length).toBeGreaterThan(0)
+    const known = new Set(versesOf(orig))
+    expect(known.size).toBeGreaterThan(0)
+    expect([...got].filter((v) => !known.has(v))).toEqual([])
   })
 
   test('building twice gives equal results', async () => {

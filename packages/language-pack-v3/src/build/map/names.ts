@@ -56,7 +56,9 @@ export function conceptNames(articles: ArticleModel[]): Record<string, string[]>
     if (a.id.startsWith('tw:')) {
       const parts = a.title.split(',').map((s) => s.trim()).filter((s) => s !== '')
       if (parts.length > 0) out[a.id] = parts
-    } else if (a.id.startsWith('ta:')) out[a.id] = [a.title]
+    } else if (a.id.startsWith('ta:')) {
+      if (a.title.trim() !== '') out[a.id] = [a.title]
+    }
   }
   return out
 }

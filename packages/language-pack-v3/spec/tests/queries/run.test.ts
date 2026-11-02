@@ -16,7 +16,7 @@ test('run.ts exits 2 on a usage error or a folder that is not a build', () => {
 
 // A build is needed for the two checks below: the folder named by LP3_QUERY_BUILD (the gate's English build).
 const BUILD = process.env.LP3_QUERY_BUILD
-test.skipIf(BUILD === undefined)('a doctored expected is reported as a difference (exit 1 from the command)', async () => {
+test.skipIf(BUILD === undefined)('a doctored expected is counted as failed and its line is not ok (runQueries; the exit 1 follows from failed > 0)', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'lp3-queries-'))
   for (const name of readdirSync(HERE).filter((f) => f.endsWith('.json'))) copyFileSync(join(HERE, name), join(dir, name))
   expect((await runQueries(BUILD!, dir)).failed).toBe(0)

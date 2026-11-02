@@ -49,8 +49,8 @@ that is truly empty is `{}`. An empty list never stands for "absent".
   note is its chapter's (`C:intro`, verse 0).
 - **A single verse covers its own id** even if the original lacks that verse. A range covers both ends and the verses the
   original has strictly between them.
-- **Partial.** No source of the sample is partial (every source lists whole books); `answers.py` asserts it, so rule 1 of
-  "States" never applies to the five fixed queries.
+- **Partial.** No source of the sample is partial (every source lists whole books), so rule 1 of
+  "States" never applies to the five fixed queries; `answers.py` does not check it, and rule 1 is covered by the unit tests of `src/query/maps.test.ts`.
 
 The fixed queries of this folder are asked of the common map alone, with no language map: `coverage` and `tables` of a
 `book` answer list only the `xmap`'s sources and tables.

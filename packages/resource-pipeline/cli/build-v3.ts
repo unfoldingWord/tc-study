@@ -44,7 +44,8 @@ export class UsageError extends Error {}
 export const USAGE =
   'Usage: build-v3 --list <lang list.json> --originals <originals list.json> --parts <dir> --out <dir> ' +
   '[--books tit,rut] [--registry <dir>] [--revision <n>] [--built <RFC 3339>] [--publisher <name>]\n' +
-  '  --books      the books to build (default: those the language and the originals have)\n' +
+  '  --books      the books to build (default: those the language and the originals have).\n' +
+  '               The common map counts only the books built: a publisher needs all 66 originals\n' +
   '  --registry   the folder of registry-<lang>.json, read if it exists and updated; without it, section ids start from scratch\n' +
   '  --revision   the revision of both catalogs (default 1)\n' +
   '  --built      the time the catalogs say they were built (default: now). Pass a fixed value for a reproducible build:\n' +
@@ -217,6 +218,7 @@ async function build(o: Options, io: Io): Promise<void> {
   // Common first: the language catalog names it.
   // The common map needs the helps of the map language: when the source has none (no list for it), there is no map to build.
   const mapLang = (await source.resources(o.mapLang)).length > 0 ? o.mapLang : undefined
+  if (mapLang === undefined) io.log(`no list for the map language ${o.mapLang} (--map-list): no common map is built`)
   const common = await buildCommon({ source, books, about, mapLang })
   let bookNames: Record<string, [string, string, string]> | undefined
   if (o.bookNames !== undefined) {

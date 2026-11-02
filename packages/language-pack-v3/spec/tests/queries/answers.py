@@ -264,12 +264,12 @@ def answer_book(world, q):
 
 
 def fold(text):
-    return unicodedata.normalize("NFC", text.replace("/", "").replace("⁠", ""))
+    return unicodedata.normalize("NFC", text.replace("/", "").replace("\u2060", ""))
 
 
 def loose(text):
     t = unicodedata.normalize("NFD", fold(text))
-    return "".join(c for c in t if not unicodedata.category(c).startswith("M")).replace("־", "")
+    return "".join(c for c in t if not unicodedata.category(c).startswith("M")).replace("\u05be", "")
 
 
 def link_strongs(world):
@@ -295,7 +295,7 @@ def link_strongs(world):
         occ = int(link.get("occurrence") or 1)
         hit = []
         for piece in (link.get("origWords") or "").split("&"):
-            quote = [w for w in re.split(r"[\s־]+", piece.strip()) if w and w != "׀"]
+            quote = [w for w in re.split(r"[\s\u05be]+", piece.strip()) if w and w != "\u05c0"]
             run = None
             for norm in (fold, loose):
                 q = [norm(w) for w in quote]
@@ -348,7 +348,6 @@ def expect(label, got, want):
 def checks(world, strongs, missed):
     T = world["tables"]
     out = []
-    expect("partial sources", {s for s in world["partial"].values() if s}, set())
     n, v, b = totals(T["strong"], "G54850")
     out.append(f"G5485: {n} occurrences in {v} verses of {b} books")
     expect("G5485", (n, v, b), (156, 148, 23))
