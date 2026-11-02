@@ -82,6 +82,7 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | The lexicon carries no `domains` rows in phase 1 | A later version of its tables |
 | Lexicon `refs` stored as `[from, to]` pairs are larger than the source strings: a columnar version is planned | A later version of its tables |
 | A bridged book names the original's stamp, so a device must have (or build) the matching `orig` segment | Phase 2 |
+| One CBOR value with both an integer outside -(2^53 - 1) .. 2^53 - 1 and nesting deeper than 64: the TypeScript reader reports the first defect it meets reading the bytes in order, while the Python reader decodes the value and then checks the integer ranges in a second pass (so it gives `E_LIMIT`). No conformance case has such a file; a third reader may pick either until the specification fixes the order | A later minor version of the specification |
 
 ## Conformance
 
