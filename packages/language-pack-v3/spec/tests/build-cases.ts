@@ -653,6 +653,11 @@ export async function buildBigSegments(): Promise<Map<string, Uint8Array>> {
   const xmap = await buildXmap({ source: english, origs: [await extractOrig(english, 'tit')], lang: 'en' })
   for (const part of [xmap.core, ...xmap.parts]) out.set(`xmap-${part.part}-en.seg`, (await writeSegment(xmapSegment(part))).bytes)
   for (const [name, bytes] of await topicsSegments(english)) out.set(name, bytes)
+  // The index of aligned phrases (optional units): the es-419 sample built again with `aligned: true`; its catalog (with the
+  // `optional` units) and one segment per part. The other segments of that build are the ones above (byte-equal), so they are not repeated.
+  const withAligned = await buildLanguage({ source: await sample(), lang: ES, registry: {}, about: ABOUT, aligned: true })
+  out.set('catalog-es-419-aligned.seg', withAligned.catalog.bytes)
+  for (const seg of withAligned.segments.filter((s) => s.seg.h.class === 'aligned')) out.set(`aligned-${String(seg.seg.h.group).replace(/ /g, '_')}.seg`, seg.bytes)
   const whole = writeTransfer({ mode: 'full', catalogs: [built.catalog, common.catalog], entries: [orig, obs, art, lex], made: MADE, by: BY })
   out.set('full.tcpack', whole)
   out.set('full-cut.tcpack', cutMiddleOfLast(whole, lex.bytes.length))

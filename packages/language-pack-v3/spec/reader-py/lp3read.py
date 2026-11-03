@@ -33,7 +33,7 @@ MAX_HEADER = 65536
 MAX_LEN = 67108864
 MAX_DEPTH = 64
 
-CLASSES = ("catalog", "xmap", "map", "xtopics", "topics", "book", "orig", "art", "lex", "obs", "gen")
+CLASSES = ("catalog", "xmap", "map", "xtopics", "topics", "aligned", "book", "orig", "art", "lex", "obs", "gen")
 KINDS = ("chapter", "verse", "open", "close")
 BOOKS = (
     "gen exo lev num deu jos jdg rut 1sa 2sa 1ki 2ki 1ch 2ch ezr neh est job psa pro ecc sng isa jer lam ezk dan hos "
@@ -57,6 +57,7 @@ KNOWN_TABLES = {
     "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
     "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges"},
     "topics": {"names", "local", "coverage"},
+    "aligned": {"keys", "strongs", "data"},
 }
 REQUIRED_TABLES = {
     "book": {"strings", "texts"},
@@ -65,6 +66,7 @@ REQUIRED_TABLES = {
     "lex": {"entries"},
     "obs": {"strings", "stories"},
     "catalog": {"about", "resources", "segments", "units"},
+    "aligned": {"keys", "strongs", "data"},
 }
 # map and xmap: the required tables depend on the segment being a core or a part (see ``required_tables``)
 REQUIRED_MAP_CORE = {"map": {"books", "names", "coverage"}, "xmap": {"coverage", "strong", "concepts"},
@@ -1234,6 +1236,13 @@ def _decode_catalog(p: Segment) -> dict:
         unit = {"id": uid, "segments": list(idx)}
         if _opt(u, "needs", is_strlist) is not None:
             unit["needs"] = u["needs"]
+        # "optional" is true or absent; an "aligned:" unit has it and no other unit does (catalog.md, cddl/catalog.cddl)
+        if "optional" in u and u["optional"] is not True:
+            _bad()
+        if ("optional" in u) != uid.startswith("aligned:"):
+            _bad()
+        if "optional" in u:
+            unit["optional"] = True
         units.append(unit)
 
     out = {"about": about, "resources": resources, "segments": segments, "units": units}
@@ -1630,24 +1639,116 @@ def _decode_topics(p: Segment) -> dict:
     return out
 
 
-_DECODERS = {"xtopics": _decode_xtopics, "topics": _decode_topics, "book": _decode_book, "orig": _decode_orig, "art": _decode_art, "lex": _decode_lex,
+# ---------------------------------------------------------------------------------------------------------------
+# aligned (cddl/aligned.cddl, tests/README.md "aligned")
+# ---------------------------------------------------------------------------------------------------------------
+
+_ALIGNED_GROUP = re.compile(r"([a-z][a-z ]{0,5})-([a-z](?:[a-z ]{0,4}[a-z])?)|([a-z](?:[a-z ]{0,4}[a-z])?)|other")
+
+
+def aligned_range(group: str) -> tuple[str, str] | None:
+    """(P, Q) of a group text (a lone prefix is P-P), or None for "other" and for a text that is no group."""
+    m = _ALIGNED_GROUP.fullmatch(group)
+    if not m or group == "other":
+        return None
+    if m.group(3) is not None:
+        return m.group(3), m.group(3)
+    return m.group(1), m.group(2)
+
+
+def in_aligned_range(key: str, p: str, q: str) -> bool:
+    """P <= key and key[:len(Q)] <= Q, both by code point (Python compares str by code point)."""
+    return p <= key and key[:len(q)] <= q
+
+
+def aligned_ranges_of_catalog(catalog_out: dict) -> list[tuple[str, str]]:
+    """The ranges of the ``aligned:{part}`` units of a catalog's reader output (``other`` has none)."""
+    out = []
+    for u in catalog_out["units"]:
+        if u["id"].startswith("aligned:"):
+            r = aligned_range(u["id"][len("aligned:"):])
+            if r is not None:
+                out.append(r)
+    return out
+
+
+def _decode_aligned(p: Segment, ranges: list[tuple[str, str]] | None = None) -> dict:
+    _header_needs(p, "lang", "group", "res", nonempty_res=True)
+    group = p.h["group"]
+    m = _ALIGNED_GROUP.fullmatch(group)
+    if not m:
+        _bad()
+    rng = aligned_range(group)
+    if rng is not None and not rng[0] <= rng[1]:
+        _bad()                              # P after Q: "d-b"
+    for name in ("keys", "strongs", "data"):
+        if name not in p.h["tables"]:
+            _bad()
+    keys = texts_column(p.t["keys"])
+    strongs = _strtab(p.t["strongs"])
+    data = uvarints(p.t["data"])
+    prev = None
+    for k in keys:
+        if k == "" or (prev is not None and k <= prev):
+            _bad()                          # empty, repeated or not sorted
+        prev = k
+        if rng is not None and not in_aligned_range(k, *rng):
+            _bad()
+        if rng is None and ranges is not None and any(in_aligned_range(k, a, b) for a, b in ranges):
+            _bad()                          # "other" holds no key of a range of the catalog
+    entries = {}
+    at, n = 0, len(data)
+
+    def take() -> int:
+        nonlocal at
+        if at >= n:
+            _bad()                          # cut short
+        at += 1
+        return data[at - 1]
+
+    for k in keys:
+        s = take()
+        entry, used = {}, set()
+        for _ in range(s):
+            idx = take()
+            if idx >= len(strongs) or idx in used:
+                _bad()
+            used.add(idx)
+            books, book = {}, 0
+            for _ in range(take()):
+                delta = take()
+                book += delta
+                verses, occ = take(), take()
+                if delta == 0 or book > 66 or verses == 0 or verses > occ:
+                    _bad()
+                books[BOOKS[book - 1]] = [verses, occ]
+            entry[strongs[idx]] = books
+        entries[k] = entry
+    if at != n:
+        _bad()                              # numbers left over
+    return {"entries": entries}
+
+
+_DECODERS = {"aligned": _decode_aligned, "xtopics": _decode_xtopics, "topics": _decode_topics, "book": _decode_book, "orig": _decode_orig, "art": _decode_art, "lex": _decode_lex,
              "obs": _decode_obs, "catalog": _decode_catalog, "map": _decode_map, "xmap": _decode_xmap}
 
 
-def decode_segment(p: Segment, as_class: str | None = None) -> dict:
+def decode_segment(p: Segment, as_class: str | None = None, aligned_ranges: list | None = None) -> dict:
     """Step 5: the tables of the class. Returns the reader output of a segment file.
 
     ``as_class`` forces the schema (a catalog of a transfer file is read against the tables of a catalog, whatever
     its own header says).
     """
-    out = _DECODERS[as_class or p.cls](p)
+    cls = as_class or p.cls
+    out = _decode_aligned(p, aligned_ranges) if cls == "aligned" else _DECODERS[cls](p)
     out["id"] = p.id
     out["h"] = jsonable(p.h)
     return out
 
 
-def read_segment(data: bytes, expect_id: bytes | None = None) -> dict:
-    return decode_segment(parse_segment(data, expect_id))
+def read_segment(data: bytes, expect_id: bytes | None = None, aligned_ranges: list | None = None) -> dict:
+    """``aligned_ranges``: the (P, Q) ranges of the catalog's aligned units; with them an ``other`` part is checked."""
+    return decode_segment(parse_segment(data, expect_id), aligned_ranges=aligned_ranges)
 
 
 # ---------------------------------------------------------------------------------------------------------------
