@@ -70,8 +70,8 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 | One book of the original | `orig` of that book, and every `book` segment of that book in every language (their positions); the `xmap` part of that book |
 | A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog. A map part keeps its segment id, but its `inputs` carry the tN stamp of its book and so change: the part is re-checked, not re-published |
 | The alias list | the `xmap` core and the parts whose books they touch |
-| TIPNR, Theographic, English OBS, the English tN outlines or the builder's list of events | the `xtopics` core and the parts whose books they touch; never an `xmap` or `map` segment |
-| A language's aligned text, or the outline of its introductions | its `topics` core and the parts whose books they touch; never a segment of the map |
+| TIPNR, Theographic, English OBS, the English tN outlines or the builder's list of events | the `xtopics` core and every `xtopics` part (all of them share the `inputs` of the sources, so each is re-checked; only the core and the parts whose books they touch change in content); never an `xmap` or `map` segment |
+| A language's aligned text, or the outline of its introductions | its `topics` core and every `topics` part of that language (all share the `inputs` of the core, so each is re-checked; only the core and the parts whose books they touch change in content); never a segment of the map |
 
 ## Signatures
 
