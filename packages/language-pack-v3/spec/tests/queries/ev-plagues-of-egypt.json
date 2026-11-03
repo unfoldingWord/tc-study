@@ -407,6 +407,9 @@
       2012036
     ]
   },
+  "ignoreRelationsFrom": [
+    "sec:"
+  ],
   "query": {
     "id": "ev:plagues-of-egypt",
     "kind": "topic"

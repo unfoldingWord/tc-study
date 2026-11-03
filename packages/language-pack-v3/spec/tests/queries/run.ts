@@ -19,7 +19,7 @@ import { canonicalJson, KNOWN, type Json, sortKeys } from '../../../src/read/out
 import { xmapView } from '../../../src/read/xmap'
 import { xtopicsView } from '../../../src/read/topics'
 import type { XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../../../src/model'
-import { firstDifference } from '../compare'
+import { firstDifference, withoutIgnoredRelations } from '../compare'
 
 const QUERIES_DIR = import.meta.dir
 
@@ -61,7 +61,7 @@ export async function runQueries(out: string, dir: string = QUERIES_DIR, require
   let failed = 0
   let skipped = 0
   for (const name of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
-    const doc = JSON.parse(readFileSync(join(dir, name), 'utf8')) as { query: { kind: string }; expected?: Json }
+    const doc = JSON.parse(readFileSync(join(dir, name), 'utf8')) as { query: { kind: string }; expected?: Json; ignoreRelationsFrom?: string[] }
     let line: string
     // A topic query needs the topics module (optional): a build without it cannot give the expected answer, so the query is not asked.
     if (maps.xtopics === undefined && ['topic', 'category'].includes(doc.query.kind)) {
@@ -72,7 +72,7 @@ export async function runQueries(out: string, dir: string = QUERIES_DIR, require
       continue
     }
     try {
-      const got = sortKeys(answer(maps, doc.query))
+      const got = withoutIgnoredRelations(sortKeys(answer(maps, doc.query)), doc.ignoreRelationsFrom)
       const found = doc.expected === undefined ? ['$', got, undefined] : firstDifference(got, sortKeys(doc.expected))
       if (found === null) line = 'ok'
       else {

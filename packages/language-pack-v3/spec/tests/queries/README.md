@@ -86,3 +86,5 @@ every link of the English word links (`unfoldingWord/en/twl`) to it, in any book
 6. A link with a piece that is not found gives no key at all (its other pieces are dropped too).
 
 Note of the sample: 57 of its 85 764 `tw:` links find no quote and give no key.
+
+A fixture may carry `ignoreRelationsFrom`, a list of prefixes: the relations of the answer whose `from` starts with one of them are left out before the compare. `ev-plagues-of-egypt.json` uses `["sec:"]`: its `occurs-in` relations from the `obs:` stories are cross-checked (`answers.py` derives them by verse overlap), but the `occurs-in` from a section (`sec:exo/12.1-12.30`, source `unfoldingWord/en/tn`) is NOT cross-checked, because that needs the outline parsing and the oracle has none.

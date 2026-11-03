@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { XtopicsCore, XtopicsPart } from '../model'
 import { canonicalJson, sortKeys, type Json } from '../read/output'
 import { answer, type MapSet } from './maps'
-import { firstDifference } from '../../spec/tests/compare'
+import { firstDifference, withoutIgnoredRelations } from '../../spec/tests/compare'
 import { sampleTopics, SAMPLE, SOURCES } from './topicsFixture'
 
 const core: XtopicsCore = {
@@ -89,8 +89,8 @@ describe.skipIf(SAMPLE === undefined || SOURCES === undefined)('the fixed topic 
   for (const name of ['per-abraham', 'ev-plagues-of-egypt']) {
     test(`${name} agrees with answers.py`, async () => {
       const { maps } = await cached()
-      const doc = JSON.parse(readFileSync(join(QUERIES, `${name}.json`), 'utf8')) as { query: { kind: string }; expected: Json }
-      const found = firstDifference(sortKeys(answer(maps, doc.query)), sortKeys(doc.expected))
+      const doc = JSON.parse(readFileSync(join(QUERIES, `${name}.json`), 'utf8')) as { query: { kind: string }; expected: Json; ignoreRelationsFrom?: string[] }
+      const found = firstDifference(withoutIgnoredRelations(sortKeys(answer(maps, doc.query)), doc.ignoreRelationsFrom), sortKeys(doc.expected))
       expect(found).toBeNull()
     }, 900_000)
   }
