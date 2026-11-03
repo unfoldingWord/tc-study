@@ -365,7 +365,6 @@ async function cutTransfer(): Promise<Uint8Array> {
   })
   // Case 1 travels beside case 4's segment, and the catalog does not list it.
   const minimal = await storedSegment(join(TESTS_DIR, 'container', 'minimal.seg'))
-  for (const [name, bytes] of await topicsSegments(english)) out.set(name, bytes)
   const whole = writeTransfer({ mode: 'full', catalogs: [catalog], entries: [minimal, book], made: MADE, by: BY })
   return cutMiddleOfLast(whole, book.bytes.length)
 }
@@ -641,6 +640,7 @@ export async function buildBigSegments(): Promise<Map<string, Uint8Array>> {
   const english = await partsSource({ list: join(DATA, 'en', 'list.json'), partsDir: PARTS, originals: ORIGINALS_LIST })
   const xmap = await buildXmap({ source: english, origs: [await extractOrig(english, 'tit')], lang: 'en' })
   for (const part of [xmap.core, ...xmap.parts]) out.set(`xmap-${part.part}-en.seg`, (await writeSegment(xmapSegment(part))).bytes)
+  for (const [name, bytes] of await topicsSegments(english)) out.set(name, bytes)
   const whole = writeTransfer({ mode: 'full', catalogs: [built.catalog, common.catalog], entries: [orig, obs, art, lex], made: MADE, by: BY })
   out.set('full.tcpack', whole)
   out.set('full-cut.tcpack', cutMiddleOfLast(whole, lex.bytes.length))
