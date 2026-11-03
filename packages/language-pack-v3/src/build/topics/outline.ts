@@ -57,7 +57,7 @@ export function outlineOf(
     const it = ITEM.exec(line)
     if (!it) continue
     // A label after the range, "(3:1–24) - promise" in the English Genesis outline, is not part of the entry
-    const text = plain(it[1]).trim().replace(/\)\s+[-–—]\s+[A-Za-z][A-Za-z ]*$/, ')')
+    const text = plain(it[1]).trim().replace(/\)\s+[-–—]\s+\p{L}[\p{L} ]*$/u, ')')
     const t = TAIL.exec(text)
     if (!t) {
       issues.push(`outline ${book}: no range in ${JSON.stringify(text)}`)

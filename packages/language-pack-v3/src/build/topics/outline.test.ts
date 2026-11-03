@@ -89,6 +89,13 @@ describe('outlineOf', () => {
     expect(o[1]).toMatchObject({ from: verseId('tit', 1, 4), to: verseId('tit', 1, 10) })
     expect(issues).toEqual([])
   })
+  test('a label with accented letters after the range is dropped', () => {
+    const issues: string[] = []
+    const md = ['## Esquema', '1. El pecado (2:1–15) - promesa', '2. La salida (1:4–10) - Éxodo'].join('\n')
+    const o = outlineOf(md, 'tit', issues, last)
+    expect(o.map((e) => e.title)).toEqual(['El pecado', 'La salida'])
+    expect(issues).toEqual([])
+  })
   test('no Outline section is reported', () => {
     const issues: string[] = []
     expect(outlineOf('# A\n\ntext', 'exo', issues, last)).toEqual([])
