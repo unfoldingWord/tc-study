@@ -1,6 +1,11 @@
 """Independent answers of the fixed queries (README.md of this folder).
 
-Usage: python -I -X utf8 answers.py <sample dir> <queries dir>
+Usage: python -I -X utf8 answers.py <sample dir> <queries dir> [<sources dir>]
+
+The kind `topic` is computed from the SOURCE files of part B (the TIPNR text and the English OBS stories in
+`<sources dir>`, else the environment variable LP3_SOURCES) and from the sample's originals and links; it is
+skipped when there is no sources dir. The rules are those of ids.md and counts.md, written here again from the
+specification, not read from the builders.
 
 Stdlib only. It reads the raw parts of the phase 0 sample (`mapa.json` and `muestra.json`, each part a gzip of JSON
 lines), builds the counts as counts.md says, answers every `<name>.json` of the queries dir whose kind it knows
@@ -18,6 +23,7 @@ Facts of the sample's raw rows that the rules need:
 """
 import gzip
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -335,6 +341,164 @@ def answer_keyterms(world, q, strongs):
     return {"kind": "keyterms", "book": b, "candidates": cands}
 
 
+# ---- topics (ids.md, xtopics.cddl) ------------------------------------------------------------------------------------
+
+TIPNR_KEY, OBS_KEY, BUILDER_KEY = "STEPBible/STEPBible-Data/TIPNR", "unfoldingWord/en/obs", "builder"
+# The one event the builder owns (ids.md "Ids of events"): Exodus 7:14 to 12:36.
+BUILDER_EVENTS = {"ev:plagues-of-egypt": ("Plagues of Egypt", vid("exo", 7, 14), vid("exo", 12, 36))}
+OBS_NAMES = dict(pair.split(":") for pair in (
+    "genesis:gen|exodus:exo|leviticus:lev|numbers:num|deuteronomy:deu|joshua:jos|judges:jdg|ruth:rut|1 samuel:1sa|2 samuel:2sa|"
+    "1 kings:1ki|2 kings:2ki|1 chronicles:1ch|2 chronicles:2ch|ezra:ezr|nehemiah:neh|esther:est|job:job|psalm:psa|psalms:psa|"
+    "proverbs:pro|ecclesiastes:ecc|song of solomon:sng|isaiah:isa|jeremiah:jer|lamentations:lam|ezekiel:ezk|daniel:dan|"
+    "hosea:hos|joel:jol|amos:amo|obadiah:oba|jonah:jon|micah:mic|nahum:nam|habakkuk:hab|zephaniah:zep|haggai:hag|"
+    "zechariah:zec|malachi:mal|matthew:mat|mark:mrk|luke:luk|john:jhn|acts:act|romans:rom|1 corinthians:1co|2 corinthians:2co|"
+    "galatians:gal|ephesians:eph|philippians:php|colossians:col|1 thessalonians:1th|2 thessalonians:2th|1 timothy:1ti|"
+    "2 timothy:2ti|titus:tit|philemon:phm|hebrews:heb|james:jas|1 peter:1pe|2 peter:2pe|1 john:1jn|2 john:2jn|3 john:3jn|"
+    "jude:jud|revelation:rev").split("|"))
+
+
+def slug(text):
+    return re.sub(r"[^a-z0-9-]", "", text.lower().replace(" ", "-").replace("'", "-"))
+
+
+def read_tipnr(path):
+    """People and places of the TIPNR text: id, kind, unique name, uStrong, dStrongs and the verses of all its name lines."""
+    drafts, kind, cur = [], None, None
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if line.startswith("$"):
+            title = re.sub(r"^\$=*\s*", "", line).split("\t")[0].strip()
+            kind = "per" if title.startswith("PERSON") else "lug" if title in ("PLACE", "PLACE+PERSON") else None
+            cur = None
+            continue
+        if kind is None or not line:
+            continue
+        cols = line.split("\t")
+        if cols[0].startswith("–"):  # an en dash: a name line of the record above
+            if cur is None or cols[0].strip() == "– Total" or len(cols) < 3:
+                continue
+            d = cols[2].split("«")[0].strip()
+            if d:
+                cur["dstrongs"].append(d)
+            for ref in re.split(r"[;,]", cols[4] if len(cols) > 4 else ""):
+                m = re.fullmatch(r"([1-3]?[A-Za-z]+)\.(\d+)\.(\d+)[a-z]?", ref.strip())
+                if m and m.group(1).lower() in NUM:
+                    cur["verses"].add(vid(m.group(1).lower(), int(m.group(2)), int(m.group(3))))
+            continue
+        if len(cols) < 8 or not re.fullmatch(r"[^\s*@][^@\t]*@[1-3]?[A-Za-z]+\.\d+\.\d+[^=\t]*=[HG]\d{4}\w*", cols[0]):
+            continue
+        unique, _, ustrong = cols[0].rpartition("=")
+        first = re.search(r"@([1-3]?[A-Za-z]+)\.(\d+)\.(\d+)", unique)
+        cur = {"kind": kind, "unique": unique.strip(), "ustrong": ustrong.strip(), "slug": slug(unique.split("@")[0]),
+               "suffix": f"{first.group(1).lower()}-{first.group(2)}-{first.group(3)}" if first else "",
+               "dstrongs": [], "verses": set()}
+        drafts.append(cur)
+    shared = defaultdict(int)
+    for d in drafts:
+        shared[(d["kind"], d["slug"])] += 1
+    used = defaultdict(int)
+    for d in drafts:
+        tail = f"{d['slug']}-{d['suffix']}" if shared[(d["kind"], d["slug"])] > 1 and d["suffix"] else d["slug"]
+        pid = f"{d['kind']}:{tail}"
+        used[pid] += 1
+        d["id"] = pid if used[pid] == 1 else f"{pid}-{used[pid]}"
+    return drafts
+
+
+def read_obs(folder, originals):
+    """story number -> [(first verse id, last verse id)] from the closing line `_A Bible story from: ..._`."""
+    def last_verse(book, chapter):
+        o = originals.get(book)
+        return max((v % 1000 for v in o.verses if v // 1000 % 1000 == chapter), default=None) if o else None
+    out = {}
+    for f in sorted(Path(folder).glob("[0-9][0-9].md")):
+        m = re.search(r"^_A Bible story from:\s*(.+?)_\s*$", f.read_text(encoding="utf-8"), re.M)
+        if not m:
+            continue
+        book, ranges = None, []
+        for piece in re.split(r"[;,]", m.group(1)):
+            piece = piece.strip()
+            wb = re.fullmatch(r"((?:[1-3] )?[A-Za-z][A-Za-z ]*?)\s+(\d.*)", piece)
+            if wb:
+                book = OBS_NAMES.get(wb.group(1).lower())
+                piece = wb.group(2)
+            p = re.fullmatch(r"(\d+)(?::(\d+))?(?:-(\d+)(?::(\d+))?)?", piece)
+            if not book or not p:
+                continue
+            c1, v1, c2, v2 = (int(g) if g else None for g in p.groups())
+            if v1 is None and v2 is not None:  # "3-4:22"
+                rng = (vid(book, c1, 1), vid(book, c2, v2))
+            elif v1 is None:  # whole chapters "3", "5-10"
+                last = last_verse(book, c2 or c1)
+                if last is None:
+                    continue
+                rng = (vid(book, c1, 1), vid(book, c2 or c1, last))
+            elif c2 is None:
+                rng = (vid(book, c1, v1), vid(book, c1, v1))
+            elif v2 is None:  # "3:1-6"
+                rng = (vid(book, c1, v1), vid(book, c1, c2))
+            else:
+                rng = (vid(book, c1, v1), vid(book, c2, v2))
+            if rng[0] <= rng[1]:
+                ranges.append(rng)
+        if ranges:
+            out[int(f.stem)] = ranges
+    return out
+
+
+def dbase(key):
+    m = re.match(r"([HG])0*(\d{1,4})", key.split(":")[-1])
+    return f"{m.group(1)}{m.group(2).zfill(4)}" if m else None
+
+
+def topic_cell(book, covered, rows):
+    if book not in covered:
+        return {"state": "none"}
+    if rows.get(book):
+        return {"state": "count", "count": len(rows[book]), "verses": len(rows[book])}
+    return {"state": "zero", "count": 0, "verses": 0}
+
+
+def answer_topic(world, tipnr, obs, q):
+    tid = q["id"]
+    originals = world["originals"]
+    rows = defaultdict(set)  # book -> verse ids
+    covered = set()
+    rec = next((d for d in tipnr if d["id"] == tid), None)
+    if rec:
+        covered = {BOOKS[v // 1_000_000 - 1] for d in tipnr for v in d["verses"]} & set(originals)
+        for v in rec["verses"]:
+            if BOOKS[v // 1_000_000 - 1] in originals:
+                rows[BOOKS[v // 1_000_000 - 1]].add(v)
+        shown = {"kind": "person" if rec["kind"] == "per" else "place", "source": TIPNR_KEY, "ref": rec["unique"],
+                 "title": rec["unique"].split("@")[0].strip(), "ustrong": rec["ustrong"]}
+    elif tid in BUILDER_EVENTS:
+        title, a, z = BUILDER_EVENTS[tid]
+        for b, o in originals.items():
+            for v in o.verses:
+                if a <= v <= z and v % 1000 != 0:
+                    rows[b].add(v)
+        covered = set(rows)
+        shown = {"kind": "event", "source": BUILDER_KEY, "ref": tid, "title": title}
+    else:
+        return {"kind": "topic", "id": tid, "installed": True, "found": False}
+    verses = sorted(v for vs in rows.values() for v in vs)
+    stories = [f"obs:{n}" for n, rs in sorted(obs.items()) if any(a <= v <= z for a, z in rs for v in verses)]
+    relations = []
+    types = q.get("types")
+    if rec and (types is None or "same-as" in types):
+        links = world["tables"]["links"].data
+        for cid in sorted(c for c in world["tw_strongs"] if c.startswith("tw:names/")):
+            tw_verses = {v for cell_ in links[cid].values() for v in cell_[1]} if cid in links else set()
+            bases = {dbase(k) for k in world["tw_strongs"][cid]}
+            cands = [d for d in tipnr if bases & {dbase(x) for x in d["dstrongs"]}]
+            found = [d for d in cands if d["verses"] & tw_verses]
+            if len(found) == 1 and found[0]["id"] == tid:
+                relations.append({"from": cid, "to": tid, "type": "same-as", "source": TIPNR_KEY, "confidence": 70})
+    return {"kind": "topic", "id": tid, "installed": True, "found": True, "topic": shown, "unit": "verses",
+            "books": {b: topic_cell(b, covered, rows) for b in BOOKS}, "verses": verses, "stories": stories,
+            "relations": relations, "names": []}
+
+
 def totals(counts, key):
     rows = counts.data.get(key, {})
     return sum(r[0] for r in rows.values()), sum(len(r[1]) for r in rows.values()), len(rows)
@@ -385,6 +549,12 @@ def main():
     qdir = Path(sys.argv[2])
     world = load(sample)
     strongs, missed = link_strongs(world)
+    world["tw_strongs"] = strongs
+    sources = sys.argv[3] if len(sys.argv) > 3 else os.environ.get("LP3_SOURCES")
+    tipnr = obs = None
+    if sources:
+        tipnr = read_tipnr(next((Path(sources) / "tipnr").glob("*.txt")))
+        obs = read_obs(Path(sources) / "en_obs" / "obs-repo" / "content", world["originals"])
     for f in sorted(qdir.glob("*.json")):
         doc = json.loads(f.read_text(encoding="utf-8"))
         q = doc["query"]
@@ -397,6 +567,8 @@ def main():
             doc["expected"] = answer_book(world, q)
         elif kind == "keyterms":
             doc["expected"] = answer_keyterms(world, q, strongs)
+        elif kind == "topic" and tipnr is not None:
+            doc["expected"] = answer_topic(world, tipnr, obs, q)
         else:
             print(f"{f.name}: kind {kind} not computed")
             continue

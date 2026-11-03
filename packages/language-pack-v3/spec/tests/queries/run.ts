@@ -17,7 +17,8 @@ import { answer } from '../../../src/query/maps'
 import { catalogView } from '../../../src/read/catalog'
 import { canonicalJson, KNOWN, type Json, sortKeys } from '../../../src/read/output'
 import { xmapView } from '../../../src/read/xmap'
-import type { XmapCore, XmapPart } from '../../../src/model'
+import { xtopicsView } from '../../../src/read/topics'
+import type { XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../../../src/model'
 import { firstDifference } from '../compare'
 
 const QUERIES_DIR = import.meta.dir
@@ -32,7 +33,16 @@ export async function loadCommonMap(out: string): Promise<MapSet> {
   const catalog = catalogView(seg)
   let core: XmapCore | undefined
   const parts = new Map<string, XmapPart>()
+  let xcore: XtopicsCore | undefined
+  const xparts = new Map<string, XtopicsPart>()
   for (const entry of catalog.segments) {
+    if (entry.class === 'xtopics') {
+      const file = join(out, 'segments', `${hex(entry.id)}.seg`)
+      const read = await readSegment(bytesOf(file), { known: KNOWN.xtopics, expectedClass: 'xtopics' })
+      const view = xtopicsView(read.seg)
+      if (view.part === 'core') xcore = view as XtopicsCore
+      else xparts.set(view.part, view as XtopicsPart)
+    }
     if (entry.class !== 'xmap') continue
     const file = join(out, 'segments', `${hex(entry.id)}.seg`)
     const read = await readSegment(bytesOf(file), { known: KNOWN.xmap, expectedClass: 'xmap' })
@@ -41,7 +51,7 @@ export async function loadCommonMap(out: string): Promise<MapSet> {
     else parts.set(view.part, view as XmapPart)
   }
   if (core === undefined) throw new Error('the common catalog lists no xmap core')
-  return { xmap: { core, parts }, revision: catalog.about.revision }
+  return { xmap: { core, parts }, ...(xcore === undefined ? {} : { xtopics: { core: xcore, parts: xparts } }), revision: catalog.about.revision }
 }
 
 /** One line per query file: `ok`, or the first place the answer differs from `expected`. */
@@ -52,6 +62,11 @@ export async function runQueries(out: string, dir: string = QUERIES_DIR): Promis
   for (const name of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
     const doc = JSON.parse(readFileSync(join(dir, name), 'utf8')) as { query: { kind: string }; expected?: Json }
     let line: string
+    // A topic query needs the topics module (optional): a build without it cannot give the expected answer, so the query is not asked.
+    if (maps.xtopics === undefined && ['topic', 'category'].includes(doc.query.kind)) {
+      lines.push(`${name.replace(/\.json$/, '')}: skipped (the build has no xtopics)`)
+      continue
+    }
     try {
       const got = sortKeys(answer(maps, doc.query))
       const found = doc.expected === undefined ? ['$', got, undefined] : firstDifference(got, sortKeys(doc.expected))

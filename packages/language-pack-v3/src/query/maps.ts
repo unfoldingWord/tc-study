@@ -7,13 +7,17 @@
 import { compareCodePoints } from '../codec/columns'
 import type { CountRows, Coverage } from '../codec/counts'
 import { BOOKS, bookNumber } from '../ids'
-import type { MapCore, MapPart, XmapCore, XmapPart } from '../model'
+import type { MapCore, MapPart, TopicsCore, TopicsPart, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../model'
 
 export type State = 'count' | 'zero' | 'none' | 'partial'
 export type Cell = { state: State; count?: number; verses?: number }
 export type MapSet = {
   xmap?: { core: XmapCore; parts: Map<string, XmapPart> }
   map?: { core: MapCore; parts: Map<string, MapPart> }
+  /** The common topics (optional module: the map never reads them). */
+  xtopics?: { core: XtopicsCore; parts: Map<string, XtopicsPart> }
+  /** The topics of a language (optional module). */
+  topics?: { core: TopicsCore; parts: Map<string, TopicsPart> }
   /** The revision of the catalog the maps belong to. */
   revision: number
 }
@@ -149,6 +153,45 @@ function revisionAnswer(m: MapSet, concept: string, book: string): unknown {
   return { kind: 'revision', concept, book, revision: m.revision, verses: [...verses].sort((a, b) => a - b), sources }
 }
 
+const STORY_HOLDERS = new Set(['person', 'place', 'event', 'topic'])
+
+/**
+ * A topic (`per:abraham`, `ev:plagues-of-egypt`; README.md of the queries). With no `xtopics` in the set the module is not on
+ * the device: `{installed: false}` and nothing else, never a state. `types` keeps only the relations of those types.
+ */
+function topicAnswer(m: MapSet, id: string, types?: string[]): unknown {
+  const x = m.xtopics
+  if (x === undefined) return { kind: 'topic', id, installed: false }
+  const topic = x.core.topics.get(id)
+  if (topic === undefined) return { kind: 'topic', id, installed: true, found: false }
+  const books: Record<string, Cell> = {}
+  for (const book of BOOKS) books[book] = cell(book, x.core.coverage, topic.source, x.core.occurrences, id)
+  const verses = [...x.parts.values()].flatMap((part) => part.occurrences.get(id) ?? []).sort((a, b) => a - b)
+  const stories: string[] = []
+  if (STORY_HOLDERS.has(topic.kind)) {
+    for (const [story, ranges] of Object.entries(x.core.ranges ?? {})) {
+      if (story.startsWith('obs:') && ranges.some(([a, z]) => verses.some((v) => a <= v && v <= z))) stories.push(story)
+    }
+    stories.sort((a, b) => Number(a.slice(4)) - Number(b.slice(4)))
+  }
+  const relations = (x.core.relations ?? [])
+    .filter((r) => (r.from === id || r.to === id) && (types === undefined || types.includes(r.type)))
+    .map((r) => ({ from: r.from, to: r.to, type: r.type, source: r.source, confidence: r.confidence }))
+    .sort((a, b) => compareCodePoints(a.type, b.type) || compareCodePoints(a.from, b.from) || compareCodePoints(a.to, b.to))
+  const shown: Record<string, string> = { kind: topic.kind, source: topic.source, ref: topic.ref }
+  if (topic.title !== '') shown.title = topic.title
+  if (topic.ustrong !== '') shown.ustrong = topic.ustrong
+  const names = (m.topics?.core.names[id] ?? []).map((n) => n[0])
+  return { kind: 'topic', id, installed: true, found: true, topic: shown, unit: 'verses', books, verses, stories, relations, names }
+}
+
+/** The ids of one kind of topic (`person place event topic story section`), sorted by code point. */
+function categoryAnswer(m: MapSet, topicKind: string): unknown {
+  if (m.xtopics === undefined) return { kind: 'category', topicKind, installed: false }
+  const ids = [...m.xtopics.core.topics].filter(([, t]) => t.kind === topicKind).map(([id]) => id).sort(compareCodePoints)
+  return { kind: 'category', topicKind, installed: true, ids }
+}
+
 /** The answer to a fixed query (`spec/tests/queries/README.md`): a plain value, written with `canonicalJson`. */
 export function answer(m: MapSet, query: { kind: string; [k: string]: unknown }): unknown {
   switch (query.kind) {
@@ -164,6 +207,10 @@ export function answer(m: MapSet, query: { kind: string; [k: string]: unknown })
       return keytermsAnswer(m, String(query.book))
     case 'revision':
       return revisionAnswer(m, String(query.concept), String(query.book))
+    case 'topic':
+      return topicAnswer(m, String(query.id), Array.isArray(query.types) ? query.types.map(String) : undefined)
+    case 'category':
+      return categoryAnswer(m, String(query.topicKind))
     default:
       throw new Error(`Unknown query kind ${JSON.stringify(query.kind)}`)
   }
