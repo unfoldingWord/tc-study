@@ -29,6 +29,8 @@ A **unit** is what a device installs or replaces at once:
 | `orig:tit` | The original of Titus (common catalog) |
 | `map` | The language map: its core and its parts. Needs nothing |
 | `xmap` | The common map: its core and its parts (common catalog). Needs nothing |
+| `topics` | The language topics: its core and its parts (`topics`, language catalog). Needs nothing |
+| `xtopics` | The common topics: its core and its parts (common catalog). Needs nothing |
 | `art:tw:kt`, `art:ta:translate`… | A group of articles |
 | `lex:G5`… | A group of lexicon entries |
 | `obs` | Open Bible Stories |
@@ -68,6 +70,8 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 | One book of the original | `orig` of that book, and every `book` segment of that book in every language (their positions); the `xmap` part of that book |
 | A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog. A map part keeps its segment id, but its `inputs` carry the tN stamp of its book and so change: the part is re-checked, not re-published |
 | TIPNR, Theographic or the alias list | the `xmap` core and the parts whose books they touch |
+| TIPNR, Theographic, English OBS or the builder's list of events | the `xtopics` core and the parts whose books they touch; never an `xmap` or `map` segment |
+| A language's aligned text or outline | its `topics` core and the parts whose books they touch; never a segment of the map |
 
 ## Signatures
 
@@ -87,4 +91,6 @@ travel through the catalog with their own version, and their bytes are opaque to
 
 - Each complement has its sha256, size, media type and version.
 - A complement may name what it is for (`for`: the version of the library's queries).
+- **The kinds `images` and `basemap`** (specified here, built after part B of phase 2). `images` is an image archive with an index: file, size, concepts, verse ranges and a credit for each piece. `basemap` is background layers with no place names; relief is a separate `basemap` complement; an app places the `lug:` points of the topics with the language's names. `license` is the license of the whole set, and each piece's license is in the index; `lang` is present only when an image has text burned in; `for` names the `xmap` revision whose concept ids and verse ranges the index uses. They change no map and no unit.
+- **Topics and installation.** The `xtopics` and `topics` units need nothing and nothing needs them. A topics answer says `installed: false` when the module is not on the device, and then gives no state of `counts.md` (that file has no "not installed" state); with the module the four states apply as always.
 - A complement is built before the catalog that lists it. A complement built later goes in a later revision.

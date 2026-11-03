@@ -376,6 +376,25 @@ absent when the file lacks them.
 concepts links notes relations aliases strongs` at version 1. `topics` and `numbering` are not known yet: they are optional,
 so they are skipped (listed in `h.tables`, not in the output). `gen` stays `E_TABLE`.
 
+### `xtopics`, `topics`
+
+**`xtopics` core** (`part` is `"core"`):
+
+| Key | Type | Absent when |
+| --- | --- | --- |
+| `coverage` | as above | never |
+| `topics` | `{id: {"kind": k, "source": res key, "ref": text}}`; `k` is one of `person place event topic story section` (1 to 6) | never |
+| `occurrences` | counts table, unit `"verses"` | never |
+| `relations` | list of `{"from", "to", "type", "source", "confidence"}` in the order of the file; `from`, `to` the ids (a topic's or an external concept's), as in the `xmap` | the table is not in the file |
+| `strongs` | `{topic id: [Strong keys]}` as the file has it | the table is not in the file |
+| `ranges` | `{topic id: [[first, last], ...]}`, full verse ids, as the file has it | the table is not in the file |
+
+**`xtopics` part**: `occurrences` as `{id: [verse ids]}`, full ids.
+
+**`topics` core**: `names` as `{id: [[name, source, count, [books]], ...]}` in the order of the file, `books` as codes in canonical order; `local` as the file has it (`local-topics` of `map.cddl`; bytes in hex); `coverage` as above. **`topics` part**: `names` as `{topic id: [verse ids]}`, full ids; absent when the file lacks it.
+
+A phase 2 reader of part B knows `xtopics`: `coverage topics relations strongs occurrences ranges` and `topics`: `names local coverage`, at version 1. A topics query's answer states `installed` (`true` or `false`); with `false` it has no state, with `true` the four states of `counts.md`.
+
 ### Checks of the tables (`E_BODY`)
 
 After the checks of `container.md` have passed (including `E_TABLE`), a reader decodes the tables of the class. A table that
@@ -429,6 +448,12 @@ types, these are `E_BODY` too:
   - `xmap` `strongs`: keys repeated or not in `concepts`; a list of Strong keys that is empty, not sorted by code
     point or has a repeat. `aliases`: keys repeated; a value that is not in `concepts` (a key need not be: it is
     an id that moved).
+  - `xtopics`, `topics` (headers as the `map`, `xmap` ones: `part` needed, `lang` for `topics`; a part with `res` not `[]`, a core of `xtopics` with `res` empty, a `book` that differs from `part`, a core table in a part and the reverse are `E_BODY`):
+    - `xtopics` `topics`: ids not sorted or repeated; columns of different lengths; `kind` 0 or above 6; a `source` outside `h.res`; a `ref` outside `refs`.
+    - `xtopics` `relations`: as the `xmap` ones, with an end beyond the count of `topics.ids` plus `external`; `external` not sorted or repeated.
+    - `xtopics` `strongs`, `ranges`: a key not in `topics.ids`; an empty list; Strong keys not sorted or repeated; a range that runs backwards (`first > last`) or whose verse id is not `LLCCCVVV` of a book 1..66.
+    - `xtopics` `occurrences`: a counts table of unit `"verses"` (another unit is `E_BODY`) whose keys are not in `topics.ids`; in a part, verse lists as above.
+    - `topics` `names`: a topic with no name; a `source` outside `alignment outline obs list`; `count` 0; `books` of another length than 9 or with a bit 66 to 71 set; a name that is empty. `topics` part `names`: verse lists as above; a key that is not in the core is not checked by a reader of the part alone.
   - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
   bytes; a `books` of another length than 9 (the bits 66 to 71 of this set are not checked); a unit that names a segment outside `segments`, or has none; a segment, a unit

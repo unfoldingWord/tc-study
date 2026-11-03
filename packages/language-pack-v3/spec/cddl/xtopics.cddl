@@ -1,0 +1,56 @@
+; Format 3: the common topics. The same for every language: the people, places, events, stories and sections of the
+; Bible, each with the verses that mention it, from TIPNR, Theographic, English OBS and the English tN outlines. A core
+; with the topics and their counts, and one part per book with the verses behind the counts. The map never depends on
+; this class and this class never depends on the map (ids.md).
+
+xtopics-segment = body<xtopics-header, xtopics-tables>
+xtopics-tables = xtopics-core-tables / xtopics-part-tables
+
+xtopics-header = {
+  "class": "xtopics",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "part": "core" / book-code,
+  ? "book": book-code,         ; equal to "part" in a book's part
+  "res": [* [tstr, tstr]],     ; every source in the core with its release; tables name them by index. Empty in a part
+                               ; (the release of each source is in the core and in the catalog)
+}
+
+xtopics-core-tables = {
+  "coverage": coverage,        ; required, v1; per source key: the books it covers
+  "topics": topics,            ; required, v1
+  ? "relations": topic-relations,   ; optional, v1
+  ? "strongs": { * topic-id => [+ tstr] },   ; optional, v1; per person or place, the Strong keys of its name
+                               ; (TIPNR dStrongs), sorted by code point
+  "occurrences": counts,       ; required, v1; unit "verses": per topic, the books and how many verses mention it
+  ? "ranges": { * topic-id => [* [verse-id, verse-id]] },  ; optional, v1; for stories and sections: the verse
+                               ; ranges they span (first and last verse, both inside; first <= last)
+}
+
+topic-id = concept-id          ; "per:", "lug:", "ev:", "sec:", "obs:" ids (ids.md)
+
+topics = {
+  "ids": strtab,               ; every topic id, sorted by code point
+  "kind": uvarints,            ; per id: person 1, place 2, event 3, topic 4, story 5, section 6
+  "source": uvarints,          ; per id: the index in "res" of the source that defines it
+  "ref": uvarints,             ; per id: an index in "refs", the source's own key (TIPNR unique name; Theographic
+                               ; eventID as text; OBS story number; outline range)
+  "refs": strtab,
+}
+
+; Like xmap "relations", and "from" and "to" number the rows of topics.ids. An end that is not a topic of this
+; segment but a concept of the common map (tw:names/abraham) is named by id in "external", and its number is the
+; count of topics.ids plus the index in "external". Concepts are never merged: "same-as" is a relation like any other.
+topic-relations = {
+  "types": strtab,
+  "external": strtab,          ; ids of part A concepts, sorted by code point
+  "from": uvarints,
+  "to": uvarints,
+  "type": uvarints,            ; a number in "types"
+  "source": uvarints,          ; an index in "res"
+  "confidence": uvarints,      ; 0 to 100
+}
+
+xtopics-part-tables = {
+  "occurrences": verse-lists,  ; required, v1; the verses of this book behind the core's counts
+}

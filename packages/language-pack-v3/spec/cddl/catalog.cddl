@@ -54,13 +54,13 @@ segment-entry = {
 }
 
 unit = {
-  "id": tstr,                  ; "book:tit", "orig:tit", "map", "xmap", "art:tw:kt", "lex:G5", "obs"
+  "id": tstr,                  ; "book:tit", "orig:tit", "map", "xmap", "topics", "xtopics", "art:tw:kt", "lex:G5", "obs"
   "segments": [+ uint],        ; indexes in "segments"
   ? "needs": [* tstr],         ; unit ids, in this catalog or in one it requires
 }
 
 complement = {
-  "kind": tstr,                ; "classifier", "vectors", "numbers", "language-id", "model"
+  "kind": tstr,                ; "classifier", "vectors", "numbers", "language-id", "model", "images", "basemap"
   ? "lang": tstr,
   "id": sha256,
   "size": uint,

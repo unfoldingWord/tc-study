@@ -54,12 +54,12 @@ The compressed bytes are not part of the identity, so a better compressor never 
 
 | Key | Type | In | What |
 | --- | --- | --- | --- |
-| `class` | text | all | `catalog`, `xmap`, `map`, `book`, `orig`, `art`, `lex`, `obs` or `gen` |
+| `class` | text | all | `catalog`, `xmap`, `map`, `xtopics`, `topics`, `book`, `orig`, `art`, `lex`, `obs` or `gen` |
 | `v` | uint | all | The class's schema version. 1 for every class in 3.0 |
 | `tables` | map | all | Every table in `t`: name → `[version, required]` (uint, bool). A table in one and not the other is an error |
 | `lang` | text | language classes | The language tag of the resources, as Door43 writes it (`es-419`) |
-| `book` | text | `book`, `orig`, parts of `map` and `xmap` | The book code (`ids.md`) |
-| `part` | text | `map`, `xmap` | `core`, or the book code of a per-book part |
+| `book` | text | `book`, `orig`, parts of `map`, `xmap`, `topics` and `xtopics` | The book code (`ids.md`) |
+| `part` | text | `map`, `xmap`, `topics`, `xtopics` | `core`, or the book code of a per-book part |
 | `group` | text | `art`, `lex` | Which group of articles or entries (`ids.md`) |
 | `orig` | array | everything that names original positions | `[resource key, stamp]` of the original book those positions belong to (`ids.md`) |
 | `res` | array | language classes | The resources whose data is inside: `[* [resource key, release stamp]]`. Tables name a resource by its index here |
@@ -180,7 +180,7 @@ this order and stops at the first defect:
    place of `E_BODY`. A catalog inside a transfer file has one more check here: its class (`transfer.md`).
 5. Then the tables of the class, which only a reader that knows the class can check: each table against its schema
    (`cddl/`) and the further checks `tests/README.md` lists ("Checks of the tables"), `E_BODY` again. A segment of a class
-   the reader does not decode (in phase 1: `map`, `xmap` and `gen`) is `E_TABLE` at this step if it was not before, because
+   the reader does not decode (in phase 1: `map`, `xmap` and `gen`; in a phase 2 part A reader also `xtopics` and `topics`, which it does not know as classes: `E_HEADER` at the header, as for any unknown class) is `E_TABLE` at this step if it was not before, because
    the reader has no known table for it, even if all its tables are optional. A segment inside a transfer file
    (`transfer.md`) gets this `E_TABLE` too, but not the rest of the step: the shape of its tables is checked when the
    app opens it.

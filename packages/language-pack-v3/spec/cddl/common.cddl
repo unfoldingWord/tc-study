@@ -26,7 +26,7 @@ logical-header = {
   ? "res": [* [resource-key: tstr, release-stamp: tstr]],
 }
 
-class-name = "catalog" / "xmap" / "map" / "book" / "orig" / "art" / "lex" / "obs" / "gen"
+class-name = "catalog" / "xmap" / "map" / "xtopics" / "topics" / "book" / "orig" / "art" / "lex" / "obs" / "gen"
 table-name = tstr              ; lowercase ASCII letters, digits and "-", starting with a letter
 
 ; The body: the logical header again, and the tables.
@@ -79,13 +79,13 @@ coverage = { * tstr => [whole: book-set, ? partial: book-set] }
 ; key in that order: the number of books b; then per book, in canonical order: its book number minus the previous
 ; one written for this key (the first minus 0), the count, and the number of distinct verses.
 counts = { "unit": count-unit, "keys": strtab, "counts": uvarints }
-count-unit = "occurrences" / "links" / "notes"
+count-unit = "occurrences" / "links" / "notes" / "verses"
 
 ; Rules of counts: a key lists at least one book; the book numbers of a key strictly increase (so the first delta is
 ; at least 1, and so are the others); 1 <= count; 0 <= verses (verses may exceed count: a note on 1:2-4 is 1 note and 3 verses; it is 0 for
 ; rows whose reference cannot be read, counts.md: the builder counts such a row at verse 0, so its verse may be counted
 ; once more than the readable rows say). The "unit" of each table is fixed:
-; xmap "strong" is "occurrences", "links" is "links", "notes" is "notes"; map "usage" is "notes".
+; xmap "strong" is "occurrences", "links" is "links", "notes" is "notes"; map "usage" is "notes"; xtopics "occurrences" is "verses".
 
 ; The verses behind the counts, for one book. "keys" are the keys this book has with at least one verse (a key whose
 ; rows in this book cover no verse is left out of the part), sorted by code point. "verses" holds,

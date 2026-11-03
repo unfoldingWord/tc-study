@@ -1,7 +1,7 @@
 # Language packs, format 3: specification
 
 Status: **phase 1 is implemented**: the TypeScript reader and builders (`packages/language-pack-v3`), an independent Python reader
-(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). Part B (topics, people, places, events, relations) and phase 3 (signatures) are not.
+(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). Part B (topics, people, places, events, relations) is specified (`xtopics`, `topics`) and not built; phase 3 (signatures) are not.
 
 Format 3 is the next major version of the tc-language-packs. Format 2.0 (`packages/language-pack`, parts per book)
 keeps being published, frozen, until each app version that reads it has a retirement date. Format 3 keeps what 2.0
@@ -36,6 +36,8 @@ for every language and are published once.
 | --- | --- | --- |
 | `catalog` | Which segments exist, their ids, sizes and dependencies; the language's resources and their licenses; what each source covers | One language, one revision |
 | `xmap` | Where every Strong number, concept and Academy article appears, book by book and verse by verse; topics and relations; what each source covers | All languages; a core plus one part per book |
+| `xtopics` | The people, places, events, stories and sections of the Bible, each with the verses that mention it; their relations | All languages; a core plus one part per book |
+| `topics` | What this language calls those topics, from its aligned text and outlines; topics only it has | One language; a core plus one part per book |
 | `map` | Book names, concept and article titles, Academy subtitles, how many of this language's notes use each article, coverage | One language; a core plus one part per book |
 | `book` | The bridge texts with their marks and alignment; notes, questions and word links with their quotes found in the original | One language, one book |
 | `orig` | One row per word of the original: form, lemma, Strong, morphology; structure; optionally MACULA | One book of the UHB or UGNT |
@@ -78,7 +80,8 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | MACULA and the lexicon in columns | A later version of their tables |
 | `needs: "map"` in the units of a catalog was dangling until phase 2 built the `map` unit: done in phase 2 part A. A phase 1 catalog still cannot activate a book on a device that enforces it, so phase 1 catalogs are not published | Done |
 | Signatures (`sig`): a reader ignores them today | Phase 3 |
-| Two complement kinds, `images` (an image archive with an index: file, size, concepts, verse ranges and a credit per piece) and `basemap` (background layers with no place names; relief is a separate `basemap`; the app places the `lug:` points of the topics with the language's names). In the catalog: both in `complement.kind`, `license` for the whole set with each piece's license in the index, `lang` only when an image has text burned in, `for` names the `xmap` revision. No change to the maps or the units. Approved by Abel on 2026-11-02 | With part B of phase 2; built after it |
+| Two complement kinds, `images` (an image archive with an index: file, size, concepts, verse ranges and a credit per piece) and `basemap` (background layers with no place names; relief is a separate `basemap`; the app places the `lug:` points of the topics with the language's names). In the catalog: both in `complement.kind`, `license` for the whole set with each piece's license in the index, `lang` only when an image has text burned in, `for` names the `xmap` revision. No change to the maps or the units. Approved by Abel on 2026-11-02 | Specified in `catalog.md` and `catalog.cddl`; built later, after part B of phase 2 |
+| `ev:` concepts get no name from the alignment: the aligned text names people and places, not events; an event has its Theographic title and the language's outline | Open: a later version may add event names by a way that does not mistake a common word for a name |
 | The frozen case bytes include the deflate output of pako 2.1.0: a compressor upgrade needs `build-cases.ts --refreeze` (ids and reader outputs do not change) | When pako is upgraded |
 | The MACULA trees are kept as published, under MACULA's own license | Before the common pack is published |
 | A bridged article's section ids depend on the registry, and a bridge starts with an empty one: `ids.md` says so | Done in phase 2 part A |

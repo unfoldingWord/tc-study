@@ -1,0 +1,32 @@
+; Format 3: the language topics. What a language calls the people, places, events, stories and sections of the common
+; topics (xtopics), taken from its own aligned text and outlines, and the topics only it has. A core, and one part
+; per book with the verses each name came from.
+
+topics-segment = body<topics-header, topics-tables>
+topics-tables = topics-core-tables / topics-part-tables
+
+topics-header = {
+  "class": "topics",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "lang": tstr,
+  "part": "core" / book-code,
+  ? "book": book-code,         ; absent in the core; in a part, absent or equal to "part"
+  "res": [* [tstr, tstr]],     ; every source in the core; required and empty in a part
+}
+
+topics-core-tables = {
+  "names": { * topic-id => [+ topic-name] },   ; required, v1; most frequent first
+  ? "local": local-topics,     ; optional, v1; "{lang}:tema/..." topics only this language has
+  "coverage": coverage,        ; required, v1
+}
+
+; "source" says where the name came from: the aligned text ("alignment"), the language's own book outline
+; ("outline"), its OBS ("obs") or a list of names the builder was given ("list"). "count" is how many times the name
+; was found; "books" the books it was found in.
+topic-name = [name: tstr, source: "alignment" / "outline" / "obs" / "list", count: uint, books: book-set]
+
+topics-part-tables = {
+  ? "names": { * topic-id => verse-lists },   ; optional, v1; the verses each alignment name came from. Keys of
+                               ; the table are the topic ids of this book's names, sorted by code point
+}
