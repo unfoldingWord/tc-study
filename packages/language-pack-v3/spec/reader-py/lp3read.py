@@ -1623,7 +1623,9 @@ def _decode_topics(p: Segment) -> dict:
         names[tid] = [_topic_name(x) for x in rows]
     out = {"names": names}
     if p.has("local"):
-        out["local"] = jsonable(_str_map(p.t["local"], _local_topic))
+        local = _str_map(p.t["local"], _local_topic)
+        # Only the keys of local-topics: any other key of an entry is ignored, as the TypeScript reader does
+        out["local"] = {k: {key: jsonable(v[key]) for key in ("names", "refs", "related") if key in v} for k, v in local.items()}
     out["coverage"] = _coverage(p.t["coverage"])
     return out
 

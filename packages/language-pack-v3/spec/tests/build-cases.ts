@@ -339,6 +339,17 @@ async function withTable(name: string, required: boolean): Promise<Uint8Array> {
   return (await writeSegment({ h: { ...seg.h, tables: { ...seg.h.tables, [name]: [1, required] } }, t: { ...seg.t, [name]: table } })).bytes
 }
 
+// Case 15: a key of a local topic that the schema does not list
+
+/** A topics core whose `local` entry has one more key (`x`): a reader ignores it and does not put it in the output. */
+async function localWithExtraKey(): Promise<Uint8Array> {
+  const coverage = new Map([[GLT, { whole: ['tit'], partial: [] as string[] }]])
+  const local = { 'es-419:tema/la-gracia': { names: ['La gracia'], refs: [[56001001, 56001004]] as [number, number][] } }
+  const seg = topicsSegment({ lang: ES, part: 'core', res: [[GLT, 'v42']], coverage, names: { 'per:abraham': [['Abraham', 'alignment', 1, ['tit']]] }, local })
+  const t = { ...seg.t, local: { 'es-419:tema/la-gracia': { names: ['La gracia'], refs: [[56001001, 56001004]], x: 'a key a later version adds' } } }
+  return (await writeSegment({ h: seg.h, t })).bytes
+}
+
 // Case 10: a transfer file cut inside its last entry
 
 /** A file the test suite stores as it is, made a `BuiltSegment` so that a transfer file can carry it. */
@@ -454,6 +465,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('articulo-mal-titulado/art.seg', await badlyTitled())
   out.set('tabla-desconocida/future-x.seg', await withTable('future-x', false))
   out.set('tabla-desconocida/future-y.seg', await withTable('future-y', true))
+  out.set('topics-local-clave-extra/core.seg', await localWithExtraKey())
   out.set('transferencia-cortada/cut.tcpack', await cutTransfer())
   out.set('paquete-viejo/catalog.seg', (await bridgeCatalog()).bytes)
   const outOfRange = await integerOutOfRange()

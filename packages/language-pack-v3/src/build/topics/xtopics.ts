@@ -9,7 +9,7 @@
  *   Theographic `part-of` and `follows` with confidence 100; Theographic participants (`participant`, from the event to
  *   the person) and places (`place`, from the event to the place) only when the name and at least one verse match
  *   exactly one TIPNR record of the kind (confidence 80); `occurs-in` from a story or section to each event with a verse
- *   inside its ranges (confidence 60); `same-as` from a `tw:names/` concept to the one person or place whose dStrongs
+ *   in any of its ranges, that is, any overlap (confidence 60); `same-as` from a `tw:names/` concept to the one person or place whose dStrongs
  *   share a key with the link's Strong keys and whose verses overlap the link's (confidence 70). A match that is not
  *   exactly one goes to the review list of `report` (lines starting `review: `): nothing is guessed, and no two ids
  *   are merged.

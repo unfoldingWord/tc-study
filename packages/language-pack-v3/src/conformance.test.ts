@@ -59,6 +59,7 @@ describe('the case files', () => {
       'strong-repetido/xmap-tit.seg',
       'tabla-desconocida/future-x.seg',
       'tabla-desconocida/future-y.seg',
+      'topics-local-clave-extra/core.seg',
       'transferencia-cortada/cut.tcpack',
       'tito-es419/book.seg',
     ].sort())
@@ -420,7 +421,7 @@ describe('the cross-reader check (compare.ts)', () => {
       expect(run.text.trim().split('\n')).toEqual([
         'container/minimal.seg: $.texts[0].pieces[0][0]: TypeScript "Pablo" / Python "Pablox"',
         'container/truncated.seg: $.error: TypeScript "E_TRUNCATED" / Python "E_ID"',
-        'compare: 22 files compared (22 cases), 2 mismatches',
+        'compare: 23 files compared (23 cases), 2 mismatches',
       ])
     } finally {
       rmSync(folder, { recursive: true, force: true })

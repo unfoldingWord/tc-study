@@ -104,7 +104,8 @@ export function buildTopics(o: {
   const local: NonNullable<TopicsCore['local']> = {}
   const rangeOfLocal = new Map<string, string>()
   for (const book of [...o.outlines.keys()].sort((a, b) => bookNumber(a) - bookNumber(b))) {
-    for (const entry of o.outlines.get(book)!) {
+    for (const raw of o.outlines.get(book)!) {
+      const entry = { ...raw, title: raw.title.normalize('NFC') } // names are stored in NFC (topics.cddl)
       let id: string
       try {
         id = sectionId(book, entry.from, entry.to, o.lastVerse)

@@ -41,6 +41,24 @@ describe('buildTopics', () => {
     expect(topicsSegment(out.core).h.class).toBe('topics')
   })
 
+  test('outline names are stored in NFC, for a section and for a local topic', () => {
+    const decomposed = 'Salutación' // o + combining acute
+    const outlines = new Map([
+      [
+        'tit',
+        [
+          { title: decomposed, from: verseId('tit', 1, 1), to: verseId('tit', 1, 16) },
+          { title: 'Concepción', from: verseId('tit', 1, 5), to: verseId('tit', 1, 9) },
+        ],
+      ],
+    ])
+    const out = buildTopics({ ...base, outlines, outlineRes: 'es/tn', obs: [] })
+    expect(out.core.names['sec:tit/1-1'][0][0]).toBe('Salutación')
+    expect(out.core.names['sec:tit/1-1'][0][0]).not.toBe(decomposed)
+    const local = Object.values(out.core.local!)[0]
+    expect(local.names).toEqual(['Concepción'])
+  })
+
   test('nothing to name gives an empty core that the writer accepts (res may be empty)', () => {
     const out = buildTopics({ ...base, outlines: new Map(), obs: [] })
     expect(out.core.res).toEqual([])
