@@ -1,5 +1,5 @@
 /**
- * The segment of the index of aligned phrases (`spec/cddl/aligned.cddl`): one part of one language, the keys that begin in
+ * The segment of the index of aligned phrases (`spec/cddl/aligned.cddl`): one part of one language, the keys inside
  * the range of its group. The reader is `read/aligned.ts`. No Node module is used.
  */
 import type { CborValue } from '../../codec/cbor'
@@ -8,18 +8,29 @@ import type { Segment } from '../../codec/container'
 import { BOOKS, bookNumber } from '../../ids'
 import type { AlignedModel } from '../../model'
 
-/** A letter, a range of two letters (the first before the last) or `other`. */
+const END = '[a-z][a-z ]{0,5}'
+const GROUP = new RegExp(`^(${END})(?:-(${END}))?$`)
+
+/**
+ * A group: a prefix of 1 to 6 characters from lowercase ASCII letters and the space, the first a letter (`t`, `the `), a range of
+ * two such prefixes (`b-c`, `ar-b`; the first not after the last by code point; a prefix alone is `P-P`) or `other`. `A`, `aaaaaaa`,
+ * `d-b` are not groups.
+ */
 export function isAlignedGroup(group: string): boolean {
   if (group === 'other') return true
-  if (/^[a-z]$/.test(group)) return true
-  return /^[a-z]-[a-z]$/.test(group) && group[0] < group[2]
+  const m = GROUP.exec(group)
+  return m !== null && (m[2] === undefined || m[1]! <= m[2])
 }
 
-/** Whether the first code point of `key` is inside the range of a range group (`a`, `b-c`). */
+/**
+ * Whether `key` is in the range of a range group (not `other`): with P the start and Q the end of the group (P twice when there is
+ * one), `P <= key` and `key.slice(0, Q.length) <= Q` by code point. So `t` is in `t-td` and not in `ta-tz`, and `as` is in `ar-b`.
+ * Throws `Error` for a group that is not valid or is `other`.
+ */
 export function inAlignedRange(group: string, key: string): boolean {
-  const first = key.codePointAt(0)
-  if (first === undefined) return false
-  return first >= group.charCodeAt(0) && first <= group.charCodeAt(group.length - 1)
+  if (group === 'other' || !isAlignedGroup(group)) throw new Error(`The group ${JSON.stringify(group)} is not a range`)
+  const [p, q = p] = group.split('-') as [string, string?]
+  return key >= p && key.slice(0, q!.length) <= q!
 }
 
 /**
@@ -30,13 +41,13 @@ export function inAlignedRange(group: string, key: string): boolean {
  */
 export function alignedSegment(model: AlignedModel): Segment {
   const { lang, group, res } = model
-  if (!isAlignedGroup(group)) throw new Error(`The group ${JSON.stringify(group)} is not a letter, a range of two letters or "other"`)
+  if (!isAlignedGroup(group)) throw new Error(`The group ${JSON.stringify(group)} is not a range of prefixes or "other"`)
   if (res.length === 0) throw new Error('The header needs at least one resource (res)')
 
   const keys = [...model.entries.keys()].sort(compareCodePoints)
   const rows = keys.map((key) => {
     if (key === '') throw new Error('A key is empty')
-    if (group !== 'other' && !inAlignedRange(group, key)) throw new Error(`The key ${JSON.stringify(key)} does not begin in the range ${group}`)
+    if (group !== 'other' && !inAlignedRange(group, key)) throw new Error(`The key ${JSON.stringify(key)} is outside the range ${group}`)
     const byStrong = model.entries.get(key)!
     if (byStrong.size === 0) throw new Error(`The key ${JSON.stringify(key)} has no Strong key`)
     const strongs = [...byStrong.keys()].sort(compareCodePoints)

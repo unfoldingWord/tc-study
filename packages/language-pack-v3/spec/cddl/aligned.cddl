@@ -3,18 +3,20 @@
 ; occurrences. For lookups across books. An optional unit (catalog.md): no unit needs it, it needs nothing, and building
 ; with or without it gives byte-equal segments of every other class.
 ;
-; One segment per part. The parts split the keys by their start (normative): a part's "group" is the range of the first
-; code points of its keys, one letter ("a"), two letters with a hyphen ("b-c": every first code point from "b" to "c")
-; or "other". The partition table is the builder's and is not in the segment: a reader gets the ranges from the
-; catalog, from the ids of its "aligned:{part}" units. The part of a key is the aligned unit of the catalog whose range
-; holds the first code point of the key after NFC and lowercase (below); if no unit's range holds it, "aligned:other".
-; So a key that begins with "b" is in "aligned:b-c" when the catalog has that unit, and in "aligned:other" when it
-; does not. "other" thus holds every key outside all the listed ranges, whatever the character ("¿", "Ἰ", a digit).
-; A part whose range holds no key is not built.
+; One segment per part. The parts split the keys by their start (normative): a part's "group" is a range of keys in code point
+; order, written P-Q (or P for P-P): P and Q are prefixes of 1 to 6 characters from the lowercase ASCII letters and the space,
+; the first a letter ("a", "ar-b", "the "), or the group is "other". A key (after NFC and lowercase, below) is in the range P-Q
+; iff P <= key and key.slice(0, len(Q)) <= Q, both by code point (a key shorter than Q is compared as it is). So the key "as" is
+; in "ar-b" and the key "t" is in "t-td" and not in "ta-tz". The ranges of one build are contiguous in code point order, with
+; no overlap and no hole, so a key whose characters after the first are not letters ("a'x") falls into the range of its
+; neighbours. The partition table is the builder's and is not in the segment: a reader gets the ranges from the catalog, from
+; the ids of its "aligned:{part}" units. The part of a key is the aligned unit of the catalog whose range holds it; if no
+; unit's range holds it, "aligned:other". "other" thus holds every key outside all the listed ranges (a first character that
+; is not a-z: "¿", "Ἰ", a digit; or beyond the last range). A part whose range holds no key is not built.
 ;
-; Checks of "keys" against "group" (tests/README.md): for a range group, a segment alone is enough (every key's first
-; code point lies in the range). For "other" the check needs the catalog (no key may lie in a range of the catalog's
-; aligned units); a reader that has the segment alone does not make it and does not fail.
+; Checks of "keys" against "group" (tests/README.md): for a range group, a segment alone is enough (every key lies in the
+; range). For "other" the check needs the catalog (no key may lie in a range of the catalog's aligned units); a reader that
+; has the segment alone does not make it and does not fail.
 
 aligned-segment = body<aligned-header, aligned-tables>
 
@@ -28,9 +30,9 @@ aligned-header = {
                                ; language's GLT and GST; the same in every part of one build
 }
 
-; A letter, a range of two letters (first before last) or "other"; ASCII lowercase letters. Another text is E_BODY, like
-; a malformed group of "lex" (the range's order is not in the regexp: "d-b" is E_BODY too).
-aligned-group = tstr .regexp "[a-z]|[a-z]-[a-z]|other"
+; A prefix, a range of two prefixes (P not after Q by code point) or "other". Another text is E_BODY, like a malformed group
+; of "lex" (the range's order is not in the regexp: "d-b" is E_BODY too).
+aligned-group = tstr .regexp "[a-z][a-z ]{0,5}(-[a-z][a-z ]{0,5})?|other"
 
 ; How the entries are made (normative; the same rules as the measurement script tests/measure/alignedIndex.ts).
 ; - Texts: the bridge texts of the book segments whose resource ends in /glt, /gst (es-419) or /ult, /ust (en). One

@@ -74,6 +74,31 @@ describe('alignedSegment and alignedView', () => {
     expect(alignedView(fresh(m), ['a', 'c-d', 'other']).entries.size).toBe(1)
   })
 
+  test('the membership rule: P <= key and the key cut to len(Q) <= Q', () => {
+    const one = (key: string, g: string): AlignedModel => ({ lang: 'en', group: g, res: [[GLT, 'v1']], entries: new Map([[key, new Map([['G1', books([['mat', 1, 1]])]])]]) })
+    const as = (key: string, g: string): Segment => {
+      const seg = fresh(one(key, 'other')) // the writer would refuse a key outside the range: change the header after
+      seg.h.group = g
+      return seg
+    }
+    const ok = (key: string, g: string): void => expect(alignedView(as(key, g)).group).toBe(g)
+    const no = (key: string, g: string): void => expect(() => alignedView(as(key, g))).toThrow(FormatError)
+    ok('as', 'ar-b')
+    ok('b9', 'ar-b')
+    no('aq', 'ar-b')
+    no('ca', 'ar-b')
+    no('a', 'ar-b')
+    ok('t', 't-td')
+    no('t', 'ta-tz')
+    ok("a'x", 'a-am')
+    ok('the end', 'the -thf')
+    no('the', 'the -thf')
+    ok('ab', 'a-ab')
+    ok('abz', 'a-ab')
+    no('ac', 'a-ab')
+    ok('b', 'b-b')
+  })
+
   test('the writer refuses a key outside the range, an empty key, a bad group, bad counts', () => {
     const one = (key: string, g = 'a'): AlignedModel => ({ lang: 'es', group: g, res: [[GLT, 'v1']], entries: new Map([[key, new Map([['G1', books([['mat', 1, 1]])]])]]) })
     expect(() => alignedSegment(one('bien'))).toThrow('range')
@@ -103,8 +128,10 @@ describe('alignedSegment and alignedView', () => {
     ['an empty res', (s) => void (s.h.res = [])],
     ['a group in uppercase', (s) => void (s.h.group = 'A')],
     ['a range backwards', (s) => void (s.h.group = 'd-b')],
-    ['a range of equal letters', (s) => void (s.h.group = 'b-b')],
-    ['a group of three letters', (s) => void (s.h.group = 'a-d-f')],
+    ['a range backwards by prefix', (s) => void (s.h.group = 'ab-a')],
+    ['a prefix of seven characters', (s) => void (s.h.group = 'aaaaaaa')],
+    ['a prefix that begins with a space', (s) => void (s.h.group = ' a')],
+    ['a group of three ends', (s) => void (s.h.group = 'a-d-f')],
     ['a group that is a word', (s) => void (s.h.group = 'others')],
     ['keys not sorted', (s) => rebuild(s, ['b', 'a'], [1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1])],
     ['a key repeated', (s) => rebuild(s, ['a', 'a'], [1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1])],

@@ -9,15 +9,31 @@ import type { AlignedModel, BookModel, OrigModel } from '../../model'
 import { inAlignedRange } from './segment'
 
 /**
- * The parts, by the start of the key (normative for this builder, the same table for every language): groups in alphabet order,
- * each one a letter or a range of letters. Chosen greedily on the whole English build of P15 (a letter is added to the group while
- * the part stays at most 262 144 bytes compressed). Three single letters are over it on English whatever the grouping (`a` 477 797,
- * `t` 650 586, `w` 342 025 bytes): the group grammar cannot split a letter (`task-C3-report.md` has the numbers). A key whose first code point is in no group goes
- * to `other`.
+ * The parts, by the start of the key (normative for this builder, the same table for every language): ranges of keys in code
+ * point order, contiguous (the end of one is followed by the start of the next: `ar` `b`... no hole, no overlap), from `a` to `z`.
+ * Chosen greedily over the keys of the whole English build of P15, each part at most 250 000 bytes compressed (limit 262 144), the
+ * ends as short as the keys allow (prefixes of 1 to 6 characters). A key outside every range goes to `other`.
  */
-export const ALIGNED_PARTS: readonly string[] = ['a', 'b', 'c-d', 'e-f', 'g', 'h', 'i', 'j-m', 'n-o', 'p-r', 's', 't', 'u-v', 'w', 'x-z']
+export const ALIGNED_PARTS: readonly string[] = [
+  'a-and ha',
+  'and hb-awar',
+  'awas-contac',
+  'contad-foo',
+  'fop-ha',
+  'hb-if on',
+  'if oo-leb',
+  'lec-od',
+  'oe-prisc',
+  'prisd-sol',
+  'som-the ch',
+  'the ci-they g',
+  'they h-trea',
+  'treb-whi',
+  'whj-you wh',
+  'you wi-z',
+]
 
-/** The part a key goes to: one group name, from the first code point of the key. `strongs` is not used (the parts are by the key). */
+/** The part a key goes to: one group name (the range that holds the key, else `other`). `strongs` is not used (the parts are by the key). */
 export function partOf(key: string, _strongs: string[]): string[] {
   for (const group of ALIGNED_PARTS) if (inAlignedRange(group, key)) return [group]
   return ['other']

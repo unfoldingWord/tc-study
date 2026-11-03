@@ -17,11 +17,20 @@ function bad(what: string): never {
   throw new FormatError('E_BODY', `the aligned segment is malformed: ${what}`)
 }
 
-/** The group of an `aligned` header: a letter, a range of two letters in order, or `other`. */
+const END = '[a-z][a-z ]{0,5}'
+const GROUP = new RegExp(`^(${END})(?:-(${END}))?$`)
+
+/** The group of an `aligned` header: a prefix of 1 to 6 characters of `[a-z ]` (the first a letter), a range of two (the first not after the last) or `other`. */
 function checkGroup(group: string): void {
-  const m = /^([a-z])(?:-([a-z]))?$/.exec(group)
-  if (group === 'other' || (m !== null && (m[2] === undefined || m[1] < m[2]))) return
-  bad(`the group ${JSON.stringify(group)} is not a letter, a range of two letters or "other"`)
+  const m = GROUP.exec(group)
+  if (group === 'other' || (m !== null && (m[2] === undefined || m[1]! <= m[2]))) return
+  bad(`the group ${JSON.stringify(group)} is not a range of prefixes or "other"`)
+}
+
+/** Whether `key` is in a range group: `P <= key` and `key.slice(0, Q.length) <= Q` by code point (P twice for a group with no hyphen). */
+function inRange(group: string, key: string): boolean {
+  const [p, q = p] = group.split('-') as [string, string?]
+  return key >= p && key.slice(0, q!.length) <= q!
 }
 
 /**
@@ -54,18 +63,15 @@ export function alignedView(seg: Segment, groups?: readonly string[]): AlignedMo
     throw error
   }
 
-  const low = group.charCodeAt(0)
-  const high = group.charCodeAt(group.length - 1)
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i]
     if (key === '') bad(`keys[${i}] is empty`)
     if (i > 0 && compareCodePoints(keys[i - 1], key) >= 0) bad('keys are not sorted by code point or one is repeated')
-    const first = key.codePointAt(0)!
-    if (group !== 'other' && (first < low || first > high)) bad(`the key ${JSON.stringify(key)} does not begin in the range ${group}`)
+    if (group !== 'other' && !inRange(group, key)) bad(`the key ${JSON.stringify(key)} is outside the range ${group}`)
     if (group === 'other' && groups !== undefined) {
       for (const g of groups) {
-        if (g !== 'other' && first >= g.charCodeAt(0) && first <= g.charCodeAt(g.length - 1)) {
-          bad(`the key ${JSON.stringify(key)} begins in the range ${g}, which has its own part`)
+        if (g !== 'other' && inRange(g, key)) {
+          bad(`the key ${JSON.stringify(key)} is inside the range ${g}, which has its own part`)
         }
       }
     }

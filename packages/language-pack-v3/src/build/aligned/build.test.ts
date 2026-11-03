@@ -6,7 +6,7 @@ import { ALIGNED_TABLES, alignedView } from '../../read/aligned'
 import { CATALOG_TABLES, catalogView } from '../../read/catalog'
 import { BUILDER, buildLanguage } from '../language'
 import { ALIGNED_PARTS, buildAligned, isBridgeText, partOf } from './build'
-import { alignedSegment, isAlignedGroup } from './segment'
+import { alignedSegment, inAlignedRange, isAlignedGroup } from './segment'
 
 const GLT = 'es-419_gl/es-419/glt'
 const GST = 'es-419_gl/es-419/gst'
@@ -65,12 +65,12 @@ describe('buildAligned on Ruth-like books', () => {
   })
 
   test('every part has a valid group, the same res, and writes and reads back', async () => {
-    expect(built.parts.map((p) => p.group)).toEqual(['a', 'c-d', 'j-m', 'other'])
+    expect(built.parts.map((p) => p.group)).toEqual(['a-and ha', 'contad-foo', 'if oo-leb', 'other'])
     for (const p of built.parts) {
       expect(isAlignedGroup(p.group)).toBe(true)
       expect(p.res).toEqual([[GLT, 'v1'], [GST, 'v2']])
       const { seg } = await readSegment((await writeSegment(alignedSegment(p))).bytes, { known: ALIGNED_TABLES })
-      expect(alignedView(seg, ['a', 'c-d', 'j-m'])).toEqual(p)
+      expect(alignedView(seg, ['a-and ha', 'contad-foo', 'if oo-leb'])).toEqual(p)
     }
   })
 
@@ -83,15 +83,61 @@ describe('buildAligned on Ruth-like books', () => {
 })
 
 describe('partOf and ALIGNED_PARTS', () => {
-  test('one part from the first code point; the table is in alphabet order and valid', () => {
-    expect(partOf('diestra', ['H3225'])).toEqual(['c-d'])
-    expect(partOf('zoe', [])).toEqual(['x-z'])
-    for (const key of ['¿qué', 'ἰησοῦς', '1 rey', 'ñandú', 'ácido']) expect(partOf(key, ['G1'])).toEqual(['other'])
+  const inAll = (key: string): string[] => ALIGNED_PARTS.filter((g) => inAlignedRange(g, key))
+  test('routes a key to the range that holds it, else other', () => {
+    expect(partOf('diestra', ['H3225'])).toEqual(['contad-foo'])
+    expect(partOf('t', [])).toEqual(ALIGNED_PARTS.filter((g) => inAlignedRange(g, 't')))
+    expect(partOf('t', [])).not.toEqual(['other'])
+    expect(partOf('ta', [])).not.toEqual(['other'])
+    expect(partOf('tz', [])).not.toEqual(['other'])
+    expect(partOf('the ', [])).toEqual(['som-the ch'])
+    expect(partOf("a'x", [])).toEqual(['a-and ha'])
+    expect(partOf('zoe', [])).toEqual(['you wi-z'])
+    for (const key of ['¿qué', 'ἰησοῦς'.toLowerCase(), '1 rey', 'ñandú', 'ácido', '9', 'Ἰ'.toLowerCase()]) expect(partOf(key, ['G1'])).toEqual(['other'])
+  })
+
+  test('the table is valid, in order, contiguous, covers a-z with no hole and no overlap', () => {
     expect(ALIGNED_PARTS.every(isAlignedGroup)).toBe(true)
-    const letters = ALIGNED_PARTS.flatMap((g) => (g.length === 1 ? [g] : [g[0], g[2]]))
-    expect(letters).toEqual([...letters].sort())
-    for (const c of 'abcdefghijklmnopqrstuvwxyz') expect(partOf(c, [])).toHaveLength(1)
-    expect(new Set('abcdefghijklmnopqrstuvwxyz'.split('').map((c) => partOf(c, [])[0])).size).toBe(ALIGNED_PARTS.length)
+    expect(ALIGNED_PARTS.every((g) => g.includes('-'))).toBe(true)
+    const ends = ALIGNED_PARTS.map((g) => g.split('-') as [string, string])
+    expect(ends[0]![0]).toBe('a')
+    expect(ends[ends.length - 1]![1]).toBe('z')
+    for (let i = 0; i + 1 < ends.length; i++) {
+      const q = ends[i]![1]
+      expect(ends[i + 1]![0]).toBe(q.slice(0, -1) + String.fromCharCode(q.charCodeAt(q.length - 1) + 1)) // the next start follows the end
+      expect(ends[i]![0] <= q).toBe(true)
+    }
+  })
+
+  test('a probe of keys is in exactly one range, and every a-z first letter is covered', () => {
+    const keys = ['t', 'ta', 'tz', 'the', 'the ', 'the end', 'thea', "the'x", 'they', 'they ', 'treb', 'a', 'a b', 'and', 'and ha', 'and hb', 'awar', 'awas', 'zzz', 'z', 'whi', 'whj']
+    for (const c of 'abcdefghijklmnopqrstuvwxyz') keys.push(c, c + 'a', c + 'm', c + 'z', c + "'x", c + '9', c + 'é')
+    for (const key of keys) expect(inAll(key)).toHaveLength(1)
+    for (const key of ['', ' a', '1', '¿', 'é', '{']) expect(inAll(key)).toHaveLength(0)
+  })
+
+  test('groups: ab-b, a-ab, aaa, d-b as the grammar says', () => {
+    expect(isAlignedGroup('ab-b')).toBe(true)
+    expect(isAlignedGroup('a-ab')).toBe(true)
+    expect(isAlignedGroup('aaa')).toBe(true) // three letters are a prefix
+    expect(isAlignedGroup('aaaaaaa')).toBe(false)
+    expect(isAlignedGroup('d-b')).toBe(false)
+    expect(isAlignedGroup('b-b')).toBe(true)
+    expect(isAlignedGroup('ab-a')).toBe(false)
+    expect(isAlignedGroup('the -thf')).toBe(true)
+    expect(isAlignedGroup(' a')).toBe(false)
+    expect(isAlignedGroup('A')).toBe(false)
+    expect(isAlignedGroup('other')).toBe(true)
+    expect(inAlignedRange('ar-b', 'as')).toBe(true)
+    expect(inAlignedRange('ar-b', 'aq')).toBe(false)
+    expect(inAlignedRange('t-td', 't')).toBe(true)
+    expect(inAlignedRange('ta-tz', 't')).toBe(false)
+    expect(inAlignedRange('ab-b', 'abc')).toBe(true)
+    expect(inAlignedRange('ab-b', 'a')).toBe(false)
+    expect(inAlignedRange('a-ab', 'abz')).toBe(true)
+    expect(inAlignedRange('a-ab', 'ac')).toBe(false)
+    expect(() => inAlignedRange('other', 'a')).toThrow()
+    expect(() => inAlignedRange('d-b', 'c')).toThrow()
   })
 })
 
