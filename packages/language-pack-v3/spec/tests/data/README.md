@@ -88,3 +88,10 @@ These are in the phase 0 sample, and a later task may need them:
 - the es-419 `ta` titles part (`helps-text:ta-title:…`), the part `57d3a13656ca0886adb91a6fdfc31575666b9d2acb2ec96c966c41824ac0e27f.part.gz` of the phase 0 sample;
 - the MACULA Titus part of `Biblica/el-x-koine/macula`, the part `0c6f97e1352dbdd0c999e829c389022856aed65a9890ef48338642c8182621dc.part.gz` of the phase 0 sample
   (MACULA is published under its own license; check it before copying).
+
+## topics/
+
+- `topics/tipnr-subset.txt`: the header lines and 11 records (Abraham, Absalom, Isaac, Sarah, two Zechariahs, two Bethlehems,
+  Egypt, Jerusalem, Ur) of TIPNR, "Translators Individualised Proper Names with all References", by STEPBible.org
+  (www.STEPBible.org, based on work at Tyndale House Cambridge), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+  Copied without change from the file the header names; the reader test uses it. The whole file is not in the repository.
