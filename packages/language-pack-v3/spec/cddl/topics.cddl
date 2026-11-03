@@ -33,8 +33,8 @@ topics-core-tables = {
 ; in the verse, and with no letter every occurrence), the gateway words aligned to that original word in that verse
 ; are found, and only in the verses TIPNR lists for that topic. The name is the maximal run of consecutive word pieces
 ; (only " " between them) that contains the first word aligned to that original word; other words aligned to it in
-; that verse are not part of the name and are counted in the build report. A reference TIPNR writes in English
-; versification is converted to the original's numbering first; one that cannot be converted is listed in the report.
+; that verse are not part of the name and are counted in the build report. A reference TIPNR writes is read as
+; the original's (UHB) numbering, with no conversion: TIPNR's English references are already in that numbering (ids.md).
 ; Names are stored in NFC, as the builder normalized them before storing; they are not lowercased, and a reader never
 ; normalizes (container.md): it shows and compares the bytes it reads. A topic of kind event takes no name from the
 ; alignment (ids.md).

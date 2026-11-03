@@ -80,9 +80,8 @@ baa0a1a5658e4621c50fad9d99c856174c8ce75b40a794c6cbc424b97c75ff24  47.md
 - TIPNR's `@Brief`, `@Short` and `@Article` fields are left out: an AI wrote them (Claude 3 Opus, April 2024). Its column
   of translated names follows the ESV spelling and is not used for any name a reader shows.
 - From Theographic, no Easton text (`dictText`, `dictionaryText`, `easton.json`: CCEL asks for permission to republish)
-  and no dates or chronology (they come from Floyd Nolen Jones's book, whose license is not confirmed). Its verses are in
-  KJV versification (the OSIS of `verses.json`): a builder converts them to the original's numbering and lists the ones
-  it cannot convert. Its tables link by Airtable ids (`rec…`); verses join through `verses.json`.
+  and no dates or chronology (they come from Floyd Nolen Jones's book, whose license is not confirmed). Its verse references (the OSIS of `verses.json`)
+  are read as the original's (UHB) numbering, with no conversion. Its tables link by Airtable ids (`rec…`); verses join through `verses.json`.
 - No derived work carries the unfoldingWord® mark.
 
 **Left out.** Nave's Topical Bible: no clean digital edition was found. CCEL restricts republishing, the SWORD module comes
