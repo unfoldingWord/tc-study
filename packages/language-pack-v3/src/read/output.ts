@@ -49,6 +49,8 @@ export const KNOWN: Record<ClassName, Record<string, number[]>> = deepFreeze({
   catalog: { ...CATALOG_TABLES },
   map: { ...MAP_TABLES },
   xmap: { ...XMAP_TABLES },
+  xtopics: {}, // read by read/topics.ts; the conformance output of it is a later task
+  topics: {},
   gen: {},
 })
 

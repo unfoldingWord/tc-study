@@ -1,7 +1,7 @@
 import { BOOKS, bookNumber } from '../ids'
 import { ColumnError, compareCodePoints, decodeUvarints, encodeUvarints } from './columns'
 
-export type CountUnit = 'occurrences' | 'links' | 'notes'
+export type CountUnit = 'occurrences' | 'links' | 'notes' | 'verses'
 /** Key to book code to `[count, verses]`; books iterate in canonical order. */
 export type CountRows = Map<string, Map<string, [count: number, verses: number]>>
 /** Key to full verse ids, ascending and distinct. */
@@ -158,6 +158,16 @@ function booksOf(bytes: unknown): string[] {
     }
   }
   return out
+}
+
+/** A set of books as the 9 bytes of `book-set`. */
+export function encodeBookSet(books: string[]): Uint8Array {
+  return setOf(books)
+}
+
+/** The books of a `book-set`; throws {@link ColumnError} for another length or a bit beyond the 66 books. */
+export function decodeBookSet(bytes: unknown): string[] {
+  return booksOf(bytes)
 }
 
 export function encodeCoverage(c: Coverage): Record<string, Uint8Array[]> {

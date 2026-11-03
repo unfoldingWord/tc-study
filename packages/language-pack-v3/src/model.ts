@@ -345,3 +345,49 @@ export type MapCore = {
 
 /** The part of one book: the verses behind the core's `usage`. `part` is the book code. */
 export type MapPart = { lang: string; part: string; usage?: VerseLists }
+
+// The common topics (`spec/cddl/xtopics.cddl`) and the language topics (`spec/cddl/topics.cddl`)
+
+/** Index 0 is not a kind: the column `topics.kind` of `xtopics` holds 1 to 6. */
+export const TOPIC_KINDS = ['', 'person', 'place', 'event', 'topic', 'story', 'section'] as const
+export const TOPIC_NAME_SOURCES = ['alignment', 'outline', 'obs', 'list'] as const
+
+/**
+ * A topic of the common topics: its kind, the key of the resource (an entry of `res`) that defines it, the source's own key
+ * (`ref`), the English title and the TIPNR uStrong (`""` for none).
+ */
+export type Topic = { kind: (typeof TOPIC_KINDS)[number]; source: string; ref: string; title: string; ustrong: string }
+
+/** A relation of `xtopics`: an end is a topic of the segment or, if not, a concept of the map (named in `external`). */
+export type TopicRelation = Relation
+
+/** The core of the common topics. `occurrences` rows are `[count, verses]` with `count == verses` (unit "verses"). */
+export type XtopicsCore = {
+  part: 'core'
+  res: [string, string][]
+  coverage: Coverage
+  topics: Map<string, Topic>
+  occurrences: CountRows
+  relations?: TopicRelation[]
+  strongs?: Record<string, string[]>
+  ranges?: Record<string, [first: number, last: number][]>
+}
+
+/** The part of one book: the verses behind the core's `occurrences`. `part` is the book code. */
+export type XtopicsPart = { part: string; occurrences: VerseLists }
+
+/** A name: the text, where it came from, how many times it was found and the books (codes) it was found in. */
+export type TopicName = [name: string, source: (typeof TOPIC_NAME_SOURCES)[number], count: number, books: string[]]
+
+/** The core of a language's topics. `local` is the table `local-topics` of `map.cddl`, as the file has it. */
+export type TopicsCore = {
+  lang: string
+  part: 'core'
+  res: [string, string][]
+  names: Record<string, TopicName[]>
+  local?: Record<string, { names: string[]; refs?: [number, number][]; related?: string[] }>
+  coverage: Coverage
+}
+
+/** The part of one book: the verses each topic's alignment names were taken from. */
+export type TopicsPart = { lang: string; part: string; names?: VerseLists }
