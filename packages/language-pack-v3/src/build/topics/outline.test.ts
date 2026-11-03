@@ -64,6 +64,31 @@ describe('outlineOf', () => {
     expect(o[2]).toMatchObject({ from: verseId('exo', 9, 13), to: verseId('exo', 9, 35) })
     expect(issues).toHaveLength(2)
   })
+  test('a Spanish Esquema section is read like the English Outline (es-419 tN: "Esquema del libro de Tito")', () => {
+    const issues: string[] = []
+    const md = [
+      '# Introducción a Tito',
+      '## Parte 1',
+      '### Esquema del libro de Tito',
+      '1. Pablo instruye a Tito. (1:1-16)',
+      '    ',
+      '2. Pablo instruye al pueblo. (2:1-3:11)',
+      '### ¿Quién escribió?',
+      '1. No (3:1-2)',
+    ].join('\n')
+    const o = outlineOf(md, 'tit', issues, last)
+    expect(o.map((e) => e.title)).toEqual(['Pablo instruye a Tito', 'Pablo instruye al pueblo'])
+    expect(o[1]).toMatchObject({ from: verseId('tit', 2, 1), to: verseId('tit', 3, 11) })
+    expect(issues).toEqual([])
+  })
+  test('a label after the range and half verses (10b) are read', () => {
+    const issues: string[] = []
+    const md = ['## Outline', '1. The first sin (2:1–15) - promise', '2. Examples (1:4–10a)'].join('\n')
+    const o = outlineOf(md, 'tit', issues, last)
+    expect(o.map((e) => e.title)).toEqual(['The first sin', 'Examples'])
+    expect(o[1]).toMatchObject({ from: verseId('tit', 1, 4), to: verseId('tit', 1, 10) })
+    expect(issues).toEqual([])
+  })
   test('no Outline section is reported', () => {
     const issues: string[] = []
     expect(outlineOf('# A\n\ntext', 'exo', issues, last)).toEqual([])

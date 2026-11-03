@@ -27,7 +27,7 @@ function lastOf(book: string, chapter: number, lastVerse: LastVerse): number {
 }
 
 /**
- * The entries of the "Outline" section (the first heading with the word Outline, up to the next heading of the same
+ * The entries of the "Outline" section (the first heading with the word Outline or Esquema, up to the next heading of the same
  * or a higher level) that end with a range. An entry whose range cannot be read, or that has none, is described in
  * `issues` and left out; a missing Outline section is reported too. TSV escapes (backslash-n and
  * `<br>`) in the text are line breaks, as in the stored notes.
@@ -44,7 +44,7 @@ export function outlineOf(
   for (const line of unescapeTsv(introMarkdown).split(/\r?\n/)) {
     const h = HEADING.exec(line)
     if (!found) {
-      if (h && /outline/i.test(h[2])) {
+      if (h && /outline|esquema/i.test(h[2])) {
         found = true
         level = h[1].length
       }
@@ -56,7 +56,8 @@ export function outlineOf(
     }
     const it = ITEM.exec(line)
     if (!it) continue
-    const text = plain(it[1]).trim()
+    // A label after the range, "(3:1–24) - promise" in the English Genesis outline, is not part of the entry
+    const text = plain(it[1]).trim().replace(/\)\s+[-–—]\s+[A-Za-z][A-Za-z ]*$/, ')')
     const t = TAIL.exec(text)
     if (!t) {
       issues.push(`outline ${book}: no range in ${JSON.stringify(text)}`)
@@ -67,7 +68,7 @@ export function outlineOf(
       .trim()
       .replace(/[\s.:;,]+$/, '')
     try {
-      const r = rangeOf(book, t[1].replace(/\s+/g, ' '), lastVerse)
+      const r = rangeOf(book, t[1].replace(/\s+/g, ' ').replace(/(\d)[a-c](?![A-Za-z])/g, '$1'), lastVerse)
       if (r === null) issues.push(`outline ${book}: cannot read the range of ${JSON.stringify(text)}`)
       else if (r[1] < r[0]) issues.push(`outline ${book}: range runs backwards in ${JSON.stringify(text)}`)
       else out.push({ title, from: r[0], to: r[1] })

@@ -433,7 +433,7 @@ async function outlinesOf(
       .map(({ item }) => item as Record<string, unknown>)
       // `front:intro` in a TSV; format 2.0 marks the introductions `isIntro` and places the book's at 1:1, with the chapter's
       .filter((item) => item !== null && typeof item === 'object' && typeof item.note === 'string')
-      .find((item) => item.reference === 'front:intro' || (item.isIntro === true && /^#{1,6}\s.*outline/im.test(item.note as string)))
+      .find((item) => item.reference === 'front:intro' || (item.isIntro === true && /^#{1,6}\s.*(outline|esquema)/im.test(item.note as string)))
     if (intro === undefined) issues.push(`outline ${book}: no introduction with an outline (front:intro) in ${tn.key}`)
     else outlines.set(book, outlineOf(intro.note as string, book, issues, lastVerse))
   }
