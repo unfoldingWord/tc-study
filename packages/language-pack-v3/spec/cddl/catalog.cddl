@@ -57,7 +57,8 @@ unit = {
   "id": tstr,                  ; "book:tit", "orig:tit", "map", "xmap", "topics", "xtopics", "art:tw:kt", "lex:G5", "obs", "aligned:a", "aligned:b-c", "aligned:other"
   "segments": [+ uint],        ; indexes in "segments"
   ? "needs": [* tstr],         ; unit ids, in this catalog or in one it requires
-  ? "optional": true,          ; a device installs the unit only when asked; no unit lists an optional unit in "needs" (the "aligned:{part}" units)
+  ? "optional": true,          ; a device installs the unit only when asked. Every "aligned:{part}" unit carries it, with the
+                               ; value true; no other unit does. Only true is valid (false or a non-bool is E_BODY)
 }
 
 complement = {

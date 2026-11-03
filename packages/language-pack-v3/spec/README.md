@@ -29,7 +29,7 @@ num, ecc, ezk and frt.
 
 ## The pieces
 
-A language is published as a **catalog** and segments of seven classes. The original and the common map are the same
+A language is published as a **catalog** and segments of eleven classes. The original and the common map are the same
 for every language and are published once.
 
 | Class | What it holds | Scope |

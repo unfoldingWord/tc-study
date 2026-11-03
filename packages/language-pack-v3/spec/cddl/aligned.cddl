@@ -4,12 +4,17 @@
 ; with or without it gives byte-equal segments of every other class.
 ;
 ; One segment per part. The parts split the keys by their start (normative): a part's "group" is the range of the first
-; code points of its keys, written as one letter ("a"), two letters with a hyphen ("b-c": every first code point from
-; "b" to "c") or "other". A key belongs to the part whose range holds its first code point after the key has been
-; normalized (NFC) and lowercased, which is how the keys are stored (below). "other" holds every key whose first code
-; point lies in no range of any other part of the language, whatever that character is ("¿", "Ἰ", a digit). The table
-; of ranges is the builder's, and a reader needs none: it looks a key up in the part its first code point names, and
-; the catalog lists the parts that exist (units "aligned:{part}"). A part whose range holds no key is not built.
+; code points of its keys, one letter ("a"), two letters with a hyphen ("b-c": every first code point from "b" to "c")
+; or "other". The partition table is the builder's and is not in the segment: a reader gets the ranges from the
+; catalog, from the ids of its "aligned:{part}" units. The part of a key is the aligned unit of the catalog whose range
+; holds the first code point of the key after NFC and lowercase (below); if no unit's range holds it, "aligned:other".
+; So a key that begins with "b" is in "aligned:b-c" when the catalog has that unit, and in "aligned:other" when it
+; does not. "other" thus holds every key outside all the listed ranges, whatever the character ("¿", "Ἰ", a digit).
+; A part whose range holds no key is not built.
+;
+; Checks of "keys" against "group" (tests/README.md): for a range group, a segment alone is enough (every key's first
+; code point lies in the range). For "other" the check needs the catalog (no key may lie in a range of the catalog's
+; aligned units); a reader that has the segment alone does not make it and does not fail.
 
 aligned-segment = body<aligned-header, aligned-tables>
 
@@ -18,10 +23,14 @@ aligned-header = {
   "v": 1,
   "tables": { * table-name => [uint, bool] },
   "lang": tstr,
-  "group": tstr,               ; the part: "a", "b-c" or "other"
+  "group": aligned-group,      ; the part
   "res": [+ [tstr, tstr]],     ; the bridge texts the entries came from (resource key and release tag), e.g. the
                                ; language's GLT and GST; the same in every part of one build
 }
+
+; A letter, a range of two letters (first before last) or "other"; ASCII lowercase letters. Another text is E_BODY, like
+; a malformed group of "lex" (the range's order is not in the regexp: "d-b" is E_BODY too).
+aligned-group = tstr .regexp "[a-z]|[a-z]-[a-z]|other"
 
 ; How the entries are made (normative; the same rules as the measurement script tests/measure/alignedIndex.ts).
 ; - Texts: the bridge texts of the book segments whose resource ends in /glt, /gst (es-419) or /ult, /ust (en). One
@@ -29,7 +38,7 @@ aligned-header = {
 ; - A word entry: each word piece whose "align" list is not empty. A phrase entry: each maximal run of two or more
 ;   consecutive word pieces (only " " pieces between them) whose "align" lists are equal and not empty, the texts joined
 ;   with single spaces.
-; - The key: the text in NFC, then lowercased with toLocaleLowerCase(lang). A reader never normalizes (container.md):
+; - The key (the one exception to "text is kept as published", container.md): the text in NFC, then lowercased with toLocaleLowerCase(lang). A reader never normalizes (container.md):
 ;   a caller who looks a key up normalizes and lowercases it the same way before it compares bytes.
 ; - The Strong keys of an entry: the strongKey of the original words at the aligned positions (ids.md); a word with no
 ;   Strong key is skipped; an entry with none is not stored.
@@ -50,3 +59,7 @@ aligned-tables = {
                                ;       verses (distinct verses of that book),
                                ;       occurrences (never less than verses)
 }
+
+; Builder rules a reader does not check: an entry with no Strong key is not stored; the Strong keys of an entry are in
+; code point order of their text; the "strongs" table has each key once and none unused, most used first. A reader
+; checks what it needs to read safely: a key empty or repeated, a Strong index repeated in one entry (tests/README.md).

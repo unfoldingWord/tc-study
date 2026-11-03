@@ -88,8 +88,9 @@ They MUST also follow these rules:
 
 - **No floats, no tags, no `null`, no `undefined`.** A missing value is a missing key, or an "absent" bit (below).
 - **Text is kept as published.** It is valid UTF-8, without Unicode normalization or trimming, because the bytes are
-  the translator's. The one exception is the names of the `topics` class, which the builder normalizes to NFC before it
-  stores them (`cddl/topics.cddl`); a reader still never normalizes.
+  the translator's. The exceptions are the names of the `topics` class, which the builder normalizes to NFC before it
+  stores them (`cddl/topics.cddl`), and the keys of the `aligned` class, which it normalizes to NFC and lowercases
+  with `toLocaleLowerCase(lang)` (`cddl/aligned.cddl`); a reader still never normalizes.
 - **Ids are ASCII** (`ids.md`).
 - **String tables** are in the order their schema gives: usually most used first, ties by code point.
 
