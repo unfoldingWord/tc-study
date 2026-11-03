@@ -179,3 +179,21 @@ spec, builder, readers (TypeScript and Python), queries and size check are part 
 ## After Task P16 (controller)
 
 Final review with three Opus reviewers (spec and readers; source readers and builders; Python, queries and command line), one fix wave, one scoped re-review, "Deviations from this plan" appended here, then `FIN:` with the commit range, the gate numbers and the open items.
+
+## Deviations from this plan
+
+Written by the controller from the ledger after the final review and its fix wave.
+
+1. **References are not converted (Review Focus 2).** TIPNR, Theographic (KJV) and OBS references are English = the UHB's own numbering (`Psa.3.0`, Malachi 4, Jonah 1:17 are in the UHB sample). The plan's "converted with `fromHebrewNumbering`" was wrong; nothing is converted. Unknown book or chapter still goes to the report. `topics.cddl` and `fuentes.md` say so since the fix wave.
+2. **`xtopics` topics table has `title` and `ustrong` columns and a pinned `refs` order; topics part `names` are flat verse lists** (no per-name provenance). Needed by Decision 2, `ids.md` and the P2 review. A format tweak in the unpublished 3.0.
+3. **Relation types the plan did not name** (P9): `participant` (event→`per:`), `place` (event→`lug:`), `tribe` (person→tribe), `occurs-in` (story or section→event) by verse overlap, not containment. They are in `ids.md` and `xtopics.cddl`.
+4. **"OBS story 10" for `ev:plagues-of-egypt`** means "includes `obs:10`": by overlap the list is `obs:10, 11, 12, 48`, and `per:abraham` has 20 stories. A stricter rule would be a spec change.
+5. **Glued prepositions stay in aligned names** (P11, Decision 5 taken literally): es-419 shows "de Moab" as a top variant. Open for a later heuristic or a choice in the UI. Alignment names are also noisy ("Mientras tanto" for Boaz, "Yo" for Paul).
+6. **Outline parser** accepts `Outline` and `Esquema…` headings, a label after the range and half verses (found on the real es-419 notes in P14). It still reports, and does not read, bare chapter ranges, comma lists and entries without a range (about 146 issue lines in en). The fix wave also reports non-item lines that end in a range.
+7. **TIPNR Strong keys:** `dStrong` → Strong by letter plus the first four digits (`H2148P` → `H2148`, `G2197H` → `G2197`); `same-as` and the alignment use the same four-digit rule (fix wave).
+8. **Python and TypeScript agree on `local` entries:** unknown keys dropped, names non-empty, refs two verse ids of books 1..66, names NFC (P16 and the fix wave).
+9. **Final-wave fixed query:** `ev:plagues-of-egypt` compares only the story `occurs-in`; the section `occurs-in` from the English tN outline is not cross-checked, because the independent oracle has no outline parser (`ignoreRelationsFrom` in the query file, said in `queries/README.md`).
+10. **`--topics` of `build-v3`** checks its four Theographic files, at least one story file and one TIPNR file; with `--topics` a skipped topic query is a failure.
+11. **Catalog fingerprints:** every `xtopics` and `topics` part is re-checked when any topics source changes (`catalog.md`), not only the parts of the touched books.
+12. **B7 (aligned-phrase index)** is not built here. Abel decided on 2026-11-03: its own optional catalog unit, split by Strong group, not downloaded by default, with its own `needs`; spec, builder, readers, queries and size check are part C. Measured numbers are in `.superpowers/sdd/2026-11-02-language-pack-v3-phase2b/task-P15-report.md`.
+13. **Left as minors:** `resolve()` prefers a person on a shared unique name (the spec says so); `releases` spread can overwrite defaults with `undefined` in `language.ts`; `builder` appears in segment `res` but is not a catalog resource; `theographic.ts` reads `r.fields` inconsistently; `sectionId` with an undefined `lastVerse` gives the `c.v` form silently; the writer does not validate local `refs` verse ids; a catalog test uses a stub `needs`; es-419 sample has only Titus and Ruth aligned; the Theographic fuentes row lacks the commit that last touched `json/`.
