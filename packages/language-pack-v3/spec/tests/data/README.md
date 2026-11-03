@@ -97,3 +97,10 @@ These are in the phase 0 sample, and a later task may need them:
   Copied from the file the header names, with these columns and lines emptied or removed: the description and `#Summary`
   columns of the records, the translated-name column of the name lines, and every `@Briefest`, `@Brief`, `@Short` and
   `@Article` text. The reader test uses it. The whole file is not in the repository.
+
+- `topics/theographic-subset/`: 6 events (1, 73, 125 and the `partOf`/`predecessor` neighbors 71, 74, 122), 18 verses, 8 people
+  and 1 place of the Theographic Bible Metadata (viz.bible, https://github.com/robertrouse/theographic-bible-metadata),
+  CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). Only these fields are kept: events `title`, `eventID`,
+  `verses`, `participants`, `locations`, `partOf`, `predecessor`; verses `osisRef`; people `personID`, `displayTitle`,
+  `verses`; places `placeID`, `displayTitle`, `verses`. Every date field and every Easton text is removed, and lists
+  point only at records of the subset. The reader test uses it. The whole data is not in the repository.

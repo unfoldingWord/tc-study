@@ -23,7 +23,7 @@ const PERSON_RELATIONS: [number, TipnrRelationType][] = [[2, 'parent'], [3, 'sib
 const PLACE_RELATIONS: [number, TipnrRelationType][] = [[2, 'founder'], [3, 'inhabitant']]
 
 /** The slug of ids.md: lowercase, spaces and `'` to `-`, any other character outside `[a-z0-9-]` dropped. */
-function slug(text: string): string {
+export function slug(text: string): string {
   return text.toLowerCase().replace(/[ ']/g, '-').replace(/[^a-z0-9-]/g, '')
 }
 
