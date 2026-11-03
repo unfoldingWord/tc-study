@@ -1,7 +1,7 @@
 # Language packs, format 3: specification
 
 Status: **phase 1 is implemented**: the TypeScript reader and builders (`packages/language-pack-v3`), an independent Python reader
-(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). Part B (topics, people, places, events, relations) is specified (`xtopics`, `topics`) and not built; phase 3 (signatures) is not.
+(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). **Phase 2 part B is implemented** (topics, people, places, events, stories, sections and relations: TIPNR, Theographic, English OBS and the tN outlines in `xtopics`; the language's names from its alignment and outlines in `topics`; two fixed queries). Phase 3 (signatures) is not, and nor are the images and the basemap.
 
 Format 3 is the next major version of the tc-language-packs. Format 2.0 (`packages/language-pack`, parts per book)
 keeps being published, frozen, until each app version that reads it has a retirement date. Format 3 keeps what 2.0
@@ -75,13 +75,14 @@ catalog with their own version, and no reader has to read them (`catalog.md`).
 | Item | When |
 | --- | --- |
 | The transfer file's extension (`.tcpack` is a proposal) and the format's name | Abel decides before the builder publishes |
-| Part B of phase 2: topics, people, places, events and relations (TIPNR, Theographic, OBS) in the common map | After Abel approves `fuentes.md` |
+| Part B of phase 2: topics, people, places, events and relations (TIPNR, Theographic, OBS) in the common map | Done in phase 2 part B. Measured on the real sources: the common map (core and parts) plus the es-419 map and topics weigh 1 474 320 bytes compressed, within the 2 MB limit |
 | Verse equivalences between a text's numbering and the original's (`map`, `numbering`) | A later version |
 | MACULA and the lexicon in columns | A later version of their tables |
 | `needs: "map"` in the units of a catalog was dangling until phase 2 built the `map` unit: done in phase 2 part A. A phase 1 catalog still cannot activate a book on a device that enforces it, so phase 1 catalogs are not published | Done |
 | Signatures (`sig`): a reader ignores them today | Phase 3 |
-| Two complement kinds, `images` (an image archive with an index: file, size, concepts, verse ranges and a credit per piece) and `basemap` (background layers with no place names; relief is a separate `basemap`; the app places the `lug:` points of the topics with the language's names). In the catalog: both in `complement.kind`, `license` for the whole set with each piece's license in the index, `lang` only when an image has text burned in, `for` names the `xmap` revision. No change to the maps or the units. Approved by Abel on 2026-11-02 | Specified in `catalog.md` and `catalog.cddl`; built later, after part B of phase 2 |
-| `ev:` concepts get no name from the alignment: the aligned text names people and places, not events; an event has its Theographic title and the language's outline | Open: a later version may add event names by a way that does not mistake a common word for a name |
+| Two complement kinds, `images` (an image archive with an index: file, size, concepts, verse ranges and a credit per piece) and `basemap` (background layers with no place names; relief is a separate `basemap`; the app places the `lug:` points of the topics with the language's names). In the catalog: both in `complement.kind`, `license` for the whole set with each piece's license in the index, `lang` only when an image has text burned in, `for` names the `xmap` revision. No change to the maps or the units. Approved by Abel on 2026-11-02 | Specified in `catalog.md` and `catalog.cddl`; built later, now that part B of phase 2 is done, in the order Abel approved: the UBS animals and plants at 360 px by default and 600 px optional, then the OBS images, then our own basemap. Left out: images made by AI, Pixabay images whose origin cannot be verified, FIA images whose license is not confirmed, and Biblica's English maps |
+| `ev:` concepts get no name from the alignment: the aligned text names people and places, not events; an event has its Theographic title and the language's outline | Open: a later version may add event names by a way that does not mistake a common word for a name. The names of people and places from the alignment are also noisy (a pronoun or a preposition can come glued to a name: `de Moab`); the rule of `topics.cddl` is kept as written |
+| The outline reader knows the headings `Outline` and `Esquema` only, and skips items that are a bare chapter range, a comma list or have no range (they go to the build report); `occurs-in` is by any overlap, so story lists are generous | A later version may add languages and forms of outline |
 | The frozen case bytes include the deflate output of pako 2.1.0: a compressor upgrade needs `build-cases.ts --refreeze` (ids and reader outputs do not change) | When pako is upgraded |
 | The MACULA trees are kept as published, under MACULA's own license | Before the common pack is published |
 | A bridged article's section ids depend on the registry, and a bridge starts with an empty one: `ids.md` says so | Done in phase 2 part A |
