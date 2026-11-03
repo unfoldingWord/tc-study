@@ -55,7 +55,12 @@ export function outlineOf(
       continue
     }
     const it = ITEM.exec(line)
-    if (!it) continue
+    if (!it) {
+      // A line that is not a list item but ends in a parenthesised range is an entry the builder cannot take
+      const tail = TAIL.exec(line)
+      if (tail && /\d+:\d+|chapters?\s+\d/i.test(tail[1])) issues.push(`outline ${book}: not a list item: ${JSON.stringify(line.trim())}`)
+      continue
+    }
     // A label after the range, "(3:1–24) - promise" in the English Genesis outline, is not part of the entry
     const text = plain(it[1]).trim().replace(/\)\s+[-–—]\s+\p{L}[\p{L} ]*$/u, ')')
     const t = TAIL.exec(text)

@@ -81,6 +81,13 @@ describe('outlineOf', () => {
     expect(o[1]).toMatchObject({ from: verseId('tit', 2, 1), to: verseId('tit', 3, 11) })
     expect(issues).toEqual([])
   })
+  test('a line that is not a list item but ends in a range is reported', () => {
+    const issues: string[] = []
+    const md = ['## Outline', 'I. The first part (1:1-5)', '1. Fine (1:6-10)'].join(String.fromCharCode(10))
+    const o = outlineOf(md, 'tit', issues, last)
+    expect(o.map((e) => e.title)).toEqual(['Fine'])
+    expect(issues).toHaveLength(1)
+  })
   test('a label after the range and half verses (10b) are read', () => {
     const issues: string[] = []
     const md = ['## Outline', '1. The first sin (2:1–15) - promise', '2. Examples (1:4–10a)'].join('\n')
