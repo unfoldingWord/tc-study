@@ -86,6 +86,14 @@ describe('alignedNames, small cases', () => {
     expect(issues[0]).toContain('per:mary')
   })
 
+  test('a letterless reference whose verse has no such word is reported', () => {
+    const { orig, model } = tiny(['H4813'], ['Ana'], [[0]])
+    const issues: string[] = []
+    const out = alignedNames({ records: [record('per:x', 'H9999', [[v]])], books: [model], origs: new Map([['rut', orig]]), lang: 'es' }, issues)
+    expect(out.size).toBe(0)
+    expect(issues.some((i) => i.includes('no word with'))).toBe(true)
+  })
+
   test('occurrence letters pick the nth word of the verse; a missing one is reported', () => {
     const { orig, model } = tiny(['H4813', 'H0002', 'H4813'], ['Ana', 'y', 'Ruth'], [[0], [1], [2]])
     const issues: string[] = []

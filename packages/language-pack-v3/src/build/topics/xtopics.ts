@@ -298,7 +298,15 @@ export function buildXtopics(o: {
       for (const key of tw.strongs) for (const id of byBase.get(strongBase(key) ?? '') ?? []) candidates.add(id)
       const found = [...candidates].filter((id) => tw.verses.some((v) => versesOfRecord.get(id)!.has(v))).sort(compareCodePoints)
       if (found.length === 1) relate(concept, 'same-as', found[0], tipnrKey, 70)
-      else if (candidates.size > 0) review(`${concept} same-as: ${found.length === 0 ? `no TIPNR record of its Strong keys (${[...candidates].sort(compareCodePoints).join(', ')}) shares a verse` : `${found.length} TIPNR records (${found.join(', ')})`}`)
+      else {
+        const why =
+          candidates.size === 0
+            ? 'no TIPNR record has its Strong keys'
+            : found.length === 0
+              ? `no TIPNR record of its Strong keys (${[...candidates].sort(compareCodePoints).join(', ')}) shares a verse`
+              : `${found.length} TIPNR records (${found.join(', ')})`
+        review(`${concept} same-as: ${why}`)
+      }
     }
   }
 

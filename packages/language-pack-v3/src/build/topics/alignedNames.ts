@@ -32,7 +32,9 @@ function sameKey(word: string, wanted: string): boolean {
   const w = KEY.exec(word)
   const d = KEY.exec(wanted)
   if (w === null || d === null) return false
-  return w[1] === d[1] && w[2] === d[2] && (d[3] === '' || d[3] === w[3])
+  const four = w[1] === 'G' && d[1] === 'G'
+  const number = (x: string): string => (four ? x.slice(0, 4) : x)
+  return w[1] === d[1] && number(w[2]) === number(d[2]) && (d[3] === '' || d[3] === w[3])
 }
 
 const bookCodeOf = (verse: number): string => BOOKS[Math.floor(verse / 1_000_000) - 1]
@@ -149,6 +151,9 @@ export function alignedNames(
             continue
           }
           candidates = [candidates[n]]
+        } else if (candidates.length === 0) {
+          issues.push(`${record.id}: ${line.name} ${ref.verse}: the verse has no word with ${line.dStrong}`)
+          continue
         }
         for (const position of candidates) {
           for (const t of textsOfBook) {

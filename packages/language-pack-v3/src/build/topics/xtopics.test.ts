@@ -116,11 +116,13 @@ describe('buildXtopics: same-as', () => {
         ['tw:names/abraham', { strongs: ['H0085'], verses: [verseId('gen', 17, 5)] }],
         ['tw:names/sarah', { strongs: ['H8283'], verses: [verseId('exo', 1, 1)] }],
         ['tw:kt/god', { strongs: ['H0085'], verses: [verseId('gen', 17, 5)] }],
+        ['tw:names/nobody', { strongs: ['H9999'], verses: [verseId('gen', 1, 1)] }],
       ]),
     )
     expect(core.relations).toContainEqual({ from: 'tw:names/abraham', to: 'per:abraham', type: 'same-as', source: 'STEPBible/TIPNR', confidence: 70 })
     expect(core.relations!.some((r) => r.from === 'tw:names/sarah' || r.from === 'tw:kt/god')).toBe(false)
     expect(report.some((l) => l.startsWith('review: tw:names/sarah same-as'))).toBe(true)
+    expect(report.some((l) => l.startsWith('review: tw:names/nobody same-as'))).toBe(true)
     expect(xtopicsView(xtopicsSegment(core))).toMatchObject({ relations: expect.anything() })
   })
 })
