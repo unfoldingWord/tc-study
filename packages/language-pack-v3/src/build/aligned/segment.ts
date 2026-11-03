@@ -8,18 +8,21 @@ import type { Segment } from '../../codec/container'
 import { BOOKS, bookNumber } from '../../ids'
 import type { AlignedModel } from '../../model'
 
-const END = '[a-z][a-z ]{0,5}'
-const GROUP = new RegExp(`^(${END})(?:-(${END}))?$`)
+const START = '[a-z][a-z ]{0,5}'
+const END = '[a-z](?:[a-z ]{0,4}[a-z])?' // an end does not finish with a space
+const GROUP = new RegExp(`^(${START})(?:-(${END}))?$`)
 
 /**
- * A group: a prefix of 1 to 6 characters from lowercase ASCII letters and the space, the first a letter (`t`, `the `), a range of
- * two such prefixes (`b-c`, `ar-b`; the first not after the last by code point; a prefix alone is `P-P`) or `other`. `A`, `aaaaaaa`,
+ * A group: a prefix of 1 to 6 characters from lowercase ASCII letters and the space, the first a letter (`t`, `the`), a range of
+ * two such prefixes, the last not finishing with a space (`b-c`, `ar-b`; the first not after the last by code point; a prefix alone is `P-P`) or `other`. `A`, `aaaaaaa`,
  * `d-b` are not groups.
  */
 export function isAlignedGroup(group: string): boolean {
   if (group === 'other') return true
   const m = GROUP.exec(group)
-  return m !== null && (m[2] === undefined || m[1]! <= m[2])
+  if (m === null) return false
+  if (m[2] === undefined) return new RegExp(`^${END}$`).test(m[1]!) // a prefix alone is P-P: it is also an end
+  return m[1]! <= m[2]
 }
 
 /**

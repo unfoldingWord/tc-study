@@ -98,6 +98,7 @@ describe('partOf and ALIGNED_PARTS', () => {
 
   test('the table is valid, in order, contiguous, covers a-z with no hole and no overlap', () => {
     expect(ALIGNED_PARTS.every(isAlignedGroup)).toBe(true)
+    expect(ALIGNED_PARTS.every((g) => !g.endsWith(' '))).toBe(true)
     expect(ALIGNED_PARTS.every((g) => g.includes('-'))).toBe(true)
     const ends = ALIGNED_PARTS.map((g) => g.split('-') as [string, string])
     expect(ends[0]![0]).toBe('a')
@@ -126,6 +127,10 @@ describe('partOf and ALIGNED_PARTS', () => {
     expect(isAlignedGroup('ab-a')).toBe(false)
     expect(isAlignedGroup('the -thf')).toBe(true)
     expect(isAlignedGroup(' a')).toBe(false)
+    expect(isAlignedGroup('the ')).toBe(false) // an end does not finish with a space
+    expect(isAlignedGroup('a-b ')).toBe(false)
+    expect(isAlignedGroup('a b-c')).toBe(true)
+    expect(isAlignedGroup('the -thf')).toBe(true)
     expect(isAlignedGroup('A')).toBe(false)
     expect(isAlignedGroup('other')).toBe(true)
     expect(inAlignedRange('ar-b', 'as')).toBe(true)
