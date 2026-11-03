@@ -135,7 +135,9 @@ export function unitsOf(segments: BuiltSegment[], needs: (s: BuiltSegment) => st
       throw new Error(`needs of the segment ${built.id} is not a list of unit ids`)
     }
     if (wanted.some((item) => item.startsWith('aligned:'))) throw new Error(`needs of the segment ${built.id} lists an aligned unit, which is optional`)
-    if (!id.startsWith('aligned:')) for (const item of wanted) unit.needs.add(item)
+    if (id.startsWith('aligned:')) {
+      if (wanted.length > 0) throw new Error(`needs of the aligned segment ${built.id} is not empty, and an aligned unit lists no needs`)
+    } else for (const item of wanted) unit.needs.add(item)
   })
 
   return [...units.keys()].sort(compareCodePoints).map((id): Unit => {

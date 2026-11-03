@@ -138,6 +138,15 @@ def test_strong_repeated_in_entry():
     assert "error" not in read_file(seg(["a"], ["G1", "G2"], [2, 0, 1, 1, 1, 1, 1, 1, 2, 1, 1]))
 
 
+def test_strongs_text_twice():
+    err(seg(["a"], ["G1", "G1"], [1, 0, 1, 1, 1, 1]), "E_BODY")
+
+
+def test_entry_without_strong_key_and_key_without_book():
+    err(seg(["a"], ["G1"], [0]), "E_BODY")
+    err(seg(["a"], ["G1"], [1, 0, 0]), "E_BODY")
+
+
 def test_strong_index_outside():
     err(seg(["a"], ["G1"], [1, 1, 1, 1, 1, 1]), "E_BODY")
 
@@ -196,5 +205,7 @@ def test_catalog_optional_rules():
     err(cat_with({"id": "aligned:a-am", "segments": [0], "optional": "true"}), "E_BODY")
     err(cat_with({"id": "aligned:a-am", "segments": [0]}), "E_BODY")
     err(cat_with({"id": "aligned:other", "segments": [0]}), "E_BODY")
+    for bad_id in ("aligned:A", "aligned:ab-a", "aligned:", "aligned:d-b", "aligned:a-b-c"):
+        err(cat_with({"id": bad_id, "segments": [0], "optional": True}), "E_BODY")
     err(cat_with({"id": "lex:G5", "segments": [0], "optional": True}), "E_BODY")
     err(cat_with({"id": "obs", "segments": [0], "optional": False}), "E_BODY")

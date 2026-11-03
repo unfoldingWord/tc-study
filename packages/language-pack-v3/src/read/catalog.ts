@@ -11,6 +11,7 @@
 import { CLASS_NAMES, hex, type Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
 import { type CborMap, hasOwn, isMap, isUint } from '../codec/values'
+import { isGroup } from './aligned'
 import type { About, CatalogModel, CatalogResource, Complement, SegmentEntry, Unit } from '../model'
 
 function bad(what: string): never {
@@ -140,6 +141,7 @@ function readUnit(value: unknown, i: number, segmentCount: number): Unit {
     if (fields.optional !== true) bad(`${what}.optional is not true`)
     unit.optional = true
   }
+  if (id.startsWith('aligned:') && !isGroup(id.slice('aligned:'.length))) bad(`${what} (${JSON.stringify(id)}): the part is not a group`)
   if (id.startsWith('aligned:') !== (unit.optional === true)) bad(`${what} (${JSON.stringify(id)}): the aligned units are optional, and no other unit is`)
   return unit
 }

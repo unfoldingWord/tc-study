@@ -21,9 +21,13 @@ const END = '[a-z][a-z ]{0,5}'
 const GROUP = new RegExp(`^(${END})(?:-(${END}))?$`)
 
 /** The group of an `aligned` header: a prefix of 1 to 6 characters of `[a-z ]` (the first a letter), a range of two (the first not after the last) or `other`. */
-function checkGroup(group: string): void {
+export function isGroup(group: string): boolean {
   const m = GROUP.exec(group)
-  if (group === 'other' || (m !== null && (m[2] === undefined || m[1]! <= m[2]))) return
+  return group === 'other' || (m !== null && (m[2] === undefined || m[1]! <= m[2]))
+}
+
+function checkGroup(group: string): void {
+  if (isGroup(group)) return
   bad(`the group ${JSON.stringify(group)} is not a range of prefixes or "other"`)
 }
 
@@ -56,6 +60,7 @@ export function alignedView(seg: Segment, groups?: readonly string[]): AlignedMo
     keys = decodeTexts({ utf8: t.keys.utf8, len: t.keys.len })
     if (!Array.isArray(t.strongs) || !t.strongs.every((s) => typeof s === 'string')) bad('strongs is not a list of text')
     strongs = t.strongs as string[]
+    if (new Set(strongs).size !== strongs.length) bad('strongs repeats a text')
     if (!(t.data instanceof Uint8Array)) bad('data is not a byte string')
     data = decodeUvarints(t.data)
   } catch (error) {

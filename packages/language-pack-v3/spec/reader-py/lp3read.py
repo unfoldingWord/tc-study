@@ -1241,6 +1241,10 @@ def _decode_catalog(p: Segment) -> dict:
             _bad()
         if ("optional" in u) != uid.startswith("aligned:"):
             _bad()
+        if uid.startswith("aligned:") and uid != "aligned:other":
+            rng = aligned_range(uid[len("aligned:"):])
+            if rng is None or not rng[0] <= rng[1]:
+                _bad()                          # the part of an aligned unit is a group
         if "optional" in u:
             unit["optional"] = True
         units.append(unit)
@@ -1686,6 +1690,8 @@ def _decode_aligned(p: Segment, ranges: list[tuple[str, str]] | None = None) -> 
             _bad()
     keys = texts_column(p.t["keys"])
     strongs = _strtab(p.t["strongs"])
+    if len(set(strongs)) != len(strongs):
+        _bad()                              # a text twice in strongs
     data = uvarints(p.t["data"])
     prev = None
     for k in keys:
@@ -1708,6 +1714,8 @@ def _decode_aligned(p: Segment, ranges: list[tuple[str, str]] | None = None) -> 
 
     for k in keys:
         s = take()
+        if s == 0:
+            _bad()                          # an entry with no Strong key
         entry, used = {}, set()
         for _ in range(s):
             idx = take()
@@ -1715,7 +1723,10 @@ def _decode_aligned(p: Segment, ranges: list[tuple[str, str]] | None = None) -> 
                 _bad()
             used.add(idx)
             books, book = {}, 0
-            for _ in range(take()):
+            nb = take()
+            if nb == 0:
+                _bad()                      # a Strong key with no book
+            for _ in range(nb):
                 delta = take()
                 book += delta
                 verses, occ = take(), take()

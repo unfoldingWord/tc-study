@@ -36,7 +36,7 @@ A **unit** is what a device installs or replaces at once:
 | `aligned:a-am`, `aligned:ar-b`, `aligned:other`… | One part of the language's index of aligned phrases (`aligned`, language catalog), named by its range of keys (prefixes of 1 to 6 characters; `cddl/aligned.cddl`). Optional: a device installs it only when asked. Needs nothing, and no unit needs it |
 | `obs` | Open Bible Stories |
 
-Each unit lists the units it needs (`needs`). A unit may carry `optional: true`: a device installs it only when asked. Every `aligned:{part}` unit must carry it (with the value `true`) and no other unit may; no unit lists an optional unit in `needs`. A book needs its original, the language map (`needs: "map"`, now satisfied by its own catalog) and the article groups its
+Each unit lists the units it needs (`needs`). A unit may carry `optional: true`: a device installs it only when asked. Every `aligned:{part}` unit must carry it (with the value `true`) and no other unit may; no unit lists an optional unit in `needs`, and an optional unit lists no `needs` (rules of the builder; a reader does not check them). The part of an `aligned:{part}` id must be a group (`cddl/aligned.cddl`), or the catalog is `E_BODY`. A book needs its original, the language map (`needs: "map"`, now satisfied by its own catalog) and the article groups its
 notes and links point to that the catalog builds (the others are reported and not listed). The lexicon is not needed to read; an app downloads it when asked.
 
 A bridged book names the original's stamp, so its unit needs `orig:<book>` like any book: a device without that

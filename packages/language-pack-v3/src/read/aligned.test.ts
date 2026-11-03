@@ -143,6 +143,7 @@ describe('alignedSegment and alignedView', () => {
     ['data cut short at the start', (s) => rebuild(s, ['a'], [])],
     ['an entry with no Strong key', (s) => rebuild(s, ['a'], [0])],
     ['a Strong index outside strongs', (s) => rebuild(s, ['a'], [1, 2, 1, 1, 1, 1])],
+    ['strongs that repeats a text', (s) => rebuild(s, ['a'], [1, 0, 1, 1, 1, 1], ['G1', 'G1'])],
     ['a Strong index repeated', (s) => rebuild(s, ['a'], [2, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1])],
     ['a Strong key with no book', (s) => rebuild(s, ['a'], [1, 0, 0])],
     ['a book delta of 0', (s) => rebuild(s, ['a'], [1, 0, 1, 0, 1, 1])],
@@ -188,7 +189,7 @@ describe('the catalog and the aligned units', () => {
   test('two parts are the units aligned:a and aligned:b-c, optional and without needs', async () => {
     const a = await part('a', 'amor')
     const b = await part('b-c', 'bien')
-    const cat = await buildCatalog({ about, resources: [], segments: [b, a], needs: () => ['map'] })
+    const cat = await buildCatalog({ about, resources: [], segments: [b, a], needs: (s) => (s.seg.h.class === 'aligned' ? [] : ['map']) })
     const view = catalogView(cat.seg)
     expect(view.units).toEqual([
       { id: 'aligned:a', segments: [0], optional: true },
@@ -205,6 +206,7 @@ describe('the catalog and the aligned units', () => {
     const cat = await buildCatalog({ about, resources: [], segments: [a, other] })
     expect(catalogView(cat.seg).units.find((u) => u.id === 'obs')).toEqual({ id: 'obs', segments: [1] })
     await expect(buildCatalog({ about, resources: [], segments: [a, other], needs: (s) => (s.seg.h.class === 'obs' ? ['aligned:a'] : []) })).rejects.toThrow('aligned')
+    await expect(buildCatalog({ about, resources: [], segments: [a, other], needs: (s) => (s.seg.h.class === 'aligned' ? ['map'] : []) })).rejects.toThrow('aligned')
   })
 
   test('the catalog reader refuses optional that is not true, optional on another unit, an aligned unit without it', async () => {
@@ -217,6 +219,9 @@ describe('the catalog and the aligned units', () => {
       (s) => void (units(s)[0].optional = 1),
       (s) => void delete units(s)[0].optional,
       (s) => void (units(s)[1].optional = true),
+      (s) => void (units(s)[0].id = 'aligned:A'),
+      (s) => void (units(s)[0].id = 'aligned:ab-a'),
+      (s) => void (units(s)[0].id = 'aligned:'),
     ]
     for (const change of mutations) {
       const seg = structuredClone(cat.seg)
