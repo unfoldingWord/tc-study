@@ -277,6 +277,10 @@ describe('topicsView rejects', () => {
   test('a name that is not a four-item row', () => rejects((s) => (body(s, 'names')['obs:10'][0] = ['a', 'obs', 1])))
   test('names of a part with verse list defects', () => rejects((s) => (body(s, 'names').keys = ['b', 'a']), tpart))
   test('local that is not a map of rows', () => rejects((s) => (body(s, 'local')['es-419:tema/x'] = 3)))
+  test('local names that are empty', () => rejects((s) => (body(s, 'local')['es-419:tema/x'] = { names: [] })))
+  test('local refs that are not verse ids', () => rejects((s) => (body(s, 'local')['es-419:tema/x'] = { names: ['a'], refs: [[1, 2]] })))
+  test('local refs of a book above 66', () =>
+    rejects((s) => (body(s, 'local')['es-419:tema/x'] = { names: ['a'], refs: [[56_001_001, 67_001_001]] })))
   test('a coverage book set of another length', () => rejects((s) => (body(s, 'coverage')['aligned/es-419'] = [new Uint8Array(10)])))
 })
 

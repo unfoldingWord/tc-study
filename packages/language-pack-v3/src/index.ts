@@ -47,7 +47,7 @@ export { catalogView } from './read/catalog'
 export { lexView } from './read/lex'
 export { obsView } from './read/obs'
 export { origView } from './read/orig'
-export { xtopicsView } from './read/topics'
+export { topicsView, xtopicsView } from './read/topics'
 export { parseTipnr, type TipnrRecord } from './source/tipnr'
 export {
   type ComplementFile,

@@ -2914,6 +2914,8 @@ TOPICS_CORE_MUTATIONS = {
     "local names empty": lambda h, t: t["local"].update({"x": {"names": []}}),
     "local names not text": lambda h, t: t["local"].update({"x": {"names": [1]}}),
     "local refs not pairs": lambda h, t: t["local"].update({"x": {"names": ["a"], "refs": [[1]]}}),
+    "local refs ids not verses": lambda h, t: t["local"].update({"x": {"names": ["a"], "refs": [[1, 2]]}}),
+    "local refs book 67": lambda h, t: t["local"].update({"x": {"names": ["a"], "refs": [[56001001, 67001001]]}}),
     "local related not text": lambda h, t: t["local"].update({"x": {"names": ["a"], "related": [1]}}),
     "coverage book both whole and partial": lambda h, t: t.update(coverage={"a": [bset(["tit"]), bset(["tit"])]}),
 }

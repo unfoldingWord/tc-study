@@ -455,6 +455,7 @@ types, these are `E_BODY` too:
     - `xtopics` `occurrences`: a counts table of unit `"verses"` (another unit is `E_BODY`) whose keys are not in `topics.ids`; a row whose `count` differs from its `verses` or is 0; in a part, verse lists as above.
     - `topics` `names`: a topic with no name; a `source` outside `alignment outline obs list`; `count` 0; `books` of another length than 9 or with a bit 66 to 71 set; a name that is empty. `topics` part `names`: verse lists as above; a key that is not in the core is not checked by a reader of the part alone.
       - The order of a topic's names (most frequent first: `count` descending, ties by name in code point order) and the rule that a name and source pair is listed once are the builder's, like the order of a string table (`container.md`): a reader keeps the order of the file and does not reject another order or a repeat.
+  - `topics` `local`: an entry with no `names` or with an empty list, or a name that is not text; a `refs` item that is not a pair of two verse ids (`book * 1000000 + chapter * 1000 + verse`, book 1 to 66); a `related` that is not a list of texts.
   - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
   bytes; a `books` of another length than 9 (the bits 66 to 71 of this set are not checked); a unit that names a segment outside `segments`, or has none; a segment, a unit

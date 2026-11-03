@@ -1605,7 +1605,7 @@ def _topic_name(x) -> list:
 def _local_topic(v) -> bool:
     return (type(v) is dict and type(v.get("names")) is list and len(v["names"]) > 0 and all(is_str(x) for x in v["names"])
             and ("refs" not in v or (type(v["refs"]) is list and all(
-                type(r) is list and len(r) == 2 and is_uint(r[0]) and is_uint(r[1]) for r in v["refs"])))
+                type(r) is list and len(r) == 2 and _verse_id_ok(r[0]) and _verse_id_ok(r[1]) for r in v["refs"])))
             and ("related" not in v or is_strlist(v["related"])))
 
 
