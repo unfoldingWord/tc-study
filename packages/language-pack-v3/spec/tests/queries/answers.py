@@ -446,8 +446,13 @@ def read_obs(folder, originals):
 
 
 def dbase(key):
-    m = re.match(r"([HG])0*(\d{1,4})", key.split(":")[-1])
-    return f"{m.group(1)}{m.group(2).zfill(4)}" if m else None
+    m = re.match(r"([HG])(\d+)", key.split(":")[-1])
+    if not m:
+        return None
+    # Greek: the first four digits, leading zeros kept (G00110 is G0011); Hebrew: the number, padded to four digits
+    if m.group(1) == "G":
+        return "G" + m.group(2).zfill(4)[:4]
+    return "H" + re.sub(r"^0+(?=\d{4})", "", m.group(2)).zfill(4)
 
 
 def topic_cell(book, covered, rows):
@@ -484,6 +489,12 @@ def answer_topic(world, tipnr, obs, q):
     verses = sorted(v for vs in rows.values() for v in vs)
     stories = [f"obs:{n}" for n, rs in sorted(obs.items()) if any(a <= v <= z for a, z in rs for v in verses)]
     relations = []
+    if tid in BUILDER_EVENTS:
+        # occurs-in: from each story whose ranges overlap the event's range (confidence 60); the event is the `to` end
+        _, ea, ez = BUILDER_EVENTS[tid]
+        for n, rs in sorted(obs.items()):
+            if any(a <= ez and ea <= z for a, z in rs):
+                relations.append({"from": f"obs:{n}", "to": tid, "type": "occurs-in", "source": OBS_KEY, "confidence": 60})
     types = q.get("types")
     if rec and (types is None or "same-as" in types):
         links = world["tables"]["links"].data

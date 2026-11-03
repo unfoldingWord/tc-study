@@ -74,8 +74,10 @@ export function strongKeyOfDStrong(dStrong: string): string | null {
 
 /** The part of a Strong key two sources can share: the letter and the four digits of the number (`G54850` is `G5485`). */
 const strongBase = (key: string): string | null => {
-  const m = /^([HG])0*(\d{1,4})/.exec(key.slice(key.lastIndexOf(':') + 1))
-  return m === null ? null : `${m[1]}${m[2].padStart(4, '0')}`
+  const m = /^([HG])(\d+)/.exec(key.slice(key.lastIndexOf(':') + 1))
+  if (m === null) return null
+  // Greek: the first four digits, leading zeros kept (`G00110` is `G0011`); Hebrew: the number, padded to four digits
+  return m[1] === 'G' ? `G${m[2].padStart(4, '0').slice(0, 4)}` : `H${m[2].replace(/^0+(?=\d{4})/, '').padStart(4, '0')}`
 }
 
 /** The last verse of each chapter of the originals, by book and chapter (`lastVerse` of the outline and OBS readers). */

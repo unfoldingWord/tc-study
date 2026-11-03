@@ -207,7 +207,36 @@
     "installed": true,
     "kind": "topic",
     "names": [],
-    "relations": [],
+    "relations": [
+      {
+        "confidence": 60,
+        "from": "obs:10",
+        "source": "unfoldingWord/en/obs",
+        "to": "ev:plagues-of-egypt",
+        "type": "occurs-in"
+      },
+      {
+        "confidence": 60,
+        "from": "obs:11",
+        "source": "unfoldingWord/en/obs",
+        "to": "ev:plagues-of-egypt",
+        "type": "occurs-in"
+      },
+      {
+        "confidence": 60,
+        "from": "obs:12",
+        "source": "unfoldingWord/en/obs",
+        "to": "ev:plagues-of-egypt",
+        "type": "occurs-in"
+      },
+      {
+        "confidence": 60,
+        "from": "obs:48",
+        "source": "unfoldingWord/en/obs",
+        "to": "ev:plagues-of-egypt",
+        "type": "occurs-in"
+      }
+    ],
     "stories": [
       "obs:10",
       "obs:11",
@@ -380,11 +409,6 @@
   },
   "query": {
     "id": "ev:plagues-of-egypt",
-    "kind": "topic",
-    "types": [
-      "same-as",
-      "part-of",
-      "follows"
-    ]
+    "kind": "topic"
   }
 }
