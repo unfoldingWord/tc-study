@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
 import JSZip from 'jszip'
 import { hex, readHeader, readSegment } from '../codec/container'
-import type { About, CatalogModel } from '../model'
+import type { About, CatalogModel, XtopicsCore } from '../model'
+import { xtopicsView } from '../read/topics'
 import { partsSource } from '../node/partsSource'
 import { CATALOG_TABLES, catalogView } from '../read/catalog'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../source/rows'
@@ -693,5 +695,46 @@ describe('buildLanguage: the map unit', () => {
     for (const unit of catalog.units) for (const need of unit.needs ?? []) expect(ids.has(need) || need.startsWith('orig:')).toBe(true)
     expect(catalog.units.find((u) => u.id === 'book:tit')!.needs).toEqual(['art:tw:kt', 'map', 'orig:tit'])
     expect(built.report.some((line) => line.startsWith('book tit: its notes point to art:ta:translate, art:tw:names, art:tw:other, which this catalog does not build'))).toBe(true)
+  })
+})
+
+describe('buildCommon: the xtopics unit', () => {
+  const english = () => partsSource({ list: join(DATA, 'en', 'list.json'), partsDir: PARTS, originals: ORIGINALS_LIST })
+  const TOPICS = join(DATA, 'topics')
+  const read = (path: string) => readFileSync(join(TOPICS, path), 'utf8')
+  const topics = () => {
+    const obs = new Map<number, string>()
+    let n = 0
+    for (const line of read('obs-refs.txt').split(/\r?\n/)) {
+      const h = /^=== (\d+)$/.exec(line)
+      if (h) obs.set((n = Number(h[1])), '')
+      else if (n > 0) obs.set(n, `${obs.get(n)}${line}\n`)
+    }
+    const theo = (name: string) => read(`theographic-subset/${name}.json`)
+    return { tipnr: read('tipnr-subset.txt'), theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') }, obs }
+  }
+
+  test('lists the unit xtopics (no needs); the xmap and orig segments are the same bytes as without topics', async () => {
+    const plain = await buildCommon({ source: await english(), about, mapLang: 'en' })
+    const withTopics = await buildCommon({ source: await english(), about, mapLang: 'en', topics: topics() })
+    const catalog = await catalogOf(withTopics.catalog)
+    expect(catalog.units.map((u) => u.id)).toEqual(['orig:tit', 'xmap', 'xtopics'])
+    expect(catalog.units.find((u) => u.id === 'xtopics')!.needs).toBeUndefined()
+    const mapLike = (b: { segments: BuiltSegment[] }) => b.segments.filter((s) => s.seg.h.class === 'xmap' || s.seg.h.class === 'orig')
+    expect(mapLike(withTopics).map((s) => [s.id, s.inputs, hex(s.bytes)])).toEqual(mapLike(plain).map((s) => [s.id, s.inputs, hex(s.bytes)]))
+    for (const s of mapLike(withTopics)) expect(JSON.stringify(s.seg.h)).not.toContain('topics')
+    const keys = catalog.resources.map((r) => r.key)
+    expect(keys).toEqual([...keys].sort())
+    expect(keys).toContain('STEPBible/STEPBible-Data/TIPNR')
+    for (const r of catalog.resources) expect(r.license).not.toBe('unknown')
+    expect(withTopics.report.every((line) => !plain.report.includes(line) ? line.startsWith('topics: ') : true)).toBe(true)
+    // The sections of the outline of the English tN introduction of Titus, whole chapters to the UHB's last verse
+    const core = withTopics.segments.find((s) => s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')!
+    const view = xtopicsView(core.seg) as XtopicsCore
+    expect([...view.topics.keys()].filter((id) => id.startsWith('sec:tit/')).length).toBeGreaterThan(0)
+    expect(withTopics.report.some((line) => line.startsWith('topics: outline tit: no introduction'))).toBe(false)
+    expect(keys).toContain('unfoldingWord/en/tn')
+    const again = await buildCommon({ source: await english(), about, mapLang: 'en', topics: topics() })
+    expect(again.catalog.id).toBe(withTopics.catalog.id)
   })
 })

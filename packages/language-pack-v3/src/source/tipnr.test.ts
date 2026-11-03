@@ -13,7 +13,7 @@ describe('parseTipnr (fixture)', () => {
   const byId = (id: string) => records.find((r) => r.id === id)
 
   test('the records of the fixture, by kind', () => {
-    expect(records.filter((r) => r.kind === 'person')).toHaveLength(6)
+    expect(records.filter((r) => r.kind === 'person')).toHaveLength(7)
     expect(records.filter((r) => r.kind === 'place')).toHaveLength(5)
     expect(issues).toEqual([])
   })

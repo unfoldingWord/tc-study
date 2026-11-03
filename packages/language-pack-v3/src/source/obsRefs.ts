@@ -31,7 +31,7 @@ export function parseObsRefs(
   for (const [story, text] of stories) {
     const m = LINE.exec(text)
     if (!m) {
-      issues.push(`obs:${story}: no "A Bible story from" line`)
+      issues.push(`obs:${story}: no closing line ("A Bible story from: …")`)
       continue
     }
     const ranges: [number, number][] = []

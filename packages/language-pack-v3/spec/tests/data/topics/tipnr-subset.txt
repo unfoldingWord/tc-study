@@ -40,6 +40,11 @@ Sarah@Gen.11.29-1Pe=H8283		Terah@Gen.11.24-Luk + 	Abraham@Gen.11.26-1Pe, Nahor@G
 – Greek	Sarah@Gen.11.29-1Pe	G4564«G4564=Σάρρα		Rom.4.19; Rom.9.9; Heb.11.11; 1Pe.3.6																																
 – Total	Sarah or Sarai	Sarah, Sarai	H8283, H8297, G4564	Gen.11.29; Gen.17.15,17,19,21; 18.1ff; 20.2,14,16,18; 21.1,2,3,6,7,9,12; 23.1,2,19; 24.36,67; 25.10,12; 49.31; Isa.51.2; Gen.11.30,31; 12.5,11,17; 16.1,2,3,5,6,8; Rom.4.19; 9.9; Heb.11.11; 1Pe.3.6	48
 @Ambiguity=																																					
+Terah@Gen.11.24-Luk=H8646G		Nahor@Gen.11.22-Luk + 			Abraham@Gen.11.26-1Pe, Nahor@Gen.11.26-, Haran@Gen.11.26-, Sarah@Gen.11.29-1Pe	Early Patriarch		Male																													
+– Named	Terah@Gen.11.24-Luk	H8646G«H8646=תֶּ֫רַח		Gen.11.24; Gen.11.25; Gen.11.26; Gen.11.27a; Gen.11.27b; Gen.11.28; Gen.11.31; Gen.11.32a; Gen.11.32b; Jos.24.2; 1Ch.1.26																																
+– Greek	Terah@Gen.11.24-Luk	G2291«G2291=Θάρα		Luk.3.34																																
+– Total	Terah or Thara	Terah	H8646G, G2291	Gen.11.24; Gen.11.1ff; Jos.24.2; 1Ch.1.26; Luk.3.34	5
+@Ambiguity=
 Zechariah@2Ki.14.29-=H2148P		Jeroboam@2Ki.13.13-Amo + 				Israel		Male																													
 – Named	Zechariah@2Ki.14.29-	H2148P«H2148a=זְכַרְיָהוּ		2Ki.14.29; 2Ki.15.8; 2Ki.15.11																																
 – Total	Zechariah or Zachariah	Zechariah	H2148P	2Ki.14.29; 15.8,11	3
