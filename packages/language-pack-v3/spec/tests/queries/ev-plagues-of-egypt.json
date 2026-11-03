@@ -408,7 +408,10 @@
     ]
   },
   "ignoreRelationsFrom": [
-    "sec:"
+    "sec:exo/12.1-12.30",
+    "sec:exo/12.31-18.27",
+    "sec:exo/6.28-7.25",
+    "sec:exo/8-11"
   ],
   "query": {
     "id": "ev:plagues-of-egypt",

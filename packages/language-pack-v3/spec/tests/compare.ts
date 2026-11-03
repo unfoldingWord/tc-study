@@ -41,9 +41,8 @@ const isObject = (value: Json | undefined): value is { [key: string]: Json } => 
 /** `$.texts[0].events[3]`: a key that is not a plain name is written `["…"]`. */
 const keyPath = (path: string, key: string): string => (/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? `${path}.${key}` : `${path}[${JSON.stringify(key)}]`)
 
-/** The first place, in the order of the file (keys by code point), where `a` and `b` differ: its path and the two values (`undefined` for an absent one). */
 /**
- * A fixture may name `ignoreRelationsFrom`: prefixes of `from` whose relations are left out of the answer before the compare,
+ * A fixture may name `ignoreRelationsFrom`: `from` ids (or prefixes) whose relations are left out of the answer before the compare,
  * because the independent oracle (`answers.py`) does not derive them (the `sec:` ones need the outline parsing).
  */
 export function withoutIgnoredRelations(got: Json, ignore: string[] | undefined): Json {
@@ -52,6 +51,7 @@ export function withoutIgnoredRelations(got: Json, ignore: string[] | undefined)
   return { ...got, relations: keep }
 }
 
+/** The first place, in the order of the file (keys by code point), where `a` and `b` differ: its path and the two values (`undefined` for an absent one). */
 export function firstDifference(a: Json | undefined, b: Json | undefined, path = '$'): [string, Json | undefined, Json | undefined] | null {
   if (a === undefined || b === undefined) return a === b ? null : [path, a, b]
   if (Array.isArray(a) && Array.isArray(b)) {

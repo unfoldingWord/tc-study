@@ -44,6 +44,14 @@ describe('parseObsRefs (forms)', () => {
     expect(one('Genesis 24:1-25:26').r).toEqual([[verseId('gen', 24, 1), verseId('gen', 25, 26)]])
     expect(one('Acts 3-4:22').r).toEqual([[verseId('act', 3, 1), verseId('act', 4, 22)]])
   })
+  test('a piece that cannot be read does not carry its chapter to the next bare number', () => {
+    const x = one('Genesis 1:1, 2:x, 5', () => 30)
+    expect(x.issues.length).toBe(1)
+    expect(x.r).toEqual([
+      [verseId('gen', 1, 1), verseId('gen', 1, 1)],
+      [verseId('gen', 5, 1), verseId('gen', 5, 30)],
+    ])
+  })
   test('after a comma a bare number is a verse of the chapter just named; after a semicolon, a chapter', () => {
     expect(one('Genesis 1:1-2, 5').r).toEqual([
       [verseId('gen', 1, 1), verseId('gen', 1, 2)],

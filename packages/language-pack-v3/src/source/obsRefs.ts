@@ -48,6 +48,7 @@ export function parseObsRefs(
         if (!code) {
           issues.push(`obs:${story}: unknown book in ${JSON.stringify(piece)}`)
           book = null
+          verseChapter = null
           continue
         }
         book = code
@@ -58,6 +59,7 @@ export function parseObsRefs(
       const p = PLACE.exec(rest)
       if (!book || !p) {
         issues.push(`obs:${story}: cannot read ${JSON.stringify(piece)}`)
+        verseChapter = null // a piece that cannot be read does not carry its chapter to the next one
         continue
       }
       const bk = book
@@ -76,6 +78,7 @@ export function parseObsRefs(
         const last = end(c2)
         if (last < 0) {
           issues.push(`obs:${story}: no last verse for ${bk} ${c2} in ${JSON.stringify(piece)}`)
+          verseChapter = null
           continue
         }
         range = [verseId(book, c1, 1), verseId(book, c2, last)]
