@@ -18,7 +18,9 @@ topics-header = {
 topics-core-tables = {
   "names": { * topic-id => [+ topic-name] },   ; required, v1; most frequent first (count descending),
                                ; ties by name in code point order; a name and source pair is listed once
-  ? "local": local-topics,     ; optional, v1; "{lang}:tema/..." topics only this language has
+  ? "local": local-topics,     ; optional, v1; "{lang}:tema/..." topics only this language has. A reader reads the
+                               ; keys of local-topics (names, refs, related) and ignores any other key of an entry,
+                               ; as everywhere (tests/README.md)
   "coverage": coverage,        ; required, v1
 }
 

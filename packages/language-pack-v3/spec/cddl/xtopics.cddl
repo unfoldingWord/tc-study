@@ -26,7 +26,9 @@ xtopics-core-tables = {
   "occurrences": counts,       ; required, v1; unit "verses": per topic, the books and how many verses mention it;
                                ; here count == verses (distinct verses) and 1 <= count
   ? "ranges": { * topic-id => [+ [verse-id, verse-id]] },  ; optional, v1; for stories and sections: the verse
-                               ; ranges they span (first and last verse, both inside; first <= last)
+                               ; ranges they span: first and last verse of each range, first <= last. A reader checks
+                               ; that both are verse ids of a book 1..66 and that first <= last; it does not check that
+                               ; both ends are in one book, or that the verses exist in any original
 }
 
 topic-id = concept-id          ; "per:", "lug:", "ev:", "tema:" (kind 4), "sec:", "obs:" ids (ids.md)
@@ -41,7 +43,9 @@ topics = {
                                ; topics may share a ref (the same outline range under two ids)
   "title": strtab,             ; per id (as many as ids, "" for none): the English title shown when a language has no
                                ; name: TIPNR's unified name before "@" (people, places), the Theographic title or the
-                               ; builder's list title (events), the OBS story title, the outline heading (sections)
+                               ; builder's list title (events), the OBS story title, the outline heading (sections).
+                               ; "" when the source gives none: a reader then has no title to show and the answer
+                               ; leaves "title" out; the app shows the id
   "ustrong": strtab,           ; per id (as many as ids, "" for none): TIPNR's uStrong of a person or place, kept so
                                ; that the id can be derived again (ids.md)
 }
@@ -50,6 +54,8 @@ topics = {
 ; segment but a concept of the common map (tw:names/abraham) is named by id in "external", and its number is the
 ; count of topics.ids plus the index in "external". Both ends may be external (a relation between two concepts of
 ; the map that only this module asserts). Concepts are never merged: "same-as" is a relation like any other.
+; The types and their direction are in ids.md ("Relation types of xtopics"): participant and place go from the event,
+; tribe from the person, occurs-in from the story or section to an event whose verses overlap its ranges at all.
 topic-relations = {
   "types": strtab,
   "external": strtab,          ; ids of part A concepts, sorted by code point
