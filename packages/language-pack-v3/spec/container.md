@@ -54,13 +54,13 @@ The compressed bytes are not part of the identity, so a better compressor never 
 
 | Key | Type | In | What |
 | --- | --- | --- | --- |
-| `class` | text | all | `catalog`, `xmap`, `map`, `xtopics`, `topics`, `book`, `orig`, `art`, `lex`, `obs` or `gen` |
+| `class` | text | all | `catalog`, `xmap`, `map`, `xtopics`, `topics`, `aligned`, `book`, `orig`, `art`, `lex`, `obs` or `gen` |
 | `v` | uint | all | The class's schema version. 1 for every class in 3.0 |
 | `tables` | map | all | Every table in `t`: name → `[version, required]` (uint, bool). A table in one and not the other is an error |
 | `lang` | text | language classes | The language tag of the resources, as Door43 writes it (`es-419`) |
 | `book` | text | `book`, `orig`, parts of `map`, `xmap`, `topics` and `xtopics` | The book code (`ids.md`) |
 | `part` | text | `map`, `xmap`, `topics`, `xtopics` | `core`, or the book code of a per-book part |
-| `group` | text | `art`, `lex` | Which group of articles or entries (`ids.md`) |
+| `group` | text | `art`, `lex`, `aligned` | Which group of articles or entries (`ids.md`); for `aligned`, the part: the range of first code points of its keys (`cddl/aligned.cddl`) |
 | `orig` | array | everything that names original positions | `[resource key, stamp]` of the original book those positions belong to (`ids.md`) |
 | `res` | array | language classes | The resources whose data is inside: `[* [resource key, release stamp]]`. Tables name a resource by its index here |
 

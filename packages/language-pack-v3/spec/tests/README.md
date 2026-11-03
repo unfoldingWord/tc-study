@@ -395,6 +395,10 @@ so they are skipped (listed in `h.tables`, not in the output). `gen` stays `E_TA
 
 A phase 2 reader of part B knows `xtopics`: `coverage topics relations strongs occurrences ranges` and `topics`: `names local coverage`, at version 1. A topics query's answer states `installed` (`true` or `false`); with `false` it has no state, with `true` the four states of `counts.md`.
 
+### `aligned`
+
+`entries` as `{key: {strong: {book: [verses, occurrences]}}}`: `key` the text as stored, `strong` the Strong key text from `strongs`, `book` the book code (`ids.md`). A reader of part C knows `keys strongs data` at version 1. `group` and `lang` are in `h`, not repeated.
+
 ### Checks of the tables (`E_BODY`)
 
 After the checks of `container.md` have passed (including `E_TABLE`), a reader decodes the tables of the class. A table that
@@ -455,6 +459,9 @@ types, these are `E_BODY` too:
     - `xtopics` `occurrences`: a counts table of unit `"verses"` (another unit is `E_BODY`) whose keys are not in `topics.ids`; a row whose `count` differs from its `verses` or is 0; in a part, verse lists as above.
     - `topics` `names`: a topic with no name; a `source` outside `alignment outline obs list`; `count` 0; `books` of another length than 9 or with a bit 66 to 71 set; a name that is empty. `topics` part `names`: verse lists as above; a key that is not in the core is not checked by a reader of the part alone.
       - The order of a topic's names (most frequent first: `count` descending, ties by name in code point order) and the rule that a name and source pair is listed once are the builder's, like the order of a string table (`container.md`): a reader keeps the order of the file and does not reject another order or a repeat.
+  - `aligned` (the header needs `lang`, `group` and a non-empty `res`):
+    - `keys` not sorted by code point or with a repeat; a key whose first code point, read as it is stored, is outside the range of `h.group` (for `other`: inside the range of a part that is not `other`, which a reader knows only if `group` is a range it can read; a reader checks the ranges of a group written `x` or `x-y`, and takes `other` as everything else).
+    - `data` with numbers left over or cut short (the entries must use it exactly); a Strong index outside `strongs`; book numbers (the running sum of the deltas) not increasing within a Strong key, a delta of 0, or a book outside 1..66; `verses` 0, or above `occurrences`.
   - `topics` `local`: an entry with no `names` or with an empty list, or a name that is not text; a `refs` item that is not a pair of two verse ids (`book * 1000000 + chapter * 1000 + verse`, book 1 to 66); a `related` that is not a list of texts.
   - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32

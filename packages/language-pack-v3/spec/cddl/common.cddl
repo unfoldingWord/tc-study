@@ -26,7 +26,7 @@ logical-header = {
   ? "res": [* [resource-key: tstr, release-stamp: tstr]],
 }
 
-class-name = "catalog" / "xmap" / "map" / "xtopics" / "topics" / "book" / "orig" / "art" / "lex" / "obs" / "gen"
+class-name = "catalog" / "xmap" / "map" / "xtopics" / "topics" / "aligned" / "book" / "orig" / "art" / "lex" / "obs" / "gen"
 table-name = tstr              ; lowercase ASCII letters, digits and "-", starting with a letter
 
 ; The body: the logical header again, and the tables.

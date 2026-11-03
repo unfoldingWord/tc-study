@@ -1,0 +1,52 @@
+; Format 3: the index of aligned phrases. For one language, the words and the phrases of its bridge texts that are aligned
+; to original words, with the Strong keys they translate and, per Strong key and book, the distinct verses and the
+; occurrences. For lookups across books. An optional unit (catalog.md): no unit needs it, it needs nothing, and building
+; with or without it gives byte-equal segments of every other class.
+;
+; One segment per part. The parts split the keys by their start (normative): a part's "group" is the range of the first
+; code points of its keys, written as one letter ("a"), two letters with a hyphen ("b-c": every first code point from
+; "b" to "c") or "other". A key belongs to the part whose range holds its first code point after the key has been
+; normalized (NFC) and lowercased, which is how the keys are stored (below). "other" holds every key whose first code
+; point lies in no range of any other part of the language, whatever that character is ("¿", "Ἰ", a digit). The table
+; of ranges is the builder's, and a reader needs none: it looks a key up in the part its first code point names, and
+; the catalog lists the parts that exist (units "aligned:{part}"). A part whose range holds no key is not built.
+
+aligned-segment = body<aligned-header, aligned-tables>
+
+aligned-header = {
+  "class": "aligned",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "lang": tstr,
+  "group": tstr,               ; the part: "a", "b-c" or "other"
+  "res": [+ [tstr, tstr]],     ; the bridge texts the entries came from (resource key and release tag), e.g. the
+                               ; language's GLT and GST; the same in every part of one build
+}
+
+; How the entries are made (normative; the same rules as the measurement script tests/measure/alignedIndex.ts).
+; - Texts: the bridge texts of the book segments whose resource ends in /glt, /gst (es-419) or /ult, /ust (en). One
+;   index per language, all its texts together.
+; - A word entry: each word piece whose "align" list is not empty. A phrase entry: each maximal run of two or more
+;   consecutive word pieces (only " " pieces between them) whose "align" lists are equal and not empty, the texts joined
+;   with single spaces.
+; - The key: the text in NFC, then lowercased with toLocaleLowerCase(lang). A reader never normalizes (container.md):
+;   a caller who looks a key up normalizes and lowercases it the same way before it compares bytes.
+; - The Strong keys of an entry: the strongKey of the original words at the aligned positions (ids.md); a word with no
+;   Strong key is skipped; an entry with none is not stored.
+; - Per Strong key and book: the distinct verses (a verse event with a range "1-2" counts as the verse of its first
+;   number) and the occurrences. An occurrence is one appearance of the entry in a text, counted once for each distinct
+;   Strong key of its aligned positions. Each text adds its own occurrences; a verse in two texts is one verse. So a
+;   phrase found in one text only has its verse once and the occurrences of that text.
+aligned-tables = {
+  "keys": texts,               ; required, v1; the keys, sorted by code point, no repeat
+  "strongs": strtab,           ; required, v1; the Strong keys the entries use, each once; the builder writes the most used first
+  "data": uvarints,            ; required, v1; per key, in the order of "keys", these numbers one after the other:
+                               ;   s = number of Strong keys of the entry, then s times, with the Strong keys in code
+                               ;   point order of their text:
+                               ;     the index of the Strong key in "strongs",
+                               ;     b = number of books, then b times, with the books ascending:
+                               ;       book delta (from the previous book of this Strong key, the first from 0; so the
+                               ;         first is the book number and the book number never passes 66),
+                               ;       verses (distinct verses of that book),
+                               ;       occurrences (never less than verses)
+}

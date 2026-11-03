@@ -54,9 +54,10 @@ segment-entry = {
 }
 
 unit = {
-  "id": tstr,                  ; "book:tit", "orig:tit", "map", "xmap", "topics", "xtopics", "art:tw:kt", "lex:G5", "obs"
+  "id": tstr,                  ; "book:tit", "orig:tit", "map", "xmap", "topics", "xtopics", "art:tw:kt", "lex:G5", "obs", "aligned:a", "aligned:b-c", "aligned:other"
   "segments": [+ uint],        ; indexes in "segments"
   ? "needs": [* tstr],         ; unit ids, in this catalog or in one it requires
+  ? "optional": true,          ; a device installs the unit only when asked; no unit lists an optional unit in "needs" (the "aligned:{part}" units)
 }
 
 complement = {
