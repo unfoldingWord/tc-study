@@ -279,7 +279,7 @@ export type SegmentEntry = {
 }
 
 /** A unit (`catalog.cddl`, `unit`): `segments` are indexes in the catalog's `segments`; `needs` are unit ids. */
-export type Unit = { id: string; segments: number[]; needs?: string[] }
+export type Unit = { id: string; segments: number[]; needs?: string[]; optional?: true }
 
 /**
  * A catalog (`catalog.cddl`). `lang` is the header's: set for a language catalog (the same as `about.catalog`), absent in the
@@ -391,3 +391,17 @@ export type TopicsCore = {
 
 /** The part of one book: the verses each topic's alignment names were taken from. */
 export type TopicsPart = { lang: string; part: string; names?: VerseLists }
+
+// The index of aligned phrases (`spec/cddl/aligned.cddl`)
+
+/**
+ * One part of a language's index of aligned phrases. `group` is the range of first code points of its keys (`a`, `b-c` or
+ * `other`); `res` the bridge texts (`[key, release tag]`). `entries`: key, then Strong key, then book code, to
+ * `[verses, occurrences]`. The writer sorts keys, Strong keys and books itself.
+ */
+export type AlignedModel = {
+  lang: string
+  group: string
+  res: [string, string][]
+  entries: Map<string, Map<string, Map<string, [verses: number, occurrences: number]>>>
+}

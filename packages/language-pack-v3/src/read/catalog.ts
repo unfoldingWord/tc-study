@@ -136,6 +136,11 @@ function readUnit(value: unknown, i: number, segmentCount: number): Unit {
     if (!needs.every((item) => typeof item === 'string')) bad(`${what}.needs is not a list of text`)
     unit.needs = [...(needs as string[])]
   }
+  if (hasOwn(fields, 'optional')) {
+    if (fields.optional !== true) bad(`${what}.optional is not true`)
+    unit.optional = true
+  }
+  if (id.startsWith('aligned:') !== (unit.optional === true)) bad(`${what} (${JSON.stringify(id)}): the aligned units are optional, and no other unit is`)
   return unit
 }
 

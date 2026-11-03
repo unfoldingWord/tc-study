@@ -61,7 +61,7 @@ export const MAX_UNCOMPRESSED_BYTES = 67_108_864
 
 // Types
 
-export const CLASS_NAMES = ['catalog', 'xmap', 'map', 'xtopics', 'topics', 'book', 'orig', 'art', 'lex', 'obs', 'gen'] as const
+export const CLASS_NAMES = ['catalog', 'xmap', 'map', 'xtopics', 'topics', 'aligned', 'book', 'orig', 'art', 'lex', 'obs', 'gen'] as const
 export type ClassName = (typeof CLASS_NAMES)[number]
 
 /** The header inside the body, and again in the file header (`container.md`, "Logical header"). */

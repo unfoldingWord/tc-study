@@ -14,13 +14,14 @@
 import { compareCodePoints } from '../codec/columns'
 import { CLASS_NAMES, type ClassName, hex, KIND_TRANSFER, readHeader, readSegment, type Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
-import { isMap } from '../codec/values'
+import { isMap, put } from '../codec/values'
 import type { CountRows, Coverage, VerseLists } from '../codec/counts'
 import type { CountTable, HelpTable, MapCore, MapPart, ObsHelpTable, TextModel, TopicsCore, TopicsPart, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../model'
 import { readTransfer } from '../transfer'
 import { ART_TABLES, artView } from './art'
 import { BOOK_TABLES, bookView } from './book'
 import { CATALOG_TABLES, catalogView } from './catalog'
+import { ALIGNED_TABLES, alignedView } from './aligned'
 import { LEX_TABLES, lexView } from './lex'
 import { OBS_TABLES, obsView } from './obs'
 import { MAP_TABLES, mapView } from './map'
@@ -52,6 +53,7 @@ export const KNOWN: Record<ClassName, Record<string, number[]>> = deepFreeze({
   xmap: { ...XMAP_TABLES },
   xtopics: { ...XTOPICS_TABLES },
   topics: { ...TOPICS_TABLES },
+  aligned: { ...ALIGNED_TABLES },
   gen: {},
 })
 
@@ -186,6 +188,16 @@ function xtopicsOut(seg: Segment): Record<string, unknown> {
   }
 }
 
+function alignedOut(seg: Segment): Record<string, unknown> {
+  const entries: Record<string, unknown> = {}
+  for (const [key, byStrong] of alignedView(seg).entries) {
+    const strongs: Record<string, unknown> = {}
+    for (const [strong, books] of byStrong) put(strongs, strong, Object.fromEntries(books))
+    put(entries, key, strongs)
+  }
+  return { entries }
+}
+
 function topicsOut(seg: Segment): Record<string, unknown> {
   const m = topicsView(seg)
   if (m.part !== 'core') return { names: listsOut((m as TopicsPart).names) }
@@ -231,6 +243,8 @@ function bodyOut(seg: Segment): Record<string, unknown> {
       return xtopicsOut(seg)
     case 'topics':
       return topicsOut(seg)
+    case 'aligned':
+      return alignedOut(seg)
     default:
       throw new FormatError('E_TABLE', `the class "${seg.h.class}" is not read by this reader`)
   }

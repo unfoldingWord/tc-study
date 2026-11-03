@@ -11,7 +11,7 @@
  *
  * ## Order (so that the same inputs give the same catalog)
  *
- * - **segments**: by class in the order of `class-name` (catalog, xmap, map, xtopics, topics, book, orig, art, lex, obs, gen), then by book number
+ * - **segments**: by class in the order of `class-name` (catalog, xmap, map, xtopics, topics, aligned, book, orig, art, lex, obs, gen), then by book number
  *   (a segment without a book first), then by part (`core` first, then by book number), then by group by code point, then by id.
  * - **units**: by id by code point (`lex:G10` before `lex:G5`). A unit lists its segments by index, ascending.
  * - **resources**: by key. **requires**: by catalog and revision. **complements**: by kind, lang and id. All by code point.
@@ -92,6 +92,8 @@ function unitIdOf(seg: Segment): string {
       return `art:${need(group, 'group')}`
     case 'lex':
       return `lex:${need(group, 'group')}`
+    case 'aligned':
+      return `aligned:${need(group, 'group')}`
     case 'obs':
       return 'obs'
     case 'map':
@@ -132,13 +134,15 @@ export function unitsOf(segments: BuiltSegment[], needs: (s: BuiltSegment) => st
     if (!Array.isArray(wanted) || !wanted.every((item) => typeof item === 'string' && item !== '')) {
       throw new Error(`needs of the segment ${built.id} is not a list of unit ids`)
     }
-    for (const item of wanted) unit.needs.add(item)
+    if (wanted.some((item) => item.startsWith('aligned:'))) throw new Error(`needs of the segment ${built.id} lists an aligned unit, which is optional`)
+    if (!id.startsWith('aligned:')) for (const item of wanted) unit.needs.add(item)
   })
 
   return [...units.keys()].sort(compareCodePoints).map((id): Unit => {
     const unit = units.get(id)!
     const out: Unit = { id, segments: unit.indexes }
     if (unit.needs.size > 0) out.needs = [...unit.needs].sort(compareCodePoints)
+    if (id.startsWith('aligned:')) out.optional = true
     return out
   })
 }
