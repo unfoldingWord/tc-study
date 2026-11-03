@@ -348,3 +348,49 @@ describe('build-v3: the maps', () => {
     expect((await run(sample(temp(), ['--book-names', join(temp(), 'none.json')]))).code).toBe(1)
   })
 })
+
+describe('build-v3: --topics', () => {
+  const EN_LIST = join(DATA, 'en', 'list.json')
+  const TOPICS = join(DATA, 'topics')
+  /** The fixtures as a sources folder: `tipnr/`, `theographic/` and the stories of `en_obs/obs-repo/content/`. */
+  function sources(): string {
+    const dir = temp()
+    mkdirSync(join(dir, 'tipnr'))
+    cpSync(join(TOPICS, 'tipnr-subset.txt'), join(dir, 'tipnr', 'TIPNR.txt'))
+    cpSync(join(TOPICS, 'theographic-subset'), join(dir, 'theographic'), { recursive: true })
+    const content = join(dir, 'en_obs', 'obs-repo', 'content')
+    mkdirSync(content, { recursive: true })
+    let n = 0
+    const stories = new Map<number, string>()
+    for (const line of readFileSync(join(TOPICS, 'obs-refs.txt'), 'utf8').split(/\r?\n/)) {
+      const h = /^=== (\d+)$/.exec(line)
+      if (h) stories.set((n = Number(h[1])), '')
+      else if (n > 0) stories.set(n, `${stories.get(n)}${line}\n`)
+    }
+    for (const [story, text] of stories) writeFileSync(join(content, `${String(story).padStart(2, '0')}.md`), text)
+    return dir
+  }
+  const files = (out: string): Record<string, string> => snapshot(out, 'segments')
+
+  test('adds the xtopics and the topics segments and leaves every other segment as the build without it', async () => {
+    const plain = temp()
+    const withTopics = temp()
+    const base = ['--map-lang', 'en', '--map-list', EN_LIST]
+    expect((await run(sample(plain, base))).code).toBe(0)
+    const result = await run(sample(withTopics, [...base, '--topics', sources()]))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    expect(result.out.some((line) => /^xtopics\s+-\s/.test(line))).toBe(true)
+    expect(result.out.some((line) => /^topics\s+es-419\s/.test(line))).toBe(true)
+    const before = files(plain)
+    const after = files(withTopics)
+    for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
+    expect(Object.keys(after).length).toBeGreaterThan(Object.keys(before).length)
+  })
+
+  test('a --topics folder without the three sources is a usage error that names the missing folder', async () => {
+    const result = await run(sample(temp(), ['--topics', temp()]))
+    expect(result.code).toBe(1)
+    expect(result.err.join('\n')).toMatch(/--topics: .*tipnr/)
+  })
+})

@@ -3,7 +3,7 @@
  *
  *   bun packages/resource-pipeline/cli/build-v3.ts --list <lang list.json> --originals <originals list.json> --parts <dir> --out <dir>
  *     [--books tit,rut] [--registry <dir>] [--revision <n>] [--built <RFC 3339>] [--publisher <name>]
- *     [--map-lang <lang>] [--map-list <list.json>] [--book-names <file>]
+ *     [--map-lang <lang>] [--map-list <list.json>] [--book-names <file>] [--topics <dir>]
  *
  * The inputs are what phase 0 left on disk: the parts list of a language (`es-419/list.json`, its `language` says which language
  * this is), the list of the originals (`originals/list.json`) and the folder with the `<sha256>.part.gz` files both name. Only the
@@ -20,11 +20,15 @@
  * With `--registry <dir>` the sections of the articles keep their ids from build to build: `registry-<lang>.json` is read if it
  * exists and written after the build. Without it nothing is read or written, and the report says so.
  *
+ * With `--topics <dir>` (the sources folder: `tipnr/*.txt`, `theographic/{events,verses,people,places}.json`,
+ * `en_obs/obs-repo/content/NN.md`) the common part also gets the `xtopics` segments and the language its `topics` segments. The map
+ * segments are the same bytes with or without it.
+ *
  * Prints one line per segment: class, book or group, size in KB (1 KB = 1024 bytes) and the first 12 digits of the id. Exit code 0
  * when the folder is written, 1 for a usage error (the usage is printed), 2 for a build error (the message is printed).
  */
 
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
@@ -35,7 +39,11 @@ import {
   buildLanguage,
   BUILDER,
   ORIGINALS,
+  parseTipnr,
   type SectionRegistry,
+  type TipnrRecord,
+  xtopicsView,
+  type XtopicsCore,
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 
@@ -53,7 +61,8 @@ export const USAGE =
   '  --publisher  the publisher of both catalogs (default unfoldingWord)\n' +
   '  --map-lang   the language whose helps make the common map (default en; with no list for it, no common map)\n' +
   '  --map-list   the parts list of the map language, when it is not the language of --list (default: none)\n' +
-  '  --book-names a JSON file {book: [name, short, abbreviation]} for the book names of the language map'
+  '  --book-names a JSON file {book: [name, short, abbreviation]} for the book names of the language map\n' +
+  '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/): builds the xtopics and the topics of the language'
 
 type Io = { log: (line: string) => void; error: (line: string) => void }
 
@@ -70,9 +79,10 @@ type Options = {
   mapLang: string
   mapList?: string
   bookNames?: string
+  topics?: string
 }
 
-const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names']
+const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -128,13 +138,20 @@ export function optionsFromArgs(argv: string[]): Options {
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(mapLang)) throw new UsageError(`--map-lang ${JSON.stringify(mapLang)} is not a language code`)
   const bookNames = flags.get('book-names')
   const mapList = flags.get('map-list')
+  const topics = flags.get('topics')
 
   for (const [name, path] of [['list', list], ['originals', originals], ...(bookNames === undefined ? [] : [['book-names', bookNames]]), ...(mapList === undefined ? [] : [['map-list', mapList]])]) {
     if (!existsSync(path) || !statSync(path).isFile()) throw new UsageError(`--${name}: ${path} is not a file`)
   }
   if (!existsSync(parts) || !statSync(parts).isDirectory()) throw new UsageError(`--parts: ${parts} is not a directory`)
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, built, publisher, mapLang, mapList, bookNames }
+  if (topics !== undefined) {
+    for (const dir of [topics, join(topics, 'tipnr'), join(topics, 'theographic'), join(topics, 'en_obs', 'obs-repo', 'content')]) {
+      if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new UsageError(`--topics: ${dir} is not a directory`)
+    }
+  }
+
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, built, publisher, mapLang, mapList, bookNames, topics }
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -147,6 +164,23 @@ async function languageOf(path: string): Promise<string> {
   }
   if (typeof list?.language !== 'string' || list.language === '') throw new Error(`${path} is not a parts list: it has no language`)
   return list.language
+}
+
+/** The texts of the topic sources in `dir` (`--topics`). */
+function topicTexts(dir: string) {
+  const text = (path: string): string => readFileSync(path, 'utf8')
+  const tipnrDir = join(dir, 'tipnr')
+  const tipnrFile = readdirSync(tipnrDir).filter((f) => f.endsWith('.txt')).sort()[0]
+  if (tipnrFile === undefined) throw new Error(`${tipnrDir} has no .txt file (the TIPNR file)`)
+  const obs = new Map<number, string>()
+  const obsDir = join(dir, 'en_obs', 'obs-repo', 'content')
+  for (const f of readdirSync(obsDir)) if (/^\d\d\.md$/.test(f)) obs.set(Number(f.slice(0, 2)), text(join(obsDir, f)))
+  const theo = (name: string): string => text(join(dir, 'theographic', `${name}.json`))
+  return {
+    tipnr: text(join(tipnrDir, tipnrFile)),
+    theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') },
+    obs,
+  }
 }
 
 /** The registry of the last build of `lang` in `dir`, `{}` if there is none (the first build). */
@@ -219,7 +253,8 @@ async function build(o: Options, io: Io): Promise<void> {
   // The common map needs the helps of the map language: when the source has none (no list for it), there is no map to build.
   const mapLang = (await source.resources(o.mapLang)).length > 0 ? o.mapLang : undefined
   if (mapLang === undefined) io.log(`no list for the map language ${o.mapLang} (--map-list): no common map is built`)
-  const common = await buildCommon({ source, books, about, mapLang })
+  const topicSources = o.topics === undefined ? undefined : topicTexts(o.topics)
+  const common = await buildCommon({ source, books, about, mapLang, topics: topicSources })
   let bookNames: Record<string, [string, string, string]> | undefined
   if (o.bookNames !== undefined) {
     try {
@@ -227,6 +262,12 @@ async function build(o: Options, io: Io): Promise<void> {
     } catch (error) {
       throw new Error(`Cannot read the book names ${o.bookNames}: ${(error as Error).message}`)
     }
+  }
+  let topics: { xtopics: XtopicsCore; records: TipnrRecord[] } | undefined
+  if (topicSources !== undefined) {
+    const core = common.segments.find(({ seg }) => seg.h.class === 'xtopics' && seg.h.part === 'core')
+    if (core === undefined) throw new Error('--topics: the common part has no xtopics core (no originals were built?)')
+    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records: parseTipnr(topicSources.tipnr, []) }
   }
   const built = await buildLanguage({
     source,
@@ -236,6 +277,7 @@ async function build(o: Options, io: Io): Promise<void> {
     bookNames,
     about,
     requires: [['common', o.revision, common.catalog.id]],
+    topics,
   })
 
   const articles = Object.keys(built.registry).length
