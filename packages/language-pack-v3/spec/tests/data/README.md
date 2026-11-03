@@ -104,3 +104,7 @@ These are in the phase 0 sample, and a later task may need them:
   `verses`, `participants`, `locations`, `partOf`, `predecessor`; verses `osisRef`; people `personID`, `displayTitle`,
   `verses`; places `placeID`, `displayTitle`, `verses`. Every date field and every Easton text is removed, and lists
   point only at records of the subset. The reader test uses it. The whole data is not in the repository.
+
+- `topics/obs-refs.txt`: the closing line `_A Bible story from: …_` of stories 1, 10 and 50 of "unfoldingWord® Open Bible Stories",
+  English v9 (https://git.door43.org/unfoldingWord/en_obs), copyright © 2023 unfoldingWord, CC BY-SA 4.0
+  (https://creativecommons.org/licenses/by-sa/4.0/). The `obsRefs` reader test uses it. The whole text is not in the repository.
