@@ -32,7 +32,8 @@ import { lexGroupOf } from '../../../src/build/lex'
 import type { CborValue } from '../../../src/codec/cbor'
 import { compareCodePoints, encodeTexts, encodeUvarints, stringTable } from '../../../src/codec/columns'
 import { hex, readSegment, writeSegment } from '../../../src/codec/container'
-import { BOOKS, bookNumber, strongKey, verseId } from '../../../src/ids'
+import { alignedEntries } from '../../../src/build/aligned/build'
+import { BOOKS, bookNumber } from '../../../src/ids'
 import type { BookModel, OrigModel } from '../../../src/model'
 import { bookView } from '../../../src/read/book'
 import { catalogView } from '../../../src/read/catalog'
@@ -59,8 +60,6 @@ async function catalogOf(file: string) {
 
 const fmt = (n: number): string => n.toLocaleString('en-US')
 const bookCode = (n: number): string => BOOKS[n - 1] ?? String(n)
-const refOf = (v: number): string => `${Math.floor(v / 1000) % 1000}:${v % 1000}`
-const same = (x: number[], y: number[]): boolean => x.length === y.length && x.every((v, k) => v === y[k])
 
 async function main(): Promise<void> {
   const common = await catalogOf('catalog-common.seg')
@@ -94,71 +93,27 @@ async function main(): Promise<void> {
     const textsUsed = new Map<string, number>()
     const withText = new Set<string>()
     let stampMismatch = 0
-    let noOrig = 0
+    let noOrig = 0 // lines of the builder's report (a book left out)
 
-    // The index build (timed): pieces and align to entries.
+    // The index build (timed): the builder of `src/build/aligned/build.ts`, the same rules.
     const t0 = performance.now()
-    const index = new Map<string, Entry>()
-    const add = (key: string, kind: 'word' | 'phrase', strongs: string[], book: number, verse: number): void => {
-      let entry = index.get(key)
-      if (entry === undefined) index.set(key, (entry = { kind, strongs: new Map() }))
-      for (const s of strongs) {
-        let per = entry.strongs.get(s)
-        if (per === undefined) entry.strongs.set(s, (per = new Map()))
-        let c = per.get(book)
-        if (c === undefined) per.set(book, (c = { verses: new Set(), occ: 0 }))
-        c.verses.add(verse)
-        c.occ++
-      }
-    }
-    const norm = (s: string): string => s.normalize('NFC').toLocaleLowerCase(lang)
+    const built = alignedEntries({ lang, books, origs, texts: (res) => TEXTS.has(res.slice(res.lastIndexOf('/') + 1)) })
+    noOrig = built.report.length
+    for (const b of books) if (origs.get(b.book) !== undefined && origs.get(b.book)!.stamp !== b.orig[1]) stampMismatch++
     for (const b of books) {
-      const orig = origs.get(b.book)
-      if (orig === undefined) {
-        noOrig++
-        continue
-      }
-      if (orig.stamp !== b.orig[1]) stampMismatch++
-      const bookNo = bookNumber(b.book)
-      const strongsOf = (a: number[]): string[] => [...new Set(a.map((p) => strongKey(orig.words[p]?.strong ?? '')).filter((s) => s !== ''))]
       for (const text of b.texts) {
         const short = text.res.slice(text.res.lastIndexOf('/') + 1)
         if (!TEXTS.has(short) || text.align === undefined) continue
         textsUsed.set(short, (textsUsed.get(short) ?? 0) + 1)
         withText.add(b.book)
-        const words: { t: string; a: number[]; v: number; adj: boolean }[] = []
-        let ev = 0
-        let chapter = 0
-        let verse = 0
-        let ord = 0
-        let gap = false // only " " pieces since the last word
-        for (let i = 0; i < text.pieces.length; i++) {
-          while (ev < text.events.length && text.events[ev]![0] <= i) {
-            const [, kind, arg] = text.events[ev++]!
-            if (kind === 'chapter') {
-              chapter = parseInt(arg, 10) || 0
-              verse = 0
-            } else if (kind === 'verse') verse = parseInt(arg, 10) || 0
-          }
-          const [p, isWord] = text.pieces[i]!
-          if (isWord) {
-            words.push({ t: p, a: text.align[ord++] ?? [], v: verseId(b.book, chapter, verse), adj: gap })
-            gap = true
-          } else if (p !== ' ') gap = false
-        }
-        for (const w of words) if (w.a.length > 0) add(norm(w.t), 'word', strongsOf(w.a), bookNo, w.v)
-        for (let i = 0; i < words.length; ) {
-          const w = words[i]!
-          if (w.a.length === 0) {
-            i++
-            continue
-          }
-          let j = i + 1
-          while (j < words.length && words[j]!.adj && same(words[j]!.a, w.a)) j++
-          if (j - i >= 2) add(norm(words.slice(i, j).map((x) => x.t).join(' ')), 'phrase', strongsOf(w.a), bookNo, w.v)
-          i = j
-        }
       }
+    }
+    // The shape this script measures: Strong key to book number to counts.
+    const index = new Map<string, Entry>()
+    for (const [key, e] of built.entries) {
+      const strongs = new Map<string, PerStrong>()
+      for (const [s, perBook] of e.strongs) strongs.set(s, new Map([...perBook].map(([code, [v, occ]]) => [bookNumber(code), { verses: new Set(Array.from({ length: v }, (_, k) => k)), occ }])))
+      index.set(key, { kind: e.kind, strongs })
     }
     const buildMs = performance.now() - t0
 
@@ -244,7 +199,7 @@ async function main(): Promise<void> {
           out.push(`- ${s}`)
           for (const [bk, c] of [...e.strongs.get(s)!].sort((x, y) => x[0] - y[0])) {
             const code = bookCode(bk)
-            out.push(`  - ${code}: occurrences ${c.occ}, verses ${c.verses.size}: ${[...c.verses].sort((x, y) => x - y).map(refOf).join(' ')}`)
+            out.push(`  - ${code}: occurrences ${c.occ}, verses ${c.verses.size}`)
           }
         }
       }

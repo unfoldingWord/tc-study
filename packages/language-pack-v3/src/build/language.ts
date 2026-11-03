@@ -39,6 +39,8 @@ import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOf
 import { extractLexicon, lexResources, lexSegment } from './lex'
 import { extractObs, obsSegment } from './obs'
 import { extractOrig, origSegment } from './orig'
+import { buildAligned, isBridgeText } from './aligned/build'
+import { alignedSegment } from './aligned/segment'
 import { buildMap } from './map/build'
 import { mapSegment } from './map/segment'
 import { versesOf } from './maps/verses'
@@ -220,6 +222,10 @@ export type LanguageBuild = { segments: BuiltSegment[]; catalog: BuiltSegment; r
  *   against, `[catalog, revision, id in hex]`.
  * - **Registry.** `registry` is the one of the last build (`{}` for the first); the one returned is {@link extractArticles}'s: give it to the next.
  *
+ * - **Aligned.** With `aligned: true` it also builds the optional units `aligned:{part}` ({@link buildAligned}, the bridge texts GLT, GST, ULT and
+ *   UST of the books built): one `aligned` segment per part that has a key. They are optional in the catalog and no unit needs them; the
+ *   segments of every other class are the same bytes with or without them (the index is built last and nothing reads it). Default `false`.
+ *
  * The same source, `about` and registry give the same segments and catalog. Throws `Error` for rows that are not what format 2.0
  * writes (the extractors do), and for what a segment cannot hold.
  */
@@ -233,6 +239,7 @@ export async function buildLanguage(o: {
   bookNames?: Record<string, [string, string, string]>
   partial?: boolean
   topics?: { xtopics: XtopicsCore; records: TipnrRecord[] }
+  aligned?: boolean
 }): Promise<LanguageBuild> {
   const { source, lang } = o
   const report: string[] = []
@@ -377,6 +384,15 @@ export async function buildLanguage(o: {
     const inputs = inputsOf(rows, [...stampsOf(keys.filter((key) => refOf.has(key))), ...xt.res.map(([key, stamp]) => ({ key, stamp }))])
     await add(topicsSegment(built.core), inputs, keys)
     for (const part of built.parts) await add(topicsSegment(part), inputs, keys)
+  }
+
+  // The index of aligned phrases (optional units): built last, from the book models already made; nothing reads it back.
+  if (o.aligned === true) {
+    const built = buildAligned({ lang, books: [...bookModels.values()], origs, texts: isBridgeText })
+    report.push(...built.report)
+    const keys = built.parts[0]?.res.map(([key]) => key) ?? []
+    const rows: RowKey[] = [...mapRows.values()].flat()
+    for (const part of built.parts) await add(alignedSegment(part), inputsOf(rows, [...stampsOf(keys), ...[...origs.values()].map((orig) => ({ key: orig.key, stamp: orig.stamp }))]), keys)
   }
 
   segments.sort(compareSegments)
