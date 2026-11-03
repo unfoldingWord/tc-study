@@ -16,7 +16,8 @@ topics-header = {
 }
 
 topics-core-tables = {
-  "names": { * topic-id => [+ topic-name] },   ; required, v1; most frequent first
+  "names": { * topic-id => [+ topic-name] },   ; required, v1; most frequent first (count descending),
+                               ; ties by name in code point order; a name and source pair is listed once
   ? "local": local-topics,     ; optional, v1; "{lang}:tema/..." topics only this language has
   "coverage": coverage,        ; required, v1
 }
@@ -24,9 +25,21 @@ topics-core-tables = {
 ; "source" says where the name came from: the aligned text ("alignment"), the language's own book outline
 ; ("outline"), its OBS ("obs") or a list of names the builder was given ("list"). "count" is how many times the name
 ; was found; "books" the books it was found in.
+;
+; How an "alignment" name is taken (normative). For each TIPNR name line of a person or place (its dStrong and its
+; references; a reference with an occurrence letter a or b means the first or second occurrence of that original word
+; in the verse, and with no letter every occurrence), the gateway words aligned to that original word in that verse
+; are found, and only in the verses TIPNR lists for that topic. The name is the maximal run of consecutive word pieces
+; (only " " between them) that contains the first word aligned to that original word; other words aligned to it in
+; that verse are not part of the name and are counted in the build report. A reference TIPNR writes in English
+; versification is converted to the original's numbering first; one that cannot be converted is listed in the report.
+; Names are stored in NFC, as the builder normalized them before storing; they are not lowercased, and a reader never
+; normalizes (container.md): it shows and compares the bytes it reads. A topic of kind event takes no name from the
+; alignment (ids.md).
 topic-name = [name: tstr, source: "alignment" / "outline" / "obs" / "list", count: uint, books: book-set]
 
 topics-part-tables = {
-  ? "names": { * topic-id => verse-lists },   ; optional, v1; the verses each alignment name came from. Keys of
-                               ; the table are the topic ids of this book's names, sorted by code point
+  ? "names": verse-lists,      ; optional, v1; "keys" are topic ids, sorted by code point; per key, the verses of this
+                               ; book from which the topic's alignment names were taken. Which name came from which
+                               ; verse is not stored: the core has the counts
 }

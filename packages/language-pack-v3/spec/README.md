@@ -1,7 +1,7 @@
 # Language packs, format 3: specification
 
 Status: **phase 1 is implemented**: the TypeScript reader and builders (`packages/language-pack-v3`), an independent Python reader
-(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). Part B (topics, people, places, events, relations) is specified (`xtopics`, `topics`) and not built; phase 3 (signatures) are not.
+(`spec/reader-py/`) and the frozen conformance cases (`tests/`). **Phase 2 part A is implemented** (the maps, `xmap`, `map`, section ids). Part B (topics, people, places, events, relations) is specified (`xtopics`, `topics`) and not built; phase 3 (signatures) is not.
 
 Format 3 is the next major version of the tc-language-packs. Format 2.0 (`packages/language-pack`, parts per book)
 keeps being published, frozen, until each app version that reads it has a retirement date. Format 3 keeps what 2.0

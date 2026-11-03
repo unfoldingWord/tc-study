@@ -85,7 +85,7 @@ count-unit = "occurrences" / "links" / "notes" / "verses"
 ; at least 1, and so are the others); 1 <= count; 0 <= verses (verses may exceed count: a note on 1:2-4 is 1 note and 3 verses; it is 0 for
 ; rows whose reference cannot be read, counts.md: the builder counts such a row at verse 0, so its verse may be counted
 ; once more than the readable rows say). The "unit" of each table is fixed:
-; xmap "strong" is "occurrences", "links" is "links", "notes" is "notes"; map "usage" is "notes"; xtopics "occurrences" is "verses".
+; xmap "strong" is "occurrences", "links" is "links", "notes" is "notes"; map "usage" is "notes"; xtopics "occurrences" is "verses" (there count == verses, and 1 <= count).
 
 ; The verses behind the counts, for one book. "keys" are the keys this book has with at least one verse (a key whose
 ; rows in this book cover no verse is left out of the part), sorted by code point. "verses" holds,

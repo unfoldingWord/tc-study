@@ -95,21 +95,20 @@ name a person sees comes from each language's map.
 | --- | --- | --- | --- |
 | `tw:` | A word article | `tw:kt/grace`, `tw:names/abraham`, `tw:other/shepherd` | The tW path without `bible/` |
 | `ta:` | An Academy article | `ta:translate/figs-metaphor` | The tA manual and slug |
-| `per:` | A person | `per:abraham` | TIPNR's unique name (phase 2) |
-| `lug:` | A place | `lug:jerusalem` | TIPNR's unique name (phase 2) |
-| `ev:` | An event | `ev:plagues-of-egypt` | Theographic or the builder's list (phase 2) |
-| `tema:` | A topic | `tema:faith` | The builder's list (phase 2) |
+| `per:` | A person | `per:abraham` | The id: TIPNR's unique name. The name shown: the language's `topics` names, else the English title in `xtopics` |
+| `lug:` | A place | `lug:jerusalem` | As `per:` |
+| `ev:` | An event | `ev:plagues-of-egypt` | The id: Theographic's title or the builder's list. The name shown: the language's outline, else the English title in `xtopics` |
+| `tema:` | A topic (kind 4) | `tema:faith` | The builder's list; the language's name is in its `map` `names` |
 | `sec:` | A section of a book, from its outline | `sec:exo/7-12` | Chapters it spans |
 | `obs:` | An OBS story or frame | `obs:10`, `obs:10:3` | Its number |
 | `{lang}:tema/` | A topic only one language has, from its own outlines | `es-419:tema/la-gracia-que-educa` | That language's builder |
 
-- **Ids of people and places** (`per:`, `lug:`): the slug of TIPNR's unified name before `@`: lowercase, spaces and `'` to `-`, any other character outside `[a-z0-9-]` dropped. When two TIPNR records of one kind give the same slug, every one of them takes `-{book}-{chapter}-{verse}` of the reference after `@` (`per:zechariah-2ki-14-29`; the book is the lowercase code of the reference as TIPNR writes it). The TIPNR `uStrong` is kept beside the id, so an id can be derived again.
-- **Ids of events** (`ev:`): the slug of the Theographic title by the same rule, with `-2`, `-3` after it on a clash, in the order of the `eventID`; the `eventID` is kept beside the id as the topic's `ref`. An event Theographic lacks comes from a short list the builder owns (source `builder`, confidence 100); it starts with `ev:plagues-of-egypt`, Exodus 7:14-12:36.
+- **Ids of people and places** (`per:`, `lug:`): the slug of TIPNR's unified name before `@`: lowercase, spaces and `'` to `-`, any other character outside `[a-z0-9-]` dropped. People and places with the same name (there are several Zechariahs) get different ids by this rule: when two TIPNR records of one kind give the same slug, every one of them takes `-{book}-{chapter}-{verse}` of the first reference after `@` (`per:zechariah-2ki-14-29`). The book is the format-3 book code of the TIPNR book: TIPNR writes the USFM code with a capital (`2Ki`, `Jhn`, `Mrk`, `Sng`), and that text in lowercase is the code of the list above for every book TIPNR uses. Chapter and verse are the numbers of the reference as TIPNR writes it (English versification, not converted: the suffix is part of the id and must not change with a conversion), digits only: a verse letter (`a`, `b`) or an occurrence letter is dropped (`Psa.3.0` gives `psa-3-0`). Records of one slug that still give the same suffix take `-2`, `-3` after it, in the order of the TIPNR file. The TIPNR `uStrong` is kept beside the id (`xtopics` `topics.ustrong`), so an id can be derived again.
+- **Ids of events** (`ev:`): the slug of the Theographic title by the same rule, with `-2`, `-3` after it on a clash, in the order of the `eventID`; the `eventID` is kept beside the id as the topic's `ref`, and the title as its `title` (the English name shown when a language has none; for an event of the builder's list, that list's title). An event Theographic lacks comes from a short list the builder owns (source `builder`, confidence 100); it starts with `ev:plagues-of-egypt`, Exodus 7:14-12:36.
 - **Sections and stories.** `sec:{book}/{range}` comes from the outline of the English tN introduction (`sec:exo/7-12`); `obs:{n}` from English OBS v9, with the verse ranges of the story's closing line. An entry of a language's outline whose range equals that of an English `sec:` gives that section a name in the language; one that equals none becomes `{lang}:tema/{slug}`.
 - **`ev:` concepts get no name from the alignment.** An event is named by its title (English, from Theographic) and by the language's outline; no name is taken for it from the aligned text.
-- **Concepts are never merged.** Two ids for the same thing are joined by a `same-as` relation in the common map,
+- **Concepts are never merged.** Two ids for the same thing are joined by a `same-as` relation: in the common map for concepts of part A, and in `xtopics` `relations` when one end is a topic (an end that is a concept of the map is named there by its id, so the map never depends on the topics),
   with its source and confidence.
-- **People and places with the same name** (there are several Zechariahs) take TIPNR's id, which tells them apart.
 - **An article that moved** (`other/` to `kt/`) keeps its old id as an alias in the common map: the old id still
   leads to it.
 - **Ids are lowercase.** An article whose published name has capitals (`figs-orderHeb`) gets the lowercase id

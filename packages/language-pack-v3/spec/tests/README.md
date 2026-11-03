@@ -383,7 +383,7 @@ so they are skipped (listed in `h.tables`, not in the output). `gen` stays `E_TA
 | Key | Type | Absent when |
 | --- | --- | --- |
 | `coverage` | as above | never |
-| `topics` | `{id: {"kind": k, "source": res key, "ref": text}}`; `k` is one of `person place event topic story section` (1 to 6) | never |
+| `topics` | `{id: {"kind": k, "source": res key, "ref": text, "title": text, "ustrong": text}}` (`title` and `ustrong` are `""` when the file has none); `k` is one of `person place event topic story section` (1 to 6) | never |
 | `occurrences` | counts table, unit `"verses"` | never |
 | `relations` | list of `{"from", "to", "type", "source", "confidence"}` in the order of the file; `from`, `to` the ids (a topic's or an external concept's), as in the `xmap` | the table is not in the file |
 | `strongs` | `{topic id: [Strong keys]}` as the file has it | the table is not in the file |
@@ -449,10 +449,10 @@ types, these are `E_BODY` too:
     point or has a repeat. `aliases`: keys repeated; a value that is not in `concepts` (a key need not be: it is
     an id that moved).
   - `xtopics`, `topics` (headers as the `map`, `xmap` ones: `part` needed, `lang` for `topics`; a part with `res` not `[]`, a core of `xtopics` with `res` empty, a `book` that differs from `part`, a core table in a part and the reverse are `E_BODY`):
-    - `xtopics` `topics`: ids not sorted or repeated; columns of different lengths; `kind` 0 or above 6; a `source` outside `h.res`; a `ref` outside `refs`.
+    - `xtopics` `topics`: ids not sorted or repeated; columns of different lengths; `kind` 0 or above 6; a `source` outside `h.res`; a `ref` outside `refs`; `refs` with a text twice, or one no id uses, or not in the order of first use; `title` or `ustrong` with a count other than the ids.
     - `xtopics` `relations`: as the `xmap` ones, with an end beyond the count of `topics.ids` plus `external`; `external` not sorted or repeated.
-    - `xtopics` `strongs`, `ranges`: a key not in `topics.ids`; an empty list; Strong keys not sorted or repeated; a range that runs backwards (`first > last`) or whose verse id is not `LLCCCVVV` of a book 1..66.
-    - `xtopics` `occurrences`: a counts table of unit `"verses"` (another unit is `E_BODY`) whose keys are not in `topics.ids`; in a part, verse lists as above.
+    - `xtopics` `strongs`, `ranges`: a key not in `topics.ids`; an empty list (also an empty `ranges` list); Strong keys not sorted or repeated; a range that runs backwards (`first > last`) or whose verse id is not `LLCCCVVV` of a book 1..66.
+    - `xtopics` `occurrences`: a counts table of unit `"verses"` (another unit is `E_BODY`) whose keys are not in `topics.ids`; a row whose `count` differs from its `verses` or is 0; in a part, verse lists as above.
     - `topics` `names`: a topic with no name; a `source` outside `alignment outline obs list`; `count` 0; `books` of another length than 9 or with a bit 66 to 71 set; a name that is empty. `topics` part `names`: verse lists as above; a key that is not in the core is not checked by a reader of the part alone.
   - `map` `books`: not 66 entries; a `source` outside `text list none`.
 - **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32

@@ -180,8 +180,8 @@ this order and stops at the first defect:
    place of `E_BODY`. A catalog inside a transfer file has one more check here: its class (`transfer.md`).
 5. Then the tables of the class, which only a reader that knows the class can check: each table against its schema
    (`cddl/`) and the further checks `tests/README.md` lists ("Checks of the tables"), `E_BODY` again. A segment of a class
-   the reader does not decode (in phase 1: `map`, `xmap` and `gen`; in a phase 2 part A reader also `xtopics` and `topics`, which it does not know as classes: `E_HEADER` at the header, as for any unknown class) is `E_TABLE` at this step if it was not before, because
-   the reader has no known table for it, even if all its tables are optional. A segment inside a transfer file
+   the reader does not decode (in phase 1: `map`, `xmap` and `gen`) is `E_TABLE` at this step if it was not before, because
+   the reader has no known table for it, even if all its tables are optional. (A phase 2 part A reader does not know `xtopics` and `topics` as classes at all: it gives `E_HEADER`, unknown class, at the header checks, not `E_TABLE`.) A segment inside a transfer file
    (`transfer.md`) gets this `E_TABLE` too, but not the rest of the step: the shape of its tables is checked when the
    app opens it.
 
