@@ -55,16 +55,20 @@ export async function loadCommonMap(out: string): Promise<MapSet> {
 }
 
 /** One line per query file: `ok`, or the first place the answer differs from `expected`. */
-export async function runQueries(out: string, dir: string = QUERIES_DIR): Promise<{ lines: string[]; failed: number }> {
+export async function runQueries(out: string, dir: string = QUERIES_DIR, requireTopics = false): Promise<{ lines: string[]; failed: number; skipped: number }> {
   const maps = await loadCommonMap(out)
   const lines: string[] = []
   let failed = 0
+  let skipped = 0
   for (const name of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
     const doc = JSON.parse(readFileSync(join(dir, name), 'utf8')) as { query: { kind: string }; expected?: Json }
     let line: string
     // A topic query needs the topics module (optional): a build without it cannot give the expected answer, so the query is not asked.
     if (maps.xtopics === undefined && ['topic', 'category'].includes(doc.query.kind)) {
-      lines.push(`${name.replace(/\.json$/, '')}: skipped (the build has no xtopics)`)
+      // Asked for with `--topics`, a skipped query is a failure: a gate that expects every query to run must not pass without them
+      if (requireTopics) failed++
+      else skipped++
+      lines.push(`${name.replace(/\.json$/, '')}: ${requireTopics ? 'failed' : 'skipped'} (the build has no xtopics)`)
       continue
     }
     try {
@@ -81,19 +85,22 @@ export async function runQueries(out: string, dir: string = QUERIES_DIR): Promis
     if (line !== 'ok') failed++
     lines.push(`${name.replace(/\.json$/, '')}: ${line}`)
   }
-  return { lines, failed }
+  return { lines, failed, skipped }
 }
 
 if (import.meta.main) {
-  const out = process.argv[2]
-  if (out === undefined || process.argv.length > 3) {
-    console.error('Usage: bun spec/tests/queries/run.ts <out dir>')
+  const args = process.argv.slice(2)
+  const requireTopics = args.includes('--topics')
+  const rest = args.filter((a) => a !== '--topics')
+  const out = rest[0]
+  if (out === undefined || rest.length > 1) {
+    console.error('Usage: bun spec/tests/queries/run.ts <out dir> [--topics]')
     process.exit(2)
   }
   try {
-    const { lines, failed } = await runQueries(out)
+    const { lines, failed, skipped } = await runQueries(out, QUERIES_DIR, requireTopics)
     console.log(lines.join('\n'))
-    console.log(failed === 0 ? `${lines.length} queries ok` : `${failed} of ${lines.length} queries differ`)
+    console.log(failed === 0 ? `${lines.length - skipped} queries ok, ${skipped} skipped` : `${failed} of ${lines.length} queries differ`)
     process.exit(failed === 0 ? 0 : 1)
   } catch (error) {
     console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)

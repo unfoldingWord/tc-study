@@ -11,7 +11,17 @@ const spawn = (...args: string[]) => Bun.spawnSync(['bun', RUN, ...args], { stdo
 test('run.ts exits 2 on a usage error or a folder that is not a build', () => {
   expect(spawn().exitCode).toBe(2)
   expect(spawn(tmpdir(), 'extra').exitCode).toBe(2)
+  expect(spawn('--topics').exitCode).toBe(2)
   expect(spawn(mkdtempSync(join(tmpdir(), 'lp3-run-'))).exitCode).toBe(2)
+})
+
+// A build folder with the common map and no xtopics: LP3_QUERY_BUILD_PLAIN
+const plain = process.env.LP3_QUERY_BUILD_PLAIN
+test.skipIf(plain === undefined)('a topic query the build cannot answer is skipped, and a failure when --topics asked for it', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'lp3-queries-'))
+  for (const name of ['per-abraham.json', 'ev-plagues-of-egypt.json']) copyFileSync(join(HERE, name), join(dir, name))
+  expect(await runQueries(plain!, dir)).toMatchObject({ failed: 0, skipped: 2 })
+  expect(await runQueries(plain!, dir, true)).toMatchObject({ failed: 2, skipped: 0 })
 })
 
 // A build is needed for the two checks below: the folder named by LP3_QUERY_BUILD (the gate's English build).

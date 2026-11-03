@@ -60,7 +60,7 @@ The fixed queries of this folder are asked of the common map alone, with no lang
 The answers are computed by `answers.py` from the raw parts, not from the builders (Task 17). The TypeScript query
 module (Task 15) must give the same answers (Task 18). `answers.py <sample> <queries dir>` writes `expected` into each
 query file there; it computes the kinds `strong`, `usage`, `book` and `keyterms` (the sample has no TIPNR, aliases or
-relations, so `concept` and `revision` have no fixed query yet) and, with the sources of part B as a third argument (or `LP3_SOURCES`), `topic`: the TIPNR text and English OBS v9 are read as the specification says (`ids.md`), with the sample's originals and links, never the builders. `category` has no fixed query. `per-abraham` and `ev-plagues-of-egypt` need the `xtopics` of a build over all the originals of the sample; `run.ts` skips a topic query when the build it is given has none.
+relations, so `concept` and `revision` have no fixed query yet) and, with the sources of part B as a third argument (or `LP3_SOURCES`), `topic`: the TIPNR text and English OBS v9 are read as the specification says (`ids.md`), with the sample's originals and links, never the builders. `category` has no fixed query. `per-abraham` and `ev-plagues-of-egypt` need the `xtopics` of a build over all the originals of the sample; `run.ts` skips a topic query when the build it is given has none (the line says `skipped` and the summary counts them); with `--topics` (`bun run.ts <out dir> --topics`) such a query is a failure (exit 1), so a gate that expects all the queries to run uses `--topics`.
 
 ## Deriving `strongs` for keyterms
 
