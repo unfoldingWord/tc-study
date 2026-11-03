@@ -796,11 +796,34 @@ describe('buildLanguage: the topics unit', () => {
   })
 
   test('an outline entry that matches a section names it; one that matches none becomes a local topic', async () => {
-    const built = await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about, topics: { xtopics: await xtopics(), records: [] } })
+    // The es-419 sample has no tN introduction: give the book one, with an outline of two entries.
+    const intro = [
+      '# Introducción a Tito',
+      '',
+      '### Esquema (Outline) de Tito',
+      '',
+      '1. Pablo da instrucciones a Tito sobre los líderes (1:1–16)',
+      '1. Cualidades especiales de los ancianos (1:5–9)',
+    ].join('\n')
+    const base = await sample()
+    const source: RowSource = {
+      resources: (lang) => base.resources(lang),
+      rows: async function* (filter: RowFilter) {
+        for await (const row of base.rows(filter)) {
+          if (row.layer === 'sot' && row.key === `tn:${TN}:tit:1`) {
+            const value = row.value as { content: { notes: unknown[] } }
+            yield { ...row, value: { ...value, content: { ...value.content, notes: [{ id: 'zz01', reference: 'front:intro', isIntro: true, note: intro }, ...value.content.notes] } } }
+          } else yield row
+        }
+      },
+    }
+    const built = await buildLanguage({ source, lang: ES, registry: registry(), about, topics: { xtopics: await xtopics(), records: [] } })
     const core = topicsView(built.segments.find((s) => s.seg.h.class === 'topics' && s.seg.h.part === 'core')!.seg)
-    const sections = Object.entries(core.names).filter(([id]) => id.startsWith('sec:tit/'))
-    for (const [, list] of sections) expect(list.every((n) => n[1] === 'outline')).toBe(true)
-    for (const key of Object.keys(core.local ?? {})) expect(key.startsWith('es-419:tema/')).toBe(true)
-    console.log(`topics outline: ${sections.length} sections named, ${Object.keys(core.local ?? {}).length} local; ${built.report.filter((l) => l.startsWith('topics: outline')).join(' | ')}`)
+    expect(built.report.filter((l) => l.startsWith('topics: outline tit: no introduction'))).toEqual([])
+    expect(core.names['sec:tit/1-1']).toEqual([['Pablo da instrucciones a Tito sobre los líderes', 'outline', 1, ['tit']]])
+    expect(core.local).toEqual({
+      'es-419:tema/cualidades-especiales-de-los-ancianos': { names: ['Cualidades especiales de los ancianos'], refs: [[56001005, 56001009]] },
+    })
+    expect(core.res.map(([key]) => key)).toContain(TN)
   })
 })
