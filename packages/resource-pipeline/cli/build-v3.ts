@@ -149,6 +149,14 @@ export function optionsFromArgs(argv: string[]): Options {
     for (const dir of [topics, join(topics, 'tipnr'), join(topics, 'theographic'), join(topics, 'en_obs', 'obs-repo', 'content')]) {
       if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new UsageError(`--topics: ${dir} is not a directory`)
     }
+    for (const name of ['events', 'verses', 'people', 'places']) {
+      const file = join(topics, 'theographic', `${name}.json`)
+      if (!existsSync(file) || !statSync(file).isFile()) throw new UsageError(`--topics: ${file} is not a file`)
+    }
+    const content = join(topics, 'en_obs', 'obs-repo', 'content')
+    if (!readdirSync(content).some((f) => /^\d\d\.md$/.test(f))) throw new UsageError(`--topics: ${content} has no NN.md story file`)
+    const texts = readdirSync(join(topics, 'tipnr')).filter((f) => f.endsWith('.txt'))
+    if (texts.length !== 1) throw new UsageError(`--topics: ${join(topics, 'tipnr')} must have exactly one .txt file (the TIPNR file), it has ${texts.length}`)
   }
 
   return { list, originals, parts, out, books, registry: flags.get('registry'), revision, built, publisher, mapLang, mapList, bookNames, topics }
@@ -267,7 +275,11 @@ async function build(o: Options, io: Io): Promise<void> {
   if (topicSources !== undefined) {
     const core = common.segments.find(({ seg }) => seg.h.class === 'xtopics' && seg.h.part === 'core')
     if (core === undefined) throw new Error('--topics: the common part has no xtopics core (no originals were built?)')
-    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records: parseTipnr(topicSources.tipnr, []) }
+    // The builder already reported what it worked around in the TIPNR text (`common.report`); only a line it did not report is added
+    const issues: string[] = []
+    const records = parseTipnr(topicSources.tipnr, issues)
+    for (const line of issues) if (!common.report.includes(`topics: ${line}`)) common.report.push(`topics: ${line}`)
+    topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records }
   }
   const built = await buildLanguage({
     source,

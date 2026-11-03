@@ -393,4 +393,24 @@ describe('build-v3: --topics', () => {
     expect(result.code).toBe(1)
     expect(result.err.join('\n')).toMatch(/--topics: .*tipnr/)
   })
+
+  test('a --topics folder missing a Theographic file, the stories or the TIPNR file, or with two TIPNR files, is a usage error that names it', async () => {
+    const missing = sources()
+    rmSync(join(missing, 'theographic', 'places.json'))
+    const a = await run(sample(temp(), ['--topics', missing]))
+    expect(a.code).toBe(1)
+    expect(a.err.join('\n')).toMatch(/--topics: .*places\.json is not a file/)
+
+    const noStories = sources()
+    for (const f of readdirSync(join(noStories, 'en_obs', 'obs-repo', 'content'))) rmSync(join(noStories, 'en_obs', 'obs-repo', 'content', f))
+    const b = await run(sample(temp(), ['--topics', noStories]))
+    expect(b.code).toBe(1)
+    expect(b.err.join('\n')).toMatch(/--topics: .*content has no NN\.md/)
+
+    const two = sources()
+    cpSync(join(two, 'tipnr', 'TIPNR.txt'), join(two, 'tipnr', 'OTHER.txt'))
+    const c = await run(sample(temp(), ['--topics', two]))
+    expect(c.code).toBe(1)
+    expect(c.err.join('\n')).toMatch(/--topics: .*exactly one \.txt file/)
+  })
 })
