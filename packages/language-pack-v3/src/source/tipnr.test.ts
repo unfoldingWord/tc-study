@@ -102,6 +102,18 @@ describe('parseTipnr (fixture)', () => {
     parseTipnr(bent, bad)
     expect(bad.length).toBe(2)
   })
+
+  test('a record line that cannot be read is listed and takes no name lines from the previous record', () => {
+    const bad: string[] = []
+    const lines = text.split(String.fromCharCode(10))
+    const i = lines.findIndex((l) => l.startsWith('Abraham@Gen.11.26'))
+    const j = lines.findIndex((l, k) => k > i && l.includes('@') && l.includes('=') && !l.startsWith('–') && !l.startsWith('@'))
+    lines[j] = lines[j].replace('=', '=?')
+    const out = parseTipnr(lines.join(String.fromCharCode(10)), bad)
+    expect(bad.length).toBeGreaterThanOrEqual(1)
+    const len = (r: TipnrRecord[]) => r.find((x) => x.id === 'per:abraham')?.names.length
+    expect(len(out)).toBe(len(parseTipnr(text, [])))
+  })
 })
 
 // The whole file is not in the repository: LP3_SOURCES names the folder of the sources (the sources worktree).

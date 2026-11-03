@@ -95,7 +95,14 @@ export function parseTipnr(text: string, issues: string[]): TipnrRecord[] {
       continue
     }
     const eq = first.lastIndexOf('=')
-    if (!RECORD.test(first) || cols.length < 8) continue
+    if (!RECORD.test(first) || cols.length < 8) {
+      // A line that looks like a record but cannot be read must not leave the previous record open for its name lines
+      if (!first.startsWith('@') && first.includes('@') && eq > 0) {
+        current = null
+        issues.push(`${first.trim()}: record line not readable`)
+      }
+      continue
+    }
     const unique = first.slice(0, eq).trim()
     const uStrong = first.slice(eq + 1).trim()
     const m = FIRST_REF.exec(unique)
