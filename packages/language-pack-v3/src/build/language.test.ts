@@ -2,8 +2,9 @@ import { beforeAll, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import JSZip from 'jszip'
 import { hex, readHeader, readSegment } from '../codec/container'
-import type { About, CatalogModel, XtopicsCore } from '../model'
-import { xtopicsView } from '../read/topics'
+import type { About, CatalogModel, TopicsPart, XtopicsCore } from '../model'
+import { topicsView, xtopicsView } from '../read/topics'
+import type { TipnrRecord } from '../source/tipnr'
 import { partsSource } from '../node/partsSource'
 import { CATALOG_TABLES, catalogView } from '../read/catalog'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../source/rows'
@@ -736,5 +737,70 @@ describe('buildCommon: the xtopics unit', () => {
     expect(keys).toContain('unfoldingWord/en/tn')
     const again = await buildCommon({ source: await english(), about, mapLang: 'en', topics: topics() })
     expect(again.catalog.id).toBe(withTopics.catalog.id)
+  })
+})
+
+describe('buildLanguage: the topics unit', () => {
+  const english = () => partsSource({ list: join(DATA, 'en', 'list.json'), partsDir: PARTS, originals: ORIGINALS_LIST })
+  const read = (path: string) => readFileSync(join(DATA, 'topics', path), 'utf8')
+  const commonTopics = () => {
+    const obs = new Map<number, string>()
+    let n = 0
+    for (const line of read('obs-refs.txt').split(/\r?\n/)) {
+      const h = /^=== (\d+)$/.exec(line)
+      if (h) obs.set((n = Number(h[1])), '')
+      else if (n > 0) obs.set(n, `${obs.get(n)}${line}\n`)
+    }
+    const theo = (name: string) => read(`theographic-subset/${name}.json`)
+    return { tipnr: read('tipnr-subset.txt'), theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') }, obs }
+  }
+  /** The xtopics core of the fixtures, with Titus added (the fixtures have no record that Titus 1:4 lists). */
+  const xtopics = async () => {
+    const common = await buildCommon({ source: await english(), about, mapLang: 'en', topics: commonTopics() })
+    const core = xtopicsView(common.segments.find((s) => s.seg.h.class === 'xtopics' && s.seg.h.part === 'core')!.seg) as XtopicsCore
+    core.topics.set('per:titus', { kind: 'person', source: core.res[0][0], ref: 'Titus@Tit.1.4', title: 'Titus', ustrong: 'G5103' })
+    return core
+  }
+  const titus: TipnrRecord = {
+    kind: 'person',
+    unique: 'Titus@Tit.1.4',
+    uStrong: 'G5103',
+    id: 'per:titus',
+    names: [{ name: 'Titus', dStrong: 'G5103', refs: [{ verse: 56001004 }] }],
+    relations: [],
+  }
+
+  test('lists the unit topics (no needs); per:titus has a name from the alignment; the map segments are the same bytes as without topics', async () => {
+    const plain = await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about })
+    const built = await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about, topics: { xtopics: await xtopics(), records: [titus] } })
+    const catalog = await catalogOf(built.catalog)
+    const unit = catalog.units.find((u) => u.id === 'topics')!
+    expect(unit).toBeDefined()
+    expect(unit.needs).toBeUndefined()
+    expect(unit.segments.map((i) => built.segments[i].seg.h.part).sort()).toEqual(['core', 'tit'])
+    const core = built.segments.find((s) => s.seg.h.class === 'topics' && s.seg.h.part === 'core')!
+    const view = topicsView(core.seg)
+    expect(view.names['per:titus'].map((n) => [n[0], n[1]])).toContainEqual(['a Tito', 'alignment'])
+    // no id of names that the xtopics core lacks, and the part lists the verse
+    const ids = (await xtopics()).topics
+    for (const id of Object.keys(view.names)) expect(ids.has(id)).toBe(true)
+    const part = built.segments.find((s) => s.seg.h.class === 'topics' && s.seg.h.part === 'tit')!
+    expect((topicsView(part.seg) as TopicsPart).names?.get('per:titus')).toEqual([56001004])
+    // Review Focus 4: the map segments (and the book, art and lex ones) are the same bytes with and without topics
+    const notTopics = (b: { segments: BuiltSegment[] }) => b.segments.filter((s) => s.seg.h.class !== 'topics')
+    expect(notTopics(built).map((s) => [s.id, s.inputs, hex(s.bytes)])).toEqual(notTopics(plain).map((s) => [s.id, s.inputs, hex(s.bytes)]))
+    for (const s of built.segments.filter((s) => s.seg.h.class === 'map')) expect(JSON.stringify(s.seg.h)).not.toContain('topics')
+    for (const unit of catalog.units.filter((u) => u.id === 'map')) expect(unit.needs).toBeUndefined()
+    const again = await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about, topics: { xtopics: await xtopics(), records: [titus] } })
+    expect(again.catalog.id).toBe(built.catalog.id)
+  })
+
+  test('an outline entry that matches a section names it; one that matches none becomes a local topic', async () => {
+    const built = await buildLanguage({ source: await sample(), lang: ES, registry: registry(), about, topics: { xtopics: await xtopics(), records: [] } })
+    const core = topicsView(built.segments.find((s) => s.seg.h.class === 'topics' && s.seg.h.part === 'core')!.seg)
+    const sections = Object.entries(core.names).filter(([id]) => id.startsWith('sec:tit/'))
+    for (const [, list] of sections) expect(list.every((n) => n[1] === 'outline')).toBe(true)
+    for (const key of Object.keys(core.local ?? {})) expect(key.startsWith('es-419:tema/')).toBe(true)
+    console.log(`topics outline: ${sections.length} sections named, ${Object.keys(core.local ?? {}).length} local; ${built.report.filter((l) => l.startsWith('topics: outline')).join(' | ')}`)
   })
 })

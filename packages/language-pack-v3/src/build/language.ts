@@ -47,12 +47,14 @@ import { xmapSegment } from './xmap/segment'
 import type { SectionRegistry } from './sections'
 import { sourceRows } from './bookHelps'
 import { outlineOf } from './topics/outline'
-import { xtopicsSegment } from './topics/segment'
+import { topicsSegment, xtopicsSegment } from './topics/segment'
+import { buildTopics } from './topics/topics'
 import { buildXtopics, chapterLengths, type TwName, type XtopicsSources } from './topics/xtopics'
 import { parseObsRefs } from '../source/obsRefs'
 import { parseTheographic } from '../source/theographic'
 import { parseTipnr } from '../source/tipnr'
-import type { XmapCore, XmapPart } from '../model'
+import type { XmapCore, XmapPart, XtopicsCore } from '../model'
+import type { TipnrRecord } from '../source/tipnr'
 
 /** The name and version `about.builder` carries when this package builds. A constant, not read from `package.json` at run time. */
 export const BUILDER = 'language-pack-v3 0.1.0'
@@ -230,6 +232,7 @@ export async function buildLanguage(o: {
   requires?: [string, number, string][]
   bookNames?: Record<string, [string, string, string]>
   partial?: boolean
+  topics?: { xtopics: XtopicsCore; records: TipnrRecord[] }
 }): Promise<LanguageBuild> {
   const { source, lang } = o
   const report: string[] = []
@@ -252,6 +255,7 @@ export async function buildLanguage(o: {
   const books = o.books === undefined ? booksOf(refs) : canonical(o.books)
   const mapBooks: { model: BookModel; verses: number[] }[] = []
   const mapRows = new Map<string, RowKey[]>()
+  const origs = new Map<string, OrigModel>()
   for (const book of books) {
     if (!refs.some((ref) => ref.books.includes(book))) {
       report.push(`book ${book}: ${lang} has no resource of this book: left out`)
@@ -268,6 +272,7 @@ export async function buildLanguage(o: {
     }
     const issues: string[] = []
     const orig = await extractOrig(source, book)
+    origs.set(book, orig)
     // The rows `extractBook` reads are the ones the inputs name: they are read once.
     const read: RowKey[] = []
     const model = await extractBook(source, lang, book, orig, issues, read)
@@ -341,6 +346,39 @@ export async function buildLanguage(o: {
     }
   }
 
+  // The language topics: the names the language gives to the topics of the xtopics it was built against. The map above never reads them.
+  if (o.topics !== undefined) {
+    const xt = o.topics.xtopics
+    const lastVerse = chapterLengths([...origs.values()])
+    const issues: string[] = []
+    const outlines = new Map<string, { title: string; from: number; to: number }[]>()
+    const tn = refs.filter((ref) => ref.kind === TN_KIND).sort((a, b) => compareCodePoints(a.key, b.key))[0]
+    if (tn !== undefined) await outlinesOf(source, lang, tn, [...origs.keys()], outlines, issues, lastVerse)
+    const stories = (obs?.stories ?? []).map((story) => ({ n: story.n, title: story.title }))
+    const built = buildTopics({
+      lang,
+      xtopics: xt,
+      records: o.topics.records,
+      books: [...bookModels.values()],
+      origs,
+      outlines,
+      outlineRes: tn?.key,
+      lastVerse,
+      obs: stories,
+      obsRes: obs?.res.map(([key]) => key),
+      releases: new Map(refs.map((ref) => [ref.key, tagOf(ref.stamp)])),
+    })
+    report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
+    const rows: RowKey[] = [...mapRows.values()].flat()
+    if (tn !== undefined) for (const book of origs.keys()) if (tn.books.includes(book)) await addKeys(rows, source.rows({ lang, book, resource: tn.key }))
+    if (obs !== null) for (const resource of obs.res.map(([key]) => key)) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
+    rows.push({ layer: 'topics', key: `tipnr|${sha256Hex(JSON.stringify(o.topics.records))}` }, { layer: 'topics', key: `xtopics|${sha256Hex([...xt.topics.keys()].join('\n'))}` })
+    const keys = built.core.res.map(([key]) => key)
+    const inputs = inputsOf(rows, [...stampsOf(keys.filter((key) => refOf.has(key))), ...xt.res.map(([key, stamp]) => ({ key, stamp }))])
+    await add(topicsSegment(built.core), inputs, keys)
+    for (const part of built.parts) await add(topicsSegment(part), inputs, keys)
+  }
+
   segments.sort(compareSegments)
   const catalog = await buildCatalog({
     about: { ...o.about, catalog: lang },
@@ -375,6 +413,30 @@ const TOPIC_CREDITS: Record<keyof typeof TOPIC_SOURCES, { title: string; license
   },
   theographic: { title: 'Theographic Bible Metadata', license: 'CC-BY-SA-4.0', attribution: 'Theographic Bible Metadata (viz.bible), Robert Rouse' },
   obs: { title: 'Open Bible Stories', license: 'CC-BY-SA-4.0', attribution: 'The original work by unfoldingWord is available from https://openbiblestories.org' },
+}
+
+/** The outlines of the `front:intro` notes of the tN `tn`, by book, into `outlines`; what cannot be read goes to `issues`. */
+async function outlinesOf(
+  source: RowSource,
+  lang: string,
+  tn: ResourceRef,
+  books: string[],
+  outlines: Map<string, { title: string; from: number; to: number }[]>,
+  issues: string[],
+  lastVerse: (book: string, chapter: number) => number | undefined,
+): Promise<void> {
+  for (const book of books) {
+    if (!tn.books.includes(book)) continue
+    const rows: Row[] = []
+    for await (const row of source.rows({ lang, book, resource: tn.key })) rows.push(row)
+    const intro = sourceRows(rows, book, tn.key, 'notes')
+      .map(({ item }) => item as Record<string, unknown>)
+      // `front:intro` in a TSV; format 2.0 marks the introductions `isIntro` and places the book's at 1:1, with the chapter's
+      .filter((item) => item !== null && typeof item === 'object' && typeof item.note === 'string')
+      .find((item) => item.reference === 'front:intro' || (item.isIntro === true && /^#{1,6}\s.*outline/im.test(item.note as string)))
+    if (intro === undefined) issues.push(`outline ${book}: no introduction with an outline (front:intro) in ${tn.key}`)
+    else outlines.set(book, outlineOf(intro.note as string, book, issues, lastVerse))
+  }
 }
 
 /**
@@ -491,18 +553,7 @@ export async function buildCommon(o: {
     if (lang === undefined) report.push('topics: no mapLang: the xtopics have no sections and no same-as relations')
     else {
       tn = (await o.source.resources(lang)).filter((ref) => ref.kind === TN_KIND).sort((a, b) => compareCodePoints(a.key, b.key))[0]
-      for (const orig of tn === undefined ? [] : origs) {
-        if (!tn!.books.includes(orig.book)) continue
-        const rows: Row[] = []
-        for await (const row of o.source.rows({ lang, book: orig.book, resource: tn!.key })) rows.push(row)
-        const intro = sourceRows(rows, orig.book, tn!.key, 'notes')
-          .map(({ item }) => item as Record<string, unknown>)
-          // `front:intro` in a TSV; format 2.0 marks the introductions `isIntro` and places the book's at 1:1, with the chapter's
-          .filter((item) => item !== null && typeof item === 'object' && typeof item.note === 'string')
-          .find((item) => item.reference === 'front:intro' || (item.isIntro === true && /^#{1,6}\s.*outline/im.test(item.note as string)))
-        if (intro === undefined) issues.push(`outline ${orig.book}: no introduction with an outline (front:intro) in ${tn!.key}`)
-        else outlines.set(orig.book, outlineOf(intro.note as string, orig.book, issues, lastVerse))
-      }
+      if (tn !== undefined) await outlinesOf(o.source, lang, tn, origs.map((orig) => orig.book), outlines, issues, lastVerse)
     }
     // The tW names of the map, with the Strong keys and the verses of their links
     let twNames: Map<string, TwName> | undefined
