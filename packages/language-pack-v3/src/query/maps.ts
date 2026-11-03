@@ -181,7 +181,8 @@ function topicAnswer(m: MapSet, id: string, types?: string[]): unknown {
   const shown: Record<string, string> = { kind: topic.kind, source: topic.source, ref: topic.ref }
   if (topic.title !== '') shown.title = topic.title
   if (topic.ustrong !== '') shown.ustrong = topic.ustrong
-  const names = (m.topics?.core.names[id] ?? []).map((n) => n[0])
+  // A name under two sources is listed once, at its first place (most frequent first)
+  const names = [...new Set((m.topics?.core.names[id] ?? []).map((n) => n[0]))]
   return { kind: 'topic', id, installed: true, found: true, topic: shown, unit: 'verses', books, verses, stories, relations, names }
 }
 

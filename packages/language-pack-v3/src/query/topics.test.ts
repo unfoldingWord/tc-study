@@ -75,6 +75,11 @@ describe('topic and category queries (unit)', () => {
     expect((answer(withNames, { kind: 'topic', id: 'per:abraham' }) as { names: string[] }).names).toEqual(['Abraham', 'Abram'])
     expect((answer(installed, { kind: 'topic', id: 'per:abraham' }) as { names: string[] }).names).toEqual([])
   })
+
+  test('a name under two sources is listed once, at its first place', () => {
+    const twice: MapSet = { ...installed, topics: { core: { lang: 'es-419', part: 'core', res: [], names: { 'per:abraham': [['Abraham', 'alignment', 5, ['gen']], ['Abram', 'alignment', 4, ['gen']], ['Abraham', 'outline', 1, ['gen']]] }, coverage: new Map() }, parts: new Map() } }
+    expect((answer(twice, { kind: 'topic', id: 'per:abraham' }) as { names: string[] }).names).toEqual(['Abraham', 'Abram'])
+  })
 })
 
 const QUERIES = join(import.meta.dir, '..', '..', 'spec', 'tests', 'queries')
