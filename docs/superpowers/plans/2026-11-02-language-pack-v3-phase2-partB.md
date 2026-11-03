@@ -170,6 +170,12 @@ Agent `lp3-pyreader`, from Task P2's spec alone: decode `xtopics` and `topics`, 
 
 - [ ] `spec/README.md`: phase 2 part B implemented; open items updated (`ev:` names, images and basemap built later in the order Abel approved: UBS animals and plants at 360 px by default and 600 px optional, then the OBS images, then our own basemap; AI-made, unverifiable Pixabay, unconfirmed FIA images and Biblica's English maps left out). Run `bun test`, `bun run type-check`, `compare.ts --built`. Commit `spec: status after phase 2 part B`.
 
+## Part C (written after part B's FIN, approved by Abel before it runs)
+
+Abel decided on 2026-11-03, from P15's numbers, that the aligned-phrase index becomes its own optional catalog unit:
+not downloaded by default, split by Strong group, with its own `needs`; no map or topics segment depends on it. Its
+spec, builder, readers (TypeScript and Python), queries and size check are part C, planned once part B is complete.
+
 ## After Task P16 (controller)
 
 Final review with three Opus reviewers (spec and readers; source readers and builders; Python, queries and command line), one fix wave, one scoped re-review, "Deviations from this plan" appended here, then `FIN:` with the commit range, the gate numbers and the open items.
