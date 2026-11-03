@@ -11,7 +11,7 @@
  *
  * ## Order (so that the same inputs give the same catalog)
  *
- * - **segments**: by class in the order of `class-name` (catalog, xmap, map, book, orig, art, lex, obs, gen), then by book number
+ * - **segments**: by class in the order of `class-name` (catalog, xmap, map, xtopics, topics, book, orig, art, lex, obs, gen), then by book number
  *   (a segment without a book first), then by part (`core` first, then by book number), then by group by code point, then by id.
  * - **units**: by id by code point (`lex:G10` before `lex:G5`). A unit lists its segments by index, ascending.
  * - **resources**: by key. **requires**: by catalog and revision. **complements**: by kind, lang and id. All by code point.
@@ -96,6 +96,8 @@ function unitIdOf(seg: Segment): string {
       return 'obs'
     case 'map':
     case 'xmap':
+    case 'xtopics':
+    case 'topics':
       return cls
     default:
       throw new Error(`A segment of class ${cls} is not part of a unit`)
@@ -103,7 +105,7 @@ function unitIdOf(seg: Segment): string {
 }
 
 /**
- * The units of `segments` (`catalog.md`): one per book, orig book, art group, lex group, `obs`, `map` and `xmap`, ordered by id by
+ * The units of `segments` (`catalog.md`): one per book, orig book, art group, lex group, `obs`, `map`, `xmap`, `xtopics` and `topics`, ordered by id by
  * code point. A unit's `segments` are indexes in `segments`, ascending. `needs(segment)` gives the ids of the units a segment needs;
  * the unit's `needs` are the sorted union over its segments, left out when empty.
  *
@@ -118,7 +120,7 @@ export function unitsOf(segments: BuiltSegment[], needs: (s: BuiltSegment) => st
     if (unit === undefined) {
       unit = { indexes: [], needs: new Set(), parts: new Set() }
       units.set(id, unit)
-    } else if (id !== 'map' && id !== 'xmap') {
+    } else if (id !== 'map' && id !== 'xmap' && id !== 'xtopics' && id !== 'topics') {
       throw new Error(`The segments ${built.id} and ${segments[unit.indexes[0]].id} are both the unit ${id}`)
     }
     const { part } = built.seg.h

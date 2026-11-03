@@ -202,6 +202,26 @@ describe('unitsOf', () => {
     expect(() => unitsOf([e, f], () => [])).toThrow('part')
   })
 
+  test('xtopics and topics are units of their own, with no needs; their segments follow the map', async () => {
+    const segments = [
+      await stub({ class: 'xtopics', part: 'core' }, 1),
+      await stub({ class: 'xtopics', part: 'gen', book: 'gen' }, 2),
+      await stub({ class: 'topics', lang: 'es-419', part: 'core' }, 3),
+      await stub({ class: 'topics', lang: 'es-419', part: 'gen', book: 'gen' }, 4),
+    ]
+    expect(unitsOf(segments, () => [])).toEqual([
+      { id: 'topics', segments: [2, 3] },
+      { id: 'xtopics', segments: [0, 1] },
+    ])
+  })
+
+  test('two topics cores are an error, as two map cores', async () => {
+    const [a, b] = [await stub({ class: 'topics', part: 'core', lang: 'es-419' }, 1), await stub({ class: 'topics', part: 'core', lang: 'en' }, 2)]
+    expect(() => unitsOf([a, b], () => [])).toThrow('part')
+    const [c, d] = [await stub({ class: 'xtopics', part: 'core' }, 3), await stub({ class: 'xtopics', part: 'core' }, 4)]
+    expect(() => unitsOf([c, d], () => [])).toThrow('part')
+  })
+
   test('a catalog and a gen segment are not units', async () => {
     const [catalog, gen] = [await stub({ class: 'catalog' }), await stub({ class: 'gen' })]
     expect(() => unitsOf([catalog], () => [])).toThrow('catalog')

@@ -16,7 +16,7 @@ import { CLASS_NAMES, type ClassName, hex, KIND_TRANSFER, readHeader, readSegmen
 import { FormatError } from '../codec/errors'
 import { isMap } from '../codec/values'
 import type { CountRows, Coverage, VerseLists } from '../codec/counts'
-import type { CountTable, HelpTable, MapCore, MapPart, ObsHelpTable, TextModel, XmapCore, XmapPart } from '../model'
+import type { CountTable, HelpTable, MapCore, MapPart, ObsHelpTable, TextModel, TopicsCore, TopicsPart, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../model'
 import { readTransfer } from '../transfer'
 import { ART_TABLES, artView } from './art'
 import { BOOK_TABLES, bookView } from './book'
@@ -25,6 +25,7 @@ import { LEX_TABLES, lexView } from './lex'
 import { OBS_TABLES, obsView } from './obs'
 import { MAP_TABLES, mapView } from './map'
 import { ORIG_TABLES, origView } from './orig'
+import { TOPICS_TABLES, topicsView, XTOPICS_TABLES, xtopicsView } from './topics'
 import { XMAP_TABLES, xmapView } from './xmap'
 
 /** `value` and everything inside it frozen: a table that is written to would change what every reader of the process accepts. */
@@ -49,8 +50,8 @@ export const KNOWN: Record<ClassName, Record<string, number[]>> = deepFreeze({
   catalog: { ...CATALOG_TABLES },
   map: { ...MAP_TABLES },
   xmap: { ...XMAP_TABLES },
-  xtopics: {}, // read by read/topics.ts; the conformance output of it is a later task
-  topics: {},
+  xtopics: { ...XTOPICS_TABLES },
+  topics: { ...TOPICS_TABLES },
   gen: {},
 })
 
@@ -171,6 +172,27 @@ function mapOut(seg: Segment): Record<string, unknown> {
   return { books: c.books, names: c.names, subtitles: c.subtitles, coverage: coverageOut(c.coverage), usage: countsOut(c.usage), obs: c.obs }
 }
 
+function xtopicsOut(seg: Segment): Record<string, unknown> {
+  const m = xtopicsView(seg)
+  if (m.part !== 'core') return { occurrences: listsOut((m as XtopicsPart).occurrences) }
+  const c = m as XtopicsCore
+  return {
+    coverage: coverageOut(c.coverage),
+    topics: Object.fromEntries(c.topics),
+    occurrences: { unit: 'verses', rows: rowsOut(c.occurrences) },
+    relations: c.relations,
+    strongs: c.strongs,
+    ranges: c.ranges,
+  }
+}
+
+function topicsOut(seg: Segment): Record<string, unknown> {
+  const m = topicsView(seg)
+  if (m.part !== 'core') return { names: listsOut((m as TopicsPart).names) }
+  const c = m as TopicsCore
+  return { names: c.names, local: c.local, coverage: coverageOut(c.coverage) }
+}
+
 /** What a class adds to `id` and `h`; `E_TABLE` for a class phase 1 does not decode. */
 function bodyOut(seg: Segment): Record<string, unknown> {
   switch (seg.h.class) {
@@ -205,6 +227,10 @@ function bodyOut(seg: Segment): Record<string, unknown> {
       return mapOut(seg)
     case 'xmap':
       return xmapOut(seg)
+    case 'xtopics':
+      return xtopicsOut(seg)
+    case 'topics':
+      return topicsOut(seg)
     default:
       throw new FormatError('E_TABLE', `the class "${seg.h.class}" is not read by this reader`)
   }

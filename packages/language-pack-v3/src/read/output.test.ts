@@ -6,16 +6,18 @@ import { type BuiltSegment } from '../build/catalog'
 import { BUILDER, buildCommon, buildLanguage } from '../build/language'
 import { mapSegment } from '../build/map/segment'
 import { obsSegment } from '../build/obs'
+import { topicsSegment, xtopicsSegment } from '../build/topics/segment'
 import { xmapSegment } from '../build/xmap/segment'
 import { type CborValue, encodeDeterministic } from '../codec/cbor'
 import { FORMAT_ERROR_CODES, FormatError } from '../codec/errors'
 import { hex, readHeader, readSegment, type Segment, writeSegment } from '../codec/container'
-import type { About, BookModel, Concept, MapCore, MapPart, ObsModel, XmapCore, XmapPart } from '../model'
+import type { About, BookModel, Concept, MapCore, MapPart, ObsModel, Topic, TopicsCore, TopicsPart, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../model'
 import { partsSource } from '../node/partsSource'
 import { writeTransfer } from '../transfer'
 import { BOOK_TABLES } from './book'
 import { MAP_TABLES } from './map'
 import { canonicalJson, KNOWN, readerOutput, sortKeys } from './output'
+import { TOPICS_TABLES, XTOPICS_TABLES } from './topics'
 import { XMAP_TABLES } from './xmap'
 
 const SPEC = join(import.meta.dir, '..', '..', 'spec', 'tests')
@@ -280,6 +282,64 @@ describe('tables a reader does not know (case 9)', () => {
     const result = await out((await writeSegment(mapSegment(part))).bytes)
     expect(result.usage).toEqual({ 'ta:x': [56001002, 56001003] })
     expect(result.h.lang).toBe('es-419')
+  })
+
+  test('xtopics and topics know their tables', () => {
+    expect(KNOWN.xtopics).toEqual(XTOPICS_TABLES)
+    expect(KNOWN.topics).toEqual(TOPICS_TABLES)
+  })
+
+  const OBSR = 'unfoldingWord/en/obs'
+  const xtCore: XtopicsCore = {
+    part: 'core',
+    res: [['STEPBible/TIPNR', 'r1'], [OBSR, 'v9']],
+    coverage: new Map([['STEPBible/TIPNR', { whole: ['gen'], partial: ['mat'] }]]),
+    topics: new Map<string, Topic>([
+      ['per:abraham', { kind: 'person', source: 'STEPBible/TIPNR', ref: 'Abraham@Gen.11.26', title: 'Abraham', ustrong: 'H0085' }],
+      ['obs:10', { kind: 'story', source: OBSR, ref: '10', title: '', ustrong: '' }],
+    ]),
+    occurrences: new Map([['per:abraham', new Map([['gen', [3, 3] as [number, number]]])]]),
+    relations: [{ from: 'per:abraham', to: 'tw:names/abraham', type: 'same-as', source: 'STEPBible/TIPNR', confidence: 90 }],
+    strongs: { 'per:abraham': ['H0085'] },
+    ranges: { 'obs:10': [[2001001, 2001010]] },
+  }
+
+  test('xtopics core: coverage, topics, occurrences, relations, strongs, ranges', async () => {
+    const result = await out((await writeSegment(xtopicsSegment(xtCore))).bytes)
+    expect(result.coverage['STEPBible/TIPNR']).toEqual({ whole: ['gen'], partial: ['mat'] })
+    expect(result.topics['obs:10']).toEqual({ kind: 'story', source: OBSR, ref: '10', title: '', ustrong: '' })
+    expect(result.occurrences).toEqual({ unit: 'verses', rows: { 'per:abraham': { gen: [3, 3] } } })
+    expect(result.relations).toEqual(xtCore.relations)
+    expect(result.strongs).toEqual({ 'per:abraham': ['H0085'] })
+    expect(result.ranges).toEqual({ 'obs:10': [[2001001, 2001010]] })
+    const { relations: _r, strongs: _s, ranges: _g, ...small } = xtCore
+    const bare = await out((await writeSegment(xtopicsSegment(small))).bytes)
+    expect([bare.relations, bare.strongs, bare.ranges]).toEqual([undefined, undefined, undefined])
+  })
+
+  test('xtopics part: occurrences as full verse ids', async () => {
+    const part: XtopicsPart = { part: 'gen', occurrences: new Map([['per:abraham', [1011026, 1012001]]]) }
+    const result = await out((await writeSegment(xtopicsSegment(part))).bytes)
+    expect(result.occurrences).toEqual({ 'per:abraham': [1011026, 1012001] })
+    expect(result.coverage).toBeUndefined()
+  })
+
+  test('topics core and part', async () => {
+    const core: TopicsCore = {
+      lang: 'es-419',
+      part: 'core',
+      res: [['aligned/es-419', 'a1']],
+      names: { 'per:abraham': [['Abraham', 'alignment', 5, ['gen', 'mat']], ['Abraham', 'list', 1, ['gen']]] },
+      local: { 'es-419:tema/x': { names: ['X'], refs: [[1001001, 1001002]], related: ['tw:kt/grace'] } },
+      coverage: new Map([['aligned/es-419', { whole: ['gen'], partial: [] }]]),
+    }
+    const result = await out((await writeSegment(topicsSegment(core))).bytes)
+    expect(result.names['per:abraham'][0]).toEqual(['Abraham', 'alignment', 5, ['gen', 'mat']])
+    expect(result.local).toEqual(core.local)
+    expect(result.coverage).toEqual({ 'aligned/es-419': { whole: ['gen'] } })
+    expect(result.h.lang).toBe('es-419')
+    const part: TopicsPart = { lang: 'es-419', part: 'gen', names: new Map([['per:abraham', [1011026]]]) }
+    expect((await out((await writeSegment(topicsSegment(part))).bytes)).names).toEqual({ 'per:abraham': [1011026] })
   })
 
   test('KNOWN cannot be changed: it is frozen, down to the lists of versions', () => {
