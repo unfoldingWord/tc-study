@@ -67,6 +67,13 @@ describe('alignedSegment and alignedView', () => {
     expect(alignedView(fresh({ ...m, group: 'b', entries: new Map([['bien', new Map([['G1', books([['mat', 1, 1]])]])]]) })).group).toBe('b')
   })
 
+  test('valid groups read, including a space inside', () => {
+    for (const group of ['the -thf', 'a b', 'a-a', 'ar-b', 'other']) {
+      const seg = fresh({ lang: 'es', group, res: [[GLT, 'v1']], entries: new Map() })
+      expect(alignedView(seg).group).toBe(group)
+    }
+  })
+
   test('a segment alone does not check "other" against ranges; with the catalog groups it does', () => {
     const m: AlignedModel = { lang: 'es-419', group: 'other', res: [[GLT, 'v1']], entries: new Map([['bien', new Map([['G1', books([['mat', 1, 1]])]])]]) }
     expect(alignedView(fresh(m)).entries.size).toBe(1)
@@ -129,6 +136,9 @@ describe('alignedSegment and alignedView', () => {
     ['a group in uppercase', (s) => void (s.h.group = 'A')],
     ['a range backwards', (s) => void (s.h.group = 'd-b')],
     ['a range backwards by prefix', (s) => void (s.h.group = 'ab-a')],
+    ['a prefix that ends in a space', (s) => void (s.h.group = 'the ')],
+    ['an end that ends in a space', (s) => void (s.h.group = 'a-b ')],
+    ['a lone-prefix range ending in a space', (s) => void (s.h.group = 'a-a ')],
     ['a prefix of seven characters', (s) => void (s.h.group = 'aaaaaaa')],
     ['a prefix that begins with a space', (s) => void (s.h.group = ' a')],
     ['a group of three ends', (s) => void (s.h.group = 'a-d-f')],
@@ -219,6 +229,8 @@ describe('the catalog and the aligned units', () => {
       (s) => void (units(s)[0].optional = 1),
       (s) => void delete units(s)[0].optional,
       (s) => void (units(s)[1].optional = true),
+      (s) => void (units(s)[0].id = 'aligned:the '),
+      (s) => void (units(s)[0].id = 'aligned:a-b '),
       (s) => void (units(s)[0].id = 'aligned:A'),
       (s) => void (units(s)[0].id = 'aligned:ab-a'),
       (s) => void (units(s)[0].id = 'aligned:'),
@@ -229,5 +241,10 @@ describe('the catalog and the aligned units', () => {
       expect(() => catalogView(seg)).toThrow(FormatError)
     }
     expect(() => catalogView(structuredClone(cat.seg))).not.toThrow()
+    for (const id of ['aligned:the -thf', 'aligned:other']) {
+      const seg = structuredClone(cat.seg)
+      units(seg)[0].id = id
+      expect(() => catalogView(seg)).not.toThrow()
+    }
   })
 })

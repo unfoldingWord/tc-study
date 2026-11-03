@@ -54,7 +54,7 @@ def test_unknown_table_and_header_key_ignored():
 
 
 @pytest.mark.parametrize("group", ["A", "aaaaaaa", "d-b", "a-ab-c", "the ", "a-b ", "", "-a", " a", "a1", "Other",
-                                   "other ", "ab-a"])
+                                   "other ", "ab-a", "a-a ", "a-b "])
 def test_bad_group(group):
     b, _ = make([], [], [], group=group)
     err(b.data, "E_BODY")
@@ -200,12 +200,13 @@ def cat_with(unit):
 def test_catalog_optional_rules():
     out = read_file(cat_with({"id": "aligned:a-am", "segments": [0], "optional": True}))
     assert out["units"][-1] == {"id": "aligned:a-am", "segments": [0], "optional": True}
+    assert "error" not in read_file(cat_with({"id": "aligned:the -thf", "segments": [0], "optional": True}))
     err(cat_with({"id": "aligned:a-am", "segments": [0], "optional": False}), "E_BODY")
     err(cat_with({"id": "aligned:a-am", "segments": [0], "optional": 1}), "E_BODY")
     err(cat_with({"id": "aligned:a-am", "segments": [0], "optional": "true"}), "E_BODY")
     err(cat_with({"id": "aligned:a-am", "segments": [0]}), "E_BODY")
     err(cat_with({"id": "aligned:other", "segments": [0]}), "E_BODY")
-    for bad_id in ("aligned:A", "aligned:ab-a", "aligned:", "aligned:d-b", "aligned:a-b-c"):
+    for bad_id in ("aligned:A", "aligned:ab-a", "aligned:", "aligned:d-b", "aligned:a-b-c", "aligned:the ", "aligned:a-b "):
         err(cat_with({"id": bad_id, "segments": [0], "optional": True}), "E_BODY")
     err(cat_with({"id": "lex:G5", "segments": [0], "optional": True}), "E_BODY")
     err(cat_with({"id": "obs", "segments": [0], "optional": False}), "E_BODY")

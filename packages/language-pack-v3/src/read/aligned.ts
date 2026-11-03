@@ -17,13 +17,17 @@ function bad(what: string): never {
   throw new FormatError('E_BODY', `the aligned segment is malformed: ${what}`)
 }
 
-const END = '[a-z][a-z ]{0,5}'
-const GROUP = new RegExp(`^(${END})(?:-(${END}))?$`)
+const START = '[a-z][a-z ]{0,5}'
+const END = '[a-z](?:[a-z ]{0,4}[a-z])?'
+const GROUP = new RegExp(`^(${START})(?:-(${END}))?$`)
+const LONE = new RegExp(`^${END}$`)
 
 /** The group of an `aligned` header: a prefix of 1 to 6 characters of `[a-z ]` (the first a letter), a range of two (the first not after the last) or `other`. */
 export function isGroup(group: string): boolean {
   const m = GROUP.exec(group)
-  return group === 'other' || (m !== null && (m[2] === undefined || m[1]! <= m[2]))
+  if (group === 'other') return true
+  if (m === null) return false
+  return m[2] === undefined ? LONE.test(group) : m[1]! <= m[2]
 }
 
 function checkGroup(group: string): void {
