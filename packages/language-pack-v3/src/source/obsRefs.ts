@@ -36,8 +36,11 @@ export function parseObsRefs(
     }
     const ranges: [number, number][] = []
     let book: string | null = null
-    for (const raw of m[1].split(/[;,]/)) {
-      const piece = raw.trim()
+    let verseChapter: number | null = null // the chapter of the last piece that named verses, for "1:1-2, 5"
+    const tokens = m[1].split(/([;,])/)
+    for (let t = 0; t < tokens.length; t += 2) {
+      const piece = tokens[t].trim()
+      const afterComma = t > 0 && tokens[t - 1] === ','
       let rest = piece
       const wb = WITH_BOOK.exec(piece)
       if (wb) {
@@ -50,6 +53,8 @@ export function parseObsRefs(
         book = code
         rest = wb[2]
       }
+      // After a comma a bare number or range is verses of the chapter just named: "Genesis 1:1-2, 5" is 1:5
+      if (!wb && afterComma && verseChapter !== null && /^\d+(?:-\d+)?$/.test(rest)) rest = `${verseChapter}:${rest}`
       const p = PLACE.exec(rest)
       if (!book || !p) {
         issues.push(`obs:${story}: cannot read ${JSON.stringify(piece)}`)
@@ -81,6 +86,7 @@ export function parseObsRefs(
       } else {
         range = [verseId(book, c1, Number(p[2])), verseId(book, Number(p[3]), Number(p[4]))]
       }
+      verseChapter = p[2] !== undefined ? c1 : p[4] !== undefined ? Number(p[3]) : null
       if (range[1] < range[0]) issues.push(`obs:${story}: range runs backwards in ${JSON.stringify(piece)}`)
       else ranges.push(range)
     }
