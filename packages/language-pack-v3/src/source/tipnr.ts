@@ -4,8 +4,7 @@
  * references, and the relations to other records. It never reads the `@Briefest`, `@Brief`, `@Short` or `@Article` text, nor
  * the translated-name column: those are not part of what the format keeps. No Node module is used.
  */
-import { bookNumber, verseId } from '../ids'
-import { fromHebrewNumbering } from '../build/hebrewNumbering'
+import { verseId } from '../ids'
 
 export type TipnrName = { name: string; dStrong: string; refs: { verse: number; letter?: string }[] }
 
@@ -56,12 +55,11 @@ function parseRefs(text: string, issues: string[], where: string): TipnrName['re
     }
     const book = m[1].toLowerCase()
     try {
-      const place = fromHebrewNumbering(book, { chapter: Number(m[2]), verse: Number(m[3]) })
-      bookNumber(book)
-      const verse = verseId(book, place.chapter, place.verse)
+      // TIPNR numbers as English Bibles do, which is the numbering of the UHB: no conversion (`Psa.3.0` is the title, verse 0).
+      const verse = verseId(book, Number(m[2]), Number(m[3]))
       refs.push(m[4] === '' ? { verse } : { verse, letter: m[4] })
     } catch {
-      issues.push(`${where}: reference cannot be converted: ${ref}`)
+      issues.push(`${where}: reference outside the books and numbers of the format: ${ref}`)
     }
   }
   return refs

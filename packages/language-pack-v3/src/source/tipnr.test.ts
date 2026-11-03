@@ -57,13 +57,43 @@ describe('parseTipnr (fixture)', () => {
   })
 
   test('no description text is read', () => {
-    const json = JSON.stringify(records)
-    for (const phrase of ['@Brief', '@Short', '@Article', 'Man living at the time', '#A man', 'first mentioned at']) {
-      expect(json).not.toContain(phrase)
-    }
-    const brief = /^@Brief= (.{12,})$/m.exec(text)?.[1].trim() as string
-    expect(brief.length).toBeGreaterThan(11)
-    expect(json).not.toContain(brief)
+    // A synthetic record: its description, summary, @Brief, @Short, @Article and translated name must not reach the result.
+    const synthetic = [
+      '$========== PERSON(s)',
+      'Zed@Gen.1.1=H9999	ZED-DESCRIPTION						#ZED-SUMMARY	Male',
+      '– Named	Zed@Gen.1.1	H9999«H9999=א	ZED-TRANSLATED =ESV	Gen.1.1',
+      '– Total	Zed	Zed	H9999	Gen.1.1	1',
+      '@Briefest= ZED-BRIEFEST',
+      '@Brief= ZED-BRIEF',
+      '@Short= ZED-SHORT	& @Article= ZED-ARTICLE',
+      '@Ambiguity=',
+    ].join('\n')
+    const got = parseTipnr(synthetic, [])
+    expect(got).toHaveLength(1)
+    expect(got[0].id).toBe('per:zed')
+    expect(JSON.stringify(got)).not.toContain('ZED-')
+    expect(/^@(Briefest|Brief|Short|Article)=[ ]*[^\s&]/m.test(text)).toBe(false)
+    expect(text).not.toContain('first mentioned at')
+  })
+
+  test('references keep the numbering of the file, which is the UHB numbering: no conversion', () => {
+    const T = '\t'
+    const line = (refs: string) =>
+      [
+        '$========== PERSON(s)',
+        ['Zed@Gen.1.1=H9999', '', '', '', '', '', '', '', 'Male'].join(T),
+        ['– Named', 'Zed@Gen.1.1', 'H9999«H9999=x', '', refs].join(T),
+      ].join('\n')
+    const issues: string[] = []
+    const [zed] = parseTipnr(line('Exo.8.5; Jon.1.17; Mal.4.1; Psa.51.0; Psa.3.0'), issues)
+    expect(zed.names[0].refs.map((r) => r.verse)).toEqual([
+      verseId('exo', 8, 5),
+      verseId('jon', 1, 17),
+      verseId('mal', 4, 1),
+      verseId('psa', 51, 0),
+      verseId('psa', 3, 0),
+    ])
+    expect(issues).toEqual([])
   })
 
   test('unusable references are listed in issues', () => {
