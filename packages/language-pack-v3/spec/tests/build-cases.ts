@@ -31,11 +31,12 @@ import { versesOf } from '../../src/build/maps/verses'
 import { extractOrig } from '../../src/build/orig'
 import { buildXmap } from '../../src/build/xmap/build'
 import { xmapSegment } from '../../src/build/xmap/segment'
+import { topicsSegment } from '../../src/build/topics/segment'
 import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
 import { FORMAT_MAJOR, FORMAT_MINOR, KIND_SEGMENT, readSegment, type Segment, writeSegment } from '../../src/codec/container'
 import { verseId } from '../../src/ids'
-import type { BookModel, HelpRow, MapCore, MapPart, OrigModel, TextModel } from '../../src/model'
+import type { BookModel, HelpRow, MapCore, MapPart, OrigModel, TextModel, TopicName } from '../../src/model'
 import { partsSource } from '../../src/node/partsSource'
 import { BOOK_TABLES, bookView } from '../../src/read/book'
 import { CATALOG_TABLES, catalogView } from '../../src/read/catalog'
@@ -364,6 +365,7 @@ async function cutTransfer(): Promise<Uint8Array> {
   })
   // Case 1 travels beside case 4's segment, and the catalog does not list it.
   const minimal = await storedSegment(join(TESTS_DIR, 'container', 'minimal.seg'))
+  for (const [name, bytes] of await topicsSegments(english)) out.set(name, bytes)
   const whole = writeTransfer({ mode: 'full', catalogs: [catalog], entries: [minimal, book], made: MADE, by: BY })
   return cutMiddleOfLast(whole, book.bytes.length)
 }
@@ -571,6 +573,46 @@ async function obsOfStory(): Promise<BuiltSegment> {
   const model = await extractObs(source, 'en', [])
   if (model === null) throw new Error('The synthetic story gave no Open Bible Stories')
   return builtSegment(obsSegment(model), '1'.repeat(64))
+}
+
+/** The files of `data/topics/` as `buildCommon` takes them: the TIPNR text, the four Theographic files and the OBS closing lines by story. */
+function topicsInput() {
+  const read = (path: string) => readFileSync(join(DATA, 'topics', path), 'utf8')
+  const obs = new Map<number, string>()
+  let story = 0
+  for (const line of read('obs-refs.txt').split(/\r?\n/)) {
+    const header = /^=== (\d+)$/.exec(line)
+    if (header) obs.set((story = Number(header[1])), '')
+    else if (story > 0) obs.set(story, `${obs.get(story)}${line}\n`)
+  }
+  const theographic = (name: string) => read(`theographic-subset/${name}.json`)
+  return {
+    tipnr: read('tipnr-subset.txt'),
+    theographic: { events: theographic('events'), verses: theographic('verses'), people: theographic('people'), places: theographic('places') },
+    obs,
+  }
+}
+
+/**
+ * The topics of the sample, for `compare.ts --built`: the `xtopics` core and parts `buildCommon` makes from `data/topics/` (with the
+ * English tN introduction of Titus for the sections), and a `topics` core and part of es-419 built by hand (no builder of the language
+ * topics exists yet). By file name.
+ */
+export async function topicsSegments(english: RowSource): Promise<Map<string, Uint8Array>> {
+  const out = new Map<string, Uint8Array>()
+  const common = await buildCommon({ source: english, about: ABOUT, mapLang: 'en', topics: topicsInput() })
+  for (const seg of common.segments.filter((s) => s.seg.h.class === 'xtopics')) out.set(`xtopics-${seg.seg.h.part}.seg`, seg.bytes)
+  const coverage = new Map([[GLT, { whole: ['tit'], partial: [] as string[] }]])
+  const names: Record<string, TopicName[]> = {
+    'per:abraham': [['Abraham', 'alignment', 5, ['gen', 'tit']], ['Abrahán', 'list', 1, []]],
+    'sec:tit/1': [['Requisitos', 'outline', 1, ['tit']]],
+  }
+  const local = { 'es-419:tema/la-gracia': { names: ['La gracia'], refs: [[56001001, 56001004]] as [number, number][], related: ['tw:kt/grace'] } }
+  const core = { lang: ES, part: 'core' as const, res: [[GLT, 'v42']] as [string, string][], coverage, names, local }
+  out.set('topics-core-es-419.seg', (await writeSegment(topicsSegment(core))).bytes)
+  const part = { lang: ES, part: 'tit', names: new Map([['per:abraham', [56001001, 56001002]]]) }
+  out.set('topics-tit-es-419.seg', (await writeSegment(topicsSegment(part))).bytes)
+  return out
 }
 
 /**

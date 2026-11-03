@@ -2613,3 +2613,377 @@ def test_map_cli_prints_the_canonical_text(tmp_path):
     proc = subprocess.run([sys.executable, "-X", "utf8", str(HERE / "lp3read.py"), str(f)], capture_output=True)
     assert proc.returncode == 0
     assert json.loads(proc.stdout.decode("utf-8")) == dict(expected, id=b.id)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Phase 2 part B: xtopics and topics (cddl/xtopics.cddl, cddl/topics.cddl, tests/README.md "xtopics, topics")
+# ---------------------------------------------------------------------------------------------------------------
+
+TIPNR_RES = ["STEPBible/TIPNR", "be4191f"]
+THEO_RES = ["robertrouse/theographic", "744355c"]
+TN_RES = ["unfoldingWord/en/tn", "v91"]
+XT_TABLES = ("coverage", "topics", "relations", "strongs", "occurrences", "ranges")
+
+
+def xtopics_core(skip: tuple = ()):
+    h = {"class": "xtopics", "v": 1,
+         "tables": {n: [1, n in ("coverage", "topics", "occurrences")] for n in XT_TABLES},
+         "part": "core", "res": [TIPNR_RES, THEO_RES, TN_RES]}
+    t = {
+        "coverage": {TIPNR_RES[0]: [bset(["gen", "tit"])], TN_RES[0]: [bset(["tit"]), bset(["exo"])]},
+        "topics": {"ids": ["ev:plagues", "per:abraham", "per:isaac", "sec:tit/1", "sec:tit/1-3"],
+                   "kind": uv([3, 1, 1, 6, 6]), "source": uv([1, 0, 0, 2, 2]), "ref": uv([0, 1, 2, 3, 3]),
+                   "refs": ["73", "Abraham@Gen.11.26", "Isaac@Gen.21.3", "1:1-3"],
+                   "title": ["Plagues of Egypt", "Abraham", "", "Qualities of elders", ""],
+                   "ustrong": ["", "H0085", "H3327", "", ""]},
+        "relations": {"types": ["parent-of", "same-as"], "external": ["tw:names/abraham"],
+                      "from": uv([1, 1]), "to": uv([2, 5]), "type": uv([0, 1]), "source": uv([0, 0]),
+                      "confidence": uv([100, 90])},
+        "strongs": {"per:abraham": ["H0085", "H0087"]},
+        "occurrences": counts("verses", {"per:abraham": [(1, 3, 3), (56, 1, 1)], "per:isaac": [(1, 1, 1)]}),
+        "ranges": {"sec:tit/1": [[56001001, 56001016]], "ev:plagues": [[2007014, 2012036], [2012037, 2012037]]},
+    }
+    for name in skip:
+        h["tables"][name] = [2, False]
+        t[name] = {"later": True}
+    expected = {
+        "h": header_h(h),
+        "coverage": {TIPNR_RES[0]: {"whole": ["gen", "tit"]}, TN_RES[0]: {"whole": ["tit"], "partial": ["exo"]}},
+        "topics": {
+            "ev:plagues": {"kind": "event", "source": THEO_RES[0], "ref": "73", "title": "Plagues of Egypt",
+                           "ustrong": ""},
+            "per:abraham": {"kind": "person", "source": TIPNR_RES[0], "ref": "Abraham@Gen.11.26",
+                            "title": "Abraham", "ustrong": "H0085"},
+            "per:isaac": {"kind": "person", "source": TIPNR_RES[0], "ref": "Isaac@Gen.21.3", "title": "",
+                          "ustrong": "H3327"},
+            "sec:tit/1": {"kind": "section", "source": TN_RES[0], "ref": "1:1-3", "title": "Qualities of elders",
+                          "ustrong": ""},
+            "sec:tit/1-3": {"kind": "section", "source": TN_RES[0], "ref": "1:1-3", "title": "", "ustrong": ""}},
+        "occurrences": {"unit": "verses", "rows": {"per:abraham": {"gen": [3, 3], "tit": [1, 1]},
+                                                   "per:isaac": {"gen": [1, 1]}}},
+        "relations": [{"from": "per:abraham", "to": "per:isaac", "type": "parent-of", "source": TIPNR_RES[0],
+                       "confidence": 100},
+                      {"from": "per:abraham", "to": "tw:names/abraham", "type": "same-as", "source": TIPNR_RES[0],
+                       "confidence": 90}],
+        "strongs": {"per:abraham": ["H0085", "H0087"]},
+        "ranges": {"sec:tit/1": [[56001001, 56001016]], "ev:plagues": [[2007014, 2012036], [2012037, 2012037]]},
+    }
+    for name in skip:
+        del expected[name]
+    return build(h, t), expected, (h, t)
+
+
+def xtopics_part():
+    h = {"class": "xtopics", "v": 1, "tables": {"occurrences": [1, True]}, "part": "tit", "book": "tit", "res": []}
+    t = {"occurrences": vlists({"per:abraham": [1001, 2003], "sec:tit/1": [0, 1001]})}
+    expected = {"h": header_h(h),
+                "occurrences": {"per:abraham": [56001001, 56002003], "sec:tit/1": [56000000, 56001001]}}
+    return build(h, t), expected, (h, t)
+
+
+def topics_core(skip: tuple = ()):
+    h = {"class": "topics", "v": 1,
+         "tables": {"names": [1, True], "local": [1, False], "coverage": [1, True]},
+         "lang": "es-419", "part": "core", "res": [["es-419_gl/es-419/glt", "v42"]]}
+    t = {
+        "names": {"per:abraham": [["Abraham", "alignment", 5, bset(["gen", "tit"])],
+                                  ["Abram", "alignment", 2, bset(["gen"])], ["Abrahán", "list", 1, bset([])]],
+                  "sec:tit/1": [["Requisitos", "outline", 1, bset(["tit"])]]},
+        "local": {"es-419:tema/la-gracia": {"names": ["La gracia"], "refs": [[56001001, 56001004]],
+                                            "related": ["tw:kt/grace"]}},
+        "coverage": {"es-419_gl/es-419/glt": [bset(["tit"])]},
+    }
+    for name in skip:
+        h["tables"][name] = [2, False]
+        t[name] = {"later": True}
+    expected = {
+        "h": header_h(h),
+        "names": {"per:abraham": [["Abraham", "alignment", 5, ["gen", "tit"]], ["Abram", "alignment", 2, ["gen"]],
+                                  ["Abrahán", "list", 1, []]],
+                  "sec:tit/1": [["Requisitos", "outline", 1, ["tit"]]]},
+        "local": {"es-419:tema/la-gracia": {"names": ["La gracia"], "refs": [[56001001, 56001004]],
+                                            "related": ["tw:kt/grace"]}},
+        "coverage": {"es-419_gl/es-419/glt": {"whole": ["tit"]}},
+    }
+    for name in skip:
+        del expected[name]
+    return build(h, t), expected, (h, t)
+
+
+def topics_part():
+    h = {"class": "topics", "v": 1, "tables": {"names": [1, False]}, "lang": "es-419", "part": "tit", "res": []}
+    t = {"names": vlists({"per:abraham": [1001, 1002]})}
+    expected = {"h": header_h(h), "names": {"per:abraham": [56001001, 56001002]}}
+    return build(h, t), expected, (h, t)
+
+
+@pytest.mark.parametrize("fixture", [xtopics_core, xtopics_part, topics_core, topics_part])
+def test_topics_classes_read(fixture):
+    b, expected, _ = fixture()
+    ok(b, expected)
+
+
+@pytest.mark.parametrize("skip", [("relations",), ("strongs",), ("ranges",), ("relations", "strongs", "ranges")])
+def test_xtopics_core_unknown_optional_tables_are_skipped(skip):
+    b, expected, _ = xtopics_core(skip)
+    ok(b, expected)
+
+
+def test_xtopics_core_without_optional_tables_and_empty():
+    _, expected, (h, t) = xtopics_core()
+    for name in ("relations", "strongs", "ranges"):
+        del h["tables"][name]
+        del t[name]
+        expected.pop(name)
+    expected["h"] = header_h(h)
+    ok(build(h, t), expected)
+    t["topics"] = {"ids": [], "kind": b"", "source": b"", "ref": b"", "refs": [], "title": [], "ustrong": []}
+    t["occurrences"] = counts("verses", {})
+    expected["topics"], expected["occurrences"] = {}, {"unit": "verses", "rows": {}}
+    ok(build(h, t), expected)
+
+
+def test_topics_core_unknown_local_is_skipped():
+    b, expected, _ = topics_core(("local",))
+    ok(b, expected)
+
+
+def test_topics_core_without_local_and_part_without_names():
+    _, expected, (h, t) = topics_core()
+    del h["tables"]["local"], t["local"], expected["local"]
+    expected["h"] = header_h(h)
+    ok(build(h, t), expected)
+    _, _, (h, t) = topics_part()
+    h["tables"], t = {}, {}
+    b = build(h, t)
+    assert read_file(b.data) == {"id": b.id, "h": header_h(h)}
+
+
+def test_xtopics_part_without_book_key_and_first_offset_zero():
+    _, _, (h, t) = xtopics_part()
+    del h["book"]
+    t["occurrences"] = vlists({"a": [0], "b": [999999]})
+    assert read_file(build(h, t).data)["occurrences"] == {"a": [56000000], "b": [56999999]}
+
+
+def test_topics_core_names_order_is_kept_as_the_file_has_it():
+    _, _, (h, t) = topics_core()
+    t["names"]["per:abraham"] = [["b", "list", 1, bset([])], ["a", "list", 9, bset([])]]
+    names = read_file(build(h, t).data)["names"]["per:abraham"]
+    assert [n[0] for n in names] == ["b", "a"]
+
+
+def test_topics_classes_are_class_names():
+    assert "xtopics" in lp3read.CLASSES and "topics" in lp3read.CLASSES
+
+
+def _drop(h, t, name):
+    h["tables"].pop(name)
+    t.pop(name)
+
+
+def _set_topics(**changes):
+    def f(h, t):
+        t["topics"].update(changes)
+    return f
+
+
+XTOPICS_CORE_MUTATIONS = {
+    "no part": lambda h, t: h.pop("part"),
+    "core with a book": lambda h, t: h.update(book="tit"),
+    "res empty": lambda h, t: h.update(res=[]),
+    "version 2 header": lambda h, t: h.update(v=2),
+    "required topics missing": lambda h, t: _drop(h, t, "topics"),
+    "required coverage missing": lambda h, t: _drop(h, t, "coverage"),
+    "required occurrences missing": lambda h, t: _drop(h, t, "occurrences"),
+    "ids unsorted": _set_topics(ids=["per:abraham", "ev:plagues", "per:isaac", "sec:tit/1", "sec:tit/1-3"]),
+    "ids repeated": _set_topics(ids=["ev:plagues", "per:abraham", "per:abraham", "sec:tit/1", "sec:tit/1-3"]),
+    "kind column short": _set_topics(kind=uv([3, 1, 1, 6])),
+    "kind column long": _set_topics(kind=uv([3, 1, 1, 6, 6, 6])),
+    "kind 0": _set_topics(kind=uv([0, 1, 1, 6, 6])),
+    "kind 7": _set_topics(kind=uv([3, 1, 1, 6, 7])),
+    "source outside res": _set_topics(source=uv([1, 0, 0, 2, 3])),
+    "source column short": _set_topics(source=uv([1, 0, 0, 2])),
+    "ref outside refs": _set_topics(ref=uv([0, 1, 2, 3, 4])),
+    "ref column short": _set_topics(ref=uv([0, 1, 2, 3])),
+    "refs text twice": _set_topics(refs=["73", "Abraham@Gen.11.26", "Isaac@Gen.21.3", "73"]),
+    "refs text no id uses": _set_topics(refs=["73", "Abraham@Gen.11.26", "Isaac@Gen.21.3", "1:1-3", "x"]),
+    "refs not in order of first use": _set_topics(ref=uv([1, 0, 2, 3, 3])),
+    "title too few": _set_topics(title=["a", "b", "c", "d"]),
+    "title too many": _set_topics(title=["a", "b", "c", "d", "e", "f"]),
+    "ustrong too few": _set_topics(ustrong=["", "", "", ""]),
+    "ustrong too many": _set_topics(ustrong=["", "", "", "", "", ""]),
+    "title not text": _set_topics(title=[1, "", "", "", ""]),
+    "ids missing": lambda h, t: t["topics"].pop("ids"),
+    "relations end beyond ids and external": lambda h, t: t["relations"].update(to=uv([2, 6])),
+    "relations from beyond": lambda h, t: t["relations"].update(**{"from": uv([1, 7])}),
+    "relations external unsorted": lambda h, t: t["relations"].update(external=["tw:names/b", "tw:names/a"]),
+    "relations external repeated": lambda h, t: t["relations"].update(external=["tw:names/a", "tw:names/a"]),
+    "relations type outside types": lambda h, t: t["relations"].update(type=uv([0, 2])),
+    "relations source outside res": lambda h, t: t["relations"].update(source=uv([0, 3])),
+    "relations confidence 101": lambda h, t: t["relations"].update(confidence=uv([100, 101])),
+    "relations columns differ": lambda h, t: t["relations"].update(confidence=uv([100])),
+    "relations external missing": lambda h, t: t["relations"].pop("external"),
+    "strongs key not a topic": lambda h, t: t["strongs"].update({"per:nobody": ["H1"]}),
+    "strongs empty list": lambda h, t: t["strongs"].update({"per:isaac": []}),
+    "strongs unsorted": lambda h, t: t["strongs"].update({"per:isaac": ["H2", "H1"]}),
+    "strongs repeated": lambda h, t: t["strongs"].update({"per:isaac": ["H1", "H1"]}),
+    "ranges key not a topic": lambda h, t: t["ranges"].update({"sec:tit/9": [[56001001, 56001002]]}),
+    "ranges empty list": lambda h, t: t["ranges"].update({"sec:tit/1": []}),
+    "ranges backwards": lambda h, t: t["ranges"].update({"sec:tit/1": [[56001016, 56001001]]}),
+    "ranges book 0": lambda h, t: t["ranges"].update({"sec:tit/1": [[1001, 1002]]}),
+    "ranges book 67": lambda h, t: t["ranges"].update({"sec:tit/1": [[67001001, 67001002]]}),
+    "ranges pair of three": lambda h, t: t["ranges"].update({"sec:tit/1": [[56001001, 56001002, 56001003]]}),
+    "occurrences unit occurrences": lambda h, t: t["occurrences"].update(unit="occurrences"),
+    "occurrences key not a topic": lambda h, t: t.update(occurrences=counts("verses", {"per:zed": [(1, 1, 1)]})),
+    "occurrences count differs from verses": lambda h, t: t.update(
+        occurrences=counts("verses", {"per:abraham": [(1, 3, 2)]})),
+    "occurrences verses above count": lambda h, t: t.update(
+        occurrences=counts("verses", {"per:abraham": [(1, 2, 3)]})),
+    "occurrences count 0": lambda h, t: t.update(occurrences=counts("verses", {"per:abraham": [(1, 0, 0)]})),
+    "occurrences keys unsorted": lambda h, t: t["occurrences"].update(keys=["per:isaac", "per:abraham"]),
+    "occurrences in the shape of a part": lambda h, t: t.update(occurrences=vlists({"per:abraham": [1]})),
+    "coverage book both whole and partial": lambda h, t: t.update(coverage={"a": [bset(["tit"]), bset(["tit"])]}),
+    "coverage bit 66": lambda h, t: t.update(coverage={"a": [bytes(8) + b"\x04"]}),
+    "coverage 8 bytes": lambda h, t: t.update(coverage={"a": [bytes(8)]}),
+    "tables not matching t": lambda h, t: t.pop("strongs"),
+}
+
+
+@pytest.mark.parametrize("name", list(XTOPICS_CORE_MUTATIONS))
+def test_xtopics_core_that_does_not_match_its_schema(name):
+    _, _, (h, t) = xtopics_core()
+    XTOPICS_CORE_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+XTOPICS_PART_MUTATIONS = {
+    "res not empty": lambda h, t: h.update(res=[TIPNR_RES]),
+    "book is not the part": lambda h, t: h.update(book="rut"),
+    "part is not a book": lambda h, t: h.update(part="zzz", book="zzz"),
+    "no part": lambda h, t: h.pop("part"),
+    "required occurrences missing": lambda h, t: _drop(h, t, "occurrences"),
+    "a core table in a part": lambda h, t: (h["tables"].update(coverage=[1, False]), t.update(coverage={}), None)[2],
+    "topics in a part": lambda h, t: (h["tables"].update(topics=[1, False]), t.update(topics={}), None)[2],
+    "ranges in a part": lambda h, t: (h["tables"].update(ranges=[1, False]), t.update(ranges={}), None)[2],
+    "occurrences in the shape of a core": lambda h, t: t.update(occurrences=counts("verses", {"a": [(56, 1, 1)]})),
+    "keys unsorted": lambda h, t: t["occurrences"].update(keys=["sec:tit/1", "per:abraham"]),
+    "a key with n = 0": lambda h, t: t["occurrences"].update(keys=["a"], verses=uv([0])),
+    "offset not increasing": lambda h, t: t["occurrences"].update(keys=["a"], verses=uv([2, 5, 0])),
+    "offset reaches 1 000 000": lambda h, t: t["occurrences"].update(keys=["a"], verses=uv([1, 1000000])),
+    "verses cut short": lambda h, t: t["occurrences"].update(verses=t["occurrences"]["verses"][:-1]),
+    "verses numbers left over": lambda h, t: t["occurrences"].update(verses=t["occurrences"]["verses"] + b"\x01"),
+}
+
+
+@pytest.mark.parametrize("name", list(XTOPICS_PART_MUTATIONS))
+def test_xtopics_part_that_does_not_match_its_schema(name):
+    _, _, (h, t) = xtopics_part()
+    XTOPICS_PART_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+def _name(i, j, value):
+    def f(h, t):
+        t["names"]["per:abraham"][i][j] = value
+    return f
+
+
+TOPICS_CORE_MUTATIONS = {
+    "no lang": lambda h, t: h.pop("lang"),
+    "no part": lambda h, t: h.pop("part"),
+    "core with a book": lambda h, t: h.update(book="tit"),
+    "required names missing": lambda h, t: _drop(h, t, "names"),
+    "required coverage missing": lambda h, t: _drop(h, t, "coverage"),
+    "a topic with no name": lambda h, t: t["names"].update({"per:isaac": []}),
+    "source unknown": _name(0, 1, "file"),
+    "source not text": _name(0, 1, 1),
+    "count 0": _name(0, 2, 0),
+    "count not a number": _name(0, 2, "5"),
+    "books 8 bytes": _name(0, 3, bytes(8)),
+    "books 10 bytes": _name(0, 3, bytes(10)),
+    "books bit 66": _name(0, 3, bytes(8) + b"\x04"),
+    "books bit 71": _name(0, 3, bytes(8) + b"\x80"),
+    "name empty": _name(0, 0, ""),
+    "name not text": _name(0, 0, 1),
+    "name row of three": lambda h, t: t["names"]["per:abraham"][0].pop(),
+    "name row of five": lambda h, t: t["names"]["per:abraham"][0].append(1),
+    "names not a map": lambda h, t: t.update(names=[]),
+    "names in the shape of a part": lambda h, t: t.update(names=vlists({"a": [1]})),
+    "local entry without names": lambda h, t: t["local"].update({"x": {}}),
+    "local names empty": lambda h, t: t["local"].update({"x": {"names": []}}),
+    "local names not text": lambda h, t: t["local"].update({"x": {"names": [1]}}),
+    "local refs not pairs": lambda h, t: t["local"].update({"x": {"names": ["a"], "refs": [[1]]}}),
+    "local related not text": lambda h, t: t["local"].update({"x": {"names": ["a"], "related": [1]}}),
+    "coverage book both whole and partial": lambda h, t: t.update(coverage={"a": [bset(["tit"]), bset(["tit"])]}),
+}
+
+
+@pytest.mark.parametrize("name", list(TOPICS_CORE_MUTATIONS))
+def test_topics_core_that_does_not_match_its_schema(name):
+    _, _, (h, t) = topics_core()
+    TOPICS_CORE_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+TOPICS_PART_MUTATIONS = {
+    "no lang": lambda h, t: h.pop("lang"),
+    "res not empty": lambda h, t: h.update(res=[["a", "b"]]),
+    "book is not the part": lambda h, t: h.update(book="rut"),
+    "part is not a book": lambda h, t: h.update(part="zzz"),
+    "coverage in a part": lambda h, t: (h["tables"].update(coverage=[1, False]), t.update(coverage={}), None)[2],
+    "local in a part": lambda h, t: (h["tables"].update(local=[1, False]), t.update(local={}), None)[2],
+    "names in the shape of a core": lambda h, t: t.update(names={"per:abraham": [["a", "list", 1, bytes(9)]]}),
+    "keys unsorted": lambda h, t: t["names"].update(keys=["b", "a"], verses=uv([1, 1, 1, 1])),
+    "a key with n = 0": lambda h, t: t["names"].update(keys=["a"], verses=uv([0])),
+    "offset not increasing": lambda h, t: t["names"].update(keys=["a"], verses=uv([2, 4, 0])),
+}
+
+
+@pytest.mark.parametrize("name", list(TOPICS_PART_MUTATIONS))
+def test_topics_part_that_does_not_match_its_schema(name):
+    _, _, (h, t) = topics_part()
+    TOPICS_PART_MUTATIONS[name](h, t)
+    err(build(h, t).data, "E_BODY")
+
+
+def test_topics_part_key_outside_the_core_is_not_checked_by_a_part_reader():
+    _, _, (h, t) = topics_part()
+    t["names"] = vlists({"per:nobody-at-all": [5]})
+    assert read_file(build(h, t).data)["names"] == {"per:nobody-at-all": [56000005]}
+
+
+def test_xtopics_range_may_be_one_verse_and_cross_books():
+    _, _, (h, t) = xtopics_core()
+    t["ranges"] = {"sec:tit/1": [[56001001, 56001001]], "ev:plagues": [[1050026, 2001001]]}
+    out = read_file(build(h, t).data)
+    assert out["ranges"]["ev:plagues"] == [[1050026, 2001001]]
+
+
+def test_xtopics_relation_between_two_external_concepts():
+    _, _, (h, t) = xtopics_core()
+    t["relations"].update(**{"from": uv([5]), "to": uv([5])}, type=uv([1]), source=uv([0]), confidence=uv([0]))
+    rel = read_file(build(h, t).data)["relations"]
+    assert rel == [{"from": "tw:names/abraham", "to": "tw:names/abraham", "type": "same-as",
+                    "source": TIPNR_RES[0], "confidence": 0}]
+
+
+def test_xtopics_and_topics_required_table_unknown_version_is_e_table():
+    for fixture, name in ((xtopics_core, "topics"), (xtopics_core, "occurrences"), (xtopics_core, "coverage"),
+                          (xtopics_part, "occurrences"), (topics_core, "names"), (topics_core, "coverage")):
+        _, _, (h, t) = fixture()
+        h["tables"][name] = [2, False]
+        err(build(h, t).data, "E_TABLE")
+
+
+def test_topics_part_names_unknown_version_is_skipped():
+    _, _, (h, t) = topics_part()
+    h["tables"]["names"] = [2, False]
+    assert "names" not in read_file(build(h, t).data)
+
+
+def test_xtopics_unknown_required_table_is_e_table():
+    _, _, (h, t) = xtopics_core()
+    h["tables"]["future"] = [1, True]
+    t["future"] = 1
+    err(build(h, t).data, "E_TABLE")

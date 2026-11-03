@@ -33,7 +33,7 @@ MAX_HEADER = 65536
 MAX_LEN = 67108864
 MAX_DEPTH = 64
 
-CLASSES = ("catalog", "xmap", "map", "book", "orig", "art", "lex", "obs", "gen")
+CLASSES = ("catalog", "xmap", "map", "xtopics", "topics", "book", "orig", "art", "lex", "obs", "gen")
 KINDS = ("chapter", "verse", "open", "close")
 BOOKS = (
     "gen exo lev num deu jos jdg rut 1sa 2sa 1ki 2ki 1ch 2ch ezr neh est job psa pro ecc sng isa jer lam ezk dan hos "
@@ -55,6 +55,8 @@ KNOWN_TABLES = {
     "catalog": {"about", "resources", "segments", "units", "requires", "complements"},
     "map": {"books", "names", "subtitles", "coverage", "usage", "obs"},
     "xmap": {"coverage", "strong", "concepts", "links", "notes", "relations", "aliases", "strongs"},
+    "xtopics": {"coverage", "topics", "relations", "strongs", "occurrences", "ranges"},
+    "topics": {"names", "local", "coverage"},
 }
 REQUIRED_TABLES = {
     "book": {"strings", "texts"},
@@ -65,8 +67,9 @@ REQUIRED_TABLES = {
     "catalog": {"about", "resources", "segments", "units"},
 }
 # map and xmap: the required tables depend on the segment being a core or a part (see ``required_tables``)
-REQUIRED_MAP_CORE = {"map": {"books", "names", "coverage"}, "xmap": {"coverage", "strong", "concepts"}}
-REQUIRED_MAP_PART = {"map": set(), "xmap": {"strong"}}
+REQUIRED_MAP_CORE = {"map": {"books", "names", "coverage"}, "xmap": {"coverage", "strong", "concepts"},
+                     "xtopics": {"coverage", "topics", "occurrences"}, "topics": {"names", "coverage"}}
+REQUIRED_MAP_PART = {"map": set(), "xmap": {"strong"}, "xtopics": {"occurrences"}, "topics": set()}
 KNOWN_VERSION = 1
 
 _TABLE_NAME = re.compile(r"[a-z][a-z0-9-]*")
@@ -1265,27 +1268,29 @@ def _decode_catalog(p: Segment) -> dict:
 # ---------------------------------------------------------------------------------------------------------------
 
 COUNT_UNITS = {("xmap", "strong"): "occurrences", ("xmap", "links"): "links", ("xmap", "notes"): "notes",
-               ("map", "usage"): "notes"}
+               ("map", "usage"): "notes", ("xtopics", "occurrences"): "verses"}
 CONCEPT_KINDS = ("none", "person", "place", "event", "topic", "story")
 TW_CATEGORIES = ("none", "kt", "names", "other")
 BOOK_SOURCES = ("text", "list", "none")
 # Tables of the core that must not be in a part (the shared names, strong/links/notes/usage, are told apart by shape)
 CORE_ONLY = {"map": {"books", "names", "subtitles", "coverage", "obs"},
-             "xmap": {"coverage", "concepts", "relations", "aliases", "strongs"}}
+             "xmap": {"coverage", "concepts", "relations", "aliases", "strongs"},
+             "xtopics": {"coverage", "topics", "relations", "strongs", "ranges"},
+             "topics": {"coverage", "local"}}
 
 
 def _map_header(p: Segment) -> tuple[bool, int | None]:
     """Checks the header of a map or xmap. Returns (is a core, book number of a part)."""
-    is_map = p.cls == "map"
+    has_lang = p.cls in ("map", "topics")
     h = p.h
-    _header_needs(p, "part", "res", *(("lang",) if is_map else ()))
+    _header_needs(p, "part", "res", *(("lang",) if has_lang else ()))
     part = h["part"]
     if part != "core" and not _BOOK_CODE.fullmatch(part):
         _bad()
     if part == "core":
         if "book" in h:
             _bad()
-        if not is_map and len(h["res"]) == 0:
+        if p.cls in ("xmap", "xtopics") and len(h["res"]) == 0:
             _bad()
         number = None
     else:
@@ -1501,7 +1506,129 @@ def _decode_map(p: Segment) -> dict:
     return out
 
 
-_DECODERS = {"book": _decode_book, "orig": _decode_orig, "art": _decode_art, "lex": _decode_lex,
+TOPIC_KINDS = ("", "person", "place", "event", "topic", "story", "section")
+TOPIC_NAME_SOURCES = ("alignment", "outline", "obs", "list")
+
+
+def _verse_id_ok(v) -> bool:
+    return is_uint(v) and 1 <= v // 1000000 <= 66
+
+
+def _decode_xtopics_topics(p: Segment) -> tuple[list[str], dict]:
+    t = p.t["topics"]
+    if type(t) is not dict:
+        _bad()
+    ids = _sorted_strtab(t.get("ids"))
+    n = len(ids)
+    cols = {k: uvarints(_need(t, k, is_bytes)) for k in ("kind", "source", "ref")}
+    refs = _strtab(t.get("refs"))
+    title, ustrong = _strtab(t.get("title")), _strtab(t.get("ustrong"))
+    if any(len(v) != n for v in cols.values()) or len(title) != n or len(ustrong) != n:
+        _bad()
+    if any(not 1 <= k <= 6 for k in cols["kind"]):
+        _bad()
+    nxt = 0                                 # refs: each text once, in the order of first use by the ids
+    for r in cols["ref"]:
+        if r == nxt:
+            nxt += 1
+        elif r > nxt:
+            _bad()
+    if nxt != len(refs):
+        _bad()                              # a text no id uses
+    if len(set(refs)) != len(refs):
+        _bad()
+    topics = {}
+    for i, tid in enumerate(ids):
+        topics[tid] = {"kind": TOPIC_KINDS[cols["kind"][i]], "source": p.res_key(cols["source"][i]),
+                       "ref": refs[cols["ref"][i]], "title": title[i], "ustrong": ustrong[i]}
+    return ids, topics
+
+
+def _decode_xtopics_core(p: Segment) -> dict:
+    out = {"coverage": _coverage(p.t["coverage"])}
+    ids, topics = _decode_xtopics_topics(p)
+    out["topics"] = topics
+    occ = _counts_table(p, "occurrences")
+    for key, books in occ["rows"].items():
+        if key not in topics or any(count != verses for count, verses in books.values()):
+            _bad()
+    out["occurrences"] = occ
+    if p.has("relations"):
+        r = p.t["relations"]
+        if type(r) is not dict:
+            _bad()
+        types = _strtab(r.get("types"))
+        external = _sorted_strtab(r.get("external"))
+        rc = {k: uvarints(_need(r, k, is_bytes)) for k in ("from", "to", "type", "source", "confidence")}
+        n = len(rc["from"])
+        if any(len(v) != n for v in rc.values()):
+            _bad()
+        ends = ids + external
+        rels = []
+        for i in range(n):
+            if (rc["from"][i] >= len(ends) or rc["to"][i] >= len(ends) or rc["type"][i] >= len(types)
+                    or rc["confidence"][i] > 100):
+                _bad()
+            rels.append({"from": ends[rc["from"][i]], "to": ends[rc["to"][i]], "type": types[rc["type"][i]],
+                         "source": p.res_key(rc["source"][i]), "confidence": rc["confidence"][i]})
+        out["relations"] = rels
+    if p.has("strongs"):
+        s = _str_map(p.t["strongs"], lambda v: type(v) is list and len(v) > 0 and all(type(x) is str for x in v)
+                     and all(a < b for a, b in zip(v, v[1:])))
+        if any(k not in topics for k in s):
+            _bad()
+        out["strongs"] = s
+    if p.has("ranges"):
+        g = _str_map(p.t["ranges"], lambda v: type(v) is list and len(v) > 0 and all(
+            type(x) is list and len(x) == 2 and _verse_id_ok(x[0]) and _verse_id_ok(x[1]) and x[0] <= x[1]
+            for x in v))
+        if any(k not in topics for k in g):
+            _bad()
+        out["ranges"] = {k: [list(x) for x in v] for k, v in g.items()}
+    return out
+
+
+def _decode_xtopics(p: Segment) -> dict:
+    core, number = _map_header(p)
+    if core:
+        return _decode_xtopics_core(p)
+    return {"occurrences": _verse_lists(p.t["occurrences"], number)}
+
+
+def _topic_name(x) -> list:
+    if (type(x) is not list or len(x) != 4 or not is_str(x[0]) or x[0] == "" or x[1] not in TOPIC_NAME_SOURCES
+            or not is_uint(x[2]) or x[2] == 0):
+        _bad()
+    return [x[0], x[1], x[2], _book_set(x[3])]
+
+
+def _local_topic(v) -> bool:
+    return (type(v) is dict and type(v.get("names")) is list and len(v["names"]) > 0 and all(is_str(x) for x in v["names"])
+            and ("refs" not in v or (type(v["refs"]) is list and all(
+                type(r) is list and len(r) == 2 and is_uint(r[0]) and is_uint(r[1]) for r in v["refs"])))
+            and ("related" not in v or is_strlist(v["related"])))
+
+
+def _decode_topics(p: Segment) -> dict:
+    core, number = _map_header(p)
+    if not core:
+        return {"names": _verse_lists(p.t["names"], number)} if p.has("names") else {}
+    names_in = p.t["names"]
+    if type(names_in) is not dict:
+        _bad()
+    names = {}
+    for tid, rows in names_in.items():
+        if type(rows) is not list or len(rows) == 0:
+            _bad()
+        names[tid] = [_topic_name(x) for x in rows]
+    out = {"names": names}
+    if p.has("local"):
+        out["local"] = jsonable(_str_map(p.t["local"], _local_topic))
+    out["coverage"] = _coverage(p.t["coverage"])
+    return out
+
+
+_DECODERS = {"xtopics": _decode_xtopics, "topics": _decode_topics, "book": _decode_book, "orig": _decode_orig, "art": _decode_art, "lex": _decode_lex,
              "obs": _decode_obs, "catalog": _decode_catalog, "map": _decode_map, "xmap": _decode_xmap}
 
 
