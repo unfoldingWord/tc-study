@@ -100,7 +100,10 @@ function xtopicsCoreTables(m: XtopicsCore): Built {
     const out: Record<string, string[]> = {}
     for (const [k, v] of Object.entries(sortedRecord(m.strongs))) {
       if (!number.has(k)) throw new Error(`strongs: ${JSON.stringify(k)} is not a topic`)
-      put(out, k, [...v].sort(compareCodePoints))
+      if (v.length === 0) throw new Error(`strongs: ${JSON.stringify(k)} has no Strong key`)
+      const sorted = [...v].sort(compareCodePoints)
+      if (sorted.some((x, i) => i > 0 && x === sorted[i - 1])) throw new Error(`strongs: ${JSON.stringify(k)} repeats a Strong key`)
+      put(out, k, sorted)
     }
     tables.strongs = [1, false]
     t.strongs = out
@@ -109,6 +112,13 @@ function xtopicsCoreTables(m: XtopicsCore): Built {
     const out: Record<string, number[][]> = {}
     for (const [k, v] of Object.entries(sortedRecord(m.ranges))) {
       if (!number.has(k)) throw new Error(`ranges: ${JSON.stringify(k)} is not a topic`)
+      if (v.length === 0) throw new Error(`ranges: ${JSON.stringify(k)} has no range`)
+      for (const [a, b] of v) {
+        for (const n of [a, b]) {
+          if (!Number.isSafeInteger(n) || n < 1_000_000 || n >= 67_000_000) throw new Error(`ranges: ${JSON.stringify(k)} has ${n}, which is not a verse id`)
+        }
+        if (a > b) throw new Error(`ranges: ${JSON.stringify(k)} has a range that runs backwards`)
+      }
       put(out, k, v.map(([a, b]) => [a, b]))
     }
     tables.ranges = [1, false]
@@ -140,7 +150,9 @@ function topicsCoreTables(m: TopicsCore): Built {
     put(
       names,
       k,
-      list.map(([name, source, count, books]) => {
+      [...list]
+        .sort((a, b) => b[2] - a[2] || compareCodePoints(a[0], b[0]))
+        .map(([name, source, count, books]) => {
         if (name === '') throw new Error(`names of ${JSON.stringify(k)} has an empty name`)
         if (!TOPIC_NAME_SOURCES.includes(source)) throw new Error(`names of ${JSON.stringify(k)}: the source ${JSON.stringify(source)} is not known`)
         if (!Number.isInteger(count) || count < 1) throw new Error(`names of ${JSON.stringify(k)}: the count of ${JSON.stringify(name)} is below 1`)
@@ -155,6 +167,7 @@ function topicsCoreTables(m: TopicsCore): Built {
     tables.local = [1, false]
     const local: Record<string, CborValue> = {}
     for (const [k, v] of Object.entries(sortedRecord(m.local))) {
+      if (v.names.length === 0) throw new Error(`local: ${JSON.stringify(k)} has no names`)
       const row: Record<string, CborValue> = { names: [...v.names] }
       if (v.refs !== undefined) row.refs = v.refs.map(([a, b]) => [a, b])
       if (v.related !== undefined) row.related = [...v.related]

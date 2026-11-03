@@ -218,6 +218,31 @@ describe('topics round trips', () => {
   })
 })
 
+describe('writers never emit what the view rejects', () => {
+  test('names are written count descending, ties by code point', () => {
+    const m: TopicsCore = {
+      ...tcore,
+      names: { x: [['b', 'list', 1, []], ['z', 'obs', 3, []], ['a', 'list', 1, []], ['y', 'obs', 3, []]] },
+    }
+    const out = body(topicsSegment(m), 'names').x.map((n: any[]) => n[0])
+    expect(out).toEqual(['y', 'z', 'a', 'b'])
+    expect(() => topicsView(structuredClone(topicsSegment(m)))).not.toThrow()
+  })
+  test('strongs: empty list and repeated key throw', () => {
+    expect(() => xtopicsSegment({ ...core, strongs: { 'per:abraham': [] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, strongs: { 'per:abraham': ['H1', 'H1'] } })).toThrow()
+  })
+  test('ranges: empty, backwards and bad ids throw', () => {
+    expect(() => xtopicsSegment({ ...core, ranges: { 'obs:10': [] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, ranges: { 'obs:10': [[1_001_002, 1_001_001]] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, ranges: { 'obs:10': [[5, 1_001_001]] } })).toThrow()
+    expect(() => xtopicsSegment({ ...core, ranges: { 'obs:10': [[1_001_001, 67_000_000]] } })).toThrow()
+  })
+  test('local: empty names throw', () => {
+    expect(() => topicsSegment({ ...tcore, local: { 'es-419:tema/x': { names: [] } } })).toThrow()
+  })
+})
+
 describe('topicsView rejects', () => {
   const rejects = (mutate: (s: Segment) => void, m: TopicsCore | TopicsPart = tcore) => {
     const s = tfresh(m)
