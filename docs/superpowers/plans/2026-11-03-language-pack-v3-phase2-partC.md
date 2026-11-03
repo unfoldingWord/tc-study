@@ -17,7 +17,7 @@ Abel approved "its own optional unit, split by Strong group". Writing this plan 
 - **Option 1 (recommended): parts by the start of the key**, letters grouped so that no part passes 256 KB compressed. One phrase lookup opens one part. The reverse question ("how does this language render G1188") is already answered from the book segments' alignment and the maps.
 - **Option 2 (as approved): parts by Strong group** (`G5`, `H1`, as the lexicon). Best for "renderings of this Strong"; a phrase lookup opens all parts.
 
-Tasks C1–C7 are the same for both; only `partOf(key, strongs)` in C1 and C3 changes. The controller does not start until Abel picks one.
+**Abel chose Option 1 on 2026-11-03 ("Por letra, recomendado").** Every task below implements Option 1; Option 2 is not built.
 
 ## Global Constraints
 
