@@ -7,6 +7,7 @@
 import { compareCodePoints } from '../codec/columns'
 import type { CountRows, Coverage } from '../codec/counts'
 import { BOOKS, bookNumber } from '../ids'
+import { type AlignedSet, phrase } from './aligned'
 import type { MapCore, MapPart, TopicsCore, TopicsPart, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../model'
 
 export type State = 'count' | 'zero' | 'none' | 'partial'
@@ -18,6 +19,8 @@ export type MapSet = {
   xtopics?: { core: XtopicsCore; parts: Map<string, XtopicsPart> }
   /** The topics of a language (optional module). */
   topics?: { core: TopicsCore; parts: Map<string, TopicsPart> }
+  /** The index of aligned phrases of a language (optional module): without it a `phrase` query answers `installed: false`. */
+  aligned?: AlignedSet
   /** The revision of the catalog the maps belong to. */
   revision: number
 }
@@ -212,6 +215,10 @@ export function answer(m: MapSet, query: { kind: string; [k: string]: unknown })
       return topicAnswer(m, String(query.id), Array.isArray(query.types) ? query.types.map(String) : undefined)
     case 'category':
       return categoryAnswer(m, String(query.topicKind))
+    case 'phrase':
+      return m.aligned === undefined
+        ? { kind: 'phrase', lang: String(query.lang), text: String(query.text), installed: false }
+        : phrase(m.aligned, String(query.lang), String(query.text))
     default:
       throw new Error(`Unknown query kind ${JSON.stringify(query.kind)}`)
   }

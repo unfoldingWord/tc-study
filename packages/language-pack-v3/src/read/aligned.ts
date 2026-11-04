@@ -36,7 +36,7 @@ function checkGroup(group: string): void {
 }
 
 /** Whether `key` is in a range group: `P <= key` and `key.slice(0, Q.length) <= Q` by code point (P twice for a group with no hyphen). */
-function inRange(group: string, key: string): boolean {
+export function inRange(group: string, key: string): boolean {
   const [p, q = p] = group.split('-') as [string, string?]
   return key >= p && key.slice(0, q!.length) <= q!
 }

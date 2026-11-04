@@ -9,7 +9,7 @@ specification, not read from the builders.
 
 Stdlib only. It reads the raw parts of the phase 0 sample (`mapa.json` and `muestra.json`, each part a gzip of JSON
 lines), builds the counts as counts.md says, answers every `<name>.json` of the queries dir whose kind it knows
-(strong, usage, book, keyterms) and writes `expected` into it. It reads no builder and no reader of the format.
+(strong, usage, book, keyterms, phrase) and writes `expected` into it. It reads no builder and no reader of the format.
 
 Counting rules (counts.md, ids.md):
   * a count is occurrences / links / notes; verses are distinct verse ids;
@@ -510,6 +510,142 @@ def answer_topic(world, tipnr, obs, q):
             "relations": relations, "names": []}
 
 
+# ---- phrases of the aligned index (aligned.cddl, "How the entries are made") --------------------------------------
+
+BRIDGE = {"en": ("ult", "ust"), "es-419": ("glt", "gst")}
+
+
+def text_of(node):
+    if isinstance(node, str):
+        return node
+    if isinstance(node, dict):
+        return "".join(text_of(x) for x in node.get("content", []) or [])
+    return ""
+
+
+def fold_form(s):
+    return unicodedata.normalize("NFC", s.replace("/", "").replace("⁠", ""))
+
+
+def locate(words, text, occurrence):
+    """The position of the occurrence-th word (from 1) of `words` (a list of (position, form)) whose form is `text`: exact form
+    first, then the folded one. None when there is none."""
+    if occurrence < 1 or fold_form(text) == "":
+        return None
+    for same in (lambda f: f == text, lambda f: fold_form(f) == fold_form(text)):
+        seen = 0
+        for position, form in words:
+            if same(form):
+                seen += 1
+                if seen == occurrence:
+                    return position
+    return None
+
+
+def read_text(sample, part, orig):
+    """The word pieces of a bridge text of one book: [(text, positions, verse id, adjacent)].
+
+    Re-written from the specification: the pieces of the text are its strings (non-words) and its `w` nodes (words); a blank is
+    understood between two words with nothing between them, so it does not break a run; a word is adjacent to the one before it
+    when only " " strings came between. The milestones `zaln-s` open around a word are the original words it translates (found in
+    the verse by `x-content` and `x-occurrence`, over the whole label of a bridge; one the original lacks places nothing)."""
+    book = part["book"]
+    by_verse = defaultdict(list)
+    for position, (v, t, _st) in enumerate(orig.words):
+        by_verse[v].append((position, t))
+    head = f"scripture-usj:{part['resource']}:{book}:"
+    chunks = sorted((int(r["key"][len(head):]), r) for r in sample.rows(part)
+                    if r["layer"] == "sot" and r["key"].startswith(head) and r["key"][len(head):].isdigit())
+    out, state = [], {"chapter": 0, "verse": 0, "end": 0, "stack": [], "gap": False}
+
+    def visit(n):
+        if isinstance(n, str):
+            if n != " ":
+                state["gap"] = False
+            return
+        t, marker = n.get("type"), n.get("marker")
+        if t == "char" and marker == "w":
+            out.append((text_of(n), [p for p in state["stack"] if p is not None],
+                        vid(book, state["chapter"], state["verse"]), state["gap"]))
+            state["gap"] = True
+            return
+        if t == "ms" and marker == "zaln-s":
+            occ = n.get("x-occurrence")
+            occ = int(occ) if isinstance(occ, str) and occ.isdigit() and int(occ) >= 1 else 0
+            lo, hi = state["verse"], max(state["end"], state["verse"])
+            words = [w for v in range(lo, hi + 1) for w in by_verse.get(vid(book, state["chapter"], v), [])]
+            state["stack"].append(locate(words, n["x-content"], occ))
+            return
+        if t == "ms" and marker == "zaln-e":
+            if state["stack"]:
+                state["stack"].pop()
+            return
+        if t == "chapter":
+            state["chapter"], state["verse"], state["end"] = first_number(n["number"]), 0, 0
+        elif t == "verse":
+            v = first_number(n["number"])
+            m = re.match(r"\d+-(\d+)", n["number"])
+            e = int(m.group(1)) if m else v
+            state["verse"], state["end"] = v, (e if v < e < 1000 else v)
+        for child in n.get("content", []) or []:
+            visit(child)
+
+    for _, r in chunks:
+        for node in r["value"]["content"]["usj"]["content"]:
+            visit(node)
+    return out
+
+
+def phrase_index(world, sample, lang):
+    """{key: {strong: {book: [verses set, occurrences]}}} of the bridge texts of `lang`, whole."""
+    index = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [set(), 0])))
+    norm = lambda t: unicodedata.normalize("NFC", t).lower()
+
+    def add(key, strongs, book, verse):
+        for st in strongs:
+            cell_ = index[key][st][book]
+            cell_[0].add(verse)
+            cell_[1] += 1
+
+    for ending in BRIDGE[lang]:
+        for part in sample.parts:
+            if part["lang"] != lang or part["kind"] != "book" or not part["resource"].endswith("/" + ending) or part.get("book") not in NUM:
+                continue
+            orig = world["originals"].get(part["book"])
+            if orig is None:
+                continue
+            words = read_text(sample, part, orig)
+            strongs = lambda ps: sorted({orig.words[p][2] for p in ps if orig.words[p][2]})
+            for w in words:
+                if w[1]:
+                    add(norm(w[0]), strongs(w[1]), part["book"], w[2])
+            i = 0
+            while i < len(words):
+                if not words[i][1]:
+                    i += 1
+                    continue
+                j = i + 1
+                while j < len(words) and words[j][3] and words[j][1] == words[i][1]:
+                    j += 1
+                if j - i >= 2:
+                    add(norm(" ".join(x[0] for x in words[i:j])), strongs(words[i][1]), part["book"], words[i][2])
+                i = j
+    return index
+
+
+def answer_phrase(world, sample, q, cache={}):
+    lang = q["lang"]
+    if lang not in cache:
+        cache[lang] = phrase_index(world, sample, lang)
+    key = unicodedata.normalize("NFC", q["text"]).lower()
+    entry = cache[lang].get(key)
+    out = {"kind": "phrase", "lang": lang, "text": q["text"], "installed": True, "found": bool(entry), "strongs": {}}
+    for st, books in (entry or {}).items():
+        out["strongs"][st] = {"books": len(books), "verses": sum(len(v[0]) for v in books.values()),
+                              "occurrences": sum(v[1] for v in books.values())}
+    return out
+
+
 def totals(counts, key):
     rows = counts.data.get(key, {})
     return sum(r[0] for r in rows.values()), sum(len(r[1]) for r in rows.values()), len(rows)
@@ -578,6 +714,8 @@ def main():
             doc["expected"] = answer_book(world, q)
         elif kind == "keyterms":
             doc["expected"] = answer_keyterms(world, q, strongs)
+        elif kind == "phrase":
+            doc["expected"] = answer_phrase(world, sample, q)
         elif kind == "topic" and tipnr is not None:
             doc["expected"] = answer_topic(world, tipnr, obs, q)
         else:

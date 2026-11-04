@@ -1,0 +1,26 @@
+{
+  "expected": {
+    "found": true,
+    "installed": true,
+    "kind": "phrase",
+    "lang": "en",
+    "strongs": {
+      "G11880": {
+        "books": 1,
+        "occurrences": 4,
+        "verses": 4
+      },
+      "G35880": {
+        "books": 1,
+        "occurrences": 2,
+        "verses": 2
+      }
+    },
+    "text": "right hand"
+  },
+  "query": {
+    "kind": "phrase",
+    "lang": "en",
+    "text": "right hand"
+  }
+}

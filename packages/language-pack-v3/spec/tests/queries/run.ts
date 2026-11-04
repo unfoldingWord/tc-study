@@ -7,7 +7,7 @@
  * asked of the common map alone (`README.md`): the `xmap` core and its parts named by the common catalog, with no language map. Every
  * `*.json` file here is answered by `answer` (`src/query/maps.ts`); the answer and `expected` are compared by their canonical text.
  * It prints one line per query, `<name>: ok` or `<name>: <first difference>`, and exits 0 when all are ok, 1 when one is not, 2 for a
- * usage error or a build that cannot be read.
+ * usage error or a build that cannot be read. A `phrase` query is asked of the `aligned:` units of `catalog-<lang>.seg`; a build without them skips it.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -16,9 +16,11 @@ import type { MapSet } from '../../../src/query/maps'
 import { answer } from '../../../src/query/maps'
 import { catalogView } from '../../../src/read/catalog'
 import { canonicalJson, KNOWN, type Json, sortKeys } from '../../../src/read/output'
+import { alignedView } from '../../../src/read/aligned'
+import type { AlignedSet } from '../../../src/query/aligned'
 import { xmapView } from '../../../src/read/xmap'
 import { xtopicsView } from '../../../src/read/topics'
-import type { XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../../../src/model'
+import type { AlignedModel, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../../../src/model'
 import { firstDifference, withoutIgnoredRelations } from '../compare'
 
 const QUERIES_DIR = import.meta.dir
@@ -54,10 +56,35 @@ export async function loadCommonMap(out: string): Promise<MapSet> {
   return { xmap: { core, parts }, ...(xcore === undefined ? {} : { xtopics: { core: xcore, parts: xparts } }), revision: catalog.about.revision }
 }
 
+/**
+ * The index of aligned phrases of a language in a build: the groups of the `aligned:` units of `catalog-<lang>.seg` and the parts whose
+ * segment file is there. `undefined` when the build has no catalog of that language or its catalog lists no `aligned:` unit.
+ */
+export async function loadAlignedSet(out: string, lang: string): Promise<AlignedSet | undefined> {
+  const catalogFile = join(out, `catalog-${lang}.seg`)
+  if (!existsSync(catalogFile)) return undefined
+  const { seg } = await readSegment(bytesOf(catalogFile), { known: KNOWN.catalog, expectedClass: 'catalog' })
+  const catalog = catalogView(seg)
+  const units = catalog.units.filter((u) => u.id.startsWith('aligned:'))
+  if (units.length === 0) return undefined
+  const groups = units.map((u) => u.id.slice('aligned:'.length))
+  const parts = new Map<string, AlignedModel>()
+  for (const unit of units) {
+    for (const index of unit.segments) {
+      const file = join(out, 'segments', `${hex(catalog.segments[index]!.id)}.seg`)
+      if (!existsSync(file)) continue
+      const view = alignedView((await readSegment(bytesOf(file), { known: KNOWN.aligned, expectedClass: 'aligned' })).seg, groups)
+      parts.set(view.group, view)
+    }
+  }
+  return { lang, groups, parts }
+}
+
 /** One line per query file: `ok`, or the first place the answer differs from `expected`. */
 export async function runQueries(out: string, dir: string = QUERIES_DIR, requireTopics = false): Promise<{ lines: string[]; failed: number; skipped: number }> {
   const maps = await loadCommonMap(out)
   const lines: string[] = []
+  const aligned = new Map<string, AlignedSet | undefined>()
   let failed = 0
   let skipped = 0
   for (const name of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
@@ -70,6 +97,18 @@ export async function runQueries(out: string, dir: string = QUERIES_DIR, require
       else skipped++
       lines.push(`${name.replace(/\.json$/, '')}: ${requireTopics ? 'failed' : 'skipped'} (the build has no xtopics)`)
       continue
+    }
+    // A phrase query needs the index of its language (optional units): a build without it cannot give the expected answer, so it is not asked.
+    if (doc.query.kind === 'phrase') {
+      const lang = String((doc.query as { lang?: unknown }).lang)
+      if (!aligned.has(lang)) aligned.set(lang, await loadAlignedSet(out, lang))
+      const set = aligned.get(lang)
+      if (set === undefined) {
+        skipped++
+        lines.push(`${name.replace(/\.json$/, '')}: skipped (the build has no aligned index of ${lang})`)
+        continue
+      }
+      maps.aligned = set
     }
     try {
       const got = withoutIgnoredRelations(sortKeys(answer(maps, doc.query)), doc.ignoreRelationsFrom)
