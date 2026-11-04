@@ -34,7 +34,7 @@ import { xmapSegment } from '../../src/build/xmap/segment'
 import { topicsSegment } from '../../src/build/topics/segment'
 import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
-import { FORMAT_MAJOR, FORMAT_MINOR, KIND_SEGMENT, readSegment, type Segment, writeSegment } from '../../src/codec/container'
+import { FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, readHeader, readSegment, type Segment, writeSegment } from '../../src/codec/container'
 import { verseId } from '../../src/ids'
 import type { BookModel, HelpRow, MapCore, MapPart, OrigModel, TextModel, TopicName } from '../../src/model'
 import { partsSource } from '../../src/node/partsSource'
@@ -42,6 +42,7 @@ import { BOOK_TABLES, bookView } from '../../src/read/book'
 import { CATALOG_TABLES, catalogView } from '../../src/read/catalog'
 import { type Json, readerOutput, sortKeys } from '../../src/read/output'
 import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../../src/source/rows'
+import { keyId, publicKeyOf, signCatalog } from '../../src/sign'
 import { writeTransfer } from '../../src/transfer'
 
 export const TESTS_DIR = import.meta.dir
@@ -350,6 +351,81 @@ async function localWithExtraKey(): Promise<Uint8Array> {
   return (await writeSegment({ h: seg.h, t })).bytes
 }
 
+// Cases 16 to 19: signed catalogs (`catalog.md`, "Signatures")
+
+/**
+ * The cases that need keys have a `<name>.keys.json` beside the file: an object from key id to the 64 hex digits of a raw public key, the keys a
+ * reader is given. It is the only thing about keys that is stored, and a public key at that.
+ */
+export const keysName = (name: string): string => name.replace(/\.(seg|tcpack)$/, '.keys.json')
+/** The trusted keys of a case file (`undefined` when it has no `.keys.json`: it is read with no keys). */
+export function keysOf(root: string, name: string): Record<string, Uint8Array> | undefined {
+  const path = join(root, keysName(name))
+  return existsSync(path) ? keysFromText(readFileSync(path, 'utf8')) : undefined
+}
+function keysFromText(text: string): Record<string, Uint8Array> {
+  const listed = JSON.parse(text) as Record<string, string>
+  return Object.fromEntries(Object.entries(listed).map(([id, key]) => [id, Uint8Array.from(key.match(/../g) ?? [], (pair) => parseInt(pair, 16))]))
+}
+/**
+ * The case files the Python reader (`lp3read.py`) does not check yet, because it does not check signatures: `compare.ts` says so for each and
+ * does not count it a mismatch. Task 10 of phase 3 makes this list empty.
+ */
+export const PYTHON_NOT_YET: readonly string[] = [
+  'catalog-signed/catalog.seg',
+  'catalog-bad-sig/catalog.seg',
+  'catalog-unknown-key/catalog.seg',
+  'catalog-unsigned-published/catalog.seg',
+]
+
+const keysText = (publicKey: Uint8Array): string => `${JSON.stringify({ [keyId(publicKey)]: hex(publicKey) }, null, 2)}
+`
+
+/** A public key of a pair made now, whose private half is dropped as soon as it has signed: nothing secret is kept. */
+async function freshKey(): Promise<{ privateKey: Uint8Array; publicKey: Uint8Array }> {
+  const { privateKey } = (await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify'])) as CryptoKeyPair
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', privateKey))
+  return { privateKey: pkcs8, publicKey: await publicKeyOf(pkcs8) }
+}
+
+/**
+ * The four cases of signatures, all on the published catalog of case 11 (`revisiones-mixtas`). The signed file and the two public keys are
+ * **generated once** (the first time this runs) and then frozen: the signed bytes come back from `catalog-signed/` on disk, because the
+ * private key that made them does not exist any more (Ed25519 is deterministic but the key was random). The cases that follow from them are
+ * built from the frozen file, so they are checked like any other.
+ */
+async function signedCases(catalog: Uint8Array): Promise<Map<string, Uint8Array>> {
+  const onDisk = (path: string): Uint8Array | undefined => (existsSync(join(TESTS_DIR, path)) ? bytesOf(join(TESTS_DIR, path)) : undefined)
+  let signed = onDisk('catalog-signed/catalog.seg')
+  let keysA = onDisk('catalog-signed/catalog.keys.json')
+  if (signed === undefined || keysA === undefined) {
+    const a = await freshKey()
+    signed = await signCatalog(catalog, a.privateKey)
+    keysA = new TextEncoder().encode(keysText(a.publicKey))
+  }
+  const keysB = onDisk('catalog-unknown-key/catalog.keys.json') ?? new TextEncoder().encode(keysText((await freshKey()).publicKey))
+  const unsigned = await readSegment(catalog, { known: CATALOG_TABLES })
+  if ((await readSegment(signed, { known: CATALOG_TABLES })).id !== unsigned.id) {
+    throw new Error('catalog-signed/catalog.seg is the signature of another catalog: delete the four signature cases and run again to freeze new ones')
+  }
+  // A flipped bit in s: the rest of the file, the body included, is the signed one.
+  const { seg } = await readSegment(signed, { known: CATALOG_TABLES })
+  const sig = structuredClone(readHeader(signed).header.sig) as unknown as { key: string; alg: 'ed25519'; s: Uint8Array }[]
+  sig[0].s[0] ^= 1
+  const flipped = (await writeSegment(seg, { sig })).bytes
+
+  const out = new Map<string, Uint8Array>()
+  const add = (folder: string, file: Uint8Array, keys: Uint8Array): void => {
+    out.set(`${folder}/catalog.seg`, file)
+    out.set(`${folder}/catalog.keys.json`, keys)
+  }
+  add('catalog-signed', signed, keysA)
+  add('catalog-bad-sig', flipped, keysA)
+  add('catalog-unknown-key', signed, keysB)
+  add('catalog-unsigned-published', catalog, keysA)
+  return out
+}
+
 // Case 10: a transfer file cut inside its last entry
 
 /** A file the test suite stores as it is, made a `BuiltSegment` so that a transfer file can carry it. */
@@ -458,6 +534,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('revisiones-mixtas/catalog.seg', mixed.catalog)
   out.set('revisiones-mixtas/map-core.seg', mixed.core)
   out.set('revisiones-mixtas/book-rut.seg', mixed.book)
+  for (const [name, bytes] of await signedCases(mixed.catalog)) out.set(name, bytes)
   out.set('idioma-parcial/map-core.seg', await partialLanguage())
   const { build1, build2 } = await sectionInserted()
   out.set('seccion-insertada/build1.seg', build1)
@@ -527,11 +604,14 @@ export async function runBuildCases(o: { root?: string; refreeze?: boolean; chec
     writeFileSync(join(root, name), bytes)
     report.written.push(name)
   }
-  for (const [name, bytes] of await buildFrozenCases()) {
+  const built = await buildFrozenCases()
+  for (const [name, bytes] of built) {
     const onDisk = (path: string): Uint8Array | undefined => (existsSync(join(root, path)) ? bytesOf(join(root, path)) : undefined)
     put(name, bytes, onDisk(name), 'the builders')
+    if (name.endsWith('.keys.json')) continue
     const expected = expectedName(name)
-    put(expected, expectedText(await readerOutput(bytes)), onDisk(expected), 'the TypeScript reader')
+    const keys = built.has(keysName(name)) ? keysFromText(new TextDecoder().decode(built.get(keysName(name)))) : undefined
+    put(expected, expectedText(await readerOutput(bytes, keys === undefined ? {} : { trustedKeys: keys })), onDisk(expected), 'the TypeScript reader')
   }
   return report
 }

@@ -5,7 +5,7 @@
  * {@link FormatError.code} and nothing else: the message is for people and may change.
  */
 
-/** The 13 codes of `container.md`, "Errors". The conformance cases expect exactly these strings. */
+/** The 14 codes of `container.md`, "Errors". The conformance cases expect exactly these strings. */
 export const FORMAT_ERROR_CODES = [
   'E_MAGIC',
   'E_VERSION',
@@ -20,6 +20,7 @@ export const FORMAT_ERROR_CODES = [
   'E_HMISMATCH',
   'E_TABLE',
   'E_LIMIT',
+  'E_SIGNATURE',
 ] as const
 
 export type FormatErrorCode = (typeof FORMAT_ERROR_CODES)[number]

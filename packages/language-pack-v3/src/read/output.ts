@@ -14,9 +14,10 @@
 import { compareCodePoints } from '../codec/columns'
 import { CLASS_NAMES, type ClassName, hex, KIND_TRANSFER, readHeader, readSegment, type Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
-import { isMap, put } from '../codec/values'
+import { hexToBytes, isMap, put } from '../codec/values'
 import type { CountRows, Coverage, VerseLists } from '../codec/counts'
 import type { CountTable, HelpTable, MapCore, MapPart, ObsHelpTable, TextModel, TopicsCore, TopicsPart, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../model'
+import { checkSignatures } from '../sign'
 import { readTransfer } from '../transfer'
 import { ART_TABLES, artView } from './art'
 import { BOOK_TABLES, bookView } from './book'
@@ -257,29 +258,46 @@ function knownOf(header: Record<string, unknown>): Record<string, number[]> {
   return typeof cls === 'string' && (CLASS_NAMES as readonly string[]).includes(cls) ? KNOWN[cls as ClassName] : {}
 }
 
+/** What a reader is given besides the bytes: the keys it trusts (key id to raw public key). Without them `sig` is ignored. */
+export type ReaderOptions = { trustedKeys?: Record<string, Uint8Array> }
+
+/**
+ * The `sig` of a catalog's output (`catalog.md`): only when keys were given and the catalog is `published`; throws `E_SIGNATURE` when
+ * the signature is not accepted.
+ */
+async function signatureOut(seg: Segment, header: Record<string, unknown>, id: string, options: ReaderOptions): Promise<Json | undefined> {
+  if (options.trustedKeys === undefined || seg.h.class !== 'catalog') return undefined
+  if (catalogView(seg).about.origin !== 'published') return undefined
+  const { key, valid } = await checkSignatures(header, hexToBytes(id), options.trustedKeys)
+  return { key, valid }
+}
+
 /** The output of a segment file; throws {@link FormatError}. */
-async function segmentOutput(bytes: Uint8Array): Promise<Json> {
+async function segmentOutput(bytes: Uint8Array, options: ReaderOptions): Promise<Json> {
   const { header } = readHeader(bytes)
-  const { seg, id } = await readSegment(bytes, { known: knownOf(header) })
-  return sortKeys({ id, h: seg.h, ...bodyOut(seg) })
+  const { seg, id, header: full } = await readSegment(bytes, { known: knownOf(header) })
+  const out = sortKeys({ id, h: seg.h, ...bodyOut(seg) })
+  const sig = await signatureOut(seg, full, id, options)
+  return sig === undefined ? out : sortKeys({ ...(out as { [key: string]: Json }), sig })
 }
 
 /** The output of a catalog entry of a transfer file: its own header must say class catalog (`readTransfer` has checked it too). */
-async function catalogOutput(bytes: Uint8Array): Promise<Json> {
-  const { seg, id } = await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
+async function catalogOutput(bytes: Uint8Array, options: ReaderOptions): Promise<Json> {
+  const { seg, id, header } = await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
   const m = catalogView(seg)
-  return sortKeys({ id, h: seg.h, about: m.about, resources: m.resources, segments: m.segments, units: m.units, requires: m.requires, complements: m.complements })
+  const sig = await signatureOut(seg, header, id, options)
+  return sortKeys({ id, h: seg.h, about: m.about, resources: m.resources, segments: m.segments, units: m.units, requires: m.requires, complements: m.complements, sig })
 }
 
 /** The output of a transfer file; throws {@link FormatError}. */
-async function transferOutput(bytes: Uint8Array): Promise<Json> {
+async function transferOutput(bytes: Uint8Array, options: ReaderOptions): Promise<Json> {
   const { index, entries } = await readTransfer(bytes, { known: KNOWN })
   const catalogs: Json[] = []
   for (const id of index.catalogs) {
     const entry = entries.find((candidate) => candidate.id === id)
     // `readTransfer` has rejected the file unless every catalog is whole and verified.
     if (entry === undefined || entry.bytes === undefined) throw new FormatError('E_TRUNCATED', `the catalog ${id} is not in the file`)
-    catalogs.push(await catalogOutput(entry.bytes))
+    catalogs.push(await catalogOutput(entry.bytes, options))
   }
   const { mode, base, made, by, extra } = index
   return sortKeys({
@@ -291,12 +309,12 @@ async function transferOutput(bytes: Uint8Array): Promise<Json> {
 
 /**
  * The reader output of a file (`spec/tests/README.md`, "Reader output"): a segment file (kind 1) or a transfer file (kind 2) read with
- * {@link KNOWN}, as plain JSON data with sorted keys. A file the reader rejects gives `{ error: code }`, the code of `container.md`.
+ * {@link KNOWN}, as plain JSON data with sorted keys. With `options.trustedKeys` a `published` catalog is also checked against them: its output gains `sig`, or the file is `{ error: "E_SIGNATURE" }`. A file the reader rejects gives `{ error: code }`, the code of `container.md`.
  */
-export async function readerOutput(bytes: Uint8Array): Promise<unknown> {
+export async function readerOutput(bytes: Uint8Array, options: ReaderOptions = {}): Promise<unknown> {
   try {
     const { kind } = readHeader(bytes)
-    return kind === KIND_TRANSFER ? await transferOutput(bytes) : await segmentOutput(bytes)
+    return kind === KIND_TRANSFER ? await transferOutput(bytes, options) : await segmentOutput(bytes, options)
   } catch (error) {
     if (error instanceof FormatError) return { error: error.code }
     throw error

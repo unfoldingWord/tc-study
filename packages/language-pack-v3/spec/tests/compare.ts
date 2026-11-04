@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compareCodePoints } from '../../src/codec/columns'
 import { canonicalJson, type Json, readerOutput, sortKeys } from '../../src/read/output'
-import { buildBigSegments, caseFilesOn, TESTS_DIR } from './build-cases'
+import { buildBigSegments, caseFilesOn, PYTHON_NOT_YET, TESTS_DIR } from './build-cases'
 
 const DEFAULT_READER = join(TESTS_DIR, '..', 'reader-py', 'lp3read.py')
 const MAX_VALUE = 80
@@ -151,8 +151,15 @@ export async function compare(args: string[], log: (line: string) => void = cons
 
   const lines: string[] = []
   let count = 0
+  let notYet = 0
   for (const name of caseFilesOn(TESTS_DIR)) {
     const file = join(TESTS_DIR, name)
+    if (PYTHON_NOT_YET.includes(name)) {
+      // Said, not skipped in silence: the Python reader does not check signatures yet (Task 10 of phase 3).
+      notYet++
+      lines.push(`${name}: Python: not yet`)
+      continue
+    }
     count++
     const line = await disagreement(name, new Uint8Array(readFileSync(file)), file, python, reader)
     if (line !== null) lines.push(line)
@@ -174,8 +181,9 @@ export async function compare(args: string[], log: (line: string) => void = cons
     }
   }
   for (const line of lines) log(line)
-  log(`compare: ${count} files compared (${count - big} cases${built ? `, ${big} built` : ''}), ${lines.length} mismatches`)
-  return lines.length === 0 ? 0 : 1
+  const mismatches = lines.length - notYet
+  log(`compare: ${count} files compared (${count - big} cases${built ? `, ${big} built` : ''}), ${mismatches} mismatches${notYet > 0 ? `, ${notYet} not yet in Python` : ''}`)
+  return mismatches === 0 ? 0 : 1
 }
 
 if (import.meta.main) process.exit(await compare(process.argv.slice(2)))

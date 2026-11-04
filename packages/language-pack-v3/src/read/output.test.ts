@@ -397,8 +397,8 @@ describe('every error code is reachable from one corrupted file', () => {
     ['E_LIMIT', () => withHeader(bytes, (h) => void (h.ulen = 67_108_865))],
   ]
 
-  test('all 13 codes are covered', () => {
-    expect(cases.map(([code]) => code).sort()).toEqual([...FORMAT_ERROR_CODES].sort())
+  test('all 13 codes of a reader with no keys are covered (E_SIGNATURE is in sign.test.ts)', () => {
+    expect(cases.map(([code]) => code).sort()).toEqual([...FORMAT_ERROR_CODES].filter((code) => code !== 'E_SIGNATURE').sort())
   })
 
   test.each(cases)('%s', async (code, make) => {
