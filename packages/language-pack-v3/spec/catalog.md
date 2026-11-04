@@ -89,6 +89,14 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 - Which keys a reader trusts, and where it keeps them, is up to the app. The format only says how to check a signature.
   An app gives the reader its trusted keys as a map from key id to raw public key (a key whose id, computed from
   its bytes, is not the one it is listed under is not trusted).
+- **A trusted-keys map entry counts only if** its id equals the key id (lowercase hex, above) of its 32-byte key. Other
+  entries are dropped: a key of another length, an id in uppercase or of another length, an id that is not the key's.
+- **Verification** is Ed25519 as RFC 8032 section 5.1.7 gives it, with the cofactorless equation `[S]B = R + [k]A`
+  (`k` is the SHA-512 of `R || A || message`, little-endian, mod `L`). A signature does not verify when `S >= L`, or
+  when the encoding of `R` or of `A` is not canonical (a `y` that is `>= p`, or `x = 0` with the sign bit set) or is
+  not a point of the curve. A point of small order is not rejected for being of small order.
+- **Elements are compared by exact text.** A `sig` element's `key` is compared to the trusted ids as it is written (no
+  case folding). Keys of an element beyond `key`, `alg` and `s` are ignored.
 - A signature labels who published the catalog. It does not judge the content.
 - A catalog an app builds on the device (from an old pack, `transfer.md`) has `origin: local` and no signature.
 
@@ -100,11 +108,13 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
    `about.origin` is `published`, once the rest of the file has been accepted: an `E_BODY` or any other earlier error
    wins over `E_SIGNATURE`. It rejects the file with `E_SIGNATURE` when:
    - `sig` is missing, is not a non-empty array, or has an element that is not a map with `key` (text), `alg`
-     (`ed25519`) and `s` (64 bytes): malformed;
-   - no element names a trusted key (unknown key);
-   - an element names a trusted key and its signature does not verify over the id (the element's `s` is not the signature
-     of that key on the id);
-   - otherwise it accepts. Elements of unknown keys beside a verifying element of a trusted key are ignored.
+     (exactly `ed25519`) and `s` (64 bytes): malformed. One malformed element rejects the file, even if its `key` is
+     not a trusted one;
+   - no element names a trusted key (unknown key): elements whose `key` is not in the trusted map are skipped, and at
+     least one element from a trusted key must be present;
+   - **any** element that names a trusted key does not verify over the id (the element's `s` is not the signature of
+     that key on the id): every element of a trusted key must verify, not only the first;
+   - otherwise it accepts. Elements of unknown keys beside the verifying elements of trusted keys are ignored.
 3. A `local` catalog is never signed and never rejected for its signature: a reader ignores its `sig`, whatever
    keys it was given.
 4. A `sig` in a segment that is not a catalog is ignored always.
