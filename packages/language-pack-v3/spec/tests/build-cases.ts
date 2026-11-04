@@ -368,15 +368,10 @@ function keysFromText(text: string): Record<string, Uint8Array> {
   return Object.fromEntries(Object.entries(listed).map(([id, key]) => [id, Uint8Array.from(key.match(/../g) ?? [], (pair) => parseInt(pair, 16))]))
 }
 /**
- * The case files the Python reader (`lp3read.py`) does not check yet, because it does not check signatures: `compare.ts` says so for each and
- * does not count it a mismatch. Task 10 of phase 3 makes this list empty.
+ * The case files the Python reader (`lp3read.py`) does not read yet: `compare.ts` says so for each and does not count it a mismatch. Empty since
+ * the Python reader checks signatures (phase 3, Task 10).
  */
-export const PYTHON_NOT_YET: readonly string[] = [
-  'catalog-signed/catalog.seg',
-  'catalog-bad-sig/catalog.seg',
-  'catalog-unknown-key/catalog.seg',
-  'catalog-unsigned-published/catalog.seg',
-]
+export const PYTHON_NOT_YET: readonly string[] = []
 
 const keysText = (publicKey: Uint8Array): string => `${JSON.stringify({ [keyId(publicKey)]: hex(publicKey) }, null, 2)}
 `

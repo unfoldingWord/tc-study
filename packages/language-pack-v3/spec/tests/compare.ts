@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { compareCodePoints } from '../../src/codec/columns'
 import { canonicalJson, type Json, readerOutput, sortKeys } from '../../src/read/output'
-import { buildBigSegments, caseFilesOn, PYTHON_NOT_YET, TESTS_DIR } from './build-cases'
+import { buildBigSegments, caseFilesOn, keysName, keysOf, PYTHON_NOT_YET, TESTS_DIR } from './build-cases'
 
 const DEFAULT_READER = join(TESTS_DIR, '..', 'reader-py', 'lp3read.py')
 const MAX_VALUE = 80
@@ -75,8 +75,8 @@ export function firstDifference(a: Json | undefined, b: Json | undefined, path =
 /** What the Python reader said of a file: its parsed output and exit code, or why that cannot be compared. */
 type PythonResult = { output: Json; status: number } | { failure: string }
 
-function pythonOn(python: string, reader: string, file: string): PythonResult {
-  const run = spawnSync(python, ['-I', '-X', 'utf8', reader, file], { encoding: 'buffer', maxBuffer: 1 << 29 })
+function pythonOn(python: string, reader: string, file: string, keysFile: string | null): PythonResult {
+  const run = spawnSync(python, ['-I', '-X', 'utf8', reader, file, ...(keysFile === null ? [] : ['--keys', keysFile])], { encoding: 'buffer', maxBuffer: 1 << 29 })
   if (run.error !== undefined) return { failure: `cannot run Python: ${run.error.message}` }
   const status = run.status ?? -1
   if (status !== 0 && status !== 1) return { failure: `lp3read.py exited ${status}: ${shortened(new TextDecoder().decode(run.stderr).trim())}` }
@@ -91,14 +91,17 @@ const isError = (output: Json): boolean => isObject(output) && Object.hasOwn(out
 
 /** The line to print when the readers disagree on `bytes` (the file at `file`), or `null` when they agree. */
 async function disagreement(name: string, bytes: Uint8Array, file: string, python: string, reader: string): Promise<string | null> {
+  const keysFile = join(TESTS_DIR, keysName(name))
+  const trustedKeys = name.startsWith('built/') ? undefined : keysOf(TESTS_DIR, name)
+  const hasKeys = trustedKeys !== undefined
   // A TypeScript exception (not a FormatError, which readerOutput turns into an error object) is a mismatch of this file, not the end of the run.
   let ts: Json
   try {
-    ts = sortKeys(await readerOutput(bytes))
+    ts = sortKeys(await readerOutput(bytes, trustedKeys === undefined ? {} : { trustedKeys }))
   } catch (error) {
     return `${name}: the TypeScript reader threw: ${(error as Error).message}`
   }
-  const py = pythonOn(python, reader, file)
+  const py = pythonOn(python, reader, file, hasKeys ? keysFile : null)
   if ('failure' in py) return `${name}: ${py.failure}`
   let normal: Json
   try {
