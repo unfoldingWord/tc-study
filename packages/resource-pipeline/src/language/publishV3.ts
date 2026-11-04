@@ -61,6 +61,7 @@ export async function publishV3(o: {
   log: (line: string) => void
 }): Promise<{ outcome: 'published' | 'unchanged'; uploaded: string[]; skipped: string[] }> {
   const { bucket, outDir, lang, log } = o
+  if (!/^[a-z0-9-]+$/.test(lang) || lang === 'common') throw new Error(`Not a language for a format 3 upload: ${JSON.stringify(lang)}`)
   const uploaded: string[] = []
   const skipped: string[] = []
   const file = (name: string): string => join(outDir, name)
@@ -71,7 +72,6 @@ export async function publishV3(o: {
   for (const name of o.publishCommon ? ['common', lang] : [lang]) {
     const path = `catalog-${name}.seg`
     if (!existsSync(file(path))) {
-      if (name === 'common') continue
       throw new Error(`The build folder has no ${path}`)
     }
     const bytes = bytesOf(path)
@@ -97,6 +97,18 @@ export async function publishV3(o: {
   // The segments the catalogs to put name, in id order.
   const classes = new Map<string, string>()
   for (const { model } of planned) for (const entry of model.segments) classes.set(hex(entry.id), entry.class)
+  // The common catalog this run does not put must already be published, be the one the language catalog requires, and have its segments.
+  const commonIds: string[] = []
+  const language = planned.find(({ name }) => name === lang)
+  if (!o.publishCommon && language !== undefined) {
+    if (published.common === undefined) throw new Error('The common catalog is not published; the language catalog requires it and none was put')
+    const required = language.model.requires?.find(([name]) => name === 'common')
+    if (required === undefined) throw new Error(`The catalog ${lang} does not require the common catalog`)
+    if (required[1] !== published.common.revision || hex(required[2]) !== published.common.id) {
+      throw new Error(`The catalog ${lang} requires common revision ${required[1]} id ${hex(required[2])}, and the published one is revision ${published.common.revision} id ${published.common.id}`)
+    }
+    for (const entry of (await readCatalog(published.common.bytes)).model.segments) commonIds.push(hex(entry.id))
+  }
   const ids = [...classes.keys()].sort()
   for (const id of ids) {
     const key = V3_KEYS.seg(id)
@@ -115,7 +127,7 @@ export async function publishV3(o: {
   log(`segments: ${uploaded.length} uploaded, ${skipped.length} already there`)
 
   // A catalog is only put when every segment it names is in the bucket (a lost write must not leave a catalog that points nowhere).
-  for (const id of ids) {
+  for (const id of [...ids, ...commonIds]) {
     if (!(await bucket.has(V3_KEYS.seg(id)))) throw new Error(`Segment ${id} is not in the bucket after its upload; no catalog was put`)
   }
 

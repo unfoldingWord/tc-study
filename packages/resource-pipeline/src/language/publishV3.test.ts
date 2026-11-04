@@ -22,14 +22,31 @@ afterAll(() => {
   for (const dir of temps) rmSync(dir, { recursive: true, force: true })
 })
 
-let built: string
-beforeAll(async () => {
-  built = temp()
-  const args = ['--list', join(DATA, LANG, 'list.json'), '--originals', join(DATA, 'originals', 'list.json'), '--parts', join(DATA, 'parts'), '--out', built, '--built', '2026-11-01T10:00:00Z']
+async function build(extra: string[] = []): Promise<string> {
+  const out = temp()
+  const args = ['--list', join(DATA, LANG, 'list.json'), '--originals', join(DATA, 'originals', 'list.json'), '--parts', join(DATA, 'parts'), '--out', out, '--built', '2026-11-01T10:00:00Z', ...extra]
   const code = await main(args, { log: () => {}, error: (line) => { throw new Error(line) } })
   expect(code).toBe(0)
-  writeFileSync(join(built, `registry-${LANG}.json`), JSON.stringify({ sections: { a: 1 } }))
+  writeFileSync(join(out, `registry-${LANG}.json`), JSON.stringify({ sections: { a: 1 } }))
+  return out
+}
+
+let built: string
+beforeAll(async () => {
+  built = await build()
 })
+
+/** A bucket holding the common catalog (and, unless `withSegments` is false, every segment of the first build) but no language catalog. */
+async function bucketWithCommon(withSegments = true) {
+  const full = memoryBucket()
+  await run(full, copy())
+  const bucket = memoryBucket()
+  const put = (key: string) => bucket.put(key, full.bytes(key)!, { contentType: 'x', cacheControl: 'x' })
+  await put(V3_KEYS.catalog('common'))
+  if (withSegments) for (const { key } of full.puts.filter((p) => p.key.startsWith('v3/seg/'))) await put(key)
+  bucket.puts.length = 0
+  return bucket
+}
 
 /** A fresh copy of the built folder. */
 const copy = (): string => {
@@ -122,6 +139,17 @@ describe('publishV3', () => {
     expect(bucket.puts).toEqual([])
   })
 
+  test('unchanged: a rebuild with another revision and previous but equal tables puts nothing', async () => {
+    const bucket = memoryBucket()
+    await run(bucket, copy())
+    bucket.puts.length = 0
+    const published = await readPublishedV3(bucket, LANG)
+    const again = await build(['--revision-lang', '2', '--previous-lang', published.lang!.id])
+    const result = await run(bucket, again)
+    expect(result.outcome).toBe('unchanged')
+    expect(bucket.puts).toEqual([])
+  })
+
   test('a changed registry alone is put, without segments or catalogs', async () => {
     const bucket = memoryBucket()
     await run(bucket, copy())
@@ -133,11 +161,37 @@ describe('publishV3', () => {
     expect(keys(bucket)).toEqual([V3_KEYS.registry(LANG)])
   })
 
-  test('publishCommon false never writes common', async () => {
-    const bucket = memoryBucket()
+  test('publishCommon false never writes common, and checks the published one', async () => {
+    const bucket = await bucketWithCommon()
     await run(bucket, copy(), false)
     expect(keys(bucket)).not.toContain(V3_KEYS.catalog('common'))
     expect(keys(bucket)).toContain(V3_KEYS.catalog(LANG))
+  })
+
+  test('publishCommon false: no published common catalog throws, nothing is put', async () => {
+    const bucket = memoryBucket()
+    await expect(run(bucket, copy(), false)).rejects.toThrow(/common catalog is not published/)
+    expect(keys(bucket).some((key) => key.startsWith('v3/catalog/'))).toBe(false)
+  })
+
+  test('publishCommon false: a published common with another id or revision throws', async () => {
+    const bucket = await bucketWithCommon()
+    const other = await build(['--revision', '2'])
+    await expect(run(bucket, other, false)).rejects.toThrow(/requires common revision 2/)
+    expect(keys(bucket).some((key) => key.startsWith('v3/catalog/'))).toBe(false)
+  })
+
+  test('publishCommon false: a common segment missing from the bucket throws before the language catalog', async () => {
+    const bucket = await bucketWithCommon(false)
+    await expect(run(bucket, copy(), false)).rejects.toThrow(/not in the bucket/)
+    expect(keys(bucket).some((key) => key.startsWith('v3/catalog/'))).toBe(false)
+  })
+
+  test('a lang that is common or not a language code throws; publishCommon true needs catalog-common.seg', async () => {
+    for (const lang of ['common', 'a/b', '..', 'ES']) await expect(publishV3({ bucket: memoryBucket(), outDir: copy(), lang, publishCommon: true, log: () => {} })).rejects.toThrow(/Not a language/)
+    const dir = copy()
+    rmSync(join(dir, 'catalog-common.seg'))
+    await expect(run(memoryBucket(), dir)).rejects.toThrow(/no catalog-common.seg/)
   })
 
   test('uploads only builder output', async () => {
