@@ -74,7 +74,9 @@ export async function loadAlignedSet(out: string, lang: string): Promise<Aligned
       const file = join(out, 'segments', `${hex(catalog.segments[index]!.id)}.seg`)
       if (!existsSync(file)) continue
       const view = alignedView((await readSegment(bytesOf(file), { known: KNOWN.aligned, expectedClass: 'aligned' })).seg, groups)
-      parts.set(view.group, view)
+      const id = unit.id.slice('aligned:'.length)
+      if (view.group !== id) throw new Error(`the unit ${unit.id} holds a segment of group ${view.group}`)
+      parts.set(id, view)
     }
   }
   return { lang, groups, parts }

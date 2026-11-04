@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
+import { toHex } from '../codec/sha256'
 import { ALIGNED_PARTS, buildAligned, isBridgeText } from '../build/aligned/build'
 import type { AlignedModel, BookModel, OrigModel, TextModel } from '../model'
 import { alignedKey, groupOfKey, phrase, type AlignedSet } from './aligned'
@@ -154,11 +155,18 @@ describe.skipIf(SAMPLE === undefined)('the fixed phrase queries on a build of th
       const source = await partsSource({ list: have(`${SAMPLE}/${lang}/list.json`, lang), partsDir: `${SAMPLE}/parts`, originals: have(`${SAMPLE}/originals/list.json`, 'originals') })
       const b = await buildLanguage({ source, lang, registry: {}, about, aligned: true })
       const catalog = catalogView((await readSegment(b.catalog.bytes, { known: CATALOG_TABLES })).seg)
-      const groups = catalog.units.filter((u) => u.id.startsWith('aligned:')).map((u) => u.id.slice('aligned:'.length))
+      const units = catalog.units.filter((u) => u.id.startsWith('aligned:'))
+      const groups = units.map((u) => u.id.slice('aligned:'.length))
       const parts = new Map<string, AlignedModel>()
-      for (const s of b.segments.filter((x) => x.seg.h.class === 'aligned')) {
-        const view = alignedView((await readSegment(s.bytes, { known: ALIGNED_TABLES })).seg, groups)
-        parts.set(view.group, view)
+      for (const unit of units) {
+        const id = unit.id.slice('aligned:'.length)
+        for (const index of unit.segments) {
+          const s = b.segments.find((x) => x.id === toHex(catalog.segments[index]!.id))
+          if (!s) continue
+          const view = alignedView((await readSegment(s.bytes, { known: ALIGNED_TABLES })).seg, groups)
+          expect(view.group).toBe(id)
+          parts.set(id, view)
+        }
       }
       sets.set(lang, { lang, groups, parts })
     }

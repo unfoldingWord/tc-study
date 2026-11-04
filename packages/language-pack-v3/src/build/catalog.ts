@@ -107,12 +107,12 @@ function unitIdOf(seg: Segment): string {
 }
 
 /**
- * The units of `segments` (`catalog.md`): one per book, orig book, art group, lex group, `obs`, `map`, `xmap`, `xtopics` and `topics`, ordered by id by
+ * The units of `segments` (`catalog.md`): one per book, orig book, art group, lex group, `obs`, `map`, `xmap`, `xtopics`, `topics` and `aligned` (one per part, id `aligned:{group}`, `optional: true`, no `needs`), ordered by id by
  * code point. A unit's `segments` are indexes in `segments`, ascending. `needs(segment)` gives the ids of the units a segment needs;
  * the unit's `needs` are the sorted union over its segments, left out when empty.
  *
  * Throws `Error` for a segment of class `catalog` or `gen`, two segments that give the same unit id (the core of a `map` or an `xmap`
- * and its parts are one unit, but a part twice is an error) and a `needs` that is not a list of text.
+ * and its parts are one unit, but a part twice is an error) a `needs` that is not a list of text, a segment whose `needs` lists an `aligned` unit, and an `aligned` segment with `needs`.
  */
 export function unitsOf(segments: BuiltSegment[], needs: (s: BuiltSegment) => string[]): Unit[] {
   const units = new Map<string, { indexes: number[]; needs: Set<string>; parts: Set<string | undefined> }>()

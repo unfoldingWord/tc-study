@@ -395,8 +395,8 @@ export type TopicsPart = { lang: string; part: string; names?: VerseLists }
 // The index of aligned phrases (`spec/cddl/aligned.cddl`)
 
 /**
- * One part of a language's index of aligned phrases. `group` is the range of first code points of its keys (`a`, `b-c` or
- * `other`); `res` the bridge texts (`[key, release tag]`). `entries`: key, then Strong key, then book code, to
+ * One part of a language's index of aligned phrases. `group` is the range of prefixes of 1 to 6 characters of its keys (`a`, `ar-b`, `t-td` or
+ * `other`, see `aligned.cddl`); `res` the bridge texts (`[key, release tag]`). `entries`: key, then Strong key, then book code, to
  * `[verses, occurrences]`. The writer sorts keys, Strong keys and books itself.
  */
 export type AlignedModel = {
