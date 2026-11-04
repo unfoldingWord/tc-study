@@ -41,6 +41,9 @@ Not in this phase:
 
 ## Decisions for Abel before this runs
 
+**Abel approved the plan on 2026-11-04 with signatures ("Sí, con firmas"):** Part C runs with the rules of item 1; Task 12 uses
+`.tcpack` (item 2); staging is not "published" for the MACULA item (item 3).
+
 1. **Signature rules (Part C).** The spec fixes the algorithm (Ed25519 over the catalog's 32-byte id) and leaves the rest to phase 3. Proposed:
    - `sig.key` is the first 16 hex digits of the sha256 of the 32-byte public key.
    - A reader with **no** trusted keys ignores `sig`, as today. A reader **given** trusted keys rejects a `published` catalog with `E_SIGNATURE` when `sig` is missing, malformed, from an unknown key, or does not verify. A `local` catalog is never signed and never rejected for it.
