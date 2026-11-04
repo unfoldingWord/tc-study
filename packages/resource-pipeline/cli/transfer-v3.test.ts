@@ -42,9 +42,9 @@ async function built(revision: number, list = LIST): Promise<string> {
 }
 
 /** A list without its last part of a kind that changes the segments. */
-function changedList(): string {
+function changedList(kind = 'notes'): string {
   const list = JSON.parse(readFileSync(LIST, 'utf8'))
-  list.parts = list.parts.filter((p: { kind: string }) => p.kind !== 'notes')
+  list.parts = list.parts.filter((p: { kind: string }) => p.kind !== kind)
   const path = join(temp(), 'list.json')
   writeFileSync(path, JSON.stringify(list))
   return path
@@ -159,5 +159,56 @@ describe('transfer-v3', () => {
     const r = await run(['import', '--file', file, '--into', into])
     expect(r.code).toBe(1)
     expect(new Uint8Array(readFileSync(join(into, 'segments', seg)))).toEqual(new Uint8Array([1, 2, 3]))
+  })
+
+  test('full export of a language folder needs the common part (--common), as transfer.md says', async () => {
+    const both = await built(1)
+    const lang = temp()
+    const code = await build(['--list', LIST, '--originals', ORIGINALS, '--parts', PARTS, '--out', lang, '--revision', '1', '--built', '2026-11-01T10:00:00Z', '--common', both], { log: () => {}, error: () => {} })
+    expect(code).toBe(0)
+    expect(existsSync(join(lang, 'catalog-common.seg'))).toBe(false)
+    const file = join(temp(), 'l.tcpack')
+    const refused = await run(['export', '--from', lang, '--mode', 'full', '--out', file])
+    expect(refused.code).toBe(2)
+    expect(existsSync(file)).toBe(false)
+    const ok = await run(['export', '--from', lang, '--mode', 'full', '--common', both, '--out', file])
+    expect(ok.err).toEqual([])
+    expect(ok.result.catalogs).toBe(2)
+    const into = temp()
+    expect((await run(['import', '--file', file, '--into', into])).code).toBe(0)
+    expect(files(into)).toEqual(files(both))
+    // a common folder that is another build is refused
+    const other = await built(2)
+    expect((await run(['export', '--from', lang, '--mode', 'full', '--common', other, '--out', join(temp(), 'o.tcpack')])).code).toBe(1)
+  })
+
+  test('an update file is refused where its base revision is not, and nothing is written', async () => {
+    const r1 = await built(1)
+    const r2 = await built(2, changedList())
+    const file = join(temp(), 'u.tcpack')
+    expect((await run(['export', '--from', r2, '--mode', 'update', ...catalogsOf(r1).flatMap((c) => ['--base', c]), '--out', file])).code).toBe(0)
+    const empty = temp()
+    const r = await run(['import', '--file', file, '--into', empty])
+    expect(r.code).toBe(1)
+    expect(readdirSync(empty)).toEqual([])
+    const wrong = await built(3)
+    expect((await run(['import', '--file', file, '--into', wrong])).code).toBe(1)
+  })
+
+  test('a cut update keeps the older catalog and exits 1; the segments it did bring stay', async () => {
+    const r1 = await built(1)
+    const r2 = await built(2, changedList("tw"))
+    const file = join(temp(), 'u.tcpack')
+    const ex = await run(["export", "--from", r2, "--mode", "update", ...catalogsOf(r1).flatMap((c) => ["--base", c]), "--out", file])
+    const cut = join(temp(), 'cut.tcpack')
+    writeFileSync(cut, readFileSync(file).subarray(0, readFileSync(file).length - 5))
+    const before = files(r1)
+    const r = await run(['import', '--file', cut, '--into', r1])
+    expect(r.code).toBe(1)
+    expect(r.result.complete).toBe(false)
+    expect(r.result.kept.length).toBeGreaterThanOrEqual(1)
+    const after = files(r1)
+    expect(after["catalog-es-419.seg"]).toBe(before["catalog-es-419.seg"])
+    for (const name of Object.keys(before)) if (name.startsWith("segments/")) expect(after[name]).toBe(before[name])
   })
 })
