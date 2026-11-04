@@ -264,7 +264,7 @@ const isTextPair = (value: unknown): boolean => Array.isArray(value) && value.le
 /** The logical header against `container.md`, "Logical header". Keys it does not list are left alone. */
 function checkLogicalHeader(h: CborMap): LogicalHeader {
   if (!isText(h.class) || !(CLASS_NAMES as readonly string[]).includes(h.class)) throw malformed('class')
-  if (!isUint(h.v)) throw malformed('v')
+  if (!isUint(h.v) || h.v !== 1) throw malformed('v')
   if (!isMap(h.tables)) throw malformed('tables')
   for (const [name, entry] of Object.entries(h.tables)) {
     if (!TABLE_NAME.test(name)) throw malformed(`table name "${name}"`)

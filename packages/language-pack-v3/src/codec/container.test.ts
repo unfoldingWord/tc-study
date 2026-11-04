@@ -207,6 +207,8 @@ describe('writeSegment', () => {
     const bad: [string, (h: Record<string, unknown>) => void][] = [
       ['a class that does not exist', (h) => (h.class = 'chapter')],
       ['a version that is not a count', (h) => (h.v = -1)],
+      ['a version other than 1', (h) => (h.v = 2)],
+      ['a version other than 1 in another class (aligned)', (h) => ((h.class = 'aligned'), (h.v = 2))],
       ['a table entry that is not [version, required]', (h) => (h.tables = { strings: [1] })],
       ['a table name with capitals', (h) => (h.tables = { Strings: [1, true], texts: [1, true] })],
       ['a lang that is not text', (h) => (h.lang = 7)],
