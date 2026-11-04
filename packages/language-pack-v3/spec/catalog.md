@@ -94,7 +94,9 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 - **Verification** is Ed25519 as RFC 8032 section 5.1.7 gives it, with the cofactorless equation `[S]B = R + [k]A`
   (`k` is the SHA-512 of `R || A || message`, little-endian, mod `L`). A signature does not verify when `S >= L`, or
   when the encoding of `R` or of `A` is not canonical (a `y` that is `>= p`, or `x = 0` with the sign bit set) or is
-  not a point of the curve. A point of small order is not rejected for being of small order.
+  not a point of the curve. A signature does not verify either when `R` or `A` is a point of small order (a point `P`
+  with `[8]P` the identity: eight encodings are canonical). WebCrypto runtimes disagree on such points, so a reader
+  checks this itself and does not leave it to the runtime.
 - **Elements are compared by exact text.** A `sig` element's `key` is compared to the trusted ids as it is written (no
   case folding). Keys of an element beyond `key`, `alg` and `s` are ignored.
 - A signature labels who published the catalog. It does not judge the content.
@@ -103,7 +105,9 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 **When a reader checks, and when it rejects.**
 
 1. A reader given **no** trusted keys ignores `sig` altogether (a `sig` of the wrong type too) and its output is the
-   same as before signatures existed.
+   same as before signatures existed. "Given trusted keys" means the app passed a key map, even an empty one or one
+   whose entries were all dropped (above): then no signature can be from a trusted key, and every published catalog is
+   rejected with `E_SIGNATURE` (an unsigned one too). An app that has no keys passes none; it does not pass an empty map.
 2. A reader given trusted keys checks every catalog it reads (a catalog file, and each catalog of a transfer file) whose
    `about.origin` is `published`, once the rest of the file has been accepted: an `E_BODY` or any other earlier error
    wins over `E_SIGNATURE`. It rejects the file with `E_SIGNATURE` when:

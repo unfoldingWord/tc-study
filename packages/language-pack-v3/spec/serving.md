@@ -89,8 +89,11 @@ A client must treat any other 4xx or 5xx as "not available now" and keep what it
 
 Not part of the Worker's contract, written here so the fake server and the Worker are tested the same way:
 
-1. `GET` the language catalog (with `If-None-Match` when one is installed). A 304 means nothing changed.
-2. Read its `requires`; `GET` the common catalog when its id differs from the installed one.
+1. `GET` the language catalog (with `If-None-Match` when one is installed). A 304 means nothing changed. Read it
+   (`container.md`) and, when the app has trusted keys, check its `sig` (`catalog.md`, "Signatures"): a catalog that fails
+   with `E_SIGNATURE` is not installed.
+2. Read its `requires`; `GET` the common catalog when its id differs from the installed one, and check its `sig` the
+   same way. Signing a catalog again changes its file bytes and its ETag but not its id.
 3. `GET` each segment the chosen units name, verify it, and activate a unit only when it and its `needs` are complete
    (`catalog.md`).
 

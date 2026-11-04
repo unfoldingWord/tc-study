@@ -12,7 +12,13 @@ segment-header = {
   * tstr => any,               ; keys a later minor version adds; readers ignore them
 }
 
-signature = { "key": tstr, "alg": "ed25519", "s": bstr .size 64 }
+; A signature element: any other "alg" makes the element malformed (E_SIGNATURE, catalog.md), it is not "unknown".
+signature = {
+  "key": tstr,
+  "alg": "ed25519",
+  "s": bstr .size 64,
+  * tstr => any,               ; other keys of an element are ignored (catalog.md)
+}
 
 logical-header = {
   "class": class-name,
