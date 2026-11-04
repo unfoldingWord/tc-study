@@ -50,6 +50,11 @@ type Model = ReturnType<typeof catalogView>
 /** Everything of a catalog but `about` (its revision and previous id change on every build). */
 const content = (m: Model): string => canonical({ resources: m.resources, segments: m.segments, units: m.units, requires: m.requires ?? null, complements: m.complements ?? null })
 
+/** Whether two catalogs (their bytes) are equal apart from `about`: what decides that a build has nothing new to put. */
+export async function sameCatalogContent(a: Uint8Array, b: Uint8Array): Promise<boolean> {
+  return content((await readCatalog(a)).model) === content((await readCatalog(b)).model)
+}
+
 type Planned = { name: string; bytes: Uint8Array; model: Model; id: string }
 
 /** Uploads the folder `build-v3` wrote: segments first, then the catalogs, then the registry; nothing outside the three key shapes. */

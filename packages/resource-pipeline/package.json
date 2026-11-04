@@ -13,7 +13,8 @@
     "test": "bun test",
     "type-check": "tsc --noEmit",
     "prepare-language": "bun cli/prepare-language.ts",
-    "build-v3": "bun cli/build-v3.ts"
+    "build-v3": "bun cli/build-v3.ts",
+    "publish-v3": "bun cli/publish-v3.ts"
   },
   "license": "MIT",
   "dependencies": {
