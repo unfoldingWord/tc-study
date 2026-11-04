@@ -410,10 +410,11 @@ describe('the cross-reader check (compare.ts)', () => {
       writeFileSync(
         stub,
         [
-          'import sys',
+          'import sys, json',
           `sys.path.insert(0, ${JSON.stringify(join(PACKAGE_DIR, 'spec', 'reader-py'))})`,
           'from lp3read import read_file, canonical_text',
-          'out = read_file(open(sys.argv[1], "rb").read())',
+          'trusted = json.load(open(sys.argv[3])) if len(sys.argv) > 3 and sys.argv[2] == "--keys" else None',
+          'out = read_file(open(sys.argv[1], "rb").read(), trusted=trusted)',
           'name = sys.argv[1].replace(chr(92), "/")',
           'if name.endswith("container/minimal.seg"):',
           '    out["texts"][0]["pieces"][0][0] += "x"',
@@ -426,15 +427,11 @@ describe('the cross-reader check (compare.ts)', () => {
       )
       const run = compare('--reader', stub)
       expect(run.status).toBe(1)
-      // In the order of the files; the cases of signatures are said "not yet" and are not mismatches.
+      // In the order of the files; the stub passes the keys as compare.ts does, so the cases of signatures compare for real.
       expect(run.text.trim().split('\n')).toEqual([
-        'catalog-bad-sig/catalog.seg: Python: not yet',
-        'catalog-signed/catalog.seg: Python: not yet',
-        'catalog-unknown-key/catalog.seg: Python: not yet',
-        'catalog-unsigned-published/catalog.seg: Python: not yet',
         'container/minimal.seg: $.texts[0].pieces[0][0]: TypeScript "Pablo" / Python "Pablox"',
         'container/truncated.seg: $.error: TypeScript "E_TRUNCATED" / Python "E_ID"',
-        `compare: ${FILES.length - PYTHON_NOT_YET.length} files compared (${FILES.length - PYTHON_NOT_YET.length} cases), 2 mismatches, ${PYTHON_NOT_YET.length} not yet in Python`,
+        `compare: ${FILES.length - PYTHON_NOT_YET.length} files compared (${FILES.length - PYTHON_NOT_YET.length} cases), 2 mismatches${PYTHON_NOT_YET.length === 0 ? '' : `, ${PYTHON_NOT_YET.length} not yet in Python`}`,
       ])
     } finally {
       rmSync(folder, { recursive: true, force: true })
