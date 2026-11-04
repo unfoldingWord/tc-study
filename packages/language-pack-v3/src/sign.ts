@@ -60,6 +60,20 @@ export async function signCatalog(catalogFile: Uint8Array, privateKeyPkcs8: Uint
   return out
 }
 
+const FIELD_P = 2n ** 255n - 19n
+
+/**
+ * The canonical-encoding rule of `catalog.md` for a point (`R` or `A`), checked here and not left to WebCrypto, which accepts some
+ * encodings the spec rejects: `y >= p`, or `x = 0` (`y` is 1 or p - 1) with the sign bit set.
+ */
+function canonicalPoint(bytes: Uint8Array): boolean {
+  let y = 0n
+  for (let i = 31; i >= 0; i--) y = (y << 8n) | BigInt(i === 31 ? bytes[i] & 0x7f : bytes[i])
+  const sign = (bytes[31] & 0x80) !== 0
+  if (y >= FIELD_P) return false
+  return !(sign && (y === 1n || y === FIELD_P - 1n))
+}
+
 const reject = (why: string): never => {
   throw new FormatError('E_SIGNATURE', `the catalog's signature is not accepted: ${why}`)
 }
@@ -85,6 +99,7 @@ export async function checkSignatures(header: Header, id: Uint8Array, trusted: R
     if (publicKey === undefined || publicKey.length !== 32 || keyId(publicKey) !== key) continue
     let ok = false
     try {
+      if (!canonicalPoint(publicKey) || !canonicalPoint(s.subarray(0, 32))) throw new Error('not canonical')
       const imported = await crypto.subtle.importKey('raw', copy(publicKey), { name: 'Ed25519' }, false, ['verify'])
       ok = await crypto.subtle.verify('Ed25519', imported, copy(s), copy(id))
     } catch {
@@ -103,7 +118,8 @@ export async function checkSignatures(header: Header, id: Uint8Array, trusted: R
  * per the rules of `catalog.md`. It does not look at the origin: a reader skips `local` catalogs before calling it.
  */
 export async function verifyCatalog(catalogFile: Uint8Array, trusted: Record<string, Uint8Array>): Promise<{ key: string; valid: true }> {
-  const { header, id } = await readSegment(catalogFile, { known: CATALOG_TABLES, expectedClass: 'catalog' })
+  const { seg, header, id } = await readSegment(catalogFile, { known: CATALOG_TABLES, expectedClass: 'catalog' })
+  catalogView(seg) // an invalid body is E_BODY before any signature is looked at
   return checkSignatures(header, hexToBytes(id), trusted)
 }
 

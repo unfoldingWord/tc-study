@@ -293,12 +293,16 @@ async function catalogOutput(bytes: Uint8Array, options: ReaderOptions): Promise
 async function transferOutput(bytes: Uint8Array, options: ReaderOptions): Promise<Json> {
   const { index, entries } = await readTransfer(bytes, { known: KNOWN })
   const catalogs: Json[] = []
+  const files: Uint8Array[] = []
   for (const id of index.catalogs) {
     const entry = entries.find((candidate) => candidate.id === id)
     // `readTransfer` has rejected the file unless every catalog is whole and verified.
     if (entry === undefined || entry.bytes === undefined) throw new FormatError('E_TRUNCATED', `the catalog ${id} is not in the file`)
-    catalogs.push(await catalogOutput(entry.bytes, options))
+    files.push(entry.bytes)
   }
+  // Every catalog body is validated (E_BODY) before any signature is checked.
+  for (const file of files) catalogView((await readSegment(file, { known: KNOWN.catalog, expectedClass: 'catalog' })).seg)
+  for (const file of files) catalogs.push(await catalogOutput(file, options))
   const { mode, base, made, by, extra } = index
   return sortKeys({
     index: { ...extra, mode, catalogs: index.catalogs, base, entries: index.entries, made, by },

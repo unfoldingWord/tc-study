@@ -6,6 +6,8 @@ import { FormatError } from './codec/errors'
 import { BOOK_TABLES } from './read/book'
 import { CATALOG_TABLES } from './read/catalog'
 import { canonicalJson, readerOutput } from './read/output'
+import { buildCatalog } from './build/catalog'
+import { writeTransfer } from './transfer'
 import { keyId, publicKeyOf, signCatalog, verifyCatalog } from './sign'
 
 const CASES = join(import.meta.dir, '..', 'spec', 'tests')
@@ -176,5 +178,56 @@ describe('the reader', () => {
     const plain = canonicalJson(await readerOutput(book))
     expect(canonicalJson(await readerOutput(withBadSig))).toBe(plain)
     expect(canonicalJson(await readerOutput(withBadSig, { trustedKeys: trust(k) }))).toBe(plain)
+  })
+})
+
+describe('encodings and precedence the spec fixes', () => {
+  const unhex = (text: string): Uint8Array => Uint8Array.from(text.match(/../g)!, (pair) => parseInt(pair, 16))
+  const withKey = async (publicKey: Uint8Array, s: Uint8Array): Promise<Uint8Array> =>
+    withSig(published, [{ key: keyId(publicKey), alg: 'ed25519', s }])
+  const sig01 = unhex('01' + '00'.repeat(63))
+
+  test('a public key with x = 0 and the sign bit set is E_SIGNATURE', async () => {
+    const key = unhex('01' + '00'.repeat(30) + '80')
+    const file = await withKey(key, sig01)
+    expect(await codeOf(verifyCatalog(file, { [keyId(key)]: key }))).toBe('E_SIGNATURE')
+  })
+
+  test('a public key with y >= p is E_SIGNATURE', async () => {
+    const key = unhex('ee' + 'ff'.repeat(30) + '7f')
+    const file = await withKey(key, sig01)
+    expect(await codeOf(verifyCatalog(file, { [keyId(key)]: key }))).toBe('E_SIGNATURE')
+  })
+
+  test('a non-canonical R is E_SIGNATURE', async () => {
+    const k = await newKey()
+    const s = sigsOf(await signCatalog(published, k.privateKey))[0].s
+    s.set(unhex('01' + '00'.repeat(30) + '80'), 0)
+    expect(await codeOf(verifyCatalog(await withSig(published, [{ key: k.id, alg: 'ed25519', s }]), trust(k)))).toBe('E_SIGNATURE')
+  })
+
+  /** A published catalog whose `about.revision` is text (not valid), written by the writer so the hashes are right. */
+  const badBody = async (): Promise<Uint8Array> => {
+    const { seg } = await readSegment(published, { known: CATALOG_TABLES })
+    const about = { ...(seg.t.about as Record<string, unknown>), revision: 'bad' }
+    return (await writeSegment({ h: seg.h, t: { ...seg.t, about } as never }, { sig: [{ key: '0123456789abcdef', alg: 'ed25519', s: new Uint8Array(64) }] })).bytes
+  }
+
+  test('verifyCatalog: an invalid body is E_BODY, before the signature', async () => {
+    const k = await newKey()
+    expect(await codeOf(verifyCatalog(await badBody(), trust(k)))).toBe('E_BODY')
+  })
+
+  test('a transfer with an unsigned catalog and then an invalid one is E_BODY, not E_SIGNATURE', async () => {
+    const k = await newKey()
+    const about = { format: '3.0', catalog: 'es-419', publisher: 'unfoldingWord', origin: 'published', revision: 4, built: '2026-11-01T10:00:00Z', builder: 'test' }
+    const first = await buildCatalog({ about: about as never, resources: [], segments: [], needs: () => [] })
+    const second = await buildCatalog({ about: { ...about, catalog: 'common' } as never, resources: [], segments: [], needs: () => [] })
+    const { seg } = await readSegment(second.bytes, { known: CATALOG_TABLES })
+    const badSeg = { h: seg.h, t: { ...seg.t, about: { ...(seg.t.about as object), revision: 'bad' } } as never }
+    const written = await writeSegment(badSeg)
+    const bad = { ...second, seg: badSeg, bytes: written.bytes, id: written.id }
+    const bytes = writeTransfer({ mode: 'full', catalogs: [first, bad], entries: [], made: '2026-11-01T10:00:00Z', by: 'test' })
+    expect(await readerOutput(bytes, { trustedKeys: trust(k) })).toEqual({ error: 'E_BODY' })
   })
 })
