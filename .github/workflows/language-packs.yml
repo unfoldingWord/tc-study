@@ -55,6 +55,11 @@ on:
         required: false
         type: boolean
         default: false
+      v3:
+        description: With parts, also build and publish format 3 (staging only in this phase), after the 2.0 parts
+        required: false
+        type: string
+        default: 'true'
 
 permissions:
   contents: read
@@ -313,6 +318,58 @@ jobs:
             echo '```'
             head -n 200 "$RUNNER_TEMP/packs-out/compare.txt"
             echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      # Format 3 (packages/language-pack-v3) next to the 2.0 parts, from the lists and parts this run just built. Staging
+      # only in this phase: a production run builds none, and nothing here reads PACKS_V3_PRODUCTION. Neither step may fail
+      # the run nor change the 2.0 status: the result goes to the summary and to the result artifact, never to status/.
+      - name: Topic sources (format 3)
+        id: topics
+        if: inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
+        continue-on-error: true
+        run: bun packages/resource-pipeline/cli/fetch-topic-sources.ts --out "$RUNNER_TEMP/topics" --work "$RUNNER_TEMP/packs-v3-work"
+
+      - name: Build and publish format 3
+        id: v3
+        if: inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
+        continue-on-error: true
+        env:
+          R2_ENDPOINT: ${{ inputs.mode == 'publish' && secrets.R2_ENDPOINT || '' }}
+          R2_BUCKET: ${{ inputs.mode == 'publish' && secrets.R2_BUCKET || '' }}
+          R2_ACCESS_KEY_ID: ${{ inputs.mode == 'publish' && secrets.R2_ACCESS_KEY_ID || '' }}
+          R2_SECRET_ACCESS_KEY: ${{ inputs.mode == 'publish' && secrets.R2_SECRET_ACCESS_KEY || '' }}
+          PACKS_V3_SIGNING_KEY: ${{ secrets.PACKS_V3_SIGNING_KEY }}
+          TOPICS_OUTCOME: ${{ steps.topics.outcome }}
+        run: |
+          # What Door43 or a library prints could look like a workflow command: none is read until the token comes back.
+          token="$(openssl rand -hex 16)"
+          echo "::stop-commands::$token"
+          trap 'echo "::$token::"' EXIT
+          work="$RUNNER_TEMP/packs-work"
+          lists=("$work"/catalog/*/"$LANGUAGE.json")
+          if [ "${#lists[@]}" != 1 ] || [ ! -f "${lists[0]}" ]; then
+            echo "format 3: expected one language list under $work/catalog, found ${#lists[@]}" >&2
+            exit 1
+          fi
+          list="${lists[0]}"
+          originals="$work/$(jq -r '.originals.path' "$list")"
+          # The key is written only when the secret is set, readable by this user alone; it is never printed.
+          if [ -n "$PACKS_V3_SIGNING_KEY" ]; then
+            (umask 077; printf '%s\n' "$PACKS_V3_SIGNING_KEY" > "$RUNNER_TEMP/sign.pem")
+          fi
+          args=(--lang "$LANGUAGE" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
+          if [ "$TOPICS_OUTCOME" = success ]; then args+=(--topics "$RUNNER_TEMP/topics"); fi
+          if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
+          mkdir -p "$RUNNER_TEMP/packs-out"
+          status=0
+          bun packages/resource-pipeline/cli/publish-v3.ts "${args[@]}" > "$RUNNER_TEMP/packs-out/v3-stdout.txt" || status=$?
+          tail -n 1 "$RUNNER_TEMP/packs-out/v3-stdout.txt" > "$RUNNER_TEMP/packs-out/v3-result.json"
+          outcome="$(jq -r '.outcome // "unknown"' "$RUNNER_TEMP/packs-out/v3-result.json" || echo unknown)"
+          {
+            echo
+            echo "### Format 3: $LANGUAGE"
+            echo "Outcome: \`$outcome\` (exit $status)"
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 
