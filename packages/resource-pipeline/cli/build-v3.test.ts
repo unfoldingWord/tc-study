@@ -449,3 +449,89 @@ describe('build-v3: --aligned', () => {
     expect(readFileSync(join(withAligned, 'report.txt'), 'utf8')).toContain(`aligned: on, ${aligned.length} units`)
   })
 })
+
+describe('build-v3: revisions, previous ids and a published common catalog', () => {
+  const PREV = 'ab'.repeat(32)
+
+  test('separate revisions: a revision and a previous id per catalog', async () => {
+    const out = temp()
+    const result = await run(sample(out, ['--revision-common', '3', '--revision-lang', '7', '--previous-lang', PREV]))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    const common = await catalogOf(join(out, 'catalog-common.seg'))
+    const language = await catalogOf(join(out, 'catalog-es-419.seg'))
+    expect(common.about.revision).toBe(3)
+    expect(common.about.previous).toBeUndefined()
+    expect(language.about.revision).toBe(7)
+    expect(hex(language.about.previous!)).toBe(PREV)
+    expect(language.requires![0][1]).toBe(3)
+  })
+
+  test('--revision alone sets both', async () => {
+    const out = temp()
+    expect((await run(sample(out, ['--revision', '4']))).code).toBe(0)
+    expect((await catalogOf(join(out, 'catalog-common.seg'))).about.revision).toBe(4)
+    expect((await catalogOf(join(out, 'catalog-es-419.seg'))).about.revision).toBe(4)
+  })
+
+  test('a specific revision wins over --revision, which fills the other', async () => {
+    const out = temp()
+    expect((await run(sample(out, ['--revision', '4', '--revision-lang', '9']))).code).toBe(0)
+    expect((await catalogOf(join(out, 'catalog-common.seg'))).about.revision).toBe(4)
+    expect((await catalogOf(join(out, 'catalog-es-419.seg'))).about.revision).toBe(9)
+  })
+
+  test('a previous id that is not 64 hex digits is a usage error', async () => {
+    const result = await run(sample(temp(), ['--previous-common', 'abc']))
+    expect(result.code).toBe(1)
+  })
+
+  test('builds against a published common catalog', async () => {
+    const a = temp()
+    const b = temp()
+    expect((await run(sample(a, ['--revision-common', '5', '--revision-lang', '2']))).code).toBe(0)
+    const result = await run(sample(b, ['--revision-lang', '2', '--common', a]))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    expect(existsSync(join(b, 'catalog-common.seg'))).toBe(false)
+    const common = await catalogOf(join(a, 'catalog-common.seg'))
+    const { id } = await readSegment(read(join(a, 'catalog-common.seg')), { known: KNOWN.catalog, expectedClass: 'catalog' })
+    const language = await catalogOf(join(b, 'catalog-es-419.seg'))
+    expect(language.requires![0][0]).toBe('common')
+    expect(language.requires![0][1]).toBe(common.about.revision)
+    expect(hex(language.requires![0][2])).toBe(id)
+    expect(readFileSync(join(b, 'catalog-es-419.seg')).equals(readFileSync(join(a, 'catalog-es-419.seg')))).toBe(true)
+    // Same language segments as A's, and no common one
+    const after = snapshot(b, 'segments')
+    const before = snapshot(a, 'segments')
+    const names = Object.keys(after)
+    expect(names.length).toBeGreaterThan(0)
+    expect(names.length).toBeLessThan(Object.keys(before).length)
+    for (const name of names) expect(after[name]).toBe(before[name])
+    for (const entry of language.segments) expect(names).toContain(`segments/${hex(entry.id)}.seg`)
+  })
+
+  test('a common catalog without the books orig fails with exit 2', async () => {
+    const a = temp()
+    const b = temp()
+    const lists = listsWithAnotherBook(temp())
+    expect((await run(['--list', lists.list, '--originals', lists.originals, '--parts', PARTS, '--out', a, '--built', BUILT, '--books', 'tit'])).code).toBe(0)
+    const result = await run(['--list', lists.list, '--originals', lists.originals, '--parts', PARTS, '--out', b, '--built', BUILT, '--books', 'rut', '--common', a])
+    expect(result.code).toBe(2)
+    expect(result.err.join('\n')).toContain('common catalog lacks orig:rut')
+  })
+
+  test('--common must be a folder with catalog-common.seg', async () => {
+    expect((await run(sample(temp(), ['--common', temp()]))).code).toBe(1)
+  })
+
+  test('old segments are removed', async () => {
+    const out = temp()
+    mkdirSync(join(out, 'segments'), { recursive: true })
+    const stray = join(out, 'segments', `ff${'00'.repeat(31)}.seg`)
+    writeFileSync(stray, 'old')
+    expect((await run(sample(out))).code).toBe(0)
+    expect(existsSync(stray)).toBe(false)
+    expect(readdirSync(join(out, 'segments')).length).toBeGreaterThan(0)
+  })
+})
