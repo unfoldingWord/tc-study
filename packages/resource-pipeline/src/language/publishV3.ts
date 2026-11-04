@@ -50,7 +50,7 @@ type Model = ReturnType<typeof catalogView>
 /** Everything of a catalog but `about` (its revision and previous id change on every build). */
 const content = (m: Model): string => canonical({ resources: m.resources, segments: m.segments, units: m.units, requires: m.requires ?? null, complements: m.complements ?? null })
 
-type Planned = { name: string; bytes: Uint8Array; model: Model }
+type Planned = { name: string; bytes: Uint8Array; model: Model; id: string }
 
 /** Uploads the folder `build-v3` wrote: segments first, then the catalogs, then the registry; nothing outside the three key shapes. */
 export async function publishV3(o: {
@@ -61,7 +61,7 @@ export async function publishV3(o: {
   log: (line: string) => void
 }): Promise<{ outcome: 'published' | 'unchanged'; uploaded: string[]; skipped: string[] }> {
   const { bucket, outDir, lang, log } = o
-  if (!/^[a-z0-9-]+$/.test(lang) || lang === 'common') throw new Error(`Not a language for a format 3 upload: ${JSON.stringify(lang)}`)
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(lang) || lang === 'common') throw new Error(`Not a language for a format 3 upload: ${JSON.stringify(lang)}`)
   const uploaded: string[] = []
   const skipped: string[] = []
   const file = (name: string): string => join(outDir, name)
@@ -75,13 +75,13 @@ export async function publishV3(o: {
       throw new Error(`The build folder has no ${path}`)
     }
     const bytes = bytesOf(path)
-    const { model } = await readCatalog(bytes)
+    const { model, id } = await readCatalog(bytes)
     const before = name === 'common' ? published.common : published.lang
     if (before !== undefined && content((await readCatalog(before.bytes)).model) === content(model)) {
       log(`catalog ${name}: unchanged (revision ${before.revision})`)
       continue
     }
-    planned.push({ name, bytes, model })
+    planned.push({ name, bytes, model, id })
   }
 
   const registryFile = `registry-${lang}.json`
@@ -97,17 +97,20 @@ export async function publishV3(o: {
   // The segments the catalogs to put name, in id order.
   const classes = new Map<string, string>()
   for (const { model } of planned) for (const entry of model.segments) classes.set(hex(entry.id), entry.class)
-  // The common catalog this run does not put must already be published, be the one the language catalog requires, and have its segments.
+  // The language catalog must require the common catalog that will be in the bucket: the one put in this run, or else the published one
+  // (which then needs its segments in the bucket too).
   const commonIds: string[] = []
   const language = planned.find(({ name }) => name === lang)
-  if (!o.publishCommon && language !== undefined) {
-    if (published.common === undefined) throw new Error('The common catalog is not published; the language catalog requires it and none was put')
+  if (language !== undefined) {
+    const putCommon = planned.find(({ name }) => name === 'common')
+    const there = putCommon !== undefined ? { revision: putCommon.model.about.revision, id: putCommon.id } : published.common
+    if (there === undefined) throw new Error('The common catalog is not published; the language catalog requires it and none was put')
     const required = language.model.requires?.find(([name]) => name === 'common')
     if (required === undefined) throw new Error(`The catalog ${lang} does not require the common catalog`)
-    if (required[1] !== published.common.revision || hex(required[2]) !== published.common.id) {
-      throw new Error(`The catalog ${lang} requires common revision ${required[1]} id ${hex(required[2])}, and the published one is revision ${published.common.revision} id ${published.common.id}`)
+    if (required[1] !== there.revision || hex(required[2]) !== there.id) {
+      throw new Error(`The catalog ${lang} requires common revision ${required[1]} id ${hex(required[2])}, and the common catalog of the bucket after this run is revision ${there.revision} id ${there.id}`)
     }
-    for (const entry of (await readCatalog(published.common.bytes)).model.segments) commonIds.push(hex(entry.id))
+    if (putCommon === undefined) for (const entry of (await readCatalog(published.common!.bytes)).model.segments) commonIds.push(hex(entry.id))
   }
   const ids = [...classes.keys()].sort()
   for (const id of ids) {

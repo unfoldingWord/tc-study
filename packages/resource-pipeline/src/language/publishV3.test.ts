@@ -150,6 +150,15 @@ describe('publishV3', () => {
     expect(bucket.puts).toEqual([])
   })
 
+  test('publishCommon true with an unchanged common but a language catalog that requires the new common id throws, nothing put', async () => {
+    const bucket = memoryBucket()
+    await run(bucket, copy())
+    bucket.puts.length = 0
+    const rebuilt = await build(['--revision', '2'])
+    await expect(run(bucket, rebuilt)).rejects.toThrow(/requires common revision 2 id [0-9a-f]{64}, and the common catalog of the bucket after this run is revision 1 id [0-9a-f]{64}/)
+    expect(bucket.puts).toEqual([])
+  })
+
   test('a changed registry alone is put, without segments or catalogs', async () => {
     const bucket = memoryBucket()
     await run(bucket, copy())
@@ -188,7 +197,7 @@ describe('publishV3', () => {
   })
 
   test('a lang that is common or not a language code throws; publishCommon true needs catalog-common.seg', async () => {
-    for (const lang of ['common', 'a/b', '..', 'ES']) await expect(publishV3({ bucket: memoryBucket(), outDir: copy(), lang, publishCommon: true, log: () => {} })).rejects.toThrow(/Not a language/)
+    for (const lang of ['common', 'a/b', '..', 'ES', 'a--b', '-a']) await expect(publishV3({ bucket: memoryBucket(), outDir: copy(), lang, publishCommon: true, log: () => {} })).rejects.toThrow(/Not a language/)
     const dir = copy()
     rmSync(join(dir, 'catalog-common.seg'))
     await expect(run(memoryBucket(), dir)).rejects.toThrow(/no catalog-common.seg/)
