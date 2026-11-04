@@ -89,3 +89,15 @@ Parts A and B's Global Constraints hold. In addition:
 ## After Task C7 (controller)
 
 Final review with three Opus reviewers (spec and readers; builder and catalog; Python, query and command line), one fix wave, one scoped re-review, "Deviations from this plan" appended here, then `FIN:` with the commit range, the gate numbers and the open items. Every reviewer dispatch starts with the format 3 project exception. A supervisor 15-minute check runs for the whole of part C (`.claude/lp3-controller.md`).
+
+## Deviations from this plan
+
+Recorded by the controller at the end of part C (commits `704378f4..db300242`).
+
+- **Partition below one letter.** One-letter groups left English `a`, `t`, `w` over 262 144 B and `th` alone at 469 766 B. Groups are now prefix ranges: ends are 1–6 characters `[a-z]([a-z ]{0,4}[a-z])?`, `P-Q` holds a key iff `P <= key` and `key.slice(0, len(Q)) <= Q` by code point; `ALIGNED_PARTS` is 16 contiguous ranges (largest 249 991 B on English) plus `other` (catalog-aware: keys outside every range the catalog lists). One phrase lookup still opens one part.
+- **Option 2 wording in tasks ignored**; only Option 1 (parts by start of key) was built.
+- **Extra E_BODY rules** after the Python reader (both readers): a `strongs` table repeating a text; `s=0` or Strong key with `b=0`; `P-Q` with `P > Q`; unit id `aligned:{x}` whose `x` is not a valid group; empty key; repeated Strong index in an entry. `optional` appears in the reader output of `units`; "no unit lists an aligned unit in `needs`" and "aligned units list no `needs`" are builder rules (the builder throws), readers do not check; ordering and non-overlap of aligned units are builder rules too.
+- **Added beyond the plan:** `answers.py --whole` and `spec/tests/queries/whole.ts` (independent whole-language check of the three fixed queries); report line `aligned: on|off, N units`.
+- **Final-review fixes:** TS now rejects header `v != 1` for every class (as Python did); the spec says a catalog listing `aligned` units needs a part C reader (older readers: E_BODY on the catalog, E_HEADER on the segment); docs and unit-id/group assertions in the query tests.
+
+Open items (not done): fixed aligned conformance case in `spec/tests`; `src/read/output.ts:193` calls `alignedView` without groups (catalog-aware `other` check never runs in `readerOutput`); non-Latin languages all land in `other` with no size guard; a TS `read` test with a hand-built `v:2` body; `unitsOf` doc comma; aligned `inputs` hash tN rows (needless rebuild); `res` tag last-wins; measure script no longer prints verse refs; 249 985 → 249 991 B drift not bisected; `answers.py` uses `.lower()` not `toLocaleLowerCase(lang)`.
