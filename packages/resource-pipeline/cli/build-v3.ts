@@ -3,7 +3,7 @@
  *
  *   bun packages/resource-pipeline/cli/build-v3.ts --list <lang list.json> --originals <originals list.json> --parts <dir> --out <dir>
  *     [--books tit,rut] [--registry <dir>] [--revision <n>] [--built <RFC 3339>] [--publisher <name>]
- *     [--map-lang <lang>] [--map-list <list.json>] [--book-names <file>] [--topics <dir>]
+ *     [--map-lang <lang>] [--map-list <list.json>] [--book-names <file>] [--topics <dir>] [--aligned]
  *
  * The inputs are what phase 0 left on disk: the parts list of a language (`es-419/list.json`, its `language` says which language
  * this is), the list of the originals (`originals/list.json`) and the folder with the `<sha256>.part.gz` files both name. Only the
@@ -23,6 +23,10 @@
  * With `--topics <dir>` (the sources folder: `tipnr/*.txt`, `theographic/{events,verses,people,places}.json`,
  * `en_obs/obs-repo/content/NN.md`) the common part also gets the `xtopics` segments and the language its `topics` segments. The map
  * segments are the same bytes with or without it.
+ *
+ * `--aligned` (a flag with no value) also builds the optional `aligned:` units of the language, the index of aligned phrases of its bridge
+ * texts (GLT, GST, ULT, UST). The other segments are the same bytes with or without it; only the `aligned` segments and the language
+ * catalog (which lists them) are added or changed.
  *
  * Prints one line per segment: class, book or group, size in KB (1 KB = 1024 bytes) and the first 12 digits of the id. Exit code 0
  * when the folder is written, 1 for a usage error (the usage is printed), 2 for a build error (the message is printed).
@@ -62,7 +66,9 @@ export const USAGE =
   '  --map-lang   the language whose helps make the common map (default en; with no list for it, no common map)\n' +
   '  --map-list   the parts list of the map language, when it is not the language of --list (default: none)\n' +
   '  --book-names a JSON file {book: [name, short, abbreviation]} for the book names of the language map\n' +
-  '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/): builds the xtopics and the topics of the language'
+  '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/): builds the xtopics and the topics of the language\n' +
+  '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
+  '               every other segment is the same bytes with or without it'
 
 type Io = { log: (line: string) => void; error: (line: string) => void }
 
@@ -80,8 +86,10 @@ type Options = {
   mapList?: string
   bookNames?: string
   topics?: string
+  aligned: boolean
 }
 
+const BOOLEAN_FLAGS = ['aligned']
 const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
@@ -91,6 +99,12 @@ function flagsOf(argv: string[]): Map<string, string> {
   const flags = new Map<string, string>()
   for (let i = 0; i < argv.length; i += 2) {
     const name = argv[i]
+    if (name.startsWith('--') && BOOLEAN_FLAGS.includes(name.slice(2))) {
+      if (flags.has(name.slice(2))) throw new UsageError(`${name} is given twice`)
+      flags.set(name.slice(2), 'true')
+      i -= 1
+      continue
+    }
     if (!name.startsWith('--') || !VALUE_FLAGS.includes(name.slice(2))) throw new UsageError(`Unknown argument ${JSON.stringify(name)}`)
     const value = argv[i + 1]
     if (value === undefined || value.startsWith('--')) throw new UsageError(`The value of ${name} is missing`)
@@ -159,7 +173,7 @@ export function optionsFromArgs(argv: string[]): Options {
     if (texts.length !== 1) throw new UsageError(`--topics: ${join(topics, 'tipnr')} must have exactly one .txt file (the TIPNR file), it has ${texts.length}`)
   }
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, built, publisher, mapLang, mapList, bookNames, topics }
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned') }
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -290,6 +304,7 @@ async function build(o: Options, io: Io): Promise<void> {
     about,
     requires: [['common', o.revision, common.catalog.id]],
     topics,
+    aligned: o.aligned,
   })
 
   const articles = Object.keys(built.registry).length

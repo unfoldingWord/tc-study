@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { catalogView, hex, KNOWN, readerOutput, readSegment } from '@bt-synergy/language-pack-v3'
-import { main, USAGE } from './build-v3'
+import { main, optionsFromArgs, USAGE } from './build-v3'
 
 // The sample of es-419 Titus the language-pack-v3 package tests with: real parts, a trimmed list.
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
@@ -412,5 +412,29 @@ describe('build-v3: --topics', () => {
     const c = await run(sample(temp(), ['--topics', two]))
     expect(c.code).toBe(1)
     expect(c.err.join('\n')).toMatch(/--topics: .*exactly one \.txt file/)
+  })
+})
+
+describe('build-v3: --aligned', () => {
+  test('is a flag with no value: the other flags after it are still read, and giving it twice is a usage error', async () => {
+    const options = optionsFromArgs([...sample(temp()), '--aligned', '--revision', '3'])
+    expect(options.aligned).toBe(true)
+    expect(options.revision).toBe(3)
+    expect(optionsFromArgs(sample(temp())).aligned).toBe(false)
+    const twice = await run(sample(temp(), ['--aligned', '--aligned']))
+    expect(twice.code).toBe(1)
+    expect(twice.err.join('\n')).toMatch(/--aligned is given twice/)
+  })
+
+  test('leaves every other segment as the build without it', async () => {
+    const plain = temp()
+    const withAligned = temp()
+    expect((await run(sample(plain, []))).code).toBe(0)
+    const result = await run(sample(withAligned, ['--aligned']))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    const before = snapshot(plain, 'segments')
+    const after = snapshot(withAligned, 'segments')
+    for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
   })
 })
