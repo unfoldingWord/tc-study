@@ -64,6 +64,19 @@ def test_non_canonical_encodings_are_rejected():
     assert not ed25519.verify((1 | 1 << 255).to_bytes(32, "little"), msg, sig)
 
 
+def test_small_order_points_are_rejected():
+    msg = b"any message"
+    identity = (1).to_bytes(32, "little")
+    # A = R = identity and S = 0 satisfy [S]B = R + [k]A for every message: only the small-order rule rejects it
+    assert not ed25519.verify(identity, msg, identity + bytes(32))
+    # R of order 4 (y = 0) with a real key
+    pk, m, sig = (bytes.fromhex(x) for x in VECTORS[0])
+    assert not ed25519.verify(pk, m, bytes(32) + sig[32:])
+    # a key of order 8
+    order8 = bytes.fromhex("26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05")
+    assert not ed25519.verify(order8, m, sig)
+
+
 CASES = ["catalog-signed", "catalog-bad-sig", "catalog-unknown-key", "catalog-unsigned-published"]
 
 

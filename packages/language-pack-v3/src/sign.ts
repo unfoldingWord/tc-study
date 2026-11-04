@@ -63,7 +63,7 @@ export async function signCatalog(catalogFile: Uint8Array, privateKeyPkcs8: Uint
 const FIELD_P = 2n ** 255n - 19n
 
 /**
- * The canonical-encoding rule of `catalog.md` for a point (`R` or `A`), checked here and not left to WebCrypto, which accepts some
+ * The canonical-encoding and small-order rules of `catalog.md` for a point (`R` or `A`), checked here and not left to WebCrypto, which accepts some
  * encodings the spec rejects: `y >= p`, or `x = 0` (`y` is 1 or p - 1) with the sign bit set.
  */
 function canonicalPoint(bytes: Uint8Array): boolean {
@@ -73,6 +73,21 @@ function canonicalPoint(bytes: Uint8Array): boolean {
   if (y >= FIELD_P) return false
   return !(sign && (y === 1n || y === FIELD_P - 1n))
 }
+
+/** The 8 points of order 1, 2, 4 and 8 of the curve, in their canonical encoding (the rest of the small-order encodings are not canonical). */
+const SMALL_ORDER = new Set(
+  [
+    '0000000000000000000000000000000000000000000000000000000000000000',
+    '0000000000000000000000000000000000000000000000000000000000000080',
+    '0100000000000000000000000000000000000000000000000000000000000000',
+    '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05',
+    '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85',
+    'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
+    'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa',
+    'ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f',
+  ],
+)
+const smallOrder = (bytes: Uint8Array): boolean => SMALL_ORDER.has(toHex(bytes))
 
 const reject = (why: string): never => {
   throw new FormatError('E_SIGNATURE', `the catalog's signature is not accepted: ${why}`)
@@ -100,6 +115,8 @@ export async function checkSignatures(header: Header, id: Uint8Array, trusted: R
     let ok = false
     try {
       if (!canonicalPoint(publicKey) || !canonicalPoint(s.subarray(0, 32))) throw new Error('not canonical')
+      // Rejected here for every runtime: WebCrypto implementations disagree on A or R of small order (catalog.md).
+      if (smallOrder(publicKey) || smallOrder(s.subarray(0, 32))) throw new Error('small order')
       const imported = await crypto.subtle.importKey('raw', copy(publicKey), { name: 'Ed25519' }, false, ['verify'])
       ok = await crypto.subtle.verify('Ed25519', imported, copy(s), copy(id))
     } catch {

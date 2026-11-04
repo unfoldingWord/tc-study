@@ -206,6 +206,33 @@ describe('encodings and precedence the spec fixes', () => {
     expect(await codeOf(verifyCatalog(await withSig(published, [{ key: k.id, alg: 'ed25519', s }]), trust(k)))).toBe('E_SIGNATURE')
   })
 
+  test('S >= L is E_SIGNATURE (the same signature to the group, S + L)', async () => {
+    const k = await newKey()
+    const s = sigsOf(await signCatalog(published, k.privateKey))[0].s
+    const L = 2n ** 252n + 27742317777372353535851937790883648493n
+    let value = 0n
+    for (let i = 63; i >= 32; i--) value = (value << 8n) | BigInt(s[i])
+    value += L
+    expect(value < 2n ** 256n).toBe(true)
+    for (let i = 32; i < 64; i++) {
+      s[i] = Number(value & 0xffn)
+      value >>= 8n
+    }
+    expect(await codeOf(verifyCatalog(await withSig(published, [{ key: k.id, alg: 'ed25519', s }]), trust(k)))).toBe('E_SIGNATURE')
+  })
+
+  test('a public key or an R of small order is E_SIGNATURE, whatever the runtime does', async () => {
+    // A = R = identity and S = 0 satisfies [S]B = R + [k]A for every message; Bun accepts it, WebCrypto of other runtimes does not.
+    const identity = unhex('01' + '00'.repeat(31))
+    const file = await withKey(identity, unhex('01' + '00'.repeat(31) + '00'.repeat(32)))
+    expect(await codeOf(verifyCatalog(file, { [keyId(identity)]: identity }))).toBe('E_SIGNATURE')
+    // an honest key with R of order 4
+    const k = await newKey()
+    const s = sigsOf(await signCatalog(published, k.privateKey))[0].s
+    s.set(unhex('00'.repeat(32)), 0)
+    expect(await codeOf(verifyCatalog(await withSig(published, [{ key: k.id, alg: 'ed25519', s }]), trust(k)))).toBe('E_SIGNATURE')
+  })
+
   /** A published catalog whose `about.revision` is text (not valid), written by the writer so the hashes are right. */
   const badBody = async (): Promise<Uint8Array> => {
     const { seg } = await readSegment(published, { known: CATALOG_TABLES })

@@ -1,7 +1,8 @@
 """Ed25519 signature verification, RFC 8032 section 5.1 (pure Ed25519, no context). Standard library only.
 
 Strict: a signature whose ``S`` is not below the group order ``L`` is rejected, and so is any encoding of ``R`` or of
-the public key that is not canonical (``y >= p``, or ``x = 0`` with the sign bit set, or a ``y`` that is no point).
+the public key that is not canonical (``y >= p``, or ``x = 0`` with the sign bit set, or a ``y`` that is no point), and so
+is an ``R`` or a public key of small order (``[8]P`` is the identity).
 The check is the cofactorless equation ``[S]B = R + [k]A``. Written from the RFC's reference algorithm, not fast.
 """
 
@@ -82,6 +83,8 @@ def verify(public_key: bytes, message: bytes, signature: bytes) -> bool:
         return False
     r = _decompress(signature[:32])
     if r is None:
+        return False
+    if _equal(_mul(8, a), ZERO) or _equal(_mul(8, r), ZERO):
         return False
     s = int.from_bytes(signature[32:], "little")
     if s >= L:
