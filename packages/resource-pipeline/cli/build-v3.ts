@@ -321,6 +321,7 @@ async function build(o: Options, io: Io): Promise<void> {
     `common: ${countsOf(common.segments)}, catalog ${common.catalog.id.slice(0, 12)}`,
     `${lang}: ${countsOf(built.segments)}, catalog ${built.catalog.id.slice(0, 12)}`,
     registryLine,
+    `aligned: ${o.aligned ? 'on' : 'off'}, ${built.segments.filter(({ seg }) => seg.h.class === 'aligned').length} units`,
     '',
     ...common.report,
     ...built.report,

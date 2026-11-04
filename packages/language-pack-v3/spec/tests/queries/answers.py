@@ -1,6 +1,11 @@
 """Independent answers of the fixed queries (README.md of this folder).
 
 Usage: python -I -X utf8 answers.py <sample dir> <queries dir> [<sources dir>]
+       python -I -X utf8 answers.py --whole <aligned sources dir> <queries dir> <output file>
+
+`--whole` answers only the `phrase` queries, from the whole-language raw books of a sources folder (`<dir>/originals/list.json`,
+`<dir>/<lang>/list.json`, `<dir>/parts/<sha256>.part.gz`) instead of the sample, and writes `{query name: answer}` as JSON to
+`<output file>`. It never touches the query files.
 
 The kind `topic` is computed from the SOURCE files of part B (the TIPNR text and the English OBS stories in
 `<sources dir>`, else the environment variable LP3_SOURCES) and from the sample's originals and links; it is
@@ -691,7 +696,34 @@ def checks(world, strongs, missed):
     return out
 
 
+class WholeSample(Sample):
+    """The parts of the lists of a sources folder (`originals/`, one folder per language, `parts/`), as `Sample` has them."""
+
+    def __init__(self, folder):
+        self.folder = Path(folder)
+        self.parts = []
+        for sub in sorted(p.name for p in self.folder.iterdir() if (p / "list.json").is_file()):
+            lst = json.loads((self.folder / sub / "list.json").read_text(encoding="utf-8-sig"))
+            lang = "originals" if sub == "originals" else lst["language"]
+            self.parts.extend(dict(p, lang=lang) for p in lst["parts"])
+
+
+def main_whole():
+    sample = WholeSample(sys.argv[2])
+    qdir, target = Path(sys.argv[3]), Path(sys.argv[4])
+    world = load(sample)
+    answers = {}
+    for f in sorted(qdir.glob("*.json")):
+        q = json.loads(f.read_text(encoding="utf-8"))["query"]
+        if q["kind"] == "phrase":
+            answers[f.stem] = answer_phrase(world, sample, q)
+    target.write_text(json.dumps(answers, sort_keys=True, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    print(f"wrote {len(answers)} answers to {target}")
+
+
 def main():
+    if sys.argv[1:2] == ["--whole"]:
+        return main_whole()
     sample = Sample(sys.argv[1])
     qdir = Path(sys.argv[2])
     world = load(sample)

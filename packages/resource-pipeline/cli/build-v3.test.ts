@@ -426,15 +426,26 @@ describe('build-v3: --aligned', () => {
     expect(twice.err.join('\n')).toMatch(/--aligned is given twice/)
   })
 
-  test('leaves every other segment as the build without it', async () => {
+  test('adds the aligned segments, changes the language catalog, and leaves every other segment as the build without it', async () => {
     const plain = temp()
     const withAligned = temp()
-    expect((await run(sample(plain, []))).code).toBe(0)
+    const base = await run(sample(plain, []))
+    expect(base.code).toBe(0)
     const result = await run(sample(withAligned, ['--aligned']))
     expect(result.err).toEqual([])
     expect(result.code).toBe(0)
     const before = snapshot(plain, 'segments')
     const after = snapshot(withAligned, 'segments')
     for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
+    // The flag has an effect: more segments, at least one `aligned`, another language catalog
+    expect(Object.keys(after).length).toBeGreaterThan(Object.keys(before).length)
+    const aligned = result.out.filter((line) => /^aligned\s/.test(line))
+    expect(aligned.length).toBeGreaterThan(0)
+    expect(base.out.some((line) => /^aligned\s/.test(line))).toBe(false)
+    expect(readFileSync(join(withAligned, 'catalog-es-419.seg')).equals(readFileSync(join(plain, 'catalog-es-419.seg')))).toBe(false)
+    expect(readFileSync(join(withAligned, 'catalog-common.seg')).equals(readFileSync(join(plain, 'catalog-common.seg')))).toBe(true)
+    // report.txt says how many units were built, 0 included
+    expect(readFileSync(join(plain, 'report.txt'), 'utf8')).toMatch(/^aligned: off, 0 units$/m)
+    expect(readFileSync(join(withAligned, 'report.txt'), 'utf8')).toContain(`aligned: on, ${aligned.length} units`)
   })
 })
