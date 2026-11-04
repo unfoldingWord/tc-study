@@ -407,7 +407,7 @@ The supervisor asks Abel one step at a time and does nothing until he says yes.
 - **S2. Pull requests**, as drafts: translation-helps-mcp into `v2`; tc-study into the branch Abel names (phase 2 has no PR yet). Note in the translation-helps-mcp PR that merging into `v2` deploys production, where `PACKS_V3` is `off`.
 - **S3. Staging Worker.** A Worker Preview of the translation-helps-mcp branch (`npx wrangler preview --config wrangler.toml`): it binds `language-packs-staging`, runs no crons and has `PACKS_V3=on`. Run with Abel's own `wrangler` login; Claude does not handle a token.
 - **S4. Publish to staging.** Abel runs `publish-v3` for `en` (66 books) and then `es-419`, in his own terminal with the `packs-staging` R2 credentials (and the staging signing key when Part C is done) in the environment, and `--parts` from a `publish-language --parts --no-upload` run of the same day. The workflow route (a dispatch from `master`) needs the tc-study PR merged and is for later.
-- **S5. Verify staging.** `verify-v3 --base <preview URL> --lang en --built …` and the same for `es-419` (with `--pubkey`), then S4 again: `unchanged`.
+- **S5. Verify staging.** `verify-v3 --base <preview URL> --lang en --built …` and the same for `es-419` (with `--pubkey`), then S4 again: `unchanged`. Fixed-query answers that differ from `expected` are warnings (the expected answers come from the fase0 sample and need the full 66-book common); `--strict-queries` makes them fail, and only a full-data staging run should use it.
 - **S6. Transfer on staging data.** Export `full` and `update` files from what S5 downloaded and import them between two folders with no network (step 3.5).
 
 Production (3.6) is not in this phase.
@@ -415,3 +415,5 @@ Production (3.6) is not in this phase.
 ## Deviations from this plan
 
 (The controller records them here as they happen.)
+
+- After a common revision bump, the languages published earlier require the old common id, which the Worker no longer serves until they are re-run. Staging order is therefore en first, then every language, and never unsigned to signed on the same bucket.

@@ -1,7 +1,7 @@
 /**
  * Check a published format 3 language over HTTP, with both readers (spec/serving.md is the contract).
  *
- *   bun packages/resource-pipeline/cli/verify-v3.ts --base <url> --lang <tag> --out <dir> [--built <v3-out dir>] [--python <path>] [--reader <lp3read.py>] [--pubkey <64 hex>]
+ *   bun packages/resource-pipeline/cli/verify-v3.ts --base <url> --lang <tag> --out <dir> [--built <v3-out dir>] [--python <path>] [--reader <lp3read.py>] [--pubkey <64 hex>] [--strict-queries]
  *
  * Downloads `{base}/v3/packs/{lang}/catalog`, `{base}/v3/packs/common/catalog` and every segment either names (`/v3/packs/seg/{id}`) into
  * `<out>` in the shape `build-v3` writes: `catalog-<lang>.seg`, `catalog-common.seg`, `segments/<id>.seg`. Then it checks
@@ -12,14 +12,17 @@
  *     the right bytes;
  *  4. both readers over `<out>` (the TypeScript `readerOutput` and `spec/reader-py/lp3read.py`, as `spec/tests/compare.ts` compares them,
  *     here on the files of the folder) give the same output;
- *  5. the fixed queries of `spec/tests/queries/` whose books the catalog holds answer as their `expected` (the independent answers).
+ *  5. the fixed queries of `spec/tests/queries/` whose books the catalog holds are answered. An answer that differs from `expected` is a
+ *     warning, not a failure: the expected answers were computed from the fase0 sample and need its data and the full 66-book common, so live
+ *     data that moved (or a partial build) differs without being wrong. `--strict-queries` makes a difference a failure. A query that
+ *     cannot be answered at all (`error:`) always fails, as does every other check.
  *
  * The interpreter is `--python`, else `LP3_PYTHON`, else `python` (3.11 or later). `--reader` is another script for the Python reader
  * (tests use it to show that a difference is found). `--pubkey` is the raw Ed25519 public key (64 hex digits) the catalogs have to be
  * signed by: each downloaded catalog must verify against it (an unsigned or wrongly signed one fails the check `catalog signatures`),
  * and both readers read the catalogs with that key trusted (`readerOutput` with `trustedKeys`, `lp3read.py --trusted`).
  *
- * One line per check on stdout, then a last line `{"ok","segments","bytes","failures"}`. Exit 0 when ok, 1 when a check fails, 2 for
+ * One line per check on stdout, then a last line `{"ok","segments","bytes","failures","warnings"}`. Exit 0 when ok, 1 when a check fails, 2 for
  * bad arguments, an unusable interpreter or a network failure (the base does not answer).
  */
 
@@ -33,7 +36,7 @@ import { runQueries } from '../../language-pack-v3/spec/tests/queries/run'
 class UsageError extends Error {}
 class NetworkError extends Error {}
 
-export const USAGE = 'Usage: verify-v3 --base <url> --lang <tag> --out <dir> [--built <v3-out dir>] [--python <path>] [--reader <lp3read.py>] [--pubkey <64 hex>]'
+export const USAGE = 'Usage: verify-v3 --base <url> --lang <tag> --out <dir> [--built <v3-out dir>] [--python <path>] [--reader <lp3read.py>] [--pubkey <64 hex>] [--strict-queries]'
 
 type Io = { log: (line: string) => void; error: (line: string) => void; out?: (line: string) => void }
 type Env = Record<string, string | undefined>
@@ -42,7 +45,9 @@ const VALUE_FLAGS = ['base', 'lang', 'out', 'built', 'python', 'reader', 'pubkey
 const TAG = /^[a-z]{2,3}(-[a-z0-9]{1,8})*$/
 const SPEC_TESTS = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests')
 
-function parse(argv: string[]): { base: string; lang: string; out: string; built?: string; python?: string; reader?: string; pubkey?: Uint8Array } {
+function parse(args: string[]): { base: string; lang: string; out: string; built?: string; python?: string; reader?: string; pubkey?: Uint8Array; strictQueries: boolean } {
+  const strictQueries = args.includes('--strict-queries')
+  const argv = args.filter((a) => a !== '--strict-queries')
   const flags = new Map<string, string>()
   for (let i = 0; i < argv.length; i++) {
     const name = argv[i]
@@ -60,7 +65,7 @@ function parse(argv: string[]): { base: string; lang: string; out: string; built
   const pubkeyText = flags.get('pubkey')
   if (pubkeyText !== undefined && !/^[0-9a-fA-F]{64}$/.test(pubkeyText)) throw new UsageError('--pubkey must be 64 hex digits (a raw Ed25519 public key)')
   const pubkey = pubkeyText === undefined ? undefined : Uint8Array.from(pubkeyText.match(/../g)!, (pair) => parseInt(pair, 16))
-  return { pubkey, base: flags.get('base')!.replace(/\/+$/, ''), lang, out: flags.get('out')!, built: flags.get('built'), python: flags.get('python'), reader: flags.get('reader') }
+  return { pubkey, base: flags.get('base')!.replace(/\/+$/, ''), lang, out: flags.get('out')!, built: flags.get('built'), python: flags.get('python'), reader: flags.get('reader'), strictQueries }
 }
 
 type Got = { status: number; headers: Headers; bytes: Uint8Array; bodyError?: string }
@@ -130,6 +135,7 @@ async function readersDisagree(file: string, python: string, reader: string, pub
 
 export async function main(argv: string[], env: Env = process.env, io: Io = { log: console.log, error: console.error, out: console.log }): Promise<number> {
   const failures: string[] = []
+  const warnings: string[] = []
   let segments = 0
   let bytesTotal = 0
   /** One line per check: ok, or FAIL with the first problem; every problem goes to `failures` (at most 5 a check). */
@@ -305,7 +311,15 @@ export async function main(argv: string[], env: Env = process.env, io: Io = { lo
           if (asked === 0) io.log(`ok   queries: 0 asked (${left} need books the common catalog lacks)`)
           else {
             const result = await runQueries(o.out, temp)
-            record('fixed queries', result.lines.filter((l) => !/: (ok|skipped)\b/.test(l)), `${asked} asked, ${result.skipped} skipped, ${left} left out`)
+            const differing = result.lines.filter((l) => !/: (ok|skipped)\b/.test(l))
+            // A query that threw is a failure; one whose answer differs from `expected` is one only with --strict-queries.
+            const broken = differing.filter((l) => o.strictQueries || /: error: /.test(l))
+            for (const l of differing) {
+              if (broken.includes(l)) continue
+              warnings.push(`fixed query ${l} (the expected answers come from the fase0 sample and need its data and the full 66-book common)`)
+              io.log(`WARN fixed query ${l}`)
+            }
+            record('fixed queries', broken, `${asked} asked, ${result.skipped} skipped, ${left} left out`)
           }
         } catch (error) {
           record('fixed queries', [error instanceof Error ? error.message : String(error)])
@@ -327,7 +341,7 @@ export async function main(argv: string[], env: Env = process.env, io: Io = { lo
     failures.push(`verify-v3: ${error instanceof Error ? error.message : String(error)}`)
   }
   const ok = failures.length === 0
-  ;(io.out ?? console.log)(JSON.stringify({ ok, segments, bytes: bytesTotal, failures }))
+  ;(io.out ?? console.log)(JSON.stringify({ ok, segments, bytes: bytesTotal, failures, warnings }))
   return ok ? 0 : 1
 }
 

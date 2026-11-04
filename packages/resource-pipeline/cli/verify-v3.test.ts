@@ -234,13 +234,19 @@ describe('verify-v3 fixed queries', () => {
     })
   })
 
-  test.skipIf(needsPython)('a query with a wrong expected fails', async () => {
+  test.skipIf(needsPython)('a query with a different expected is a warning, and fails with --strict-queries', async () => {
     await withServer({}, async (base) => {
-      const r = await run(base, python, temp(), { LP3_VERIFY_QUERIES: queriesWith({ ...titus, tables: {} }) })
-      expect(r.code).toBe(1)
-      expect(r.result!.failures.join('\n')).toContain('fixed queries')
+      const dir = queriesWith({ ...titus, tables: {} })
+      const r = await run(base, python, temp(), { LP3_VERIFY_QUERIES: dir })
+      expect(r.code).toBe(0)
+      expect(r.result!.ok).toBe(true)
+      expect(r.result!.failures).toEqual([])
+      expect(r.result!.warnings.join('\n')).toMatch(/fixed query tit: .*full 66-book common/)
+      const strict = await run(base, [...python, '--strict-queries'], temp(), { LP3_VERIFY_QUERIES: dir })
+      expect(strict.code).toBe(1)
+      expect(strict.result!.failures.join('\n')).toContain('fixed queries')
     })
-  })
+  }, 60000)
 })
 
 describe('verify-v3 --pubkey', () => {
