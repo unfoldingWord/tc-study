@@ -88,10 +88,10 @@ afterAll(() => {
 
 type Run = { code: number; lines: string[]; result: { ok: boolean; segments: number; bytes: number; failures: string[] } | undefined }
 
-async function run(base: string, extra: string[] = [], out = temp()): Promise<Run & { out: string }> {
+async function run(base: string, extra: string[] = [], out = temp(), env: Record<string, string | undefined> = {}): Promise<Run & { out: string }> {
   const lines: string[] = []
   const stdout: string[] = []
-  const code = await verify(['--base', base, '--lang', 'en', '--out', out, ...extra], { ...process.env }, { log: (l) => lines.push(l), error: (l) => lines.push(l), out: (l) => stdout.push(l) })
+  const code = await verify(['--base', base, '--lang', 'en', '--out', out, ...extra], { ...process.env, ...env }, { log: (l) => lines.push(l), error: (l) => lines.push(l), out: (l) => stdout.push(l) })
   return { code, lines, out, result: stdout.length > 0 ? JSON.parse(stdout[stdout.length - 1]) : undefined }
 }
 
@@ -111,8 +111,10 @@ const segmentPath = (): string => {
 }
 
 describe('verify-v3', () => {
-  test('exits 2 on a usage error or an unreachable base', async () => {
-    expect((await run('http://127.0.0.1:1', [])).code).toBe(2)
+  test.skipIf(needsPython)('exits 2 on a usage error or an unreachable base', async () => {
+    const down = await run('http://127.0.0.1:1', python)
+    expect(down.code).toBe(2)
+    expect(down.lines.join(' ')).toContain('cannot reach')
     const lines: string[] = []
     expect(await verify(['--lang', 'en'], {}, { log: (l) => lines.push(l), error: (l) => lines.push(l), out: (l) => lines.push(l) })).toBe(2)
     expect(await verify(['--base', 'http://x', '--lang', 'en', '--out', temp(), '--pubkey', 'ab'], {}, { log: () => {}, error: () => {}, out: () => {} })).toBe(2)
@@ -142,7 +144,8 @@ describe('verify-v3', () => {
         const r = await run(base, python)
         expect(r.code).toBe(1)
         expect(r.result!.ok).toBe(false)
-        expect(r.result!.failures.join('\n')).toContain(target.slice(-64))
+        expect(r.result!.failures[0]).toStartWith('segment ' + target.slice(-64))
+        expect(r.result!.failures.join(' ')).toMatch(/E_[A-Z]+/)
       },
     )
   })
@@ -152,7 +155,7 @@ describe('verify-v3', () => {
     await withServer({ mutate: (p, b) => (p === target ? Uint8Array.from([...b, 0]) : b) }, async (base) => {
       const r = await run(base, python)
       expect(r.code).toBe(1)
-      expect(r.result!.failures.join('\n')).toMatch(/length|size/)
+      expect(r.result!.failures.join('\n')).toMatch(/length is/)
     })
   })
 
@@ -206,4 +209,35 @@ describe('verify-v3', () => {
     })
   })
 
+})
+
+describe('verify-v3 fixed queries', () => {
+  // The fixture holds Titus only, so the fixed queries of the spec are out; these two are written by hand for it.
+  const titus = {
+    book: 'tit',
+    coverage: { 'unfoldingWord/el-x-koine/ugnt': 'whole', 'unfoldingWord/en/tn': 'whole', 'unfoldingWord/en/twl': 'whole' },
+    kind: 'book',
+    tables: { links: { keys: 93, unit: 'links' }, notes: { keys: 28, unit: 'notes' }, strong: { keys: 300, unit: 'occurrences' } },
+  }
+  const queriesWith = (expected: unknown): string => {
+    const dir = temp()
+    writeFileSync(join(dir, 'tit.json'), JSON.stringify({ query: { kind: 'book', book: 'tit' }, expected }))
+    return dir
+  }
+
+  test.skipIf(needsPython)('a query whose book is in the catalog is asked and passes', async () => {
+    await withServer({}, async (base) => {
+      const r = await run(base, python, temp(), { LP3_VERIFY_QUERIES: queriesWith(titus) })
+      expect(r.code).toBe(0)
+      expect(r.lines.join('\n')).toMatch(/fixed queries: 1 asked/)
+    })
+  })
+
+  test.skipIf(needsPython)('a query with a wrong expected fails', async () => {
+    await withServer({}, async (base) => {
+      const r = await run(base, python, temp(), { LP3_VERIFY_QUERIES: queriesWith({ ...titus, tables: {} }) })
+      expect(r.code).toBe(1)
+      expect(r.result!.failures.join('\n')).toContain('fixed queries')
+    })
+  })
 })

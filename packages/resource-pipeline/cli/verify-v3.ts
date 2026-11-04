@@ -198,7 +198,7 @@ export async function main(argv: string[], env: Env = process.env, io: Io = { lo
           try {
             await readSegment(got.bytes, { known: KNOWN[entry.class as keyof typeof KNOWN] ?? {}, expectedId: id, expectedClass: entry.class as 'xmap' })
           } catch (error) {
-            problems.push(`id ${id}: ${error instanceof Error ? error.message : String(error)}`)
+            problems.push(`id ${id}: ${(error as { code?: string }).code ?? 'error'} ${error instanceof Error ? error.message : String(error)}`)
           }
         }
         save(`segments/${id}.seg`, got.bytes)
@@ -253,7 +253,7 @@ export async function main(argv: string[], env: Env = process.env, io: Io = { lo
 
     // 5. Both readers over the folder
     {
-      const files = [...catalogs.map((c) => join(o.out, c.file)), ...readdirSync(join(o.out, 'segments')).filter((f) => f.endsWith('.seg')).map((f) => join(o.out, 'segments', f))]
+      const files = [...catalogs.map((c) => join(o.out, c.file)), ...[...wanted.keys()].filter((id) => existsSync(join(o.out, 'segments', `${id}.seg`))).map((id) => join(o.out, 'segments', `${id}.seg`))]
       const problems: string[] = []
       for (const file of files) {
         const why = await readersDisagree(file, python, reader)
@@ -265,7 +265,8 @@ export async function main(argv: string[], env: Env = process.env, io: Io = { lo
     // 6. The fixed queries whose books the catalogs hold
     {
       const common = catalogs.find((c) => c.name === 'common')
-      const dir = join(SPEC_TESTS, 'queries')
+      // LP3_VERIFY_QUERIES: another queries folder, for tests. A query with no book (Strong key, concept, phrase) needs all 66 originals, so a partial publication skips those.
+      const dir = env.LP3_VERIFY_QUERIES ?? join(SPEC_TESTS, 'queries')
       if (common === undefined || !existsSync(dir)) io.log('skip queries: no common catalog or no queries folder')
       else {
         const origs = new Set(common.model.units.filter((u) => u.id.startsWith('orig:')).map((u) => u.id.slice('orig:'.length)))
