@@ -8,7 +8,7 @@
 ; the first a letter ("a", "ar-b", "the -thf"); the end Q of a range (and a lone prefix, which is P-P) also ends in a letter, never a space, or the group is "other". A key (after NFC and lowercase, below) is in the range P-Q
 ; iff P <= key and key.slice(0, len(Q)) <= Q, both by code point (a key shorter than Q is compared as it is). So the key "as" is
 ; in "ar-b" and the key "t" is in "t-td" and not in "ta-tz". The builder's table of parts is contiguous in code point order, with
-; no overlap and no hole (the units of one catalog are a subset of it, in order and without overlap, since a part with no key is not built), so a key whose characters after the first are not letters ("a'x") falls into the range of its
+; no overlap and no hole (the units of one catalog are a subset of it, in order and without overlap, since a part with no key is not built; that is a rule of the builder, and a reader does not check it), so a key whose characters after the first are not letters ("a'x") falls into the range of its
 ; neighbours in the table. The partition table is the builder's and is not in the segment: a reader gets the ranges from the catalog, from
 ; the ids of its "aligned:{part}" units. The part of a key is the aligned unit of the catalog whose range holds it; if no
 ; unit's range holds it, "aligned:other". "other" thus holds every key outside all the listed ranges (a first character that
@@ -47,7 +47,8 @@ aligned-group = tstr .regexp "[a-z][a-z ]{0,5}-[a-z]([a-z ]{0,4}[a-z])?|[a-z]([a
 ; - Per Strong key and book: the distinct verses (a verse event with a range "1-2" counts as the verse of its first
 ;   number) and the occurrences. An occurrence is one appearance of the entry in a text, counted once for each distinct
 ;   Strong key of its aligned positions. Each text adds its own occurrences; a verse in two texts is one verse. So a
-;   phrase found in one text only has its verse once and the occurrences of that text.
+;   phrase found in one text only has its verse once and the occurrences of that text. A phrase may run across a verse
+;   event; it counts in the verse of its first word.
 aligned-tables = {
   "keys": texts,               ; required, v1; the keys, sorted by code point, no repeat
   "strongs": strtab,           ; required, v1; the Strong keys the entries use, each once (a text twice is E_BODY); the builder writes the most used first
