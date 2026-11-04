@@ -89,6 +89,20 @@ describe('language-packs.yml format 3 steps', () => {
     expect(step.env).toBeUndefined()
   })
 
+  test('the format 3 step is skipped without topics and fails without the signing key when it would upload', () => {
+    const run = find('Build and publish format 3').run as string
+    const skip = run.indexOf('if [ "$TOPICS_OUTCOME" != success ]')
+    const key = run.indexOf('if [ "$MODE" != no-upload ] && [ -z "$PACKS_V3_SIGNING_KEY" ]')
+    expect(skip).toBeGreaterThan(-1)
+    expect(key).toBeGreaterThan(skip)
+    expect(run.indexOf('publish-v3.ts')).toBeGreaterThan(key)
+    // --topics is never conditional
+    expect(run).toContain('args+=(--topics "$RUNNER_TEMP/topics")')
+    expect(run).not.toMatch(/if \[ "\$TOPICS_OUTCOME" = success \]/)
+    expect(run.slice(skip, key)).toContain('exit 0')
+    expect(run.slice(key, run.indexOf('work="$RUNNER_TEMP/packs-work"'))).toContain('exit 1')
+  })
+
   test('the format 3 step maps the 2.0 work folder to publish-v3', () => {
     const run = find('Build and publish format 3').run as string
     for (const part of ['publish-v3.ts', '--list', '--originals', '--parts "$work/parts"', '--aligned', '--topics "$RUNNER_TEMP/topics"', '--no-upload'])

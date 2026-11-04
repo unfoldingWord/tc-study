@@ -58,7 +58,7 @@ const run = (bucket: PackBucket, outDir: string, publishCommon = true) => publis
 const keys = (bucket: ReturnType<typeof memoryBucket>) => bucket.puts.map((put) => put.key)
 
 describe('publishV3', () => {
-  test('uploads segments, then common, then the language catalog, then the registry', async () => {
+  test('uploads segments, then the registry, then common, then the language catalog', async () => {
     const bucket = memoryBucket()
     const result = await run(bucket, copy())
     expect(result.outcome).toBe('published')
@@ -67,7 +67,7 @@ describe('publishV3', () => {
     const segs = order.filter((key) => key.startsWith('v3/seg/'))
     expect(segs.length).toBeGreaterThan(2)
     expect(segs).toEqual([...segs].sort())
-    expect(order.slice(segs.length)).toEqual([V3_KEYS.catalog('common'), V3_KEYS.catalog(LANG), V3_KEYS.registry(LANG)])
+    expect(order.slice(segs.length)).toEqual([V3_KEYS.registry(LANG), V3_KEYS.catalog('common'), V3_KEYS.catalog(LANG)])
     expect(order.slice(0, segs.length)).toEqual(segs)
     expect(result.uploaded).toEqual(order)
   })

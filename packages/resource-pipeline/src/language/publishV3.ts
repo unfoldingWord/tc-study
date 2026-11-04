@@ -76,7 +76,7 @@ export async function sameAsPublished(published: Uint8Array, built: Uint8Array, 
 
 type Planned = { name: string; bytes: Uint8Array; model: Model; id: string }
 
-/** Uploads the folder `build-v3` wrote: segments first, then the catalogs, then the registry; nothing outside the three key shapes. */
+/** Uploads the folder `build-v3` wrote: segments first, then the registry, then the catalogs (common before the language); nothing outside the three key shapes. */
 export async function publishV3(o: {
   bucket: PackBucket
   outDir: string
@@ -160,15 +160,17 @@ export async function publishV3(o: {
     if (!(await bucket.has(V3_KEYS.seg(id)))) throw new Error(`Segment ${id} is not in the bucket after its upload; no catalog was put`)
   }
 
+  // The registry goes before the catalogs: one that is ahead of its catalog only reserves section numbers, while a catalog whose registry
+  // was lost could let a later run give a published number to another section (sections.ts).
+  if (registry !== undefined) {
+    await bucket.put(V3_KEYS.registry(lang), registry, { contentType: 'application/json', cacheControl: NO_CACHE })
+    uploaded.push(V3_KEYS.registry(lang))
+  }
   for (const { name, bytes } of planned) {
     const key = V3_KEYS.catalog(name)
     await bucket.put(key, bytes, { contentType: 'application/octet-stream', cacheControl: NO_CACHE })
     uploaded.push(key)
     log(`catalog ${name}: put`)
-  }
-  if (registry !== undefined) {
-    await bucket.put(V3_KEYS.registry(lang), registry, { contentType: 'application/json', cacheControl: NO_CACHE })
-    uploaded.push(V3_KEYS.registry(lang))
   }
   return { outcome: 'published', uploaded, skipped }
 }

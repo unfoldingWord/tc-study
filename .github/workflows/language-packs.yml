@@ -346,6 +346,24 @@ jobs:
           token="$(openssl rand -hex 16)"
           echo "::stop-commands::$token"
           trap 'echo "::$token::"' EXIT
+          mkdir -p "$RUNNER_TEMP/packs-out"
+          # A build without the topic sources would publish a common catalog without xtopics and drop the topics unit of the language:
+          # when that step failed, format 3 is skipped (not failed, the topic step already shows the failure) and says why.
+          if [ "$TOPICS_OUTCOME" != success ]; then
+            echo '{"outcome":"skipped","reason":"the topic sources step did not succeed"}' > "$RUNNER_TEMP/packs-out/v3-result.json"
+            {
+              echo
+              echo "### Format 3: $LANGUAGE"
+              echo "Outcome: \`skipped\`: the topic sources step did not succeed, and a build without topics must not be published"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # An upload without the key would put an unsigned catalog over a signed one: that fails this step (the 2.0 status is not touched).
+          if [ "$MODE" != no-upload ] && [ -z "$PACKS_V3_SIGNING_KEY" ]; then
+            echo "format 3: the signing secret is not set and this run would upload; nothing was uploaded" >&2
+            echo '{"outcome":"failed","reason":"the signing secret is not set"}' > "$RUNNER_TEMP/packs-out/v3-result.json"
+            exit 1
+          fi
           work="$RUNNER_TEMP/packs-work"
           lists=("$work"/catalog/*/"$LANGUAGE.json")
           if [ "${#lists[@]}" != 1 ] || [ ! -f "${lists[0]}" ]; then
@@ -359,10 +377,9 @@ jobs:
             (umask 077; printf '%s\n' "$PACKS_V3_SIGNING_KEY" > "$RUNNER_TEMP/sign.pem")
           fi
           args=(--lang "$LANGUAGE" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
-          if [ "$TOPICS_OUTCOME" = success ]; then args+=(--topics "$RUNNER_TEMP/topics"); fi
+          args+=(--topics "$RUNNER_TEMP/topics")
           if [ -f "$RUNNER_TEMP/sign.pem" ]; then args+=(--sign-key "$RUNNER_TEMP/sign.pem"); fi
           if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
-          mkdir -p "$RUNNER_TEMP/packs-out"
           status=0
           bun packages/resource-pipeline/cli/publish-v3.ts "${args[@]}" > "$RUNNER_TEMP/packs-out/v3-stdout.txt" || status=$?
           tail -n 1 "$RUNNER_TEMP/packs-out/v3-stdout.txt" > "$RUNNER_TEMP/packs-out/v3-result.json"
