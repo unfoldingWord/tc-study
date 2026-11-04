@@ -45,6 +45,7 @@ import {
   catalogView,
   hex,
   KNOWN,
+  signCatalog,
   readSegment,
   type Segment,
   ORIGINALS,
@@ -55,6 +56,7 @@ import {
   type XtopicsCore,
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
+import { readSigningKey, type SigningKey } from '../src/language/signKey'
 
 export class UsageError extends Error {}
 
@@ -76,6 +78,8 @@ export const USAGE =
   '  --map-list   the parts list of the map language, when it is not the language of --list (default: none)\n' +
   '  --book-names a JSON file {book: [name, short, abbreviation]} for the book names of the language map\n' +
   '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/): builds the xtopics and the topics of the language\n' +
+  '  --sign-key   a PKCS#8 PEM file of an Ed25519 key: both catalogs this build writes are signed with it (segments are the same bytes; the key is read\n' +
+  '               into memory and never printed or written)\n' +
   '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
   '               every other segment is the same bytes with or without it'
 
@@ -101,10 +105,11 @@ type Options = {
   bookNames?: string
   topics?: string
   aligned: boolean
+  signKey?: string
 }
 
 const BOOLEAN_FLAGS = ['aligned']
-const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common']
+const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -191,6 +196,8 @@ export function optionsFromArgs(argv: string[]): Options {
   for (const [name, path] of [['list', list], ['originals', originals], ...(bookNames === undefined ? [] : [['book-names', bookNames]]), ...(mapList === undefined ? [] : [['map-list', mapList]])]) {
     if (!existsSync(path) || !statSync(path).isFile()) throw new UsageError(`--${name}: ${path} is not a file`)
   }
+  const signKey = flags.get('sign-key')
+  if (signKey !== undefined && (!existsSync(signKey) || !statSync(signKey).isFile())) throw new UsageError(`--sign-key: ${signKey} is not a file`)
   if (!existsSync(parts) || !statSync(parts).isDirectory()) throw new UsageError(`--parts: ${parts} is not a directory`)
 
   if (topics !== undefined) {
@@ -207,7 +214,7 @@ export function optionsFromArgs(argv: string[]): Options {
     if (texts.length !== 1) throw new UsageError(`--topics: ${join(topics, 'tipnr')} must have exactly one .txt file (the TIPNR file), it has ${texts.length}`)
   }
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned') }
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key') }
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -384,6 +391,15 @@ async function build(o: Options, io: Io): Promise<void> {
     aligned: o.aligned,
   })
 
+  // Signing changes the header of a catalog and nothing its id is the hash of: the ids, and so every `requires` and every segment, stay.
+  let key: SigningKey | undefined
+  if (o.signKey !== undefined) {
+    key = await readSigningKey(o.signKey)
+    const sign = async (catalog: BuiltSegment): Promise<BuiltSegment> => ({ ...catalog, bytes: await signCatalog(catalog.bytes, key!.pkcs8) })
+    if (common.catalog !== undefined) common.catalog = await sign(common.catalog)
+    built.catalog = await sign(built.catalog)
+  }
+
   const articles = Object.keys(built.registry).length
   const registryLine =
     registryFile === undefined
@@ -398,6 +414,7 @@ async function build(o: Options, io: Io): Promise<void> {
     common.published ? `common: published, revision ${common.revision}, catalog ${common.catalogId.slice(0, 12)}` : `common: ${countsOf(common.segments)}, catalog ${common.catalogId.slice(0, 12)}`,
     `${lang}: ${countsOf(built.segments)}, catalog ${built.catalog.id.slice(0, 12)}`,
     registryLine,
+    `signed: ${key === undefined ? 'no' : `key ${key.keyId}`}`,
     `aligned: ${o.aligned ? 'on' : 'off'}, ${built.segments.filter(({ seg }) => seg.h.class === 'aligned').length} units`,
     '',
     ...common.report,

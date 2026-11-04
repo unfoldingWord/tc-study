@@ -360,6 +360,7 @@ jobs:
           fi
           args=(--lang "$LANGUAGE" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
           if [ "$TOPICS_OUTCOME" = success ]; then args+=(--topics "$RUNNER_TEMP/topics"); fi
+          if [ -f "$RUNNER_TEMP/sign.pem" ]; then args+=(--sign-key "$RUNNER_TEMP/sign.pem"); fi
           if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
           mkdir -p "$RUNNER_TEMP/packs-out"
           status=0
@@ -372,6 +373,11 @@ jobs:
             echo "Outcome: \`$outcome\` (exit $status)"
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
+
+      # The signing key file never outlives the step that wrote it: removed whatever the outcome (also when the step failed or the run was cancelled).
+      - name: Remove the format 3 signing key
+        if: always()
+        run: shred -u "$RUNNER_TEMP/sign.pem" 2> /dev/null || rm -f "$RUNNER_TEMP/sign.pem"
 
       # A cancelled or timed-out run counts as a failed one: left at «running» it would hold the dispatch for hours.
       # An ok parts status records the code the run built, from its result line (its lists' `code`, the one published),

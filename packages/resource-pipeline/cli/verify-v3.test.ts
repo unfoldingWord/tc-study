@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { main as publish } from './publish-v3'
 import { main as verify } from './verify-v3'
+import { testKey } from './testKey'
 
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
 const PYTHON = process.env.LP3_PYTHON
@@ -239,5 +240,56 @@ describe('verify-v3 fixed queries', () => {
       expect(r.code).toBe(1)
       expect(r.result!.failures.join('\n')).toContain('fixed queries')
     })
+  })
+})
+
+describe('verify-v3 --pubkey', () => {
+  let signedBucket = ''
+  let key: ReturnType<typeof testKey>
+  beforeAll(async () => {
+    key = testKey()
+    temps.push(key.dir)
+    signedBucket = temp()
+    const code = await publish(
+      ['--lang', 'en', '--list', join(DATA, 'en', 'list.json'), '--originals', join(DATA, 'originals', 'list.json'), '--parts', join(DATA, 'parts'), '--work', temp(), '--bucket-dir', signedBucket, '--sign-key', key.pem],
+      {},
+      { log: () => {}, error: () => {}, out: () => {} },
+    )
+    expect(code).toBe(0)
+  })
+  const against = async (dir: string, extra: string[]) => {
+    const server = fakeV3Server(dir)
+    try {
+      return await run(server.base, [...python, ...extra])
+    } finally {
+      server.stop()
+    }
+  }
+
+  test.skipIf(needsPython)('passes on a publication signed by the key, with both readers', async () => {
+    const r = await against(signedBucket, ['--pubkey', key.publicHex])
+    expect(r.lines.filter((l) => l.startsWith('FAIL'))).toEqual([])
+    expect(r.code).toBe(0)
+    expect(r.lines.some((l) => l.startsWith('ok   catalog signatures'))).toBe(true)
+  })
+
+  test.skipIf(needsPython)('fails on an unsigned publication', async () => {
+    const r = await against(bucket, ['--pubkey', key.publicHex])
+    expect(r.code).toBe(1)
+    expect(r.result!.failures.join(' ')).toContain('catalog signatures')
+    expect(r.result!.failures.join(' ')).toContain('signature is not accepted')
+  })
+
+  test.skipIf(needsPython)('fails on a publication signed by another key', async () => {
+    const other = testKey()
+    temps.push(other.dir)
+    const r = await against(signedBucket, ['--pubkey', other.publicHex])
+    expect(r.code).toBe(1)
+    expect(r.result!.failures.join(' ')).toContain('catalog signatures')
+  })
+
+  test.skipIf(needsPython)('without --pubkey a signed publication still passes', async () => {
+    const r = await against(signedBucket, [])
+    expect(r.code).toBe(0)
   })
 })

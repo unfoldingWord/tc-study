@@ -2,8 +2,9 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { catalogView, hex, KNOWN, readSegment } from '@bt-synergy/language-pack-v3'
+import { catalogView, hex, keyId, KNOWN, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
 import { commonFolderProblem, main } from './publish-v3'
+import { testKey } from './testKey'
 
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
 const ES = join(DATA, 'es-419', 'list.json')
@@ -270,5 +271,93 @@ describe('publish-v3: arguments', () => {
     for (const [path, value] of Object.entries(before)) expect(snapshot(bucket)[path]).toBe(value)
     expect(readdirSync(join(work, 'common', 'segments')).length).toBeGreaterThan(0)
     expect(existsSync(join(work, 'v3-out', 'catalog-common.seg'))).toBe(false)
+  })
+})
+
+describe('publish-v3 --sign-key', () => {
+  const trustedOf = (key: { publicKey: Uint8Array }) => ({ [keyId(key.publicKey)]: key.publicKey })
+  const signedBy = async (bucket: string, name: string, key: { publicKey: Uint8Array }): Promise<boolean> =>
+    verifyCatalog(new Uint8Array(readFileSync(join(bucket, 'v3', 'catalog', `${name}.seg`))), trustedOf(key)).then(() => true, () => false)
+  const newKey = () => {
+    const key = testKey()
+    temps.push(key.dir)
+    return key
+  }
+
+  test('catalogs are published signed; the same key again is unchanged and puts nothing', async () => {
+    const key = newKey()
+    const bucket = temp()
+    const first = await publish(en(bucket, EN, ['--sign-key', key.pem]))
+    expect(first.err.filter((l) => l.startsWith('publish-v3:'))).toEqual([])
+    expect(first.result.outcome).toBe('published')
+    expect(await signedBy(bucket, 'common', key)).toBe(true)
+    expect(await signedBy(bucket, 'en', key)).toBe(true)
+    expect((await publish(es(bucket, ES, ['--sign-key', key.pem]))).result.outcome).toBe('published')
+    expect(await signedBy(bucket, 'es-419', key)).toBe(true)
+
+    const before = snapshot(bucket)
+    for (const args of [en(bucket, EN, ['--sign-key', key.pem]), es(bucket, ES, ['--sign-key', key.pem])]) {
+      const run = await publish(args)
+      expect(run.code).toBe(0)
+      expect(run.result.outcome).toBe('unchanged')
+      expect(run.result.segments).toEqual({ uploaded: 0, present: 0 })
+    }
+    expect(snapshot(bucket)).toEqual(before)
+    // the key is nowhere in the log or the bucket
+    const pem = readFileSync(key.pem, 'utf8').split('\n')[1]
+    expect(JSON.stringify(Object.values(before))).not.toContain(Buffer.from(pem).toString('hex'))
+  })
+
+  test('a catalog equal apart from about but unsigned is republished signed, revision + 1; segments are not put again', async () => {
+    const key = newKey()
+    const bucket = temp()
+    await publish(en(bucket))
+    await publish(es(bucket))
+    const unsigned = await catalog(bucket, 'es-419')
+    const segmentsBefore = snapshot(bucket, 'v3/seg')
+
+    // map language: common and language republished signed
+    const run = await publish(en(bucket, EN, ['--sign-key', key.pem]))
+    expect(run.code).toBe(0)
+    expect(run.result.outcome).toBe('published')
+    expect(run.result.catalogs.common.revision).toBe(2)
+    expect(run.result.catalogs.lang.revision).toBe(2)
+    expect(await signedBy(bucket, 'common', key)).toBe(true)
+    expect(await signedBy(bucket, 'en', key)).toBe(true)
+    expect(snapshot(bucket, 'v3/seg')).toEqual(segmentsBefore)
+    expect(run.result.segments.uploaded).toBe(0)
+
+    // another language, now against the signed common
+    const second = await publish(es(bucket, ES, ['--sign-key', key.pem]))
+    expect(second.result.outcome).toBe('published')
+    expect(second.result.catalogs.lang.revision).toBe(unsigned.model.about.revision + 1)
+    expect(await signedBy(bucket, 'es-419', key)).toBe(true)
+    expect((await publish(es(bucket, ES, ['--sign-key', key.pem]))).result.outcome).toBe('unchanged')
+  })
+
+  test('a catalog signed by another key only is republished with this one', async () => {
+    const a = newKey()
+    const b = newKey()
+    const bucket = temp()
+    await publish(en(bucket, EN, ['--sign-key', a.pem]))
+    const run = await publish(en(bucket, EN, ['--sign-key', b.pem]))
+    expect(run.result.outcome).toBe('published')
+    expect(run.result.catalogs.lang.revision).toBe(2)
+    expect(await signedBy(bucket, 'en', b)).toBe(true)
+    expect(await signedBy(bucket, 'en', a)).toBe(false)
+  })
+
+  test('a missing or bad key file is refused before anything is put', async () => {
+    const bucket = temp()
+    mkdirSync(join(bucket, 'v3'), { recursive: true })
+    const before = snapshot(bucket)
+    const missing = await publish(en(bucket, EN, ['--sign-key', join(temp(), 'none.pem')]))
+    expect(missing.code).toBe(2)
+    const dir = temp()
+    writeFileSync(join(dir, 'bad.pem'), 'not a key SECRETWORD')
+    const bad = await publish(en(bucket, EN, ['--sign-key', join(dir, 'bad.pem')]))
+    expect(bad.code).toBe(1)
+    expect(bad.err.join('\n')).not.toContain('SECRETWORD')
+    expect(snapshot(bucket)).toEqual(before)
   })
 })

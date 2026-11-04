@@ -3,6 +3,7 @@
  *
  *   bun packages/resource-pipeline/cli/publish-v3.ts --lang <tag> --list <list.json> --originals <originals list.json> --parts <dir> --work <dir>
  *     [--bucket-dir <dir>] [--no-upload] [--map-lang en] [--map-list <list.json>] [--topics <dir>] [--aligned]
+ *     [--sign-key <PKCS#8 PEM file of an Ed25519 key>]
  *     [--books <list>]   (local tests only: refused with --lang equal to --map-lang unless --bucket-dir is given)
  *
  * The bucket: `--bucket-dir` (a folder, for local runs), else R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY (all four
@@ -28,7 +29,8 @@ import { isAbsolute, join, relative, resolve } from 'node:path'
 import { catalogView, hex, KNOWN, readSegment } from '@bt-synergy/language-pack-v3'
 import { dirBucket } from '../src/language/dirBucket'
 import { memoryBucket, oneLine, type PackBucket, r2Bucket } from '../src/language/publishLanguage'
-import { publishV3, readPublishedV3, sameCatalogContent, V3_KEYS } from '../src/language/publishV3'
+import { publishV3, readPublishedV3, sameAsPublished, V3_KEYS } from '../src/language/publishV3'
+import { readSigningKey, type SigningKey } from '../src/language/signKey'
 import { main as buildV3 } from './build-v3'
 
 class UsageError extends Error {}
@@ -59,6 +61,7 @@ type Options = {
   topics?: string
   aligned: boolean
   books?: string
+  signKey?: string
 }
 
 function parse(argv: string[]): Options {
@@ -87,7 +90,8 @@ function parse(argv: string[]): Options {
   if (!TAG.test(lang) || lang === 'common') throw new UsageError(`--lang ${JSON.stringify(lang)} is not a language tag for format 3 (lowercase letters, digits and hyphens; not "common")`)
   const mapLang = flags.get('map-lang') ?? 'en'
   if (!TAG.test(mapLang) || mapLang === 'common') throw new UsageError(`--map-lang ${JSON.stringify(mapLang)} is not a language tag`)
-  if (flags.has('sign-key')) throw new UsageError('--sign-key: signing is not implemented by build-v3 or publishV3 yet')
+  const signKey = flags.get('sign-key')
+  if (signKey !== undefined && (!existsSync(signKey) || !statSync(signKey).isFile())) throw new UsageError(`--sign-key: ${signKey} is not a file`)
   return {
     lang,
     list: need('list'),
@@ -101,6 +105,7 @@ function parse(argv: string[]): Options {
     topics: flags.get('topics'),
     aligned: flags.has('aligned'),
     books: flags.get('books'),
+    signKey,
   }
 }
 
@@ -171,6 +176,8 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
   if (!existsSync(o.parts) || !statSync(o.parts).isDirectory()) throw new UsageError(`--parts: ${o.parts} is not a directory`)
   const store = bucket ?? memoryBucket()
   const { lang } = o
+  // The key stays in memory: build-v3 reads the same file itself, and only the key id (public) is used here.
+  const signer: SigningKey | undefined = o.signKey === undefined ? undefined : await readSigningKey(o.signKey)
 
   await fetchParts(o, store, io)
 
@@ -213,6 +220,7 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
       ...(o.topics === undefined ? [] : ['--topics', o.topics]),
       ...(o.books === undefined ? [] : ['--books', o.books]),
       ...(o.aligned ? ['--aligned'] : []),
+      ...(o.signKey === undefined ? [] : ['--sign-key', o.signKey]),
     ]
     const code = await buildV3(args, { log: io.error, error: io.error })
     if (code !== 0) throw new BuildFailure(`build-v3 failed (exit ${code})`)
@@ -229,8 +237,8 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
     publishCommon = true
     if (published.common !== undefined) {
       const built = new Uint8Array(readFileSync(join(out, 'catalog-common.seg')))
-      if (await sameCatalogContent(published.common.bytes, built)) {
-        io.log(`catalog common: equal to the published revision ${published.common.revision}: its revision is not bumped`)
+      if (await sameAsPublished(published.common.bytes, built, signer)) {
+        io.log(`catalog common: equal to the published revision ${published.common.revision}${signer === undefined ? '' : ' and signed by this key'}: its revision is not bumped`)
         await build(true)
         publishCommon = false
       }
@@ -246,7 +254,7 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
     return { outcome: 'built', lang, catalogs: { ...(common ? { common } : {}), lang: (await catalogOut(lang))! }, segments: { uploaded: 0, present: 0 } }
   }
 
-  const result = await publishV3({ bucket: store, outDir: out, lang, publishCommon, log: io.error })
+  const result = await publishV3({ bucket: store, outDir: out, lang, publishCommon, signer, log: io.error })
   const put = (name: string): boolean => result.uploaded.includes(V3_KEYS.catalog(name))
   const common = put('common') ? await catalogOut('common') : published.common ? { revision: published.common.revision, id: published.common.id } : undefined
   const language = put(lang) ? (await catalogOut(lang))! : published.lang ? { revision: published.lang.revision, id: published.lang.id } : (await catalogOut(lang))!

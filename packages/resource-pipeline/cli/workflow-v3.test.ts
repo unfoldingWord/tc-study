@@ -70,9 +70,23 @@ describe('language-packs.yml format 3 steps', () => {
     const run = find('Build and publish format 3').run as string
     expect(run).toContain('umask 077')
     expect(run).toContain('stop-commands')
-    expect(run).not.toContain('--sign-key')
+    // the key is passed only when its file exists
+    expect(run).toContain('if [ -f "$RUNNER_TEMP/sign.pem" ]; then args+=(--sign-key "$RUNNER_TEMP/sign.pem"); fi')
+    expect((run.match(/sign\.pem/g) ?? []).length).toBe(3)
     expect(run).toMatch(/\[ -n "\$PACKS_V3_SIGNING_KEY" \]/)
     expect(find('Build and publish format 3').env?.PACKS_V3_SIGNING_KEY).toBe('${{ secrets.PACKS_V3_SIGNING_KEY }}')
+  })
+
+  test('an always() step deletes the key file after the format 3 step, before Status result', () => {
+    const remove = names.indexOf('Remove the format 3 signing key')
+    expect(remove).toBeGreaterThan(names.indexOf('Build and publish format 3'))
+    expect(remove).toBeLessThan(names.indexOf('Status result'))
+    const step = steps[remove]
+    expect(step.if).toBe('always()')
+    expect(step.run).toContain('$RUNNER_TEMP/sign.pem')
+    expect(step.run).toMatch(/shred -u|rm -f/)
+    expect(step.run).not.toMatch(/echo|cat|printf/)
+    expect(step.env).toBeUndefined()
   })
 
   test('the format 3 step maps the 2.0 work folder to publish-v3', () => {

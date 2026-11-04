@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { catalogView, hex, KNOWN, readSegment } from '@bt-synergy/language-pack-v3'
+import { catalogView, hex, KNOWN, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
 import { IMMUTABLE, NO_CACHE, type PackBucket } from './publishLanguage'
 
 /** The only keys format 3 writes (`spec/serving.md`). */
@@ -55,6 +55,25 @@ export async function sameCatalogContent(a: Uint8Array, b: Uint8Array): Promise<
   return content((await readCatalog(a)).model) === content((await readCatalog(b)).model)
 }
 
+/** Whether a published catalog carries a signature of the key `signer` (its id and raw public key) that verifies. */
+export async function signedBy(bytes: Uint8Array, signer: { keyId: string; publicKey: Uint8Array }): Promise<boolean> {
+  try {
+    await verifyCatalog(bytes, { [signer.keyId]: signer.publicKey })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Whether a published catalog already is what a build says: equal apart from `about` and, when a signer is given, signed by it. A catalog
+ * equal apart from `about` but unsigned (or signed by another key only) is not the same publication when this run signs.
+ */
+export async function sameAsPublished(published: Uint8Array, built: Uint8Array, signer?: { keyId: string; publicKey: Uint8Array }): Promise<boolean> {
+  if (!(await sameCatalogContent(published, built))) return false
+  return signer === undefined || (await signedBy(published, signer))
+}
+
 type Planned = { name: string; bytes: Uint8Array; model: Model; id: string }
 
 /** Uploads the folder `build-v3` wrote: segments first, then the catalogs, then the registry; nothing outside the three key shapes. */
@@ -63,6 +82,8 @@ export async function publishV3(o: {
   outDir: string
   lang: string
   publishCommon: boolean
+  /** The key this run signs with: a published catalog not signed by it is not `unchanged`. */
+  signer?: { keyId: string; publicKey: Uint8Array }
   log: (line: string) => void
 }): Promise<{ outcome: 'published' | 'unchanged'; uploaded: string[]; skipped: string[] }> {
   const { bucket, outDir, lang, log } = o
@@ -82,7 +103,7 @@ export async function publishV3(o: {
     const bytes = bytesOf(path)
     const { model, id } = await readCatalog(bytes)
     const before = name === 'common' ? published.common : published.lang
-    if (before !== undefined && content((await readCatalog(before.bytes)).model) === content(model)) {
+    if (before !== undefined && (await sameAsPublished(before.bytes, bytes, o.signer))) {
       log(`catalog ${name}: unchanged (revision ${before.revision})`)
       continue
     }

@@ -3,8 +3,9 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { catalogView, hex, KNOWN, readerOutput, readSegment } from '@bt-synergy/language-pack-v3'
+import { catalogView, hex, keyId, KNOWN, readerOutput, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
 import { main, optionsFromArgs, USAGE } from './build-v3'
+import { testKey } from './testKey'
 
 // The sample of es-419 Titus the language-pack-v3 package tests with: real parts, a trimmed list.
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
@@ -533,5 +534,43 @@ describe('build-v3: revisions, previous ids and a published common catalog', () 
     expect((await run(sample(out))).code).toBe(0)
     expect(existsSync(stray)).toBe(false)
     expect(readdirSync(join(out, 'segments')).length).toBeGreaterThan(0)
+  })
+})
+
+describe('build-v3 --sign-key', () => {
+  test('both catalogs verify with the public half of the key; segments are byte-equal to an unsigned build', async () => {
+    const key = testKey()
+    temps.push(key.dir)
+    const plain = temp()
+    const signed = temp()
+    expect((await run(sample(plain))).code).toBe(0)
+    const r = await run(sample(signed, ['--sign-key', key.pem]))
+    expect(r.code).toBe(0)
+    const trusted = { [keyId(key.publicKey)]: key.publicKey }
+    for (const name of ['catalog-common.seg', 'catalog-es-419.seg']) {
+      expect((await verifyCatalog(read(join(signed, name)), trusted)).valid).toBe(true)
+      // The id is of the body: the same as the unsigned build's
+      const a = await readSegment(read(join(plain, name)), { known: KNOWN.catalog, expectedClass: 'catalog' })
+      const b = await readSegment(read(join(signed, name)), { known: KNOWN.catalog, expectedClass: 'catalog' })
+      expect(b.id).toBe(a.id)
+      await expect(verifyCatalog(read(join(plain, name)), trusted)).rejects.toThrow()
+    }
+    const before = snapshot(plain, 'segments')
+    const after = snapshot(signed, 'segments')
+    expect(after).toEqual(before)
+    // the key never reaches the output or the folder
+    const pemText = readFileSync(key.pem, 'utf8').split('\n')[1]
+    expect([...r.out, ...r.err].join('\n')).not.toContain(pemText)
+    for (const text of Object.values(snapshot(signed))) expect(Buffer.from(text, 'hex').includes(pemText)).toBe(false)
+  })
+
+  test('a bad key file is a build error that does not print its content', async () => {
+    const dir = temp()
+    const file = join(dir, 'bad.pem')
+    writeFileSync(file, '-----BEGIN PRIVATE KEY-----\nc2VjcmV0LXRleHQ=\n-----END PRIVATE KEY-----\n')
+    const r = await run(sample(temp(), ['--sign-key', file]))
+    expect(r.code).toBe(2)
+    expect(r.err.join('\n')).not.toContain('c2VjcmV0LXRleHQ=')
+    expect((await run(sample(temp(), ['--sign-key', join(dir, 'missing.pem')]))).code).toBe(1)
   })
 })

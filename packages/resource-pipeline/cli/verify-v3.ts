@@ -1,7 +1,7 @@
 /**
  * Check a published format 3 language over HTTP, with both readers (spec/serving.md is the contract).
  *
- *   bun packages/resource-pipeline/cli/verify-v3.ts --base <url> --lang <tag> --out <dir> [--built <v3-out dir>] [--python <path>] [--reader <lp3read.py>]
+ *   bun packages/resource-pipeline/cli/verify-v3.ts --base <url> --lang <tag> --out <dir> [--built <v3-out dir>] [--python <path>] [--reader <lp3read.py>] [--pubkey <64 hex>]
  *
  * Downloads `{base}/v3/packs/{lang}/catalog`, `{base}/v3/packs/common/catalog` and every segment either names (`/v3/packs/seg/{id}`) into
  * `<out>` in the shape `build-v3` writes: `catalog-<lang>.seg`, `catalog-common.seg`, `segments/<id>.seg`. Then it checks
@@ -15,7 +15,9 @@
  *  5. the fixed queries of `spec/tests/queries/` whose books the catalog holds answer as their `expected` (the independent answers).
  *
  * The interpreter is `--python`, else `LP3_PYTHON`, else `python` (3.11 or later). `--reader` is another script for the Python reader
- * (tests use it to show that a difference is found). `--pubkey` is not here yet (Task 11).
+ * (tests use it to show that a difference is found). `--pubkey` is the raw Ed25519 public key (64 hex digits) the catalogs have to be
+ * signed by: each downloaded catalog must verify against it (an unsigned or wrongly signed one fails the check `catalog signatures`),
+ * and both readers read the catalogs with that key trusted (`readerOutput` with `trustedKeys`, `lp3read.py --trusted`).
  *
  * One line per check on stdout, then a last line `{"ok","segments","bytes","failures"}`. Exit 0 when ok, 1 when a check fails, 2 for
  * bad arguments, an unusable interpreter or a network failure (the base does not answer).
@@ -25,22 +27,22 @@ import { spawnSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { canonicalJson, catalogView, hex, KNOWN, readerOutput, readSegment, type CatalogModel } from '@bt-synergy/language-pack-v3'
+import { canonicalJson, catalogView, hex, keyId, KNOWN, readerOutput, readSegment, verifyCatalog, type CatalogModel } from '@bt-synergy/language-pack-v3'
 import { runQueries } from '../../language-pack-v3/spec/tests/queries/run'
 
 class UsageError extends Error {}
 class NetworkError extends Error {}
 
-export const USAGE = 'Usage: verify-v3 --base <url> --lang <tag> --out <dir> [--built <v3-out dir>] [--python <path>] [--reader <lp3read.py>]'
+export const USAGE = 'Usage: verify-v3 --base <url> --lang <tag> --out <dir> [--built <v3-out dir>] [--python <path>] [--reader <lp3read.py>] [--pubkey <64 hex>]'
 
 type Io = { log: (line: string) => void; error: (line: string) => void; out?: (line: string) => void }
 type Env = Record<string, string | undefined>
 
-const VALUE_FLAGS = ['base', 'lang', 'out', 'built', 'python', 'reader']
+const VALUE_FLAGS = ['base', 'lang', 'out', 'built', 'python', 'reader', 'pubkey']
 const TAG = /^[a-z]{2,3}(-[a-z0-9]{1,8})*$/
 const SPEC_TESTS = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests')
 
-function parse(argv: string[]): { base: string; lang: string; out: string; built?: string; python?: string; reader?: string } {
+function parse(argv: string[]): { base: string; lang: string; out: string; built?: string; python?: string; reader?: string; pubkey?: Uint8Array } {
   const flags = new Map<string, string>()
   for (let i = 0; i < argv.length; i++) {
     const name = argv[i]
@@ -55,7 +57,10 @@ function parse(argv: string[]): { base: string; lang: string; out: string; built
   const lang = flags.get('lang')!
   if (!TAG.test(lang)) throw new UsageError(`--lang ${JSON.stringify(lang)} is not a language tag`)
   if (!/^https?:\/\//.test(flags.get('base')!)) throw new UsageError('--base must be an http or https URL')
-  return { base: flags.get('base')!.replace(/\/+$/, ''), lang, out: flags.get('out')!, built: flags.get('built'), python: flags.get('python'), reader: flags.get('reader') }
+  const pubkeyText = flags.get('pubkey')
+  if (pubkeyText !== undefined && !/^[0-9a-fA-F]{64}$/.test(pubkeyText)) throw new UsageError('--pubkey must be 64 hex digits (a raw Ed25519 public key)')
+  const pubkey = pubkeyText === undefined ? undefined : Uint8Array.from(pubkeyText.match(/../g)!, (pair) => parseInt(pair, 16))
+  return { pubkey, base: flags.get('base')!.replace(/\/+$/, ''), lang, out: flags.get('out')!, built: flags.get('built'), python: flags.get('python'), reader: flags.get('reader') }
 }
 
 type Got = { status: number; headers: Headers; bytes: Uint8Array; bodyError?: string }
@@ -88,15 +93,15 @@ function pythonVersion(python: string): PythonVersion | string {
 }
 
 /** Why the two readers disagree on `file`, or null. */
-async function readersDisagree(file: string, python: string, reader: string): Promise<string | null> {
+async function readersDisagree(file: string, python: string, reader: string, pubkey?: Uint8Array): Promise<string | null> {
   const bytes = new Uint8Array(readFileSync(file))
   let ts: unknown
   try {
-    ts = await readerOutput(bytes)
+    ts = await readerOutput(bytes, pubkey === undefined ? {} : { trustedKeys: { [keyId(pubkey)]: pubkey } })
   } catch (error) {
     return `the TypeScript reader threw: ${error instanceof Error ? error.message : String(error)}`
   }
-  const run = spawnSync(python, ['-I', '-X', 'utf8', reader, file], { encoding: 'buffer', maxBuffer: 1 << 29 })
+  const run = spawnSync(python, ['-I', '-X', 'utf8', reader, file, ...(pubkey === undefined ? [] : ['--trusted', hex(pubkey)])], { encoding: 'buffer', maxBuffer: 1 << 29 })
   if (run.error !== undefined) return `cannot run Python: ${run.error.message}`
   const status = run.status ?? -1
   if (status !== 0 && status !== 1) return `the Python reader exited ${status}: ${new TextDecoder().decode(run.stderr).trim().slice(0, 200)}`
@@ -169,6 +174,20 @@ export async function main(argv: string[], env: Env = process.env, io: Io = { lo
         }
       }
       record(`catalog ${name}`, problems, problems.length === 0 ? `${got.bytes.length} bytes` : '')
+    }
+
+    // 1b. The signatures, with --pubkey: both catalogs have to verify against the key
+    if (o.pubkey !== undefined) {
+      const trusted = { [keyId(o.pubkey)]: o.pubkey }
+      const problems: string[] = []
+      for (const c of catalogs) {
+        try {
+          await verifyCatalog(new Uint8Array(readFileSync(join(o.out, c.file))), trusted)
+        } catch (error) {
+          problems.push(`${c.name}: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }
+      record('catalog signatures', problems, `key ${keyId(o.pubkey)}`)
     }
 
     // 2. The segments both catalogs name
@@ -256,7 +275,7 @@ export async function main(argv: string[], env: Env = process.env, io: Io = { lo
       const files = [...catalogs.map((c) => join(o.out, c.file)), ...[...wanted.keys()].filter((id) => existsSync(join(o.out, 'segments', `${id}.seg`))).map((id) => join(o.out, 'segments', `${id}.seg`))]
       const problems: string[] = []
       for (const file of files) {
-        const why = await readersDisagree(file, python, reader)
+        const why = await readersDisagree(file, python, reader, o.pubkey)
         if (why !== null) problems.push(`readers disagree on ${file.slice(o.out.length + 1).replace(/\\/g, '/')}: ${why}`)
       }
       record('both readers agree', problems, `${files.length} files`)
