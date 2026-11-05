@@ -84,7 +84,9 @@ baa0a1a5658e4621c50fad9d99c856174c8ce75b40a794c6cbc424b97c75ff24  47.md
 - From Theographic, no Easton text (`dictText`, `dictionaryText`, `easton.json`: CCEL asks for permission to republish)
   and no dates or chronology (they come from Floyd Nolen Jones's book, whose license is not confirmed). Its verse references (the OSIS of `verses.json`)
   are read as the original's (UHB) numbering, with no conversion. Its tables link by Airtable ids (`rec…`); verses join through `verses.json`.
-- No derived work carries the unfoldingWord® mark.
+- No derived work carries the unfoldingWord® mark: a derived work's own name and title never contain it. Naming the
+  original source by its own title (for example "unfoldingWord® Translation Notes" in a catalog's `resources`) is a
+  citation of that source, not a name of ours, and is allowed.
 
 **Left out.** Nave's Topical Bible: no clean digital edition was found. CCEL restricts republishing, the SWORD module comes
 from CCEL, and the CC BY CSV of `BradyStephenson/bible-data` does not say which edition it comes from. Abel left it out

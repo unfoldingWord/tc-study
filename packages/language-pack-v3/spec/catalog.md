@@ -120,7 +120,11 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
      that key on the id): every element of a trusted key must verify, not only the first;
    - otherwise it accepts. Elements of unknown keys beside the verifying elements of trusted keys are ignored.
 3. A `local` catalog is never signed and never rejected for its signature: a reader ignores its `sig`, whatever
-   keys it was given.
+   keys it was given. **Exception: a transfer file.** A local catalog is one the device builds for itself, so it can
+   only come from the device's own store. When a reader given trusted keys reads a catalog that arrives inside a
+   transfer file (`readTransfer`, import) and has `about.origin` `local`, it rejects the file with `E_SIGNATURE`: a
+   file from outside must not install a catalog that claims the device made it, which no signature vouches for. A
+   reader given no keys accepts it, as it ignores signatures altogether (1).
 4. A `sig` in a segment that is not a catalog is ignored always.
 5. **Output.** Only when keys were given, the catalog's reader output has `"sig": {"key": <key id>, "valid": true}`
    (the first verifying element in file order). A local catalog has no `sig` in the output, nor does a file read
