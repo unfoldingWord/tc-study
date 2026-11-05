@@ -265,9 +265,19 @@ export type ReaderOptions = { trustedKeys?: Record<string, Uint8Array> }
  * The `sig` of a catalog's output (`catalog.md`): only when keys were given and the catalog is `published`; throws `E_SIGNATURE` when
  * the signature is not accepted.
  */
-async function signatureOut(seg: Segment, header: Record<string, unknown>, id: string, options: ReaderOptions): Promise<Json | undefined> {
+async function signatureOut(
+  seg: Segment,
+  header: Record<string, unknown>,
+  id: string,
+  options: ReaderOptions,
+  inTransfer = false,
+): Promise<Json | undefined> {
   if (options.trustedKeys === undefined || seg.h.class !== 'catalog') return undefined
-  if (catalogView(seg).about.origin !== 'published') return undefined
+  if (catalogView(seg).about.origin !== 'published') {
+    // A local catalog is accepted only from the device's own store, never from a transfer file (`transfer.md`, "Receiving", step 2).
+    if (inTransfer) throw new FormatError('E_SIGNATURE', 'a local catalog does not come in a transfer file')
+    return undefined
+  }
   const { key, valid } = await checkSignatures(header, hexToBytes(id), options.trustedKeys)
   return { key, valid }
 }
@@ -285,7 +295,7 @@ async function segmentOutput(bytes: Uint8Array, options: ReaderOptions): Promise
 async function catalogOutput(bytes: Uint8Array, options: ReaderOptions): Promise<Json> {
   const { seg, id, header } = await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
   const m = catalogView(seg)
-  const sig = await signatureOut(seg, header, id, options)
+  const sig = await signatureOut(seg, header, id, options, true)
   return sortKeys({ id, h: seg.h, about: m.about, resources: m.resources, segments: m.segments, units: m.units, requires: m.requires, complements: m.complements, sig })
 }
 

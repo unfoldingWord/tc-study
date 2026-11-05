@@ -497,6 +497,7 @@ The order of the checks between a defect in the container and one in a table is 
 | 17 | `catalog-bad-sig` | A bit of `s` flipped | Case 16 with the first byte of `s` changed, same keys | `E_SIGNATURE` |
 | 18 | `catalog-unknown-key` | A signature from a key the reader was not given | The file of case 16, and the keys of another key | `E_SIGNATURE` |
 | 19 | `catalog-unsigned-published` | A published catalog with no `sig`, read with keys | The catalog of case 11 as it is, with the key of case 16 | `E_SIGNATURE` (the same file with no keys is case 11's output) |
+| 20 | `transferencia-catalogo-local` (`local.tcpack`, `local.keys.json`) | A local catalog inside a transfer file, read with keys (`transfer.md`, "Receiving", step 2) | A `full` transfer file whose only catalog is the local catalog of case 13 and which has no other entry; `made` "2026-11-01T10:00:00Z", `by` "build-cases 1"; the keys of case 16 | `E_SIGNATURE` (with no keys the file is accepted; the plain catalog file of case 13 is accepted with the keys) |
 
 Cases 6, 11 and 12 and the map half of case 5 are built from the maps of phase 2; `src/conformance.test.ts` checks their numbers with `answer` (`src/query/maps.ts`).
 

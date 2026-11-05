@@ -258,3 +258,14 @@ describe('encodings and precedence the spec fixes', () => {
     expect(await readerOutput(bytes, { trustedKeys: trust(k) })).toEqual({ error: 'E_BODY' })
   })
 })
+
+describe('a local catalog in a transfer file', () => {
+  const transfer = (): Uint8Array => fileOf('transferencia-catalogo-local/local.tcpack')
+
+  test('with keys it is E_SIGNATURE, with none it is accepted, and the plain catalog file is unchanged', async () => {
+    const k = await newKey()
+    expect(await readerOutput(transfer(), { trustedKeys: trust(k) })).toEqual({ error: 'E_SIGNATURE' })
+    expect((await readerOutput(transfer())) as Record<string, unknown>).not.toHaveProperty('error')
+    expect((await readerOutput(local, { trustedKeys: trust(k) })) as Record<string, unknown>).not.toHaveProperty('error')
+  })
+})

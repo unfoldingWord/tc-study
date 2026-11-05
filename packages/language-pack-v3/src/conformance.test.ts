@@ -69,6 +69,7 @@ describe('the case files', () => {
       'tabla-desconocida/future-y.seg',
       'topics-local-clave-extra/core.seg',
       'transferencia-cortada/cut.tcpack',
+      'transferencia-catalogo-local/local.tcpack',
       'tito-es419/book.seg',
     ].sort())
   })

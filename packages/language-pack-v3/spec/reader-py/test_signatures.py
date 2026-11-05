@@ -148,3 +148,16 @@ def test_uppercase_key_id_in_the_trusted_map_is_not_trusted():
     assert kid != kid.upper()
     assert read_file(data, trusted={kid.upper(): hexkey}) == {"error": "E_SIGNATURE"}
     assert read_file(data, trusted={kid: hexkey})["sig"] == {"key": kid, "valid": True}
+
+
+def test_local_catalog_in_transfer_with_keys():
+    folder = TESTS / "transferencia-catalogo-local"
+    data = (folder / "local.tcpack").read_bytes()
+    keys = json.loads((folder / "local.keys.json").read_text("utf-8"))
+    expected = (folder / "local.expected.json").read_bytes().decode("utf-8")
+    assert canonical_text(read_file(data, trusted=keys)) == expected
+    # with no keys it is accepted
+    assert "error" not in read_file(data)
+    # a plain local catalog file with keys is unchanged
+    plain = (TESTS / "paquete-viejo" / "catalog.seg").read_bytes()
+    assert "error" not in read_file(plain, trusted=keys)

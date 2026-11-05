@@ -1800,9 +1800,12 @@ def _trusted_keys(trusted: dict) -> dict[str, bytes]:
     return keys
 
 
-def _check_signature(p: Segment, out: dict, trusted: dict) -> None:
-    """Rule 2 to 5 of catalog.md: adds ``sig`` to ``out`` or raises E_SIGNATURE. A local catalog is left alone."""
+def _check_signature(p: Segment, out: dict, trusted: dict, in_transfer: bool = False) -> None:
+    """Rule 2 to 5 of catalog.md: adds ``sig`` to ``out`` or raises E_SIGNATURE. A local catalog is left alone, except
+    inside a transfer file, where it is rejected (transfer.md, "Receiving", step 2)."""
     if out["about"]["origin"] != "published":
+        if in_transfer:
+            _fail("E_SIGNATURE")
         return
     sig = p.file_header.get("sig")
     if type(sig) is not list or not sig:
@@ -1917,7 +1920,7 @@ def _read_transfer(data: bytes, trusted: dict | None = None) -> dict:
     catalog_outputs = [decode_segment(parsed[c], "catalog") for c in catalogs]
     if trusted is not None:
         for c, o in zip(catalogs, catalog_outputs):
-            _check_signature(parsed[c], o, trusted)
+            _check_signature(parsed[c], o, trusted, True)
 
     index_out = {k: jsonable(v) for k, v in index.items() if k not in ("mode", "catalogs", "entries", "base",
                                                                          "made", "by")}
