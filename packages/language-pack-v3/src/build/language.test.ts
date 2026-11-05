@@ -822,7 +822,7 @@ describe('buildLanguage: the topics unit', () => {
     expect(built.report.filter((l) => l.startsWith('topics: outline tit: no introduction'))).toEqual([])
     expect(core.names['sec:tit/1-1']).toEqual([['Pablo da instrucciones a Tito sobre los líderes', 'outline', 1, ['tit']]])
     expect(core.local).toEqual({
-      'es-419:tema/cualidades-especiales-de-los-ancianos': { names: ['Cualidades especiales de los ancianos'], refs: [[56001005, 56001009]] },
+      'es-419:tema/tit/cualidades-especiales-de-los-ancianos': { names: ['Cualidades especiales de los ancianos'], refs: [[56001005, 56001009]] },
     })
     expect(core.res.map(([key]) => key)).toContain(TN)
   })

@@ -123,9 +123,9 @@ export function buildTopics(o: {
         continue
       }
       const range = `${entry.from}-${entry.to}`
-      const base = `${lang}:tema/${slugOf(entry.title) || `${book}-${entry.from}`}`
+      const base = `${lang}:tema/${book}/${slugOf(entry.title) || `${book}-${entry.from}`}`
       let key = base
-      for (let n = 2; local[key] !== undefined && rangeOfLocal.get(key) !== range; n++) key = n === 2 ? `${base}-${book}` : `${base}-${book}-${n - 1}`
+      for (let n = 2; local[key] !== undefined && rangeOfLocal.get(key) !== range; n++) key = `${base}-${n}`
       if (local[key] === undefined) {
         local[key] = { names: [entry.title], refs: [[entry.from, entry.to]] }
         rangeOfLocal.set(key, range)
