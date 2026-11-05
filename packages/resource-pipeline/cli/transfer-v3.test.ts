@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { canonicalJson, readerOutput } from '@bt-synergy/language-pack-v3'
 import { main as build } from './build-v3'
 import { main } from './transfer-v3'
+import { testKey } from './testKey'
 
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
 const LIST = join(DATA, 'es-419', 'list.json')
@@ -210,5 +211,109 @@ describe('transfer-v3', () => {
     const after = files(r1)
     expect(after["catalog-es-419.seg"]).toBe(before["catalog-es-419.seg"])
     for (const name of Object.keys(before)) if (name.startsWith("segments/")) expect(after[name]).toBe(before[name])
+  })
+
+  describe('import: signatures', () => {
+    const LOCAL = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'transferencia-catalogo-local')
+
+    async function signedFull(key: { pem: string }): Promise<string> {
+      const out = temp()
+      const code = await build(['--list', LIST, '--originals', ORIGINALS, '--parts', PARTS, '--out', out, '--revision', '1', '--built', '2026-11-01T10:00:00Z', '--sign-key', key.pem], { log: () => {}, error: () => {} })
+      expect(code).toBe(0)
+      const file = join(temp(), 's.tcpack')
+      expect((await run(['export', '--from', out, '--mode', 'full', '--out', file])).code).toBe(0)
+      return file
+    }
+
+    test('with keys: signed is written; unsigned, wrongly signed and local-origin are exit 1 and write nothing', async () => {
+      const key = testKey()
+      const other = testKey()
+      temps.push(key.dir, other.dir)
+      const signed = await signedFull(key)
+      const into = temp()
+      const ok = await run(['import', '--file', signed, '--into', into, '--trusted', key.publicHex])
+      expect(ok.code).toBe(0)
+      expect(ok.err).toEqual([])
+      expect(catalogsOf(into).length).toBe(2)
+
+      const keys = temp()
+      writeFileSync(join(keys, 'k.pub'), `${key.publicHex}
+`)
+      expect((await run(['import', '--file', signed, '--into', temp(), '--keys', keys])).code).toBe(0)
+
+      const wrong = temp()
+      expect((await run(['import', '--file', signed, '--into', wrong, '--trusted', other.publicHex])).code).toBe(1)
+      expect(readdirSync(wrong)).toEqual([])
+
+      const from = await built(1)
+      const unsigned = join(temp(), 'u.tcpack')
+      await run(['export', '--from', from, '--mode', 'full', '--out', unsigned])
+      const into2 = temp()
+      expect((await run(['import', '--file', unsigned, '--into', into2, '--trusted', key.publicHex])).code).toBe(1)
+      expect(readdirSync(into2)).toEqual([])
+
+      const local = JSON.parse(readFileSync(join(LOCAL, 'local.keys.json'), 'utf8')) as Record<string, string>
+      const into3 = temp()
+      expect((await run(['import', '--file', join(LOCAL, 'local.tcpack'), '--into', into3, '--trusted', Object.values(local)[0]])).code).toBe(1)
+      expect(readdirSync(into3)).toEqual([])
+    })
+
+    test('without keys: a warning on stderr and the file is written', async () => {
+      const from = await built(1)
+      const file = join(temp(), 'a.tcpack')
+      await run(['export', '--from', from, '--mode', 'full', '--out', file])
+      const into = temp()
+      const r = await run(['import', '--file', file, '--into', into])
+      expect(r.code).toBe(0)
+      expect(r.err.some((l) => /warning.*not checked/.test(l))).toBe(true)
+      expect(files(into)).toEqual(files(from))
+    })
+  })
+
+  describe('import: no going back', () => {
+    const full = async (dir: string): Promise<string> => {
+      const file = join(temp(), 'f.tcpack')
+      expect((await run(['export', '--from', dir, '--mode', 'full', '--out', file])).code).toBe(0)
+      return file
+    }
+
+    test('a full file of a lower revision is refused unless --allow-older; same revision and id is a no-op; a fork is refused', async () => {
+      const r1 = await full(await built(1))
+      const r2dir = await built(2)
+      const r2 = await full(r2dir)
+      const into = temp()
+      expect((await run(['import', '--file', r2, '--into', into])).code).toBe(0)
+      const before = files(into)
+      const back = await run(['import', '--file', r1, '--into', into])
+      expect(back.code).toBe(1)
+      expect(files(into)).toEqual(before)
+      expect((await run(['import', '--file', r1, '--into', into, '--allow-older'])).code).toBe(0)
+      expect(files(into)).not.toEqual(before)
+      // the same file again: nothing changes
+      expect((await run(['import', '--file', r1, '--into', into])).code).toBe(0)
+      // revision 2 of another content: a fork of the installed revision 2
+      const fork = await full(await built(2, changedList("tw")))
+      const into2 = temp()
+      expect((await run(['import', '--file', r2, '--into', into2])).code).toBe(0)
+      const before2 = files(into2)
+      expect((await run(["import", "--file", fork, "--into", into2])).code).toBe(1)
+      expect((await run(['import', '--file', fork, '--into', into2, '--allow-older'])).code).toBe(1)
+      expect(files(into2)).toEqual(before2)
+    })
+
+    test('an update file of a lower revision than the installed one is refused unless --allow-older', async () => {
+      const r1dir = await built(1)
+      const r2dir = await built(2, changedList())
+      const file = join(temp(), 'd.tcpack')
+      expect((await run(['export', '--from', r1dir, '--mode', 'update', ...catalogsOf(r2dir).flatMap((c) => ['--base', c]), '--out', file])).code).toBe(0)
+      const into = temp()
+      const seed = join(temp(), 'seed.tcpack')
+      await run(['export', '--from', r2dir, '--mode', 'full', '--out', seed])
+      expect((await run(['import', '--file', seed, '--into', into])).code).toBe(0)
+      const before = files(into)
+      expect((await run(['import', '--file', file, '--into', into])).code).toBe(1)
+      expect(files(into)).toEqual(before)
+      expect((await run(['import', '--file', file, '--into', into, '--allow-older'])).code).toBe(0)
+    })
   })
 })

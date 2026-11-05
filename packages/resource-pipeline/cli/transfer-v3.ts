@@ -2,7 +2,7 @@
  * Export and import format 3 transfer files (`.tcpack`, spec/transfer.md), without a network.
  *
  *   bun packages/resource-pipeline/cli/transfer-v3.ts export --from <folder> --mode full|update [--base <catalog file>…] [--common <folder>] --out <file.tcpack>
- *   bun packages/resource-pipeline/cli/transfer-v3.ts import --file <file.tcpack> --into <folder>
+ *   bun packages/resource-pipeline/cli/transfer-v3.ts import --file <file.tcpack> --into <folder> [--trusted <64 hex>…] [--keys <dir>] [--allow-older]
  *
  * The folder has the shape `build-v3` writes: `catalog-*.seg` and `segments/<id>.seg`.
  *  - `export full`: every catalog of the folder and every segment they name. `export update`: the catalogs and only the segments the
@@ -18,17 +18,23 @@
  *    is written. A segment already there with other bytes is an error (ids are hashes) and nothing is written; a catalog is replaced.
  *    Entries whose status is not ok, and complements (no place for them in the folder shape), are not written and are listed.
  *
+ *  - `import --trusted <hex>` (repeatable, a raw Ed25519 public key) and `--keys <dir>` (a folder of `*.pub` files, one hex key each) give the
+ *    keys the catalogs of the file must verify against, through the TS reader (a local-origin catalog in a file is rejected too): before
+ *    anything is written, any failure is exit 1. Without keys a warning goes to stderr: the signatures were not checked.
+ *  - `import` never goes back: a catalog of a lower revision than the installed one of the same publisher and catalog is refused (exit 1,
+ *    nothing written) unless `--allow-older`; the same revision with another id is a fork and always refused; the same id is a no-op.
+ *
  * Stdout: one JSON line. Exit 0 ok, 1 failure, 2 usage.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, isAbsolute } from 'node:path'
-import { catalogView, hex, KNOWN, readSegment, readTransfer, writeTransfer, type BuiltSegment, type KnownTables } from '@bt-synergy/language-pack-v3'
+import { catalogView, hex, keyId, KNOWN, readerOutput, readSegment, readTransfer, writeTransfer, type BuiltSegment, type KnownTables } from '@bt-synergy/language-pack-v3'
 
 class UsageError extends Error {}
 
 export const USAGE =
   'Usage: transfer-v3 export --from <folder> --mode full|update [--base <catalog file>…] [--common <folder>] --out <file.tcpack>\n' +
-  '       transfer-v3 import --file <file.tcpack> --into <folder>'
+  '       transfer-v3 import --file <file.tcpack> --into <folder> [--trusted <64 hex>…] [--keys <dir>] [--allow-older]'
 
 type Io = { log: (line: string) => void; error: (line: string) => void; out?: (line: string) => void }
 
@@ -136,14 +142,42 @@ async function exportFile(argv: string[], io: Io): Promise<number> {
   return 0
 }
 
-async function importFile(argv: string[], io: Io): Promise<number> {
-  const flags = flagsOf(argv, ['file', 'into'])
+/** The trusted keys of `--trusted` (hex) and `--keys <dir>` (every `*.pub` of the folder holds one raw public key in hex). */
+function trustedKeysOf(flags: Map<string, string[]>): Record<string, Uint8Array> | undefined {
+  const texts = [...(flags.get('trusted') ?? [])]
+  const dir = flags.get('keys')?.[0]
+  if (dir !== undefined) {
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) throw new UsageError(`--keys ${dir} is not a folder`)
+    for (const f of readdirSync(dir).filter((n) => n.endsWith('.pub')).sort()) texts.push(readFileSync(join(dir, f), 'utf8').trim())
+  }
+  if (!flags.has('trusted') && dir === undefined) return undefined
+  const keys: Record<string, Uint8Array> = {}
+  for (const t of texts) {
+    if (!/^[0-9a-fA-F]{64}$/.test(t)) throw new UsageError('a trusted key must be 64 hex digits (a raw Ed25519 public key)')
+    const raw = Uint8Array.from(t.match(/../g)!, (pair) => parseInt(pair, 16))
+    keys[keyId(raw)] = raw
+  }
+  if (Object.keys(keys).length === 0) throw new UsageError('--keys: the folder has no *.pub file, so no key is trusted')
+  return keys
+}
+
+async function importFile(args: string[], io: Io): Promise<number> {
+  const allowOlder = args.includes('--allow-older')
+  const argv = args.filter((a) => a !== '--allow-older')
+  const flags = flagsOf(argv, ['file', 'into', 'trusted', 'keys'], ['trusted'])
   for (const key of ['file', 'into']) if (!flags.has(key)) throw new UsageError(`--${key} is required`)
   const file = flags.get('file')![0]
   const into = flags.get('into')![0]
   if (!existsSync(file) || !statSync(file).isFile()) throw new UsageError(`--file ${file} is not a file`)
   if (existsSync(into) && !statSync(into).isDirectory()) throw new UsageError(`--into ${into} is not a folder`)
 
+  const trustedKeys = trustedKeysOf(flags)
+  if (trustedKeys !== undefined) {
+    const out = (await readerOutput(read(file), { trustedKeys })) as { error?: string }
+    if (out.error !== undefined) throw new Error(`the signatures of ${file} are not accepted: ${out.error}`)
+  } else {
+    io.error('transfer-v3: warning: no --trusted or --keys given, the signatures of the catalogs were not checked')
+  }
   const { index, entries, missing } = await readTransfer(read(file), { known: KNOWN as KnownTables })
   // An update file is for a receiver that has its base revisions (transfer.md): without them nothing is written.
   for (const [name, revision] of index.base ?? []) {
@@ -175,7 +209,25 @@ async function importFile(argv: string[], io: Io): Promise<number> {
       const { seg } = await readSegment(bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
       const name = catalogView(seg).about.catalog
       if (!/^[A-Za-z0-9._-]+$/.test(name) || name.startsWith('.')) throw new Error(`the catalog name ${JSON.stringify(name)} is not a safe file name`)
-      writes.push({ path: join(into, `catalog-${name}.seg`), bytes, catalog: { name, ids: catalogView(seg).segments.map((s) => hex(s.id)) } })
+      const target = join(into, `catalog-${name}.seg`)
+      if (existsSync(target)) {
+        const old = await readSegment(read(target), { known: KNOWN.catalog, expectedClass: 'catalog' })
+        const about = catalogView(old.seg).about
+        const now = catalogView(seg).about
+        if (about.publisher === now.publisher) {
+          if (now.revision === about.revision) {
+            if (old.id === e.id) {
+              unchanged++
+              continue
+            }
+            throw new Error(`the catalog ${name} revision ${now.revision} in the file (${e.id}) is not the installed one (${old.id}): a fork, not imported`)
+          }
+          if (now.revision < about.revision && !allowOlder) {
+            throw new Error(`the catalog ${name} in the file has the revision ${now.revision}, older than the installed ${about.revision}: use --allow-older to go back`)
+          }
+        }
+      }
+      writes.push({ path: target, bytes, catalog: { name, ids: catalogView(seg).segments.map((s) => hex(s.id)) } })
       continue
     }
     const path = join(into, 'segments', `${e.id}.seg`)
