@@ -99,7 +99,6 @@ export function buildXtopics(o: {
   tipnr: TipnrRecord[]
   events: TheoEvent[]
   obs: Map<number, Range[]>
-  obsTitles?: Map<number, string>
   outlines: Map<string, { title: string; from: number; to: number }[]>
   origs: OrigModel[]
   res: XtopicsSources
@@ -259,7 +258,7 @@ export function buildXtopics(o: {
   const obsKey = o.res.obs[0]
   for (const [n, list] of [...o.obs].sort((a, b) => a[0] - b[0])) {
     const id = `obs:${n}`
-    topics.set(id, { kind: 'story', source: obsKey, ref: String(n), title: o.obsTitles?.get(n) ?? '', ustrong: '' })
+    topics.set(id, { kind: 'story', source: obsKey, ref: String(n), title: '', ustrong: '' })
     spans(id, obsKey, list)
   }
   const outlineKey = o.res.outlines?.[0]

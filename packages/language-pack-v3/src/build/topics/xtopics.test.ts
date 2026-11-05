@@ -87,6 +87,12 @@ describe('buildXtopics (fixtures)', () => {
     expect(core.topics.get('sec:exo/7-12')).toMatchObject({ kind: 'section', title: 'God sends the plagues' })
   })
 
+  test('an obs: story has no title: only its reference is taken from OBS', () => {
+    const stories = [...core.topics].filter(([id]) => id.startsWith('obs:'))
+    expect(stories.length).toBeGreaterThan(0)
+    for (const [, topic] of stories) expect(topic.title).toBe('')
+  })
+
   test('Theographic: part-of, follows, and participants only on one exact match; the rest is in the review list', () => {
     expect(core.relations).toContainEqual({ from: 'ev:abraham-goes-to-egypt', to: 'ev:sojourn-in-canaan-and-egypt', type: 'part-of', source: RES.theographic[0], confidence: 100 })
     expect(core.relations).toContainEqual({ from: 'ev:abraham-goes-to-egypt', to: 'ev:abraham-enters-canaan', type: 'follows', source: RES.theographic[0], confidence: 100 })
