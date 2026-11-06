@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { schemas as exported } from '../index'
+import { SEARCH_FILTER_KEYS } from '../search/types'
 import schemas from './schemas.json'
 
 const NAMES = ['article', 'books', 'concept', 'context', 'passage', 'renderings', 'search', 'topics']
@@ -20,5 +21,9 @@ describe('schemas.json', () => {
       expect(Array.isArray(s.input.required)).toBe(true)
       for (const r of s.input.required) expect(Object.keys(s.input.properties)).toContain(r)
     }
+  })
+  test('the search schema has the arguments of reader.search(text, filters)', () => {
+    const props = Object.keys((schemas as unknown as Record<string, Entry>).search!.input.properties).sort()
+    expect(props).toEqual(['text', ...Object.keys(SEARCH_FILTER_KEYS)].sort())
   })
 })

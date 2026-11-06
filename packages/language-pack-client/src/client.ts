@@ -1,12 +1,13 @@
 /**
  * The client: refresh the catalogs, install by unit, status, prune and verify. Calls on one client run one after the other.
  */
-import { FormatError, KNOWN, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
+import { bookView, FormatError, KNOWN, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
 import { catalogsOf, verifiedHave, type InstallReport, type MissingCommon, type Progress, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
 import { exportTransfer, importOldPack, importTransfer, type ImportReport } from './transfer'
 import { readerOfState, type PackReader } from './reader'
+import type { SearchIndex } from './search/types'
 import type { PackSource } from './source/http'
 import { hex, type InstalledCatalog, type InstalledState, installedOf } from './state'
 import type { BlobStore } from './store/types'
@@ -43,9 +44,14 @@ export interface LanguagePackClient {
   exportTransfer(o: { lang: string; mode: 'full' | 'update'; books?: string[]; units?: string[]; base?: Uint8Array[] }): Promise<Uint8Array>
   /** Converts a format 1.1 `.langpack.zip` into a local catalog. `originals` are the original-language rows (UGNT, UHB): a book is built only with them. */
   importOldPack(zip: Uint8Array, o?: { originals?: RowSource; device?: string; now?: string }): Promise<ImportReport>
+  /**
+   * What went wrong keeping the search index up to date (the `index` option). An index failure never fails an install or an import and never touches the
+   * installed state: it is recorded here, and the next install, import or `open` tries the missing segments again.
+   */
+  indexProblems(): { segment?: string; message: string }[]
 }
 
-export function createClient(o: { store: BlobStore; source?: PackSource; trust: TrustPolicy }): LanguagePackClient {
+export function createClient(o: { store: BlobStore; source?: PackSource; trust: TrustPolicy; index?: SearchIndex }): LanguagePackClient {
   const { store, trust } = o
   const need = (): PackSource => {
     if (o.source === undefined) throw new ClientError('E_ARG', 'this client has no source')
@@ -250,12 +256,64 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     return { bad }
   }
 
+  // The search index. It follows the active `book:` segments: after every call that can change them (install, importTransfer,
+  // importOldPack) and on `open`, segments not indexed yet are added, and those the call replaced or deactivated are removed.
+  const indexProblems: { segment?: string; message: string }[] = []
+  let indexReady: Promise<void> | undefined
+  const activeBooks = (state: InstalledState): Map<string, string> => {
+    const out = new Map<string, string>()
+    for (const [k, u] of Object.entries(state.units)) {
+      const slash = k.indexOf('/')
+      if (!k.slice(slash + 1).startsWith('book:')) continue
+      for (const id of u.segments) out.set(id, k.slice(0, slash))
+    }
+    return out
+  }
+  /** Runs `call`, then brings the index in line with the state. Index errors are recorded, never thrown. */
+  async function withIndex<T>(call: () => Promise<T>): Promise<T> {
+    const index = o.index
+    if (index === undefined) return call()
+    let before: Map<string, string> | undefined
+    try {
+      before = activeBooks(await loadState(store))
+    } catch {
+      // The call itself reports a store that fails.
+    }
+    try {
+      return await call()
+    } finally {
+      await syncIndex(index, before)
+    }
+  }
+  async function syncIndex(index: SearchIndex, before?: Map<string, string>): Promise<void> {
+    try {
+      const after = activeBooks(await loadState(store))
+      await (indexReady ??= index.init())
+      for (const id of before?.keys() ?? []) if (!after.has(id)) await index.removeSegment(id)
+      for (const [id, name] of after) {
+        if (await index.has(id)) continue
+        try {
+          const bytes = await st(() => store.get(id))
+          if (bytes === undefined) continue
+          const { seg } = await readSegment(bytes, { known: KNOWN.book, expectedId: id })
+          await index.addBook(name, bookView(seg), id)
+        } catch (e) {
+          indexProblems.push({ segment: id, message: e instanceof Error ? e.message : String(e) })
+        }
+      }
+    } catch (e) {
+      indexReady = undefined
+      indexProblems.push({ message: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
   async function openNow(lang: string): Promise<PackReader> {
+    if (o.index !== undefined) await syncIndex(o.index)
     const state = await loadState(store)
     const name = state.aliases?.[lang] ?? lang
     const { lang: langCat, catalogs } = await catalogsOf(store, trust, state, name)
     if (langCat === undefined) throw new ClientError('E_NOT_INSTALLED', `the catalog of ${lang} is not installed`)
-    return readerOfState({ lang: langCat.name, name, catalogs, state, get: (id) => st(() => store.get(id)) })
+    return readerOfState({ lang: langCat.name, name, catalogs, state, get: (id) => st(() => store.get(id)), ...(o.index !== undefined ? { index: o.index } : {}) })
   }
 
   return {
@@ -265,12 +323,13 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
         const { name: _name, ...report } = await refreshNow(lang, opts)
         return report
       }),
-    install: (lang, want = {}, opts = {}) => queued(() => installNow(lang, want, opts)),
+    install: (lang, want = {}, opts = {}) => queued(() => withIndex(() => installNow(lang, want, opts))),
     status: (lang) => queued(() => statusNow(lang)),
     prune: () => queued(pruneNow),
     verify: () => queued(verifyNow),
-    importTransfer: (bytes, opts = {}) => queued(() => importTransfer({ store, trust }, bytes, opts)),
+    importTransfer: (bytes, opts = {}) => queued(() => withIndex(() => importTransfer({ store, trust }, bytes, opts))),
     exportTransfer: (opts) => queued(() => exportTransfer({ store, trust }, opts)),
-    importOldPack: (zip, opts = {}) => queued(() => importOldPack({ store, trust }, zip, opts)),
+    indexProblems: () => [...indexProblems],
+    importOldPack: (zip, opts = {}) => queued(() => withIndex(() => importOldPack({ store, trust }, zip, opts))),
   }
 }

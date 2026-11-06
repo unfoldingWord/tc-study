@@ -27,6 +27,9 @@ import { type ArticleData, articleQuery, type ContextData, contextQuery } from '
 import type { Answer } from './query/envelope'
 import { type BooksData, booksQuery, conceptQuery, topicsQuery } from './query/maps'
 import { type PassageData, passageQuery } from './query/passage'
+import { searchQuery } from './query/search'
+import { memoryIndex } from './search/memory'
+import type { Hit, SearchFilters, SearchIndex } from './search/types'
 import { type RenderingsData, renderingsQuery } from './query/renderings'
 import type { InstalledState } from './state'
 import { hex } from './state'
@@ -66,6 +69,8 @@ export interface PackReader {
   topics(q?: { category?: string; book?: string }): Promise<Answer<unknown>>
   books(q: { article: string } | { concept: string }): Promise<Answer<BooksData>>
   renderings(q: { strong: string } | { book: string; word: number }): Promise<Answer<RenderingsData>>
+  /** Full-text search over the installed books: the client's index when it has one, else an index in memory filled with the books this reader opens. */
+  search(text: string, filters?: SearchFilters): Promise<Answer<Hit[]>>
 }
 
 export type ReaderInput = {
@@ -77,6 +82,8 @@ export type ReaderInput = {
   revisions?: { lang?: number; common?: number }
   /** The revision each active unit was installed from, as `<catalog>/<unit>` -> revision. Absent: the revision of the catalog that lists it. */
   unitRevisions?: Record<string, number>
+  /** The index `search` uses. Absent: a `memoryIndex` filled on the first search. */
+  index?: SearchIndex
 }
 
 export function makeReader(o: ReaderInput): PackReader {
@@ -221,6 +228,18 @@ export function makeReader(o: ReaderInput): PackReader {
   }
 
   let mapsOnce: Promise<MapSet> | undefined
+  let memory: Promise<SearchIndex> | undefined
+  /** The books that are active, read once into a `memoryIndex` (keyed by segment id, so a rebuilt book replaces itself). */
+  async function fillMemory(): Promise<SearchIndex> {
+    const index = memoryIndex()
+    for (const unit of activeIds.keys()) {
+      if (!unit.startsWith('book:') || !reader.installed(unit)) continue
+      const model = await reader.book(unit.slice('book:'.length))
+      const id = activeIds.get(unit)![0]
+      if (model !== undefined && id !== undefined) await index.addBook(o.lang, model, id)
+    }
+    return index
+  }
   const lang = o.revisions?.lang ?? langCat?.revision
   const common = o.revisions?.common ?? commonCat?.revision
   const reader: PackReader = {
@@ -265,6 +284,17 @@ export function makeReader(o: ReaderInput): PackReader {
     topics: (q) => topicsQuery(reader, q),
     books: (q) => booksQuery(reader, q),
     renderings: (q) => renderingsQuery(reader, q),
+    async search(text, filters) {
+      let index = o.index
+      if (index === undefined) {
+        const run = (memory ??= fillMemory())
+        run.catch(() => {
+          if (memory === run) memory = undefined
+        })
+        index = await run
+      }
+      return searchQuery(reader, index, [...listedUnits].filter((u) => u.startsWith('book:')), text, filters)
+    },
   }
   return reader
 }
@@ -280,6 +310,7 @@ export function readerOfState(o: {
   state: InstalledState
   get: (id: string) => Promise<Uint8Array | undefined>
   name: string
+  index?: SearchIndex
 }): PackReader {
   const active: Record<string, string[]> = {}
   const unitRevisions: Record<string, number> = {}
@@ -296,6 +327,7 @@ export function readerOfState(o: {
     get: o.get,
     active,
     unitRevisions,
+    ...(o.index !== undefined ? { index: o.index } : {}),
     revisions: { ...(lang !== undefined ? { lang } : {}), ...(comm !== undefined ? { common: comm } : {}) },
   })
 }
