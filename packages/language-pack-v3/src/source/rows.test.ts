@@ -129,8 +129,10 @@ describe('es-419 Titus, five resources: parts and the format 1.1 pack', () => {
     for (const key of FIVE) expect(found.get(key)!.bookStamps).toEqual({ tit: BLOBS[key] })
     // A resource of no book (tW) or without blobs in its list (uGL) has none, and no empty map.
     for (const key of ['es-419_gl/es-419/tw', 'es-419_gl/es-419/ugl']) expect('bookStamps' in found.get(key)!).toBe(false)
-    // A format 1.1 pack does not record them.
-    for (const ref of await zip.resources('es-419')) expect('bookStamps' in ref).toBe(false)
+    // A format 1.1 pack records them in its catalog.json (the same Door43 rows): the same stamps, and none where the parts have none.
+    const fromZip = byKey(await zip.resources('es-419'))
+    for (const key of FIVE) expect(fromZip.get(key)!.bookStamps).toEqual({ tit: BLOBS[key] })
+    for (const [key, ref] of fromZip) expect(ref.bookStamps).toEqual(found.get(key)?.bookStamps)
   })
 
   test('the stamps of the books are those that the quote and align keys of the sample name after "@"', async () => {
