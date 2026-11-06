@@ -25,7 +25,9 @@ import {
 } from '@bt-synergy/language-pack-v3'
 import { type ArticleData, articleQuery, type ContextData, contextQuery } from './query/article'
 import type { Answer } from './query/envelope'
+import { type BooksData, booksQuery, conceptQuery, topicsQuery } from './query/maps'
 import { type PassageData, passageQuery } from './query/passage'
+import { type RenderingsData, renderingsQuery } from './query/renderings'
 import type { InstalledState } from './state'
 import { hex } from './state'
 import type { VerifiedCatalog } from './verify'
@@ -60,6 +62,10 @@ export interface PackReader {
   passage(ref: string): Promise<Answer<PassageData>>
   article(id: string, section?: string | 'all'): Promise<Answer<ArticleData>>
   context(ref: string): Promise<Answer<ContextData>>
+  concept(id: string): Promise<Answer<unknown>>
+  topics(q?: { category?: string; book?: string }): Promise<Answer<unknown>>
+  books(q: { article: string } | { concept: string }): Promise<Answer<BooksData>>
+  renderings(q: { strong: string } | { book: string; word: number }): Promise<Answer<RenderingsData>>
 }
 
 export type ReaderInput = {
@@ -255,6 +261,10 @@ export function makeReader(o: ReaderInput): PackReader {
     passage: (ref) => passageQuery(reader, ref),
     article: (id, section) => articleQuery(reader, id, section),
     context: (ref) => contextQuery(reader, ref),
+    concept: (id) => conceptQuery(reader, id),
+    topics: (q) => topicsQuery(reader, q),
+    books: (q) => booksQuery(reader, q),
+    renderings: (q) => renderingsQuery(reader, q),
   }
   return reader
 }
