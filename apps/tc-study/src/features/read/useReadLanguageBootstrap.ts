@@ -18,6 +18,7 @@ import {
 } from '../../contexts'
 import { useAppStore } from '../../contexts/AppContext'
 import { useBackgroundDownload, useCatalogBackgroundDownload } from '../../hooks'
+import { usePartsForCurrentBook } from '../packs/parts/usePartsForCurrentBook'
 import { usePackageStore } from '../../lib/stores/packageStore'
 import { canonicalReadLanguageCode } from '../../utils/languageCodeMatch'
 import { replaceReadLanguageUrlFromUi } from './pushReadLanguageUrl'
@@ -130,6 +131,7 @@ export function useReadLanguageBootstrap({
   }, [helpsLanguageCode])
 
   useReadIngredientHydration(loadedResources, catalogManager)
+  usePartsForCurrentBook()
   const isCollectionFullyCached = useReadCollectionCompleteness(
     currentLanguageCode,
     packageStore.packages,

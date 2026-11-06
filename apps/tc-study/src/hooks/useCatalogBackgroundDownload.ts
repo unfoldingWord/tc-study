@@ -22,6 +22,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { CatalogManager } from '@bt-synergy/catalog-manager'
 import { isOffline } from '@bt-synergy/resource-pipeline/download/networkFailure'
+import { keysLeftToDoor43, usePartsModeStore } from '../features/packs/parts/partsMode'
 import type { ResourceCompletenessChecker } from '../lib/services/ResourceCompletenessChecker'
 import {
   discoveredIngredientCount,
@@ -190,10 +191,13 @@ export function useCatalogBackgroundDownload(
       }
       // Queue cataloged expected keys + OL extras. Do not wait for every
       // expected key to land — one hung TA/UGNT entry used to block UHB.
-      const candidateKeys =
+      // A language served as parts by the packs server (and the originals with it) is not downloaded whole.
+      const candidateKeys = keysLeftToDoor43(
         allResourceKeys.length > 0
           ? keysToEnqueueForDownload(allResourceKeys, expectedResources)
-          : [...(expectedResources ?? [])]
+          : [...(expectedResources ?? [])],
+        usePartsModeStore.getState().modes
+      )
 
       if (typeof window !== 'undefined') {
         window.__bgdlLast = {
@@ -374,6 +378,14 @@ export function useCatalogBackgroundDownload(
       void checkCatalogAndDownload()
     }, 500)
   }, [enabled, catalogTrigger, expectedResources, checkCatalogAndDownload])
+
+  // A language the packs server does not serve after all goes back to Door43: check again when a mode changes.
+  useEffect(() => {
+    if (!enabled) return
+    return usePartsModeStore.subscribe((state, prev) => {
+      if (state.modes !== prev.modes) void checkCatalogAndDownload()
+    })
+  }, [enabled, checkCatalogAndDownload])
 
   // Back online: what was skipped (or failed) with no network is checked again.
   useEffect(() => {

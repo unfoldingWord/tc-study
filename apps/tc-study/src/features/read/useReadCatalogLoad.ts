@@ -5,8 +5,11 @@
 
 import { useCallback, useRef, useState } from 'react'
 import { useCatalogManager, useResourceTypeRegistry, useViewerRegistry } from '../../contexts'
+import { useCacheAdapter } from '../../contexts/CatalogContext'
 import { useResourceManagement } from '../../hooks'
 import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
+import { useNavigationStore } from '../nav/navigationStore'
+import { startLanguagesForRead, type ReadPartsStores } from '../packs/parts/readParts'
 import { clearReadPanelsForLanguageSwitch } from './clearReadPanelsForLanguageSwitch'
 import { shouldSkipHelpsCatalogLoad } from './helpsLanguagePolicy'
 import {
@@ -35,6 +38,7 @@ export interface RunReadCatalogLoadOptions {
 
 export function useReadCatalogLoad() {
   const catalogManager = useCatalogManager()
+  const cache = useCacheAdapter()
   const viewerRegistry = useViewerRegistry()
   const resourceTypeRegistry = useResourceTypeRegistry()
   const setActiveResourceInPanel = useWorkspaceStore((s) => s.setActiveResourceInPanel)
@@ -179,6 +183,14 @@ export function useReadCatalogLoad() {
       }
       beginCatalogLoad(destPanels, options.loadTarget)
       try {
+        // A language the packs server serves comes as parts, prepared, in the background (T-049); Read does not wait.
+        if (options.navigationScope !== 'obs') {
+          void startLanguagesForRead(
+            [options.textLanguageCode, options.helpsLanguageCode],
+            useNavigationStore.getState().currentReference.book,
+            { cache, catalog: catalogManager.catalogAdapter as ReadPartsStores['catalog'] }
+          )
+        }
         const result = await loadReadLanguageCatalog({
           ...catalogLoadDeps(),
           textLanguageCode: options.textLanguageCode,
@@ -202,7 +214,7 @@ export function useReadCatalogLoad() {
         endCatalogLoad(destPanels, options.loadTarget)
       }
     },
-    [catalogLoadDeps, markCatalogSettled, resourceTypeRegistry]
+    [catalogLoadDeps, markCatalogSettled, resourceTypeRegistry, cache, catalogManager]
   )
 
   return {

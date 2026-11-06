@@ -86,6 +86,19 @@ const MOCK_REPO_TREE = {
 
 const DOOR43_ROUTE = '**/git.door43.org/**'
 
+/**
+ * The packs server (translation-helps-mcp /v2/packs): Read asks it for a language's parts before Door43 (T-049).
+ * These journeys read from mocked Door43, so it answers that it has no packs for the language, and Read goes on to
+ * Door43 as before, with no request to the real server.
+ */
+export const PACKS_ROUTE = '**/v2/packs/**'
+
+export async function mockNoPacks(page: Page): Promise<void> {
+  await page.route(PACKS_ROUTE, (route) =>
+    route.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ error: 'no packs for this language' }) })
+  )
+}
+
 function jsonOk(data: unknown) {
   return {
     status: 200,
@@ -144,6 +157,7 @@ async function fulfillDoor43Success(route: Route): Promise<void> {
  * Covers language list, owners, catalog search, and git tree verification.
  */
 export async function mockDoor43Network(page: Page): Promise<void> {
+  await mockNoPacks(page)
   await page.route(DOOR43_ROUTE, fulfillDoor43Success)
 }
 
@@ -153,6 +167,7 @@ export async function mockDoor43Network(page: Page): Promise<void> {
  */
 export async function mockDoor43NetworkFailure(page: Page): Promise<{ heal: () => void }> {
   let failing = true
+  await mockNoPacks(page)
 
   await page.route(DOOR43_ROUTE, async (route) => {
     const url = route.request().url()

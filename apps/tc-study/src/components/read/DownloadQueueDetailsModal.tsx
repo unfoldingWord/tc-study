@@ -6,6 +6,7 @@ import {
   Download,
   Flame,
   Loader2,
+  PackageOpen,
   Maximize2,
   PanelBottom,
   RotateCcw,
@@ -28,6 +29,8 @@ import {
   type DownloadQueueRowStatus,
 } from './downloadQueueDetails'
 import { useHeldBooks } from './useHeldBooks'
+import { usePartsModeStore } from '../../features/packs/parts/partsMode'
+import { partsProgressView } from './partsProgressView'
 import {
   buildProcessDebugModel,
   type ProcessWorkerSection,
@@ -328,6 +331,7 @@ export function DownloadQueueDetailsModal({
   }, [open])
 
   const heldBooksByKey = useHeldBooks(queue, open)
+  const parts = partsProgressView(usePartsModeStore((s) => s.progress))
 
   const model = useMemo(
     () =>
@@ -487,6 +491,20 @@ export function DownloadQueueDetailsModal({
       {model.blockedReason ? (
         <div className="px-3 py-1.5 border-b border-border-subtle text-[10px] font-mono text-danger break-all">
           {model.blockedReason}
+        </div>
+      ) : null}
+
+      {parts ? (
+        <div
+          className="px-3 py-1.5 border-b border-border-subtle shrink-0 flex items-center gap-2 text-xs text-fg"
+          role="status"
+          data-testid="parts-progress-details"
+        >
+          <PackageOpen className="w-3.5 h-3.5 text-accent shrink-0" aria-hidden />
+          <span className="truncate" title={parts.label}>
+            {parts.label}
+          </span>
+          <span className="ml-auto font-mono text-fg-muted">{parts.percent}%</span>
         </div>
       ) : null}
 
