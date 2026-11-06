@@ -106,7 +106,7 @@ Errors are `ClientError` with a `code` (`CLIENT_ERROR_CODES`): the list is `CLIE
 
 `LP3_SAMPLE=<phase 0 sample folder> bun bench/timings.ts` builds English Psalms from the sample once, then reports the median of 20 runs, each on a fresh reader over the stored bytes (the second and third rows have the book read already, as a screen would).
 
-Measured on the author's Windows 11 desktop, Bun 1.3.3 (the build of English Psalms itself took about 69 s and is not a client cost):
+Measured on the author's Windows 11 desktop, Bun 1.3.3 (the build of English Psalms itself took about 69 s and is not a client cost). What the numbers include: the segments are already in memory (store I/O is not measured: no IndexedDB or disk read), the catalogs are verified once before the runs (no signature check per run), and the JIT is warm (the 20 runs follow one untimed read). On a phone, reading the segments from the store comes on top.
 
 | Operation | Target (2 GB phone, C3) | Desktop median |
 |---|---|---|

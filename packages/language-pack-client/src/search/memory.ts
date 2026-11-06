@@ -1,4 +1,6 @@
-/** The index in memory: the fallback of a reader (and the one of a Worker) when the host gives no SQL driver. Same hits as `sqlIndex`. */
+/** The index in memory: the fallback of a reader (and the one of a Worker) when the host gives no SQL driver. Same matches as `sqlIndex`,
+ * ranked differently: here by word count over the square root of the piece length, there by SQLite's bm25. With
+ * more matches than the limit, the two can keep different hits. */
 import type { BookModel } from '@bt-synergy/language-pack-v3'
 import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, type SearchFilters, type SearchIndex } from './types'
 

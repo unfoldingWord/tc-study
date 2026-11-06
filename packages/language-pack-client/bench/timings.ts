@@ -6,7 +6,7 @@
  * It builds English Psalms (and the common build) from the sample once, then measures, as the median of 20 runs on a fresh
  * reader each time: from the stored bytes to `book('psa')` readable; `passage('psa 23:1')` with its notes; `context('psa 23:1')`.
  */
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { BUILDER, buildCommon, buildLanguage, keyId, publicKeyOf, signCatalog, type BuiltSegment } from '@bt-synergy/language-pack-v3'
@@ -25,7 +25,9 @@ const hex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, '0')
 // The sample's English list names parts the sample does not carry: keep the ones it has (as the language-pack-v3 topics fixture does).
 const list = JSON.parse(readFileSync(join(sample, 'en', 'list.json'), 'utf8')) as { parts: { sha256: string }[] }
 list.parts = list.parts.filter((p) => existsSync(join(sample, 'parts', `${p.sha256}.part.gz`)))
-const kept = join(mkdtempSync(join(tmpdir(), 'lp3-bench-')), 'list.json')
+const tmp = mkdtempSync(join(tmpdir(), 'lp3-bench-'))
+process.on('exit', () => rmSync(tmp, { recursive: true, force: true }))
+const kept = join(tmp, 'list.json')
 writeFileSync(kept, JSON.stringify(list))
 const source = await partsSource({ list: kept, partsDir: join(sample, 'parts'), originals: join(sample, 'originals', 'list.json') })
 const about = { format: '3.0' as const, publisher: 'unfoldingWord', origin: 'published' as const, revision: 1, built: '2026-11-01T10:00:00Z', builder: BUILDER }

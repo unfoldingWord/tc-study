@@ -77,3 +77,20 @@ test('the library modules the client imports (language-pack-v3 index) reach none
   expect(files.length).toBeGreaterThan(10)
   expect(chains).toEqual([])
 })
+
+/** Uses of the Node and Bun globals, outside comments: a browser, a WebView and a Worker have none of them. */
+function globalsUsed(text: string): string[] {
+  const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  return [...code.matchAll(/(?<![\w$.'"`])(process|Buffer|Bun|__dirname|__filename|require)\b(?=\s*[.([])/g)].map((m) => m[1]!)
+}
+
+test('the globals scanner sees process, Buffer and Bun, not words in comments or member names', () => {
+  expect(globalsUsed(`const a = process.env.X\nBuffer.from(b)\nawait Bun.file('x')\nrequire('y')`)).toEqual(['process', 'Buffer', 'Bun', 'require'])
+  expect(globalsUsed(`// process.env\n/* Bun.file */\nconst o = x.process.y\nconst s = 'Buffer.from'`)).toEqual([])
+})
+
+test('the files the main entry reaches use no Node or Bun global', () => {
+  const { files } = offenders(join(SRC, 'index.ts'), SRC)
+  const used = files.filter((f) => f.endsWith('.ts')).flatMap((f) => globalsUsed(readFileSync(f, 'utf8')).map((g) => `${relative(SRC, f)}: ${g}`))
+  expect(used).toEqual([])
+})

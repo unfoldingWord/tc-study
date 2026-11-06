@@ -4,7 +4,7 @@
  * The trusted key is read from the language-pack-v3 package at test time; the store is a temp folder, removed at the end.
  */
 import { expect, test } from 'bun:test'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createClient } from './client'
@@ -20,6 +20,11 @@ const KEY_FILE = join(import.meta.dir, '../../language-pack-v3/keys', `${KEY_ID}
 test.skipIf(process.env.LP3_STAGING !== '1')(
   'es-419 with Ruth: revision 1 from the local bucket, then revision 2 from staging',
   async () => {
+    if (!existsSync(REV1)) {
+      throw new Error(
+        `revision 1 bucket not found at ${REV1}: set LP3_STAGING_REV1 to a local copy of the staging bucket at revision 1 (the folder the fake server serves)`,
+      )
+    }
     const hex = readFileSync(KEY_FILE, 'utf8').trim()
     const trust = { trustedKeys: { [KEY_ID]: Uint8Array.from(hex.match(/../g)!, (p) => parseInt(p, 16)) } }
     const dir = mkdtempSync(join(tmpdir(), 'lp3-staging-'))

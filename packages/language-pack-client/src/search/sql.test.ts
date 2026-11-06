@@ -168,7 +168,9 @@ describe('sqlIndex through the client', () => {
     const client = setup(sample, sqlIndex(bunDriver()))
     await client.install('es-419', { books: ['tit'] })
     const a = await (await client.open('es-419')).search('Pablo')
-    expect(a.notInstalled.every((n) => n.unit.startsWith('book:') && n.bytes > 0 && n.unit !== 'book:tit')).toBe(true)
+    // The sample lists Titus only, and Titus is installed: nothing is missing.
+    expect(a.data!.length).toBeGreaterThan(0)
+    expect(a.notInstalled).toEqual([])
     const none = setup(sample)
     await none.refresh('es-419')
     const b = await (await none.open('es-419')).search('Pablo')
