@@ -622,7 +622,7 @@ describe('install several segments at a time', () => {
   /** `beforeSet` may hold a `setState` (it is counted when called); `failPut(n)` makes the n-th segment put throw. */
   function gatedSetup(
     o: Parameters<typeof startFakeServer>[1] = {},
-    hooks: { beforeSet?: () => Promise<void> | undefined; failPut?: (n: number) => boolean } = {},
+    hooks: { beforeSet?: () => Promise<void> | undefined; failPut?: (n: number) => boolean; beforePut?: (id: string) => void } = {},
   ) {
     const srv = startFakeServer(sample, o)
     server?.stop()
@@ -636,6 +636,7 @@ describe('install several segments at a time', () => {
       get: (id) => inner.get(id),
       async put(id, b) {
         if (sample.segments.has(id) && hooks.failPut?.(++puts) === true) throw new Error('QuotaExceededError')
+        if (sample.segments.has(id)) hooks.beforePut?.(id)
         return inner.put(id, b)
       },
       ids: () => inner.ids(),
@@ -792,6 +793,132 @@ describe('install several segments at a time', () => {
     expect(units['es-419/map']).toBeDefined()
     expect(units['common/xtopics']).toBeUndefined()
     expect(sets() - setsBefore).toBe(1) // map: one save after the abort
+  })
+
+  // The last segment: no request is pending any more when the abort comes, so no worker sees it; the end of the install must.
+  test('an abort during the last put rejects with the abort and keeps every complete unit', async () => {
+    const ac = new AbortController()
+    let setsAtAbort = -1
+    const { gate, client, store, sets } = gatedSetup({}, {
+      beforePut: (id) => {
+        if (id !== order.at(-1)) return
+        setsAtAbort = sets()
+        ac.abort()
+      },
+    })
+    gate.openAll()
+    const e = await client.install('es-419', { books: ['tit'] }, { concurrency: 1, signal: ac.signal }).catch((x) => x)
+    expect(e).toBe(ac.signal.reason)
+    expect(gate.calls).toEqual(order)
+    const units = (await store.getState())!.units
+    expect(units['es-419/book:tit']).toBeDefined() // the last segment is stored and completes the book
+    expect(sets() - setsAtAbort).toBe(1) // saved once, at the end
+  })
+
+  test('an abort during the last state save rejects with the abort', async () => {
+    const ac = new AbortController()
+    const { gate, client, store, sets } = gatedSetup({}, {
+      beforeSet: () => {
+        if (gate.calls.length === order.length) ac.abort()
+        return undefined
+      },
+    })
+    gate.openAll()
+    const e = await client.install('es-419', { books: ['tit'] }, { concurrency: 1, signal: ac.signal }).catch((x) => x)
+    expect(e).toBe(ac.signal.reason)
+    const setsAfter = sets()
+    const units = (await store.getState())!.units
+    expect(units['es-419/book:tit']).toBeDefined()
+    expect(units['common/orig:tit']).toBeDefined()
+    expect(sets()).toBe(setsAfter)
+  })
+
+  test('an abort from the last progress callback rejects with the abort, after one save', async () => {
+    const ac = new AbortController()
+    const { gate, client, store, sets } = gatedSetup()
+    gate.openAll()
+    let setsAtAbort = -1
+    const e = await client
+      .install('es-419', { books: ['tit'] }, {
+        concurrency: 1,
+        signal: ac.signal,
+        onProgress: (p) => {
+          if (p.done < p.total) return
+          setsAtAbort = sets()
+          ac.abort()
+        },
+      })
+      .catch((x) => x)
+    expect(e).toBe(ac.signal.reason)
+    expect((await store.getState())!.units['es-419/book:tit']).toBeDefined()
+    expect(sets() - setsAtAbort).toBe(1) // the queued activation is left to the single one at the end
+  })
+
+  /**
+   * A source whose segment answers the test gives by hand, whatever the signal says: an answer that was already on its way when
+   * the abort came. Catalogs come from the fake server.
+   */
+  function handSource() {
+    const srv = startFakeServer(sample)
+    server?.stop()
+    server = srv
+    const http = httpSource({ base: srv.url })
+    const pending = new Map<string, { resolve: (b: Uint8Array) => void; reject: (e: unknown) => void }>()
+    const waits: { n: number; resolve: () => void }[] = []
+    const source: PackSource = {
+      catalog: (name, o) => http.catalog(name, o),
+      segment: (id) =>
+        new Promise<Uint8Array>((resolve, reject) => {
+          pending.set(id, { resolve, reject })
+          for (const w of [...waits]) if (pending.size >= w.n) (waits.splice(waits.indexOf(w), 1), w.resolve())
+        }),
+    }
+    const store = memoryStore()
+    const client = createClient({ store, source, trust })
+    const answer = async (id: string, how: Uint8Array | Error) => {
+      const p = pending.get(id)!
+      pending.delete(id)
+      if (how instanceof Uint8Array) p.resolve(how)
+      else p.reject(how)
+      await new Promise((r) => setTimeout(r, 0))
+    }
+    return {
+      client,
+      store,
+      answer,
+      requested: (n: number) => (pending.size >= n ? Promise.resolve() : new Promise<void>((resolve) => waits.push({ n, resolve }))),
+    }
+  }
+
+  test('after an abort, a late 503, a corrupt segment or an unexpected error does not replace the abort', async () => {
+    const { client, store, answer, requested } = handSource()
+    const ac = new AbortController()
+    const run = client.install('es-419', { books: ['tit'] }, { signal: ac.signal })
+    await requested(4)
+    await answer(order[0]!, sample.segments.get(order[0]!)!)
+    await answer(order[1]!, sample.segments.get(order[1]!)!) // xmap is complete
+    await requested(4)
+    ac.abort()
+    await answer(order[2]!, new ClientError('E_NETWORK', 'HTTP 503', { status: 503 }))
+    await answer(order[3]!, new Uint8Array([1, 2, 3])) // does not read as a segment: FormatError
+    await answer(order[4]!, new Error('a bug'))
+    await answer(order[5]!, sample.segments.get(order[5]!)!)
+    const e = await run.catch((x) => x)
+    expect(e).toBe(ac.signal.reason)
+    expect((await store.getState())!.units['common/xmap']).toBeDefined()
+    expect(await store.has(order[5]!)).toBe(true) // what verified after the abort is still stored
+  })
+
+  test('a network error recorded before the abort still wins, with its retryAfter', async () => {
+    const { client, answer, requested } = handSource()
+    const ac = new AbortController()
+    const run = client.install('es-419', { books: ['tit'] }, { signal: ac.signal })
+    await requested(4)
+    await answer(order[0]!, new ClientError('E_NETWORK', 'rate limited', { status: 429, retryAfter: 7 }))
+    ac.abort()
+    for (const id of order.slice(1, 4)) await answer(id, new ClientError('E_NETWORK', 'HTTP 503', { status: 503 }))
+    const e = await run.catch((x) => x)
+    expect(e).toMatchObject({ code: 'E_NETWORK', status: 429, retryAfter: 7 })
   })
 
   test('a store failure waits for the running requests, then E_STORE with the state before', async () => {

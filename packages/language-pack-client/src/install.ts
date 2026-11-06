@@ -156,13 +156,15 @@ export async function runSteps(
   let bytes = 0
   let state = state0
   let next = 0
+  const aborted = (): boolean => o.signal?.aborted === true
   // A network failure other than a 404 (429, 5xx, a dropped connection) stops the install: no new request starts (the next ones
   // would fail the same way, and after a 429 they would go against Retry-After), the ones running settle and what they verify is
-  // stored, then what is complete is activated and saved once, and the first such error is thrown.
+  // stored, then what is complete is activated and saved once, and the first such error is thrown. Only a failure seen before
+  // the abort is recorded: after it, the abort is the answer.
   let stopped: ClientError | undefined
-  // An abort is handled the same way: what is complete is activated and saved once, then the abort is thrown (unless a network
-  // failure came first: the first error wins).
-  let aborted: { error: unknown } | undefined
+  // An abort is handled the same way: what is complete is activated and saved once, then `signal.reason` is thrown (unless a
+  // network failure was recorded before it). Whatever a request does after the abort (a late 503, a segment that does not
+  // verify, an unexpected error) does not replace the abort; only a store failure does, since the state is then the one before.
   // Anything else a worker throws (a store failure, a bug): no new request starts, nothing more is activated, and it is thrown
   // once all have settled.
   let halt: { error: unknown } | undefined
@@ -176,18 +178,18 @@ export async function runSteps(
     }
     return r
   }
-  // Activations run one after the other, each from the state the one before saved; once the install is stopping they are left to
-  // the single activation at the end.
+  // Activations run one after the other, each from the state the one before saved; once the install is stopping (a network
+  // failure, an abort, a halt) they are left to the single activation at the end.
+  const stopping = (): boolean => stopped !== undefined || halt !== undefined || aborted()
   let saving: Promise<unknown> = Promise.resolve()
   const activateSoon = (): Promise<unknown> => {
-    const run = saving.then(() => (stopped === undefined && aborted === undefined && halt === undefined ? activateNow() : undefined))
+    const run = saving.then(() => (stopping() ? undefined : activateNow()))
     saving = run.catch(() => {})
     return run
   }
 
   const worker = async (): Promise<void> => {
-    while (stopped === undefined && aborted === undefined && halt === undefined && next < queue.length) {
-      o.signal?.throwIfAborted()
+    while (!stopping() && next < queue.length) {
       const seg = queue[next++]!
       if (seg.users.every((i) => blocked.has(i))) continue
       let body: Uint8Array
@@ -197,7 +199,7 @@ export async function runSteps(
         body = await source.segment(seg.id, o.signal)
         await readSegment(body, { known, expectedId: seg.id })
       } catch (e) {
-        if (o.signal?.aborted) throw e
+        if (aborted()) return
         if (e instanceof ClientError && e.code === 'E_NETWORK' && e.status !== 404) {
           stopped ??= e
           return
@@ -208,6 +210,7 @@ export async function runSteps(
         }
         throw e
       }
+      // A segment that verified is stored even if the abort came meanwhile: the next install does not ask for it again.
       await st(() => store.put(seg.id, body))
       have.add(seg.id)
       fetched.push(seg.id)
@@ -226,8 +229,7 @@ export async function runSteps(
     const workers = Array.from({ length: Math.min(width, queue.length) }, () =>
       worker().catch((error: unknown) => {
         const storeFailed = error instanceof ClientError && error.code === 'E_STORE'
-        if (o.signal?.aborted === true && !storeFailed) aborted ??= { error }
-        else halt ??= { error }
+        if (!aborted() || storeFailed) halt ??= { error }
       }),
     )
     await Promise.all(workers)
@@ -241,7 +243,8 @@ export async function runSteps(
     throw e
   }
   if (stopped !== undefined) throw stopped
-  if (aborted !== undefined) throw aborted.error
+  // Checked after the last save, so an abort during the last put, the last save or the last progress callback is not lost.
+  if (aborted()) throw o.signal!.reason
 
   const wanted = new Set(steps.map((s) => s.key))
   return { activated, waiting: waiting.filter((w) => wanted.has(w.key)), fetched, bytes, unknown }
