@@ -120,9 +120,13 @@ export async function runSteps(
   let bytes = 0
   let state = state0
   let waiting: InstallReport['waiting'] = []
+  // A network failure other than a 404 (429, 5xx, a dropped connection) stops the loop: the next requests would fail the same way,
+  // and after a 429 they would go against Retry-After. What is complete is activated and saved, then the error is thrown.
+  let stopped: ClientError | undefined
 
   try {
     for (const step of steps) {
+      if (stopped !== undefined) break
       for (const seg of step.segments) {
         if (have.has(seg.id)) continue
         if (failed.has(seg.id)) break
@@ -135,8 +139,13 @@ export async function runSteps(
           await readSegment(body, { known, expectedId: seg.id })
         } catch (e) {
           if (o.signal?.aborted) throw e
+          if (e instanceof ClientError && e.code === 'E_NETWORK' && e.status !== 404) {
+            stopped = e
+            break
+          }
           if (e instanceof FormatError || (e instanceof ClientError && e.code === 'E_NETWORK')) {
-            // Not stored. The unit cannot be complete, so its other segments are not fetched now.
+            // Not stored (the bytes are not the segment, or the server has no such segment). The unit cannot be complete, so its other
+          // segments are not fetched now; it waits.
             failed.add(seg.id)
             break
           }
@@ -152,6 +161,7 @@ export async function runSteps(
           // a progress callback must not break an install
         }
       }
+      if (stopped !== undefined) break
       const r = activate(state, catalogs, have)
       if (r.activated.length > 0) {
         await st(() => store.setState(r.state))
@@ -172,6 +182,7 @@ export async function runSteps(
     if (e instanceof ClientError && e.code === 'E_STORE' && state !== state0) await store.setState(state0).catch(() => {})
     throw e
   }
+  if (stopped !== undefined) throw stopped
 
   const wanted = new Set(steps.map((s) => s.key))
   return { activated, waiting: waiting.filter((w) => wanted.has(w.key)), fetched, bytes, unknown }

@@ -448,3 +448,78 @@ describe('fix round 1', () => {
     expect((await createClient({ store, source: offline, trust }).status('es-419')).missingCommon).toBeUndefined()
   })
 })
+
+describe('final review, trust and installation', () => {
+  const offlineSrc: PackSource = {
+    catalog: () => Promise.reject(new ClientError('E_NETWORK', 'offline')),
+    segment: () => Promise.reject(new ClientError('E_NETWORK', 'offline')),
+  }
+
+  test('A2: refresh of a language that requires an older common catalog stores it by id and keeps published.common', async () => {
+    const { client, store, server } = setup({}, { ...sample, commonCatalog: otherCommon.commonCatalog })
+    await client.refresh('common')
+    const c2 = (await store.getState())!.published.common!
+    expect(c2.revision).toBe(2)
+    server.set(sample)
+    const r = await client.refresh('es-419')
+    expect(r.missingCommon).toBeUndefined()
+    expect((await store.getState())!.published.common!.id).toBe(c2.id)
+    const i = await client.install('es-419', { books: ['tit'] })
+    expect(i.waiting).toEqual([])
+    expect((await store.getState())!.units['es-419/book:tit']).toBeDefined()
+    expect((await store.getState())!.published.common!.id).toBe(c2.id)
+  })
+
+  test('A3: a stored language catalog that no longer verifies is fetched again, without the ETag', async () => {
+    const etags: (string | undefined)[] = []
+    const { server, store, client } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const langId = (await store.getState())!.published['es-419']!.id
+    await store.put(langId, new Uint8Array([1, 2, 3]))
+    const inner = httpSource({ base: server.url })
+    const spy: PackSource = { catalog: (n, o) => (etags.push(o?.etag), inner.catalog(n, o)), segment: (i, s) => inner.segment(i, s) }
+    const c = createClient({ store, source: spy, trust })
+    await c.refresh('es-419')
+    expect(etags[0]).toBeUndefined()
+    expect(await verifyCatalogFile((await store.get(langId))!, trust, { from: 'store', expectedId: langId })).toBeDefined()
+    // install too: a stored catalog that does not verify makes install refresh first
+    await store.put(langId, new Uint8Array([1, 2, 3]))
+    const r = await c.install('es-419', { books: ['tit'] })
+    expect(r.waiting).toEqual([])
+  })
+
+  test('A4: a 429 stops the install: E_NETWORK with retryAfter, the units already complete stay active, no further request', async () => {
+    const [failing] = segsOf['es-419/map']!
+    const { client, store, segHits } = setup({ failSegment: (id) => (id === failing ? 429 : 'ok') })
+    const e = await client.install('es-419', { books: ['tit'] }).catch((x) => x)
+    expect(e).toBeInstanceOf(ClientError)
+    expect(e).toMatchObject({ code: 'E_NETWORK', status: 429, retryAfter: 7 })
+    expect(segHits().at(-1)).toBe(failing!)
+    expect((await store.getState())!.units['common/xmap']).toBeDefined()
+    expect((await store.getState())!.units['es-419/map']).toBeUndefined()
+  })
+
+  test('A4: a 503 stops the install with E_NETWORK status 503 and keeps what is installed', async () => {
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const before = await store.getState()
+    const part = Object.keys(segsOf).find((k) => k.startsWith('es-419/aligned:'))!
+    const down = setup({ failSegment: () => 503 }, sample, store)
+    await expect(down.client.install('es-419', { aligned: [part.slice('es-419/aligned:'.length)] })).rejects.toMatchObject({ code: 'E_NETWORK', status: 503 })
+    expect(await store.getState()).toEqual(before)
+    expect(down.segHits().length).toBe(1)
+  })
+
+  test('A6: prune keeps the common catalog a stored language catalog requires even when that catalog no longer verifies', async () => {
+    const { client, store, server } = setup()
+    await client.install('es-419', { defaults: false, units: ['map'] })
+    const c1 = (await verifyCatalogFile(sample.commonCatalog, {}, { from: 'store' })).id
+    server.set({ ...sample, commonCatalog: otherCommon.commonCatalog })
+    await client.refresh('common')
+    expect((await store.getState())!.published.common!.id).not.toBe(c1)
+    const other = await newKey()
+    const { removed } = await createClient({ store, source: offlineSrc, trust: { trustedKeys: other.trusted } }).prune()
+    expect(removed).not.toContain(c1)
+    expect(await store.has(c1)).toBe(true)
+  })
+})

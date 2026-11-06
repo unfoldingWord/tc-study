@@ -21,7 +21,7 @@ import {
 import { ClientError } from './errors'
 import { loadState, readStored, st, verifiedHave } from './install'
 import { activate } from './plan'
-import { hex, type InstalledCatalog, type InstalledState, installedOf } from './state'
+import { hex, type InstalledCatalog, type InstalledState, installedOf, qualify } from './state'
 import type { BlobStore } from './store/types'
 import { checkRevision, type TrustPolicy, type VerifiedCatalog, verifyCatalogFile } from './verify'
 
@@ -84,17 +84,21 @@ async function activationSet(env: Env, fileCats: VerifiedCatalog[]): Promise<Ver
   return set
 }
 
-/** Writes segments then catalogs, activates over `fileCats`, saves the state once. */
+/**
+ * Writes segments then catalogs, activates over `fileCats`, saves the state once. `publish`: the file catalogs that become the
+ * published one of their name (the others are common catalogs a language requires by id that are older than the installed one).
+ */
 async function commit(
   env: Env,
   state: InstalledState,
   fileCats: VerifiedCatalog[],
   segs: Seg[],
   cut: string[] = [],
+  publish: VerifiedCatalog[] = fileCats,
 ): Promise<Pick<ImportReport, 'catalogs' | 'stored' | 'activated' | 'waiting'>> {
   const { store } = env
   const next: InstalledState = { ...state, published: { ...state.published } }
-  for (const cat of fileCats) next.published[cat.name] = installedOf(cat, state.published[cat.name])
+  for (const cat of publish) next.published[cat.name] = installedOf(cat, state.published[cat.name])
 
   const set = await activationSet(env, fileCats)
   for (const s of segs) await st(() => store.put(s.id, s.bytes))
@@ -103,10 +107,30 @@ async function commit(
   const stored = new Set(await st(() => store.ids()))
   const everything = set.flatMap((cat) => cat.catalog.segments.map((e) => ({ id: hex(e.id), class: e.class, size: e.size })))
   const have = await verifiedHave(store, [{ key: '', catalog: '', unit: '', segments: everything, complete: false }], stored)
-  const r = activate(next, set, have, { strict: true })
-
+  // Only the units the file brought a segment of (or lost one in a cut), the units already installed, and what those need are
+  // activated: a unit whose segments merely sit in the store (an optional `aligned:*`, a half-fetched one) is not asked for.
   const arrived = new Set([...segs.map((s) => s.id), ...cut])
-  const catalogs = fileCats.map((c) => r.state.published[c.name] ?? next.published[c.name]!)
+  const only = new Set<string>()
+  const visit = (key: string): void => {
+    if (only.has(key)) return
+    only.add(key)
+    const slash = key.indexOf('/')
+    const cat = set.find((c) => c.name === key.slice(0, slash))
+    const unit = cat?.catalog.units.find((u) => u.id === key.slice(slash + 1))
+    for (const n of unit?.needs ?? []) visit(qualify(set, cat!.name, n))
+  }
+  for (const cat of set) {
+    for (const unit of cat.catalog.units) {
+      const key = `${cat.name}/${unit.id}`
+      if (state.units[key] !== undefined || unit.segments.some((i) => arrived.has(hex(cat.catalog.segments[i]!.id)))) visit(key)
+    }
+  }
+  const r = activate(next, set, have, { strict: true, only })
+
+  const catalogs = fileCats.map((c) => {
+    const p = r.state.published[c.name] ?? next.published[c.name]
+    return p?.id === c.id ? p : installedOf(c)
+  })
   // A unit is reported waiting when the file brought some of it (or lost some in a cut) or it is already installed; the rest of the catalog is not asked for.
   const waiting = r.waiting.filter((w) => {
     if (state.units[w.key] !== undefined) return true
@@ -137,7 +161,19 @@ export async function importTransfer(env: Env, bytes: Uint8Array, o: { confirmDo
     }
   }
   if (index.mode === 'update' && (index.base ?? []).length === 0) throw new ClientError('E_NO_BASE', 'an update file names no base')
-  for (const cat of fileCats) checkRevision(state.published[cat.name], cat, o.confirmDowngrade === true)
+  // A catalog another catalog of the file requires by id (the common catalog of a full export) is used by id for that language's
+  // units; when it is older than the installed one of its name, or of another publisher, it is stored but not published, so it does
+  // not trip the downgrade check. Any other catalog is the file's offer of the published one of its name.
+  const requiredIds = new Set(fileCats.flatMap((c) => (c.catalog.requires ?? []).map((r) => hex(r[2]))))
+  const publish: VerifiedCatalog[] = []
+  for (const cat of fileCats) {
+    try {
+      checkRevision(state.published[cat.name], cat, o.confirmDowngrade === true)
+      publish.push(cat)
+    } catch (e) {
+      if (!(requiredIds.has(cat.id) && e instanceof ClientError && e.code === 'E_DOWNGRADE')) throw e
+    }
+  }
   for (const [name, revision] of index.base ?? []) {
     const have = state.active[name]?.revision === revision || state.published[name]?.revision === revision
     if (!have) throw new ClientError('E_NO_BASE', `the update file needs the revision ${revision} of the catalog ${name}`)
@@ -154,14 +190,14 @@ export async function importTransfer(env: Env, bytes: Uint8Array, o: { confirmDo
   const checked = await checkSegments(items)
   rejected.push(...checked.rejected)
 
-  const done = await commit(env, state, fileCats, checked.ok, missing)
+  const done = await commit(env, state, fileCats, checked.ok, missing, publish)
   return { ...done, rejected, missing }
 }
 
 export async function importOldPack(
   env: Env,
   zip: Uint8Array,
-  o: { originals?: RowSource; device?: string; now?: string } = {},
+  o: { originals?: RowSource; device?: string; now?: string; confirmDowngrade?: boolean } = {},
 ): Promise<ImportReport> {
   const state = await loadState(env.store)
   const none: RowSource = { async resources() { return [] }, async *rows() {} }
@@ -180,6 +216,9 @@ export async function importOldPack(
     for (const s of checked.ok) await st(() => env.store.put(s.id, s.bytes))
     return { catalogs: [], stored: checked.ok.map((s) => s.id), rejected: checked.rejected, skipped: true, missing: [], activated: [], waiting: [] }
   }
+  // A local catalog of another device (another publisher) is treated like a lower revision. Two packs of this device are not
+  // compared: every bridged catalog is revision 1 with the time it was made in it.
+  if (current !== undefined && current.publisher !== cat.publisher) checkRevision(current, cat, o.confirmDowngrade === true)
   const done = await commit(env, state, [cat], checked.ok)
   return { ...done, rejected: checked.rejected, missing: [] }
 }

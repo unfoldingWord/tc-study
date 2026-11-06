@@ -33,4 +33,13 @@ describe('fsStore', () => {
     await writeFile(join(dir, 'state.json.tmp'), '{"v":1,"k":"bad"')
     expect(await fsStore(dir).getState()).toEqual(st(2))
   })
+
+  test('A8: an unreadable state.json fails with E_STORE naming the file and how to reset', async () => {
+    const dir = await tmp()
+    await writeFile(join(dir, 'state.json'), '{"v":1,')
+    const e = await fsStore(dir).getState().catch((x) => x)
+    expect(e.code).toBe('E_STORE')
+    expect(e.message).toContain(join(dir, 'state.json'))
+    expect(e.message).toMatch(/delet/i)
+  })
 })

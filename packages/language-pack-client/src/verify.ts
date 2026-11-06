@@ -67,13 +67,24 @@ export async function verifyCatalogFile(
   }
 }
 
-/** Whether `incoming` may replace `installed`: a lower revision is E_DOWNGRADE unless confirmed; a fork (same revision, other id) always. */
+/**
+ * Whether `incoming` may replace `installed`: a lower revision is E_DOWNGRADE unless confirmed; a fork (same revision, other id) always.
+ * The installed state is keyed by catalog name, so a catalog of the same name from another publisher would replace it: that is treated
+ * like a lower revision (catalog.md "Going back": an old card must not undo an update without asking), whatever its revision; the
+ * exception is a published catalog over a local one, which replaces it (transfer.md "Old packs").
+ */
 export function checkRevision(
   installed: InstalledCatalog | undefined,
   incoming: VerifiedCatalog,
   confirmDowngrade = false,
 ): 'same' | 'newer' | 'first' {
-  if (installed === undefined || installed.publisher !== incoming.publisher || installed.name !== incoming.name) return 'first'
+  if (installed === undefined || installed.name !== incoming.name) return 'first'
+  // transfer.md "Old packs": a later published catalog replaces a local one (from an old pack).
+  if (installed.origin === 'local' && incoming.origin === 'published') return 'newer'
+  if (installed.publisher !== incoming.publisher) {
+    if (!confirmDowngrade) throw new ClientError('E_DOWNGRADE', `the installed ${installed.name} comes from ${installed.publisher}, not ${incoming.publisher}`)
+    return 'newer'
+  }
   if (installed.id === incoming.id) return 'same'
   if (incoming.revision === installed.revision) {
     throw new ClientError('E_DOWNGRADE', `two different catalogs share the revision ${incoming.revision}`)

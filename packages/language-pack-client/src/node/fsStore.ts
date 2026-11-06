@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { ClientError } from '../errors'
 import { isStoreId, type BlobStore, type InstalledState } from '../store/types'
@@ -20,7 +20,7 @@ export function fsStore(dir: string): BlobStore {
     async has(id) {
       if (!isStoreId(id)) return false
       try {
-        await readFile(path(id))
+        await stat(path(id))
         return true
       } catch (e) {
         if (isNotFound(e)) return false
@@ -68,11 +68,21 @@ export function fsStore(dir: string): BlobStore {
       }
     },
     async getState() {
+      let text: string
       try {
-        return JSON.parse(await readFile(statePath, 'utf8')) as InstalledState
+        text = await readFile(statePath, 'utf8')
       } catch (e) {
         if (isNotFound(e)) return undefined
         throw storeError(e)
+      }
+      try {
+        return JSON.parse(text) as InstalledState
+      } catch (e) {
+        // Failing loudly: a silent reset would hide the installed content. The person (or the app) decides to delete it.
+        throw new ClientError(
+          'E_STORE',
+          `the installed state ${statePath} cannot be read (${e instanceof Error ? e.message : String(e)}); deleting that file resets this device to nothing installed (the segments stay and are reused)`,
+        )
       }
     },
     async setState(state) {

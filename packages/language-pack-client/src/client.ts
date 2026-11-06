@@ -43,7 +43,7 @@ export interface LanguagePackClient {
   importTransfer(bytes: Uint8Array, o?: { confirmDowngrade?: boolean }): Promise<ImportReport>
   exportTransfer(o: { lang: string; mode: 'full' | 'update'; books?: string[]; units?: string[]; base?: Uint8Array[] }): Promise<Uint8Array>
   /** Converts a format 1.1 `.langpack.zip` into a local catalog. `originals` are the original-language rows (UGNT, UHB): a book is built only with them. */
-  importOldPack(zip: Uint8Array, o?: { originals?: RowSource; device?: string; now?: string }): Promise<ImportReport>
+  importOldPack(zip: Uint8Array, o?: { originals?: RowSource; device?: string; now?: string; confirmDowngrade?: boolean }): Promise<ImportReport>
   /**
    * What went wrong keeping the search index up to date (the `index` option). An index failure never fails an install or an import and never touches the
    * installed state: it is recorded here, and the next install, import or `open` tries the missing segments again.
@@ -76,16 +76,18 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const signal = opts.signal
     const confirm = opts.confirmDowngrade === true
     const known = state.published[state.aliases?.[lang] ?? lang]
-    const sendEtag = known?.etag !== undefined && (await st(() => store.has(known.id)))
-    const answer = await source.catalog(lang, { ...(sendEtag ? { etag: known!.etag } : {}), ...(signal ? { signal } : {}) })
+    // The ETag is sent only when the stored catalog still reads and verifies: a 304 must leave us a catalog to use.
+    const storedLang = known?.etag !== undefined ? await readStored(store, trust, known) : undefined
+    let answer = await source.catalog(lang, { ...(storedLang !== undefined ? { etag: known!.etag } : {}), ...(signal ? { signal } : {}) })
+    if (answer === 'not-modified' && storedLang === undefined) answer = await source.catalog(lang, signal ? { signal } : {})
 
     const next: InstalledState = { ...state, published: { ...state.published } }
     const toPut: { id: string; bytes: Uint8Array }[] = []
     let langCat: VerifiedCatalog | undefined
     let unchanged = true
     if (answer === 'not-modified') {
-      langCat = await readStored(store, trust, known)
-      if (langCat === undefined) throw new ClientError('E_STORE', 'the stored catalog is gone though the server says it did not change')
+      langCat = storedLang
+      if (langCat === undefined) throw new ClientError('E_NETWORK', 'the server answered 304 to a request without If-None-Match', { status: 304 })
     } else {
       langCat = await verifyCatalogFile(answer.bytes, trust, { from: 'network' })
       // A fork or an unconfirmed lower revision throws here. A confirmed lower revision passes, so 'newer' alone proves nothing.
@@ -112,7 +114,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       const wanted: MissingCommon = { name: rname, revision, id }
       let got: Awaited<ReturnType<PackSource['catalog']>>
       try {
-        const etag = have?.etag !== undefined && (await st(() => store.has(have.id))) ? have.etag : undefined
+        const etag = have?.etag !== undefined && (await readStored(store, trust, have)) !== undefined ? have.etag : undefined
         got = await source.catalog(rname, { ...(etag !== undefined ? { etag } : {}), ...(signal ? { signal } : {}) })
       } catch (e) {
         if (e instanceof ClientError && e.code === 'E_NO_PACK') {
@@ -128,8 +130,16 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
         missingCommon ??= wanted
         continue
       }
-      checkRevision(have, cv, confirm)
-      next.published[rname] = { ...installedOf(cv, have), ...(got.etag !== undefined ? { etag: got.etag } : {}) }
+      // The common catalog this language names is stored by id and used for its units. It replaces the published one of its name
+      // only when it may (not older, not another publisher): a language built against an older common does not undo an update.
+      let publish = true
+      try {
+        checkRevision(have, cv, confirm)
+      } catch (e) {
+        if (!(e instanceof ClientError && e.code === 'E_DOWNGRADE')) throw e
+        publish = false
+      }
+      if (publish) next.published[rname] = { ...installedOf(cv, have), ...(got.etag !== undefined ? { etag: got.etag } : {}) }
       toPut.push({ id: cv.id, bytes: got.bytes })
       unchanged = false
     }
@@ -140,7 +150,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const found = await catalogsOf(store, trust, next, langCat.name)
     return {
       name: langCat.name,
-      catalogs: found.catalogs.map((c) => next.published[c.name]!),
+      catalogs: found.catalogs.map((c) => (next.published[c.name]?.id === c.id ? next.published[c.name]! : installedOf(c))),
       updates: updates(next, found.catalogs),
       unchanged,
       ...(missingCommon !== undefined ? { missingCommon } : {}),
@@ -150,7 +160,10 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
   async function installNow(lang: string, want: Want, opts: { signal?: AbortSignal; onProgress?: (p: Progress) => void }): Promise<InstallReport> {
     const first = await loadState(store)
     let name = first.aliases?.[lang] ?? lang
-    if (first.published[name] === undefined) name = (await refreshNow(lang, opts.signal ? { signal: opts.signal } : {})).name
+    // No catalog yet, or the stored one no longer verifies: fetch it first.
+    if (first.published[name] === undefined || (await catalogsOf(store, trust, first, name)).lang === undefined) {
+      name = (await refreshNow(lang, opts.signal ? { signal: opts.signal } : {})).name
+    }
     const state = await loadState(store)
     const { catalogs } = await catalogsOf(store, trust, state, name)
     if (catalogs.length === 0) throw new ClientError('E_STORE', `the catalog of ${name} is not in the store`)
@@ -210,7 +223,9 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     for (const id of kept) {
       if (!(await st(() => store.has(id)))) continue
       const entry = [...Object.values(state.active), ...Object.values(state.published)].find((e) => e.id === id)
-      const cat = await readStored(store, trust, entry ?? { name: '', publisher: '', revision: 0, id, origin: 'published' })
+      // A catalog that no longer verifies (keys changed) is still read for its `requires`, without the signature: deleting the
+      // common catalog its units came from would make a later fix of the trust unrecoverable without the network.
+      const cat = (await readStored(store, trust, entry ?? { name: '', publisher: '', revision: 0, id, origin: 'published' })) ?? (await readTolerant(id))
       if (cat === undefined) continue
       for (const r of cat.catalog.requires ?? []) used.add(hex(r[2]))
       if (current.has(id)) for (const s of cat.catalog.segments) used.add(hex(s.id))
@@ -222,6 +237,17 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       removed.push(id)
     }
     return { removed }
+  }
+
+  async function readTolerant(id: string): Promise<VerifiedCatalog | undefined> {
+    const bytes = await st(() => store.get(id))
+    if (bytes === undefined) return undefined
+    try {
+      return await verifyCatalogFile(bytes, {}, { from: 'store', expectedId: id })
+    } catch (e) {
+      if (e instanceof FormatError) return undefined
+      throw e
+    }
   }
 
   async function verifyNow(): Promise<{ bad: string[] }> {

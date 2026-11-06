@@ -97,16 +97,29 @@ function sameList(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((x, i) => x === b[i])
 }
 
+/**
+ * Activates the units that are complete and whose needs are (catalog.md "Activation").
+ *
+ * Mixed revisions: a unit keeps the revision it was activated from until its own segments change, and a shared dependency (the
+ * common `orig:<book>`, `xmap`) may move on to a later revision under it when another language updates it. That is allowed here;
+ * correctness is kept on the reader side, which never uses alignment positions against an original of another stamp (ids.md
+ * "Positions in the original", `query/renderings.ts`). The other way is refused: a unit installed from a later revision is not moved
+ * back by an older catalog of its name that is not the published one (a language built against an older common catalog), so an old
+ * file does not undo an update (catalog.md "Going back"); the installed unit serves the needs instead.
+ *
+ * `only`: when given, the only units considered (an import: what the file brought, what is installed, and their needs).
+ */
 export function activate(
   state: InstalledState,
   catalogs: VerifiedCatalog[],
   have: ReadonlySet<string>,
-  o: { strict?: boolean } = {},
+  o: { strict?: boolean; only?: ReadonlySet<string> } = {},
 ): { state: InstalledState; activated: string[]; waiting: { key: string; missing: string[] }[] } {
   type Cand = { key: string; cat: VerifiedCatalog; entry: InstalledUnit; missing: string[] }
   const cands: Cand[] = []
   for (const cat of catalogs) {
     for (const unit of cat.catalog.units) {
+      if (o.only !== undefined && !o.only.has(`${cat.name}/${unit.id}`)) continue
       const segments = unit.segments.map((i) => hex(segmentOf(cat, i).id))
       const entry: InstalledUnit = {
         catalog: cat.name,
@@ -128,11 +141,15 @@ export function activate(
     const old = state.units[c.key]
     return old !== undefined && sameList(old.segments, c.entry.segments) && sameList(old.needs, c.entry.needs)
   }
+  const held = (c: Cand): boolean => {
+    const old = state.units[c.key]
+    return old !== undefined && old.revision > c.entry.revision && state.published[c.cat.name]?.id !== c.cat.id
+  }
   for (let changed = true; changed; ) {
     changed = false
     for (const c of cands) {
       if (ok.has(c.key)) continue
-      if ((same(c) && (o.strict !== true || c.missing.length === 0)) || (c.missing.length === 0 && c.entry.needs.every(satisfied))) {
+      if (held(c) || (same(c) && (o.strict !== true || c.missing.length === 0)) || (c.missing.length === 0 && c.entry.needs.every(satisfied))) {
         ok.add(c.key)
         changed = true
       }
@@ -147,6 +164,7 @@ export function activate(
       waiting.push({ key: c.key, missing: [...c.missing, ...c.entry.needs.filter((n) => !satisfied(n))] })
       continue
     }
+    if (held(c)) continue
     const old = state.units[c.key]
     if (old === undefined || old.revision !== c.entry.revision || old.catalogId !== c.entry.catalogId) {
       next.units[c.key] = c.entry
@@ -156,7 +174,7 @@ export function activate(
   }
   for (const cat of catalogs) {
     const cur = next.published[cat.name]
-    if (cur === undefined || cat.revision >= cur.revision) next.published[cat.name] = installedOf(cat, cur, state.active[cat.name])
+    if (cur === undefined || (cur.publisher === cat.publisher && cat.revision >= cur.revision)) next.published[cat.name] = installedOf(cat, cur, state.active[cat.name])
   }
   return { state: next, activated, waiting }
 }

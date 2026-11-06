@@ -7,7 +7,8 @@ import { join } from 'node:path'
 import type { Sample } from './sample'
 
 export type Content = Sample | { bucketDir: string }
-export type FailSegment = (id: string, n: number) => 'ok' | 404 | 'drop' | 'corrupt'
+/** 429 answers with `Retry-After: 7`; 500 and 503 with a JSON error body, as the Worker does (`serving.md`). */
+export type FailSegment = (id: string, n: number) => 'ok' | 404 | 429 | 500 | 503 | 'drop' | 'corrupt'
 export type FakeServer = { url: string; hits: string[]; set(content: Content): void; stop(): void }
 
 const CORS = {
@@ -87,6 +88,8 @@ export function startFakeServer(initial: Content, o: { failSegment?: FailSegment
       const n = (segCount.get(key) ?? 0) + 1
       segCount.set(key, n)
       failure = o.failSegment?.(key, n) ?? 'ok'
+      if (failure === 429) return json(429, { error: 'rate limited' }, { 'Retry-After': '7' })
+      if (failure === 500 || failure === 503) return json(failure, { error: 'unavailable' })
       bytes = failure === 404 ? undefined : lookup(content, 'seg', key)
       if (bytes === undefined) return json(404, { error: 'segment not found' })
     }

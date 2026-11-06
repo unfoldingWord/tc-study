@@ -344,6 +344,51 @@ describe('fix round 1', () => {
   })
 })
 
+describe('final review, trust and installation', () => {
+  test('A1: an old pack of another device (another publisher) is E_DOWNGRADE unless confirmed', async () => {
+    const b = offline(memoryStore(), {})
+    const zip = file('data', 'es-419-tit.langpack.zip')
+    await b.importOldPack(zip, { device: 'tablet-1' })
+    await expect(b.importOldPack(zip, { device: 'tablet-2' })).rejects.toMatchObject({ code: 'E_DOWNGRADE' })
+    const r = await b.importOldPack(zip, { device: 'tablet-2', confirmDowngrade: true })
+    expect(r.catalogs[0]?.publisher).toBe('local:tablet-2')
+  })
+
+  test('A2: a full export made against common r1 imports onto a device with common r2; published.common stays r2', async () => {
+    const otherCommon = await buildSample({ commonRevision: 2 })
+    const srv = startFakeServer({ ...sample, commonCatalog: otherCommon.commonCatalog })
+    server = srv
+    const store = memoryStore()
+    await createClient({ store, source: httpSource({ base: srv.url }), trust }).refresh('common')
+    const c2 = (await store.getState())!.published.common!
+    expect(c2.revision).toBe(2)
+    const a = await installed(sample)
+    const bytes = await a.client.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] })
+    const b = offline(store)
+    const r = await b.importTransfer(bytes)
+    expect(r.waiting).toEqual([])
+    const st = (await store.getState())!
+    expect(st.published.common!.id).toBe(c2.id)
+    expect(st.units['es-419/book:tit']).toBeDefined()
+    expect(st.units['common/orig:tit']).toBeDefined()
+  })
+
+  test('A7: an optional unit whose segments sit in the store is not activated by an import that did not bring it', async () => {
+    const a = await installed(sample)
+    const bytes = await a.client.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] })
+    const c = await verifyCatalogFile(sample.langCatalog, {}, { from: 'store' })
+    const aligned = c.catalog.units.find((u) => u.id.startsWith('aligned:'))!
+    const store = memoryStore()
+    for (const i of aligned.segments) {
+      const id = hexOf(c.catalog.segments[i]!.id)
+      await store.put(id, sample.segments.get(id)!)
+    }
+    const r = await offline(store).importTransfer(bytes)
+    expect(r.activated).not.toContain(`es-419/${aligned.id}`)
+    expect((await store.getState())!.units[`es-419/${aligned.id}`]).toBeUndefined()
+  })
+})
+
 describe('the spec fixtures', () => {
   test('a cut file: whole entries are stored, the cut one is missing, and nothing is activated from a unit that lacks it', async () => {
     const store = memoryStore()

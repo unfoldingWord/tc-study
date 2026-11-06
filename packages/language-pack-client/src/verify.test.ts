@@ -134,9 +134,15 @@ describe('checkRevision', () => {
     expect(await codeOf(() => checkRevision(installed(12), incoming9))).toBe('E_DOWNGRADE')
     expect(checkRevision(installed(12), incoming9, true)).toBe('newer')
   })
-  test('other publisher or nothing installed is first', async () => {
-    expect(checkRevision(installed(12), await incoming(9, B, 'other'))).toBe('first')
+  test('nothing installed is first', async () => {
     expect(checkRevision(undefined, await incoming(9))).toBe('first')
+  })
+  test('A1: another publisher of the same name is treated like a lower revision: E_DOWNGRADE unless confirmed', async () => {
+    const other = await incoming(13, B, 'other')
+    expect(await codeOf(() => checkRevision(installed(12), other))).toBe('E_DOWNGRADE')
+    expect(checkRevision(installed(12), other, true)).toBe('newer')
+    const local: InstalledCatalog = { ...installed(1), publisher: 'local:tablet', origin: 'local' }
+    expect(checkRevision(local, await incoming(1, B, 'unfoldingWord'))).toBe('newer')
   })
   test('same revision, other id is E_DOWNGRADE even confirmed', async () => {
     expect(await codeOf(() => checkRevision(installed(12), incoming12, true))).toBe('E_DOWNGRADE')

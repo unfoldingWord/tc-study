@@ -47,7 +47,7 @@ const answer = await reader.passage('tit 1:1')
 
 - With `trustedKeys` given, even an empty map: a published catalog must carry a signature by a listed key, or it is `E_SIGNATURE` and nothing is installed; a local catalog is refused when it comes from a server or a transfer file (it is only valid when made on the device, by `importOldPack`).
 - Without `trustedKeys`: signatures are not checked. Use this for tests only.
-- A lower `about.revision` of the same publisher and catalog is `E_DOWNGRADE` unless the call passes `confirmDowngrade: true`.
+- A lower `about.revision` of the same publisher and catalog is `E_DOWNGRADE` unless the call passes `confirmDowngrade: true`. A catalog of the same name from another publisher is treated the same way, whatever its revision (the installed state is kept by catalog name); a published catalog over a local one (an old pack) replaces it. A common catalog that a language names in `requires` and that is older than the installed one is stored and used for that language's units by id, without replacing the installed one.
 - Every segment is checked against the id the catalog gives it (the sha256 of its body) before it is stored or read; a stored segment that fails later is treated as not installed and listed in `reader.problems`.
 
 The signature check uses WebCrypto Ed25519 when the runtime has it and falls back to `@noble/curves`.
@@ -61,6 +61,10 @@ The signature check uses WebCrypto Ed25519 when the runtime has it and falls bac
 | `GET /v3/packs/seg/{id}` | a segment by its id (64 lowercase hex); the same id is the same bytes for every language |
 
 The order is: language catalog, then the common catalog it requires, then the segments of the chosen units. A unit is activated only when it and its `needs` are complete. `HEAD` and `OPTIONS` exist on the server; the client only uses `GET`.
+
+A segment the server does not have (404) or whose bytes are not the segment leaves its unit waiting, and the install goes on. Any other failed request (429, 5xx, a dropped connection) stops the install: the units already complete are activated and saved, then `install` rejects with `E_NETWORK` (`status`, and `retryAfter` in seconds for a 429). Installed content is kept; call `install` again later, after `retryAfter` when there is one.
+
+**Mixed revisions.** A unit keeps the revision it was activated from until its own segments change. A shared dependency can move on under it: when another language updates the common `orig:<book>`, a book of this language built against the older original stays as it is. The reader then does not use that book's alignment positions (they point into another original): `renderings` leaves the book out and says so in `notInstalled` (`what: 'stale'`). The other way is refused: an older catalog (a language built against an older common catalog) does not move back a unit installed from a later revision.
 
 ## The eight queries and the envelope
 
