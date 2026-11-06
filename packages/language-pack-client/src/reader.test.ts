@@ -119,3 +119,36 @@ describe('openFromSegments', () => {
     expect(r.installed('book:tit')).toBe(false)
   })
 })
+
+describe('failed reads', () => {
+  test('a get that rejects once is retried by the next call, for book() and maps()', async () => {
+    const catalogs = [await verifyCatalogFile(sample.langCatalog, {}, { from: 'store' }), await verifyCatalogFile(sample.commonCatalog, {}, { from: 'store' })]
+    let failing = true
+    const r = openFromSegments({
+      lang: 'es-419',
+      catalogs,
+      get: async (id) => {
+        if (failing) throw new Error('network')
+        return sample.segments.get(id)
+      },
+    })
+    await expect(r.book('tit')).rejects.toThrow('network')
+    await expect(r.maps()).rejects.toThrow('network')
+    failing = false
+    expect((await r.book('tit'))?.lang).toBe('es-419')
+    expect((await r.maps()).xmap).toBeDefined()
+    expect(r.problems).toEqual([])
+  })
+
+  test('a valid segment stored under another segment\'s id is a problem', async () => {
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const state = (await store.getState())!
+    const bookId = state.units['es-419/book:tit']!.segments[0]!
+    const origId = state.units['common/orig:tit']!.segments[0]!
+    await store.put(bookId, (await store.get(origId))!)
+    const r = await client.open('es-419')
+    expect(await r.book('tit')).toBeUndefined()
+    expect(r.problems.map((p) => p.id)).toEqual([bookId])
+  })
+})

@@ -29,6 +29,11 @@ import type { VerifiedCatalog } from './verify'
 
 export type ReaderProblem = { id: string; code: string }
 
+/**
+ * A snapshot of one `open()`: what it found missing or bad stays so (reopen after an install). A read that fails (the store or the
+ * network rejects) is not remembered and is tried again by the next call. In `openFromSegments`, `installed()` is optimistic: every
+ * unit the catalogs list counts as installed until a read finds its bytes missing or bad.
+ */
 export interface PackReader {
   lang: string
   /** Segments that were stored but do not read as the segment their id says. */
@@ -106,6 +111,10 @@ export function makeReader(o: ReaderInput): PackReader {
         }
       })()
       segCache.set(key, p)
+      // A rejected read (the store or the network failed) is not remembered: the next call tries again.
+      p.catch(() => {
+        if (segCache.get(key) === p) segCache.delete(key)
+      })
     }
     return p
   }
@@ -127,6 +136,10 @@ export function makeReader(o: ReaderInput): PackReader {
         return out
       })()
       unitSegments.set(unit, p)
+      const mine = p
+      p.catch(() => {
+        if (unitSegments.get(unit) === mine) unitSegments.delete(unit)
+      })
     }
     return p
   }
@@ -206,8 +219,11 @@ export function makeReader(o: ReaderInput): PackReader {
       return (await single(`art:${group}`, artView))?.articles
     },
     maps() {
-      mapsOnce ??= buildMaps()
-      return mapsOnce
+      const run = (mapsOnce ??= buildMaps())
+      run.catch(() => {
+        if (mapsOnce === run) mapsOnce = undefined
+      })
+      return run
     },
     size: (unit) => sizes.get(unit) ?? 0,
     unitOf(cls, key) {
