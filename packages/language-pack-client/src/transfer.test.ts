@@ -436,6 +436,20 @@ describe('importOldPack', () => {
     expect(state.units['common/orig:tit']).toBeDefined()
   })
 
+  test('a bridged book exported full imports on a receiver with no trusted keys, and reads', async () => {
+    const data = join(SPEC, 'data')
+    const originals = await partsSource({ list: join(data, 'originals', 'list.json'), partsDir: join(data, 'parts') })
+    const sender = offline()
+    await sender.importOldPack(file('data', 'es-419-tit.langpack.zip'), { originals, device: 'test-device', now: '2026-11-01T10:00:00Z' })
+    const bytes = await sender.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] })
+    const receiver = offline(memoryStore(), {})
+    const r = await receiver.importTransfer(bytes)
+    expect(r.activated).toEqual(expect.arrayContaining(['es-419/map', 'es-419/orig:tit', 'es-419/book:tit']))
+    expect(r.waiting).toEqual([])
+    const passage = await (await receiver.open('es-419')).passage('tit 2:11')
+    expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+  })
+
   test('bytes that are not an old pack are refused', async () => {
     await expect(offline().importOldPack(new Uint8Array([1, 2, 3]))).rejects.toBeInstanceOf(Error)
   })
