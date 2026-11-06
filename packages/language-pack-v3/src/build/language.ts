@@ -226,8 +226,8 @@ export type LanguageBuild = { segments: BuiltSegment[]; catalog: BuiltSegment; r
  *   UST of the books built): one `aligned` segment per part that has a key. They are optional in the catalog and no unit needs them; the
  *   segments of every other class are the same bytes with or without them (the index is built last and nothing reads it). Default `false`.
  *
- * - **Own originals.** With `withOrig: true` it also builds the `orig` segment of each book it builds, the same bytes as the common
- *   catalog's ({@link buildCommon}), lists it as a unit of this catalog and lists the originals it names among the resources. The
+ * - **Own originals.** With `withOrig: true` it also builds the `orig` segment of each book it builds, the same bytes {@link buildCommon}
+ *   makes from the same source, lists it as a unit of this catalog and lists the originals it names among the resources. The
  *   book then finds `orig:{book}` in its own catalog, with no common catalog: this is for a device that bridges an old pack with
  *   no network. A publisher leaves it off (the common catalog has the originals). Default `false`.
  *

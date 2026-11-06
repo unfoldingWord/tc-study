@@ -82,8 +82,9 @@ prepared rows). `es-419 ugl G1-G999` is group `0` of the lexicon: `content/1.jso
 | `en/list.json` | 244 546 | `62a0ed1dc7f1a52184a21f0a0bd8af161b1dba1de9a2343ecd57f92ac7130c32` | the phase 0 sample's list of English: trimmed (source sha256 37588b1990680594d169c86b480c7a745aadabe0e96d70e9dad171a0ace2c0f8, 595 parts, 11 resources): 4 parts, 4 resources |
 | `originals/list.json` | 10 317 | `1516a779e6862a1bd846aa4e4fbf6eddd13fe73ab93e914d838d8efa748d5273` | the phase 0 sample's list of the originals: trimmed (source sha256 f0d6ca889d58fba47a0ad22597791596f6b368b5933931a30d39b037cd4983b8, 132 parts, 4 resources): 1 parts, 1 resources |
 | `es-419-tit.langpack.zip` | 314 931 | `d3ecdff0ee9e329f58ec6652571bbebe6873784aa1c90e943a01e3c5299285c8` | the phase 0 sample's pack: format 1.1 pack, es-419 Titus |
+| `originals-tit.langpack.zip` | 26 478 | `da54265935941fb1b98245264a3bb9e3c80ad492062545ac4dd7d212c4fda2b8` | made here by `spec/tests/build-originals-fixture.ts` from the UGNT part: format 1.1 originals pack whose manifest lists no `books` |
 
-Total: 1 567 846 bytes in 19 files (not counting `originals-tit.langpack.zip`, 26 478 bytes, made from the UGNT part).
+Total: 1 594 324 bytes in 20 files.
 
 ## Not copied
 
