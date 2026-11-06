@@ -31,6 +31,9 @@ export type VerifiedCatalog = {
 /** The part of an installed catalog that `checkRevision` reads. Task 4 replaces this with the real type. */
 export type InstalledCatalog = { publisher: string; name: string; revision: number; id: string }
 
+/**
+ * Reads and checks a catalog file. `o.verify` is `@internal`: tests use it to run a given Ed25519 primitive; apps leave it out.
+ */
 export async function verifyCatalogFile(
   bytes: Uint8Array,
   policy: TrustPolicy,
@@ -45,7 +48,8 @@ export async function verifyCatalogFile(
   const { about } = catalog
   const keys = policy.trustedKeys
   let signedBy: string | undefined
-  if (keys !== undefined && Object.keys(keys).length > 0) {
+  // Given keys means a map was passed, even an empty one (catalog.md rule 1): then nothing unsigned or untrusted is accepted.
+  if (keys !== undefined) {
     if (about.origin === 'published') {
       const idBytes = Uint8Array.from(id.match(/../g)!, (pair) => parseInt(pair, 16))
       signedBy = (await checkSignatures(header, idBytes, keys, o.verify ?? (await ed25519Verify()))).key

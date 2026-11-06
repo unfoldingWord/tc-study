@@ -70,6 +70,12 @@ describe.each([
     expect((await verifyCatalogFile(published, {}, { from, verify })).signedBy).toBeUndefined()
   })
 
+  test('an empty map of keys rejects published catalogs, signed or not', async () => {
+    const k = await newKey()
+    expect(await codeOf(verifyCatalogFile(await k.sign(published), { trustedKeys: {} }, { from, verify }))).toBe('E_SIGNATURE')
+    expect(await codeOf(verifyCatalogFile(published, { trustedKeys: {} }, { from, verify }))).toBe('E_SIGNATURE')
+  })
+
   test('a body that changed (another id than expectedId) is E_ID', async () => {
     const { id, seg } = await readSegment(published, { known: CATALOG_TABLES })
     const about = { ...(seg.t.about as Record<string, unknown>), revision: 999 }
@@ -99,6 +105,10 @@ describe('a local catalog', () => {
     expect((await verifyCatalogFile(bytes, { trustedKeys }, { from: 'bridge' })).origin).toBe('local')
     expect((await verifyCatalogFile(bytes, { trustedKeys }, { from: 'store' })).origin).toBe('local')
     expect((await verifyCatalogFile(bytes, {}, { from: 'transfer' })).origin).toBe('local')
+  })
+
+  test('an empty map of keys is still keys: a local catalog from a transfer is E_SIGNATURE', async () => {
+    expect(await codeOf(verifyCatalogFile(await catalogBytes(), { trustedKeys: {} }, { from: 'transfer' }))).toBe('E_SIGNATURE')
   })
 })
 
