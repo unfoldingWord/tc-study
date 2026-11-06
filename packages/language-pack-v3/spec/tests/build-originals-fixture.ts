@@ -1,13 +1,15 @@
 /**
  * Builds `data/originals-tit.langpack.zip`: a format 1.1 pack of the originals with Titus of the UGNT, shaped like the
  * `originals.langpack.zip` that `prepare-language` writes (`kind: "originals"`, resources with `role: "original"`, `rows`
- * counts, and no `books`). The rows are those of the UGNT part in `data/parts/` (source rows and prepared rows of Titus);
- * the real pack also has index rows, which the parts do not carry and the bridge does not need.
+ * counts, no `books`, and a `catalog.json` with the Door43 catalog row of the resource, `{ key, metadata }`). The rows are
+ * those of the UGNT part in `data/parts/` (source rows and prepared rows of Titus); the real pack also has index rows, which
+ * the parts do not carry and the bridge does not need. The catalog row's `metadata` is the one `data/originals/list.json`
+ * holds for the UGNT (the same Door43 row the real pack writes, `bookBlobs` included, without the `catalogedAt` of a run).
  *
  * Run: `bun spec/tests/build-originals-fixture.ts`. The zip is deterministic: fixed dates (JSZip writes them in UTC, so the time zone does not matter) and no folder entries, so a second run changes nothing.
  */
 
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { partsSource } from '../../src/node/partsSource'
@@ -44,6 +46,10 @@ export async function buildOriginalsFixture(): Promise<Uint8Array> {
     resources: [{ key: UGNT, role: 'original', stamp: ref.stamp, subject: ref.kind, title: ref.title, rows: { receipt: counts.receipt, sot: counts.sot, prepared: counts.prepared } }],
   }
   zip.file('manifest.json', JSON.stringify(manifest, null, 2) + '\n', { date: FIXED })
+  const list = JSON.parse(readFileSync(join(DATA, 'originals', 'list.json'), 'utf8')) as { resources: { key: string; metadata?: unknown }[] }
+  const metadata = list.resources.find((r) => r.key === UGNT)?.metadata
+  if (metadata === undefined) throw new Error(`The originals list has no catalog row of ${UGNT}`)
+  zip.file('catalog.json', JSON.stringify([{ key: UGNT, metadata }]), { date: FIXED, createFolders: false })
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 9 } })
 }
 
