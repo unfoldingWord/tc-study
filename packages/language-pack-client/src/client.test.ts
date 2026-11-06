@@ -986,12 +986,46 @@ describe('importOldPack with an originals pack', () => {
     const store = memoryStore()
     const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
     await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    const bridged = (await store.getState())!
+    const localId = bridged.active['es-419']!.id
+    expect(bridged.active['es-419']!.origin).toBe('local')
+    const bridgedOrig = bridged.units['es-419/orig:tit']!.segments
+    expect(bridged.units['es-419/orig:tit']!.local).toBe(true)
     await client.refresh('es-419')
     const inst = await client.install('es-419', { books: ['tit'] })
     expect(inst.waiting).toEqual([])
     const state = (await store.getState())!
     expect(state.active['es-419']?.origin).toBe('published')
     expect(state.units['common/orig:tit']).toBeDefined()
+    // The published catalog replaced the local one: the bridged orig is no longer installed, and no unit keeps the local catalog.
+    expect(state.units['es-419/orig:tit']).toBeUndefined()
+    expect(Object.values(state.units).some((u) => u.catalogId === localId)).toBe(false)
+    const { removed } = await client.prune()
+    expect(removed).toContain(localId)
+    expect(await store.has(localId)).toBe(false)
+    const published = new Set(Object.values(state.units).flatMap((u) => u.segments))
+    for (const id of bridgedOrig) if (!published.has(id)) expect(await store.has(id)).toBe(false)
+    expect(bridgedOrig.some((id) => !published.has(id))).toBe(true) // the bridged orig is not the published one here
+    expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
+  })
+
+  test('with no common catalog, a published book does not activate against the bridged orig', async () => {
+    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const srv = startFakeServer(sample, { noCommon: true })
+    server?.stop()
+    server = srv
+    const store = memoryStore()
+    const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
+    await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    const localBook = (await store.getState())!.units['es-419/book:tit']!
+    await client.refresh('es-419')
+    const inst = await client.install('es-419', { books: ['tit'] })
+    expect(inst.waiting.find((w) => w.key === 'es-419/book:tit')?.missing).toContain('es-419/orig:tit')
+    const state = (await store.getState())!
+    expect(state.active['es-419']?.origin).toBe('published') // map and topics came from the published catalog
+    expect(state.units['es-419/book:tit']).toEqual(localBook) // the bridged book stays, with the orig it needs
+    expect(state.units['es-419/orig:tit']).toBeDefined()
+    await client.prune()
     expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
   })
 

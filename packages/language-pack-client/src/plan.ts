@@ -107,6 +107,11 @@ function sameList(a: string[], b: string[]): boolean {
  * back by an older catalog of its name that is not the published one (a language built against an older common catalog), so an old
  * file does not undo an update (catalog.md "Going back"); the installed unit serves the needs instead.
  *
+ * A published catalog replaces a local one (transfer.md "Old packs"): an installed unit that came from a local catalog and that
+ * the published catalog of its name (one of `catalogs`) does not list (the bridged `orig:<book>`) no longer serves a need, so a
+ * published book never activates against it; and once that name's active catalog is published, it is dropped from the state as
+ * soon as no unit kept needs it, so `prune` removes its segments and the local catalog.
+ *
  * `only`: when given, the only units considered (an import: what the file brought, what is installed, and their needs).
  */
 export function activate(
@@ -128,13 +133,23 @@ export function activate(
         segments,
         needs: (unit.needs ?? []).map((n) => qualify(catalogs, cat.name, n)),
         ...(unit.optional ? { optional: true as const } : {}),
+        ...(cat.origin === 'local' ? { local: true as const } : {}),
       }
       cands.push({ key: `${cat.name}/${unit.id}`, cat, entry, missing: segments.filter((s) => !have.has(s)) })
     }
   }
   const byKey = new Map(cands.map((c) => [c.key, c]))
+  const publishedOf = new Map(catalogs.filter((c) => c.origin === 'published').map((c) => [c.name, c]))
+  // From a local catalog: the flag, or (a state saved before the flag) the catalog its units came from is a local one.
+  const fromLocal = (u: InstalledUnit): boolean =>
+    u.local === true || (state.active[u.catalog]?.origin === 'local' && state.active[u.catalog]!.id === u.catalogId)
+  const replaced = (key: string): boolean => {
+    const u = state.units[key]
+    const pub = u === undefined ? undefined : publishedOf.get(u.catalog)
+    return u !== undefined && pub !== undefined && fromLocal(u) && !pub.catalog.units.some((x) => `${pub.name}/${x.id}` === key)
+  }
   const ok = new Set<string>()
-  const satisfied = (need: string): boolean => ok.has(need) || (!byKey.has(need) && state.units[need] !== undefined)
+  const satisfied = (need: string): boolean => ok.has(need) || (!byKey.has(need) && state.units[need] !== undefined && !replaced(need))
   // A unit whose segments and needs are the installed ones only takes the new revision. `strict`: `have` covers every segment of
   // the catalogs (an import), so a segment the store lost also holds back a unit that would otherwise only take the revision.
   const same = (c: Cand): boolean => {
@@ -172,6 +187,18 @@ export function activate(
       next.active[c.cat.name] = installedOf(c.cat, state.published[c.cat.name], state.active[c.cat.name])
     }
   }
+  // The units a published catalog replaced, once their name's active catalog is published and no unit kept needs them.
+  const gone = new Set(Object.keys(next.units).filter((k) => replaced(k) && next.active[next.units[k]!.catalog]?.origin === 'published'))
+  for (let changed = true; changed; ) {
+    changed = false
+    const needed = new Set(Object.entries(next.units).flatMap(([k, u]) => (gone.has(k) ? [] : u.needs)))
+    for (const k of gone) {
+      if (!needed.has(k)) continue
+      gone.delete(k)
+      changed = true
+    }
+  }
+  for (const k of gone) delete next.units[k]
   for (const cat of catalogs) {
     const cur = next.published[cat.name]
     if (cur === undefined || (cur.publisher === cat.publisher && cat.revision >= cur.revision)) next.published[cat.name] = installedOf(cat, cur, state.active[cat.name])
