@@ -137,7 +137,7 @@ export function activate(
     }
   }
 
-  const next: InstalledState = { v: 1, published: { ...state.published }, active: { ...state.active }, units: { ...state.units } }
+  const next: InstalledState = { v: 1, published: { ...state.published }, active: { ...state.active }, units: { ...state.units }, ...(state.aliases !== undefined ? { aliases: state.aliases } : {}) }
   const activated: string[] = []
   const waiting: { key: string; missing: string[] }[] = []
   for (const c of cands) {

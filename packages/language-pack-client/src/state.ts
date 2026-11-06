@@ -18,6 +18,8 @@ export type InstalledState = {
   /** The catalog each catalog's active units came from. */
   active: Record<string, InstalledCatalog>
   units: Record<string, InstalledUnit>
+  /** Language tags the server answers to with a catalog of another name (`es` for `es-419`), so lookups work offline. */
+  aliases?: Record<string, string>
 }
 
 export function emptyState(): InstalledState {

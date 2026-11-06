@@ -284,3 +284,128 @@ describe('status, prune and verify', () => {
     expect((await client.verify()).bad).toEqual([id!])
   })
 })
+
+describe('fix round 1', () => {
+  const ids = async (s: Sample, unit: string) => {
+    const c = await verifyCatalogFile(s.langCatalog, {}, { from: 'store' })
+    return c.catalog.units.find((u) => u.id === unit)!.segments.map((i) => hexOf(c.catalog.segments[i]!.id))
+  }
+  const offline: PackSource = {
+    catalog: async () => {
+      throw new ClientError('E_NETWORK', 'offline')
+    },
+    segment: async () => {
+      throw new ClientError('E_NETWORK', 'offline')
+    },
+  }
+
+  test('1: a stored blob that no longer matches its id is refetched, never activated', async () => {
+    const { client, store, segHits, server } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const [id] = segsOf['es-419/book:tit']!
+    const bad = (await store.get(id!))!.slice()
+    bad[bad.length >> 1] ^= 0xff
+    await store.put(id!, bad)
+    const n = segHits().length
+    const r = await client.install('es-419', { books: ['tit'] })
+    expect(r.fetched).toEqual([id!])
+    expect(segHits().slice(n)).toEqual([id!])
+    expect((await client.verify()).bad).toEqual([])
+    // good blobs are not fetched again
+    const m = server.hits.length
+    expect((await client.install('es-419', { books: ['tit'] })).fetched).toEqual([])
+    expect(server.hits.length).toBe(m)
+  })
+
+  test('1: a corrupt blob under the id of a new revision does not activate it', async () => {
+    const { client, store, server } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const [oldId] = await ids(sample, 'book:tit')
+    const [newId] = await ids(sample2, 'book:tit')
+    expect(newId).not.toBe(oldId)
+    server.set(sample2)
+    await client.refresh('es-419')
+    await store.put(newId!, new Uint8Array([1, 2, 3]))
+    const r = await client.install('es-419', { books: ['tit'] })
+    expect(r.fetched).toEqual([newId!])
+    expect(r.waiting).toEqual([])
+    expect((await client.verify()).bad).toEqual([])
+    // and when the refetch fails too, the unit stays on the old revision
+    await store.put(newId!, new Uint8Array([1, 2, 3]))
+    const state = (await store.getState())!
+    await store.setState({ ...state, units: { ...state.units, 'es-419/book:tit': { ...state.units['es-419/book:tit']!, segments: [oldId!], revision: 1 } } })
+    const down = setup({ failSegment: (id) => (id === newId ? 404 : 'ok') }, sample2, store)
+    const r2 = await down.client.install('es-419', { books: ['tit'] })
+    expect(r2.waiting.map((w) => w.key)).toContain('es-419/book:tit')
+    expect((await store.getState())!.units['es-419/book:tit']!.segments).toEqual([oldId!])
+  })
+
+  test('2: the required common catalog is found by id in the store, not by the published pointer', async () => {
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const c2 = await verifyCatalogFile(otherCommon.commonCatalog, {}, { from: 'store' })
+    await store.put(c2.id, otherCommon.commonCatalog)
+    const state = (await store.getState())!
+    await store.setState({ ...state, published: { ...state.published, common: { name: 'common', publisher: c2.publisher, revision: 2, id: c2.id, origin: 'published' } } })
+    expect((await client.status('es-419')).missingCommon).toBeUndefined()
+    const r = await createClient({ store, source: offline, trust }).install('es-419', { books: ['tit'] })
+    expect(r.waiting).toEqual([])
+    expect(r.unknown).toEqual([])
+  })
+
+  test('3: prune keeps a catalog an installed unit still names', async () => {
+    const { client, store, server } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const oldLang = (await store.getState())!.published['es-419']!.id
+    const [newId] = await ids(sample2, 'book:tit')
+    server.set(sample2)
+    await client.refresh('es-419')
+    const down = setup({ failSegment: (id) => (id === newId ? 404 : 'ok') }, sample2, store)
+    const r = await down.client.install('es-419', { books: ['tit'] })
+    expect(r.waiting.map((w) => w.key)).toContain('es-419/book:tit')
+    expect((await store.getState())!.units['es-419/book:tit']!.catalogId).toBe(oldLang)
+    const { removed } = await down.client.prune()
+    expect(removed).not.toContain(oldLang)
+    expect(await store.has(oldLang)).toBe(true)
+  })
+
+  test('4: an alias resolves to the catalog name: offline install and ETag on refresh', async () => {
+    const etags: (string | undefined)[] = []
+    const { server, store } = setup()
+    const inner = httpSource({ base: server.url })
+    const spy: PackSource = { catalog: (n, o) => (etags.push(o?.etag), inner.catalog(n, o)), segment: (i, s) => inner.segment(i, s) }
+    const c1 = createClient({ store, source: spy, trust })
+    await c1.install('es', { books: ['tit'] })
+    const r = await c1.refresh('es')
+    expect(r.unchanged).toBe(true)
+    expect(etags.filter((e) => e !== undefined).length).toBe(1)
+    const c2 = createClient({ store, source: offline, trust })
+    const again = await c2.install('es', { books: ['tit'] })
+    expect(again.fetched).toEqual([])
+    expect((await c2.status('es')).published?.name).toBe('es-419')
+  })
+
+  test('5: a setState that fails after one activated unit leaves the state as it was', async () => {
+    const inner = memoryStore()
+    let sets = 0
+    let armed = false
+    const store: BlobStore = {
+      has: (id) => inner.has(id),
+      get: (id) => inner.get(id),
+      ids: () => inner.ids(),
+      delete: (id) => inner.delete(id),
+      put: (id, b) => inner.put(id, b),
+      getState: () => inner.getState(),
+      async setState(s) {
+        if (armed && ++sets === 2) throw new Error('disk full')
+        return inner.setState(s)
+      },
+    }
+    const { client } = setup({}, sample, store)
+    await client.refresh('es-419')
+    const before = await store.getState()
+    armed = true
+    await expect(client.install('es-419', { books: ['tit'] })).rejects.toMatchObject({ code: 'E_STORE' })
+    expect(await store.getState()).toEqual(before)
+  })
+})

@@ -64,12 +64,41 @@ export async function catalogsOf(
   let missing: MissingCommon | undefined
   for (const [rname, revision, rid] of lang.catalog.requires ?? []) {
     const id = hex(rid)
-    const entry = state.published[rname]
-    const found = entry?.id === id ? await readStored(store, trust, entry) : undefined
+    // By id, from the stored files: the `published` pointer of that name may already be a newer common catalog.
+    const stored = await readStored(store, trust, { name: rname, publisher: lang.publisher, revision, id, origin: 'published' })
+    const found = stored?.name === rname ? stored : undefined
     if (found !== undefined) catalogs.push(found)
     else missing ??= { name: rname, revision, id }
   }
   return { lang, catalogs, ...(missing !== undefined ? { missing } : {}) }
+}
+
+/**
+ * The stored segment ids that still read as the segment their id says (`readSegment` with the class tables and `expectedId`).
+ * A blob that does not is left out, so it counts as missing and is fetched again.
+ */
+export async function verifiedHave(store: BlobStore, catalogs: VerifiedCatalog[]): Promise<Set<string>> {
+  const stored = new Set(await st(() => store.ids()))
+  const have = new Set<string>()
+  const tables = KNOWN as Record<string, Record<string, number[]> | undefined>
+  const checked = new Set<string>()
+  for (const cat of catalogs) {
+    for (const entry of cat.catalog.segments) {
+      const id = hex(entry.id)
+      if (!stored.has(id) || checked.has(id)) continue
+      checked.add(id)
+      const known = tables[entry.class]
+      const bytes = await st(() => store.get(id))
+      if (bytes === undefined || known === undefined) continue
+      try {
+        await readSegment(bytes, { known, expectedId: id })
+        have.add(id)
+      } catch (e) {
+        if (!(e instanceof FormatError)) throw e
+      }
+    }
+  }
+  return have
 }
 
 /** Fetches and verifies the segments the plan lacks, a unit at a time; after each unit it activates what is complete and saves. */
@@ -77,12 +106,12 @@ export async function runSteps(
   env: { store: BlobStore; source: PackSource },
   catalogs: VerifiedCatalog[],
   state0: InstalledState,
+  have: Set<string>,
   steps: Step[],
   unknown: string[],
   o: { signal?: AbortSignal; onProgress?: (p: Progress) => void } = {},
 ): Promise<InstallReport> {
   const { store, source } = env
-  const have = new Set(await st(() => store.ids()))
   const missing = new Set<string>()
   for (const step of steps) for (const s of step.segments) if (!have.has(s.id)) missing.add(s.id)
   const total = missing.size
@@ -91,6 +120,7 @@ export async function runSteps(
   const activated: string[] = []
   let bytes = 0
   let state = state0
+  let waiting: InstallReport['waiting'] = []
 
   try {
     for (const step of steps) {
@@ -130,6 +160,13 @@ export async function runSteps(
         activated.push(...r.activated)
       }
     }
+    const last = activate(state, catalogs, have)
+    if (last.activated.length > 0) {
+      await st(() => store.setState(last.state))
+      state = last.state
+      activated.push(...last.activated)
+    }
+    waiting = last.waiting
   } catch (e) {
     // The store failed: the installed state is the one the call started from. The segments written stay, so the retry activates
     // what they complete without fetching it again. (An abort keeps the units already complete.)
@@ -137,11 +174,6 @@ export async function runSteps(
     throw e
   }
 
-  const last = activate(state, catalogs, have)
-  if (last.activated.length > 0) {
-    await st(() => store.setState(last.state))
-    activated.push(...last.activated)
-  }
   const wanted = new Set(steps.map((s) => s.key))
-  return { activated, waiting: last.waiting.filter((w) => wanted.has(w.key)), fetched, bytes, unknown }
+  return { activated, waiting: waiting.filter((w) => wanted.has(w.key)), fetched, bytes, unknown }
 }

@@ -3,7 +3,7 @@
  */
 import { FormatError, KNOWN, readSegment } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
-import { catalogsOf, type InstallReport, type MissingCommon, type Progress, loadState, readStored, runSteps, st } from './install'
+import { catalogsOf, verifiedHave, type InstallReport, type MissingCommon, type Progress, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
 import type { PackSource } from './source/http'
 import { hex, type InstalledCatalog, type InstalledState, installedOf } from './state'
@@ -60,7 +60,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const state = await loadState(store)
     const signal = opts.signal
     const confirm = opts.confirmDowngrade === true
-    const known = state.published[lang]
+    const known = state.published[state.aliases?.[lang] ?? lang]
     const sendEtag = known?.etag !== undefined && (await st(() => store.has(known.id)))
     const answer = await source.catalog(lang, { ...(sendEtag ? { etag: known!.etag } : {}), ...(signal ? { signal } : {}) })
 
@@ -82,12 +82,18 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       toPut.push({ id: langCat.id, bytes: answer.bytes })
       unchanged = state.published[langCat.name]?.id === langCat.id && state.published[langCat.name]?.etag === answer.etag
     }
+    // The server may answer to an alias ('es' for 'es-419'); the name is remembered in the state, so lookups need no network.
+    if (langCat.name !== lang && state.aliases?.[lang] !== langCat.name) {
+      next.aliases = { ...state.aliases, [lang]: langCat.name }
+      toPut.push({ id: '', bytes: new Uint8Array() })
+      unchanged = false
+    }
 
     let missingCommon: MissingCommon | undefined
     for (const [rname, revision, rid] of langCat.catalog.requires ?? []) {
       const id = hex(rid)
       const have = next.published[rname]
-      if (have?.id === id && (await st(() => store.has(id)))) continue
+      if (await readStored(store, trust, { name: rname, publisher: langCat.publisher, revision, id, origin: 'published' })) continue
       const wanted: MissingCommon = { name: rname, revision, id }
       let got: Awaited<ReturnType<PackSource['catalog']>>
       try {
@@ -113,7 +119,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       unchanged = false
     }
 
-    for (const p of toPut) await st(() => store.put(p.id, p.bytes))
+    for (const p of toPut) if (p.id !== '') await st(() => store.put(p.id, p.bytes))
     if (toPut.length > 0) await st(() => store.setState(next))
 
     const found = await catalogsOf(store, trust, next, langCat.name)
@@ -127,19 +133,21 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
   }
 
   async function installNow(lang: string, want: Want, opts: { signal?: AbortSignal; onProgress?: (p: Progress) => void }): Promise<InstallReport> {
-    let name = lang
-    if ((await loadState(store)).published[lang] === undefined) name = (await refreshNow(lang, opts.signal ? { signal: opts.signal } : {})).name
+    const first = await loadState(store)
+    let name = first.aliases?.[lang] ?? lang
+    if (first.published[name] === undefined) name = (await refreshNow(lang, opts.signal ? { signal: opts.signal } : {})).name
     const state = await loadState(store)
     const { catalogs } = await catalogsOf(store, trust, state, name)
     if (catalogs.length === 0) throw new ClientError('E_STORE', `the catalog of ${name} is not in the store`)
-    const have = new Set(await st(() => store.ids()))
+    const have = await verifiedHave(store, catalogs)
     const plan = planInstall(catalogs, state, want, have)
-    return runSteps({ store, source: need() }, catalogs, state, plan.steps, plan.unknown, opts)
+    return runSteps({ store, source: need() }, catalogs, state, have, plan.steps, plan.unknown, opts)
   }
 
   async function statusNow(lang: string): Promise<Status> {
     const state = await loadState(store)
-    const { lang: langCat, catalogs, missing } = await catalogsOf(store, trust, state, lang)
+    const name = state.aliases?.[lang] ?? lang
+    const { lang: langCat, catalogs, missing } = await catalogsOf(store, trust, state, name)
     const units: Status['units'] = []
     for (const cat of catalogs) {
       for (const unit of cat.catalog.units) {
@@ -154,8 +162,8 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
         })
       }
     }
-    const published = state.published[lang]
-    const active = state.active[lang]
+    const published = state.published[name]
+    const active = state.active[name]
     return {
       lang,
       ...(published !== undefined ? { published } : {}),
@@ -169,7 +177,11 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
   async function pruneNow(): Promise<{ removed: string[] }> {
     const state = await loadState(store)
     const used = new Set<string>()
-    for (const u of Object.values(state.units)) for (const s of u.segments) used.add(s)
+    // A unit keeps the catalog of the revision it came from, which can be older than `active` while its re-download is pending.
+    for (const u of Object.values(state.units)) {
+      for (const s of u.segments) used.add(s)
+      used.add(u.catalogId)
+    }
     // The stored catalogs of `active` and `published`, and the segments they name (some may be half-fetched, for a retry).
     for (const entry of [...Object.values(state.active), ...Object.values(state.published)]) {
       used.add(entry.id)
