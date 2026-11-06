@@ -149,12 +149,12 @@ export function activate(
     if (old === undefined || old.revision !== c.entry.revision || old.catalogId !== c.entry.catalogId) {
       next.units[c.key] = c.entry
       activated.push(c.key)
-      next.active[c.cat.name] = installedOf(c.cat)
+      next.active[c.cat.name] = installedOf(c.cat, state.published[c.cat.name], state.active[c.cat.name])
     }
   }
   for (const cat of catalogs) {
     const cur = next.published[cat.name]
-    if (cur === undefined || cat.revision >= cur.revision) next.published[cat.name] = installedOf(cat)
+    if (cur === undefined || cat.revision >= cur.revision) next.published[cat.name] = installedOf(cat, cur, state.active[cat.name])
   }
   return { state: next, activated, waiting }
 }

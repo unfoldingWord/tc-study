@@ -5,7 +5,7 @@
 import type { SegmentEntry } from '@bt-synergy/language-pack-v3'
 import type { VerifiedCatalog } from './verify'
 
-export type InstalledCatalog = { name: string; publisher: string; revision: number; id: string; origin: 'published' | 'local' }
+export type InstalledCatalog = { name: string; publisher: string; revision: number; id: string; origin: 'published' | 'local'; etag?: string }
 
 /** `segments` are segment ids (hex); `needs` are qualified unit keys (`<catalog>/<unit>`). */
 export type InstalledUnit = { catalog: string; revision: number; catalogId: string; segments: string[]; needs: string[]; optional?: true }
@@ -30,8 +30,10 @@ export function hex(bytes: Uint8Array): string {
   return s
 }
 
-export function installedOf(c: VerifiedCatalog): InstalledCatalog {
-  return { name: c.name, publisher: c.publisher, revision: c.revision, id: c.id, origin: c.origin }
+/** `etag` is kept from `known` (an entry of the same catalog file) when it has one: it belongs to the file, not to where it is listed. */
+export function installedOf(c: VerifiedCatalog, ...known: (InstalledCatalog | undefined)[]): InstalledCatalog {
+  const etag = known.find((k) => k?.id === c.id && k.etag !== undefined)?.etag
+  return { name: c.name, publisher: c.publisher, revision: c.revision, id: c.id, origin: c.origin, ...(etag !== undefined ? { etag } : {}) }
 }
 
 export function segmentOf(c: VerifiedCatalog, index: number): SegmentEntry {
