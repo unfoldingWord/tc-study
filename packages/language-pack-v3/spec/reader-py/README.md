@@ -42,11 +42,11 @@ print(compact_text(out))          # the canonical text of tests/README.md, witho
 
 ## What it reads
 
-Segment files of the classes `book`, `orig`, `art`, `lex`, `obs` and `catalog`, and transfer files. It checks the
+Segment files of the classes `book`, `orig`, `art`, `lex`, `obs`, `catalog`, `map`, `xmap`, `topics`, `xtopics` and `aligned`, and transfer files. It checks the
 container in the order of `container.md` (all thirteen codes), the identity, the required and optional tables (an
 optional table it does not know is skipped with what depends on it), the column encodings, and the further checks of
-`tests/README.md`, "Checks of the tables". Segments of the classes `map`, `xmap` and `gen` are `E_TABLE`: phase 1
-readers know no table of them.
+`tests/README.md`, "Checks of the tables". A segment of the class `gen` is `E_TABLE`: no reader knows a table of it yet. Of the maps it does
+not know `topics` and `numbering` (optional, so skipped).
 
 ## Tests
 
@@ -66,6 +66,11 @@ python -m pytest spec/reader-py -q
 
 ## Status
 
-Complete for phase 1. Not done: `map`, `xmap` and `gen` (phase 2), checking the signatures of a catalog (phase 3).
+Complete for phase 2 (the maps included). Not done: `gen`, checking the signatures of a catalog (phase 3).
 `../.gitattributes` makes git check the `*.expected.json` files out with LF line ends on every platform, so the tests
 compare the text of the output with the file byte for byte.
+
+`aligned` (part C): `entries` as `{key: {strong: {book: [verses, occurrences]}}}`. The check of an `other` part against the
+catalog is made only when the caller passes the ranges of the catalog's `aligned:` units:
+`read_segment(data, aligned_ranges=aligned_ranges_of_catalog(catalog_output))`; a segment alone does not make it.
+Tests: `test_aligned.py`.

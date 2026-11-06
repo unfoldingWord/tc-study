@@ -6,7 +6,7 @@
  *   as the canonical text of the parsed values.
  * - `build-cases.ts` in check mode builds every case again and finds the frozen bytes. The cases are not rebuilt silently: a change of a
  *   builder that alters them fails here until somebody runs `bun spec/tests/build-cases.ts --refreeze`.
- * - The numbers of the table of cases (4, 5, 7, 8, 9, 10, 13) are asserted on the output.
+ * - The numbers of the table of cases (4 to 14) are asserted on the output.
  * - `compare.ts` runs both readers on every case file (and, with `--built`, on the big segments of the sample) and finds no difference. It
  *   needs Python 3.11 or later: `LP3_PYTHON` names the interpreter, else `python` is used when it is new enough, else the test is skipped.
  */
@@ -17,7 +17,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { bridgeBook, bridgeCatalog, buildFrozenCases, caseFilesOn, expectedText, runBuildCases, TESTS_DIR } from '../spec/tests/build-cases'
 import { firstDifference } from '../spec/tests/compare'
+import { mapView } from './read/map'
 import { canonicalJson, readerOutput } from './read/output'
+import { xmapView } from './read/xmap'
+import { readSegment } from './codec/container'
+import { BOOK_TABLES, bookView } from './read/book'
+import { MAP_TABLES } from './read/map'
+import { XMAP_TABLES } from './read/xmap'
+import type { MapCore, MapPart, XmapCore, XmapPart } from './model'
+import { answer, type MapSet } from './query/maps'
 
 type Out = Record<string, any>
 
@@ -29,7 +37,7 @@ const expectedOf = (name: string): unknown => JSON.parse(readFileSync(join(TESTS
 const FILES = caseFilesOn(TESTS_DIR)
 
 describe('the case files', () => {
-  test('are the ones of the table of cases (cases 6, 11 and 12, and the map half of case 5, come in phase 2)', () => {
+  test('are the ones of the table of cases ', () => {
     expect(FILES).toEqual([
       'articulo-mal-titulado/art.seg',
       'container/bad-id.seg',
@@ -37,12 +45,21 @@ describe('the case files', () => {
       'container/truncated.seg',
       'entero-fuera-de-rango/body.seg',
       'entero-fuera-de-rango/header.seg',
+      'idioma-parcial/map-core.seg',
       'nota-varios-versiculos/book.seg',
+      'nota-varios-versiculos/map-core.seg',
+      'nota-varios-versiculos/map-tit.seg',
       'paquete-viejo/catalog.seg',
+      'revisiones-mixtas/book-rut.seg',
+      'revisiones-mixtas/catalog.seg',
+      'revisiones-mixtas/map-core.seg',
       'seccion-insertada/build1.seg',
       'seccion-insertada/build2.seg',
+      'strong-repetido/xmap-core.seg',
+      'strong-repetido/xmap-tit.seg',
       'tabla-desconocida/future-x.seg',
       'tabla-desconocida/future-y.seg',
+      'topics-local-clave-extra/core.seg',
       'transferencia-cortada/cut.tcpack',
       'tito-es419/book.seg',
     ].sort())
@@ -199,6 +216,61 @@ describe('case 5: nota-varios-versiculos (the book half)', () => {
   })
 })
 
+const segmentOf = async (name: string, known: Record<string, number[]>) => (await readSegment(bytesOf(join(TESTS_DIR, name)), { known })).seg
+const mapOf = async (name: string) => mapView(await segmentOf(name, MAP_TABLES)) as MapCore
+const MET = 'ta:translate/figs-metaphor'
+
+describe('case 5: nota-varios-versiculos (the map half)', () => {
+  test('the language map counts 1 note on figs-metaphor in Titus on 3 distinct verses', async () => {
+    const core = await mapOf('nota-varios-versiculos/map-core.seg')
+    const part = mapView(await segmentOf('nota-varios-versiculos/map-tit.seg', MAP_TABLES)) as MapPart
+    expect(core.usage!.rows.get(MET)!.get('tit')).toEqual([1, 3])
+    expect(part.usage!.get(MET)).toEqual([56001002, 56001003, 56001004])
+    const found = answer({ map: { core, parts: new Map([['tit', part]]) }, revision: 1 }, { kind: 'usage', concept: MET, source: 'es-419_gl/es-419/tn' }) as any
+    expect(found.books.tit).toEqual({ state: 'count', count: 1, verses: 3 })
+  })
+})
+
+describe('case 6: strong-repetido', () => {
+  test('G5485 is 3 occurrences in 1 verse of Titus in the common map', async () => {
+    const core = xmapView(await segmentOf('strong-repetido/xmap-core.seg', XMAP_TABLES)) as XmapCore
+    const part = xmapView(await segmentOf('strong-repetido/xmap-tit.seg', XMAP_TABLES)) as XmapPart
+    expect(core.strong.rows.get('G54850')!.get('tit')).toEqual([3, 1])
+    expect(part.strong.get('G54850')).toEqual([56001001])
+    const found = answer({ xmap: { core, parts: new Map([['tit', part]]) }, revision: 1 }, { kind: 'strong', key: 'G5485' }) as any
+    expect(found.key).toBe('G54850')
+    expect(found.books.tit).toEqual({ state: 'count', count: 3, verses: 1 })
+  })
+})
+
+describe('case 11: revisiones-mixtas', () => {
+  test('the map of revision 4 says 15 notes in Ruth, the installed book of revision 3 has 14', async () => {
+    const core = await mapOf('revisiones-mixtas/map-core.seg')
+    const installed = bookView(await segmentOf('revisiones-mixtas/book-rut.seg', BOOK_TABLES))
+    const catalog = (await readerOutput(bytesOf(join(TESTS_DIR, 'revisiones-mixtas/catalog.seg')))) as Out
+    expect(catalog.about.revision).toBe(4)
+    const set: MapSet = { map: { core, parts: new Map() }, revision: catalog.about.revision }
+    // The answer from the map names the revision it describes; the installed book is counted from its own segment (counts.md).
+    const found = answer(set, { kind: 'revision', concept: MET, book: 'rut' }) as any
+    expect(found.revision).toBe(4)
+    expect(found.sources['es-419_gl/es-419/tn']).toMatchObject({ state: 'count', count: 15 })
+    expect((installed.notes?.rows ?? []).filter((r) => r.concept === MET)).toHaveLength(14)
+  })
+})
+
+describe('case 12: idioma-parcial', () => {
+  test('Titus has the count, Jonah zero, Isaiah no source', async () => {
+    const core = await mapOf('idioma-parcial/map-core.seg')
+    const found = answer({ map: { core, parts: new Map() }, revision: 1 }, { kind: 'usage', concept: MET, source: 'es-419_gl/es-419/tn' }) as any
+    const of = (book: string) => found.books[book]
+    expect(of('tit')).toEqual({ state: 'count', count: 1, verses: 3 })
+    expect(of('jon')).toEqual({ state: 'zero', count: 0, verses: 0 })
+    expect(of('isa')).toEqual({ state: 'none' })
+    expect(of('rut')).toEqual({ state: 'zero', count: 0, verses: 0 })
+    expect(core.coverage.get('es-419_gl/es-419/tn')).toEqual({ whole: ['rut', 'jon', 'tit', '3jn'], partial: [] })
+  })
+})
+
 describe('case 7: seccion-insertada', () => {
   test('first build: intro, definition, translation-suggestions; second: examples between, the first three unchanged', async () => {
     const [one, two] = [await outputOf('seccion-insertada/build1.seg'), await outputOf('seccion-insertada/build2.seg')]
@@ -281,8 +353,10 @@ describe('case 13: paquete-viejo', () => {
     const out = await outputOf('paquete-viejo/catalog.seg')
     expect(out.about).toMatchObject({ origin: 'local', publisher: 'local:test-device', catalog: 'es-419', revision: 1 })
     expect(out.h.lang).toBe('es-419')
-    expect(out.segments.map((s: Out) => [s.class, s.book, s.id])).toEqual([['book', 'tit', (await outputOf('tito-es419/book.seg')).id]])
-    expect(out.units.map((u: Out) => u.id)).toEqual(['book:tit'])
+    // The book segment is case 4's; the bridge also builds the map unit (core and the part of Titus), partial.
+    expect(out.segments.filter((s: Out) => s.class === 'book').map((s: Out) => [s.book, s.id])).toEqual([['tit', (await outputOf('tito-es419/book.seg')).id]])
+    expect(out.segments.filter((s: Out) => s.class === 'map')).toHaveLength(2)
+    expect(out.units.map((u: Out) => u.id)).toEqual(['book:tit', 'map'])
     const bytes = bytesOf(join(TESTS_DIR, 'paquete-viejo/catalog.seg'))
     expect(Buffer.from((await bridgeCatalog()).bytes).equals(Buffer.from(bytes))).toBe(true)
   }, 60_000)
@@ -347,7 +421,7 @@ describe('the cross-reader check (compare.ts)', () => {
       expect(run.text.trim().split('\n')).toEqual([
         'container/minimal.seg: $.texts[0].pieces[0][0]: TypeScript "Pablo" / Python "Pablox"',
         'container/truncated.seg: $.error: TypeScript "E_TRUNCATED" / Python "E_ID"',
-        'compare: 14 files compared (14 cases), 2 mismatches',
+        'compare: 23 files compared (23 cases), 2 mismatches',
       ])
     } finally {
       rmSync(folder, { recursive: true, force: true })

@@ -4,6 +4,7 @@
  * Plain data, with no import, so that builders and readers can both depend on it. Each segment class adds its model here
  * as its task is written.
  */
+import type { CountRows, CountUnit, Coverage, VerseLists } from './codec/counts'
 
 /**
  * Structure inside a sequence of pieces (`spec/cddl/book.cddl`, "Texts"): at `position`, the number of pieces before
@@ -197,7 +198,7 @@ export type ObsStory = { res: string; n: number; title: string; reference?: stri
 
 /**
  * A note, question, word link, study note or study question of Open Bible Stories (`obs.cddl`, `obs-helps`). `frame` is
- * story × 100 + frame (frame 0 is the story's title or introduction, and the place of a row whose reference cannot be read);
+ * story × 100 + frame (frame 0 is the story's title or introduction);
  * `ref` is the reference text as published (`10:3`, or `10:03`); `cols` and `concept` are as in {@link HelpRow}.
  */
 export type ObsHelpRow = { id: string; ref: string; frame: number; concept?: string; cols: Record<string, string | boolean> }
@@ -278,7 +279,7 @@ export type SegmentEntry = {
 }
 
 /** A unit (`catalog.cddl`, `unit`): `segments` are indexes in the catalog's `segments`; `needs` are unit ids. */
-export type Unit = { id: string; segments: number[]; needs?: string[] }
+export type Unit = { id: string; segments: number[]; needs?: string[]; optional?: true }
 
 /**
  * A catalog (`catalog.cddl`). `lang` is the header's: set for a language catalog (the same as `about.catalog`), absent in the
@@ -292,4 +293,115 @@ export type CatalogModel = {
   units: Unit[]
   requires?: [catalog: string, revision: number, id: Uint8Array][]
   complements?: Complement[]
+}
+
+// The common map (`spec/cddl/xmap.cddl`)
+
+export const CONCEPT_KINDS = ['none', 'person', 'place', 'event', 'topic', 'story'] as const
+export const TW_CATEGORIES = ['none', 'kt', 'names', 'other'] as const
+
+/** A concept: its kind, its tW category and the key of the resource (an entry of `res`) that defines it. */
+export type Concept = { kind: (typeof CONCEPT_KINDS)[number]; tw: (typeof TW_CATEGORIES)[number]; source: string }
+
+/** A typed relation between two concepts (ids), where it comes from (a res key) and how sure it is (0 to 100). */
+export type Relation = { from: string; to: string; type: string; source: string; confidence: number }
+
+export type CountTable = { unit: CountUnit; rows: CountRows }
+
+/** The core of the common map. */
+export type XmapCore = {
+  part: 'core'
+  res: [string, string][]
+  coverage: Coverage
+  strong: CountTable
+  concepts: Map<string, Concept>
+  links?: CountTable
+  notes?: CountTable
+  relations?: Relation[]
+  aliases?: Record<string, string>
+  strongs?: Record<string, string[]>
+}
+
+/** The part of one book: the verses behind the counts of the core. `part` is the book code. */
+export type XmapPart = { part: string; strong: VerseLists; links?: VerseLists; notes?: VerseLists }
+
+// The language map (`spec/cddl/map.cddl`)
+
+/** A book's names: the name, the short name, the abbreviation, and where they came from. */
+export type BookName = [name: string, short: string, abbreviation: string, source: 'text' | 'list' | 'none']
+
+/** The core of a language's map: what the language calls things and what it has. */
+export type MapCore = {
+  lang: string
+  part: 'core'
+  res: [string, string][]
+  books: BookName[]
+  names: Record<string, string[]>
+  subtitles?: Record<string, string>
+  coverage: Coverage
+  usage?: CountTable
+  obs?: [number, string][]
+}
+
+/** The part of one book: the verses behind the core's `usage`. `part` is the book code. */
+export type MapPart = { lang: string; part: string; usage?: VerseLists }
+
+// The common topics (`spec/cddl/xtopics.cddl`) and the language topics (`spec/cddl/topics.cddl`)
+
+/** Index 0 is not a kind: the column `topics.kind` of `xtopics` holds 1 to 6. */
+export const TOPIC_KINDS = ['', 'person', 'place', 'event', 'topic', 'story', 'section'] as const
+export const TOPIC_NAME_SOURCES = ['alignment', 'outline', 'obs', 'list'] as const
+
+/**
+ * A topic of the common topics: its kind, the key of the resource (an entry of `res`) that defines it, the source's own key
+ * (`ref`), the English title and the TIPNR uStrong (`""` for none).
+ */
+export type Topic = { kind: (typeof TOPIC_KINDS)[number]; source: string; ref: string; title: string; ustrong: string }
+
+/** A relation of `xtopics`: an end is a topic of the segment or, if not, a concept of the map (named in `external`). */
+export type TopicRelation = Relation
+
+/** The core of the common topics. `occurrences` rows are `[count, verses]` with `count == verses` (unit "verses"). */
+export type XtopicsCore = {
+  part: 'core'
+  res: [string, string][]
+  coverage: Coverage
+  topics: Map<string, Topic>
+  occurrences: CountRows
+  relations?: TopicRelation[]
+  strongs?: Record<string, string[]>
+  ranges?: Record<string, [first: number, last: number][]>
+}
+
+/** The part of one book: the verses behind the core's `occurrences`. `part` is the book code. */
+export type XtopicsPart = { part: string; occurrences: VerseLists }
+
+/** A name: the text, where it came from, how many times it was found and the books (codes) it was found in. */
+export type TopicName = [name: string, source: (typeof TOPIC_NAME_SOURCES)[number], count: number, books: string[]]
+
+/** The core of a language's topics. `local` is the table `local-topics` of `map.cddl`, as the file has it. */
+export type TopicsCore = {
+  lang: string
+  part: 'core'
+  res: [string, string][]
+  names: Record<string, TopicName[]>
+  local?: Record<string, { names: string[]; refs?: [number, number][]; related?: string[] }>
+  coverage: Coverage
+}
+
+/** The part of one book: the verses each topic's alignment names were taken from. */
+export type TopicsPart = { lang: string; part: string; names?: VerseLists }
+
+// The index of aligned phrases (`spec/cddl/aligned.cddl`)
+
+/**
+ * One part of a language's index of aligned phrases. `group` is the range of prefixes of 1 to 6 characters of its keys (`a`, `ar-b`, `t-td` or
+ * `other`, see `aligned.cddl`); `res` the bridge texts (`[key, release tag]`). `entries`: key, then Strong key, then book code, to
+ * `[verses, occurrences]`. The writer sorts keys, Strong keys and books itself.
+ */
+export type AlignedModel = {
+  lang: string
+  group: string
+  res: [string, string][]
+  entries: Map<string, Map<string, Map<string, [verses: number, occurrences: number]>>>
 }

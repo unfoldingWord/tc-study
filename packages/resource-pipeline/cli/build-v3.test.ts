@@ -4,7 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { catalogView, hex, KNOWN, readerOutput, readSegment } from '@bt-synergy/language-pack-v3'
-import { main, USAGE } from './build-v3'
+import { main, optionsFromArgs, USAGE } from './build-v3'
 
 // The sample of es-419 Titus the language-pack-v3 package tests with: real parts, a trimmed list.
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
@@ -316,5 +316,136 @@ describe('build-v3: as a script', () => {
     const result = cli(sample(temp(), ['--books', 'mat']))
     expect(result.status).toBe(2)
     expect(result.stderr).toContain('mat')
+  })
+})
+
+describe('build-v3: the maps', () => {
+  const EN_LIST = join(DATA, 'en', 'list.json')
+
+  test('--map-lang en with the English list writes the xmap core and the tit part, and the es-419 map core', async () => {
+    const out = temp()
+    const result = await run(sample(out, ['--map-lang', 'en', '--map-list', EN_LIST]))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    const classes: Record<string, string[]> = {}
+    for (const name of readdirSync(join(out, 'segments'))) {
+      const output = (await readerOutput(read(join(out, 'segments', name)))) as { h?: { class?: string; part?: string } }
+      const h = output.h
+      if (h?.class !== undefined) (classes[h.class] ??= []).push(h.part ?? '-')
+    }
+    expect(classes.xmap?.sort()).toEqual(['core', 'tit'])
+    expect(classes.map).toContain('core')
+    expect(result.out.some((line) => /^xmap: core \d+ bytes, 1 parts \d+ bytes, total \d+ bytes$/.test(line))).toBe(true)
+    expect(result.out.some((line) => /^map es-419: core \d+ bytes/.test(line))).toBe(true)
+  })
+
+  test('--book-names reads a file and a bad flag value is a usage error', async () => {
+    const names = join(temp(), 'names.json')
+    writeFileSync(names, JSON.stringify({ tit: ['Tito', 'Tit', 'Tit'] }))
+    const out = temp()
+    expect((await run(sample(out, ['--map-lang', 'en', '--map-list', EN_LIST, '--book-names', names]))).code).toBe(0)
+    expect((await run(sample(temp(), ['--map-lang', 'x y']))).code).toBe(1)
+    expect((await run(sample(temp(), ['--book-names', join(temp(), 'none.json')]))).code).toBe(1)
+  })
+})
+
+describe('build-v3: --topics', () => {
+  const EN_LIST = join(DATA, 'en', 'list.json')
+  const TOPICS = join(DATA, 'topics')
+  /** The fixtures as a sources folder: `tipnr/`, `theographic/` and the stories of `en_obs/obs-repo/content/`. */
+  function sources(): string {
+    const dir = temp()
+    mkdirSync(join(dir, 'tipnr'))
+    cpSync(join(TOPICS, 'tipnr-subset.txt'), join(dir, 'tipnr', 'TIPNR.txt'))
+    cpSync(join(TOPICS, 'theographic-subset'), join(dir, 'theographic'), { recursive: true })
+    const content = join(dir, 'en_obs', 'obs-repo', 'content')
+    mkdirSync(content, { recursive: true })
+    let n = 0
+    const stories = new Map<number, string>()
+    for (const line of readFileSync(join(TOPICS, 'obs-refs.txt'), 'utf8').split(/\r?\n/)) {
+      const h = /^=== (\d+)$/.exec(line)
+      if (h) stories.set((n = Number(h[1])), '')
+      else if (n > 0) stories.set(n, `${stories.get(n)}${line}\n`)
+    }
+    for (const [story, text] of stories) writeFileSync(join(content, `${String(story).padStart(2, '0')}.md`), text)
+    return dir
+  }
+  const files = (out: string): Record<string, string> => snapshot(out, 'segments')
+
+  test('adds the xtopics and the topics segments and leaves every other segment as the build without it', async () => {
+    const plain = temp()
+    const withTopics = temp()
+    const base = ['--map-lang', 'en', '--map-list', EN_LIST]
+    expect((await run(sample(plain, base))).code).toBe(0)
+    const result = await run(sample(withTopics, [...base, '--topics', sources()]))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    expect(result.out.some((line) => /^xtopics\s+-\s/.test(line))).toBe(true)
+    expect(result.out.some((line) => /^topics\s+es-419\s/.test(line))).toBe(true)
+    const before = files(plain)
+    const after = files(withTopics)
+    for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
+    expect(Object.keys(after).length).toBeGreaterThan(Object.keys(before).length)
+  })
+
+  test('a --topics folder without the three sources is a usage error that names the missing folder', async () => {
+    const result = await run(sample(temp(), ['--topics', temp()]))
+    expect(result.code).toBe(1)
+    expect(result.err.join('\n')).toMatch(/--topics: .*tipnr/)
+  })
+
+  test('a --topics folder missing a Theographic file, the stories or the TIPNR file, or with two TIPNR files, is a usage error that names it', async () => {
+    const missing = sources()
+    rmSync(join(missing, 'theographic', 'places.json'))
+    const a = await run(sample(temp(), ['--topics', missing]))
+    expect(a.code).toBe(1)
+    expect(a.err.join('\n')).toMatch(/--topics: .*places\.json is not a file/)
+
+    const noStories = sources()
+    for (const f of readdirSync(join(noStories, 'en_obs', 'obs-repo', 'content'))) rmSync(join(noStories, 'en_obs', 'obs-repo', 'content', f))
+    const b = await run(sample(temp(), ['--topics', noStories]))
+    expect(b.code).toBe(1)
+    expect(b.err.join('\n')).toMatch(/--topics: .*content has no NN\.md/)
+
+    const two = sources()
+    cpSync(join(two, 'tipnr', 'TIPNR.txt'), join(two, 'tipnr', 'OTHER.txt'))
+    const c = await run(sample(temp(), ['--topics', two]))
+    expect(c.code).toBe(1)
+    expect(c.err.join('\n')).toMatch(/--topics: .*exactly one \.txt file/)
+  })
+})
+
+describe('build-v3: --aligned', () => {
+  test('is a flag with no value: the other flags after it are still read, and giving it twice is a usage error', async () => {
+    const options = optionsFromArgs([...sample(temp()), '--aligned', '--revision', '3'])
+    expect(options.aligned).toBe(true)
+    expect(options.revision).toBe(3)
+    expect(optionsFromArgs(sample(temp())).aligned).toBe(false)
+    const twice = await run(sample(temp(), ['--aligned', '--aligned']))
+    expect(twice.code).toBe(1)
+    expect(twice.err.join('\n')).toMatch(/--aligned is given twice/)
+  })
+
+  test('adds the aligned segments, changes the language catalog, and leaves every other segment as the build without it', async () => {
+    const plain = temp()
+    const withAligned = temp()
+    const base = await run(sample(plain, []))
+    expect(base.code).toBe(0)
+    const result = await run(sample(withAligned, ['--aligned']))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    const before = snapshot(plain, 'segments')
+    const after = snapshot(withAligned, 'segments')
+    for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
+    // The flag has an effect: more segments, at least one `aligned`, another language catalog
+    expect(Object.keys(after).length).toBeGreaterThan(Object.keys(before).length)
+    const aligned = result.out.filter((line) => /^aligned\s/.test(line))
+    expect(aligned.length).toBeGreaterThan(0)
+    expect(base.out.some((line) => /^aligned\s/.test(line))).toBe(false)
+    expect(readFileSync(join(withAligned, 'catalog-es-419.seg')).equals(readFileSync(join(plain, 'catalog-es-419.seg')))).toBe(false)
+    expect(readFileSync(join(withAligned, 'catalog-common.seg')).equals(readFileSync(join(plain, 'catalog-common.seg')))).toBe(true)
+    // report.txt says how many units were built, 0 included
+    expect(readFileSync(join(plain, 'report.txt'), 'utf8')).toMatch(/^aligned: off, 0 units$/m)
+    expect(readFileSync(join(withAligned, 'report.txt'), 'utf8')).toContain(`aligned: on, ${aligned.length} units`)
   })
 })

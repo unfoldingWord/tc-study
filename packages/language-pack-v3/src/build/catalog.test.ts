@@ -108,6 +108,13 @@ describe('needsOfBook', () => {
     expect(needs).toEqual(['art:ta:checking', 'art:ta:translate', 'art:tw:kt', 'art:tw:names', 'map', 'orig:tit'])
   })
 
+  test('with the article groups the catalog builds, the others are left out (a book could never activate on them)', () => {
+    const m = model([row('a', 'ta:translate/figs-metaphor')], [row('e', 'tw:kt/grace'), row('f', 'tw:names/paul')])
+    expect(needsOfBook(m, new Set(['art:tw:kt']))).toEqual(['art:tw:kt', 'map', 'orig:tit'])
+    expect(needsOfBook(m, new Set())).toEqual(['map', 'orig:tit'])
+    expect(needsOfBook(m)).toEqual(['art:ta:translate', 'art:tw:kt', 'art:tw:names', 'map', 'orig:tit'])
+  })
+
   test('a book without helps needs its original and the map', () => {
     expect(needsOfBook({ lang: 'es-419', book: 'rut', orig: ['x', 'y'], res: [], texts: [] })).toEqual(['map', 'orig:rut'])
   })
@@ -193,6 +200,26 @@ describe('unitsOf', () => {
     expect(() => unitsOf([c, d], () => [])).toThrow(Error)
     const [e, f] = [await stub({ class: 'map', part: 'tit', book: 'tit' }, 1), await stub({ class: 'map', part: 'tit', book: 'tit', lang: 'es-419' }, 2)]
     expect(() => unitsOf([e, f], () => [])).toThrow('part')
+  })
+
+  test('xtopics and topics are units of their own, with no needs; their segments follow the map', async () => {
+    const segments = [
+      await stub({ class: 'xtopics', part: 'core' }, 1),
+      await stub({ class: 'xtopics', part: 'gen', book: 'gen' }, 2),
+      await stub({ class: 'topics', lang: 'es-419', part: 'core' }, 3),
+      await stub({ class: 'topics', lang: 'es-419', part: 'gen', book: 'gen' }, 4),
+    ]
+    expect(unitsOf(segments, () => [])).toEqual([
+      { id: 'topics', segments: [2, 3] },
+      { id: 'xtopics', segments: [0, 1] },
+    ])
+  })
+
+  test('two topics cores are an error, as two map cores', async () => {
+    const [a, b] = [await stub({ class: 'topics', part: 'core', lang: 'es-419' }, 1), await stub({ class: 'topics', part: 'core', lang: 'en' }, 2)]
+    expect(() => unitsOf([a, b], () => [])).toThrow('part')
+    const [c, d] = [await stub({ class: 'xtopics', part: 'core' }, 3), await stub({ class: 'xtopics', part: 'core' }, 4)]
+    expect(() => unitsOf([c, d], () => [])).toThrow('part')
   })
 
   test('a catalog and a gen segment are not units', async () => {

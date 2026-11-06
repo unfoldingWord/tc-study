@@ -11,7 +11,7 @@
  *
  * ## Order (so that the same inputs give the same catalog)
  *
- * - **segments**: by class in the order of `class-name` (catalog, xmap, map, book, orig, art, lex, obs, gen), then by book number
+ * - **segments**: by class in the order of `class-name` (catalog, xmap, map, xtopics, topics, aligned, book, orig, art, lex, obs, gen), then by book number
  *   (a segment without a book first), then by part (`core` first, then by book number), then by group by code point, then by id.
  * - **units**: by id by code point (`lex:G10` before `lex:G5`). A unit lists its segments by index, ascending.
  * - **resources**: by key. **requires**: by catalog and revision. **complements**: by kind, lang and id. All by code point.
@@ -92,10 +92,14 @@ function unitIdOf(seg: Segment): string {
       return `art:${need(group, 'group')}`
     case 'lex':
       return `lex:${need(group, 'group')}`
+    case 'aligned':
+      return `aligned:${need(group, 'group')}`
     case 'obs':
       return 'obs'
     case 'map':
     case 'xmap':
+    case 'xtopics':
+    case 'topics':
       return cls
     default:
       throw new Error(`A segment of class ${cls} is not part of a unit`)
@@ -103,12 +107,12 @@ function unitIdOf(seg: Segment): string {
 }
 
 /**
- * The units of `segments` (`catalog.md`): one per book, orig book, art group, lex group, `obs`, `map` and `xmap`, ordered by id by
+ * The units of `segments` (`catalog.md`): one per book, orig book, art group, lex group, `obs`, `map`, `xmap`, `xtopics`, `topics` and `aligned` (one per part, id `aligned:{group}`, `optional: true`, no `needs`), ordered by id by
  * code point. A unit's `segments` are indexes in `segments`, ascending. `needs(segment)` gives the ids of the units a segment needs;
  * the unit's `needs` are the sorted union over its segments, left out when empty.
  *
  * Throws `Error` for a segment of class `catalog` or `gen`, two segments that give the same unit id (the core of a `map` or an `xmap`
- * and its parts are one unit, but a part twice is an error) and a `needs` that is not a list of text.
+ * and its parts are one unit, but a part twice is an error) a `needs` that is not a list of text, a segment whose `needs` lists an `aligned` unit, and an `aligned` segment with `needs`.
  */
 export function unitsOf(segments: BuiltSegment[], needs: (s: BuiltSegment) => string[]): Unit[] {
   const units = new Map<string, { indexes: number[]; needs: Set<string>; parts: Set<string | undefined> }>()
@@ -118,7 +122,7 @@ export function unitsOf(segments: BuiltSegment[], needs: (s: BuiltSegment) => st
     if (unit === undefined) {
       unit = { indexes: [], needs: new Set(), parts: new Set() }
       units.set(id, unit)
-    } else if (id !== 'map' && id !== 'xmap') {
+    } else if (id !== 'map' && id !== 'xmap' && id !== 'xtopics' && id !== 'topics') {
       throw new Error(`The segments ${built.id} and ${segments[unit.indexes[0]].id} are both the unit ${id}`)
     }
     const { part } = built.seg.h
@@ -130,13 +134,17 @@ export function unitsOf(segments: BuiltSegment[], needs: (s: BuiltSegment) => st
     if (!Array.isArray(wanted) || !wanted.every((item) => typeof item === 'string' && item !== '')) {
       throw new Error(`needs of the segment ${built.id} is not a list of unit ids`)
     }
-    for (const item of wanted) unit.needs.add(item)
+    if (wanted.some((item) => item.startsWith('aligned:'))) throw new Error(`needs of the segment ${built.id} lists an aligned unit, which is optional`)
+    if (id.startsWith('aligned:')) {
+      if (wanted.length > 0) throw new Error(`needs of the aligned segment ${built.id} is not empty, and an aligned unit lists no needs`)
+    } else for (const item of wanted) unit.needs.add(item)
   })
 
   return [...units.keys()].sort(compareCodePoints).map((id): Unit => {
     const unit = units.get(id)!
     const out: Unit = { id, segments: unit.indexes }
     if (unit.needs.size > 0) out.needs = [...unit.needs].sort(compareCodePoints)
+    if (id.startsWith('aligned:')) out.optional = true
     return out
   })
 }
@@ -149,13 +157,17 @@ const ARTICLE_CONCEPT = /^(tw|ta):([^/:]+)\//
  * notes and word links point to (`tw:kt/grace` is `art:tw:kt`, `ta:translate/figs-metaphor` is `art:ta:translate`). Sorted by code
  * point, without repeats. A concept of another kind (`per:abraham`) needs no article group. The links inside the text of a note are
  * not read: the concept of the row is what the note is about.
+ *
+ * With `groups` (the units `art:...` the catalog builds) a need on another article group is left out: a unit activates only when
+ * every unit it needs is complete (`catalog.md`), and a group no segment of this catalog supplies would keep the book from ever
+ * activating. Without it every group is listed.
  */
-export function needsOfBook(book: BookModel): string[] {
+export function needsOfBook(book: BookModel, groups?: ReadonlySet<string>): string[] {
   const needs = new Set<string>([`orig:${book.book}`, 'map'])
   for (const table of [book.notes, book.links]) {
     for (const row of table?.rows ?? []) {
       const m = row.concept === undefined ? null : ARTICLE_CONCEPT.exec(row.concept)
-      if (m !== null) needs.add(`art:${m[1]}:${m[2]}`)
+      if (m !== null && (groups === undefined || groups.has(`art:${m[1]}:${m[2]}`))) needs.add(`art:${m[1]}:${m[2]}`)
     }
   }
   return [...needs].sort(compareCodePoints)

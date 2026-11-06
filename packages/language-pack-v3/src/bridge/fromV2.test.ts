@@ -55,10 +55,11 @@ describe('bridgeZip: the format 1.1 pack of es-419 Titus', () => {
     expect(fromPack.bytes).toEqual(fromParts.bytes)
   })
 
-  test('the pack brings the book and nothing else', () => {
-    expect(bridged.segments.map((s) => [s.seg.h.class, s.seg.h.book])).toEqual([['book', 'tit']])
-    expect(catalog.units.map((u) => u.id)).toEqual(['book:tit'])
-    expect(catalog.units[0].needs).toEqual(expect.arrayContaining(['orig:tit', 'map']))
+  test('the pack brings the book and the map of what it had', () => {
+    expect(bridged.segments.map((s) => [s.seg.h.class, s.seg.h.part ?? s.seg.h.book])).toEqual([['map', 'core'], ['map', 'tit'], ['book', 'tit']])
+    expect(catalog.units.map((u) => u.id)).toEqual(['book:tit', 'map'])
+    // The pack has no tW or tA: the book needs no article group, so it can activate (a need no unit of the catalog meets would block it).
+    expect(catalog.units[0].needs).toEqual(['map', 'orig:tit'])
     expect(catalog.segments.map((s) => hex(s.id))).toEqual(bridged.segments.map((s) => s.id))
   })
 
@@ -84,8 +85,8 @@ describe('bridgeZip: the format 1.1 pack of es-419 Titus', () => {
     expect(tn).toMatchObject({ title: 'Notas de Traducción', subject: 'TSV Translation Notes', release: 'v66', license: 'unknown' })
     expect(tn.books).toEqual(Uint8Array.from([0, 0, 0, 0, 0, 0, 128, 0, 0]))
     // The same segment, from the parts, has the same resources (the lists carry the license; the pack does not).
-    const fromParts = published.segments[0]
-    expect(fromParts.seg.h.res).toEqual(bridged.segments[0].seg.h.res)
+    const bookOf = (b: { segments: { seg: { h: { class: string } } }[] }) => b.segments.find((s) => s.seg.h.class === 'book')!
+    expect(bookOf(published).seg.h.res).toEqual(bookOf(bridged).seg.h.res)
   })
 
   test('twice gives the same segments and the same catalog', async () => {
@@ -112,14 +113,13 @@ describe('bridgeZip: the format 1.1 pack of es-419 Titus', () => {
 describe('bridgeZip: a pack with no originals available', () => {
   test('waits for them: no book is built and the report says so', async () => {
     const built = await bridgeZip(await bytesOf(ZIP), noOriginals, DEVICE, NOW)
-    expect(built.segments).toEqual([])
+    expect(built.segments.filter((s) => s.seg.h.class !== 'map')).toEqual([])
     expect(built.report).toHaveLength(1)
     expect(built.report[0]).toMatch(/^book tit: the source has no originals of this book/)
     expect(built.report[0]).toContain('waits for them')
     const catalog = await catalogOf(built.catalog)
     expect(catalog.about.origin).toBe('local')
-    expect(catalog.units).toEqual([])
-    expect(catalog.segments).toEqual([])
+    expect(catalog.units.map((u) => u.id)).toEqual(['map'])
   })
 })
 

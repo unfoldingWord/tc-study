@@ -37,6 +37,7 @@ export async function bridgeZip(
     source,
     lang: source.language,
     registry: {},
+    partial: true,
     about: { format: '3.0', publisher: `local:${device}`, origin: 'local', revision: 1, built: now, builder: BUILDER },
   })
   return { segments, catalog, report }

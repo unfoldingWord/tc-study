@@ -54,13 +54,13 @@ The compressed bytes are not part of the identity, so a better compressor never 
 
 | Key | Type | In | What |
 | --- | --- | --- | --- |
-| `class` | text | all | `catalog`, `xmap`, `map`, `book`, `orig`, `art`, `lex`, `obs` or `gen` |
+| `class` | text | all | `catalog`, `xmap`, `map`, `xtopics`, `topics`, `aligned`, `book`, `orig`, `art`, `lex`, `obs` or `gen` |
 | `v` | uint | all | The class's schema version. 1 for every class in 3.0 |
 | `tables` | map | all | Every table in `t`: name → `[version, required]` (uint, bool). A table in one and not the other is an error |
 | `lang` | text | language classes | The language tag of the resources, as Door43 writes it (`es-419`) |
-| `book` | text | `book`, `orig`, parts of `map` and `xmap` | The book code (`ids.md`) |
-| `part` | text | `map`, `xmap` | `core`, or the book code of a per-book part |
-| `group` | text | `art`, `lex` | Which group of articles or entries (`ids.md`) |
+| `book` | text | `book`, `orig`, parts of `map`, `xmap`, `topics` and `xtopics` | The book code (`ids.md`) |
+| `part` | text | `map`, `xmap`, `topics`, `xtopics` | `core`, or the book code of a per-book part |
+| `group` | text | `art`, `lex`, `aligned` | Which group of articles or entries (`ids.md`); for `aligned`, the part: the range of its keys (prefixes of 1 to 6 characters) (`cddl/aligned.cddl`) |
 | `orig` | array | everything that names original positions | `[resource key, stamp]` of the original book those positions belong to (`ids.md`) |
 | `res` | array | language classes | The resources whose data is inside: `[* [resource key, release stamp]]`. Tables name a resource by its index here |
 
@@ -88,7 +88,9 @@ They MUST also follow these rules:
 
 - **No floats, no tags, no `null`, no `undefined`.** A missing value is a missing key, or an "absent" bit (below).
 - **Text is kept as published.** It is valid UTF-8, without Unicode normalization or trimming, because the bytes are
-  the translator's.
+  the translator's. The exceptions are the names of the `topics` class, which the builder normalizes to NFC before it
+  stores them (`cddl/topics.cddl`), and the keys of the `aligned` class, which it normalizes to NFC and lowercases
+  with `toLocaleLowerCase(lang)` (`cddl/aligned.cddl`); a reader still never normalizes.
 - **Ids are ASCII** (`ids.md`).
 - **String tables** are in the order their schema gives: usually most used first, ties by code point.
 
@@ -135,7 +137,12 @@ Each class's schema says which tables are required and what each optional one de
 | `ulen` and `clen` | 67 108 864 bytes (64 MiB) each |
 | Nesting of CBOR arrays and maps | 64 levels |
 
-Nesting counts the outermost map or array as level 1. A reader MUST reject anything beyond these limits (`E_LIMIT`).
+Nesting counts the outermost map or array as level 1. A reader MUST reject anything beyond the three limits of this
+table (`E_LIMIT`).
+
+The row count of a table is not a limit of this table. A table whose declared row count `n` is larger than the
+segment's `ulen` is `E_BODY`, not `E_LIMIT` (checked with the tables, `tests/README.md`), because a reader allocates no
+more rows than the body has bytes.
 
 ## Errors
 
@@ -176,7 +183,7 @@ this order and stops at the first defect:
 5. Then the tables of the class, which only a reader that knows the class can check: each table against its schema
    (`cddl/`) and the further checks `tests/README.md` lists ("Checks of the tables"), `E_BODY` again. A segment of a class
    the reader does not decode (in phase 1: `map`, `xmap` and `gen`) is `E_TABLE` at this step if it was not before, because
-   the reader has no known table for it, even if all its tables are optional. A segment inside a transfer file
+   the reader has no known table for it, even if all its tables are optional. (A phase 2 part A reader does not know `xtopics` and `topics` as classes at all: it gives `E_HEADER`, unknown class, at the header checks, not `E_TABLE`. Likewise a reader older than part C and an `aligned` segment: `E_HEADER`; the catalog that lists such a segment is `E_BODY` for it, see `catalog.md`.) A segment inside a transfer file
    (`transfer.md`) gets this `E_TABLE` too, but not the rest of the step: the shape of its tables is checked when the
    app opens it.
 

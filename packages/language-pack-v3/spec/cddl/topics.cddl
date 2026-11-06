@@ -1,0 +1,47 @@
+; Format 3: the language topics. What a language calls the people, places, events, stories and sections of the common
+; topics (xtopics), taken from its own aligned text and outlines, and the topics only it has. A core, and one part
+; per book with the verses each name came from.
+
+topics-segment = body<topics-header, topics-tables>
+topics-tables = topics-core-tables / topics-part-tables
+
+topics-header = {
+  "class": "topics",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "lang": tstr,
+  "part": "core" / book-code,
+  ? "book": book-code,         ; absent in the core; in a part, absent or equal to "part"
+  "res": [* [tstr, tstr]],     ; every source in the core; required and empty in a part
+}
+
+topics-core-tables = {
+  "names": { * topic-id => [+ topic-name] },   ; required, v1; most frequent first (count descending),
+                               ; ties by name in code point order; a name and source pair is listed once
+  ? "local": local-topics,     ; optional, v1; "{lang}:tema/..." topics only this language has. A reader reads the
+                               ; keys of local-topics (names, refs, related) and ignores any other key of an entry,
+                               ; as everywhere (tests/README.md)
+  "coverage": coverage,        ; required, v1
+}
+
+; "source" says where the name came from: the aligned text ("alignment"), the language's own book outline
+; ("outline"), its OBS ("obs") or a list of names the builder was given ("list"). "count" is how many times the name
+; was found; "books" the books it was found in.
+;
+; How an "alignment" name is taken (normative). For each TIPNR name line of a person or place (its dStrong and its
+; references; a reference with an occurrence letter a or b means the first or second occurrence of that original word
+; in the verse, and with no letter every occurrence), the gateway words aligned to that original word in that verse
+; are found, and only in the verses TIPNR lists for that topic. The name is the maximal run of consecutive word pieces
+; (only " " between them) that contains the first word aligned to that original word; other words aligned to it in
+; that verse are not part of the name and are counted in the build report. A reference TIPNR writes is read as
+; the original's (UHB) numbering, with no conversion: TIPNR's English references are already in that numbering (ids.md).
+; Names are stored in NFC, as the builder normalized them before storing; they are not lowercased, and a reader never
+; normalizes (container.md): it shows and compares the bytes it reads. A topic of kind event takes no name from the
+; alignment (ids.md).
+topic-name = [name: tstr, source: "alignment" / "outline" / "obs" / "list", count: uint, books: book-set]
+
+topics-part-tables = {
+  ? "names": verse-lists,      ; optional, v1; "keys" are topic ids, sorted by code point; per key, the verses of this
+                               ; book from which the topic's alignment names were taken. Which name came from which
+                               ; verse is not stored: the core has the counts
+}

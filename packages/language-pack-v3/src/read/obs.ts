@@ -12,6 +12,7 @@ import { ColumnError, decodeBits, decodeTexts, decodeUvarints } from '../codec/c
 import type { Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
 import { type CborMap, hasOwn, isMap, isUint } from '../codec/values'
+import { checkRows } from './book'
 import type { ObsFrame, ObsHelpRow, ObsHelpTable, ObsModel, ObsStory } from '../model'
 
 function bad(what: string): never {
@@ -129,12 +130,13 @@ function frameText(frame: number): string {
 }
 
 /** One of the tables of helps (`obs-helps` in `obs.cddl`). */
-function readHelps(value: unknown, name: string, table: string[], res: [string, string][]): ObsHelpTable {
+function readHelps(value: unknown, name: string, table: string[], res: [string, string][], ulen?: number): ObsHelpTable {
   const what = `the table "${name}"`
   const fields = map(value, what)
   if (!isUint(fields.res) || fields.res >= res.length) bad(`${what}.res names the resource ${String(fields.res)}, and the header has ${res.length}`)
   if (!isUint(fields.n)) bad(`${what}.n is not a count`)
   const n = fields.n
+  checkRows(n, ulen, what)
 
   const idFields = map(fields.id, `${what}.id`)
   let ids: string[]
@@ -164,6 +166,8 @@ function readHelps(value: unknown, name: string, table: string[], res: [string, 
   if (frames.length !== n) bad(`${what}.frame has ${frames.length} numbers and the table has ${n} rows`)
   frames.forEach((frame, i) => {
     if (!isUint(frame)) bad(`${what}.frame: row ${i} has the value ${frame}`)
+    const story = Math.floor(frame / 100)
+    if (story < 1 || story > 50) bad(`${what}.frame: row ${i} has the value ${frame}, whose story ${story} is not from 1 to 50`)
   })
 
   const refText = new Map<number, string>()
@@ -248,7 +252,7 @@ export function obsView(seg: Segment): ObsModel {
 
     const model: ObsModel = { lang: h.lang, res: res.map(([key, tag]): [string, string] => [key, tag]), stories }
     for (const [name, key] of HELPS_TABLES) {
-      if (t[name] !== undefined) model[key] = readHelps(t[name], name, table, res)
+      if (t[name] !== undefined) model[key] = readHelps(t[name], name, table, res, seg.ulen)
     }
     return model
   } catch (error) {

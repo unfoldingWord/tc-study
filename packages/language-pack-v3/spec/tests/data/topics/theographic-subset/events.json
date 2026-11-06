@@ -1,0 +1,125 @@
+[
+ {
+  "id": "recOIPcFaPCjMpQ6w",
+  "fields": {
+   "title": "Creation of all things",
+   "eventID": 1,
+   "verses": [
+    "rec7mkRLwey2ntUG9",
+    "rec7DRaTJV5ANnvEj",
+    "recESVgcnokvjv0Do",
+    "rec1czW93MUSPz4m0",
+    "recSWczqAPNQmqHFp"
+   ],
+   "participants": [
+    "reccZB8SVU5bEMcgo",
+    "recgkFqZovgbr3pAi",
+    "reco82mzy0XTzaOgv"
+   ]
+  }
+ },
+ {
+  "id": "recbqTND1uSdqNjOx",
+  "fields": {
+   "title": "Abraham goes to Egypt",
+   "eventID": 73,
+   "verses": [
+    "recX74cRHwDmYb1sK",
+    "recPMnvB1cd7AQgro",
+    "recATDE3Fe1MzrL2l",
+    "rechILQyS7dx4R6sI",
+    "rec0g6dRO4X5RwJ4e"
+   ],
+   "participants": [
+    "reccdFYIq50NyxNej",
+    "rechda7WMDuW1jBTq",
+    "recd1WK44ltaGtsK0"
+   ],
+   "locations": [
+    "recfrXyxhuYOczKTm"
+   ],
+   "partOf": [
+    "recc78JIsfuTy7cNu"
+   ],
+   "predecessor": [
+    "rechJv1ksZ00ye38i"
+   ]
+  }
+ },
+ {
+  "id": "recjkmUO88wihv8Ci",
+  "fields": {
+   "title": "Exodus from Egypt",
+   "eventID": 125,
+   "verses": [
+    "recPyZczGHyjYdFBQ",
+    "recBBjlTw7uVWjx16",
+    "rec98PWnjOH3Rwuor",
+    "recSaICUAgcY7Pck6",
+    "recnhF7OryYorcYmY",
+    "recxvyuwU6v5m1tKI"
+   ],
+   "participants": [
+    "recjNRR60PAuFtjha",
+    "recv0dAY2ULzJ687g"
+   ],
+   "locations": [
+    "recfrXyxhuYOczKTm"
+   ],
+   "predecessor": [
+    "recwofVaBASTvL8lL"
+   ]
+  }
+ },
+ {
+  "id": "recc78JIsfuTy7cNu",
+  "fields": {
+   "title": "Sojourn in Canaan and Egypt",
+   "eventID": 74,
+   "verses": [
+    "recBBjlTw7uVWjx16"
+   ],
+   "participants": [
+    "reccdFYIq50NyxNej",
+    "rechda7WMDuW1jBTq",
+    "recd1WK44ltaGtsK0"
+   ],
+   "locations": [
+    "recfrXyxhuYOczKTm"
+   ],
+   "predecessor": [
+    "rechJv1ksZ00ye38i"
+   ]
+  }
+ },
+ {
+  "id": "rechJv1ksZ00ye38i",
+  "fields": {
+   "title": "Abraham enters Canaan",
+   "eventID": 71,
+   "verses": [
+    "recVgar4gTGR2K8Qh"
+   ],
+   "participants": [
+    "reccdFYIq50NyxNej",
+    "rechda7WMDuW1jBTq"
+   ],
+   "locations": [],
+   "partOf": [
+    "recc78JIsfuTy7cNu"
+   ],
+   "predecessor": []
+  }
+ },
+ {
+  "id": "recwofVaBASTvL8lL",
+  "fields": {
+   "title": "Moses Flees Pharaoh",
+   "eventID": 122,
+   "verses": [
+    "reccmhu3pWjLFerBx"
+   ],
+   "predecessor": []
+  }
+ }
+]

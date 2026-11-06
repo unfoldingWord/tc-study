@@ -1,0 +1,61 @@
+{
+  "coverage": {
+    "es-419_gl/es-419/glt": {
+      "whole": [
+        "tit"
+      ]
+    }
+  },
+  "h": {
+    "class": "topics",
+    "lang": "es-419",
+    "part": "core",
+    "res": [
+      [
+        "es-419_gl/es-419/glt",
+        "v42"
+      ]
+    ],
+    "tables": {
+      "coverage": [
+        1,
+        true
+      ],
+      "local": [
+        1,
+        false
+      ],
+      "names": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "2c7b8df07e1c79ae5ec46b727c4b7e619402fda6260e97f13f1c3f06a7b324ff",
+  "local": {
+    "es-419:tema/la-gracia": {
+      "names": [
+        "La gracia"
+      ],
+      "refs": [
+        [
+          56001001,
+          56001004
+        ]
+      ]
+    }
+  },
+  "names": {
+    "per:abraham": [
+      [
+        "Abraham",
+        "alignment",
+        1,
+        [
+          "tit"
+        ]
+      ]
+    ]
+  }
+}

@@ -31,7 +31,7 @@
     },
     "v": 1
   },
-  "id": "27117c16645261bbd8527744d508cfb86e1e784f32b41267249253f719e635f5",
+  "id": "739e90668ccb543dcfd2bff30b9cb28641fca08ef0024ff5aaa02dc26de4e330",
   "resources": [
     {
       "books": "000000000000800000",
@@ -76,6 +76,23 @@
   ],
   "segments": [
     {
+      "class": "map",
+      "id": "8f91cac908b57966e1b698c046344f4de9f0f28d7c0d1e717206a6cdfa3f231e",
+      "inputs": "1c98ecdfdad944ab4237a0eed648339602d2080acac730dea2da59ecd73f0bed",
+      "part": "core",
+      "size": 825,
+      "ulen": 1922
+    },
+    {
+      "book": "tit",
+      "class": "map",
+      "id": "2ecb147f545425624766fd580fc324bc39ba5609fbd313e7a83a9292845c0ac8",
+      "inputs": "0a16b64688a726ec8503291ca2fa60300328b47cb34f8a6fab025f7b04999a19",
+      "part": "tit",
+      "size": 609,
+      "ulen": 981
+    },
+    {
       "book": "tit",
       "class": "book",
       "id": "12e4f2c8c44626fda329709ee53f852cef3d93046a36f145f2196738f794469b",
@@ -88,15 +105,18 @@
     {
       "id": "book:tit",
       "needs": [
-        "art:ta:translate",
-        "art:tw:kt",
-        "art:tw:names",
-        "art:tw:other",
         "map",
         "orig:tit"
       ],
       "segments": [
-        0
+        2
+      ]
+    },
+    {
+      "id": "map",
+      "segments": [
+        0,
+        1
       ]
     }
   ]

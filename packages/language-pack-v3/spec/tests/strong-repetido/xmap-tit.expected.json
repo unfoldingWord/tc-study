@@ -1,0 +1,21 @@
+{
+  "h": {
+    "book": "tit",
+    "class": "xmap",
+    "part": "tit",
+    "res": [],
+    "tables": {
+      "strong": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "3a6a95b70283eb46660efdfab2c76dbd018609f725163a6c3f99a0848c82dd74",
+  "strong": {
+    "G54850": [
+      56001001
+    ]
+  }
+}

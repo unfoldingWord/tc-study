@@ -27,14 +27,20 @@ A **unit** is what a device installs or replaces at once:
 | --- | --- |
 | `book:tit` | The language's book segment for Titus |
 | `orig:tit` | The original of Titus (common catalog) |
-| `map` | The language map: its core and its 66 parts |
-| `xmap` | The common map: its core and its 66 parts (common catalog) |
+| `map` | The language map: its core and its parts. Needs nothing |
+| `xmap` | The common map: its core and its parts (common catalog). Needs nothing |
+| `topics` | The language topics: its core and its parts (`topics`, language catalog). Needs nothing |
+| `xtopics` | The common topics: its core and its parts (common catalog). Needs nothing |
 | `art:tw:kt`, `art:ta:translate`… | A group of articles |
 | `lex:G5`… | A group of lexicon entries |
+| `aligned:a-am`, `aligned:ar-b`, `aligned:other`… | One part of the language's index of aligned phrases (`aligned`, language catalog), named by its range of keys (prefixes of 1 to 6 characters; `cddl/aligned.cddl`). Optional: a device installs it only when asked. Needs nothing, and no unit needs it |
 | `obs` | Open Bible Stories |
 
-Each unit lists the units it needs (`needs`). A book needs its original, the language map and the article groups its
-notes and links point to. The lexicon is not needed to read; an app downloads it when asked.
+Each unit lists the units it needs (`needs`). A unit may carry `optional: true`: a device installs it only when asked. Every `aligned:{part}` unit must carry it (with the value `true`) and no other unit may; no unit lists an optional unit in `needs`, and an optional unit lists no `needs` (rules of the builder; a reader does not check them). The part of an `aligned:{part}` id must be a group (`cddl/aligned.cddl`), or the catalog is `E_BODY`. A book needs its original, the language map (`needs: "map"`, now satisfied by its own catalog) and the article groups its
+notes and links point to that the catalog builds (the others are reported and not listed). The lexicon is not needed to read; an app downloads it when asked.
+
+A bridged book names the original's stamp, so its unit needs `orig:<book>` like any book: a device without that
+original does not activate it.
 
 **Activation.**
 - A device activates a unit when the unit and every unit it needs are complete and verified.
@@ -60,10 +66,13 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 | The wording of a note of Ruth | `book:rut`, the catalog |
 | The SupportReference of a note of Ruth | `book:rut`, the `map` part of Ruth and the `map` core (its counts), the catalog |
 | The introduction of Ruth (its outline) | `book:rut`, the `map` core (topics), the catalog |
-| An English note or word link | the English `book` segment; the `xmap` part of that book and its core, if a count changed; both catalogs |
+| An English note or word link | the English `book` segment; the `xmap` part of that book and its core, if a count or the Strong keys of a link's quote (`strongs`) changed; both catalogs |
 | A tW or tA article | its `art` group, the `map` core if its title changed, the catalog |
 | One book of the original | `orig` of that book, and every `book` segment of that book in every language (their positions); the `xmap` part of that book |
-| TIPNR, Theographic or the alias list | the `xmap` core and the parts whose books they touch |
+| A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog. A map part keeps its segment id, but its `inputs` carry the tN stamp of its book and so change: the part is re-checked, not re-published |
+| The alias list | the `xmap` core and the parts whose books they touch |
+| TIPNR, Theographic, English OBS, the English tN outlines or the builder's list of events | the `xtopics` core and every `xtopics` part (all of them share the `inputs` of the sources, so each is re-checked; only the core and the parts whose books they touch change in content); never an `xmap` or `map` segment |
+| A language's aligned text, or the outline of its introductions | its `topics` core and every `topics` part of that language (all share the `inputs` of the core, so each is re-checked; only the core and the parts whose books they touch change in content); never a segment of the map |
 
 ## Signatures
 
@@ -83,4 +92,7 @@ travel through the catalog with their own version, and their bytes are opaque to
 
 - Each complement has its sha256, size, media type and version.
 - A complement may name what it is for (`for`: the version of the library's queries).
+- **The kinds `images` and `basemap`** (specified here, built after part B of phase 2). `images` is an image archive with an index: file, size, concepts, verse ranges and a credit for each piece. `basemap` is background layers with no place names; relief is a separate `basemap` complement; an app places the `lug:` points of the topics with the language's names. `license` is the license of the whole set, and each piece's license is in the index; `lang` is present only when an image has text burned in; `for` names the `xmap` revision whose concept ids and verse ranges the index uses. They change no map and no unit.
+- **The `aligned` units are optional.** A unit with `"optional": true` is installed only when the device asks for it. No unit lists an `aligned:{part}` unit in `needs`, and these units list no `needs`: nothing else depends on them. Building a language with or without them gives byte-equal segments of every other class, and a catalog that lists them differs only by those units and their segments. A lookup in a part that is not on the device answers `installed: false`, never "not found"; with the part, a key that is not in it is simply absent. The part of a key is the one whose range holds the key, after NFC and lowercase (`cddl/aligned.cddl`). A catalog that lists `aligned` units needs a reader of part C: a reader of part A or B knows no class `aligned`, so it answers `E_BODY` (catalog class) for such a catalog, whatever it does with `optional`.
+- **Topics and installation.** The `xtopics` and `topics` units need nothing and nothing needs them. `xtopics` decides: an occurrence query needs it, and without it `installed` is `false` whatever `topics` holds. With `xtopics` and no `topics` of the language, `installed` is `true` and the names are absent: the answer shows the English `title` and says so, and is not an error. A topics answer says `installed: false` when the module is not on the device, and then gives no state of `counts.md` (that file has no "not installed" state); with the module the four states apply as always.
 - A complement is built before the catalog that lists it. A complement built later goes in a later revision.

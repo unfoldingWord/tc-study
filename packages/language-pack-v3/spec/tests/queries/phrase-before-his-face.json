@@ -1,0 +1,15 @@
+{
+  "expected": {
+    "found": false,
+    "installed": true,
+    "kind": "phrase",
+    "lang": "en",
+    "strongs": {},
+    "text": "before his face"
+  },
+  "query": {
+    "kind": "phrase",
+    "lang": "en",
+    "text": "before his face"
+  }
+}

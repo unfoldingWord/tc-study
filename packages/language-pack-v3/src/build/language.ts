@@ -30,7 +30,7 @@ import { compareCodePoints } from '../codec/columns'
 import type { Segment } from '../codec/container'
 import { sha256Hex } from '../codec/sha256'
 import { BOOKS, bookNumber, bookSet } from '../ids'
-import type { About, ArticleModel, CatalogResource, LexEntry } from '../model'
+import type { About, ArticleModel, BookModel, CatalogResource, LexEntry, OrigModel } from '../model'
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
 import { articleOfPath, articleResources, artSegment, extractArticles, type Kind } from './art'
 import { extractBook, isBookResource } from './bookHelps'
@@ -39,7 +39,24 @@ import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOf
 import { extractLexicon, lexResources, lexSegment } from './lex'
 import { extractObs, obsSegment } from './obs'
 import { extractOrig, origSegment } from './orig'
+import { buildAligned, isBridgeText } from './aligned/build'
+import { alignedSegment } from './aligned/segment'
+import { buildMap } from './map/build'
+import { mapSegment } from './map/segment'
+import { versesOf } from './maps/verses'
+import { buildXmap } from './xmap/build'
+import { xmapSegment } from './xmap/segment'
 import type { SectionRegistry } from './sections'
+import { sourceRows } from './bookHelps'
+import { outlineOf } from './topics/outline'
+import { topicsSegment, xtopicsSegment } from './topics/segment'
+import { buildTopics } from './topics/topics'
+import { buildXtopics, chapterLengths, type TwName, type XtopicsSources } from './topics/xtopics'
+import { parseObsRefs } from '../source/obsRefs'
+import { parseTheographic } from '../source/theographic'
+import { parseTipnr } from '../source/tipnr'
+import type { XmapCore, XmapPart, XtopicsCore } from '../model'
+import type { TipnrRecord } from '../source/tipnr'
 
 /** The name and version `about.builder` carries when this package builds. A constant, not read from `package.json` at run time. */
 export const BUILDER = 'language-pack-v3 0.1.0'
@@ -205,6 +222,10 @@ export type LanguageBuild = { segments: BuiltSegment[]; catalog: BuiltSegment; r
  *   against, `[catalog, revision, id in hex]`.
  * - **Registry.** `registry` is the one of the last build (`{}` for the first); the one returned is {@link extractArticles}'s: give it to the next.
  *
+ * - **Aligned.** With `aligned: true` it also builds the optional units `aligned:{part}` ({@link buildAligned}, the bridge texts GLT, GST, ULT and
+ *   UST of the books built): one `aligned` segment per part that has a key. They are optional in the catalog and no unit needs them; the
+ *   segments of every other class are the same bytes with or without them (the index is built last and nothing reads it). Default `false`.
+ *
  * The same source, `about` and registry give the same segments and catalog. Throws `Error` for rows that are not what format 2.0
  * writes (the extractors do), and for what a segment cannot hold.
  */
@@ -215,6 +236,10 @@ export async function buildLanguage(o: {
   registry: SectionRegistry
   about: Omit<About, 'catalog'>
   requires?: [string, number, string][]
+  bookNames?: Record<string, [string, string, string]>
+  partial?: boolean
+  topics?: { xtopics: XtopicsCore; records: TipnrRecord[] }
+  aligned?: boolean
 }): Promise<LanguageBuild> {
   const { source, lang } = o
   const report: string[] = []
@@ -224,7 +249,7 @@ export async function buildLanguage(o: {
   const originals = await source.resources(ORIGINALS)
 
   const segments: BuiltSegment[] = []
-  const needs = new Map<string, string[]>()
+  const bookModels = new Map<string, BookModel>()
   const used = new Set<string>()
   const add = async (seg: Segment, inputs: string, uses: Iterable<string>): Promise<BuiltSegment> => {
     const built = await builtSegment(seg, inputs)
@@ -235,6 +260,9 @@ export async function buildLanguage(o: {
 
   // Books
   const books = o.books === undefined ? booksOf(refs) : canonical(o.books)
+  const mapBooks: { model: BookModel; verses: number[] }[] = []
+  const mapRows = new Map<string, RowKey[]>()
+  const origs = new Map<string, OrigModel>()
   for (const book of books) {
     if (!refs.some((ref) => ref.books.includes(book))) {
       report.push(`book ${book}: ${lang} has no resource of this book: left out`)
@@ -251,6 +279,7 @@ export async function buildLanguage(o: {
     }
     const issues: string[] = []
     const orig = await extractOrig(source, book)
+    origs.set(book, orig)
     // The rows `extractBook` reads are the ones the inputs name: they are read once.
     const read: RowKey[] = []
     const model = await extractBook(source, lang, book, orig, issues, read)
@@ -258,7 +287,9 @@ export async function buildLanguage(o: {
     const keys = model.res.map(([key]) => key)
     const inputs = inputsOf([...read, ...(await originalRowKeys(source, book))], [...stampsOf(keys), { key: orig.key, stamp: orig.stamp }])
     const built = await add(bookSegment(model), inputs, keys)
-    needs.set(built.id, needsOfBook(model))
+    bookModels.set(built.id, model)
+    mapBooks.push({ model, verses: versesOf(orig) })
+    mapRows.set(book, [...read, ...(await originalRowKeys(source, book))])
   }
 
   // Articles
@@ -270,6 +301,17 @@ export async function buildLanguage(o: {
     const res = articleResources(list, refs)
     const keys = res.map(([key]) => key)
     await add(artSegment(lang, group, res, list), inputsOf(artRows.get(group) ?? [], stampsOf(keys)), keys)
+  }
+
+  // The article groups a book's notes point to that this catalog does not build are not needs: the book would never activate.
+  const groupUnits = new Set([...articles.keys()].map((group) => `art:${group}`))
+  const needs = new Map<string, string[]>()
+  for (const [id, model] of bookModels) {
+    const wanted = needsOfBook(model)
+    const kept = needsOfBook(model, groupUnits)
+    needs.set(id, kept)
+    const left = wanted.filter((unit) => !kept.includes(unit))
+    if (left.length > 0) report.push(`book ${model.book}: its notes point to ${left.join(', ')}, which this catalog does not build: not listed as needs`)
   }
 
   // Lexicon
@@ -294,6 +336,65 @@ export async function buildLanguage(o: {
     await add(obsSegment(obs), inputsOf(rows, stampsOf(keys)), keys)
   }
 
+  // The language map: the notes counted by concept, the names of books and concepts, the coverage of every resource
+  if (refs.length > 0) {
+    const built = buildMap({ lang, refs, books: mapBooks, articles: [...articles.values()].flat(), obs, bookNames: o.bookNames, partial: o.partial })
+    const all = refs.map((ref) => ref.key)
+    const coreRows: RowKey[] = [...mapRows.values()].flat()
+    for (const list of artRows.values()) coreRows.push(...list)
+    if (obs !== null) for (const resource of obs.res.map(([key]) => key)) await addKeys(coreRows, source.rows({ lang, resource, layer: 'sot' }))
+    await add(mapSegment(built.core), inputsOf(coreRows, stampsOf(all)), all)
+    for (const part of built.parts) {
+      const keys = refs.filter((ref) => ref.books.includes(part.part)).map((ref) => ref.key)
+      // The usage counts come from the SupportReference of the notes, which the row keys do not show: the stamp of the tN of the
+      // book stands for them (catalog.md, "What changes"), so a new release of the notes rebuilds the part.
+      const notes = refs.filter((ref) => ref.kind === TN_KIND && ref.books.includes(part.part)).map((ref) => ref.key)
+      await add(mapSegment(part), inputsOf(mapRows.get(part.part) ?? [], stampsOf(notes)), keys)
+    }
+  }
+
+  // The language topics: the names the language gives to the topics of the xtopics it was built against. The map above never reads them.
+  if (o.topics !== undefined) {
+    const xt = o.topics.xtopics
+    const lastVerse = chapterLengths([...origs.values()])
+    const issues: string[] = []
+    const outlines = new Map<string, { title: string; from: number; to: number }[]>()
+    const tn = refs.filter((ref) => ref.kind === TN_KIND).sort((a, b) => compareCodePoints(a.key, b.key))[0]
+    if (tn !== undefined) await outlinesOf(source, lang, tn, [...origs.keys()], outlines, issues, lastVerse)
+    const stories = (obs?.stories ?? []).map((story) => ({ n: story.n, title: story.title }))
+    const built = buildTopics({
+      lang,
+      xtopics: xt,
+      records: o.topics.records,
+      books: [...bookModels.values()],
+      origs,
+      outlines,
+      outlineRes: tn?.key,
+      lastVerse,
+      obs: stories,
+      obsRes: obs?.res.map(([key]) => key),
+      releases: new Map(refs.map((ref) => [ref.key, tagOf(ref.stamp)])),
+    })
+    report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
+    const rows: RowKey[] = [...mapRows.values()].flat()
+    if (tn !== undefined) for (const book of origs.keys()) if (tn.books.includes(book)) await addKeys(rows, source.rows({ lang, book, resource: tn.key }))
+    if (obs !== null) for (const resource of obs.res.map(([key]) => key)) await addKeys(rows, source.rows({ lang, resource, layer: 'sot' }))
+    rows.push({ layer: 'topics', key: `tipnr|${sha256Hex(JSON.stringify(o.topics.records))}` }, { layer: 'topics', key: `xtopics|${sha256Hex([...xt.topics.keys()].join('\n'))}` })
+    const keys = built.core.res.map(([key]) => key)
+    const inputs = inputsOf(rows, [...stampsOf(keys.filter((key) => refOf.has(key))), ...xt.res.map(([key, stamp]) => ({ key, stamp }))])
+    await add(topicsSegment(built.core), inputs, keys)
+    for (const part of built.parts) await add(topicsSegment(part), inputs, keys)
+  }
+
+  // The index of aligned phrases (optional units): built last, from the book models already made; nothing reads it back.
+  if (o.aligned === true) {
+    const built = buildAligned({ lang, books: [...bookModels.values()], origs, texts: isBridgeText })
+    report.push(...built.report)
+    const keys = built.parts[0]?.res.map(([key]) => key) ?? []
+    const rows: RowKey[] = [...mapRows.values()].flat()
+    for (const part of built.parts) await add(alignedSegment(part), inputsOf(rows, [...stampsOf(keys), ...[...origs.values()].map((orig) => ({ key: orig.key, stamp: orig.stamp }))]), keys)
+  }
+
   segments.sort(compareSegments)
   const catalog = await buildCatalog({
     about: { ...o.about, catalog: lang },
@@ -307,11 +408,71 @@ export async function buildLanguage(o: {
 
 // Common
 
+const TN_KIND = 'TSV Translation Notes'
+const TWL_KIND = 'TSV Translation Words Links'
+const XMAP_SUBJECTS: ReadonlySet<string> = new Set([TN_KIND, TWL_KIND, 'Translation Words', 'Translation Academy'])
+const TITLE_ROW = /^helps-text:(tw|ta)-title:/
+
+/** The keys and pinned releases of the sources of the common topics (`spec/fuentes.md`). */
+const TOPIC_SOURCES: Omit<XtopicsSources, 'outlines'> = {
+  tipnr: ['STEPBible/STEPBible-Data/TIPNR', 'be4191f0'],
+  theographic: ['robertrouse/theographic-bible-metadata', '744355c7'],
+  obs: ['unfoldingWord/en/obs', 'v9'],
+}
+
+/** What the catalog says of each source of the common topics (title, SPDX license, credit line). */
+const TOPIC_CREDITS: Record<keyof typeof TOPIC_SOURCES, { title: string; license: string; attribution: string }> = {
+  tipnr: {
+    title: 'TIPNR - Translators Individualised Proper Names with all References',
+    license: 'CC-BY-4.0',
+    attribution: 'STEPBible.org, based on work at Tyndale House Cambridge',
+  },
+  theographic: { title: 'Theographic Bible Metadata', license: 'CC-BY-SA-4.0', attribution: 'Theographic Bible Metadata (viz.bible), Robert Rouse' },
+  obs: { title: 'Open Bible Stories', license: 'CC-BY-SA-4.0', attribution: 'The original work by unfoldingWord is available from https://openbiblestories.org' },
+}
+
+/** The outlines of the `front:intro` notes of the tN `tn`, by book, into `outlines`; what cannot be read goes to `issues`. */
+async function outlinesOf(
+  source: RowSource,
+  lang: string,
+  tn: ResourceRef,
+  books: string[],
+  outlines: Map<string, { title: string; from: number; to: number }[]>,
+  issues: string[],
+  lastVerse: (book: string, chapter: number) => number | undefined,
+): Promise<void> {
+  for (const book of books) {
+    if (!tn.books.includes(book)) continue
+    const rows: Row[] = []
+    for await (const row of source.rows({ lang, book, resource: tn.key })) rows.push(row)
+    const intro = sourceRows(rows, book, tn.key, 'notes')
+      .map(({ item }) => item as Record<string, unknown>)
+      // `front:intro` in a TSV; format 2.0 marks the introductions `isIntro` and places the book's at 1:1, with the chapter's
+      .filter((item) => item !== null && typeof item === 'object' && typeof item.note === 'string')
+      .find((item) => item.reference === 'front:intro' || (item.isIntro === true && /^#{1,6}\s.*(outline|esquema)/im.test(item.note as string)))
+    if (intro === undefined) issues.push(`outline ${book}: no introduction with an outline (front:intro) in ${tn.key}`)
+    else outlines.set(book, outlineOf(intro.note as string, book, issues, lastVerse))
+  }
+}
+
 /**
  * Builds the `orig` segments (one per book, from {@link extractOrig} and {@link origSegment}) and the common catalog: `about` is
  * `o.about` with `catalog` set to `"common"`, the units are `orig:{book}`, and the resources are the originals that have a book
- * built. `books` defaults to every book the originals of the source have, in the order of the canon. The common map (`xmap`) comes in
- * phase 2.
+ * built. `books` defaults to every book the originals of the source have, in the order of the canon.
+ *
+ * With `mapLang` (the language whose helps make the common map, `"en"`) it also builds the `xmap` core and one part per book
+ * ({@link buildXmap} over the originals just read) and the unit `xmap`, which needs no other unit. The `inputs` of the core are the
+ * rows the map read (the originals of the books, the tN and tWL rows of the books, the title rows of the tW and tA) and the stamps
+ * of every resource of `res`; those of a part are the rows of its book and the stamps of the sources that have the book. Without
+ * `mapLang` the result is what phase 1 gave, with an empty `report`.
+ *
+ * With `topics` (the TIPNR file, the four Theographic files, the English OBS stories by number) it also builds the `xtopics`
+ * core and its parts ({@link buildXtopics} over the originals just read; the unit `xtopics`, which needs nothing). The sections
+ * come from the outlines of the `front:intro` notes of the tN of `mapLang`, and the `same-as` relations from the `tw:names/`
+ * concepts of the xmap; without `mapLang` there are neither. The map is built first and never reads the topics: its segments are
+ * the same bytes with or without `topics`. The `inputs` of every xtopics segment are the sha256 of the three source texts and
+ * the stamps of the topic sources, the originals and the tN. Report lines of this module start with `topics: `; those of its
+ * review list (a match that is not exactly one) with `topics: review: `.
  *
  * Throws `Error` for a book the source has no originals of, `RangeError` for a code that is not one of the 66.
  */
@@ -319,22 +480,135 @@ export async function buildCommon(o: {
   source: RowSource
   books?: string[]
   about: Omit<About, 'catalog'>
-}): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment }> {
+  mapLang?: string
+  topics?: {
+    tipnr: string
+    theographic: { events: string; verses: string; people: string; places: string }
+    obs: Map<number, string>
+    releases?: Partial<Omit<XtopicsSources, 'outlines'>>
+  }
+}): Promise<{ segments: BuiltSegment[]; catalog: BuiltSegment; report: string[] }> {
   const refs = await o.source.resources(ORIGINALS)
   const books = o.books === undefined ? booksOf(refs) : canonical(o.books)
   const segments: BuiltSegment[] = []
   const used = new Set<string>()
+  const origs: OrigModel[] = []
+  const origRows = new Map<string, RowKey[]>()
   for (const book of books) {
     const orig = await extractOrig(o.source, book)
+    origs.push(orig)
     const having = refs.filter((ref) => ref.books.includes(book))
     const rows: RowKey[] = []
     await addKeys(rows, o.source.rows({ lang: ORIGINALS, book, layer: 'sot' }))
+    origRows.set(book, rows)
     // The original is known by the stamp of its book; another original with rows of the book (MACULA) by its release.
     const resources = having.map((ref) => ({ key: ref.key, stamp: ref.key === orig.key ? orig.stamp : ref.stamp }))
     segments.push(await builtSegment(origSegment(orig), inputsOf(rows, resources)))
     for (const ref of having) used.add(ref.key)
   }
+
+  const report: string[] = []
+  const listed = [...refs]
+  const lang = o.mapLang
+  if (lang !== undefined && origs.length === 0) report.push(`no original was built, so the xmap of ${lang} is not built: the publisher needs the originals`)
+  let xmap: { core: XmapCore; parts: XmapPart[] } | undefined
+  if (lang !== undefined && origs.length > 0) {
+    const built = await buildXmap({ source: o.source, origs, lang })
+    xmap = built
+    report.push(...built.report)
+    const helps = (await o.source.resources(lang)).filter((ref) => XMAP_SUBJECTS.has(ref.kind))
+    for (const ref of helps) {
+      listed.push(ref)
+      used.add(ref.key)
+    }
+    const noteLike = (ref: ResourceRef): boolean => ref.kind === TN_KIND || ref.kind === TWL_KIND
+    // An original is known by the stamp of each book (`orig.stamp`); a part lists the stamp of its own book, the core one per book.
+    const stampOf = (ref: ResourceRef, book?: string): { key: string; stamp: string }[] => {
+      const mine = origs.filter((orig) => orig.key === ref.key && (book === undefined || orig.book === book))
+      return mine.length === 0 ? [{ key: ref.key, stamp: ref.stamp }] : mine.map((orig) => ({ key: ref.key, stamp: orig.stamp }))
+    }
+    const originalsUsed = refs.filter((ref) => origs.some((orig) => orig.key === ref.key))
+    const coreRows: RowKey[] = [...origRows.values()].flat()
+    const bookRows = new Map<string, RowKey[]>()
+    for (const orig of origs) {
+      const rows: RowKey[] = [...(origRows.get(orig.book) ?? [])]
+      const before = rows.length
+      for (const ref of helps) if (noteLike(ref) && ref.books.includes(orig.book)) await addKeys(rows, o.source.rows({ lang, book: orig.book, resource: ref.key }))
+      bookRows.set(orig.book, rows)
+      coreRows.push(...rows.slice(before))
+    }
+    for (const ref of helps) {
+      if (noteLike(ref)) continue
+      for await (const row of o.source.rows({ lang, resource: ref.key, layer: 'text' })) if (TITLE_ROW.test(row.key)) coreRows.push({ layer: row.layer, key: row.key })
+    }
+    segments.push(await builtSegment(xmapSegment(built.core), inputsOf(coreRows, [...originalsUsed, ...helps].flatMap((ref) => stampOf(ref)))))
+    for (const part of built.parts) {
+      const book = part.part
+      const sources = [...originalsUsed, ...helps.filter(noteLike)].filter((ref) => ref.books.includes(book)).flatMap((ref) => stampOf(ref, book))
+      segments.push(await builtSegment(xmapSegment(part), inputsOf(bookRows.get(book) ?? [], sources)))
+    }
+  }
+
+  const extra: CatalogResource[] = []
+  if (o.topics !== undefined && origs.length === 0) report.push('topics: no original was built, so the xtopics are not built: the publisher needs the originals')
+  if (o.topics !== undefined && origs.length > 0) {
+    const t = o.topics
+    const issues: string[] = []
+    const lastVerse = chapterLengths(origs)
+    const tipnr = parseTipnr(t.tipnr, issues)
+    const events = parseTheographic(t.theographic, issues)
+    const obs = parseObsRefs(t.obs, issues, lastVerse)
+    const obsTitles = new Map<number, string>()
+    for (const [n, text] of t.obs) {
+      const h = /^#\s+(.*?)\s*$/m.exec(text)
+      if (h !== null) obsTitles.set(n, h[1].replace(/^\d+\.\s*/, ''))
+    }
+    // The outlines of the English tN introductions (the first tN of mapLang by key)
+    const outlines = new Map<string, { title: string; from: number; to: number }[]>()
+    let tn: ResourceRef | undefined
+    if (lang === undefined) report.push('topics: no mapLang: the xtopics have no sections and no same-as relations')
+    else {
+      tn = (await o.source.resources(lang)).filter((ref) => ref.kind === TN_KIND).sort((a, b) => compareCodePoints(a.key, b.key))[0]
+      if (tn !== undefined) await outlinesOf(o.source, lang, tn, origs.map((orig) => orig.book), outlines, issues, lastVerse)
+    }
+    // The tW names of the map, with the Strong keys and the verses of their links
+    let twNames: Map<string, TwName> | undefined
+    if (xmap !== undefined) {
+      twNames = new Map()
+      for (const [concept, keys] of Object.entries(xmap.core.strongs ?? {})) {
+        if (!concept.startsWith('tw:names/')) continue
+        const verses = xmap.parts.flatMap((part) => part.links?.get(concept) ?? [])
+        twNames.set(concept, { strongs: keys, verses })
+      }
+    }
+    const res: XtopicsSources = { ...TOPIC_SOURCES, ...t.releases }
+    if (tn !== undefined) res.outlines = [tn.key, tagOf(tn.stamp)]
+    const built = buildXtopics({ tipnr, events, obs, obsTitles, outlines, origs, res, twNames })
+    report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
+    const texts = [['tipnr', t.tipnr], ...Object.entries(t.theographic), ...[...t.obs].sort((a, b) => a[0] - b[0]).map(([n, text]) => [`obs ${n}`, text])]
+    const rows = texts.map(([name, text]) => ({ layer: 'topics', key: `${name}|${sha256Hex(text)}` }))
+    const stamps = [
+      ...built.core.res.map(([key, release]) => ({ key, stamp: release })),
+      ...origs.map((orig) => ({ key: orig.key, stamp: orig.stamp })),
+    ]
+    const inputs = inputsOf(rows, stamps)
+    segments.push(await builtSegment(xtopicsSegment(built.core), inputs))
+    for (const part of built.parts) segments.push(await builtSegment(xtopicsSegment(part), inputs))
+    const topicKeys = new Set(built.core.res.map(([key]) => key))
+    for (const [role, info] of Object.entries(TOPIC_CREDITS)) {
+      const [key, release] = res[role as keyof typeof TOPIC_CREDITS]
+      if (!topicKeys.has(key)) continue
+      extra.push({ key, title: info.title, subject: 'Topics', release, license: info.license, attribution: info.attribution, books: bookSet(built.core.coverage.get(key)?.whole ?? []) })
+    }
+    // The tN the sections come from is a resource of the catalog (with mapLang it is already listed, for the map)
+    if (tn !== undefined && topicKeys.has(tn.key)) {
+      if (!listed.some((ref) => ref.key === tn!.key)) listed.push(tn)
+      used.add(tn.key)
+    }
+  }
+
   segments.sort(compareSegments)
-  const catalog = await buildCatalog({ about: { ...o.about, catalog: 'common' }, resources: catalogResources(refs, used), segments })
-  return { segments, catalog }
+  const resources = [...catalogResources(listed, used), ...extra].sort((a, b) => compareCodePoints(a.key, b.key))
+  const catalog = await buildCatalog({ about: { ...o.about, catalog: 'common' }, resources, segments })
+  return { segments, catalog, report }
 }

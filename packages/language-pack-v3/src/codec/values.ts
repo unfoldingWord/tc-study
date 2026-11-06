@@ -26,6 +26,11 @@ export async function sha256Digest(data: Uint8Array): Promise<Uint8Array> {
 /** Whether `object` has `key` as its own property. A key like "constructor" or "__proto__" is not found on the prototype. */
 export const hasOwn = (object: object, key: string): boolean => Object.prototype.hasOwnProperty.call(object, key)
 
+/** Sets an own key, a key named "__proto__" included (a plain assignment would change the prototype). */
+export function put<T>(object: Record<string, T>, key: string, value: T): void {
+  Object.defineProperty(object, key, { value, enumerable: true, writable: true, configurable: true })
+}
+
 /**
  * Whether `value` is a map: not `null`, not an array, not a byte string. It checks the shape only; what the values are is
  * for the caller to check.

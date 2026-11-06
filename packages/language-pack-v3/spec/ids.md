@@ -95,17 +95,29 @@ name a person sees comes from each language's map.
 | --- | --- | --- | --- |
 | `tw:` | A word article | `tw:kt/grace`, `tw:names/abraham`, `tw:other/shepherd` | The tW path without `bible/` |
 | `ta:` | An Academy article | `ta:translate/figs-metaphor` | The tA manual and slug |
-| `per:` | A person | `per:abraham` | TIPNR's unique name (phase 2) |
-| `lug:` | A place | `lug:jerusalem` | TIPNR's unique name (phase 2) |
-| `ev:` | An event | `ev:plagues-of-egypt` | Theographic or the builder's list (phase 2) |
-| `tema:` | A topic | `tema:faith` | The builder's list (phase 2) |
+| `per:` | A person | `per:abraham` | The id: TIPNR's unique name. The name shown: the language's `topics` names, else the English title in `xtopics` |
+| `lug:` | A place | `lug:jerusalem` | As `per:` |
+| `ev:` | An event | `ev:plagues-of-egypt` | The id: Theographic's title or the builder's list. The name shown: the language's outline, else the English title in `xtopics` |
+| `tema:` | A topic (kind 4) | `tema:faith` | The builder's list; the language's name is in its `map` `names` (`map.cddl`). Part B builds no `tema:` id yet: the list is empty |
 | `sec:` | A section of a book, from its outline | `sec:exo/7-12` | Chapters it spans |
 | `obs:` | An OBS story or frame | `obs:10`, `obs:10:3` | Its number |
 | `{lang}:tema/` | A topic only one language has, from its own outlines | `es-419:tema/la-gracia-que-educa` | That language's builder |
 
-- **Concepts are never merged.** Two ids for the same thing are joined by a `same-as` relation in the common map,
+- **Ids of people and places** (`per:`, `lug:`): the slug of TIPNR's unified name before `@`: lowercase, spaces and `'` to `-`, any other character outside `[a-z0-9-]` dropped. People and places with the same name (there are several Zechariahs) get different ids by this rule: when two TIPNR records of one kind give the same slug, every one of them takes `-{book}-{chapter}-{verse}` of the first reference after `@` (`per:zechariah-2ki-14-29`). The book is the format-3 book code of the TIPNR book: TIPNR writes the USFM code with a capital (`2Ki`, `Jhn`, `Mrk`, `Sng`), and that text in lowercase is the code of the list above for every book TIPNR uses. Chapter and verse are the numbers of the reference as TIPNR writes it (English versification, not converted: the suffix is part of the id and must not change with a conversion), digits only: a verse letter (`a`, `b`) or an occurrence letter is dropped (`Psa.3.0` gives `psa-3-0`). Records of one slug that still give the same suffix take `-2`, `-3` after it, in the order of the TIPNR file. The TIPNR `uStrong` is kept beside the id (`xtopics` `topics.ustrong`), so an id can be derived again.
+- **Ids of events** (`ev:`): the slug of the Theographic title by the same rule, with `-2`, `-3` after it on a clash, in the order of the `eventID`; the `eventID` is kept beside the id as the topic's `ref`, and the title as its `title` (the English name shown when a language has none; for an event of the builder's list, that list's title). An event Theographic lacks comes from a short list the builder owns (source `builder`, confidence 100); it starts with `ev:plagues-of-egypt`, Exodus 7:14-12:36.
+- **Sections and stories.** `sec:{book}/{range}` comes from the outline of the English tN introduction (`sec:exo/7-12`); `obs:{n}` from English OBS v9, with the verse ranges of the story's closing line. The outline is the list under the first heading of the introduction (`front:intro`) whose text contains `Outline` or `Esquema` (English and Spanish, any case), up to the next heading of the same or a higher level. The introduction is the first note, in the order of the source, whose reference is `front:intro` or that is marked `isIntro` and has such a heading (a source in format 2.0 has no `front:intro` and uses the second form). Each item is a title and a verse range (`3:1-24`, `1:1-2:3`); of a label after the range, only the form `(3:1-24) - label` (a parenthesized range, a dash, then letters) is stripped from the title. A heading in another language is not recognised: that introduction gives no sections and no names, no local topics, and the build report says `no Outline section`; so does an item the builder cannot read as a range. An entry of a language's outline whose range equals that of an English `sec:` gives that section a name in the language; one that equals none becomes `{lang}:tema/{slug}`.
+- **Relation types of `xtopics`** (the `type` of a relation; the end that is `from` is named first):
+  - `parent-of` (parent to child), `sibling-of` and `partner-of` (symmetric), `founder-of` (founder to the place or tribe) and `inhabitant-of` (inhabitant to the place), from TIPNR;
+  - `tribe`: from the person to the tribe (or people) TIPNR names for them;
+  - `part-of` (an event to the larger event) and `follows` (an event to its predecessor), from Theographic;
+  - `participant`: from the event to a person, and `place`: from the event to a place, both from Theographic's participants and places, only when the name and at least one verse of the event match exactly one TIPNR record of that kind (confidence 80); a match that is not exactly one goes to the review list, and no relation is made;
+  - `occurs-in`: from a story (`obs:`) or a section (`sec:`) to an event, when any verse of the event is also a verse of one of the story's or section's ranges (confidence 60). The test is overlap of any size, not containment: an event that begins in a story and ends outside it is listed, and a story can occur in several events (the Plagues of Egypt overlap OBS stories 10, 11, 12 and 48);
+  - `same-as`: from a `tw:names/` concept to the one person or place whose Strong keys it shares and whose verses overlap (confidence 70); a match that is not exactly one goes to the review list.
+  A TIPNR relation whose other end is a unique name shared by several records goes to the person's record when there is one, and is not reported as a review case.
+- **A TIPNR dStrong as a Strong key** (`topics.strongs`). TIPNR writes the Strong number of a name with STEPBible's capital disambiguation letter: `H2148P`, `G2197H`. The builder writes it as the key of the original (see "Strong keys"): Hebrew `H` and four digits, keeping a lowercase suffix when TIPNR has one (`H2148P` gives `H2148`, `H7462b` stays); Greek `G`, the number in four digits and a final `0`, which makes the five digits the UGNT writes (`G2197H` gives `G21970`; a disambiguation letter is dropped). Two comparisons use the keys. To take a name from the alignment, a word of the original matches when it has the same letter and number, and the same suffix when the key has one (`H2148` matches `H2148` and `H2148a`; `H2148a` only `H2148a`); for Greek only the first four digits of the number are compared, because the UGNT may end a number in a digit other than `0` (`G21970` and `G21971` both match a TIPNR `G2197`). To join a `tw:names/` concept to a person or place (`same-as`), only the letter and the four digits of the number are compared (`H2148a`, `H2148` and `G21970` against `G2197`). A text of another form is not a Strong key and goes to the build report.
+- **`ev:` concepts get no name from the alignment.** An event is named by its title (English, from Theographic) and by the language's outline; no name is taken for it from the aligned text.
+- **Concepts are never merged.** Two ids for the same thing are joined by a `same-as` relation: in the common map for concepts of part A, and in `xtopics` `relations` when one end is a topic (an end that is a concept of the map is named there by its id, so the map never depends on the topics),
   with its source and confidence.
-- **People and places with the same name** (there are several Zechariahs) take TIPNR's id, which tells them apart.
 - **An article that moved** (`other/` to `kt/`) keeps its old id as an alias in the common map: the old id still
   leads to it.
 - **Ids are lowercase.** An article whose published name has capitals (`figs-orderHeb`) gets the lowercase id
@@ -141,6 +153,10 @@ once and kept between builds, even when the heading is corrected, translated or 
   When none applies, it is new.
 - **Splits and merges.** A section that splits keeps its sid in the first part. A merged section keeps the sid of the
   first, and takes the other as an alias.
+- **Equal headings.** When two sections of one article would get the same sid, the later one (in the order of the
+  article) gets `-2`, the next `-3`, unless the registry already gave it a sid.
+- **A bridged article** starts with an empty registry: its section ids are those of a first build, local to the device,
+  and a later published catalog replaces them. A map never names a section, so the maps do not depend on them.
 - **The role is apart from the sid.** Correcting a role does not change the sid.
 - A heading the builder cannot place gets the role `unknown`, and the builder's report lists it. The section stays
   readable and citable.

@@ -1,0 +1,343 @@
+{
+  "expected": {
+    "books": {
+      "1ch": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "1co": {
+        "count": 10,
+        "state": "count",
+        "verses": 8
+      },
+      "1jn": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "1ki": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "1pe": {
+        "count": 10,
+        "state": "count",
+        "verses": 10
+      },
+      "1sa": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "1th": {
+        "count": 2,
+        "state": "count",
+        "verses": 2
+      },
+      "1ti": {
+        "count": 4,
+        "state": "count",
+        "verses": 4
+      },
+      "2ch": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "2co": {
+        "count": 18,
+        "state": "count",
+        "verses": 18
+      },
+      "2jn": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "2ki": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "2pe": {
+        "count": 2,
+        "state": "count",
+        "verses": 2
+      },
+      "2sa": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "2th": {
+        "count": 4,
+        "state": "count",
+        "verses": 4
+      },
+      "2ti": {
+        "count": 5,
+        "state": "count",
+        "verses": 5
+      },
+      "3jn": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "act": {
+        "count": 17,
+        "state": "count",
+        "verses": 17
+      },
+      "amo": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "col": {
+        "count": 5,
+        "state": "count",
+        "verses": 5
+      },
+      "dan": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "deu": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "ecc": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "eph": {
+        "count": 12,
+        "state": "count",
+        "verses": 12
+      },
+      "est": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "exo": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "ezk": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "ezr": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "gal": {
+        "count": 7,
+        "state": "count",
+        "verses": 7
+      },
+      "gen": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "hab": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "hag": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "heb": {
+        "count": 8,
+        "state": "count",
+        "verses": 7
+      },
+      "hos": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "isa": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jas": {
+        "count": 2,
+        "state": "count",
+        "verses": 1
+      },
+      "jdg": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jer": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jhn": {
+        "count": 4,
+        "state": "count",
+        "verses": 3
+      },
+      "job": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jol": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jon": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jos": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "jud": {
+        "count": 1,
+        "state": "count",
+        "verses": 1
+      },
+      "lam": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "lev": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "luk": {
+        "count": 8,
+        "state": "count",
+        "verses": 8
+      },
+      "mal": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "mat": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "mic": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "mrk": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "nam": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "neh": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "num": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "oba": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "phm": {
+        "count": 2,
+        "state": "count",
+        "verses": 2
+      },
+      "php": {
+        "count": 3,
+        "state": "count",
+        "verses": 3
+      },
+      "pro": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "psa": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "rev": {
+        "count": 2,
+        "state": "count",
+        "verses": 2
+      },
+      "rom": {
+        "count": 25,
+        "state": "count",
+        "verses": 22
+      },
+      "rut": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "sng": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "tit": {
+        "count": 4,
+        "state": "count",
+        "verses": 4
+      },
+      "zec": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      },
+      "zep": {
+        "count": 0,
+        "state": "zero",
+        "verses": 0
+      }
+    },
+    "key": "G54850",
+    "kind": "strong",
+    "unit": "occurrences"
+  },
+  "query": {
+    "key": "G5485",
+    "kind": "strong"
+  }
+}

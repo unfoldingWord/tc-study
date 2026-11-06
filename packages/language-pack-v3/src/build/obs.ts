@@ -63,7 +63,7 @@ export function parseFrameRef(text: string): number | null {
   const m = FRAME_REF.exec(text.trim())
   if (m === null) return null
   const story = Number(m[1])
-  if (story < 1) return null
+  if (story < 1 || story > MAX_STORY) return null
   return story * FRAME_FACTOR + (m[2] === undefined ? 0 : Number(m[2]))
 }
 
@@ -160,8 +160,8 @@ function extractStories(rows: Row[], ref: ResourceRef, issues: string[]): ObsSto
  *
  * - **Ids** are the `id` field; one that repeats gets `~2`, `~3`….
  * - **Frame.** The `reference` field, `story:frame`, becomes `frame = story × 100 + frame` (`parseFrameRef`); the text stays in
- *   `ref`. A reference that cannot be read puts the row at frame 0, keeps the text in `ref`, and adds a line to `issues`. The row
- *   is never dropped.
+ *   `ref`. A reference that cannot be read (no story from 1 to 50, no frame from 0 to 99) leaves the row out and adds a
+ *   line to `issues`: the readers reject a frame id outside story 1 to 50 and frame 0 to 99.
  * - **Concept and columns** as the book helps: SupportReference and TWLink become `concept`; the escapes and links of note,
  *   question and response are undone and rewritten (`rewriteLinks(text, null)`: there is no book). The text of a quote stays in
  *   `cols.quote`: OBS quotes have no positions in the original.
@@ -178,10 +178,10 @@ function extractHelps(rows: Row[], ref: ResourceRef, kind: HelpsKind, issues: st
     if (id !== published) report(`the id ${JSON.stringify(published)} is in the source twice; this row is ${JSON.stringify(id)}`)
 
     const reference = typeof item.reference === 'string' ? item.reference : ''
-    let frame = parseFrameRef(reference)
+    const frame = parseFrameRef(reference)
     if (frame === null) {
-      frame = 0
-      report(`the reference ${JSON.stringify(reference)} is not story:frame; the row is placed at frame 0`)
+      report(`the reference ${JSON.stringify(reference)} is not story:frame; the row is left out`)
+      continue
     }
     const { cols, concept } = helpColumns(item, kind, null, where, published, report)
     const row: ObsHelpRow = { id, ref: reference, frame, cols }

@@ -1,0 +1,99 @@
+[
+ {
+  "id": "reccZB8SVU5bEMcgo",
+  "fields": {
+   "personID": 1324,
+   "displayTitle": "God",
+   "verses": [
+    "recSaICUAgcY7Pck6",
+    "recnhF7OryYorcYmY",
+    "recxvyuwU6v5m1tKI",
+    "recPyZczGHyjYdFBQ",
+    "rec7mkRLwey2ntUG9",
+    "recESVgcnokvjv0Do",
+    "rec1czW93MUSPz4m0",
+    "recSWczqAPNQmqHFp",
+    "rec7DRaTJV5ANnvEj",
+    "recVgar4gTGR2K8Qh",
+    "rec0g6dRO4X5RwJ4e"
+   ]
+  }
+ },
+ {
+  "id": "recgkFqZovgbr3pAi",
+  "fields": {
+   "personID": 905,
+   "displayTitle": "Jesus Christ",
+   "verses": []
+  }
+ },
+ {
+  "id": "reco82mzy0XTzaOgv",
+  "fields": {
+   "personID": 7400,
+   "displayTitle": "Holy Spirit",
+   "verses": [
+    "rec7DRaTJV5ANnvEj"
+   ]
+  }
+ },
+ {
+  "id": "reccdFYIq50NyxNej",
+  "fields": {
+   "personID": 58,
+   "displayTitle": "Abraham",
+   "verses": [
+    "recVgar4gTGR2K8Qh",
+    "recX74cRHwDmYb1sK",
+    "recATDE3Fe1MzrL2l",
+    "rechILQyS7dx4R6sI",
+    "rec0g6dRO4X5RwJ4e"
+   ]
+  }
+ },
+ {
+  "id": "rechda7WMDuW1jBTq",
+  "fields": {
+   "personID": 2473,
+   "displayTitle": "Sarah",
+   "verses": [
+    "recPMnvB1cd7AQgro",
+    "rec0g6dRO4X5RwJ4e"
+   ]
+  }
+ },
+ {
+  "id": "recd1WK44ltaGtsK0",
+  "fields": {
+   "personID": 2328,
+   "displayTitle": "Pharaoh (during Abraham's Journey)",
+   "verses": [
+    "rec0g6dRO4X5RwJ4e"
+   ]
+  }
+ },
+ {
+  "id": "recjNRR60PAuFtjha",
+  "fields": {
+   "personID": 2108,
+   "displayTitle": "Moses",
+   "verses": [
+    "reccmhu3pWjLFerBx",
+    "rec98PWnjOH3Rwuor",
+    "recSaICUAgcY7Pck6",
+    "recnhF7OryYorcYmY",
+    "recxvyuwU6v5m1tKI"
+   ]
+  }
+ },
+ {
+  "id": "recv0dAY2ULzJ687g",
+  "fields": {
+   "personID": 1,
+   "displayTitle": "Aaron",
+   "verses": [
+    "recxvyuwU6v5m1tKI"
+   ]
+  }
+ }
+]

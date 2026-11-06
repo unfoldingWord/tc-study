@@ -4,15 +4,21 @@ import { join } from 'node:path'
 import { bookSegment } from '../build/book'
 import { type BuiltSegment } from '../build/catalog'
 import { BUILDER, buildCommon, buildLanguage } from '../build/language'
+import { mapSegment } from '../build/map/segment'
 import { obsSegment } from '../build/obs'
+import { topicsSegment, xtopicsSegment } from '../build/topics/segment'
+import { xmapSegment } from '../build/xmap/segment'
 import { type CborValue, encodeDeterministic } from '../codec/cbor'
 import { FORMAT_ERROR_CODES, FormatError } from '../codec/errors'
 import { hex, readHeader, readSegment, type Segment, writeSegment } from '../codec/container'
-import type { About, BookModel, ObsModel } from '../model'
+import type { About, BookModel, Concept, MapCore, MapPart, ObsModel, Topic, TopicsCore, TopicsPart, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../model'
 import { partsSource } from '../node/partsSource'
 import { writeTransfer } from '../transfer'
 import { BOOK_TABLES } from './book'
+import { MAP_TABLES } from './map'
 import { canonicalJson, KNOWN, readerOutput, sortKeys } from './output'
+import { TOPICS_TABLES, XTOPICS_TABLES } from './topics'
+import { XMAP_TABLES } from './xmap'
 
 const SPEC = join(import.meta.dir, '..', '..', 'spec', 'tests')
 const DATA = join(SPEC, 'data')
@@ -24,6 +30,36 @@ const GLT = 'es-419_gl/es-419/glt'
 const GST = 'es-419_gl/es-419/gst'
 const TN = 'es-419_gl/es-419/tn'
 const TWL = 'es-419_gl/es-419/twl'
+
+const TW = 'unfoldingWord/en/tw'
+const xmapCore: XmapCore = {
+  part: 'core',
+  res: [[TW, 'v91'], ['unfoldingWord/en/ta', 'v91']],
+  coverage: new Map([
+    ['unfoldingWord/en/twl', { whole: ['gen', 'tit'], partial: ['mat'] }],
+    ['unfoldingWord/en/ta', { whole: ['tit'], partial: [] }],
+  ]),
+  strong: { unit: 'occurrences', rows: new Map([['G54850', new Map([['tit', [2, 1] as [number, number]]])]]) },
+  concepts: new Map<string, Concept>([
+    ['tw:kt/grace', { kind: 'none', tw: 'kt', source: TW }],
+    ['tw:kt/x', { kind: 'none', tw: 'kt', source: TW }],
+  ]),
+  links: { unit: 'links', rows: new Map([['tw:kt/grace', new Map([['tit', [1, 1] as [number, number]]])]]) },
+  relations: [{ from: 'tw:kt/grace', to: 'tw:kt/x', type: 'related', source: TW, confidence: 80 }],
+  aliases: { 'tw:other/x': 'tw:kt/x' },
+  strongs: { 'tw:kt/grace': ['G54850'] },
+}
+const mapCore: MapCore = {
+  lang: 'es-419',
+  part: 'core',
+  res: [['es-419_gl/es-419/tn', 'v1']],
+  books: Array.from({ length: 66 }, (_, i): MapCore['books'][number] => (i === 55 ? ['Tito', 'Tit', 'Tit', 'text'] : [`L${i}`, `S${i}`, `A${i}`, 'none'])),
+  names: { 'tw:kt/grace': ['gracia'] },
+  subtitles: { 'ta:x': 'Sub' },
+  coverage: new Map([['es-419_gl/es-419/tn', { whole: ['tit'], partial: [] }]]),
+  usage: { unit: 'notes', rows: new Map([['ta:x', new Map([['tit', [1, 3] as [number, number]]])]]) },
+  obs: [[1, 'La creacion']],
+}
 
 const out = async (bytes: Uint8Array): Promise<any> => readerOutput(bytes)
 const minimal = () => file('container', 'minimal.seg')
@@ -173,17 +209,137 @@ describe('tables a reader does not know (case 9)', () => {
     expect(((await out((await writeSegment(optional)).bytes)).texts[0] as object) ?? 0).toEqual(json('container', 'minimal.expected.json').texts[0])
   })
 
-  test('the classes of phase 2 have no known tables: map, xmap and gen give E_TABLE', async () => {
-    expect(KNOWN.map).toEqual({})
-    expect(KNOWN.xmap).toEqual({})
+  test('map and xmap know their tables; gen has none and gives E_TABLE', async () => {
+    expect(KNOWN.map).toEqual(MAP_TABLES)
+    expect(KNOWN.xmap).toEqual(XMAP_TABLES)
     expect(KNOWN.gen).toEqual({})
-    for (const cls of ['map', 'xmap', 'gen'] as const) {
-      const required: Segment = { h: { class: cls, v: 1, tables: { core: [1, true] } }, t: { core: {} } }
-      expect(await readerOutput((await writeSegment(required)).bytes)).toEqual({ error: 'E_TABLE' })
-      // Even a segment whose tables are all optional: the class is not read.
-      const optional: Segment = { h: { class: cls, v: 1, tables: { core: [1, false] } }, t: { core: {} } }
-      expect(await readerOutput((await writeSegment(optional)).bytes)).toEqual({ error: 'E_TABLE' })
+    const required: Segment = { h: { class: 'gen', v: 1, tables: { core: [1, true] } }, t: { core: {} } }
+    expect(await readerOutput((await writeSegment(required)).bytes)).toEqual({ error: 'E_TABLE' })
+    // Even a segment whose tables are all optional: the class is not read.
+    const optional: Segment = { h: { class: 'gen', v: 1, tables: { core: [1, false] } }, t: { core: {} } }
+    expect(await readerOutput((await writeSegment(optional)).bytes)).toEqual({ error: 'E_TABLE' })
+  })
+
+  test('a map segment is decoded; a required table it does not know is E_TABLE', async () => {
+    const result = await out((await writeSegment(mapSegment(mapCore))).bytes)
+    expect(result.h.class).toBe('map')
+    const unknownRequired = mapSegment(mapCore)
+    unknownRequired.h.tables.future = [1, true]
+    unknownRequired.t.future = {}
+    expect(await out((await writeSegment(unknownRequired)).bytes)).toEqual({ error: 'E_TABLE' })
+  })
+
+  test('xmap core: coverage as book codes, counts tables, concepts', async () => {
+    const result = await out((await writeSegment(xmapSegment(xmapCore))).bytes)
+    expect(result.coverage['unfoldingWord/en/twl']).toEqual({ whole: ['gen', 'tit'], partial: ['mat'] })
+    expect(result.coverage['unfoldingWord/en/ta']).toEqual({ whole: ['tit'] })
+    expect(result.strong.unit).toBe('occurrences')
+    expect(result.strong.rows.G54850.tit).toEqual([2, 1])
+    expect(result.concepts['tw:kt/grace']).toEqual({ kind: 'none', tw: 'kt', source: 'unfoldingWord/en/tw' })
+    expect(result.links.rows['tw:kt/grace'].tit).toEqual([1, 1])
+    expect(result.notes).toBeUndefined()
+    expect(result.relations).toEqual([{ from: 'tw:kt/grace', to: 'tw:kt/x', type: 'related', source: 'unfoldingWord/en/tw', confidence: 80 }])
+    expect(result.aliases).toEqual({ 'tw:other/x': 'tw:kt/x' })
+    expect(result.strongs).toEqual({ 'tw:kt/grace': ['G54850'] })
+    expect(result.h.part).toBe('core')
+  })
+
+  test('xmap part: lists of full verse ids', async () => {
+    const part: XmapPart = { part: 'tit', strong: new Map([['G54850', [56001001, 56001004]]]), notes: new Map([['ta:x', [56001002]]]) }
+    const result = await out((await writeSegment(xmapSegment(part))).bytes)
+    expect(result.strong).toEqual({ G54850: [56001001, 56001004] })
+    expect(result.notes).toEqual({ 'ta:x': [56001002] })
+    expect(result.links).toBeUndefined()
+  })
+
+  test('xmap with an extra optional table topics: not in the output, listed in h.tables', async () => {
+    const seg = xmapSegment(xmapCore)
+    const plain = await out((await writeSegment(seg)).bytes)
+    const extra = structuredClone(seg)
+    extra.h.tables.topics = [1, false]
+    extra.t.topics = { anything: new Uint8Array([1]) }
+    const result = await out((await writeSegment(extra)).bytes)
+    expect(result.topics).toBeUndefined()
+    expect(Object.keys(result.h.tables)).toContain('topics')
+    const { h: _h, id: _id, ...rest } = result
+    const { h: _h2, id: _id2, ...restPlain } = plain
+    expect(rest).toEqual(restPlain)
+  })
+
+  test('map core: books, names, subtitles, coverage, usage, obs', async () => {
+    const result = await out((await writeSegment(mapSegment(mapCore))).bytes)
+    expect(result.books).toHaveLength(66)
+    expect(result.books[55]).toEqual(['Tito', 'Tit', 'Tit', 'text'])
+    expect(result.names).toEqual({ 'tw:kt/grace': ['gracia'] })
+    expect(result.subtitles).toEqual({ 'ta:x': 'Sub' })
+    expect(result.coverage['es-419_gl/es-419/tn']).toEqual({ whole: ['tit'] })
+    expect(result.usage).toEqual({ unit: 'notes', rows: { 'ta:x': { tit: [1, 3] } } })
+    expect(result.obs).toEqual([[1, 'La creacion']])
+  })
+
+  test('map part: usage as full verse ids', async () => {
+    const part: MapPart = { lang: 'es-419', part: 'tit', usage: new Map([['ta:x', [56001002, 56001003]]]) }
+    const result = await out((await writeSegment(mapSegment(part))).bytes)
+    expect(result.usage).toEqual({ 'ta:x': [56001002, 56001003] })
+    expect(result.h.lang).toBe('es-419')
+  })
+
+  test('xtopics and topics know their tables', () => {
+    expect(KNOWN.xtopics).toEqual(XTOPICS_TABLES)
+    expect(KNOWN.topics).toEqual(TOPICS_TABLES)
+  })
+
+  const OBSR = 'unfoldingWord/en/obs'
+  const xtCore: XtopicsCore = {
+    part: 'core',
+    res: [['STEPBible/TIPNR', 'r1'], [OBSR, 'v9']],
+    coverage: new Map([['STEPBible/TIPNR', { whole: ['gen'], partial: ['mat'] }]]),
+    topics: new Map<string, Topic>([
+      ['per:abraham', { kind: 'person', source: 'STEPBible/TIPNR', ref: 'Abraham@Gen.11.26', title: 'Abraham', ustrong: 'H0085' }],
+      ['obs:10', { kind: 'story', source: OBSR, ref: '10', title: '', ustrong: '' }],
+    ]),
+    occurrences: new Map([['per:abraham', new Map([['gen', [3, 3] as [number, number]]])]]),
+    relations: [{ from: 'per:abraham', to: 'tw:names/abraham', type: 'same-as', source: 'STEPBible/TIPNR', confidence: 90 }],
+    strongs: { 'per:abraham': ['H0085'] },
+    ranges: { 'obs:10': [[2001001, 2001010]] },
+  }
+
+  test('xtopics core: coverage, topics, occurrences, relations, strongs, ranges', async () => {
+    const result = await out((await writeSegment(xtopicsSegment(xtCore))).bytes)
+    expect(result.coverage['STEPBible/TIPNR']).toEqual({ whole: ['gen'], partial: ['mat'] })
+    expect(result.topics['obs:10']).toEqual({ kind: 'story', source: OBSR, ref: '10', title: '', ustrong: '' })
+    expect(result.occurrences).toEqual({ unit: 'verses', rows: { 'per:abraham': { gen: [3, 3] } } })
+    expect(result.relations).toEqual(xtCore.relations)
+    expect(result.strongs).toEqual({ 'per:abraham': ['H0085'] })
+    expect(result.ranges).toEqual({ 'obs:10': [[2001001, 2001010]] })
+    const { relations: _r, strongs: _s, ranges: _g, ...small } = xtCore
+    const bare = await out((await writeSegment(xtopicsSegment(small))).bytes)
+    expect([bare.relations, bare.strongs, bare.ranges]).toEqual([undefined, undefined, undefined])
+  })
+
+  test('xtopics part: occurrences as full verse ids', async () => {
+    const part: XtopicsPart = { part: 'gen', occurrences: new Map([['per:abraham', [1011026, 1012001]]]) }
+    const result = await out((await writeSegment(xtopicsSegment(part))).bytes)
+    expect(result.occurrences).toEqual({ 'per:abraham': [1011026, 1012001] })
+    expect(result.coverage).toBeUndefined()
+  })
+
+  test('topics core and part', async () => {
+    const core: TopicsCore = {
+      lang: 'es-419',
+      part: 'core',
+      res: [['aligned/es-419', 'a1']],
+      names: { 'per:abraham': [['Abraham', 'alignment', 5, ['gen', 'mat']], ['Abraham', 'list', 1, ['gen']]] },
+      local: { 'es-419:tema/x': { names: ['X'], refs: [[1001001, 1001002]], related: ['tw:kt/grace'] } },
+      coverage: new Map([['aligned/es-419', { whole: ['gen'], partial: [] }]]),
     }
+    const result = await out((await writeSegment(topicsSegment(core))).bytes)
+    expect(result.names['per:abraham'][0]).toEqual(['Abraham', 'alignment', 5, ['gen', 'mat']])
+    expect(result.local).toEqual(core.local)
+    expect(result.coverage).toEqual({ 'aligned/es-419': { whole: ['gen'] } })
+    expect(result.h.lang).toBe('es-419')
+    const part: TopicsPart = { lang: 'es-419', part: 'gen', names: new Map([['per:abraham', [1011026]]]) }
+    expect((await out((await writeSegment(topicsSegment(part))).bytes)).names).toEqual({ 'per:abraham': [1011026] })
   })
 
   test('KNOWN cannot be changed: it is frozen, down to the lists of versions', () => {
@@ -548,10 +704,10 @@ describe('the sample (es-419 Titus)', () => {
     expect(canonicalJson(result.macula)).toBe('{"release":"r1","trees":{"10":[2],"9":"01ff","b":{"z":true}}}')
   })
 
-  test('a segment of a class phase 1 does not read is E_TABLE in a transfer file, even when all its tables are optional', async () => {
-    const optionalMap = await builtOf({ h: { class: 'map', v: 1, tables: { core: [1, false] } }, t: { core: {} } })
+  test('a segment of a class the reader does not read is E_TABLE in a transfer file, even when all its tables are optional', async () => {
+    const optionalMap = await builtOf({ h: { class: 'gen', v: 1, tables: { core: [1, false] } }, t: { core: {} } })
     const file = writeTransfer({ mode: 'full', catalogs: [lang.catalog], entries: [segmentOf(lang, 'book'), optionalMap], made: '2026-11-01T10:00:00Z', by: 'test 1' })
-    expect((await out(file)).entries.map((e: any) => [e.class, e.status])).toEqual([['catalog', 'ok'], ['book', 'ok'], ['map', 'E_TABLE']])
+    expect((await out(file)).entries.map((e: any) => [e.class, e.status])).toEqual([['catalog', 'ok'], ['book', 'ok'], ['gen', 'E_TABLE']])
   })
 
   test('the articles: the group, each article with its sections and the resource key', async () => {
@@ -583,7 +739,7 @@ describe('the sample (es-419 Titus)', () => {
     expect(result.resources.find((r: any) => r.key === GLT).books).toBe('000000000000800000')
     expect(result.segments.map((s: any) => s.id)).toEqual(lang.segments.map((s) => s.id))
     expect(result.segments.every((s: any) => /^[0-9a-f]{64}$/.test(s.inputs) && s.size > 0 && s.ulen > 0)).toBe(true)
-    expect(result.units.map((u: any) => u.id)).toEqual(['art:tw:kt', 'book:tit', 'lex:G0'])
+    expect(result.units.map((u: any) => u.id)).toEqual(['art:tw:kt', 'book:tit', 'lex:G0', 'map'])
     expect(result.units.find((u: any) => u.id === 'book:tit').segments).toHaveLength(1)
     const commonResult = await out(common.catalog.bytes)
     expect(commonResult.h.lang).toBeUndefined()
@@ -595,7 +751,7 @@ describe('the sample (es-419 Titus)', () => {
     const file = writeTransfer({ mode: 'full', catalogs: [lang.catalog, common.catalog], entries, made: '2026-11-01T10:00:00Z', by: 'test 1' })
     const whole = await out(file)
     expect(Object.keys(whole)).toEqual(['catalogs', 'entries', 'index'])
-    expect(whole.entries.map((e: any) => e.status)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok'])
+    expect(whole.entries.map((e: any) => e.status)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok', 'ok'])
     expect(whole.catalogs).toEqual([await out(lang.catalog.bytes), await out(common.catalog.bytes)])
     expect(whole.index.mode).toBe('full')
     expect(whole.index.made).toBe('2026-11-01T10:00:00Z')
@@ -604,7 +760,7 @@ describe('the sample (es-419 Titus)', () => {
       [lang.catalog, common.catalog, ...entries].map((b) => [b.id, 'segment', b.seg.h.class]),
     )
     expect(whole.index.entries[0]).toMatchObject({ offset: 0, size: lang.catalog.bytes.length })
-    expect(whole.entries[2]).toEqual({ id: entries[0].id, kind: 'segment', class: 'book', status: 'ok' })
+    expect(whole.entries[2]).toEqual({ id: entries[0].id, kind: 'segment', class: 'map', status: 'ok' })
 
     // Cut in the middle of the article segment (the third of the entries, after the book).
     const art = whole.index.entries.find((e: any) => e.class === 'art')
@@ -614,6 +770,8 @@ describe('the sample (es-419 Titus)', () => {
     expect(result.entries.map((e: any) => [e.class, e.status])).toEqual([
       ['catalog', 'ok'],
       ['catalog', 'ok'],
+      ['map', 'ok'],
+      ['map', 'ok'],
       ['book', 'ok'],
       ['art', 'missing'],
       ['lex', 'missing'],
@@ -664,11 +822,11 @@ describe('the sample (es-419 Titus)', () => {
     expect(canonicalJson(result.entries)).toBe(canonicalJson((await out(file)).entries))
   })
 
-  test('an entry that fails says why and does not discard the others; a class phase 1 does not read is E_TABLE', async () => {
+  test('an entry that fails says why and does not discard the others; a class the reader does not read is E_TABLE', async () => {
     const book = segmentOf(lang, 'book')
     const lex = segmentOf(lang, 'lex')
     const orig = segmentOf(common, 'orig')
-    const future = await builtOf({ h: { class: 'map', v: 1, tables: { core: [1, true] } }, t: { core: {} } })
+    const future = await builtOf({ h: { class: 'gen', v: 1, tables: { core: [1, true] } }, t: { core: {} } })
     const complement = new Uint8Array([1, 2, 3, 4])
     const complementId = hex(new Uint8Array(await crypto.subtle.digest('SHA-256', complement)))
     const file = writeTransfer({
@@ -687,7 +845,7 @@ describe('the sample (es-419 Titus)', () => {
     expect(result.entries.map((e: any) => [e.kind, e.class, e.status])).toEqual([
       ['segment', 'catalog', 'ok'],
       ['segment', 'book', 'ok'],
-      ['segment', 'map', 'E_TABLE'],
+      ['segment', 'gen', 'E_TABLE'],
       ['segment', 'lex', expect.stringMatching(/^E_(INFLATE|ID)$/)],
       ['complement', undefined, 'ok'],
       ['segment', 'orig', 'ok'],

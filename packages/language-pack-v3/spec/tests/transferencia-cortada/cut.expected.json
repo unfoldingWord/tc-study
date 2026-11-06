@@ -33,7 +33,7 @@
         },
         "v": 1
       },
-      "id": "ccb15d18a247a18f27de059d32a3eadaea57fa6a20dd8d44c5e4a25655297461",
+      "id": "4554c992186d17ed9056a84684aed26dfd4b89ebdf8780af1732317b0fcf44fa",
       "resources": [
         {
           "books": "000000000000800000",
@@ -90,10 +90,7 @@
         {
           "id": "book:tit",
           "needs": [
-            "art:ta:translate",
             "art:tw:kt",
-            "art:tw:names",
-            "art:tw:other",
             "map",
             "orig:tit"
           ],
@@ -107,7 +104,7 @@
   "entries": [
     {
       "class": "catalog",
-      "id": "ccb15d18a247a18f27de059d32a3eadaea57fa6a20dd8d44c5e4a25655297461",
+      "id": "4554c992186d17ed9056a84684aed26dfd4b89ebdf8780af1732317b0fcf44fa",
       "kind": "segment",
       "status": "ok"
     },
@@ -127,28 +124,28 @@
   "index": {
     "by": "build-cases 1",
     "catalogs": [
-      "ccb15d18a247a18f27de059d32a3eadaea57fa6a20dd8d44c5e4a25655297461"
+      "4554c992186d17ed9056a84684aed26dfd4b89ebdf8780af1732317b0fcf44fa"
     ],
     "entries": [
       {
         "class": "catalog",
-        "id": "ccb15d18a247a18f27de059d32a3eadaea57fa6a20dd8d44c5e4a25655297461",
+        "id": "4554c992186d17ed9056a84684aed26dfd4b89ebdf8780af1732317b0fcf44fa",
         "kind": "segment",
         "offset": 0,
-        "size": 763
+        "size": 743
       },
       {
         "class": "book",
         "id": "644fd73e8b75f16563e6adf91301f5f7727339f3e405ab9ce9ebf3dfe7e52ea7",
         "kind": "segment",
-        "offset": 763,
+        "offset": 743,
         "size": 427
       },
       {
         "class": "book",
         "id": "12e4f2c8c44626fda329709ee53f852cef3d93046a36f145f2196738f794469b",
         "kind": "segment",
-        "offset": 1190,
+        "offset": 1170,
         "size": 37713
       }
     ],

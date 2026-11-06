@@ -8,21 +8,26 @@
  *   and {@link canonicalJson} writes that data as the text two readers' outputs are compared by.
  *
  * Which tables depend on an optional table this reader does not know is class knowledge and lives in the views (`bookView`: no `align`,
- * texts without alignment; no `notes` or `links`, no quotes for them). A class this reader does not decode (`map`, `xmap`, `gen`: phase 2)
- * has no known tables, so a segment of it is `E_TABLE`. No Node module is used.
+ * texts without alignment; no `notes` or `links`, no quotes for them). `gen` (phase 3) has no known
+ * tables, so a segment of it is `E_TABLE`; `topics` and `numbering` of the maps are optional tables not read yet. No Node module is used.
  */
 import { compareCodePoints } from '../codec/columns'
 import { CLASS_NAMES, type ClassName, hex, KIND_TRANSFER, readHeader, readSegment, type Segment } from '../codec/container'
 import { FormatError } from '../codec/errors'
-import { isMap } from '../codec/values'
-import type { HelpTable, ObsHelpTable, TextModel } from '../model'
+import { isMap, put } from '../codec/values'
+import type { CountRows, Coverage, VerseLists } from '../codec/counts'
+import type { CountTable, HelpTable, MapCore, MapPart, ObsHelpTable, TextModel, TopicsCore, TopicsPart, XmapCore, XmapPart, XtopicsCore, XtopicsPart } from '../model'
 import { readTransfer } from '../transfer'
 import { ART_TABLES, artView } from './art'
 import { BOOK_TABLES, bookView } from './book'
 import { CATALOG_TABLES, catalogView } from './catalog'
+import { ALIGNED_TABLES, alignedView } from './aligned'
 import { LEX_TABLES, lexView } from './lex'
 import { OBS_TABLES, obsView } from './obs'
+import { MAP_TABLES, mapView } from './map'
 import { ORIG_TABLES, origView } from './orig'
+import { TOPICS_TABLES, topicsView, XTOPICS_TABLES, xtopicsView } from './topics'
+import { XMAP_TABLES, xmapView } from './xmap'
 
 /** `value` and everything inside it frozen: a table that is written to would change what every reader of the process accepts. */
 function deepFreeze<T>(value: T): T {
@@ -35,8 +40,7 @@ function deepFreeze<T>(value: T): T {
 
 /**
  * The tables and versions this reader understands, per class. A required table that is not here, or in another version, makes the
- * segment `E_TABLE`; an optional one is skipped, with what depends on it. `map`, `xmap` and `gen` are phase 2: a segment of these
- * classes gives `E_TABLE`, because phase 1 readers decode `book`, `orig`, `art`, `lex`, `obs`, `catalog` and transfer files.
+ * segment `E_TABLE`; an optional one is skipped, with what depends on it. `gen` is not read: a segment of it gives `E_TABLE`.
  */
 export const KNOWN: Record<ClassName, Record<string, number[]>> = deepFreeze({
   book: { ...BOOK_TABLES },
@@ -45,8 +49,11 @@ export const KNOWN: Record<ClassName, Record<string, number[]>> = deepFreeze({
   lex: { ...LEX_TABLES },
   obs: { ...OBS_TABLES },
   catalog: { ...CATALOG_TABLES },
-  map: {},
-  xmap: {},
+  map: { ...MAP_TABLES },
+  xmap: { ...XMAP_TABLES },
+  xtopics: { ...XTOPICS_TABLES },
+  topics: { ...TOPICS_TABLES },
+  aligned: { ...ALIGNED_TABLES },
   gen: {},
 })
 
@@ -128,6 +135,76 @@ const obsHelpsOut = (table: ObsHelpTable | undefined): unknown =>
     ? undefined
     : { res: table.res, rows: table.rows.map(({ id, ref, frame, concept, cols }) => ({ id, frame: ref, frameId: frame, concept, cols })) }
 
+/** A coverage as `{source: {whole: [books], partial?: [books]}}`: `partial` is absent when empty. */
+const coverageOut = (c: Coverage): Record<string, { whole: string[]; partial?: string[] }> =>
+  Object.fromEntries([...c].map(([source, { whole, partial }]) => [source, { whole, partial: partial.length > 0 ? partial : undefined }]))
+
+const rowsOut = (rows: CountRows): Record<string, Record<string, [number, number]>> =>
+  Object.fromEntries([...rows].map(([key, books]) => [key, Object.fromEntries(books)]))
+
+/** A counts table as `{unit, rows: {key: {book: [count, verses]}}}`, or nothing when the file has none. */
+const countsOut = (table: CountTable | undefined): unknown => (table === undefined ? undefined : { unit: table.unit, rows: rowsOut(table.rows) })
+
+/** Verse lists as `{key: [verse ids]}`, or nothing when the file has none. */
+const listsOut = (lists: VerseLists | undefined): unknown => (lists === undefined ? undefined : Object.fromEntries(lists))
+
+function xmapOut(seg: Segment): Record<string, unknown> {
+  const m = xmapView(seg)
+  if (m.part !== 'core') {
+    const p = m as XmapPart
+    return { strong: listsOut(p.strong), links: listsOut(p.links), notes: listsOut(p.notes) }
+  }
+  const c = m as XmapCore
+  return {
+    coverage: coverageOut(c.coverage),
+    strong: countsOut(c.strong),
+    concepts: Object.fromEntries(c.concepts),
+    links: countsOut(c.links),
+    notes: countsOut(c.notes),
+    relations: c.relations,
+    aliases: c.aliases,
+    strongs: c.strongs,
+  }
+}
+
+function mapOut(seg: Segment): Record<string, unknown> {
+  const m = mapView(seg)
+  if (m.part !== 'core') return { usage: listsOut((m as MapPart).usage) }
+  const c = m as MapCore
+  return { books: c.books, names: c.names, subtitles: c.subtitles, coverage: coverageOut(c.coverage), usage: countsOut(c.usage), obs: c.obs }
+}
+
+function xtopicsOut(seg: Segment): Record<string, unknown> {
+  const m = xtopicsView(seg)
+  if (m.part !== 'core') return { occurrences: listsOut((m as XtopicsPart).occurrences) }
+  const c = m as XtopicsCore
+  return {
+    coverage: coverageOut(c.coverage),
+    topics: Object.fromEntries(c.topics),
+    occurrences: { unit: 'verses', rows: rowsOut(c.occurrences) },
+    relations: c.relations,
+    strongs: c.strongs,
+    ranges: c.ranges,
+  }
+}
+
+function alignedOut(seg: Segment): Record<string, unknown> {
+  const entries: Record<string, unknown> = {}
+  for (const [key, byStrong] of alignedView(seg).entries) {
+    const strongs: Record<string, unknown> = {}
+    for (const [strong, books] of byStrong) put(strongs, strong, Object.fromEntries(books))
+    put(entries, key, strongs)
+  }
+  return { entries }
+}
+
+function topicsOut(seg: Segment): Record<string, unknown> {
+  const m = topicsView(seg)
+  if (m.part !== 'core') return { names: listsOut((m as TopicsPart).names) }
+  const c = m as TopicsCore
+  return { names: c.names, local: c.local, coverage: coverageOut(c.coverage) }
+}
+
 /** What a class adds to `id` and `h`; `E_TABLE` for a class phase 1 does not decode. */
 function bodyOut(seg: Segment): Record<string, unknown> {
   switch (seg.h.class) {
@@ -158,6 +235,16 @@ function bodyOut(seg: Segment): Record<string, unknown> {
       const m = catalogView(seg)
       return { about: m.about, resources: m.resources, segments: m.segments, units: m.units, requires: m.requires, complements: m.complements }
     }
+    case 'map':
+      return mapOut(seg)
+    case 'xmap':
+      return xmapOut(seg)
+    case 'xtopics':
+      return xtopicsOut(seg)
+    case 'topics':
+      return topicsOut(seg)
+    case 'aligned':
+      return alignedOut(seg)
     default:
       throw new FormatError('E_TABLE', `the class "${seg.h.class}" is not read by this reader`)
   }

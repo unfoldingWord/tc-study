@@ -61,7 +61,7 @@ export const MAX_UNCOMPRESSED_BYTES = 67_108_864
 
 // Types
 
-export const CLASS_NAMES = ['catalog', 'xmap', 'map', 'book', 'orig', 'art', 'lex', 'obs', 'gen'] as const
+export const CLASS_NAMES = ['catalog', 'xmap', 'map', 'xtopics', 'topics', 'aligned', 'book', 'orig', 'art', 'lex', 'obs', 'gen'] as const
 export type ClassName = (typeof CLASS_NAMES)[number]
 
 /** The header inside the body, and again in the file header (`container.md`, "Logical header"). */
@@ -80,7 +80,8 @@ export type LogicalHeader = {
   res?: [string, string][]
 }
 
-export type Segment = { h: LogicalHeader; t: Record<string, CborValue> }
+/** `ulen` is the length of the body; `readSegment` sets it so the views can bound a table's row count by it. */
+export type Segment = { h: LogicalHeader; t: Record<string, CborValue>; ulen?: number }
 
 // Small helpers
 
@@ -263,7 +264,7 @@ const isTextPair = (value: unknown): boolean => Array.isArray(value) && value.le
 /** The logical header against `container.md`, "Logical header". Keys it does not list are left alone. */
 function checkLogicalHeader(h: CborMap): LogicalHeader {
   if (!isText(h.class) || !(CLASS_NAMES as readonly string[]).includes(h.class)) throw malformed('class')
-  if (!isUint(h.v)) throw malformed('v')
+  if (!isUint(h.v) || h.v !== 1) throw malformed('v')
   if (!isMap(h.tables)) throw malformed('tables')
   for (const [name, entry] of Object.entries(h.tables)) {
     if (!TABLE_NAME.test(name)) throw malformed(`table name "${name}"`)
@@ -365,7 +366,10 @@ export async function readSegment(
   }
   for (const name of skipped) delete parsed.t[name]
 
-  return { seg: { h: parsed.logical, t: parsed.t }, id, header, skipped }
+  // `ulen` is not an enumerable key: a segment read equals the segment written, and only the views look at it.
+  const seg: Segment = { h: parsed.logical, t: parsed.t }
+  Object.defineProperty(seg, 'ulen', { value: fields.ulen, enumerable: false })
+  return { seg, id, header, skipped }
 }
 
 // Writer

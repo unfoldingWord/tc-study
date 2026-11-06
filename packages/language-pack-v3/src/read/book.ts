@@ -19,6 +19,11 @@ function bad(what: string): never {
   throw new FormatError('E_BODY', `the book segment is malformed: ${what}`)
 }
 
+/** A table cannot declare more rows than the body has bytes (`ulen`); a segment built in memory has no `ulen` and is not checked. */
+export function checkRows(n: number, ulen: number | undefined, what = 'a table'): void {
+  if (ulen !== undefined && n > ulen) bad(`${what} declares ${n} rows, and the body has ${ulen} bytes`)
+}
+
 
 function map(value: unknown, what: string): CborMap {
   if (!isMap(value)) bad(`${what} is not a map`)
@@ -194,12 +199,13 @@ function readColumn(value: unknown, n: number, what: string, table: string[]): (
 }
 
 /** One of `notes`, `questions` and `links` (`helps` in `book.cddl`), read into rows without their quotes. */
-function readHelps(value: unknown, name: string, table: string[], res: [string, string][], book: string): HelpTable {
+function readHelps(value: unknown, name: string, table: string[], res: [string, string][], book: string, ulen?: number): HelpTable {
   const what = `the table "${name}"`
   const fields = map(value, what)
   if (!isUint(fields.res) || fields.res >= res.length) bad(`${what}.res names the resource ${String(fields.res)}, and the header has ${res.length}`)
   if (!isUint(fields.n)) bad(`${what}.n is not a count`)
   const n = fields.n
+  checkRows(n, ulen, what)
 
   const idFields = map(fields.id, `${what}.id`)
   let ids: string[]
@@ -379,7 +385,7 @@ export function bookView(seg: Segment): BookModel {
       texts: entries.map((entry) => entry.text),
     }
     for (const name of ['notes', 'questions', 'links'] as const) {
-      if (t[name] !== undefined) model[name] = readHelps(t[name], name, table, h.res, h.book)
+      if (t[name] !== undefined) model[name] = readHelps(t[name], name, table, h.res, h.book, seg.ulen)
     }
     if (t.quotes !== undefined) {
       const quotes = map(t.quotes, 'the table "quotes"')

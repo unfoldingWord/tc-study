@@ -25,17 +25,23 @@ import { bookSegment } from '../../src/build/book'
 import { type BuiltSegment, buildCatalog, builtSegment } from '../../src/build/catalog'
 import { BUILDER, buildCommon, buildLanguage, type LanguageBuild } from '../../src/build/language'
 import { extractObs, obsSegment } from '../../src/build/obs'
+import { buildMap } from '../../src/build/map/build'
+import { mapSegment } from '../../src/build/map/segment'
+import { versesOf } from '../../src/build/maps/verses'
 import { extractOrig } from '../../src/build/orig'
+import { buildXmap } from '../../src/build/xmap/build'
+import { xmapSegment } from '../../src/build/xmap/segment'
+import { topicsSegment } from '../../src/build/topics/segment'
 import { encodeDeterministic } from '../../src/codec/cbor'
 import { compareCodePoints } from '../../src/codec/columns'
 import { FORMAT_MAJOR, FORMAT_MINOR, KIND_SEGMENT, readSegment, type Segment, writeSegment } from '../../src/codec/container'
 import { verseId } from '../../src/ids'
-import type { BookModel, HelpRow, TextModel } from '../../src/model'
+import type { BookModel, HelpRow, MapCore, MapPart, OrigModel, TextModel, TopicName } from '../../src/model'
 import { partsSource } from '../../src/node/partsSource'
 import { BOOK_TABLES, bookView } from '../../src/read/book'
 import { CATALOG_TABLES, catalogView } from '../../src/read/catalog'
 import { type Json, readerOutput, sortKeys } from '../../src/read/output'
-import type { ResourceRef, Row, RowFilter, RowSource } from '../../src/source/rows'
+import { ORIGINALS, type ResourceRef, type Row, type RowFilter, type RowSource } from '../../src/source/rows'
 import { writeTransfer } from '../../src/transfer'
 
 export const TESTS_DIR = import.meta.dir
@@ -130,7 +136,8 @@ function cutText(text: TextModel, lastVerse: number): TextModel {
   return out
 }
 
-async function noteOnSeveralVerses(): Promise<Uint8Array> {
+/** The book model of case 5: Titus 1:1-4 and one note on 1:2-4. */
+async function noteModel(): Promise<BookModel> {
   const { seg } = await readSegment(bookOf((await language()).segments).bytes, { known: BOOK_TABLES })
   const full = bookView(seg)
   const glt = cutText(full.texts.find((t) => t.res === GLT)!, 4)
@@ -156,7 +163,7 @@ async function noteOnSeveralVerses(): Promise<Uint8Array> {
     },
     quote: positions,
   }
-  const model: BookModel = {
+  return {
     lang: ES,
     book: 'tit',
     orig: full.orig,
@@ -164,7 +171,94 @@ async function noteOnSeveralVerses(): Promise<Uint8Array> {
     texts: [glt],
     notes: { res: TN, rows: [note] },
   }
-  return (await writeSegment(bookSegment(model))).bytes
+}
+
+async function noteOnSeveralVerses(): Promise<Uint8Array> {
+  return (await writeSegment(bookSegment(await noteModel()))).bytes
+}
+
+// The maps of cases 5, 6, 11 and 12
+
+const bytesOfMap = async (m: MapCore | MapPart): Promise<Uint8Array> => (await writeSegment(mapSegment(m))).bytes
+
+/** The es-419 resources of the sample, with tN given these books (it is where the notes of the maps are counted). */
+async function esRefs(tnBooks: string[]): Promise<ResourceRef[]> {
+  return (await (await sample()).resources(ES)).map((ref) => (ref.key === TN ? { ...ref, books: tnBooks } : ref))
+}
+
+const titVerses = async (): Promise<number[]> => versesOf(await extractOrig(await originalsOnly(), 'tit'))
+
+/** Case 5, map half: `map-core.seg` and `map-tit.seg` over the book model of the case. In the core, the use of figs-metaphor in Titus is [1, 3]. */
+async function mapOfNote(): Promise<{ core: Uint8Array; tit: Uint8Array }> {
+  const model = await noteModel()
+  const { core, parts } = buildMap({ lang: ES, refs: await esRefs(['tit']), books: [{ model, verses: await titVerses() }], articles: [], obs: null })
+  return { core: await bytesOfMap(core), tit: await bytesOfMap(parts.find((p) => p.part === 'tit')!) }
+}
+
+/** Case 6: a Titus original whose verse 1:1 has one Strong key three times (and no other word). */
+const SYNTHETIC_ORIG: OrigModel = {
+  book: 'tit',
+  key: 'unfoldingWord/el-x-koine/ugnt',
+  stamp: 'v0#2026-01-01T00_00_00Z',
+  words: [0, 1, 2].map(() => ({ form: 'a', lemma: 'a', strong: 'G54850', morph: '' })),
+  pieces: [0, 1, 2].map((): [string, boolean] => ['a', true]),
+  events: [[0, 'chapter', '1'], [0, 'verse', '1']],
+}
+
+/** A source that has the synthetic original and nothing else. */
+const onlyOriginal: RowSource = {
+  async resources(lang: string) {
+    return lang === ORIGINALS ? [{ key: SYNTHETIC_ORIG.key, stamp: SYNTHETIC_ORIG.stamp, kind: 'Greek New Testament', books: ['tit'] }] : []
+  },
+  // biome-ignore lint/correctness/useYield: a source with no rows
+  async *rows() {},
+}
+
+async function repeatedStrong(): Promise<{ core: Uint8Array; tit: Uint8Array }> {
+  const { core, parts } = await buildXmap({ source: onlyOriginal, origs: [SYNTHETIC_ORIG], lang: 'en' })
+  const tit = parts.find((p) => p.part === 'tit')!
+  return { core: (await writeSegment(xmapSegment(core))).bytes, tit: (await writeSegment(xmapSegment(tit))).bytes }
+}
+
+/** The Ruth of case 11 is synthetic: the data has no es-419 Ruth. Its verses: 1:1-22. */
+const RUTH_VERSES = Array.from({ length: 22 }, (_, i) => verseId('rut', 1, i + 1))
+
+/** Ruth with the notes on metaphor of the sample's Titus (15) relabeled to verses of Ruth 1: the first `count` of them. */
+async function ruthModel(count: number): Promise<BookModel> {
+  const { seg } = await readSegment(bookOf((await language()).segments).bytes, { known: BOOK_TABLES })
+  const metaphor = (bookView(seg).notes?.rows ?? []).filter((row) => row.concept === 'ta:translate/figs-metaphor')
+  if (metaphor.length !== 15) throw new Error(`Case 11: Titus has ${metaphor.length} notes on metaphor and the case needs 15`)
+  const rows: HelpRow[] = metaphor.slice(0, count).map((row, i) => {
+    const verse = (i % 22) + 1
+    const span = Math.min(row.to - row.from < 100 ? row.to - row.from : 0, 3, 22 - verse)
+    const { quote: _quote, quoteKinds: _kinds, quoteMissing: _missing, ...rest } = row
+    return { ...rest, ref: span === 0 ? `1:${verse}` : `1:${verse}-${verse + span}`, from: verseId('rut', 1, verse), to: verseId('rut', 1, verse + span) }
+  })
+  return { lang: ES, book: 'rut', orig: ['unfoldingWord/hbo/uhb', 'v0#2026-01-01T00_00_00Z'], res: [[TN, 'v37']], texts: [], notes: { res: TN, rows } }
+}
+
+/** Case 11: the catalog and map core of revision 4 (Ruth: 15 notes on metaphor) and the book segment of Ruth of revision 3 (14). */
+async function mixedRevisions(): Promise<{ catalog: Uint8Array; core: Uint8Array; book: Uint8Array }> {
+  const refs = (await esRefs(['rut'])).filter((ref) => ref.key === TN)
+  const { core } = buildMap({ lang: ES, refs, books: [{ model: await ruthModel(15), verses: RUTH_VERSES }], articles: [], obs: null })
+  const listed = await builtSegment(mapSegment(core), '4'.repeat(64))
+  const languageCatalog = catalogView((await readSegment((await language()).catalog.bytes, { known: CATALOG_TABLES })).seg)
+  const catalog = await buildCatalog({
+    about: { ...ABOUT, catalog: ES, revision: 4 },
+    resources: languageCatalog.resources.filter((resource) => resource.key === TN),
+    segments: [listed],
+  })
+  return { catalog: catalog.bytes, core: listed.bytes, book: (await writeSegment(bookSegment(await ruthModel(14)))).bytes }
+}
+
+/** Case 12: an es-419 map whose tN covers tit, rut, 3jn and jon whole, with notes on metaphor in Titus only. */
+async function partialLanguage(): Promise<Uint8Array> {
+  const books = ['tit', 'rut', '3jn', 'jon']
+  const bare = (book: string): BookModel => ({ lang: ES, book, orig: ['x', 'x'], res: [[TN, 'v37']], texts: [] })
+  const models = [await noteModel(), ...books.slice(1).map(bare)]
+  const titus = await titVerses()
+  const { core } = buildMap({ lang: ES, refs: await esRefs(books), books: models.map((model) => ({ model, verses: model.book === 'tit' ? titus : [] })), articles: [], obs: null })
+  return bytesOfMap(core)
 }
 
 // Cases 7 and 8: articles
@@ -243,6 +337,17 @@ async function withTable(name: string, required: boolean): Promise<Uint8Array> {
   const { seg } = await readSegment(bytesOf(join(TESTS_DIR, 'container', 'minimal.seg')), { known: BOOK_TABLES })
   const table = { rows: [1, 2, 3], what: 'a table a later version of the format adds' }
   return (await writeSegment({ h: { ...seg.h, tables: { ...seg.h.tables, [name]: [1, required] } }, t: { ...seg.t, [name]: table } })).bytes
+}
+
+// Case 15: a key of a local topic that the schema does not list
+
+/** A topics core whose `local` entry has one more key (`x`): a reader ignores it and does not put it in the output. */
+async function localWithExtraKey(): Promise<Uint8Array> {
+  const coverage = new Map([[GLT, { whole: ['tit'], partial: [] as string[] }]])
+  const local = { 'es-419:tema/la-gracia': { names: ['La gracia'], refs: [[56001001, 56001004]] as [number, number][] } }
+  const seg = topicsSegment({ lang: ES, part: 'core', res: [[GLT, 'v42']], coverage, names: { 'per:abraham': [['Abraham', 'alignment', 1, ['tit']]] }, local })
+  const t = { ...seg.t, local: { 'es-419:tema/la-gracia': { names: ['La gracia'], refs: [[56001001, 56001004]], x: 'a key a later version adds' } } }
+  return (await writeSegment({ h: seg.h, t })).bytes
 }
 
 // Case 10: a transfer file cut inside its last entry
@@ -343,12 +448,24 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   const out = new Map<string, Uint8Array>()
   out.set('tito-es419/book.seg', bookOf((await language()).segments).bytes)
   out.set('nota-varios-versiculos/book.seg', await noteOnSeveralVerses())
+  const noteMap = await mapOfNote()
+  out.set('nota-varios-versiculos/map-core.seg', noteMap.core)
+  out.set('nota-varios-versiculos/map-tit.seg', noteMap.tit)
+  const strong = await repeatedStrong()
+  out.set('strong-repetido/xmap-core.seg', strong.core)
+  out.set('strong-repetido/xmap-tit.seg', strong.tit)
+  const mixed = await mixedRevisions()
+  out.set('revisiones-mixtas/catalog.seg', mixed.catalog)
+  out.set('revisiones-mixtas/map-core.seg', mixed.core)
+  out.set('revisiones-mixtas/book-rut.seg', mixed.book)
+  out.set('idioma-parcial/map-core.seg', await partialLanguage())
   const { build1, build2 } = await sectionInserted()
   out.set('seccion-insertada/build1.seg', build1)
   out.set('seccion-insertada/build2.seg', build2)
   out.set('articulo-mal-titulado/art.seg', await badlyTitled())
   out.set('tabla-desconocida/future-x.seg', await withTable('future-x', false))
   out.set('tabla-desconocida/future-y.seg', await withTable('future-y', true))
+  out.set('topics-local-clave-extra/core.seg', await localWithExtraKey())
   out.set('transferencia-cortada/cut.tcpack', await cutTransfer())
   out.set('paquete-viejo/catalog.seg', (await bridgeCatalog()).bytes)
   const outOfRange = await integerOutOfRange()
@@ -469,6 +586,46 @@ async function obsOfStory(): Promise<BuiltSegment> {
   return builtSegment(obsSegment(model), '1'.repeat(64))
 }
 
+/** The files of `data/topics/` as `buildCommon` takes them: the TIPNR text, the four Theographic files and the OBS closing lines by story. */
+function topicsInput() {
+  const read = (path: string) => readFileSync(join(DATA, 'topics', path), 'utf8')
+  const obs = new Map<number, string>()
+  let story = 0
+  for (const line of read('obs-refs.txt').split(/\r?\n/)) {
+    const header = /^=== (\d+)$/.exec(line)
+    if (header) obs.set((story = Number(header[1])), '')
+    else if (story > 0) obs.set(story, `${obs.get(story)}${line}\n`)
+  }
+  const theographic = (name: string) => read(`theographic-subset/${name}.json`)
+  return {
+    tipnr: read('tipnr-subset.txt'),
+    theographic: { events: theographic('events'), verses: theographic('verses'), people: theographic('people'), places: theographic('places') },
+    obs,
+  }
+}
+
+/**
+ * The topics of the sample, for `compare.ts --built`: the `xtopics` core and parts `buildCommon` makes from `data/topics/` (with the
+ * English tN introduction of Titus for the sections), and a `topics` core and part of es-419 built by hand (no builder of the language
+ * topics exists yet). By file name.
+ */
+export async function topicsSegments(english: RowSource): Promise<Map<string, Uint8Array>> {
+  const out = new Map<string, Uint8Array>()
+  const common = await buildCommon({ source: english, about: ABOUT, mapLang: 'en', topics: topicsInput() })
+  for (const seg of common.segments.filter((s) => s.seg.h.class === 'xtopics')) out.set(`xtopics-${seg.seg.h.part}.seg`, seg.bytes)
+  const coverage = new Map([[GLT, { whole: ['tit'], partial: [] as string[] }]])
+  const names: Record<string, TopicName[]> = {
+    'per:abraham': [['Abraham', 'alignment', 5, ['gen', 'tit']], ['Abrahán', 'list', 1, []]],
+    'sec:tit/1': [['Requisitos', 'outline', 1, ['tit']]],
+  }
+  const local = { 'es-419:tema/la-gracia': { names: ['La gracia'], refs: [[56001001, 56001004]] as [number, number][], related: ['tw:kt/grace'] } }
+  const core = { lang: ES, part: 'core' as const, res: [[GLT, 'v42']] as [string, string][], coverage, names, local }
+  out.set('topics-core-es-419.seg', (await writeSegment(topicsSegment(core))).bytes)
+  const part = { lang: ES, part: 'tit', names: new Map([['per:abraham', [56001001, 56001002]]]) }
+  out.set('topics-tit-es-419.seg', (await writeSegment(topicsSegment(part))).bytes)
+  return out
+}
+
 /**
  * Big segments of the sample, built in memory: the Titus original, the `tw:kt` art group, the lexicon group `G0`, the language catalog,
  * the common catalog, an OBS segment from a synthetic story, and a `full` transfer file of them, whole (`full.tcpack`) and cut in the
@@ -490,6 +647,17 @@ export async function buildBigSegments(): Promise<Map<string, Uint8Array>> {
   out.set('catalog-es-419.seg', built.catalog.bytes)
   out.set('catalog-common.seg', common.catalog.bytes)
   out.set('obs.seg', obs.bytes)
+  // The maps: the es-419 map of the sample, and the xmap of Titus from the English fixture
+  for (const seg of built.segments.filter((s) => s.seg.h.class === 'map')) out.set(`map-${seg.seg.h.part}.seg`, seg.bytes)
+  const english = await partsSource({ list: join(DATA, 'en', 'list.json'), partsDir: PARTS, originals: ORIGINALS_LIST })
+  const xmap = await buildXmap({ source: english, origs: [await extractOrig(english, 'tit')], lang: 'en' })
+  for (const part of [xmap.core, ...xmap.parts]) out.set(`xmap-${part.part}-en.seg`, (await writeSegment(xmapSegment(part))).bytes)
+  for (const [name, bytes] of await topicsSegments(english)) out.set(name, bytes)
+  // The index of aligned phrases (optional units): the es-419 sample built again with `aligned: true`; its catalog (with the
+  // `optional` units) and one segment per part. The other segments of that build are the ones above (byte-equal), so they are not repeated.
+  const withAligned = await buildLanguage({ source: await sample(), lang: ES, registry: {}, about: ABOUT, aligned: true })
+  out.set('catalog-es-419-aligned.seg', withAligned.catalog.bytes)
+  for (const seg of withAligned.segments.filter((s) => s.seg.h.class === 'aligned')) out.set(`aligned-${String(seg.seg.h.group).replace(/ /g, '_')}.seg`, seg.bytes)
   const whole = writeTransfer({ mode: 'full', catalogs: [built.catalog, common.catalog], entries: [orig, obs, art, lex], made: MADE, by: BY })
   out.set('full.tcpack', whole)
   out.set('full-cut.tcpack', cutMiddleOfLast(whole, lex.bytes.length))

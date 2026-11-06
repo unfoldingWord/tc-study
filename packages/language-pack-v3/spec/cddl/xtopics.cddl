@@ -1,0 +1,71 @@
+; Format 3: the common topics. The same for every language: the people, places, events, stories and sections of the
+; Bible, each with the verses that mention it, from TIPNR, Theographic, English OBS and the English tN outlines. A core
+; with the topics and their counts, and one part per book with the verses behind the counts. The map never depends on
+; this class and this class never depends on the map (ids.md).
+
+xtopics-segment = body<xtopics-header, xtopics-tables>
+xtopics-tables = xtopics-core-tables / xtopics-part-tables
+
+xtopics-header = {
+  "class": "xtopics",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "part": "core" / book-code,
+  ? "book": book-code,         ; equal to "part" in a book's part
+  "res": [* [tstr, tstr]],     ; every source in the core with its release; tables name them by index. Empty in a part
+                               ; (the release of each source is in the core and in the catalog)
+}
+
+xtopics-core-tables = {
+  "coverage": coverage,        ; required, v1; per source key: the books it covers
+  "topics": topics,            ; required, v1
+  ? "relations": topic-relations,   ; optional, v1
+  ? "strongs": { * topic-id => [+ tstr] },   ; optional, v1; per person or place, the Strong keys of its name
+                               ; (TIPNR dStrongs, written as Strong keys by the rules of ids.md "Strong keys"), sorted by code
+                               ; point, no repeat
+  "occurrences": counts,       ; required, v1; unit "verses": per topic, the books and how many verses mention it;
+                               ; here count == verses (distinct verses) and 1 <= count
+  ? "ranges": { * topic-id => [+ [verse-id, verse-id]] },  ; optional, v1; for stories and sections: the verse
+                               ; ranges they span: first and last verse of each range, first <= last. A reader checks
+                               ; that both are verse ids of a book 1..66 and that first <= last; it does not check that
+                               ; both ends are in one book, or that the verses exist in any original
+}
+
+topic-id = concept-id          ; "per:", "lug:", "ev:", "tema:" (kind 4), "sec:", "obs:" ids (ids.md)
+
+topics = {
+  "ids": strtab,               ; every topic id, sorted by code point
+  "kind": uvarints,            ; per id: person 1, place 2, event 3, topic 4, story 5, section 6
+  "source": uvarints,          ; per id: the index in "res" of the source that defines it
+  "ref": uvarints,             ; per id: an index in "refs", the source's own key (TIPNR unique name; Theographic
+                               ; eventID as text; OBS story number; outline range)
+  "refs": strtab,              ; the distinct ref texts, in the order of their first use by "ids"; no text twice. Two
+                               ; topics may share a ref (the same outline range under two ids)
+  "title": strtab,             ; per id (as many as ids, "" for none): the English title shown when a language has no
+                               ; name: TIPNR's unified name before "@" (people, places), the Theographic title or the
+                               ; builder's list title (events), the OBS story title, the outline heading (sections).
+                               ; "" when the source gives none: a reader then has no title to show and the answer
+                               ; leaves "title" out; the app shows the id
+  "ustrong": strtab,           ; per id (as many as ids, "" for none): TIPNR's uStrong of a person or place, kept so
+                               ; that the id can be derived again (ids.md)
+}
+
+; Like xmap "relations", and "from" and "to" number the rows of topics.ids. An end that is not a topic of this
+; segment but a concept of the common map (tw:names/abraham) is named by id in "external", and its number is the
+; count of topics.ids plus the index in "external". Both ends may be external (a relation between two concepts of
+; the map that only this module asserts). Concepts are never merged: "same-as" is a relation like any other.
+; The types and their direction are in ids.md ("Relation types of xtopics"): participant and place go from the event,
+; tribe from the person, occurs-in from the story or section to an event whose verses overlap its ranges at all.
+topic-relations = {
+  "types": strtab,
+  "external": strtab,          ; ids of part A concepts, sorted by code point
+  "from": uvarints,
+  "to": uvarints,
+  "type": uvarints,            ; a number in "types"
+  "source": uvarints,          ; an index in "res"
+  "confidence": uvarints,      ; 0 to 100
+}
+
+xtopics-part-tables = {
+  "occurrences": verse-lists,  ; required, v1; the verses of this book behind the core's counts
+}

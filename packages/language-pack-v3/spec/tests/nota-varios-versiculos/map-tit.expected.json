@@ -1,0 +1,24 @@
+{
+  "h": {
+    "book": "tit",
+    "class": "map",
+    "lang": "es-419",
+    "part": "tit",
+    "res": [],
+    "tables": {
+      "usage": [
+        1,
+        false
+      ]
+    },
+    "v": 1
+  },
+  "id": "0156afbe4472afb70e8e6cccbea782ec30e0540eff525687d92699626f45ddfc",
+  "usage": {
+    "ta:translate/figs-metaphor": [
+      56001002,
+      56001003,
+      56001004
+    ]
+  }
+}

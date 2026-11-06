@@ -11,7 +11,8 @@ xmap-header = {
   "tables": { * table-name => [uint, bool] },
   "part": "core" / book-code,
   ? "book": book-code,         ; equal to "part" in a book's part
-  "res": [+ [tstr, tstr]],     ; every source with its release; tables name them by index
+  "res": [* [tstr, tstr]],     ; every source in the core with its release; tables name them by index. Empty in a part
+                               ; (the release of each source is in the core and in the catalog)
 }
 
 xmap-core-tables = {
@@ -20,6 +21,9 @@ xmap-core-tables = {
   "concepts": concepts,        ; required, v1
   ? "links": counts,           ; optional, v1; unit "links": the English word links of each concept
   ? "notes": counts,           ; optional, v1; unit "notes": the English notes that point to each Academy article
+  ? "strongs": { * concept-id => [+ tstr] },     ; optional, v1; for each tw: concept, the Strong keys of the original
+                               ; words its English word links quote, sorted by code point. It is what the key-term
+                               ; candidates of a book are found with
   ? "relations": relations,    ; optional, v1
   ? "aliases": { * concept-id => concept-id },   ; optional, v1; ids that moved (other/ -> kt/), to their new id
   ? "topics": any,             ; optional; defined in phase 2 (TIPNR, Theographic, OBS)

@@ -1,0 +1,331 @@
+{
+  "expected": {
+    "books": {
+      "1ch": {
+        "state": "none"
+      },
+      "1co": {
+        "count": 163,
+        "state": "count",
+        "verses": 137
+      },
+      "1jn": {
+        "count": 136,
+        "state": "count",
+        "verses": 71
+      },
+      "1ki": {
+        "count": 225,
+        "state": "count",
+        "verses": 176
+      },
+      "1pe": {
+        "count": 80,
+        "state": "count",
+        "verses": 59
+      },
+      "1sa": {
+        "count": 193,
+        "state": "count",
+        "verses": 169
+      },
+      "1th": {
+        "count": 41,
+        "state": "count",
+        "verses": 34
+      },
+      "1ti": {
+        "count": 65,
+        "state": "count",
+        "verses": 46
+      },
+      "2ch": {
+        "state": "none"
+      },
+      "2co": {
+        "count": 124,
+        "state": "count",
+        "verses": 93
+      },
+      "2jn": {
+        "count": 9,
+        "state": "count",
+        "verses": 8
+      },
+      "2ki": {
+        "count": 176,
+        "state": "count",
+        "verses": 144
+      },
+      "2pe": {
+        "count": 48,
+        "state": "count",
+        "verses": 29
+      },
+      "2sa": {
+        "count": 186,
+        "state": "count",
+        "verses": 154
+      },
+      "2th": {
+        "count": 12,
+        "state": "count",
+        "verses": 11
+      },
+      "2ti": {
+        "count": 72,
+        "state": "count",
+        "verses": 52
+      },
+      "3jn": {
+        "count": 7,
+        "state": "count",
+        "verses": 5
+      },
+      "act": {
+        "count": 276,
+        "state": "count",
+        "verses": 222
+      },
+      "amo": {
+        "count": 79,
+        "state": "count",
+        "verses": 64
+      },
+      "col": {
+        "count": 86,
+        "state": "count",
+        "verses": 54
+      },
+      "dan": {
+        "count": 85,
+        "state": "count",
+        "verses": 70
+      },
+      "deu": {
+        "count": 394,
+        "state": "count",
+        "verses": 309
+      },
+      "ecc": {
+        "state": "none"
+      },
+      "eph": {
+        "count": 98,
+        "state": "count",
+        "verses": 68
+      },
+      "est": {
+        "count": 61,
+        "state": "count",
+        "verses": 46
+      },
+      "exo": {
+        "count": 131,
+        "state": "count",
+        "verses": 114
+      },
+      "ezk": {
+        "state": "none"
+      },
+      "ezr": {
+        "count": 218,
+        "state": "count",
+        "verses": 158
+      },
+      "gal": {
+        "count": 82,
+        "state": "count",
+        "verses": 64
+      },
+      "gen": {
+        "count": 26,
+        "state": "count",
+        "verses": 26
+      },
+      "hab": {
+        "count": 41,
+        "state": "count",
+        "verses": 28
+      },
+      "hag": {
+        "count": 12,
+        "state": "count",
+        "verses": 10
+      },
+      "heb": {
+        "count": 135,
+        "state": "count",
+        "verses": 104
+      },
+      "hos": {
+        "count": 150,
+        "state": "count",
+        "verses": 101
+      },
+      "isa": {
+        "state": "none"
+      },
+      "jas": {
+        "count": 109,
+        "state": "count",
+        "verses": 59
+      },
+      "jdg": {
+        "count": 159,
+        "state": "count",
+        "verses": 131
+      },
+      "jer": {
+        "state": "none"
+      },
+      "jhn": {
+        "count": 203,
+        "state": "count",
+        "verses": 140
+      },
+      "job": {
+        "count": 490,
+        "state": "count",
+        "verses": 391
+      },
+      "jol": {
+        "count": 38,
+        "state": "count",
+        "verses": 28
+      },
+      "jon": {
+        "count": 10,
+        "state": "count",
+        "verses": 9
+      },
+      "jos": {
+        "count": 72,
+        "state": "count",
+        "verses": 65
+      },
+      "jud": {
+        "count": 23,
+        "state": "count",
+        "verses": 15
+      },
+      "lam": {
+        "count": 86,
+        "state": "count",
+        "verses": 65
+      },
+      "lev": {
+        "count": 90,
+        "state": "count",
+        "verses": 81
+      },
+      "luk": {
+        "count": 368,
+        "state": "count",
+        "verses": 263
+      },
+      "mal": {
+        "count": 43,
+        "state": "count",
+        "verses": 28
+      },
+      "mat": {
+        "count": 329,
+        "state": "count",
+        "verses": 275
+      },
+      "mic": {
+        "count": 64,
+        "state": "count",
+        "verses": 42
+      },
+      "mrk": {
+        "count": 118,
+        "state": "count",
+        "verses": 102
+      },
+      "nam": {
+        "count": 22,
+        "state": "count",
+        "verses": 18
+      },
+      "neh": {
+        "count": 232,
+        "state": "count",
+        "verses": 173
+      },
+      "num": {
+        "state": "none"
+      },
+      "oba": {
+        "count": 15,
+        "state": "count",
+        "verses": 11
+      },
+      "phm": {
+        "count": 11,
+        "state": "count",
+        "verses": 7
+      },
+      "php": {
+        "count": 31,
+        "state": "count",
+        "verses": 23
+      },
+      "pro": {
+        "count": 705,
+        "state": "count",
+        "verses": 486
+      },
+      "psa": {
+        "count": 1175,
+        "state": "count",
+        "verses": 949
+      },
+      "rev": {
+        "count": 144,
+        "state": "count",
+        "verses": 110
+      },
+      "rom": {
+        "count": 291,
+        "state": "count",
+        "verses": 196
+      },
+      "rut": {
+        "count": 15,
+        "state": "count",
+        "verses": 14
+      },
+      "sng": {
+        "count": 54,
+        "state": "count",
+        "verses": 46
+      },
+      "tit": {
+        "count": 22,
+        "state": "count",
+        "verses": 21
+      },
+      "zec": {
+        "count": 91,
+        "state": "count",
+        "verses": 69
+      },
+      "zep": {
+        "count": 40,
+        "state": "count",
+        "verses": 28
+      }
+    },
+    "concept": "ta:translate/figs-metaphor",
+    "kind": "usage",
+    "source": "unfoldingWord/en/tn",
+    "unit": "notes"
+  },
+  "query": {
+    "concept": "ta:translate/figs-metaphor",
+    "kind": "usage",
+    "source": "unfoldingWord/en/tn"
+  }
+}

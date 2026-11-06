@@ -1,0 +1,15 @@
+{
+  "expected": {
+    "found": false,
+    "installed": true,
+    "kind": "phrase",
+    "lang": "es-419",
+    "strongs": {},
+    "text": "diestra"
+  },
+  "query": {
+    "kind": "phrase",
+    "lang": "es-419",
+    "text": "diestra"
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "about": {
+    "builder": "language-pack-v3 0.1.0",
+    "built": "2026-11-01T10:00:00Z",
+    "catalog": "es-419",
+    "format": "3.0",
+    "origin": "published",
+    "publisher": "unfoldingWord",
+    "revision": 4
+  },
+  "h": {
+    "class": "catalog",
+    "lang": "es-419",
+    "tables": {
+      "about": [
+        1,
+        true
+      ],
+      "resources": [
+        1,
+        true
+      ],
+      "segments": [
+        1,
+        true
+      ],
+      "units": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "ec478f1a9d935ad71c2337569c0a2b9718fe29188ba3b46098f969e78b211ec6",
+  "resources": [
+    {
+      "books": "000000000000800000",
+      "key": "es-419_gl/es-419/tn",
+      "license": "CC-BY-SA-4.0",
+      "release": "v66",
+      "subject": "TSV Translation Notes",
+      "title": "Notas de Traducción"
+    }
+  ],
+  "segments": [
+    {
+      "class": "map",
+      "id": "d348a8d779d9c803e54946a6f738f39ea371694c9b1c1b6b47dc8755f55f0490",
+      "inputs": "4444444444444444444444444444444444444444444444444444444444444444",
+      "part": "core",
+      "size": 384,
+      "ulen": 833
+    }
+  ],
+  "units": [
+    {
+      "id": "map",
+      "segments": [
+        0
+      ]
+    }
+  ]
+}

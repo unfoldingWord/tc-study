@@ -42,7 +42,7 @@ bun spec/tests/compare.ts [--python <path>] [--built] [--reader <path>]
   environment variable `LP3_PYTHON`, else `python`. `--reader` is the Python script to run, `spec/reader-py/lp3read.py` unless given
   (the tests use it to show that a difference is found). With `--built` it also builds the big segments of the sample in
   memory (the Titus original, the `tw:kt` art group, the lexicon group `G0`, the language catalog and the common
-  catalog, an OBS segment from a synthetic story, and a `full` transfer file of them, whole and cut in the middle of
+  catalog, the es-419 map core and part, the xmap of Titus from the English fixture, an OBS segment from a synthetic story, and a `full` transfer file of them, whole and cut in the middle of
   its last entry), writes them under the temporary folder of the system and compares them the same way. Those are not
   frozen and have no expected file.
 - **`src/conformance.test.ts`** checks that `readerOutput` gives each `.expected.json`, that `build-cases.ts` finds the
@@ -123,8 +123,9 @@ required table it does not know is `E_TABLE`.
 | any table of any class that is not in the schema | nothing (it is only in `h.tables`) |
 
 **What a phase 1 reader knows.** Every table of `cddl/<class>.cddl`, at version 1, for the classes `book`, `orig`, `art`,
-`lex`, `obs` and `catalog`. For `map`, `xmap` and `gen` (read in phase 2) it knows no table at all, so **a segment of
-these classes is `E_TABLE`**, even if its tables are all optional, once the checks of `container.md` up to
+`lex`, `obs` and `catalog`. For `map`, `xmap` and `gen` it knows no table at all (a phase 2 reader knows those of `map` and `xmap`: see
+"`map`, `xmap`" below), so **a segment of
+these classes is `E_TABLE`** for a phase 1 reader, even if its tables are all optional, once the checks of `container.md` up to
 `E_HMISMATCH` have passed. The same holds for a segment inside a transfer file (below).
 
 The case 9 files are built this way.
@@ -281,7 +282,7 @@ The keys are those of `catalog.cddl`, with every byte string in hex and these di
 | `about` | object | never. `format`, `catalog`, `publisher`, `origin`, `revision`, `built`, `builder`, and when the file has them `previous` (hex), `name`, `direction` |
 | `resources` | list of objects | never. `key`, `title`, `subject`, `release`, `license`, `books` (hex of the 9 bytes: **18 digits**), and `rights`, `attribution` when the file has them |
 | `segments` | list of objects | never. `id` (hex), `class`, `size`, `ulen`, `inputs` (hex), and `book`, `part`, `group` when the file has them |
-| `units` | list of objects | never. `id`, `segments` (list of integers, indexes in `segments`), and `needs` (list of text) when the file has it |
+| `units` | list of objects | never. `id`, `segments` (list of integers, indexes in `segments`), `needs` (list of text) when the file has it, and `optional` (always `true`) when the file has it, which only the `aligned:` units do |
 | `requires` | list of `[catalog, revision, id]` | the table is not in the file or not read; `id` is hex |
 | `complements` | list of objects | the table is not in the file or not read. `kind`, `id` (hex), `size`, `media`, `version`, and `lang`, `for`, `license` when the file has them |
 
@@ -327,13 +328,76 @@ Example, for a file cut inside its last entry:
  "catalogs": [{"id": "9ee2…", "h": {…}, "about": {…}, "resources": […], "segments": […], "units": […]}]}
 ```
 
-### `map`, `xmap` (phase 2)
+### `map`, `xmap`
 
-Phase 1 readers do not decode these classes (`E_TABLE`, above). Phase 2 will give:
+`coverage` (both cores) is `{source: {"whole": [books], "partial": [books]}}`: books as codes in canonical order
+(`ids.md`); `partial` is absent when the file has none. The source is the resource key.
 
-- each counts table as `{"unit", "rows": {key: {book: [count, distinct verses]}}}`;
-- in a part, each verse list as `{key: [verse ids]}`;
-- `coverage` as `{source: {"whole": [books], "partial": [books]}}`.
+What decides coverage, in the `xmap`: the `notes` table is covered by `unfoldingWord/en/tn`, `links` by
+`unfoldingWord/en/twl`, and `strong` by the keys of the originals (`unfoldingWord/hbo/uhb`, `unfoldingWord/el-x-koine/ugnt`).
+In the `map`, the `usage` table is covered by the language's `tn` entry alone (the source of `coverage` whose last segment is `tn`, not the English `unfoldingWord/en/tn`): every `usage` cell, in the `usage` and the `revision` queries, is judged by that entry. A source that is not a language's `tn` has no `usage`.
+
+A **counts table** (`strong`, `links`, `notes` of `xmap`; `usage` of `map`) is `{"unit": text, "rows": {key: {book:
+[count, verses]}}}`: `count` is the number of occurrences, links or notes, and `verses` the number of distinct verses.
+The book is its code. Example: `{"unit": "notes", "rows": {"ta:translate/figs-metaphor": {"tit": [1, 3]}}}`.
+
+**`xmap` core** (`part` is `"core"`):
+
+| Key | Type | Absent when |
+| --- | --- | --- |
+| `coverage` | as above | never |
+| `strong` | counts table | never |
+| `concepts` | `{id: {"kind": k, "tw": t, "source": res key}}` | never. `k` is one of `none person place event topic story` (0 to 5), `t` one of `none kt names other` (0 to 3) |
+| `links`, `notes` | counts tables | the table is not in the file |
+| `relations` | list of `{"from", "to", "type", "source", "confidence"}`: `from`, `to` the concept ids, `type` the type's text, `source` the res key (text), `confidence` an integer 0 to 100; the rows in the order of the file | the table is not in the file |
+| `aliases` | `{id: id}` as the file has it | the table is not in the file |
+| `strongs` | `{concept id: [Strong keys]}` as the file has it | the table is not in the file |
+| `topics` | as the file has it (`any`; bytes in hex) | the table is not in the file or not read |
+
+**`xmap` part** (`part` is a book code): `strong`, `links`, `notes` as `{key: [verse ids]}`, each verse id the full
+`LLCCCVVV` (the book number times 1 000 000 plus the verse offset, which is the running sum of the stored values within that key), in the order of the file. `links` and `notes` are
+absent when the file lacks them.
+
+**`map` core**:
+
+| Key | Type | Absent when |
+| --- | --- | --- |
+| `books` | list of 66 `[name, short, abbreviation, source]`, in canonical order | never |
+| `names` | `{id: [names]}` as the file has it | never |
+| `subtitles` | `{id: text}` as the file has it | the table is not in the file |
+| `coverage` | as above | never |
+| `usage` | counts table | the table is not in the file |
+| `obs` | list of `[story, title]` | the table is not in the file |
+| `topics`, `numbering` | as the file has them (bytes in hex) | the table is not in the file or not read |
+
+**`map` part**: `usage` as `{key: [verse ids]}`, full ids; absent when the file lacks it.
+
+**What a phase 2 reader knows.** `map`: `books names subtitles coverage usage obs` at version 1. `xmap`: `coverage strong
+concepts links notes relations aliases strongs` at version 1. `topics` and `numbering` are not known yet: they are optional,
+so they are skipped (listed in `h.tables`, not in the output). `gen` stays `E_TABLE`.
+
+### `xtopics`, `topics`
+
+**`xtopics` core** (`part` is `"core"`):
+
+| Key | Type | Absent when |
+| --- | --- | --- |
+| `coverage` | as above | never |
+| `topics` | `{id: {"kind": k, "source": res key, "ref": text, "title": text, "ustrong": text}}` (`title` and `ustrong` are `""` when the file has none); `k` is one of `person place event topic story section` (1 to 6) | never |
+| `occurrences` | counts table, unit `"verses"` | never |
+| `relations` | list of `{"from", "to", "type", "source", "confidence"}` in the order of the file; `from`, `to` the ids (a topic's or an external concept's), as in the `xmap` | the table is not in the file |
+| `strongs` | `{topic id: [Strong keys]}` as the file has it | the table is not in the file |
+| `ranges` | `{topic id: [[first, last], ...]}`, full verse ids, as the file has it | the table is not in the file |
+
+**`xtopics` part**: `occurrences` as `{id: [verse ids]}`, full ids.
+
+**`topics` core**: `names` as `{id: [[name, source, count, [books]], ...]}` in the order of the file, `books` as codes in canonical order; `local` as `{topic id: {"names": [...], "refs": [[first, last], ...], "related": [...]}}` (`local-topics` of `map.cddl`), with `refs` and `related` only when the entry has them and any other key of an entry left out, like every unknown key; `coverage` as above. **`topics` part**: `names` as `{topic id: [verse ids]}`, full ids; absent when the file lacks it.
+
+A phase 2 reader of part B knows `xtopics`: `coverage topics relations strongs occurrences ranges` and `topics`: `names local coverage`, at version 1. A topics query's answer states `installed` (`true` or `false`); with `false` it has no state, with `true` the four states of `counts.md`.
+
+### `aligned`
+
+`entries` as `{key: {strong: {book: [verses, occurrences]}}}`: `key` the text as stored, `strong` the Strong key text from `strongs`, `book` the book code (`ids.md`). A reader of part C knows `keys strongs data` at version 1. `group` and `lang` are in `h`, not repeated.
 
 ### Checks of the tables (`E_BODY`)
 
@@ -342,6 +406,8 @@ is not what its schema says is `E_BODY`, and nothing of the file is used. The sc
 keys the schema does not list (a later minor version adds them): they are ignored and are not in the output. Beyond the
 types, these are `E_BODY` too:
 
+- **Rows.** A table whose declared row count `n` is larger than the segment's `ulen`: a reader allocates no more rows than
+  the body has bytes.
 - **Columns.** A `uvarints` column that is cut short, longer than 8 bytes for a number, not minimal (the last byte of a number of two or more bytes is `00`)
   or above 2^53 − 1. An `ev` column whose length is not a multiple of 3. A `bits` column that is not `ceil(n / 8)` bytes
   or has an unused bit set. A `texts` column whose
@@ -363,19 +429,48 @@ types, these are `E_BODY` too:
   position of a quote that is in neither list (every `-1` is in exactly one of `quoteKinds` and `quoteMissing`).
 - **`orig`.** `words.cols` columns of different lengths; a number outside a word table; word pieces in `text.tok` that
   are not as many as the words; `macula.release` that is not text.
-- **`obs`.** A story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
+- **`obs`.** A help row whose story is outside 1 to 50 or whose frame is outside 0 to 99; a story number outside 1 to 50 or twice; a story with no frame; a frame outside 0 to 99 or twice in a story; a
   table of helps with an empty id, an id twice, `id.strings` with a count other than `n`, a `concept` column that is
   `flags`, or a `frame` column of another length than `n`.
 - **`art`.** An article with an empty `id`; an article with no section; a role that is not in the list of `art.cddl`; an empty `sid`; a `sid` twice in an
   article; an `id` twice in the group.
 - **`lex`.** A Strong number that is not `G` or `H` and a number, or of another group than the header's; a `refs` pair that
   runs backwards.
-- **`catalog`.** `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
-  bytes; a `books` of another length than 9; a unit that names a segment outside `segments`, or has none; a segment, a unit
-  or a resource listed twice; a header `lang` that differs from `about.catalog` (the common catalog has none).
+- **`map`, `xmap`.** The header needs `part` (both) and `lang` (`map`). A part whose `res` is not `[]`; a core of `xmap` whose `res` is empty. A part without `book` is valid; a part whose `book` differs from its `part` is E_BODY; a core with a `book`; a
+  known core table in a part, or a part table shape in a core.
+  - Coverage: a book set (`whole` or `partial` of a source) of another length than 9 bytes, or with any of the bits 66 to 71 set, or a book in both sets of one source (both readers reject it; the book sets of a catalog's `books` are checked for length only).
+  - Counts: keys not sorted or repeated; a `counts` column cut short, or with numbers left over; a book number outside 1..66 or not
+    increasing within its key; `count = 0` (`verses` above `count` is valid: a note on 1:2-4 is 1 note and 3 verses; `verses = 0` is valid too); a key with no book; a `unit` other than the table's (`xmap`
+    `strong` "occurrences", `links` "links", `notes` "notes"; `map` `usage` "notes").
+  - Verse lists: `keys` not sorted or repeated; a key with `n = 0` (a key with no verse in the book is not in the part); a verse offset, rebuilt as the
+    running sum of the stored values of its key, that is not strictly increasing within its key or reaches 1 000 000 (the
+    first offset may be 0: `front:intro`); a `verses` column cut short or with numbers left over. A part's keys that are not
+    in the core's counts table, or whose number of verses is not the `verses` of the core's row for this book, are not checked by
+    a reader of the part alone.
+  - `concepts`: ids not sorted or repeated; columns of different lengths; `kind` above 5; `tw` above 3; a `source` outside `h.res`.
+  - `relations`: a concept outside `concepts`, a type outside `types`, a `source` outside `h.res`; a `confidence` above 100.
+  - `xmap` `strongs`: keys repeated or not in `concepts`; a list of Strong keys that is empty, not sorted by code
+    point or has a repeat. `aliases`: keys repeated; a value that is not in `concepts` (a key need not be: it is
+    an id that moved).
+  - `xtopics`, `topics` (headers as the `map`, `xmap` ones: `part` needed, `lang` for `topics`; a part with `res` not `[]`, a core of `xtopics` with `res` empty, a `book` that differs from `part`, a core table in a part and the reverse are `E_BODY`):
+    - `xtopics` `topics`: ids not sorted or repeated; columns of different lengths; `kind` 0 or above 6; a `source` outside `h.res`; a `ref` outside `refs`; `refs` with a text twice, or one no id uses, or not in the order of first use; `title` or `ustrong` with a count other than the ids.
+    - `xtopics` `relations`: as the `xmap` ones, with an end beyond the count of `topics.ids` plus `external`; `external` not sorted or repeated.
+    - `xtopics` `strongs`, `ranges`: a key not in `topics.ids`; an empty list (also an empty `ranges` list); Strong keys not sorted or repeated; a range that runs backwards (`first > last`) or whose verse id is not `LLCCCVVV` of a book 1..66. That is all a reader checks of a range: it does not check that the two ends are in the same book.
+    - `xtopics` `occurrences`: a counts table of unit `"verses"` (another unit is `E_BODY`) whose keys are not in `topics.ids`; a row whose `count` differs from its `verses` or is 0; in a part, verse lists as above.
+    - `topics` `names`: a topic with no name; a `source` outside `alignment outline obs list`; `count` 0; `books` of another length than 9 or with a bit 66 to 71 set; a name that is empty. `topics` part `names`: verse lists as above; a key that is not in the core is not checked by a reader of the part alone.
+      - The order of a topic's names (most frequent first: `count` descending, ties by name in code point order) and the rule that a name and source pair is listed once are the builder's, like the order of a string table (`container.md`): a reader keeps the order of the file and does not reject another order or a repeat.
+  - `aligned` (the header needs `lang`, `group` and a non-empty `res`):
+    - `group` that is not a prefix of 1 to 6 characters of `[a-z ]` (the first a letter), a range `P-Q` of two such prefixes with `P` not after `Q` by code point and `Q` of 1 to 6 characters that begins and ends with a letter (no trailing space; a prefix alone is `P-P`, so it follows the same rule), or `other` (the header is `E_BODY`, as for a `lex` group): `A`, `aaaaaaa`, `d-b`, `a-ab-c`, `the ` (an end with a space), `a-b ` are `E_BODY`; `a-ab`, `b-b`, `ar-b`, `the`, `the -thf` are not.
+    - `keys` not sorted by code point, with a repeat, or with an empty key. For a range group `P-Q` (`P` alone is `P-P`): a key that is not in the range, that is `P <= key` and `key.slice(0, len(Q)) <= Q` by code point (`as` is in `ar-b`, `t` is in `t-td` and not in `ta-tz`). The builder's table of parts (`ALIGNED_PARTS`) is contiguous, without hole or overlap; the `aligned:` units of a catalog are a subset of it, in order and without overlap (a part whose range holds no key is not built, so a catalog may have holes between its units); that is a builder rule and a reader does not check it. For `other` the check is catalog-aware: no key may lie inside a range of the catalog's `aligned:` units. A reader that has the segment alone does not make it (no `E_BODY`); one that has the catalog does.
+    - `strongs` that repeats a text; `data` with numbers left over or cut short (the entries must use it exactly); an entry with `s` = 0 (no Strong key) or a Strong key with `b` = 0 (no book); a Strong index outside `strongs` or repeated in one entry; book numbers (the running sum of the deltas) not increasing within a Strong key, a delta of 0, or a book outside 1..66; `verses` 0, or above `occurrences`.
+  - `topics` `local`: an entry with no `names` or with an empty list, or a name that is not text; a `refs` item that is not a pair of two verse ids (`book * 1000000 + chapter * 1000 + verse`, book 1 to 66); a `related` that is not a list of texts.
+  - `map` `books`: not 66 entries; a `source` outside `text list none`.
+- **`catalog`.** A unit with `optional` that is not `true` (false or not a bool), a unit with `optional` whose id does not begin with `aligned:`, an `aligned:` unit without `optional`; an `aligned:` unit whose part is not a group (`aligned:A`, `aligned:ab-a`; `aligned:other` is one); `format` other than `3.0`; an `origin` other than `published` and `local`; an id of another length than 32
+  bytes; a `books` of another length than 9 (the bits 66 to 71 of this set are not checked); a unit that names a segment outside `segments`, or has none; a segment, a unit
+  or a resource listed twice; a header `lang` that differs from `about.catalog` (the common catalog has none). That no unit lists an `aligned:` unit in `needs`, and that an `aligned:` unit lists no `needs`, are rules of the catalog builder (`catalog.md`); a reader does not check them.
 - **Every class.** The header must have the keys its class needs (`lang`, `book`, `orig`, `res` for `book`; `book`, `orig`
   for `orig`; `lang`, `group`, `res` for `art`; `lang`, `group` of the form `[GH]` and digits, `res` for `lex`; `lang`, `res` for
-  `obs`), and `res` is not empty where it is needed.
+  `obs`; `lang`, `group`, `res` for `aligned`), and `res` is not empty where it is needed.
 
 The order of the checks between a defect in the container and one in a table is in `container.md`, "Order of checks".
 
@@ -387,18 +482,19 @@ The order of the checks between a defect in the container and one in a table is 
 | 2 | `container/truncated` | A file cut short | `minimal.seg` without its last 10 bytes | `E_TRUNCATED` |
 | 3 | `container/bad-id` | A wrong id | `minimal.seg` with its id changed | `E_ID` |
 | 4 | `tito-es419` (`book.seg`) | A real book, whole | The es-419 Titus of the format 2.0 parts on staging (GLT, GST, tN, tQ, tWL) | GLT: 1 913 pieces, 953 words, all aligned, 69 events. GST: 3 471 pieces, 1 732 words, all aligned, 69 events. 216 notes (212 with quote text, 203 of them with positions found in the original), 36 questions, 223 links (223 with quote text, all with positions). Both readers give the same output |
-| 5 | `nota-varios-versiculos` (`book.seg`) | A range | Titus 1:1-4 in one text (the pieces, events and alignment of the real GLT, cut after verse 4); one note on `1:2-4` pointing to `ta:translate/figs-metaphor`, with a quote of three original words. This is the book half; the map half is phase 2 | The note: `ref` "1:2-4", `from` 56001002, `to` 56001004. In the language map: 1 note, 3 distinct verses |
-| 6 | `strong-repetido` | Counting occurrences against verses | An original verse where one Strong key appears three times | In the common map: 3 occurrences, 1 distinct verse |
+| 5 | `nota-varios-versiculos` (`book.seg`) | A range | Titus 1:1-4 in one text (the pieces, events and alignment of the real GLT, cut after verse 4); one note on `1:2-4` pointing to `ta:translate/figs-metaphor`, with a quote of three original words. `book.seg` is the book half; the map half is `map-core.seg` and `map-tit.seg`, built by `buildMap` over that book model | The note: `ref` "1:2-4", `from` 56001002, `to` 56001004. In the language map (`map-core.seg`): 1 note, 3 distinct verses (use of the concept in Titus `[1, 3]`) |
+| 6 | `strong-repetido` (`xmap-core.seg`, `xmap-tit.seg`) | Counting occurrences against verses | A synthetic Titus original whose verse 1:1 holds the key `G54850` three times, and the common map `buildXmap` makes from it | In the common map: 3 occurrences, 1 distinct verse |
 | 7 | `seccion-insertada` (`build1.seg`, `build2.seg`) | Section ids that last | An article built twice with the registry in between. The first time it has an intro, a definition and translation suggestions. The second time it has an examples section before the suggestions, and its definition heading is corrected | First build: `intro`, `definition`, `translation-suggestions`. Second build: `intro`, `definition`, `examples`, `translation-suggestions`, with the first three unchanged |
 | 8 | `articulo-mal-titulado` (`art.seg`) | Articles that do not follow the pattern | An es-419 article with text before any heading, a heading no rule places, and a section whose heading is in English | `intro` with role `intro`; `s1` with role `unknown`; the English section with `lang` "en". Every section readable |
-| 9 | `tabla-desconocida` (`future-x.seg`, `future-y.seg`) | Tables a reader does not know | Case 1 with an extra optional table `future-x` (`future-x.seg`), and again with an extra required table `future-y` (`future-y.seg`); each table is version 1 and holds a map | The first gives case 1's output, except for `h.tables` (which lists `future-x` too) and `id` (the body has another table); the second gives `E_TABLE` |
+| 9 | `tabla-desconocida` (`future-x.seg`, `future-y.seg`) | Tables a reader does not know (a phase 1 case: a phase 2 reader gives the same, since `book` is a class both know) | Case 1 with an extra optional table `future-x` (`future-x.seg`), and again with an extra required table `future-y` (`future-y.seg`); each table is version 1 and holds a map | The first gives case 1's output, except for `h.tables` (which lists `future-x` too) and `id` (the body has another table); the second gives `E_TABLE` |
 | 10 | `transferencia-cortada` (`cut.tcpack`) | A transfer file cut inside an entry | A `full` transfer file with three entries: a catalog that lists case 4's book segment as the unit `book:tit`, case 1's segment (it travels beside it: the catalog does not list it) and case 4's segment; `made` "2026-11-01T10:00:00Z", `by` "build-cases 1". Cut in the middle of case 4's segment | The catalog and case 1 have status `ok`; case 4 has status `missing` |
-| 11 | `revisiones-mixtas` | Published against installed | Catalog and language map of revision 4, where Ruth has 15 notes on metaphor; Ruth's book segment of revision 3, where it had 14 | From the map: 15, "revision 4". From the installed book: 14 |
-| 12 | `idioma-parcial` | Zero against no source | An es-419 map whose tN covers tit, rut, 3jn and jon | Use of `ta:translate/figs-metaphor` in Titus: the count. In Jonah with no such note: zero. In Isaiah: no source |
-| 13 | `paquete-viejo` (`catalog.seg`) | The bridge from an old pack | `data/es-419-tit.langpack.zip`, format 1.1, with the originals from case 4, bridged on the device `test-device` at "2026-11-01T10:00:00Z" | The same book segment as case 4, with the same id; a local catalog (`origin` "local", `publisher` "local:test-device", unsigned). The folder holds only the catalog, `catalog.seg`: the book segment the bridge makes is not stored, because the test asserts that its bytes are those of case 4's `book.seg` |
+| 11 | `revisiones-mixtas` (`catalog.seg`, `map-core.seg`, `book-rut.seg`) | Published against installed | Catalog and language map of revision 4, where Ruth has 15 notes on metaphor; Ruth's book segment of revision 3, where it had 14 (Ruth is synthetic: the notes on metaphor of the sample's Titus relabeled to Ruth 1, since the data has no es-419 Ruth; the catalog lists the map core only) | From the map: 15, "revision 4". From the installed book: 14 |
+| 12 | `idioma-parcial` (`map-core.seg`) | Zero against no source | An es-419 map whose tN covers tit, rut, 3jn and jon whole, with notes on metaphor in Titus only (those of case 5) | Use of `ta:translate/figs-metaphor` in Titus: the count. In Jonah with no such note: zero. In Isaiah: no source |
+| 13 | `paquete-viejo` (`catalog.seg`) | The bridge from an old pack | `data/es-419-tit.langpack.zip`, format 1.1, with the originals from case 4, bridged on the device `test-device` at "2026-11-01T10:00:00Z" | The same book segment as case 4, with the same id; a local catalog (`origin` "local", `publisher` "local:test-device", unsigned). The folder holds only the catalog, `catalog.seg`: the book segment the bridge makes is not stored, because the test asserts that its bytes are those of case 4's `book.seg`. Since phase 2 the catalog also has the map unit: `catalog.seg` 758 -> 965 bytes, `expected.json` 2260 -> 2878 bytes |
 | 14 | `entero-fuera-de-rango` (`header.seg`, `body.seg`) | An integer outside -(2^53 - 1) .. 2^53 - 1 (`container.md`, "What a reader accepts") | Case 1 twice: with a key `x` in the file header that holds 2^60 (`header.seg`), and with a root key `x` in the body that holds -2^53 (`body.seg`); the reader knows neither key | `header.seg`: `E_HEADER`; `body.seg`: `E_BODY` |
+| 15 | `topics-local-clave-extra` (`core.seg`) | A key the schema does not list, inside an entry of `local` | A `topics` core of es-419 whose `local` entry `es-419:tema/la-gracia` has `names`, `refs` and one more key `x` | The core with `local` holding `names` and `refs` only: `x` is ignored and is not in the output |
 
-Cases 6, 11 and 12, and the map half of case 5, need the maps, so they are built in phase 2.
+Cases 6, 11 and 12 and the map half of case 5 are built from the maps of phase 2; `src/conformance.test.ts` checks their numbers with `answer` (`src/query/maps.ts`).
 
 Phase 2 also adds the fixed queries of the common map, with the answers phase 0 measured:
 - G5485;

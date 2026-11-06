@@ -1,0 +1,235 @@
+{
+  "h": {
+    "book": "rut",
+    "class": "book",
+    "lang": "es-419",
+    "orig": [
+      "unfoldingWord/hbo/uhb",
+      "v0#2026-01-01T00_00_00Z"
+    ],
+    "res": [
+      [
+        "es-419_gl/es-419/tn",
+        "v37"
+      ]
+    ],
+    "tables": {
+      "notes": [
+        1,
+        false
+      ],
+      "strings": [
+        1,
+        true
+      ],
+      "texts": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "c3c99d30350cea3899b580be27f64ce7e8cb7eb2097186259b8b4688d279e64a",
+  "notes": {
+    "res": "es-419_gl/es-419/tn",
+    "rows": [
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Pablo habla de la Palabra de Dios como si fuera un objeto que pudiera mostrarse de manera visible a las personas. Si esto fuera complicado de entender en su idioma nativo, puede traducir este fragmento usando una frase que explique el significado de esta metáfora, como en el TPS. Traducción alternativa: «Me hizo entender su mensaje». (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "ἐφανέρωσεν & τὸν λόγον αὐτοῦ",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001001,
+        "id": "swi9",
+        "ref": "1:1",
+        "to": 8001001
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Esto es una metáfora. Aunque Tito no era el **hijo** biológico de Pablo, comparten una fe común en Cristo. Pablo considera que la relación con Cristo a través de la fe es más importante que la relación biológica. Así, debido a sus edades relativas y a la fe en Cristo que tienen en común, Pablo considera a Tito como su propio hijo. También puede ser que Pablo llevó a Tito a la fe en Cristo, y así Tito es como un hijo en este sentido espiritual. Traducción alternativa: «eres como un hijo para mí» o como en el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "γνησίῳ τέκνῳ",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001002,
+        "id": "gu55",
+        "ref": "1:2",
+        "to": 8001002
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "En esta metáfora; Pablo habla de la Iglesia como si fuera la casa de Dios, y del supervisor como si fuera un sirviente a cargo de administrar aquella casa. Puede usar como traducción alternativa «alguien que cuida de los creyentes como un sirviente cuida una casa», «alguien que cuida de los creyentes como un encargado que cuida una casa», o como se muestra en el TPS. También puede usar la palabra que mejor se adapte a su idioma. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "Θεοῦ οἰκονόμον",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001003,
+        "id": "g2zf",
+        "ref": "1:3",
+        "to": 8001003
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Pablo habla de la devoción a la fe cristiana como si esta fuera aferrarse a la fe con las propias manos. Traducción alternativa: «Debería estar dedicado a», «Debería saber bien» o «Debe creer siempre en» como en el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "ἀντεχόμενον",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001004,
+        "id": "xwy6",
+        "ref": "1:4",
+        "to": 8001004
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Estas son personas rebeldes que no obedecen el mensaje del evangelio. Son personas que dicen cosas inútiles o tontas. Traducción alternativa: «personas que se niegan a obedecer y que dicen cosas inútiles» o como en el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "ἀνυπότακτοι, ματαιολόγοι",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001005,
+        "id": "w9kk",
+        "ref": "1:5",
+        "to": 8001005
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Esta metáfora compara a los cretenses con peligrosos animales salvajes. Traducción alternativa: «tan peligrosos como animales salvajes» o como en el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "κακὰ θηρία",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001006,
+        "id": "h3jb",
+        "ref": "1:6",
+        "to": 8001006
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Pablo habla de la verdad como si fuera un objeto del que uno pudiera apartarse o evitar. Traducción alternativa: «que rechazan la verdad» o como en el TPS. (ver: [[ta:translate/figs-metaphor]])",
+          "occurrence": "1",
+          "quote": "ἀποστρεφομένων τὴν ἀλήθειαν",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001007,
+        "id": "m4a5",
+        "ref": "1:7",
+        "to": 8001007
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Pablo habla de los pecadores como si estuvieran físicamente sucios. Traducción alternativa: «si las personas están moralmente contaminadas y no creen, no pueden hacer nada puro», «cuando las personas están llenas de pecado e incredulidad, nada de lo que hacen es aceptable a Dios» o como está en el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "τοῖς & μεμιαμμένοις καὶ ἀπίστοις, οὐδὲν καθαρόν",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001008,
+        "id": "n3wk",
+        "ref": "1:8",
+        "to": 8001008
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Aquí, se habla de las personas que no pueden controlarse y beben demasiado vino como si fueran esclavas del vino. Traducción alternativa: «o controladas por su deseo de vino» o como en el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "οἴνῳ πολλῷ δεδουλωμένας",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001009,
+        "id": "g9re",
+        "ref": "1:9",
+        "to": 8001009
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Pablo habla de Jesús como si estuviera liberando esclavos de su malvado amo. Puede usar como traducción alternativa el TPS. (ver también: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "λυτρώσηται ἡμᾶς ἀπὸ πάσης ἀνομίας",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001010,
+        "id": "gxe7",
+        "ref": "1:10",
+        "to": 8001010
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Pablo combina aquí dos metáforas. Con **«lavamiento»**, habla del perdón de Dios a los pecadores como si Dios los lavara físicamente de su pecado. También, con **«nuevo nacimiento»**, habla de los pecadores que se vuelven receptivos a Dios como si ellos hubieran nacido de nuevo. Puede usar como traducción alternativa el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "λουτροῦ παλινγενεσίας",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001011,
+        "id": "k1a6",
+        "ref": "1:11",
+        "to": 8001011
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Es común que los escritores del Nuevo Testamento hablen del Espíritu Santo como si fuera un líquido que Dios puede derramar en grandes cantidades. Traducción alternativa: «que Dios nos dio generosamente» o como está en el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "οὗ ἐξέχεεν ἐφ’ ἡμᾶς πλουσίως",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001012,
+        "id": "fby9",
+        "ref": "1:12",
+        "to": 8001012
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Se habla de las personas a las que Dios ha hecho promesas como si fueran a heredar las cosas prometidas, así como una persona hereda propiedades o posesiones de un miembro de la familia. Traducción alternativa: «pudiéramos esperar recibir la vida eterna que Dios nos ha prometido» o como en el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "κληρονόμοι γενηθῶμεν, κατ’ ἐλπίδα ζωῆς αἰωνίου",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001013,
+        "id": "q1cm",
+        "ref": "1:13",
+        "to": 8001013
+      },
+      {
+        "cols": {
+          "isIntro": false,
+          "note": "Pablo habla de alguien que elige hacer cosas incorrectas como si estuviera dejando el camino correcto para caminar en la dirección incorrecta. Puede usar como traducción alternativa el TPS. (ver: [[ta:translate/figs-metaphor]]).",
+          "occurrence": "1",
+          "quote": "ἐξέστραπται",
+          "tags": ""
+        },
+        "concept": "ta:translate/figs-metaphor",
+        "from": 8001014,
+        "id": "inh5",
+        "ref": "1:14",
+        "to": 8001014
+      }
+    ]
+  },
+  "texts": []
+}
