@@ -160,7 +160,11 @@ export async function runSteps(
   // would fail the same way, and after a 429 they would go against Retry-After), the ones running settle and what they verify is
   // stored, then what is complete is activated and saved once, and the first such error is thrown.
   let stopped: ClientError | undefined
-  // Anything else a worker throws (an abort, a store failure): no new request starts and it is thrown once all have settled.
+  // An abort is handled the same way: what is complete is activated and saved once, then the abort is thrown (unless a network
+  // failure came first: the first error wins).
+  let aborted: { error: unknown } | undefined
+  // Anything else a worker throws (a store failure, a bug): no new request starts, nothing more is activated, and it is thrown
+  // once all have settled.
   let halt: { error: unknown } | undefined
 
   const activateNow = async (): Promise<ReturnType<typeof activate>> => {
@@ -176,13 +180,13 @@ export async function runSteps(
   // the single activation at the end.
   let saving: Promise<unknown> = Promise.resolve()
   const activateSoon = (): Promise<unknown> => {
-    const run = saving.then(() => (stopped === undefined && halt === undefined ? activateNow() : undefined))
+    const run = saving.then(() => (stopped === undefined && aborted === undefined && halt === undefined ? activateNow() : undefined))
     saving = run.catch(() => {})
     return run
   }
 
   const worker = async (): Promise<void> => {
-    while (stopped === undefined && halt === undefined && next < queue.length) {
+    while (stopped === undefined && aborted === undefined && halt === undefined && next < queue.length) {
       o.signal?.throwIfAborted()
       const seg = queue[next++]!
       if (seg.users.every((i) => blocked.has(i))) continue
@@ -221,7 +225,9 @@ export async function runSteps(
   try {
     const workers = Array.from({ length: Math.min(width, queue.length) }, () =>
       worker().catch((error: unknown) => {
-        halt ??= { error }
+        const storeFailed = error instanceof ClientError && error.code === 'E_STORE'
+        if (o.signal?.aborted === true && !storeFailed) aborted ??= { error }
+        else halt ??= { error }
       }),
     )
     await Promise.all(workers)
@@ -235,6 +241,7 @@ export async function runSteps(
     throw e
   }
   if (stopped !== undefined) throw stopped
+  if (aborted !== undefined) throw aborted.error
 
   const wanted = new Set(steps.map((s) => s.key))
   return { activated, waiting: waiting.filter((w) => wanted.has(w.key)), fetched, bytes, unknown }

@@ -619,22 +619,31 @@ describe('install several segments at a time', () => {
     expect(order.length).toBe(10)
   })
 
-  function gatedSetup(o: Parameters<typeof startFakeServer>[1] = {}) {
+  /** `beforeSet` may hold a `setState` (it is counted when called); `failPut(n)` makes the n-th segment put throw. */
+  function gatedSetup(
+    o: Parameters<typeof startFakeServer>[1] = {},
+    hooks: { beforeSet?: () => Promise<void> | undefined; failPut?: (n: number) => boolean } = {},
+  ) {
     const srv = startFakeServer(sample, o)
     server?.stop()
     server = srv
     const gate = gatedFetch()
     const inner = memoryStore()
     let sets = 0
+    let puts = 0
     const store: BlobStore = {
       has: (id) => inner.has(id),
       get: (id) => inner.get(id),
-      put: (id, b) => inner.put(id, b),
+      async put(id, b) {
+        if (sample.segments.has(id) && hooks.failPut?.(++puts) === true) throw new Error('QuotaExceededError')
+        return inner.put(id, b)
+      },
       ids: () => inner.ids(),
       delete: (id) => inner.delete(id),
       getState: () => inner.getState(),
-      setState: (s) => {
+      async setState(s) {
         sets++
+        await hooks.beforeSet?.()
         return inner.setState(s)
       },
     }
@@ -735,13 +744,73 @@ describe('install several segments at a time', () => {
     await gate.release(order.slice(0, 4))
     await gate.until(() => gate.held.size === 4 && gate.calls.length === 8)
     ac.abort()
-    await expect(run).rejects.toThrow()
+    const e = await run.catch((x) => x)
+    expect(e).toBe(ac.signal.reason)
+    expect((e as Error).name).toBe('AbortError')
     expect(gate.calls).toEqual(order.slice(0, 8))
     const units = (await store.getState())!.units
     expect(units['common/xmap']).toBeDefined()
     expect(units['es-419/map']).toBeDefined()
     expect(units['common/xtopics']).toBeUndefined()
     expect(units['es-419/book:tit']).toBeUndefined()
+  })
+
+  test('an abort while a state save is running still activates what is complete, with one more save', async () => {
+    let armed = false
+    let onHeld!: () => void
+    const held = new Promise<void>((r) => (onHeld = r))
+    let letGo!: () => void
+    const gateSet = new Promise<void>((r) => (letGo = r))
+    const { gate, client, store, sets } = gatedSetup({}, {
+      beforeSet: () => {
+        if (!armed) return undefined
+        armed = false
+        onHeld()
+        return gateSet
+      },
+    })
+    await client.refresh('es-419')
+    armed = true
+    const ac = new AbortController()
+    const run = client.install('es-419', { books: ['tit'] }, { signal: ac.signal })
+    const box = settled(run)
+    await gate.until(() => gate.held.size === 4)
+    await gate.release(order.slice(0, 2))
+    await held // xmap is being saved
+    await gate.release(order.slice(2, 4)) // map is complete; its activation waits behind the save
+    await gate.until(() => gate.held.size === 2 && gate.calls.length === 6)
+    const setsBefore = sets()
+    ac.abort()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(box.done).toBe(false) // the save still runs
+    letGo()
+    const e = await run.catch((x) => x)
+    expect(e).toBe(ac.signal.reason)
+    expect(gate.calls).toEqual(order.slice(0, 6))
+    const units = (await store.getState())!.units
+    expect(units['common/xmap']).toBeDefined()
+    expect(units['es-419/map']).toBeDefined()
+    expect(units['common/xtopics']).toBeUndefined()
+    expect(sets() - setsBefore).toBe(1) // map: one save after the abort
+  })
+
+  test('a store failure waits for the running requests, then E_STORE with the state before', async () => {
+    const { gate, client, store } = gatedSetup({}, { failPut: (n) => n === 2 })
+    await client.refresh('es-419')
+    const before = await store.getState()
+    const run = client.install('es-419', { books: ['tit'] })
+    const box = settled(run)
+    await gate.until(() => gate.held.size === 4)
+    await gate.release([order[1]!]) // put 1: stored; its worker asks order[4]
+    await gate.until(() => gate.calls.length === 5)
+    await gate.release([order[0]!]) // put 2 throws
+    expect(box.done).toBe(false)
+    expect(gate.calls.length).toBe(5)
+    await gate.release([order[2]!, order[3]!, order[4]!])
+    const e = await run.catch((x) => x)
+    expect(e).toMatchObject({ code: 'E_STORE' })
+    expect(gate.calls).toEqual(order.slice(0, 5)) // no request after the failure
+    expect(await store.getState()).toEqual(before) // map was complete, but nothing is activated after a store failure
   })
 
   test('a progress callback that throws does not break a parallel install', async () => {
