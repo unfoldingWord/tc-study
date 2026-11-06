@@ -332,6 +332,7 @@ jobs:
 
       - name: Build and publish format 3
         id: v3
+        timeout-minutes: 90
         if: inputs.parts && inputs.v3 == 'true' && inputs.target == 'staging' && !cancelled() && steps.publish.outcome == 'success'
         continue-on-error: true
         env:
@@ -376,7 +377,8 @@ jobs:
           if [ -n "$PACKS_V3_SIGNING_KEY" ]; then
             (umask 077; printf '%s\n' "$PACKS_V3_SIGNING_KEY" > "$RUNNER_TEMP/sign.pem")
           fi
-          args=(--lang "$LANGUAGE" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
+          # publish-v3 wants the tag in lowercase; the 2.0 files above keep the value as given.
+          args=(--lang "${LANGUAGE,,}" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
           args+=(--topics "$RUNNER_TEMP/topics")
           if [ -f "$RUNNER_TEMP/sign.pem" ]; then args+=(--sign-key "$RUNNER_TEMP/sign.pem"); fi
           if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
