@@ -47,7 +47,7 @@ const answer = await reader.passage('tit 1:1')
 
 - With `trustedKeys` given, even an empty map: a published catalog must carry a signature by a listed key, or it is `E_SIGNATURE` and nothing is installed; a local catalog is refused when it comes from a server or a transfer file (it is only valid when made on the device, by `importOldPack`).
 - Without `trustedKeys`: signatures are not checked. Use this for tests only.
-- A lower `about.revision` of the same publisher and catalog is `E_DOWNGRADE` unless the call passes `confirmDowngrade: true`. A catalog of the same name from another publisher is treated the same way, whatever its revision (the installed state is kept by catalog name); a published catalog over a local one (an old pack) replaces it. A common catalog that a language names in `requires` and that is older than the installed one is stored and used for that language's units by id, without replacing the installed one.
+- A lower `about.revision` of the same publisher and catalog is `E_DOWNGRADE` unless the call passes `confirmDowngrade: true`. A catalog of the same name from another publisher is treated the same way, whatever its revision (the installed state is kept by catalog name); a published catalog over a local one (an old pack) replaces it: once a language's active units come from its published catalog, a unit of the local catalog that the published one does not list (the bridged `orig:<book>`) is dropped as soon as no installed unit needs it, and `prune` then removes it and the local catalog. Such a unit never serves a need of a published unit. A common catalog that a language names in `requires` and that is older than the installed one is stored and used for that language's units by id, without replacing the installed one.
 - Every segment is checked against the id the catalog gives it (the sha256 of its body) before it is stored or read; a stored segment that fails later is treated as not installed and listed in `reader.problems`.
 
 The signature check uses WebCrypto Ed25519 when the runtime has it and falls back to `@noble/curves`.
@@ -64,17 +64,9 @@ The order is: language catalog, then the common catalog it requires, then the se
 
 `install` fetches up to `concurrency` segments at once (default 4): `client.install('es-419', { books: ['tit'] }, { concurrency: 4 })`. `1` asks one segment after the other, in plan order. Each segment is fetched once even when several units share it, a unit is activated (and the state saved) as soon as it and its `needs` are complete, and `onProgress` fires once per stored segment. Calls on one client still run one after the other.
 
-A segment the server does not have (404) or whose bytes are not the segment leaves its unit waiting, and the install goes on. Any other failed request (429, 5xx, a dropped connection) stops the install: no new request starts, the requests already running settle and what they verify is stored, the units complete by then are activated and the state is saved once, then `install` rejects with the first such error, `E_NETWORK` (`status`, and `retryAfter` in seconds for a 429). Installed content is kept; call `install` again later, after `retryAfter` when there is one. An abort (`signal`) stops new requests the same way and keeps the units already complete.
+A segment the server does not have (404) or whose bytes are not the segment leaves its unit waiting, and the install goes on. Any other failed request (429, 5xx, a dropped connection) stops the install: no new request starts, the requests already running settle and what they verify is stored, the units complete by then are activated and the state is saved once, then `install` rejects with the first such error, `E_NETWORK` (`status`, and `retryAfter` in seconds for a 429). Installed content is kept; call `install` again later, after `retryAfter` when there is one. An abort (`signal`) stops new requests the same way and keeps the units already complete, then `install` rejects with `signal.reason`, even when the abort comes during the last segment's store or save; only a network failure seen before the abort, or a store failure, is thrown instead.
 
-**Install time from staging** (es-419, `install('es-419', { books: ['tit'] })` after a `refresh`, empty memory store; 151 segment requests, 2.3 MB; the author's Windows 11 desktop on a home connection, 6 Nov 2026):
-
-| `concurrency` | Time |
-|---|---|
-| 1 (one at a time, as before) | 48 s first measured; 51 s and 76 s in the runs below |
-| 4 (default) | 13.0 s, 14.5 s, 11.5 s |
-| 8 | 6.7 s (one run) |
-
-The server and the network decide most of it; a phone on mobile data has not been measured.
+On staging, es-419 Titus took about 50–75 s one segment at a time and about 12–15 s with the default of 4.
 
 **Mixed revisions.** A unit keeps the revision it was activated from until its own segments change. A shared dependency can move on under it: when another language updates the common `orig:<book>`, a book of this language built against the older original stays as it is. The reader then does not use that book's alignment positions (they point into another original): `renderings` leaves the book out and says so in `notInstalled` (`what: 'stale'`). The other way is refused: an older catalog (a language built against an older common catalog) does not move back a unit installed from a later revision.
 
