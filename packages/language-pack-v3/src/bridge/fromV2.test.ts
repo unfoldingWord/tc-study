@@ -56,8 +56,8 @@ describe('bridgeZip: the format 1.1 pack of es-419 Titus', () => {
   })
 
   test('the pack brings the book and the map of what it had', () => {
-    expect(bridged.segments.map((s) => [s.seg.h.class, s.seg.h.part ?? s.seg.h.book])).toEqual([['map', 'core'], ['map', 'tit'], ['book', 'tit']])
-    expect(catalog.units.map((u) => u.id)).toEqual(['book:tit', 'map'])
+    expect(bridged.segments.map((s) => [s.seg.h.class, s.seg.h.part ?? s.seg.h.book])).toEqual([['map', 'core'], ['map', 'tit'], ['book', 'tit'], ['orig', 'tit']])
+    expect(catalog.units.map((u) => u.id)).toEqual(['book:tit', 'map', 'orig:tit'])
     // The pack has no tW or tA: the book needs no article group, so it can activate (a need no unit of the catalog meets would block it).
     expect(catalog.units[0].needs).toEqual(['map', 'orig:tit'])
     expect(catalog.segments.map((s) => hex(s.id))).toEqual(bridged.segments.map((s) => s.id))
@@ -80,7 +80,7 @@ describe('bridgeZip: the format 1.1 pack of es-419 Titus', () => {
   })
 
   test('the catalog lists the resources of the pack with what the manifest says: the title, and no license', () => {
-    expect(catalog.resources.map((r) => r.key)).toEqual(['glt', 'gst', 'tn', 'tq', 'twl'].map((id) => `es-419_gl/es-419/${id}`))
+    expect(catalog.resources.map((r) => r.key)).toEqual(['glt', 'gst', 'tn', 'tq', 'twl'].map((id) => `es-419_gl/es-419/${id}`).concat('unfoldingWord/el-x-koine/ugnt'))
     const tn = catalog.resources.find((r) => r.key.endsWith('/tn'))!
     expect(tn).toMatchObject({ title: 'Notas de Traducción', subject: 'TSV Translation Notes', release: 'v66', license: 'unknown' })
     expect(tn.books).toEqual(Uint8Array.from([0, 0, 0, 0, 0, 0, 128, 0, 0]))

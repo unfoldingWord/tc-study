@@ -528,40 +528,58 @@ describe('final review, trust and installation', () => {
 })
 
 // An old pack of a book is built with an originals pack of format 1.1, whose manifest lists no `books` (spec/tests/data/README.md).
-// The book segment is stored, and it waits for `orig:tit` as with any originals source: that unit comes with the published catalogs.
+// The local catalog lists the book, its map and its `orig`, so with no network and no common catalog the book is active and readable.
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
 const dataFile = (name: string) => new Uint8Array(readFileSync(join(DATA, name)))
 const OLD_PACKS = process.env.LP3_OLD_PACKS
 const OLD = { device: 'test-device', now: '2026-11-01T10:00:00Z' }
+/** A device with no network: no source at all. */
+const offlineDevice = () => createClient({ store: memoryStore(), trust })
 
 describe('importOldPack with an originals pack', () => {
   test('importOldPack builds the book with an originals pack whose manifest lists no books', async () => {
     const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
-    const { client } = setup()
+    const client = offlineDevice()
     const r = await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
-    // The map, the local catalog and the book (with no originals the book is left out and only two are stored).
-    expect(r.stored).toHaveLength(3)
+    expect(r.activated).toContain('es-419/book:tit')
+    expect(r.activated).toContain('es-419/orig:tit')
+    expect(r.waiting).toEqual([])
     expect(r.missing).toEqual([])
-    expect(r.waiting).toEqual([{ key: 'es-419/book:tit', missing: ['es-419/orig:tit'] }])
+    const passage = await (await client.open('es-419')).passage('tit 2:11')
+    expect(passage.data).not.toBeNull()
+    const glt = passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')
+    expect(glt!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+    expect(passage.data!.notes.length).toBeGreaterThan(0)
+  })
 
-    // The published catalogs bring orig:tit and the book activates.
+  test('a published install later replaces the local catalog and still reads', async () => {
+    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const srv = startFakeServer(sample)
+    server?.stop()
+    server = srv
+    const store = memoryStore()
+    const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
+    await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
     await client.refresh('es-419')
     const inst = await client.install('es-419', { books: ['tit'] })
     expect(inst.waiting).toEqual([])
+    const state = (await store.getState())!
+    expect(state.active['es-419']?.origin).toBe('published')
+    expect(state.units['common/orig:tit']).toBeDefined()
+    expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
   })
 
   // LP3_OLD_PACKS=<folder with originals.langpack.zip and es-419-tit.langpack.zip as prepare-language writes them>
-  test.skipIf(!OLD_PACKS || !existsSync(join(OLD_PACKS, 'originals.langpack.zip')))('the real packs of prepare-language build Titus', async () => {
+  test.skipIf(!OLD_PACKS || !existsSync(join(OLD_PACKS, 'originals.langpack.zip')))('the real packs of prepare-language build Titus with no network', async () => {
     const real = (name: string) => new Uint8Array(readFileSync(join(OLD_PACKS!, name)))
     const originals = await zipSource(real('originals.langpack.zip'))
     expect((await originals.resources('originals')).find((r) => r.key === 'unfoldingWord/el-x-koine/ugnt')!.books).toContain('tit')
-    const { client } = setup()
+    const client = offlineDevice()
     const r = await client.importOldPack(real('es-419-tit.langpack.zip'), { originals, ...OLD })
-    expect(r.stored).toHaveLength(3)
-    expect(r.waiting).toEqual([{ key: 'es-419/book:tit', missing: ['es-419/orig:tit'] }])
-    await client.refresh('es-419')
-    await client.install('es-419', { books: ['tit'] })
+    expect(r.activated).toContain('es-419/book:tit')
+    expect(r.waiting).toEqual([])
     const passage = await (await client.open('es-419')).passage('tit 2:11')
-    expect(passage.data).not.toBeNull()
+    console.log('passage tit 2:11:', JSON.stringify(passage.data!.texts))
+    expect(passage.data!.texts.length).toBeGreaterThan(0)
   }, 300_000)
 })

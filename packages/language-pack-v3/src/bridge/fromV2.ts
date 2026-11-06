@@ -7,6 +7,9 @@
  * is the device's (`origin: local`, `publisher: local:` and the device name, revision 1), unsigned, and it lists only what the pack
  * brought. A later published catalog replaces it.
  *
+ * Each book is bridged with its `orig` segment (the same bytes as the common catalog's) and the catalog lists it, so the book has all it
+ * needs on a device with no network. The catalog does not `require` a common one.
+ *
  * The pack's language is the manifest's (`ZipSource.language`). The pack's originals are those of `originals`, which is required:
  * the originals a pack carries itself are not used. A book `originals` lacks is left out with a line in `report`, and waits for them as
  * format 2.0 does.
@@ -38,6 +41,7 @@ export async function bridgeZip(
     lang: source.language,
     registry: {},
     partial: true,
+    withOrig: true,
     about: { format: '3.0', publisher: `local:${device}`, origin: 'local', revision: 1, built: now, builder: BUILDER },
   })
   return { segments, catalog, report }

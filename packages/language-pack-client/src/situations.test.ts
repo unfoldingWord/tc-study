@@ -86,7 +86,7 @@ describe('the five situations', () => {
     }
   })
 
-  test('3. an old pack with no network: partial until orig:tit arrives by transfer', async () => {
+  test('3. an old pack with no network reads at once, and a full transfer file still imports on top', async () => {
     const data = join(SPEC, 'data')
     const originals = await partsSource({ list: join(data, 'originals', 'list.json'), partsDir: join(data, 'parts') })
     // Another device that has everything and can export a transfer file.
@@ -97,11 +97,11 @@ describe('the five situations', () => {
 
     const phone = createClient({ store: memoryStore(), trust }) // no source: no network
     const old = await phone.importOldPack(file('data', 'es-419-tit.langpack.zip'), { originals, device: 'test-device', now: '2026-11-01T10:00:00Z' })
-    expect(old.waiting).toEqual([{ key: 'es-419/book:tit', missing: ['es-419/orig:tit'] }])
+    // The bridge brings the book's own original, so it reads with no network and no common catalog.
+    expect(old.waiting).toEqual([])
     let r = await phone.open('es-419')
     const before = await r.passage('tit 1:1')
-    expect(before.data).toBeNull()
-    expect(before.notInstalled?.[0]?.unit).toBe('book:tit')
+    expect(before.data).not.toBeNull()
 
     const got = await phone.importTransfer(transfer)
     expect(got.waiting).toEqual([])

@@ -413,7 +413,7 @@ describe('the spec fixtures', () => {
 })
 
 describe('importOldPack', () => {
-  test('a local catalog; the book waits for its original until the published catalogs come, then activates', async () => {
+  test('a local catalog with the book, its map and its original; the published catalogs later replace it', async () => {
     const data = join(SPEC, 'data')
     const originals = await partsSource({ list: join(data, 'originals', 'list.json'), partsDir: join(data, 'parts') })
     const srv = startFakeServer(sample)
@@ -423,8 +423,8 @@ describe('importOldPack', () => {
     const r = await client.importOldPack(file('data', 'es-419-tit.langpack.zip'), { originals, device: 'test-device', now: '2026-11-01T10:00:00Z' })
     expect(r.catalogs).toHaveLength(1)
     expect(r.catalogs[0]).toMatchObject({ name: 'es-419', origin: 'local', publisher: 'local:test-device' })
-    expect(r.activated).toContain('es-419/map')
-    expect(r.waiting).toEqual([{ key: 'es-419/book:tit', missing: ['es-419/orig:tit'] }])
+    expect(r.activated).toEqual(expect.arrayContaining(['es-419/map', 'es-419/orig:tit', 'es-419/book:tit']))
+    expect(r.waiting).toEqual([])
     expect(srv.hits).toEqual([])
 
     await client.refresh('es-419')
