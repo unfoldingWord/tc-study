@@ -7,7 +7,8 @@ import { type Answer, type CellState, missingUnit, newAnswer, usedUnit } from '.
 export const TOPIC_CATEGORIES = ['person', 'place', 'event', 'topic', 'story', 'section'] as const
 
 export type BookCell = { state: CellState; count?: number; verses?: number; installed: boolean; bytes?: number }
-export type BooksData = { books: Record<string, BookCell> }
+/** `installed: false` (and no states) when a topic is asked and the `xtopics` module is not on the device. */
+export type BooksData = { installed?: false; books: Record<string, BookCell> }
 
 /** Notes the units of the maps an answer read. */
 async function usedMaps(out: Answer<unknown>, reader: PackReader): Promise<MapSet> {
@@ -41,7 +42,7 @@ export async function conceptQuery(reader: PackReader, id: string): Promise<Answ
   if (found.found) {
     for (const [book, c] of Object.entries(cellsOf(m, found.id))) {
       const unit = `book:${book}`
-      if (counted(c) && !reader.installed(unit)) missingUnit(out, { book, unit, bytes: reader.size(unit), what: found.id })
+      if (counted(c) && reader.listed(unit) && !reader.installed(unit)) missingUnit(out, { book, unit, bytes: reader.size(unit), what: found.id })
     }
   }
   return out
@@ -56,6 +57,10 @@ export async function booksQuery(reader: PackReader, q: { article: string } | { 
   if (article !== undefined && !id.startsWith('ta:') && !id.startsWith('tw:')) throw new ClientError('E_ARG', `not an article id: ${JSON.stringify(id)}`)
   const out = newAnswer<BooksData>(reader, 'books')
   const m = await usedMaps(out, reader)
+  if (article === undefined && !id.startsWith('ta:') && !id.startsWith('tw:') && m.xtopics === undefined) {
+    out.data = { installed: false, books: {} }
+    return out
+  }
   const cells = cellsOf(m, id)
   const books: Record<string, BookCell> = {}
   for (const book of BOOKS) {
@@ -82,7 +87,7 @@ export async function topicsQuery(reader: PackReader, q: { category?: string; bo
   const m = await usedMaps(out, reader)
   // The module decides: without `xtopics` the answer is `installed: false`, never "not found" or a state.
   if (m.xtopics === undefined) {
-    out.data = { installed: false }
+    out.data = category !== undefined ? { kind: 'category', topicKind: category, installed: false } : { installed: false }
     return out
   }
   const x = m.xtopics

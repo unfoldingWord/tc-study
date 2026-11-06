@@ -51,7 +51,17 @@ describe('books', () => {
     const a = await r.books({ concept: 'per:abraham' })
     expect(a.data!.books.tit!.installed).toBe(true)
     expect(a.data!.books.gen!.installed).toBe(false)
-    expect(['count', 'zero', 'partial', 'none']).toContain(a.data!.books.tit!.state)
+    expect(a.data!.installed).toBeUndefined()
+    // The sample's topic source does not cover Titus for persons: the cell says so, it is not a zero.
+    expect(a.data!.books.tit).toEqual({ state: 'none', installed: true })
+    const sec = await r.books({ concept: 'sec:tit/1-1' })
+    expect(sec.data!.books.tit).toMatchObject({ state: 'count', count: 16, installed: true })
+    expect(a.revision.units.xtopics).toBeGreaterThan(0)
+  })
+  test('a topic without xtopics: installed false and no per-book states', async () => {
+    const r = await open({ defaults: false, books: ['tit'] })
+    const a = await r.books({ concept: 'per:abraham' })
+    expect(a.data).toEqual({ installed: false, books: {} })
   })
   test('bad arguments are E_ARG', async () => {
     const r = await open({ books: ['tit'] })
@@ -81,7 +91,7 @@ describe('topics', () => {
   test('without xtopics: installed false', async () => {
     const r = await open({ defaults: false, books: ['tit'] })
     expect((await r.topics()).data).toEqual({ installed: false })
-    expect((await r.topics({ category: 'person' })).data).toMatchObject({ installed: false })
+    expect((await r.topics({ category: 'person' })).data).toEqual({ kind: 'category', topicKind: 'person', installed: false })
     expect((await r.topics({ book: 'tit' })).data).toMatchObject({ installed: false })
   })
   test('a category: ids sorted', async () => {
@@ -126,6 +136,20 @@ describe('renderings', () => {
     expect(a.revision.units['book:tit']).toBeGreaterThan(0)
     expect(a.revision.units['orig:tit']).toBeGreaterThan(0)
     expect(a.cites.length).toBeGreaterThan(0)
+  })
+  test('both texts are merged, a word is a rendering with its neighbours, refs have no duplicates', async () => {
+    const r = await open({ books: ['tit'] })
+    const a = await r.renderings({ strong: 'G23160' })
+    expect(new Set(a.cites.map((c) => c.res))).toEqual(new Set(['es-419_gl/es-419/glt', 'es-419_gl/es-419/gst']))
+    const by = Object.fromEntries(a.data!.renderings.map((x) => [x.text, x]))
+    // "de Dios" translates one original word: one rendering, not "de" and "Dios".
+    expect(by['de Dios']!.refs).toContain('tit 1:1')
+    expect(by['de']).toBeUndefined()
+    // A word that both texts (and several verses) use counts every time, its refs once each.
+    expect(by['Dios']!.count).toBeGreaterThan(by['Dios']!.refs.length)
+    for (const x of a.data!.renderings) expect(new Set(x.refs).size).toBe(x.refs.length)
+    const total = a.data!.renderings.reduce((n, x) => n + x.count, 0)
+    expect(total).toBeGreaterThanOrEqual(27)
   })
   test('{ book, word } takes the Strong of that word', async () => {
     const r = await open({ books: ['tit'] })

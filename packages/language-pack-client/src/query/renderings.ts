@@ -21,7 +21,7 @@ export async function renderingsQuery(reader: PackReader, q: { strong: string } 
     const unit = `orig:${book}`
     const orig = reader.installed(unit) ? await reader.orig(book) : undefined
     if (orig === undefined) {
-      missingUnit(out, { book, unit, bytes: reader.size(unit) })
+      if (reader.listed(unit) && !reader.installed(unit)) missingUnit(out, { book, unit, bytes: reader.size(unit) })
       return out
     }
     const w = orig.words[word]
@@ -42,8 +42,8 @@ export async function renderingsQuery(reader: PackReader, q: { strong: string } 
     const origUnit = `orig:${book}`
     if (!reader.installed(bookUnit) || !reader.installed(origUnit)) {
       if (counted.has(book)) {
-        if (!reader.installed(bookUnit)) missingUnit(out, { book, unit: bookUnit, bytes: reader.size(bookUnit), what: key })
-        if (!reader.installed(origUnit)) missingUnit(out, { book, unit: origUnit, bytes: reader.size(origUnit), what: key })
+        if (reader.listed(bookUnit) && !reader.installed(bookUnit)) missingUnit(out, { book, unit: bookUnit, bytes: reader.size(bookUnit), what: key })
+        if (reader.listed(origUnit) && !reader.installed(origUnit)) missingUnit(out, { book, unit: origUnit, bytes: reader.size(origUnit), what: key })
       }
       continue
     }
