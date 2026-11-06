@@ -66,3 +66,12 @@ export { canonicalJson, KNOWN, readerOutput } from './read/output'
 
 // The model
 export * from './model'
+
+// Views of the maps and the answers over them (`spec/tests/queries/`), used by the client's reader and queries
+export { mapView } from './read/map'
+export { xmapView } from './read/xmap'
+export { alignedView } from './read/aligned'
+export { answer, type Cell, type MapSet, type State, TN, TWL, UGNT, UHB } from './query/maps'
+export { type AlignedSet, alignedKey, groupOfKey, phrase } from './query/aligned'
+export type { CountRows, Coverage, CountUnit, VerseLists } from './codec/counts'
+export { EVENT_KINDS, type EventKind, eventKind } from './events'

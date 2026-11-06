@@ -6,6 +6,7 @@ import { ClientError } from './errors'
 import { catalogsOf, verifiedHave, type InstallReport, type MissingCommon, type Progress, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
 import { exportTransfer, importOldPack, importTransfer, type ImportReport } from './transfer'
+import { readerOfState, type PackReader } from './reader'
 import type { PackSource } from './source/http'
 import { hex, type InstalledCatalog, type InstalledState, installedOf } from './state'
 import type { BlobStore } from './store/types'
@@ -31,6 +32,8 @@ export type Status = {
 }
 
 export interface LanguagePackClient {
+  /** A reader over the installed segments of a language (its units as the installed state says). */
+  open(lang: string): Promise<PackReader>
   refresh(lang: string, o?: { confirmDowngrade?: boolean; signal?: AbortSignal }): Promise<RefreshReport>
   install(lang: string, want?: Want, o?: { signal?: AbortSignal; onProgress?: (p: Progress) => void }): Promise<InstallReport>
   status(lang: string): Promise<Status>
@@ -247,7 +250,16 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     return { bad }
   }
 
+  async function openNow(lang: string): Promise<PackReader> {
+    const state = await loadState(store)
+    const name = state.aliases?.[lang] ?? lang
+    const { lang: langCat, catalogs } = await catalogsOf(store, trust, state, name)
+    if (langCat === undefined) throw new ClientError('E_NOT_INSTALLED', `the catalog of ${lang} is not installed`)
+    return readerOfState({ lang: langCat.name, name, catalogs, state, get: (id) => st(() => store.get(id)) })
+  }
+
   return {
+    open: (lang) => queued(() => openNow(lang)),
     refresh: (lang, opts = {}) =>
       queued(async () => {
         const { name: _name, ...report } = await refreshNow(lang, opts)
