@@ -7,7 +7,7 @@
  * is the device's (`origin: local`, `publisher: local:` and the device name, revision 1), unsigned, and it lists what the pack
  * brought plus the `orig` of each book it built. A later published catalog replaces it.
  *
- * Each book is bridged with its `orig` segment (the same bytes as the common catalog's) and the catalog lists it, so the book has all it
+ * Each book is bridged with its `orig` segment (built from the rows of `originals`: the same bytes as the common catalog's only when the published orig was built from the same rows and stamps, with no MACULA the `originals` source lacks) and the catalog lists it, so the book has all it
  * needs on a device with no network. The catalog does not `require` a common one.
  *
  * The pack's language is the manifest's (`ZipSource.language`). The pack's originals are those of `originals`, which is required:

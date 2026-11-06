@@ -4,7 +4,7 @@
  * counts, and no `books`). The rows are those of the UGNT part in `data/parts/` (source rows and prepared rows of Titus);
  * the real pack also has index rows, which the parts do not carry and the bridge does not need.
  *
- * Run: `bun spec/tests/build-originals-fixture.ts`. The zip is deterministic (fixed dates), so a second run changes nothing.
+ * Run: `bun spec/tests/build-originals-fixture.ts`. The zip is deterministic: fixed dates (JSZip writes them in UTC, so the time zone does not matter) and no folder entries, so a second run changes nothing.
  */
 
 import { writeFileSync } from 'node:fs'
