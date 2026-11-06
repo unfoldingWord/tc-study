@@ -402,6 +402,53 @@ describe('build-v3: --topics', () => {
     expect(Object.keys(after).length).toBeGreaterThan(Object.keys(before).length)
   })
 
+  describe('the pinned sha256 of the source files', () => {
+    const toCrlf = (s: string): string => s.split('\r\n').join('\n').split('\n').join('\r\n')
+    const attempt = async (src: string, pins: TopicSource[]) => {
+      const out = temp()
+      const result = await runWith(sample(out, ['--map-lang', 'en', '--map-list', EN_LIST, '--topics', src]), pins)
+      return { ...result, out: existsSync(out) ? readdirSync(out) : [] }
+    }
+
+    test('a tampered file exits 1 and builds nothing', async () => {
+      const src = sources()
+      const pins = pinsOf(src)
+      const file = join(src, 'tipnr', 'TIPNR.txt')
+      writeFileSync(file, `${readFileSync(file, 'utf8')}x`)
+      const result = await attempt(src, pins)
+      expect(result.code).toBe(1)
+      expect(result.err.join('\n')).toMatch(/--topics: .*TIPNR\.txt: sha256 is [0-9a-f]{64}, the pin in topic-sources\.json says /)
+      expect(result.out).toEqual([])
+    })
+
+    test('a missing pinned file exits 1 and builds nothing', async () => {
+      const src = sources()
+      const pins = [...pinsOf(src), { ...pinsOf(src)[0], name: 'gone', target: 'theographic/gone.json' }]
+      const result = await attempt(src, pins)
+      expect(result.code).toBe(1)
+      expect(result.err.join('\n')).toMatch(/--topics: .*gone\.json is missing \(pinned source gone\)/)
+      expect(result.out).toEqual([])
+    })
+
+    test('LF bytes whose CRLF form has the pinned sha256 pass for a pin with rawSha256 and eol crlf, and fail without them', async () => {
+      const src = sources()
+      const file = join(src, 'theographic', 'events.json')
+      const lf = readFileSync(file, 'utf8').split('\r\n').join('\n')
+      writeFileSync(file, lf)
+      const base = pinsOf(src)
+      const pinned = (extra: Partial<TopicSource>): TopicSource[] =>
+        base.map((p) => (p.target === 'theographic/events.json' ? { ...p, sha256: sha(Buffer.from(toCrlf(lf))), ...extra } : p))
+      const ok = await attempt(src, pinned({ rawSha256: sha(Buffer.from(lf)), eol: 'crlf' }))
+      expect(ok.err).toEqual([])
+      expect(ok.code).toBe(0)
+      const noEol = await attempt(src, pinned({ rawSha256: sha(Buffer.from(lf)) }))
+      expect(noEol.code).toBe(1)
+      expect(noEol.out).toEqual([])
+      const wrongRaw = await attempt(src, pinned({ rawSha256: '0'.repeat(64), eol: 'crlf' }))
+      expect(wrongRaw.code).toBe(1)
+    })
+  })
+
   test('a --topics folder without the three sources is a usage error that names the missing folder', async () => {
     const result = await run(sample(temp(), ['--topics', temp()]))
     expect(result.code).toBe(1)

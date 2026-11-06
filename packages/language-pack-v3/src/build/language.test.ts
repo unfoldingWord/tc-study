@@ -738,6 +738,18 @@ describe('buildCommon: the xtopics unit', () => {
     const again = await buildCommon({ source: await english(), about, mapLang: 'en', topics: topics() })
     expect(again.catalog.id).toBe(withTopics.catalog.id)
   })
+
+  test('the resources of the topic sources carry their credit lines', async () => {
+    const catalog = await catalogOf((await buildCommon({ source: await english(), about, mapLang: 'en', topics: topics() })).catalog)
+    const credit = (key: string) => (catalog.resources.find((r) => r.key === key) as { attribution?: string } | undefined)?.attribution ?? ''
+    const tipnr = credit('STEPBible/STEPBible-Data/TIPNR')
+    expect(tipnr).toContain('STEP Bible')
+    expect(tipnr).toContain('www.STEPBible.org')
+    expect(tipnr).toContain('Changed:')
+    const theo = credit('robertrouse/theographic-bible-metadata')
+    expect(theo).toContain('Changed:')
+    expect(theo).toContain('744355c7a5f38efd407bc67a5257c99aca9532bc')
+  })
 })
 
 describe('buildLanguage: the topics unit', () => {
@@ -825,5 +837,25 @@ describe('buildLanguage: the topics unit', () => {
       'es-419:tema/tit/cualidades-especiales-de-los-ancianos': { names: ['Cualidades especiales de los ancianos'], refs: [[56001005, 56001009]] },
     })
     expect(core.res.map(([key]) => key)).toContain(TN)
+  })
+
+  test('an outline entry whose title has no letters gets the id tema/{book}/{first verse}', async () => {
+    const intro = ['# Introducción a Tito', '', '### Esquema (Outline) de Tito', '', '1. ¿¿?? (1:5–9)'].join('\n')
+    const base = await sample()
+    const source: RowSource = {
+      resources: (lang) => base.resources(lang),
+      rows: async function* (filter: RowFilter) {
+        for await (const row of base.rows(filter)) {
+          if (row.layer === 'sot' && row.key === `tn:${TN}:tit:1`) {
+            const value = row.value as { content: { notes: unknown[] } }
+            yield { ...row, value: { ...value, content: { ...value.content, notes: [{ id: 'zz01', reference: 'front:intro', isIntro: true, note: intro }, ...value.content.notes] } } }
+          } else yield row
+        }
+      },
+    }
+    const built = await buildLanguage({ source, lang: ES, registry: registry(), about, topics: { xtopics: await xtopics(), records: [] } })
+    const core = topicsView(built.segments.find((s) => s.seg.h.class === 'topics' && s.seg.h.part === 'core')!.seg)
+    expect(Object.keys(core.local)).toEqual(['es-419:tema/tit/56001005'])
+    expect(core.local['es-419:tema/tit/56001005'].names).toEqual(['¿¿??'])
   })
 })

@@ -127,3 +127,11 @@ describe('language-packs.yml format 3 steps', () => {
     expect(kept).toEqual(before)
   })
 })
+
+describe('language-packs.yml format 3 step: language and time limit', () => {
+  test('the build step lowercases the language and has a 90 minute timeout', () => {
+    const step = find('Build and publish format 3') as Step & { 'timeout-minutes'?: number }
+    expect(step['timeout-minutes']).toBe(90)
+    expect(step.run).toContain('--lang "${LANGUAGE,,}"')
+  })
+})
