@@ -499,6 +499,17 @@
         "typescript": "^5.3.3",
       },
     },
+    "packages/language-pack-client": {
+      "name": "@bt-synergy/language-pack-client",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bt-synergy/language-pack-v3": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "^20.10.0",
+        "typescript": "^5.3.3",
+      },
+    },
     "packages/language-pack-v3": {
       "name": "@bt-synergy/language-pack-v3",
       "version": "0.1.0",
@@ -1272,6 +1283,8 @@
     "@bt-synergy/door43-api": ["@bt-synergy/door43-api@workspace:packages/door43-api"],
 
     "@bt-synergy/language-pack": ["@bt-synergy/language-pack@workspace:packages/language-pack"],
+
+    "@bt-synergy/language-pack-client": ["@bt-synergy/language-pack-client@workspace:packages/language-pack-client"],
 
     "@bt-synergy/language-pack-v3": ["@bt-synergy/language-pack-v3@workspace:packages/language-pack-v3"],
 
