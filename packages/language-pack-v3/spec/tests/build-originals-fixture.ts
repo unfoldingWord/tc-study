@@ -23,7 +23,7 @@ export async function buildOriginalsFixture(): Promise<Uint8Array> {
   if (!ref) throw new Error(`The test data has no ${UGNT}`)
   const zip = new JSZip()
   const counts: Record<string, number> = { receipt: 1 }
-  const put = (path: string, text: string): void => void zip.file(path, text, { date: FIXED })
+  const put = (path: string, text: string): void => void zip.file(path, text, { date: FIXED, createFolders: false })
   const name = encodeURIComponent(UGNT).replace(/%/g, '~')
   put(`rows/receipt/${name}.jsonl`, JSON.stringify({ key: `resource:${UGNT}`, entry: { content: { downloaded: true }, metadata: { downloadComplete: true, releaseStamp: ref.stamp } } }) + '\n')
   for (const layer of LAYERS) {

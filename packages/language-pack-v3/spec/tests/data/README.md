@@ -83,7 +83,7 @@ prepared rows). `es-419 ugl G1-G999` is group `0` of the lexicon: `content/1.jso
 | `originals/list.json` | 10 317 | `1516a779e6862a1bd846aa4e4fbf6eddd13fe73ab93e914d838d8efa748d5273` | the phase 0 sample's list of the originals: trimmed (source sha256 f0d6ca889d58fba47a0ad22597791596f6b368b5933931a30d39b037cd4983b8, 132 parts, 4 resources): 1 parts, 1 resources |
 | `es-419-tit.langpack.zip` | 314 931 | `d3ecdff0ee9e329f58ec6652571bbebe6873784aa1c90e943a01e3c5299285c8` | the phase 0 sample's pack: format 1.1 pack, es-419 Titus |
 
-Total: 1 567 846 bytes in 19 files (not counting `originals-tit.langpack.zip`, 26 864 bytes, made from the UGNT part).
+Total: 1 567 846 bytes in 19 files (not counting `originals-tit.langpack.zip`, 26 478 bytes, made from the UGNT part).
 
 ## Not copied
 

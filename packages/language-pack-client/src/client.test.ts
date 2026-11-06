@@ -579,7 +579,6 @@ describe('importOldPack with an originals pack', () => {
     expect(r.activated).toContain('es-419/book:tit')
     expect(r.waiting).toEqual([])
     const passage = await (await client.open('es-419')).passage('tit 2:11')
-    console.log('passage tit 2:11:', JSON.stringify(passage.data!.texts))
-    expect(passage.data!.texts.length).toBeGreaterThan(0)
+    expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
   }, 300_000)
 })

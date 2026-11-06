@@ -104,4 +104,8 @@ phase 1):
 - They go into a **local catalog** (`origin: local`, `publisher: local:` and the device), unsigned, with coverage
   partial where the old pack lacked something.
 - A later published catalog replaces them.
-- An old pack that brings no originals waits for them, as format 2.0 does today.
+- The bridge also builds the `orig` segment of each book it builds, from the `originals` source, and the local catalog lists it
+  (`orig:<book>`), so the bridged book activates and reads on a device with no network and no common catalog. The bridged orig is
+  built from what the `originals` source has, which may lack the MACULA rows the publisher's common orig reads, so its bytes (and
+  id) can differ from the published one. A published common catalog's orig keeps serving published books.
+- A book whose originals the `originals` source lacks is not built, and the pack waits for them, as format 2.0 does today.
