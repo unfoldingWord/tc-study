@@ -59,6 +59,18 @@ export function rewordTitusNote(): Tweak {
   }
 }
 
+/** A tweak that changes the title text a tW title row holds: the articles and the map change, the books do not. */
+export function retitleTw(): Tweak {
+  return {
+    row: (row) => {
+      if (row.layer !== 'text' || !row.key.startsWith('helps-text:tw-title')) return row
+      const value = JSON.parse(JSON.stringify(row.value))
+      value.content = `${String(value.content)} (otro)`
+      return { ...row, value }
+    },
+  }
+}
+
 type Built = { sample: Sample; common: Awaited<ReturnType<typeof buildCommon>>; source: (lang: string) => Promise<RowSource>; pkcs8: Uint8Array; core: XtopicsCore; records: ReturnType<typeof parseTipnr> }
 let memo: Promise<Built> | undefined
 

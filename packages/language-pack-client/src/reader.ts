@@ -23,6 +23,9 @@ import {
   xmapView,
   xtopicsView,
 } from '@bt-synergy/language-pack-v3'
+import { type ArticleData, articleQuery, type ContextData, contextQuery } from './query/article'
+import type { Answer } from './query/envelope'
+import { type PassageData, passageQuery } from './query/passage'
 import type { InstalledState } from './state'
 import { hex } from './state'
 import type { VerifiedCatalog } from './verify'
@@ -52,6 +55,11 @@ export interface PackReader {
   listed(unit: string): boolean
   /** The checked segments of an installed unit, or `undefined` when it is not installed. For the queries of later tasks. */
   segments(unit: string): Promise<Segment[] | undefined>
+  /** The revision of the catalog the unit was installed from (the catalog's own in `openFromSegments`), or `undefined` when it is not active. */
+  unitRevision(unit: string): number | undefined
+  passage(ref: string): Promise<Answer<PassageData>>
+  article(id: string, section?: string | 'all'): Promise<Answer<ArticleData>>
+  context(ref: string): Promise<Answer<ContextData>>
 }
 
 export type ReaderInput = {
@@ -61,22 +69,27 @@ export type ReaderInput = {
   /** Units that are active, as `<catalog>/<unit>` -> segment ids. Absent: every unit the catalogs list counts as installed until its bytes are missing. */
   active?: Record<string, string[]>
   revisions?: { lang?: number; common?: number }
+  /** The revision each active unit was installed from, as `<catalog>/<unit>` -> revision. Absent: the revision of the catalog that lists it. */
+  unitRevisions?: Record<string, number>
 }
 
 export function makeReader(o: ReaderInput): PackReader {
   const listedUnits = new Set<string>()
   const sizes = new Map<string, number>()
   const activeIds = new Map<string, string[]>()
+  const unitRevs = new Map<string, number>()
   for (const cat of o.catalogs) {
     for (const u of cat.catalog.units) {
       if (listedUnits.has(u.id)) continue
       listedUnits.add(u.id)
       sizes.set(u.id, u.segments.reduce((n, i) => n + (cat.catalog.segments[i]?.size ?? 0), 0))
+      const key = `${cat.name}/${u.id}`
       if (o.active === undefined) activeIds.set(u.id, u.segments.map((i) => hex(cat.catalog.segments[i]!.id)))
       else {
-        const mine = o.active[`${cat.name}/${u.id}`]
+        const mine = o.active[key]
         if (mine !== undefined) activeIds.set(u.id, mine)
       }
+      unitRevs.set(u.id, o.unitRevisions?.[key] ?? cat.revision)
     }
   }
   const langCat = o.catalogs.find((c) => c.catalog.lang !== undefined) ?? o.catalogs[0]
@@ -204,7 +217,7 @@ export function makeReader(o: ReaderInput): PackReader {
   let mapsOnce: Promise<MapSet> | undefined
   const lang = o.revisions?.lang ?? langCat?.revision
   const common = o.revisions?.common ?? commonCat?.revision
-  return {
+  const reader: PackReader = {
     lang: o.lang,
     problems,
     revisions: () => ({ ...(lang !== undefined ? { lang } : {}), ...(common !== undefined ? { common } : {}) }),
@@ -238,7 +251,12 @@ export function makeReader(o: ReaderInput): PackReader {
       return undefined
     },
     segments,
+    unitRevision: (unit) => (activeIds.has(unit) ? unitRevs.get(unit) : undefined),
+    passage: (ref) => passageQuery(reader, ref),
+    article: (id, section) => articleQuery(reader, id, section),
+    context: (ref) => contextQuery(reader, ref),
   }
+  return reader
 }
 
 export function openFromSegments(o: { lang: string; catalogs: VerifiedCatalog[]; get: (id: string) => Promise<Uint8Array | undefined> }): PackReader {
@@ -254,7 +272,11 @@ export function readerOfState(o: {
   name: string
 }): PackReader {
   const active: Record<string, string[]> = {}
-  for (const [k, u] of Object.entries(o.state.units)) active[k] = u.segments
+  const unitRevisions: Record<string, number> = {}
+  for (const [k, u] of Object.entries(o.state.units)) {
+    active[k] = u.segments
+    unitRevisions[k] = u.revision
+  }
   const common = o.catalogs.find((c) => c.catalog.lang === undefined)
   const lang = o.state.active[o.name]?.revision
   const comm = common === undefined ? undefined : o.state.active[common.name]?.revision
@@ -263,6 +285,7 @@ export function readerOfState(o: {
     catalogs: o.catalogs,
     get: o.get,
     active,
+    unitRevisions,
     revisions: { ...(lang !== undefined ? { lang } : {}), ...(comm !== undefined ? { common: comm } : {}) },
   })
 }
