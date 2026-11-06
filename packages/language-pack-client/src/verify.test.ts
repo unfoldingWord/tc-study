@@ -7,7 +7,8 @@ import { sha512 } from '@noble/hashes/sha2.js'
 import { ed25519 } from '@noble/curves/ed25519.js'
 import { ed25519Verify, noblePrimitive, subtlePrimitive } from './ed25519'
 import { ClientError } from './errors'
-import { checkRevision, type InstalledCatalog, verifyCatalogFile } from './verify'
+import type { InstalledCatalog } from './state'
+import { checkRevision, verifyCatalogFile } from './verify'
 
 const SPEC = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests')
 const fileOf = (path: string): Uint8Array => new Uint8Array(readFileSync(join(SPEC, path)))
@@ -117,7 +118,7 @@ describe('a local catalog', () => {
 describe('checkRevision', () => {
   const A = 'a'.repeat(64)
   const B = 'b'.repeat(64)
-  const installed = (revision: number, id = A): InstalledCatalog => ({ publisher: 'pub', name: 'es-419', revision, id })
+  const installed = (revision: number, id = A): InstalledCatalog => ({ publisher: 'pub', name: 'es-419', revision, id, origin: 'published' })
   const incoming = async (revision: number, id = B, publisher = 'pub') => ({
     ...(await verifyCatalogFile(published, {}, { from: 'store' })),
     revision,

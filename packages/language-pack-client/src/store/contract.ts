@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { ClientError } from '../errors'
+import { emptyState } from '../state'
 import type { BlobStore } from './types'
+
+const cat = { name: 'es-419', publisher: 'pub', revision: 1, id: 'a'.repeat(64), origin: 'published' as const }
 
 const A = 'a'.repeat(64)
 const B = 'b1' + 'c'.repeat(62)
@@ -36,9 +39,9 @@ export function storeContract(make: () => Promise<BlobStore>): void {
     test('state round trip', async () => {
       const s = await make()
       expect(await s.getState()).toBeUndefined()
-      await s.setState({ v: 1, x: 'one' })
-      await s.setState({ v: 1, x: 'two' })
-      expect(await s.getState()).toEqual({ v: 1, x: 'two' })
+      await s.setState({ ...emptyState(), published: { one: cat } })
+      await s.setState({ ...emptyState(), published: { two: cat } })
+      expect(await s.getState()).toEqual({ ...emptyState(), published: { two: cat } })
     })
   })
 }

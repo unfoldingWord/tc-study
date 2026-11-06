@@ -13,6 +13,7 @@ import {
 } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
 import { ed25519Verify } from './ed25519'
+import type { InstalledCatalog } from './state'
 
 export type TrustPolicy = { trustedKeys?: Record<string, Uint8Array> }
 
@@ -27,9 +28,6 @@ export type VerifiedCatalog = {
   origin: 'published' | 'local'
   signedBy?: string
 }
-
-/** The part of an installed catalog that `checkRevision` reads. Task 4 replaces this with the real type. */
-export type InstalledCatalog = { publisher: string; name: string; revision: number; id: string }
 
 /**
  * Reads and checks a catalog file. `o.verify` is `@internal`: tests use it to run a given Ed25519 primitive; apps leave it out.

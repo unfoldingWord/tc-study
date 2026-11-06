@@ -1,5 +1,6 @@
-/** Installed state; Task 4 narrows it. */
-export type InstalledState = { v: 1; [k: string]: unknown }
+import type { InstalledState } from '../state'
+
+export type { InstalledState }
 
 export interface BlobStore {
   has(id: string): Promise<boolean>
