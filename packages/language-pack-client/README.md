@@ -96,6 +96,8 @@ Errors are `ClientError` with a `code` (`CLIENT_ERROR_CODES`): the list is `CLIE
 
 `bun test` (needs the sibling `packages/language-pack-v3` for the spec fixtures). `src/situations.test.ts` runs the five failure situations of the plan end to end: few resources, a book with no sources, an old pack with no network, mixed revisions, a mistitled article.
 
+`src/staging.e2e.test.ts` runs against the staging Worker (read-only GETs) and is opt-in: it is skipped unless `LP3_STAGING=1`, and no CI workflow sets that flag.
+
 ## Timings (desktop)
 
 `LP3_SAMPLE=<phase 0 sample folder> bun bench/timings.ts` builds English Psalms from the sample once, then reports the median of 20 runs, each on a fresh reader over the stored bytes (the second and third rows have the book read already, as a screen would).
