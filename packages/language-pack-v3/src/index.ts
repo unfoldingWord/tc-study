@@ -53,6 +53,7 @@ export { topicsView, xtopicsView } from './read/topics'
 export { parseTipnr, type TipnrRecord } from './source/tipnr'
 export {
   type ComplementFile,
+  type KnownTables,
   readTransfer,
   type TransferEntry,
   type TransferIndex,

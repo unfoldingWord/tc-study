@@ -1,16 +1,18 @@
 /**
  * The client: refresh the catalogs, install by unit, status, prune and verify. Calls on one client run one after the other.
  */
-import { FormatError, KNOWN, readSegment } from '@bt-synergy/language-pack-v3'
+import { FormatError, KNOWN, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
 import { catalogsOf, verifiedHave, type InstallReport, type MissingCommon, type Progress, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
+import { exportTransfer, importOldPack, importTransfer, type ImportReport } from './transfer'
 import type { PackSource } from './source/http'
 import { hex, type InstalledCatalog, type InstalledState, installedOf } from './state'
 import type { BlobStore } from './store/types'
 import { checkRevision, type TrustPolicy, type VerifiedCatalog, verifyCatalogFile } from './verify'
 
 export type { InstallReport, Progress } from './install'
+export type { ImportReport } from './transfer'
 
 export type RefreshReport = {
   catalogs: InstalledCatalog[]
@@ -34,6 +36,10 @@ export interface LanguagePackClient {
   status(lang: string): Promise<Status>
   prune(): Promise<{ removed: string[] }>
   verify(): Promise<{ bad: string[] }>
+  importTransfer(bytes: Uint8Array, o?: { confirmDowngrade?: boolean }): Promise<ImportReport>
+  exportTransfer(o: { lang: string; mode: 'full' | 'update'; books?: string[]; units?: string[]; base?: Uint8Array[] }): Promise<Uint8Array>
+  /** Converts a format 1.1 `.langpack.zip` into a local catalog. `originals` are the original-language rows (UGNT, UHB): a book is built only with them. */
+  importOldPack(zip: Uint8Array, o?: { originals?: RowSource; device?: string; now?: string }): Promise<ImportReport>
 }
 
 export function createClient(o: { store: BlobStore; source?: PackSource; trust: TrustPolicy }): LanguagePackClient {
@@ -251,5 +257,8 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     status: (lang) => queued(() => statusNow(lang)),
     prune: () => queued(pruneNow),
     verify: () => queued(verifyNow),
+    importTransfer: (bytes, opts = {}) => queued(() => importTransfer({ store, trust }, bytes, opts)),
+    exportTransfer: (opts) => queued(() => exportTransfer({ store, trust }, opts)),
+    importOldPack: (zip, opts = {}) => queued(() => importOldPack({ store, trust }, zip, opts)),
   }
 }
