@@ -78,6 +78,7 @@
         "book": { "type": "string", "description": "A book code." }
       },
       "required": [],
+      "not": { "required": ["category", "book"] },
       "additionalProperties": false
     }
   },

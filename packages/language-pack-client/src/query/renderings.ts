@@ -1,4 +1,10 @@
-/** `renderings`: how the installed texts of the language render the original words with one Strong, by their alignment. No Node module here. */
+/**
+ * `renderings`: how the installed texts of the language render the original words with one Strong, by their alignment. The key is
+ * resolved by the lookup rule of the `strong` table (queries/README.md: `G5485` is `G54850` when the table has that one); `data.strong`
+ * is the resolved key, and the original's words are matched against it. A book whose alignment counts positions in an original of
+ * another stamp than the installed one is left out (ids.md "Positions in the original") and named in `notInstalled` with
+ * `what: 'stale'`. No Node module here.
+ */
 import { answer, BOOKS, type Cell, strongKey } from '@bt-synergy/language-pack-v3'
 import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
@@ -32,10 +38,16 @@ export async function renderingsQuery(reader: PackReader, q: { strong: string } 
   const maps = await reader.maps()
   const found = new Map<string, { count: number; refs: string[] }>()
   const counted = new Set<string>()
+  // Without the `xmap` the table cannot resolve the key: a four-digit Greek key also matches the words keyed with a 0 added.
+  let alt: string | undefined
   if (maps.xmap !== undefined) {
     usedUnit(out, reader, 'xmap')
-    const books = (answer(maps, { kind: 'strong', key }) as { books: Record<string, Cell> }).books
-    for (const [book, c] of Object.entries(books)) if (c.state === 'count' || c.state === 'partial') counted.add(book)
+    const a = answer(maps, { kind: 'strong', key }) as { key: string; books: Record<string, Cell> }
+    key = a.key
+    for (const [book, c] of Object.entries(a.books)) if (c.state === 'count' || c.state === 'partial') counted.add(book)
+  } else {
+    missingUnit(out, { unit: 'xmap', bytes: reader.listed('xmap') ? reader.size('xmap') : 0 })
+    if (/^G\d{4}$/.test(key)) alt = `${key}0`
   }
   for (const book of BOOKS) {
     const bookUnit = `book:${book}`
@@ -50,12 +62,22 @@ export async function renderingsQuery(reader: PackReader, q: { strong: string } 
     const model = await reader.book(book)
     const orig = await reader.orig(book)
     if (model === undefined || orig === undefined) continue
+    if (model.orig[1] !== orig.stamp) {
+      // The positions count words of another original: they MUST NOT be used.
+      missingUnit(out, { book, unit: origUnit, bytes: reader.size(origUnit), what: 'stale' })
+      continue
+    }
     usedUnit(out, reader, bookUnit)
     usedUnit(out, reader, origUnit)
     const positions = new Set<number>()
     orig.words.forEach((w, i) => {
       if (strongKey(w.strong) === key) positions.add(i)
     })
+    if (positions.size === 0 && alt !== undefined) {
+      orig.words.forEach((w, i) => {
+        if (strongKey(w.strong) === alt) positions.add(i)
+      })
+    }
     if (positions.size === 0) continue
     for (const text of model.texts) {
       if (text.align === undefined) continue

@@ -193,7 +193,8 @@ export function makeReader(o: ReaderInput): PackReader {
   }
 
   async function buildMaps(): Promise<MapSet> {
-    const set: MapSet = { revision: o.revisions?.lang ?? langCat?.revision ?? 0 }
+    // The revision of the map that answers: the active `map` unit's, else the language's.
+    const set: MapSet = { revision: (activeIds.has('map') ? unitRevs.get('map') : undefined) ?? o.revisions?.lang ?? langCat?.revision ?? 0 }
     const read = async <V extends { part: string }>(unit: string, view: (s: Segment) => V): Promise<{ core: V; parts: Map<string, V> } | undefined> => {
       const segs = await segments(unit)
       if (segs === undefined) return undefined

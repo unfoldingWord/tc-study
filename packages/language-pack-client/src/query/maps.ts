@@ -7,8 +7,22 @@ import { type Answer, type CellState, missingUnit, newAnswer, usedUnit } from '.
 export const TOPIC_CATEGORIES = ['person', 'place', 'event', 'topic', 'story', 'section'] as const
 
 export type BookCell = { state: CellState; count?: number; verses?: number; installed: boolean; bytes?: number }
-/** `installed: false` (and no states) when a topic is asked and the `xtopics` module is not on the device. */
+/** `installed: false` (and no states) when the map that answers is not on the device: `xtopics` for a topic, `xmap` for `tw:`, `map` for `ta:`. */
 export type BooksData = { installed?: false; books: Record<string, BookCell> }
+
+/**
+ * Whether the map unit a query needs (`xmap` for `tw:` and the Strong table, `map` for `ta:`) was read. When it was not (not
+ * installed, or its bytes are bad) the unit goes to `notInstalled`, with its size when a catalog lists it: "nobody looked" is not
+ * `none` (counts.md).
+ */
+export function haveMap(out: Answer<unknown>, reader: PackReader, m: MapSet, unit: 'xmap' | 'map'): boolean {
+  if (m[unit] !== undefined) return true
+  missingUnit(out, { unit, bytes: reader.listed(unit) ? reader.size(unit) : 0 })
+  return false
+}
+
+/** The map unit the usage of an article comes from: the English TWL of the `xmap` for `tw:`, the language's tN of the `map` for `ta:`. */
+export const usageUnit = (concept: string): 'xmap' | 'map' => (concept.startsWith('tw:') ? 'xmap' : 'map')
 
 /** Notes the units of the maps an answer read. */
 async function usedMaps(out: Answer<unknown>, reader: PackReader): Promise<MapSet> {
@@ -50,9 +64,14 @@ export async function conceptQuery(reader: PackReader, id: string): Promise<Answ
   if (typeof id !== 'string' || id === '') throw new ClientError('E_ARG', 'concept needs an id')
   const out = newAnswer<unknown>(reader, 'concept')
   const m = await usedMaps(out, reader)
+  const article = id.startsWith('ta:') || id.startsWith('tw:')
+  if (article && !haveMap(out, reader, m, 'xmap')) {
+    out.data = { kind: 'concept', id, installed: false }
+    return out
+  }
   out.data = answer(m, { kind: 'concept', id })
   const found = out.data as { found: boolean; id: string }
-  if (found.found) {
+  if (found.found && (!article || haveMap(out, reader, m, usageUnit(found.id)))) {
     for (const [book, c] of Object.entries(cellsOf(m, found.id))) {
       const unit = `book:${book}`
       if (counted(c) && reader.listed(unit) && !reader.installed(unit)) missingUnit(out, { book, unit, bytes: reader.size(unit), what: found.id })
@@ -71,6 +90,10 @@ export async function booksQuery(reader: PackReader, q: { article: string } | { 
   const out = newAnswer<BooksData>(reader, 'books')
   const m = await usedMaps(out, reader)
   if (article === undefined && !id.startsWith('ta:') && !id.startsWith('tw:') && m.xtopics === undefined) {
+    out.data = { installed: false, books: {} }
+    return out
+  }
+  if ((id.startsWith('ta:') || id.startsWith('tw:')) && !haveMap(out, reader, m, usageUnit(id))) {
     out.data = { installed: false, books: {} }
     return out
   }

@@ -79,28 +79,31 @@ let memo: Promise<Built> | undefined
  * catalog only (same key, same common catalog); `commonRevision` builds a common catalog of another id (the language catalog
  * still requires the first one).
  */
-export async function buildSample(o: { revision?: number; tweak?: Tweak; commonRevision?: number } = {}): Promise<Sample> {
+export async function buildSample(o: { revision?: number; tweak?: Tweak; commonRevision?: number; requireNewCommon?: boolean } = {}): Promise<Sample> {
   memo ??= make()
   const base = await memo
   if (o.revision === undefined && o.tweak === undefined && o.commonRevision === undefined) return base.sample
   let { langCatalog, commonCatalog } = base.sample
   const segments = new Map(base.sample.segments)
+  // `requireNewCommon` (with `commonRevision`): the language catalog requires that common catalog instead of the first one.
+  let required: [string, number, string] = ['common', about.revision, base.common.catalog.id]
+  if (o.commonRevision !== undefined) {
+    const common = await buildCommon({ source: await base.source('en'), about: { ...about, revision: o.commonRevision }, mapLang: 'en' })
+    commonCatalog = await signCatalog(common.catalog.bytes, base.pkcs8)
+    if (o.requireNewCommon === true) required = ['common', o.commonRevision, common.catalog.id]
+  }
   if (o.revision !== undefined || o.tweak !== undefined) {
     const lang = await buildLanguage({
       source: tweaked(await base.source(ES), o.tweak ?? {}),
       lang: ES,
       registry: {},
       about: { ...about, revision: o.revision ?? 1 },
-      requires: [['common', about.revision, base.common.catalog.id]],
+      requires: [required],
       topics: { xtopics: base.core, records: base.records },
       aligned: true,
     })
     for (const s of lang.segments as BuiltSegment[]) segments.set(s.id, s.bytes)
     langCatalog = await signCatalog(lang.catalog.bytes, base.pkcs8)
-  }
-  if (o.commonRevision !== undefined) {
-    const common = await buildCommon({ source: await base.source('en'), about: { ...about, revision: o.commonRevision }, mapLang: 'en' })
-    commonCatalog = await signCatalog(common.catalog.bytes, base.pkcs8)
   }
   return { ...base.sample, segments, langCatalog, commonCatalog }
 }

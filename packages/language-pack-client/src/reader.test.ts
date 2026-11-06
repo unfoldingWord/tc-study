@@ -80,7 +80,7 @@ describe('open', () => {
     // The sample covers Titus only: compare the book it has, and the whole answer when it covers the lot.
     expect(got.books.tit).toEqual(want.books.tit!)
     const same = Object.keys(want.books).filter((b) => canonicalJson(got.books[b]) === canonicalJson(want.books[b])).length
-    console.log('g5485 books equal:', same, 'of', Object.keys(want.books).length, JSON.stringify(got.books.tit))
+    expect(same).toBeGreaterThan(0)
   })
 
   test('a corrupt stored segment is not installed, it is in problems, and verify lists it', async () => {

@@ -15,7 +15,7 @@ export type PassageData = {
 
 /** `tit 1:1-2` -> book `tit` and the range of verse ids; `E_ARG` for anything else. */
 export function parsePassage(ref: string): { book: string; ref: string; range: [number, number] } {
-  const m = /^([a-z0-9]{3})\s+(\S+)$/.exec(ref.trim())
+  const m = /^([a-z0-9]{3})\s+(\S+)$/.exec(ref.trim().toLowerCase())
   const range = m === null ? null : parseRef(m[1]!, m[2]!)
   if (m === null || range === null) throw new ClientError('E_ARG', `not a reference: ${JSON.stringify(ref)}`)
   return { book: m[1]!, ref: m[2]!, range }
@@ -72,6 +72,8 @@ export async function passageQuery(reader: PackReader, input: string): Promise<A
   usedUnit(out, reader, unit)
   const [from, to] = range
   const data: PassageData = { book, ref, texts: [], notes: [], questions: [], links: [] }
+  /** Rows in range by resource key, for the coverage. */
+  const inRange = new Map<string, number>()
   for (const t of model.texts) {
     data.texts.push({ res: t.res, text: textOfRange(book, t.pieces, t.events, from, to) })
     out.cites.push({ res: t.res, release: releaseOf(model.res, t.res), ref: `${book} ${ref}` })
@@ -82,6 +84,7 @@ export async function passageQuery(reader: PackReader, input: string): Promise<A
     for (const row of table.rows) {
       if (row.from > to || row.to < from) continue
       data[kind].push(row)
+      inRange.set(table.res, (inRange.get(table.res) ?? 0) + 1)
       out.cites.push({ res: table.res, release: releaseOf(model.res, table.res), id: row.id, ref: row.ref })
     }
   }
@@ -93,7 +96,8 @@ export async function passageQuery(reader: PackReader, input: string): Promise<A
     for (const [key] of maps.map.core.res) {
       if (!COVERED.has(idOf(key))) continue
       const c = maps.map.core.coverage.get(key)
-      cov[key] = c?.whole.includes(book) ? 'count' : c?.partial.includes(book) ? 'partial' : 'none'
+      // queries/README.md "States": a whole source with no row in the range is `zero`, not `count`.
+      cov[key] = c?.whole.includes(book) ? ((inRange.get(key) ?? 0) > 0 ? 'count' : 'zero') : c?.partial.includes(book) ? 'partial' : 'none'
     }
     out.coverage = cov
   }

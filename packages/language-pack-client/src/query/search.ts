@@ -11,7 +11,8 @@ export async function searchQuery(
   filters: SearchFilters = {},
 ): Promise<Answer<Hit[]>> {
   const out = newAnswer<Hit[]>(reader, 'search')
-  const hits = await index.search(reader.lang, text, filters)
+  // The index may hold books this reader does not have active (a shared index, a book removed since): those hits are left out.
+  const hits = (await index.search(reader.lang, text, filters)).filter((h) => reader.installed(`book:${h.book}`))
   out.data = hits
   const releases = new Map<string, readonly (readonly [string, string])[] | undefined>()
   for (const h of hits) {

@@ -338,8 +338,27 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const state = await loadState(store)
     const name = state.aliases?.[lang] ?? lang
     const { lang: langCat, catalogs } = await catalogsOf(store, trust, state, name)
-    if (langCat === undefined) throw new ClientError('E_NOT_INSTALLED', `the catalog of ${lang} is not installed`)
-    return readerOfState({ lang: langCat.name, name, catalogs, state, get: (id) => st(() => store.get(id)), ...(o.index !== undefined ? { index: o.index } : {}) })
+    // The active units are read from the catalogs they came from (catalog.md: until a unit's new revision is complete, the device
+    // keeps using the one it had). The published catalogs come first, so what they list (and its size) is what is offered; the
+    // catalogs of the active units are added after them, by id, so a unit the published catalogs no longer reach (a common catalog
+    // the server lags on, a unit a later revision dropped) stays readable.
+    const all = [...catalogs]
+    const tried = new Set(all.map((c) => c.id))
+    const addFrom = async (names: Set<string>): Promise<void> => {
+      for (const u of Object.values(state.units)) {
+        if (!names.has(u.catalog) || tried.has(u.catalogId)) continue
+        tried.add(u.catalogId)
+        const c = await readStored(store, trust, { name: u.catalog, publisher: '', revision: u.revision, id: u.catalogId, origin: 'published' })
+        if (c !== undefined && c.name === u.catalog) all.push(c)
+      }
+    }
+    await addFrom(new Set([name]))
+    const commons = new Set<string>()
+    for (const c of all) if (c.name === name) for (const [rname] of c.catalog.requires ?? []) commons.add(rname)
+    await addFrom(commons)
+    const first = langCat ?? all.find((c) => c.name === name)
+    if (first === undefined) throw new ClientError('E_NOT_INSTALLED', `the catalog of ${lang} is not installed`)
+    return readerOfState({ lang: first.name, name, catalogs: all, state, get: (id) => st(() => store.get(id)), ...(o.index !== undefined ? { index: o.index } : {}) })
   }
 
   return {
