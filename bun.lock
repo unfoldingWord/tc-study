@@ -505,6 +505,7 @@
       "dependencies": {
         "@bt-synergy/language-pack-v3": "workspace:*",
         "@noble/curves": "2.2.0",
+        "@noble/hashes": "2.2.0",
       },
       "devDependencies": {
         "@types/node": "^20.10.0",

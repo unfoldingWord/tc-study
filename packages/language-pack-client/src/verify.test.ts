@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CATALOG_TABLES, readHeader, readSegment, readTransfer, writeSegment } from '@bt-synergy/language-pack-v3'
 import { newKey } from '../test/keys'
+import { sha512 } from '@noble/hashes/sha2.js'
+import { ed25519 } from '@noble/curves/ed25519.js'
 import { ed25519Verify, noblePrimitive, subtlePrimitive } from './ed25519'
 import { ClientError } from './errors'
 import { checkRevision, type InstalledCatalog, verifyCatalogFile } from './verify'
@@ -150,5 +152,34 @@ describe('checkRevision', () => {
   beforeAll(async () => {
     incoming9 = await incoming(9)
     incoming12 = await incoming(12)
+  })
+})
+
+describe('the cofactorless equation', () => {
+  // A = B (private scalar 1), R = B + T with T the point of order 2, S = 1 + k: [S]B - R - [k]A = -T, not 0.
+  const P = ed25519.Point
+  const L = P.Fn.ORDER
+  const le = (bytes: Uint8Array): bigint => bytes.reduceRight((n, b) => (n << 8n) | BigInt(b), 0n)
+  const toLE32 = (n: bigint): Uint8Array => Uint8Array.from({ length: 32 }, (_, i) => Number((n >> BigInt(8 * i)) & 0xffn))
+  const message = new TextEncoder().encode('m')
+
+  test('a signature off by a point of order 2 is rejected by both primitives', async () => {
+    const order2 = P.fromAffine({ x: 0n, y: 2n ** 255n - 20n })
+    const A = P.BASE.toBytes()
+    const R = P.BASE.add(order2).toBytes()
+    const input = new Uint8Array([...R, ...A, ...message])
+    const k = le(sha512(input)) % L
+    const sig = new Uint8Array([...R, ...toLE32((1n + k) % L)])
+    // noble's own verify (cofactored) accepts this signature: that is why noblePrimitive checks the equation itself.
+    expect(ed25519.verify(sig, message, A, { zip215: false })).toBe(true)
+    expect(await noblePrimitive(A, sig, message)).toBe(false)
+    expect(await subtlePrimitive(A, sig, message)).toBe(false)
+  })
+
+  test('a valid RFC 8032 signature (test 1) is accepted by both', async () => {
+    const key = unhex('d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a')
+    const sig = unhex('e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b')
+    expect(await noblePrimitive(key, sig, new Uint8Array(0))).toBe(true)
+    expect(await subtlePrimitive(key, sig, new Uint8Array(0))).toBe(true)
   })
 })
