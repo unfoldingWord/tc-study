@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { createClient } from '../client'
 import { ClientError } from '../errors'
+import { usageBooks } from './maps'
 import { httpSource } from '../source/http'
 import { memoryStore } from '../store/memory'
 import { type FakeServer, startFakeServer } from '../../test/fakeServer'
@@ -34,13 +35,20 @@ describe('books', () => {
     const a = await r.books({ article: METAPHOR })
     expect(a.query).toBe('books')
     const books = a.data!.books
-    expect(books.tit).toEqual({ state: 'count', count: 23, verses: 16, installed: true })
+    // The language's own tN (es-419, the map's usage table), not the English one.
+    expect(books.tit).toEqual({ state: 'count', count: 14, verses: 9, installed: true })
     expect(books.isa!.state).toBe('none')
     expect(books.isa!.installed).toBe(false)
     expect(books.isa!.count).toBeUndefined()
     expect(Object.values(books).some((b) => b.state === 'zero')).toBe(false)
     expect(Object.keys(books)).toHaveLength(66)
-    expect(a.revision.units.xmap).toBeGreaterThan(0)
+    expect(a.revision.units.map).toBeGreaterThan(0)
+  })
+  test('a language map with no tN of its own gives every cell none, never zero', () => {
+    const m = { revision: 1, map: { core: { res: [['unfoldingWord/en/tn', 'v1']], coverage: new Map(), usage: undefined }, parts: new Map() } } as never
+    const cells = Object.values(usageBooks(m, 'ta:translate/figs-metaphor'))
+    expect(cells).toHaveLength(66)
+    expect(cells.every((c) => c.state === 'none')).toBe(true)
   })
   test('a tW article reads the word links', async () => {
     const r = await open({ books: ['tit'] })

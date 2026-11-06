@@ -21,11 +21,24 @@ function isBook(b: unknown): b is string {
   return typeof b === 'string' && (BOOKS as readonly string[]).includes(b)
 }
 
+/** The language's own tN: a source of the language map's coverage whose last segment is `tn` (not the English one). */
+export function languageTn(m: MapSet): string | undefined {
+  for (const [key] of m.map?.core.res ?? []) if (key !== TN && key.slice(key.lastIndexOf('/') + 1) === 'tn') return key
+  return undefined
+}
+
+/** The usage cells of a `ta:` / `tw:` article: the language's tN for `ta:` (every cell `none` when it has none), the English TWL for `tw:`. */
+export function usageBooks(m: MapSet, concept: string): Record<string, Cell> {
+  const source = concept.startsWith('tw:') ? TWL : (languageTn(m) ?? TN)
+  const books = (answer(m, { kind: 'usage', concept, source }) as { books: Record<string, Cell> }).books
+  if (source !== TN || concept.startsWith('tw:')) return books
+  return Object.fromEntries(Object.keys(books).map((b) => [b, { state: 'none' } as Cell]))
+}
+
 /** The per-book cells of a concept: the usage in tN / TWL for an article, the occurrences for a topic. */
 function cellsOf(m: MapSet, concept: string): Record<string, Cell> {
   if (concept.startsWith('ta:') || concept.startsWith('tw:')) {
-    const source = concept.startsWith('tw:') ? TWL : TN
-    return (answer(m, { kind: 'usage', concept, source }) as { books: Record<string, Cell> }).books
+    return usageBooks(m, concept)
   }
   const t = answer(m, { kind: 'topic', id: concept }) as { books?: Record<string, Cell> }
   return t.books ?? {}

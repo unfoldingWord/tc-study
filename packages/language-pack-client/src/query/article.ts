@@ -1,7 +1,8 @@
 /** `article`, and `context`: a passage with the default sections of the articles its notes and links name. No Node module here. */
-import { answer, type ArticleModel, type Role, type SectionModel, TN, TWL } from '@bt-synergy/language-pack-v3'
+import type { ArticleModel, Role, SectionModel } from '@bt-synergy/language-pack-v3'
 import type { PackReader } from '../reader'
 import { type Answer, absorb, missingUnit, newAnswer, releaseOf, usedUnit } from './envelope'
+import { usageBooks } from './maps'
 import { type PassageData, passageQuery } from './passage'
 
 export type ArticleData = {
@@ -68,10 +69,10 @@ export async function contextQuery(reader: PackReader, ref: string): Promise<Ans
     const art = await articleQuery(reader, concept)
     absorb(out, art)
     const books: string[] = []
-    if (maps.xmap !== undefined) {
-      usedUnit(out, reader, 'xmap')
-      const source = concept.startsWith('tw:') ? TWL : TN
-      const usage = answer(maps, { kind: 'usage', concept, source }) as { books: Record<string, { state: string }> }
+    if (maps.xmap !== undefined || maps.map !== undefined) {
+      if (maps.xmap !== undefined) usedUnit(out, reader, 'xmap')
+      if (maps.map !== undefined) usedUnit(out, reader, 'map')
+      const usage = { books: usageBooks(maps, concept) as Record<string, { state: string }> }
       for (const [book, cell] of Object.entries(usage.books)) {
         if (cell.state !== 'count' && cell.state !== 'partial') continue
         books.push(book)

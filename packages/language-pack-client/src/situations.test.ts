@@ -2,7 +2,6 @@
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { answer } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '../../language-pack-v3/src/node/partsSource'
 import { createClient } from './client'
 import { openFromSegments } from './reader'
@@ -130,9 +129,9 @@ describe('the five situations', () => {
     expect(a.data).not.toBeNull()
     expect(a.revision.units).toEqual({ 'book:rut': 3, map: 4 })
     // The map says 15 notes on metaphor in Ruth (revision 4); the installed book (revision 3) has 14.
-    // No client query reads the language's own tN usage (books() and concept() read the English sources), so this asks the map itself.
-    const usage = answer(await r.maps(), { kind: 'usage', concept: 'ta:translate/figs-metaphor', source: 'es-419_gl/es-419/tn' }) as { books: Record<string, { count?: number }> }
-    expect(usage.books.rut!.count).toBe(15)
+    const b = await r.books({ article: 'ta:translate/figs-metaphor' })
+    expect(b.data!.books.rut).toMatchObject({ state: 'count', count: 15, installed: true })
+    expect(b.revision.units.map).toBe(4)
     const book = await r.book('rut')
     const metaphors = book!.notes!.rows.filter((n) => JSON.stringify(n).includes('figs-metaphor'))
     expect(metaphors.length).toBe(14)

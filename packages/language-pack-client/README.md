@@ -88,7 +88,7 @@ type Answer<T> = {
 | `renderings({ strong } or { book, word })` | a Strong's number or a word | how the language renders it, with counts and references |
 | `search(text, filters?)` | full text | hits over the installed books, from the client's index or one built in memory |
 
-`none` means the source does not cover the book; it is not zero. The JSON Schema of each `data` is `schemas` (exported from the package, `src/query/schemas.json`). The language's own tN usage (the `usage` table of the `map`) is read through `reader.maps()` and `answer` of `language-pack-v3`; none of the eight queries reads it.
+`none` means the source does not cover the book; it is not zero. The JSON Schema of each `data` is `schemas` (exported from the package, `src/query/schemas.json`). For a `ta:` article, `books` and `context` read the usage table of the language's `map`, judged by the language's own `tn` source (the coverage key whose last segment is `tn`, not `unfoldingWord/en/tn`); a language whose map has none gets `none` in every cell. A `tw:` article reads the English word links (`unfoldingWord/en/twl`) of the `xmap`. The answer names the `map` or `xmap` unit in `revision.units`.
 
 Errors are `ClientError` with a `code` (`CLIENT_ERROR_CODES`): the list is `CLIENT_ERROR_CODES` (`E_DOWNGRADE`, `E_COMMON`, `E_NO_BASE`, `E_NO_PACK`, `E_NETWORK`, `E_STORE`, ...); a signature or format failure is a `FormatError` of `language-pack-v3` with its own code (`E_SIGNATURE`, `E_BODY`, ...).
 

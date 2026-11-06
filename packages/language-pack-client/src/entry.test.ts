@@ -6,7 +6,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 
 const SRC = import.meta.dir
 const BUILTINS = new Set(builtinModules.map((m) => m.replace(/^node:/, '').split('/')[0]!))
-const FROM = /(?:^|[\s;])(?:import|export)\s+(?:type\s+)?(?:[^'"`;]*?\s+from\s+)?['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g
+const FROM = /(?:^|[\s;}])(?:import|export)\s*(?:type\s+)?(?:[^'"`;]*?\s*from\s*)?['"]([^'"]+)['"]|\b(?:import|require)\s*\(\s*['"]([^'"]+)['"]\s*\)/g
 
 function specifiers(text: string): string[] {
   const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -55,6 +55,9 @@ function offenders(entry: string, root: string): { chains: string[]; files: stri
 test('the specifier scanner sees imports, exports and dynamic imports', () => {
   const t = `import { a } from 'node:fs'\nexport * from './x'\nexport { b } from "bun:test"\nimport type { C } from './c'\nconst d = await import('path')\n// import z from 'fs'\nimport './side'`
   expect(specifiers(t)).toEqual(['node:fs', './x', 'bun:test', './c', 'path', './side'])
+  expect(specifiers(`import{a}from'node:fs';export*from'./y'
+const f = require('fs')
+import type{T}from"./t"`)).toEqual(['node:fs', './y', 'fs', './t'])
   expect(forbidden('node:fs')).toBe(true)
   expect(forbidden('fs')).toBe(true)
   expect(forbidden('crypto')).toBe(true)
