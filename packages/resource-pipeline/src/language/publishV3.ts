@@ -107,6 +107,9 @@ export async function publishV3(o: {
       log(`catalog ${name}: unchanged (revision ${before.revision})`)
       continue
     }
+    if (o.signer !== undefined && !(await signedBy(bytes, o.signer))) {
+      throw new Error(`The catalog ${name} in ${outDir} does not verify against the signing key ${o.signer.keyId}: nothing was uploaded`)
+    }
     planned.push({ name, bytes, model, id })
   }
 
@@ -135,6 +138,10 @@ export async function publishV3(o: {
     if (required === undefined) throw new Error(`The catalog ${lang} does not require the common catalog`)
     if (required[1] !== there.revision || hex(required[2]) !== there.id) {
       throw new Error(`The catalog ${lang} requires common revision ${required[1]} id ${hex(required[2])}, and the common catalog of the bucket after this run is revision ${there.revision} id ${there.id}`)
+    }
+    // A signed language catalog must not stand on a common catalog another key (or none) signed.
+    if (o.signer !== undefined && putCommon === undefined && !(await signedBy(published.common!.bytes, o.signer))) {
+      throw new Error(`The catalog ${lang} requires the published common catalog (revision ${there.revision}), which is not signed by the signing key ${o.signer.keyId}: nothing was uploaded`)
     }
     if (putCommon === undefined) for (const entry of (await readCatalog(published.common!.bytes)).model.segments) commonIds.push(hex(entry.id))
   }

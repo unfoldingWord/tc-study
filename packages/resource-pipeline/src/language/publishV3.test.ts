@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, readdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { KNOWN, readSegment } from '@bt-synergy/language-pack-v3'
 import { main } from '../../cli/build-v3'
+import { testKey } from '../../cli/testKey'
 import { dirBucket } from './dirBucket'
 import { IMMUTABLE, memoryBucket, NO_CACHE, type PackBucket } from './publishLanguage'
 import { publishV3, readPublishedV3, V3_KEYS } from './publishV3'
@@ -242,5 +243,65 @@ describe('dirBucket', () => {
     expect(await bucket.getBytes('v3/nope')).toBeNull()
     await expect(bucket.put('v3/../x', 'x', { contentType: 'a', cacheControl: 'b' })).rejects.toThrow(/Refused/)
     await expect(bucket.has('..\\x')).rejects.toThrow(/Refused/)
+  })
+})
+
+describe('publishV3: signing key', () => {
+  const log = () => {}
+  const signed = async (key: { pem: string }) => build(['--sign-key', key.pem])
+  const signerOf = async (key: { pem: string }) => {
+    const { readSigningKey } = await import('./signKey')
+    const { publicKey, keyId } = await readSigningKey(key.pem)
+    return { publicKey, keyId }
+  }
+
+  test('puts catalogs signed by the key', async () => {
+    const key = testKey()
+    const bucket = memoryBucket()
+    const result = await publishV3({ bucket, outDir: await signed(key), lang: LANG, publishCommon: true, signer: await signerOf(key), log })
+    expect(result.outcome).toBe('published')
+    expect(keys(bucket)).toContain(V3_KEYS.catalog('common'))
+  })
+
+  test('a catalog of the build that does not verify against the key is refused before any upload', async () => {
+    const key = testKey()
+    const bucket = memoryBucket()
+    await expect(publishV3({ bucket, outDir: copy(), lang: LANG, publishCommon: true, signer: await signerOf(key), log })).rejects.toThrow(/does not verify against the signing key/)
+    expect(bucket.puts).toEqual([])
+    const other = testKey()
+    await expect(publishV3({ bucket, outDir: await signed(other), lang: LANG, publishCommon: true, signer: await signerOf(key), log })).rejects.toThrow(/does not verify/)
+    expect(bucket.puts).toEqual([])
+  })
+
+  test('a language catalog over a published common catalog signed by another key, or by none, is refused and nothing is put', async () => {
+    const key = testKey()
+    const other = testKey()
+    const out = await signed(key)
+    // The same build, its common catalog signed by another key / unsigned, in the bucket.
+    for (const common of [await signed(other), built]) {
+      const bucket = memoryBucket()
+      const bytes = new Uint8Array(readFileSync(join(common, 'catalog-common.seg')))
+      await bucket.put(V3_KEYS.catalog('common'), bytes, { contentType: 'x', cacheControl: 'x' })
+      bucket.puts.length = 0
+      await expect(publishV3({ bucket, outDir: out, lang: LANG, publishCommon: false, signer: await signerOf(key), log })).rejects.toThrow(/not signed by the signing key/)
+      expect(bucket.puts).toEqual([])
+    }
+  })
+
+  test('over a published common catalog signed by the same key the language catalog is put', async () => {
+    const key = testKey()
+    const out = await signed(key)
+    const bucket = memoryBucket()
+    await bucket.put(V3_KEYS.catalog('common'), new Uint8Array(readFileSync(join(out, 'catalog-common.seg'))), { contentType: 'x', cacheControl: 'x' })
+    for (const f of readdirSync(join(out, 'segments'))) await bucket.put(`v3/seg/${f}`, new Uint8Array(readFileSync(join(out, 'segments', f))), { contentType: 'x', cacheControl: 'x' })
+    bucket.puts.length = 0
+    const result = await publishV3({ bucket, outDir: out, lang: LANG, publishCommon: false, signer: await signerOf(key), log })
+    expect(result.outcome).toBe('published')
+    expect(keys(bucket)).toContain(V3_KEYS.catalog(LANG))
+  })
+
+  test('without a signer nothing changes: an unsigned build is put', async () => {
+    const bucket = memoryBucket()
+    expect((await run(bucket, copy())).outcome).toBe('published')
   })
 })
