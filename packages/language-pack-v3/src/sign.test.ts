@@ -8,7 +8,15 @@ import { CATALOG_TABLES } from './read/catalog'
 import { canonicalJson, readerOutput } from './read/output'
 import { buildCatalog } from './build/catalog'
 import { writeTransfer } from './transfer'
-import { keyId, publicKeyOf, signCatalog, verifyCatalog } from './sign'
+import { ed25519 } from '@noble/curves/ed25519.js'
+import { type Ed25519Verify, keyId, publicKeyOf, signCatalog, verifyCatalog as verifyWith } from './sign'
+
+/** The pure-JS primitive a runtime without WebCrypto Ed25519 would pass: strict (RFC 8032), no ZIP 215. */
+const noble: Ed25519Verify = async (publicKey, signature, message) => ed25519.verify(signature, message, publicKey, { zip215: false })
+const PRIMITIVES: [string, Ed25519Verify | undefined][] = [
+  ['WebCrypto', undefined],
+  ['noble', noble],
+]
 
 const CASES = join(import.meta.dir, '..', 'spec', 'tests')
 const fileOf = (name: string): Uint8Array => new Uint8Array(readFileSync(join(CASES, name)))
@@ -52,7 +60,8 @@ describe('key id', () => {
   })
 })
 
-describe('signing a catalog', () => {
+describe.each(PRIMITIVES)('signing a catalog (%s)', (_name, primitive) => {
+  const verifyCatalog = (file: Uint8Array, trusted: Record<string, Uint8Array>) => verifyWith(file, trusted, primitive)
   test('sign then verify', async () => {
     const k = await newKey()
     const signed = await signCatalog(published, k.privateKey)
@@ -181,7 +190,8 @@ describe('the reader', () => {
   })
 })
 
-describe('encodings and precedence the spec fixes', () => {
+describe.each(PRIMITIVES)('encodings and precedence the spec fixes (%s)', (_name, primitive) => {
+  const verifyCatalog = (file: Uint8Array, trusted: Record<string, Uint8Array>) => verifyWith(file, trusted, primitive)
   const unhex = (text: string): Uint8Array => Uint8Array.from(text.match(/../g)!, (pair) => parseInt(pair, 16))
   const withKey = async (publicKey: Uint8Array, s: Uint8Array): Promise<Uint8Array> =>
     withSig(published, [{ key: keyId(publicKey), alg: 'ed25519', s }])

@@ -8,7 +8,8 @@
 // Container and errors
 export { CLASS_NAMES, type ClassName, hex, type LogicalHeader, readHeader, readSegment, type Segment, writeSegment } from './codec/container'
 export { FORMAT_ERROR_CODES, FormatError, type FormatErrorCode } from './codec/errors'
-export { keyId, publicKeyOf, signCatalog, verifyCatalog } from './sign'
+export { checkSignatures, type Ed25519Verify, keyId, publicKeyOf, signCatalog, verifyCatalog } from './sign'
+export { CATALOG_TABLES } from './read/catalog'
 
 // Ids
 export {

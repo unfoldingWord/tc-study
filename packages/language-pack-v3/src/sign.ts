@@ -14,6 +14,18 @@ import { CATALOG_TABLES, catalogView } from './read/catalog'
 
 type Header = Record<string, unknown>
 
+/**
+ * An Ed25519 verification primitive. A runtime whose WebCrypto has no Ed25519 passes one (strict, RFC 8032, not ZIP 215); the
+ * canonical-point and small-order rules of {@link checkSignatures} run before it, so they hold for every primitive. A throw is a failed signature.
+ */
+export type Ed25519Verify = (publicKey: Uint8Array, signature: Uint8Array, message: Uint8Array) => Promise<boolean>
+
+/** The default primitive: WebCrypto. */
+const subtleVerify: Ed25519Verify = async (publicKey, signature, message) => {
+  const imported = await crypto.subtle.importKey('raw', copy(publicKey), { name: 'Ed25519' }, false, ['verify'])
+  return crypto.subtle.verify('Ed25519', imported, copy(signature), copy(message))
+}
+
 /** The id of a key: the first 16 hex digits (lowercase) of the sha256 of its 32-byte raw public key. */
 export function keyId(publicKey: Uint8Array): string {
   return toHex(sha256(publicKey)).slice(0, 16)
@@ -98,7 +110,7 @@ const reject = (why: string): never => {
  * trusted key, or throws `E_SIGNATURE` when `sig` is missing or malformed, no element names a trusted key, or an element of a
  * trusted key does not verify. Does not look at `origin`: the caller decides which catalogs it checks.
  */
-export async function checkSignatures(header: Header, id: Uint8Array, trusted: Record<string, Uint8Array>): Promise<{ key: string; valid: true }> {
+export async function checkSignatures(header: Header, id: Uint8Array, trusted: Record<string, Uint8Array>, verify: Ed25519Verify = subtleVerify): Promise<{ key: string; valid: true }> {
   const sig = header.sig
   if (!Array.isArray(sig) || sig.length === 0) return reject('sig is missing or is not a list')
   const entries = sig.map((item) => {
@@ -117,8 +129,7 @@ export async function checkSignatures(header: Header, id: Uint8Array, trusted: R
       if (!canonicalPoint(publicKey) || !canonicalPoint(s.subarray(0, 32))) throw new Error('not canonical')
       // Rejected here for every runtime: WebCrypto implementations disagree on A or R of small order (catalog.md).
       if (smallOrder(publicKey) || smallOrder(s.subarray(0, 32))) throw new Error('small order')
-      const imported = await crypto.subtle.importKey('raw', copy(publicKey), { name: 'Ed25519' }, false, ['verify'])
-      ok = await crypto.subtle.verify('Ed25519', imported, copy(s), copy(id))
+      ok = await verify(publicKey, s, id)
     } catch {
       ok = false
     }
@@ -134,9 +145,13 @@ export async function checkSignatures(header: Header, id: Uint8Array, trusted: R
  * container or the catalog wins), then {@link checkSignatures}. Gives the key that verified; throws {@link FormatError} `E_SIGNATURE`
  * per the rules of `catalog.md`. It does not look at the origin: a reader skips `local` catalogs before calling it.
  */
-export async function verifyCatalog(catalogFile: Uint8Array, trusted: Record<string, Uint8Array>): Promise<{ key: string; valid: true }> {
+export async function verifyCatalog(
+  catalogFile: Uint8Array,
+  trusted: Record<string, Uint8Array>,
+  verify: Ed25519Verify = subtleVerify,
+): Promise<{ key: string; valid: true }> {
   const { seg, header, id } = await readSegment(catalogFile, { known: CATALOG_TABLES, expectedClass: 'catalog' })
   catalogView(seg) // an invalid body is E_BODY before any signature is looked at
-  return checkSignatures(header, hexToBytes(id), trusted)
+  return checkSignatures(header, hexToBytes(id), trusted, verify)
 }
 
