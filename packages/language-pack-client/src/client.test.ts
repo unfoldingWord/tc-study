@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { zipSource } from '@bt-synergy/language-pack-v3'
+import { KNOWN, origView, readSegment, type RowSource, zipSource } from '@bt-synergy/language-pack-v3'
 import { createClient } from './client'
 import { ClientError } from './errors'
 import { httpSource, type PackSource } from './source/http'
@@ -979,7 +979,13 @@ describe('importOldPack with an originals pack', () => {
   })
 
   test('a published install later replaces the local catalog and still reads', async () => {
-    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    // Without the book stamps of catalog.json (an older originals pack) the bridged orig is known by the release tag, so it is not
+    // the published one: its segment is the bridge's own, and prune must remove it.
+    const zipped = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const originals: RowSource = {
+      rows: (f) => zipped.rows(f),
+      resources: async (lang) => (await zipped.resources(lang)).map(({ bookStamps: _, ...ref }) => ref),
+    }
     const srv = startFakeServer(sample)
     server?.stop()
     server = srv
@@ -1009,6 +1015,25 @@ describe('importOldPack with an originals pack', () => {
     expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
   })
 
+  test('with the same rows and book stamps, the bridged orig is the published one', async () => {
+    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const srv = startFakeServer(sample)
+    server?.stop()
+    server = srv
+    const store = memoryStore()
+    const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
+    await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    const bridgedOrig = (await store.getState())!.units['es-419/orig:tit']!.segments
+    expect(bridgedOrig).toEqual(segsOf['common/orig:tit']!)
+    await client.refresh('es-419')
+    const inst = await client.install('es-419', { books: ['tit'] })
+    expect(inst.fetched).not.toContain(bridgedOrig[0]!) // already stored: the bridge made the same bytes
+    expect((await store.getState())!.units['es-419/orig:tit']).toBeUndefined()
+    await client.prune()
+    expect(await store.has(bridgedOrig[0]!)).toBe(true) // common/orig:tit uses it
+    expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
+  })
+
   test('with no common catalog, a published book does not activate against the bridged orig', async () => {
     const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
     const srv = startFakeServer(sample, { noCommon: true })
@@ -1034,10 +1059,16 @@ describe('importOldPack with an originals pack', () => {
     const real = (name: string) => new Uint8Array(readFileSync(join(OLD_PACKS!, name)))
     const originals = await zipSource(real('originals.langpack.zip'))
     expect((await originals.resources('originals')).find((r) => r.key === 'unfoldingWord/el-x-koine/ugnt')!.books).toContain('tit')
-    const client = offlineDevice()
+    const store = memoryStore()
+    const client = createClient({ store, trust })
     const r = await client.importOldPack(real('es-419-tit.langpack.zip'), { originals, ...OLD })
     expect(r.activated).toContain('es-419/book:tit')
     expect(r.waiting).toEqual([])
+    // The bridged orig carries Titus's MACULA (sentence trees and referents), as the published one does.
+    const [origId] = (await store.getState())!.units['es-419/orig:tit']!.segments
+    const orig = origView((await readSegment((await store.get(origId!))!, { known: KNOWN.orig })).seg)
+    expect(orig.macula?.trees).toBeDefined()
+    expect(orig.macula?.referents).toBeDefined()
     const passage = await (await client.open('es-419')).passage('tit 2:11')
     expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
   }, 300_000)

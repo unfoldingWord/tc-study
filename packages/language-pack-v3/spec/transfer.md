@@ -109,6 +109,8 @@ phase 1):
   as soon as no installed unit needs it, and its segments and the local catalog can be pruned.
 - The bridge also builds the `orig` segment of each book it builds, from the `originals` source, and the local catalog lists it
   (`orig:<book>`), so the bridged book activates and reads on a device with no network and no common catalog. The bridged orig is
-  built from what the `originals` source has, which may lack the MACULA rows the publisher's common orig reads, so its bytes (and
-  id) can differ from the published one. A published common catalog's orig keeps serving published books.
+  built from the book's rows in the `originals` source, its MACULA trees and referents included, and with the book's stamp from
+  the pack's `catalog.json` (`bookBlobs`). When those rows and stamps are the ones the publisher built from, its bytes (and id) are
+  the published orig's; when they are not (an older originals pack, without MACULA or without `catalog.json`), they differ. A
+  published common catalog's orig keeps serving published books.
 - A book whose originals the `originals` source lacks is not built, and the pack waits for them, as format 2.0 does today.

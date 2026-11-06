@@ -1,6 +1,6 @@
 /**
- * A row source over a format 1.1 language pack (a zip): `manifest.json` and `rows/{layer}/{resource}.jsonl`, one
- * `{"key", "entry"}` per line. A browser or a Worker can run it: jszip and pako only. The order of the rows, the filters
+ * A row source over a format 1.1 language pack (a zip): `manifest.json`, `rows/{layer}/{resource}.jsonl` (one
+ * `{"key", "entry"}` per line) and, when the pack has it, `catalog.json` (the Door43 catalog row of each resource). A browser or a Worker can run it: jszip and pako only. The order of the rows, the filters
  * and `lang` are in `rows.ts`.
  *
  * The rows are the pack's own: an entry keeps the dates a cache sets (`timestamp`, `expiresAt`, `processingDate`) that
@@ -39,6 +39,10 @@ const BOOK_SCOPED_SUBJECTS = new Set([
 
 const SOT_PREFIXES = ['scripture-usj:', 'tn:', 'twl:', 'tq:', 'obs:']
 
+/** The MACULA resources (`Biblica/el-x-koine/macula`): rows `{resource}/trees/{BOOK}` and `{resource}/referents/{BOOK}`, one book each. */
+const isMacula = (resourceKey: string): boolean => resourceKey.endsWith('/macula')
+const MACULA_PARTS = ['trees', 'referents']
+
 /**
  * The book a row of a book-scoped resource is about (lowercase), or undefined. A 1.1 pack does not say it per row, so it
  * is read from the key the way the cache writes it: source rows right after the resource key (`tn:{key}:{book}[:{chapter}]`),
@@ -52,6 +56,12 @@ function bookOfRow(key: string, layer: string, resourceKey: string): string | un
       const head = `${prefix}${resourceKey}:`
       if (key.startsWith(head)) book = key.slice(head.length).split(':')[0]
     }
+    if (isMacula(resourceKey)) {
+      for (const part of MACULA_PARTS) {
+        const head = `${resourceKey}/${part}/`
+        if (key.startsWith(head)) book = key.slice(head.length)
+      }
+    }
   } else if (layer === 'prepared') {
     book = key.split(':')[3]
   } else if (layer === 'quote' || layer === 'align') {
@@ -63,8 +73,31 @@ function bookOfRow(key: string, layer: string, resourceKey: string): string | un
   return book ? book.toLowerCase() : undefined
 }
 
-/** Resources of tW, tA, OBS and the lexicons are not about one book: their keys (`prepared:words:…:bible/kt/grace`) are not read for one. */
-const isBookScoped = (resource: ManifestResource): boolean => resource.books !== undefined || BOOK_SCOPED_SUBJECTS.has(resource.subject ?? '')
+/**
+ * Resources of tW, tA, OBS and the lexicons are not about one book: their keys (`prepared:words:…:bible/kt/grace`) are not read for one.
+ * MACULA is: each of its rows is one book's, so a book's original gets that book's trees and referents, as from the parts.
+ */
+const isBookScoped = (resource: ManifestResource): boolean =>
+  resource.books !== undefined || BOOK_SCOPED_SUBJECTS.has(resource.subject ?? '') || isMacula(resource.key)
+
+/** A git blob as the catalog writes it: lowercase hex (40 digits in practice); the stamp keeps the first 10. */
+const BLOB = /^[0-9a-f]{10,}$/
+
+/**
+ * The stamp of each of `books` as format 2.0 records it (`g` and the first 10 digits of the book's blob), from the catalog row's
+ * `metadata.contentMetadata.bookBlobs`, as `partsSource` reads it from a parts list; `undefined` when no book has one.
+ */
+function bookStampsOf(row: unknown, books: string[]): Record<string, string> | undefined {
+  const meta = (row as { metadata?: { contentMetadata?: { bookBlobs?: unknown } } } | undefined)?.metadata
+  const blobs = meta?.contentMetadata?.bookBlobs
+  if (typeof blobs !== 'object' || blobs === null || Array.isArray(blobs)) return undefined
+  const stamps: [string, string][] = []
+  for (const book of books) {
+    const blob = Object.prototype.hasOwnProperty.call(blobs, book) ? (blobs as Record<string, unknown>)[book] : undefined
+    if (typeof blob === 'string' && BLOB.test(blob)) stamps.push([book, `g${blob.slice(0, 10)}`])
+  }
+  return stamps.length > 0 ? Object.fromEntries(stamps) : undefined
+}
 
 /**
  * The books the pack has rows for in a resource. The manifest's `books` of a resource are the books the store had, whether
@@ -103,7 +136,8 @@ export type ZipSource = RowSource & { language: string }
  *
  * The pack's own language is `manifest.language`, and the source's `language` says it. Receipts (`rows/receipt/`) are not
  * rows of a source and are not read. The `kind` of a resource is its manifest `subject`; its `stamp` is the manifest's
- * `stamp`; its `title` is the manifest's `title` when it has one (the manifest has no license, rights or credit line).
+ * `stamp`; its `title` is the manifest's `title` when it has one (the manifest has no license, rights or credit line); its
+ * `bookStamps` come from `catalog.json` when the pack has it.
  */
 export async function zipSource(zip: Uint8Array, originals?: RowSource): Promise<ZipSource> {
   const archive = await JSZip.loadAsync(zip)
@@ -113,6 +147,13 @@ export async function zipSource(zip: Uint8Array, originals?: RowSource): Promise
   if (manifest.format !== PACK_FORMAT) throw new Error(`This is not a language pack: its format is ${JSON.stringify(manifest.format)}, not ${PACK_FORMAT}`)
   if (Number(String(manifest.formatVersion).split('.')[0]) !== 1) throw new Error(`Only format 1 packs are read here, not ${manifest.formatVersion}`)
   if (!Array.isArray(manifest.resources)) throw new Error('The manifest of the pack lists no resources')
+  // The Door43 catalog rows, by resource key: they give each book's stamp (an original is known by the blob of its book file).
+  const catalogFile = archive.file('catalog.json')
+  const catalogRows = new Map<string, unknown>()
+  if (catalogFile) {
+    const rows = JSON.parse(await catalogFile.async('string')) as unknown
+    if (Array.isArray(rows)) for (const row of rows) if (typeof (row as { key?: unknown })?.key === 'string') catalogRows.set((row as { key: string }).key, row)
+  }
 
   /** The resources of the pack that answer for `lang`: the originals it carries, or the rest if it is the pack's language. */
   const resourcesOf = (lang: string): ManifestResource[] => {
@@ -176,8 +217,11 @@ export async function zipSource(zip: Uint8Array, originals?: RowSource): Promise
           }
           return [...found]
         }
-        const ref: ResourceRef = { key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books: await carriedBooks(manifest, resource, sotBooks) }
+        const books = await carriedBooks(manifest, resource, sotBooks)
+        const ref: ResourceRef = { key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books }
         if (typeof resource.title === 'string' && resource.title.trim() !== '') ref.title = resource.title
+        const bookStamps = bookStampsOf(catalogRows.get(resource.key), books)
+        if (bookStamps !== undefined) ref.bookStamps = bookStamps
         refs.push(ref)
       }
       return refs
