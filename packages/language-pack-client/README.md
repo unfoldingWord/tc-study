@@ -123,3 +123,25 @@ The phone has not been measured yet: that is C3.
 - **Phone timings.** Only desktop numbers are here; the targets above are checked on the 2 GB phone in C3.
 - **Stems.** `search` matches words as they are; stemming per language is for the app (or a later task).
 - **Key distribution.** The app decides which public keys it trusts and how it gets them.
+
+## Open items (after C1, 2026-11-06)
+
+What C1 left open, so the next phases find it here and not only in the session that built it:
+
+- **Production publisher key.** Only the staging key exists (`language-pack-v3/keys/78d2e6299a2de4d0.pub`). Abel makes the production key outside the repositories; its public half goes in `keys/` and in each app's trusted keys.
+- **`transfer-v3.ts` and the library.** `resource-pipeline/cli/transfer-v3.ts` keeps its own copy of the import rules (signatures, no going back, forks refused, base check). Open question: should it call `importTransfer` / `exportTransfer` here instead, so the rules live in one place?
+- **Phone timings (C3).** Psalms readable in under 3 s and a verse with its helps in under 50 ms, on the 2 GB phone, store reads included.
+- **Drivers and OPFS (C3, C5).** A `SqlDriver` for wa-sqlite (browser), Capacitor (Servos) and Tauri (desktop); an OPFS `BlobStore` if IndexedDB is too slow for tc-study.
+- **Stems (C2).** Snowball stems for es and pt in the search index.
+- **Minors deferred from the final review:**
+  - an answer's `usedMaps` can name more maps than it read;
+  - a stale entry reuses the `notInstalled` shape;
+  - `search` applies its filters after the limit;
+  - no end-to-end tests yet for `refresh` and `importTransfer`;
+  - `install` verifies the catalogs twice.
+
+Rulings made while building C1 that apps must know:
+
+- A catalog whose publisher differs from the installed one of the same name is treated like a lower revision (`E_DOWNGRADE` unless `confirmDowngrade`).
+- `install` saves what it activated, then rethrows `E_NETWORK`, including 429 with `retryAfter`. A hash mismatch or a 404 on one segment leaves that unit waiting.
+- A book whose installed original has another stamp shows no renderings until it is updated (alignment positions never cross originals).
