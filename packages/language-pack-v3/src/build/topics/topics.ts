@@ -3,7 +3,7 @@
  *
  * - **alignment**: {@link alignedNames} over the TIPNR records and the aligned books of the language.
  * - **outline**: an entry of the language's own tN outline whose range makes the id of a `sec:` topic of the core gives that
- *   section a name; one that makes none becomes `{lang}:tema/{slug}` in `local`, with its range as `refs`.
+ *   section a name; one that makes none becomes `{lang}:tema/{book}/{slug}` in `local`, with its range as `refs`.
  * - **obs**: the title of a story of the language names `obs:{n}` when the core has that story.
  *
  * Only topics the core has get names (no orphan). No versification conversion (English numbering is the UHB's). The part of a
@@ -123,7 +123,7 @@ export function buildTopics(o: {
         continue
       }
       const range = `${entry.from}-${entry.to}`
-      const base = `${lang}:tema/${book}/${slugOf(entry.title) || `${book}-${entry.from}`}`
+      const base = `${lang}:tema/${book}/${slugOf(entry.title) || `${entry.from}`}`
       let key = base
       for (let n = 2; local[key] !== undefined && rangeOfLocal.get(key) !== range; n++) key = `${base}-${n}`
       if (local[key] === undefined) {
