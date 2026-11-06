@@ -69,12 +69,17 @@ const isBookScoped = (resource: ManifestResource): boolean => resource.books !==
 /**
  * The books the pack has rows for in a resource. The manifest's `books` of a resource are the books the store had, whether
  * or not the pack carries them: a book pack carries those of its own `books`, a base pack carries none, any other pack
- * carries them all. A resource with no source rows has none. (A 1.0 pack has no `books`: this says none.)
+ * carries them all. A resource with no source rows has none. A resource of a book-scoped subject with source rows and no
+ * `books` (a 1.1 pack of the originals writes none) has the books of its source rows, read from their keys.
  */
-function carriedBooks(manifest: Manifest, resource: ManifestResource): string[] {
-  if (!resource.books || !resource.rows?.sot) return []
+async function carriedBooks(manifest: Manifest, resource: ManifestResource, sotBooks: () => Promise<string[]>): Promise<string[]> {
+  if (!resource.rows?.sot) return []
   const wanted = manifest.kind === 'book' && manifest.books ? new Set(manifest.books) : undefined
-  return [...new Set(resource.books)].filter((book) => !wanted || wanted.has(book)).sort()
+  let books: string[]
+  if (resource.books) books = resource.books
+  else if (isBookScoped(resource)) books = await sotBooks()
+  else return []
+  return [...new Set(books)].filter((book) => !wanted || wanted.has(book)).sort()
 }
 
 /** The start of a line the pack writes: `{"key":"…","entry":…}`. The key is read without parsing the entry. */
@@ -161,11 +166,21 @@ export async function zipSource(zip: Uint8Array, originals?: RowSource): Promise
     rows,
     async resources(lang) {
       if (lang === ORIGINALS && originals) return originals.resources(lang)
-      return resourcesOf(lang).map((resource): ResourceRef => {
-        const ref: ResourceRef = { key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books: carriedBooks(manifest, resource) }
+      const refs: ResourceRef[] = []
+      for (const resource of resourcesOf(lang)) {
+        const sotBooks = async (): Promise<string[]> => {
+          const found = new Set<string>()
+          for (const { key } of await fileOf(resource, 'sot')) {
+            const book = bookOfRow(key, 'sot', resource.key)
+            if (book) found.add(book)
+          }
+          return [...found]
+        }
+        const ref: ResourceRef = { key: resource.key, stamp: resource.stamp, kind: resource.subject ?? '', books: await carriedBooks(manifest, resource, sotBooks) }
         if (typeof resource.title === 'string' && resource.title.trim() !== '') ref.title = resource.title
-        return ref
-      })
+        refs.push(ref)
+      }
+      return refs
     },
   }
 }

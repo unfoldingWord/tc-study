@@ -1,4 +1,7 @@
 import { afterEach, beforeAll, describe, expect, test } from 'bun:test'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { zipSource } from '@bt-synergy/language-pack-v3'
 import { createClient } from './client'
 import { ClientError } from './errors'
 import { httpSource, type PackSource } from './source/http'
@@ -522,4 +525,43 @@ describe('final review, trust and installation', () => {
     expect(removed).not.toContain(c1)
     expect(await store.has(c1)).toBe(true)
   })
+})
+
+// An old pack of a book is built with an originals pack of format 1.1, whose manifest lists no `books` (spec/tests/data/README.md).
+// The book segment is stored, and it waits for `orig:tit` as with any originals source: that unit comes with the published catalogs.
+const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
+const dataFile = (name: string) => new Uint8Array(readFileSync(join(DATA, name)))
+const OLD_PACKS = process.env.LP3_OLD_PACKS
+const OLD = { device: 'test-device', now: '2026-11-01T10:00:00Z' }
+
+describe('importOldPack with an originals pack', () => {
+  test('importOldPack builds the book with an originals pack whose manifest lists no books', async () => {
+    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const { client } = setup()
+    const r = await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    // The map, the local catalog and the book (with no originals the book is left out and only two are stored).
+    expect(r.stored).toHaveLength(3)
+    expect(r.missing).toEqual([])
+    expect(r.waiting).toEqual([{ key: 'es-419/book:tit', missing: ['es-419/orig:tit'] }])
+
+    // The published catalogs bring orig:tit and the book activates.
+    await client.refresh('es-419')
+    const inst = await client.install('es-419', { books: ['tit'] })
+    expect(inst.waiting).toEqual([])
+  })
+
+  // LP3_OLD_PACKS=<folder with originals.langpack.zip and es-419-tit.langpack.zip as prepare-language writes them>
+  test.skipIf(!OLD_PACKS || !existsSync(join(OLD_PACKS, 'originals.langpack.zip')))('the real packs of prepare-language build Titus', async () => {
+    const real = (name: string) => new Uint8Array(readFileSync(join(OLD_PACKS!, name)))
+    const originals = await zipSource(real('originals.langpack.zip'))
+    expect((await originals.resources('originals')).find((r) => r.key === 'unfoldingWord/el-x-koine/ugnt')!.books).toContain('tit')
+    const { client } = setup()
+    const r = await client.importOldPack(real('es-419-tit.langpack.zip'), { originals, ...OLD })
+    expect(r.stored).toHaveLength(3)
+    expect(r.waiting).toEqual([{ key: 'es-419/book:tit', missing: ['es-419/orig:tit'] }])
+    await client.refresh('es-419')
+    await client.install('es-419', { books: ['tit'] })
+    const passage = await (await client.open('es-419')).passage('tit 2:11')
+    expect(passage.data).not.toBeNull()
+  }, 300_000)
 })

@@ -39,6 +39,10 @@ The resources of the lists, with the release each row was made from (`resources[
 - `parts/<sha256>.part.gz`: the part files, under their own names (the sha256 of the file). Gzip of JSONL
   `{layer, key, value}`.
 - `es-419-tit.langpack.zip`: the format 1.1 pack of es-419 Titus (`kind: book`, books `["tit"]`).
+- `originals-tit.langpack.zip`: a format 1.1 pack of the originals with Titus of the UGNT, shaped like the `originals.langpack.zip` of
+  `prepare-language` (`kind: originals`, resource `role: original`, `rows` counts, and no `books`). Built from the UGNT part above by
+  `spec/tests/build-originals-fixture.ts` (`bun spec/tests/build-originals-fixture.ts`; the zip is deterministic). It has the source and
+  prepared rows of Titus (5 and 7) and a receipt; the real pack also has index rows, which the bridge does not read. Same license as the UGNT.
 
 ## What is here, and where each file comes from
 
@@ -79,7 +83,7 @@ prepared rows). `es-419 ugl G1-G999` is group `0` of the lexicon: `content/1.jso
 | `originals/list.json` | 10 317 | `1516a779e6862a1bd846aa4e4fbf6eddd13fe73ab93e914d838d8efa748d5273` | the phase 0 sample's list of the originals: trimmed (source sha256 f0d6ca889d58fba47a0ad22597791596f6b368b5933931a30d39b037cd4983b8, 132 parts, 4 resources): 1 parts, 1 resources |
 | `es-419-tit.langpack.zip` | 314 931 | `d3ecdff0ee9e329f58ec6652571bbebe6873784aa1c90e943a01e3c5299285c8` | the phase 0 sample's pack: format 1.1 pack, es-419 Titus |
 
-Total: 1 567 846 bytes in 19 files.
+Total: 1 567 846 bytes in 19 files (not counting `originals-tit.langpack.zip`, 26 864 bytes, made from the UGNT part).
 
 ## Not copied
 
