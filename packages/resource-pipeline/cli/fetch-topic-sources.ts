@@ -45,6 +45,23 @@ export function pins(): TopicSource[] {
   return (JSON.parse(readFileSync(join(import.meta.dir, 'topic-sources.json'), 'utf8')) as { sources: TopicSource[] }).sources
 }
 
+/**
+ * Why the files under `dir` are not the pinned sources, or undefined. A file is right when its sha256 is the pin's `sha256` (as fetch
+ * wrote it), or, for a pin with `rawSha256`, when it is the LF bytes of the commit (`rawSha256`) whose CRLF form has the pin's `sha256`.
+ */
+export function sourcesProblem(dir: string, sources: TopicSource[] = pins()): string | undefined {
+  for (const s of sources) {
+    const file = join(dir, s.target)
+    if (!existsSync(file)) return `${file} is missing (pinned source ${s.name})`
+    const bytes = new Uint8Array(readFileSync(file))
+    const disk = sha256Of(bytes)
+    if (disk === s.sha256) continue
+    if (s.rawSha256 !== undefined && disk === s.rawSha256 && sha256Of(s.eol === 'crlf' ? toCrlf(bytes) : bytes) === s.sha256) continue
+    return `${file}: sha256 is ${disk}, the pin in topic-sources.json says ${s.sha256}`
+  }
+  return undefined
+}
+
 /** Why `out` may not hold source files, or undefined. */
 export function outProblem(out: string, work?: string): string | undefined {
   const abs = resolve(out)

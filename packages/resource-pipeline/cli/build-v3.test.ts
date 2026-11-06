@@ -4,7 +4,9 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { catalogView, hex, keyId, KNOWN, readerOutput, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
+import { createHash } from 'node:crypto'
 import { main, optionsFromArgs, USAGE } from './build-v3'
+import type { TopicSource } from './fetch-topic-sources'
 import { testKey } from './testKey'
 
 // The sample of es-419 Titus the language-pack-v3 package tests with: real parts, a trimmed list.
@@ -372,13 +374,24 @@ describe('build-v3: --topics', () => {
     return dir
   }
   const files = (out: string): Record<string, string> => snapshot(out, 'segments')
+  const sha = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex')
+  /** Pins that say what the files of `dir` are now (the fixtures are not the pinned sources). */
+  const pinsOf = (dir: string): TopicSource[] =>
+    Object.keys(snapshot(dir)).map((target) => ({ name: target, repository: 'x/y', host: 'github', commit: '0'.repeat(40), path: target, sha256: sha(read(join(dir, target))), target }))
+  const runWith = async (args: string[], sources: TopicSource[]) => {
+    const out: string[] = []
+    const err: string[] = []
+    const code = await main(args, { log: (l) => out.push(l), error: (l) => err.push(l) }, sources)
+    return { code, out, err }
+  }
 
   test('adds the xtopics and the topics segments and leaves every other segment as the build without it', async () => {
     const plain = temp()
     const withTopics = temp()
     const base = ['--map-lang', 'en', '--map-list', EN_LIST]
     expect((await run(sample(plain, base))).code).toBe(0)
-    const result = await run(sample(withTopics, [...base, '--topics', sources()]))
+    const src = sources()
+    const result = await runWith(sample(withTopics, [...base, '--topics', src]), pinsOf(src))
     expect(result.err).toEqual([])
     expect(result.code).toBe(0)
     expect(result.out.some((line) => /^xtopics\s+-\s/.test(line))).toBe(true)

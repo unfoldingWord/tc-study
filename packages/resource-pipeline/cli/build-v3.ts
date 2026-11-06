@@ -57,6 +57,7 @@ import {
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 import { readSigningKey, type SigningKey } from '../src/language/signKey'
+import { pins, sourcesProblem, type TopicSource } from './fetch-topic-sources'
 
 export class UsageError extends Error {}
 
@@ -133,7 +134,7 @@ function flagsOf(argv: string[]): Map<string, string> {
   return flags
 }
 
-export function optionsFromArgs(argv: string[]): Options {
+export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins()): Options {
   const flags = flagsOf(argv)
   const need = (name: string): string => {
     const value = flags.get(name)
@@ -212,6 +213,8 @@ export function optionsFromArgs(argv: string[]): Options {
     if (!readdirSync(content).some((f) => /^\d\d\.md$/.test(f))) throw new UsageError(`--topics: ${content} has no NN.md story file`)
     const texts = readdirSync(join(topics, 'tipnr')).filter((f) => f.endsWith('.txt'))
     if (texts.length !== 1) throw new UsageError(`--topics: ${join(topics, 'tipnr')} must have exactly one .txt file (the TIPNR file), it has ${texts.length}`)
+    const wrong = sourcesProblem(topics, sources)
+    if (wrong !== undefined) throw new UsageError(`--topics: ${wrong}`)
   }
 
   return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key') }
@@ -442,10 +445,10 @@ async function build(o: Options, io: Io): Promise<void> {
 }
 
 /** The command: its exit code (0, 1 for a usage error, 2 for a build error). `io` takes what it prints. */
-export async function main(argv: string[], io: Io = { log: console.log, error: console.error }): Promise<number> {
+export async function main(argv: string[], io: Io = { log: console.log, error: console.error }, sources: TopicSource[] = pins()): Promise<number> {
   let options: Options
   try {
-    options = optionsFromArgs(argv)
+    options = optionsFromArgs(argv, sources)
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
     io.error(error.message)
