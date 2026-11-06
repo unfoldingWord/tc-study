@@ -20,6 +20,7 @@ The base is the packs Worker's origin, for example `https://<worker host>`. Path
 - `{lang}` is a BCP 47 tag. The Worker lowercases it and applies the same aliases as `/v2/packs` (today `es` → `es-419`),
   then checks it against `^[a-z]{2,3}(-[a-z0-9]{1,8})*$`. The answer for an alias is the catalog of the tag it maps to.
 - `common` is reserved: no language is called `common` (a language tag has 2 or 3 letters before the first `-`).
+- The path `/v3/packs/seg/catalog` is the catalog of the language `seg` (Segeju), not a segment: a path whose first element is `seg` is a segment only when the second is 64 lowercase hex.
 - `{id}` is the segment's id (`container.md`: the sha256 of the **uncompressed body**, not of the file) in 64 lowercase hex
   digits. Uppercase hex is a bad path (400), not an alias.
 - A trailing slash, a query string other than one the Worker ignores, a third path element, or any other path under `/v3/packs/`
@@ -107,9 +108,9 @@ The packs bucket (R2) holds format 3 under its own prefix, so the format 2.0 cle
 | Key | Content | Written |
 | --- | --- | --- |
 | `v3/seg/{id}.seg` | a segment file | before any catalog that names it; never rewritten |
-| `v3/catalog/{lang}.seg` | the language catalog | last, after every segment it and the common catalog name exists |
+| `v3/catalog/{lang}.seg` | the language catalog | last, after every segment it and the common catalog name exists, and after the registry |
 | `v3/catalog/common.seg` | the common catalog | only by the run of the map language (`en`), before that language's catalog |
-| `v3/registry/{lang}.json` | the section registry of the language's builds (`ids.md`) | after the language catalog; never served |
+| `v3/registry/{lang}.json` | the section registry of the language's builds (`ids.md`) | after the segments and before any catalog (a catalog that is visible always has its registry); never served |
 
 Uploads use `Cache-Control: public, max-age=31536000, immutable` for segments and `no-cache` for catalogs; the Worker sets its own
 headers anyway. Nothing else is written under `v3/`. Source files the builders read (TIPNR, Theographic, OBS) are never uploaded
