@@ -74,25 +74,24 @@ export async function catalogsOf(
 }
 
 /**
- * The stored segment ids that still read as the segment their id says (`readSegment` with the class tables and `expectedId`).
- * A blob that does not is left out, so it counts as missing and is fetched again.
+ * Of the segments the plan names, the ones stored that still read as the segment their id says (`readSegment` with the class
+ * tables and `expectedId`). A blob that does not is left out, so it counts as missing and is fetched again. Nothing else in the
+ * store is read; the result is also the only `have` the activation sees, so an install activates what it asked for.
  */
-export async function verifiedHave(store: BlobStore, catalogs: VerifiedCatalog[]): Promise<Set<string>> {
-  const stored = new Set(await st(() => store.ids()))
+export async function verifiedHave(store: BlobStore, steps: Step[], stored: ReadonlySet<string>): Promise<Set<string>> {
   const have = new Set<string>()
   const tables = KNOWN as Record<string, Record<string, number[]> | undefined>
   const checked = new Set<string>()
-  for (const cat of catalogs) {
-    for (const entry of cat.catalog.segments) {
-      const id = hex(entry.id)
-      if (!stored.has(id) || checked.has(id)) continue
-      checked.add(id)
-      const known = tables[entry.class]
-      const bytes = await st(() => store.get(id))
+  for (const step of steps) {
+    for (const seg of step.segments) {
+      if (!stored.has(seg.id) || checked.has(seg.id)) continue
+      checked.add(seg.id)
+      const known = tables[seg.class]
+      const bytes = await st(() => store.get(seg.id))
       if (bytes === undefined || known === undefined) continue
       try {
-        await readSegment(bytes, { known, expectedId: id })
-        have.add(id)
+        await readSegment(bytes, { known, expectedId: seg.id })
+        have.add(seg.id)
       } catch (e) {
         if (!(e instanceof FormatError)) throw e
       }

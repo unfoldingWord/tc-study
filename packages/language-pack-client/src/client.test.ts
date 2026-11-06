@@ -408,4 +408,43 @@ describe('fix round 1', () => {
     await expect(client.install('es-419', { books: ['tit'] })).rejects.toMatchObject({ code: 'E_STORE' })
     expect(await store.getState()).toEqual(before)
   })
+
+  test('6: install reads only the planned segments from the store', async () => {
+    const inner = memoryStore()
+    const gets: string[] = []
+    const store: BlobStore = {
+      has: (id) => inner.has(id),
+      get: (id) => (gets.push(id), inner.get(id)),
+      ids: () => inner.ids(),
+      delete: (id) => inner.delete(id),
+      put: (id, b) => inner.put(id, b),
+      getState: () => inner.getState(),
+      setState: (s) => inner.setState(s),
+    }
+    const { client } = setup({}, sample, store)
+    const part = Object.keys(segsOf).find((k) => k.startsWith('es-419/aligned:'))!.slice('es-419/aligned:'.length)
+    await client.install('es-419', { defaults: false, aligned: [part] })
+    const stray = 'cd'.repeat(32)
+    await inner.put(stray, new Uint8Array([7]))
+    const unrelated = [stray, ...segsOf[`es-419/aligned:${part}`]!]
+    gets.length = 0
+    await client.install('es-419', { defaults: false, units: ['map'] })
+    expect(gets.filter((id) => unrelated.includes(id))).toEqual([])
+    expect(gets.length).toBeGreaterThan(0) // the catalogs and the planned segments are read
+  })
+
+  test('7: prune keeps the common catalog a kept language catalog requires', async () => {
+    const { client, store } = setup()
+    await client.install('es-419', { defaults: false, units: ['map'] })
+    const c1 = (await verifyCatalogFile(sample.commonCatalog, {}, { from: 'store' })).id
+    expect(await store.has(c1)).toBe(true)
+    const c2 = await verifyCatalogFile(otherCommon.commonCatalog, {}, { from: 'store' })
+    await store.put(c2.id, otherCommon.commonCatalog)
+    const state = (await store.getState())!
+    await store.setState({ ...state, published: { ...state.published, common: { name: 'common', publisher: c2.publisher, revision: 2, id: c2.id, origin: 'published' } } })
+    const { removed } = await client.prune()
+    expect(removed).not.toContain(c1)
+    expect(await store.has(c1)).toBe(true)
+    expect((await createClient({ store, source: offline, trust }).status('es-419')).missingCommon).toBeUndefined()
+  })
 })

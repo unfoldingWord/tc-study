@@ -139,8 +139,9 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const state = await loadState(store)
     const { catalogs } = await catalogsOf(store, trust, state, name)
     if (catalogs.length === 0) throw new ClientError('E_STORE', `the catalog of ${name} is not in the store`)
-    const have = await verifiedHave(store, catalogs)
-    const plan = planInstall(catalogs, state, want, have)
+    const stored = new Set(await st(() => store.ids()))
+    const plan = planInstall(catalogs, state, want, stored)
+    const have = await verifiedHave(store, plan.steps, stored)
     return runSteps({ store, source: need() }, catalogs, state, have, plan.steps, plan.unknown, opts)
   }
 
@@ -177,16 +178,27 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
   async function pruneNow(): Promise<{ removed: string[] }> {
     const state = await loadState(store)
     const used = new Set<string>()
+    const kept = new Set<string>()
     // A unit keeps the catalog of the revision it came from, which can be older than `active` while its re-download is pending.
     for (const u of Object.values(state.units)) {
       for (const s of u.segments) used.add(s)
       used.add(u.catalogId)
+      kept.add(u.catalogId)
     }
     // The stored catalogs of `active` and `published`, and the segments they name (some may be half-fetched, for a retry).
-    for (const entry of [...Object.values(state.active), ...Object.values(state.published)]) {
-      used.add(entry.id)
-      const cat = await readStored(store, trust, entry)
-      if (cat !== undefined) for (const s of cat.catalog.segments) used.add(hex(s.id))
+    const current = new Set([...Object.values(state.active), ...Object.values(state.published)].map((e) => e.id))
+    for (const id of current) {
+      used.add(id)
+      kept.add(id)
+    }
+    // Every kept language catalog also keeps the catalogs it requires, by id: `published.common` may have moved on.
+    for (const id of kept) {
+      if (!(await st(() => store.has(id)))) continue
+      const entry = [...Object.values(state.active), ...Object.values(state.published)].find((e) => e.id === id)
+      const cat = await readStored(store, trust, entry ?? { name: '', publisher: '', revision: 0, id, origin: 'published' })
+      if (cat === undefined) continue
+      for (const r of cat.catalog.requires ?? []) used.add(hex(r[2]))
+      if (current.has(id)) for (const s of cat.catalog.segments) used.add(hex(s.id))
     }
     const removed: string[] = []
     for (const id of await st(() => store.ids())) {

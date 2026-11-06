@@ -43,5 +43,11 @@ export function storeContract(make: () => Promise<BlobStore>): void {
       await s.setState({ ...emptyState(), published: { two: cat } })
       expect(await s.getState()).toEqual({ ...emptyState(), published: { two: cat } })
     })
+    test('a state keeps its aliases', async () => {
+      const s = await make()
+      const state = { ...emptyState(), aliases: { es: 'es-419' } }
+      await s.setState(state)
+      expect(await s.getState()).toEqual(state)
+    })
   })
 }
