@@ -884,7 +884,7 @@ describe('tables', () => {
 })
 
 describe('FormatError', () => {
-  test('the codes are exactly the 13 of container.md', () => {
+  test('the codes are exactly the 14 of container.md', () => {
     expect([...FORMAT_ERROR_CODES]).toEqual([
       'E_MAGIC',
       'E_VERSION',
@@ -899,6 +899,7 @@ describe('FormatError', () => {
       'E_HMISMATCH',
       'E_TABLE',
       'E_LIMIT',
+      'E_SIGNATURE',
     ])
   })
 

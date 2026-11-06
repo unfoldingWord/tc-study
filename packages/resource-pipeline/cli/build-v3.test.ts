@@ -3,8 +3,11 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { catalogView, hex, KNOWN, readerOutput, readSegment } from '@bt-synergy/language-pack-v3'
+import { catalogView, hex, keyId, KNOWN, readerOutput, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
+import { createHash } from 'node:crypto'
 import { main, optionsFromArgs, USAGE } from './build-v3'
+import type { TopicSource } from './fetch-topic-sources'
+import { testKey } from './testKey'
 
 // The sample of es-419 Titus the language-pack-v3 package tests with: real parts, a trimmed list.
 const DATA = join(import.meta.dir, '..', '..', 'language-pack-v3', 'spec', 'tests', 'data')
@@ -371,13 +374,24 @@ describe('build-v3: --topics', () => {
     return dir
   }
   const files = (out: string): Record<string, string> => snapshot(out, 'segments')
+  const sha = (b: Uint8Array): string => createHash('sha256').update(b).digest('hex')
+  /** Pins that say what the files of `dir` are now (the fixtures are not the pinned sources). */
+  const pinsOf = (dir: string): TopicSource[] =>
+    Object.keys(snapshot(dir)).map((target) => ({ name: target, repository: 'x/y', host: 'github', commit: '0'.repeat(40), path: target, sha256: sha(read(join(dir, target))), target }))
+  const runWith = async (args: string[], sources: TopicSource[]) => {
+    const out: string[] = []
+    const err: string[] = []
+    const code = await main(args, { log: (l) => out.push(l), error: (l) => err.push(l) }, sources)
+    return { code, out, err }
+  }
 
   test('adds the xtopics and the topics segments and leaves every other segment as the build without it', async () => {
     const plain = temp()
     const withTopics = temp()
     const base = ['--map-lang', 'en', '--map-list', EN_LIST]
     expect((await run(sample(plain, base))).code).toBe(0)
-    const result = await run(sample(withTopics, [...base, '--topics', sources()]))
+    const src = sources()
+    const result = await runWith(sample(withTopics, [...base, '--topics', src]), pinsOf(src))
     expect(result.err).toEqual([])
     expect(result.code).toBe(0)
     expect(result.out.some((line) => /^xtopics\s+-\s/.test(line))).toBe(true)
@@ -386,6 +400,53 @@ describe('build-v3: --topics', () => {
     const after = files(withTopics)
     for (const [name, hex] of Object.entries(before)) expect(after[name]).toBe(hex)
     expect(Object.keys(after).length).toBeGreaterThan(Object.keys(before).length)
+  })
+
+  describe('the pinned sha256 of the source files', () => {
+    const toCrlf = (s: string): string => s.split('\r\n').join('\n').split('\n').join('\r\n')
+    const attempt = async (src: string, pins: TopicSource[]) => {
+      const out = temp()
+      const result = await runWith(sample(out, ['--map-lang', 'en', '--map-list', EN_LIST, '--topics', src]), pins)
+      return { ...result, out: existsSync(out) ? readdirSync(out) : [] }
+    }
+
+    test('a tampered file exits 1 and builds nothing', async () => {
+      const src = sources()
+      const pins = pinsOf(src)
+      const file = join(src, 'tipnr', 'TIPNR.txt')
+      writeFileSync(file, `${readFileSync(file, 'utf8')}x`)
+      const result = await attempt(src, pins)
+      expect(result.code).toBe(1)
+      expect(result.err.join('\n')).toMatch(/--topics: .*TIPNR\.txt: sha256 is [0-9a-f]{64}, the pin in topic-sources\.json says /)
+      expect(result.out).toEqual([])
+    })
+
+    test('a missing pinned file exits 1 and builds nothing', async () => {
+      const src = sources()
+      const pins = [...pinsOf(src), { ...pinsOf(src)[0], name: 'gone', target: 'theographic/gone.json' }]
+      const result = await attempt(src, pins)
+      expect(result.code).toBe(1)
+      expect(result.err.join('\n')).toMatch(/--topics: .*gone\.json is missing \(pinned source gone\)/)
+      expect(result.out).toEqual([])
+    })
+
+    test('LF bytes whose CRLF form has the pinned sha256 pass for a pin with rawSha256 and eol crlf, and fail without them', async () => {
+      const src = sources()
+      const file = join(src, 'theographic', 'events.json')
+      const lf = readFileSync(file, 'utf8').split('\r\n').join('\n')
+      writeFileSync(file, lf)
+      const base = pinsOf(src)
+      const pinned = (extra: Partial<TopicSource>): TopicSource[] =>
+        base.map((p) => (p.target === 'theographic/events.json' ? { ...p, sha256: sha(Buffer.from(toCrlf(lf))), ...extra } : p))
+      const ok = await attempt(src, pinned({ rawSha256: sha(Buffer.from(lf)), eol: 'crlf' }))
+      expect(ok.err).toEqual([])
+      expect(ok.code).toBe(0)
+      const noEol = await attempt(src, pinned({ rawSha256: sha(Buffer.from(lf)) }))
+      expect(noEol.code).toBe(1)
+      expect(noEol.out).toEqual([])
+      const wrongRaw = await attempt(src, pinned({ rawSha256: '0'.repeat(64), eol: 'crlf' }))
+      expect(wrongRaw.code).toBe(1)
+    })
   })
 
   test('a --topics folder without the three sources is a usage error that names the missing folder', async () => {
@@ -447,5 +508,129 @@ describe('build-v3: --aligned', () => {
     // report.txt says how many units were built, 0 included
     expect(readFileSync(join(plain, 'report.txt'), 'utf8')).toMatch(/^aligned: off, 0 units$/m)
     expect(readFileSync(join(withAligned, 'report.txt'), 'utf8')).toContain(`aligned: on, ${aligned.length} units`)
+  })
+})
+
+describe('build-v3: revisions, previous ids and a published common catalog', () => {
+  const PREV = 'ab'.repeat(32)
+
+  test('separate revisions: a revision and a previous id per catalog', async () => {
+    const out = temp()
+    const result = await run(sample(out, ['--revision-common', '3', '--revision-lang', '7', '--previous-lang', PREV]))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    const common = await catalogOf(join(out, 'catalog-common.seg'))
+    const language = await catalogOf(join(out, 'catalog-es-419.seg'))
+    expect(common.about.revision).toBe(3)
+    expect(common.about.previous).toBeUndefined()
+    expect(language.about.revision).toBe(7)
+    expect(hex(language.about.previous!)).toBe(PREV)
+    expect(language.requires![0][1]).toBe(3)
+  })
+
+  test('--revision alone sets both', async () => {
+    const out = temp()
+    expect((await run(sample(out, ['--revision', '4']))).code).toBe(0)
+    expect((await catalogOf(join(out, 'catalog-common.seg'))).about.revision).toBe(4)
+    expect((await catalogOf(join(out, 'catalog-es-419.seg'))).about.revision).toBe(4)
+  })
+
+  test('a specific revision wins over --revision, which fills the other', async () => {
+    const out = temp()
+    expect((await run(sample(out, ['--revision', '4', '--revision-lang', '9']))).code).toBe(0)
+    expect((await catalogOf(join(out, 'catalog-common.seg'))).about.revision).toBe(4)
+    expect((await catalogOf(join(out, 'catalog-es-419.seg'))).about.revision).toBe(9)
+  })
+
+  test('a previous id that is not 64 hex digits is a usage error', async () => {
+    const result = await run(sample(temp(), ['--previous-common', 'abc']))
+    expect(result.code).toBe(1)
+  })
+
+  test('builds against a published common catalog', async () => {
+    const a = temp()
+    const b = temp()
+    expect((await run(sample(a, ['--revision-common', '5', '--revision-lang', '2']))).code).toBe(0)
+    const result = await run(sample(b, ['--revision-lang', '2', '--common', a]))
+    expect(result.err).toEqual([])
+    expect(result.code).toBe(0)
+    expect(existsSync(join(b, 'catalog-common.seg'))).toBe(false)
+    const common = await catalogOf(join(a, 'catalog-common.seg'))
+    const { id } = await readSegment(read(join(a, 'catalog-common.seg')), { known: KNOWN.catalog, expectedClass: 'catalog' })
+    const language = await catalogOf(join(b, 'catalog-es-419.seg'))
+    expect(language.requires![0][0]).toBe('common')
+    expect(language.requires![0][1]).toBe(common.about.revision)
+    expect(hex(language.requires![0][2])).toBe(id)
+    expect(readFileSync(join(b, 'catalog-es-419.seg')).equals(readFileSync(join(a, 'catalog-es-419.seg')))).toBe(true)
+    // Same language segments as A's, and no common one
+    const after = snapshot(b, 'segments')
+    const before = snapshot(a, 'segments')
+    const names = Object.keys(after)
+    expect(names.length).toBeGreaterThan(0)
+    expect(names.length).toBeLessThan(Object.keys(before).length)
+    for (const name of names) expect(after[name]).toBe(before[name])
+    for (const entry of language.segments) expect(names).toContain(`segments/${hex(entry.id)}.seg`)
+  })
+
+  test('a common catalog without the books orig fails with exit 2', async () => {
+    const a = temp()
+    const b = temp()
+    const lists = listsWithAnotherBook(temp())
+    expect((await run(['--list', lists.list, '--originals', lists.originals, '--parts', PARTS, '--out', a, '--built', BUILT, '--books', 'tit'])).code).toBe(0)
+    const result = await run(['--list', lists.list, '--originals', lists.originals, '--parts', PARTS, '--out', b, '--built', BUILT, '--books', 'rut', '--common', a])
+    expect(result.code).toBe(2)
+    expect(result.err.join('\n')).toContain('common catalog lacks orig:rut')
+  })
+
+  test('--common must be a folder with catalog-common.seg', async () => {
+    expect((await run(sample(temp(), ['--common', temp()]))).code).toBe(1)
+  })
+
+  test('old segments are removed', async () => {
+    const out = temp()
+    mkdirSync(join(out, 'segments'), { recursive: true })
+    const stray = join(out, 'segments', `ff${'00'.repeat(31)}.seg`)
+    writeFileSync(stray, 'old')
+    expect((await run(sample(out))).code).toBe(0)
+    expect(existsSync(stray)).toBe(false)
+    expect(readdirSync(join(out, 'segments')).length).toBeGreaterThan(0)
+  })
+})
+
+describe('build-v3 --sign-key', () => {
+  test('both catalogs verify with the public half of the key; segments are byte-equal to an unsigned build', async () => {
+    const key = testKey()
+    temps.push(key.dir)
+    const plain = temp()
+    const signed = temp()
+    expect((await run(sample(plain))).code).toBe(0)
+    const r = await run(sample(signed, ['--sign-key', key.pem]))
+    expect(r.code).toBe(0)
+    const trusted = { [keyId(key.publicKey)]: key.publicKey }
+    for (const name of ['catalog-common.seg', 'catalog-es-419.seg']) {
+      expect((await verifyCatalog(read(join(signed, name)), trusted)).valid).toBe(true)
+      // The id is of the body: the same as the unsigned build's
+      const a = await readSegment(read(join(plain, name)), { known: KNOWN.catalog, expectedClass: 'catalog' })
+      const b = await readSegment(read(join(signed, name)), { known: KNOWN.catalog, expectedClass: 'catalog' })
+      expect(b.id).toBe(a.id)
+      await expect(verifyCatalog(read(join(plain, name)), trusted)).rejects.toThrow()
+    }
+    const before = snapshot(plain, 'segments')
+    const after = snapshot(signed, 'segments')
+    expect(after).toEqual(before)
+    // the key never reaches the output or the folder
+    const pemText = readFileSync(key.pem, 'utf8').split('\n')[1]
+    expect([...r.out, ...r.err].join('\n')).not.toContain(pemText)
+    for (const text of Object.values(snapshot(signed))) expect(Buffer.from(text, 'hex').includes(pemText)).toBe(false)
+  })
+
+  test('a bad key file is a build error that does not print its content', async () => {
+    const dir = temp()
+    const file = join(dir, 'bad.pem')
+    writeFileSync(file, '-----BEGIN PRIVATE KEY-----\nc2VjcmV0LXRleHQ=\n-----END PRIVATE KEY-----\n')
+    const r = await run(sample(temp(), ['--sign-key', file]))
+    expect(r.code).toBe(2)
+    expect(r.err.join('\n')).not.toContain('c2VjcmV0LXRleHQ=')
+    expect((await run(sample(temp(), ['--sign-key', join(dir, 'missing.pem')]))).code).toBe(1)
   })
 })

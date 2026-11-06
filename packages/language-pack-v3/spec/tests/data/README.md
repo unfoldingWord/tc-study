@@ -92,9 +92,9 @@ These are in the phase 0 sample, and a later task may need them:
 ## topics/
 
 - `topics/tipnr-subset.txt`: the header lines and 11 records (Abraham, Absalom, Isaac, Sarah, two Zechariahs, two Bethlehems,
-  Egypt, Jerusalem, Ur) of TIPNR, "Translators Individualised Proper Names with all References", by STEPBible.org
-  (www.STEPBible.org, based on work at Tyndale House Cambridge), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
-  Copied from the file the header names, with these columns and lines emptied or removed: the description and `#Summary`
+  Egypt, Jerusalem, Ur) of TIPNR, "Translators Individualised Proper Names with all References", credited to "STEP Bible"
+  (www.STEPBible.org, data by Tyndale House Cambridge), CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/).
+  Changed: copied from the file the header names, with these columns and lines emptied or removed: the description and `#Summary`
   columns of the records, the translated-name column of the name lines, and every `@Briefest`, `@Brief`, `@Short` and
   `@Article` text. The reader test uses it. The whole file is not in the repository.
 

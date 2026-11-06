@@ -18,7 +18,7 @@ import { type CborValue, encodeDeterministic } from './codec/cbor'
 import { CLASS_NAMES, type ClassName, FIXED_BYTES, FORMAT_MAJOR, FORMAT_MINOR, hex, KIND_SEGMENT, KIND_TRANSFER, MAGIC, readFixed, readHeader, readSegment } from './codec/container'
 import { FormatError, type FormatErrorCode } from './codec/errors'
 import { type CborMap, hasOwn, hexToBytes, isMap, isUint, sha256Digest } from './codec/values'
-import { CATALOG_TABLES } from './read/catalog'
+import { CATALOG_TABLES, catalogView } from './read/catalog'
 
 const HEX_ID = /^[0-9a-f]{64}$/
 
@@ -349,6 +349,11 @@ export async function readTransfer(
       if (i < index.catalogs.length) throw error
       result.status = error.code
     }
+  }
+  // Step 6 of the order of checks: the tables of each catalog against `catalog.cddl`, in the order of `catalogs`; the first that fails rejects the file.
+  for (let i = 0; i < index.catalogs.length; i++) {
+    const bytesOfCatalog = entries[i].bytes
+    if (bytesOfCatalog !== undefined) catalogView((await readSegment(bytesOfCatalog, { known: CATALOG_TABLES, expectedClass: 'catalog' })).seg)
   }
   return { index, entries, missing }
 }

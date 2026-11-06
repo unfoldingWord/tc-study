@@ -445,6 +445,15 @@ describe('readTransfer', () => {
       expect(await codeOf(readTransfer(craft([CATALOG, asCatalog(minimal), ORIG], undefined, 2)))).toBe('E_BODY')
     })
 
+    test('E_BODY: a catalog whose tables fail its schema rejects the file, after the errors of step 5 of every catalog', async () => {
+      const broken = specOf(await catalogWith({}, { resources: 'not a list' }, 40))
+      expect(await codeOf(readTransfer(craft([broken, MINIMAL])))).toBe('E_BODY')
+      const second = specOf(await buildCatalog({ about: { ...about, catalog: 'common' }, resources: [], segments: [orig] }))
+      expect(await codeOf(readTransfer(craft([broken, second, ORIG], undefined, 2)))).toBe('E_BODY')
+      // The tables come after the check of every catalog as a segment: a bad id of the second catalog is E_ID.
+      expect(await codeOf(readTransfer(craft([broken, { ...second, id: fingerprint(3) }, ORIG], undefined, 2)))).toBe('E_ID')
+    })
+
     test('the status of a catalog that is not whole: its own error, nothing else is returned', async () => {
       // A catalog with another id in the index, with the body changed, and one that is not a segment file at all.
       const wrongId = craft([{ ...CATALOG, id: fingerprint(3) }, MINIMAL])

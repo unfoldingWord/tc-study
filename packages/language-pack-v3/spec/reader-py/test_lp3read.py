@@ -2002,7 +2002,7 @@ def test_cli_unexpected_exception_is_not_exit_1(monkeypatch, capsys, tmp_path):
     p = tmp_path / "x.seg"
     p.write_bytes(MIN)
 
-    def boom(data, expect=None):
+    def boom(data, expect=None, trusted=None):
         raise RuntimeError("bug")
 
     monkeypatch.setattr(lp3read, "read_file", boom)
@@ -2033,7 +2033,9 @@ def case_files():
 @pytest.mark.parametrize("path", case_files(), ids=lambda f: str(f.relative_to(TESTS_DIR)).replace("\\", "/"))
 def test_every_conformance_case_file_gives_its_expected_output(path):
     expected = path.with_name(path.name.rsplit(".", 1)[0] + ".expected.json").read_bytes().decode("utf-8")
-    out = read_file(path.read_bytes())
+    keys_file = path.with_name(path.name.rsplit(".", 1)[0] + ".keys.json")
+    keys = json.loads(keys_file.read_bytes().decode("utf-8")) if keys_file.exists() else None
+    out = read_file(path.read_bytes(), trusted=keys)
     assert canonical_text(out) == expected                    # byte for byte
     assert compact_text(out) == compact_text(json.loads(expected))
 

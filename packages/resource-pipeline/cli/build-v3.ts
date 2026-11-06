@@ -33,7 +33,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
   BOOKS,
@@ -42,6 +42,12 @@ import {
   buildCommon,
   buildLanguage,
   BUILDER,
+  catalogView,
+  hex,
+  KNOWN,
+  signCatalog,
+  readSegment,
+  type Segment,
   ORIGINALS,
   parseTipnr,
   type SectionRegistry,
@@ -50,6 +56,8 @@ import {
   type XtopicsCore,
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
+import { readSigningKey, type SigningKey } from '../src/language/signKey'
+import { pins, sourcesProblem, type TopicSource } from './fetch-topic-sources'
 
 export class UsageError extends Error {}
 
@@ -60,6 +68,10 @@ export const USAGE =
   '               The common map counts only the books built: a publisher needs all 66 originals\n' +
   '  --registry   the folder of registry-<lang>.json, read if it exists and updated; without it, section ids start from scratch\n' +
   '  --revision   the revision of both catalogs (default 1)\n' +
+  '  --revision-common, --revision-lang   the revision of one catalog (default: --revision)\n' +
+  '  --previous-common, --previous-lang   the id (64 hex digits) of the published catalog this one follows (about.previous; default none)\n' +
+  '  --common     a folder with catalog-common.seg and segments/ of a published common build: the common part is not built, the language\n' +
+  '               is built against that catalog and nothing of the common part is written in --out\n' +
   '  --built      the time the catalogs say they were built (default: now). Pass a fixed value for a reproducible build:\n' +
   '               the same inputs and the same --built give the same bytes\n' +
   '  --publisher  the publisher of both catalogs (default unfoldingWord)\n' +
@@ -67,6 +79,8 @@ export const USAGE =
   '  --map-list   the parts list of the map language, when it is not the language of --list (default: none)\n' +
   '  --book-names a JSON file {book: [name, short, abbreviation]} for the book names of the language map\n' +
   '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/): builds the xtopics and the topics of the language\n' +
+  '  --sign-key   a PKCS#8 PEM file of an Ed25519 key: both catalogs this build writes are signed with it (segments are the same bytes; the key is read\n' +
+  '               into memory and never printed or written)\n' +
   '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
   '               every other segment is the same bytes with or without it'
 
@@ -80,6 +94,11 @@ type Options = {
   books?: string[]
   registry?: string
   revision: number
+  revisionCommon: number
+  revisionLang: number
+  previousCommon?: Uint8Array
+  previousLang?: Uint8Array
+  common?: string
   built: string
   publisher: string
   mapLang: string
@@ -87,10 +106,11 @@ type Options = {
   bookNames?: string
   topics?: string
   aligned: boolean
+  signKey?: string
 }
 
 const BOOLEAN_FLAGS = ['aligned']
-const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics']
+const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -114,7 +134,7 @@ function flagsOf(argv: string[]): Map<string, string> {
   return flags
 }
 
-export function optionsFromArgs(argv: string[]): Options {
+export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins()): Options {
   const flags = flagsOf(argv)
   const need = (name: string): string => {
     const value = flags.get(name)
@@ -138,9 +158,29 @@ export function optionsFromArgs(argv: string[]): Options {
     }
   }
 
-  const revisionText = flags.get('revision') ?? '1'
-  const revision = Number(revisionText)
-  if (!/^[0-9]+$/.test(revisionText) || !Number.isSafeInteger(revision)) throw new UsageError(`--revision ${JSON.stringify(revisionText)} is not a whole number`)
+  const revisionOf = (name: string, fallback: string): number => {
+    const text = flags.get(name) ?? fallback
+    const n = Number(text)
+    if (!/^[0-9]+$/.test(text) || !Number.isSafeInteger(n)) throw new UsageError(`--${name} ${JSON.stringify(text)} is not a whole number`)
+    return n
+  }
+  const revision = revisionOf('revision', '1')
+  const revisionCommon = revisionOf('revision-common', flags.get('revision') ?? '1')
+  const revisionLang = revisionOf('revision-lang', flags.get('revision') ?? '1')
+  const previousOf = (name: string): Uint8Array | undefined => {
+    const text = flags.get(name)
+    if (text === undefined) return undefined
+    if (!/^[0-9a-f]{64}$/.test(text)) throw new UsageError(`--${name} ${JSON.stringify(text)} is not an id (64 lowercase hex digits)`)
+    return Uint8Array.from(text.match(/../g)!, (pair) => parseInt(pair, 16))
+  }
+  const previousCommon = previousOf('previous-common')
+  const previousLang = previousOf('previous-lang')
+  const common = flags.get('common')
+  if (common !== undefined) {
+    const file = join(common, 'catalog-common.seg')
+    if (!existsSync(file) || !statSync(file).isFile()) throw new UsageError(`--common: ${file} is not a file`)
+    if (flags.has('revision-common') || flags.has('previous-common')) throw new UsageError('--common is a published common catalog: --revision-common and --previous-common do not apply')
+  }
 
   const built = flags.get('built') ?? new Date().toISOString().replace(/\.\d+Z$/, 'Z')
   if (!RFC3339.test(built)) throw new UsageError(`--built ${JSON.stringify(built)} is not an RFC 3339 date and time (2026-11-01T10:00:00Z)`)
@@ -157,6 +197,8 @@ export function optionsFromArgs(argv: string[]): Options {
   for (const [name, path] of [['list', list], ['originals', originals], ...(bookNames === undefined ? [] : [['book-names', bookNames]]), ...(mapList === undefined ? [] : [['map-list', mapList]])]) {
     if (!existsSync(path) || !statSync(path).isFile()) throw new UsageError(`--${name}: ${path} is not a file`)
   }
+  const signKey = flags.get('sign-key')
+  if (signKey !== undefined && (!existsSync(signKey) || !statSync(signKey).isFile())) throw new UsageError(`--sign-key: ${signKey} is not a file`)
   if (!existsSync(parts) || !statSync(parts).isDirectory()) throw new UsageError(`--parts: ${parts} is not a directory`)
 
   if (topics !== undefined) {
@@ -171,9 +213,11 @@ export function optionsFromArgs(argv: string[]): Options {
     if (!readdirSync(content).some((f) => /^\d\d\.md$/.test(f))) throw new UsageError(`--topics: ${content} has no NN.md story file`)
     const texts = readdirSync(join(topics, 'tipnr')).filter((f) => f.endsWith('.txt'))
     if (texts.length !== 1) throw new UsageError(`--topics: ${join(topics, 'tipnr')} must have exactly one .txt file (the TIPNR file), it has ${texts.length}`)
+    const wrong = sourcesProblem(topics, sources)
+    if (wrong !== undefined) throw new UsageError(`--topics: ${wrong}`)
   }
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned') }
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key') }
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -251,6 +295,44 @@ function countsOf(segments: BuiltSegment[]): string {
   return `${segments.length} segments${parts.length > 0 ? ` (${parts.join(', ')})` : ''}`
 }
 
+/** The common part of a build: built here, or published (`--common`: its catalog is not ours to write, and it has no segments here). */
+type Common = {
+  segments: BuiltSegment[]
+  catalog?: BuiltSegment
+  catalogId: string
+  revision: number
+  report: string[]
+  published: boolean
+  core?: Segment
+}
+
+/** The published common catalog in `dir`: it has to hold the units the language needs, `orig:<book>` for each book and `xmap` if there is a map. */
+async function readPublished(dir: string, books: string[], needMap: boolean, needTopics: boolean): Promise<Common & { core?: Segment }> {
+  const file = join(dir, 'catalog-common.seg')
+  let read
+  try {
+    read = await readSegment(new Uint8Array(await readFile(file)), { known: KNOWN.catalog, expectedClass: 'catalog' })
+  } catch (error) {
+    throw new Error(`Cannot read the common catalog ${file}: ${(error as Error).message}`)
+  }
+  const model = catalogView(read.seg)
+  if (model.about.catalog !== 'common') throw new Error(`${file} is not the common catalog: it is the catalog ${JSON.stringify(model.about.catalog)}`)
+  const units = new Set(model.units.map((unit) => unit.id))
+  for (const book of [...books].sort((a, b) => bookNumber(a) - bookNumber(b))) {
+    if (!units.has(`orig:${book}`)) throw new Error(`common catalog lacks orig:${book}`)
+  }
+  if (needMap && !units.has('xmap')) throw new Error('common catalog lacks xmap')
+  let core: Segment | undefined
+  if (needTopics) {
+    const entry = model.segments.find((e) => e.class === 'xtopics' && e.part === 'core')
+    if (entry === undefined) throw new Error('common catalog lacks xtopics')
+    const name = join(dir, 'segments', `${hex(entry.id)}.seg`)
+    if (!existsSync(name)) throw new Error(`the common segment ${name} is not there`)
+    core = (await readSegment(new Uint8Array(await readFile(name)), { known: KNOWN.xtopics, expectedId: hex(entry.id), expectedClass: 'xtopics' })).seg
+  }
+  return { segments: [], catalogId: read.id, revision: model.about.revision, report: [], published: true, core }
+}
+
 async function build(o: Options, io: Io): Promise<void> {
   const lang = await languageOf(o.list)
   if (!/^[A-Za-z0-9][A-Za-z0-9-]*$/.test(lang)) throw new Error(`${o.list}: the language ${JSON.stringify(lang)} cannot name a file`)
@@ -258,7 +340,9 @@ async function build(o: Options, io: Io): Promise<void> {
   if (originalsLanguage !== ORIGINALS) throw new Error(`${o.originals} is not the list of the originals: its language is ${JSON.stringify(originalsLanguage)}`)
 
   const source = await partsSource({ list: o.list, partsDir: o.parts, originals: o.originals, extra: o.mapList === undefined ? [] : [o.mapList] })
-  const about = { format: '3.0' as const, publisher: o.publisher, origin: 'published' as const, revision: o.revision, built: o.built, builder: BUILDER }
+  const aboutOf = (revision: number, previous?: Uint8Array) => ({ format: '3.0' as const, publisher: o.publisher, origin: 'published' as const, revision, ...(previous === undefined ? {} : { previous }), built: o.built, builder: BUILDER })
+  const aboutCommon = aboutOf(o.revisionCommon, o.previousCommon)
+  const about = aboutOf(o.revisionLang, o.previousLang)
 
   // The books to build: the ones asked for, else those the language has and the originals have (a book without originals is left out).
   let books = o.books
@@ -274,9 +358,12 @@ async function build(o: Options, io: Io): Promise<void> {
   // Common first: the language catalog names it.
   // The common map needs the helps of the map language: when the source has none (no list for it), there is no map to build.
   const mapLang = (await source.resources(o.mapLang)).length > 0 ? o.mapLang : undefined
-  if (mapLang === undefined) io.log(`no list for the map language ${o.mapLang} (--map-list): no common map is built`)
+  if (mapLang === undefined && o.common === undefined) io.log(`no list for the map language ${o.mapLang} (--map-list): no common map is built`)
   const topicSources = o.topics === undefined ? undefined : topicTexts(o.topics)
-  const common = await buildCommon({ source, books, about, mapLang, topics: topicSources })
+  // With --common the common part is a published one: only its catalog (and the xtopics core, for --topics) is read, nothing is built
+  const published = o.common === undefined ? undefined : await readPublished(o.common, books, mapLang !== undefined, topicSources !== undefined)
+  const built0 = published === undefined ? await buildCommon({ source, books, about: aboutCommon, mapLang, topics: topicSources }) : undefined
+  const common: Common = published ?? { ...built0!, catalogId: built0!.catalog.id, revision: o.revisionCommon, published: false }
   let bookNames: Record<string, [string, string, string]> | undefined
   if (o.bookNames !== undefined) {
     try {
@@ -287,7 +374,7 @@ async function build(o: Options, io: Io): Promise<void> {
   }
   let topics: { xtopics: XtopicsCore; records: TipnrRecord[] } | undefined
   if (topicSources !== undefined) {
-    const core = common.segments.find(({ seg }) => seg.h.class === 'xtopics' && seg.h.part === 'core')
+    const core = published !== undefined ? { seg: published.core! } : common.segments.find(({ seg }) => seg.h.class === 'xtopics' && seg.h.part === 'core')
     if (core === undefined) throw new Error('--topics: the common part has no xtopics core (no originals were built?)')
     // The builder already reported what it worked around in the TIPNR text (`common.report`); only a line it did not report is added
     const issues: string[] = []
@@ -302,10 +389,19 @@ async function build(o: Options, io: Io): Promise<void> {
     registry,
     bookNames,
     about,
-    requires: [['common', o.revision, common.catalog.id]],
+    requires: [['common', common.revision, common.catalogId]],
     topics,
     aligned: o.aligned,
   })
+
+  // Signing changes the header of a catalog and nothing its id is the hash of: the ids, and so every `requires` and every segment, stay.
+  let key: SigningKey | undefined
+  if (o.signKey !== undefined) {
+    key = await readSigningKey(o.signKey)
+    const sign = async (catalog: BuiltSegment): Promise<BuiltSegment> => ({ ...catalog, bytes: await signCatalog(catalog.bytes, key!.pkcs8) })
+    if (common.catalog !== undefined) common.catalog = await sign(common.catalog)
+    built.catalog = await sign(built.catalog)
+  }
 
   const articles = Object.keys(built.registry).length
   const registryLine =
@@ -318,19 +414,23 @@ async function build(o: Options, io: Io): Promise<void> {
     `builder: ${BUILDER}`,
     `language: ${lang}`,
     `books: ${[...books].sort((a, b) => bookNumber(a) - bookNumber(b)).join(',')}`,
-    `common: ${countsOf(common.segments)}, catalog ${common.catalog.id.slice(0, 12)}`,
+    common.published ? `common: published, revision ${common.revision}, catalog ${common.catalogId.slice(0, 12)}` : `common: ${countsOf(common.segments)}, catalog ${common.catalogId.slice(0, 12)}`,
     `${lang}: ${countsOf(built.segments)}, catalog ${built.catalog.id.slice(0, 12)}`,
     registryLine,
+    `signed: ${key === undefined ? 'no' : `key ${key.keyId}`}`,
     `aligned: ${o.aligned ? 'on' : 'off'}, ${built.segments.filter(({ seg }) => seg.h.class === 'aligned').length} units`,
     '',
     ...common.report,
     ...built.report,
   ]
 
+  // Every run starts from an empty segments folder: what an earlier build left there is not part of this one
+  await rm(join(o.out, 'segments'), { recursive: true, force: true })
   await mkdir(join(o.out, 'segments'), { recursive: true })
-  const all = [...common.segments, common.catalog, ...built.segments, built.catalog]
+  const all = [...common.segments, ...(common.catalog === undefined ? [] : [common.catalog]), ...built.segments, built.catalog]
   for (const segment of [...common.segments, ...built.segments]) await writeFile(join(o.out, 'segments', `${segment.id}.seg`), segment.bytes)
-  await writeFile(join(o.out, 'catalog-common.seg'), common.catalog.bytes)
+  if (common.catalog !== undefined) await writeFile(join(o.out, 'catalog-common.seg'), common.catalog.bytes)
+  else await rm(join(o.out, 'catalog-common.seg'), { force: true })
   await writeFile(join(o.out, `catalog-${lang}.seg`), built.catalog.bytes)
   await writeFile(join(o.out, 'report.txt'), `${report.join('\n')}\n`)
   if (registryFile !== undefined) {
@@ -345,10 +445,10 @@ async function build(o: Options, io: Io): Promise<void> {
 }
 
 /** The command: its exit code (0, 1 for a usage error, 2 for a build error). `io` takes what it prints. */
-export async function main(argv: string[], io: Io = { log: console.log, error: console.error }): Promise<number> {
+export async function main(argv: string[], io: Io = { log: console.log, error: console.error }, sources: TopicSource[] = pins()): Promise<number> {
   let options: Options
   try {
-    options = optionsFromArgs(argv)
+    options = optionsFromArgs(argv, sources)
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
     io.error(error.message)

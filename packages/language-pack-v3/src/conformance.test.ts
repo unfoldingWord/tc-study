@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { bridgeBook, bridgeCatalog, buildFrozenCases, caseFilesOn, expectedText, runBuildCases, TESTS_DIR } from '../spec/tests/build-cases'
+import { bridgeBook, bridgeCatalog, buildFrozenCases, caseFilesOn, expectedText, keysOf, PYTHON_NOT_YET, runBuildCases, TESTS_DIR } from '../spec/tests/build-cases'
 import { firstDifference } from '../spec/tests/compare'
 import { mapView } from './read/map'
 import { canonicalJson, readerOutput } from './read/output'
@@ -31,7 +31,11 @@ type Out = Record<string, any>
 
 const PACKAGE_DIR = join(import.meta.dir, '..')
 const bytesOf = (path: string): Uint8Array => new Uint8Array(readFileSync(path))
-const outputOf = async (name: string): Promise<Out> => (await readerOutput(bytesOf(join(TESTS_DIR, name)))) as Out
+const readWith = (name: string): Promise<unknown> => {
+  const trustedKeys = keysOf(TESTS_DIR, name)
+  return readerOutput(bytesOf(join(TESTS_DIR, name)), trustedKeys === undefined ? {} : { trustedKeys })
+}
+const outputOf = async (name: string): Promise<Out> => (await readWith(name)) as Out
 const expectedOf = (name: string): unknown => JSON.parse(readFileSync(join(TESTS_DIR, name.replace(/\.(seg|tcpack)$/, '.expected.json')), 'utf8'))
 
 const FILES = caseFilesOn(TESTS_DIR)
@@ -40,6 +44,10 @@ describe('the case files', () => {
   test('are the ones of the table of cases ', () => {
     expect(FILES).toEqual([
       'articulo-mal-titulado/art.seg',
+      'catalog-bad-sig/catalog.seg',
+      'catalog-signed/catalog.seg',
+      'catalog-unknown-key/catalog.seg',
+      'catalog-unsigned-published/catalog.seg',
       'container/bad-id.seg',
       'container/minimal.seg',
       'container/truncated.seg',
@@ -61,6 +69,7 @@ describe('the case files', () => {
       'tabla-desconocida/future-y.seg',
       'topics-local-clave-extra/core.seg',
       'transferencia-cortada/cut.tcpack',
+      'transferencia-catalogo-local/local.tcpack',
       'tito-es419/book.seg',
     ].sort())
   })
@@ -74,7 +83,7 @@ describe('the case files', () => {
 
   for (const name of FILES) {
     test(`${name}: readerOutput is its expected.json`, async () => {
-      const got = await readerOutput(bytesOf(join(TESTS_DIR, name)))
+      const got = await readWith(name)
       expect(canonicalJson(got)).toBe(canonicalJson(expectedOf(name)))
     })
   }
@@ -97,7 +106,7 @@ describe('build-cases.ts', () => {
   }, 120_000)
 
   test('builds every case file but the ones of container/, and gives the frozen bytes', () => {
-    expect([...built.keys()].sort()).toEqual(FILES.filter((name) => !name.startsWith('container/')))
+    expect([...built.keys()].filter((name) => !name.endsWith('.keys.json')).sort()).toEqual(FILES.filter((name) => !name.startsWith('container/')))
     for (const [name, bytes] of built) expect(Buffer.from(bytes).equals(Buffer.from(bytesOf(join(TESTS_DIR, name))))).toBe(true)
   })
 
@@ -117,7 +126,7 @@ describe('build-cases.ts', () => {
     test('writes the cases, and a second run changes nothing', async () => {
       const first = await runBuildCases({ root })
       expect(first.problems).toEqual([])
-      expect(first.written.length).toBe(2 * built.size)
+      expect(first.written.length).toBe(2 * built.size - [...built.keys()].filter((name) => name.endsWith('.keys.json')).length)
       for (const name of built.keys()) expect(existsSync(join(root, name))).toBe(true)
       const stamp = (path: string) => statSync(join(root, path)).mtimeMs
       const before = first.written.map(stamp)
@@ -402,10 +411,11 @@ describe('the cross-reader check (compare.ts)', () => {
       writeFileSync(
         stub,
         [
-          'import sys',
+          'import sys, json',
           `sys.path.insert(0, ${JSON.stringify(join(PACKAGE_DIR, 'spec', 'reader-py'))})`,
           'from lp3read import read_file, canonical_text',
-          'out = read_file(open(sys.argv[1], "rb").read())',
+          'trusted = json.load(open(sys.argv[3])) if len(sys.argv) > 3 and sys.argv[2] == "--keys" else None',
+          'out = read_file(open(sys.argv[1], "rb").read(), trusted=trusted)',
           'name = sys.argv[1].replace(chr(92), "/")',
           'if name.endswith("container/minimal.seg"):',
           '    out["texts"][0]["pieces"][0][0] += "x"',
@@ -418,10 +428,11 @@ describe('the cross-reader check (compare.ts)', () => {
       )
       const run = compare('--reader', stub)
       expect(run.status).toBe(1)
+      // In the order of the files; the stub passes the keys as compare.ts does, so the cases of signatures compare for real.
       expect(run.text.trim().split('\n')).toEqual([
         'container/minimal.seg: $.texts[0].pieces[0][0]: TypeScript "Pablo" / Python "Pablox"',
         'container/truncated.seg: $.error: TypeScript "E_TRUNCATED" / Python "E_ID"',
-        'compare: 23 files compared (23 cases), 2 mismatches',
+        `compare: ${FILES.length - PYTHON_NOT_YET.length} files compared (${FILES.length - PYTHON_NOT_YET.length} cases), 2 mismatches${PYTHON_NOT_YET.length === 0 ? '' : `, ${PYTHON_NOT_YET.length} not yet in Python`}`,
       ])
     } finally {
       rmSync(folder, { recursive: true, force: true })

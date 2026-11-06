@@ -76,12 +76,59 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 
 ## Signatures
 
-- A catalog MAY carry signatures in its header (`sig`). Each is Ed25519 over the catalog's 32-byte id, with the id of
-  the key that made it.
+- A catalog MAY carry signatures in its header (`sig`, `cddl/common.cddl`): a list of `{key, alg, s}`. `alg` is
+  `ed25519` (RFC 8032, pure Ed25519, no context) and `s` is the 64-byte signature **of the catalog's 32-byte id**, the
+  raw bytes and not their hex.
+- **The key id.** `key` is the first 16 hex digits (lowercase) of the sha256 of the key's 32-byte raw public key.
+- **The id does not change when a catalog is signed.** `sig` is a key of the file header, outside the body, and the id
+  is the sha256 of the body. Signing changes the header, so `H` (the header length), `clen`'s position and the file
+  bytes change; the body, the id and the `h` inside the header do not. So the same catalog can be signed by two
+  keys, by one key later, or signed again, without changing any id that names it (`previous`, `requires`, a transfer
+  file's index).
 - Signing the id is enough: the id is the hash of the whole catalog, and the catalog holds the id of every segment.
 - Which keys a reader trusts, and where it keeps them, is up to the app. The format only says how to check a signature.
+  An app gives the reader its trusted keys as a map from key id to raw public key (a key whose id, computed from
+  its bytes, is not the one it is listed under is not trusted).
+- **A trusted-keys map entry counts only if** its id equals the key id (lowercase hex, above) of its 32-byte key. Other
+  entries are dropped: a key of another length, an id in uppercase or of another length, an id that is not the key's.
+- **Verification** is Ed25519 as RFC 8032 section 5.1.7 gives it, with the cofactorless equation `[S]B = R + [k]A`
+  (`k` is the SHA-512 of `R || A || message`, little-endian, mod `L`). A signature does not verify when `S >= L`, or
+  when the encoding of `R` or of `A` is not canonical (a `y` that is `>= p`, or `x = 0` with the sign bit set) or is
+  not a point of the curve. A signature does not verify either when `R` or `A` is a point of small order (a point `P`
+  with `[8]P` the identity: eight encodings are canonical). WebCrypto runtimes disagree on such points, so a reader
+  checks this itself and does not leave it to the runtime.
+- **Elements are compared by exact text.** A `sig` element's `key` is compared to the trusted ids as it is written (no
+  case folding). Keys of an element beyond `key`, `alg` and `s` are ignored.
 - A signature labels who published the catalog. It does not judge the content.
 - A catalog an app builds on the device (from an old pack, `transfer.md`) has `origin: local` and no signature.
+
+**When a reader checks, and when it rejects.**
+
+1. A reader given **no** trusted keys ignores `sig` altogether (a `sig` of the wrong type too) and its output is the
+   same as before signatures existed. "Given trusted keys" means the app passed a key map, even an empty one or one
+   whose entries were all dropped (above): then no signature can be from a trusted key, and every published catalog is
+   rejected with `E_SIGNATURE` (an unsigned one too). An app that has no keys passes none; it does not pass an empty map.
+2. A reader given trusted keys checks every catalog it reads (a catalog file, and each catalog of a transfer file) whose
+   `about.origin` is `published`, once the rest of the file has been accepted: an `E_BODY` or any other earlier error
+   wins over `E_SIGNATURE`. It rejects the file with `E_SIGNATURE` when:
+   - `sig` is missing, is not a non-empty array, or has an element that is not a map with `key` (text), `alg`
+     (exactly `ed25519`) and `s` (64 bytes): malformed. One malformed element rejects the file, even if its `key` is
+     not a trusted one;
+   - no element names a trusted key (unknown key): elements whose `key` is not in the trusted map are skipped, and at
+     least one element from a trusted key must be present;
+   - **any** element that names a trusted key does not verify over the id (the element's `s` is not the signature of
+     that key on the id): every element of a trusted key must verify, not only the first;
+   - otherwise it accepts. Elements of unknown keys beside the verifying elements of trusted keys are ignored.
+3. A `local` catalog is never signed and never rejected for its signature: a reader ignores its `sig`, whatever
+   keys it was given. **Exception: a transfer file.** A local catalog is one the device builds for itself, so it can
+   only come from the device's own store. When a reader given trusted keys reads a catalog that arrives inside a
+   transfer file (`readTransfer`, import) and has `about.origin` `local`, it rejects the file with `E_SIGNATURE`: a
+   file from outside must not install a catalog that claims the device made it, which no signature vouches for. A
+   reader given no keys accepts it, as it ignores signatures altogether (1).
+4. A `sig` in a segment that is not a catalog is ignored always.
+5. **Output.** Only when keys were given, the catalog's reader output has `"sig": {"key": <key id>, "valid": true}`
+   (the first verifying element in file order). A local catalog has no `sig` in the output, nor does a file read
+   without keys.
 - **Going back.** A reader MUST NOT replace an installed catalog with a lower revision of the same publisher and
   catalog, unless the person confirms it. An old SD card must not undo an update without asking.
 

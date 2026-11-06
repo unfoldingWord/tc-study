@@ -425,9 +425,15 @@ const TOPIC_CREDITS: Record<keyof typeof TOPIC_SOURCES, { title: string; license
   tipnr: {
     title: 'TIPNR - Translators Individualised Proper Names with all References',
     license: 'CC-BY-4.0',
-    attribution: 'STEPBible.org, based on work at Tyndale House Cambridge',
+    attribution:
+      '"STEP Bible" (www.STEPBible.org), data by Tyndale House Cambridge, licensed CC BY 4.0. Changed: the data of TIPNR was extracted, re-keyed and reduced (names, verses, relations, Strong keys)',
   },
-  theographic: { title: 'Theographic Bible Metadata', license: 'CC-BY-SA-4.0', attribution: 'Theographic Bible Metadata (viz.bible), Robert Rouse' },
+  theographic: {
+    title: 'Theographic Bible Metadata',
+    license: 'CC-BY-SA-4.0',
+    attribution:
+      'Theographic Bible Metadata (viz.bible), Robert Rouse, CC BY-SA 4.0. Changed: only the events were extracted, re-keyed and reduced. Its original sources are cited in docs/data-source-bibliography.md of robertrouse/theographic-bible-metadata at commit 744355c7a5f38efd407bc67a5257c99aca9532bc',
+  },
   obs: { title: 'Open Bible Stories', license: 'CC-BY-SA-4.0', attribution: 'The original work by unfoldingWord is available from https://openbiblestories.org' },
 }
 
@@ -558,11 +564,6 @@ export async function buildCommon(o: {
     const tipnr = parseTipnr(t.tipnr, issues)
     const events = parseTheographic(t.theographic, issues)
     const obs = parseObsRefs(t.obs, issues, lastVerse)
-    const obsTitles = new Map<number, string>()
-    for (const [n, text] of t.obs) {
-      const h = /^#\s+(.*?)\s*$/m.exec(text)
-      if (h !== null) obsTitles.set(n, h[1].replace(/^\d+\.\s*/, ''))
-    }
     // The outlines of the English tN introductions (the first tN of mapLang by key)
     const outlines = new Map<string, { title: string; from: number; to: number }[]>()
     let tn: ResourceRef | undefined
@@ -583,7 +584,7 @@ export async function buildCommon(o: {
     }
     const res: XtopicsSources = { ...TOPIC_SOURCES, ...t.releases }
     if (tn !== undefined) res.outlines = [tn.key, tagOf(tn.stamp)]
-    const built = buildXtopics({ tipnr, events, obs, obsTitles, outlines, origs, res, twNames })
+    const built = buildXtopics({ tipnr, events, obs, outlines, origs, res, twNames })
     report.push(...issues.map((line) => `topics: ${line}`), ...built.report.map((line) => `topics: ${line}`))
     const texts = [['tipnr', t.tipnr], ...Object.entries(t.theographic), ...[...t.obs].sort((a, b) => a[0] - b[0]).map(([n, text]) => [`obs ${n}`, text])]
     const rows = texts.map(([name, text]) => ({ layer: 'topics', key: `${name}|${sha256Hex(text)}` }))

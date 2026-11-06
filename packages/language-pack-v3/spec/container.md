@@ -34,8 +34,9 @@ contents cheaply.
 | `id` | bytes (32) | sha256 of the uncompressed body: the segment's identity |
 | `sig` | array | Only in the catalog: its signatures (`catalog.md`) |
 
-A reader ignores header keys it does not know: a minor version can add them. A `sig` of the wrong type, or in a segment that is not a
-catalog, is ignored the same way: phase 3, which checks signatures, decides what it does with them.
+A reader ignores header keys it does not know: a minor version can add them. A reader given no trusted keys ignores `sig`, and a `sig`
+in a segment that is not a catalog is always ignored. What a reader given keys does, and the key id, are in `catalog.md`
+("Signatures"). `sig` is not part of the body: signing a catalog changes `H` and the file but not the `id`.
 
 ## Body
 
@@ -164,6 +165,7 @@ cases expect.
 | `E_HMISMATCH` | The body's `h` differs from the header's `h` |
 | `E_TABLE` | A required table, or its version, is unknown |
 | `E_LIMIT` | A limit above is exceeded |
+| `E_SIGNATURE` | A reader given trusted keys finds a `published` catalog whose `sig` is missing, malformed, from no trusted key, or does not verify (`catalog.md`). A reader given no keys never gives it |
 
 **Order of checks.** A file can have more than one defect. So that two readers give the same code, a reader checks in
 this order and stops at the first defect:
@@ -186,6 +188,7 @@ this order and stops at the first defect:
    the reader has no known table for it, even if all its tables are optional. (A phase 2 part A reader does not know `xtopics` and `topics` as classes at all: it gives `E_HEADER`, unknown class, at the header checks, not `E_TABLE`. Likewise a reader older than part C and an `aligned` segment: `E_HEADER`; the catalog that lists such a segment is `E_BODY` for it, see `catalog.md`.) A segment inside a transfer file
    (`transfer.md`) gets this `E_TABLE` too, but not the rest of the step: the shape of its tables is checked when the
    app opens it.
+6. Last, and only for a reader given trusted keys, the signature of a `published` catalog (`E_SIGNATURE`, `catalog.md`): after every other check of the catalog, so a catalog with a bad table and a bad signature is `E_BODY`.
 
 A file that came cut short over Bluetooth or a full SD card fails `E_TRUNCATED` or `E_INFLATE`. The app keeps what it
 had and asks for the file again.

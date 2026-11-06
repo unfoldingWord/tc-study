@@ -17,7 +17,7 @@
  * - **resources**: by key. **requires**: by catalog and revision. **complements**: by kind, lang and id. All by code point.
  * - An optional table with no rows (`requires`, `complements`) is left out, as an absent one is.
  *
- * The catalog is written unsigned: signing is phase 3 and belongs to whoever holds the key (`catalog.md`, "Signatures").
+ * The catalog is written unsigned: signing belongs to whoever holds the key, and is `signCatalog` of `../sign` (`catalog.md`, "Signatures"), which changes the header and not the id.
  */
 import type { CborValue } from '../codec/cbor'
 import { compareCodePoints } from '../codec/columns'

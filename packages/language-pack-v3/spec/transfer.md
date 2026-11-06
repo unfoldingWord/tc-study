@@ -48,7 +48,9 @@ and how much of it the device already has, by reading only the index and the cat
 ## Receiving
 
 1. Check the first 12 bytes and the index: `E_MAGIC`, `E_VERSION`, `E_KIND`, `E_HEADER`.
-2. Read the catalogs and check their ids and signatures (`catalog.md`).
+2. Read the catalogs and check their ids and signatures (`catalog.md`). A reader given trusted keys also rejects a
+   catalog with `about.origin` `local` here (`E_SIGNATURE`): local catalogs are accepted only from the device's own
+   store, never from a transfer file.
 3. Check every entry as if it had been downloaded (`container.md`): an entry whose id does not match is rejected
    (`E_ID`).
 4. Activate the units that are complete (`catalog.md`).

@@ -43,7 +43,8 @@ topics = {
                                ; topics may share a ref (the same outline range under two ids)
   "title": strtab,             ; per id (as many as ids, "" for none): the English title shown when a language has no
                                ; name: TIPNR's unified name before "@" (people, places), the Theographic title or the
-                               ; builder's list title (events), the OBS story title, the outline heading (sections).
+                               ; builder's list title (events), the outline heading (sections). "" for an OBS story: only its
+                               ; reference is taken from OBS, never its title (fuentes.md).
                                ; "" when the source gives none: a reader then has no title to show and the answer
                                ; leaves "title" out; the app shows the id
   "ustrong": strtab,           ; per id (as many as ids, "" for none): TIPNR's uStrong of a person or place, kept so

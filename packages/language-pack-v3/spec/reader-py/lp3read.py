@@ -26,6 +26,13 @@ import json
 import re
 import sys
 import zlib
+from importlib import util as _util
+from pathlib import Path as _Path
+
+# ed25519.py sits beside this file. It is loaded by its path: under ``python -I`` the script's folder is not on sys.path.
+_spec = _util.spec_from_file_location("lp3_ed25519", _Path(__file__).resolve().with_name("ed25519.py"))
+ed25519 = _util.module_from_spec(_spec)
+_spec.loader.exec_module(ed25519)
 
 MAX_INT = 2**53 - 1
 MAGIC = bytes([0x89, 0x54, 0x4C, 0x50])
@@ -381,6 +388,7 @@ class Segment:
         self.t = t
         self.skip = skip
         self.cls = h["class"]
+        self.file_header = None             # the file header (the CBOR map of the H bytes), for ``sig``
 
     def has(self, name: str) -> bool:
         """The table is in the file and this reader reads it."""
@@ -522,7 +530,9 @@ def parse_segment(data: bytes, expect_id: bytes | None = None, must_class: str |
         if required or name in schema_required:
             _fail("E_TABLE")
         skip.add(name)
-    return Segment(digest.hex(), h, t, skip, ulen)
+    seg = Segment(digest.hex(), h, t, skip, ulen)
+    seg.file_header = header
+    return seg
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1757,9 +1767,69 @@ def decode_segment(p: Segment, as_class: str | None = None, aligned_ranges: list
     return out
 
 
-def read_segment(data: bytes, expect_id: bytes | None = None, aligned_ranges: list | None = None) -> dict:
-    """``aligned_ranges``: the (P, Q) ranges of the catalog's aligned units; with them an ``other`` part is checked."""
-    return decode_segment(parse_segment(data, expect_id), aligned_ranges=aligned_ranges)
+def read_segment(data: bytes, expect_id: bytes | None = None, aligned_ranges: list | None = None,
+                 trusted: dict | None = None) -> dict:
+    """``aligned_ranges``: the (P, Q) ranges of the catalog's aligned units; with them an ``other`` part is checked.
+
+    ``trusted``: ``None`` (no keys: ``sig`` is ignored) or a map from key id to the 64 hex digits of a raw public key.
+    """
+    p = parse_segment(data, expect_id)
+    out = decode_segment(p, aligned_ranges=aligned_ranges)
+    if trusted is not None and p.cls == "catalog":
+        _check_signature(p, out, trusted)
+    return out
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Signatures (catalog.md, "Signatures")
+# ---------------------------------------------------------------------------------------------------------------
+
+
+def _trusted_keys(trusted: dict) -> dict[str, bytes]:
+    """key id -> raw key, only for the keys whose id, computed from the bytes, is the one they are listed under."""
+    keys = {}
+    for kid, hexkey in trusted.items():
+        if type(kid) is not str or type(hexkey) is not str or len(hexkey) != 64:
+            continue
+        try:
+            raw = bytes.fromhex(hexkey)
+        except ValueError:
+            continue
+        if hashlib.sha256(raw).hexdigest()[:16] == kid:
+            keys[kid] = raw
+    return keys
+
+
+def _check_signature(p: Segment, out: dict, trusted: dict, in_transfer: bool = False) -> None:
+    """Rule 2 to 5 of catalog.md: adds ``sig`` to ``out`` or raises E_SIGNATURE. A local catalog is left alone, except
+    inside a transfer file, where it is rejected (transfer.md, "Receiving", step 2)."""
+    if out["about"]["origin"] != "published":
+        if in_transfer:
+            _fail("E_SIGNATURE")
+        return
+    sig = p.file_header.get("sig")
+    if type(sig) is not list or not sig:
+        _fail("E_SIGNATURE")
+    elements = []
+    for el in sig:
+        if (type(el) is not dict or not is_str(el.get("key")) or el.get("alg") != "ed25519"
+                or type(el.get("alg")) is not str or not is_bytes(el.get("s"), 64)):
+            _fail("E_SIGNATURE")
+        elements.append(el)
+    keys = _trusted_keys(trusted)
+    id_ = bytes.fromhex(p.id)
+    first = None
+    for el in elements:
+        raw = keys.get(el["key"])
+        if raw is None:
+            continue
+        if not ed25519.verify(raw, id_, bytes(el["s"])):
+            _fail("E_SIGNATURE")
+        if first is None:
+            first = el["key"]
+    if first is None:
+        _fail("E_SIGNATURE")
+    out["sig"] = {"key": first, "valid": True}
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1767,7 +1837,7 @@ def read_segment(data: bytes, expect_id: bytes | None = None, aligned_ranges: li
 # ---------------------------------------------------------------------------------------------------------------
 
 
-def _read_transfer(data: bytes) -> dict:
+def _read_transfer(data: bytes, trusted: dict | None = None) -> dict:
     _check_fixed(data, (2,))
     ilen = int.from_bytes(data[8:12], "big")
     if len(data) < 12 + ilen:
@@ -1848,6 +1918,9 @@ def _read_transfer(data: bytes) -> dict:
         statuses.append(status)
     # step 6
     catalog_outputs = [decode_segment(parsed[c], "catalog") for c in catalogs]
+    if trusted is not None:
+        for c, o in zip(catalogs, catalog_outputs):
+            _check_signature(parsed[c], o, trusted, True)
 
     index_out = {k: jsonable(v) for k, v in index.items() if k not in ("mode", "catalogs", "entries", "base",
                                                                          "made", "by")}
@@ -1876,7 +1949,7 @@ def _read_transfer(data: bytes) -> dict:
 # ---------------------------------------------------------------------------------------------------------------
 
 
-def read_file(data: bytes, expect: str | None = None) -> dict:
+def read_file(data: bytes, expect: str | None = None, trusted: dict | None = None) -> dict:
     """The reader output of a file: the object of tests/README.md, or ``{"error": code}``.
 
     ``expect`` is ``None`` (the kind byte says how to read the file), ``"segment"`` or ``"transfer"`` (any other
@@ -1884,11 +1957,11 @@ def read_file(data: bytes, expect: str | None = None) -> dict:
     """
     try:
         if expect == "segment":
-            return read_segment(data)
+            return read_segment(data, trusted=trusted)
         if expect == "transfer":
-            return _read_transfer(data)
+            return _read_transfer(data, trusted)
         kind = _check_fixed(data, (1, 2))
-        return read_segment(data) if kind == 1 else _read_transfer(data)
+        return read_segment(data, trusted=trusted) if kind == 1 else _read_transfer(data, trusted)
     except LP3Error as e:
         return {"error": e.code}
 
@@ -1908,18 +1981,57 @@ def canonical_text(obj) -> str:
     return json.dumps(obj, sort_keys=True, indent=2, ensure_ascii=False) + "\n"
 
 
+USAGE = "usage: python lp3read.py <file> [--keys <keys.json>] [--trusted <hex key>]...\n"
+
+
+def _args(argv: list[str]):
+    """(file, trusted) or None. ``--keys`` a JSON file {key id: 64 hex}; ``--trusted`` one raw key, its id computed."""
+    file, trusted, i = None, None, 1
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--keys", "--trusted"):
+            if i + 1 >= len(argv):
+                return None
+            v = argv[i + 1]
+            i += 2
+            trusted = {} if trusted is None else trusted
+            if a == "--keys":
+                with open(v, "rb") as f:
+                    m = json.loads(f.read().decode("utf-8"))
+                if type(m) is not dict:
+                    return None
+                trusted.update(m)
+            else:
+                try:
+                    raw = bytes.fromhex(v)
+                except ValueError:
+                    raw = b""
+                trusted[hashlib.sha256(raw).hexdigest()[:16]] = v.lower()
+        elif file is None and not a.startswith("--"):
+            file, i = a, i + 1
+        else:
+            return None
+    return None if file is None else (file, trusted)
+
+
 def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        sys.stderr.write("usage: python lp3read.py <file>\n")
-        return 2
     try:
-        with open(argv[1], "rb") as f:
+        parsed = _args(argv)
+    except (OSError, ValueError) as e:
+        sys.stderr.write(f"lp3read: {e}\n")
+        return 2
+    if parsed is None:
+        sys.stderr.write(USAGE)
+        return 2
+    path, trusted = parsed
+    try:
+        with open(path, "rb") as f:
             data = f.read()
     except OSError as e:
         sys.stderr.write(f"lp3read: {e}\n")
         return 2
     try:
-        out = read_file(data)
+        out = read_file(data, trusted=trusted)
         text = canonical_text(out)
     except Exception as e:  # a bug of this reader, never a verdict on the file: exit 3, not 1
         sys.stderr.write(f"lp3read: internal error ({type(e).__name__}: {e}); this is a bug of the reader, "

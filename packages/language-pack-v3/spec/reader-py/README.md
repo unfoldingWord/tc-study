@@ -27,6 +27,8 @@ two-space indent) and exits 0. A rejected file prints `{"error": "<code>"}` (on 
 exits 2. An unexpected exception inside the reader (a bug, never a verdict on the file) prints one line on stderr and
 exits 3, so that it cannot be taken for a format error.
 
+Trusted keys (catalog signatures, `spec/catalog.md`): `python lp3read.py <file> --keys <keys.json>` (the `x.keys.json` of a case: key id to 64 hex digits) and/or `--trusted <64 hex digits>` (a raw key, repeatable; its id is computed). Without either the reader ignores `sig`. `ed25519.py` is the RFC 8032 verifier (strict: `S >= L` and non-canonical encodings are rejected).
+
 As a library:
 
 ```python
