@@ -1,0 +1,51 @@
+; Format 3: the lexicon segment. One language, one group of entries (the Strong numbers of one thousand).
+;
+; v1 keeps the entries in the shape they are published today, without columns. Phase 0 found that this does not shrink
+; them (es-419: 3 636 KB today, 3 725 KB as CBOR after compression), so a columnar version of "entries" is planned
+; once it is measured. The group and the ids do not change with it.
+
+lex-segment = body<lex-header, lex-tables>
+
+lex-header = {
+  "class": "lex",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  "lang": tstr,
+  "group": lex-group,          ; the letter and the thousands: "G0" holds G1-G999, "G5" holds G5000-G5999
+  "res": [+ [tstr, tstr]],
+}
+
+lex-group = tstr .regexp "[GH][0-9]+"
+
+lex-tables = {
+  "entries": [* lex-entry],    ; required, v1; ordered by Strong number
+}
+
+lex-entry = {
+  "res": res-index,
+  "strong": tstr,              ; as the lexicon publishes it ("G5485", "H0001", and "G127a" for a homonym)
+  "lemma": tstr,
+  ? "brief": tstr,             ; "brief" and "long" belong to the lexicon's file, which can hold several entries (homonyms):
+  ? "long": tstr,              ; each of its entries repeats them
+  ? "pos": [* tstr],
+  "senses": [* lex-sense],
+  ? "notes": [* tstr],
+  ? "aramaic": bool,           ; Hebrew lexicon: the word is Aramaic
+  ? "source": tstr,            ; kept as published: where the entry's text comes from ("en_uhl") and its review state ("pending")
+  ? "review": tstr,
+}
+
+lex-sense = {
+  ? "code": tstr,
+  ? "definition": tstr,
+  ? "glosses": [* tstr],
+  ? "domain": tstr,
+  ? "domainCode": tstr,
+  ? "comments": tstr,
+  ? "etymology": tstr,
+  ? "lang": tstr,              ; the language of the sense's text when it is not the lexicon's ("en")
+  ? "definitionLang": tstr,
+  ? "refs": [* [verse-id, verse-id]],   ; every reference as a range, in the original's numbering
+}
+; The Hebrew lexicon numbers verses as the Hebrew Bible does, and the UHB as the English one does. The builder converts
+; the references to the original's numbering (hebrewNumbering.ts), so a reader needs no table to follow them.

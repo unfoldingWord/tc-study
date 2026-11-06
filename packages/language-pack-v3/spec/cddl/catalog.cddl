@@ -1,0 +1,71 @@
+; Format 3: the catalog (catalog.md). A segment of class "catalog"; its header may carry signatures ("sig").
+
+catalog-segment = body<catalog-header, catalog-tables>
+
+catalog-header = {
+  "class": "catalog",
+  "v": 1,
+  "tables": { * table-name => [uint, bool] },
+  ? "lang": tstr,              ; absent in the common catalog
+}
+
+catalog-tables = {
+  "about": about,              ; required, v1
+  "resources": [* resource],   ; required, v1
+  "segments": [* segment-entry],   ; required, v1; ordered by class, then book, part or group
+  "units": [* unit],           ; required, v1; ordered by id
+  ? "requires": [* [catalog: tstr, revision: uint, id: sha256]],   ; optional, v1; e.g. the common catalog
+  ? "complements": [* complement],   ; optional, v1
+}
+
+about = {
+  "format": "3.0",
+  "catalog": tstr,             ; the catalog's name: the language tag, or "common"
+  "publisher": tstr,           ; "unfoldingWord", or "local:" and a device name for a catalog built on a device
+  "origin": "published" / "local",
+  "revision": uint,            ; grows with every publication of this catalog by this publisher
+  ? "previous": sha256,        ; the id of the revision before
+  "built": tstr,               ; RFC 3339 date and time of the build
+  "builder": tstr,             ; the builder's name and version
+  ? "name": tstr,              ; the language's name, in the language
+  ? "direction": "ltr" / "rtl",
+}
+
+resource = {
+  "key": tstr,                 ; "es-419_gl/es-419/tn"
+  "title": tstr,
+  "subject": tstr,             ; Door43's subject ("TSV Translation Notes", "Aligned Bible", ...)
+  "release": tstr,             ; the release it was built from
+  "license": tstr,             ; SPDX id when there is one ("CC-BY-SA-4.0")
+  ? "rights": tstr,            ; the holder, as the resource states it
+  ? "attribution": tstr,       ; the credit line an app shows
+  "books": book-set,           ; the books it has (all zeros for resources without books)
+}
+
+segment-entry = {
+  "id": sha256,
+  "class": class-name,
+  ? "book": book-code,
+  ? "part": "core" / book-code,
+  ? "group": tstr,
+  "size": uint,                ; the file's size, compressed: what a download weighs
+  "ulen": uint,
+  "inputs": sha256,            ; fingerprint of what it was built from (catalog.md, "What changes")
+}
+
+unit = {
+  "id": tstr,                  ; "book:tit", "orig:tit", "map", "xmap", "art:tw:kt", "lex:G5", "obs"
+  "segments": [+ uint],        ; indexes in "segments"
+  ? "needs": [* tstr],         ; unit ids, in this catalog or in one it requires
+}
+
+complement = {
+  "kind": tstr,                ; "classifier", "vectors", "numbers", "language-id", "model"
+  ? "lang": tstr,
+  "id": sha256,
+  "size": uint,
+  "media": tstr,               ; media type of the bytes
+  "version": tstr,
+  ? "for": tstr,               ; what it works with, e.g. the version of the library's queries
+  ? "license": tstr,
+}

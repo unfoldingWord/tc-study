@@ -1,0 +1,53 @@
+{
+  "articles": [
+    {
+      "id": "tw:kt/grace",
+      "res": "es-419_gl/es-419/tw",
+      "sections": [
+        {
+          "lang": "es-419",
+          "level": 0,
+          "md": "La gracia es un favor que se da sin que se haya ganado.",
+          "role": "intro",
+          "sid": "intro"
+        },
+        {
+          "lang": "en",
+          "level": 2,
+          "md": "La palabra gracia se refiere a la ayuda que se da a quien no la merece, con generosidad y sin esperar nada a cambio.",
+          "role": "definition",
+          "sid": "definition",
+          "title": "Definition"
+        },
+        {
+          "lang": "es-419",
+          "level": 2,
+          "md": "Otras formas de traducir la palabra gracia son favor, bondad y generosidad.",
+          "role": "translation-suggestions",
+          "sid": "translation-suggestions",
+          "title": "Sugerencias de traducción"
+        }
+      ],
+      "title": "gracia, amable"
+    }
+  ],
+  "h": {
+    "class": "art",
+    "group": "tw:kt",
+    "lang": "es-419",
+    "res": [
+      [
+        "es-419_gl/es-419/tw",
+        "v37"
+      ]
+    ],
+    "tables": {
+      "articles": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "9bd7b87746712794e5a220aa51fee763f7d3adf558826917cefcbd282523c2df"
+}

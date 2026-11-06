@@ -499,6 +499,19 @@
         "typescript": "^5.3.3",
       },
     },
+    "packages/language-pack-v3": {
+      "name": "@bt-synergy/language-pack-v3",
+      "version": "0.1.0",
+      "dependencies": {
+        "jszip": "^3.10.1",
+        "pako": "2.1.0",
+      },
+      "devDependencies": {
+        "@types/node": "^20.10.0",
+        "@types/pako": "^2.0.4",
+        "typescript": "^5.3.3",
+      },
+    },
     "packages/linked-panels": {
       "name": "@bt-synergy/linked-panels",
       "version": "1.0.0",
@@ -716,6 +729,7 @@
       "dependencies": {
         "@bt-synergy/catalog-manager": "workspace:*",
         "@bt-synergy/door43-api": "workspace:*",
+        "@bt-synergy/language-pack-v3": "workspace:*",
         "@bt-synergy/resource-cache": "workspace:*",
         "@bt-synergy/resource-catalog": "workspace:*",
         "@bt-synergy/resource-parsers": "workspace:*",
@@ -1258,6 +1272,8 @@
     "@bt-synergy/door43-api": ["@bt-synergy/door43-api@workspace:packages/door43-api"],
 
     "@bt-synergy/language-pack": ["@bt-synergy/language-pack@workspace:packages/language-pack"],
+
+    "@bt-synergy/language-pack-v3": ["@bt-synergy/language-pack-v3@workspace:packages/language-pack-v3"],
 
     "@bt-synergy/linked-panels": ["@bt-synergy/linked-panels@workspace:packages/linked-panels"],
 

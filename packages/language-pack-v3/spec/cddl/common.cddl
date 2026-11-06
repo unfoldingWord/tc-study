@@ -1,0 +1,85 @@
+; Format 3: types shared by every class. The byte encodings of the column types are in container.md.
+
+; ---- The file header (container.md) ----
+
+segment-header = {
+  "h": logical-header,
+  "codec": "deflate-raw",
+  "clen": uint,
+  "ulen": uint,
+  "id": sha256,
+  ? "sig": [+ signature],      ; catalog only (catalog.md)
+  * tstr => any,               ; keys a later minor version adds; readers ignore them
+}
+
+signature = { "key": tstr, "alg": "ed25519", "s": bstr .size 64 }
+
+logical-header = {
+  "class": class-name,
+  "v": uint,
+  "tables": { * table-name => [version: uint, required: bool] },
+  ? "lang": tstr,
+  ? "book": book-code,
+  ? "part": "core" / book-code,
+  ? "group": tstr,
+  ? "orig": [original-key: tstr, original-stamp: tstr],
+  ? "res": [* [resource-key: tstr, release-stamp: tstr]],
+}
+
+class-name = "catalog" / "xmap" / "map" / "book" / "orig" / "art" / "lex" / "obs" / "gen"
+table-name = tstr              ; lowercase ASCII letters, digits and "-", starting with a letter
+
+; The body: the logical header again, and the tables.
+body<H, T> = { "h": H, "t": T }
+
+; ---- Columns (container.md, "Column encodings") ----
+
+uvarints = bstr                ; unsigned LEB128 numbers, one after the other
+svarints = bstr                ; zigzag, then as uvarints
+deltas = bstr                  ; svarints of each value minus the previous one (the first minus 0)
+bits = bstr                    ; one bit per row, least significant bit first
+strtab = [* tstr]              ; numbered from 0
+texts = { "utf8": bstr, "len": uvarints }
+sha256 = bstr .size 32
+
+; A column of a table with n rows. "has" is present when some rows lack the value; the values then list only the
+; rows whose bit is 1.
+column = {
+  ? "has": bits,
+  (
+    "strings": uvarints        ; numbers in the segment's string table
+    // "texts": texts           ; long text: notes, questions, answers
+    // "flags": bits            ; true or false
+    // "uints": uvarints        ; small numbers
+  ),
+}
+
+; ---- Ids (ids.md) ----
+
+book-code = tstr .regexp "[0-9a-z]{3}"
+verse-id = uint                ; LLCCCVVV
+concept-id = tstr              ; "tw:kt/grace", "ta:translate/figs-metaphor", "per:abraham", "obs:10" ...
+res-index = uint               ; a resource, by its index in the header's "res"
+
+; Verse ranges of n rows: the first verse id of each row as deltas, and the last verse id minus the first.
+; Both ends are included. A range across chapters (1:12-2:3) is still two verse ids; span is their difference.
+ranges = { "from": deltas, "span": uvarints }
+
+; One bit per book of the canonical order (ids.md): bit 0 is gen, bit 65 is rev. 9 bytes.
+book-set = bstr .size 9
+
+; What a source covers (counts.md): per source key, the books it covers whole, and the books it covers only in part.
+coverage = { * tstr => [whole: book-set, ? partial: book-set] }
+
+; ---- Counts of the maps (counts.md) ----
+
+; Per key and book: how many, and in how many distinct verses. "keys" are sorted by code point. "counts" holds, per
+; key in that order: the number of books b; then per book, in canonical order: its book number minus the previous
+; one written for this key (the first minus 0), the count, and the number of distinct verses.
+counts = { "unit": count-unit, "keys": strtab, "counts": uvarints }
+count-unit = "occurrences" / "links" / "notes"
+
+; The verses behind the counts, for one book: per key the book has, in key order: the key's number minus the previous
+; key number written (the first minus 0), then its distinct verses (as many as the core says), each as
+; LLCCCVVV mod 1 000 000, minus the previous one (the first minus 0).
+verse-lists = uvarints
