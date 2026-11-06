@@ -19,7 +19,7 @@ import {
   writeTransfer,
 } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
-import { loadState, readStored, st, verifiedHave } from './install'
+import { loadState, localCatalogIds, readStored, st, verifiedHave } from './install'
 import { activate } from './plan'
 import { hex, type InstalledCatalog, type InstalledState, installedOf, qualify } from './state'
 import type { BlobStore } from './store/types'
@@ -125,7 +125,7 @@ async function commit(
       if (state.units[key] !== undefined || unit.segments.some((i) => arrived.has(hex(cat.catalog.segments[i]!.id)))) visit(key)
     }
   }
-  const r = activate(next, set, have, { strict: true, only })
+  const r = activate(next, set, have, { strict: true, only, localCatalogs: await localCatalogIds(store, state) })
 
   const catalogs = fileCats.map((c) => {
     const p = r.state.published[c.name] ?? next.published[c.name]

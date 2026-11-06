@@ -107,18 +107,22 @@ function sameList(a: string[], b: string[]): boolean {
  * back by an older catalog of its name that is not the published one (a language built against an older common catalog), so an old
  * file does not undo an update (catalog.md "Going back"); the installed unit serves the needs instead.
  *
- * A published catalog replaces a local one (transfer.md "Old packs"): an installed unit that came from a local catalog and that
- * the published catalog of its name (one of `catalogs`) does not list (the bridged `orig:<book>`) no longer serves a need, so a
- * published book never activates against it; and once that name's active catalog is published, it is dropped from the state as
- * soon as no unit kept needs it, so `prune` removes its segments and the local catalog.
+ * A published catalog replaces a local one (transfer.md "Old packs") unit by unit, and only where it has a replacement. A unit of
+ * the local catalog is replaced by the same unit of the published catalog of its name when that one activates; a bridged
+ * `<name>/orig:<book>` is dropped once a published `orig:<book>` of another catalog (the common one) is installed and no unit kept
+ * needs it, so `prune` removes its segments (and the local catalog once none of its units is left). A bridged unit with no
+ * published replacement (a book the published catalog lacks) stays, with what it needs. A local unit the published catalog of its
+ * name does not list never serves a need of a published unit, so a published book does not activate against the bridged orig.
  *
  * `only`: when given, the only units considered (an import: what the file brought, what is installed, and their needs).
+ * `localCatalogs`: the ids of the stored catalogs whose origin is local, which tell the units of a state saved before units carried
+ * `local` (`localCatalogIds`).
  */
 export function activate(
   state: InstalledState,
   catalogs: VerifiedCatalog[],
   have: ReadonlySet<string>,
-  o: { strict?: boolean; only?: ReadonlySet<string> } = {},
+  o: { strict?: boolean; only?: ReadonlySet<string>; localCatalogs?: ReadonlySet<string> } = {},
 ): { state: InstalledState; activated: string[]; waiting: { key: string; missing: string[] }[] } {
   type Cand = { key: string; cat: VerifiedCatalog; entry: InstalledUnit; missing: string[] }
   const cands: Cand[] = []
@@ -142,14 +146,18 @@ export function activate(
   const publishedOf = new Map(catalogs.filter((c) => c.origin === 'published').map((c) => [c.name, c]))
   // From a local catalog: the flag, or (a state saved before the flag) the catalog its units came from is a local one.
   const fromLocal = (u: InstalledUnit): boolean =>
-    u.local === true || (state.active[u.catalog]?.origin === 'local' && state.active[u.catalog]!.id === u.catalogId)
-  const replaced = (key: string): boolean => {
+    u.local === true ||
+    o.localCatalogs?.has(u.catalogId) === true ||
+    (state.active[u.catalog]?.origin === 'local' && state.active[u.catalog]!.id === u.catalogId)
+  // A local unit the published catalog of its name does not list (the bridged orig): it serves no need of a published unit.
+  const unlisted = (key: string): boolean => {
     const u = state.units[key]
     const pub = u === undefined ? undefined : publishedOf.get(u.catalog)
     return u !== undefined && pub !== undefined && fromLocal(u) && !pub.catalog.units.some((x) => `${pub.name}/${x.id}` === key)
   }
   const ok = new Set<string>()
-  const satisfied = (need: string): boolean => ok.has(need) || (!byKey.has(need) && state.units[need] !== undefined && !replaced(need))
+  const satisfied = (c: Cand) => (need: string): boolean =>
+    ok.has(need) || (!byKey.has(need) && state.units[need] !== undefined && !(c.cat.origin === 'published' && unlisted(need)))
   // A unit whose segments and needs are the installed ones only takes the new revision. `strict`: `have` covers every segment of
   // the catalogs (an import), so a segment the store lost also holds back a unit that would otherwise only take the revision.
   const same = (c: Cand): boolean => {
@@ -164,7 +172,7 @@ export function activate(
     changed = false
     for (const c of cands) {
       if (ok.has(c.key)) continue
-      if (held(c) || (same(c) && (o.strict !== true || c.missing.length === 0)) || (c.missing.length === 0 && c.entry.needs.every(satisfied))) {
+      if (held(c) || (same(c) && (o.strict !== true || c.missing.length === 0)) || (c.missing.length === 0 && c.entry.needs.every(satisfied(c)))) {
         ok.add(c.key)
         changed = true
       }
@@ -176,7 +184,7 @@ export function activate(
   const waiting: { key: string; missing: string[] }[] = []
   for (const c of cands) {
     if (!ok.has(c.key)) {
-      waiting.push({ key: c.key, missing: [...c.missing, ...c.entry.needs.filter((n) => !satisfied(n))] })
+      waiting.push({ key: c.key, missing: [...c.missing, ...c.entry.needs.filter((n) => !satisfied(c)(n))] })
       continue
     }
     if (held(c)) continue
@@ -187,8 +195,14 @@ export function activate(
       next.active[c.cat.name] = installedOf(c.cat, state.published[c.cat.name], state.active[c.cat.name])
     }
   }
-  // The units a published catalog replaced, once their name's active catalog is published and no unit kept needs them.
-  const gone = new Set(Object.keys(next.units).filter((k) => replaced(k) && next.active[next.units[k]!.catalog]?.origin === 'published'))
+  // A bridged `<name>/orig:<book>` whose replacement is installed: `orig:<book>` of a published catalog of another name. It goes
+  // once no unit kept needs it (a bridged book the published catalog has not replaced yet keeps it).
+  const replacedOrig = (key: string, u: InstalledUnit): boolean => {
+    const id = key.slice(key.indexOf('/') + 1)
+    if (!id.startsWith('orig:') || !fromLocal(u)) return false
+    return Object.entries(next.units).some(([k, v]) => k !== key && k === `${v.catalog}/${id}` && v.catalog !== u.catalog && !fromLocal(v))
+  }
+  const gone = new Set(Object.entries(next.units).filter(([k, u]) => replacedOrig(k, u)).map(([k]) => k))
   for (let changed = true; changed; ) {
     changed = false
     const needed = new Set(Object.entries(next.units).flatMap(([k, u]) => (gone.has(k) ? [] : u.needs)))

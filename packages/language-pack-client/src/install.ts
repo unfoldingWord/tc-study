@@ -35,6 +35,30 @@ export async function loadState(store: BlobStore): Promise<InstalledState> {
   return (await st(() => store.getState())) ?? emptyState()
 }
 
+/**
+ * The ids of the stored catalogs whose origin is local that installed units came from (for `activate`'s `localCatalogs`): a state
+ * saved before units carried `local` tells its bridged units only by the catalog they came from. Catalogs `active` or `published`
+ * names say their origin; the others are read from the store, without the signature (a local one has none).
+ */
+export async function localCatalogIds(store: BlobStore, state: InstalledState): Promise<Set<string>> {
+  const ids = new Set<string>()
+  const toRead = new Set(Object.values(state.units).filter((u) => u.local !== true).map((u) => u.catalogId))
+  for (const e of [...Object.values(state.active), ...Object.values(state.published)]) {
+    if (!toRead.delete(e.id)) continue
+    if (e.origin === 'local') ids.add(e.id)
+  }
+  for (const id of toRead) {
+    const bytes = await st(() => store.get(id))
+    if (bytes === undefined) continue
+    try {
+      if ((await verifyCatalogFile(bytes, {}, { from: 'store', expectedId: id })).origin === 'local') ids.add(id)
+    } catch (e) {
+      if (!(e instanceof FormatError)) throw e
+    }
+  }
+  return ids
+}
+
 /** A stored catalog file, read again with the same rules; `undefined` when it is gone or no longer verifies. */
 export async function readStored(store: BlobStore, trust: TrustPolicy, entry: InstalledCatalog | undefined): Promise<VerifiedCatalog | undefined> {
   if (entry === undefined) return undefined
@@ -119,7 +143,7 @@ export function checkConcurrency(n: number | undefined): void {
  * segment in plan order). A unit is activated, and the state saved, as soon as a stored segment completes it.
  */
 export async function runSteps(
-  env: { store: BlobStore; source: PackSource },
+  env: { store: BlobStore; source: PackSource; localCatalogs?: ReadonlySet<string> },
   catalogs: VerifiedCatalog[],
   state0: InstalledState,
   have: Set<string>,
@@ -170,7 +194,7 @@ export async function runSteps(
   let halt: { error: unknown } | undefined
 
   const activateNow = async (): Promise<ReturnType<typeof activate>> => {
-    const r = activate(state, catalogs, have)
+    const r = activate(state, catalogs, have, env.localCatalogs !== undefined ? { localCatalogs: env.localCatalogs } : {})
     if (r.activated.length > 0) {
       await st(() => store.setState(r.state))
       state = r.state

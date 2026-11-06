@@ -3,7 +3,7 @@
  */
 import { bookView, FormatError, KNOWN, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
-import { catalogsOf, checkConcurrency, verifiedHave, type InstallOptions, type InstallReport, type MissingCommon, loadState, readStored, runSteps, st } from './install'
+import { catalogsOf, checkConcurrency, localCatalogIds, verifiedHave, type InstallOptions, type InstallReport, type MissingCommon, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
 import { exportTransfer, importOldPack, importTransfer, type ImportReport } from './transfer'
 import { readerOfState, type PackReader } from './reader'
@@ -172,7 +172,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const stored = new Set(await st(() => store.ids()))
     const plan = planInstall(catalogs, state, want, stored)
     const have = await verifiedHave(store, plan.steps, stored)
-    return runSteps({ store, source: need() }, catalogs, state, have, plan.steps, plan.unknown, opts)
+    return runSteps({ store, source: need(), localCatalogs: await localCatalogIds(store, state) }, catalogs, state, have, plan.steps, plan.unknown, opts)
   }
 
   async function statusNow(lang: string): Promise<Status> {

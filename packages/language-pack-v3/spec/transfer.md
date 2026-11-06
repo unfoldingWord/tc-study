@@ -103,10 +103,12 @@ phase 1):
   inputs (`container.md`: the compressed bytes are not part of the identity).
 - They go into a **local catalog** (`origin: local`, `publisher: local:` and the device), unsigned, with coverage
   partial where the old pack lacked something.
-- A later published catalog of the same name replaces them. A unit of the local catalog that the published one does not list
-  (the bridged `orig:<book>`) never serves a need of a published unit, so a published book waits for the common catalog's
-  orig rather than use it; once the language's active units come from the published catalog, the device drops such a unit
-  as soon as no installed unit needs it, and its segments and the local catalog can be pruned.
+- A later published catalog replaces them unit by unit, where it has a replacement: a unit by the same unit of the published
+  catalog of its name, and the bridged `<lang>/orig:<book>` by `orig:<book>` of the published common catalog, once that one is
+  installed and no installed unit needs the bridged one. A bridged unit with no published replacement (a book the published
+  catalog lacks) stays active with what it needs, and the local catalog stays while any of its units do. A unit of the local
+  catalog that the published catalog of its name does not list never serves a need of a published unit, so a published book
+  waits for the common catalog's orig rather than use the bridged one.
 - The bridge also builds the `orig` segment of each book it builds, from the `originals` source, and the local catalog lists it
   (`orig:<book>`), so the bridged book activates and reads on a device with no network and no common catalog. The bridged orig is
   built from the book's rows in the `originals` source, its MACULA trees and referents included, and with the book's stamp from

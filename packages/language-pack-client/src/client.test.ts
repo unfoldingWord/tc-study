@@ -1034,6 +1034,75 @@ describe('importOldPack with an originals pack', () => {
     expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
   })
 
+  test('a bridged book the published catalog lacks survives refresh, install and prune, with its orig, and reads', async () => {
+    const noBooks = await buildSample({ books: [] })
+    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const srv = startFakeServer(noBooks)
+    server?.stop()
+    server = srv
+    const store = memoryStore()
+    const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
+    await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    const bridged = (await store.getState())!
+    const localId = bridged.active['es-419']!.id
+    await client.refresh('es-419')
+    expect((await verifyCatalogFile(noBooks.langCatalog, {}, { from: 'store' })).catalog.units.some((u) => u.id === 'book:tit')).toBe(false)
+    // The common orig:tit is installed too: the bridged orig has a replacement, but the bridged book still needs it.
+    const inst = await client.install('es-419', { units: ['orig:tit'] })
+    expect(inst.activated).toContain('common/orig:tit')
+    const state = (await store.getState())!
+    expect(state.active['es-419']?.origin).toBe('published')
+    expect(state.units['es-419/book:tit']).toEqual(bridged.units['es-419/book:tit'])
+    expect(state.units['es-419/orig:tit']).toEqual(bridged.units['es-419/orig:tit'])
+    await client.prune()
+    expect(await store.has(localId)).toBe(true) // the local catalog stays while its units do
+    for (const k of ['es-419/book:tit', 'es-419/orig:tit']) for (const id of state.units[k]!.segments) expect(await store.has(id)).toBe(true)
+    const passage = await (await client.open('es-419')).passage('tit 2:11')
+    expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+  })
+
+  test('a state saved before units carried `local`: the bridged orig is still dropped when the published book replaces the bridged one', async () => {
+    const zipped = await zipSource(dataFile('originals-tit.langpack.zip'))
+    // No book stamps, so the bridged orig is not the published one and its pruning shows.
+    const originals: RowSource = {
+      rows: (f) => zipped.rows(f),
+      resources: async (lang) => (await zipped.resources(lang)).map(({ bookStamps: _, ...ref }) => ref),
+    }
+    const store = memoryStore()
+    const first = startFakeServer(sample, { noCommon: true })
+    server?.stop()
+    server = first
+    const c1 = createClient({ store, source: httpSource({ base: first.url }), trust })
+    await c1.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    const bridged = (await store.getState())!
+    const localId = bridged.active['es-419']!.id
+    const bridgedOrig = bridged.units['es-419/orig:tit']!.segments
+    // As an older client saved it: no `local` on any unit.
+    await store.setState({ ...bridged, units: Object.fromEntries(Object.entries(bridged.units).map(([k, { local: _, ...u }]) => [k, u])) })
+    // With no common catalog the published map moves the active catalog of es-419 to the published one; the bridged book stays.
+    await c1.refresh('es-419')
+    await c1.install('es-419', { books: ['tit'] })
+    const mid = (await store.getState())!
+    expect(mid.active['es-419']?.origin).toBe('published')
+    expect(mid.units['es-419/book:tit']?.catalogId).toBe(localId)
+    expect(mid.units['es-419/orig:tit']?.local).toBeUndefined()
+    // Later the common catalog is there: the published book replaces the bridged one, and the bridged orig goes.
+    const second = startFakeServer(sample)
+    server?.stop()
+    server = second
+    const c2 = createClient({ store, source: httpSource({ base: second.url }), trust })
+    await c2.refresh('es-419')
+    const inst = await c2.install('es-419', { books: ['tit'] })
+    expect(inst.waiting).toEqual([])
+    const state = (await store.getState())!
+    expect(state.units['es-419/book:tit']?.catalogId).toBe(state.published['es-419']!.id)
+    expect(state.units['es-419/orig:tit']).toBeUndefined()
+    const { removed } = await c2.prune()
+    expect(removed).toContain(localId)
+    for (const id of bridgedOrig) expect(await store.has(id)).toBe(false)
+    expect((await (await c2.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
+  })
+
   test('with no common catalog, a published book does not activate against the bridged orig', async () => {
     const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
     const srv = startFakeServer(sample, { noCommon: true })
