@@ -42,7 +42,7 @@ The resources of the lists, with the release each row was made from (`resources[
 - `originals-tit.langpack.zip`: a format 1.1 pack of the originals with Titus of the UGNT, shaped like the `originals.langpack.zip` of
   `prepare-language` (`kind: originals`, resource `role: original`, `rows` counts, and no `books`). Built from the UGNT part above by
   `spec/tests/build-originals-fixture.ts` (`bun spec/tests/build-originals-fixture.ts`; the zip is deterministic: fixed UTC dates, no folder entries, the same bytes in any time zone). It has the source and
-  prepared rows of Titus (5 and 7) and a receipt; the real pack also has index rows, which the bridge does not read. Same license as the UGNT.
+  prepared rows of Titus (5 and 7), a receipt and a `catalog.json` with the UGNT's Door43 catalog row (`{ key, metadata }`, the metadata of `originals/list.json`, `bookBlobs` included); the real pack also has index rows, which the bridge does not read. Same license as the UGNT.
 
 ## What is here, and where each file comes from
 
