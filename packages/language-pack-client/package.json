@@ -1,0 +1,29 @@
+{
+  "name": "@bt-synergy/language-pack-client",
+  "version": "0.1.0",
+  "description": "Common client library of language packs format 3",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node/fsStore": "./src/node/fsStore.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test",
+    "type-check": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@bt-synergy/language-pack-v3": "workspace:*",
+    "@noble/curves": "2.2.0",
+    "@noble/hashes": "2.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "fake-indexeddb": "6.2.5",
+    "typescript": "^5.3.3"
+  }
+}

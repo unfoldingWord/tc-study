@@ -8,7 +8,8 @@
 // Container and errors
 export { CLASS_NAMES, type ClassName, hex, type LogicalHeader, readHeader, readSegment, type Segment, writeSegment } from './codec/container'
 export { FORMAT_ERROR_CODES, FormatError, type FormatErrorCode } from './codec/errors'
-export { keyId, publicKeyOf, signCatalog, verifyCatalog } from './sign'
+export { checkSignatures, type Ed25519Verify, keyId, publicKeyOf, signCatalog, verifyCatalog } from './sign'
+export { CATALOG_TABLES } from './read/catalog'
 
 // Ids
 export {
@@ -52,6 +53,7 @@ export { topicsView, xtopicsView } from './read/topics'
 export { parseTipnr, type TipnrRecord } from './source/tipnr'
 export {
   type ComplementFile,
+  type KnownTables,
   readTransfer,
   type TransferEntry,
   type TransferIndex,
@@ -64,3 +66,12 @@ export { canonicalJson, KNOWN, readerOutput } from './read/output'
 
 // The model
 export * from './model'
+
+// Views of the maps and the answers over them (`spec/tests/queries/`), used by the client's reader and queries
+export { mapView } from './read/map'
+export { xmapView } from './read/xmap'
+export { alignedView } from './read/aligned'
+export { answer, type Cell, type MapSet, type State, TN, TWL, UGNT, UHB } from './query/maps'
+export { type AlignedSet, alignedKey, groupOfKey, phrase } from './query/aligned'
+export type { CountRows, Coverage, CountUnit, VerseLists } from './codec/counts'
+export { EVENT_KINDS, type EventKind, eventKind } from './events'

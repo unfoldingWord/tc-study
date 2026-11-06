@@ -1,0 +1,111 @@
+{
+  "passage": {
+    "label": { "es": "Pasaje: el texto de un versículo o rango con sus notas, preguntas y enlaces de palabras" },
+    "description": "The texts of a verse range with the notes, questions and word links in range.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "ref": { "type": "string", "description": "A book code and a range, such as \"tit 1:1-2\"." } },
+      "required": ["ref"],
+      "additionalProperties": false
+    }
+  },
+  "concept": {
+    "label": { "es": "Concepto: qué es, sus nombres, sus relaciones y los libros donde aparece" },
+    "description": "A concept of the translation helps with its names and relations, and the installed books that use it.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "id": { "type": "string", "description": "A concept id such as \"ta:translate/figs-metaphor\" or \"tw:kt/grace\"." } },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  "article": {
+    "label": { "es": "Artículo: las secciones de un artículo de tA o tW" },
+    "description": "The default sections of a translation academy or translation words article, or the ones asked for.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "An article id such as \"tw:kt/grace\"." },
+        "section": { "type": "string", "description": "A section id, or \"all\" for every section." }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  "renderings": {
+    "label": { "es": "Traducciones: cómo se vierte una palabra del original en los libros instalados" },
+    "description": "How the installed texts render the original words with one Strong number, with counts and references.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "strong": { "type": "string", "description": "A Strong key such as \"G39720\"." },
+        "book": { "type": "string", "description": "A book code, with word." },
+        "word": { "type": "integer", "minimum": 0, "description": "The position of a word in the original of the book." }
+      },
+      "required": [],
+      "oneOf": [{ "required": ["strong"] }, { "required": ["book", "word"] }],
+      "additionalProperties": false
+    }
+  },
+  "search": {
+    "label": { "es": "Búsqueda: texto en los recursos instalados" },
+    "description": "A full-text search over the installed resources.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string", "description": "The words to look for." },
+        "books": { "type": "array", "items": { "type": "string" }, "description": "Only these books (three-letter codes)." },
+        "kinds": { "type": "array", "items": { "enum": ["text", "note", "question", "link"] }, "description": "Only these kinds of result." },
+        "limit": { "type": "integer", "minimum": 1, "description": "The most results to return (20 when absent)." }
+      },
+      "required": ["text"],
+      "additionalProperties": false
+    }
+  },
+  "topics": {
+    "label": { "es": "Temas: personas, lugares, eventos y más, por categoría o por libro" },
+    "description": "The topics of a category or of a book, or the categories with their counts; installed is false without the topics module.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "category": { "type": "string", "enum": ["person", "place", "event", "topic", "story", "section"] },
+        "book": { "type": "string", "description": "A book code." }
+      },
+      "required": [],
+      "not": { "required": ["category", "book"] },
+      "additionalProperties": false
+    }
+  },
+  "books": {
+    "label": { "es": "Libros: dónde se usa un artículo o concepto, y si el libro está instalado" },
+    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "article": { "type": "string", "description": "A tA or tW article id (\"ta:...\", \"tw:...\")." },
+        "concept": { "type": "string", "description": "Any concept id, such as \"per:abraham\"." }
+      },
+      "required": [],
+      "oneOf": [{ "required": ["article"] }, { "required": ["concept"] }],
+      "additionalProperties": false
+    }
+  },
+  "context": {
+    "label": { "es": "Contexto: un pasaje con los artículos que sus notas y enlaces nombran" },
+    "description": "A passage together with the default sections of the articles its notes and word links name.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "ref": { "type": "string", "description": "A book code and a range, such as \"tit 1:1-2\"." } },
+      "required": ["ref"],
+      "additionalProperties": false
+    }
+  }
+}
