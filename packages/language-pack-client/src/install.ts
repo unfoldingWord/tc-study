@@ -100,7 +100,24 @@ export async function verifiedHave(store: BlobStore, steps: Step[], stored: Read
   return have
 }
 
-/** Fetches and verifies the segments the plan lacks, a unit at a time; after each unit it activates what is complete and saves. */
+export type InstallOptions = {
+  signal?: AbortSignal
+  onProgress?: (p: Progress) => void
+  /** How many segment requests run at once (default 4). `1` asks in plan order, one after the other. */
+  concurrency?: number
+}
+
+export const DEFAULT_CONCURRENCY = 4
+
+/** `E_ARG` unless `n` is absent or a whole number from 1 up. */
+export function checkConcurrency(n: number | undefined): void {
+  if (n !== undefined && !(Number.isInteger(n) && n >= 1)) throw new ClientError('E_ARG', `concurrency must be a whole number from 1 up, not ${n}`)
+}
+
+/**
+ * Fetches and verifies the segments the plan lacks, each once, with up to `concurrency` requests at once (workers take the next
+ * segment in plan order). A unit is activated, and the state saved, as soon as a stored segment completes it.
+ */
 export async function runSteps(
   env: { store: BlobStore; source: PackSource },
   catalogs: VerifiedCatalog[],
@@ -108,74 +125,109 @@ export async function runSteps(
   have: Set<string>,
   steps: Step[],
   unknown: string[],
-  o: { signal?: AbortSignal; onProgress?: (p: Progress) => void } = {},
+  o: InstallOptions = {},
 ): Promise<InstallReport> {
   const { store, source } = env
-  const missing = new Set<string>()
-  for (const step of steps) for (const s of step.segments) if (!have.has(s.id)) missing.add(s.id)
-  const total = missing.size
-  const failed = new Set<string>()
+  checkConcurrency(o.concurrency)
+  const width = o.concurrency ?? DEFAULT_CONCURRENCY
+  const tables = KNOWN as Record<string, Record<string, number[]> | undefined>
+
+  // The segments to fetch, in plan order and once each (units can share a segment), with the steps that use each.
+  const queue: { id: string; class: string; key: string; users: number[] }[] = []
+  const byId = new Map<string, (typeof queue)[number]>()
+  steps.forEach((step, i) => {
+    for (const s of step.segments) {
+      if (have.has(s.id)) continue
+      let q = byId.get(s.id)
+      if (q === undefined) {
+        q = { id: s.id, class: s.class, key: step.key, users: [] }
+        byId.set(s.id, q)
+        queue.push(q)
+      }
+      if (!q.users.includes(i)) q.users.push(i)
+    }
+  })
+  const total = queue.length
+  // Steps with a segment that was not stored (404, or bytes that are not the segment): they cannot be complete, so their other
+  // segments are not fetched now (unless a step still wanted needs them too); they wait.
+  const blocked = new Set<number>()
   const fetched: string[] = []
   const activated: string[] = []
   let bytes = 0
   let state = state0
-  let waiting: InstallReport['waiting'] = []
-  // A network failure other than a 404 (429, 5xx, a dropped connection) stops the loop: the next requests would fail the same way,
-  // and after a 429 they would go against Retry-After. What is complete is activated and saved, then the error is thrown.
+  let next = 0
+  // A network failure other than a 404 (429, 5xx, a dropped connection) stops the install: no new request starts (the next ones
+  // would fail the same way, and after a 429 they would go against Retry-After), the ones running settle and what they verify is
+  // stored, then what is complete is activated and saved once, and the first such error is thrown.
   let stopped: ClientError | undefined
+  // Anything else a worker throws (an abort, a store failure): no new request starts and it is thrown once all have settled.
+  let halt: { error: unknown } | undefined
 
+  const activateNow = async (): Promise<ReturnType<typeof activate>> => {
+    const r = activate(state, catalogs, have)
+    if (r.activated.length > 0) {
+      await st(() => store.setState(r.state))
+      state = r.state
+      activated.push(...r.activated)
+    }
+    return r
+  }
+  // Activations run one after the other, each from the state the one before saved; once the install is stopping they are left to
+  // the single activation at the end.
+  let saving: Promise<unknown> = Promise.resolve()
+  const activateSoon = (): Promise<unknown> => {
+    const run = saving.then(() => (stopped === undefined && halt === undefined ? activateNow() : undefined))
+    saving = run.catch(() => {})
+    return run
+  }
+
+  const worker = async (): Promise<void> => {
+    while (stopped === undefined && halt === undefined && next < queue.length) {
+      o.signal?.throwIfAborted()
+      const seg = queue[next++]!
+      if (seg.users.every((i) => blocked.has(i))) continue
+      let body: Uint8Array
+      try {
+        const known = tables[seg.class]
+        if (known === undefined) throw new FormatError('E_BODY', `unknown segment class ${seg.class}`)
+        body = await source.segment(seg.id, o.signal)
+        await readSegment(body, { known, expectedId: seg.id })
+      } catch (e) {
+        if (o.signal?.aborted) throw e
+        if (e instanceof ClientError && e.code === 'E_NETWORK' && e.status !== 404) {
+          stopped ??= e
+          return
+        }
+        if (e instanceof FormatError || (e instanceof ClientError && e.code === 'E_NETWORK')) {
+          for (const i of seg.users) blocked.add(i)
+          continue
+        }
+        throw e
+      }
+      await st(() => store.put(seg.id, body))
+      have.add(seg.id)
+      fetched.push(seg.id)
+      bytes += body.length
+      try {
+        o.onProgress?.({ done: fetched.length, total, bytes, key: seg.key })
+      } catch {
+        // a progress callback must not break an install
+      }
+      if (seg.users.some((i) => steps[i]!.segments.every((s) => have.has(s.id)))) await activateSoon()
+    }
+  }
+
+  let waiting: InstallReport['waiting'] = []
   try {
-    for (const step of steps) {
-      if (stopped !== undefined) break
-      for (const seg of step.segments) {
-        if (have.has(seg.id)) continue
-        if (failed.has(seg.id)) break
-        o.signal?.throwIfAborted()
-        let body: Uint8Array
-        try {
-          const known = (KNOWN as Record<string, Record<string, number[]> | undefined>)[seg.class]
-          if (known === undefined) throw new FormatError('E_BODY', `unknown segment class ${seg.class}`)
-          body = await source.segment(seg.id, o.signal)
-          await readSegment(body, { known, expectedId: seg.id })
-        } catch (e) {
-          if (o.signal?.aborted) throw e
-          if (e instanceof ClientError && e.code === 'E_NETWORK' && e.status !== 404) {
-            stopped = e
-            break
-          }
-          if (e instanceof FormatError || (e instanceof ClientError && e.code === 'E_NETWORK')) {
-            // Not stored (the bytes are not the segment, or the server has no such segment). The unit cannot be complete, so its other
-          // segments are not fetched now; it waits.
-            failed.add(seg.id)
-            break
-          }
-          throw e
-        }
-        await st(() => store.put(seg.id, body))
-        have.add(seg.id)
-        fetched.push(seg.id)
-        bytes += body.length
-        try {
-          o.onProgress?.({ done: fetched.length, total, bytes, key: step.key })
-        } catch {
-          // a progress callback must not break an install
-        }
-      }
-      if (stopped !== undefined) break
-      const r = activate(state, catalogs, have)
-      if (r.activated.length > 0) {
-        await st(() => store.setState(r.state))
-        state = r.state
-        activated.push(...r.activated)
-      }
-    }
-    const last = activate(state, catalogs, have)
-    if (last.activated.length > 0) {
-      await st(() => store.setState(last.state))
-      state = last.state
-      activated.push(...last.activated)
-    }
-    waiting = last.waiting
+    const workers = Array.from({ length: Math.min(width, queue.length) }, () =>
+      worker().catch((error: unknown) => {
+        halt ??= { error }
+      }),
+    )
+    await Promise.all(workers)
+    await saving
+    if (halt !== undefined) throw halt.error
+    waiting = (await activateNow()).waiting
   } catch (e) {
     // The store failed: the installed state is the one the call started from. The segments written stay, so the retry activates
     // what they complete without fetching it again. (An abort keeps the units already complete.)

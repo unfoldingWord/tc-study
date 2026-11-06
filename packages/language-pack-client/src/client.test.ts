@@ -7,6 +7,8 @@ import { ClientError } from './errors'
 import { httpSource, type PackSource } from './source/http'
 import { memoryStore } from './store/memory'
 import type { BlobStore } from './store/types'
+import { planInstall } from './plan'
+import { emptyState } from './state'
 import { verifyCatalogFile } from './verify'
 import { type FakeServer, startFakeServer } from '../test/fakeServer'
 import { newKey } from '../test/keys'
@@ -172,7 +174,8 @@ describe('install', () => {
     await client.refresh('es-419')
     const before = await store.getState()
     const catalogIds = await inner.ids()
-    await expect(client.install('es-419', { books: ['tit'] })).rejects.toMatchObject({ code: 'E_STORE' })
+    // One request at a time, so exactly the two segments before the failing put are kept.
+    await expect(client.install('es-419', { books: ['tit'] }, { concurrency: 1 })).rejects.toMatchObject({ code: 'E_STORE' })
     expect(await store.getState()).toEqual(before)
     const kept = (await inner.ids()).filter((id) => !catalogIds.includes(id))
     expect(kept.length).toBe(2)
@@ -494,7 +497,8 @@ describe('final review, trust and installation', () => {
   test('A4: a 429 stops the install: E_NETWORK with retryAfter, the units already complete stay active, no further request', async () => {
     const [failing] = segsOf['es-419/map']!
     const { client, store, segHits } = setup({ failSegment: (id) => (id === failing ? 429 : 'ok') })
-    const e = await client.install('es-419', { books: ['tit'] }).catch((x) => x)
+    // One request at a time, so the failing one is the last asked (the parallel case is in 'install several segments at a time').
+    const e = await client.install('es-419', { books: ['tit'] }, { concurrency: 1 }).catch((x) => x)
     expect(e).toBeInstanceOf(ClientError)
     expect(e).toMatchObject({ code: 'E_NETWORK', status: 429, retryAfter: 7 })
     expect(segHits().at(-1)).toBe(failing!)
@@ -524,6 +528,232 @@ describe('final review, trust and installation', () => {
     const { removed } = await createClient({ store, source: offlineSrc, trust: { trustedKeys: other.trusted } }).prune()
     expect(removed).not.toContain(c1)
     expect(await store.has(c1)).toBe(true)
+  })
+})
+
+/**
+ * A fetch in front of the fake server that holds each segment request until the test releases it (or lets it through once
+ * `openAll` is called), so the order and the overlap of the requests are set by the test, not by timing.
+ */
+function gatedFetch() {
+  const calls: string[] = []
+  const held = new Map<string, { release: () => void; done: Promise<void> }>()
+  let inFlight = 0
+  let max = 0
+  let open = false
+  const checks: { cond: () => boolean; resolve: () => void }[] = []
+  const notify = () => {
+    for (const c of [...checks]) {
+      if (!c.cond()) continue
+      checks.splice(checks.indexOf(c), 1)
+      c.resolve()
+    }
+  }
+  const f: typeof fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    const at = url.indexOf('/v3/packs/seg/')
+    if (at < 0) return fetch(input, init)
+    const id = url.slice(at + '/v3/packs/seg/'.length)
+    calls.push(id)
+    inFlight++
+    max = Math.max(max, inFlight)
+    let finished!: () => void
+    const done = new Promise<void>((r) => (finished = r))
+    try {
+      await new Promise<void>((resolve, reject) => {
+        if (open) return resolve()
+        held.set(id, { release: resolve, done })
+        init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), { once: true })
+        notify()
+      })
+      return await fetch(input, init)
+    } finally {
+      held.delete(id)
+      inFlight--
+      finished()
+    }
+  }
+  return {
+    fetch: f,
+    calls,
+    held,
+    max: () => max,
+    /** Resolves once `cond` holds (checked whenever a request is held). */
+    until(cond: () => boolean): Promise<void> {
+      return cond() ? Promise.resolve() : new Promise((resolve) => checks.push({ cond, resolve }))
+    },
+    /** Lets these held requests go on; resolves when their answers are back and the client has handled them. */
+    async release(ids: string[]): Promise<void> {
+      const ds = ids.map((id) => {
+        const h = held.get(id)
+        if (h === undefined) throw new Error(`not held: ${id}`)
+        h.release()
+        return h.done
+      })
+      await Promise.all(ds)
+      // The client handles an answer in microtasks only (the body is in memory): one macrotask lets it finish.
+      await new Promise((r) => setTimeout(r, 0))
+    },
+    openAll() {
+      open = true
+      for (const h of [...held.values()]) h.release()
+    },
+  }
+}
+
+describe('install several segments at a time', () => {
+  /** The segment ids of the Titus install, once each in plan order: xmap(2) map(2) xtopics(2) topics art:tw:kt orig:tit book:tit. */
+  let order: string[]
+  beforeAll(async () => {
+    const cats = [await verifyCatalogFile(sample.langCatalog, {}, { from: 'store' }), await verifyCatalogFile(sample.commonCatalog, {}, { from: 'store' })]
+    const seen = new Set<string>()
+    order = []
+    for (const step of planInstall(cats, emptyState(), { books: ['tit'] }, new Set()).steps) {
+      for (const s of step.segments) {
+        if (seen.has(s.id)) continue
+        seen.add(s.id)
+        order.push(s.id)
+      }
+    }
+    expect(order.slice(0, 6)).toEqual([...segsOf['common/xmap']!, ...segsOf['es-419/map']!, ...segsOf['common/xtopics']!])
+    expect(order.length).toBe(10)
+  })
+
+  function gatedSetup(o: Parameters<typeof startFakeServer>[1] = {}) {
+    const srv = startFakeServer(sample, o)
+    server?.stop()
+    server = srv
+    const gate = gatedFetch()
+    const inner = memoryStore()
+    let sets = 0
+    const store: BlobStore = {
+      has: (id) => inner.has(id),
+      get: (id) => inner.get(id),
+      put: (id, b) => inner.put(id, b),
+      ids: () => inner.ids(),
+      delete: (id) => inner.delete(id),
+      getState: () => inner.getState(),
+      setState: (s) => {
+        sets++
+        return inner.setState(s)
+      },
+    }
+    const client = createClient({ store, source: httpSource({ base: srv.url, fetch: gate.fetch }), trust })
+    return { gate, store, client, sets: () => sets }
+  }
+  const settled = (p: Promise<unknown>) => {
+    const box = { done: false }
+    p.then(
+      () => (box.done = true),
+      () => (box.done = true),
+    )
+    return box
+  }
+
+  test('install runs up to 4 segment requests at once', async () => {
+    const { gate, client } = gatedSetup()
+    const run = client.install('es-419', { books: ['tit'] })
+    await gate.until(() => gate.held.size === 4)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(gate.calls).toEqual(order.slice(0, 4)) // no fifth request while four are running
+    gate.openAll()
+    const report = await run
+    expect(gate.max()).toBe(4)
+    expect(gate.calls.length).toBe(order.length)
+    expect(new Set(gate.calls).size).toBe(order.length)
+    expect(report.waiting).toEqual([])
+    expect(report.fetched.length).toBe(order.length)
+  })
+
+  test('install with concurrency 1 asks in catalog order', async () => {
+    const { gate, client } = gatedSetup()
+    gate.openAll()
+    const done: number[] = []
+    const report = await client.install('es-419', { books: ['tit'] }, { concurrency: 1, onProgress: (p) => done.push(p.done) })
+    expect(gate.calls).toEqual(order)
+    expect(gate.max()).toBe(1)
+    expect(report.fetched).toEqual(order)
+    expect(done).toEqual(order.map((_, i) => i + 1))
+  })
+
+  test('a concurrency that is not a whole number from 1 up is E_ARG', async () => {
+    const { client } = gatedSetup()
+    for (const concurrency of [0, -1, 1.5, Number.NaN]) {
+      await expect(client.install('es-419', { books: ['tit'] }, { concurrency })).rejects.toMatchObject({ code: 'E_ARG' })
+    }
+  })
+
+  test('stops on E_NETWORK and keeps complete units', async () => {
+    // order[4] is the first segment of common/xtopics: by then xmap and map are complete.
+    const { gate, client, store, sets } = gatedSetup({ failSegment: (id) => (id === order[4] ? 503 : 'ok') })
+    const run = client.install('es-419', { books: ['tit'] })
+    const box = settled(run)
+    await gate.until(() => gate.held.size === 4)
+    await gate.release(order.slice(0, 4))
+    await gate.until(() => gate.held.size === 4 && gate.calls.length === 8)
+    expect(gate.calls).toEqual(order.slice(0, 8))
+    const setsBefore = sets()
+    await gate.release([order[4]!]) // the client has seen the 503 now
+    expect(box.done).toBe(false) // the requests already running settle first
+    await gate.release(order.slice(5, 8))
+    const e = await run.catch((x) => x)
+    expect(e).toBeInstanceOf(ClientError)
+    expect(e).toMatchObject({ code: 'E_NETWORK', status: 503 })
+    expect(gate.calls).toEqual(order.slice(0, 8)) // no request after the failure
+    const units = (await store.getState())!.units
+    expect(units['common/xmap']).toBeDefined()
+    expect(units['es-419/map']).toBeDefined()
+    expect(units['common/xtopics']).toBeUndefined()
+    expect(units['es-419/book:tit']).toBeUndefined()
+    for (const id of order.slice(5, 8)) expect(await store.has(id)).toBe(true) // what was running is stored
+    expect(sets() - setsBefore).toBe(1) // saved once after the failure (art:tw:kt completed meanwhile)
+    expect(units['es-419/art:tw:kt']).toBeDefined()
+  })
+
+  test('a 429 rejects with retryAfter after in-flight requests settle', async () => {
+    const { gate, client, store } = gatedSetup({ failSegment: (id) => (id === order[1] ? 429 : 'ok') })
+    const run = client.install('es-419', { books: ['tit'] })
+    const box = settled(run)
+    await gate.until(() => gate.held.size === 4)
+    await gate.release([order[1]!])
+    expect(box.done).toBe(false)
+    await gate.release([order[0]!, order[2]!, order[3]!])
+    const e = await run.catch((x) => x)
+    expect(e).toMatchObject({ code: 'E_NETWORK', status: 429, retryAfter: 7 })
+    expect(gate.calls).toEqual(order.slice(0, 4))
+    for (const id of [order[0]!, order[2]!, order[3]!]) expect(await store.has(id)).toBe(true)
+    const units = (await store.getState())!.units
+    expect(units['common/xmap']).toBeUndefined()
+    expect(units['es-419/map']).toBeDefined() // completed by requests that settled after the 429
+  })
+
+  test('abort stops new requests and keeps complete units', async () => {
+    const { gate, client, store } = gatedSetup()
+    const ac = new AbortController()
+    const run = client.install('es-419', { books: ['tit'] }, { signal: ac.signal })
+    await gate.until(() => gate.held.size === 4)
+    await gate.release(order.slice(0, 4))
+    await gate.until(() => gate.held.size === 4 && gate.calls.length === 8)
+    ac.abort()
+    await expect(run).rejects.toThrow()
+    expect(gate.calls).toEqual(order.slice(0, 8))
+    const units = (await store.getState())!.units
+    expect(units['common/xmap']).toBeDefined()
+    expect(units['es-419/map']).toBeDefined()
+    expect(units['common/xtopics']).toBeUndefined()
+    expect(units['es-419/book:tit']).toBeUndefined()
+  })
+
+  test('a progress callback that throws does not break a parallel install', async () => {
+    const { gate, client } = gatedSetup()
+    gate.openAll()
+    const report = await client.install('es-419', { books: ['tit'] }, {
+      onProgress: () => {
+        throw new Error('the screen is gone')
+      },
+    })
+    expect(report.waiting).toEqual([])
+    expect(report.fetched.length).toBe(order.length)
   })
 })
 

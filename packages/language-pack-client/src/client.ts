@@ -3,7 +3,7 @@
  */
 import { bookView, FormatError, KNOWN, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
-import { catalogsOf, verifiedHave, type InstallReport, type MissingCommon, type Progress, loadState, readStored, runSteps, st } from './install'
+import { catalogsOf, checkConcurrency, verifiedHave, type InstallOptions, type InstallReport, type MissingCommon, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
 import { exportTransfer, importOldPack, importTransfer, type ImportReport } from './transfer'
 import { readerOfState, type PackReader } from './reader'
@@ -13,7 +13,7 @@ import { hex, type InstalledCatalog, type InstalledState, installedOf } from './
 import type { BlobStore } from './store/types'
 import { checkRevision, type TrustPolicy, type VerifiedCatalog, verifyCatalogFile } from './verify'
 
-export type { InstallReport, Progress } from './install'
+export type { InstallOptions, InstallReport, Progress } from './install'
 export type { ImportReport } from './transfer'
 
 export type RefreshReport = {
@@ -36,7 +36,8 @@ export interface LanguagePackClient {
   /** A reader over the installed segments of a language (its units as the installed state says). */
   open(lang: string): Promise<PackReader>
   refresh(lang: string, o?: { confirmDowngrade?: boolean; signal?: AbortSignal }): Promise<RefreshReport>
-  install(lang: string, want?: Want, o?: { signal?: AbortSignal; onProgress?: (p: Progress) => void }): Promise<InstallReport>
+  /** `concurrency`: how many segment requests run at once (default 4; `1` asks one after the other, in plan order). */
+  install(lang: string, want?: Want, o?: InstallOptions): Promise<InstallReport>
   status(lang: string): Promise<Status>
   prune(): Promise<{ removed: string[] }>
   verify(): Promise<{ bad: string[] }>
@@ -157,7 +158,8 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     }
   }
 
-  async function installNow(lang: string, want: Want, opts: { signal?: AbortSignal; onProgress?: (p: Progress) => void }): Promise<InstallReport> {
+  async function installNow(lang: string, want: Want, opts: InstallOptions): Promise<InstallReport> {
+    checkConcurrency(opts.concurrency)
     const first = await loadState(store)
     let name = first.aliases?.[lang] ?? lang
     // No catalog yet, or the stored one no longer verifies: fetch it first.

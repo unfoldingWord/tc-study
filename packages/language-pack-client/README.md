@@ -62,7 +62,19 @@ The signature check uses WebCrypto Ed25519 when the runtime has it and falls bac
 
 The order is: language catalog, then the common catalog it requires, then the segments of the chosen units. A unit is activated only when it and its `needs` are complete. `HEAD` and `OPTIONS` exist on the server; the client only uses `GET`.
 
-A segment the server does not have (404) or whose bytes are not the segment leaves its unit waiting, and the install goes on. Any other failed request (429, 5xx, a dropped connection) stops the install: the units already complete are activated and saved, then `install` rejects with `E_NETWORK` (`status`, and `retryAfter` in seconds for a 429). Installed content is kept; call `install` again later, after `retryAfter` when there is one.
+`install` fetches up to `concurrency` segments at once (default 4): `client.install('es-419', { books: ['tit'] }, { concurrency: 4 })`. `1` asks one segment after the other, in plan order. Each segment is fetched once even when several units share it, a unit is activated (and the state saved) as soon as it and its `needs` are complete, and `onProgress` fires once per stored segment. Calls on one client still run one after the other.
+
+A segment the server does not have (404) or whose bytes are not the segment leaves its unit waiting, and the install goes on. Any other failed request (429, 5xx, a dropped connection) stops the install: no new request starts, the requests already running settle and what they verify is stored, the units complete by then are activated and the state is saved once, then `install` rejects with the first such error, `E_NETWORK` (`status`, and `retryAfter` in seconds for a 429). Installed content is kept; call `install` again later, after `retryAfter` when there is one. An abort (`signal`) stops new requests the same way and keeps the units already complete.
+
+**Install time from staging** (es-419, `install('es-419', { books: ['tit'] })` after a `refresh`, empty memory store; 151 segment requests, 2.3 MB; the author's Windows 11 desktop on a home connection, 6 Nov 2026):
+
+| `concurrency` | Time |
+|---|---|
+| 1 (one at a time, as before) | 48 s first measured; 51 s and 76 s in the runs below |
+| 4 (default) | 13.0 s, 14.5 s, 11.5 s |
+| 8 | 6.7 s (one run) |
+
+The server and the network decide most of it; a phone on mobile data has not been measured.
 
 **Mixed revisions.** A unit keeps the revision it was activated from until its own segments change. A shared dependency can move on under it: when another language updates the common `orig:<book>`, a book of this language built against the older original stays as it is. The reader then does not use that book's alignment positions (they point into another original): `renderings` leaves the book out and says so in `notInstalled` (`what: 'stale'`). The other way is refused: an older catalog (a language built against an older common catalog) does not move back a unit installed from a later revision.
 
