@@ -101,6 +101,7 @@ export function activate(
   state: InstalledState,
   catalogs: VerifiedCatalog[],
   have: ReadonlySet<string>,
+  o: { strict?: boolean } = {},
 ): { state: InstalledState; activated: string[]; waiting: { key: string; missing: string[] }[] } {
   type Cand = { key: string; cat: VerifiedCatalog; entry: InstalledUnit; missing: string[] }
   const cands: Cand[] = []
@@ -121,7 +122,8 @@ export function activate(
   const byKey = new Map(cands.map((c) => [c.key, c]))
   const ok = new Set<string>()
   const satisfied = (need: string): boolean => ok.has(need) || (!byKey.has(need) && state.units[need] !== undefined)
-  // A unit whose segments and needs are the installed ones only takes the new revision.
+  // A unit whose segments and needs are the installed ones only takes the new revision. `strict`: `have` covers every segment of
+  // the catalogs (an import), so a segment the store lost also holds back a unit that would otherwise only take the revision.
   const same = (c: Cand): boolean => {
     const old = state.units[c.key]
     return old !== undefined && sameList(old.segments, c.entry.segments) && sameList(old.needs, c.entry.needs)
@@ -130,7 +132,7 @@ export function activate(
     changed = false
     for (const c of cands) {
       if (ok.has(c.key)) continue
-      if (same(c) || (c.missing.length === 0 && c.entry.needs.every(satisfied))) {
+      if ((same(c) && (o.strict !== true || c.missing.length === 0)) || (c.missing.length === 0 && c.entry.needs.every(satisfied))) {
         ok.add(c.key)
         changed = true
       }

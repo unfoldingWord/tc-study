@@ -254,6 +254,96 @@ describe('export and import', () => {
   })
 })
 
+/** Entries for the given segment ids of a sample, in the classes its catalogs name. */
+async function entriesOf(s: Sample, ids: string[]): Promise<BuiltSegment[]> {
+  const classOf = new Map<string, string>()
+  for (const bytes of [s.langCatalog, s.commonCatalog]) {
+    const c = await verifyCatalogFile(bytes, {}, { from: 'store' })
+    for (const e of c.catalog.segments) classOf.set(hexOf(e.id), e.class)
+  }
+  const out: BuiltSegment[] = []
+  for (const id of ids) out.push(await built(s.segments.get(id)!, (KNOWN as Record<string, Record<string, number[]>>)[classOf.get(id)!]!))
+  return out
+}
+
+describe('fix round 1', () => {
+  test('1: an update file with no base (omitted or empty) is E_NO_BASE and writes nothing', async () => {
+    const file1 = writeTransfer({ mode: 'update', catalogs: [await built(sample.langCatalog, CATALOG_TABLES)], entries: [], base: [], made: '2026-11-02T00:00:00Z', by: 'test' })
+    const store = memoryStore()
+    await expect(offline(store).importTransfer(file1)).rejects.toMatchObject({ code: 'E_NO_BASE' })
+    expect(await store.ids()).toEqual([])
+    expect(await store.getState()).toBeUndefined()
+  })
+
+  test('2: two catalogs of one name with different ids in one file are refused before anything is written', async () => {
+    const other = await buildSample({ revision: 2 })
+    const file2 = writeTransfer({
+      mode: 'full',
+      catalogs: [await built(sample2.langCatalog, CATALOG_TABLES), await built(other.langCatalog, CATALOG_TABLES), await built(sample.commonCatalog, CATALOG_TABLES)],
+      entries: [],
+      made: '2026-11-02T00:00:00Z',
+      by: 'test',
+    })
+    const store = memoryStore()
+    await expect(offline(store).importTransfer(file2)).rejects.toMatchObject({ code: 'E_DOWNGRADE' })
+    expect(await store.ids()).toEqual([])
+  })
+
+  test('3 and 6: a full export refuses when the required common catalog is not stored; an update export does not', async () => {
+    const mapIds = await unitSegs(sample.langCatalog, 'map')
+    const partial = writeTransfer({
+      mode: 'full',
+      catalogs: [await built(sample.langCatalog, CATALOG_TABLES)],
+      entries: await entriesOf(sample, mapIds),
+      made: '2026-11-02T00:00:00Z',
+      by: 'test',
+    })
+    const b = offline()
+    const r = await b.importTransfer(partial)
+    expect(r.activated).toContain('es-419/map')
+    await expect(b.exportTransfer({ lang: 'es-419', mode: 'full' })).rejects.toMatchObject({ code: 'E_NOT_INSTALLED' })
+    const u = await b.exportTransfer({ lang: 'es-419', mode: 'update', base: [sample.langCatalog] })
+    expect((await idsOf(u)).index.catalogs.length).toBe(1)
+  })
+
+  test('4: a full export keeps the common units whose active catalog is a later revision with the same segments', async () => {
+    const later = await buildSample({ commonRevision: 2 })
+    const a = await installed(sample)
+    const bump = writeTransfer({ mode: 'full', catalogs: [await built(later.commonCatalog, CATALOG_TABLES)], entries: [], made: '2026-11-02T00:00:00Z', by: 'test' })
+    await a.client.importTransfer(bump)
+    const bytes = await a.client.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] })
+    const b = offline()
+    const r = await b.importTransfer(bytes)
+    expect(r.waiting).toEqual([])
+    expect(r.activated).toEqual(expect.arrayContaining(['es-419/book:tit', 'common/orig:tit']))
+  })
+
+  test('5: a cut import does not advance a unit whose stored segment is gone', async () => {
+    const same2 = await buildSample({ revision: 2 })
+    const a = await installed(sample)
+    const gone = (await unitSegs(sample.langCatalog, 'book:tit'))[0]!
+    await a.store.delete(gone)
+    const f = writeTransfer({
+      mode: 'update',
+      catalogs: [await built(same2.langCatalog, CATALOG_TABLES)],
+      entries: [],
+      base: [['es-419', 1], ['common', 1]],
+      made: '2026-11-02T00:00:00Z',
+      by: 'test',
+    })
+    const r = await a.client.importTransfer(f)
+    expect(r.waiting.map((w) => w.key)).toContain('es-419/book:tit')
+    expect((await a.store.getState())!.units['es-419/book:tit']!.revision).toBe(1)
+  })
+
+  test('an old pack next to a published catalog says it was skipped', async () => {
+    const a = await installed(sample)
+    const r = await a.client.importOldPack(file('data', 'es-419-tit.langpack.zip'))
+    expect(r.skipped).toBe(true)
+    expect(r.catalogs).toEqual([])
+  })
+})
+
 describe('the spec fixtures', () => {
   test('a cut file: whole entries are stored, the cut one is missing, and nothing is activated from a unit that lacks it', async () => {
     const store = memoryStore()

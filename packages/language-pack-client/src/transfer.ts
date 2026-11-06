@@ -31,6 +31,8 @@ export type ImportReport = {
   stored: string[]
   /** Entries that did not verify: they are not stored. */
   rejected: { id: string; code: string }[]
+  /** Old pack only: a published catalog of that language is installed, so the pack's catalog was not used. */
+  skipped?: true
   /** Entries a cut file lost. */
   missing: string[]
   activated: string[]
@@ -101,7 +103,7 @@ async function commit(
   const stored = new Set(await st(() => store.ids()))
   const everything = set.flatMap((cat) => cat.catalog.segments.map((e) => ({ id: hex(e.id), class: e.class, size: e.size })))
   const have = await verifiedHave(store, [{ key: '', catalog: '', unit: '', segments: everything, complete: false }], stored)
-  const r = activate(next, set, have)
+  const r = activate(next, set, have, { strict: true })
 
   const arrived = new Set([...segs.map((s) => s.id), ...cut])
   const catalogs = fileCats.map((c) => r.state.published[c.name] ?? next.published[c.name]!)
@@ -128,6 +130,13 @@ export async function importTransfer(env: Env, bytes: Uint8Array, o: { confirmDo
     if (e === undefined || e.status !== 'ok' || e.bytes === undefined) throw new FormatError('E_TRUNCATED', `the catalog ${id} is not whole in the file`)
     fileCats.push(await verifyCatalogFile(e.bytes, env.trust, { from: 'transfer', expectedId: id }))
   }
+  // One file does not carry two catalogs of one name: they would share the completeness of their units.
+  for (const cat of fileCats) {
+    if (fileCats.some((o2) => o2 !== cat && o2.name === cat.name && o2.publisher === cat.publisher && o2.id !== cat.id)) {
+      throw new ClientError('E_DOWNGRADE', `the file carries two different catalogs ${cat.name}`)
+    }
+  }
+  if (index.mode === 'update' && (index.base ?? []).length === 0) throw new ClientError('E_NO_BASE', 'an update file names no base')
   for (const cat of fileCats) checkRevision(state.published[cat.name], cat, o.confirmDowngrade === true)
   for (const [name, revision] of index.base ?? []) {
     const have = state.active[name]?.revision === revision || state.published[name]?.revision === revision
@@ -169,7 +178,7 @@ export async function importOldPack(
   if (current !== undefined && current.origin !== 'local') {
     // A published catalog is already here: it wins. The segments are kept (the published catalog names the same ids when the book is the same).
     for (const s of checked.ok) await st(() => env.store.put(s.id, s.bytes))
-    return { catalogs: [], stored: checked.ok.map((s) => s.id), rejected: checked.rejected, missing: [], activated: [], waiting: [] }
+    return { catalogs: [], stored: checked.ok.map((s) => s.id), rejected: checked.rejected, skipped: true, missing: [], activated: [], waiting: [] }
   }
   const done = await commit(env, state, [cat], checked.ok)
   return { ...done, rejected: checked.rejected, missing: [] }
@@ -194,11 +203,18 @@ export async function exportTransfer(
   for (const [rname, revision, rid] of lang.catalog.requires ?? []) {
     const c = await readStored(store, env.trust, { name: rname, publisher: lang.publisher, revision, id: hex(rid), origin: 'published' })
     if (c !== undefined && c.name === rname) cats.push(c)
+    else if (o.mode === 'full') throw new ClientError('E_NOT_INSTALLED', `a full export needs the ${rname} catalog ${hex(rid)} that ${name} requires, and it is not stored`)
   }
 
-  // Only units active from these very catalogs: a unit still on an older catalog is not what this file's catalogs describe.
-  const ids = new Set(cats.map((c) => c.id))
-  const activeKeys = Object.entries(state.units).filter(([, u]) => ids.has(u.catalogId)).map(([k]) => k)
+  // A unit goes in when it is active with exactly the segments one of these catalogs lists for it. The revision it was activated
+  // from does not matter (a later common revision may keep the segments); a unit still on other segments is not described by them.
+  const activeKeys = Object.entries(state.units)
+    .filter(([key, u]) => {
+      const cat = cats.find((c) => c.name === u.catalog)
+      const unit = cat?.catalog.units.find((x) => `${cat.name}/${x.id}` === key)
+      return cat !== undefined && unit !== undefined && unit.segments.length === u.segments.length && unit.segments.every((i, n) => hex(cat.catalog.segments[i]!.id) === u.segments[n])
+    })
+    .map(([k]) => k)
   let chosen: string[]
   if (o.books === undefined && o.units === undefined) {
     chosen = activeKeys
