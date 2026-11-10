@@ -192,7 +192,10 @@ export function activate(
     if (old === undefined || old.revision !== c.entry.revision || old.catalogId !== c.entry.catalogId) {
       next.units[c.key] = c.entry
       activated.push(c.key)
-      next.active[c.cat.name] = installedOf(c.cat, state.published[c.cat.name], state.active[c.cat.name])
+      // A bridged unit activated next to a published catalog (an old pack of a book the device lacks) leaves `active` on it.
+      if (!(c.cat.origin === 'local' && next.active[c.cat.name]?.origin === 'published')) {
+        next.active[c.cat.name] = installedOf(c.cat, state.published[c.cat.name], state.active[c.cat.name])
+      }
     }
   }
   // A bridged `<name>/orig:<book>` whose replacement is installed: `orig:<book>` of a published catalog of another name. It goes

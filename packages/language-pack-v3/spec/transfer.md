@@ -109,6 +109,12 @@ phase 1):
   catalog lacks) stays active with what it needs, and the local catalog stays while any of its units do. A unit of the local
   catalog that the published catalog of its name does not list never serves a need of a published unit, so a published book
   waits for the common catalog's orig rather than use the bridged one.
+- An old pack received when a published catalog of its language is already installed (a device that went online once) is still
+  bridged, but only for what the device does not have from a published catalog: each unit of the local catalog that is not
+  installed from a published catalog (a book never installed, a map or article group the device lacks), with what it needs
+  (its `orig:<book>`), is activated; a unit installed from a published catalog stays, and serves the bridged units' needs. The
+  local catalog does not become the published one of the name. When the pack brings nothing that is not installed already from a
+  published catalog, nothing is activated and the import says it was skipped (its segments are kept).
 - The bridge also builds the `orig` segment of each book it builds, from the `originals` source, and the local catalog lists it
   (`orig:<book>`), so the bridged book activates and reads on a device with no network and no common catalog. The bridged orig is
   built from the book's rows in the `originals` source, its MACULA trees and referents included, and with the book's stamp from

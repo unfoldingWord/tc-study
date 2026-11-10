@@ -1123,6 +1123,67 @@ describe('importOldPack with an originals pack', () => {
     expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
   })
 
+  test('A3: with the published catalog refreshed and no book installed, an old pack still bridges and activates its book', async () => {
+    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const srv = startFakeServer(sample)
+    server?.stop()
+    server = srv
+    const store = memoryStore()
+    const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
+    await client.refresh('es-419')
+    const publishedId = (await store.getState())!.published['es-419']!.id
+    const r = await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    expect(r.skipped).toBeUndefined()
+    expect(r.activated).toEqual(expect.arrayContaining(['es-419/book:tit', 'es-419/orig:tit']))
+    expect(r.waiting).toEqual([])
+    const bridged = (await store.getState())!
+    expect(bridged.published['es-419']!.id).toBe(publishedId) // the local catalog does not become the published one
+    expect(bridged.units['es-419/book:tit']!.local).toBe(true)
+    const passage = await (await client.open('es-419')).passage('tit 2:11')
+    expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+    // The published book replaces the bridged one, and the bridged orig goes, as with any bridged book.
+    const inst = await client.install('es-419', { books: ['tit'] })
+    expect(inst.waiting).toEqual([])
+    const state = (await store.getState())!
+    expect(state.units['es-419/book:tit']!.catalogId).toBe(publishedId)
+    expect(state.units['es-419/orig:tit']).toBeUndefined()
+    expect(state.units['common/orig:tit']).toBeDefined()
+    await client.prune()
+    expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
+  })
+
+  test('A3: with the published book installed, an old pack of that book is skipped and the published one stays', async () => {
+    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const before = (await store.getState())!
+    const r = await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    expect(r.skipped).toBe(true)
+    expect(r.activated).toEqual([])
+    expect(await store.getState()).toEqual(before)
+  })
+
+  // LP3_OLD_PACKS=<folder with originals.langpack.zip and es-419.langpack.zip as prepare-language writes them>: the whole es-419 pack
+  // has Titus and Ruth (and Jonah, 3 John); with the published Titus installed, only the others are bridged.
+  test.skipIf(!OLD_PACKS || !existsSync(join(OLD_PACKS, 'es-419.langpack.zip')))('A3: a pack with tit and rut next to the published tit bridges rut only', async () => {
+    const real = (name: string) => new Uint8Array(readFileSync(join(OLD_PACKS!, name)))
+    const originals = await zipSource(real('originals.langpack.zip'))
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const publishedTit = (await store.getState())!.units['es-419/book:tit']!
+    const r = await client.importOldPack(real('es-419.langpack.zip'), { originals, ...OLD })
+    expect(r.skipped).toBeUndefined()
+    expect(r.activated).toEqual(expect.arrayContaining(['es-419/book:rut', 'es-419/orig:rut']))
+    expect(r.activated).not.toContain('es-419/book:tit')
+    expect(r.activated).not.toContain('es-419/orig:tit')
+    const state = (await store.getState())!
+    expect(state.units['es-419/book:tit']).toEqual(publishedTit)
+    expect(state.units['es-419/book:rut']!.local).toBe(true)
+    const reader = await client.open('es-419')
+    expect((await reader.passage('rut 1:1')).data).not.toBeNull()
+    expect((await reader.passage('tit 2:11')).data).not.toBeNull()
+  }, 600_000)
+
   // LP3_OLD_PACKS=<folder with originals.langpack.zip and es-419-tit.langpack.zip as prepare-language writes them>
   test.skipIf(!OLD_PACKS || !existsSync(join(OLD_PACKS, 'originals.langpack.zip')))('the real packs of prepare-language build Titus with no network', async () => {
     const real = (name: string) => new Uint8Array(readFileSync(join(OLD_PACKS!, name)))

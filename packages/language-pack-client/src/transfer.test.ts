@@ -7,7 +7,9 @@ import { createClient, type LanguagePackClient } from './client'
 import { httpSource } from './source/http'
 import { memoryStore } from './store/memory'
 import type { BlobStore } from './store/types'
-import { verifyCatalogFile } from './verify'
+import { type VerifiedCatalog, verifyCatalogFile } from './verify'
+import { bridgeOnly } from './transfer'
+import type { InstalledState } from './state'
 import { type FakeServer, startFakeServer } from '../test/fakeServer'
 import { buildSample, rewordTitusNote, type Sample } from '../test/sample'
 
@@ -448,6 +450,33 @@ describe('importOldPack', () => {
     expect(r.waiting).toEqual([])
     const passage = await (await receiver.open('es-419')).passage('tit 2:11')
     expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+  })
+
+  test('A3: bridgeOnly picks the books the device lacks from a published catalog, with what they need', async () => {
+    // A bridged catalog of two books, as a hand-made catalog view: only `name`, `units` and their `needs` are read.
+    const unit = (id: string, needs: string[] = []) => ({ id, segments: [], needs })
+    const cat = {
+      name: 'es-419',
+      catalog: {
+        units: [
+          unit('map'),
+          unit('art:tw:kt'),
+          unit('orig:rut'),
+          unit('orig:tit'),
+          unit('book:rut', ['map', 'orig:rut', 'art:tw:kt']),
+          unit('book:tit', ['map', 'orig:tit', 'art:tw:kt']),
+        ],
+      },
+    } as unknown as VerifiedCatalog
+    const pub = (key: string) => ({ catalog: key.split('/')[0]!, revision: 1, catalogId: 'p', segments: [], needs: [] })
+    const state = { v: 1, published: {}, active: {}, units: Object.fromEntries(['es-419/map', 'es-419/art:tw:kt', 'es-419/book:tit', 'common/orig:tit'].map((k) => [k, pub(k)])) } as InstalledState
+    expect([...bridgeOnly(cat, state, new Set())].sort()).toEqual(['es-419/book:rut', 'es-419/orig:rut'])
+    // A unit installed from a local catalog is not published: it is bridged again (the same unit).
+    const local = { ...state, units: { ...state.units, 'es-419/book:tit': { ...pub('es-419/book:tit'), catalogId: 'l' } } }
+    expect([...bridgeOnly(cat, local, new Set(['l']))].sort()).toEqual(['es-419/book:rut', 'es-419/book:tit', 'es-419/orig:rut', 'es-419/orig:tit'])
+    // Everything from a published catalog: nothing to bridge.
+    const all = { ...state, units: { ...state.units, 'es-419/book:rut': pub('es-419/book:rut') } }
+    expect(bridgeOnly(cat, all, new Set()).size).toBe(0)
   })
 
   test('bytes that are not an old pack are refused', async () => {
