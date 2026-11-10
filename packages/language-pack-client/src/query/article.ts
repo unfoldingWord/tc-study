@@ -63,7 +63,9 @@ export async function contextQuery(reader: PackReader, ref: string): Promise<Ans
   if (base.data === null) return out
   const ids: string[] = []
   for (const row of [...base.data.notes, ...base.data.links]) if (row.concept !== undefined && !ids.includes(row.concept)) ids.push(row.concept)
-  const maps = await reader.maps()
+  // The usage of an article comes from the core of the `xmap` (tw:) or of the `map` (ta:): their parts, the topics and the aligned
+  // units are not read.
+  const maps = await reader.mapsOf(['xmap', 'map'], { coreOnly: true })
   const concepts: ContextData['concepts'] = []
   for (const concept of ids) {
     const art = await articleQuery(reader, concept)

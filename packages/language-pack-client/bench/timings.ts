@@ -4,7 +4,9 @@
  *   LP3_SAMPLE=<folder of the phase 0 sample> bun bench/timings.ts
  *
  * It builds English Psalms (and the common build) from the sample once, then measures, as the median of 20 runs on a fresh
- * reader each time: from the stored bytes to `book('psa')` readable; `passage('psa 23:1')` with its notes; `context('psa 23:1')`.
+ * reader each time: from the stored bytes to `book('psa')` readable; `passage('psa 23:1')` with its notes; `context('psa 23:1')`;
+ * and the first `passage` and `context` on a fresh reader (nothing read yet: what a screen asks right after an install or import),
+ * with how many segments each one reads.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -45,7 +47,16 @@ const stored = new Map<string, Uint8Array>()
 for (const s of [...common.segments, ...lang.segments] as BuiltSegment[]) stored.set(s.id, s.bytes)
 const langCatalog = await verifyCatalogFile(await signCatalog(lang.catalog.bytes, pkcs8), trust, { from: 'store' })
 const commonCatalog = await verifyCatalogFile(await signCatalog(common.catalog.bytes, pkcs8), trust, { from: 'store' })
-const fresh = () => openFromSegments({ lang: 'en', catalogs: [langCatalog, commonCatalog], get: async (id) => stored.get(id) })
+let reads = 0
+const fresh = () =>
+  openFromSegments({
+    lang: 'en',
+    catalogs: [langCatalog, commonCatalog],
+    get: async (id) => {
+      reads++
+      return stored.get(id)
+    },
+  })
 
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!
 async function measure(name: string, prepare: () => Promise<unknown>, run: (ctx: any) => Promise<unknown>): Promise<void> {
@@ -67,3 +78,14 @@ console.log(`psa: ${book.texts.length} text(s), notes ${book.notes?.rows.length 
 await measure("stored bytes -> book('psa') readable", async () => fresh(), (r) => r.book('psa'))
 await measure("passage('psa 23:1') with its notes (book read)", async () => { const r = fresh(); await r.passage('psa 23:1'); return r }, (r) => r.passage('psa 23:1'))
 await measure("context('psa 23:1') (book read)", async () => { const r = fresh(); await r.context('psa 23:1'); return r }, (r) => r.context('psa 23:1'))
+
+for (const [name, run] of [
+  ["first passage('psa 23:1') on a fresh reader", (r: ReturnType<typeof fresh>) => r.passage('psa 23:1')],
+  ["first context('psa 23:1') on a fresh reader", (r: ReturnType<typeof fresh>) => r.context('psa 23:1')],
+] as const) {
+  const r = fresh()
+  reads = 0
+  await run(r)
+  const n = reads
+  await measure(`${name} (${n} segments)`, async () => fresh(), run)
+}

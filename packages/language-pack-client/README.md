@@ -108,7 +108,7 @@ Errors are `ClientError` with a `code` (`CLIENT_ERROR_CODES`): the list is `CLIE
 
 ## Timings (desktop)
 
-`LP3_SAMPLE=<phase 0 sample folder> bun bench/timings.ts` builds English Psalms from the sample once, then reports the median of 20 runs, each on a fresh reader over the stored bytes (the second and third rows have the book read already, as a screen would).
+`LP3_SAMPLE=<phase 0 sample folder> bun bench/timings.ts` builds English Psalms from the sample once, then reports the median of 20 runs, each on a fresh reader over the stored bytes (the second and third rows have the book read already, as a screen would; the last two are the first query on a fresh reader, what a screen asks right after an install or import, with the segments it reads).
 
 Measured on the author's Windows 11 desktop, Bun 1.3.3 (the build of English Psalms itself took about 69 s and is not a client cost). What the numbers include: the segments are already in memory (store I/O is not measured: no IndexedDB or disk read), the catalogs are verified once before the runs (no signature check per run), and the JIT is warm (the 20 runs follow one untimed read). On a phone, reading the segments from the store comes on top.
 
@@ -117,6 +117,10 @@ Measured on the author's Windows 11 desktop, Bun 1.3.3 (the build of English Psa
 | stored bytes -> `book('psa')` readable | < 3 s | 180 ms (min 141, max 205) |
 | `passage('psa 23:1')` with its notes | < 50 ms | 5.4 ms (min 2.9, max 13) |
 | `context('psa 23:1')` | < 50 ms | 6.0 ms (min 3.7, max 10) |
+| first `passage('psa 23:1')` on a fresh reader | — | 144 ms, 3 segments (was 317 ms, 70 segments) |
+| first `context('psa 23:1')` on a fresh reader | — | 264 ms, 8 segments (was 390 ms, 74 segments) |
+
+A query reads only the map units it needs (`passage` the `map`; `context` the cores of the `xmap` and the `map`; the topic and book queries every map unit, as `maps()` does), and a unit's segments are read together, at most 8 at a time per reader. Most of the first passage is reading the book itself.
 
 The phone has not been measured yet: that is C3.
 

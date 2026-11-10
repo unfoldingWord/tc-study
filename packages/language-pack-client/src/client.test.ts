@@ -601,6 +601,83 @@ function gatedFetch() {
   }
 }
 
+describe('A4: a fresh reader reads what a query needs', () => {
+  /** A store that counts its `get` calls and how many run at once (each answers after a macrotask, so reads can overlap). */
+  function countingStore(inner: BlobStore) {
+    const got: string[] = []
+    let now = 0
+    let max = 0
+    const store: BlobStore = {
+      ...inner,
+      has: (id) => inner.has(id),
+      ids: () => inner.ids(),
+      delete: (id) => inner.delete(id),
+      put: (id, b) => inner.put(id, b),
+      getState: () => inner.getState(),
+      setState: (x) => inner.setState(x),
+      async get(id) {
+        got.push(id)
+        now++
+        max = Math.max(max, now)
+        await new Promise((r) => setTimeout(r, 0))
+        now--
+        return inner.get(id)
+      },
+    }
+    return { store, got, max: () => max }
+  }
+
+  test("the first passage reads the book's segments and the map only", async () => {
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const c = countingStore(store)
+    const reader = await createClient({ store: c.store, trust }).open('es-419')
+    const before = c.got.length // catalogs read by open
+    const passage = await reader.passage('tit 2:11')
+    expect(passage.data).not.toBeNull()
+    expect(passage.coverage).toBeDefined()
+    const segs = new Set(c.got.slice(before))
+    expect(segs).toEqual(new Set([...segsOf['es-419/book:tit']!, ...segsOf['es-419/map']!]))
+    // The same answer as a reader that read every map first.
+    const full = await createClient({ store, trust }).open('es-419')
+    await full.maps()
+    expect(await full.passage('tit 2:11')).toEqual(passage)
+  })
+
+  test('the first context reads the cores of the xmap and the map, no parts, and answers as after every map', async () => {
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const c = countingStore(store)
+    const reader = await createClient({ store: c.store, trust }).open('es-419')
+    const before = c.got.length
+    const context = await reader.context('tit 2:11')
+    expect(context.data?.concepts.length).toBeGreaterThan(0)
+    const read = new Set(c.got.slice(before))
+    const cats = [await verifyCatalogFile(sample.langCatalog, {}, { from: 'store' }), await verifyCatalogFile(sample.commonCatalog, {}, { from: 'store' })]
+    const parts = cats.flatMap((cat) => cat.catalog.segments.filter((e) => (e.class === 'xmap' || e.class === 'map') && e.part !== 'core').map((e) => hexOf(e.id)))
+    const xmapCore = segsOf['common/xmap']!.filter((id) => !parts.includes(id))
+    for (const id of xmapCore) expect(read.has(id)).toBe(true)
+    // The passage's map is read whole (its coverage); no xmap part, no topics, no aligned.
+    for (const id of parts.filter((id) => !segsOf['es-419/map']!.includes(id))) expect(read.has(id)).toBe(false)
+    for (const k of ['common/xtopics', 'es-419/topics']) for (const id of segsOf[k]!) expect(read.has(id)).toBe(false)
+    const full = await createClient({ store, trust }).open('es-419')
+    await full.maps()
+    expect(await full.context('tit 2:11')).toEqual(context)
+  })
+
+  test("a unit's segments are read together, at most 8 at a time", async () => {
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'], aligned: true })
+    const c = countingStore(store)
+    const reader = await createClient({ store: c.store, trust }).open('es-419')
+    const m = await reader.maps()
+    expect(m.xmap).toBeDefined()
+    expect(m.aligned?.parts.size).toBeGreaterThan(1)
+    expect(c.max()).toBeGreaterThan(1)
+    expect(c.max()).toBeLessThanOrEqual(8)
+  })
+})
+
 describe('install several segments at a time', () => {
   /** The segment ids of the Titus install, once each in plan order: xmap(2) map(2) xtopics(2) topics art:tw:kt orig:tit book:tit. */
   let order: string[]

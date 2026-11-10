@@ -89,7 +89,8 @@ export async function passageQuery(reader: PackReader, input: string): Promise<A
     }
   }
   out.data = data
-  const maps = await reader.maps()
+  // The coverage needs the `map` only: the other map units are not read for a passage.
+  const maps = await reader.mapsOf(['map'])
   if (maps.map !== undefined) {
     usedUnit(out, reader, 'map')
     const cov: Record<string, CellState> = {}
