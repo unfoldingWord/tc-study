@@ -93,7 +93,9 @@ export function makeReader(o: ReaderInput): PackReader {
   const unitRevs = new Map<string, number>()
   for (const cat of o.catalogs) {
     for (const u of cat.catalog.units) {
-      if (listedUnits.has(u.id)) continue
+      // The first catalog that lists an id answers for it, unless the state has not installed it under that catalog and has under
+      // this one (a bridged `es-419/orig:tit` next to a common catalog whose `orig:tit` is not installed): the installed unit wins.
+      if (listedUnits.has(u.id) && (o.active === undefined || activeIds.has(u.id) || o.active[`${cat.name}/${u.id}`] === undefined)) continue
       listedUnits.add(u.id)
       sizes.set(u.id, u.segments.reduce((n, i) => n + (cat.catalog.segments[i]?.size ?? 0), 0))
       const key = `${cat.name}/${u.id}`

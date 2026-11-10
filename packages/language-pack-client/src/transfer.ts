@@ -219,10 +219,20 @@ export async function importOldPack(
     // device does not have from a published catalog (a book never installed, with its orig and what it needs) into the local
     // catalog, which does not become the published one of the name. With nothing of that kind, the segments are kept (the
     // published catalog names the same ids when the book is the same) and the pack is skipped.
-    const only = bridgeOnly(cat, state, await localCatalogIds(env.store, state))
+    const localIds = await localCatalogIds(env.store, state)
+    const only = bridgeOnly(cat, state, localIds)
     if (only.size === 0) {
       for (const s of checked.ok) await st(() => env.store.put(s.id, s.bytes))
       return { catalogs: [], stored: checked.ok.map((s) => s.id), rejected: checked.rejected, skipped: true, missing: [], activated: [], waiting: [] }
+    }
+    // Units bridged on another device (a local catalog of another publisher, active or behind installed units) are not replaced
+    // by this device's pack unless confirmed, as when no published catalog is here.
+    const bridged = new Set(Object.values(state.units).filter((u) => u.catalog === cat.name && (u.local === true || localIds.has(u.catalogId))).map((u) => u.catalogId))
+    const active = state.active[cat.name]
+    if (active?.origin === 'local') bridged.add(active.id)
+    for (const id of bridged) {
+      const known = active?.id === id ? active : await storedLocal(env.store, id)
+      if (known !== undefined && known.publisher !== cat.publisher) checkRevision(known, cat, o.confirmDowngrade === true)
     }
     const done = await commit(env, state, [cat], checked.ok, [], [], only)
     return { ...done, rejected: checked.rejected, missing: [] }
@@ -234,10 +244,23 @@ export async function importOldPack(
   return { ...done, rejected: checked.rejected, missing: [] }
 }
 
+/** A stored local catalog as an installed-catalog entry (read without trust: a local catalog has no signature); `undefined` when gone. */
+async function storedLocal(store: BlobStore, id: string): Promise<InstalledCatalog | undefined> {
+  const bytes = await st(() => store.get(id))
+  if (bytes === undefined) return undefined
+  try {
+    return installedOf(await verifyCatalogFile(bytes, {}, { from: 'store', expectedId: id }))
+  } catch (e) {
+    if (e instanceof FormatError) return undefined
+    throw e
+  }
+}
+
 /**
  * The units of a bridged catalog to activate next to a published catalog of its name: each unit the device has not installed
- * from a published catalog (`<name>/<unit>` absent, or itself bridged), and what it needs, except what the device has installed
- * from a published catalog (that serves the need). Empty when the pack brings nothing new.
+ * from a published catalog (`<name>/<unit>` absent, or bridged with other segments), and what it needs, except what the device
+ * has already: installed from a published catalog (that serves the need), or bridged with the same segments. Empty when the pack
+ * brings nothing new (the same pack again, say).
  */
 export function bridgeOnly(cat: VerifiedCatalog, state: InstalledState, localIds: ReadonlySet<string>): Set<string> {
   const fromPublished = (key: string): boolean => {
@@ -245,9 +268,17 @@ export function bridgeOnly(cat: VerifiedCatalog, state: InstalledState, localIds
     return u !== undefined && u.local !== true && !localIds.has(u.catalogId)
   }
   const keys = cat.catalog.units.map((u) => `${cat.name}/${u.id}`)
+  const bridgedSame = (key: string): boolean => {
+    const u = state.units[key]
+    const unit = cat.catalog.units.find((x) => `${cat.name}/${x.id}` === key)
+    if (u === undefined || unit === undefined || fromPublished(key)) return false
+    const ids = unit.segments.map((i) => hex(cat.catalog.segments[i]!.id))
+    return ids.length === u.segments.length && ids.every((id, n) => id === u.segments[n])
+  }
+  const has = (key: string): boolean => fromPublished(key) || bridgedSame(key)
   const only = new Set<string>()
   const visit = (key: string): void => {
-    if (only.has(key) || fromPublished(key) || !keys.includes(key)) return
+    if (only.has(key) || has(key) || !keys.includes(key)) return
     only.add(key)
     const unit = cat.catalog.units.find((u) => `${cat.name}/${u.id}` === key)!
     for (const n of unit.needs ?? []) visit(qualify([cat], cat.name, n))
@@ -256,7 +287,7 @@ export function bridgeOnly(cat: VerifiedCatalog, state: InstalledState, localIds
   // would reach (the bridged orig of a book installed from the published catalog) is not one: it is reached from its book or not at all.
   for (const key of keys) {
     const id = key.slice(cat.name.length + 1)
-    if (fromPublished(key) || id.startsWith('orig:')) continue
+    if (has(key) || id.startsWith('orig:')) continue
     visit(key)
   }
   return only
@@ -286,7 +317,11 @@ export async function exportTransfer(
 
   // A unit goes in when it is active with exactly the segments one of these catalogs lists for it. The revision it was activated
   // from does not matter (a later common revision may keep the segments); a unit still on other segments is not described by them.
+  // From a published catalog, a unit bridged from an old pack does not go (its orig and what it needs are in the local catalog,
+  // which a published export does not carry): naming it is E_NOT_INSTALLED.
+  const localIds = lang.origin === 'published' ? await localCatalogIds(store, state) : new Set<string>()
   const activeKeys = Object.entries(state.units)
+    .filter(([, u]) => !(lang.origin === 'published' && (u.local === true || localIds.has(u.catalogId))))
     .filter(([key, u]) => {
       const cat = cats.find((c) => c.name === u.catalog)
       const unit = cat?.catalog.units.find((x) => `${cat.name}/${x.id}` === key)

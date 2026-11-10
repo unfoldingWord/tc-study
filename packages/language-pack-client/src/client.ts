@@ -9,7 +9,7 @@ import { exportTransfer, importOldPack, importTransfer, type ImportReport } from
 import { readerOfState, type PackReader } from './reader'
 import type { SearchIndex } from './search/types'
 import type { PackSource } from './source/http'
-import { hex, type InstalledCatalog, type InstalledState, installedOf } from './state'
+import { hex, type InstalledCatalog, type InstalledState, type InstalledUnit, installedOf } from './state'
 import type { BlobStore } from './store/types'
 import { checkRevision, type TrustPolicy, type VerifiedCatalog, verifyCatalogFile } from './verify'
 
@@ -27,7 +27,8 @@ export type Status = {
   lang: string
   published?: InstalledCatalog
   active?: InstalledCatalog
-  units: { key: string; revision: number; installed: boolean; optional: boolean; bytes: number }[]
+  /** `local`: the installed unit came from a local catalog (an old pack bridged on the device); it does not travel in an export of the published catalog. */
+  units: { key: string; revision: number; installed: boolean; optional: boolean; bytes: number; local: boolean }[]
   updates: ReturnType<typeof updates>
   missingCommon?: RefreshReport['missingCommon']
 }
@@ -180,6 +181,8 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const name = state.aliases?.[lang] ?? lang
     const { lang: langCat, catalogs, missing } = await catalogsOf(store, trust, state, name)
     const units: Status['units'] = []
+    const localIds = await localCatalogIds(store, state)
+    const fromLocal = (u: InstalledUnit | undefined): boolean => u !== undefined && (u.local === true || localIds.has(u.catalogId))
     for (const cat of catalogs) {
       for (const unit of cat.catalog.units) {
         const key = `${cat.name}/${unit.id}`
@@ -190,8 +193,28 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
           installed: installed !== undefined,
           optional: unit.optional === true,
           bytes: unit.segments.reduce((n, i) => n + (cat.catalog.segments[i]?.size ?? 0), 0),
+          local: fromLocal(installed),
         })
       }
+    }
+    // Installed units of these names that the catalogs do not list (a bridged book or orig the published catalog lacks), sized
+    // from the catalog they came from.
+    const names = new Set([name, ...catalogs.map((c) => c.name)])
+    const listed = new Set(units.map((u) => u.key))
+    const cats = new Map<string, VerifiedCatalog | undefined>()
+    for (const [key, u] of Object.entries(state.units)) {
+      if (!names.has(u.catalog) || listed.has(key)) continue
+      if (!cats.has(u.catalogId)) cats.set(u.catalogId, await readStored(store, trust, { name: u.catalog, publisher: '', revision: u.revision, id: u.catalogId, origin: 'published' }))
+      const cat = cats.get(u.catalogId)
+      const unit = cat?.catalog.units.find((x) => `${cat.name}/${x.id}` === key)
+      units.push({
+        key,
+        revision: u.revision,
+        installed: true,
+        optional: u.optional === true,
+        bytes: unit === undefined ? 0 : unit.segments.reduce((n, i) => n + (cat!.catalog.segments[i]?.size ?? 0), 0),
+        local: fromLocal(u),
+      })
     }
     const published = state.published[name]
     const active = state.active[name]

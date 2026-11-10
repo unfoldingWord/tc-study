@@ -471,9 +471,11 @@ describe('importOldPack', () => {
     const pub = (key: string) => ({ catalog: key.split('/')[0]!, revision: 1, catalogId: 'p', segments: [], needs: [] })
     const state = { v: 1, published: {}, active: {}, units: Object.fromEntries(['es-419/map', 'es-419/art:tw:kt', 'es-419/book:tit', 'common/orig:tit'].map((k) => [k, pub(k)])) } as InstalledState
     expect([...bridgeOnly(cat, state, new Set())].sort()).toEqual(['es-419/book:rut', 'es-419/orig:rut'])
-    // A unit installed from a local catalog is not published: it is bridged again (the same unit).
-    const local = { ...state, units: { ...state.units, 'es-419/book:tit': { ...pub('es-419/book:tit'), catalogId: 'l' } } }
-    expect([...bridgeOnly(cat, local, new Set(['l']))].sort()).toEqual(['es-419/book:rut', 'es-419/book:tit', 'es-419/orig:rut', 'es-419/orig:tit'])
+    // A unit installed from a local catalog with other segments is bridged again; with the same segments (the same pack) it is not.
+    const other = { ...state, units: { ...state.units, 'es-419/book:tit': { ...pub('es-419/book:tit'), catalogId: 'l', segments: ['ab'] } } }
+    expect([...bridgeOnly(cat, other, new Set(['l']))].sort()).toEqual(['es-419/book:rut', 'es-419/book:tit', 'es-419/orig:rut', 'es-419/orig:tit'])
+    const same = { ...state, units: { ...state.units, 'es-419/book:tit': { ...pub('es-419/book:tit'), catalogId: 'l', local: true as const } } }
+    expect([...bridgeOnly(cat, same, new Set())].sort()).toEqual(['es-419/book:rut', 'es-419/orig:rut'])
     // Everything from a published catalog: nothing to bridge.
     const all = { ...state, units: { ...state.units, 'es-419/book:rut': pub('es-419/book:rut') } }
     expect(bridgeOnly(cat, all, new Set()).size).toBe(0)

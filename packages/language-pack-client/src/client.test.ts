@@ -1139,8 +1139,16 @@ describe('importOldPack with an originals pack', () => {
     const bridged = (await store.getState())!
     expect(bridged.published['es-419']!.id).toBe(publishedId) // the local catalog does not become the published one
     expect(bridged.units['es-419/book:tit']!.local).toBe(true)
-    const passage = await (await client.open('es-419')).passage('tit 2:11')
+    const reader = await client.open('es-419')
+    const passage = await reader.passage('tit 2:11')
     expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+    // The common catalog is stored and lists orig:tit, not installed: the reader still finds the bridged one.
+    expect(reader.installed('orig:tit')).toBe(true)
+    expect(await reader.orig('tit')).toBeDefined()
+    // The same pack again, made at another time: nothing new, so it is skipped and no other local catalog appears.
+    const again = await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, device: OLD.device, now: '2026-11-02T10:00:00Z' })
+    expect(again.skipped).toBe(true)
+    expect(await store.getState()).toEqual(bridged)
     // The published book replaces the bridged one, and the bridged orig goes, as with any bridged book.
     const inst = await client.install('es-419', { books: ['tit'] })
     expect(inst.waiting).toEqual([])
@@ -1150,6 +1158,45 @@ describe('importOldPack with an originals pack', () => {
     expect(state.units['common/orig:tit']).toBeDefined()
     await client.prune()
     expect((await (await client.open('es-419')).passage('tit 2:11')).data).not.toBeNull()
+  })
+
+  test('A3: next to an active published catalog, a bridged book is marked local in status and does not travel in an export', async () => {
+    const originals = await zipSource(dataFile('originals-tit.langpack.zip'))
+    const { client, store } = setup()
+    await client.install('es-419') // the map and topics: the published catalog is the active one
+    const publishedId = (await store.getState())!.active['es-419']!.id
+    const r = await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals, ...OLD })
+    expect(r.activated).toContain('es-419/book:tit')
+    expect((await store.getState())!.active['es-419']!.id).toBe(publishedId)
+    const units = new Map((await client.status('es-419')).units.map((u) => [u.key, u]))
+    expect(units.get('es-419/book:tit')).toMatchObject({ installed: true, local: true })
+    expect(units.get('es-419/orig:tit')).toMatchObject({ installed: true, local: true })
+    expect(units.get('es-419/map')).toMatchObject({ installed: true, local: false })
+    await expect(client.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] })).rejects.toMatchObject({ code: 'E_NOT_INSTALLED' })
+    const full = await client.exportTransfer({ lang: 'es-419', mode: 'full' })
+    const receiver = createClient({ store: memoryStore(), trust })
+    const got = await receiver.importTransfer(full)
+    expect(got.activated).toContain('es-419/map')
+    expect(got.activated.some((k) => k.includes('book:tit') || k === 'es-419/orig:tit')).toBe(false)
+    expect(got.waiting).toEqual([])
+  })
+
+  test('A3: next to a published catalog, a pack of another device does not replace bridged units unless confirmed', async () => {
+    const zipped = await zipSource(dataFile('originals-tit.langpack.zip'))
+    // Without book stamps the second pack's orig and book differ from the first's, so it would replace them.
+    const unstamped: RowSource = {
+      rows: (f) => zipped.rows(f),
+      resources: async (lang) => (await zipped.resources(lang)).map(({ bookStamps: _, ...ref }) => ref),
+    }
+    const { client, store } = setup()
+    await client.install('es-419')
+    await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals: zipped, device: 'tablet-1', now: OLD.now })
+    const before = (await store.getState())!
+    await expect(client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals: unstamped, device: 'tablet-2', now: OLD.now })).rejects.toMatchObject({ code: 'E_DOWNGRADE' })
+    expect(await store.getState()).toEqual(before)
+    const r = await client.importOldPack(dataFile('es-419-tit.langpack.zip'), { originals: unstamped, device: 'tablet-2', now: OLD.now, confirmDowngrade: true })
+    expect(r.activated).toContain('es-419/book:tit')
+    expect(r.catalogs[0]?.publisher).toBe('local:tablet-2')
   })
 
   test('A3: with the published book installed, an old pack of that book is skipped and the published one stays', async () => {
@@ -1181,6 +1228,7 @@ describe('importOldPack with an originals pack', () => {
     expect(state.units['es-419/book:rut']!.local).toBe(true)
     const reader = await client.open('es-419')
     expect((await reader.passage('rut 1:1')).data).not.toBeNull()
+    expect((await reader.orig('rut'))?.macula).toBeDefined() // the bridged orig, MACULA included, next to the stored common catalog
     expect((await reader.passage('tit 2:11')).data).not.toBeNull()
   }, 600_000)
 
