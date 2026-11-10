@@ -37,16 +37,40 @@ import type { VerifiedCatalog } from './verify'
 
 export type ReaderProblem = { id: string; code: string }
 
-/**
- * A snapshot of one `open()`: what it found missing or bad stays so (reopen after an install). A read that fails (the store or the
- * network rejects) is not remembered and is tried again by the next call. In `openFromSegments`, `installed()` is optimistic: every
- * unit the catalogs list counts as installed until a read finds its bytes missing or bad.
- */
 export type MapUnit = 'xmap' | 'map' | 'xtopics' | 'topics' | 'aligned'
 
 /** How many segment reads (`get` and decoding) one reader runs at once. */
 const READS_AT_ONCE = 8
 
+/**
+ * Runs at most `n` works at once; the others wait their turn in the order they asked. A work that ends hands its place straight to
+ * the next waiter (the count does not drop in between), so a work that asks at that moment cannot slip in and make it `n + 1`.
+ * Internal to the reader (not exported by the package).
+ */
+export function limiter(n: number): <T>(work: () => Promise<T>) => Promise<T> {
+  let running = 0
+  const queue: (() => void)[] = []
+  return async (work) => {
+    if (running >= n) await new Promise<void>((resolve) => queue.push(resolve))
+    else running++
+    try {
+      return await work()
+    } finally {
+      const next = queue.shift()
+      if (next !== undefined) next()
+      else running--
+    }
+  }
+}
+
+/**
+ * A snapshot of one `open()`: what it found missing or bad stays so (reopen after an install). A read that fails (the store or the
+ * network rejects) is not remembered and is tried again by the next call. In `openFromSegments`, `installed()` is optimistic: every
+ * unit the catalogs list counts as installed until a read finds its bytes missing or bad.
+ *
+ * `mapsOf` was added after the first release of this interface: a hand-made `PackReader` (a test double, a wrapper) can spread a
+ * real reader (`{ ...reader, orig: … }`, as `query/final.test.ts` does) to get it.
+ */
 export interface PackReader {
   lang: string
   /** Segments that were stored but do not read as the segment their id says. */
@@ -64,6 +88,8 @@ export interface PackReader {
    * needs (`passage` the `map`, `context` the `map` and `xmap`). Each unit is read once per reader, whichever call asks first.
    * `coreOnly`: for a query that reads only the cores (the usage of an article): each of `xmap`, `map`, `xtopics`, `topics` comes
    * with its core and no parts (the whole unit when it was read already), and only the core segment is read.
+   * With valid segments the answers do not depend on which query came first. With a corrupt map part they can, within one reader:
+   * a `coreOnly` read does not see the part, so it answers from the core, while a reader that read the whole unit first has no unit.
    */
   mapsOf(units: readonly MapUnit[], o?: { coreOnly?: boolean }): Promise<MapSet>
   /** The bytes of the unit's segments as the catalog lists them (0 for a unit no catalog lists). */
@@ -128,19 +154,7 @@ export function makeReader(o: ReaderInput): PackReader {
   const segCache = new Map<string, Promise<Segment | undefined>>()
   const viewCache = new Map<string, unknown>()
 
-  // At most READS_AT_ONCE reads run at once, the others wait their turn in the order they asked.
-  let running = 0
-  const queue: (() => void)[] = []
-  async function slot<T>(work: () => Promise<T>): Promise<T> {
-    if (running >= READS_AT_ONCE) await new Promise<void>((resolve) => queue.push(resolve))
-    running++
-    try {
-      return await work()
-    } finally {
-      running--
-      queue.shift()?.()
-    }
-  }
+  const slot = limiter(READS_AT_ONCE)
 
   function readOne(id: string, cls: string): Promise<Segment | undefined> {
     const key = `${cls}:${id}`

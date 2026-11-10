@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { KNOWN, origView, readSegment, type RowSource, zipSource } from '@bt-synergy/language-pack-v3'
 import { createClient } from './client'
+import { limiter } from './reader'
 import { ClientError } from './errors'
 import { httpSource, type PackSource } from './source/http'
 import { memoryStore } from './store/memory'
@@ -602,11 +603,15 @@ function gatedFetch() {
 }
 
 describe('A4: a fresh reader reads what a query needs', () => {
-  /** A store that counts its `get` calls and how many run at once (each answers after a macrotask, so reads can overlap). */
-  function countingStore(inner: BlobStore) {
+  /**
+   * A store that counts its `get` calls and how many run at once. Each answers after a macrotask, so reads can overlap; with
+   * `batch`, every read in flight answers in the same macrotask, so places free up together while queries start new reads.
+   */
+  function countingStore(inner: BlobStore, batch = false) {
     const got: string[] = []
     let now = 0
     let max = 0
+    let gate: Promise<void> | undefined
     const store: BlobStore = {
       ...inner,
       has: (id) => inner.has(id),
@@ -619,7 +624,15 @@ describe('A4: a fresh reader reads what a query needs', () => {
         got.push(id)
         now++
         max = Math.max(max, now)
-        await new Promise((r) => setTimeout(r, 0))
+        if (batch) {
+          gate ??= new Promise<void>((r) =>
+            setTimeout(() => {
+              gate = undefined
+              r()
+            }, 0),
+          )
+          await gate
+        } else await new Promise((r) => setTimeout(r, 0))
         now--
         return inner.get(id)
       },
@@ -646,7 +659,8 @@ describe('A4: a fresh reader reads what a query needs', () => {
 
   test('the first context reads the cores of the xmap and the map, no parts, and answers as after every map', async () => {
     const { client, store } = setup()
-    await client.install('es-419', { books: ['tit'] })
+    // With the aligned parts installed, so that not reading them is checked.
+    await client.install('es-419', { books: ['tit'], aligned: true })
     const c = countingStore(store)
     const reader = await createClient({ store: c.store, trust }).open('es-419')
     const before = c.got.length
@@ -659,10 +673,55 @@ describe('A4: a fresh reader reads what a query needs', () => {
     for (const id of xmapCore) expect(read.has(id)).toBe(true)
     // The passage's map is read whole (its coverage); no xmap part, no topics, no aligned.
     for (const id of parts.filter((id) => !segsOf['es-419/map']!.includes(id))) expect(read.has(id)).toBe(false)
-    for (const k of ['common/xtopics', 'es-419/topics']) for (const id of segsOf[k]!) expect(read.has(id)).toBe(false)
+    const aligned = Object.keys(segsOf).filter((k) => k.startsWith('es-419/aligned:'))
+    expect(aligned.length).toBeGreaterThan(0)
+    for (const k of ['common/xtopics', 'es-419/topics', ...aligned]) for (const id of segsOf[k]!) expect(read.has(id)).toBe(false)
     const full = await createClient({ store, trust }).open('es-419')
     await full.maps()
     expect(await full.context('tit 2:11')).toEqual(context)
+  })
+
+  test('the read limiter never runs more than its bound, whenever a new work asks', async () => {
+    // A work ends and frees its place while a waiter is queued; a new work asks k microtasks later. Every k is tried, so the moment
+    // between the place freeing and the waiter starting is hit.
+    for (let k = 0; k < 20; k++) {
+      const slot = limiter(2)
+      let now = 0
+      let max = 0
+      const gates: (() => void)[] = []
+      const run = () =>
+        slot(async () => {
+          now++
+          max = Math.max(max, now)
+          await new Promise<void>((r) => gates.push(r))
+          now--
+        })
+      const all = [run(), run(), run()] // the third waits
+      gates[0]!()
+      for (let i = 0; i < k; i++) await Promise.resolve()
+      all.push(run())
+      // Let every work end, one gate after another as they start.
+      let done = false
+      const settled = Promise.all(all).then(() => (done = true))
+      for (let released = 1; !done; ) {
+        while (released < gates.length) gates[released++]!()
+        await new Promise((r) => setTimeout(r, 0))
+      }
+      await settled
+      expect(max).toBeLessThanOrEqual(2)
+    }
+  })
+
+  test('queries racing on one reader never run more than 8 reads at once', async () => {
+    const { client, store } = setup()
+    await client.install('es-419', { books: ['tit'], aligned: true })
+    for (let round = 0; round < 5; round++) {
+      const c = countingStore(store, true)
+      const reader = await createClient({ store: c.store, trust }).open('es-419')
+      await Promise.all([reader.maps(), reader.passage('tit 2:11'), reader.context('tit 1:1'), reader.orig('tit'), reader.articles('tw:kt'), reader.maps()])
+      expect(c.max()).toBeGreaterThan(1)
+      expect(c.max()).toBeLessThanOrEqual(8)
+    }
   })
 
   test("a unit's segments are read together, at most 8 at a time", async () => {
