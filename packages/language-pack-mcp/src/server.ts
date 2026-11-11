@@ -321,7 +321,9 @@ export function createPacksServer(o: PacksServerOptions): McpServer {
       const d = ans.data as any
       if (!d) return `That article is not on this computer.${missing(ans)}`
       const body = (d.sections ?? []).map((s: any) => clean(s.md)).filter(Boolean).join('\n\n')
-      const text = `${d.title ?? d.id}\n\n${body}`
+      // tA: the articles tied to this one, so the model can follow the family (Metaphor -> Simple Metaphor, Biblical Imagery…).
+      const related = (d.related ?? []).map((x: { id: string; title?: string }) => (x.title ? `${x.title} (${x.id})` : x.id)).join('; ')
+      const text = `${d.title ?? d.id}${related ? `\nRelated: ${related}` : ''}\n\n${body}`
       return text.length > 6000 ? text.slice(0, 6000) + '\n…' : text
     }),
   )

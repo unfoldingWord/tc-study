@@ -96,6 +96,12 @@ describe('publish-v3', () => {
     expect(second.result.catalogs.lang.id).toBe(es419.id)
   })
 
+  test('--ta-config is passed to the build: a folder that does not exist fails it', async () => {
+    const run = await publish(en(temp(), EN, ['--no-upload', '--ta-config', join(temp(), 'no-such-folder')]))
+    expect(run.code).toBe(1)
+    expect(run.err.join(' ')).toContain('--ta-config')
+  })
+
   test('es-419 before en is skipped', async () => {
     const bucket = temp()
     mkdirSync(join(bucket, 'v3'), { recursive: true })

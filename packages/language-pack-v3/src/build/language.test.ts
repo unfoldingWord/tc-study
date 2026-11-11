@@ -859,3 +859,54 @@ describe('buildLanguage: the topics unit', () => {
     expect(core.local['es-419:tema/tit/56001005'].names).toEqual(['¿¿??'])
   })
 })
+
+describe('buildLanguage: the related of tA', () => {
+  const TA = 'es-419_gl/es-419/ta'
+  const ref: ResourceRef = { key: TA, stamp: 'v4#2024-07-17T20_15_35Z', kind: 'Translation Academy', books: [] }
+  const taSource = (mdOfB = '# B\n\n## ¿Qué?\n\nx'): RowSource => {
+    const rows: Row[] = [
+      { layer: 'sot', key: `${TA}/translate/a`, value: '# A\n\n## ¿Qué?\n\nVer [B](../b/01.md).' },
+      { layer: 'sot', key: `${TA}/translate/b`, value: mdOfB },
+      { layer: 'sot', key: `${TA}/checking/c`, value: '# C\n\n## ¿Qué?\n\nx' },
+    ]
+    return {
+      async resources(lang) {
+        return lang === ES ? [ref] : []
+      },
+      async *rows(f: RowFilter) {
+        if (f.resource !== undefined && f.resource !== TA) return
+        for (const row of rows) if (f.layer === undefined || row.layer === f.layer) yield row
+      },
+    }
+  }
+  const run = (source: RowSource, taConfigs?: Map<string, Map<string, string>>) => buildLanguage({ source, lang: ES, registry: registry(), about, taConfigs })
+  const groupsOf = (segments: BuiltSegment[]) => Object.fromEntries(byClass(segments, 'art').map((s) => [s.seg.h.group, s]))
+
+  test('the segment holds related; the inputs of every tA group change with the configs and with the set of tA rows', async () => {
+    const plain = groupsOf((await run(taSource())).segments)
+    const translate = (plain['ta:translate'].seg.t as { articles: { id: string; related?: string[] }[] }).articles
+    expect(translate.map((a) => [a.id, a.related])).toEqual([
+      ['ta:translate/a', ['ta:translate/b']],
+      ['ta:translate/b', ['ta:translate/a']],
+    ])
+
+    const configs = new Map([[TA, new Map([['checking', 'c:\n  dependencies:\n    - a\n']])]])
+    const withConfig = groupsOf((await run(taSource(), configs)).segments)
+    expect((withConfig['ta:checking'].seg.t as { articles: { related?: string[] }[] }).articles[0].related).toEqual(['ta:translate/a'])
+    expect(withConfig['ta:translate'].inputs).not.toBe(plain['ta:translate'].inputs)
+    expect(withConfig['ta:checking'].inputs).not.toBe(plain['ta:checking'].inputs)
+
+    // A tA text of another group is an input too: its links may tie an article of this one.
+    const otherText = groupsOf((await run(taSource('# B\n\n## ¿Qué?\n\ny'))).segments)
+    expect(otherText['ta:checking'].inputs).toBe(plain['ta:checking'].inputs)
+    const renamed: RowSource = taSource()
+    const more: RowSource = {
+      resources: renamed.resources,
+      async *rows(f) {
+        yield* renamed.rows(f)
+        if ((f.resource === undefined || f.resource === TA) && (f.layer === undefined || f.layer === 'sot')) yield { layer: 'sot', key: `${TA}/translate/d`, value: '# D\n\nx' }
+      },
+    }
+    expect(groupsOf((await run(more)).segments)['ta:checking'].inputs).not.toBe(plain['ta:checking'].inputs)
+  })
+})

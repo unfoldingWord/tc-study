@@ -380,6 +380,13 @@ jobs:
           # publish-v3 wants the tag in lowercase; the 2.0 files above keep the value as given.
           args=(--lang "${LANGUAGE,,}" --list "$list" --originals "$originals" --parts "$work/parts" --work "$RUNNER_TEMP/packs-v3-work" --aligned)
           args+=(--topics "$RUNNER_TEMP/topics")
+          # The related of the tA articles needs the config.yaml of each manual, from the release the list names: without it the
+          # build would lose those ties and say nothing, so a failed fetch fails this step (nothing was uploaded).
+          if ! bun packages/resource-pipeline/cli/fetch-ta-config.ts --list "$list" --out "$RUNNER_TEMP/ta-config" >&2; then
+            echo '{"outcome":"failed","reason":"the tA configs could not be fetched"}' > "$RUNNER_TEMP/packs-out/v3-result.json"
+            exit 1
+          fi
+          args+=(--ta-config "$RUNNER_TEMP/ta-config")
           if [ -f "$RUNNER_TEMP/sign.pem" ]; then args+=(--sign-key "$RUNNER_TEMP/sign.pem"); fi
           if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
           status=0

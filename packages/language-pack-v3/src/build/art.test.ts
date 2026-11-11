@@ -282,6 +282,25 @@ describe('extractArticles: tW', () => {
 })
 
 describe('extractArticles: tA', () => {
+  test('related: the articles of the config and of the links, both ways, in every group', async () => {
+    const source = fakeSource([
+      ta([
+        { path: 'translate/figs-metaphor', md: '# Metáfora\n\n## ¿Qué es?\n\nVer [Símil](../figs-simile/01.md).', title: 'Metáfora' },
+        { path: 'translate/figs-simile', md: '# Símil\n\n## ¿Qué es?\n\nx', title: 'Símil' },
+        { path: 'translate/figs-simetaphor', md: '# Metáfora simple\n\n## ¿Qué es?\n\nVer [[rc://*/ta/man/translate/figs-metaphor]].', title: 'Metáfora simple' },
+        { path: 'checking/acceptable', md: '# Aceptable\n\n## ¿Qué es?\n\nx', title: 'Aceptable' },
+      ]),
+    ])
+    const issues: string[] = []
+    const configs = new Map([['es-419_gl/es-419/ta', new Map([['checking', 'acceptable:\n  dependencies:\n    - figs-metaphor\n']])]])
+    const { groups } = await extractArticles(source, ES, {}, issues, configs)
+    const byId = new Map([...groups.values()].flat().map((a) => [a.id, a.related]))
+    expect(byId.get('ta:translate/figs-metaphor')).toEqual(['ta:checking/acceptable', 'ta:translate/figs-simetaphor', 'ta:translate/figs-simile'])
+    expect(byId.get('ta:checking/acceptable')).toEqual(['ta:translate/figs-metaphor'])
+    expect(byId.get('ta:translate/figs-simile')).toEqual(['ta:translate/figs-metaphor'])
+    expect(issues).toEqual([])
+  })
+
   test('# title, then ## subtitle (the question), then the sections under ###', async () => {
     const md = '# Metáfora\n\n## ¿Qué es una metáfora?\n\n### Descripción\n\nUna comparación.\n\n### Estrategias de traducción\n\nSe puede traducir así.'
     const { groups } = await build([ta([{ path: 'translate/figs-metaphor', md, title: 'Metáfora' }])])

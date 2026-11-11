@@ -3,7 +3,7 @@
  *
  *   bun packages/resource-pipeline/cli/publish-v3.ts --lang <tag> --list <list.json> --originals <originals list.json> --parts <dir> --work <dir>
  *     [--bucket-dir <dir>] [--no-upload] [--map-lang en] [--map-list <list.json>] [--topics <dir>] [--aligned]
- *     [--sign-key <PKCS#8 PEM file of an Ed25519 key>]
+ *     [--sign-key <PKCS#8 PEM file of an Ed25519 key>] [--ta-config <dir>]
  *     [--books <list>]   (local tests only: refused with --lang equal to --map-lang unless --bucket-dir is given)
  *
  * The bucket: `--bucket-dir` (a folder, for local runs), else R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY (all four
@@ -37,7 +37,7 @@ class UsageError extends Error {}
 
 export const USAGE =
   'Usage: publish-v3 --lang <tag> --list <list.json> --originals <originals list.json> --parts <dir> --work <dir>\n' +
-  '  [--bucket-dir <dir>] [--no-upload] [--map-lang en] [--map-list <list.json>] [--topics <dir>] [--aligned] [--books <list>]\n' +
+  '  [--bucket-dir <dir>] [--no-upload] [--map-lang en] [--map-list <list.json>] [--topics <dir>] [--aligned] [--books <list>] [--ta-config <dir>]\n' +
   '  The bucket is --bucket-dir, else R2_ENDPOINT, R2_BUCKET, R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY (all or none); with neither only --no-upload is allowed.\n' +
   '  --books is for local tests: with --lang equal to --map-lang it needs --bucket-dir.'
 
@@ -45,7 +45,7 @@ type Io = { log: (line: string) => void; error: (line: string) => void; out?: (l
 type Env = Record<string, string | undefined>
 
 const BOOLEAN_FLAGS = ['no-upload', 'aligned']
-const VALUE_FLAGS = ['lang', 'list', 'originals', 'parts', 'work', 'bucket-dir', 'map-lang', 'map-list', 'topics', 'books', 'sign-key']
+const VALUE_FLAGS = ['lang', 'list', 'originals', 'parts', 'work', 'bucket-dir', 'map-lang', 'map-list', 'topics', 'books', 'sign-key', 'ta-config']
 const TAG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 type Options = {
@@ -62,6 +62,7 @@ type Options = {
   aligned: boolean
   books?: string
   signKey?: string
+  taConfig?: string
 }
 
 function parse(argv: string[]): Options {
@@ -106,6 +107,7 @@ function parse(argv: string[]): Options {
     aligned: flags.has('aligned'),
     books: flags.get('books'),
     signKey,
+    taConfig: flags.get('ta-config'),
   }
 }
 
@@ -218,6 +220,7 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
       ...(against ? ['--common', commonDir] : ['--revision-common', String((published.common?.revision ?? 0) + 1), ...(published.common === undefined ? [] : ['--previous-common', published.common.id])]),
       ...(o.mapList === undefined ? [] : ['--map-list', o.mapList]),
       ...(o.topics === undefined ? [] : ['--topics', o.topics]),
+      ...(o.taConfig === undefined ? [] : ['--ta-config', o.taConfig]),
       ...(o.books === undefined ? [] : ['--books', o.books]),
       ...(o.aligned ? ['--aligned'] : []),
       ...(o.signKey === undefined ? [] : ['--sign-key', o.signKey]),
