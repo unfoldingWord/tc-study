@@ -25,6 +25,7 @@ import {
 } from '@bt-synergy/language-pack-v3'
 import { type ArticleData, articleQuery, type ContextData, contextQuery } from './query/article'
 import type { Answer } from './query/envelope'
+import { type LookupData, lookupQuery } from './query/lookup'
 import { type BooksData, booksQuery, conceptQuery, topicsQuery } from './query/maps'
 import { type PassageData, passageQuery } from './query/passage'
 import { searchQuery } from './query/search'
@@ -107,6 +108,8 @@ export interface PackReader {
   concept(id: string): Promise<Answer<unknown>>
   topics(q?: { category?: string; book?: string }): Promise<Answer<unknown>>
   books(q: { article: string } | { concept: string }): Promise<Answer<BooksData>>
+  /** The ids whose names contain a word ("gracia", "grace", "metaphor", "Pablo"), from the maps alone: exact names first. */
+  lookup(name: string, limit?: number): Promise<Answer<LookupData>>
   renderings(q: { strong: string } | { book: string; word: number }): Promise<Answer<RenderingsData>>
   /** Full-text search over the installed books: the client's index when it has one, else an index in memory filled with the books this reader opens. */
   search(text: string, filters?: SearchFilters): Promise<Answer<Hit[]>>
@@ -356,6 +359,7 @@ export function makeReader(o: ReaderInput): PackReader {
     concept: (id) => conceptQuery(reader, id),
     topics: (q) => topicsQuery(reader, q),
     books: (q) => booksQuery(reader, q),
+    lookup: (name, limit) => lookupQuery(reader, name, limit),
     renderings: (q) => renderingsQuery(reader, q),
     async search(text, filters) {
       let index = o.index

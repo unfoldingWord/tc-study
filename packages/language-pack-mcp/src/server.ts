@@ -40,7 +40,6 @@ export function clean(md: unknown): string {
 }
 
 const short = (res: string): string => String(res).split('/').pop()!.toUpperCase()
-const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
 export function createPacksServer(o: PacksServerOptions): McpServer {
   const { client } = o
@@ -188,26 +187,10 @@ export function createPacksServer(o: PacksServerOptions): McpServer {
     run(async (a: { name: string; lang?: string }) => {
       const l = await langOf(a.lang)
       const r = await readerOf(l)
-      const maps = await r.maps()
-      const q = fold(a.name.trim())
-      if (!q) throw new Error('Give a word to look for.')
-      const found = new Map<string, { names: Set<string>; score: number }>()
-      const add = (id: string, name: string): void => {
-        const f = fold(name)
-        if (!f.includes(q)) return
-        const score = f === q ? 0 : f.startsWith(q) ? 1 : 2
-        const e = found.get(id) ?? { names: new Set<string>(), score }
-        e.names.add(name)
-        e.score = Math.min(e.score, score)
-        found.set(id, e)
-      }
-      for (const [id, names] of Object.entries(maps.map?.core.names ?? {})) for (const n of names) add(id, n)
-      for (const [id, names] of Object.entries(maps.topics?.core.names ?? {})) for (const n of names) add(id, n[0])
-      for (const [id, t] of maps.xtopics?.core.topics ?? []) if (t.title) add(id, t.title)
-      for (const id of maps.xmap?.core.concepts?.keys?.() ?? []) add(id, id.split('/').pop()!.replace(/-/g, ' '))
-      const rows = [...found].sort((x, y) => x[1].score - y[1].score || x[0].localeCompare(y[0])).slice(0, 15)
+      if (!a.name.trim()) throw new Error('Give a word to look for.')
+      const rows = (await r.lookup(a.name)).data?.matches ?? []
       if (rows.length === 0) return `Nothing named like "${a.name}" in ${l}. Try another spelling, or the English word.`
-      return rows.map(([id, e]) => `${id} — ${[...e.names].join(', ')}`).join('\n')
+      return rows.map((m) => `${m.id} — ${m.names.join(', ')}`).join('\n')
     }),
   )
 
