@@ -15,6 +15,7 @@ export type { Answer, Cite, CellState, NotInstalled, QueryName } from './query/e
 export type { PassageData } from './query/passage'
 export type { ArticleData, ContextData } from './query/article'
 export type { BookCell, BooksData } from './query/maps'
+export type { LookupData, LookupMatch } from './query/lookup'
 export type { RenderingsData } from './query/renderings'
 export { default as schemas } from './query/schemas.json'
 export { type SqlDriver, sqlIndex } from './search/sql'

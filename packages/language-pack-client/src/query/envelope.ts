@@ -12,7 +12,7 @@ export type Cite = { res: string; release: string; id?: string; ref?: string; se
 /** The state of a cell of the map: `State` of language-pack-v3 (`Coverage` there is the map's own type). */
 export type CellState = State
 
-export type QueryName = 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context'
+export type QueryName = 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context' | 'lookup'
 
 export type NotInstalled = { book?: string; unit: string; bytes: number; what?: string }
 

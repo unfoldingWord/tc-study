@@ -107,5 +107,19 @@
       "required": ["ref"],
       "additionalProperties": false
     }
+  },
+  "lookup": {
+    "label": { "es": "Buscar por nombre: las claves de los términos, artículos, personas y lugares que se llaman así" },
+    "description": "The ids of key terms, Academy articles, people, places and events whose name contains a word, in this language or in English, exact names first. It reads the maps only.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "A word or name, such as \"gracia\", \"grace\", \"metaphor\" or \"Pablo\". Accents and capitals do not count." },
+        "limit": { "type": "integer", "minimum": 1, "description": "At most this many ids (15 when left out)." }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    }
   }
 }
