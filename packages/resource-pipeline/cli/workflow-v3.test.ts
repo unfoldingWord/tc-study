@@ -111,6 +111,15 @@ describe('language-packs.yml format 3 steps', () => {
     expect(find('Topic sources (format 3)').run).toContain('fetch-topic-sources.ts --out "$RUNNER_TEMP/topics"')
   })
 
+  test('the format 3 step fetches the tA configs of the list before publish-v3, and a failed fetch fails it', () => {
+    const run = find('Build and publish format 3').run as string
+    const fetchAt = run.indexOf('fetch-ta-config.ts --list "$list" --out "$RUNNER_TEMP/ta-config"')
+    expect(fetchAt).toBeGreaterThan(run.indexOf('list="${lists[0]}"'))
+    expect(run.indexOf('bun packages/resource-pipeline/cli/publish-v3.ts')).toBeGreaterThan(fetchAt)
+    expect(run).toContain('args+=(--ta-config "$RUNNER_TEMP/ta-config")')
+    expect(run).toContain('"reason":"the tA configs could not be fetched"')
+  })
+
   test('the 2.0 text is unchanged: the old lines are all there, in order', () => {
     const old = spawnSync('git', ['show', `${BASE}:${FILE}`], { cwd: ROOT, encoding: 'utf8' })
     if (old.status !== 0) return // no history (a shallow checkout)

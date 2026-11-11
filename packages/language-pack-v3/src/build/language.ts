@@ -16,7 +16,9 @@
  *   book in the originals; the resources are those of `res` (key and whole stamp) and the original (its key and the stamp of the
  *   book, `OrigModel.stamp`);
  * - **orig**: the `sot` rows of the book in the originals; the resources are the originals that have the book;
- * - **art**: the `sot` rows of the articles of the group, in the resources of those articles; **lex**: the `sot` rows of the
+ * - **art**: the `sot` rows of the articles of the group, in the resources of those articles. A tA group also has the `sot` rows of
+ *   every tA article and one row `ta-config|{resource}/{manual}/config.yaml#{sha-256 of the text}` per config given: its
+ *   `related` comes from all of them (`related.ts`); **lex**: the `sot` rows of the
  *   lexicon files `content/{n}.json` of the group, in the resources of its entries; **obs**: the `sot` rows of every resource the
  *   segment names in `res`.
  *
@@ -33,6 +35,7 @@ import { BOOKS, bookNumber, bookSet } from '../ids'
 import type { About, ArticleModel, BookModel, CatalogResource, LexEntry, OrigModel } from '../model'
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
 import { articleOfPath, articleResources, artSegment, extractArticles, type Kind } from './art'
+import type { TaConfigs } from './related'
 import { extractBook, isBookResource } from './bookHelps'
 import { bookSegment } from './book'
 import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOfBook } from './catalog'
@@ -240,6 +243,7 @@ export async function buildLanguage(o: {
   partial?: boolean
   topics?: { xtopics: XtopicsCore; records: TipnrRecord[] }
   aligned?: boolean
+  taConfigs?: TaConfigs
 }): Promise<LanguageBuild> {
   const { source, lang } = o
   const report: string[] = []
@@ -294,13 +298,18 @@ export async function buildLanguage(o: {
 
   // Articles
   const artIssues: string[] = []
-  const { groups: articles, registry } = await extractArticles(source, lang, o.registry, artIssues)
+  const { groups: articles, registry } = await extractArticles(source, lang, o.registry, artIssues, o.taConfigs)
   report.push(...scoped(artIssues, artScope))
   const artRows = await articleRowKeys(source, lang, articles)
+  // The `related` of a tA article comes from every tA text and from the configs: they are inputs of each tA group.
+  const taRows = [...artRows].filter(([group]) => group.startsWith('ta:')).flatMap(([, rows]) => rows)
+  const configRows = (keys: string[]): RowKey[] =>
+    keys.flatMap((key) => [...(o.taConfigs?.get(key) ?? [])].map(([manual, text]) => ({ layer: 'ta-config', key: `${key}/${manual}/config.yaml#${sha256Hex(text)}` })))
   for (const [group, list] of articles) {
     const res = articleResources(list, refs)
     const keys = res.map(([key]) => key)
-    await add(artSegment(lang, group, res, list), inputsOf(artRows.get(group) ?? [], stampsOf(keys)), keys)
+    const rows = group.startsWith('ta:') ? [...taRows, ...configRows(keys)] : (artRows.get(group) ?? [])
+    await add(artSegment(lang, group, res, list), inputsOf(rows, stampsOf(keys)), keys)
   }
 
   // The article groups a book's notes point to that this catalog does not build are not needs: the book would never activate.
