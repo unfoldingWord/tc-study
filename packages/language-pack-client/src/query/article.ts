@@ -10,6 +10,24 @@ export type ArticleData = {
   title: string
   sections: (SectionModel & { otherLang: boolean })[]
   more: { sid: string; title?: string; role: Role }[]
+  /** tA: the articles tied to this one (`art.cddl`), with the title of each whose group is installed. */
+  related?: { id: string; title?: string }[]
+}
+
+/** Each id with the title of its article: from `models` (the group of the article asked for), else from its own group when installed. */
+async function titled(reader: PackReader, ids: string[], models: ArticleModel[]): Promise<{ id: string; title?: string }[]> {
+  const groups = new Map<string, ArticleModel[] | undefined>()
+  const out: { id: string; title?: string }[] = []
+  for (const id of ids) {
+    let title = models.find((a) => a.id === id)?.title
+    if (title === undefined) {
+      const unit = reader.unitOf('art', id) ?? `art:${id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : id}`
+      if (!groups.has(unit)) groups.set(unit, reader.installed(unit) ? await reader.articles(unit.slice('art:'.length)) : undefined)
+      title = groups.get(unit)?.find((a) => a.id === id)?.title
+    }
+    out.push(title === undefined ? { id } : { id, title })
+  }
+  return out
 }
 
 function defaults(id: string, sections: SectionModel[]): SectionModel[] {
@@ -46,6 +64,7 @@ export async function articleQuery(reader: PackReader, id: string, section?: str
     sections: chosen.map((s) => ({ ...s, otherLang: s.lang !== reader.lang })),
     more: art.sections.filter((s) => !shown.has(s)).map((s) => ({ sid: s.sid, ...(s.title !== undefined ? { title: s.title } : {}), role: s.role })),
   }
+  if (art.related !== undefined) out.data.related = await titled(reader, art.related, models)
   for (const s of chosen) out.cites.push({ res: art.res, release, id: art.id, section: s.sid })
   return out
 }
