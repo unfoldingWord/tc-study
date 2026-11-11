@@ -41,12 +41,21 @@ export function languageTn(m: MapSet): string | undefined {
   return undefined
 }
 
-/** The usage cells of a `ta:` / `tw:` article: the language's tN for `ta:` (every cell `none` when it has none), the English TWL for `tw:`. */
+/** The language of the English tN (`unfoldingWord/en/tn`): for a map in this language, that tN is the language's own. */
+const TN_LANG = TN.split('/')[1]
+
+/**
+ * The usage cells of a `ta:` / `tw:` article: the English TWL for `tw:`; for `ta:`, the language's own tN. For English the own
+ * tN is the English one, whose counts are the `notes` of the `xmap`. Any other language with no tN of its own gets every cell
+ * `none`: the English notes are not its usage.
+ */
 export function usageBooks(m: MapSet, concept: string): Record<string, Cell> {
-  const source = concept.startsWith('tw:') ? TWL : (languageTn(m) ?? TN)
-  const books = (answer(m, { kind: 'usage', concept, source }) as { books: Record<string, Cell> }).books
-  if (source !== TN || concept.startsWith('tw:')) return books
-  return Object.fromEntries(Object.keys(books).map((b) => [b, { state: 'none' } as Cell]))
+  const usage = (source: string) => (answer(m, { kind: 'usage', concept, source }) as { books: Record<string, Cell> }).books
+  if (concept.startsWith('tw:')) return usage(TWL)
+  const own = languageTn(m)
+  if (own !== undefined) return usage(own)
+  if (m.map?.core.lang === TN_LANG) return usage(TN)
+  return Object.fromEntries(BOOKS.map((b) => [b, { state: 'none' } as Cell]))
 }
 
 /** The per-book cells of a concept: the usage in tN / TWL for an article, the occurrences for a topic. */

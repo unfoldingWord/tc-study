@@ -45,10 +45,24 @@ describe('books', () => {
     expect(a.revision.units.map).toBeGreaterThan(0)
   })
   test('a language map with no tN of its own gives every cell none, never zero', () => {
-    const m = { revision: 1, map: { core: { res: [['unfoldingWord/en/tn', 'v1']], coverage: new Map(), usage: undefined }, parts: new Map() } } as never
+    const m = { revision: 1, map: { core: { lang: 'fr', res: [['unfoldingWord/en/tn', 'v1']], coverage: new Map(), usage: undefined }, parts: new Map() } } as never
     const cells = Object.values(usageBooks(m, 'ta:translate/figs-metaphor'))
     expect(cells).toHaveLength(66)
     expect(cells.every((c) => c.state === 'none')).toBe(true)
+  })
+  test('English: the English tN is its own, so a ta: article counts its notes in every book', () => {
+    const TN = 'unfoldingWord/en/tn'
+    const notes = { unit: 'notes', rows: new Map([['ta:translate/figs-metaphor', new Map([['psa', [140, 120]]])]]) }
+    const coverage = new Map([[TN, { whole: ['psa', 'tit'], partial: [] }]])
+    const m = {
+      revision: 1,
+      xmap: { core: { coverage, notes, links: undefined, strong: { unit: 'occurrences', rows: new Map() } }, parts: new Map() },
+      map: { core: { lang: 'en', res: [[TN, 'v1']], coverage: new Map(), usage: undefined }, parts: new Map() },
+    } as never
+    const books = usageBooks(m, 'ta:translate/figs-metaphor')
+    expect(books.psa).toEqual({ state: 'count', count: 140, verses: 120 })
+    expect(books.tit).toEqual({ state: 'zero', count: 0, verses: 0 })
+    expect(books.gen!.state).toBe('none')
   })
   test('a tW article reads the word links', async () => {
     const r = await open({ books: ['tit'] })
