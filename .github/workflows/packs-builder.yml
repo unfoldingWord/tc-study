@@ -30,7 +30,8 @@ jobs:
   staging:
     # A dispatch from a branch would write that branch's code, which no build the Worker dispatches (ref master) gives.
     if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest now rolls to 26.04, whose Node 24 cannot build better-sqlite3 9.6 (no prebuilt binary, needs C++20).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: packs-staging
     # The latest push's code is the one master builds: an older run still going is of no use.
@@ -61,7 +62,8 @@ jobs:
   # Production only once its Worker serves parts (repository variable PACKS_PARTS_PRODUCTION, set with Abel's yes).
   production:
     if: github.ref == 'refs/heads/master' && vars.PACKS_PARTS_PRODUCTION == 'true'
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest now rolls to 26.04, whose Node 24 cannot build better-sqlite3 9.6 (no prebuilt binary, needs C++20).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: packs-production
     concurrency:
