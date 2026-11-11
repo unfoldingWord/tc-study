@@ -223,22 +223,62 @@ export function activate(
   return { state: next, activated, waiting }
 }
 
+/**
+ * The units to offer: each installed unit whose segments changed in the catalogs, and each bridged unit (from a local catalog)
+ * that a published catalog lists, whose replacement is installed by the same install (transfer.md "Old packs"). A bridged unit
+ * is listed even when its segments are the published ones (the bridge makes the same ids): the published unit needs other units
+ * (the common catalog's `orig:<book>` in place of the bridged `<lang>/orig:<book>`), so it activates only once those are here,
+ * and no install would ask for them otherwise. Those needs that are not installed are listed too, so the install of the listed
+ * keys brings them and the sizes add up without counting a segment twice; `from` is the revision of the bridged unit of the same
+ * id they replace (0 when none). `bytes` counts the segments the replaced unit does not have.
+ *
+ * `localCatalogs`: the ids of the stored local catalogs, which tell the bridged units of a state saved before units carried `local`.
+ */
 export function updates(
   state: InstalledState,
   catalogs: VerifiedCatalog[],
+  localCatalogs?: ReadonlySet<string>,
 ): { key: string; from: number; to: number; bytes: number }[] {
   const out: { key: string; from: number; to: number; bytes: number }[] = []
+  const listed = new Set<string>()
+  const fromLocal = (u: InstalledUnit): boolean =>
+    u.local === true ||
+    localCatalogs?.has(u.catalogId) === true ||
+    (state.active[u.catalog]?.origin === 'local' && state.active[u.catalog]!.id === u.catalogId)
+  const sizeOf = (cat: VerifiedCatalog, unit: Unit, had: ReadonlySet<string>): number =>
+    unit.segments.reduce((n, i) => {
+      const s = segmentOf(cat, i)
+      return n + (had.has(hex(s.id)) ? 0 : s.size)
+    }, 0)
+  const replacing: Found[] = []
   for (const cat of catalogs) {
     for (const unit of cat.catalog.units) {
       const key = `${cat.name}/${unit.id}`
       const old = state.units[key]
       if (old === undefined) continue
+      const bridged = cat.origin === 'published' && old.catalogId !== cat.id && fromLocal(old)
       const ids = unit.segments.map((i) => hex(segmentOf(cat, i).id))
-      if (sameList(old.segments, ids)) continue
-      const had = new Set(old.segments)
-      const bytes = unit.segments.reduce((n, i, k) => n + (had.has(ids[k]!) ? 0 : segmentOf(cat, i).size), 0)
-      out.push({ key, from: old.revision, to: cat.revision, bytes })
+      if (sameList(old.segments, ids) && !bridged) continue
+      out.push({ key, from: old.revision, to: cat.revision, bytes: sizeOf(cat, unit, new Set(old.segments)) })
+      listed.add(key)
+      if (bridged) replacing.push({ cat, unit })
     }
   }
+  // What the replacements need that is not installed, and what that needs in turn.
+  const bridgedTwin = (id: string): InstalledUnit | undefined =>
+    Object.entries(state.units).find(([k, u]) => k.slice(k.indexOf('/') + 1) === id && fromLocal(u))?.[1]
+  const addNeeds = ({ cat, unit }: Found): void => {
+    for (const n of unit.needs ?? []) {
+      const key = qualify(catalogs, cat.name, n)
+      if (listed.has(key) || state.units[key] !== undefined) continue
+      const f = find(catalogs, key)
+      if (f === undefined) continue
+      listed.add(key)
+      const twin = bridgedTwin(f.unit.id)
+      out.push({ key, from: twin?.revision ?? 0, to: f.cat.revision, bytes: sizeOf(f.cat, f.unit, new Set(twin?.segments ?? [])) })
+      addNeeds(f)
+    }
+  }
+  replacing.forEach(addNeeds)
   return out
 }

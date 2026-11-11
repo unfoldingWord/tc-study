@@ -109,6 +109,11 @@ phase 1):
   catalog lacks) stays active with what it needs, and the local catalog stays while any of its units do. A unit of the local
   catalog that the published catalog of its name does not list never serves a need of a published unit, so a published book
   waits for the common catalog's orig rather than use the bridged one.
+- A bridged unit that a published catalog lists is offered as an update (`updates`), even when its segments are the published
+  ones: the published unit needs other units (the common catalog's `orig:<book>`), so it activates only once they are here.
+  The update also lists what the replacement needs and the device lacks, so installing the offered units installs the
+  replacement and drops the bridged units it replaces. Without that, nothing would ever ask for the common orig and the book
+  would stay bridged.
 - An old pack received when a published catalog of its language is already installed (a device that went online once) is still
   bridged, but only for what the device does not have from a published catalog: each unit of the local catalog that is not
   installed from a published catalog (a book never installed, a map or article group the device lacks), with what it needs

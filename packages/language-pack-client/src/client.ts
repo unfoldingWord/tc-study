@@ -153,7 +153,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     return {
       name: langCat.name,
       catalogs: found.catalogs.map((c) => (next.published[c.name]?.id === c.id ? next.published[c.name]! : installedOf(c))),
-      updates: updates(next, found.catalogs),
+      updates: updates(next, found.catalogs, await localCatalogIds(store, next)),
       unchanged,
       ...(missingCommon !== undefined ? { missingCommon } : {}),
     }
@@ -223,7 +223,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       ...(published !== undefined ? { published } : {}),
       ...(active !== undefined ? { active } : {}),
       units,
-      updates: langCat === undefined ? [] : updates(state, catalogs),
+      updates: langCat === undefined ? [] : updates(state, catalogs, localIds),
       ...(missing !== undefined ? { missingCommon: missing } : {}),
     }
   }

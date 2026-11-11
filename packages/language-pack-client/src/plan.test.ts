@@ -139,4 +139,46 @@ describe('updates', () => {
     expect(updates(s1, [common(), es()])).toEqual([])
     expect(updates(s1, [common(), es(24, 6)])).toEqual([{ key: 'es-419/book:rut', from: 5, to: 6, bytes: 400 }])
   })
+
+  // A device with Titus bridged from an old pack: the bridge made the published segment ids, but its book needs its own orig.
+  const bridged = (o: { flag?: boolean } = {}) => {
+    const local = (key: string, segs: number[], needs: string[] = []) => ({
+      catalog: 'es-419',
+      revision: 1,
+      catalogId: 'l'.repeat(64),
+      segments: segs.map(hexOf),
+      needs,
+      ...(o.flag !== false ? { local: true as const } : {}),
+    })
+    return {
+      ...emptyState(),
+      units: {
+        'es-419/map': local('es-419/map', [11]),
+        'es-419/orig:tit': local('es-419/orig:tit', [3]),
+        'es-419/book:tit': local('es-419/book:tit', [13], ['es-419/orig:tit']),
+        // A book the published catalog lacks: it stays bridged, so it is no update.
+        'es-419/book:jon': local('es-419/book:jon', [40], ['es-419/orig:jon']),
+        'es-419/orig:jon': local('es-419/orig:jon', [41]),
+      },
+    }
+  }
+  test('a bridged book the published catalog lists is an update even with the same segments, with the orig it needs', () => {
+    const u = updates(bridged(), [common(), es()])
+    expect(u).toEqual([
+      { key: 'es-419/map', from: 1, to: 5, bytes: 0 },
+      { key: 'es-419/book:tit', from: 1, to: 5, bytes: 0 },
+      // The bridged orig had the published bytes: nothing to fetch, but the install must name it.
+      { key: 'common/orig:tit', from: 1, to: 1, bytes: 0 },
+    ])
+    // A state saved before units carried `local`: the local catalog's id tells them.
+    expect(updates(bridged({ flag: false }), [common(), es()], new Set(['l'.repeat(64)]))).toEqual(u)
+    expect(updates(bridged({ flag: false }), [common(), es()])).toEqual([])
+  })
+  test('a published book that needs a unit the device lacks lists it once, sized whole', () => {
+    const s = bridged()
+    const rut = { ...s.units['es-419/book:tit']!, segments: [hexOf(14)], needs: ['es-419/orig:rut'] }
+    const u = updates({ ...s, units: { ...s.units, 'es-419/book:rut': rut } }, [common(), es()])
+    expect(u.filter((x) => x.key === 'es-419/art:tw:kt')).toEqual([{ key: 'es-419/art:tw:kt', from: 0, to: 5, bytes: 200 }])
+    expect(u.filter((x) => x.key === 'common/orig:rut')).toEqual([{ key: 'common/orig:rut', from: 0, to: 1, bytes: 20 }])
+  })
 })

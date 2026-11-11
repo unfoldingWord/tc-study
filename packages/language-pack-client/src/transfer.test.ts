@@ -438,6 +438,45 @@ describe('importOldPack', () => {
     expect(state.units['common/orig:tit']).toBeDefined()
   })
 
+  test('a bridged book the published catalog lists is an update, with the common orig it needs; installing it replaces the bridged units', async () => {
+    const data = join(SPEC, 'data')
+    const originals = await partsSource({ list: join(data, 'originals', 'list.json'), partsDir: join(data, 'parts') })
+    const srv = startFakeServer(sample)
+    server = srv
+    const store = memoryStore()
+    const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
+    await client.importOldPack(file('data', 'es-419-tit.langpack.zip'), { originals, device: 'test-device', now: '2026-11-01T10:00:00Z' })
+    const before = (await store.getState())!
+    expect(before.units['es-419/book:tit']?.local).toBe(true)
+
+    const r = await client.refresh('es-419')
+    const keys = r.updates.map((u) => u.key)
+    expect(keys).toContain('es-419/book:tit')
+    expect(keys).toContain('common/orig:tit')
+    expect(new Set(keys).size).toBe(keys.length)
+    const st0 = await client.status('es-419')
+    expect(st0.updates.map((u) => u.key).sort()).toEqual([...keys].sort())
+    const orig = r.updates.find((u) => u.key === 'common/orig:tit')!
+    expect(orig.from).toBe(before.units['es-419/orig:tit']!.revision)
+
+    // What an app does with the offer: install the updated units by key, nothing else named.
+    const inst = await client.install('es-419', { units: keys })
+    expect(inst.waiting).toEqual([])
+    const state = (await store.getState())!
+    expect(state.units['es-419/book:tit']?.catalogId).toBe(state.published['es-419']!.id)
+    expect(state.units['es-419/book:tit']?.local).toBeUndefined()
+    expect(state.units['common/orig:tit']).toBeDefined()
+    expect(state.units['es-419/orig:tit']).toBeUndefined()
+    const after = await client.status('es-419')
+    expect(after.units.filter((u) => u.installed && u.local)).toEqual([])
+    expect(after.updates).toEqual([])
+    const passage = await (await client.open('es-419')).passage('tit 2:11')
+    expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+    // The published book exports now; the bridged units are gone from the state.
+    const bytes = await client.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] })
+    expect((await idsOf(bytes)).index.catalogs.length).toBeGreaterThan(0)
+  })
+
   test('a bridged book exported full imports on a receiver with no trusted keys, and reads', async () => {
     const data = join(SPEC, 'data')
     const originals = await partsSource({ list: join(data, 'originals', 'list.json'), partsDir: join(data, 'parts') })
