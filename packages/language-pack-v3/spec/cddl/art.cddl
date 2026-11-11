@@ -25,7 +25,7 @@ article = {
   "res": res-index,
   "title": tstr,               ; tW: the article's heading; tA: title.md
   ? "subtitle": tstr,          ; tA: sub-title.md, the question the article answers
-  ? "related": [* concept-id], ; tA: the articles its config lists as related
+  ? "related": [* concept-id], ; tA: the articles tied to it, both ways, by the config.yaml of a manual or a link of a text
   ? "aliases": [* concept-id], ; ids this article had before (other/ moved to kt/): they still lead here
   "sections": [+ section],     ; in reading order
 }
