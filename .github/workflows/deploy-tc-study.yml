@@ -29,7 +29,8 @@ on:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest now rolls to 26.04, whose Node 24 cannot build better-sqlite3 9.6 (no prebuilt binary, needs C++20).
+    runs-on: ubuntu-24.04
     # Unit + typecheck + lint (includes arch-freeze LOC/`as any` ratchets — not behavioral QA)
     name: TC-Study unit + arch-freeze
 
@@ -88,7 +89,8 @@ jobs:
           retention-days: 2
 
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest now rolls to 26.04, whose Node 24 cannot build better-sqlite3 9.6 (no prebuilt binary, needs C++20).
+    runs-on: ubuntu-24.04
     name: TC-Study behavioral E2E
     needs: quality
 
@@ -131,7 +133,8 @@ jobs:
           retention-days: 7
 
   deploy:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest now rolls to 26.04, whose Node 24 cannot build better-sqlite3 9.6 (no prebuilt binary, needs C++20).
+    runs-on: ubuntu-24.04
     name: Deploy to Cloudflare Pages
     needs: [quality, e2e]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'

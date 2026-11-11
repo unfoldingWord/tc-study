@@ -126,6 +126,11 @@ describe('language-packs.yml format 3 steps', () => {
     const now = text.split('\n')
     let at = 0
     for (const line of old.stdout.split('\n')) {
+      // The runner was pinned on purpose (ubuntu-latest moved to 26.04, where the pack tools do not build).
+      if (line.trimEnd() === '    runs-on: ubuntu-latest') {
+        expect(now.map((l) => l.trimEnd())).toContain('    runs-on: ubuntu-24.04')
+        continue
+      }
       const found = now.indexOf(line, at)
       expect(found).toBeGreaterThanOrEqual(at)
       at = found + 1

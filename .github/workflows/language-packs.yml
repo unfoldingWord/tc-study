@@ -83,7 +83,8 @@ defaults:
 
 jobs:
   packs:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest now rolls to 26.04, whose Node 24 cannot build better-sqlite3 9.6 (no prebuilt binary, needs C++20).
+    runs-on: ubuntu-24.04
     timeout-minutes: 300
     environment: ${{ inputs.target == 'production' && 'packs-production' || 'packs-staging' }}
     env:
