@@ -7,7 +7,9 @@ import { createClient, type LanguagePackClient } from './client'
 import { httpSource } from './source/http'
 import { memoryStore } from './store/memory'
 import type { BlobStore } from './store/types'
-import { verifyCatalogFile } from './verify'
+import { type VerifiedCatalog, verifyCatalogFile } from './verify'
+import { bridgeOnly } from './transfer'
+import type { InstalledState } from './state'
 import { type FakeServer, startFakeServer } from '../test/fakeServer'
 import { buildSample, rewordTitusNote, type Sample } from '../test/sample'
 
@@ -413,7 +415,7 @@ describe('the spec fixtures', () => {
 })
 
 describe('importOldPack', () => {
-  test('a local catalog; the book waits for its original until the published catalogs come, then activates', async () => {
+  test('a local catalog with the book, its map and its original; the published catalogs later replace it', async () => {
     const data = join(SPEC, 'data')
     const originals = await partsSource({ list: join(data, 'originals', 'list.json'), partsDir: join(data, 'parts') })
     const srv = startFakeServer(sample)
@@ -423,8 +425,8 @@ describe('importOldPack', () => {
     const r = await client.importOldPack(file('data', 'es-419-tit.langpack.zip'), { originals, device: 'test-device', now: '2026-11-01T10:00:00Z' })
     expect(r.catalogs).toHaveLength(1)
     expect(r.catalogs[0]).toMatchObject({ name: 'es-419', origin: 'local', publisher: 'local:test-device' })
-    expect(r.activated).toContain('es-419/map')
-    expect(r.waiting).toEqual([{ key: 'es-419/book:tit', missing: ['es-419/orig:tit'] }])
+    expect(r.activated).toEqual(expect.arrayContaining(['es-419/map', 'es-419/orig:tit', 'es-419/book:tit']))
+    expect(r.waiting).toEqual([])
     expect(srv.hits).toEqual([])
 
     await client.refresh('es-419')
@@ -434,6 +436,88 @@ describe('importOldPack', () => {
     expect(state.active['es-419']?.origin).toBe('published')
     expect(state.units['es-419/book:tit']?.catalogId).toBe(state.published['es-419']!.id)
     expect(state.units['common/orig:tit']).toBeDefined()
+  })
+
+  test('a bridged book the published catalog lists is an update, with the common orig it needs; installing it replaces the bridged units', async () => {
+    const data = join(SPEC, 'data')
+    const originals = await partsSource({ list: join(data, 'originals', 'list.json'), partsDir: join(data, 'parts') })
+    const srv = startFakeServer(sample)
+    server = srv
+    const store = memoryStore()
+    const client = createClient({ store, source: httpSource({ base: srv.url }), trust })
+    await client.importOldPack(file('data', 'es-419-tit.langpack.zip'), { originals, device: 'test-device', now: '2026-11-01T10:00:00Z' })
+    const before = (await store.getState())!
+    expect(before.units['es-419/book:tit']?.local).toBe(true)
+
+    const r = await client.refresh('es-419')
+    const keys = r.updates.map((u) => u.key)
+    expect(keys).toContain('es-419/book:tit')
+    expect(keys).toContain('common/orig:tit')
+    expect(new Set(keys).size).toBe(keys.length)
+    const st0 = await client.status('es-419')
+    expect(st0.updates.map((u) => u.key).sort()).toEqual([...keys].sort())
+    const orig = r.updates.find((u) => u.key === 'common/orig:tit')!
+    expect(orig.from).toBe(before.units['es-419/orig:tit']!.revision)
+
+    // What an app does with the offer: install the updated units by key, nothing else named.
+    const inst = await client.install('es-419', { units: keys })
+    expect(inst.waiting).toEqual([])
+    const state = (await store.getState())!
+    expect(state.units['es-419/book:tit']?.catalogId).toBe(state.published['es-419']!.id)
+    expect(state.units['es-419/book:tit']?.local).toBeUndefined()
+    expect(state.units['common/orig:tit']).toBeDefined()
+    expect(state.units['es-419/orig:tit']).toBeUndefined()
+    const after = await client.status('es-419')
+    expect(after.units.filter((u) => u.installed && u.local)).toEqual([])
+    expect(after.updates).toEqual([])
+    const passage = await (await client.open('es-419')).passage('tit 2:11')
+    expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+    // The published book exports now; the bridged units are gone from the state.
+    const bytes = await client.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] })
+    expect((await idsOf(bytes)).index.catalogs.length).toBeGreaterThan(0)
+  })
+
+  test('a bridged book exported full imports on a receiver with no trusted keys, and reads', async () => {
+    const data = join(SPEC, 'data')
+    const originals = await partsSource({ list: join(data, 'originals', 'list.json'), partsDir: join(data, 'parts') })
+    const sender = offline()
+    await sender.importOldPack(file('data', 'es-419-tit.langpack.zip'), { originals, device: 'test-device', now: '2026-11-01T10:00:00Z' })
+    const bytes = await sender.exportTransfer({ lang: 'es-419', mode: 'full', books: ['tit'] })
+    const receiver = offline(memoryStore(), {})
+    const r = await receiver.importTransfer(bytes)
+    expect(r.activated).toEqual(expect.arrayContaining(['es-419/map', 'es-419/orig:tit', 'es-419/book:tit']))
+    expect(r.waiting).toEqual([])
+    const passage = await (await receiver.open('es-419')).passage('tit 2:11')
+    expect(passage.data!.texts.find((t) => t.res === 'es-419_gl/es-419/glt')!.text).toBe('Porque la gracia salvadora de Dios fue manifestada a todos los hombres,')
+  })
+
+  test('A3: bridgeOnly picks the books the device lacks from a published catalog, with what they need', async () => {
+    // A bridged catalog of two books, as a hand-made catalog view: only `name`, `units` and their `needs` are read.
+    const unit = (id: string, needs: string[] = []) => ({ id, segments: [], needs })
+    const cat = {
+      name: 'es-419',
+      catalog: {
+        units: [
+          unit('map'),
+          unit('art:tw:kt'),
+          unit('orig:rut'),
+          unit('orig:tit'),
+          unit('book:rut', ['map', 'orig:rut', 'art:tw:kt']),
+          unit('book:tit', ['map', 'orig:tit', 'art:tw:kt']),
+        ],
+      },
+    } as unknown as VerifiedCatalog
+    const pub = (key: string) => ({ catalog: key.split('/')[0]!, revision: 1, catalogId: 'p', segments: [], needs: [] })
+    const state = { v: 1, published: {}, active: {}, units: Object.fromEntries(['es-419/map', 'es-419/art:tw:kt', 'es-419/book:tit', 'common/orig:tit'].map((k) => [k, pub(k)])) } as InstalledState
+    expect([...bridgeOnly(cat, state, new Set())].sort()).toEqual(['es-419/book:rut', 'es-419/orig:rut'])
+    // A unit installed from a local catalog with other segments is bridged again; with the same segments (the same pack) it is not.
+    const other = { ...state, units: { ...state.units, 'es-419/book:tit': { ...pub('es-419/book:tit'), catalogId: 'l', segments: ['ab'] } } }
+    expect([...bridgeOnly(cat, other, new Set(['l']))].sort()).toEqual(['es-419/book:rut', 'es-419/book:tit', 'es-419/orig:rut', 'es-419/orig:tit'])
+    const same = { ...state, units: { ...state.units, 'es-419/book:tit': { ...pub('es-419/book:tit'), catalogId: 'l', local: true as const } } }
+    expect([...bridgeOnly(cat, same, new Set())].sort()).toEqual(['es-419/book:rut', 'es-419/orig:rut'])
+    // Everything from a published catalog: nothing to bridge.
+    const all = { ...state, units: { ...state.units, 'es-419/book:rut': pub('es-419/book:rut') } }
+    expect(bridgeOnly(cat, all, new Set()).size).toBe(0)
   })
 
   test('bytes that are not an old pack are refused', async () => {

@@ -229,6 +229,11 @@ export type LanguageBuild = { segments: BuiltSegment[]; catalog: BuiltSegment; r
  *   UST of the books built): one `aligned` segment per part that has a key. They are optional in the catalog and no unit needs them; the
  *   segments of every other class are the same bytes with or without them (the index is built last and nothing reads it). Default `false`.
  *
+ * - **Own originals.** With `withOrig: true` it also builds the `orig` segment of each book it builds, the same bytes {@link buildCommon}
+ *   makes from the same source, lists it as a unit of this catalog and lists the originals it names among the resources. The
+ *   book then finds `orig:{book}` in its own catalog, with no common catalog: this is for a device that bridges an old pack with
+ *   no network. A publisher leaves it off (the common catalog has the originals). Default `false`.
+ *
  * The same source, `about` and registry give the same segments and catalog. Throws `Error` for rows that are not what format 2.0
  * writes (the extractors do), and for what a segment cannot hold.
  */
@@ -243,6 +248,7 @@ export async function buildLanguage(o: {
   partial?: boolean
   topics?: { xtopics: XtopicsCore; records: TipnrRecord[] }
   aligned?: boolean
+  withOrig?: boolean
   taConfigs?: TaConfigs
 }): Promise<LanguageBuild> {
   const { source, lang } = o
@@ -267,6 +273,7 @@ export async function buildLanguage(o: {
   const mapBooks: { model: BookModel; verses: number[] }[] = []
   const mapRows = new Map<string, RowKey[]>()
   const origs = new Map<string, OrigModel>()
+  const usedOriginals = new Set<string>()
   for (const book of books) {
     if (!refs.some((ref) => ref.books.includes(book))) {
       report.push(`book ${book}: ${lang} has no resource of this book: left out`)
@@ -294,6 +301,12 @@ export async function buildLanguage(o: {
     bookModels.set(built.id, model)
     mapBooks.push({ model, verses: versesOf(orig) })
     mapRows.set(book, [...read, ...(await originalRowKeys(source, book))])
+    if (o.withOrig === true) {
+      const having = originals.filter((ref) => ref.books.includes(book))
+      const resources = having.map((ref) => ({ key: ref.key, stamp: ref.key === orig.key ? orig.stamp : ref.stamp }))
+      await add(origSegment(orig), inputsOf(await originalRowKeys(source, book), resources), [])
+      for (const ref of having) usedOriginals.add(ref.key)
+    }
   }
 
   // Articles
@@ -407,7 +420,7 @@ export async function buildLanguage(o: {
   segments.sort(compareSegments)
   const catalog = await buildCatalog({
     about: { ...o.about, catalog: lang },
-    resources: catalogResources(refs, used),
+    resources: [...catalogResources(refs, used), ...catalogResources(originals, usedOriginals)],
     segments,
     requires: o.requires,
     needs: (built) => needs.get(built.id) ?? [],

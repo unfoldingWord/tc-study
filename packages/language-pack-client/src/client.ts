@@ -3,17 +3,17 @@
  */
 import { bookView, FormatError, KNOWN, readSegment, type RowSource } from '@bt-synergy/language-pack-v3'
 import { ClientError } from './errors'
-import { catalogsOf, verifiedHave, type InstallReport, type MissingCommon, type Progress, loadState, readStored, runSteps, st } from './install'
+import { catalogsOf, checkConcurrency, localCatalogIds, verifiedHave, type InstallOptions, type InstallReport, type MissingCommon, loadState, readStored, runSteps, st } from './install'
 import { planInstall, updates, type Want } from './plan'
 import { exportTransfer, importOldPack, importTransfer, type ImportReport } from './transfer'
 import { readerOfState, type PackReader } from './reader'
 import type { SearchIndex } from './search/types'
 import type { PackSource } from './source/http'
-import { hex, type InstalledCatalog, type InstalledState, installedOf } from './state'
+import { hex, type InstalledCatalog, type InstalledState, type InstalledUnit, installedOf } from './state'
 import type { BlobStore } from './store/types'
 import { checkRevision, type TrustPolicy, type VerifiedCatalog, verifyCatalogFile } from './verify'
 
-export type { InstallReport, Progress } from './install'
+export type { InstallOptions, InstallReport, Progress } from './install'
 export type { ImportReport } from './transfer'
 
 export type RefreshReport = {
@@ -27,7 +27,8 @@ export type Status = {
   lang: string
   published?: InstalledCatalog
   active?: InstalledCatalog
-  units: { key: string; revision: number; installed: boolean; optional: boolean; bytes: number }[]
+  /** `local`: the installed unit came from a local catalog (an old pack bridged on the device); it does not travel in an export of the published catalog. */
+  units: { key: string; revision: number; installed: boolean; optional: boolean; bytes: number; local: boolean }[]
   updates: ReturnType<typeof updates>
   missingCommon?: RefreshReport['missingCommon']
 }
@@ -36,7 +37,8 @@ export interface LanguagePackClient {
   /** A reader over the installed segments of a language (its units as the installed state says). */
   open(lang: string): Promise<PackReader>
   refresh(lang: string, o?: { confirmDowngrade?: boolean; signal?: AbortSignal }): Promise<RefreshReport>
-  install(lang: string, want?: Want, o?: { signal?: AbortSignal; onProgress?: (p: Progress) => void }): Promise<InstallReport>
+  /** `concurrency`: how many segment requests run at once (default 4; `1` asks one after the other, in plan order). */
+  install(lang: string, want?: Want, o?: InstallOptions): Promise<InstallReport>
   status(lang: string): Promise<Status>
   prune(): Promise<{ removed: string[] }>
   verify(): Promise<{ bad: string[] }>
@@ -151,13 +153,14 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     return {
       name: langCat.name,
       catalogs: found.catalogs.map((c) => (next.published[c.name]?.id === c.id ? next.published[c.name]! : installedOf(c))),
-      updates: updates(next, found.catalogs),
+      updates: updates(next, found.catalogs, await localCatalogIds(store, next)),
       unchanged,
       ...(missingCommon !== undefined ? { missingCommon } : {}),
     }
   }
 
-  async function installNow(lang: string, want: Want, opts: { signal?: AbortSignal; onProgress?: (p: Progress) => void }): Promise<InstallReport> {
+  async function installNow(lang: string, want: Want, opts: InstallOptions): Promise<InstallReport> {
+    checkConcurrency(opts.concurrency)
     const first = await loadState(store)
     let name = first.aliases?.[lang] ?? lang
     // No catalog yet, or the stored one no longer verifies: fetch it first.
@@ -170,7 +173,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const stored = new Set(await st(() => store.ids()))
     const plan = planInstall(catalogs, state, want, stored)
     const have = await verifiedHave(store, plan.steps, stored)
-    return runSteps({ store, source: need() }, catalogs, state, have, plan.steps, plan.unknown, opts)
+    return runSteps({ store, source: need(), localCatalogs: await localCatalogIds(store, state) }, catalogs, state, have, plan.steps, plan.unknown, opts)
   }
 
   async function statusNow(lang: string): Promise<Status> {
@@ -178,6 +181,8 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
     const name = state.aliases?.[lang] ?? lang
     const { lang: langCat, catalogs, missing } = await catalogsOf(store, trust, state, name)
     const units: Status['units'] = []
+    const localIds = await localCatalogIds(store, state)
+    const fromLocal = (u: InstalledUnit | undefined): boolean => u !== undefined && (u.local === true || localIds.has(u.catalogId))
     for (const cat of catalogs) {
       for (const unit of cat.catalog.units) {
         const key = `${cat.name}/${unit.id}`
@@ -188,8 +193,28 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
           installed: installed !== undefined,
           optional: unit.optional === true,
           bytes: unit.segments.reduce((n, i) => n + (cat.catalog.segments[i]?.size ?? 0), 0),
+          local: fromLocal(installed),
         })
       }
+    }
+    // Installed units of these names that the catalogs do not list (a bridged book or orig the published catalog lacks), sized
+    // from the catalog they came from.
+    const names = new Set([name, ...catalogs.map((c) => c.name)])
+    const listed = new Set(units.map((u) => u.key))
+    const cats = new Map<string, VerifiedCatalog | undefined>()
+    for (const [key, u] of Object.entries(state.units)) {
+      if (!names.has(u.catalog) || listed.has(key)) continue
+      if (!cats.has(u.catalogId)) cats.set(u.catalogId, await readStored(store, trust, { name: u.catalog, publisher: '', revision: u.revision, id: u.catalogId, origin: 'published' }))
+      const cat = cats.get(u.catalogId)
+      const unit = cat?.catalog.units.find((x) => `${cat.name}/${x.id}` === key)
+      units.push({
+        key,
+        revision: u.revision,
+        installed: true,
+        optional: u.optional === true,
+        bytes: unit === undefined ? 0 : unit.segments.reduce((n, i) => n + (cat!.catalog.segments[i]?.size ?? 0), 0),
+        local: fromLocal(u),
+      })
     }
     const published = state.published[name]
     const active = state.active[name]
@@ -198,7 +223,7 @@ export function createClient(o: { store: BlobStore; source?: PackSource; trust: 
       ...(published !== undefined ? { published } : {}),
       ...(active !== undefined ? { active } : {}),
       units,
-      updates: langCat === undefined ? [] : updates(state, catalogs),
+      updates: langCat === undefined ? [] : updates(state, catalogs, localIds),
       ...(missing !== undefined ? { missingCommon: missing } : {}),
     }
   }

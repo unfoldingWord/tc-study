@@ -77,12 +77,12 @@ let memo: Promise<Built> | undefined
 /**
  * The sample. With no option it is the same object each time. `revision` and `tweak` build another revision of the language
  * catalog only (same key, same common catalog); `commonRevision` builds a common catalog of another id (the language catalog
- * still requires the first one).
+ * still requires the first one). `books` builds the language catalog with those books only (`[]`: none).
  */
-export async function buildSample(o: { revision?: number; tweak?: Tweak; commonRevision?: number; requireNewCommon?: boolean } = {}): Promise<Sample> {
+export async function buildSample(o: { revision?: number; tweak?: Tweak; commonRevision?: number; requireNewCommon?: boolean; books?: string[] } = {}): Promise<Sample> {
   memo ??= make()
   const base = await memo
-  if (o.revision === undefined && o.tweak === undefined && o.commonRevision === undefined) return base.sample
+  if (o.revision === undefined && o.tweak === undefined && o.commonRevision === undefined && o.books === undefined) return base.sample
   let { langCatalog, commonCatalog } = base.sample
   const segments = new Map(base.sample.segments)
   // `requireNewCommon` (with `commonRevision`): the language catalog requires that common catalog instead of the first one.
@@ -92,10 +92,11 @@ export async function buildSample(o: { revision?: number; tweak?: Tweak; commonR
     commonCatalog = await signCatalog(common.catalog.bytes, base.pkcs8)
     if (o.requireNewCommon === true) required = ['common', o.commonRevision, common.catalog.id]
   }
-  if (o.revision !== undefined || o.tweak !== undefined) {
+  if (o.revision !== undefined || o.tweak !== undefined || o.books !== undefined) {
     const lang = await buildLanguage({
       source: tweaked(await base.source(ES), o.tweak ?? {}),
       lang: ES,
+      ...(o.books !== undefined ? { books: o.books } : {}),
       registry: {},
       about: { ...about, revision: o.revision ?? 1 },
       requires: [required],

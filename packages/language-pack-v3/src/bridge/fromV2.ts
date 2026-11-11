@@ -4,8 +4,11 @@
  *
  * Bridging is building from the rows of the pack: {@link bridgeZip} is {@link buildLanguage} over {@link zipSource}, so a book segment
  * made here has the same body, so the same id, as the one the publisher's builder makes from the same rows (test case 13). What differs is the catalog: it
- * is the device's (`origin: local`, `publisher: local:` and the device name, revision 1), unsigned, and it lists only what the pack
- * brought. A later published catalog replaces it.
+ * is the device's (`origin: local`, `publisher: local:` and the device name, revision 1), unsigned, and it lists what the pack
+ * brought plus the `orig` of each book it built. A later published catalog replaces it.
+ *
+ * Each book is bridged with its `orig` segment (built from the book's rows of `originals`, MACULA included, and the book stamps it gives: the same bytes as the common catalog's when the published orig was built from the same rows and stamps) and the catalog lists it, so the book has all it
+ * needs on a device with no network. The catalog does not `require` a common one.
  *
  * The pack's language is the manifest's (`ZipSource.language`). The pack's originals are those of `originals`, which is required:
  * the originals a pack carries itself are not used. A book `originals` lacks is left out with a line in `report`, and waits for them as
@@ -38,6 +41,7 @@ export async function bridgeZip(
     lang: source.language,
     registry: {},
     partial: true,
+    withOrig: true,
     about: { format: '3.0', publisher: `local:${device}`, origin: 'local', revision: 1, built: now, builder: BUILDER },
   })
   return { segments, catalog, report }

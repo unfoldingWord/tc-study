@@ -107,13 +107,22 @@ function sameList(a: string[], b: string[]): boolean {
  * back by an older catalog of its name that is not the published one (a language built against an older common catalog), so an old
  * file does not undo an update (catalog.md "Going back"); the installed unit serves the needs instead.
  *
+ * A published catalog replaces a local one (transfer.md "Old packs") unit by unit, and only where it has a replacement. A unit of
+ * the local catalog is replaced by the same unit of the published catalog of its name when that one activates; a bridged
+ * `<name>/orig:<book>` is dropped once a published `orig:<book>` of another catalog (the common one) is installed and no unit kept
+ * needs it, so `prune` removes its segments (and the local catalog once none of its units is left). A bridged unit with no
+ * published replacement (a book the published catalog lacks) stays, with what it needs. A local unit the published catalog of its
+ * name does not list never serves a need of a published unit, so a published book does not activate against the bridged orig.
+ *
  * `only`: when given, the only units considered (an import: what the file brought, what is installed, and their needs).
+ * `localCatalogs`: the ids of the stored catalogs whose origin is local, which tell the units of a state saved before units carried
+ * `local` (`localCatalogIds`).
  */
 export function activate(
   state: InstalledState,
   catalogs: VerifiedCatalog[],
   have: ReadonlySet<string>,
-  o: { strict?: boolean; only?: ReadonlySet<string> } = {},
+  o: { strict?: boolean; only?: ReadonlySet<string>; localCatalogs?: ReadonlySet<string> } = {},
 ): { state: InstalledState; activated: string[]; waiting: { key: string; missing: string[] }[] } {
   type Cand = { key: string; cat: VerifiedCatalog; entry: InstalledUnit; missing: string[] }
   const cands: Cand[] = []
@@ -128,13 +137,27 @@ export function activate(
         segments,
         needs: (unit.needs ?? []).map((n) => qualify(catalogs, cat.name, n)),
         ...(unit.optional ? { optional: true as const } : {}),
+        ...(cat.origin === 'local' ? { local: true as const } : {}),
       }
       cands.push({ key: `${cat.name}/${unit.id}`, cat, entry, missing: segments.filter((s) => !have.has(s)) })
     }
   }
   const byKey = new Map(cands.map((c) => [c.key, c]))
+  const publishedOf = new Map(catalogs.filter((c) => c.origin === 'published').map((c) => [c.name, c]))
+  // From a local catalog: the flag, or (a state saved before the flag) the catalog its units came from is a local one.
+  const fromLocal = (u: InstalledUnit): boolean =>
+    u.local === true ||
+    o.localCatalogs?.has(u.catalogId) === true ||
+    (state.active[u.catalog]?.origin === 'local' && state.active[u.catalog]!.id === u.catalogId)
+  // A local unit the published catalog of its name does not list (the bridged orig): it serves no need of a published unit.
+  const unlisted = (key: string): boolean => {
+    const u = state.units[key]
+    const pub = u === undefined ? undefined : publishedOf.get(u.catalog)
+    return u !== undefined && pub !== undefined && fromLocal(u) && !pub.catalog.units.some((x) => `${pub.name}/${x.id}` === key)
+  }
   const ok = new Set<string>()
-  const satisfied = (need: string): boolean => ok.has(need) || (!byKey.has(need) && state.units[need] !== undefined)
+  const satisfied = (c: Cand) => (need: string): boolean =>
+    ok.has(need) || (!byKey.has(need) && state.units[need] !== undefined && !(c.cat.origin === 'published' && unlisted(need)))
   // A unit whose segments and needs are the installed ones only takes the new revision. `strict`: `have` covers every segment of
   // the catalogs (an import), so a segment the store lost also holds back a unit that would otherwise only take the revision.
   const same = (c: Cand): boolean => {
@@ -149,7 +172,7 @@ export function activate(
     changed = false
     for (const c of cands) {
       if (ok.has(c.key)) continue
-      if (held(c) || (same(c) && (o.strict !== true || c.missing.length === 0)) || (c.missing.length === 0 && c.entry.needs.every(satisfied))) {
+      if (held(c) || (same(c) && (o.strict !== true || c.missing.length === 0)) || (c.missing.length === 0 && c.entry.needs.every(satisfied(c)))) {
         ok.add(c.key)
         changed = true
       }
@@ -161,7 +184,7 @@ export function activate(
   const waiting: { key: string; missing: string[] }[] = []
   for (const c of cands) {
     if (!ok.has(c.key)) {
-      waiting.push({ key: c.key, missing: [...c.missing, ...c.entry.needs.filter((n) => !satisfied(n))] })
+      waiting.push({ key: c.key, missing: [...c.missing, ...c.entry.needs.filter((n) => !satisfied(c)(n))] })
       continue
     }
     if (held(c)) continue
@@ -169,9 +192,30 @@ export function activate(
     if (old === undefined || old.revision !== c.entry.revision || old.catalogId !== c.entry.catalogId) {
       next.units[c.key] = c.entry
       activated.push(c.key)
-      next.active[c.cat.name] = installedOf(c.cat, state.published[c.cat.name], state.active[c.cat.name])
+      // A bridged unit activated next to a published catalog (an old pack of a book the device lacks) leaves `active` on it.
+      if (!(c.cat.origin === 'local' && next.active[c.cat.name]?.origin === 'published')) {
+        next.active[c.cat.name] = installedOf(c.cat, state.published[c.cat.name], state.active[c.cat.name])
+      }
     }
   }
+  // A bridged `<name>/orig:<book>` whose replacement is installed: `orig:<book>` of a published catalog of another name. It goes
+  // once no unit kept needs it (a bridged book the published catalog has not replaced yet keeps it).
+  const replacedOrig = (key: string, u: InstalledUnit): boolean => {
+    const id = key.slice(key.indexOf('/') + 1)
+    if (!id.startsWith('orig:') || !fromLocal(u)) return false
+    return Object.entries(next.units).some(([k, v]) => k !== key && k === `${v.catalog}/${id}` && v.catalog !== u.catalog && !fromLocal(v))
+  }
+  const gone = new Set(Object.entries(next.units).filter(([k, u]) => replacedOrig(k, u)).map(([k]) => k))
+  for (let changed = true; changed; ) {
+    changed = false
+    const needed = new Set(Object.entries(next.units).flatMap(([k, u]) => (gone.has(k) ? [] : u.needs)))
+    for (const k of gone) {
+      if (!needed.has(k)) continue
+      gone.delete(k)
+      changed = true
+    }
+  }
+  for (const k of gone) delete next.units[k]
   for (const cat of catalogs) {
     const cur = next.published[cat.name]
     if (cur === undefined || (cur.publisher === cat.publisher && cat.revision >= cur.revision)) next.published[cat.name] = installedOf(cat, cur, state.active[cat.name])
@@ -179,22 +223,62 @@ export function activate(
   return { state: next, activated, waiting }
 }
 
+/**
+ * The units to offer: each installed unit whose segments changed in the catalogs, and each bridged unit (from a local catalog)
+ * that a published catalog lists, whose replacement is installed by the same install (transfer.md "Old packs"). A bridged unit
+ * is listed even when its segments are the published ones (the bridge makes the same ids): the published unit needs other units
+ * (the common catalog's `orig:<book>` in place of the bridged `<lang>/orig:<book>`), so it activates only once those are here,
+ * and no install would ask for them otherwise. Those needs that are not installed are listed too, so the install of the listed
+ * keys brings them and the sizes add up without counting a segment twice; `from` is the revision of the bridged unit of the same
+ * id they replace (0 when none). `bytes` counts the segments the replaced unit does not have.
+ *
+ * `localCatalogs`: the ids of the stored local catalogs, which tell the bridged units of a state saved before units carried `local`.
+ */
 export function updates(
   state: InstalledState,
   catalogs: VerifiedCatalog[],
+  localCatalogs?: ReadonlySet<string>,
 ): { key: string; from: number; to: number; bytes: number }[] {
   const out: { key: string; from: number; to: number; bytes: number }[] = []
+  const listed = new Set<string>()
+  const fromLocal = (u: InstalledUnit): boolean =>
+    u.local === true ||
+    localCatalogs?.has(u.catalogId) === true ||
+    (state.active[u.catalog]?.origin === 'local' && state.active[u.catalog]!.id === u.catalogId)
+  const sizeOf = (cat: VerifiedCatalog, unit: Unit, had: ReadonlySet<string>): number =>
+    unit.segments.reduce((n, i) => {
+      const s = segmentOf(cat, i)
+      return n + (had.has(hex(s.id)) ? 0 : s.size)
+    }, 0)
+  const replacing: Found[] = []
   for (const cat of catalogs) {
     for (const unit of cat.catalog.units) {
       const key = `${cat.name}/${unit.id}`
       const old = state.units[key]
       if (old === undefined) continue
+      const bridged = cat.origin === 'published' && old.catalogId !== cat.id && fromLocal(old)
       const ids = unit.segments.map((i) => hex(segmentOf(cat, i).id))
-      if (sameList(old.segments, ids)) continue
-      const had = new Set(old.segments)
-      const bytes = unit.segments.reduce((n, i, k) => n + (had.has(ids[k]!) ? 0 : segmentOf(cat, i).size), 0)
-      out.push({ key, from: old.revision, to: cat.revision, bytes })
+      if (sameList(old.segments, ids) && !bridged) continue
+      out.push({ key, from: old.revision, to: cat.revision, bytes: sizeOf(cat, unit, new Set(old.segments)) })
+      listed.add(key)
+      if (bridged) replacing.push({ cat, unit })
     }
   }
+  // What the replacements need that is not installed, and what that needs in turn.
+  const bridgedTwin = (id: string): InstalledUnit | undefined =>
+    Object.entries(state.units).find(([k, u]) => k.slice(k.indexOf('/') + 1) === id && fromLocal(u))?.[1]
+  const addNeeds = ({ cat, unit }: Found): void => {
+    for (const n of unit.needs ?? []) {
+      const key = qualify(catalogs, cat.name, n)
+      if (listed.has(key) || state.units[key] !== undefined) continue
+      const f = find(catalogs, key)
+      if (f === undefined) continue
+      listed.add(key)
+      const twin = bridgedTwin(f.unit.id)
+      out.push({ key, from: twin?.revision ?? 0, to: f.cat.revision, bytes: sizeOf(f.cat, f.unit, new Set(twin?.segments ?? [])) })
+      addNeeds(f)
+    }
+  }
+  replacing.forEach(addNeeds)
   return out
 }

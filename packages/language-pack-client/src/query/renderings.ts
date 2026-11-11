@@ -35,7 +35,8 @@ export async function renderingsQuery(reader: PackReader, q: { strong: string } 
     usedUnit(out, reader, unit)
     key = strongKey(w.strong)
   }
-  const maps = await reader.maps()
+  // The Strong table is in the `xmap`.
+  const maps = await reader.mapsOf(['xmap'])
   const found = new Map<string, { count: number; refs: string[] }>()
   const counted = new Set<string>()
   // Without the `xmap` the table cannot resolve the key: a four-digit Greek key also matches the words keyed with a 0 added.

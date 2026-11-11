@@ -379,7 +379,7 @@ describe('case 13: paquete-viejo', () => {
     // The book segment is case 4's; the bridge also builds the map unit (core and the part of Titus), partial.
     expect(out.segments.filter((s: Out) => s.class === 'book').map((s: Out) => [s.book, s.id])).toEqual([['tit', (await outputOf('tito-es419/book.seg')).id]])
     expect(out.segments.filter((s: Out) => s.class === 'map')).toHaveLength(2)
-    expect(out.units.map((u: Out) => u.id)).toEqual(['book:tit', 'map'])
+    expect(out.units.map((u: Out) => u.id)).toEqual(['book:tit', 'map', 'orig:tit'])
     const bytes = bytesOf(join(TESTS_DIR, 'paquete-viejo/catalog.seg'))
     expect(Buffer.from((await bridgeCatalog()).bytes).equals(Buffer.from(bytes))).toBe(true)
   }, 60_000)

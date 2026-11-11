@@ -31,7 +31,7 @@
     },
     "v": 1
   },
-  "id": "739e90668ccb543dcfd2bff30b9cb28641fca08ef0024ff5aaa02dc26de4e330",
+  "id": "f497f0153d985208b08e6e63440bf77bb40162974cd457721fea8b275783ea30",
   "resources": [
     {
       "books": "000000000000800000",
@@ -72,6 +72,14 @@
       "release": "v18",
       "subject": "TSV Translation Words Links",
       "title": "Enlaces a las Palabras de Traducción"
+    },
+    {
+      "books": "000000000000800000",
+      "key": "unfoldingWord/el-x-koine/ugnt",
+      "license": "CC-BY-SA-4.0",
+      "release": "v0.34",
+      "subject": "Greek New Testament",
+      "title": "unfoldingWord® Greek New Testament"
     }
   ],
   "segments": [
@@ -99,6 +107,14 @@
       "inputs": "38c7a9b9849f1c0eaf8117628c74f9dece052c477ce2b022f9a146beb70e9383",
       "size": 37713,
       "ulen": 104046
+    },
+    {
+      "book": "tit",
+      "class": "orig",
+      "id": "595b6fa083dd57e1407393051a645fc0359944acfe3516dcf46c2b7d10875ff5",
+      "inputs": "41444415803bc2c7e98d943fd6374de5dd441c98dd57c81f678994b5c1182d10",
+      "size": 9906,
+      "ulen": 20930
     }
   ],
   "units": [
@@ -117,6 +133,12 @@
       "segments": [
         0,
         1
+      ]
+    },
+    {
+      "id": "orig:tit",
+      "segments": [
+        3
       ]
     }
   ]

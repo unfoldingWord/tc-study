@@ -103,5 +103,30 @@ phase 1):
   inputs (`container.md`: the compressed bytes are not part of the identity).
 - They go into a **local catalog** (`origin: local`, `publisher: local:` and the device), unsigned, with coverage
   partial where the old pack lacked something.
-- A later published catalog replaces them.
-- An old pack that brings no originals waits for them, as format 2.0 does today.
+- A later published catalog replaces them unit by unit, where it has a replacement: a unit by the same unit of the published
+  catalog of its name, and the bridged `<lang>/orig:<book>` by `orig:<book>` of the published common catalog, once that one is
+  installed and no installed unit needs the bridged one. A bridged unit with no published replacement (a book the published
+  catalog lacks) stays active with what it needs, and the local catalog stays while any of its units do. A unit of the local
+  catalog that the published catalog of its name does not list never serves a need of a published unit, so a published book
+  waits for the common catalog's orig rather than use the bridged one.
+- A bridged unit that a published catalog lists is offered as an update (`updates`), even when its segments are the published
+  ones: the published unit needs other units (the common catalog's `orig:<book>`), so it activates only once they are here.
+  The update also lists what the replacement needs and the device lacks, so installing the offered units installs the
+  replacement and drops the bridged units it replaces. Without that, nothing would ever ask for the common orig and the book
+  would stay bridged.
+- An old pack received when a published catalog of its language is already installed (a device that went online once) is still
+  bridged, but only for what the device does not have from a published catalog: each unit of the local catalog that is not
+  installed from a published catalog (a book never installed, a map or article group the device lacks), with what it needs
+  (its `orig:<book>`), is activated; a unit installed from a published catalog stays, and serves the bridged units' needs. The
+  local catalog does not become the published one of the name. When the pack brings nothing that is not installed already (from a
+  published catalog, or bridged with the same segments: the same pack again), nothing is activated and the import says it was
+  skipped (its segments are kept). Bridged units of another device's local catalog are replaced only with confirmation, as a
+  local catalog of another publisher always is. An export made from the published catalog does not carry bridged units: their
+  orig and what they need are in the local catalog, which such a file does not hold.
+- The bridge also builds the `orig` segment of each book it builds, from the `originals` source, and the local catalog lists it
+  (`orig:<book>`), so the bridged book activates and reads on a device with no network and no common catalog. The bridged orig is
+  built from the book's rows in the `originals` source, its MACULA trees and referents included, and with the book's stamp from
+  the pack's `catalog.json` (`bookBlobs`). When those rows and stamps are the ones the publisher built from, its bytes (and id) are
+  the published orig's; when they are not (an older originals pack, without MACULA or without `catalog.json`), they differ. A
+  published common catalog's orig keeps serving published books.
+- A book whose originals the `originals` source lacks is not built, and the pack waits for them, as format 2.0 does today.

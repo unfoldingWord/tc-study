@@ -7,8 +7,11 @@ import type { VerifiedCatalog } from './verify'
 
 export type InstalledCatalog = { name: string; publisher: string; revision: number; id: string; origin: 'published' | 'local'; etag?: string }
 
-/** `segments` are segment ids (hex); `needs` are qualified unit keys (`<catalog>/<unit>`). */
-export type InstalledUnit = { catalog: string; revision: number; catalogId: string; segments: string[]; needs: string[]; optional?: true }
+/**
+ * `segments` are segment ids (hex); `needs` are qualified unit keys (`<catalog>/<unit>`). `local`: the unit came from a local
+ * catalog (an old pack bridged on the device), so a published catalog of its name replaces it (`activate`).
+ */
+export type InstalledUnit = { catalog: string; revision: number; catalogId: string; segments: string[]; needs: string[]; optional?: true; local?: true }
 
 /** Units are keyed `<catalog name>/<unit id>`, so several languages share a device. */
 export type InstalledState = {

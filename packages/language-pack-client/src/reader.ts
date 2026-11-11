@@ -37,10 +37,39 @@ import type { VerifiedCatalog } from './verify'
 
 export type ReaderProblem = { id: string; code: string }
 
+export type MapUnit = 'xmap' | 'map' | 'xtopics' | 'topics' | 'aligned'
+
+/** How many segment reads (`get` and decoding) one reader runs at once. */
+const READS_AT_ONCE = 8
+
+/**
+ * Runs at most `n` works at once; the others wait their turn in the order they asked. A work that ends hands its place straight to
+ * the next waiter (the count does not drop in between), so a work that asks at that moment cannot slip in and make it `n + 1`.
+ * Internal to the reader (not exported by the package).
+ */
+export function limiter(n: number): <T>(work: () => Promise<T>) => Promise<T> {
+  let running = 0
+  const queue: (() => void)[] = []
+  return async (work) => {
+    if (running >= n) await new Promise<void>((resolve) => queue.push(resolve))
+    else running++
+    try {
+      return await work()
+    } finally {
+      const next = queue.shift()
+      if (next !== undefined) next()
+      else running--
+    }
+  }
+}
+
 /**
  * A snapshot of one `open()`: what it found missing or bad stays so (reopen after an install). A read that fails (the store or the
  * network rejects) is not remembered and is tried again by the next call. In `openFromSegments`, `installed()` is optimistic: every
  * unit the catalogs list counts as installed until a read finds its bytes missing or bad.
+ *
+ * `mapsOf` was added after the first release of this interface: a hand-made `PackReader` (a test double, a wrapper) can spread a
+ * real reader (`{ ...reader, orig: … }`, as `query/final.test.ts` does) to get it.
  */
 export interface PackReader {
   lang: string
@@ -52,7 +81,17 @@ export interface PackReader {
   book(book: string): Promise<BookModel | undefined>
   orig(book: string): Promise<OrigModel | undefined>
   articles(group: string): Promise<ArticleModel[] | undefined>
+  /** Every map unit: `xmap`, `map`, `xtopics`, `topics` and the `aligned` parts, read in parallel. */
   maps(): Promise<MapSet>
+  /**
+   * Only the map units named, as `maps()` gives them (a unit that is missing or bad is left out the same way): a query reads what it
+   * needs (`passage` the `map`, `context` the `map` and `xmap`). Each unit is read once per reader, whichever call asks first.
+   * `coreOnly`: for a query that reads only the cores (the usage of an article): each of `xmap`, `map`, `xtopics`, `topics` comes
+   * with its core and no parts (the whole unit when it was read already), and only the core segment is read.
+   * With valid segments the answers do not depend on which query came first. With a corrupt map part they can, within one reader:
+   * a `coreOnly` read does not see the part, so it answers from the core, while a reader that read the whole unit first has no unit.
+   */
+  mapsOf(units: readonly MapUnit[], o?: { coreOnly?: boolean }): Promise<MapSet>
   /** The bytes of the unit's segments as the catalog lists them (0 for a unit no catalog lists). */
   size(unit: string): number
   unitOf(cls: 'book' | 'art' | 'orig', key: string): string | undefined
@@ -93,7 +132,9 @@ export function makeReader(o: ReaderInput): PackReader {
   const unitRevs = new Map<string, number>()
   for (const cat of o.catalogs) {
     for (const u of cat.catalog.units) {
-      if (listedUnits.has(u.id)) continue
+      // The first catalog that lists an id answers for it, unless the state has not installed it under that catalog and has under
+      // this one (a bridged `es-419/orig:tit` next to a common catalog whose `orig:tit` is not installed): the installed unit wins.
+      if (listedUnits.has(u.id) && (o.active === undefined || activeIds.has(u.id) || o.active[`${cat.name}/${u.id}`] === undefined)) continue
       listedUnits.add(u.id)
       sizes.set(u.id, u.segments.reduce((n, i) => n + (cat.catalog.segments[i]?.size ?? 0), 0))
       const key = `${cat.name}/${u.id}`
@@ -113,11 +154,13 @@ export function makeReader(o: ReaderInput): PackReader {
   const segCache = new Map<string, Promise<Segment | undefined>>()
   const viewCache = new Map<string, unknown>()
 
+  const slot = limiter(READS_AT_ONCE)
+
   function readOne(id: string, cls: string): Promise<Segment | undefined> {
     const key = `${cls}:${id}`
     let p = segCache.get(key)
     if (p === undefined) {
-      p = (async () => {
+      p = slot(async () => {
         const known = (KNOWN as Record<string, Record<string, number[]> | undefined>)[cls]
         const bytes = await o.get(id)
         if (bytes === undefined) {
@@ -135,7 +178,7 @@ export function makeReader(o: ReaderInput): PackReader {
           if (!problems.some((x) => x.id === id)) problems.push({ id, code: e.code })
           return undefined
         }
-      })()
+      })
       segCache.set(key, p)
       // A rejected read (the store or the network failed) is not remembered: the next call tries again.
       p.catch(() => {
@@ -152,15 +195,8 @@ export function makeReader(o: ReaderInput): PackReader {
     let p = unitSegments.get(unit)
     if (p === undefined) {
       const cls = unit.split(':')[0]!
-      p = (async () => {
-        const out: Segment[] = []
-        for (const id of ids) {
-          const seg = await readOne(id, cls)
-          if (seg === undefined) return undefined
-          out.push(seg)
-        }
-        return out
-      })()
+      // The segments of a unit are read together (bounded by `slot`); the unit is there only when every one is.
+      p = Promise.all(ids.map((id) => readOne(id, cls))).then((segs) => (segs.some((s) => s === undefined) ? undefined : (segs as Segment[])))
       unitSegments.set(unit, p)
       const mine = p
       p.catch(() => {
@@ -192,43 +228,84 @@ export function makeReader(o: ReaderInput): PackReader {
     return seg === undefined ? undefined : viewOf(unit, 0, seg, view)
   }
 
-  async function buildMaps(): Promise<MapSet> {
+  const VIEWS = { xmap: xmapView, map: mapView, xtopics: xtopicsView, topics: topicsView } as const
+  type Part = { part: string }
+  /** One map unit: its core and parts, or `undefined` when a segment is missing or bad, or no segment is the core. */
+  async function readMap(unit: keyof typeof VIEWS): Promise<{ core: Part; parts: Map<string, Part> } | undefined> {
+    const segs = await segments(unit)
+    if (segs === undefined) return undefined
+    let core: Part | undefined
+    const parts = new Map<string, Part>()
+    for (const [i, seg] of segs.entries()) {
+      const v = viewOf(unit, i, seg, VIEWS[unit] as (s: Segment) => Part)
+      if (v === undefined) return undefined
+      if (v.part === 'core') core = v
+      else parts.set(v.part, v)
+    }
+    return core === undefined ? undefined : { core, parts }
+  }
+  async function readAligned(): Promise<MapSet['aligned']> {
+    const groups = [...listedUnits].filter((u) => u.startsWith('aligned:')).map((u) => u.slice('aligned:'.length))
+    if (groups.length === 0) return undefined
+    const models = await Promise.all(groups.map((g) => single(`aligned:${g}`, (s) => alignedView(s, groups))))
+    const parts = new Map<string, AlignedModel>()
+    groups.forEach((g, i) => {
+      if (models[i] !== undefined) parts.set(g, models[i]!)
+    })
+    return { lang: o.lang, groups, parts }
+  }
+  // The part of each segment, from the catalogs: which segment of a map unit is its core.
+  const partOf = new Map<string, string>()
+  for (const cat of o.catalogs) for (const e of cat.catalog.segments) if (e.part !== undefined) partOf.set(hex(e.id), e.part)
+  /** The core of one map unit alone (`parts` empty), or `undefined` as `readMap` would say for a missing or bad core. */
+  async function readCore(unit: keyof typeof VIEWS): Promise<{ core: Part; parts: Map<string, Part> } | undefined> {
+    const ids = activeIds.get(unit)
+    const at = ids?.findIndex((id) => partOf.get(id) === 'core') ?? -1
+    // A catalog that does not say which segment is the core: the whole unit, as `maps()` reads it.
+    if (ids === undefined || at < 0) return (await mapUnit(unit)) as { core: Part; parts: Map<string, Part> } | undefined
+    const seg = await readOne(ids[at]!, unit)
+    const v = seg === undefined ? undefined : viewOf(unit, at, seg, VIEWS[unit] as (s: Segment) => Part)
+    return v === undefined || v.part !== 'core' ? undefined : { core: v, parts: new Map() }
+  }
+  const cores = new Map<string, Promise<unknown>>()
+  function mapCore(unit: MapUnit): Promise<unknown> {
+    if (unit === 'aligned' || mapUnits.has(unit)) return mapUnit(unit)
+    let p = cores.get(unit)
+    if (p === undefined) {
+      p = readCore(unit)
+      cores.set(unit, p)
+      const mine = p
+      p.catch(() => {
+        if (cores.get(unit) === mine) cores.delete(unit)
+      })
+    }
+    return p
+  }
+  // Each map unit is read once per reader (a read that rejects is tried again by the next call).
+  const mapUnits = new Map<MapUnit, Promise<unknown>>()
+  function mapUnit(unit: MapUnit): Promise<unknown> {
+    let p = mapUnits.get(unit)
+    if (p === undefined) {
+      p = unit === 'aligned' ? readAligned() : readMap(unit)
+      mapUnits.set(unit, p)
+      const mine = p
+      p.catch(() => {
+        if (mapUnits.get(unit) === mine) mapUnits.delete(unit)
+      })
+    }
+    return p
+  }
+  async function mapsOf(units: readonly MapUnit[], how: { coreOnly?: boolean } = {}): Promise<MapSet> {
     // The revision of the map that answers: the active `map` unit's, else the language's.
     const set: MapSet = { revision: (activeIds.has('map') ? unitRevs.get('map') : undefined) ?? o.revisions?.lang ?? langCat?.revision ?? 0 }
-    const read = async <V extends { part: string }>(unit: string, view: (s: Segment) => V): Promise<{ core: V; parts: Map<string, V> } | undefined> => {
-      const segs = await segments(unit)
-      if (segs === undefined) return undefined
-      let core: V | undefined
-      const parts = new Map<string, V>()
-      for (const [i, seg] of segs.entries()) {
-        const v = viewOf(unit, i, seg, view)
-        if (v === undefined) return undefined
-        if (v.part === 'core') core = v
-        else parts.set(v.part, v)
-      }
-      return core === undefined ? undefined : { core, parts }
-    }
-    const xmap = await read('xmap', xmapView)
-    if (xmap) set.xmap = xmap as unknown as NonNullable<MapSet['xmap']>
-    const map = await read('map', mapView)
-    if (map) set.map = map as unknown as NonNullable<MapSet['map']>
-    const xt = await read('xtopics', xtopicsView)
-    if (xt) set.xtopics = xt as unknown as NonNullable<MapSet['xtopics']>
-    const tp = await read('topics', topicsView)
-    if (tp) set.topics = tp as unknown as NonNullable<MapSet['topics']>
-    const groups = [...listedUnits].filter((u) => u.startsWith('aligned:')).map((u) => u.slice('aligned:'.length))
-    if (groups.length > 0) {
-      const parts = new Map<string, AlignedModel>()
-      for (const g of groups) {
-        const m = await single(`aligned:${g}`, (s) => alignedView(s, groups))
-        if (m !== undefined) parts.set(g, m)
-      }
-      set.aligned = { lang: o.lang, groups, parts }
-    }
+    const got = await Promise.all(units.map((u) => (how.coreOnly === true ? mapCore(u) : mapUnit(u))))
+    units.forEach((u, i) => {
+      if (got[i] !== undefined) (set as Record<string, unknown>)[u] = got[i]
+    })
     return set
   }
+  const ALL_MAPS: readonly MapUnit[] = ['xmap', 'map', 'xtopics', 'topics', 'aligned']
 
-  let mapsOnce: Promise<MapSet> | undefined
   let memory: Promise<SearchIndex> | undefined
   /** The books that are active, read once into a `memoryIndex` (keyed by segment id, so a rebuilt book replaces itself). */
   async function fillMemory(): Promise<SearchIndex> {
@@ -257,13 +334,8 @@ export function makeReader(o: ReaderInput): PackReader {
     async articles(group) {
       return (await single(`art:${group}`, artView))?.articles
     },
-    maps() {
-      const run = (mapsOnce ??= buildMaps())
-      run.catch(() => {
-        if (mapsOnce === run) mapsOnce = undefined
-      })
-      return run
-    },
+    maps: () => mapsOf(ALL_MAPS),
+    mapsOf,
     size: (unit) => sizes.get(unit) ?? 0,
     unitOf(cls, key) {
       const exact = `${cls}:${key}`
