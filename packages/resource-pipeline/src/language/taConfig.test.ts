@@ -44,6 +44,7 @@ describe('taReleases', () => {
     expect(() => taReleases(list([taResource({ stamp: 'v5#x' })]))).toThrow('is not the one of the stamp')
     expect(() => taReleases(list([taResource({ metadata: {} })]))).toThrow('names no release zip')
     expect(() => taReleases(list([taResource({ key: '../x/ta' })]))).toThrow('is not a resource key')
+    expect(() => taReleases(list([taResource({ key: 'x\\..\\../y/ta' })]))).toThrow('is not a resource key')
   })
 })
 
@@ -84,6 +85,19 @@ describe('fetchTaConfigs and readTaConfigs', () => {
     const out = join(dir, 'ta-config')
     await fetchTaConfigs({ listFile, out, fetchFn: (async () => new Response(zip)) as unknown as typeof fetch })
     expect(readTaConfigs(out, [TA])).toEqual(new Map([[TA, new Map()]]))
+  })
+})
+
+describe('fetchTaConfigs: the out folder', () => {
+  test('refuses a folder that is not empty, and a failed fetch leaves out as it was', async () => {
+    const dir = tempDir()
+    const listFile = join(dir, 'list.json')
+    writeFileSync(listFile, JSON.stringify(list([taResource()])))
+    await expect(fetchTaConfigs({ listFile, out: dir, fetchFn: (async () => new Response('')) as unknown as typeof fetch })).rejects.toThrow('is not an empty folder')
+    expect(existsSync(listFile)).toBe(true)
+    const out = join(dir, 'o')
+    await expect(fetchTaConfigs({ listFile, out, fetchFn: (async () => new Response('no', { status: 500 })) as unknown as typeof fetch })).rejects.toThrow('gave 500')
+    expect(existsSync(out)).toBe(false)
   })
 })
 

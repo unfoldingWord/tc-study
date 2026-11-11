@@ -57,8 +57,8 @@ describe('parseTaConfig', () => {
 
 describe('linkedIds', () => {
   test('finds the three forms of a link to a tA article', () => {
-    const md = 'See [Simile](../figs-simile/01.md), [Know](../../intro/ta-intro/01.md) and [[rc://*/ta/man/translate/figs-orderHeb]]. Not [x](../02/03.md).'
-    expect(linkedIds(md, 'translate')).toEqual(['ta:translate/figs-orderheb', 'ta:translate/figs-simile', 'ta:intro/ta-intro'])
+    const md = 'See [Simile](../figs-simile/01.md), [Know](../../intro/ta-intro/01.md) and [[rc://*/ta/man/translate/figs-orderHeb]]. Not [x](../02/03.md). [A](../figs-idiom/01.md#examples) [B](../figs-irony/01.md "Irony")'
+    expect(linkedIds(md, 'translate')).toEqual(['ta:translate/figs-orderheb', 'ta:translate/figs-simile', 'ta:intro/ta-intro', 'ta:translate/figs-idiom', 'ta:translate/figs-irony'])
   })
 })
 

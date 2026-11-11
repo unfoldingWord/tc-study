@@ -4,7 +4,7 @@
  *
  *   bun packages/resource-pipeline/cli/fetch-ta-config.ts --list <lang list.json> --out <dir>
  *
- * `--out` is emptied first. Exit 0 when written (one log line per resource), 1 when a release cannot be fetched or read, or the list
+ * `--out` must not exist or be empty (nothing is deleted); a failed run leaves it as it was. Exit 0 when written (one log line per resource), 1 when a release cannot be fetched or read, or the list
  * names a release other than the one of the stamp, 2 for bad arguments. A list with no tA resource writes an empty folder.
  */
 import { fetchTaConfigs } from '../src/language/taConfig'

@@ -80,7 +80,8 @@ export function parseTaConfig(text: string, issues: string[] = [], where = 'conf
 }
 
 const RC = /rc:\/\/[^/\s\])]*\/ta\/man\/([a-z0-9_-]+)\/([A-Za-z0-9_-]+)/g
-const RELATIVE = /\]\((?:\.\.\/\.\.\/([a-z0-9_-]+)\/|\.\.\/)([A-Za-z0-9_-]+)\/01\.md\)/g
+// `01.md` may be followed by an anchor or a title: `](../figs-simile/01.md#examples)`.
+const RELATIVE = /\]\((?:\.\.\/\.\.\/([a-z0-9_-]+)\/|\.\.\/)([A-Za-z0-9_-]+)\/01\.md(?:[#\s][^)]*)?\)/g
 
 /** The tA ids an article's markdown links to (`manual` is the article's own, for `../{slug}/01.md`). */
 export function linkedIds(md: string, manual: string): string[] {

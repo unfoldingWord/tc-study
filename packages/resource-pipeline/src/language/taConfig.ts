@@ -8,7 +8,7 @@
  * - {@link readTaConfigs} reads that folder back for a build.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 
@@ -27,7 +27,8 @@ export function taReleases(list: { resources?: ListResource[] }): { key: string;
   for (const resource of list.resources ?? []) {
     if (resource.subject !== TA_SUBJECT) continue
     const key = String(resource.key)
-    if (!/^[^/\s.][^/\s]*\/[^/\s.][^/\s]*\/[^/\s.][^/\s]*$/.test(key)) throw new Error(`${JSON.stringify(key)} is not a resource key`)
+    // Three parts, none starting with a dot, no backslash (a Windows path separator) and no space.
+    if (!/^[^/\\\s.][^/\\\s]*\/[^/\\\s.][^/\\\s]*\/[^/\\\s.][^/\\\s]*$/.test(key)) throw new Error(`${JSON.stringify(key)} is not a resource key`)
     const tag = resource.metadata?.release?.tag_name
     const zip = resource.metadata?.release?.zipball_url
     if (typeof tag !== 'string' || typeof zip !== 'string') throw new Error(`${key}: the list names no release zip`)
@@ -55,20 +56,24 @@ export async function configsOfZip(zip: Uint8Array | ArrayBuffer): Promise<Map<s
 }
 
 /**
- * Writes the configs of every tA resource of the parts list `listFile` under `out` (emptied first). Throws when a release cannot
- * be fetched or read: a build without them would lose the ties of the configs and say nothing. Returns what it wrote, by key.
+ * Writes the configs of every tA resource of the parts list `listFile` in the folder `out`, which must not exist or be empty (it is
+ * never emptied: a wrong path must not wipe a folder). They are written in `<out>.partial` first and moved to `out` at the end, so
+ * `out` never holds part of them. Throws when a release cannot be fetched or read: a build without them would lose the ties of the
+ * configs and say nothing. Returns what it wrote, by key.
  */
 export async function fetchTaConfigs(o: { listFile: string; out: string; fetchFn?: typeof fetch; log?: (line: string) => void }): Promise<Map<string, string[]>> {
   const fetchFn = o.fetchFn ?? fetch
   const list = JSON.parse(await readFile(o.listFile, 'utf8'))
-  await rm(o.out, { recursive: true, force: true })
-  await mkdir(o.out, { recursive: true })
+  if (existsSync(o.out) && (!statSync(o.out).isDirectory() || readdirSync(o.out).length > 0)) throw new Error(`${o.out} exists and is not an empty folder`)
+  const partial = `${o.out}.partial`
+  await rm(partial, { recursive: true, force: true })
+  await mkdir(partial, { recursive: true })
   const written = new Map<string, string[]>()
   for (const { key, tag, zip } of taReleases(list)) {
     const response = await fetchFn(zip)
     if (!response.ok) throw new Error(`${key}: GET ${zip} gave ${response.status}`)
     const configs = await configsOfZip(await response.arrayBuffer())
-    const folder = folderOf(o.out, key)
+    const folder = folderOf(partial, key)
     await mkdir(folder, { recursive: true })
     for (const [manual, text] of configs) {
       await mkdir(join(folder, manual), { recursive: true })
@@ -78,6 +83,8 @@ export async function fetchTaConfigs(o: { listFile: string; out: string; fetchFn
     written.set(key, manuals)
     o.log?.(`${key} ${tag}: ${manuals.length === 0 ? 'no config.yaml' : manuals.map((m) => `${m}/config.yaml`).join(', ')}`)
   }
+  await rm(o.out, { recursive: true, force: true })
+  await rename(partial, o.out)
   return written
 }
 
