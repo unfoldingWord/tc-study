@@ -23,7 +23,7 @@
   },
   "article": {
     "label": { "es": "Artículo: las secciones de un artículo de tA o tW" },
-    "description": "The default sections of a translation academy or translation words article, or the ones asked for.",
+    "description": "The default sections of a translation academy or translation words article, or the ones asked for. A translation academy article also lists its related articles, with their titles.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

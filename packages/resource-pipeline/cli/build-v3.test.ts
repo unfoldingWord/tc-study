@@ -248,6 +248,7 @@ describe('build-v3: arguments and errors', () => {
     ['a flag without its value', (out: string) => [...sample(out), '--books']],
     ['a --revision that is not a number', (out: string) => [...sample(out), '--revision', 'x']],
     ['a --built that is not RFC 3339', (out: string) => [...sample(out), '--built', 'yesterday']],
+    ['a --ta-config that is not a directory', (out: string) => [...sample(out), '--ta-config', join(out, 'no-such-folder')]],
   ])('%s: exit 1 with the usage', async (_name, make) => {
     const result = await run(make(temp()))
     expect(result.code).toBe(1)

@@ -1,0 +1,31 @@
+{
+  "name": "@bt-synergy/language-pack-mcp",
+  "version": "0.1.0",
+  "description": "A local MCP server over language packs format 3: install a language once, then ask it offline",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "bin": {
+    "tc-packs-mcp": "./dist/tc-packs-mcp.mjs"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "bundle": "bun build src/cli.ts --target=node --format=esm --minify --outfile dist/tc-packs-mcp.mjs",
+    "test": "bun test",
+    "type-check": "tsc --noEmit"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@bt-synergy/language-pack-client": "workspace:*",
+    "@bt-synergy/language-pack-v3": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.3"
+  }
+}

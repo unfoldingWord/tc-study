@@ -44,6 +44,7 @@ describe('the case files', () => {
   test('are the ones of the table of cases ', () => {
     expect(FILES).toEqual([
       'articulo-mal-titulado/art.seg',
+      'articulos-relacionados/art.seg',
       'catalog-bad-sig/catalog.seg',
       'catalog-signed/catalog.seg',
       'catalog-unknown-key/catalog.seg',
@@ -308,6 +309,19 @@ describe('case 8: articulo-mal-titulado', () => {
     expect(sections[0].level).toBe(0)
     expect(sections[0].title).toBeUndefined()
     for (const s of sections) expect(typeof s.md).toBe('string')
+  })
+})
+
+describe('case 21: articulos-relacionados', () => {
+  test('the ties of the config and of the links, both ways, sorted', async () => {
+    const out = await outputOf('articulos-relacionados/art.seg')
+    expect(out.h).toMatchObject({ class: 'art', lang: 'es-419', group: 'ta:translate' })
+    expect(Object.fromEntries(out.articles.map((a: Out) => [a.id, a.related]))).toEqual({
+      'ta:translate/bita-part1': ['ta:translate/figs-exmetaphor', 'ta:translate/figs-metaphor'],
+      'ta:translate/figs-exmetaphor': ['ta:translate/bita-part1', 'ta:translate/figs-metaphor'],
+      'ta:translate/figs-metaphor': ['ta:translate/bita-part1', 'ta:translate/figs-exmetaphor', 'ta:translate/figs-simetaphor'],
+      'ta:translate/figs-simetaphor': ['ta:translate/figs-metaphor'],
+    })
   })
 })
 

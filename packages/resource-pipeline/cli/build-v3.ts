@@ -3,7 +3,7 @@
  *
  *   bun packages/resource-pipeline/cli/build-v3.ts --list <lang list.json> --originals <originals list.json> --parts <dir> --out <dir>
  *     [--books tit,rut] [--registry <dir>] [--revision <n>] [--built <RFC 3339>] [--publisher <name>]
- *     [--map-lang <lang>] [--map-list <list.json>] [--book-names <file>] [--topics <dir>] [--aligned]
+ *     [--map-lang <lang>] [--map-list <list.json>] [--book-names <file>] [--topics <dir>] [--aligned] [--ta-config <dir>]
  *
  * The inputs are what phase 0 left on disk: the parts list of a language (`es-419/list.json`, its `language` says which language
  * this is), the list of the originals (`originals/list.json`) and the folder with the `<sha256>.part.gz` files both name. Only the
@@ -23,6 +23,9 @@
  * With `--topics <dir>` (the sources folder: `tipnr/*.txt`, `theographic/{events,verses,people,places}.json`,
  * `en_obs/obs-repo/content/NN.md`) the common part also gets the `xtopics` segments and the language its `topics` segments. The map
  * segments are the same bytes with or without it.
+ *
+ * With `--ta-config <dir>` (what `fetch-ta-config.ts` writes: `<dir>/<resource key>/<manual>/config.yaml`) the `related` of the tA
+ * articles also has the ties of the config of each manual; without it, the ties of the links of the texts alone, and a log line says so.
  *
  * `--aligned` (a flag with no value) also builds the optional `aligned:` units of the language, the index of aligned phrases of its bridge
  * texts (GLT, GST, ULT, UST). The other segments are the same bytes with or without it; only the `aligned` segments and the language
@@ -57,6 +60,7 @@ import {
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 import { readSigningKey, type SigningKey } from '../src/language/signKey'
+import { readTaConfigs } from '../src/language/taConfig'
 import { pins, sourcesProblem, type TopicSource } from './fetch-topic-sources'
 
 export class UsageError extends Error {}
@@ -81,6 +85,8 @@ export const USAGE =
   '  --topics     the folder of the topic sources (tipnr/, theographic/, en_obs/): builds the xtopics and the topics of the language\n' +
   '  --sign-key   a PKCS#8 PEM file of an Ed25519 key: both catalogs this build writes are signed with it (segments are the same bytes; the key is read\n' +
   '               into memory and never printed or written)\n' +
+  '  --ta-config  the folder fetch-ta-config wrote (<resource key>/<manual>/config.yaml): the related of the tA articles also has the ties\n' +
+  '               of the configs (without it, the ties of the links of the texts alone)\n' +
   '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
   '               every other segment is the same bytes with or without it'
 
@@ -107,10 +113,11 @@ type Options = {
   topics?: string
   aligned: boolean
   signKey?: string
+  taConfig?: string
 }
 
 const BOOLEAN_FLAGS = ['aligned']
-const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key']
+const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -193,6 +200,8 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
   const bookNames = flags.get('book-names')
   const mapList = flags.get('map-list')
   const topics = flags.get('topics')
+  const taConfig = flags.get('ta-config')
+  if (taConfig !== undefined && (!existsSync(taConfig) || !statSync(taConfig).isDirectory())) throw new UsageError(`--ta-config: ${taConfig} is not a directory`)
 
   for (const [name, path] of [['list', list], ['originals', originals], ...(bookNames === undefined ? [] : [['book-names', bookNames]]), ...(mapList === undefined ? [] : [['map-list', mapList]])]) {
     if (!existsSync(path) || !statSync(path).isFile()) throw new UsageError(`--${name}: ${path} is not a file`)
@@ -217,7 +226,7 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
     if (wrong !== undefined) throw new UsageError(`--topics: ${wrong}`)
   }
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key') }
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key'), taConfig }
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -382,6 +391,10 @@ async function build(o: Options, io: Io): Promise<void> {
     for (const line of issues) if (!common.report.includes(`topics: ${line}`)) common.report.push(`topics: ${line}`)
     topics = { xtopics: xtopicsView(core.seg) as XtopicsCore, records }
   }
+  // Without --ta-config the related of the tA articles comes from the links alone (a log line says so).
+  const taKeys = (await source.resources(lang)).filter((ref) => ref.kind === 'Translation Academy').map((ref) => ref.key)
+  const taConfigs = o.taConfig === undefined ? undefined : readTaConfigs(o.taConfig, taKeys)
+  if (taConfigs === undefined && taKeys.length > 0) io.log('no --ta-config: the related of the tA articles comes from the links of the texts alone')
   const built = await buildLanguage({
     source,
     lang,
@@ -392,6 +405,7 @@ async function build(o: Options, io: Io): Promise<void> {
     requires: [['common', common.revision, common.catalogId]],
     topics,
     aligned: o.aligned,
+    taConfigs,
   })
 
   // Signing changes the header of a catalog and nothing its id is the hash of: the ids, and so every `requires` and every segment, stay.

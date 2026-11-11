@@ -311,6 +311,40 @@ async function sectionInserted(): Promise<{ build1: Uint8Array; build2: Uint8Arr
   return { build1: one.bytes, build2: two.bytes }
 }
 
+const TA = 'es-419_gl/es-419/ta'
+const TA_REF: ResourceRef = { key: TA, stamp: 'v4#2024-07-17T20_15_35Z', kind: 'Translation Academy', books: [] }
+
+/**
+ * Case 21: the `related` of tA articles. Four es-419 articles of `translate`: the config of the manual says `figs-exmetaphor` and
+ * `bita-part1` depend on `figs-metaphor`, and the text of `figs-simetaphor` links to it. Every tie goes both ways.
+ */
+async function relatedArticles(): Promise<Uint8Array> {
+  const items: [string, string, string][] = [
+    ['figs-metaphor', 'Metáfora', 'Una metáfora compara dos cosas sin decir «como».'],
+    ['figs-simetaphor', 'Metáfora simple', 'Es una [metáfora](../figs-metaphor/01.md) con una sola idea.'],
+    ['figs-exmetaphor', 'Metáforas extendidas', 'Una metáfora que sigue en varias ideas.'],
+    ['bita-part1', 'Imaginería bíblica: patrones comunes', 'Imágenes que la Biblia usa a menudo.'],
+  ]
+  const rows: Row[] = []
+  for (const [slug, title, text] of items) {
+    rows.push({ layer: 'sot', key: `${TA}/translate/${slug}`, value: `# ${title}\n\n## ¿Qué es?\n\n${text}` })
+    rows.push({ layer: 'text', key: `helps-text:ta-title:${TA}@${TA_REF.stamp}:translate/${slug}`, value: { content: title, version: 1 } })
+  }
+  const source: RowSource = {
+    async resources() {
+      return [TA_REF]
+    },
+    async *rows(f: RowFilter) {
+      if (f.resource !== undefined && f.resource !== TA) return
+      for (const row of rows) if (f.layer === undefined || row.layer === f.layer) yield row
+    },
+  }
+  const config = 'figs-exmetaphor:\n  recommended:\n    - bita-part1\n  dependencies:\n    - figs-metaphor\nbita-part1:\n  recommended: []\n  dependencies:\n    - figs-metaphor\n'
+  const { groups } = await extractArticles(source, ES, {}, [], new Map([[TA, new Map([['translate', config]])]]))
+  const articles = groups.get('ta:translate')!
+  return (await writeSegment(artSegment(ES, 'ta:translate', articleResources(articles, [TA_REF]), articles))).bytes
+}
+
 /** Case 8: an es-419 article with text before any heading, a heading no rule places and a section whose heading is in English. */
 async function badlyTitled(): Promise<Uint8Array> {
   const md = [
@@ -536,6 +570,7 @@ export async function buildFrozenCases(): Promise<Map<string, Uint8Array>> {
   out.set('seccion-insertada/build1.seg', build1)
   out.set('seccion-insertada/build2.seg', build2)
   out.set('articulo-mal-titulado/art.seg', await badlyTitled())
+  out.set('articulos-relacionados/art.seg', await relatedArticles())
   out.set('tabla-desconocida/future-x.seg', await withTable('future-x', false))
   out.set('tabla-desconocida/future-y.seg', await withTable('future-y', true))
   out.set('topics-local-clave-extra/core.seg', await localWithExtraKey())

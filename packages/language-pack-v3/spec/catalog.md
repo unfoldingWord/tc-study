@@ -69,7 +69,8 @@ The builder records each segment's inputs (`inputs`, a fingerprint) and rebuilds
 | The SupportReference of a note of Ruth | `book:rut`, the `map` part of Ruth and the `map` core (its counts), the catalog |
 | The introduction of Ruth (its outline) | `book:rut`, the `map` core (topics), the catalog |
 | An English note or word link | the English `book` segment; the `xmap` part of that book and its core, if a count or the Strong keys of a link's quote (`strongs`) changed; both catalogs |
-| A tW or tA article | its `art` group, the `map` core if its title changed, the catalog |
+| A tW article | its `art` group, the `map` core if its title changed, the catalog |
+| A tA article, or the `config.yaml` of a tA manual | every `ta:` group of the language is re-checked (their `inputs` share the `sot` rows of every tA article and one row `ta-config\|{resource}/{manual}/config.yaml#{sha-256 of the text}` per config, since `related` ties articles of different groups); only the groups whose `related`, text or title changed change in content; the `map` core if a title changed; the catalog |
 | One book of the original | `orig` of that book, and every `book` segment of that book in every language (their positions); the `xmap` part of that book |
 | A new release stamp of a resource, with the same rows | The segments that list it in `res`, the cores, the catalog. A map part keeps its segment id, but its `inputs` carry the tN stamp of its book and so change: the part is re-checked, not re-published |
 | The alias list | the `xmap` core and the parts whose books they touch |

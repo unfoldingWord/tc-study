@@ -29,8 +29,9 @@
  *   subtitle; the heading is still taken out of the sections.
  * - The title is the row's, and the article's first level-1 heading when there is no row. With neither, the name in the
  *   id is used and the report says so.
- * - `related` (the articles a tA lists as related) is in `config.yaml` of the tA repository, which the parts do not carry:
- *   it is left out. `aliases` (an article that moved) come from the common map, not from the rows: left out too.
+ * - `related` (tA only): the articles tied to one by the `config.yaml` of its manual or by a link of a text, both ways
+ *   (`related.ts`). The parts do not carry `config.yaml`: the build gives its text (`taConfigs`). `aliases` (an article that
+ *   moved) come from the common map, not from the rows: left out.
  */
 import type { CborValue } from '../codec/cbor'
 import { compareCodePoints } from '../codec/columns'
@@ -39,6 +40,7 @@ import { isUint as isCount } from '../codec/values'
 import { rewriteLinks } from '../ids'
 import { type ArticleModel, ROLES, type SectionModel } from '../model'
 import type { ResourceRef, RowSource } from '../source/rows'
+import { relatedArticles, type TaConfigs } from './related'
 import { articlePath, assignArticle, canonicalRegistry, type SectionPart, type SectionRegistry, splitSections } from './sections'
 
 const TW_SUBJECT = 'Translation Words'
@@ -111,6 +113,8 @@ type Found = { id: string; group: string; kind: Kind; ref: ResourceRef; publishe
  * - `issues` receives a line for everything the builder worked around: a row that is not an article, a text that is not
  *   markdown, an id that two resources publish (the first resource by key wins), an article without title or without
  *   text, a heading no rule places (role `unknown`).
+ * - `taConfigs` is the text of the `config.yaml` of each manual of each tA resource ({@link relatedArticles}). Undefined:
+ *   `related` comes from the links of the texts alone.
  * - The result maps each group (`tw:kt`, `tw:names`, `tw:other`, `ta:translate`, `ta:checking`, `ta:process`, `ta:intro`,
  *   sorted) to its articles, ordered by id. Both orders are by code point.
  */
@@ -119,6 +123,7 @@ export async function extractArticles(
   lang: string,
   registry: SectionRegistry = {},
   issues: string[] = [],
+  taConfigs?: TaConfigs,
 ): Promise<{ groups: Map<string, ArticleModel[]>; registry: SectionRegistry }> {
   const resources = (await source.resources(lang))
     .filter((ref) => ref.kind === TW_SUBJECT || ref.kind === TA_SUBJECT)
@@ -155,6 +160,8 @@ export async function extractArticles(
     }
   }
 
+  const tas = [...found.values()].filter((article) => article.kind === 'ta')
+  const related = relatedArticles(tas.map(({ id, ref, md }) => ({ id, res: ref.key, md })), taConfigs, issues)
   const ordered = [...found.values()].sort((a, b) => compareCodePoints(a.group, b.group) || compareCodePoints(a.id, b.id))
   const groups = new Map<string, ArticleModel[]>()
   const next: SectionRegistry = { ...registry }
@@ -185,6 +192,8 @@ export async function extractArticles(
     const model: ArticleModel = { id, res: ref.key, title, sections }
     const subtitle = article.subtitle ?? prepared.subtitle
     if (subtitle !== undefined) model.subtitle = subtitle
+    const ties = related.get(id)
+    if (ties !== undefined) model.related = ties
     const list = groups.get(article.group)
     if (list === undefined) groups.set(article.group, [model])
     else list.push(model)

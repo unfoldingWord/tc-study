@@ -1,0 +1,99 @@
+{
+  "articles": [
+    {
+      "id": "ta:translate/bita-part1",
+      "related": [
+        "ta:translate/figs-exmetaphor",
+        "ta:translate/figs-metaphor"
+      ],
+      "res": "es-419_gl/es-419/ta",
+      "sections": [
+        {
+          "lang": "es-419",
+          "level": 0,
+          "md": "Imágenes que la Biblia usa a menudo.",
+          "role": "intro",
+          "sid": "intro"
+        }
+      ],
+      "subtitle": "¿Qué es?",
+      "title": "Imaginería bíblica: patrones comunes"
+    },
+    {
+      "id": "ta:translate/figs-exmetaphor",
+      "related": [
+        "ta:translate/bita-part1",
+        "ta:translate/figs-metaphor"
+      ],
+      "res": "es-419_gl/es-419/ta",
+      "sections": [
+        {
+          "lang": "es-419",
+          "level": 0,
+          "md": "Una metáfora que sigue en varias ideas.",
+          "role": "intro",
+          "sid": "intro"
+        }
+      ],
+      "subtitle": "¿Qué es?",
+      "title": "Metáforas extendidas"
+    },
+    {
+      "id": "ta:translate/figs-metaphor",
+      "related": [
+        "ta:translate/bita-part1",
+        "ta:translate/figs-exmetaphor",
+        "ta:translate/figs-simetaphor"
+      ],
+      "res": "es-419_gl/es-419/ta",
+      "sections": [
+        {
+          "lang": "es-419",
+          "level": 0,
+          "md": "Una metáfora compara dos cosas sin decir «como».",
+          "role": "intro",
+          "sid": "intro"
+        }
+      ],
+      "subtitle": "¿Qué es?",
+      "title": "Metáfora"
+    },
+    {
+      "id": "ta:translate/figs-simetaphor",
+      "related": [
+        "ta:translate/figs-metaphor"
+      ],
+      "res": "es-419_gl/es-419/ta",
+      "sections": [
+        {
+          "lang": "es-419",
+          "level": 0,
+          "md": "Es una [metáfora](../figs-metaphor/01.md) con una sola idea.",
+          "role": "intro",
+          "sid": "intro"
+        }
+      ],
+      "subtitle": "¿Qué es?",
+      "title": "Metáfora simple"
+    }
+  ],
+  "h": {
+    "class": "art",
+    "group": "ta:translate",
+    "lang": "es-419",
+    "res": [
+      [
+        "es-419_gl/es-419/ta",
+        "v4"
+      ]
+    ],
+    "tables": {
+      "articles": [
+        1,
+        true
+      ]
+    },
+    "v": 1
+  },
+  "id": "9805d7e725e3a0b61c3b0ad79bac270d8b12aa9d7b9a6a9f7227a1a59c1936a8"
+}
