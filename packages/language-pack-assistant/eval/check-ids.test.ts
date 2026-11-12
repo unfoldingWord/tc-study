@@ -101,10 +101,17 @@ test('the last verse of a chapter comes from the installed text', async () => {
 
 test('strongsOf: keys of a concept from the xmap, most occurrences first; none for a concept without', async () => {
   const keys = await strongsOf(reader, 'tw:kt/grace')
-  expect(keys.length).toBeGreaterThan(1)
+  expect(keys.length).toBeGreaterThan(0)
   expect(keys).toContain('G54850')
   const core = (await reader.mapsOf(['xmap'], { coreOnly: true })).xmap!.core
   const total = (k: string) => [...(core.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
   for (let i = 1; i < keys.length; i++) expect(total(keys[i - 1]!)).toBeGreaterThanOrEqual(total(keys[i]!))
   expect(await strongsOf(reader, 'tw:kt/nothing')).toEqual([])
+  // the catch-all keys (in more than 2 % of the tW concepts) are dropped
+  const lists = Object.entries(core.strongs ?? {}).filter(([id]) => id.startsWith('tw:'))
+  const seen = new Map<string, number>()
+  for (const [, ks] of lists) for (const k of new Set(ks)) seen.set(k, (seen.get(k) ?? 0) + 1)
+  const common = [...seen].filter(([, n]) => n > lists.length * 0.02).map(([k]) => k)
+  expect(common.length).toBeGreaterThan(0)
+  for (const [id] of lists) for (const k of await strongsOf(reader, id)) expect(common).not.toContain(k)
 })

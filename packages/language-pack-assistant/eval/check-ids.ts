@@ -52,15 +52,33 @@ export async function lastVerse(reader: PackReader, book: string, chapter: numbe
   return last
 }
 
+const catchAlls = new WeakMap<PackReader, Promise<Set<string>>>()
+
+/** The Strong keys that the `strongs` lists of more than 2 % of the tW concepts hold (`G35880`, `H0853`): they say nothing of one concept. Once per reader. */
+function catchAllKeys(reader: PackReader): Promise<Set<string>> {
+  let found = catchAlls.get(reader)
+  if (found === undefined) {
+    found = reader.mapsOf(['xmap'], { coreOnly: true }).then((m) => {
+      const lists = Object.entries(m.xmap?.core.strongs ?? {}).filter(([id]) => id.startsWith('tw:'))
+      const seen = new Map<string, number>()
+      for (const [, keys] of lists) for (const k of new Set(keys)) seen.set(k, (seen.get(k) ?? 0) + 1)
+      return new Set([...seen].filter(([, n]) => n > lists.length * 0.02).map(([k]) => k))
+    })
+    catchAlls.set(reader, found)
+  }
+  return found
+}
+
 /**
- * The Strong keys the xmap lists for a concept (`strongs`), most occurrences first (the sum of the `strong` counts over the books),
- * ties in code-point order. Empty when the concept has none or the xmap is not installed. Reusable by the assistant's rules (R10).
+ * The Strong keys the xmap lists for a concept (`strongs`) without the catch-all keys (R10b), most occurrences first (the sum of the
+ * `strong` counts over the books), ties in code-point order. Empty when none is left or the xmap is not installed. Reusable by the rules.
  */
 export async function strongsOf(reader: PackReader, conceptId: string): Promise<string[]> {
   const core = (await reader.mapsOf(['xmap'], { coreOnly: true })).xmap?.core
-  const keys = core?.strongs?.[conceptId] ?? []
+  const drop = await catchAllKeys(reader)
+  const keys = (core?.strongs?.[conceptId] ?? []).filter((k) => !drop.has(k))
   const total = (k: string): number => [...(core?.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
-  return [...keys].sort((a, b) => total(b) - total(a) || (a < b ? -1 : a > b ? 1 : 0))
+  return [...keys].sort((x, y) => total(y) - total(x) || (x < y ? -1 : x > y ? 1 : 0))
 }
 
 export function checkIds(reader: PackReader, ids: string[]): Promise<IdCheck[]> {
