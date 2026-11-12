@@ -57,7 +57,8 @@ export function decideStep(question: string, ctx: DecideCtx): { decision: Decisi
   const second = c2 === c1 ? undefined : outcomeFor(c2, question, v, ctx)
   const options = [first, second].flatMap((o) => (o === undefined ? [] : o.kind === 'call' ? (o.call.query === 'search' ? [] : [o.call]) : o.options))
   if (options.length >= 2) return { decision: { kind: 'choose', options: options.slice(0, MAX_OPTIONS), interpretation: '' }, step: 'choose' }
-  return { decision: asDecision(first, 'classifier'), step: 'classifier' }
+  // Below the margin with nothing to choose between: search rather than guess.
+  return { decision: search, step: 'search' }
 }
 
 /** What the assistant decides for a question (R4: `interpretation` is `''` until the interpretation step fills it). */

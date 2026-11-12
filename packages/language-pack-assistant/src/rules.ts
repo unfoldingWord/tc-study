@@ -3,7 +3,7 @@
  * follows C0's `decide` (`cadena.py`), step 1. Every rule is general: it reads entity kinds and phrase kinds, never one question.
  */
 import type { Call, Decision, QueryName } from './decision'
-import type { Entity, Lexicon } from './lexicon'
+import { type Entity, FILLERS, type Lexicon } from './lexicon'
 import { fold } from './fold'
 import { matchPhrases, type PhraseKind, type Phrases } from './phrases'
 
@@ -162,6 +162,24 @@ export function readQuestion(question: string, lexicon: Lexicon, phrases: Phrase
   return { tokens, entities: lexicon.entities(question, { phraseTokens }).entities, kinds: new Set(matches.map((m) => m.kind)) }
 }
 
+const FILLER_WORDS = new Set(Object.values(FILLERS).flatMap((f) => [...f]))
+const isDigits = (t: string | undefined): boolean => t !== undefined && /^\d+(-\d+)?$/.test(t)
+
+/**
+ * Whether the question writes a chapter and a verse ("8:28", "12, versiculo 1", "capitulo 15 versiculo 11"): a word, a number, and a
+ * second number after at most filler words. With no reference entity the book is one this language's map does not name (R24, R26).
+ */
+export function looksLikeRef(question: string, tokens: string[]): boolean {
+  if (/\d+\s*:\s*\d+/.test(question)) return true
+  for (let i = 1; i < tokens.length; i++) {
+    if (isDigits(tokens[i - 1]) || !isDigits(tokens[i])) continue
+    let j = i + 1
+    while (j < tokens.length && FILLER_WORDS.has(tokens[j]!)) j++
+    if (isDigits(tokens[j])) return true
+  }
+  return false
+}
+
 /** The rules, in order; the first that applies decides. */
 export function ruleOutcome(question: string, reading: Reading, ctx: RuleCtx): Outcome | undefined {
   const v = view(reading.entities)
@@ -171,6 +189,8 @@ export function ruleOutcome(question: string, reading: Reading, ctx: RuleCtx): O
 
   // 1. A reference: the passage, or its context when the question asks for everything about it.
   if (v.refs.length > 0) return outcomeFor(has('context') ? 'context' : 'passage', question, v, ctx)
+  // 1b. A chapter and verse of a book this map does not name: no other query can use it, so the text is searched (R26).
+  if (looksLikeRef(question, reading.tokens)) return outcomeFor('search', question, v, ctx)
   // 2. A book name alone that is also a person's name.
   if (!booksPhrase && !renderingsPhrase) {
     const amb = ambiguousBook(v, ctx)

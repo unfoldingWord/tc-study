@@ -66,3 +66,17 @@ test('close classifier scores give a choice of both when both can be filled', ()
   expect(r.step).toBe('choose')
   expect(r.decision.kind).toBe('choose')
 })
+
+test('below the margin with an unfillable second query, the chain searches', () => {
+  // concept and passage tie on "tw": the second (passage) has no reference to fill
+  const model = train(
+    [
+      ['tw', 'concept'],
+      ['tw', 'passage'],
+    ],
+    { lang: 'es', version: 't' },
+  )
+  const r = decideStep('pacto', { ...base, classifier: model, margin: 0.5 })
+  expect(r.step).toBe('search')
+  expect(r.decision).toEqual({ kind: 'call', call: { query: 'search', args: { text: 'pacto' } }, via: 'search', interpretation: '' })
+})

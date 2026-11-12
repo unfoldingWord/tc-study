@@ -48,13 +48,19 @@ describe('1. a reference', () => {
 
 describe('2. an ambiguous book name alone (Review Focus 1)', () => {
   test('«Juan» offers the book introduction when listed, then each person, tW names first', () => {
-    const want = choose({ query: 'passage', args: { ref: 'jhn front:intro' } }, { query: 'concept', args: { id: 'tw:names/johntheapostle' } })
+    const want = choose(
+      { query: 'passage', args: { ref: 'jhn front:intro' } },
+      { query: 'concept', args: { id: 'tw:names/johntheapostle' } },
+      { query: 'concept', args: { id: 'tw:names/johnthebaptist' } },
+    )
     expect(es('Juan')).toEqual(want)
     expect(en('John')).toEqual(want)
   })
   test('without the book in the catalogs, the persons only', () => {
     expect(rig('es-419', [])('háblame de Rut')).toEqual(ruled({ query: 'concept', args: { id: 'tw:names/ruth' } }))
-    expect(rig('en', [])('John')).toEqual(ruled({ query: 'concept', args: { id: 'tw:names/johntheapostle' } }))
+    expect(rig('en', [])('John')).toEqual(
+      choose({ query: 'concept', args: { id: 'tw:names/johntheapostle' } }, { query: 'concept', args: { id: 'tw:names/johnthebaptist' } }),
+    )
   })
   test('«Juan 3:16» is a passage; «¿quién era Juan el bautista?» is the concept', () => {
     expect(callOf(es('Juan 3:16'))).toEqual({ query: 'passage', args: { ref: 'jhn 3:16' } })
@@ -80,7 +86,7 @@ describe('4. how something was translated', () => {
   test('a concept through its keys: one, several (first 3), none', () => {
     expect(callOf(es('¿Cómo se tradujo pacto?'))).toEqual({ query: 'renderings', args: { strong: 'H1285' } })
     expect(en('How was grace translated?')).toEqual(choose(...['H2580', 'G54850', 'H2587'].map((strong) => ({ query: 'renderings', args: { strong } }))))
-    const q = '¿Qué palabras usan para pecado?'
+    const q = '¿Cómo se traduce pecado?'
     expect(es(q)).toEqual(choose({ query: 'concept', args: { id: 'tw:kt/sin' } }, { query: 'search', args: { text: q } }))
   })
 })
@@ -135,6 +141,20 @@ describe('general rules from the tune sets', () => {
   })
   test('renderings asks about the first name or term of the question', () => {
     expect(callOf(es('¿Cómo se tradujo pacto en Rut?'))).toEqual({ query: 'renderings', args: { strong: 'H1285' } })
+  })
+})
+
+describe('ask or search instead of guessing', () => {
+  test('a chapter and verse of a book the map does not name is searched (R26)', () => {
+    for (const q of ['Quiero ver Mateo 8:28', 'notas de Filipenses 4:13', 'Lucas capítulo 15 versículo 11', 'Génesis 12, versículo 1']) {
+      expect(es(q)).toEqual(ruled({ query: 'search', args: { text: q } }))
+    }
+  })
+  test('count, place and relation words alone are no books or renderings phrase', () => {
+    expect(es('¿Cuántos hijos tuvo Moisés?')).toBeUndefined()
+    expect(en('Where is Moses?')).toBeUndefined()
+    expect(callOf(en('How is Ruth related to Moses?'))?.query).not.toBe('renderings')
+    expect(es('compara la gracia y el pacto')).toBeUndefined()
   })
 })
 
