@@ -89,6 +89,21 @@ export async function renderingsOf(reader: PackReader, key: string): Promise<Ren
   return first
 }
 
+type BooksAnswer = Answer<{ books: Record<string, { state: string }> }>
+const hasBooks = (a: BooksAnswer): boolean => a.data !== null && Object.values(a.data.books ?? {}).some((b) => b.state !== 'none')
+
+/** The books of a Strong key, padded like renderings; all none and no letter suffix, the first of a, b, c with some. */
+export async function booksOf(reader: PackReader, key: string): Promise<BooksAnswer> {
+  const k = normalizeStrong(key)
+  const first = (await reader.books({ strong: k })) as BooksAnswer
+  if (hasBooks(first) || !/d$/.test(k)) return first
+  for (const s of ['a', 'b', 'c']) {
+    const next = (await reader.books({ strong: k + s })) as BooksAnswer
+    if (hasBooks(next)) return next
+  }
+  return first
+}
+
 type Hit = { kind: string; res?: string; book?: string; ref?: string; id?: string; score: number }
 
 /**
@@ -103,17 +118,18 @@ async function searchWords(reader: PackReader, text: string, words: ((t: string)
   const alone = [...content].sort((a, b) => b.length - a.length).slice(0, 4)
   const answers = await Promise.all(alone.map((w) => reader.search(w)))
   const seen = new Set<string>()
-  const merged: { hit: Hit; cite: Answer<unknown>['cites'][number] | undefined }[] = []
+  const merged: { hit: Hit; cite: Answer<unknown>['cites'][number] }[] = []
   for (const a of answers) {
     ;((a.data as Hit[] | null) ?? []).forEach((hit, i) => {
       const key = [hit.kind, hit.res, hit.book, hit.ref, hit.id].join('|')
-      if (seen.has(key)) return
+      const cite = a.cites[i]
+      if (cite === undefined || seen.has(key)) return
       seen.add(key)
-      merged.push({ hit, cite: a.cites[i] })
+      merged.push({ hit, cite })
     })
   }
   merged.sort((x, y) => y.hit.score - x.hit.score)
-  const out = { ...all, data: merged.map((m) => m.hit), cites: merged.map((m) => m.cite!), notInstalled: [...all.notInstalled] }
+  const out = { ...all, data: merged.map((m) => m.hit), cites: merged.map((m) => m.cite), notInstalled: [...all.notInstalled] }
   for (const a of answers) for (const n of a.notInstalled) if (!out.notInstalled.some((x) => x.unit === n.unit)) out.notInstalled.push(n)
   return out
 }
@@ -132,7 +148,7 @@ async function query(reader: PackReader, call: Call, words?: (t: string) => stri
       case 'concept':
         return await reader.concept(String(a.id))
       case 'books':
-        return await reader.books(typeof a.article === 'string' ? { article: a.article } : typeof a.strong === 'string' ? { strong: a.strong } : { concept: String(a.concept) })
+        return typeof a.strong === 'string' ? await booksOf(reader, a.strong) : await reader.books(typeof a.article === 'string' ? { article: a.article } : { concept: String(a.concept) })
       case 'topics':
         return await reader.topics({ ...(typeof a.category === 'string' ? { category: a.category } : {}), ...(typeof a.book === 'string' ? { book: a.book } : {}) })
       case 'renderings':

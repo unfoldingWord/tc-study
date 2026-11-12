@@ -1,6 +1,6 @@
 import { beforeAll, expect, test } from 'bun:test'
 import type { PackReader } from '@bt-synergy/language-pack-client'
-import { cardOf, normalizeStrong, now, piecesOf, renderingsOf } from './card'
+import { booksOf, cardOf, normalizeStrong, now, piecesOf, renderingsOf } from './card'
 import { contentWords } from './words'
 import { LINK, sampleReader } from './card.fixture'
 import type { Decision } from './decision'
@@ -84,6 +84,21 @@ test('R31: a Strong key is padded to four digits, and a bare key tries the suffi
   expect(h.data!.strong).toBe('H2617a')
   expect(asked).toEqual(['H2617', 'H2617a'])
   expect((await renderingsOf(stub, 'H9999')).data!.renderings).toEqual([])
+})
+
+test('books by a Strong key pad and try the suffixes like renderings', async () => {
+  const asked: string[] = []
+  const stub = {
+    books: async ({ strong }: { strong: string }) => {
+      asked.push(strong)
+      return answerOf('books', { books: { tit: { state: strong === 'G0026' || strong === 'H2617a' ? 'count' : 'none' } } })
+    },
+  } as unknown as PackReader
+  expect((await booksOf(stub, 'G26')).data!.books.tit!.state).toBe('count')
+  expect(asked).toEqual(['G0026'])
+  asked.length = 0
+  await booksOf(stub, 'H2617')
+  expect(asked).toEqual(['H2617', 'H2617a'])
 })
 
 test('R33: search sends the content words; with no hits, each word alone and the hits merge by score', async () => {
