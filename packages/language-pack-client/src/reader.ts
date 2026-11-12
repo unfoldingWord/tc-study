@@ -118,7 +118,7 @@ export interface PackReader {
   context(ref: string): Promise<Answer<ContextData>>
   concept(id: string): Promise<Answer<unknown>>
   topics(q?: { category?: string; book?: string }): Promise<Answer<unknown>>
-  books(q: { article: string } | { concept: string }): Promise<Answer<BooksData>>
+  books(q: { article: string } | { concept: string } | { strong: string }): Promise<Answer<BooksData>>
   /** The ids whose names contain a word ("gracia", "grace", "metaphor", "Pablo"), from the maps alone: exact names first. */
   lookup(name: string, limit?: number): Promise<Answer<LookupData>>
   renderings(q: { strong: string } | { book: string; word: number }): Promise<Answer<RenderingsData>>

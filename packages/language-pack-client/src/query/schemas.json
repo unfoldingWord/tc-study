@@ -108,10 +108,11 @@
       "type": "object",
       "properties": {
         "article": { "type": "string", "description": "A tA or tW article id (\"ta:...\", \"tw:...\")." },
-        "concept": { "type": "string", "description": "Any concept id, such as \"per:abraham\"." }
+        "concept": { "type": "string", "description": "Any concept id, such as \"per:abraham\"." },
+        "strong": { "type": "string", "description": "A Strong key such as \"G26\" or \"H2617a\": the occurrences of the original word, per book." }
       },
       "required": [],
-      "oneOf": [{ "required": ["article"] }, { "required": ["concept"] }],
+      "oneOf": [{ "required": ["article"] }, { "required": ["concept"] }, { "required": ["strong"] }],
       "additionalProperties": false
     }
   },

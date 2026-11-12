@@ -47,6 +47,19 @@ async function open(opts: { defaults?: boolean; books?: string[]; units?: string
 const METAPHOR = 'ta:translate/figs-abstractnouns'
 
 describe('books', () => {
+  test('a Strong key: the occurrences per book from the xmap table, a short Greek key resolved', async () => {
+    const r = await open({ books: ['tit'] })
+    const a = await r.books({ strong: 'G3972' })
+    expect(a.query).toBe('books')
+    expect(Object.keys(a.data!.books)).toHaveLength(66)
+    expect(a.data!.books.tit!.state).toBe('count')
+    expect(a.data!.books.tit!.count).toBeGreaterThan(0)
+    expect(a.data!.books.tit!.installed).toBe(true)
+    expect(a.data!.books.isa!.state).toBe('none')
+    expect(((await r.books({ strong: 'G39720' })).data!.books.tit)).toEqual(a.data!.books.tit)
+    await expect(r.books({ strong: 'G1', article: 'tw:kt/grace' } as never)).rejects.toThrow(ClientError)
+    await expect(r.books({ strong: '' })).rejects.toThrow(ClientError)
+  })
   test('an article: count where the notes cite it, none where the tN does not cover the book (never zero)', async () => {
     const r = await open({ books: ['tit'] })
     const a = await r.books({ article: METAPHOR })
