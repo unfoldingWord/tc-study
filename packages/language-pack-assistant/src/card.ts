@@ -96,7 +96,7 @@ const hasBooks = (a: BooksAnswer): boolean => a.data !== null && Object.values(a
 export async function booksOf(reader: PackReader, key: string): Promise<BooksAnswer> {
   const k = normalizeStrong(key)
   const first = (await reader.books({ strong: k })) as BooksAnswer
-  if (hasBooks(first) || !/d$/.test(k)) return first
+  if (hasBooks(first) || !/\d$/.test(k)) return first
   for (const s of ['a', 'b', 'c']) {
     const next = (await reader.books({ strong: k + s })) as BooksAnswer
     if (hasBooks(next)) return next
