@@ -1,10 +1,13 @@
 import type { PackReader } from '@bt-synergy/language-pack-client'
-import type { HelpRow, HelpTable } from '@bt-synergy/language-pack-v3'
+import type { HelpRow } from '@bt-synergy/language-pack-v3'
 import { NotesProcessor, QuestionsProcessor, WordsLinksProcessor } from '@bt-synergy/resource-parsers'
 import type { Row } from './scriptureRows'
 
 /** The marker the cache adapter puts on the manifest of a book it split into chapter rows. */
 const CHUNKED = '_chunkedBook'
+
+/** What the three writers read of a table: the rows of a book's helps and of the OBS helps (`ObsHelpRow`) both have it. */
+export type Table = { res: string; rows: Pick<HelpRow, 'id' | 'ref' | 'concept' | 'cols'>[] }
 
 const cell = (value: string | boolean | undefined): string => (typeof value === 'string' ? value : '')
 /** A TSV cell: a line break is written `\n` (a backslash and an n), as the Door43 sources have it. */
@@ -25,13 +28,13 @@ function sourceText(md: string, lang: string): string {
 }
 
 /** `ta:translate/figs-metaphor` as the SupportReference column writes it; any other form was kept as it was in `cols`. */
-function supportReferenceOf(row: HelpRow): string {
+function supportReferenceOf(row: Table['rows'][number]): string {
   const concept = /^ta:([^/]+)\/(.+)$/.exec(row.concept ?? '')
   return concept ? `rc://*/ta/man/${concept[1]}/${concept[2]}` : cell(row.cols.supportReference)
 }
 
 /** `tw:kt/grace` as the TWLink column writes it. */
-function twLinkOf(row: HelpRow): string {
+function twLinkOf(row: Table['rows'][number]): string {
   const concept = /^tw:([^/]+)\/(.+)$/.exec(row.concept ?? '')
   return concept ? `rc://*/tw/dict/bible/${concept[1]}/${concept[2]}` : cell(row.cols.twLink)
 }
@@ -40,7 +43,7 @@ function twLinkOf(row: HelpRow): string {
  * The reference column of a note. A book or chapter introduction has `isIntro`: the segment keeps it at verse 1 of its chapter
  * (`front:intro` and `1:intro` are both chapter 1), and the parser puts it there again.
  */
-const noteReference = (row: HelpRow): string => (row.cols.isIntro === true ? `${row.ref.split(':')[0]}:intro` : row.ref)
+const noteReference = (row: Table['rows'][number]): string => (row.cols.isIntro === true ? `${row.ref.split(':')[0]}:intro` : row.ref)
 
 const tsv = (header: string[], rows: string[][]): string => [header.join('\t'), ...rows.map((r) => r.join('\t'))].join('\n')
 
@@ -60,7 +63,7 @@ function chunked(key: string, field: 'notes' | 'questions', processed: object): 
   ]
 }
 
-async function notesRows(table: HelpTable, book: string, lang: string): Promise<Row[]> {
+export async function notesRows(table: Table, book: string, lang: string): Promise<Row[]> {
   const tsvText = tsv(
     ['Reference', 'ID', 'Tags', 'SupportReference', 'Quote', 'Occurrence', 'Note'],
     table.rows.map((r) => [noteReference(r), r.id, cell(r.cols.tags), supportReferenceOf(r), tsvCell(cell(r.cols.quote)), cell(r.cols.occurrence), sourceText(cell(r.cols.note), lang)]),
@@ -69,7 +72,7 @@ async function notesRows(table: HelpTable, book: string, lang: string): Promise<
   return chunked(`tn:${table.res}:${book}`, 'notes', processed)
 }
 
-async function questionsRows(table: HelpTable, book: string, lang: string): Promise<Row[]> {
+export async function questionsRows(table: Table, book: string, lang: string): Promise<Row[]> {
   const tsvText = tsv(
     ['Reference', 'ID', 'Tags', 'Quote', 'Occurrence', 'Question', 'Response'],
     table.rows.map((r) => [r.ref, r.id, cell(r.cols.tags), tsvCell(cell(r.cols.quote)), cell(r.cols.occurrence), sourceText(cell(r.cols.question), lang), sourceText(cell(r.cols.response), lang)]),
@@ -79,7 +82,7 @@ async function questionsRows(table: HelpTable, book: string, lang: string): Prom
 }
 
 /** One row for the whole book: the adapter does not split `twl:`. */
-async function linksRows(table: HelpTable, book: string): Promise<Row[]> {
+export async function linksRows(table: Table, book: string): Promise<Row[]> {
   const tsvText = tsv(
     ['Reference', 'ID', 'Tags', 'OrigWords', 'Occurrence', 'TWLink'],
     table.rows.map((r) => [r.ref, r.id, cell(r.cols.tags), tsvCell(cell(r.cols.origWords)), cell(r.cols.occurrence), twLinkOf(r)]),

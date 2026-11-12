@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url'
 import { BUILDER, buildCommon, buildLanguage, keyId, publicKeyOf, signCatalog } from '@bt-synergy/language-pack-v3'
 import type { ResourceRef, Row, RowSource } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
+import { NotesProcessor, QuestionsProcessor, WordsLinksProcessor } from '@bt-synergy/resource-parsers'
+import { ObsLoader } from '@bt-synergy/resource-pipeline'
 
 export type Sample = {
   segments: Map<string, Uint8Array>
@@ -59,6 +61,100 @@ function withTa(base: RowSource): RowSource {
   }
 }
 
+/**
+ * Open Bible Stories 1 and 2 of es-419 with their notes, questions and word links, as the Door43 loaders write them: the
+ * stories by `ObsLoader` itself (over a fake Door43 client and an in-memory cache), the helps by the parsers of the TSV
+ * loaders. `OBS_DOOR43` holds those rows (`resolvedSrc` and `timestamp` included) for the tests to compare with.
+ */
+export const OBS_RES = { stories: 'es-419_gl/es-419/obs', notes: 'es-419_gl/es-419/obs-tn', questions: 'es-419_gl/es-419/obs-tq', links: 'es-419_gl/es-419/obs-twl' }
+const OBS_STAMP = 'v9#2024-03-01T10_00_00Z'
+const IMG = (n: string, f: string) => `https://cdn.door43.org/obs/jpg/360px/obs-en-${n}-${f}.jpg`
+export const OBS_STORIES_MD: Record<string, string> = {
+  '01': [
+    '# 1. La creación',
+    `![OBS Image](${IMG('01', '01')})`,
+    'Dios creó el mundo en seis días.',
+    `![OBS Image](${IMG('01', '02')})`,
+    'Luego Dios dijo: «Que haya luz».',
+    '_Una historia de la Biblia: Génesis 1-2_',
+  ].join('\n\n'),
+  '02': [
+    '# 2. El pecado entra en el mundo',
+    `![OBS Image](${IMG('02', '01')})`,
+    'Dios puso al hombre y a la mujer en un jardín.',
+    `![OBS Image](${IMG('02', '02')})`,
+    'La serpiente engañó a la mujer.',
+    `![OBS Image](${IMG('02', '03')})`,
+    'Ellos comieron del fruto.',
+    '_Una historia de la Biblia: Génesis 2-3_',
+  ].join('\n\n'),
+}
+const T = '\t'
+const tsv = (lines: string[][]) => lines.map((l) => l.join(T)).join('\n')
+const OBS_TN_TSV = tsv([
+  ['Reference', 'ID', 'Tags', 'SupportReference', 'Quote', 'Occurrence', 'Note'],
+  ['1:1', 'ab12', '', 'rc://*/ta/man/translate/figs-metaphor', 'seis días', '1', 'Una nota.\\nVea [[rc://es-419/ta/man/translate/figs-simile]].'],
+  ['1:2', 'cd34', '', '', '', '0', 'Otra nota.'],
+  ['2:3', 'ef56', '', '', 'fruto', '1', 'Nota de la historia 2.'],
+])
+const OBS_TQ_TSV = tsv([
+  ['Reference', 'ID', 'Tags', 'Quote', 'Occurrence', 'Question', 'Response'],
+  ['1:1', 'qa01', '', '', '0', '¿Qué creó Dios?', 'El mundo.'],
+  ['2:2', 'qb02', '', '', '0', '¿Quién engañó a la mujer?', 'La serpiente.'],
+])
+const OBS_TWL_TSV = tsv([
+  ['Reference', 'ID', 'Tags', 'OrigWords', 'Occurrence', 'TWLink'],
+  ['1:1', 'wl01', 'keyterm', 'Dios', '1', 'rc://*/tw/dict/bible/kt/god'],
+  ['2:2', 'wl02', 'keyterm', 'serpiente', '1', 'rc://*/tw/dict/bible/other/serpent'],
+])
+export type ObsDoor43 = { stories: Row[]; notes: Row[]; questions: Row[]; links: Row[] }
+type Processed = { notesByChapter: Record<string, unknown[]>; questionsByChapter: Record<string, unknown[]>; metadata: unknown }
+let obsDoor43: Promise<ObsDoor43> | undefined
+export function OBS_DOOR43(): Promise<ObsDoor43> {
+  return (obsDoor43 ??= (async () => {
+    const cache = new Map<string, unknown>()
+    const loader = new ObsLoader({
+      cacheAdapter: { get: async (k: string) => (cache.get(k) as { content?: unknown }) ?? null, set: async (k: string, v: unknown) => void cache.set(k, v) },
+      catalogAdapter: { get: async () => ({ contentMetadata: { ingredients: Object.keys(OBS_STORIES_MD).map((n) => ({ identifier: n, path: `./content/${n}.md` })) } }) },
+      door43Client: {
+        findRepository: async () => ({ release: { tag_name: 'v9' } }),
+        fetchTextContent: async (_o: string, _r: string, path: string) => OBS_STORIES_MD[/(\d+)\.md$/.exec(path)![1]],
+      },
+    })
+    for (const n of Object.keys(OBS_STORIES_MD)) await loader.loadContent(OBS_RES.stories, n)
+    const stories = [...cache].map(([key, value]) => ({ key, value }))
+    const chunk = (prefix: string, res: string, field: string, by: Record<string, unknown[]>, metadata: unknown): Row[] =>
+      Object.entries(by).map(([chapter, list]) => ({ key: `${prefix}:${res}:obs:${chapter}`, value: { content: { [field]: list }, metadata } }))
+    const tn: Processed = Object.assign({}, await new NotesProcessor().processNotes(OBS_TN_TSV, 'obs', 'obs'))
+    const tq: Processed = Object.assign({}, await new QuestionsProcessor().processQuestions(OBS_TQ_TSV, 'obs', 'obs'))
+    const twl = await new WordsLinksProcessor().processWordsLinks(OBS_TWL_TSV, 'obs', 'obs')
+    return {
+      stories,
+      notes: chunk('tn', OBS_RES.notes, 'notes', tn.notesByChapter, tn.metadata),
+      questions: chunk('tq', OBS_RES.questions, 'questions', tq.questionsByChapter, tq.metadata),
+      links: [{ key: `twl:${OBS_RES.links}:obs`, value: twl }],
+    }
+  })())
+}
+async function withObs(base: RowSource): Promise<RowSource> {
+  const d = await OBS_DOOR43()
+  const parts: [string, string, Row[]][] = [
+    [OBS_RES.stories, 'Open Bible Stories', d.stories],
+    [OBS_RES.notes, 'TSV OBS Translation Notes', d.notes],
+    [OBS_RES.questions, 'TSV OBS Translation Questions', d.questions],
+    [OBS_RES.links, 'TSV OBS Translation Words Links', d.links],
+  ]
+  return {
+    resources: async (lang) => [...(await base.resources(lang)), ...(lang === 'es-419' ? parts.map(([key, kind]): ResourceRef => ({ key, stamp: OBS_STAMP, kind, books: [] })) : [])],
+    rows(f) {
+      const part = parts.find(([key]) => key === f.resource)
+      if (!part) return base.rows(f)
+      const rows = f.layer === undefined || f.layer === 'sot' ? part[2].map((r) => ({ layer: 'sot', ...r })) : []
+      return (async function* () { yield* rows })()
+    },
+  }
+}
+
 const memo = new Map<number, Promise<Sample>>()
 /** The sample as its catalogs' `revision` says (the same content, signed with a key made for each revision). */
 export function buildSample(revision = 1): Promise<Sample> {
@@ -73,7 +169,7 @@ async function make(about: ReturnType<typeof aboutOf>): Promise<Sample> {
   const source = (lang: string) => partsSource({ list: join(DATA, lang, 'list.json'), partsDir: parts, originals })
   const common = await buildCommon({ source: await source('en'), about, mapLang: 'en' })
   const lang = await buildLanguage({
-    source: withTa(await source('es-419')),
+    source: await withObs(withTa(await source('es-419'))),
     lang: 'es-419',
     registry: {},
     about,
