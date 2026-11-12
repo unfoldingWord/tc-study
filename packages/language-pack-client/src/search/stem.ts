@@ -21,9 +21,18 @@ export function stemmerFor(tag: string): ((word: string) => string) | undefined 
   return s
 }
 
-/** Folds (NFD, no marks, lower case), then stems when a stemmer exists. */
+/** Lower-cases and NFC-normalizes, stems as written, then folds the stem. Without a stemmer: the folded word. */
 export function stemWord(tag: string, word: string): string {
-  const f = fold(word)
   const s = stemmerFor(tag)
-  return s ? s(f) : f
+  if (!s) return fold(word)
+  return fold(s(word.normalize('NFC').toLowerCase().trim()))
+}
+
+/** Stem as written plus stem of the folded word (for people who type without accents). Unique values. */
+export function stemForms(tag: string, word: string): string[] {
+  const a = stemWord(tag, word)
+  const s = stemmerFor(tag)
+  if (!s) return [a]
+  const b = s(fold(word))
+  return a === b ? [a] : [a, b]
 }

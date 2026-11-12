@@ -25,4 +25,4 @@ export type { Hit, SearchFilters, SearchIndex, SearchKind } from './search/types
 export type { StoryData, StoryFrame, StoryRef } from './query/stories'
 export type { AcademyArticle, AcademyData } from './query/academy'
 export type { SectionsData } from './query/sections'
-export { baseLang, stemmerFor, stemWord } from './search/stem'
+export { baseLang, stemForms, stemmerFor, stemWord } from './search/stem'
