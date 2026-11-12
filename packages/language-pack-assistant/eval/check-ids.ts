@@ -12,6 +12,9 @@ import { BOOKS, verseId } from '@bt-synergy/language-pack-v3'
 import type { Call } from '../src/decision'
 import { installPacks } from './packs'
 
+/** The chain's own helper (`src/strongs.ts`), re-exported for the eval. */
+export { strongsOf } from '../src/strongs'
+
 export type IdCheck = { id: string; ok: boolean; why?: string }
 
 type Events = [number, string, string][]
@@ -50,42 +53,6 @@ export async function lastVerse(reader: PackReader, book: string, chapter: numbe
     }
   }
   return last
-}
-
-type Spread = { drop: Set<string>; concepts: Map<string, number> }
-const spreads = new WeakMap<PackReader, Promise<Spread>>()
-
-/**
- * For each Strong key, how many tW concepts list it in `strongs`; `drop` holds the keys of more than 2 % of them (`G35880`, `H0853`),
- * which say nothing of one concept. Once per reader.
- */
-function spreadOf(reader: PackReader): Promise<Spread> {
-  let found = spreads.get(reader)
-  if (found === undefined) {
-    found = reader.mapsOf(['xmap'], { coreOnly: true }).then((m) => {
-      const lists = Object.entries(m.xmap?.core.strongs ?? {}).filter(([id]) => id.startsWith('tw:'))
-      const concepts = new Map<string, number>()
-      for (const [, keys] of lists) for (const k of new Set(keys)) concepts.set(k, (concepts.get(k) ?? 0) + 1)
-      return { drop: new Set([...concepts].filter(([, n]) => n > lists.length * 0.02).map(([k]) => k)), concepts }
-    })
-    spreads.set(reader, found)
-  }
-  return found
-}
-
-/**
- * The Strong keys the xmap lists for a concept (`strongs`) without the catch-all keys (R10b), ranked by use and specificity (R10d):
- * `log1p(occurrences) / conceptsListing` descending (occurrences: the sum of the `strong` counts over the books; conceptsListing: how many
- * tW concepts list the key), ties in code-point order. Empty when none
- * is left or the xmap is not installed. Callers take the first 3. Reusable by the rules.
- */
-export async function strongsOf(reader: PackReader, conceptId: string): Promise<string[]> {
-  const core = (await reader.mapsOf(['xmap'], { coreOnly: true })).xmap?.core
-  const { drop, concepts } = await spreadOf(reader)
-  const keys = (core?.strongs?.[conceptId] ?? []).filter((k) => !drop.has(k))
-  const total = (k: string): number => [...(core?.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
-  const score = (k: string): number => Math.log1p(total(k)) / Math.max(1, concepts.get(k) ?? 1)
-  return [...keys].sort((x, y) => score(y) - score(x) || (x < y ? -1 : x > y ? 1 : 0))
 }
 
 export function checkIds(reader: PackReader, ids: string[]): Promise<IdCheck[]> {

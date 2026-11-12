@@ -17,7 +17,7 @@ export type Entity =
 
 export type Lexicon = {
   /** The tokens of the folded question and the entities found in them (token indexes, `end` excluded), in order of position. */
-  entities(question: string): { tokens: string[]; entities: Entity[] }
+  entities(question: string, o?: { phraseTokens?: ReadonlySet<number> }): { tokens: string[]; entities: Entity[] }
   /** A book code to the ids of the people whose name equals one of its full names (`jhn` to John). */
   ambiguousBooks: Map<string, string[]>
 }
@@ -70,7 +70,7 @@ function clsOf(id: string): 'tw' | 'name' | 'ta' | 'topic' {
   return r === 0 ? 'name' : r === 1 ? 'tw' : r === 2 ? 'ta' : 'topic'
 }
 
-type BookAlias = { toks: string[]; code: string; standalone: boolean; cued: boolean }
+type BookAlias = { toks: string[]; code: string; standalone: boolean; cued: boolean; digitsOnly: boolean }
 
 /** Book names that are also common nouns ("los numeros de la tabla"): alone they are no book. */
 export const COMMON_NOUNS: Record<string, Set<string>> = {
@@ -120,7 +120,7 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
   const seen = new Set<string>()
   const common = COMMON_NOUNS[lang] ?? new Set<string>()
   const cues = CUES[lang] ?? []
-  const addBook = (text: string | undefined, code: string, standalone: boolean): void => {
+  const addBook = (text: string | undefined, code: string, standalone: boolean, digitsOnly = false): void => {
     const toks = words(fold(text ?? ''))
     if (toks.length === 0) return
     // A name that is a stop, frame or common word alone needs a number after it or a cue before it.
@@ -129,7 +129,7 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
       const key = v.join(' ')
       if (seen.has(key)) continue
       seen.add(key)
-      aliases.push({ toks: v, code, standalone: standalone && !weak, cued: standalone && weak })
+      aliases.push({ toks: v, code, standalone: standalone && !weak, cued: standalone && weak, digitsOnly })
     }
   }
   const core = maps.map?.core
@@ -143,7 +143,8 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
     addBook(short, code, true)
     addBook(abbr, code, false)
   })
-  BOOKS.forEach((code) => addBook(code, code, false))
+  // A bare code ("deu") is no word of the language: it is a reference only when digits follow it ("deu 2", not pt "deu duas").
+  BOOKS.forEach((code) => addBook(code, code, false, true))
   const booksByFirst = new Map<string, BookAlias[]>()
   for (const a of [...aliases].sort((x, y) => y.toks.length - x.toks.length)) {
     const list = booksByFirst.get(a.toks[0]!) ?? []
@@ -265,7 +266,8 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
     return { nums, ...(verseEnd === undefined ? {} : { verseEnd }), end }
   }
 
-  function entities(question: string): { tokens: string[]; entities: Entity[] } {
+  /** `phraseTokens`: the token indexes of the question's fixed phrases ("quien fue"); no concept name uses them. */
+  function entities(question: string, o: { phraseTokens?: ReadonlySet<number> } = {}): { tokens: string[]; entities: Entity[] } {
     const toks = words(fold(question))
     const used = toks.map(() => false)
     const out: Entity[] = []
@@ -292,7 +294,7 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
       }
       const after = i + hit.toks.length
       const { nums, verseEnd, end } = numbersAfter(toks, after)
-      if (nums.length > 0) {
+      if (nums.length > 0 && !(hit.digitsOnly && !/^\d/.test(toks[after]!))) {
         out.push({
           kind: 'ref',
           book: hit.code,
@@ -331,13 +333,25 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
       }
     }
     found.sort((a, b) => b.n - a.n || a.span[0]! - b.span[0]!)
-    for (const { span, ids } of found) {
-      const a = span[0]!
-      const b = span[span.length - 1]! + 1
-      if (frame.has(toks[a]!) || used.slice(a, b).some(Boolean)) continue
-      const sorted = ids.sort(byRank)
-      out.push({ kind: 'concept', ids: sorted, cls: clsOf(sorted[0]!), start: a, end: b })
-      mark(a, b)
+    // A name inside a fixed phrase is no name ("era" in "o que era"). A name that shares words with a phrase is taken only after the
+    // others, when no other name claims its words: "quien fue Booz" is Booz, "como se traducen los nombres propios" keeps its tA name.
+    const phraseWords = (a: number, b: number): number => {
+      let n = 0
+      for (let k = a; k < b; k++) if (o.phraseTokens?.has(k)) n++
+      return n
+    }
+    for (const pass of [0, 1]) {
+      for (const { span, ids } of found) {
+        const a = span[0]!
+        const b = span[span.length - 1]! + 1
+        const shared = phraseWords(a, b)
+        if (shared === b - a || (pass === 0) !== (shared === 0)) continue
+        // A one-word name that is a frame word is the frame; a longer name may start with one ("pregunta retorica", "nombres propios").
+        if ((span.length === 1 && frame.has(toks[a]!)) || used.slice(a, b).some(Boolean)) continue
+        const sorted = ids.sort(byRank)
+        out.push({ kind: 'concept', ids: sorted, cls: clsOf(sorted[0]!), start: a, end: b })
+        mark(a, b)
+      }
     }
 
     // A book name that is also a person's name is both.
