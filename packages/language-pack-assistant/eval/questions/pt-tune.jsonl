@@ -50,16 +50,16 @@
 {"q":"O que é a elipse?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-ellipsis"}}},"pieces":[]}
 {"q":"Como traduzir um eufemismo?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-euphemism"}}},"pieces":[]}
 {"q":"leia o artigo sobre metáfora","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-metaphor"}}},"pieces":[]}
-{"q":"Como foi traduzida graça?","expect":{"choose":[{"query":"renderings","args":{"strong":"H2589"}},{"query":"renderings","args":{"strong":"H2603b"}},{"query":"renderings","args":{"strong":"H2580"}}]},"pieces":[]}
+{"q":"Como foi traduzida graça?","expect":{"choose":[{"query":"renderings","args":{"strong":"H2580"}},{"query":"renderings","args":{"strong":"G54850"}},{"query":"renderings","args":{"strong":"H2587"}}]},"pieces":[]}
 {"q":"Como os textos traduzem a palavra aliança?","expect":{"choose":[{"query":"renderings","args":{"strong":"H3772"}},{"query":"renderings","args":{"strong":"H1285"}},{"query":"renderings","args":{"strong":"G12420"}}]},"pieces":[]}
 {"q":"Como foi traduzido G5485?","expect":{"call":{"query":"renderings","args":{"strong":"G5485"}}},"pieces":[]}
 {"q":"compare como se traduziu redimir em cada livro","expect":{"choose":[{"query":"renderings","args":{"strong":"G00590"}},{"query":"renderings","args":{"strong":"G06290"}},{"query":"renderings","args":{"strong":"G18050"}}]},"pieces":[]}
 {"q":"De que maneiras se traduziu fé?","expect":{"choose":[{"query":"renderings","args":{"strong":"G36400"}},{"query":"renderings","args":{"strong":"G41020"}},{"query":"renderings","args":{"strong":"H3689"}}]},"pieces":[]}
 {"q":"traduções de H2617","expect":{"call":{"query":"renderings","args":{"strong":"H2617"}}},"pieces":[]}
-{"q":"Como traduziram santo no texto literal?","expect":{"choose":[{"query":"renderings","args":{"strong":"G00410"}},{"query":"renderings","args":{"strong":"G37420"}},{"query":"renderings","args":{"strong":"G00425"}}]},"pieces":[]}
+{"q":"Como traduziram santo no texto literal?","expect":{"choose":[{"query":"renderings","args":{"strong":"H1320"}},{"query":"renderings","args":{"strong":"H6942"}},{"query":"renderings","args":{"strong":"G00370"}}]},"pieces":[]}
 {"q":"Que palavras usam para pecado?","expect":{"choose":[{"query":"renderings","args":{"strong":"G40120"}},{"query":"renderings","args":{"strong":"G02660"}},{"query":"renderings","args":{"strong":"G02680"}}]},"pieces":[]}
-{"q":"usos da palavra amor nas traduções","expect":{"choose":[{"query":"renderings","args":{"strong":"G00260"}},{"query":"renderings","args":{"strong":"H0160"}},{"query":"renderings","args":{"strong":"G53600"}}]},"pieces":[]}
-{"q":"como se traduz cordeiro?","expect":{"choose":[{"query":"renderings","args":{"strong":"H3629"}},{"query":"renderings","args":{"strong":"G07210"}},{"query":"renderings","args":{"strong":"G02860"}}]},"pieces":[]}
+{"q":"usos da palavra amor nas traduções","expect":{"choose":[{"query":"renderings","args":{"strong":"G00260"}},{"query":"renderings","args":{"strong":"H0160"}},{"query":"renderings","args":{"strong":"G00250"}}]},"pieces":[]}
+{"q":"como se traduz cordeiro?","expect":{"choose":[{"query":"renderings","args":{"strong":"H3629"}},{"query":"renderings","args":{"strong":"G07210"}},{"query":"renderings","args":{"strong":"H3532"}}]},"pieces":[]}
 {"q":"Como os tradutores verteram perdoar?","expect":{"choose":[{"query":"renderings","args":{"strong":"H5545"}},{"query":"renderings","args":{"strong":"G54830"}},{"query":"renderings","args":{"strong":"G08590"}}]},"pieces":[]}
 {"q":"compare as traduções de G26","expect":{"call":{"query":"renderings","args":{"strong":"G26"}}},"pieces":[]}
 {"q":"Como se traduziu abençoar em Rute?","expect":{"choose":[{"query":"renderings","args":{"strong":"H1293"}},{"query":"renderings","args":{"strong":"G31070"}},{"query":"renderings","args":{"strong":"G21270"}}]},"pieces":[]}

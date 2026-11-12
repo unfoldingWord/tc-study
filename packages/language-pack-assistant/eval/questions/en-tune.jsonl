@@ -29,14 +29,14 @@
 {"q":"explain active or passive voice","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-activepassive"}}},"pieces":[]}
 {"q":"how are proper names translated?","expect":{"call":{"query":"article","args":{"id":"ta:translate/translate-names"}}},"pieces":[]}
 {"q":"what is an idiom","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-idiom"}}},"pieces":[]}
-{"q":"How was grace translated?","expect":{"choose":[{"query":"renderings","args":{"strong":"H2589"}},{"query":"renderings","args":{"strong":"H2603b"}},{"query":"renderings","args":{"strong":"H2580"}}]},"pieces":[]}
+{"q":"How was grace translated?","expect":{"choose":[{"query":"renderings","args":{"strong":"H2580"}},{"query":"renderings","args":{"strong":"G54850"}},{"query":"renderings","args":{"strong":"H2587"}}]},"pieces":[]}
 {"q":"How do the texts translate the word covenant?","expect":{"choose":[{"query":"renderings","args":{"strong":"H3772"}},{"query":"renderings","args":{"strong":"H1285"}},{"query":"renderings","args":{"strong":"G12420"}}]},"pieces":[]}
 {"q":"How has G5485 been translated?","expect":{"call":{"query":"renderings","args":{"strong":"G5485"}}},"pieces":[]}
 {"q":"compare how redeem was translated in each book","expect":{"choose":[{"query":"renderings","args":{"strong":"G00590"}},{"query":"renderings","args":{"strong":"G06290"}},{"query":"renderings","args":{"strong":"G18050"}}]},"pieces":[]}
 {"q":"translations of H2617","expect":{"call":{"query":"renderings","args":{"strong":"H2617"}}},"pieces":[]}
 {"q":"What words do they use for sin?","expect":{"choose":[{"query":"renderings","args":{"strong":"G40120"}},{"query":"renderings","args":{"strong":"G02660"}},{"query":"renderings","args":{"strong":"G02680"}}]},"pieces":[]}
 {"q":"compare the renderings of G26","expect":{"call":{"query":"renderings","args":{"strong":"G26"}}},"pieces":[]}
-{"q":"how is lamb translated?","expect":{"choose":[{"query":"renderings","args":{"strong":"H3629"}},{"query":"renderings","args":{"strong":"G07210"}},{"query":"renderings","args":{"strong":"G02860"}}]},"pieces":[]}
+{"q":"how is lamb translated?","expect":{"choose":[{"query":"renderings","args":{"strong":"H3629"}},{"query":"renderings","args":{"strong":"G07210"}},{"query":"renderings","args":{"strong":"H3532"}}]},"pieces":[]}
 {"q":"In which books are there metaphors?","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-metaphor"}}},"pieces":[]}
 {"q":"How many times does Abraham appear in the Bible?","expect":{"call":{"query":"books","args":{"article":"tw:names/abraham"}}},"pieces":[]}
 {"q":"Where does G5485 appear?","expect":{"call":{"query":"books","args":{"concept":"G5485"}}},"pieces":[]}

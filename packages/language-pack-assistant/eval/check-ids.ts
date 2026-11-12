@@ -74,8 +74,9 @@ function spreadOf(reader: PackReader): Promise<Spread> {
 }
 
 /**
- * The Strong keys the xmap lists for a concept (`strongs`) without the catch-all keys (R10b), the most specific first (R10c): fewest tW
- * concepts listing the key, then most occurrences (the sum of the `strong` counts over the books), then code-point order. Empty when none
+ * The Strong keys the xmap lists for a concept (`strongs`) without the catch-all keys (R10b), ranked by use and specificity (R10d):
+ * `log1p(occurrences) / conceptsListing` descending (occurrences: the sum of the `strong` counts over the books; conceptsListing: how many
+ * tW concepts list the key), ties in code-point order. Empty when none
  * is left or the xmap is not installed. Callers take the first 3. Reusable by the rules.
  */
 export async function strongsOf(reader: PackReader, conceptId: string): Promise<string[]> {
@@ -83,8 +84,8 @@ export async function strongsOf(reader: PackReader, conceptId: string): Promise<
   const { drop, concepts } = await spreadOf(reader)
   const keys = (core?.strongs?.[conceptId] ?? []).filter((k) => !drop.has(k))
   const total = (k: string): number => [...(core?.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
-  const spread = (k: string): number => concepts.get(k) ?? 0
-  return [...keys].sort((x, y) => spread(x) - spread(y) || total(y) - total(x) || (x < y ? -1 : x > y ? 1 : 0))
+  const score = (k: string): number => Math.log1p(total(k)) / Math.max(1, concepts.get(k) ?? 1)
+  return [...keys].sort((x, y) => score(y) - score(x) || (x < y ? -1 : x > y ? 1 : 0))
 }
 
 export function checkIds(reader: PackReader, ids: string[]): Promise<IdCheck[]> {

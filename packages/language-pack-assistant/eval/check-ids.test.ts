@@ -108,12 +108,13 @@ test('strongsOf: keys of a concept, catch-alls dropped, most specific first; non
   const seen = new Map<string, number>()
   for (const [, ks] of lists) for (const k of new Set(ks)) seen.set(k, (seen.get(k) ?? 0) + 1)
   const total = (k: string) => [...(core.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
-  // R10c: fewest concepts first, then most occurrences
+  // R10d: log1p(occurrences) / concepts listing, descending
+  const score = (k: string) => Math.log1p(total(k)) / seen.get(k)!
   for (const [id] of lists) {
     const ks = await strongsOf(reader, id)
     for (let i = 1; i < ks.length; i++) {
       const [p, q] = [ks[i - 1]!, ks[i]!]
-      expect(seen.get(p)! < seen.get(q)! || (seen.get(p) === seen.get(q) && total(p) >= total(q))).toBe(true)
+      expect(score(p)).toBeGreaterThanOrEqual(score(q))
     }
   }
   expect(await strongsOf(reader, 'tw:kt/nothing')).toEqual([])
