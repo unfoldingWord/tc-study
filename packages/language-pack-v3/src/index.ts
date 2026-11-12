@@ -50,6 +50,7 @@ export { catalogView } from './read/catalog'
 export { lexView } from './read/lex'
 export { obsView } from './read/obs'
 export { origView } from './read/orig'
+export { bookUsfm, origUsfm } from './read/usfm'
 export { topicsView, xtopicsView } from './read/topics'
 export { parseTipnr, type TipnrRecord } from './source/tipnr'
 export {
