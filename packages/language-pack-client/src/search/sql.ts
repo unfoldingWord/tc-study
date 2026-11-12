@@ -2,9 +2,9 @@
  * Full-text search over an FTS5 table, through a driver the host provides (bun:sqlite, wa-sqlite, expo-sqlite...). This file knows
  * no SQLite binding. The text of the user is never FTS5 syntax: each word is a quoted phrase of its own (all must match).
  */
-import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
+import type { ArticleModel, BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
 import { stemForms } from './stem'
-import { DEFAULT_LIMIT, type Hit, INDEX_VERSION, type PieceRow, queryWords, rowsOf, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
+import { DEFAULT_LIMIT, type Hit, INDEX_VERSION, type PieceRow, queryWords, rowsOf, rowsOfArticles, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
 
 export interface SqlDriver {
   exec(sql: string): Promise<void>
@@ -90,6 +90,9 @@ export function sqlIndex(driver: SqlDriver): SearchIndex {
     },
     async addObs(lang: string, obs: ObsModel, segmentId: string) {
       await store(lang, 'obs', rowsOfObs(obs), segmentId)
+    },
+    async addArticles(lang: string, articles: ArticleModel[], segmentId: string) {
+      await store(lang, '', rowsOfArticles(articles), segmentId)
     },
     async removeSegment(segmentId) {
       await driver.transaction(async () => {

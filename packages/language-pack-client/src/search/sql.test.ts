@@ -4,7 +4,7 @@ import { createClient, type LanguagePackClient } from '../client'
 import { httpSource } from '../source/http'
 import { memoryStore } from '../store/memory'
 import { type FakeServer, startFakeServer } from '../../test/fakeServer'
-import { buildSample, rewordTitusNote, type Sample } from '../../test/sample'
+import { buildSample, retitleTw, rewordTitusNote, type Sample } from '../../test/sample'
 import type { TrustPolicy } from '../verify'
 import { memoryIndex } from './memory'
 import { type SqlDriver, sqlIndex } from './sql'
@@ -260,6 +260,55 @@ describe('OBS in the search index', () => {
     await ix.removeSegment('o1')
     expect(await ix.has('o1')).toBe(false)
     expect(await ix.search('xx', 'creación')).toEqual([])
+  })
+})
+
+describe('article sections in the index', () => {
+  test('installing an art: unit adds its segment, section hits cite it, and prune removes it', async () => {
+    const index = sqlIndex(bunDriver())
+    const client = setup(sample, index)
+    await client.install('es-419', { books: ['tit'] })
+    const reader = await client.open('es-419')
+    const arts = (await reader.articles('tw:kt'))!
+    const art = arts.find((a) => a.sections.some((x) => x.md.trim() !== ''))!
+    const sec = art.sections.find((x) => x.md.trim() !== '')!
+    const word = /[\p{L}]{6,}/u.exec(sec.md)![0]
+    const r = await reader.search(word, { kinds: ['section'], limit: 100 })
+    const hit = r.data!.find((h) => h.id === `${art.id}#${sec.sid}`)!
+    expect(hit).toMatchObject({ kind: 'section', book: '', ref: '', res: art.res })
+    expect(r.cites.find((c) => c.id === hit.id)).toMatchObject({ res: art.res, release: expect.any(String) })
+    expect('ref' in r.cites.find((c) => c.id === hit.id)!).toBe(false)
+    const artSeg = (await client.status('es-419')).units.find((u) => u.key === 'es-419/art:tw:kt')
+    expect(artSeg?.installed).toBe(true)
+    const mem = setup(sample)
+    await mem.install('es-419', { books: ['tit'] })
+    const m = await (await mem.open('es-419')).search(word, { kinds: ['section'], limit: 100 })
+    expect(m.data!.map((h) => h.id).sort()).toEqual(r.data!.map((h) => h.id).sort())
+  })
+  test('the index has the art: segment while installed and not after the unit is gone', async () => {
+    const real = sqlIndex(bunDriver())
+    const added: string[] = []
+    const index = { ...real, addArticles: (l: string, a: Parameters<typeof real.addArticles>[1], id: string) => (added.push(id), real.addArticles(l, a, id)) }
+    const client = setup(sample, index)
+    await client.install('es-419', { books: ['tit'] })
+    await client.open('es-419')
+    expect(added.length).toBeGreaterThan(0)
+    for (const id of added) expect(await index.has(id)).toBe(true)
+    // A new revision of the articles replaces the segment: the old one leaves the index, the new one is in it.
+    const store = memoryStore()
+    const seen: string[] = []
+    const real2 = sqlIndex(bunDriver())
+    const spy = { ...real2, addArticles: (l: string, a: Parameters<typeof real.addArticles>[1], id: string) => (seen.push(id), real2.addArticles(l, a, id)) }
+    await setup(sample, spy, store).install('es-419', { books: ['tit'] })
+    const c3 = setup(await buildSample({ revision: 3, tweak: retitleTw() }), spy, store)
+    await c3.refresh('es-419')
+    await c3.install('es-419', { books: ['tit'] })
+    await c3.prune()
+    const fresh = seen.filter((id) => !added.includes(id))
+    expect(seen.filter((id) => added.includes(id)).length).toBeGreaterThan(0)
+    expect(fresh.length).toBeGreaterThan(0)
+    for (const id of fresh) expect(await real2.has(id)).toBe(true)
+    for (const id of added) expect(await real2.has(id)).toBe(false)
   })
 })
 

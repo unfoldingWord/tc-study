@@ -1,7 +1,7 @@
 /** The search index contract and the rows of a book that both indexes keep. No Node module here. */
-import type { BookModel, Event, ObsModel, Piece } from '@bt-synergy/language-pack-v3'
+import type { ArticleModel, BookModel, Event, ObsModel, Piece } from '@bt-synergy/language-pack-v3'
 
-export type SearchKind = 'text' | 'note' | 'question' | 'link' | 'title'
+export type SearchKind = 'text' | 'note' | 'question' | 'link' | 'title' | 'section'
 
 export type SearchFilters = { books?: string[]; kinds?: SearchKind[]; limit?: number }
 
@@ -24,6 +24,7 @@ export interface SearchIndex {
   addBook(lang: string, book: BookModel, segmentId: string): Promise<void>
   /** The rows of the `obs` unit, with `book: 'obs'` (`rowsOfObs`). */
   addObs(lang: string, obs: ObsModel, segmentId: string): Promise<void>
+  addArticles(lang: string, articles: ArticleModel[], segmentId: string): Promise<void>
   removeSegment(segmentId: string): Promise<void>
   has(segmentId: string): Promise<boolean>
   search(lang: string, text: string, f?: SearchFilters): Promise<Hit[]>
@@ -95,6 +96,17 @@ export function rowsOfObs(obs: ObsModel): PieceRow[] {
   for (const r of obs.questions?.rows ?? [])
     rows.push({ kind: 'question', ref: frameRef(r.frame), res: obs.questions!.res, rid: r.id, body: `${str(r.cols.question)}\n${str(r.cols.response)}`.trim() })
   return rows.filter((r) => r.body !== '')
+}
+
+/** One row per section with text: the article title, the section title and the text. A section hit has no book and no ref. */
+export function rowsOfArticles(articles: ArticleModel[]): PieceRow[] {
+  const rows: PieceRow[] = []
+  for (const a of articles)
+    for (const s of a.sections) {
+      if (s.md.trim() === '') continue
+      rows.push({ kind: 'section', ref: '', res: a.res, rid: `${a.id}#${s.sid}`, body: [a.title, s.title ?? '', s.md].filter((x) => x !== '').join('\n') })
+    }
+  return rows
 }
 
 /** The words of a user's text worth searching: those with at least one letter or digit. */

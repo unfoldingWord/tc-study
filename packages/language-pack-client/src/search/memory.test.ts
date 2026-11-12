@@ -83,4 +83,29 @@ describe('memoryIndex stems', () => {
     expect(await ix.search('fr', 'gracia')).toEqual([])
     expect((await ix.search('fr', 'GRACIAS')).length).toBeGreaterThan(0)
   })
+  test('article sections are rows of kind section', async () => {
+    const ix = memoryIndex()
+    await ix.addArticles(
+      'es-419',
+      [
+        {
+          id: 'tw:kt/grace',
+          res: 'r/tw',
+          title: 'Gracia',
+          sections: [
+            { sid: 'definicion', level: 2, role: 'definition', title: 'Definición', lang: 'es-419', md: 'El favor inmerecido de Dios.' },
+            { sid: 'sugerencias', level: 2, role: 'translation', lang: 'es-419', md: 'Se puede traducir así.' },
+            { sid: 'vacio', level: 2, role: 'other', lang: 'es-419', md: '  ' },
+          ],
+        },
+      ],
+      'a1',
+    )
+    const hits = await ix.search('es-419', 'gracia', { kinds: ['section'] })
+    expect(hits.map((h) => h.id).sort()).toEqual(['tw:kt/grace#definicion', 'tw:kt/grace#sugerencias'])
+    expect(hits[0]).toMatchObject({ kind: 'section', book: '', ref: '', res: 'r/tw' })
+    expect(await ix.search('es-419', 'inmerecido', { kinds: ['note'] })).toEqual([])
+    await ix.removeSegment('a1')
+    expect(await ix.search('es-419', 'gracia')).toEqual([])
+  })
 })

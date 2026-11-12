@@ -1,9 +1,9 @@
 /** The index in memory: the fallback of a reader (and the one of a Worker) when the host gives no SQL driver. Same matches as `sqlIndex`,
  * ranked differently: here by word count over the square root of the piece length, there by SQLite's bm25. With
  * more matches than the limit, the two can keep different hits. */
-import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
+import type { ArticleModel, BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
 import { stemForms } from './stem'
-import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
+import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfArticles, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
 
 const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
@@ -42,6 +42,11 @@ export function memoryIndex(): SearchIndex {
     async addObs(lang: string, obs: ObsModel, segmentId: string) {
       rows = rows.filter((r) => r.seg !== segmentId)
       for (const r of rowsOfObs(obs)) rows.push({ ...r, lang, book: 'obs', seg: segmentId, toks: tokens(r.body, lang) })
+      segs.add(segmentId)
+    },
+    async addArticles(lang: string, articles: ArticleModel[], segmentId: string) {
+      rows = rows.filter((r) => r.seg !== segmentId)
+      for (const r of rowsOfArticles(articles)) rows.push({ ...r, lang, book: '', seg: segmentId, toks: tokens(r.body, lang) })
       segs.add(segmentId)
     },
     async removeSegment(segmentId) {

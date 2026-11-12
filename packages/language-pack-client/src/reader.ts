@@ -333,6 +333,12 @@ export function makeReader(o: ReaderInput): PackReader {
   async function fillMemory(): Promise<SearchIndex> {
     const index = memoryIndex()
     for (const unit of activeIds.keys()) {
+      if (unit.startsWith('art:') && reader.installed(unit)) {
+        const articles = await reader.articles(unit.slice('art:'.length))
+        const aid = activeIds.get(unit)![0]
+        if (articles !== undefined && aid !== undefined) await index.addArticles(o.lang, articles, aid)
+        continue
+      }
       if (!unit.startsWith('book:') || !reader.installed(unit)) continue
       const model = await reader.book(unit.slice('book:'.length))
       const id = activeIds.get(unit)![0]
