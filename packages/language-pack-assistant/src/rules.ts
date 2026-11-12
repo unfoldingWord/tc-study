@@ -92,7 +92,7 @@ function renderingsOfConcept(c: Concept, question: string, strongsOf: RuleCtx['s
 }
 
 /** `books` takes an article id (`tw:*`, `ta:*`) or a concept (a Strong key or a topic id). */
-const booksCall = (id: string): Call => call('books', /^(tw|ta):/.test(id) ? { article: id } : { concept: id })
+const booksCall = (id: string): Call => call('books', /^(tw|ta):/.test(id) ? { article: id } : /^[GH]\d+[a-z]?$/.test(id) ? { strong: id } : { concept: id })
 
 /**
  * The call a query needs, filled from the question's entities; `undefined` when an argument is missing (C0's `need`).
@@ -122,7 +122,7 @@ export function outcomeFor(query: QueryName, question: string, v: View, ctx: Rul
     }
     case 'books': {
       const s = v.strongs[0]
-      if (s !== undefined) return { kind: 'call', call: booksCall(s.value) }
+      if (s !== undefined) return { kind: 'call', call: call('books', { strong: s.value }) }
       const c = v.ta[0] ?? v.named[0]
       return c === undefined ? undefined : overIds(c.ids, booksCall)
     }

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import type { Call, Decision } from '../src/decision'
-import { type Item, scoreQuestion } from './score'
+import { type Item, sameCall, scoreQuestion } from './score'
 
 const call = (query: Call['query'], args: Record<string, unknown>): Call => ({ query, args })
 const decide = (c: Call): Decision => ({ kind: 'call', call: c, via: 'rule', interpretation: 'x' })
@@ -71,4 +71,12 @@ test('top3 compares ids in canonical form (R29)', () => {
   const at = (pieces: string[]): Item => ({ q: 'x', expect: { call: tit }, pieces })
   expect(scoreQuestion(at(['verse:glt tit 2:11']), one, ['verse:es-419_gl/es-419/glt tit 2:11']).top3).toBe(true)
   expect(scoreQuestion(at(['rendering:G54850/Gracia']), one, ['a', 'rendering:G5485/gracia']).top3).toBe(true)
+})
+
+test('R32: books {concept:<Strong key>} and books {strong:<same key>} are the same call', () => {
+  const concept = { query: 'books', args: { concept: 'G5485' } }
+  const strong = { query: 'books', args: { strong: 'G5485' } }
+  expect(sameCall(concept, strong)).toBe(true)
+  expect(sameCall(strong, { query: 'books', args: { strong: 'G5486' } })).toBe(false)
+  expect(sameCall({ query: 'books', args: { concept: 'per:abraham' } }, { query: 'books', args: { strong: 'per:abraham' } })).toBe(false)
 })

@@ -78,7 +78,7 @@ function argsShown(c: Call, names: Names): string {
     case 'search':
       return str(a.text)
     case 'books':
-      return nameOf(str(a.article ?? a.concept), names)
+      return typeof a.strong === 'string' ? strongShown(a.strong) : nameOf(str(a.article ?? a.concept), names)
     case 'topics':
       return [a.category, typeof a.book === 'string' ? bookOf(a.book, names) : undefined].filter((x) => typeof x === 'string' && x !== '').join(', ')
     default:

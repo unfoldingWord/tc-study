@@ -6,8 +6,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createClient, httpSource, type PackReader } from '@bt-synergy/language-pack-client'
+import { createClient, httpSource, type PackReader, sqlIndex } from '@bt-synergy/language-pack-client'
 import { fsStore } from '@bt-synergy/language-pack-client/node/fsStore'
+import { bunDriver } from './sqlDriver'
 
 export const STAGING = 'https://translation-helps-mcp-v2-preview.unfoldingword.workers.dev'
 export const KEY_ID = '78d2e6299a2de4d0'
@@ -45,7 +46,9 @@ export async function installPacks(lang: string): Promise<{ reader: PackReader; 
     fetchedBytes += Number(res.headers.get('Content-Length') ?? 0)
     return res
   }
-  const client = createClient({ store, ...(network ? { source: httpSource({ base: STAGING, fetch: counting }) } : {}), trust: trust() })
+  // The search index is a SQLite file in the cache folder (R30), as an app on a device keeps it.
+  const index = sqlIndex(bunDriver(join(CACHE, `search-${lang}.sqlite`)))
+  const client = createClient({ store, ...(network ? { source: httpSource({ base: STAGING, fetch: counting }) } : {}), trust: trust(), index })
   let fetched = 0
   if (network) {
     await client.refresh(lang)

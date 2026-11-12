@@ -3,6 +3,7 @@
  * runs the reader's query for a call and builds the fragments of its answer. No Node module here.
  */
 import { type Answer, languageTn, type PackReader } from '@bt-synergy/language-pack-client'
+import { UGNT, UHB } from '@bt-synergy/language-pack-v3'
 import type { Call, Decision } from './decision'
 import { type Fragment, fragmentsOf } from './fragments'
 
@@ -41,6 +42,12 @@ async function citeMaps(reader: PackReader, call: Call, a: Answer<unknown>): Pro
     return
   }
   if (a.query === 'books') {
+    if (typeof call.args.strong === 'string') {
+      // The counts of a Strong key come from the original text of the book: the Greek or the Hebrew source of the xmap.
+      const orig = call.args.strong.startsWith('H') ? UHB : UGNT
+      push(orig, release(m.xmap?.core.res, orig), call.args.strong)
+      return
+    }
     const id = (call.args.article ?? call.args.concept) as string | undefined
     if (id === undefined) return
     if (id.startsWith('tw:')) push(TWL, release(m.xmap?.core.res, TWL), id)
@@ -61,8 +68,58 @@ async function citeMaps(reader: PackReader, call: Call, a: Answer<unknown>): Pro
   }
 }
 
+/** A Strong key as the reader's table keys it (R31): the digits padded to four (G26 is G0026, which the reader resolves to G00260). */
+export function normalizeStrong(key: string): string {
+  const m = /^([GH])(\d+)([a-z]?)$/i.exec(key.trim())
+  return m === null ? key : `${m[1]!.toUpperCase()}${m[2]!.padStart(4, '0')}${m[3]!.toLowerCase()}`
+}
+
+type RenderingsAnswer = Answer<{ renderings: unknown[] }>
+
+/** The renderings of a Strong key; with none and no letter suffix, the first of the suffixes a, b, c that has some (H2617 shows H2617a). */
+export async function renderingsOf(reader: PackReader, key: string): Promise<RenderingsAnswer> {
+  const k = normalizeStrong(key)
+  const first = await reader.renderings({ strong: k })
+  if (first.data !== null && first.data.renderings.length > 0) return first
+  if (!/\d$/.test(k)) return first
+  for (const s of ['a', 'b', 'c']) {
+    const next = await reader.renderings({ strong: k + s })
+    if (next.data !== null && next.data.renderings.length > 0) return next
+  }
+  return first
+}
+
+type Hit = { kind: string; res?: string; book?: string; ref?: string; id?: string; score: number }
+
+/**
+ * Search by the content words of the question (R33), not the whole sentence (the index wants every word to match). With no hits, each
+ * word alone (the longest four) and the hits merged by score. The call's `text` stays as typed; `words` only decides what is sent.
+ */
+async function searchWords(reader: PackReader, text: string, words: ((t: string) => string[]) | undefined): Promise<Answer<unknown>> {
+  const content = words?.(text) ?? []
+  if (content.length === 0) return reader.search(text)
+  const all = await reader.search(content.join(' '))
+  if (((all.data as Hit[] | null) ?? []).length > 0 || content.length === 1) return all
+  const alone = [...content].sort((a, b) => b.length - a.length).slice(0, 4)
+  const answers = await Promise.all(alone.map((w) => reader.search(w)))
+  const seen = new Set<string>()
+  const merged: { hit: Hit; cite: Answer<unknown>['cites'][number] | undefined }[] = []
+  for (const a of answers) {
+    ;((a.data as Hit[] | null) ?? []).forEach((hit, i) => {
+      const key = [hit.kind, hit.res, hit.book, hit.ref, hit.id].join('|')
+      if (seen.has(key)) return
+      seen.add(key)
+      merged.push({ hit, cite: a.cites[i] })
+    })
+  }
+  merged.sort((x, y) => y.hit.score - x.hit.score)
+  const out = { ...all, data: merged.map((m) => m.hit), cites: merged.map((m) => m.cite!), notInstalled: [...all.notInstalled] }
+  for (const a of answers) for (const n of a.notInstalled) if (!out.notInstalled.some((x) => x.unit === n.unit)) out.notInstalled.push(n)
+  return out
+}
+
 /** Runs one call; an argument the reader refuses (an empty search) is an answer with no data, not an error. */
-async function query(reader: PackReader, call: Call): Promise<Answer<unknown> | undefined> {
+async function query(reader: PackReader, call: Call, words?: (t: string) => string[]): Promise<Answer<unknown> | undefined> {
   const a = call.args
   try {
     switch (call.query) {
@@ -75,13 +132,13 @@ async function query(reader: PackReader, call: Call): Promise<Answer<unknown> | 
       case 'concept':
         return await reader.concept(String(a.id))
       case 'books':
-        return await reader.books(typeof a.article === 'string' ? { article: a.article } : { concept: String(a.concept) })
+        return await reader.books(typeof a.article === 'string' ? { article: a.article } : typeof a.strong === 'string' ? { strong: a.strong } : { concept: String(a.concept) })
       case 'topics':
         return await reader.topics({ ...(typeof a.category === 'string' ? { category: a.category } : {}), ...(typeof a.book === 'string' ? { book: a.book } : {}) })
       case 'renderings':
-        return await reader.renderings(typeof a.strong === 'string' ? { strong: a.strong } : { book: String(a.book), word: Number(a.word) })
+        return typeof a.strong === 'string' ? await renderingsOf(reader, a.strong) : await reader.renderings({ book: String(a.book), word: Number(a.word) })
       case 'search':
-        return await reader.search(String(a.text ?? ''))
+        return await searchWords(reader, String(a.text ?? ''), words)
     }
   } catch (e) {
     if ((e as { code?: string }).code === 'E_ARG') return undefined
@@ -90,7 +147,7 @@ async function query(reader: PackReader, call: Call): Promise<Answer<unknown> | 
 }
 
 /** The pieces, missing units and coverage of a call. A concept reads its article (the default section) and the books it is used in. */
-export async function piecesOf(reader: PackReader, call: Call, limit: number): Promise<Pick<Card, 'pieces' | 'missing' | 'coverage'>> {
+export async function piecesOf(reader: PackReader, call: Call, limit: number, words?: (t: string) => string[]): Promise<Pick<Card, 'pieces' | 'missing' | 'coverage'>> {
   const pieces: Fragment[] = []
   const missing: Answer<unknown>['notInstalled'] = []
   let coverage: Answer<unknown>['coverage']
@@ -101,7 +158,7 @@ export async function piecesOf(reader: PackReader, call: Call, limit: number): P
     for (const n of a.notInstalled) if (!missing.some((x) => x.unit === n.unit)) missing.push(n)
     if (first && a.coverage !== undefined) coverage = a.coverage
   }
-  const a = await query(reader, call)
+  const a = await query(reader, call, words)
   await take(call, a, true)
   if (call.query === 'concept') {
     // A concept reached by an alias names its article and its books by the concept's own id.
@@ -115,8 +172,8 @@ export async function piecesOf(reader: PackReader, call: Call, limit: number): P
 }
 
 /** The card of a decision: a `choose` has no pieces (R16), only its options and interpretation. */
-export async function cardOf(reader: PackReader, question: string, decision: Decision, limit: number, started: number): Promise<Card> {
-  const body: Pick<Card, 'pieces' | 'missing' | 'coverage'> = decision.kind === 'choose' ? { pieces: [], missing: [] } : await piecesOf(reader, decision.call, limit)
+export async function cardOf(reader: PackReader, question: string, decision: Decision, limit: number, started: number, words?: (t: string) => string[]): Promise<Card> {
+  const body: Pick<Card, 'pieces' | 'missing' | 'coverage'> = decision.kind === 'choose' ? { pieces: [], missing: [] } : await piecesOf(reader, decision.call, limit, words)
   return { question, decision, interpretation: decision.interpretation, ...body, elapsed: Math.max(0, now() - started) }
 }
 

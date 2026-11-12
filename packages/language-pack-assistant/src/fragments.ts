@@ -247,7 +247,7 @@ export function fragmentsOf(call: Call, answer: Answer<unknown>, reader: PackRea
       return concept(b, d as ConceptData)
     case 'books': {
       const a = call.args
-      return books(b, d as BooksData, typeof a.article === 'string' ? a.article : typeof a.concept === 'string' ? a.concept : undefined)
+      return books(b, d as BooksData, typeof a.article === 'string' ? a.article : typeof a.concept === 'string' ? a.concept : typeof a.strong === 'string' ? a.strong : undefined)
     }
     case 'topics':
       return topics(b, d as TopicsData)

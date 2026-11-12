@@ -1,6 +1,7 @@
 import { beforeAll, expect, test } from 'bun:test'
 import type { PackReader } from '@bt-synergy/language-pack-client'
-import { cardOf, now, piecesOf } from './card'
+import { cardOf, normalizeStrong, now, piecesOf, renderingsOf } from './card'
+import { contentWords } from './words'
 import { LINK, sampleReader } from './card.fixture'
 import type { Decision } from './decision'
 
@@ -58,4 +59,49 @@ test('an empty search is a card with no pieces, not an error', async () => {
 test('the limit cuts the pieces', async () => {
   const { pieces } = await piecesOf(reader, { query: 'passage', args: { ref: 'tit 1:1' } }, 3)
   expect(pieces.length).toBe(3)
+})
+
+const answerOf = (query: string, data: unknown, cites: unknown[] = []) => ({ query, data, cites, notInstalled: [] }) as never
+
+test('R31: a Strong key is padded to four digits, and a bare key tries the suffixes a, b, c', async () => {
+  expect(normalizeStrong('G26')).toBe('G0026')
+  expect(normalizeStrong('H853')).toBe('H0853')
+  expect(normalizeStrong('H2617a')).toBe('H2617a')
+  expect(normalizeStrong('G39720')).toBe('G39720')
+  const asked: string[] = []
+  // A table that keys G00260 (the reader resolves G0026) and H2617a only.
+  const stub = {
+    renderings: async ({ strong }: { strong: string }) => {
+      asked.push(strong)
+      const has = strong === 'G0026' || strong === 'H2617a'
+      return answerOf('renderings', { strong, renderings: has ? [{ text: 'amor', count: 3, refs: ['tit 1:1'] }] : [] })
+    },
+  } as unknown as PackReader
+  expect((await renderingsOf(stub, 'G26')).data!.renderings).toHaveLength(1)
+  expect(asked).toEqual(['G0026'])
+  asked.length = 0
+  const h = await renderingsOf(stub, 'H2617')
+  expect(h.data!.strong).toBe('H2617a')
+  expect(asked).toEqual(['H2617', 'H2617a'])
+  expect((await renderingsOf(stub, 'H9999')).data!.renderings).toEqual([])
+})
+
+test('R33: search sends the content words; with no hits, each word alone and the hits merge by score', async () => {
+  const sent: string[] = []
+  const hit = (id: string, score: number) => ({ kind: 'note', res: 'r', book: 'tit', ref: '1:1', id, snippet: 's', score })
+  const cite = (id: string) => ({ res: 'r', release: '1', ref: id })
+  const stub = {
+    search: async (t: string) => {
+      sent.push(t)
+      if (t === 'amor') return answerOf('search', [hit('a', 1), hit('b', 5)], [cite('a'), cite('b')])
+      if (t === 'gracia') return answerOf('search', [hit('c', 3), hit('a', 1)], [cite('c'), cite('a')])
+      return answerOf('search', [])
+    },
+    resources: undefined,
+  } as unknown as PackReader
+  const words = (t: string) => contentWords(t, 'es-419')
+  expect(words('¿Dónde dice la palabra amor y gracia?')).toEqual(['amor', 'gracia'])
+  const r = await piecesOf(stub, { query: 'search', args: { text: '¿Dónde dice la palabra amor y gracia?' } }, 8, words)
+  expect(sent).toEqual(['amor gracia', 'gracia', 'amor'])
+  expect(r.pieces.map((p) => p.id)).toEqual(['note:tit/b', 'note:tit/c', 'note:tit/a'])
 })

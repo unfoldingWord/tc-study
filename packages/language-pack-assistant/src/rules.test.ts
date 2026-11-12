@@ -71,7 +71,7 @@ describe('2. an ambiguous book name alone (Review Focus 1)', () => {
 
 describe('3. where something appears', () => {
   test('a Strong key, a concept or an article', () => {
-    expect(callOf(es('¿Dónde aparece G5485?'))).toEqual({ query: 'books', args: { concept: 'G5485' } })
+    expect(callOf(es('¿Dónde aparece G5485?'))).toEqual({ query: 'books', args: { strong: 'G5485' } })
     expect(callOf(es('¿dónde se menciona a Moisés?'))).toEqual({ query: 'books', args: { article: 'tw:names/moses' } })
     expect(callOf(en('In which books are there metaphors?'))).toEqual({ query: 'books', args: { article: 'ta:translate/figs-metaphor' } })
     expect(callOf(en('Where does Ruth appear?'))).toEqual({ query: 'books', args: { article: 'tw:names/ruth' } })

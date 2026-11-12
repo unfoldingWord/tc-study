@@ -13,6 +13,7 @@ import { interpret } from './interpret'
 import { buildLexicon } from './lexicon'
 import { phrasesFor } from './phrases'
 import { strongsIndex } from './strongs'
+import { contentWords } from './words'
 
 export type Assistant = {
   ask(question: string, o?: { limit?: number }): Promise<Card>
@@ -90,17 +91,18 @@ export async function createAssistant(o: { reader: PackReader; tag: string; comp
     names,
     kinds,
   }
+  const words = (text: string): string[] => contentWords(text, tag)
   return {
     problems,
     async ask(question, opts) {
       const started = now()
-      return cardOf(reader, question, decide(question, ctx), opts?.limit ?? DEFAULT_LIMIT, started)
+      return cardOf(reader, question, decide(question, ctx), opts?.limit ?? DEFAULT_LIMIT, started, words)
     },
     async run(call, opts) {
       const started = now()
       const decision: Decision = { kind: 'call', call, via: 'chosen', interpretation: '' }
       decision.interpretation = interpret(decision, tag, names, kinds)
-      return cardOf(reader, '', decision, opts?.limit ?? DEFAULT_LIMIT, started)
+      return cardOf(reader, '', decision, opts?.limit ?? DEFAULT_LIMIT, started, words)
     },
   }
 }

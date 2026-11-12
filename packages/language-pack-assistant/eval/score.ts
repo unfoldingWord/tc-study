@@ -29,7 +29,19 @@ export function sameValue(a: unknown, b: unknown): boolean {
   return a === b
 }
 
-export const sameCall = (a: Call, b: Call): boolean => a.query === b.query && sameValue(a.args, b.args)
+const STRONG = /^[GH]\d+[a-z]?$/
+
+/** `books {concept:<Strong key>}` and `books {strong:<key>}` are the same call (R32). */
+function canonCall(c: Call): Call {
+  const k = c.args.concept
+  if (c.query === 'books' && typeof k === 'string' && STRONG.test(k)) return { query: 'books', args: { strong: k } }
+  return c
+}
+
+export const sameCall = (a: Call, b: Call): boolean => {
+  const [x, y] = [canonCall(a), canonCall(b)]
+  return x.query === y.query && sameValue(x.args, y.args)
+}
 
 export function scoreQuestion(item: Item, decision: Decision, cardPieceIds: string[]): Score {
   const e = item.expect
