@@ -38,6 +38,7 @@ import { MACULA_KEYS } from '../../cli/companions'
 import { maculaStamp } from '../../cli/maculaIdentity'
 import { buildLanguageParts, PARTS_REPORT, type PartsReport, type PreviousParts } from './buildLanguageParts'
 import { PACK_VERSIONS } from './packVersions'
+import { isLiteralTextId } from './door43Stamps'
 import { eachLimit, IMMUTABLE, isLanguageCode, NO_CACHE, oneLine, type PackBucket } from './publishLanguage'
 
 /**
@@ -93,7 +94,7 @@ function partsGaps(list: PartsList, originals: PartsList): string[] {
     if (!inOriginals.has(key)) out.push(`${key}: no tiene partes en la lista de originales`)
   }
   // A language without an aligned literal text cannot be opened in Servos (the spec's eligibility rule).
-  if (!list.resources.some((r) => r.subject === 'Aligned Bible' && /lt$/.test(resourceIdOf(r.key)))) {
+  if (!list.resources.some((r) => r.subject === 'Aligned Bible' && isLiteralTextId(resourceIdOf(r.key), r.key.split('/')[1]))) {
     out.push('la lista no tiene texto literal alineado')
   }
   return out

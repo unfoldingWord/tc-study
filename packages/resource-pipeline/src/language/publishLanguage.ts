@@ -27,7 +27,7 @@ import {
 } from '@bt-synergy/language-pack'
 import { MACULA_KEYS } from '../../cli/companions'
 import { maculaStamp } from '../../cli/maculaIdentity'
-import { door43Stamps } from './door43Stamps'
+import { door43Stamps, isLiteralTextId } from './door43Stamps'
 import { PACK_VERSIONS } from './packVersions'
 import { prepareAndPack } from './prepareAndPack'
 import { writeMcpViews } from './writeMcpViews'
@@ -123,7 +123,7 @@ export function notWhole(
       out.push(`${key}: Door43 lo lista y el paquete no lo tiene`)
     }
   }
-  const literal = packs.language.manifest.resources.some((r) => r.subject === 'Aligned Bible' && /lt$/.test(resourceIdOf(r.key)))
+  const literal = packs.language.manifest.resources.some((r) => r.subject === 'Aligned Bible' && isLiteralTextId(resourceIdOf(r.key), r.key.split('/')[1]))
   if (!literal) out.push('el paquete no tiene texto literal alineado')
   return out
 }

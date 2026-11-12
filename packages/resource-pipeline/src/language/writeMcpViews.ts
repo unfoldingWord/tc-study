@@ -29,6 +29,7 @@ import { HELPS_QUOTE_VERSION, helpsBookStamp } from '../helps/helpsQuoteCache'
 import { NOTES_PREPARE_VERSION, type NotesLightChapter } from '../notes/notesPreparer'
 import { QUESTIONS_PREPARE_VERSION } from '../questions/questionsPreparer'
 import { WORDS_LINKS_PREPARE_VERSION, type WordsLinksLightChapter } from '../wordsLinks/wordsLinksPreparer'
+import { isLiteralTextId } from './door43Stamps'
 
 /** Bump when a view's shape changes: a server reads the views of the schema it knows. */
 const VIEWS_SCHEMA = 1
@@ -108,7 +109,7 @@ export async function writeMcpViews(o: {
   const owner = notes?.meta.owner ?? resources[0]?.meta.owner
   const preferOwner = <T extends { meta: Meta }>(list: T[]) => [...list].sort((a, b) => Number(b.meta.owner === owner) - Number(a.meta.owner === owner))[0]
   const bibles = bySubject('Aligned Bible')
-  const literal = preferOwner(bibles.filter((r) => /lt$/.test(r.meta.resourceId ?? '')))
+  const literal = preferOwner(bibles.filter((r) => isLiteralTextId(r.meta.resourceId, language)))
   const simple = preferOwner(bibles.filter((r) => /st$/.test(r.meta.resourceId ?? '')))
   const wordLinks = preferOwner(bySubject('TSV Translation Words Links'))
   const questions = preferOwner(bySubject('TSV Translation Questions'))
