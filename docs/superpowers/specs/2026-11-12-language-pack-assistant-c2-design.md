@@ -69,17 +69,17 @@ Measured per language on a held-out question set:
 
 ### 2. Fragments (client index, assistant view)
 
-- **The index gains two row kinds:**
-  - `section`: one row per section of an installed tW or tA article. It carries the article id, the section id and its
-    role.
-  - `frame`: one row per OBS frame, when OBS is installed.
-- **When they are indexed:** articles and OBS are indexed when their units are installed or imported, the same way books
-  are. The `search` filters and its schema list the new kinds.
+- **The index gains one row kind:** `section`, one row per section of an installed tW or tA article. It carries the
+  article id, the section id and its role.
+- **OBS frames wait** (decided while planning). C1's reader has no OBS accessor and staging has no OBS for es-419, so
+  a `frame` kind comes with an OBS reader.
+- **When they are indexed:** articles are indexed when their units are installed or imported, the same way books are.
+  The `search` filters and its schema list the new kind.
 - **The `Fragment` type** (in the assistant) is the one shape of a piece in a card:
   `{ id, kind, title, ref?, concepts[], length, cite, license, link }`.
   - It is built from a query answer or a search hit. It is never stored.
   - Its `id` is stable: `note:<book>/<rowid>`, `question:…`, `section:tw:kt/grace#<sid>`, `verse:<res> tit 2:11`,
-    `frame:obs 4:2`.
+    (`frame:obs 4:2` once OBS frames exist).
   - `link` is a typed link the app can open: `ref:`, `concepto:`, `articulo:<id>#<role>`, `pieza:<id>`.
 
 ### 3. The lexicon (assistant)
