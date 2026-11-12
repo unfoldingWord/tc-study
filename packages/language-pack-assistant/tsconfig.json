@@ -14,6 +14,6 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src/**/*", "eval/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "eval/**/*.test.ts"]
+  "include": ["src/**/*", "eval/**/*", "build/**/*"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "eval/**/*.test.ts", "build/**/*.test.ts"]
 }
