@@ -152,3 +152,28 @@ describe('failed reads', () => {
     expect(r.problems.map((p) => p.id)).toEqual([bookId])
   })
 })
+
+describe('resources', () => {
+  test('lists the resources of the language and the common catalog, with their fields', async () => {
+    const { client } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const rs = (await client.open('es-419')).resources()
+    expect(rs.length).toBeGreaterThan(0)
+    expect(new Set(rs.map((r) => r.catalog))).toEqual(new Set(['es-419', 'common']))
+    for (const r of rs) {
+      expect(typeof r.key).toBe('string')
+      expect(r.title.length).toBeGreaterThan(0)
+      expect(r.release.length).toBeGreaterThan(0)
+      expect(r.license.length).toBeGreaterThan(0)
+      expect(r.subject.length).toBeGreaterThan(0)
+    }
+  })
+  test('is empty when the catalogs list no resource', async () => {
+    const { client } = setup()
+    await client.install('es-419', { books: ['tit'] })
+    const r = await client.open('es-419')
+    const none = openFromSegments({ lang: 'es-419', catalogs: [], get: async () => undefined })
+    expect(none.resources()).toEqual([])
+    expect(r.resources).toBeDefined()
+  })
+})

@@ -98,6 +98,8 @@ export interface PackReader {
   unitOf(cls: 'book' | 'art' | 'orig', key: string): string | undefined
   /** Whether the catalogs list the unit, installed or not. */
   listed(unit: string): boolean
+  /** The resources each catalog lists (`catalog` is its language tag, or `common`), in the order of the catalogs. */
+  resources(): { catalog: string; key: string; title: string; subject: string; release: string; license: string; rights?: string; attribution?: string }[]
   /** The checked segments of an installed unit, or `undefined` when it is not installed. For the queries of later tasks. */
   segments(unit: string): Promise<Segment[] | undefined>
   /** The revision of the catalog the unit was installed from (the catalog's own in `openFromSegments`), or `undefined` when it is not active. */
@@ -326,6 +328,19 @@ export function makeReader(o: ReaderInput): PackReader {
   const reader: PackReader = {
     lang: o.lang,
     problems,
+    resources: () =>
+      o.catalogs.flatMap((c) =>
+        c.catalog.resources.map((r) => ({
+          catalog: c.catalog.lang ?? 'common',
+          key: r.key,
+          title: r.title,
+          subject: r.subject,
+          release: r.release,
+          license: r.license,
+          ...(r.rights !== undefined ? { rights: r.rights } : {}),
+          ...(r.attribution !== undefined ? { attribution: r.attribution } : {}),
+        })),
+      ),
     revisions: () => ({ ...(lang !== undefined ? { lang } : {}), ...(common !== undefined ? { common } : {}) }),
     installed(unit) {
       const ids = activeIds.get(unit)
