@@ -70,7 +70,20 @@ function clsOf(id: string): 'tw' | 'name' | 'ta' | 'topic' {
   return r === 0 ? 'name' : r === 1 ? 'tw' : r === 2 ? 'ta' : 'topic'
 }
 
-type BookAlias = { toks: string[]; code: string; standalone: boolean }
+type BookAlias = { toks: string[]; code: string; standalone: boolean; cued: boolean }
+
+/** Book names that are also common nouns ("los numeros de la tabla"): alone they are no book. */
+export const COMMON_NOUNS: Record<string, Set<string>> = {
+  es: new Set(words('numeros hechos reyes jueces cronicas lamentaciones proverbios cantares')),
+  pt: new Set(words('numeros atos reis juizes cronicas lamentacoes proverbios')),
+  en: new Set(words('numbers acts kings judges chronicles lamentations proverbs')),
+}
+/** Words in front of a name that say it is a book: "libro de Numeros". */
+export const CUES: Record<string, string[][]> = {
+  es: [['libro', 'de'], ['carta', 'a'], ['carta', 'de']],
+  pt: [['livro', 'de'], ['carta', 'a'], ['carta', 'de']],
+  en: [['book', 'of'], ['letter', 'to'], ['letter', 'of']],
+}
 type Concept = { forms: string[][]; ids: Set<string> }
 
 function variants(toks: string[], lang: string): string[][] {
@@ -105,23 +118,27 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
   // Books: the 66 of the map core, by token sequence, longest first.
   const aliases: BookAlias[] = []
   const seen = new Set<string>()
+  const common = COMMON_NOUNS[lang] ?? new Set<string>()
+  const cues = CUES[lang] ?? []
   const addBook = (text: string | undefined, code: string, standalone: boolean): void => {
     const toks = words(fold(text ?? ''))
     if (toks.length === 0) return
+    // A name that is a stop, frame or common word alone needs a number after it or a cue before it.
+    const weak = toks.length === 1 && (stop.has(toks[0]!) || frame.has(toks[0]!) || common.has(toks[0]!))
     for (const v of variants(toks, lang)) {
       const key = v.join(' ')
       if (seen.has(key)) continue
       seen.add(key)
-      aliases.push({ toks: v, code, standalone })
+      aliases.push({ toks: v, code, standalone: standalone && !weak, cued: standalone && weak })
     }
   }
   const core = maps.map?.core
-  const fullNames = new Map<string, string>()
+  const fullNames = new Map<string, string[]>()
   core?.books.forEach((b, i) => {
     const code = BOOKS[i]
     if (code === undefined) return
     const [full, short, abbr] = b
-    if (full) fullNames.set(code, full)
+    fullNames.set(code, [full, short].filter((n): n is string => !!n))
     addBook(full, code, true)
     addBook(short, code, true)
     addBook(abbr, code, false)
@@ -136,7 +153,30 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
 
   // Concepts: every name of the maps and every Academy subtitle, as stems.
   const all = new Map<string, string[]>()
-  for (const [id, names] of namesById(maps)) all.set(id, [...names])
+  // Names the alignment found are kept only when nothing else contradicts them: no other id has the name from a better source,
+  // it is not a book's name, and it does not start with a stop word.
+  const alignment: [string, string][] = []
+  const topicNames = maps.topics?.core.names ?? {}
+  const trustedTopics: Record<string, unknown[][]> = {}
+  for (const [id, list] of Object.entries(topicNames)) {
+    const keep = (list as unknown[][]).filter((n) => n[1] !== 'alignment')
+    for (const n of list as unknown[][]) if (n[1] === 'alignment' && typeof n[0] === 'string') alignment.push([id, n[0]])
+    trustedTopics[id] = keep
+  }
+  const trustedMaps = maps.topics ? { ...maps, topics: { ...maps.topics, core: { ...maps.topics.core, names: trustedTopics } } } : maps
+  for (const [id, names] of namesById(trustedMaps as MapSet)) all.set(id, [...names])
+  const owners = new Map<string, Set<string>>()
+  for (const [id, names] of all) for (const n of names) (owners.get(fold(n)) ?? owners.set(fold(n), new Set()).get(fold(n))!).add(id)
+  const bookNames = new Set<string>()
+  for (const b of core?.books ?? []) for (const n of b.slice(0, 3)) if (n) bookNames.add(fold(String(n)))
+  for (const [id, name] of alignment) {
+    const f = fold(name)
+    const other = [...(owners.get(f) ?? [])].some((o) => o !== id)
+    if (other || bookNames.has(f) || stop.has(words(f)[0] ?? '')) continue
+    const list = all.get(id) ?? []
+    if (!list.includes(name)) list.push(name)
+    all.set(id, list)
+  }
   for (const [id, sub] of Object.entries(core?.subtitles ?? {})) {
     const list = all.get(id) ?? []
     if (!list.includes(sub)) list.push(sub)
@@ -169,13 +209,15 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
 
   // A book whose full name is also a person's name.
   const ambiguousBooks = new Map<string, string[]>()
-  for (const [code, full] of fullNames) {
-    const toks = words(fold(full)).filter((t) => !stop.has(t))
-    if (toks.length === 0) continue
-    const forms = toks.map(formsOf)
+  for (const [code, names] of fullNames) {
     const ids = new Set<string>()
-    for (const c of conceptsByFirst.get(forms[0]![0]!) ?? []) {
-      if (c.forms.length === forms.length && c.forms.every((f, k) => sameForms(f, forms[k]!))) for (const id of c.ids) if (PERSON(id)) ids.add(id)
+    for (const name of names) {
+      const toks = words(fold(name)).filter((t) => !stop.has(t))
+      if (toks.length === 0) continue
+      const forms = toks.map(formsOf)
+      for (const c of forms[0]!.flatMap((f) => conceptsByFirst.get(f) ?? [])) {
+        if (c.forms.length === forms.length && c.forms.every((f, k) => sameForms(f, forms[k]!))) for (const id of c.ids) if (PERSON(id)) ids.add(id)
+      }
     }
     if (ids.size > 0) ambiguousBooks.set(code, [...ids].sort(byRank))
   }
@@ -264,7 +306,8 @@ export function buildLexicon(maps: MapSet, tag: string, numbers?: NumbersComplem
         i = end
         continue
       }
-      if (hit.standalone) out.push({ kind: 'book', book: hit.code, start: i, end: after })
+      const cued = hit.cued && cues.some((c) => c.length <= i && c.every((w, k) => toks[i - c.length + k] === w))
+      if (hit.standalone || cued) out.push({ kind: 'book', book: hit.code, start: i, end: after })
       i += 1
     }
 
