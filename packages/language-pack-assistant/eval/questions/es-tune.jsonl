@@ -50,20 +50,20 @@
 {"q":"¿Qué es la elipsis?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-ellipsis"}}},"pieces":[]}
 {"q":"¿Cómo traducir un eufemismo?","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-euphemism"}}},"pieces":[]}
 {"q":"lee el artículo de metáfora","expect":{"call":{"query":"article","args":{"id":"ta:translate/figs-metaphor"}}},"pieces":[]}
-{"q":"¿Cómo se tradujo gracia?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/grace"}}},"pieces":[]}
-{"q":"¿Cómo traducen los textos la palabra pacto?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/covenant"}}},"pieces":[]}
+{"q":"¿Cómo se tradujo gracia?","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"G54850"}},{"query":"renderings","args":{"strong":"H2603a"}}]},"pieces":[]}
+{"q":"¿Cómo traducen los textos la palabra pacto?","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"H0853"}},{"query":"renderings","args":{"strong":"H5921a"}}]},"pieces":[]}
 {"q":"¿Cómo se ha traducido G5485?","expect":{"call":{"query":"renderings","args":{"strong":"G5485"}}},"pieces":[]}
-{"q":"compara cómo se tradujo redimir en cada libro","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/redeem"}}},"pieces":[]}
-{"q":"¿De qué maneras se tradujo fe?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/faith"}}},"pieces":[]}
+{"q":"compara cómo se tradujo redimir en cada libro","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"H0853"}},{"query":"renderings","args":{"strong":"H1350a"}}]},"pieces":[]}
+{"q":"¿De qué maneras se tradujo fe?","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"G41020"}},{"query":"renderings","args":{"strong":"H3689"}}]},"pieces":[]}
 {"q":"traducciones de H2617","expect":{"call":{"query":"renderings","args":{"strong":"H2617"}}},"pieces":[]}
-{"q":"¿Cómo tradujeron santo en el texto literal?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/holy"}}},"pieces":[]}
-{"q":"¿Qué palabras usan para pecado?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/sin"}}},"pieces":[]}
-{"q":"usos de la palabra amor en las traducciones","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/love"}}},"pieces":[]}
-{"q":"¿cómo se traduce cordero?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/lamb"}}},"pieces":[]}
-{"q":"¿Cómo vertieron perdonar los traductores?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/forgive"}}},"pieces":[]}
+{"q":"¿Cómo tradujeron santo en el texto literal?","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"H0853"}},{"query":"renderings","args":{"strong":"H3588a"}}]},"pieces":[]}
+{"q":"¿Qué palabras usan para pecado?","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"H0853"}},{"query":"renderings","args":{"strong":"G40120"}}]},"pieces":[]}
+{"q":"usos de la palabra amor en las traducciones","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"H0853"}},{"query":"renderings","args":{"strong":"G15190"}}]},"pieces":[]}
+{"q":"¿cómo se traduce cordero?","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"H0853"}},{"query":"renderings","args":{"strong":"H5921a"}}]},"pieces":[]}
+{"q":"¿Cómo vertieron perdonar los traductores?","expect":{"choose":[{"query":"renderings","args":{"strong":"H5375"}},{"query":"renderings","args":{"strong":"H5674a"}},{"query":"renderings","args":{"strong":"G08630"}}]},"pieces":[]}
 {"q":"compara las traducciones de G26","expect":{"call":{"query":"renderings","args":{"strong":"G26"}}},"pieces":[]}
-{"q":"¿Cómo se tradujo bendecir en Rut?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/bless"}}},"pieces":[]}
-{"q":"¿con qué palabras se traduce espíritu?","expect":{"call":{"query":"renderings","args":{"concept":"tw:kt/spirit"}}},"pieces":[]}
+{"q":"¿Cómo se tradujo bendecir en Rut?","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"H0853"}},{"query":"renderings","args":{"strong":"H1288"}}]},"pieces":[]}
+{"q":"¿con qué palabras se traduce espíritu?","expect":{"choose":[{"query":"renderings","args":{"strong":"G35880"}},{"query":"renderings","args":{"strong":"H0853"}},{"query":"renderings","args":{"strong":"G15190"}}]},"pieces":[]}
 {"q":"¿En qué libros hay metáforas?","expect":{"call":{"query":"books","args":{"article":"ta:translate/figs-metaphor"}}},"pieces":[]}
 {"q":"¿Cuántas veces aparece Abraham en la Biblia?","expect":{"call":{"query":"books","args":{"article":"tw:names/abraham"}}},"pieces":[]}
 {"q":"¿Dónde aparece G5485?","expect":{"call":{"query":"books","args":{"concept":"G5485"}}},"pieces":[]}

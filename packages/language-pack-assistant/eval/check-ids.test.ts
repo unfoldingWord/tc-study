@@ -3,7 +3,7 @@ import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createClient, httpSource, memoryStore, type PackReader } from '@bt-synergy/language-pack-client'
 import { type FakeServer, startFakeServer } from '../../language-pack-client/test/fakeServer'
 import { buildSample } from '../../language-pack-client/test/sample'
-import { checkCall, checkIds, lastVerse } from './check-ids'
+import { checkCall, checkIds, lastVerse, strongsOf } from './check-ids'
 
 let reader: PackReader
 let server: FakeServer
@@ -84,8 +84,7 @@ test('the args of an expected call: refs parse, ids exist', async () => {
   expect(await ok('article', { id: 'ta:translate/none' })).toBe(false)
   expect(await ok('renderings', { strong: 'G5485' })).toBe(true)
   expect(await ok('renderings', { strong: 'grace' })).toBe(false)
-  expect(await ok('renderings', { concept: 'tw:kt/grace' })).toBe(true)
-  expect(await ok('renderings', { concept: 'tw:kt/nothing' })).toBe(false)
+  expect(await ok('renderings', { concept: 'tw:kt/grace' })).toBe(false)
   expect(await ok('books', { concept: 'G5485' })).toBe(true)
   expect(await ok('topics', { category: 'person' })).toBe(true)
   expect(await ok('topics', { category: 'persona' })).toBe(false)
@@ -98,4 +97,14 @@ test('the last verse of a chapter comes from the installed text', async () => {
   expect(await lastVerse(reader, 'tit', 2)).toBe(15)
   expect(await lastVerse(reader, 'tit', 9)).toBeUndefined()
   expect(await lastVerse(reader, 'rut', 1)).toBeUndefined()
+})
+
+test('strongsOf: keys of a concept from the xmap, most occurrences first; none for a concept without', async () => {
+  const keys = await strongsOf(reader, 'tw:kt/grace')
+  expect(keys.length).toBeGreaterThan(1)
+  expect(keys).toContain('G54850')
+  const core = (await reader.mapsOf(['xmap'], { coreOnly: true })).xmap!.core
+  const total = (k: string) => [...(core.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
+  for (let i = 1; i < keys.length; i++) expect(total(keys[i - 1]!)).toBeGreaterThanOrEqual(total(keys[i]!))
+  expect(await strongsOf(reader, 'tw:kt/nothing')).toEqual([])
 })

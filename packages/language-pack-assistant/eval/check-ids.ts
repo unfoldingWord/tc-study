@@ -52,6 +52,17 @@ export async function lastVerse(reader: PackReader, book: string, chapter: numbe
   return last
 }
 
+/**
+ * The Strong keys the xmap lists for a concept (`strongs`), most occurrences first (the sum of the `strong` counts over the books),
+ * ties in code-point order. Empty when the concept has none or the xmap is not installed. Reusable by the assistant's rules (R10).
+ */
+export async function strongsOf(reader: PackReader, conceptId: string): Promise<string[]> {
+  const core = (await reader.mapsOf(['xmap'], { coreOnly: true })).xmap?.core
+  const keys = core?.strongs?.[conceptId] ?? []
+  const total = (k: string): number => [...(core?.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
+  return [...keys].sort((a, b) => total(b) - total(a) || (a < b ? -1 : a > b ? 1 : 0))
+}
+
 export function checkIds(reader: PackReader, ids: string[]): Promise<IdCheck[]> {
   const verses = new Map<string, Promise<Map<string, Set<number>> | undefined>>()
   const versesOf = (book: string) => {
@@ -149,9 +160,7 @@ export async function checkCall(reader: PackReader, call: Call): Promise<IdCheck
       return a.section === undefined || r.data.sections.some((s) => s.sid === a.section) ? ok : fail(`no section ${String(a.section)}`)
     }
     case 'renderings':
-      if (typeof a.strong === 'string') return /^[GH]\d{1,5}$/.test(a.strong) ? ok : fail('not a Strong number')
-      // A tW or topic concept: the renderings of the words that concept covers (the assistant resolves it to strong numbers).
-      if (typeof a.concept === 'string') return (await checkIds(reader, [`concept:${a.concept}`])).map((c) => ({ ...c, id: label }))
+      if (typeof a.strong === 'string') return /^[GH]\d{1,5}[a-z]?$/.test(a.strong) ? ok : fail('not a Strong number')
       return isBook(a.book) && Number.isInteger(a.word) ? ok : fail('renderings needs {strong} or {book, word}')
     case 'search':
       return typeof a.text === 'string' && a.text.trim() !== '' ? ok : fail('search needs text')
@@ -162,7 +171,7 @@ export async function checkCall(reader: PackReader, call: Call): Promise<IdCheck
     case 'books': {
       const id = a.article ?? a.concept
       if ((a.article === undefined) === (a.concept === undefined) || typeof id !== 'string') return fail('books needs exactly one of article and concept')
-      if (a.concept !== undefined && /^[GH]\d{1,5}$/.test(id)) return ok
+      if (a.concept !== undefined && /^[GH]\d{1,5}[a-z]?$/.test(id)) return ok
       return (await checkIds(reader, [`concept:${id}`])).map((c) => ({ ...c, id: label }))
     }
     default:
