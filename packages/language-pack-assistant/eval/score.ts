@@ -1,0 +1,49 @@
+/** Scoring of one question against the assistant's decision. Eval only: nothing in `src/` imports this. */
+import type { Call, Decision } from '../src/decision'
+
+export type Item = {
+  q: string
+  expect: { call: Call } | { choose: Call[] } | { search: true }
+  /** Fragment ids in the order a good card would show them. May be empty. */
+  pieces: string[]
+  note?: string
+}
+
+export type Score = { callCorrect: boolean; accepted: boolean; top3: boolean | null }
+
+/** Lower case, no accents, trimmed. */
+export const foldText = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
+
+/** Strings compare folded, arrays element by element, objects key by key (a key whose value is `undefined` is absent). */
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (typeof a === 'string' && typeof b === 'string') return foldText(a) === foldText(b)
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => sameValue(x, b[i]))
+  }
+  if (typeof a === 'object' && a !== null && typeof b === 'object' && b !== null) {
+    const ka = Object.keys(a).filter((k) => (a as Record<string, unknown>)[k] !== undefined)
+    const kb = Object.keys(b).filter((k) => (b as Record<string, unknown>)[k] !== undefined)
+    return ka.length === kb.length && ka.every((k) => k in b && sameValue((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+  }
+  return a === b
+}
+
+export const sameCall = (a: Call, b: Call): boolean => a.query === b.query && sameValue(a.args, b.args)
+
+export function scoreQuestion(item: Item, decision: Decision, cardPieceIds: string[]): Score {
+  const e = item.expect
+  let callCorrect: boolean
+  if ('search' in e) {
+    callCorrect = decision.kind === 'call' && decision.call.query === 'search'
+  } else if ('call' in e) {
+    callCorrect = decision.kind === 'call' ? sameCall(decision.call, e.call) : decision.options.some((o) => sameCall(o, e.call))
+  } else {
+    callCorrect =
+      decision.kind === 'choose' &&
+      decision.options.length === e.choose.length &&
+      e.choose.every((x) => decision.options.some((o) => sameCall(o, x))) &&
+      decision.options.every((o) => e.choose.some((x) => sameCall(o, x)))
+  }
+  const top3 = item.pieces.length === 0 ? null : cardPieceIds.slice(0, 3).includes(item.pieces[0]!)
+  return { callCorrect, accepted: decision.kind === 'call', top3 }
+}

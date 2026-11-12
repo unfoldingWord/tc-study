@@ -60,7 +60,7 @@ export const lookupStats = { builds: 0 }
  * (`tw:kt/grace` is "grace", `ta:translate/figs-metaphor` is "figs metaphor"). The subtitle of an Academy article (its
  * question) is kept apart: it matches, but is not a name. The result is cached per map object, with the folded names.
  */
-function namesById(m: MapSet): Entry[] {
+function entriesById(m: MapSet): Entry[] {
   // `reader.maps()` makes a new MapSet each call; only the cores inside are stable, so they are the key.
   const cores: Cores = [m.map?.core, m.topics?.core, m.xtopics?.core, m.xmap?.core]
   const key = (cores.find((c) => c !== undefined) ?? NONE) as object
@@ -101,6 +101,11 @@ function namesById(m: MapSet): Entry[] {
   return list
 }
 
+/** The names of each id, the language's first (what the cached entries hold); for tools that check ids. */
+export function namesById(m: MapSet): Map<string, string[]> {
+  return new Map(entriesById(m).map((e) => [e.id, e.names]))
+}
+
 /**
  * The ids whose names contain `name`, at most `limit`, best first; ids in code-point order within a score.
  * - Accents, capitals and punctuation do not count: the query and the names are compared as their words.
@@ -133,7 +138,7 @@ export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[
     return 4
   }
   const scored: { e: Entry; score: number }[] = []
-  for (const e of namesById(m)) {
+  for (const e of entriesById(m)) {
     let score = 4
     for (const { f, words, sub } of e.forms) {
       const h = hit(f, words)
