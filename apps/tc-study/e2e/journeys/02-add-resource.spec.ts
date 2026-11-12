@@ -6,6 +6,8 @@ import { trackPageErrors, waitForCatalogReady } from '../helpers/app'
 
 test.describe('Journey 2: Add / open resource in panel', () => {
   test('wizard org → resource → assign resource to panel', async ({ page }) => {
+    // Sequential waits (45s + 30s scripture load) exceed the default 60s test timeout on slow machines.
+    test.setTimeout(180_000)
     const errors = trackPageErrors(page)
     await mockDoor43Network(page)
     // Catalog metadata (not offline) so review/add uses existing metadata path;

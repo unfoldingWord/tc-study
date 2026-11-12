@@ -283,7 +283,7 @@ in `src/components/ui/`, each built only from tokens:
 
 | Component | tC4 reference | Rules |
 |---|---|---|
-| `Button` | Button / Action | Pill. Heights 36 (desktop) and 44 (touch, `pointer: coarse`). Weight 800. Variants `fill` (accent-fill, white), `outline` (1.5 px Ocean in light, white 22% in dark), `quiet`, `danger`. |
+| `Button` | Button / Action | Pill. Heights 36 (desktop) and 44 (touch, `pointer: coarse`). Weight 800. Variants `fill` (accent-fill, white), `outline` (1.5 px Ocean in light, white 40% in dark), `quiet`, `danger`. |
 | `IconButton` | IconButton | Square on the height ladder, radius 8. Requires `aria-label`. |
 | `Badge` | Badge | Height 20–24, 10–11 px, weight 800, uppercase with 0.06 em tracking, soft tone fills. |
 | `Card` | Card / Surface | `bg-surface`, 1 px border, radius 16, card shadow. |
@@ -291,6 +291,11 @@ in `src/components/ui/`, each built only from tokens:
 | `Dialog` | Modal | Overlay scrim, radius 16, modal shadow, title 20/800 in `helps-fg` (Ocean / white). Built on the existing `ModalPortal`. |
 | `TextField` | TextField / Field | Radius 9, input border, label 11 px uppercase. |
 | `SectionLabel` | Overline | 11 px, weight 800, uppercase with 0.13 em tracking, `fg-muted`. Used for "BOOKS · 1"-style labels. |
+
+The `outline` stroke in dark is white 40% on `surface` (`#6d7f8a`), more than the 22% of the dark
+lines and tC4's 32% (`--t-ocean-border`), by Abel's decision (Oct 29, 2026). At 22% or 32% the stroke
+stays under 3:1; at 40% it reaches 3:1 (WCAG 1.4.11) on `surface` (3.58:1) and on `elevated` (3.05:1),
+so an outline button also reads in a `Dialog` footer.
 
 Each component gets a unit test of its accessible name and variants. PR 4 adopts them on the
 Settings page only, so they have a first user and a visual check. Other screens adopt them in PR 5.
