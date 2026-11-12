@@ -10,6 +10,9 @@ export const SEARCH_FILTER_KEYS: Record<keyof SearchFilters, true> = { books: tr
 
 export const DEFAULT_LIMIT = 20
 
+/** Version of the index layout. A stored index with another version is dropped and rebuilt by `init()`. */
+export const INDEX_VERSION = 2
+
 /**
  * `ref` is the reference as the resource has it (`1:1`), `res` the resource key, `id` the row id of a note, question or link.
  * `snippet` is a piece of the body with the matched words between « and ». `score` is higher for a better match.

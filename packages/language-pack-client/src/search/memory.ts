@@ -2,21 +2,30 @@
  * ranked differently: here by word count over the square root of the piece length, there by SQLite's bm25. With
  * more matches than the limit, the two can keep different hits. */
 import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
+import { stemForms } from './stem'
 import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
 
 const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
-type Tok = { t: string; start: number; end: number }
-function tokens(s: string): Tok[] {
-  return [...s.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => ({ t: fold(m[0]), start: m.index!, end: m.index! + m[0].length }))
+/** `t` is the folded word, `s` its stem forms in the language of the row (or of the query). */
+type Tok = { t: string; s: string[]; start: number; end: number }
+function tokens(s: string, lang: string): Tok[] {
+  return [...s.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => ({
+    t: fold(m[0]),
+    s: stemForms(lang, m[0]),
+    start: m.index!,
+    end: m.index! + m[0].length,
+  }))
 }
+
+const sameWord = (a: Tok, b: Tok): boolean => a.t === b.t || a.s.some((x) => b.s.includes(x))
 
 type Row = PieceRow & { lang: string; book: string; seg: string; toks: Tok[] }
 
 /** Where the phrase (the tokens of one query word) starts in the row, in token indexes. */
-function phraseAt(toks: Tok[], phrase: string[]): number[] {
+function phraseAt(toks: Tok[], phrase: Tok[]): number[] {
   const at: number[] = []
-  for (let i = 0; i + phrase.length <= toks.length; i++) if (phrase.every((p, k) => toks[i + k]!.t === p)) at.push(i)
+  for (let i = 0; i + phrase.length <= toks.length; i++) if (phrase.every((p, k) => sameWord(toks[i + k]!, p))) at.push(i)
   return at
 }
 
@@ -27,12 +36,12 @@ export function memoryIndex(): SearchIndex {
     async init() {},
     async addBook(lang: string, book: BookModel, segmentId: string) {
       rows = rows.filter((r) => r.seg !== segmentId)
-      for (const r of rowsOf(book)) rows.push({ ...r, lang, book: book.book, seg: segmentId, toks: tokens(r.body) })
+      for (const r of rowsOf(book)) rows.push({ ...r, lang, book: book.book, seg: segmentId, toks: tokens(r.body, lang) })
       segs.add(segmentId)
     },
     async addObs(lang: string, obs: ObsModel, segmentId: string) {
       rows = rows.filter((r) => r.seg !== segmentId)
-      for (const r of rowsOfObs(obs)) rows.push({ ...r, lang, book: 'obs', seg: segmentId, toks: tokens(r.body) })
+      for (const r of rowsOfObs(obs)) rows.push({ ...r, lang, book: 'obs', seg: segmentId, toks: tokens(r.body, lang) })
       segs.add(segmentId)
     },
     async removeSegment(segmentId) {
@@ -44,7 +53,7 @@ export function memoryIndex(): SearchIndex {
     },
     async search(lang, text, f: SearchFilters = {}) {
       const phrases = queryWords(text)
-        .map((w) => tokens(w).map((x) => x.t))
+        .map((w) => tokens(w, lang))
         .filter((p) => p.length > 0)
       if (phrases.length === 0) return []
       const hits: Hit[] = []

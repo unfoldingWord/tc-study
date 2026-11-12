@@ -69,3 +69,18 @@ describe('memoryIndex with OBS', () => {
     expect(await ix.search('xx', 'creación')).toEqual([])
   })
 })
+
+describe('memoryIndex stems', () => {
+  test('a stem finds other forms; the snippet marks the original word; other languages need the exact word', async () => {
+    const ix = memoryIndex()
+    await ix.addBook('es-419', book('rut', 'Las gracias de Dios'), 's1')
+    await ix.addBook('en', book('rut', 'he blessed them'), 's2')
+    await ix.addBook('fr', book('rut', 'les graces et les gracias'), 's3')
+    const es = await ix.search('es-419', 'gracia')
+    expect(es.length).toBeGreaterThan(0)
+    expect(es[0]!.snippet).toContain('«gracias»')
+    expect((await ix.search('en', 'bless')).length).toBeGreaterThan(0)
+    expect(await ix.search('fr', 'gracia')).toEqual([])
+    expect((await ix.search('fr', 'GRACIAS')).length).toBeGreaterThan(0)
+  })
+})

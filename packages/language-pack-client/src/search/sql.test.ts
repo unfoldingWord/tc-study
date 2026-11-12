@@ -262,3 +262,45 @@ describe('OBS in the search index', () => {
     expect(await ix.search('xx', 'creación')).toEqual([])
   })
 })
+
+describe('sqlIndex stems', () => {
+  const mk = (lang: string, text: string): import('@bt-synergy/language-pack-v3').BookModel => ({
+    lang,
+    book: 'rut',
+    orig: ['o', 'v1'],
+    res: [['r/t', 'v1']],
+    texts: [{ res: 'r/t', pieces: [[text, false]], events: [[0, 'chapter', '1'], [0, 'verse', '1']] }],
+  })
+  test('stems match other forms; the snippet marks the original word; fr only exact', async () => {
+    const ix = sqlIndex(bunDriver())
+    await ix.init()
+    await ix.addBook('es-419', mk('es-419', 'Las gracias de Dios'), 's1')
+    await ix.addBook('en', mk('en', 'he blessed them'), 's2')
+    await ix.addBook('fr', mk('fr', 'les graces et les gracias'), 's3')
+    const es = await ix.search('es-419', 'gracia')
+    expect(es.length).toBe(1)
+    expect(es[0]!.snippet).toContain('«gracias»')
+    expect((await ix.search('en', 'bless')).length).toBe(1)
+    expect(await ix.search('fr', 'gracia')).toEqual([])
+    expect((await ix.search('fr', 'gracias')).length).toBe(1)
+  })
+  test('a version 1 database is rebuilt by init', async () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE VIRTUAL TABLE pieces USING fts5(body, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, seg UNINDEXED);
+      CREATE TABLE indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT); INSERT INTO indexed VALUES ('s1', 'es', 'rut');`)
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    expect(await ix.has('s1')).toBe(false)
+    await ix.addBook('es', mk('es', 'Las gracias de Dios'), 's1')
+    expect((await ix.search('es', 'gracia')).length).toBe(1)
+    await ix.init()
+    expect(await ix.has('s1')).toBe(true)
+  })
+  test('user text with quotes is never FTS5 syntax', async () => {
+    const ix = sqlIndex(bunDriver())
+    await ix.init()
+    await ix.addBook('es', mk('es', 'Las gracias de Dios'), 's1')
+    expect(await ix.search('es', 'gracia" OR x')).toEqual([])
+    expect((await ix.search('es', 'gracia" dios')).length).toBe(1)
+  })
+})
