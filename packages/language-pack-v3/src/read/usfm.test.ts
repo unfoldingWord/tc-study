@@ -295,6 +295,56 @@ describe('bookUsfm', () => {
   })
 })
 
+describe('references, tables and numbers', () => {
+  const EXTRA = usfm`\id TIT EN_TPL fixture
+\ide UTF-8
+\c 1
+\ca 2\ca*
+\cp B
+\p
+\v 1 \va 1b\va* \vp 1a\vp* Texto \ref Titus 1:1|TIT 1:1\ref* y mas\f + \fr 1:1 \ft nota\f*
+\v 2 Otro verso
+\tr \tc1 Alpha\tc2 Beta
+\tr \tc1 Gamma\tcr2 Delta
+\p
+\v 3 Fin
+`
+  const build = async () => {
+    const orig = await origOf(UGNT_USFM)
+    const text = extractText(rowsOf(EXTRA, GLT, 'tit'), 'tit', GLT, new OrigIndex(orig))
+    return { orig, text, book: bookOf(orig, text) }
+  }
+
+  test('the fixture has the events and the attributes under test', async () => {
+    const { text } = await build()
+    const args = text.events.map(([, , arg]) => arg)
+    expect(args).toContain('ref')
+    expect(args).toContain('table:row:tr')
+    expect(args).toContain('table:cell:tc1')
+    expect(Object.values(text.attrs ?? {}).some((a) => a.loc === 'TIT 1:1')).toBe(true)
+    expect(Object.values(text.attrs ?? {}).some((a) => a.altnumber === '1b' && a.pubnumber === '1a')).toBe(true)
+    expect(Object.values(text.attrs ?? {}).some((a) => a.altnumber === '2' && a.pubnumber === 'B')).toBe(true)
+  })
+
+  test('a reference, a table, alternate and published numbers build again into the same segment', async () => {
+    const { orig, text, book } = await build()
+    const out = bookUsfm(book, 0, orig)
+    expect(out).toContain('\\ref Titus 1:1|TIT 1:1\\ref*')
+    const again = extractText(rowsOf(out, GLT, 'tit'), 'tit', GLT, new OrigIndex(orig))
+    expect(again.pieces).toEqual(text.pieces)
+    expect(again.events).toEqual(text.events)
+    expect(again.attrs).toEqual(text.attrs)
+    expect(await idOf(bookSegment(bookOf(orig, again)))).toBe(await idOf(bookSegment(book)))
+  })
+
+  test('the cells of a table keep their boundaries and the verse text', async () => {
+    const { orig, book } = await build()
+    const out = bookUsfm(book, 0, orig)
+    expect(out).toMatch(/\\tr\s*\\tc1 Alpha\s*\\tc2 Beta/)
+    expect(out).not.toContain('AlphaBeta')
+  })
+})
+
 // Real sources: the sample of the spec and, with LP3_DATA, a folder with the same layout (`es-419/list.json`, `parts/`,
 // `originals/list.json`).
 

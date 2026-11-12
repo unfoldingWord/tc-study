@@ -40,6 +40,8 @@ function styleOf(type: string): Style {
       return 'sidebar'
     case 'table':
       return 'none'
+    case 'table:row':
+      return 'block'
     case 'table:cell':
       return 'cell'
     default:
@@ -156,7 +158,9 @@ function render(pieces: Piece[], events: Event[], attrs: Record<number, Record<s
       if (extra?.pubnumber !== undefined) out.push(`\\vp ${extra.pubnumber}\\vp* `)
       return
     }
-    const [type, marker] = arg.includes(':') ? [arg.slice(0, arg.indexOf(':')), arg.slice(arg.indexOf(':') + 1)] : [arg, '']
+    // A table event is `table:row:tr` or `table:cell:tc1`: its type has a colon of its own.
+    const split = /^table:(row|cell):/.test(arg) ? arg.indexOf(':', 6) : arg.indexOf(':')
+    const [type, marker] = split >= 0 ? [arg.slice(0, split), arg.slice(split + 1)] : [arg, '']
     const style = styleOf(type)
     switch (style) {
       case 'block':
@@ -167,9 +171,13 @@ function render(pieces: Piece[], events: Event[], attrs: Record<number, Record<s
         break
       case 'char': {
         const prefix = nested() ? '+' : ''
-        out.push(`\\${prefix}${marker}`)
+        // A reference has no marker in the parser's tree: it is `ref`, and it names its target by position (`|TIT 1:1`)
+        // when that is all it has.
+        const name = type === 'ref' ? 'ref' : marker
+        const loc = type === 'ref' && extra !== undefined && Object.keys(extra).length === 1 ? extra.loc : undefined
+        out.push(`\\${prefix}${name}`)
         pending = true
-        stack.push({ style, close: `${attributeText(extra)}\\${prefix}${marker}*` })
+        stack.push({ style, close: `${loc !== undefined ? `|${loc}` : attributeText(extra)}\\${prefix}${name}*` })
         break
       }
       case 'note':
@@ -181,7 +189,7 @@ function render(pieces: Piece[], events: Event[], attrs: Record<number, Record<s
         stack.push({ style, close: '' })
         break
       case 'cell':
-        out.push(` \\${marker}`)
+        out.push(`\\${marker}`)
         pending = true
         stack.push({ style, close: '' })
         break
