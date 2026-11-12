@@ -59,12 +59,12 @@ function entryOf(id: string): string {
  * - `helps-text:tw-preview:` (tW only): what `useTWPreviews` caches, the first paragraph of the article.
  *
  * The `helps-text:` keys carry the content stamp of the resource's catalog row (`resourceContentStamp`), which the segment
- * does not keep: the caller gives it as `stamp` (`nostamp` when it does not). Empty when the language has no such group.
+ * does not keep: the caller gives it as `stamp` (required: rows under a made-up stamp would never be found). Empty when the language has no such group.
  */
-export async function articleRows(reader: PackReader, group: string, o: { stamp?: string } = {}): Promise<Row[]> {
+export async function articleRows(reader: PackReader, group: string, o: { stamp: string }): Promise<Row[]> {
   const articles = await reader.articles(group)
   if (!articles) return []
-  const stamp = o.stamp ?? 'nostamp'
+  const { stamp } = o
   const rows: Row[] = []
   const cache: HelpsTextCacheAdapter = {
     get: async () => null,

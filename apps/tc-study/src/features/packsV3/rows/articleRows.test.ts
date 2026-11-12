@@ -116,6 +116,6 @@ describe('article rows', () => {
   }, 60_000)
 
   it('has no rows for a group the language lacks', async () => {
-    expect(await articleRows(await readerOf(), 'tw:names')).toEqual([])
+    expect(await articleRows(await readerOf(), 'tw:names', { stamp: TW_STAMP })).toEqual([])
   }, 60_000)
 })

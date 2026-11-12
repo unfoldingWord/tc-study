@@ -156,7 +156,27 @@ async function withObs(base: RowSource): Promise<RowSource> {
 }
 
 const memo = new Map<number, Promise<Sample>>()
-/** The sample as its catalogs' `revision` says (the same content, signed with a key made for each revision). */
+/** Revision 2 and later: the first note of Titus 1 that is not an introduction has a sentence added; nothing else changes. */
+export const REVISED_NOTE_SUFFIX = ' Texto agregado en la revisión.'
+function withRevisedNote(base: RowSource): RowSource {
+  return {
+    resources: (lang) => base.resources(lang),
+    rows(f) {
+      const it = base.rows(f)
+      return (async function* () {
+        for await (const row of it) {
+          if (row.layer === 'sot' && row.key === 'tn:es-419_gl/es-419/tn:tit:1') {
+            const value = structuredClone(row.value) as { content: { notes: { isIntro?: boolean; note: string }[] } }
+            value.content.notes.find((n) => !n.isIntro)!.note += REVISED_NOTE_SUFFIX
+            yield { ...row, value }
+          } else yield row
+        }
+      })()
+    },
+  }
+}
+
+/** The sample as its catalogs' `revision` says (the same content, signed with a key made for each revision; from revision 2 one Titus note is longer). */
 export function buildSample(revision = 1): Promise<Sample> {
   let made = memo.get(revision)
   if (!made) memo.set(revision, (made = make(aboutOf(revision))))
@@ -169,7 +189,7 @@ async function make(about: ReturnType<typeof aboutOf>): Promise<Sample> {
   const source = (lang: string) => partsSource({ list: join(DATA, lang, 'list.json'), partsDir: parts, originals })
   const common = await buildCommon({ source: await source('en'), about, mapLang: 'en' })
   const lang = await buildLanguage({
-    source: await withObs(withTa(await source('es-419'))),
+    source: await withObs(withTa(about.revision >= 2 ? withRevisedNote(await source('es-419')) : await source('es-419'))),
     lang: 'es-419',
     registry: {},
     about,
@@ -205,6 +225,7 @@ export function fakeFetch(sample: Sample): typeof fetch & { urls: string[] } {
     const cat = /^\/v3\/packs\/([^/]+)\/catalog$/.exec(path)
     if (cat?.[1] === 'common') return answer(sample.commonCatalog, 'catalog')
     if (cat?.[1] === 'es-419') return answer(sample.langCatalog, 'catalog')
+    if (cat) return answer(undefined, 'catalog') // a language the Worker has no pack for
     return new Response(JSON.stringify({ error: 'not found' }), { status: 404 })
   }
   return Object.assign(fn, { urls })
