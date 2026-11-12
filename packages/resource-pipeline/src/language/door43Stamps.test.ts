@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { resourceContentStamp } from '@bt-synergy/resource-catalog'
-import { literalTextOf, stampsOfRows, stampsWithLexicons } from './door43Stamps'
+import { isLiteralTextId, literalTextOf, stampsOfRows, stampsWithLexicons } from './door43Stamps'
 
 const row = (owner: string, language: string, resourceId: string, subject: string, tag: string) => ({
   resourceKey: `${owner}/${language}/${resourceId}`,
@@ -85,5 +85,22 @@ describe('the lexicons in the stamps', () => {
     expect(await stampsWithLexicons(rows, { language: 'es-419', obs: false, fetch: fetchFn })).toEqual(
       stampsOfRows(rows, { language: 'es-419', obs: false })
     )
+  })
+})
+
+describe('isLiteralTextId', () => {
+  test('the ULT/GLT ids, and the literal texts listed by language', () => {
+    expect(isLiteralTextId('ult', 'en')).toBe(true)
+    expect(isLiteralTextId('glt', 'es-419')).toBe(true)
+    expect(isLiteralTextId('avd', 'ar')).toBe(true)
+    expect(isLiteralTextId('arst', 'ar')).toBe(false)
+    expect(isLiteralTextId('nav', 'ar')).toBe(false)
+    expect(isLiteralTextId('avd', 'fr')).toBe(false)
+    expect(isLiteralTextId('gst', 'es-419')).toBe(false)
+  })
+  test('Arabic: BSOJ avd is the literal text among avd, arst and nav', () => {
+    const rows = ['avd', 'arst', 'nav'].map((resourceId) => ({ owner: 'BSOJ', language: 'ar', subject: 'Aligned Bible', resourceId }))
+    expect(literalTextOf(rows, 'ar')?.resourceId).toBe('avd')
+    expect(literalTextOf(rows.filter((r) => r.resourceId !== 'avd'), 'ar')).toBeUndefined()
   })
 })

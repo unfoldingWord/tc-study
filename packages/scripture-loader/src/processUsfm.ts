@@ -41,6 +41,21 @@ export interface ProcessUsfmToUsjResult extends USJProcessResult {
 }
 
 /**
+ * A backslash at the end of a line, with no marker after it, is not USFM: the parser throws on it ("Invalid marker") and
+ * the whole book is lost. Drop it and say so, so the source can be fixed (BSOJ/ar_arst 57-TIT.usfm had two in Nov 2026,
+ * on the line after `\mt` in chapters 2 and 3, and blocked the Arabic packs).
+ */
+export function withoutStrayBackslashes(usfm: string, where = ''): string {
+  let dropped = 0
+  const out = usfm.replace(/\\(?=[ \t]*(?:\r?\n|$))/g, () => {
+    dropped++
+    return ''
+  })
+  if (dropped) console.warn(`⚠️ [scripture-loader] ${where}: dropped ${dropped} stray backslash(es) with no marker after them`)
+  return out
+}
+
+/**
  * Sole process path: USFM → USJ + AlignmentMap → UsjScriptureViewModel.
  * Also returns temporary ProcessedScripture projection + cache payload.
  */
@@ -61,7 +76,7 @@ export async function processUsfmToUsjResult(
 
   const usjProcessor = await resolveUsjProcessor(params.usjProcessor)
   const opts: USJProcessingOptions = { ...DEFAULT_OPTIONS, ...options }
-  const result = await usjProcessor.processUSFM(usfmText, bookId, bookName, opts)
+  const result = await usjProcessor.processUSFM(withoutStrayBackslashes(usfmText, bookId), bookId, bookName, opts)
   const cacheContent = usjProcessor.toUsjCacheContent(result, bookId, bookName)
   return { ...result, cacheContent }
 }
