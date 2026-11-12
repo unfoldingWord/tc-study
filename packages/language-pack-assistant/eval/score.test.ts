@@ -30,6 +30,14 @@ test('objects compare key by key: an extra or a missing key is a difference', ()
   expect(scoreQuestion(item({ call: call('renderings', { book: 'tit', word: 3 }) }), decide(call('renderings', { word: 3, book: 'TIT' })), []).callCorrect).toBe(true)
 })
 
+test('a call by a rule or the classifier is accepted; the fallback search is not', () => {
+  const via = (v: 'rule' | 'classifier' | 'search'): Decision => ({ kind: 'call', call: tit, via: v, interpretation: 'x' })
+  expect(scoreQuestion(item({ call: tit }), via('rule'), []).accepted).toBe(true)
+  expect(scoreQuestion(item({ call: tit }), via('classifier'), []).accepted).toBe(true)
+  const fallback: Decision = { kind: 'call', call: call('search', { text: 'q' }), via: 'search', interpretation: 'x' }
+  expect(scoreQuestion(item({ search: true }), fallback, [])).toEqual({ callCorrect: true, accepted: false, top3: null })
+})
+
 test('a choose holds the expected call: correct, and not accepted', () => {
   expect(scoreQuestion(item({ call: tit }), choose(grace, tit), [])).toEqual({ callCorrect: true, accepted: false, top3: null })
   expect(scoreQuestion(item({ call: tit }), choose(grace), []).callCorrect).toBe(false)

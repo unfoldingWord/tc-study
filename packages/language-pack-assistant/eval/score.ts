@@ -45,5 +45,5 @@ export function scoreQuestion(item: Item, decision: Decision, cardPieceIds: stri
       decision.options.every((o) => e.choose.some((x) => sameCall(o, x)))
   }
   const top3 = item.pieces.length === 0 ? null : cardPieceIds.slice(0, 3).includes(item.pieces[0]!)
-  return { callCorrect, accepted: decision.kind === 'call', top3 }
+  return { callCorrect, accepted: decision.kind === 'call' && decision.via !== 'search', top3 }
 }
