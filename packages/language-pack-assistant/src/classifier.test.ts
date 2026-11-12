@@ -40,6 +40,9 @@ describe('classifier', () => {
       expect(loadComplement(bytes(raw.replace('"for":"queries/1"', '"for":"queries/2"'))).ok).toBe(false)
     }
   })
+  test('no brace remains after the slots are replaced', () => {
+    for (const lang of ['en', 'es', 'pt']) for (const [t] of examplesOf(lang)) expect(t).not.toMatch(/[{}]/)
+  })
   test('mask replaces entities by their slot words', () => {
     const tokens = ['tito', '2:11', 'que', 'dice']
     expect(mask(tokens, [{ kind: 'ref', book: 'tit', chapter: 2, verse: 11, start: 0, end: 2 }])).toBe('ref que dice')
