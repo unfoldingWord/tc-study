@@ -52,33 +52,39 @@ export async function lastVerse(reader: PackReader, book: string, chapter: numbe
   return last
 }
 
-const catchAlls = new WeakMap<PackReader, Promise<Set<string>>>()
+type Spread = { drop: Set<string>; concepts: Map<string, number> }
+const spreads = new WeakMap<PackReader, Promise<Spread>>()
 
-/** The Strong keys that the `strongs` lists of more than 2 % of the tW concepts hold (`G35880`, `H0853`): they say nothing of one concept. Once per reader. */
-function catchAllKeys(reader: PackReader): Promise<Set<string>> {
-  let found = catchAlls.get(reader)
+/**
+ * For each Strong key, how many tW concepts list it in `strongs`; `drop` holds the keys of more than 2 % of them (`G35880`, `H0853`),
+ * which say nothing of one concept. Once per reader.
+ */
+function spreadOf(reader: PackReader): Promise<Spread> {
+  let found = spreads.get(reader)
   if (found === undefined) {
     found = reader.mapsOf(['xmap'], { coreOnly: true }).then((m) => {
       const lists = Object.entries(m.xmap?.core.strongs ?? {}).filter(([id]) => id.startsWith('tw:'))
-      const seen = new Map<string, number>()
-      for (const [, keys] of lists) for (const k of new Set(keys)) seen.set(k, (seen.get(k) ?? 0) + 1)
-      return new Set([...seen].filter(([, n]) => n > lists.length * 0.02).map(([k]) => k))
+      const concepts = new Map<string, number>()
+      for (const [, keys] of lists) for (const k of new Set(keys)) concepts.set(k, (concepts.get(k) ?? 0) + 1)
+      return { drop: new Set([...concepts].filter(([, n]) => n > lists.length * 0.02).map(([k]) => k)), concepts }
     })
-    catchAlls.set(reader, found)
+    spreads.set(reader, found)
   }
   return found
 }
 
 /**
- * The Strong keys the xmap lists for a concept (`strongs`) without the catch-all keys (R10b), most occurrences first (the sum of the
- * `strong` counts over the books), ties in code-point order. Empty when none is left or the xmap is not installed. Reusable by the rules.
+ * The Strong keys the xmap lists for a concept (`strongs`) without the catch-all keys (R10b), the most specific first (R10c): fewest tW
+ * concepts listing the key, then most occurrences (the sum of the `strong` counts over the books), then code-point order. Empty when none
+ * is left or the xmap is not installed. Callers take the first 3. Reusable by the rules.
  */
 export async function strongsOf(reader: PackReader, conceptId: string): Promise<string[]> {
   const core = (await reader.mapsOf(['xmap'], { coreOnly: true })).xmap?.core
-  const drop = await catchAllKeys(reader)
+  const { drop, concepts } = await spreadOf(reader)
   const keys = (core?.strongs?.[conceptId] ?? []).filter((k) => !drop.has(k))
   const total = (k: string): number => [...(core?.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
-  return [...keys].sort((x, y) => total(y) - total(x) || (x < y ? -1 : x > y ? 1 : 0))
+  const spread = (k: string): number => concepts.get(k) ?? 0
+  return [...keys].sort((x, y) => spread(x) - spread(y) || total(y) - total(x) || (x < y ? -1 : x > y ? 1 : 0))
 }
 
 export function checkIds(reader: PackReader, ids: string[]): Promise<IdCheck[]> {
@@ -202,7 +208,11 @@ export async function checkFile(reader: PackReader, text: string): Promise<{ lin
   const out: { line: number; q: string; check: IdCheck }[] = []
   const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '')
   for (const [i, l] of lines.entries()) {
-    const item = JSON.parse(l) as { q: string; expect: { call?: Call; choose?: Call[] }; pieces?: string[] }
+    const item = JSON.parse(l) as { q: string; expect?: { call?: Call; choose?: Call[]; search?: true }; pieces?: string[] }
+    if (item.expect === undefined || (item.expect.call === undefined && item.expect.choose === undefined && item.expect.search !== true)) {
+      out.push({ line: i + 1, q: item.q, check: { id: 'expect', ok: false, why: 'expect has none of call, choose and search' } })
+      continue
+    }
     const calls = item.expect.call !== undefined ? [item.expect.call] : (item.expect.choose ?? [])
     const checks = [...(await checkIds(reader, item.pieces ?? [])), ...(await Promise.all(calls.map((c) => checkCall(reader, c)))).flat()]
     for (const check of checks) out.push({ line: i + 1, q: item.q, check })

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createClient, httpSource, memoryStore, type PackReader } from '@bt-synergy/language-pack-client'
 import { type FakeServer, startFakeServer } from '../../language-pack-client/test/fakeServer'
 import { buildSample } from '../../language-pack-client/test/sample'
-import { checkCall, checkIds, lastVerse, strongsOf } from './check-ids'
+import { checkCall, checkFile, checkIds, lastVerse, strongsOf } from './check-ids'
 
 let reader: PackReader
 let server: FakeServer
@@ -99,19 +99,32 @@ test('the last verse of a chapter comes from the installed text', async () => {
   expect(await lastVerse(reader, 'rut', 1)).toBeUndefined()
 })
 
-test('strongsOf: keys of a concept from the xmap, most occurrences first; none for a concept without', async () => {
+test('strongsOf: keys of a concept, catch-alls dropped, most specific first; none for a concept without', async () => {
   const keys = await strongsOf(reader, 'tw:kt/grace')
   expect(keys.length).toBeGreaterThan(0)
   expect(keys).toContain('G54850')
   const core = (await reader.mapsOf(['xmap'], { coreOnly: true })).xmap!.core
-  const total = (k: string) => [...(core.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
-  for (let i = 1; i < keys.length; i++) expect(total(keys[i - 1]!)).toBeGreaterThanOrEqual(total(keys[i]!))
-  expect(await strongsOf(reader, 'tw:kt/nothing')).toEqual([])
-  // the catch-all keys (in more than 2 % of the tW concepts) are dropped
   const lists = Object.entries(core.strongs ?? {}).filter(([id]) => id.startsWith('tw:'))
   const seen = new Map<string, number>()
   for (const [, ks] of lists) for (const k of new Set(ks)) seen.set(k, (seen.get(k) ?? 0) + 1)
+  const total = (k: string) => [...(core.strong.rows.get(k)?.values() ?? [])].reduce((n, [c]) => n + c, 0)
+  // R10c: fewest concepts first, then most occurrences
+  for (const [id] of lists) {
+    const ks = await strongsOf(reader, id)
+    for (let i = 1; i < ks.length; i++) {
+      const [p, q] = [ks[i - 1]!, ks[i]!]
+      expect(seen.get(p)! < seen.get(q)! || (seen.get(p) === seen.get(q) && total(p) >= total(q))).toBe(true)
+    }
+  }
+  expect(await strongsOf(reader, 'tw:kt/nothing')).toEqual([])
+  // the catch-all keys (in more than 2 % of the tW concepts) are dropped
   const common = [...seen].filter(([, n]) => n > lists.length * 0.02).map(([k]) => k)
   expect(common.length).toBeGreaterThan(0)
   for (const [id] of lists) for (const k of await strongsOf(reader, id)) expect(common).not.toContain(k)
+})
+
+test('checkFile flags a line whose expect has none of call, choose and search', async () => {
+  const lines = [{ q: 'a', expect: { search: true }, pieces: [] }, { q: 'b', expect: {}, pieces: [] }, { q: 'c', pieces: [] }]
+  const out = await checkFile(reader, lines.map((l) => JSON.stringify(l)).join('\n'))
+  expect(out.filter((r) => !r.check.ok).map((r) => r.line)).toEqual([2, 3])
 })
