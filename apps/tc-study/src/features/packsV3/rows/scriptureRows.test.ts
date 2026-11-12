@@ -5,7 +5,7 @@ import { gunzipSync } from 'node:zlib'
 import { memoryStore } from '@bt-synergy/language-pack-client'
 import { createPacksV3 } from '../client'
 import { buildSample, fakeFetch } from '../testing/sample'
-import { origRows, scriptureRows, type Row } from './scriptureRows'
+import { origRows, scriptureRows, withoutMilestoneGaps, type Row } from './scriptureRows'
 
 const DATA = join(import.meta.dir, '..', '..', '..', '..', '..', '..', 'packages', 'language-pack-v3', 'spec', 'tests', 'data')
 
@@ -46,6 +46,13 @@ async function reader() {
 }
 
 describe('scripture rows', () => {
+  it('strips only the blank between aligned groups, not one before an unaligned word or node', () => {
+    const z = (w: string) => `\\zaln-s |x-strong="a"\\*\\w ${w}|x-occurrence="1"\\w*\\zaln-e\\*`
+    expect(withoutMilestoneGaps(`${z('a')} ${z('b')}`)).toBe(`${z('a')}${z('b')}`)
+    expect(withoutMilestoneGaps(`${z('a')} word`)).toBe(`${z('a')} word`)
+    expect(withoutMilestoneGaps(`${z('a')} \\add x\\add*`)).toBe(`${z('a')} \\add x\\add*`)
+  })
+
   it('es-419 GLT Titus equals the rows Door43 wrote, key by key and value by value', async () => {
     const rows = await scriptureRows(await reader(), 'tit')
     const mine = noStamp(rows.filter((r) => r.key.startsWith('scripture-usj:es-419_gl/es-419/glt:')))
@@ -54,6 +61,8 @@ describe('scripture rows', () => {
     for (const [key, value] of theirs) expect(`${key} ${firstDiff(mine.get(key), value)}`).toBe(`${key} null`)
   }, 60_000)
 
+  // Only GLT is compared with Door43: GST rows differ at one x-morph (bookUsfm takes x-morph from UGNT; a known limit
+  // documented in usfm.ts).
   it('gives rows to every text of the book', async () => {
     const rows = await scriptureRows(await reader(), 'tit')
     for (const res of ['es-419_gl/es-419/glt', 'es-419_gl/es-419/gst']) {

@@ -30,8 +30,8 @@ async function rowsOfUsfm(usfmText: string, resourceKey: string, book: string): 
  * USJ Door43 loads: the source USFM puts a line break there and the parser drops it. The rows must equal Door43's, so the
  * space is left out of the USFM the processor reads. A space inside a group, between two words, stays.
  */
-const withoutMilestoneGaps = (usfm: string): string =>
-  usfm.replace(/(\\w\*|\\zaln-e\\\*) +(?=\\zaln-e\\\*|\\zaln-s )/g, '$1')
+export const withoutMilestoneGaps = (usfm: string): string =>
+  usfm.replace(/(\\w\*|\\zaln-e\\\*) +(?=(?:\\zaln-e\\\*)*\\zaln-s )/g, '$1')
 
 /**
  * `scripture-usj:` rows (a row per chapter and the book index) of every Bible the language has for the book. The resource
