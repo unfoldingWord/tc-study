@@ -76,7 +76,7 @@ function outcomeOf(e: unknown): SyncOutcome {
 
 const entryContent = (entry: unknown): SyncRecord | undefined => (entry as { content?: SyncRecord } | null)?.content
 
-/** Deletes the rows of the book that a new revision makes stale: the unit's own, and every derived row of the book, so the warm worker makes them again. */
+/** Deletes the rows of the book that a new revision makes stale: the unit's own, and every derived row of the book, so the warm worker makes them again. The delete is broad on purpose: derived rows are recomputed. */
 async function dropBook(cache: CacheAdapter, book: string, resources: string[]): Promise<void> {
   const ofBook = new RegExp(`:${book}(:|$)`)
   const keys: string[] = []
@@ -103,22 +103,31 @@ async function dropResources(cache: CacheAdapter, resources: string[]): Promise<
   if (keys.length > 0) await cache.deleteMany(keys)
 }
 
-/** The row to write for a resource: Door43's own when it holds the same release (its `published_at` is part of the stamp its derived rows carry), else the one of the format. */
+/**
+ * The row to write for a resource: Door43's own when it holds the same release (its `published_at` is part of the stamp its
+ * derived rows carry), else the one of the format.
+ *
+ * When the release tag differs, the books Door43 had downloaded stay in `ingredients` but not in `downloadedIngredients`:
+ * their rows are of the old release, so Door43 downloads them again under the new one instead of treating them as held. Only
+ * the books this sync holds rows for (`books`) are downloaded.
+ */
 function merged(base: CatalogEntryRow, existing: ResourceMetadata | null, books: string[]): ResourceMetadata {
   const sameRelease = existing?.release?.tag_name !== undefined && existing.release.tag_name === base.metadata.release?.tag_name
-  const bookSet = (xs: string[] | undefined) => [...(xs ?? [])]
+  const ids = (xs: { identifier: string }[] | undefined) => (xs ?? []).map((i) => i.identifier)
   if (!existing || !sameRelease) {
-    const held = sorted([...(base.metadata.contentMetadata?.downloadedIngredients ?? []), ...books])
-    return { ...base.metadata, contentMetadata: { ...base.metadata.contentMetadata, ingredients: held.map(ingredientOf), downloadedIngredients: held, books: held } }
+    const held = sorted(books)
+    const listed = sorted([...ids(existing?.contentMetadata?.ingredients), ...(existing?.contentMetadata?.downloadedIngredients ?? []), ...held])
+    return { ...base.metadata, contentMetadata: { ...base.metadata.contentMetadata, ingredients: listed.map(ingredientOf), downloadedIngredients: held, books: held } }
   }
-  const held = sorted([...bookSet(existing.contentMetadata?.downloadedIngredients), ...books])
+  const held = sorted([...(existing.contentMetadata?.downloadedIngredients ?? []), ...books])
+  const have = new Set(ids(existing.contentMetadata?.ingredients))
   return {
     ...existing,
     availability: { ...existing.availability, offline: true },
     contentMetadata: {
       ...existing.contentMetadata,
       downloadedIngredients: held,
-      ingredients: existing.contentMetadata?.ingredients?.length ? existing.contentMetadata.ingredients : held.map(ingredientOf),
+      ingredients: [...(existing.contentMetadata?.ingredients ?? []), ...held.filter((h) => !have.has(h)).map(ingredientOf)],
     },
   }
 }
@@ -131,6 +140,7 @@ async function syncNow(lang: string, want: { books: string[]; articles?: 'all' }
   try {
     await client.refresh(lang, opts)
   } catch (e) {
+    signal?.throwIfAborted()
     return outcomeOf(e)
   }
 
@@ -141,9 +151,13 @@ async function syncNow(lang: string, want: { books: string[]; articles?: 'all' }
     const units = want.articles === 'all' ? (await client.status(lang)).units.filter((u) => idOf(u.key).startsWith('art:')).map((u) => u.key) : []
     await client.install(lang, { books, ...(units.length > 0 ? { units } : {}) }, { ...opts, onProgress: (p) => onProgress?.({ lang, unit: p.key, done: p.done, total: p.total }) })
   } catch (e) {
-    failure = outcomeOf(e)
-    if (failure.kind === 'no-pack') return failure
+    // An abort keeps what the library activated: its rows are written below, then the abort is rethrown.
+    if (!signal?.aborted) {
+      failure = outcomeOf(e)
+      if (failure.kind === 'no-pack') return failure
+    }
   }
+  const flushing = signal?.aborted === true
 
   // Rows are written only for what the library activated: a unit cut short by a failure has none.
   const reader: PackReader = await client.open(lang)
@@ -161,6 +175,7 @@ async function syncNow(lang: string, want: { books: string[]; articles?: 'all' }
     const row = base.find((r) => r.key === res)
     return resourceContentStamp(row ? merged(row, existing.get(row.key) ?? null, []) : undefined)
   }
+  const groupStamp = async (group: string): Promise<string> => stampOf((await reader.articles(group))?.[0]?.res)
 
   // The library re-activates every unit under a new catalog's revision, changed or not, so the revision says nothing about
   // a unit. What its rows were written from is the content of its segments: a digest of what the reader decoded.
@@ -182,11 +197,9 @@ async function syncNow(lang: string, want: { books: string[]; articles?: 'all' }
   }
   for (const u of listed.filter((l) => l.installed && l.id.startsWith('art:') && reader.installed(l.id))) {
     const group = u.id.slice('art:'.length)
-    todo.push({
-      id: u.id,
-      sig: await sigOf(u.id),
-      build: async () => articleRows(reader, group, { stamp: stampOf((await reader.articles(group))?.[0]?.res) }),
-    })
+    // The stamp of the stored row is part of the signature: when it changes, the helps-text rows (keyed by it) are rebuilt.
+    const stamp = await groupStamp(group)
+    todo.push({ id: u.id, sig: `${await sigOf(u.id)}@${stamp}`, build: () => articleRows(reader, group, { stamp }) })
   }
   if (reader.installed('obs')) todo.push({ id: 'obs', sig: await sigOf('obs'), build: () => obsRows(reader) })
 
@@ -195,6 +208,7 @@ async function syncNow(lang: string, want: { books: string[]; articles?: 'all' }
   let n = 0
   try {
     for (const unit of todo) {
+      if (!flushing && signal?.aborted) break
       onProgress?.({ lang, unit: unit.id, done: n++, total: todo.length })
       const before = record.units[unit.id]
       if (before === unit.sig) continue
@@ -225,7 +239,8 @@ async function syncNow(lang: string, want: { books: string[]; articles?: 'all' }
     if (record.resClass[r.key] === undefined) continue
     const row = merged(r, existing.get(r.key) ?? null, record.resBooks[r.key] ?? [])
     rows.set(r.key, row)
-    if (written.length > 0) await catalog.set(r.key, row)
+    // Written whenever rows exist, so a sync that died before this point repairs it; skipped when it is what is stored.
+    if (JSON.stringify(row) !== JSON.stringify(existing.get(r.key) ?? null)) await catalog.set(r.key, row)
   }
   const receipts: { key: string; entry: unknown }[] = []
   const staleReceipts: string[] = []
@@ -247,6 +262,7 @@ async function syncNow(lang: string, want: { books: string[]; articles?: 'all' }
   if (staleReceipts.length > 0) await cache.deleteMany(staleReceipts)
   if (receipts.length > 0) await cache.putRawMany(receipts)
 
+  signal?.throwIfAborted()
   return failure ?? { kind: 'done', books: books.filter((b) => reader.installed(`book:${b}`)) }
 }
 
@@ -258,6 +274,8 @@ const tails = new Map<string, Promise<void>>()
  * (books with their helps, originals, article groups, OBS) and their catalog entries and receipts. A unit whose revision
  * changed has its rows, and the derived `prepared:`, `helps-quote:` and `helps-align:` rows of its book, deleted before the
  * new ones come. A cut network keeps every row written and says `failed`; the next sync fetches only what is missing.
+ * An abort (`signal`) rejects with its reason, after writing the rows, catalog entries and (for whole resources) receipts of
+ * the units already activated.
  * One sync of a language runs at a time: a second call waits for the first.
  */
 export function syncLanguageV3(lang: string, want: { books: string[]; articles?: 'all' }, deps: SyncDeps): Promise<SyncOutcome> {

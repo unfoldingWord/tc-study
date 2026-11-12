@@ -36,10 +36,9 @@ function kindOf(subject: string): { type: ResourceType; format: ResourceFormat }
  * - `release.tag_name` and `version`: the format's `release`, which is the release tag alone (`v42`). The format does not keep
  *   `published_at`, so `resourceContentStamp` of this row is the tag (`v42`), not `v42#2024-...` as a Door43 row gives; the
  *   sync keeps a Door43 row's `release` when it has the same tag, so the stamp stays the one its derived rows were made under;
- * - `books` (resource key -> book codes): the books of the resource held, as `contentMetadata.ingredients` and
- *   `downloadedIngredients`. The catalogs do not list a resource's books, so the caller says which it holds.
+ * - `contentMetadata` lists no books: the catalogs do not say which a resource has, so the sync fills them in.
  */
-export function catalogRowsV3(reader: PackReader, o: { books?: ReadonlyMap<string, readonly string[]> } = {}): CatalogEntryRow[] {
+export function catalogRowsV3(reader: PackReader): CatalogEntryRow[] {
   const seen = new Set<string>()
   const rows: CatalogEntryRow[] = []
   for (const r of reader.resources()) {
@@ -47,8 +46,6 @@ export function catalogRowsV3(reader: PackReader, o: { books?: ReadonlyMap<strin
     seen.add(r.key)
     const [owner = '', language = '', resourceId = ''] = r.key.split('/')
     const { type, format } = kindOf(r.subject)
-    const books = [...(o.books?.get(r.key) ?? [])].sort()
-    const ingredients = books.map(ingredientOf)
     rows.push({
       key: r.key,
       metadata: {
@@ -66,7 +63,7 @@ export function catalogRowsV3(reader: PackReader, o: { books?: ReadonlyMap<strin
         contentStructure: type === ResourceType.SCRIPTURE || type === ResourceType.NOTES || type === ResourceType.QUESTIONS || type === ResourceType.WORDS_LINKS ? 'book' : 'entry',
         availability: { online: true, offline: true, bundled: false, partial: false },
         locations: [],
-        contentMetadata: { ingredients, downloadedIngredients: books, books },
+        contentMetadata: { ingredients: [], downloadedIngredients: [], books: [] },
         release: { tag_name: r.release, zipball_url: '', published_at: '' },
         license: { id: r.license },
         ...(r.rights !== undefined ? { rights: r.rights } : {}),

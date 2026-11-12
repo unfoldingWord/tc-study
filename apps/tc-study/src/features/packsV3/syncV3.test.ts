@@ -139,6 +139,75 @@ describe('syncLanguageV3', () => {
     expect(keysOf(a.rows, `tn:${TN}:tit`).length).toBeGreaterThan(1)
   }, 120_000)
 
+  it('a Door43 row with the same tag that appears later changes the stamp: helps-text rows exist only under the final stamp', async () => {
+    const sample = await buildSample()
+    const client = await clientOf(fakeFetch(sample), sample)
+    const a = adapters()
+    const TA = 'es-419_gl/es-419/ta'
+    await syncLanguageV3('es-419', { books: ['tit'] }, { client, cache: a.cache, catalog: a.catalog })
+    expect(keysOf(a.rows, `helps-text:ta-title:${TA}@v4:`).length).toBeGreaterThan(0)
+    const row = a.catalogRows.get(TA)!
+    a.catalogRows.set(TA, { ...row, release: { ...row.release!, published_at: '2024-01-01T00:00:00Z' } })
+    await syncLanguageV3('es-419', { books: ['tit'] }, { client, cache: a.cache, catalog: a.catalog })
+    const all = keysOf(a.rows, `helps-text:`).filter((k) => k.includes(`${TA}@`))
+    expect(all.length).toBeGreaterThan(0)
+    expect(all.every((k) => k.includes(`${TA}@v4#2024`))).toBe(true)
+  }, 120_000)
+
+  it('a different release tag keeps the books Door43 had as ingredients, not as downloaded', async () => {
+    const sample = await buildSample()
+    const client = await clientOf(fakeFetch(sample), sample)
+    const a = adapters()
+    const old = {
+      resourceKey: TN, release: { tag_name: 'v0', zipball_url: '', published_at: '2020-01-01T00:00:00Z' },
+      contentMetadata: { ingredients: [{ identifier: 'rut', title: 'rut', path: '', exists: true, downloaded: true }], downloadedIngredients: ['rut'], books: ['rut'] },
+    } as unknown as ResourceMetadata
+    a.catalogRows.set(TN, old)
+    await syncLanguageV3('es-419', { books: ['tit'] }, { client, cache: a.cache, catalog: a.catalog })
+    const cm = a.catalogRows.get(TN)!.contentMetadata!
+    expect(cm.ingredients?.map((i) => i.identifier)).toEqual(['rut', 'tit'])
+    expect(cm.downloadedIngredients).toEqual(['tit'])
+  }, 120_000)
+
+  it('an abort after the first unit keeps its rows, rejects, and the next sync fetches only what is missing', async () => {
+    const sample = await buildSample()
+    const good = fakeFetch(sample)
+    const ctl = new AbortController()
+    let segs = 0
+    const fetch = (async (i: RequestInfo | URL) => {
+      if (String(i).includes('/seg/') && ++segs > 7) ctl.abort(new Error('stop'))
+      return good(i)
+    }) as typeof globalThis.fetch
+    const client = await clientOf(fetch, sample)
+    const a = adapters()
+    await expect(syncLanguageV3('es-419', { books: ['tit'] }, { client, cache: a.cache, catalog: a.catalog, signal: ctl.signal })).rejects.toThrow('stop')
+    const kept = keysOf(a.rows, 'scripture-usj:').length + keysOf(a.rows, 'es-419_gl/es-419/').length
+    expect(kept).toBeGreaterThan(0)
+    const fetched = new Set(segments(good.urls))
+    const mark = good.urls.length
+    expect(await syncLanguageV3('es-419', { books: ['tit'] }, { client, cache: a.cache, catalog: a.catalog })).toEqual({ kind: 'done', books: ['tit'] })
+    expect(segments(good.urls.slice(mark)).filter((u) => fetched.has(u))).toEqual([])
+    expect(keysOf(a.rows, `tn:${TN}:tit`).length).toBeGreaterThan(1)
+  }, 120_000)
+
+  it('a network cut that lets the first unit finish keeps its rows and leaves the cut unit none', async () => {
+    const sample = await buildSample()
+    const good = fakeFetch(sample)
+    let segs = 0
+    const fetch = (async (i: RequestInfo | URL) => {
+      if (String(i).includes('/seg/') && ++segs > 7) throw new TypeError('network down')
+      return good(i)
+    }) as typeof globalThis.fetch
+    const client = await clientOf(fetch, sample)
+    const a = adapters()
+    expect(await syncLanguageV3('es-419', { books: ['tit'] }, { client, cache: a.cache, catalog: a.catalog })).toEqual({ kind: 'failed', code: 'E_NETWORK' })
+    const rec = (a.rows.get(syncRecordKey('es-419')) as { content: { units: Record<string, string> } }).content.units
+    expect(Object.keys(rec).length).toBeGreaterThan(0)
+    expect(rec['book:tit']).toBeUndefined()
+    expect(keysOf(a.rows, 'tn:').length).toBe(0)
+    expect(keysOf(a.rows, 'scripture-usj:').length).toBeGreaterThan(0)
+  }, 120_000)
+
   it('says offline when the device is, no-pack for a language without a pack, and failed with the code otherwise', async () => {
     const sample = await buildSample()
     const client = await clientOf(fakeFetch(sample), sample)
