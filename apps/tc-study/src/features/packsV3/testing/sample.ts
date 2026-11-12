@@ -5,6 +5,7 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BUILDER, buildCommon, buildLanguage, keyId, publicKeyOf, signCatalog } from '@bt-synergy/language-pack-v3'
+import type { ResourceRef, Row, RowSource } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 
 export type Sample = {
@@ -18,6 +19,45 @@ export type Sample = {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..', '..')
 const DATA = join(ROOT, 'packages', 'language-pack-v3', 'spec', 'tests', 'data')
 const aboutOf = (revision: number) => ({ format: '3.0', publisher: 'unfoldingWord', origin: 'published', revision, built: '2026-11-01T10:00:00Z', builder: BUILDER })
+
+/** The tA the spec data lacks: es-419, in the form the TA loader caches (`# title`, `## subtitle`, then `01.md`). */
+export const TA_RESOURCE = 'es-419_gl/es-419/ta'
+const TA_STAMP = 'v4#2024-07-17T20_15_35Z'
+export const TA_SOURCE: Record<string, { title: string; md: string }> = {
+  'translate/figs-metaphor': {
+    title: 'Metáfora',
+    md: [
+      '# Metáfora',
+      '## ¿Qué es una metáfora y cómo la traduzco?',
+      '### Descripción',
+      'Una metáfora compara dos cosas. Mira también [[rc://*/ta/man/translate/figs-simile]] y [[rc://es-419/tw/dict/bible/kt/grace]].',
+      '### Ejemplos de la Biblia',
+      'Vea [Tito 1:1](rc://*/tn/help/tit/01/01) y [la nota](../01/02.md).',
+      '### Estrategias de traducción',
+      '1. Usar la metáfora.',
+      '2. Usar una comparación.',
+    ].join('\n\n'),
+  },
+  'translate/figs-simile': {
+    title: 'Símil',
+    md: ['# Símil', '## ¿Qué es un símil?', '### Descripción', 'Un símil usa «como». Es parecido a una metáfora.'].join('\n\n'),
+  },
+}
+function withTa(base: RowSource): RowSource {
+  const ref: ResourceRef = { key: TA_RESOURCE, stamp: TA_STAMP, kind: 'Translation Academy', books: [] }
+  return {
+    resources: async (lang) => [...(await base.resources(lang)), ...(lang === 'es-419' ? [ref] : [])],
+    rows(f) {
+      if (f.resource !== TA_RESOURCE) return base.rows(f)
+      const rows: Row[] = []
+      for (const [path, a] of Object.entries(TA_SOURCE)) {
+        if (f.layer === undefined || f.layer === 'sot') rows.push({ layer: 'sot', key: `${TA_RESOURCE}/${path}`, value: a.md })
+        if (f.layer === undefined || f.layer === 'text') rows.push({ layer: 'text', key: `helps-text:ta-title:${TA_RESOURCE}@${TA_STAMP}:${path}`, value: { content: a.title, version: 1 } })
+      }
+      return (async function* () { yield* rows })()
+    },
+  }
+}
 
 const memo = new Map<number, Promise<Sample>>()
 /** The sample as its catalogs' `revision` says (the same content, signed with a key made for each revision). */
@@ -33,7 +73,7 @@ async function make(about: ReturnType<typeof aboutOf>): Promise<Sample> {
   const source = (lang: string) => partsSource({ list: join(DATA, lang, 'list.json'), partsDir: parts, originals })
   const common = await buildCommon({ source: await source('en'), about, mapLang: 'en' })
   const lang = await buildLanguage({
-    source: await source('es-419'),
+    source: withTa(await source('es-419')),
     lang: 'es-419',
     registry: {},
     about,
