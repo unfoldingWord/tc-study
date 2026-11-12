@@ -302,8 +302,8 @@ export function helpColumns(
  *   says which words of the original the quote names; each is looked up with `orig.find`. If any row has a piece, every row
  *   has `quote` (`[]` for a row with none: no quote, or one the layer did not find); if none does, no row has it.
  *
- * Each anomaly adds a line to `issues`. Throws `Error` for rows that are not what format 2.0 writes: no rows of the
- * resource, a chapter twice, a row without an id, a field that is not text or true and false.
+ * Each anomaly adds a line to `issues`; a row without an id is left out with one. Throws `Error` for rows that are not
+ * what format 2.0 writes: no rows of the resource, a chapter twice, a field that is not text or true and false.
  */
 export function extractHelps(rows: Row[], book: string, res: string, kind: HelpsKind, orig: OrigIndex, issues: string[] = []): HelpTable {
   const source = sourceRows(rows, book, res, kind)
@@ -315,7 +315,12 @@ export function extractHelps(rows: Row[], book: string, res: string, kind: Helps
   for (const [index, { where, item }] of source.entries()) {
     if (!isMap(item)) throw new Error(`${where}: row ${index} is not an object`)
     const published = item.id
-    if (typeof published !== 'string' || published === '') throw new Error(`${where}: row ${index} has no id`)
+    // A row without an id cannot be cited or matched to its quote: leave it out and say so, rather than lose the whole
+    // book (BSOJ/ar_twl had one in Proverbs, row 2397, in Nov 2026, and it stopped the Arabic format 3 build).
+    if (typeof published !== 'string' || published === '') {
+      issues.push(`${res} ${where}: row ${index} has no id; it is left out`)
+      continue
+    }
     const id = unique(published)
     const report = (text: string) => issues.push(`${res} ${id}: ${text}`)
     if (id !== published) report(`the id ${JSON.stringify(published)} is in the source twice; this row is ${JSON.stringify(id)}, and the quote layer is read by ${JSON.stringify(published)}`)

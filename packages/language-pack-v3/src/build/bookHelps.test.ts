@@ -589,9 +589,11 @@ describe('extractHelps: ids', () => {
     expect(new Set(table.rows.map((row) => row.id)).size).toBe(3)
   })
 
-  test('a row without an id is an error, not a dropped row', () => {
-    expect(() => notesOf([tnChunk(1, [noteRow('', '1:1')])])).toThrow()
-    expect(() => notesOf([tnChunk(1, [{ ...noteRow('a1b2', '1:1'), id: 7 }])])).toThrow()
+  test('a row without an id is left out with an issue, and the rest of the book is kept', () => {
+    const issues: string[] = []
+    const table = notesOf([tnChunk(1, [noteRow('', '1:1'), noteRow('a1b2', '1:2'), { ...noteRow('c3d4', '1:3'), id: 7 }])], issues)
+    expect(table.rows.map((row) => row.id)).toEqual(['a1b2'])
+    expect(issues.filter((line) => line.includes('has no id; it is left out')).length).toBe(2)
   })
 })
 
