@@ -285,6 +285,18 @@ describe('article sections in the index', () => {
     const m = await (await mem.open('es-419')).search(word, { kinds: ['section'], limit: 100 })
     expect(m.data!.map((h) => h.id).sort()).toEqual(r.data!.map((h) => h.id).sort())
   })
+  test('a section hit whose art: unit is not installed is left out of search', async () => {
+    const index = sqlIndex(bunDriver())
+    const full = setup(sample, index)
+    await full.install('es-419', { books: ['tit'] })
+    const art = (await (await full.open('es-419')).articles('tw:kt'))!.find((a) => a.sections.some((x) => x.md.trim() !== ''))!
+    const word = /[\p{L}]{6,}/u.exec(art.sections.find((x) => x.md.trim() !== '')!.md)![0]
+    expect((await index.search('es-419', word, { kinds: ['section'] })).length).toBeGreaterThan(0)
+    const bare = setup(sample, index)
+    await bare.refresh('es-419')
+    const r = await (await bare.open('es-419')).search(word, { kinds: ['section'] })
+    expect(r.data).toEqual([])
+  })
   test('the index has the art: segment while installed and not after the unit is gone', async () => {
     const real = sqlIndex(bunDriver())
     const added: string[] = []
