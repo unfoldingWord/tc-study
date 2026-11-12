@@ -6,6 +6,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { getSharedBuildConfig } from '../../config/vite-build'
 import { createTcStudyPwaPlugin } from './scripts/vite-pwa-plugin.mjs'
+import { trustedKeysV3 } from './scripts/vite-trusted-keys-v3.mjs'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -86,6 +87,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     createTcStudyPwaPlugin(),
+    trustedKeysV3(),
     forceDecodeNamedCharRefNode(),
   ],
   resolve: {

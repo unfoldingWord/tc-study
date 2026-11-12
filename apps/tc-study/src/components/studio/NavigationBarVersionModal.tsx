@@ -1,4 +1,4 @@
-import { APP_VERSION, DEPLOY_VERSION } from '../../utils/deployVersion'
+import { APP_VERSION, DEPLOY_VERSION, deployVersionLabel } from '../../utils/deployVersion'
 import { ModalPortal } from '../shared/ModalPortal'
 
 interface NavigationBarVersionModalProps {
@@ -24,7 +24,7 @@ export function NavigationBarVersionModal({ onClose }: NavigationBarVersionModal
             {APP_VERSION}
           </p>
           <p className="font-mono text-xs text-fg-secondary mt-2 break-all" data-deploy-version={DEPLOY_VERSION}>
-            Build: {DEPLOY_VERSION}
+            Build: {deployVersionLabel()}
           </p>
           <button
             onClick={onClose}

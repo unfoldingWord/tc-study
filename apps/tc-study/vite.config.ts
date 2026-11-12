@@ -7,6 +7,7 @@ import { defineConfig } from 'vite'
 import checker from 'vite-plugin-checker'
 import { getSharedBuildConfig } from '../../config/vite-build'
 import { createTcStudyPwaPlugin } from './scripts/vite-pwa-plugin.mjs'
+import { trustedKeysV3 } from './scripts/vite-trusted-keys-v3.mjs'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -81,6 +82,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     createTcStudyPwaPlugin(),
+    trustedKeysV3(),
     forceDecodeNamedCharRefNode(),
     // Run TypeScript in a worker; errors show in browser overlay + terminal and update on save (HMR)
     checker({

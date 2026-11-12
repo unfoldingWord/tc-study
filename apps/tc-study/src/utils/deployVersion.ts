@@ -7,6 +7,7 @@
  */
 
 import { APP_VERSION as PKG_APP_VERSION } from '../generated/app-version'
+import { packsFormat } from '../features/packsV3/packsFormat'
 
 function devFallback(): string {
   const t = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')
@@ -21,3 +22,8 @@ export const DEPLOY_VERSION: string =
   typeof __DEPLOY_VERSION__ !== 'undefined' && __DEPLOY_VERSION__ !== ''
     ? __DEPLOY_VERSION__
     : devFallback()
+
+/** The build id as shown to people: « · staging» is added while format 3 packs (staging server) are on. */
+export function deployVersionLabel(): string {
+  return packsFormat() === 3 ? `${DEPLOY_VERSION} · staging` : DEPLOY_VERSION
+}
