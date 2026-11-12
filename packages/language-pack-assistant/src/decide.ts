@@ -32,6 +32,8 @@ export type DecideCtx = {
   /** With `tag` and `names` (a name for a concept id or a book code), `decide` fills `interpretation`; without them it stays `''`. */
   tag?: string
   names?: (id: string) => string | undefined
+  /** The xmap kind of a concept id: a `tw:names/*` place is shown as a place, not a person. */
+  kinds?: (id: string) => string | undefined
 }
 
 /** Which step decided: a rule, the classifier alone, a choice of the classifier's two best, or search as the fallback. */
@@ -69,5 +71,5 @@ export function decideStep(question: string, ctx: DecideCtx): { decision: Decisi
 export function decide(question: string, ctx: DecideCtx): Decision {
   const { decision } = decideStep(question, ctx)
   if (ctx.tag === undefined || ctx.names === undefined) return decision
-  return { ...decision, interpretation: interpret(decision, ctx.tag, ctx.names) }
+  return { ...decision, interpretation: interpret(decision, ctx.tag, ctx.names, ctx.kinds) }
 }

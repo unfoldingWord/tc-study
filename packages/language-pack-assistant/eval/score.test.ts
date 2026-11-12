@@ -64,3 +64,11 @@ test('top3 is null with no pieces, else whether the first piece is among the fir
   expect(scoreQuestion(item({ call: tit }, p), decide(tit), []).top3).toBe(false)
   expect(scoreQuestion(item({ call: tit }, p.slice(1)), decide(tit), ['x', 'note:tit/abcd']).top3).toBe(true)
 })
+
+test('top3 compares ids in canonical form (R29)', () => {
+  const tit: Call = { query: 'passage', args: { ref: 'tit 2:11' } }
+  const one: Decision = { kind: 'call', call: tit, via: 'rule', interpretation: '' }
+  const at = (pieces: string[]): Item => ({ q: 'x', expect: { call: tit }, pieces })
+  expect(scoreQuestion(at(['verse:glt tit 2:11']), one, ['verse:es-419_gl/es-419/glt tit 2:11']).top3).toBe(true)
+  expect(scoreQuestion(at(['rendering:G54850/Gracia']), one, ['a', 'rendering:G5485/gracia']).top3).toBe(true)
+})

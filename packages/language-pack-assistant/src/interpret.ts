@@ -12,6 +12,7 @@ type Frames = {
   quote: [string, string]
   book: string
   person: string
+  place: string
   /** `{list}` is the Strong keys. */
   words: string
   /** `{name}` is the concept's name, `{text}` the quoted search text. */
@@ -19,12 +20,14 @@ type Frames = {
 }
 
 export const FRAMES: Record<string, Frames> = {
-  es: { open: '¿', close: '?', or: 'o', quote: ['«', '»'], book: 'el libro', person: 'la persona', words: 'Cuál de estas palabras del original: {list}', conceptOrSearch: 'El artículo sobre {name}, o buscar {text}' },
-  pt: { open: '', close: '?', or: 'ou', quote: ['«', '»'], book: 'o livro', person: 'a pessoa', words: 'Qual destas palavras do original: {list}', conceptOrSearch: 'O artigo sobre {name}, ou buscar {text}' },
-  en: { open: '', close: '?', or: 'or', quote: ['“', '”'], book: 'the book', person: 'the person', words: 'Which of these words of the original: {list}', conceptOrSearch: 'The article about {name}, or search for {text}' },
+  es: { open: '¿', close: '?', or: 'o', quote: ['«', '»'], book: 'el libro', person: 'la persona', place: 'el lugar', words: 'Cuál de estas palabras del original: {list}', conceptOrSearch: 'El artículo sobre {name}, o buscar {text}' },
+  pt: { open: '', close: '?', or: 'ou', quote: ['«', '»'], book: 'o livro', person: 'a pessoa', place: 'o lugar', words: 'Qual destas palavras do original: {list}', conceptOrSearch: 'O artigo sobre {name}, ou buscar {text}' },
+  en: { open: '', close: '?', or: 'or', quote: ['“', '”'], book: 'the book', person: 'the person', place: 'the place', words: 'Which of these words of the original: {list}', conceptOrSearch: 'The article about {name}, or search for {text}' },
 }
 
 type Names = (id: string) => string | undefined
+/** The xmap kind of a concept id (`person`, `place`, …), when the maps know it. */
+type Kinds = (id: string) => string | undefined
 type Labels = Record<string, { label: Record<string, string> }>
 
 /** The label's first words: `Pasaje` out of `Pasaje: el texto …`. */
@@ -34,7 +37,18 @@ function head(query: string, lang: string): string {
   return label.split(':')[0]!.trim()
 }
 
-const isPerson = (id: string): boolean => id.startsWith('tw:names/') || id.startsWith('per:')
+/**
+ * Whether a concept is a person or a place. `per:` is a person and `lug:` a place. A `tw:names/*` id is what the xmap's concept kind
+ * says (person or place); without the kinds it is taken as a person.
+ */
+function personOrPlace(id: string, kinds: Kinds | undefined): 'person' | 'place' | undefined {
+  if (id.startsWith('per:')) return 'person'
+  if (id.startsWith('lug:')) return 'place'
+  if (!id.startsWith('tw:names/')) return undefined
+  if (kinds === undefined) return 'person'
+  const k = kinds(id)
+  return k === 'person' || k === 'place' ? k : undefined
+}
 /** `G39720` is shown as `G3972`: the key's last digit is the sense and is 0 for the word itself. */
 const strongShown = (k: string): string => (/^[GH]\d{4}0$/.test(k) ? k.slice(0, -1) : k)
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
@@ -77,7 +91,7 @@ function line(c: Call, lang: string, names: Names): string {
   return shown === '' ? head(c.query, lang) : `${head(c.query, lang)}: ${shown}`
 }
 
-function chooseLine(options: Call[], lang: string, names: Names): string {
+function chooseLine(options: Call[], lang: string, names: Names, kinds: Kinds | undefined): string {
   const f = FRAMES[lang] ?? FRAMES.en!
   const q = (text: string): string => `${f.quote[0]}${text}${f.quote[1]}`
   const ask = (s: string): string => `${f.open}${s}${f.close}`
@@ -93,15 +107,16 @@ function chooseLine(options: Call[], lang: string, names: Names): string {
   const book = options.some((o) => o.query === 'passage')
   const parts = options.map((o) => {
     if (o.query === 'passage') return `${bookOf(str(o.args.ref).split(' ')[0]!, names)}, ${f.book}`
-    if (o.query === 'concept' && book && isPerson(str(o.args.id))) return `${nameOf(str(o.args.id), names)}, ${f.person}`
+    const who = o.query === 'concept' && book ? personOrPlace(str(o.args.id), kinds) : undefined
+    if (who !== undefined) return `${nameOf(str(o.args.id), names)}, ${f[who]}`
     return line(o, lang, names)
   })
   const last = parts.pop()
   return ask(parts.length === 0 ? last! : `${parts.join(', ')}, ${f.or} ${last}`)
 }
 
-export function interpret(decision: Decision, tag: string, names: Names): string {
+export function interpret(decision: Decision, tag: string, names: Names, kinds?: Kinds): string {
   const base = baseLang(tag)
   const lang = base in FRAMES ? base : 'en'
-  return decision.kind === 'call' ? line(decision.call, lang, names) : chooseLine(decision.options, lang, names)
+  return decision.kind === 'call' ? line(decision.call, lang, names) : chooseLine(decision.options, lang, names, kinds)
 }

@@ -37,3 +37,14 @@ test('a choose of a concept and a search', () => {
   const d = choose(call('concept', { id: 'tw:kt/grace' }), call('search', { text: 'qué es la gracia' }))
   expect(interpret(d, 'es', names)).toBe('¿El artículo sobre gracia, o buscar «qué es la gracia»?')
 })
+
+test('a tW name is a person or a place as the xmap kind says (Task 7 review)', () => {
+  const kinds = (id: string) => ({ 'tw:names/john': 'person', 'tw:names/rome': 'place' })[id]
+  const n = (id: string) => ({ jhn: 'Juan', rom: 'Romanos', 'tw:names/john': 'Juan', 'tw:names/rome': 'Roma' })[id]
+  const d = choose(call('passage', { ref: 'rom front:intro' }), call('concept', { id: 'tw:names/rome' }))
+  expect(interpret(d, 'es', n, kinds)).toBe('¿Romanos, el libro, o Roma, el lugar?')
+  expect(interpret(d, 'pt-BR', n, kinds)).toBe('Romanos, o livro, ou Roma, o lugar?')
+  expect(interpret(d, 'en', n, kinds)).toBe('Romanos, the book, or Roma, the place?')
+  const j = choose(call('passage', { ref: 'jhn front:intro' }), call('concept', { id: 'tw:names/john' }))
+  expect(interpret(j, 'es', n, kinds)).toBe('¿Juan, el libro, o Juan, la persona?')
+})

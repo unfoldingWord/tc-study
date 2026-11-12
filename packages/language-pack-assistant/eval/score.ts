@@ -1,5 +1,6 @@
 /** Scoring of one question against the assistant's decision. Eval only: nothing in `src/` imports this. */
 import type { Call, Decision } from '../src/decision'
+import { canonId } from '../src/fragments'
 
 export type Item = {
   q: string
@@ -44,6 +45,7 @@ export function scoreQuestion(item: Item, decision: Decision, cardPieceIds: stri
       e.choose.every((x) => decision.options.some((o) => sameCall(o, x))) &&
       decision.options.every((o) => e.choose.some((x) => sameCall(o, x)))
   }
-  const top3 = item.pieces.length === 0 ? null : cardPieceIds.slice(0, 3).includes(item.pieces[0]!)
+  // Ids compare in canonical form (R29): `verse:` by the last part of the resource, `rendering:` by a canonical key and a folded form.
+  const top3 = item.pieces.length === 0 ? null : cardPieceIds.slice(0, 3).map(canonId).includes(canonId(item.pieces[0]!))
   return { callCorrect, accepted: decision.kind === 'call' && decision.via !== 'search', top3 }
 }
