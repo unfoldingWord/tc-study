@@ -80,3 +80,8 @@ test('below the margin with an unfillable second query, the chain searches', () 
   expect(r.step).toBe('search')
   expect(r.decision).toEqual({ kind: 'call', call: { query: 'search', args: { text: 'pacto' } }, via: 'search', interpretation: '' })
 })
+
+test('with a tag and names, decide fills the interpretation (R4)', () => {
+  const names = (id: string): string | undefined => (id === 'tit' ? 'Tito' : undefined)
+  expect(decide('Tito 2:11', { ...base, tag: 'es', names }).interpretation).toBe('Pasaje: Tito 2:11')
+})

@@ -1,6 +1,7 @@
 export type { Call, Decision, QueryName } from './decision'
 export { baseLang } from './lang'
 export { type DecideCtx, decide, decideStep, DEFAULT_MARGIN, type Step } from './decide'
+export { interpret } from './interpret'
 export { hasPhrase, matchPhrases, type PhraseKind, type Phrases, phrasesFor } from './phrases'
 export { applyRules, type Outcome, outcomeFor, type Reading, readQuestion, type RuleCtx, ruleOutcome } from './rules'
 export { strongsIndex, strongsIndexOf, strongsOf } from './strongs'

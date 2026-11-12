@@ -6,6 +6,7 @@ import { QUERIES_VERSION } from '@bt-synergy/language-pack-client'
 import { mask, predict } from './classifier'
 import type { ClassifierComplement } from './complements'
 import type { Decision } from './decision'
+import { interpret } from './interpret'
 import type { Lexicon } from './lexicon'
 import type { Phrases } from './phrases'
 import { MAX_OPTIONS, outcomeFor, readQuestion, ruleOutcome, type Outcome, type RuleCtx, view } from './rules'
@@ -28,6 +29,9 @@ export type DecideCtx = {
   listed: RuleCtx['listed']
   lastVerse: RuleCtx['lastVerse']
   strongsOf: RuleCtx['strongsOf']
+  /** With `tag` and `names` (a name for a concept id or a book code), `decide` fills `interpretation`; without them it stays `''`. */
+  tag?: string
+  names?: (id: string) => string | undefined
 }
 
 /** Which step decided: a rule, the classifier alone, a choice of the classifier's two best, or search as the fallback. */
@@ -61,7 +65,9 @@ export function decideStep(question: string, ctx: DecideCtx): { decision: Decisi
   return { decision: search, step: 'search' }
 }
 
-/** What the assistant decides for a question (R4: `interpretation` is `''` until the interpretation step fills it). */
+/** What the assistant decides for a question (R4: `interpretation` is the one-line reading when the ctx has `tag` and `names`, else `''`). */
 export function decide(question: string, ctx: DecideCtx): Decision {
-  return decideStep(question, ctx).decision
+  const { decision } = decideStep(question, ctx)
+  if (ctx.tag === undefined || ctx.names === undefined) return decision
+  return { ...decision, interpretation: interpret(decision, ctx.tag, ctx.names) }
 }
