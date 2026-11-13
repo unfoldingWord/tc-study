@@ -50,3 +50,11 @@ export function shouldShowDownloadIndicator(input: {
   if (input.error) return true
   return downloadFailureCount(input.progress) > 0
 }
+
+/** Format 3 sync progress as `{lang} · {unit} {done}/{total}`; empty when there is none. */
+export function formatFormat3Progress(
+  progress: { lang: string; unit: string; done: number; total: number } | undefined,
+): string {
+  if (!progress) return ''
+  return `${progress.lang} · ${progress.unit} ${progress.done}/${progress.total}`
+}

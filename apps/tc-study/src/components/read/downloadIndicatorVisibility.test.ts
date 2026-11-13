@@ -3,6 +3,7 @@ import type { DownloadProgress } from '../../hooks/useBackgroundDownload'
 import {
   downloadFailureCount,
   formatDownloadCurrentItemLabel,
+  formatFormat3Progress,
   shouldShowDownloadIndicator,
 } from './downloadIndicatorVisibility'
 
@@ -113,5 +114,14 @@ describe('formatDownloadCurrentItemLabel', () => {
 
   test('does not invent a language from a bare resource id', () => {
     expect(formatDownloadCurrentItemLabel('ult')).toBe('ult')
+  })
+})
+
+describe('formatFormat3Progress', () => {
+  test('shows lang, unit and done/total', () => {
+    expect(formatFormat3Progress({ lang: 'es-419', unit: 'JHN', done: 2, total: 5 })).toBe('es-419 · JHN 2/5')
+  })
+  test('is empty without progress', () => {
+    expect(formatFormat3Progress(undefined)).toBe('')
   })
 })

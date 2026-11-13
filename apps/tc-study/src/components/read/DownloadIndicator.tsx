@@ -5,7 +5,9 @@ import {
   displayIngredientCounts,
 } from '../../features/download/backgroundDownloadRun'
 import { backgroundDownloadSession } from '../../features/download/backgroundDownloadSession'
-import { shouldShowDownloadIndicator } from './downloadIndicatorVisibility'
+import { packsFormat } from '../../features/packsV3/packsFormat'
+import { readV3Progress, subscribeReadV3 } from '../../features/packsV3/readV3'
+import { formatFormat3Progress, shouldShowDownloadIndicator } from './downloadIndicatorVisibility'
 import { useProcessDebugPresentationStore } from './processDebugPresentationStore'
 
 const MENU_ROW =
@@ -37,6 +39,10 @@ export function DownloadBusyBadge() {
 export function DownloadIndicator({ onClose }: { onClose?: () => void }) {
   const [stats, setStats] = useState(() => backgroundDownloadSession.getStats())
   useEffect(() => backgroundDownloadSession.subscribe(setStats), [])
+
+  const [v3Progress, setV3Progress] = useState(readV3Progress)
+  useEffect(() => subscribeReadV3(() => setV3Progress(readV3Progress())), [])
+  const v3Label = packsFormat() === 3 ? formatFormat3Progress(v3Progress) : ''
 
   const isDownloading = stats.isDownloading
   const progress = stats.progress ?? undefined
@@ -71,6 +77,7 @@ export function DownloadIndicator({ onClose }: { onClose?: () => void }) {
     queue,
   })
   const showRetry = showIndicator && !isDownloading
+  const showV3 = !showIndicator && v3Label !== ''
 
   const openProcessDebug = () => {
     dispatchPresentation('open')
@@ -97,6 +104,19 @@ export function DownloadIndicator({ onClose }: { onClose?: () => void }) {
               {overallProgress}%
             </span>
           )}
+        </button>
+      ) : null}
+
+      {showV3 ? (
+        <button
+          type="button"
+          onClick={openProcessDebug}
+          className={MENU_ROW}
+          title={`Syncing ${v3Label}`}
+          aria-label="Download progress"
+        >
+          <Loader2 className="w-4 h-4 text-accent animate-spin" />
+          <span className="text-[9px] text-fg-secondary">{v3Label}</span>
         </button>
       ) : null}
 
