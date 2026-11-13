@@ -16,6 +16,9 @@ import { useWorkspaceStore } from '../../lib/stores/workspaceStore'
 import { isOriginalLanguageResource } from '../../utils/resourceHelpers'
 import { useNavigationStore } from '../nav/navigationStore'
 import { applyCombinedHelpsEnsure } from '../helps/applyCombinedHelpsEnsure'
+import { packsFormat } from '../packsV3/packsFormat'
+import { ensureLanguageV3, readV3Mode } from '../packsV3/readV3'
+import { readV3DepsOf } from '../packsV3/useReadV3'
 import { projectCurrentWorkspacePanels } from '../workspace/resourceMutations'
 import { narrowExpectedToCataloged } from './catalogBackgroundDownloadPolicy'
 import {
@@ -154,15 +157,24 @@ export async function loadReadLanguageCatalog(
   const nextHelpsKeys: string[] = []
   const metadataPromises: Array<Promise<ResourceInfo[]>> = []
 
+  // Format 3 (staging): a language the packs server serves is synced first (its current book), and its rows are what the
+  // device catalog below holds, so Door43 is not searched for it. A no-pack language (or a book the pack lacks) is as today.
+  if (packsFormat() === 3) {
+    const book = useNavigationStore.getState().currentReference.book || ''
+    const v3Deps = readV3DepsOf(catalogManager)
+    await Promise.all([...new Set(searches.map((s) => s.languageCode))].map((l) => ensureLanguageV3(l, book, v3Deps)))
+  }
+
   // Door43 first; with no network (or no hits) the language comes from the device catalog, e.g. a language pack.
   const searchPages = await Promise.all(
     searches.map(async (search) => {
       const request = { languageCode: search.languageCode, target: search.target, navigationScope, helpsSubjects }
+      const fromV3 = packsFormat() === 3 && readV3Mode(search.languageCode) === 'v3'
       const found = await readCatalogPagesOrDevice({
         request,
-        searchDoor43: () => searchCatalogHitsForTarget(door43Client, request),
+        searchDoor43: () => (fromV3 ? Promise.resolve([]) : searchCatalogHitsForTarget(door43Client, request)),
         deviceRows: () => deviceCatalogRows(catalogManager),
-        offline: isOffline(),
+        offline: fromV3 || isOffline(),
       })
       return { search, ...found }
     })

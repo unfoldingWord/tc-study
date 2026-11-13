@@ -79,6 +79,9 @@ export interface UseCatalogBackgroundDownloadOptions {
    */
   isDownloading?: boolean
 
+  /** Narrows the keys to those Door43 may download (format 3 serves the others). Default: all. */
+  keysForDoor43?: (keys: string[]) => string[]
+
   /** Enable the check. Typically controlled by UI loading state to avoid blocking rendering. */
   enabled?: boolean
 
@@ -114,6 +117,7 @@ export function useCatalogBackgroundDownload(
     expectedResources,
     resetToken = null,
     isDownloading = false,
+    keysForDoor43,
     enabled = true,
     debug: _debug = false,
   } = options
@@ -190,10 +194,11 @@ export function useCatalogBackgroundDownload(
       }
       // Queue cataloged expected keys + OL extras. Do not wait for every
       // expected key to land — one hung TA/UGNT entry used to block UHB.
-      const candidateKeys =
+      const wanted =
         allResourceKeys.length > 0
           ? keysToEnqueueForDownload(allResourceKeys, expectedResources)
           : [...(expectedResources ?? [])]
+      const candidateKeys = keysForDoor43 ? keysForDoor43(wanted) : wanted
 
       if (typeof window !== 'undefined') {
         window.__bgdlLast = {
@@ -335,7 +340,7 @@ export function useCatalogBackgroundDownload(
     } finally {
       setIsChecking(false)
     }
-  }, [enabled, catalogManager, completenessChecker, onStartDownload, expectedResources, isDownloading])
+  }, [enabled, catalogManager, completenessChecker, onStartDownload, expectedResources, isDownloading, keysForDoor43])
 
   // Worker finished or was cancelled — free sticky downloading marks for re-check
   useEffect(() => {

@@ -47,6 +47,7 @@ import { shouldPushReadLanguageUrl } from './readBootstrapPolicy'
 import { availabilityLookupFromListed } from './readLanguageLoadPlan'
 import { catalogLoadForSinglePanel, coldStartCatalogLoads } from './runReadPanelCatalog'
 import { useEnsureCurrentBookOriginalLanguage } from './useEnsureCurrentBookOriginalLanguage'
+import { keysForDoor43, useReadV3 } from '../packsV3/useReadV3'
 import { useReadCatalogLoad } from './useReadCatalogLoad'
 import { useReadCollectionCompleteness } from './useReadCollectionCompleteness'
 import { useReadIngredientHydration } from './useReadIngredientHydration'
@@ -158,11 +159,17 @@ export function useReadLanguageBootstrap({
 
   const isLoadingResources = isLoadingTextResources
 
+  // Format 3 (staging only): a language it serves is not downloaded from Door43 in the background.
+  const currentBook = useNavigationStore((s) => s.currentReference.book) || ''
+  const readV3 = useReadV3({ lang: currentLanguageCode, book: currentBook, helpsLang: helpsLanguageCode })
+  const door43Keys = useCallback((keys: string[]) => keysForDoor43(keys, currentLanguageCode), [currentLanguageCode])
+
   useCatalogBackgroundDownload({
     catalogManager,
     completenessChecker,
     onStartDownload: startDownload,
-    catalogTrigger: `${Object.keys(loadedResources).length}-${metadataUpdateCounter}`,
+    catalogTrigger: `${Object.keys(loadedResources).length}-${metadataUpdateCounter}-${readV3.mode}-${readV3.helpsMode}`,
+    keysForDoor43: door43Keys,
     expectedResources,
     resetToken: downloadResetToken(panels['panel-1'].languageCode, panels['panel-2'].languageCode),
     isDownloading: isBackgroundDownloading,
@@ -326,5 +333,6 @@ export function useReadLanguageBootstrap({
     handleSwitchTextMode,
     handleNavigatorScopeCommitted,
     isBackgroundDownloading,
+    readV3,
   }
 }
