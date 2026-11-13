@@ -438,6 +438,14 @@ describe('a verse bridge', () => {
     }
   })
 
+  test('a verse labelled with a word is no verse: its text stays in the verse before it, with an issue', () => {
+    const issues: string[] = []
+    const t = extractText([chapterRow(GLT, 1, [chapterNode('1'), para(verseNode('13'), wd('x'), verseNode('إن'), wd('y'), verseNode('14'), wd('z'))])], 'tit', GLT, index, issues)
+    expect(t.events.filter(([, kind]) => kind === 'verse').map(([, , label]) => label)).toEqual(['13', '14'])
+    expect(t.pieces.filter(([, isWord]) => isWord).map(([form]) => form)).toEqual(['x', 'y', 'z'])
+    expect(issues.some((line) => line.includes('"إن" has no number'))).toBe(true)
+  })
+
   test('the verse after the bridge is a verse again', () => {
     const t = textOf(index, chapterNode('1'), para(verseNode('13-14'), zs('δ'), wd('x'), ze, verseNode('15'), zs('δ'), wd('y'), ze))
     expect(t.align).toEqual([[4], []])
@@ -631,9 +639,9 @@ describe('the document, node by node', () => {
     expect(t.alignMissing).toEqual([[1, 56_001_003, 'Παῦλος', 1]])
   })
 
-  test('a chapter and a verse that are not numbers are refused', () => {
+  test('a chapter that is not a number is refused; a verse that is not one is reported and read with the verse before it', () => {
     expect(() => textOf(index, chapterNode('uno'), para(wd('a')))).toThrow()
-    expect(() => textOf(index, chapterNode('1'), para(verseNode('x'), wd('a')))).toThrow()
+    expect(() => textOf(index, chapterNode('1'), para(verseNode('x'), wd('a')))).not.toThrow()
   })
 
   test('x-occurrence and x-occurrences of \\w, and every other attribute of it, are not kept; sid is not either', () => {
