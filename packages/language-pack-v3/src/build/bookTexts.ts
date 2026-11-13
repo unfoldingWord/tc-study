@@ -134,6 +134,13 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
     const content: unknown[] = node.content ?? []
     if (type === 'chapter' || type === 'verse') {
       if (typeof node.number !== 'string') throw new Error(`${where}: a ${type} needs its number as text`)
+      // "\v إن ..." (BSOJ/ar, Nov 2026): a marker whose label is a word, not a number. Its words stay in the verse before it,
+      // and the build goes on, rather than losing the whole language for one marker.
+      if (type === 'verse' && !/^[0-9]/.test(node.number)) {
+        issues.push(`${where}: a verse labelled ${JSON.stringify(node.number)} has no number; its text stays in the verse before it`)
+        for (const child of content) visit(child, where)
+        return
+      }
       const number = leadingNumber(node.number, type)
       if (type === 'chapter') {
         chapter = number
