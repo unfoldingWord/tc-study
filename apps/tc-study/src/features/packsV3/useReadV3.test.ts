@@ -101,6 +101,31 @@ describe('ensureLanguageV3', () => {
   }, 120_000)
 })
 
+describe('ensureLanguageV3 retries and restarts', () => {
+  it('a failed client is not cached: the next call retries and succeeds', async () => {
+    setServer('staging')
+    const t = await setup()
+    let calls = 0
+    const deps: ReadV3Deps = { ...t.deps, client: () => (++calls === 1 ? Promise.reject(new Error('offline')) : t.deps.client()) }
+    expect(await ensureLanguageV3('es-419', 'tit', deps)).toBe('door43')
+    expect(await ensureLanguageV3('es-419', 'tit', deps)).toBe('v3')
+    expect(readV3Mode('es-419')).toBe('v3')
+    await settle()
+  }, 120_000)
+
+  it('returning to an earlier book restarts the background sync', async () => {
+    setServer('staging')
+    const t = await setup()
+    expect(await ensureLanguageV3('es-419', 'tit', t.deps)).toBe('v3')
+    await new Promise((r) => setTimeout(r, 200))
+    expect(await ensureLanguageV3('es-419', 'gen', t.deps)).toBe('door43')
+    const before = t.opened()
+    expect(await ensureLanguageV3('es-419', 'tit', t.deps)).toBe('v3')
+    await settle()
+    expect(t.opened()).toBeGreaterThan(before)
+  }, 120_000)
+})
+
 describe('keysForDoor43 (the background download gate)', () => {
   const keys = ['x/es-419/glt', 'x/es-419/tn', 'x/pt/tn', 'unfoldingWord/el-x-koine/ugnt', 'unfoldingWord/hbo/uhb']
   const modes = (m: Record<string, ReadV3Mode>) => (lang: string) => m[lang] ?? 'door43'

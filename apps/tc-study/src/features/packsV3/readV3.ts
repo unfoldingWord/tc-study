@@ -56,6 +56,9 @@ const originalLanguages = new Set(['el-x-koine', 'hbo'])
 /**
  * The keys Door43's background download may fetch: those of a language that is `v3` or `checking` stay out, and so do the
  * original-language resources while the text language is one of them (its pack brings the original of the books it has).
+ *
+ * Accepted (ruling): a book the pack lacks switches the language to `door43` mode, so the Door43 background download may
+ * then cover that language's other resources too (same keys and shapes as format 2). Not redesigned.
  */
 export function keysForDoor43(keys: string[], textLang: string | null, modeOf: (lang: string) => ReadV3Mode = readV3Mode): string[] {
   const textMode = textLang ? modeOf(textLang) : 'door43'
@@ -66,20 +69,23 @@ export function keysForDoor43(keys: string[], textLang: string | null, modeOf: (
   })
 }
 
-async function firstSync(lang: string, book: string, deps: ReadV3Deps): Promise<ReadV3Mode> {
+type FirstSync = { mode: ReadV3Mode; retry: boolean }
+
+/** `retry`: a transient failure that left Door43 as the answer; the next call tries again. */
+async function firstSync(lang: string, book: string, deps: ReadV3Deps): Promise<FirstSync> {
   let client: LanguagePackClient
   try {
     client = await deps.client()
   } catch {
-    return 'door43'
+    return { mode: 'door43', retry: true }
   }
   const books = book ? [book] : []
   const out = await syncLanguageV3(lang, { books }, { client, cache: deps.cache, catalog: deps.catalog, onProgress }).catch(() => ({ kind: 'failed' as const }))
-  if (out.kind === 'done') return !book || out.books.includes(book.toLowerCase()) ? 'v3' : 'door43'
-  if (out.kind === 'no-pack') return 'door43'
+  if (out.kind === 'done') return { mode: !book || out.books.includes(book.toLowerCase()) ? 'v3' : 'door43', retry: false }
+  if (out.kind === 'no-pack') return { mode: 'door43', retry: false }
   // A cut network or a failure: rows written earlier for this book still serve Read.
   const record = (await deps.cache.get(syncRecordKey(lang)).catch(() => null)) as { content?: { units?: Record<string, string> } } | null
-  return book && record?.content?.units?.[`book:${book.toLowerCase()}`] !== undefined ? 'v3' : 'door43'
+  return book && record?.content?.units?.[`book:${book.toLowerCase()}`] !== undefined ? { mode: 'v3', retry: false } : { mode: 'door43', retry: true }
 }
 
 /** After the current book: the other books of the pack and its article groups. A newer book change cancels it. */
@@ -110,10 +116,18 @@ export function ensureLanguageV3(lang: string, book: string, deps: ReadV3Deps): 
   if (packsFormat() === 2 || !lang) return Promise.resolve('door43')
   const id = `${lang}|${book.toLowerCase()}`
   const have = runs.get(id)
-  if (have) return have.then((mode) => (setMode(lang, mode), mode))
+  if (have) {
+    return have.then((mode) => {
+      setMode(lang, mode)
+      // A book change aborted the background sync: coming back to a served book restarts it.
+      if (mode === 'v3' && !backgrounds.has(lang)) void background(lang, deps)
+      return mode
+    })
+  }
   backgrounds.get(lang)?.abort()
   setMode(lang, 'checking')
-  const run = firstSync(lang, book, deps).then((mode) => {
+  const run = firstSync(lang, book, deps).then(({ mode, retry }) => {
+    if (retry && runs.get(id) === run) runs.delete(id)
     setMode(lang, mode)
     if (mode === 'v3') void background(lang, deps)
     return mode
