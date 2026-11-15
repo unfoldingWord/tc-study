@@ -56,7 +56,7 @@ export async function articleQuery(reader: PackReader, id: string, section?: str
   const art = models.find((a) => a.id === id) ?? models.find((a) => a.aliases?.includes(id))
   if (art === undefined) return out
   const chosen =
-    section === undefined
+    section === undefined || section === null
       ? defaults(art.id, art.sections)
       : section === 'all'
         ? art.sections

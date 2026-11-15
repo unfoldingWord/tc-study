@@ -26,11 +26,11 @@ type Text = { content: { type: 'text'; text: string }[]; isError?: boolean }
 const ok = (text: string): Text => ({ content: [{ type: 'text', text }] })
 const fail = (text: string): Text => ({ content: [{ type: 'text', text }], isError: true })
 
-/** A note or an article in plain text: no headings, no links the reader cannot follow. */
 /** One line of `lookup_term`: the id, the names, and the question of an Academy article when it has one. */
 export const lookupLine = (m: { id: string; names: string[]; subtitle?: string }): string =>
   `${m.id} — ${m.names.join(', ')}${m.subtitle ? ` (asks: ${m.subtitle})` : ''}`
 
+/** A note or an article in plain text: no headings, no links the reader cannot follow. */
 export function clean(md: unknown): string {
   return String(md ?? '')
     .replace(/^#+\s*/gm, '')

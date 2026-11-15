@@ -24,7 +24,7 @@ export const fold = (s: string): string =>
 
 const STOP = `a an the to of in on at for and or is are do does how what which who i we my our
 can could should would be it this that with about from as by
-es lo su sus hay sobre entre este esta esto cual cuales quien
+es son lo su sus hay sobre entre este esta esto cual cuales quien quienes
 ce est qu ne pas sur dans par avec cette
 e é sao ser sobre com este esta isso qual
 itu ini adalah ada tentang pada
@@ -101,13 +101,16 @@ function namesById(m: MapSet): Entry[] {
  * - Score 1: a name that starts with the query or has it as a whole word.
  * - Score 2: a name that contains the query, or has every content word, in any order, as a word or the start of one.
  * - Score 3: a match found only in a subtitle; never exact. The subtitle is returned in `subtitle`, not in `names`.
+ * - A query of two or more words with no content word keeps its last word as the only content word.
  * - A query with no word at all (only punctuation) gives no matches.
  */
 export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[] {
   const qw = wordsOf(fold(name))
   const q = qw.join(' ')
   if (q === '') return []
-  const keep = qw.length >= 2 ? qw.filter((w) => !stopwords.has(w) && [...w].length > 1) : []
+  let keep = qw.length >= 2 ? qw.filter((w) => !stopwords.has(w) && [...w].length > 1) : []
+  // Every word was a stopword or one letter: the last word is the content ("who is the son" asks for "Son").
+  if (qw.length >= 2 && keep.length === 0) keep = [qw[qw.length - 1]!]
   const keepKey = keep.join(' ')
   const hit = (f: string, words: string[]): number => {
     if (f === q) return 0

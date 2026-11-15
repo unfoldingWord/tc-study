@@ -73,6 +73,26 @@ describe('lookupMatches: folding and content words', () => {
   })
 })
 
+describe('lookupMatches: Arabic marks and subtitles', () => {
+  const ar = (names: Record<string, string[]>) => ({ revision: 1, map: { core: { lang: 'ar', names }, parts: new Map() } }) as never
+  test('dagger alef U+0670 folds', () => {
+    const d = ar({ 'ta:x/a': ['الرحمن'] })
+    expect(lookupMatches(d, 'الرحمٰن')[0]).toMatchObject({ id: 'ta:x/a', exact: true })
+  })
+  test('hamza letters survive folding', () => {
+    const d = ar({ 'ta:x/a': ['أمل'], 'ta:x/b': ['إمل'], 'ta:x/c': ['آمل'], 'ta:x/d': ['امل'] })
+    expect(lookupMatches(d, 'أمل').filter((x) => x.exact).map((x) => x.id)).toEqual(['ta:x/a'])
+    expect(lookupMatches(d, 'إمل').filter((x) => x.exact).map((x) => x.id)).toEqual(['ta:x/b'])
+    expect(lookupMatches(d, 'آمل').filter((x) => x.exact).map((x) => x.id)).toEqual(['ta:x/c'])
+  })
+  test('the content-word exact rule never fires on a subtitle', () => {
+    const [m] = lookupMatches(taMaps, 'what is a translation team')
+    expect(m!.id).toBe('ta:manage/translate-team')
+    const d = { revision: 1, map: { core: { lang: 'en', names: { 'ta:x/q': ['Other'] }, subtitles: { 'ta:x/q': 'Grace' } }, parts: new Map() } } as never
+    expect(lookupMatches(d, 'what is grace')[0]).toMatchObject({ id: 'ta:x/q', exact: false })
+  })
+})
+
 describe('lookupMatches: exact needs the same words in order', () => {
   const d = (names: Record<string, string[]>) => ({ revision: 1, map: { core: { lang: 'en', names }, parts: new Map() } }) as never
   test('a different order is not exact but still matches', () => {
@@ -91,7 +111,10 @@ describe('lookupMatches: exact needs the same words in order', () => {
     expect(r.find((x) => x.id === 'x:two')!.exact).toBe(true)
     expect(r.find((x) => x.id === 'x:one')?.exact ?? false).toBe(false)
   })
-  test('"son" is not a stopword: "who is the son" finds "Son"', () => {
+  test('"son" is a stopword, but a query of stopwords keeps its last word', () => {
+    const e = d({ 'x:idols': ['Ídolos'], 'x:pharisees': ['Fariseos'] })
+    expect(lookupMatches(e, 'qué son los ídolos')[0]).toMatchObject({ id: 'x:idols', exact: true })
+    expect(lookupMatches(e, 'quiénes son los fariseos')[0]).toMatchObject({ id: 'x:pharisees', exact: true })
     const [m] = lookupMatches(d({ 'per:son': ['Son'] }), 'who is the son')
     expect(m!.id).toBe('per:son')
     expect(m!.exact).toBe(true)

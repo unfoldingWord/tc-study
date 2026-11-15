@@ -230,6 +230,7 @@ describe('article by roles', () => {
   test('the old forms are unchanged', async () => {
     const r = await reader()
     expect(sids((await r.article('ta:translate/m')).data!.sections)).toEqual(['d'])
+    expect(sids((await r.article('ta:translate/m', null as never)).data!.sections)).toEqual(['d'])
     expect(sids((await r.article('ta:translate/m', 'all')).data!.sections)).toHaveLength(5)
     expect(sids((await r.article('ta:translate/m', 's2')).data!.sections)).toEqual(['s2'])
   })
