@@ -9,6 +9,7 @@ import {
   parseObsStoryMarkdown,
   type ParsedObsStory,
 } from '../obs/parseObsMarkdown'
+import JSZip from 'jszip'
 import { obsStoryCacheKey, resolveObsStoryIds } from '../obs/obsStoryIds'
 
 /** Bump when the story rows this loader writes (`parseObsStoryMarkdown`'s output, as stored) change: it is in every part fingerprint. */
@@ -68,25 +69,23 @@ type ObsCatalogAdapter = {
 }
 
 type ObsDoor43Client = {
-  findRepository: (
-    owner: string,
-    repoName: string,
-    stage: string
-  ) => Promise<{ release?: { tag_name?: string }; default_branch?: string } | null>
-  fetchTextContent: (
-    owner: string,
-    repoName: string,
-    path: string,
-    ref: string
-  ) => Promise<string>
+  downloadZipball: (owner: string, repo: string, ref?: string) => Promise<ArrayBuffer | Uint8Array>
   config?: { baseUrl?: string }
 }
+
+/** The ref `releaseZip` downloads: the release tag, else the default branch, else master (read from the catalog row). */
+function zipRef(metadata: ResourceMetadata): string {
+  return metadata.release?.tag_name || (metadata as { default_branch?: string }).default_branch || 'master'
+}
+
+type ObsZip = { ref: string; archive: JSZip; top: string }
 
 export class ObsLoader implements ResourceLoader {
   private cacheAdapter: ObsCacheAdapter
   private catalogAdapter: ObsCatalogAdapter
   private door43Client: ObsDoor43Client
   private debug: boolean
+  private zips = new Map<string, Promise<ObsZip>>()
 
   constructor(config: {
     cacheAdapter: unknown
@@ -146,13 +145,13 @@ export class ObsLoader implements ResourceLoader {
     const [owner, language, resourceId] = parts
     const repoName = `${language}_${resourceId}`
 
-    const repo = await this.door43Client.findRepository(owner, repoName, 'prod')
-    if (!repo) {
-      throw new Error(`Repository not found for ${owner}/${repoName}`)
+    const zip = await this.zipOf(resourceKey, metadata)
+    const ref = zip.ref
+    const entry = zip.archive.files[`${zip.top}/${storyPath.replace(/^\.\//, '')}`]
+    if (!entry || entry.dir) {
+      throw new Error(`Story file ${storyPath} is not in the ${owner}/${repoName} zip at ${ref}`)
     }
-
-    const ref = repo.release?.tag_name || repo.default_branch || 'master'
-    const md = await this.door43Client.fetchTextContent(owner, repoName, storyPath, ref)
+    const md = await entry.async('string')
     const parsed = parseObsStoryMarkdown(storyNum, md)
 
     const baseUrl = this.door43Client?.config?.baseUrl || 'https://git.door43.org'
@@ -187,6 +186,31 @@ export class ObsLoader implements ResourceLoader {
     }
 
     return parsed
+  }
+
+  /** The release zip, downloaded once per resource and kept (the promise is memoised, a failure is not). */
+  private zipOf(resourceKey: string, metadata: ResourceMetadata): Promise<ObsZip> {
+    let pending = this.zips.get(resourceKey)
+    if (!pending) {
+      const [owner, language, resourceId] = resourceKey.split('/')
+      const repoName = `${language}_${resourceId}`
+      const ref = zipRef(metadata)
+      pending = (async () => {
+        const bytes = await this.door43Client.downloadZipball(owner, repoName, ref)
+        const archive = await JSZip.loadAsync(bytes)
+        const tops = new Set(
+          Object.keys(archive.files).map((n) => (n.includes('/') ? n.slice(0, n.indexOf('/')) : ''))
+        )
+        const [top] = tops
+        if (tops.size !== 1 || !top) {
+          throw new Error(`The ${owner}/${repoName} zip at ${ref} does not have one top folder`)
+        }
+        return { ref, archive, top }
+      })()
+      this.zips.set(resourceKey, pending)
+      pending.catch(() => this.zips.delete(resourceKey))
+    }
+    return pending
   }
 
   /**
@@ -230,6 +254,7 @@ export class ObsLoader implements ResourceLoader {
     }
 
     let loaded = total - remaining.length
+    const failures: string[] = []
     for (const storyId of remaining) {
       try {
         await this.loadContent(resourceKey, storyId)
@@ -242,6 +267,7 @@ export class ObsLoader implements ResourceLoader {
         })
       } catch (err) {
         loaded++
+        failures.push(err instanceof Error ? err.message : String(err))
         onProgress?.({
           loaded,
           total,
@@ -252,6 +278,9 @@ export class ObsLoader implements ResourceLoader {
           console.warn(`[ObsLoader] Failed to prefetch story ${storyId} for ${resourceKey}:`, err)
         }
       }
+    }
+    if (failures.length > 0) {
+      throw new Error(`${failures.length} OBS stories of ${resourceKey} failed: ${failures[0]}`)
     }
   }
 }
