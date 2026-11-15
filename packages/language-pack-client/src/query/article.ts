@@ -34,13 +34,14 @@ async function titled(reader: PackReader, ids: string[], models: ArticleModel[])
 /**
  * The sections an article gives when none is asked for, small on purpose: sections that inherit a role from a heading are not
  * extra defaults.
- * - tW: the first `definition` at the article's top heading level (the smallest level above 0), else `intro`, else the first section.
- * - tA: the first `description` and the first `reason` at that level, in reading order, else the first section.
+ * - tW: the first `definition` at the article's top heading level (the smallest level above 0), else the first at any level, else `intro`, else the first section.
+ * - tA: the first `description` and the first `reason`, each at that level or else at any level, in reading order; the first section only when neither exists.
  * @internal exported for tests
  */
 export function defaultSections(id: string, sections: SectionModel[]): SectionModel[] {
   const top = Math.min(...sections.filter((s) => s.level > 0).map((s) => s.level))
-  const first = (role: Role) => sections.find((s) => s.role === role && s.level === top)
+  // The first section of a role at the top level, else at any level: a deeper one is better than the first section.
+  const first = (role: Role) => sections.find((s) => s.role === role && s.level === top) ?? sections.find((s) => s.role === role)
   let pick: SectionModel[] = []
   if (id.startsWith('tw:')) {
     const one = first('definition') ?? sections.find((s) => s.role === 'intro')

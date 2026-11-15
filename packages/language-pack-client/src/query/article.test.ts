@@ -248,13 +248,16 @@ describe('defaultSections', () => {
     const secs = [S('a', 3, 'description'), S('b', 4, 'description'), S('c', 3, 'reason')]
     expect(sids('ta:translate/x', secs)).toEqual(['a', 'c'])
   })
-  test('tA: a description only at a deeper level, or no role at all, gives the first section', () => {
-    expect(sids('ta:translate/x', [S('a', 2, 'unknown'), S('b', 3, 'description')])).toEqual(['a'])
+  test('tA: a description only at a deeper level is chosen over the first section; no role at all gives the first section', () => {
+    expect(sids('ta:translate/x', [S('a', 2, 'unknown'), S('b', 3, 'description')])).toEqual(['b'])
+    expect(sids('ta:translate/x', [S('a', 2, 'unknown'), S('b', 3, 'description'), S('c', 2, 'reason')])).toEqual(['b', 'c'])
     expect(sids('ta:translate/x', [S('a', 2, 'unknown'), S('b', 2, 'unknown')])).toEqual(['a'])
   })
   test('tW: the first definition at the top level, else the intro, else the first section', () => {
     expect(sids('tw:kt/x', [S('intro', 0, 'intro'), S('definition', 2, 'definition'), S('definition-2', 3, 'definition')])).toEqual(['definition'])
     expect(sids('tw:kt/x', [S('intro', 0, 'intro'), S('facts', 2, 'facts')])).toEqual(['intro'])
+    expect(sids('tw:kt/x', [S('intro', 0, 'intro'), S('facts', 2, 'facts'), S('d', 3, 'definition')])).toEqual(['d'])
+    expect(sids('ta:translate/x', [S('first', 2, 'unknown'), S('d', 2, 'description'), S('r', 2, 'reason')])).toEqual(['d', 'r'])
     expect(sids('tw:kt/x', [S('s1', 2, 'unknown'), S('facts', 2, 'facts')])).toEqual(['s1'])
   })
 })
