@@ -16,6 +16,7 @@ import {
   mapView,
   type MapSet,
   type OrigModel,
+  type Role,
   origView,
   readSegment,
   type Segment,
@@ -104,7 +105,7 @@ export interface PackReader {
   /** The revision of the catalog the unit was installed from (the catalog's own in `openFromSegments`), or `undefined` when it is not active. */
   unitRevision(unit: string): number | undefined
   passage(ref: string): Promise<Answer<PassageData>>
-  article(id: string, section?: string | 'all'): Promise<Answer<ArticleData>>
+  article(id: string, section?: string | 'all' | { roles: Role[] }): Promise<Answer<ArticleData>>
   context(ref: string): Promise<Answer<ContextData>>
   concept(id: string): Promise<Answer<unknown>>
   topics(q?: { category?: string; book?: string }): Promise<Answer<unknown>>

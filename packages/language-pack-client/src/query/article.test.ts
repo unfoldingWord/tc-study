@@ -173,3 +173,61 @@ describe('context', () => {
     expect(c.notInstalled[0]!.unit).toBe('book:tit')
   })
 })
+
+describe('article by roles', () => {
+  const TA = 'es-419_gl/es-419/ta'
+  const sec = (sid: string, role: 'intro' | 'description' | 'strategies' | 'examples') => ({ sid, level: 1, role, lang: 'es-419', md: sid })
+  async function reader() {
+    const seg = await writeSegment(
+      artSegment('es-419', 'ta:translate', [[TA, 'v4']], [
+        { id: 'ta:translate/m', res: TA, title: 'M', sections: [sec('intro', 'intro'), sec('s1', 'strategies'), sec('d', 'description'), sec('s2', 'strategies'), sec('e', 'examples')] },
+      ]),
+    )
+    const catalog = {
+      id: 'x',
+      bytes: new Uint8Array(),
+      name: 'es-419',
+      publisher: 'x',
+      revision: 1,
+      origin: 'published',
+      catalog: {
+        lang: 'es-419',
+        about: { revision: 1 },
+        resources: [],
+        segments: [{ id: bytesOf(seg.id), class: 'art', group: 'ta:translate', size: seg.bytes.length, ulen: 0, inputs: new Uint8Array() }],
+        units: [{ id: 'art:ta:translate', segments: [0] }],
+      },
+    } as unknown as VerifiedCatalog
+    return openFromSegments({ lang: 'es-419', catalogs: [catalog], get: async (id) => (id === seg.id ? seg.bytes : undefined) })
+  }
+  const sids = (a: { sid: string }[]) => a.map((s) => s.sid)
+
+  test('one role: only those sections, in article order; the rest in more; cites only those', async () => {
+    const a = await (await reader()).article('ta:translate/m', { roles: ['strategies'] })
+    expect(sids(a.data!.sections)).toEqual(['s1', 's2'])
+    expect(sids(a.data!.more)).toEqual(['intro', 'd', 'e'])
+    expect(a.cites.map((c) => c.section)).toEqual(['s1', 's2'])
+  })
+  test('two roles keep article order', async () => {
+    const a = await (await reader()).article('ta:translate/m', { roles: ['examples', 'strategies'] })
+    expect(sids(a.data!.sections)).toEqual(['s1', 's2', 'e'])
+  })
+  test('a role the article lacks: no sections, everything in more', async () => {
+    const a = await (await reader()).article('ta:translate/m', { roles: ['definition'] })
+    expect(a.data!.sections).toEqual([])
+    expect(a.data!.more).toHaveLength(5)
+    expect(a.cites).toEqual([])
+  })
+  test('E_ARG: empty list, unknown role, not a list', async () => {
+    const r = await reader()
+    await expect(r.article('ta:translate/m', { roles: [] })).rejects.toMatchObject({ code: 'E_ARG' })
+    await expect(r.article('ta:translate/m', { roles: ['nope' as never] })).rejects.toMatchObject({ code: 'E_ARG' })
+    await expect(r.article('ta:translate/m', { roles: 'strategies' as never })).rejects.toMatchObject({ code: 'E_ARG' })
+  })
+  test('the old forms are unchanged', async () => {
+    const r = await reader()
+    expect(sids((await r.article('ta:translate/m')).data!.sections)).toEqual(['d'])
+    expect(sids((await r.article('ta:translate/m', 'all')).data!.sections)).toHaveLength(5)
+    expect(sids((await r.article('ta:translate/m', 's2')).data!.sections)).toEqual(['s2'])
+  })
+})

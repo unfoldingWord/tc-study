@@ -1,5 +1,6 @@
 /** `article`, and `context`: a passage with the default sections of the articles its notes and links name. No Node module here. */
-import type { ArticleModel, Role, SectionModel } from '@bt-synergy/language-pack-v3'
+import { type ArticleModel, type Role, ROLES, type SectionModel } from '@bt-synergy/language-pack-v3'
+import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
 import { type Answer, absorb, missingUnit, newAnswer, releaseOf, usedUnit } from './envelope'
 import { haveMap, usageBooks, usageUnit } from './maps'
@@ -38,7 +39,12 @@ function defaults(id: string, sections: SectionModel[]): SectionModel[] {
   return pick.length > 0 ? pick : sections.slice(0, 1)
 }
 
-export async function articleQuery(reader: PackReader, id: string, section?: string | 'all'): Promise<Answer<ArticleData>> {
+export async function articleQuery(reader: PackReader, id: string, section?: string | 'all' | { roles: Role[] }): Promise<Answer<ArticleData>> {
+  if (typeof section === 'object' && section !== null) {
+    const roles: unknown = section.roles
+    if (!Array.isArray(roles) || roles.length === 0 || !roles.every((r) => (ROLES as readonly unknown[]).includes(r)))
+      throw new ClientError('E_ARG', `article roles must be a non-empty list of: ${ROLES.join(', ')}`)
+  }
   const out = newAnswer<ArticleData>(reader, 'article')
   const unit = reader.unitOf('art', id) ?? `art:${id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : id}`
   const models: ArticleModel[] | undefined = reader.installed(unit) ? await reader.articles(unit.slice('art:'.length)) : undefined
@@ -54,7 +60,9 @@ export async function articleQuery(reader: PackReader, id: string, section?: str
       ? defaults(art.id, art.sections)
       : section === 'all'
         ? art.sections
-        : art.sections.filter((s) => s.sid === section || s.aliases?.includes(section))
+        : typeof section === 'object'
+          ? art.sections.filter((s) => section.roles.includes(s.role))
+          : art.sections.filter((s) => s.sid === section || s.aliases?.includes(section))
   const shown = new Set(chosen)
   const header = (await reader.segments(unit))?.[0]?.h.res
   const release = releaseOf(header, art.res)

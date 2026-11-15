@@ -29,8 +29,15 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "description": "An article id such as \"tw:kt/grace\"." },
-        "section": { "type": "string", "description": "A section id, or \"all\" for every section." }
+        "section": { "type": "string", "description": "A section id, or \"all\" for every section." },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "enum": ["intro", "definition", "facts", "translation-suggestions", "examples", "strategies", "description", "reason", "bible-references", "word-data", "unknown"] },
+          "description": "Only the sections whose role is in the list, in article order; the rest go to `more`. Not with `section`."
+        }
       },
+      "not": { "required": ["section", "roles"] },
       "required": ["id"],
       "additionalProperties": false
     }

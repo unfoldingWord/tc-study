@@ -88,7 +88,7 @@ type Answer<T> = {
 | Query | Asks | Data |
 |---|---|---|
 | `passage(ref)` | `'tit 1:1'`, `'tit 1:1-3'` | texts, notes, questions and links in range; coverage of the language's resources for the book |
-| `article(id, section?)` | `'tw:kt/faith'` | sections (the definition by default, or one by id, or `'all'`), `more` (the rest), `otherLang` for a section kept in another language; for tA, `related`: each tied article's id and its title (none when its group is not installed) |
+| `article(id, section?)` (`section` may also be `{ roles: Role[] }`: only the sections of those roles, the rest in `more`; an empty or unknown role is `E_ARG`) | `'tw:kt/faith'` | sections (the definition by default, or one by id, or `'all'`), `more` (the rest), `otherLang` for a section kept in another language; for tA, `related`: each tied article's id and its title (none when its group is not installed) |
 | `context(ref)` | a passage | the passage plus, for each concept its notes and links name, the article (when installed) and the books that use it |
 | `concept(id)` | `'tw:kt/grace'`, `'per:abraham'` | the concept, names, relations; books where it is used that are not installed go to `notInstalled` |
 | `topics({ category?, book? })` | people, places, events, stories, sections | the topics of the `xtopics` module (`installed: false` when it is not on the device) |
