@@ -41,7 +41,7 @@ import { rewriteLinks } from '../ids'
 import { type ArticleModel, ROLES, type SectionModel } from '../model'
 import type { ResourceRef, RowSource } from '../source/rows'
 import { relatedArticles, type TaConfigs } from './related'
-import { articlePath, assignArticle, canonicalRegistry, type SectionPart, type SectionRegistry, splitSections } from './sections'
+import { articlePath, assignArticle, canonicalRegistry, type RoleHint, type SectionPart, type SectionRegistry, splitSections } from './sections'
 
 const TW_SUBJECT = 'Translation Words'
 const TA_SUBJECT = 'Translation Academy'
@@ -115,6 +115,9 @@ type Found = { id: string; group: string; kind: Kind; ref: ResourceRef; publishe
  *   text, a heading no rule places (role `unknown`).
  * - `taConfigs` is the text of the `config.yaml` of each manual of each tA resource ({@link relatedArticles}). Undefined:
  *   `related` comes from the links of the texts alone.
+ * - `roleHints` maps an article id to the headed sections of the same article in the map language ({@link RoleHint}): an article
+ *   with the same sequence of levels takes its `unknown` roles from it (`sections.ts`). `hinted` lists, by group, the ids of the
+ *   articles that used a hint; the report has one line per group: how many articles had a hint and how many used it.
  * - The result maps each group (`tw:kt`, `tw:names`, `tw:other`, `ta:translate`, `ta:checking`, `ta:process`, `ta:intro`,
  *   sorted) to its articles, ordered by id. Both orders are by code point.
  */
@@ -124,7 +127,8 @@ export async function extractArticles(
   registry: SectionRegistry = {},
   issues: string[] = [],
   taConfigs?: TaConfigs,
-): Promise<{ groups: Map<string, ArticleModel[]>; registry: SectionRegistry }> {
+  roleHints?: Map<string, RoleHint>,
+): Promise<{ groups: Map<string, ArticleModel[]>; registry: SectionRegistry; hinted: Map<string, string[]> }> {
   const resources = (await source.resources(lang))
     .filter((ref) => ref.kind === TW_SUBJECT || ref.kind === TA_SUBJECT)
     .sort((a, b) => compareCodePoints(a.key, b.key))
@@ -165,6 +169,8 @@ export async function extractArticles(
   const ordered = [...found.values()].sort((a, b) => compareCodePoints(a.group, b.group) || compareCodePoints(a.id, b.id))
   const groups = new Map<string, ArticleModel[]>()
   const next: SectionRegistry = { ...registry }
+  const hinted = new Map<string, string[]>()
+  const counts = new Map<string, [number, number]>()
   for (const article of ordered) {
     const { id, ref } = article
     const where = `${id} (${ref.key})`
@@ -176,7 +182,19 @@ export async function extractArticles(
     }
 
     const path = articlePath(ref.key, id)
-    const { sections, entries } = assignArticle(lang, parts, Object.prototype.hasOwnProperty.call(registry, path) ? registry[path] : undefined)
+    const hint = roleHints?.get(id)
+    const { sections, entries, hintUsed } = assignArticle(lang, parts, Object.prototype.hasOwnProperty.call(registry, path) ? registry[path] : undefined, hint)
+    if (hint !== undefined) {
+      const count = counts.get(article.group) ?? [0, 0]
+      count[0]++
+      if (hintUsed) count[1]++
+      counts.set(article.group, count)
+    }
+    if (hintUsed) {
+      const list = hinted.get(article.group)
+      if (list === undefined) hinted.set(article.group, [id])
+      else list.push(id)
+    }
     next[path] = entries
     for (const section of sections) {
       if (section.role === 'unknown' && section.level > 0) {
@@ -198,7 +216,10 @@ export async function extractArticles(
     if (list === undefined) groups.set(article.group, [model])
     else list.push(model)
   }
-  return { groups, registry: canonicalRegistry(next) }
+  for (const [group, [had, used]] of [...counts].sort(([a], [b]) => compareCodePoints(a, b))) {
+    issues.push(`${group}/: role hints: ${had} articles had a hint, ${used} used it`)
+  }
+  return { groups, registry: canonicalRegistry(next), hinted }
 }
 
 /**

@@ -374,6 +374,26 @@ function inheritRoles(prepared: Prepared[]): void {
   }
 }
 
+/** The headed sections of an article in the map language, in order, with their final roles: what {@link applyHints} aligns to. */
+export type RoleHint = { level: number; role: Role }[]
+
+/**
+ * When the headed sections (level > 0) of an article have the same number and the same sequence of levels as its hint (the
+ * article with the same id in the map language), each of them whose role is `unknown` takes the role of the hint at the same
+ * position; a role the table knows is kept. Returns whether the shape matched (the hint was used). Runs before {@link inheritRoles}.
+ */
+function applyHints(prepared: Prepared[], hint: RoleHint): boolean {
+  const headed = prepared.filter((p) => p.part.level > 0)
+  if (headed.length !== hint.length || headed.some((p, i) => p.part.level !== hint[i].level)) return false
+  headed.forEach((p, i) => {
+    if (p.role === 'unknown' && hint[i].role !== 'unknown' && hint[i].role !== 'intro') {
+      p.role = hint[i].role
+      p.source = 'hint'
+    }
+  })
+  return true
+}
+
 function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   const list = map.get(key)
   if (list === undefined) map.set(key, [value])
@@ -381,8 +401,14 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 }
 
 /** The sections of one article against the entries the registry has for it. Nothing here touches the registry itself. */
-function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[]): { sections: SectionModel[]; entries: RegistryEntry[] } {
+function assign(
+  articleLang: string,
+  parts: SectionPart[],
+  old: RegistryEntry[],
+  hint?: RoleHint,
+): { sections: SectionModel[]; entries: RegistryEntry[]; hintUsed: boolean } {
   const prepared = parts.map((part) => prepare(part, articleLang))
+  const hintUsed = hint !== undefined && applyHints(prepared, hint)
   inheritRoles(prepared)
   const n = prepared.length
   const match: number[] = new Array(n).fill(-1)
@@ -502,7 +528,7 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
     if (aliases.length > 0) entry.aliases = [...aliases]
     entries.push(entry)
   })
-  return { sections, entries }
+  return { sections, entries, hintUsed }
 }
 
 /**
@@ -531,6 +557,7 @@ export function assignArticle(
   articleLang: string,
   parts: SectionPart[],
   old: RegistryEntry[] | undefined,
-): { sections: SectionModel[]; entries: RegistryEntry[] } {
-  return assign(articleLang, parts, old ?? [])
+  hint?: RoleHint,
+): { sections: SectionModel[]; entries: RegistryEntry[]; hintUsed: boolean } {
+  return assign(articleLang, parts, old ?? [], hint)
 }

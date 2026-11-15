@@ -17,9 +17,10 @@
  *   book, `OrigModel.stamp`);
  * - **orig**: the `sot` rows of the book in the originals; the resources are the originals that have the book;
  * - **art**: the `sot` rows of the articles of the group, in the resources of those articles. A tA group also has the `sot` rows of
- *   every tA article and one row `ta-config|{resource}/{manual}/config.yaml#{sha-256 of the text}` per config given: its
+ *   every tA article, and one row `ta-config|{resource}/{manual}/config.yaml#{sha-256 of the text}` per config given: its
  *   `related` comes from all of them (`related.ts`). The `map` core has one row `ta-toc|{resource}/{manual}/toc.yaml#{sha-256 of the text}`
- *   per `toc.yaml` given: its titles are more names of the articles (`taToc.ts`); **lex**: the `sot` rows of the
+ *   per `toc.yaml` given: its titles are more names of the articles (`taToc.ts`). Any art group also has one row
+ *   `role-hints|{map-language art segment id}` per map-language segment whose roles an article of the group used (`roleHints`); **lex**: the `sot` rows of the
  *   lexicon files `content/{n}.json` of the group, in the resources of its entries; **obs**: the `sot` rows of every resource the
  *   segment names in `res`.
  *
@@ -35,6 +36,7 @@ import { sha256Hex } from '../codec/sha256'
 import { BOOKS, bookNumber, bookSet } from '../ids'
 import type { About, ArticleModel, BookModel, CatalogResource, LexEntry, OrigModel } from '../model'
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
+import type { RoleHint } from './sections'
 import { articleOfPath, articleResources, artSegment, extractArticles, type Kind } from './art'
 import type { TaConfigs } from './related'
 import { parseTaToc } from './taToc'
@@ -254,6 +256,9 @@ export async function buildLanguage(o: {
   taConfigs?: TaConfigs
   /** The text of the `toc.yaml` of each manual of each tA resource: its titles are more names of the articles. */
   taTocs?: Map<string, Map<string, string>>
+  /** The roles of the same articles in the map language ({@link RoleHint}), by article id; `roleHintSegs` says the id (hex) of the map-language `art` segment each came from. */
+  roleHints?: Map<string, RoleHint>
+  roleHintSegs?: Map<string, string>
 }): Promise<LanguageBuild> {
   const { source, lang } = o
   const report: string[] = []
@@ -315,7 +320,7 @@ export async function buildLanguage(o: {
 
   // Articles
   const artIssues: string[] = []
-  const { groups: articles, registry } = await extractArticles(source, lang, o.registry, artIssues, o.taConfigs)
+  const { groups: articles, registry, hinted } = await extractArticles(source, lang, o.registry, artIssues, o.taConfigs, o.roleHints)
   report.push(...scoped(artIssues, artScope))
   const artRows = await articleRowKeys(source, lang, articles)
   // The `related` of a tA article comes from every tA text and from the configs: they are inputs of each tA group.
@@ -325,7 +330,10 @@ export async function buildLanguage(o: {
   for (const [group, list] of articles) {
     const res = articleResources(list, refs)
     const keys = res.map(([key]) => key)
-    const rows = group.startsWith('ta:') ? [...taRows, ...configRows(keys)] : (artRows.get(group) ?? [])
+    const rows = group.startsWith('ta:') ? [...taRows, ...configRows(keys)] : [...(artRows.get(group) ?? [])]
+    // The roles that came from the map language's articles are an input: one row per segment of those articles used.
+    const hintSegs = new Set((hinted.get(group) ?? []).map((id) => o.roleHintSegs?.get(id)).filter((seg): seg is string => seg !== undefined))
+    for (const seg of hintSegs) rows.push({ layer: 'role-hints', key: seg })
     await add(artSegment(lang, group, res, list), inputsOf(rows, stampsOf(keys)), keys)
   }
 

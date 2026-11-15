@@ -882,9 +882,9 @@ describe('buildLanguage: the related of tA', () => {
   const run = (source: RowSource, taConfigs?: Map<string, Map<string, string>>) => buildLanguage({ source, lang: ES, registry: registry(), about, taConfigs })
   const groupsOf = (segments: BuiltSegment[]) => Object.fromEntries(byClass(segments, 'art').map((s) => [s.seg.h.group, s]))
 
-  test('an unplaced heading is in the report with the scope of its group', async () => {
+  const withZ = (): RowSource => {
     const base = taSource()
-    const source: RowSource = {
+    return {
       resources: (lang) => base.resources(lang),
       async *rows(f: RowFilter) {
         yield* base.rows(f)
@@ -893,8 +893,27 @@ describe('buildLanguage: the related of tA', () => {
         }
       },
     }
+  }
+
+  test('an unplaced heading is in the report with the scope of its group', async () => {
+    const source = withZ()
     const built = await run(source)
     expect(built.report).toContain(`art ta:translate: ta:translate/z (${TA}): the heading "Algo raro" is not placed (role unknown, sid s1)`)
+  })
+
+  test('roles from the map language: the report counts them and the inputs carry the segment', async () => {
+    const hints = new Map([['ta:translate/z', [{ level: 2, role: 'definition' as const }]]])
+    const plain = await run(withZ())
+    const hinted = await buildLanguage({ source: withZ(), lang: ES, registry: registry(), about, roleHints: hints, roleHintSegs: new Map([['ta:translate/z', 'aa11']]) })
+    const other = await buildLanguage({ source: withZ(), lang: ES, registry: registry(), about, roleHints: hints, roleHintSegs: new Map([['ta:translate/z', 'bb22']]) })
+    expect(hinted.report).toContain('art ta:translate: ta:translate/: role hints: 1 articles had a hint, 1 used it')
+    const roles = (b: typeof plain) => (groupsOf(b.segments)['ta:translate'].seg.t as { articles: { id: string; sections: { role: string }[] }[] }).articles.find((x) => x.id === 'ta:translate/z')!.sections.map((x) => x.role)
+    expect(roles(plain)).toEqual(['intro', 'unknown'])
+    expect(roles(hinted)).toEqual(['intro', 'definition'])
+    expect(groupsOf(hinted.segments)['ta:translate'].inputs).not.toBe(groupsOf(plain.segments)['ta:translate'].inputs)
+    expect(groupsOf(hinted.segments)['ta:translate'].inputs).not.toBe(groupsOf(other.segments)['ta:translate'].inputs)
+    // A group none of whose articles used a hint keeps its inputs.
+    expect(groupsOf(hinted.segments)['ta:checking'].inputs).toBe(groupsOf(plain.segments)['ta:checking'].inputs)
   })
 
   test('the segment holds related; the inputs of every tA group change with the configs and with the set of tA rows', async () => {

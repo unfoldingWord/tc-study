@@ -40,7 +40,7 @@ export { extractLexicon, lexSegment } from './build/lex'
 export { extractObs, obsSegment } from './build/obs'
 export { buildCatalog, type BuiltSegment, builtSegment, needsOfBook, unitsOf } from './build/catalog'
 export { BUILDER, buildCommon, buildLanguage, type LanguageBuild } from './build/language'
-export type { RegistryEntry, SectionRegistry } from './build/sections'
+export type { RegistryEntry, RoleHint, SectionRegistry } from './build/sections'
 export { bridgeZip } from './bridge/fromV2'
 
 // Views and the transfer file

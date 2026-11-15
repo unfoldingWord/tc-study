@@ -4,6 +4,7 @@
  *   bun packages/resource-pipeline/cli/build-v3.ts --list <lang list.json> --originals <originals list.json> --parts <dir> --out <dir>
  *     [--books tit,rut] [--registry <dir>] [--revision <n>] [--built <RFC 3339>] [--publisher <name>]
  *     [--map-lang <lang>] [--map-list <list.json>] [--book-names <file>] [--topics <dir>] [--aligned] [--ta-config <dir>]
+ *     [--role-hints <dir>]
  *
  * The inputs are what phase 0 left on disk: the parts list of a language (`es-419/list.json`, its `language` says which language
  * this is), the list of the originals (`originals/list.json`) and the folder with the `<sha256>.part.gz` files both name. Only the
@@ -52,6 +53,8 @@ import {
   readSegment,
   type Segment,
   ORIGINALS,
+  artView,
+  type RoleHint,
   parseTipnr,
   type SectionRegistry,
   type TipnrRecord,
@@ -87,6 +90,8 @@ export const USAGE =
   '               into memory and never printed or written)\n' +
   '  --ta-config  the folder fetch-ta-config wrote (<resource key>/<manual>/config.yaml): the related of the tA articles also has the ties\n' +
   '               of the configs (without it, the ties of the links of the texts alone)\n' +
+  '  --role-hints a folder with segments/*.seg of the map language (the published `art` segments): the sections whose heading the language\n' +
+  '               does not know take the role of the same section of the English article with the same id (publish-v3 gives it)\n' +
   '  --aligned    (no value) also build the optional `aligned:` units, the index of aligned phrases of the bridge texts (GLT, GST, ULT, UST);\n' +
   '               every other segment is the same bytes with or without it'
 
@@ -114,10 +119,11 @@ type Options = {
   aligned: boolean
   signKey?: string
   taConfig?: string
+  roleHints?: string
 }
 
 const BOOLEAN_FLAGS = ['aligned']
-const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config']
+const VALUE_FLAGS = ['list', 'originals', 'parts', 'out', 'books', 'registry', 'revision', 'built', 'publisher', 'map-lang', 'map-list', 'book-names', 'topics', 'revision-common', 'revision-lang', 'previous-common', 'previous-lang', 'common', 'sign-key', 'ta-config', 'role-hints']
 
 /** RFC 3339 date and time, as the catalog writes `about.built`. */
 const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[Zz]|[+-]\d{2}:\d{2})$/
@@ -203,6 +209,9 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
   const taConfig = flags.get('ta-config')
   if (taConfig !== undefined && (!existsSync(taConfig) || !statSync(taConfig).isDirectory())) throw new UsageError(`--ta-config: ${taConfig} is not a directory`)
 
+  const roleHints = flags.get('role-hints')
+  if (roleHints !== undefined && (!existsSync(join(roleHints, 'segments')) || !statSync(join(roleHints, 'segments')).isDirectory())) throw new UsageError(`--role-hints: ${join(roleHints, 'segments')} is not a directory`)
+
   for (const [name, path] of [['list', list], ['originals', originals], ...(bookNames === undefined ? [] : [['book-names', bookNames]]), ...(mapList === undefined ? [] : [['map-list', mapList]])]) {
     if (!existsSync(path) || !statSync(path).isFile()) throw new UsageError(`--${name}: ${path} is not a file`)
   }
@@ -226,7 +235,7 @@ export function optionsFromArgs(argv: string[], sources: TopicSource[] = pins())
     if (wrong !== undefined) throw new UsageError(`--topics: ${wrong}`)
   }
 
-  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key'), taConfig }
+  return { list, originals, parts, out, books, registry: flags.get('registry'), revision, revisionCommon, revisionLang, previousCommon, previousLang, common, built, publisher, mapLang, mapList, bookNames, topics, aligned: flags.has('aligned'), signKey: flags.get('sign-key'), taConfig, roleHints }
 }
 
 /** The `language` of a parts list. The rest of the list is checked by `partsSource`. */
@@ -256,6 +265,32 @@ function topicTexts(dir: string) {
     theographic: { events: theo('events'), verses: theo('verses'), people: theo('people'), places: theo('places') },
     obs,
   }
+}
+
+/**
+ * The roles of the articles of the map language, from the `.seg` files of `<dir>/segments`: only the `art` segments count. For each
+ * article id, the headed sections (level > 0) in order with their roles; `segs` says the id (hex) of the segment each came from.
+ */
+export async function readRoleHints(dir: string): Promise<{ hints: Map<string, RoleHint>; segs: Map<string, string>; segments: number }> {
+  const hints = new Map<string, RoleHint>()
+  const segs = new Map<string, string>()
+  const folder = join(dir, 'segments')
+  let segments = 0
+  for (const name of readdirSync(folder).filter((f) => f.endsWith('.seg')).sort()) {
+    let read
+    try {
+      read = await readSegment(new Uint8Array(readFileSync(join(folder, name))), { known: KNOWN.art, expectedClass: 'art' })
+    } catch (error) {
+      if (/is expected/.test((error as Error).message)) continue
+      throw new Error(`Cannot read the role hints ${join(folder, name)}: ${(error as Error).message}`)
+    }
+    segments++
+    for (const article of artView(read.seg).articles) {
+      hints.set(article.id, article.sections.filter((section) => section.level > 0).map(({ level, role }) => ({ level, role })))
+      segs.set(article.id, read.id)
+    }
+  }
+  return { hints, segs, segments }
 }
 
 /** The registry of the last build of `lang` in `dir`, `{}` if there is none (the first build). */
@@ -399,6 +434,8 @@ async function build(o: Options, io: Io): Promise<void> {
     if (manuals.size > 0 && !(taTocs?.get(key) && taTocs.get(key)!.size > 0)) io.log(`no toc.yaml for ${key} (none in the release, or a folder fetched before toc.yaml was read)`)
   }
   if (taConfigs === undefined && taKeys.length > 0) io.log('no --ta-config: the related of the tA articles comes from the links of the texts alone')
+  const roleHints = o.roleHints === undefined ? undefined : await readRoleHints(o.roleHints)
+  if (roleHints !== undefined) io.log(`role hints: ${roleHints.hints.size} articles from ${roleHints.segments} art segments of ${o.roleHints}`)
   const built = await buildLanguage({
     source,
     lang,
@@ -411,6 +448,8 @@ async function build(o: Options, io: Io): Promise<void> {
     aligned: o.aligned,
     taConfigs,
     taTocs,
+    roleHints: roleHints?.hints,
+    roleHintSegs: roleHints?.segs,
   })
 
   // Signing changes the header of a catalog and nothing its id is the hash of: the ids, and so every `requires` and every segment, stay.

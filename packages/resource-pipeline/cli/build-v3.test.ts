@@ -236,6 +236,28 @@ describe('build-v3: arguments and errors', () => {
     expect(result.out).toEqual([])
   })
 
+  test('--role-hints reads the art segments of a folder (other classes are skipped) and the roles come from them', async () => {
+    const hintsOut = temp()
+    expect((await run(sample(hintsOut, ['--books', 'tit']))).code).toBe(0)
+    const plainOut = temp()
+    const plain = await run(sample(plainOut, ['--books', 'tit']))
+    const hintedOut = temp()
+    const hinted = await run(sample(hintedOut, ['--books', 'tit', '--role-hints', hintsOut]))
+    expect(hinted.code).toBe(0)
+    const line = hinted.out.concat(hinted.err).find((l) => l.startsWith('role hints: '))
+    expect(line).toMatch(/^role hints: [1-9][0-9]* articles from [1-9][0-9]* art segments of /)
+    expect(plain.out.concat(plain.err).some((l) => l.startsWith('role hints: '))).toBe(false)
+    // The art segments that used a hint have the segment of the hints in their inputs: their catalog entries differ.
+    expect(Buffer.from(read(join(hintedOut, 'catalog-es-419.seg'))).equals(Buffer.from(read(join(plainOut, 'catalog-es-419.seg'))))).toBe(false)
+  })
+
+  test('--role-hints that is not a folder with segments/: exit 1 with the usage', async () => {
+    const result = await run(sample(temp(), ['--role-hints', join(temp(), 'nope')]))
+    expect(result.code).toBe(1)
+    expect(result.err.join('\n')).toContain('--role-hints')
+    expect(USAGE).toContain('--role-hints')
+  })
+
   test('the usage text says how the build is made reproducible', () => {
     expect(USAGE).toContain('--built')
     expect(USAGE).toMatch(/reproducib|same bytes/i)
