@@ -14,8 +14,11 @@
  *    Given the lists an earlier build published (`previous`, same compat, code and language), a unit whose
  *    fingerprint they record, whose parts' fingerprints recomputed now are the recorded ones and which the bucket still
  *    has, is carried: its parts copied into the new lists, no database opened, nothing written. Any other unit is built
- *    whole, as below. With OBS on, the shared unit is always built.
- * 2. The shared unit: TW, TA (and OBS) downloaded whole, the lexicons and MACULA, their article jobs and titles.
+ *    whole, as below.
+ * 2. The shared unit: TW, TA downloaded whole, the lexicons and MACULA, their article jobs and titles.
+ * 2b. With OBS on, the `obs` unit: the stories and their helps (notes, questions, word links), read from their release zips
+ *    (the ones step 1 hashed, never one by one from Door43). It is carried from `previous` like any unit, and the shared
+ *    unit is what it is with OBS off.
  * 3. One unit per book any book-scoped resource or original has: that book of each, its receipt written first so the
  *    loaders and jobs find it, then the book's jobs for the language and for the book's original.
  *
@@ -123,6 +126,7 @@ import { chaptersFromStore } from './chaptersFromStore'
 import { isObs, keyOfRow, literalTextOf } from './door43Stamps'
 import { closeAndDelete } from './fakeDatabases'
 import { archiveCachingFetch, folderGitTree, folderInputs, lexiconInputs, treeCheck, zipInputs, type TreeCheck } from './inputFiles'
+import { onObsIssues } from '../obs/obsIssues'
 import { PACK_VERSIONS } from './packVersions'
 import { partsCode } from './partsCode'
 import { cacheOnlyNetwork, isRefusingFetch, recordingFetch } from './unitNetwork'
@@ -218,6 +222,21 @@ export type PartsReport = {
    * path): its rows carry the release stamp, so its parts and unit are rebuilt on every release.
    */
   releaseStampedBooks: string[]
+  /** With OBS on: which release of each OBS resource was picked (discovery's lines) and what the `obs` unit holds. */
+  obs?: ObsReport
+}
+
+/** What a parts build with OBS says of it: the picks and the number of rows the `obs` unit wrote. `links` counts OBS word links. */
+export type ObsReport = {
+  picks: string[]
+  stories: number
+  notes: number
+  questions: number
+  links: number
+  /** The unit was carried from the previous lists: nothing was built, so the counts are 0. */
+  carried?: true
+  /** What the loaders left out of the stories and helps (skipped stories, stray files of old markdown notes). */
+  issues?: string[]
 }
 
 export const PARTS_REPORT = 'parts-report.json'
@@ -294,7 +313,7 @@ export type DiscoverInto = (o: {
   language: string
   catalogManager: CatalogManager
   door43Client: Door43Like
-}) => Promise<{ resources: string[]; originals: string[] }>
+}) => Promise<{ resources: string[]; originals: string[]; obs?: { lines: string[] } }>
 
 const defaultDiscover: DiscoverInto = async ({ language, catalogManager, door43Client }) => {
   const found = await discoverLanguage({
@@ -306,17 +325,16 @@ const defaultDiscover: DiscoverInto = async ({ language, catalogManager, door43C
     // zip step 1 hashes, not from a download of their own.
     ingredientsClient: door43Client as never,
   })
-  return { resources: found.resources.map((r) => r.resourceKey), originals: found.originals }
+  return { resources: found.resources.map((r) => r.resourceKey), originals: found.originals, obs: found.obs }
 }
 
 const DEFAULT_MEMORY_LIMIT_MB = 10_240
 
-/**
- * Why a parts build refuses OBS: its loader reads each story from Door43 at the release tag (findRepository,
- * fetchTextContent), and the client's methods call the process's fetch, which a unit refuses; the rows would not be
- * of the zip fingerprinted anyway.
- */
-export const OBS_PARTS_REFUSED = 'OBS parts wait for the OBS loader to read the hashed zip'
+/** The unit of Open Bible Stories and their helps (built only with `obs: true`). */
+export const OBS_UNIT = 'obs'
+
+/** The unit a part belongs to: `unitOfPart`, except that OBS parts are the `obs` unit's (the list package files them under shared). */
+const unitOf = (part: Pick<PartEntry, 'kind' | 'book'>) => (part.kind === 'obs' ? OBS_UNIT : unitOfPart(part))
 
 /**
  * What discovery's enrichment (Door43ApiClient.enrichResourceMetadata) gets from a repository's root files, as the
@@ -335,6 +353,7 @@ const PARTS_DB_PREFIX = 'parts-'
 const CATALOG_DB = 'parts-catalog'
 const DISCOVERY_DB = 'parts-discovery'
 const SHARED_DB = 'parts-shared'
+const OBS_DB = 'parts-obs'
 const bookDb = (book: string) => `parts-book-${book}`
 
 function cacheAdapterFor(dbName: string) {
@@ -441,13 +460,9 @@ export async function buildLanguageParts(o: {
   /** Read the lexicons from this ref; none leaves them out. */
   lexiconsRef?: string
   /**
-   * Open Bible Stories and their helps; left out by default, as the published packs always were. Refused for now
-   * (OBS_PARTS_REFUSED) unless `obsTestOnly` says this is a test: on Door43 the OBS loader reads each story with the
-   * process's fetch, which a unit refuses.
+   * Open Bible Stories and their helps, in the `obs` unit; left out by default, as the published packs always were.
    */
   obs?: boolean
-  /** Test-only: lets `obs` through, for a fixture whose client serves the stories itself. */
-  obsTestOnly?: boolean
   memoryLimitMb?: number
   log?: (line: string) => void
   door43Client?: Door43Like
@@ -478,7 +493,6 @@ export async function buildLanguageParts(o: {
   const language = o.language
   const say = o.log ?? (() => {})
   const obs = o.obs ?? false
-  if (obs && !o.obsTestOnly) throw new Error(OBS_PARTS_REFUSED)
   const limit = o.memoryLimitMb ?? DEFAULT_MEMORY_LIMIT_MB
   const rss = o.rss ?? (() => process.memoryUsage().rss)
   const wait = o.wait ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
@@ -495,8 +509,6 @@ export async function buildLanguageParts(o: {
   // What step 1 read: the only network a unit is given (unitNetwork.ts).
   const stepOne = recordingFetch(fetchArchives)
   const keptZips = new Set<string>()
-  /** The OBS repositories, whose loader reads each story from Door43 (`owner/repo`). */
-  const obsRepos = new Set<string>()
   mkdirSync(join(o.workDir, 'parts'), { recursive: true })
 
   const started = Date.now()
@@ -510,6 +522,10 @@ export async function buildLanguageParts(o: {
   const treeChecks: TreeChecks = { match: 0, mismatch: 0, unverified: 0 }
   const releaseStampedBooks: string[] = []
   let sizes: Record<string, PartSizes> = {}
+  /** With OBS on: the picks and what the obs unit wrote (`carried`: nothing was built, so the counts are 0). */
+  let obsReport: ObsReport | undefined
+  /** What the OBS loaders left out, as they said it. */
+  const obsIssueLines: string[] = []
   const downloads: Downloads = { archives: 0, bytes: 0, seconds: 0 }
   let downloadMs = 0
   /** Counts one archive step 1 fetched, and the time `since` it was asked for. */
@@ -521,7 +537,7 @@ export async function buildLanguageParts(o: {
   }
 
   function writeReport(state: PartsReport['state'], error?: unknown) {
-    const report: PartsReport = { language, state, ...(error !== undefined ? { error: messageOf(error) } : {}), peakRssMb, units: [...steps, ...units], failures, treeChecks, sizes, downloads, releaseStampedBooks }
+    const report: PartsReport = { language, state, ...(error !== undefined ? { error: messageOf(error) } : {}), peakRssMb, units: [...steps, ...units], failures, treeChecks, sizes, downloads, releaseStampedBooks, ...(obsReport ? { obs: { ...obsReport, ...(obsIssueLines.length ? { issues: obsIssueLines } : {}) } } : {}) }
     const file = join(o.workDir, PARTS_REPORT)
     // Aside and renamed: a run killed mid-write still leaves the last whole report.
     writeFileSync(`${file}.partial`, JSON.stringify(report, null, 2))
@@ -575,8 +591,7 @@ export async function buildLanguageParts(o: {
    * kept before its database is deleted, the database is deleted, and the report written.
    *
    * The unit reads only what step 1 read (`net`, and the process's `fetch` refused meanwhile): any other network call
-   * is a failure of the unit naming it, since its rows would not be of the bytes fingerprinted. OBS, when on, is the
-   * exception: its loader reads each story from Door43 (logged; its unit is never carried).
+   * is a failure of the unit naming it, since its rows would not be of the bytes fingerprinted.
    */
   async function runUnit(unit: string, dbName: string, body: (cache: IndexedDBCacheAdapter, m: Meter, net: UnitNetwork) => Promise<number>) {
     say(`[${elapsed()}] ${unit}: start`)
@@ -584,7 +599,6 @@ export async function buildLanguageParts(o: {
     const failuresBefore = failures.length
     const m = meter(unit)
     const cache = cacheAdapterFor(dbName)
-    const allowed = new Set<string>()
     const net = cacheOnlyNetwork({
       unit,
       client: door43,
@@ -592,14 +606,6 @@ export async function buildLanguageParts(o: {
       kept: (owner, repo, ref) => keptZips.has(`${owner}/${repo}@${ref}`) && existsSync(zipCachePath(join(o.workDir, 'zips'), owner, repo, ref)),
       fetchFn: fetchArchives,
       recorded: stepOne,
-      allow: (method, args) => {
-        const ok = unit === SHARED_UNIT && (method === 'findRepository' || method === 'fetchTextContent') && obsRepos.has(`${args[0]}/${args[1]}`)
-        if (ok && !allowed.has(method)) {
-          allowed.add(method)
-          say(`  ${unit}: ${method} de ${args[0]}/${args[1]} desde Door43 (el lector de OBS lee cada historia, no el zip)`)
-        }
-        return ok
-      },
     })
     const processFetch = globalThis.fetch
     let parts = 0
@@ -708,6 +714,28 @@ export async function buildLanguageParts(o: {
     return out
   }
 
+  /** How many stories, notes, questions and links the obs unit's rows hold (the rows of the `sot` layer; helps are one row per resource). */
+  async function obsCounts(collected: Map<string, Collected>, keys: string[]) {
+    const out = { stories: 0, notes: 0, questions: 0, links: 0 }
+    for (const key of keys) {
+      const subject = String((await metaOf(key)).subject ?? '')
+      const kind = /Links/i.test(subject) ? 'links' : /Notes/i.test(subject) ? 'notes' : /Questions/i.test(subject) ? 'questions' : 'stories'
+      for (const { slot, rows } of collected.values()) {
+        if (slot.resource !== key) continue
+        for (const row of rows) {
+          if (row.layer !== 'sot') continue
+          const value = (row.value as { content?: unknown } | undefined)?.content ?? row.value
+          const list = (field: string) => (Array.isArray((value as Record<string, unknown> | undefined)?.[field]) ? ((value as Record<string, unknown[]>)[field].length) : 0)
+          if (kind === 'stories') out.stories += row.key.startsWith(`obs:${key}:`) ? 1 : 0
+          else if (kind === 'notes') out.notes += row.key.startsWith(`tn:${key}:obs:`) ? list('notes') : 0
+          else if (kind === 'questions') out.questions += row.key.startsWith(`tq:${key}:obs:`) ? list('questions') : 0
+          else out.links += row.key.startsWith(`twl:${key}:obs:`) ? list('links') : 0
+        }
+      }
+    }
+    return out
+  }
+
   /** Each resource's files, from the bytes step 1 read: what every fingerprint is made of. */
   const resourceFiles = new Map<string, ResourceFiles>()
   const inputs: InputsContext = {
@@ -779,15 +807,13 @@ export async function buildLanguageParts(o: {
    */
   async function carriable(unit: string): Promise<{ parts: PartEntry[] } | { why: string }> {
     if (!previous) return { why: 'no previous list' }
-    // TODO(loader): the OBS loader reads each story from Door43 at the tag it looks up, not from the zip hashed here.
-    if (unit === SHARED_UNIT && obs) return { why: 'OBS stories are read one by one from Door43, not from the zip its fingerprint hashes' }
     const recorded = previous.list.units?.find((u) => u.id === unit)
     if (!recorded) return { why: 'new' }
     if (recorded.fingerprint !== planOf(unit).fingerprint) return { why: 'changed' }
-    const parts = [...previous.list.parts, ...previous.originals.parts].filter((p) => unitOfPart(p) === unit)
+    const parts = [...previous.list.parts, ...previous.originals.parts].filter((p) => unitOf(p) === unit)
     // Every resource the unit builds must have left a part: else a part the previous build lost (a silent gap) would
     // stay lost for as long as the unit is carried. A book's source part of each resource; any part of a shared one.
-    const book = unit === SHARED_UNIT ? undefined : unit.slice('book '.length)
+    const book = unit === SHARED_UNIT || unit === OBS_UNIT ? undefined : unit.slice('book '.length)
     for (const key of planOf(unit).keys) {
       if (book === undefined) {
         if (!parts.some((p) => p.resource === key)) return { why: `the previous lists have no part of ${key}` }
@@ -971,7 +997,9 @@ export async function buildLanguageParts(o: {
     const originalCandidates = ORIGINAL_LANGUAGE_KEYS.filter((k) => found.originals.includes(k))
     const bookScoped = new Set<string>()
     for (const key of [...candidates, ...originalCandidates]) {
-      if (isBookScoped(await metaOf(key) as never)) bookScoped.add(key)
+      const row = await metaOf(key)
+      // An OBS resource's rows are the stories' and their helps', never a book's, whatever its type says.
+      if (!isObs(row) && isBookScoped(row as never)) bookScoped.add(key)
     }
 
     // Every Door43 resource's release zip, before any unit: its files are the inputs of its parts. Books absent from a
@@ -1080,7 +1108,6 @@ export async function buildLanguageParts(o: {
     // Their catalog rows and MACULA's, as `addLexicons` and `addMacula` write them: a carried shared unit runs neither.
     const lexicons = new Map<string, string>()
     const companionRows: Array<ReturnType<typeof companionCatalogRow>> = []
-    for (const key of languageKeys) if (isObs(await metaOf(key))) obsRepos.add(Object.values(repoOf(key)).join('/'))
     const literal = literalTextOf(await Promise.all(languageKeys.map(metaOf)), language) as (ResourceMetadata & { owner?: string }) | undefined
     if (o.lexiconsRef && literal?.owner) {
       for (const lexicon of lexiconRepos(language, lexiconOwnerOf(language, literal.owner))) {
@@ -1149,7 +1176,9 @@ export async function buildLanguageParts(o: {
 
     // The units, the canon's books in order, then any other book a resource has (front matter…), sorted; and what
     // each one reads, fingerprinted before any is built.
-    const whole = languageKeys.filter((k) => !bookScoped.has(k))
+    const obsKeys: string[] = []
+    for (const key of languageKeys) if (isObs(await metaOf(key))) obsKeys.push(key)
+    const whole = languageKeys.filter((k) => !bookScoped.has(k) && !obsKeys.includes(k))
     const present = new Map<string, Set<string>>()
     for (const key of bookScoped) {
       const absent = new Set((absentOf.get(key) ?? []).map((b) => b.toLowerCase()))
@@ -1170,12 +1199,14 @@ export async function buildLanguageParts(o: {
     }
     for (const [unit, keys] of [
       [SHARED_UNIT, [...whole, ...lexicons.keys(), ...maculaKeys]],
+      ...(obsKeys.length ? ([[OBS_UNIT, obsKeys]] as const) : []),
       ...books.map((book) => {
         const { ofLanguage, originals } = keysOfBook(book)
         return [bookUnit(book), [...ofLanguage, ...originals]] as const
       }),
     ] as const) {
-      const read = unitInputs(unit, keys, inputs)
+      // The obs unit reads every file and manifest of its resources, as the shared unit does of its own.
+      const read = unitInputs(unit === OBS_UNIT ? SHARED_UNIT : unit, keys, inputs)
       unitPlan.set(unit, { keys: [...keys], inputs: read, fingerprint: await fingerprintOf({ code, id: unit, inputs: read }) })
     }
     say(`[${elapsed()}] Árboles de Door43: ${treeChecks.match} iguales, ${treeChecks.mismatch} distintos, ${treeChecks.unverified} sin comprobar`)
@@ -1211,7 +1242,7 @@ export async function buildLanguageParts(o: {
           catalog: catalogManager as never,
           books: [],
           articles: true,
-          obs,
+          obs: false,
           onProgress: m.sample,
           cancelled: m.over,
         })
@@ -1252,6 +1283,85 @@ export async function buildLanguageParts(o: {
       }
       return writeParts(unit, await collect(cache, [...carried, ...macula], unit, (s) => !BOOK_STAMPED.has(s.kind), m), m)
     })
+
+    // 2b. The obs unit: the stories and their helps, from the zips step 1 hashed.
+    if (obs) {
+      const picks = found.obs?.lines?.length
+        ? found.obs.lines
+        : await Promise.all(obsKeys.map(async (k) => `${Object.values(repoOf(k)).join('/')}@${refOf(await metaOf(k))}`))
+      obsReport = { picks, stories: 0, notes: 0, questions: 0, links: 0 }
+      if (!obsKeys.length) say(`[${elapsed()}] obs: ${language} has no Open Bible Stories in the catalog, so there is no obs unit (${picks.join('; ') || 'nothing picked'})`)
+      else say(`[${elapsed()}] obs: ${picks.join('; ')}`)
+    }
+    if (obsKeys.length) {
+      if (await carry(OBS_UNIT)) obsReport = { ...obsReport!, carried: true }
+      else await runUnit(OBS_UNIT, OBS_DB, async (cache, m, net) => {
+        const unit = OBS_UNIT
+        // The helps' loaders ask Door43's tree which files a release has before they read the zip; the obs unit answers
+        // "no tree" itself (no network call), so they go on with the zip step 1 kept, as a book unit's loaders do.
+        const client = new Proxy(net.client, {
+          get: (target, prop) => (prop === 'fetchRepoTreePaths' ? async () => null : Reflect.get(target, prop, target)),
+        })
+        const catalogManager = managerOver(cache, client)
+        // What the loaders left out (stories a directory listed that the zip lacks, stray files of old markdown notes).
+        const issues: string[] = []
+        const stopListening = onObsIssues((lines) => issues.push(...lines))
+        try {
+          say(`  ${obsKeys.join(', ')}`)
+          await runDownload({
+            resourceKeys: obsKeys,
+            skipExisting: true,
+            runId: 1,
+            post: (message) => {
+              if (message.type === 'error') failures.push({ unit, error: JSON.stringify(message.payload) })
+            },
+            isCurrentRun: () => !m.over(),
+            cacheAdapter: cache as never,
+            catalogAdapter: catalog as never,
+            door43Client: client,
+          })
+          m.check()
+          count(
+            unit,
+            await buildLanguageArtifacts({
+              language,
+              cache: cache as never,
+              catalog: catalogManager as never,
+              books: [],
+              articles: false,
+              obs: true,
+              onProgress: m.sample,
+              cancelled: m.over,
+            })
+          )
+          m.check()
+          const done: string[] = []
+          for (const key of obsKeys) {
+            if (await completeHere(cache, await metaOf(key))) {
+              done.push(key)
+              continue
+            }
+            const receipt = (await cache.get(`resource:${key}`)) as { metadata?: Record<string, unknown> } | null
+            const why = receipt?.metadata?.[CACHE_METADATA_KEYS.DOWNLOAD_ERROR]
+            failures.push({ unit, error: `${key}: its download did not finish${why ? `: ${String(why)}` : ''}` })
+          }
+          const collected = await collect(cache, done, unit, (s) => s.kind === 'obs', m)
+          // A listed resource that gave no row (its zip has no OBS files, or none that parse) is a failure naming it: the
+          // stories must never be packed with an empty notes table.
+          for (const key of done) {
+            if (![...collected.values()].some((c) => c.slot.resource === key)) {
+              failures.push({ unit, error: `${key}: it is listed in the catalog, but its release zip gave no OBS rows (no files of OBS, or none that parse)` })
+            }
+          }
+          obsReport = { ...obsReport!, ...(await obsCounts(collected, done)) }
+          return writeParts(unit, collected, m)
+        } finally {
+          stopListening()
+          for (const line of [...new Set(issues)]) say(`  obs: ${line}`)
+          obsIssueLines.push(...new Set(issues))
+        }
+      })
+    }
 
     // 3. One unit per book.
     for (const book of books) {

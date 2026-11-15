@@ -50,7 +50,7 @@ describe("a unit's network", () => {
     expect(net.calls).toEqual(['downloadZipball(o, r, v2)', 'findRepository(o, r)', 'fetchTextContent(o, r, 01-GEN.usfm)'])
   })
 
-  test('lets through what `allow` names (OBS stories), and nothing else', async () => {
+  test('lets through what `allow` names, and nothing else', async () => {
     const c = client()
     const { fetchFn, recorded } = await stepOne()
     const net = cacheOnlyNetwork({ unit: 'shared', client: c, kept: () => false, fetchFn, recorded, allow: (method, args) => method === 'fetchTextContent' && args[1] === 'r' })

@@ -33,6 +33,7 @@ import {
 } from '@bt-synergy/resource-catalog'
 import { NOTES_TSV_PARSER_VERSION } from '@bt-synergy/resource-parsers'
 import JSZip from 'jszip'
+import { reportObsIssues } from './obsIssues'
 
 /** Bump when the rows this converter writes change: it is in every part fingerprint (`partsCode.ts`). */
 export const OBS_MARKDOWN_HELPS_VERSION = 1
@@ -244,31 +245,60 @@ export function markdownObsHelps(files: Map<string, string>, kind: 'tn' | 'tq', 
 
 // The switch between the TSV path and this one
 
-/**
- * Whether a catalog row is an old markdown helps resource: it needs positive evidence (an ingredient path ending in `.md`, or
- * a format that says markdown) and no `.tsv` ingredient or TSV format. A row that says nothing, or only lists ingredients with
- * no path, stays on the TSV path.
- */
-export function isMarkdownHelps(metadata: ResourceMetadata): boolean {
+/** A row whose format says markdown or whose ingredient is a `.md` file: evidence the zip need not confirm. */
+function isMarkdownBySelf(metadata: ResourceMetadata): boolean {
   const meta = metadata as { format?: unknown; contentMetadata?: { ingredients?: { path?: string }[] } }
   const ingredients = Array.isArray(meta.contentMetadata?.ingredients) ? meta.contentMetadata.ingredients : []
+  return (typeof meta.format === 'string' && /markdown/i.test(meta.format)) || ingredients.some((i) => /\.md$/i.test(i.path ?? ''))
+}
+
+/**
+ * Whether a catalog row may be an old markdown helps resource: a TSV ingredient, format or "TSV " subject says TSV; positive
+ * evidence is a `.md` ingredient path, a markdown format, or a subject without the "TSV " prefix. A row that says nothing
+ * stays on the TSV path.
+ */
+export function isMarkdownHelps(metadata: ResourceMetadata): boolean {
+  const meta = metadata as { format?: unknown; subject?: unknown; contentMetadata?: { ingredients?: { path?: string }[] } }
+  const ingredients = Array.isArray(meta.contentMetadata?.ingredients) ? meta.contentMetadata.ingredients : []
   const format = typeof meta.format === 'string' ? meta.format.toLowerCase() : ''
-  if (format.includes('tsv') || ingredients.some((i) => /\.tsv$/i.test(i.path ?? ''))) return false
-  return format.includes('markdown') || ingredients.some((i) => /\.md$/i.test(i.path ?? ''))
+  const subject = typeof meta.subject === 'string' ? meta.subject.trim() : ''
+  // A subject without the "TSV " prefix is positive evidence too (hi's rows: no format, `./content` the only path);
+  // the zip has the last word (`isMarkdownZip`).
+  if (format.includes('tsv') || ingredients.some((i) => /\.tsv$/i.test(i.path ?? '')) || /^TSV\b/i.test(subject)) return false
+  return format.includes('markdown') || ingredients.some((i) => /\.md$/i.test(i.path ?? '')) || subject !== ''
+}
+
+/**
+ * Whether a release zip holds markdown helps: its manifest says `format: text/markdown`, or it has `content/NN/FF.md`
+ * files. `files` are the zip's markdown files by path from the repository root.
+ */
+export function isMarkdownZip(files: ReadonlyMap<string, string>, manifest?: string): boolean {
+  if (manifest && /^\s*format:\s*['"]?text\/markdown/im.test(manifest)) return true
+  return [...files.keys()].some((path) => /^content\/\d+\/[^/]+\.md$/i.test(path))
 }
 
 type ZipClient = { downloadZipball: (owner: string, repo: string, ref?: string) => Promise<ArrayBuffer | Uint8Array> }
 
 /** The markdown files of a release zip, by path from the repository root (the one top folder is removed). */
 export async function markdownFilesOfZip(bytes: ArrayBuffer | Uint8Array): Promise<Map<string, string>> {
+  return (await readHelpsZip(bytes)).files
+}
+
+/** The markdown files of a release zip and its `manifest.yaml`, by path from the repository root. */
+export async function readHelpsZip(bytes: ArrayBuffer | Uint8Array): Promise<{ files: Map<string, string>; manifest?: string }> {
   const archive = await JSZip.loadAsync(bytes)
   const names = Object.keys(archive.files).filter((n) => !archive.files[n].dir)
   const tops = new Set(names.map((n) => (n.includes('/') ? n.slice(0, n.indexOf('/')) : '')))
   const [top] = tops
   if (tops.size !== 1 || !top) throw new Error('The zip does not have one top folder')
   const files = new Map<string, string>()
-  for (const name of names) if (/\.md$/i.test(name)) files.set(name.slice(top.length + 1), await archive.files[name].async('string'))
-  return files
+  let manifest: string | undefined
+  for (const name of names) {
+    const path = name.slice(top.length + 1)
+    if (/\.md$/i.test(name)) files.set(path, await archive.files[name].async('string'))
+    else if (path === 'manifest.yaml') manifest = await archive.files[name].async('string')
+  }
+  return { files, manifest }
 }
 
 type CacheLike = { get: (key: string) => Promise<any>; set: (key: string, value: unknown) => Promise<void> }
@@ -315,12 +345,18 @@ export function withMarkdownObsHelps<C extends new (config: any) => any>(Base: C
   class MarkdownAware extends Loader {
     lastIssues: string[] = []
 
-    async convertZip(resourceKey: string, metadata: ResourceMetadata): Promise<Map<string, unknown>> {
+    /** The converted rows, or null when the zip is not markdown (a TSV release whose catalog row did not say so). */
+    async convertZip(resourceKey: string, metadata: ResourceMetadata): Promise<Map<string, unknown> | null> {
       const [owner, language, resourceId] = resourceKey.split('/')
       const ref = metadata.release?.tag_name || (metadata as { default_branch?: string }).default_branch || 'master'
       const bytes = await (this.door43Client as ZipClient).downloadZipball(owner, `${language}_${resourceId}`, ref)
       this.lastIssues = []
-      return markdownObsHelps(await markdownFilesOfZip(bytes), kind, resourceKey, this.lastIssues)
+      const { files, manifest } = await readHelpsZip(bytes)
+      // A row that says markdown itself (a format, a .md path) is believed; one with only a subject needs the zip's word.
+      if (!isMarkdownZip(files, manifest) && !isMarkdownBySelf(metadata)) return null
+      const rows = markdownObsHelps(files, kind, resourceKey, this.lastIssues)
+      reportObsIssues(this.lastIssues)
+      return rows
     }
 
     async loadContent(resourceKey: string, bookCode: string) {
@@ -329,7 +365,9 @@ export function withMarkdownObsHelps<C extends new (config: any) => any>(Base: C
       const key = `${kind}:${resourceKey}:${bookCode}`
       const cached = await this.cacheAdapter.get(key)
       if (cached) return cached
-      for (const [k, v] of await this.convertZip(resourceKey, metadata)) await this.cacheAdapter.set(k, v)
+      const rows = await this.convertZip(resourceKey, metadata)
+      if (!rows) return super.loadContent(resourceKey, bookCode)
+      for (const [k, v] of rows) await this.cacheAdapter.set(k, v)
       return this.cacheAdapter.get(key)
     }
 
@@ -339,6 +377,7 @@ export function withMarkdownObsHelps<C extends new (config: any) => any>(Base: C
       const rowKey = `${kind}:${resourceKey}:obs`
       if (options?.skipExisting !== false && (await this.cacheAdapter.get(rowKey)) && (await receiptIsMatching(this.cacheAdapter, resourceKey, metadata))) return
       const rows = await this.convertZip(resourceKey, metadata)
+      if (!rows) return super.downloadResource(resourceKey, options, ...rest)
       // A resource the catalog lists that gives no row fails, as a TSV one that fails to parse does (no receipt is written).
       if (rows.size === 0) throw new Error(`${resourceKey}: ${this.lastIssues.join('; ')}`)
       for (const [k, v] of rows) await this.cacheAdapter.set(k, v)

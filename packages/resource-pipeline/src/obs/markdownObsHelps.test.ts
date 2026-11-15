@@ -4,7 +4,7 @@ import { extractObs, type Row, type RowFilter, type RowSource } from '@bt-synerg
 import { NotesProcessor, QuestionsProcessor } from '@bt-synergy/resource-parsers'
 import { ResourceCompletenessChecker } from '../download/ResourceCompletenessChecker'
 import JSZip from 'jszip'
-import { isMarkdownHelps, markdownFilesOfZip, markdownHelpId, markdownObsHelps, withMarkdownObsHelps } from './markdownObsHelps'
+import { isMarkdownHelps, isMarkdownZip, markdownFilesOfZip, markdownHelpId, markdownObsHelps, withMarkdownObsHelps } from './markdownObsHelps'
 
 const TN = 'Door43-Catalog/hi/obs-tn'
 const TQ = 'Door43-Catalog/hi/obs-tq'
@@ -268,6 +268,62 @@ describe('the switch', () => {
       await loader.downloadResource(key)
       expect((await checker.checkResource(key)).status).toBe('complete')
       expect(store.get(`resource:${key}`).metadata.downloadComplete).toBe(true)
+    }
+  })
+
+  test("hi's catalog row (subject without TSV, no format, ./content only) is markdown by its zip, complete after the download", async () => {
+    const hiRow = (kind: 'tn' | 'tq') => ({
+      resourceKey: `Door43-Catalog/hi/obs-${kind}`,
+      type: kind === 'tn' ? 'obs-notes' : 'obs-questions',
+      subject: kind === 'tn' ? 'OBS Translation Notes' : 'OBS Translation Questions',
+      flavor_type: 'peripheral',
+      metadata_type: 'rc',
+      version: 'v11.2',
+      release: { tag_name: 'v11.2', published_at: '2026-01-02T03:04:05Z' },
+      contentMetadata: { ingredients: [{ identifier: 'obs', path: './content' }] },
+    })
+    expect(isMarkdownHelps(hiRow('tn') as any)).toBe(true)
+    expect(isMarkdownHelps({ ...hiRow('tn'), subject: 'TSV OBS Translation Notes' } as any)).toBe(false)
+    expect(isMarkdownZip(new Map([['content/01/00.md', 'x']]))).toBe(true)
+    expect(isMarkdownZip(new Map(), "dublin_core: {}\nformat: 'text/markdown'\n")).toBe(true)
+    expect(isMarkdownZip(new Map([['tn_OBS.tsv', 'x']].filter(() => false) as any), 'dublin_core: {}\n')).toBe(false)
+
+    const zip = new JSZip()
+    for (const [path, text] of tnFiles()) zip.file(`hi_obs-tn/${path}`, text)
+    zip.file('hi_obs-tn/manifest.yaml', "dublin_core: {}\nformat: 'text/markdown'\nprojects:\n  - identifier: obs\n    path: ./content\n")
+    const bytes = await zip.generateAsync({ type: 'uint8array' })
+    const tsvZip = new JSZip()
+    tsvZip.file('hi_obs-tn/tn_OBS.tsv', 'Reference\tID\n')
+    tsvZip.file('hi_obs-tn/manifest.yaml', 'dublin_core: {}\n')
+    const tsvBytes = await tsvZip.generateAsync({ type: 'uint8array' })
+    for (const kind of ['tn', 'tq'] as const) {
+      const meta = hiRow(kind)
+      const key = meta.resourceKey
+      class Base {
+        cacheAdapter: any
+        door43Client: any
+        constructor(config: any) {
+          Object.assign(this, config)
+        }
+        async getMetadata() {
+          return meta
+        }
+        async downloadResource() {
+          throw new Error('the TSV path')
+        }
+      }
+      const store = new Map<string, any>()
+      const cache = { get: async (k: string) => store.get(k) ?? null, set: async (k: string, v: unknown) => void store.set(k, v) }
+      const Loader = withMarkdownObsHelps(Base as any, kind)
+      const loader: any = new Loader({ cacheAdapter: cache, door43Client: { downloadZipball: async () => (kind === 'tn' ? bytes : bytes) } })
+      const checker = new ResourceCompletenessChecker({ catalogManager: { getResourceMetadata: async () => meta } as any, cacheAdapter: cache as any })
+      expect((await checker.checkResource(key)).isComplete).toBe(false)
+      await loader.downloadResource(key)
+      expect((await checker.checkResource(key)).status).toBe('complete')
+      expect(store.has(`${kind}:${key}:obs`)).toBe(true)
+      // The same row over a TSV zip goes to the TSV path.
+      const tsvLoader: any = new Loader({ cacheAdapter: cache, door43Client: { downloadZipball: async () => tsvBytes } })
+      await expect(tsvLoader.downloadResource(key, { skipExisting: false })).rejects.toThrow('the TSV path')
     }
   })
 

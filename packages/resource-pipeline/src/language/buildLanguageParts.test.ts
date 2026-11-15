@@ -5,10 +5,10 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { IndexedDBCacheAdapter } from '@bt-synergy/cache-adapter-indexeddb'
-import { compatKeyOf, gitBlobSha, originalsListPath, PARTS_FORMAT_VERSION, partsListPath, readPart, sha256Hex, stripVolatile } from '@bt-synergy/language-pack'
+import { compatKeyOf, gitBlobSha, originalsListPath, PARTS_FORMAT_VERSION, partsListPath, readPart, serializePartsList, sha256Hex, stripVolatile } from '@bt-synergy/language-pack'
 import { runDownload } from '../download/runDownload'
 import { createDoor43ApiClient } from '@bt-synergy/door43-api'
-import { buildLanguageParts, discoveryReadsOf, PARTS_REPORT, slotRows, UNPLACED_LISTED, type PartsReport } from './buildLanguageParts'
+import { buildLanguageParts, discoveryReadsOf, OBS_UNIT, PARTS_REPORT, slotRows, UNPLACED_LISTED, type DiscoverInto, type PartsReport } from './buildLanguageParts'
 import { closeAndDelete } from './fakeDatabases'
 import { PACK_VERSIONS } from './packVersions'
 import { partsCode } from './partsCode'
@@ -27,6 +27,9 @@ import {
   LEXICONS_REF,
   MACULA_STAMP,
   maculaFolder,
+  OBS,
+  OBS_TN,
+  OBS_TQ,
   REPOS,
   reposCopy,
   TA,
@@ -41,6 +44,9 @@ import {
 
 // The whole build and the parts build of this fixture are compared row by row in compareParts.test.ts, the whole
 // one through prepareAndPack itself.
+
+/** The SHA-256 of the fixture's list (OBS off) as the code before the obs unit built it; see the test that uses it. */
+const OBS_OFF_LIST_SHA256 = '0ff36a77f23002a3ca5387ceb7d33767a03a8536ca23882201fa22eaf1bfc968'
 
 const dirs: string[] = []
 afterEach(() => {
@@ -427,11 +433,105 @@ describe('a degraded discovery', () => {
   })
 })
 
+/** The fixture's Door43 with the two calls the old OBS loader read stories with made to throw. */
+const doorWithoutStoryReads = () => {
+  const reads: string[] = []
+  const door43 = {
+    ...fakeDoor43(),
+    async findRepository(owner: string, repo: string) {
+      reads.push(`findRepository ${owner}/${repo}`)
+      throw new Error('findRepository: a parts build reads OBS from its zip')
+    },
+    async fetchTextContent(owner: string, repo: string, path: string) {
+      reads.push(`fetchTextContent ${owner}/${repo}/${path}`)
+      throw new Error('fetchTextContent: a parts build reads OBS from its zip')
+    },
+  }
+  return { door43, reads }
+}
+
+const listHash = async (list: Parameters<typeof serializePartsList>[0]) => sha256Hex(new TextEncoder().encode(serializePartsList(list)))
+
 describe('OBS', () => {
-  test('a parts build with OBS is refused before anything: its loader reads each story from Door43, not the zip hashed', async () => {
-    const workDir = freshDir('parts-obs-refused')
-    await expect(build(workDir, { obs: true })).rejects.toThrow('OBS parts wait for the OBS loader to read the hashed zip')
-  })
+  test('with OBS on, the obs unit has the stories and helps parts, and no network call is made', async () => {
+    const workDir = freshDir('parts-obs')
+    const { door43, reads } = doorWithoutStoryReads()
+    const { list, failures, carried } = await build(workDir, { obs: true, door43: door43 as never })
+    expect(failures).toEqual([])
+    expect(reads).toEqual([])
+    expect(carried).toEqual([])
+    expect(list.units!.map((u) => u.id)).toContain(OBS_UNIT)
+    const obsParts = list.parts.filter((p) => p.kind === 'obs')
+    expect([...new Set(obsParts.map((p) => p.resource))].sort()).toEqual([OBS, OBS_TN, OBS_TQ].sort())
+    expect(door43.downloads).toEqual(expect.arrayContaining(['test_gl/es-419_obs@v12', 'test_gl/es-419_obs-tn@v12', 'test_gl/es-419_obs-tq@v12']))
+    expect(reportOf(workDir).units.filter((u) => u.unit === OBS_UNIT)).toHaveLength(1)
+    // No part of another kind holds an OBS resource's rows.
+    expect(list.parts.filter((p) => [OBS, OBS_TN, OBS_TQ].includes(p.resource) && p.kind !== 'obs')).toEqual([])
+  }, 120_000)
+
+  test("with OBS on, the shared unit's fingerprint and parts are those of OBS off", async () => {
+    const off = await build(freshDir('parts-obs-off'))
+    const on = await build(freshDir('parts-obs-on'), { obs: true })
+    expect(on.failures).toEqual([])
+    const fingerprintOf = (list: typeof off.list, id: string) => list.units!.find((u) => u.id === id)?.fingerprint
+    expect(fingerprintOf(on.list, 'shared')).toBe(fingerprintOf(off.list, 'shared'))
+    for (const unit of off.list.units!) expect(fingerprintOf(on.list, unit.id)).toBe(unit.fingerprint)
+    const withoutObs = (list: typeof off.list) => JSON.stringify(list.parts.filter((p) => p.kind !== 'obs'))
+    expect(withoutObs(on.list)).toBe(withoutObs(off.list))
+  }, 120_000)
+
+  test('with OBS off, the list is byte-equal to the list before this change', async () => {
+    const { list } = await build(freshDir('parts-obs-pinned'))
+    // Pinned on the code before OBS got its unit (the fixture's list at de328f3b: same code versions, same inputs).
+    expect(await listHash(list)).toBe(OBS_OFF_LIST_SHA256)
+    expect(list.units!.map((u) => u.id)).not.toContain(OBS_UNIT)
+  }, 120_000)
+
+  test('a listed OBS help whose zip has no OBS files fails the build naming it', async () => {
+    const repos = reposCopy()
+    repos['test_gl/es-419_obs-tn'] = { 'README.md': 'no notes here', 'manifest.yaml': REPOS['test_gl/es-419_obs-tn']['manifest.yaml'] }
+    const { failures, list } = await build(freshDir('parts-obs-empty-help'), { obs: true, door43: fakeDoor43({ repos }) })
+    expect(failures.some((f) => f.unit === OBS_UNIT && f.error.includes(OBS_TN))).toBe(true)
+    expect(failures.every((f) => !f.error.includes(OBS_TQ))).toBe(true)
+    // The notes table is not packed empty: it has no part at all.
+    expect(list.parts.some((p) => p.resource === OBS_TN)).toBe(false)
+  }, 120_000)
+
+  test('a language whose catalog has no OBS: OBS on gives no obs unit and a report line', async () => {
+    const withoutObs: DiscoverInto = async (args) => {
+      const found = await discover(args)
+      const adapter = (args.catalogManager as unknown as { catalogAdapter: { delete(key: string): Promise<void> } }).catalogAdapter
+      for (const key of [OBS, OBS_TN, OBS_TQ]) await adapter.delete(key)
+      return { ...found, resources: found.resources.filter((k) => ![OBS, OBS_TN, OBS_TQ].includes(k)) }
+    }
+    const workDir = freshDir('parts-obs-none')
+    const { list, failures, lines } = await build(workDir, { obs: true, discover: withoutObs })
+    expect(failures).toEqual([])
+    expect(list.units!.map((u) => u.id)).not.toContain(OBS_UNIT)
+    expect(list.parts.some((p) => p.kind === 'obs')).toBe(false)
+    expect(lines.some((l) => /obs: es-419 has no Open Bible Stories in the catalog/.test(l))).toBe(true)
+    expect(reportOf(workDir).obs).toMatchObject({ stories: 0, notes: 0, questions: 0, links: 0 })
+    expect(reportOf(workDir).units.map((u) => u.unit)).not.toContain(OBS_UNIT)
+  }, 120_000)
+
+  test('PartsReport.obs counts the stories, notes and questions of the obs unit, and the picks', async () => {
+    const workDir = freshDir('parts-obs-report')
+    const { failures } = await build(workDir, { obs: true })
+    expect(failures).toEqual([])
+    expect(reportOf(workDir).obs).toEqual({
+      picks: ['test_gl/es-419_obs@v12', 'test_gl/es-419_obs-tn@v12', 'test_gl/es-419_obs-tq@v12'],
+      stories: 2,
+      notes: 2,
+      questions: 1,
+      links: 0,
+    })
+  }, 120_000)
+
+  test('with OBS off the report has no obs', async () => {
+    const workDir = freshDir('parts-obs-report-off')
+    await build(workDir)
+    expect(reportOf(workDir).obs).toBeUndefined()
+  }, 120_000)
 })
 
 describe("a unit's network", () => {
@@ -456,13 +556,6 @@ describe("a unit's network", () => {
     expect(network[0].error).toBe(
       'book rut: it asked the network for what step 1 did not read, so its rows would not be of the files fingerprinted: downloadZipball(test_gl, es-419_tn, v12); fetch GET https://git.door43.org/test_gl/es-419_tn/raw/tag/v12/tn_RUT.tsv'
     )
-  }, 120_000)
-
-  test("with OBS on, the OBS loader's story reads are let through and logged, and nothing else is", async () => {
-    const workDir = freshDir('parts-network-obs')
-    const { failures, lines } = await build(workDir, { obs: true, obsTestOnly: true })
-    expect(failures).toEqual([])
-    expect(lines.some((l) => /shared: fetchTextContent de test_gl\/es-419_obs desde Door43/.test(l))).toBe(true)
   }, 120_000)
 
   test("a unit refuses to start while the process's fetch is already a unit's refusal (units cannot run at once)", async () => {

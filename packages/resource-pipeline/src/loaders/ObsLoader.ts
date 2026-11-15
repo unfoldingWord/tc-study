@@ -10,6 +10,7 @@ import {
   type ParsedObsStory,
 } from '../obs/parseObsMarkdown'
 import JSZip from 'jszip'
+import { reportObsIssues } from '../obs/obsIssues'
 import { obsStoryCacheKey, resolveObsStoryIds } from '../obs/obsStoryIds'
 
 /** Bump when the story rows this loader writes (`parseObsStoryMarkdown`'s output, as stored) change: it is in every part fingerprint. */
@@ -304,6 +305,9 @@ export class ObsLoader implements ResourceLoader {
           console.warn(`[ObsLoader] Failed to prefetch story ${storyId} for ${resourceKey}:`, err)
         }
       }
+    }
+    if (this.lastSkipped.length > 0) {
+      reportObsIssues([`${resourceKey}: ${this.lastSkipped.length} stories are not in the release zip and were skipped (${this.lastSkipped.join(', ')})`])
     }
     if (failures.length > 0) {
       throw new Error(`${failures.length} OBS stories of ${resourceKey} failed: ${failures.join('; ')}`)
