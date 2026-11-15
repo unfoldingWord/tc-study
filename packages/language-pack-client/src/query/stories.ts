@@ -43,18 +43,11 @@ function textOfRange(from: number, to: number): string {
   }
 }
 
-type Known = { refs: [number, number][]; title: string | undefined }
+export type Known = { refs: [number, number][]; title: string | undefined }
 
 /** The stories the xtopics has, with their parsed ranges and the name the language's topics give them. `undefined`: no xtopics. */
-async function fromMaps(out: Answer<unknown>, reader: PackReader): Promise<Map<number, Known> | undefined> {
-  const m: MapSet = await reader.mapsOf(['xtopics', 'topics'])
-  if (m.xtopics === undefined) {
-    missingUnit(out, { unit: 'xtopics', bytes: reader.listed('xtopics') ? reader.size('xtopics') : 0 })
-    return undefined
-  }
-  usedUnit(out, reader, 'xtopics')
-  if (m.topics === undefined) missingUnit(out, { unit: 'topics', bytes: reader.listed('topics') ? reader.size('topics') : 0, what: 'titles' })
-  else usedUnit(out, reader, 'topics')
+export function storyIndex(m: MapSet): Map<number, Known> | undefined {
+  if (m.xtopics === undefined) return undefined
   const found = new Map<number, Known>()
   for (const [id, topic] of m.xtopics.core.topics) {
     const n = /^obs:([0-9]+)$/.exec(id)
@@ -65,7 +58,20 @@ async function fromMaps(out: Answer<unknown>, reader: PackReader): Promise<Map<n
   return found
 }
 
-const refOf = (n: number, k: Known | undefined, segment?: ObsStory): StoryRef => ({
+/** `storyIndex` of the maps the reader has, noting the units used and the ones missing. */
+async function fromMaps(out: Answer<unknown>, reader: PackReader): Promise<Map<number, Known> | undefined> {
+  const m: MapSet = await reader.mapsOf(['xtopics', 'topics'])
+  if (m.xtopics === undefined) {
+    missingUnit(out, { unit: 'xtopics', bytes: reader.listed('xtopics') ? reader.size('xtopics') : 0 })
+    return undefined
+  }
+  usedUnit(out, reader, 'xtopics')
+  if (m.topics === undefined) missingUnit(out, { unit: 'topics', bytes: reader.listed('topics') ? reader.size('topics') : 0, what: 'titles' })
+  else usedUnit(out, reader, 'topics')
+  return storyIndex(m)
+}
+
+export const refOf = (n: number, k: Known | undefined, segment?: ObsStory): StoryRef => ({
   n,
   id: `obs:${n}`,
   title: k?.title ?? (segment !== undefined && segment.title.trim() !== '' ? segment.title : `Story ${n}`),

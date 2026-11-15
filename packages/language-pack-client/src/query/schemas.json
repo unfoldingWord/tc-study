@@ -12,7 +12,7 @@
   },
   "concept": {
     "label": { "es": "Concepto: qué es, sus nombres, sus relaciones y los libros donde aparece" },
-    "description": "A concept of the translation helps with its names and relations, and the installed books that use it.",
+    "description": "A concept of the translation helps with its names and relations, and the installed books that use it. With the obs unit installed, a tW or tA article also lists the Open Bible Stories that use it (obs.stories, with frames or a count of notes); a person, place or event lists the stories that overlap its verses, from the topics alone.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -91,7 +91,7 @@
   },
   "books": {
     "label": { "es": "Libros: dónde se usa un artículo o concepto, y si el libro está instalado" },
-    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed.",
+    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed. A tW or tA article also has an obs cell: the Open Bible Stories frames linked (tW) or notes (tA), none when the language has no such table, installed false when the obs unit is not installed.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
