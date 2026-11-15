@@ -30,6 +30,7 @@ import {
   OBS,
   OBS_TN,
   OBS_TQ,
+  OBS_TWL,
   REPOS,
   reposCopy,
   TA,
@@ -45,7 +46,7 @@ import {
 // The whole build and the parts build of this fixture are compared row by row in compareParts.test.ts, the whole
 // one through prepareAndPack itself.
 
-/** The SHA-256 of the fixture's list (OBS off) as the code before the obs unit built it; see the test that uses it. */
+/** The SHA-256 of the fixture's list (OBS off) as this code builds it; see the test that uses it. The fingerprints moved with partsCode.ts OBS_MARKDOWN_HELPS_VERSION; the part bytes were verified equal to those of e786c2a0. */
 const OBS_OFF_LIST_SHA256 = '0ff36a77f23002a3ca5387ceb7d33767a03a8536ca23882201fa22eaf1bfc968'
 
 const dirs: string[] = []
@@ -434,10 +435,10 @@ describe('a degraded discovery', () => {
 })
 
 /** The fixture's Door43 with the two calls the old OBS loader read stories with made to throw. */
-const doorWithoutStoryReads = () => {
+const doorWithoutStoryReads = (options: Parameters<typeof fakeDoor43>[0] = {}) => {
   const reads: string[] = []
   const door43 = {
-    ...fakeDoor43(),
+    ...fakeDoor43(options),
     async findRepository(owner: string, repo: string) {
       reads.push(`findRepository ${owner}/${repo}`)
       throw new Error('findRepository: a parts build reads OBS from its zip')
@@ -462,11 +463,11 @@ describe('OBS', () => {
     expect(carried).toEqual([])
     expect(list.units!.map((u) => u.id)).toContain(OBS_UNIT)
     const obsParts = list.parts.filter((p) => p.kind === 'obs')
-    expect([...new Set(obsParts.map((p) => p.resource))].sort()).toEqual([OBS, OBS_TN, OBS_TQ].sort())
-    expect(door43.downloads).toEqual(expect.arrayContaining(['test_gl/es-419_obs@v12', 'test_gl/es-419_obs-tn@v12', 'test_gl/es-419_obs-tq@v12']))
+    expect([...new Set(obsParts.map((p) => p.resource))].sort()).toEqual([OBS, OBS_TN, OBS_TQ, OBS_TWL].sort())
+    expect(door43.downloads).toEqual(expect.arrayContaining(['test_gl/es-419_obs@v12', 'test_gl/es-419_obs-tn@v12', 'test_gl/es-419_obs-tq@v12', 'test_gl/es-419_obs-twl@v12']))
     expect(reportOf(workDir).units.filter((u) => u.unit === OBS_UNIT)).toHaveLength(1)
     // No part of another kind holds an OBS resource's rows.
-    expect(list.parts.filter((p) => [OBS, OBS_TN, OBS_TQ].includes(p.resource) && p.kind !== 'obs')).toEqual([])
+    expect(list.parts.filter((p) => [OBS, OBS_TN, OBS_TQ, OBS_TWL].includes(p.resource) && p.kind !== 'obs')).toEqual([])
   }, 120_000)
 
   test("with OBS on, the shared unit's fingerprint and parts are those of OBS off", async () => {
@@ -480,9 +481,9 @@ describe('OBS', () => {
     expect(withoutObs(on.list)).toBe(withoutObs(off.list))
   }, 120_000)
 
-  test('with OBS off, the list is byte-equal to the list before this change', async () => {
+  test("with OBS off, the list is the pinned one of this code's OBS-off build", async () => {
     const { list } = await build(freshDir('parts-obs-pinned'))
-    // Pinned on the code before OBS got its unit (the fixture's list at de328f3b: same code versions, same inputs).
+    // Pinned on this code's OBS-off list (the part bytes equal e786c2a0's; only the fingerprints moved with the helps version).
     expect(await listHash(list)).toBe(OBS_OFF_LIST_SHA256)
     expect(list.units!.map((u) => u.id)).not.toContain(OBS_UNIT)
   }, 120_000)
@@ -497,12 +498,42 @@ describe('OBS', () => {
     expect(list.parts.some((p) => p.resource === OBS_TN)).toBe(false)
   }, 120_000)
 
+  test('a listed OBS help that holds only a header fails the build naming it', async () => {
+    const repos = reposCopy()
+    repos['test_gl/es-419_obs-tn'] = { ...REPOS['test_gl/es-419_obs-tn'], 'tn_OBS.tsv': 'Reference\tID\tTags\tSupportReference\tQuote\tOccurrence\tNote\n' }
+    const { failures } = await build(freshDir('parts-obs-header-only'), { obs: true, door43: fakeDoor43({ repos }) })
+    expect(failures.some((f) => f.unit === OBS_UNIT && f.error.includes(OBS_TN))).toBe(true)
+    expect(failures.every((f) => !f.error.includes(OBS_TQ))).toBe(true)
+  }, 120_000)
+
+  test('old markdown OBS helps (hi: ./content, no format) are converted by the obs unit, with no network', async () => {
+    const repos = reposCopy()
+    const manifest = (id: string) => `dublin_core:\n  format: text/markdown\n  identifier: '${id}'\n  language:\n    identifier: 'es-419'\n  version: '12'\n`
+    repos['test_gl/es-419_obs-tn'] = { 'manifest.yaml': manifest('obs-tn'), 'content/01/02.md': '# el cielo\n\nUna nota sobre el cielo.\n' }
+    repos['test_gl/es-419_obs-tq'] = { 'manifest.yaml': manifest('obs-tq'), 'content/01/02.md': '# ¿Quién creó todo?\n\nDios.\n' }
+    // As hi's rows are: a subject without "TSV ", no `format`, and `./content` the only ingredient.
+    const edit = (row: { resourceKey: string; subject: string; format?: string; contentMetadata: { ingredients: Array<{ identifier: string; path: string }> } }) => {
+      if (row.resourceKey !== OBS_TN && row.resourceKey !== OBS_TQ) return
+      row.subject = row.resourceKey === OBS_TN ? 'OBS Translation Notes' : 'OBS Translation Questions'
+      delete row.format
+      row.contentMetadata.ingredients = [{ identifier: 'content', path: './content' }]
+    }
+    const { door43, reads } = doorWithoutStoryReads({ repos })
+    const workDir = freshDir('parts-obs-markdown')
+    const { failures, list } = await build(workDir, { obs: true, door43: door43 as never, discover: discoverWith({ edit: edit as never }) })
+    expect(failures).toEqual([])
+    expect(reads).toEqual([])
+    expect(list.parts.some((p) => p.resource === OBS_TN && p.kind === 'obs')).toBe(true)
+    expect(list.parts.some((p) => p.resource === OBS_TQ && p.kind === 'obs')).toBe(true)
+    expect(reportOf(workDir).obs).toMatchObject({ stories: 2, notes: 1, questions: 1, links: 3 })
+  }, 120_000)
+
   test('a language whose catalog has no OBS: OBS on gives no obs unit and a report line', async () => {
     const withoutObs: DiscoverInto = async (args) => {
       const found = await discover(args)
       const adapter = (args.catalogManager as unknown as { catalogAdapter: { delete(key: string): Promise<void> } }).catalogAdapter
-      for (const key of [OBS, OBS_TN, OBS_TQ]) await adapter.delete(key)
-      return { ...found, resources: found.resources.filter((k) => ![OBS, OBS_TN, OBS_TQ].includes(k)) }
+      for (const key of [OBS, OBS_TN, OBS_TQ, OBS_TWL]) await adapter.delete(key)
+      return { ...found, resources: found.resources.filter((k) => ![OBS, OBS_TN, OBS_TQ, OBS_TWL].includes(k)) }
     }
     const workDir = freshDir('parts-obs-none')
     const { list, failures, lines } = await build(workDir, { obs: true, discover: withoutObs })
@@ -519,11 +550,11 @@ describe('OBS', () => {
     const { failures } = await build(workDir, { obs: true })
     expect(failures).toEqual([])
     expect(reportOf(workDir).obs).toEqual({
-      picks: ['test_gl/es-419_obs@v12', 'test_gl/es-419_obs-tn@v12', 'test_gl/es-419_obs-tq@v12'],
+      picks: ['test_gl/es-419_obs@v12', 'test_gl/es-419_obs-tn@v12', 'test_gl/es-419_obs-tq@v12', 'test_gl/es-419_obs-twl@v12'],
       stories: 2,
       notes: 2,
       questions: 1,
-      links: 0,
+      links: 3,
     })
   }, 120_000)
 

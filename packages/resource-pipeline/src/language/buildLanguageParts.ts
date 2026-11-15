@@ -726,10 +726,12 @@ export async function buildLanguageParts(o: {
           if (row.layer !== 'sot') continue
           const value = (row.value as { content?: unknown } | undefined)?.content ?? row.value
           const list = (field: string) => (Array.isArray((value as Record<string, unknown> | undefined)?.[field]) ? ((value as Record<string, unknown[]>)[field].length) : 0)
+          // The helps are one row per resource (`tn:{key}:obs`, `twl:{key}:obs`) or, as TSV notes are, one per story (`…:obs:{story}`).
+          const ofHelps = (prefix: string) => row.key === `${prefix}:${key}:obs` || row.key.startsWith(`${prefix}:${key}:obs:`)
           if (kind === 'stories') out.stories += row.key.startsWith(`obs:${key}:`) ? 1 : 0
-          else if (kind === 'notes') out.notes += row.key.startsWith(`tn:${key}:obs:`) ? list('notes') : 0
-          else if (kind === 'questions') out.questions += row.key.startsWith(`tq:${key}:obs:`) ? list('questions') : 0
-          else out.links += row.key.startsWith(`twl:${key}:obs:`) ? list('links') : 0
+          else if (kind === 'notes') out.notes += ofHelps('tn') ? list('notes') : 0
+          else if (kind === 'questions') out.questions += ofHelps('tq') ? list('questions') : 0
+          else out.links += ofHelps('twl') ? list('links') : 0
         }
       }
     }
@@ -1319,6 +1321,7 @@ export async function buildLanguageParts(o: {
             cacheAdapter: cache as never,
             catalogAdapter: catalog as never,
             door43Client: client,
+            markdownObsHelps: true,
           })
           m.check()
           count(
@@ -1351,6 +1354,12 @@ export async function buildLanguageParts(o: {
           for (const key of done) {
             if (![...collected.values()].some((c) => c.slot.resource === key)) {
               failures.push({ unit, error: `${key}: it is listed in the catalog, but its release zip gave no OBS rows (no files of OBS, or none that parse)` })
+              continue
+            }
+            // A row with an empty list (a header-only TSV, or only invalid records) is no better than no row.
+            const n = await obsCounts(collected, [key])
+            if (n.stories + n.notes + n.questions + n.links === 0) {
+              failures.push({ unit, error: `${key}: it is listed in the catalog, but its release zip gave no OBS rows (its files hold no stories, notes, questions or links)` })
             }
           }
           obsReport = { ...obsReport!, ...(await obsCounts(collected, done)) }

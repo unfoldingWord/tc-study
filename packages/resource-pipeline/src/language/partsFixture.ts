@@ -33,6 +33,7 @@ export const UHL = 'test_gl/es-419/uhl'
 export const OBS = 'test_gl/es-419/obs'
 export const OBS_TN = 'test_gl/es-419/obs-tn'
 export const OBS_TQ = 'test_gl/es-419/obs-tq'
+export const OBS_TWL = 'test_gl/es-419/obs-twl'
 export const UHB = 'unfoldingWord/hbo/uhb'
 export const UGNT = 'unfoldingWord/el-x-koine/ugnt'
 
@@ -93,6 +94,13 @@ const FILES: Record<string, Record<string, string>> = {
   },
   'test_gl/es-419_obs-tq': {
     'tq_OBS.tsv': `${TQ_HEADER}1:2	ob56				¿Quién creó todo?	Dios.
+`,
+  },
+  // Two links on 1:2 and one on 2:1 (three links in all).
+  'test_gl/es-419_obs-twl': {
+    'twl_OBS.tsv': `${TWL_HEADER}1:2	ob78		Dios	1	rc://*/tw/dict/bible/kt/god
+1:2	ob79		creó	1	rc://*/tw/dict/bible/other/day
+2:1	ob80		Adán	1	rc://*/tw/dict/bible/names/naomi
 `,
   },
   'unfoldingWord/hbo_uhb': { '08-RUT.usfm': HEBREW('RUT'), '32-JON.usfm': HEBREW('JON') },
@@ -282,6 +290,7 @@ const baseRows = () => [
     ]),
     row(OBS_TN, 'TSV OBS Translation Notes', 'obs-notes', [{ identifier: 'obs', path: './tn_OBS.tsv' }]),
     row(OBS_TQ, 'TSV OBS Translation Questions', 'obs-questions', [{ identifier: 'obs', path: './tq_OBS.tsv' }]),
+    row(OBS_TWL, 'TSV OBS Translation Words Links', 'obs-words-links', [{ identifier: 'obs', path: './twl_OBS.tsv' }]),
     row(UHB, 'Hebrew Old Testament', 'scripture', [book('rut', '08-RUT.usfm'), book('jon', '32-JON.usfm')]),
     row(UGNT, 'Greek New Testament', 'scripture', [book('tit', '57-TIT.usfm')]),
   ]
