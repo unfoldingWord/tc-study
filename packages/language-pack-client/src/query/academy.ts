@@ -3,12 +3,10 @@ import { BOOKS, type MapSet } from '@bt-synergy/language-pack-v3'
 import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
 import { type Answer, newAnswer, usedUnit } from './envelope'
-import { haveMap, usageBooks } from './maps'
+import { haveMap, languageTn, usageBooks } from './maps'
 
 export type AcademyArticle = { id: string; title?: string; count: number; partial: boolean }
 export type AcademyData = { book: string; articles: AcademyArticle[] }
-
-type Named = { names?: Record<string, string[]> } | undefined
 
 /** The `ta:` ids the maps know: the usage table of the language, the English notes, and the names of the map. */
 function taIds(m: MapSet): Set<string> {
@@ -18,16 +16,16 @@ function taIds(m: MapSet): Set<string> {
   }
   add(m.map?.core.usage?.rows.keys())
   add(m.xmap?.core.notes?.rows.keys())
-  add(Object.keys((m.map?.core as Named)?.names ?? {}))
+  add(Object.keys(m.map?.core.names ?? {}))
   return ids
 }
 
 export function academyOf(m: MapSet, book: string): AcademyArticle[] {
-  const names = (m.map?.core as Named)?.names ?? {}
+  const names = m.map?.core.names ?? {}
   const out: AcademyArticle[] = []
   for (const id of taIds(m)) {
     const c = usageBooks(m, id)[book]
-    if (c === undefined || (c.state !== 'count' && c.state !== 'partial') || c.count === undefined) continue
+    if (c === undefined || (c.state !== 'count' && c.state !== 'partial') || c.count === undefined || c.count <= 0) continue
     const title = names[id]?.[0]
     out.push({ id, ...(title !== undefined ? { title } : {}), count: c.count, partial: c.state === 'partial' })
   }
@@ -38,8 +36,11 @@ export async function academyQuery(reader: PackReader, book: string): Promise<An
   if (typeof book !== 'string' || !(BOOKS as readonly string[]).includes(book)) throw new ClientError('E_ARG', `not a book: ${JSON.stringify(book)}`)
   const out = newAnswer<AcademyData | null>(reader, 'academy')
   const m = await reader.maps()
-  if (m.map !== undefined) usedUnit(out, reader, 'map')
-  if (!haveMap(out, reader, m, 'map')) {
+  for (const unit of ['xmap', 'map'] as const) if (m[unit] !== undefined) usedUnit(out, reader, unit)
+  // The counts of a language come from its own tN in the `map`; English has none, so its counts are the notes of the `xmap`.
+  const english = m.map !== undefined && languageTn(m) === undefined && m.map.core.lang === 'en'
+  const ok = haveMap(out, reader, m, 'map')
+  if (!ok || (english && !haveMap(out, reader, m, 'xmap'))) {
     out.data = null
     return out
   }

@@ -4,6 +4,7 @@ import { httpSource } from '../source/http'
 import { memoryStore } from '../store/memory'
 import { type FakeServer, startFakeServer } from '../../test/fakeServer'
 import { buildSample, type Sample } from '../../test/sample'
+import { usageBooks } from './maps'
 import { academyOf, academyQuery } from './academy'
 
 let sample: Sample
@@ -44,12 +45,17 @@ describe('academy', () => {
     }
     expect(a.revision.units.map).toBeGreaterThan(0)
     expect((await r.academy('isa')).data!.articles).toEqual([])
+    // Every count agrees with the cells of books().
+    const m = await r.maps()
+    for (const x of list) expect(usageBooks(m, x.id).tit).toMatchObject({ count: x.count })
   })
   test('without the map: data null and the unit missing', async () => {
     const r = await open({ books: ['tit'] })
     const a = await academyQuery({ ...r, maps: async () => ({ revision: 1 }) } as never, 'tit')
     expect(a.data).toBeNull()
-    expect(a.notInstalled.some((n) => n.unit === 'map')).toBe(true)
+    const miss = a.notInstalled.find((n) => n.unit === 'map')
+    expect(miss).toMatchObject({ unit: 'map', bytes: r.size('map') })
+    expect(miss!.bytes).toBeGreaterThan(0)
   })
   test('a bad book is E_ARG', async () => {
     const r = await open({ books: ['tit'] })
@@ -71,5 +77,29 @@ describe('academy', () => {
       ['ta:a', 3, undefined, false],
       ['ta:b', 3, undefined, false],
     ])
+  })
+  test('a partially covered book lists only the cited articles; zero and none are left out', () => {
+    const rows = new Map([['ta:a', new Map([['rut', [2, 2]]])]])
+    const coverage = new Map([['x/es-419/tn', { whole: ['gen'], partial: ['rut'] }]])
+    const core = { lang: 'es-419', res: [['x/es-419/tn', 'v1']], coverage, usage: { unit: 'notes', rows }, names: { 'ta:a': ['A'], 'ta:z': ['Z'] } }
+    const m = { revision: 1, map: { core, parts: new Map() } } as never
+    expect(academyOf(m, 'rut')).toEqual([{ id: 'ta:a', title: 'A', count: 2, partial: true }])
+    expect(academyOf(m, 'gen')).toEqual([]) // whole book, no row: zero
+    expect(academyOf(m, 'exo')).toEqual([]) // not covered: none
+  })
+  test('English: ids and counts come from the xmap notes, and the xmap is marked used', async () => {
+    const TN = 'unfoldingWord/en/tn'
+    const notes = { unit: 'notes', rows: new Map([['ta:translate/figs-metaphor', new Map([['psa', [140, 120]]])]]) }
+    const xcov = new Map([[TN, { whole: ['psa'], partial: [] }]])
+    const xmap = { core: { coverage: xcov, notes, links: undefined, strong: { unit: 'occurrences', rows: new Map() } }, parts: new Map() }
+    const map = { core: { lang: 'en', res: [[TN, 'v1']], coverage: new Map(), usage: undefined, names: {} }, parts: new Map() }
+    const r = await open({ books: ['tit'] })
+    const a = await academyQuery({ ...r, maps: async () => ({ revision: 1, xmap, map }) } as never, 'psa')
+    expect(a.data).toEqual({ book: 'psa', articles: [{ id: 'ta:translate/figs-metaphor', count: 140, partial: false }] })
+    expect(a.revision.units.xmap).toBeGreaterThan(0)
+    // Without the xmap the English counts cannot be read: data null and the unit is listed.
+    const b = await academyQuery({ ...r, maps: async () => ({ revision: 1, map }) } as never, 'psa')
+    expect(b.data).toBeNull()
+    expect(b.notInstalled.find((n) => n.unit === 'xmap')).toMatchObject({ bytes: r.size('xmap') })
   })
 })

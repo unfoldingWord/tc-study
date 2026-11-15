@@ -111,11 +111,11 @@ export interface PackReader {
   books(q: { article: string } | { concept: string }): Promise<Answer<BooksData>>
   /** The ids whose names contain a word ("gracia", "grace", "metaphor", "Pablo"), from the maps alone: exact names first. */
   lookup(name: string, limit?: number): Promise<Answer<LookupData>>
-  /** The tA articles the notes of a book cite, most cited first (`data: null` when the `map` is not installed). */
-  academy(book: string): Promise<Answer<AcademyData | null>>
   renderings(q: { strong: string } | { book: string; word: number }): Promise<Answer<RenderingsData>>
   /** Full-text search over the installed books: the client's index when it has one, else an index in memory filled with the books this reader opens. */
   search(text: string, filters?: SearchFilters): Promise<Answer<Hit[]>>
+  /** The tA articles the notes of a book cite, most cited first (`data: null` when the `map` is not installed). */
+  academy(book: string): Promise<Answer<AcademyData | null>>
 }
 
 export type ReaderInput = {
@@ -364,7 +364,6 @@ export function makeReader(o: ReaderInput): PackReader {
     books: (q) => booksQuery(reader, q),
     lookup: (name, limit) => lookupQuery(reader, name, limit),
     renderings: (q) => renderingsQuery(reader, q),
-    academy: (book) => academyQuery(reader, book),
     async search(text, filters) {
       let index = o.index
       if (index === undefined) {
@@ -376,6 +375,7 @@ export function makeReader(o: ReaderInput): PackReader {
       }
       return searchQuery(reader, index, [...listedUnits].filter((u) => u.startsWith('book:')), text, filters)
     },
+    academy: (book) => academyQuery(reader, book),
   }
   return reader
 }
