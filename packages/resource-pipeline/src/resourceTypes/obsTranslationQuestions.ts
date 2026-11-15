@@ -10,6 +10,7 @@ import { defineResourceType, type ResourceTypeDefinition } from '@bt-synergy/res
 import { TranslationQuestionsLoader } from '@bt-synergy/translation-questions-loader'
 import { getDownloadPriority } from '../config/loaderConfig'
 import { RESOURCE_TYPE_IDS } from '@bt-synergy/resource-catalog'
+import { withMarkdownObsHelps } from '../obs/markdownObsHelps'
 
 /** obsTranslationQuestionsResourceType without its viewer; tc-study adds the viewer. */
 export const obsTranslationQuestionsResourceTypeBase: ResourceTypeDefinition = defineResourceType({
@@ -28,7 +29,8 @@ export const obsTranslationQuestionsResourceTypeBase: ResourceTypeDefinition = d
   aliases: ['obs-tq', 'obs-questions'],
 
   // ===== DATA LAYER =====
-  loader: TranslationQuestionsLoader,
+  // Old repos (`hi_obs-tq`) are markdown, not TSV: for those the loader converts `content/NN/FF.md` to the same rows.
+  loader: withMarkdownObsHelps(TranslationQuestionsLoader, 'tq'),
   loaderConfig: {
     enableMemoryCache: true,
     memoryCacheSize: 100,
