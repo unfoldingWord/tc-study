@@ -646,10 +646,10 @@ describe('the sample (es-419 Titus)', () => {
     expect(result.id).toBe(book.id)
     expect(result.h.book).toBe('tit')
     const [glt, gst] = result.texts
-    expect([glt.res, glt.pieces.length, glt.pieces.filter((p: [string, boolean]) => p[1]).length, glt.events.length]).toEqual([GLT, 1913, 953, 69])
+    expect([glt.res, glt.pieces.length, glt.pieces.filter((p: [string, boolean]) => p[1]).length, glt.events.length]).toEqual([GLT, 1922, 953, 69])
     expect(glt.align).toHaveLength(953)
     expect(glt.align.every((positions: number[]) => positions.length > 0)).toBe(true)
-    expect([gst.res, gst.pieces.length, gst.pieces.filter((p: [string, boolean]) => p[1]).length, gst.events.length]).toEqual([GST, 3471, 1732, 69])
+    expect([gst.res, gst.pieces.length, gst.pieces.filter((p: [string, boolean]) => p[1]).length, gst.events.length]).toEqual([GST, 3480, 1732, 69])
     expect(gst.align).toHaveLength(1732)
     expect(gst.align.every((positions: number[]) => positions.length > 0)).toBe(true)
 

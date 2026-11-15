@@ -41,7 +41,7 @@
     },
     "v": 1
   },
-  "id": "95056db559e41695abdbd6c15118458a8aa31d17120343c95693a790b7412224",
+  "id": "3cfd8a2728be8edd5f74969ec461bf93d3669c3cd7460b6f30ee13e7d5648930",
   "notes": {
     "res": "es-419_gl/es-419/tn",
     "rows": [
@@ -379,97 +379,97 @@
           ""
         ],
         [
-          1,
+          2,
           "open",
           "para:ide"
         ],
         [
-          2,
+          3,
           "close",
           ""
         ],
         [
-          2,
+          4,
           "open",
           "para:h"
         ],
         [
-          3,
+          5,
           "close",
           ""
         ],
         [
-          3,
+          6,
           "open",
           "para:toc1"
         ],
         [
-          4,
+          7,
           "close",
           ""
         ],
         [
-          4,
+          8,
           "open",
           "para:toc2"
         ],
         [
-          5,
+          9,
           "close",
           ""
         ],
         [
-          5,
+          10,
           "open",
           "para:toc3"
         ],
         [
-          6,
+          11,
           "close",
           ""
         ],
         [
-          6,
+          12,
           "open",
           "para:mt"
         ],
         [
-          7,
+          13,
           "close",
           ""
         ],
         [
-          7,
+          13,
           "chapter",
           "1"
         ],
         [
-          7,
+          14,
           "open",
           "para:p"
         ],
         [
-          7,
+          14,
           "verse",
           "1"
         ],
         [
-          67,
+          74,
           "verse",
           "2"
         ],
         [
-          109,
+          116,
           "verse",
           "3"
         ],
         [
-          153,
+          160,
           "verse",
           "4"
         ],
         [
-          195,
+          202,
           "close",
           ""
         ]
@@ -480,11 +480,23 @@
           false
         ],
         [
+          " ",
+          false
+        ],
+        [
           "UTF-8",
           false
         ],
         [
+          " ",
+          false
+        ],
+        [
           "Tito",
+          false
+        ],
+        [
+          " ",
           false
         ],
         [
@@ -492,7 +504,15 @@
           false
         ],
         [
+          " ",
+          false
+        ],
+        [
           "Tito",
+          false
+        ],
+        [
+          " ",
           false
         ],
         [
@@ -500,7 +520,15 @@
           false
         ],
         [
+          " ",
+          false
+        ],
+        [
           "Tito",
+          false
+        ],
+        [
+          " ",
           false
         ],
         [

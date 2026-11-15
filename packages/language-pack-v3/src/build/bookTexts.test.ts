@@ -190,20 +190,20 @@ const wd = (form: string) => ({ type: 'char', marker: 'w', 'x-occurrence': '1', 
 const textOf = (index: OrigIndex, ...content: unknown[]) => extractText([chapterRow(GLT, 1, content)], 'tit', GLT, index)
 
 describe('es-419 Titus from the data folder', () => {
-  test('GLT has 1 913 pieces (1 416 and the 497 blanks between words), 953 words, 953 aligned, 69 events', async () => {
+  test('GLT has 1 922 pieces (1 416, the 497 blanks between words and 9 at the end of a line), 953 words, 953 aligned, 69 events', async () => {
     const { glt1 } = await titus()
     expect(glt1.res).toBe(GLT)
-    expect(glt1.pieces.length).toBe(1913)
+    expect(glt1.pieces.length).toBe(1922)
     expect(wordsOf(glt1)).toBe(953)
     expect(glt1.align?.length).toBe(953)
     expect(alignedOf(glt1)).toBe(953)
     expect(glt1.events.length).toBe(69)
   })
 
-  test('GST has 3 471 pieces (3 075 and the 396 blanks between words), 1 732 words, 1 732 aligned, 69 events', async () => {
+  test('GST has 3 480 pieces (3 075, the 396 blanks between words and 9 at the end of a line), 1 732 words, 1 732 aligned, 69 events', async () => {
     const { gst1 } = await titus()
     expect(gst1.res).toBe(GST)
-    expect(gst1.pieces.length).toBe(3471)
+    expect(gst1.pieces.length).toBe(3480)
     expect(wordsOf(gst1)).toBe(1732)
     expect(gst1.align?.length).toBe(1732)
     expect(alignedOf(gst1)).toBe(1732)
@@ -231,7 +231,8 @@ describe('es-419 Titus from the data folder', () => {
       text.pieces.forEach(([, isWord], i) => expect(isWord && i > 0 && text.pieces[i - 1][1]).toBe(false))
       // The pieces of the rows are the 1 416 and 3 075 of the spec before this rule; the rule adds one piece per pair.
       expect(rawPieces(rawChunks(rows, res), false).length).toBe(plain)
-      expect(text.pieces.length).toBe(plain + blanks)
+      // The rule of the blanks at the end of a line adds 9 pieces to each text of this sample.
+      expect(text.pieces.length).toBe(plain + blanks + 9)
     }
   })
 
@@ -240,7 +241,11 @@ describe('es-419 Titus from the data folder', () => {
     for (const [rows, res, text] of [[glt, GLT, glt1], [gst, GST, gst1]] as const) {
       const raw = rawChunks(rows, res)
       expect(raw.length).toBe(4)
-      expect(text.pieces).toEqual(rawPieces(raw))
+      // The builder adds blanks (between words, at the end of a line); nothing else differs from the rows.
+      const noBlanks = (pieces: [string, boolean][]) => pieces.map(([t]) => t).join('').replace(/\s/g, '')
+      expect(noBlanks(text.pieces)).toBe(noBlanks(rawPieces(raw)))
+      expect(text.pieces.filter(([, isWord]) => isWord)).toEqual(rawPieces(raw).filter(([, isWord]) => isWord))
+      expect(text.pieces.filter(([t, isWord]) => !isWord && t.trim() !== '')).toEqual(rawPieces(raw).filter(([t, isWord]) => !isWord && t.trim() !== ''))
     }
   })
 
@@ -283,11 +288,11 @@ describe('es-419 Titus from the data folder', () => {
     expect(glt1.events.slice(0, 4)).toEqual([
       [0, 'open', 'book:id'],
       [1, 'close', ''],
-      [1, 'open', 'para:ide'],
-      [2, 'close', ''],
+      [2, 'open', 'para:ide'],
+      [3, 'close', ''],
     ])
     expect(glt1.pieces[0][0].startsWith('EN_TPL es-419')).toBe(true)
-    expect(glt1.pieces[1]).toEqual(['UTF-8', false])
+    expect(glt1.pieces.slice(1, 3)).toEqual([[' ', false], ['UTF-8', false]]) // the end of the line of \id is a blank
     expect(glt1.attrs).toEqual({ 0: { code: 'TIT' } })
   })
 
@@ -455,6 +460,56 @@ describe('a verse bridge', () => {
   test('a bridge does not carry over a chapter', () => {
     const t = textOf(index, chapterNode('1'), para(verseNode('13-14')), chapterNode('2'), para(zs('δ'), wd('x'), ze))
     expect(t.alignMissing).toEqual([[0, 56_002_000, 'δ', 1]])
+  })
+})
+
+describe('the blanks that the USJ loses after a milestone and at the end of a line', () => {
+  const index = origIndex([['1', '1', ['α', 'β', 'γ']]])
+  const joined = (...content: unknown[]) =>
+    textOf(index, chapterNode('1'), ...content).pieces.map(([text]) => text).join('')
+
+  test('two aligned words with nothing between them are apart', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('a'), ze, zs('β'), wd('b'), ze))).toBe('a b')
+  })
+
+  test('a verse that ends one line and goes on in the next has one blank between the lines', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('end'), ze, ','), para(zs('β'), wd('next'), ze, '.'))).toBe('end, next.')
+    expect(joined(para(verseNode('1'), zs('α'), wd('end'), ze), para(zs('β'), wd('next'), ze))).toBe('end next')
+  })
+
+  test('a line that ends with a blank, or one that starts with punctuation, gets nothing more, and a verse does not start with the blank', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('end'), ze, ' '), para(zs('β'), wd('next'), ze))).toBe('end next')
+    expect(joined(para(verseNode('1'), zs('α'), wd('end'), ze), para(','))).toBe('end,')
+  })
+
+  test('the blank goes before the events of the paragraph that follows, so the verse that starts it starts with its word', () => {
+    const t = textOf(index, chapterNode('1'), para(verseNode('1'), zs('α'), wd('end'), ze), para(verseNode('2'), zs('β'), wd('next'), ze))
+    expect(t.pieces.map(([text]) => text)).toEqual(['end', ' ', 'next'])
+    expect(t.events.filter(([, kind]) => kind === 'verse').map(([at]) => at)).toEqual([0, 2])
+  })
+
+  test('added words in braces keep their blanks: "Blessed {are} the"', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('Blessed'), ze, '{', zs('α'), wd('are'), ze, '}', zs('β'), wd('the'), ze))).toBe('Blessed {are} the')
+    expect(joined(para(verseNode('1'), zs('α'), wd('Blessed'), ze, '{', zs('α'), wd('are'), ze, '} ', zs('β'), wd('the'), ze))).toBe('Blessed {are} the')
+  })
+
+  test('an opening mark after a milestone keeps its blank: "called ‘woman,’", "name “man{kind}”", "means “living,”"', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('called'), ze, '‘', zs('β'), wd('woman'), ze, ',’'))).toBe('called ‘woman,’')
+    expect(joined(para(verseNode('1'), zs('α'), wd('name'), ze, '“', zs('β'), wd('man'), ze, '{', zs('γ'), wd('kind'), ze, '}”'))).toBe('name “man {kind}”')
+    expect(joined(para(verseNode('1'), zs('α'), wd('means'), ze, '“', zs('β'), wd('living'), ze, ',”'))).toBe('means “living,”')
+    expect(joined(para(verseNode('1'), zs('α'), wd('Casluhim'), ze, '(', zs('β'), wd('whom'), ze, ')'))).toBe('Casluhim (whom)')
+    expect(joined(para(verseNode('1'), zs('α'), wd('end'), ze, '.', ' ', zs('β'), wd('x'), ze, '[', zs('γ'), wd('y'), ze, ']'))).toBe('end. x [y]')
+  })
+
+  test('an opening mark that follows a blank, or no word, gets nothing; a closing mark after a word gets nothing', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('a'), ze, ' ‘', zs('β'), wd('b'), ze))).toBe('a ‘b')
+    expect(joined(para(verseNode('1'), '“', zs('α'), wd('a'), ze, '”'))).toBe('“a”')
+    expect(joined(para(verseNode('1'), zs('α'), wd('bird'), '{', zs('β'), wd('s'), ze, '}'))).toBe('bird{s}')
+  })
+
+  test('nothing is added where the USFM has none: a comma or a closing quote after a word', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('end'), ze, ',', zs('β'), wd('next'), ze, '”', '.'))).toBe('end, next”.')
+    expect(joined(para(verseNode('1'), '“', zs('α'), wd('end'), ze, '”'))).toBe('“end”')
   })
 })
 

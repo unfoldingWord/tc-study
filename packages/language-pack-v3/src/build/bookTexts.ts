@@ -15,6 +15,27 @@ import { attributesOf, leadingNumber, type OrigIndex, recordOf, textOf } from '.
 type OpenMilestone = { position: number | null; verse: number; content: string; occurrence: number }
 
 const DIGITS = /^[0-9]+$/
+/**
+ * The USJ of format 2.0 also loses the blank that the USFM has after a milestone `zaln-e` and at the end of a line (a new
+ * paragraph): "Blessed{are}", "spirit,for". Two pieces that meet across such a place and would be written together are told
+ * apart by what the characters are: a letter, a digit or `}` before a letter, a digit or `{`, and `.,;:!?` before a letter or
+ * `{`. Where the USFM has no blank (a comma after a word, a closing quote) the pair is not in the table and nothing is added.
+ */
+const LOST_BEFORE = /[\p{L}\p{N}}.,;:!?]$/u
+const LOST_AFTER = /^[\p{L}\p{N}{]/u
+const LOST_BEFORE_BRACE = /[\p{L}\p{N}]$/u
+const BLANK_START = /^[\s,.;:!?)\]}”’»]/u
+const BLANK_END = /\s$/u
+/** Does a blank go between the text `a` and the text `b` that follow each other with a milestone between them? */
+const lostBlank = (a: string, b: string): boolean =>
+  b.startsWith('{')
+    ? LOST_BEFORE_BRACE.test(a)
+    : OPENING_START.test(b)
+      ? LOST_BEFORE.test(a) || CLOSING_END.test(a)
+      : LOST_BEFORE.test(a) && LOST_AFTER.test(b)
+/** An opening mark, and a closing one: "called ‘woman,’" lost the blank before the `‘` too. */
+const OPENING_START = /^[“‘(\[«„‚]/u
+const CLOSING_END = /[)\]”’»]$/u
 /** The second number of a verse label that is a bridge: `"13-14"` is 14. */
 const BRIDGE_END = /^[0-9]+-([0-9]+)/
 
@@ -82,8 +103,32 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
   // The last verse of the label that is open (`"13-14"`: 14), the same as `verse` when the label is not a bridge.
   let verseEnd = 0
 
+  // A milestone, or the start of a paragraph, came after the last piece: the blank the USFM had there may be lost.
+  let crossed = false
+  const blankBefore = (text: string): void => {
+    const last = pieces[pieces.length - 1]
+    if (!crossed || last === undefined || text === '') return
+    crossed = false
+    if (!lineBreak) {
+      if (lostBlank(last[0], text)) pieces.push([' ', false])
+      return
+    }
+    if (BLANK_END.test(last[0]) || BLANK_START.test(text)) return
+    // The blank is the end of the line, so it goes where the line ends: before the events of the paragraph that starts the next
+    // line, and the verse that starts it does not start with a blank.
+    pieces.splice(breakAt.pieces, 0, [' ', false])
+    for (let k = breakAt.events; k < events.length; k++) events[k][0]++
+  }
+  // The break that came is a paragraph, not a milestone: any two pieces that would touch are apart in the USFM. `breakAt` is
+  // where the first paragraph since the last piece began.
+  let lineBreak = false
+  let breakAt = { pieces: 0, events: 0 }
+
   const visit = (node: unknown, where: string): void => {
     if (typeof node === 'string') {
+      blankBefore(node)
+      crossed = false
+      lineBreak = false
       pieces.push([node, false])
       return
     }
@@ -103,8 +148,13 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
       // The USJ of format 2.0 drops the blank that the USFM has between two alignment milestones, so two words can follow
       // each other with nothing between them. A blank piece goes between them, and the pieces join into the text. Events
       // already written stay before it: a verse that starts with a word right after a word starts with the blank.
-      if (pieces.length > 0 && pieces[pieces.length - 1][1]) pieces.push([' ', false])
-      pieces.push([textOf(node), true])
+      const wordText = textOf(node)
+      const before = pieces.length
+      blankBefore(wordText)
+      if (pieces.length === before && pieces.length > 0 && pieces[pieces.length - 1][1]) pieces.push([' ', false])
+      crossed = false
+      lineBreak = false
+      pieces.push([wordText, true])
       return
     }
     if (type === 'ms' && marker === 'zaln-s') {
@@ -123,10 +173,12 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
       // In a bridge the milestone's x-occurrence counts over all of its verses, so the word is looked for in all of them.
       const position = verseEnd > verse ? orig.findInVerses(id, verseId(book, chapter, verseEnd), content, occurrence) : orig.find(id, content, occurrence)
       stack.push({ position, verse: id, content, occurrence })
+      crossed = true
       return
     }
     if (type === 'ms' && marker === 'zaln-e') {
       stack.pop()
+      crossed = true
       return
     }
 
@@ -161,6 +213,11 @@ export function extractText(rows: Row[], book: string, res: string, orig: OrigIn
     }
     const extra = recordOf(attributesOf(node, ['sid', 'eid'], where))
     if (extra !== undefined) attrs[events.length] = extra
+    if (type === 'para') {
+      if (!lineBreak) breakAt = { pieces: pieces.length, events: events.length }
+      crossed = true
+      lineBreak = true
+    }
     events.push([pieces.length, 'open', marker === undefined ? type : `${type}:${marker}`])
     for (const child of content) visit(child, where)
     events.push([pieces.length, 'close', ''])
