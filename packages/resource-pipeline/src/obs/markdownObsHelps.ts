@@ -21,7 +21,16 @@
  * No Node module is used: the hash is computed here, so the resource types stay loadable in a browser.
  */
 
-import type { ResourceMetadata } from '@bt-synergy/resource-catalog'
+import {
+  ABSENT_FROM_RELEASE_KEY,
+  buildIngestReceiptFromCatalog,
+  expectedIngestReleaseStamp,
+  helpsIngestSchema,
+  isMatchingIngestReceipt,
+  presentIngredientCount,
+  readAbsentFromRelease,
+  type ResourceMetadata,
+} from '@bt-synergy/resource-catalog'
 import { NOTES_TSV_PARSER_VERSION } from '@bt-synergy/resource-parsers'
 import JSZip from 'jszip'
 
@@ -98,8 +107,9 @@ function blocks(markdown: string): { before: string; entries: { heading: string;
   const entries: { heading: string; text: string[] }[] = []
   const before: string[] = []
   for (const line of markdown.replace(/^﻿/, '').split(/\r?\n/)) {
-    const m = /^#+\s*(.*?)\s*#*\s*$/.exec(line)
-    if (m !== null) entries.push({ heading: m[1], text: [] })
+    // A closing run of #'s needs a space before it ("## x ##"); the # of "C#" is part of the heading.
+    const m = /^#+(?:\s+(.*?))?(?:\s+#+)?\s*$/.exec(line)
+    if (m !== null) entries.push({ heading: m[1] ?? '', text: [] })
     else (entries.length === 0 ? before : entries[entries.length - 1].text).push(line)
   }
   return { before: paragraphs(before), entries: entries.map((e) => ({ heading: e.heading, text: paragraphs(e.text) })) }
@@ -235,16 +245,16 @@ export function markdownObsHelps(files: Map<string, string>, kind: 'tn' | 'tq', 
 // The switch between the TSV path and this one
 
 /**
- * Whether a catalog row is an old markdown helps resource: its ingredients name no `.tsv` file and its format is not TSV, and
- * it says something (a row with neither ingredients nor format stays on the TSV path).
+ * Whether a catalog row is an old markdown helps resource: it needs positive evidence (an ingredient path ending in `.md`, or
+ * a format that says markdown) and no `.tsv` ingredient or TSV format. A row that says nothing, or only lists ingredients with
+ * no path, stays on the TSV path.
  */
 export function isMarkdownHelps(metadata: ResourceMetadata): boolean {
   const meta = metadata as { format?: unknown; contentMetadata?: { ingredients?: { path?: string }[] } }
   const ingredients = Array.isArray(meta.contentMetadata?.ingredients) ? meta.contentMetadata.ingredients : []
-  if (ingredients.some((i) => /\.tsv$/i.test(i.path ?? ''))) return false
   const format = typeof meta.format === 'string' ? meta.format.toLowerCase() : ''
-  if (format.includes('tsv')) return false
-  return ingredients.length > 0 || format !== ''
+  if (format.includes('tsv') || ingredients.some((i) => /\.tsv$/i.test(i.path ?? ''))) return false
+  return format.includes('markdown') || ingredients.some((i) => /\.md$/i.test(i.path ?? ''))
 }
 
 type ZipClient = { downloadZipball: (owner: string, repo: string, ref?: string) => Promise<ArrayBuffer | Uint8Array> }
@@ -259,6 +269,40 @@ export async function markdownFilesOfZip(bytes: ArrayBuffer | Uint8Array): Promi
   const files = new Map<string, string>()
   for (const name of names) if (/\.md$/i.test(name)) files.set(name.slice(top.length + 1), await archive.files[name].async('string'))
   return files
+}
+
+type CacheLike = { get: (key: string) => Promise<any>; set: (key: string, value: unknown) => Promise<void> }
+
+/**
+ * The `resource:{key}` ingest receipt, written as the TSV loaders' `markComplete` writes it (same call, same absent-from-release
+ * handling), so `ResourceCompletenessChecker` takes its stamped-receipt path. That path does not count ingredients; the count
+ * recorded is the one of the catalog row (a markdown repo lists a directory, or one file per story).
+ */
+async function writeReceipt(cache: CacheLike, resourceKey: string, metadata: ResourceMetadata): Promise<void> {
+  const resourceCacheKey = `resource:${resourceKey}`
+  const prior = await cache.get(resourceCacheKey)
+  const absentFromRelease = readAbsentFromRelease(prior?.metadata)
+  const listed = (metadata as { contentMetadata?: { ingredients?: unknown[] } }).contentMetadata?.ingredients
+  const presentCount = presentIngredientCount(Array.isArray(listed) ? listed.length : 0, absentFromRelease)
+  const receipt = buildIngestReceiptFromCatalog(metadata, {
+    ingestSchema: helpsIngestSchema(),
+    ingredientCount: presentCount,
+    downloadMethod: 'zip',
+    entryCount: presentCount,
+    expectedEntryCount: presentCount,
+  })
+  await cache.set(resourceCacheKey, {
+    content: { downloaded: true },
+    metadata: {
+      ...(receipt ?? { downloadComplete: true, downloadCompletedAt: new Date().toISOString(), downloadMethod: 'zip', entryCount: presentCount, expectedEntryCount: presentCount }),
+      ...(absentFromRelease.length > 0 ? { [ABSENT_FROM_RELEASE_KEY]: absentFromRelease } : {}),
+    },
+  })
+}
+
+async function receiptIsMatching(cache: CacheLike, resourceKey: string, metadata: ResourceMetadata): Promise<boolean> {
+  const stamp = expectedIngestReleaseStamp(metadata)
+  return isMatchingIngestReceipt(await cache.get(`resource:${resourceKey}`), stamp, helpsIngestSchema())
 }
 
 /**
@@ -292,8 +336,13 @@ export function withMarkdownObsHelps<C extends new (config: any) => any>(Base: C
     async downloadResource(resourceKey: string, options?: { skipExisting?: boolean }, ...rest: unknown[]) {
       const metadata = await this.getMetadata(resourceKey)
       if (!isMarkdownHelps(metadata)) return super.downloadResource(resourceKey, options, ...rest)
-      if (options?.skipExisting !== false && (await this.cacheAdapter.get(`${kind}:${resourceKey}:obs`))) return
-      for (const [k, v] of await this.convertZip(resourceKey, metadata)) await this.cacheAdapter.set(k, v)
+      const rowKey = `${kind}:${resourceKey}:obs`
+      if (options?.skipExisting !== false && (await this.cacheAdapter.get(rowKey)) && (await receiptIsMatching(this.cacheAdapter, resourceKey, metadata))) return
+      const rows = await this.convertZip(resourceKey, metadata)
+      // A resource the catalog lists that gives no row fails, as a TSV one that fails to parse does (no receipt is written).
+      if (rows.size === 0) throw new Error(`${resourceKey}: ${this.lastIssues.join('; ')}`)
+      for (const [k, v] of rows) await this.cacheAdapter.set(k, v)
+      await writeReceipt(this.cacheAdapter, resourceKey, metadata)
     }
   }
   return MarkdownAware as unknown as C

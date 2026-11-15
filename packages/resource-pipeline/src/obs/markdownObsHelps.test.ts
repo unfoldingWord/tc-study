@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
 import { extractObs, type Row, type RowFilter, type RowSource } from '@bt-synergy/language-pack-v3'
 import { NotesProcessor, QuestionsProcessor } from '@bt-synergy/resource-parsers'
+import { ResourceCompletenessChecker } from '../download/ResourceCompletenessChecker'
 import JSZip from 'jszip'
 import { isMarkdownHelps, markdownFilesOfZip, markdownHelpId, markdownObsHelps, withMarkdownObsHelps } from './markdownObsHelps'
 
@@ -134,6 +135,16 @@ describe('markdownObsHelps', () => {
     expect(notes.some((n: any) => n.quote === '' && n.note === '')).toBe(false)
   })
 
+  test('a closing run of # needs a space before it; the # of C# stays in the heading', () => {
+    const files = new Map([
+      ['content/05/01.md', '# C#\n\na'],
+      ['content/05/02.md', '## x ##\n\nb'],
+      ['content/05/03.md', '# a #b\n\nc'],
+    ])
+    const notes = (markdownObsHelps(files, 'tn', TN, []).get(`tn:${TN}:obs`) as any).notes
+    expect(notes.map((n: any) => n.quote)).toEqual(['C#', 'x', 'a #b'])
+  })
+
   test('nothing in the files gives an empty map and a line', () => {
     const issues: string[] = []
     expect(markdownObsHelps(new Map([['README.md', 'x']]), 'tq', TQ, issues).size).toBe(0)
@@ -179,7 +190,11 @@ describe('the switch', () => {
     const row = (format: string | undefined, paths: string[]) =>
       ({ format, contentMetadata: { ingredients: paths.map((path) => ({ path })) } }) as any
     expect(isMarkdownHelps(row('markdown', ['./content']))).toBe(true)
-    expect(isMarkdownHelps(row(undefined, ['./content']))).toBe(true)
+    expect(isMarkdownHelps(row(undefined, ['./content/01.md']))).toBe(true)
+    // No positive evidence: stays TSV.
+    expect(isMarkdownHelps(row(undefined, ['./content']))).toBe(false)
+    expect(isMarkdownHelps(row(undefined, [undefined as any]))).toBe(false)
+    expect(isMarkdownHelps({ contentMetadata: { ingredients: [{ identifier: 'obs' }] } } as any)).toBe(false)
     expect(isMarkdownHelps(row('tsv', ['./tn_OBS.tsv']))).toBe(false)
     expect(isMarkdownHelps(row('markdown', ['./tn_OBS.tsv']))).toBe(false)
     expect(isMarkdownHelps(row('text/tsv', []))).toBe(false)
@@ -219,5 +234,63 @@ describe('the switch', () => {
     expect((store.get(`tn:${TN}:obs`) as any).notes).toHaveLength(3)
     await loader.downloadResource(TN)
     expect(calls).toHaveLength(1)
+  })
+
+  test('after a markdown download the completeness checker says complete, for notes and for questions', async () => {
+    const zip = new JSZip()
+    for (const [path, text] of tnFiles()) zip.file(`hi_obs-tn/${path}`, text)
+    const bytes = await zip.generateAsync({ type: 'uint8array' })
+    for (const [kind, type] of [['tn', 'obs-notes'], ['tq', 'obs-questions']] as const) {
+      const key = `Door43-Catalog/hi/obs-${kind}`
+      const meta = {
+        resourceKey: key,
+        type,
+        format: 'text/markdown',
+        version: 'v11.2',
+        release: { tag_name: 'v11.2', published_at: '2026-01-02T03:04:05Z' },
+        contentMetadata: { ingredients: [{ identifier: 'obs', path: './content', isDir: true }, { identifier: 'x', path: './content/01/00.md' }] },
+      }
+      class Base {
+        cacheAdapter: any
+        door43Client: any
+        constructor(config: any) {
+          Object.assign(this, config)
+        }
+        async getMetadata() {
+          return meta
+        }
+      }
+      const store = new Map<string, any>()
+      const cache = { get: async (k: string) => store.get(k) ?? null, set: async (k: string, v: unknown) => void store.set(k, v) }
+      const loader: any = new (withMarkdownObsHelps(Base as any, kind))({ cacheAdapter: cache, door43Client: { downloadZipball: async () => bytes } })
+      const checker = new ResourceCompletenessChecker({ catalogManager: { getResourceMetadata: async () => meta } as any, cacheAdapter: cache as any })
+      expect((await checker.checkResource(key)).isComplete).toBe(false)
+      await loader.downloadResource(key)
+      expect((await checker.checkResource(key)).status).toBe('complete')
+      expect(store.get(`resource:${key}`).metadata.downloadComplete).toBe(true)
+    }
+  })
+
+  test('a listed resource whose markdown gives no row fails and writes no receipt', async () => {
+    const zip = new JSZip()
+    zip.file('hi_obs-tn/README.md', 'x')
+    const bytes = await zip.generateAsync({ type: 'uint8array' })
+    class Base {
+      cacheAdapter: any
+      door43Client: any
+      constructor(config: any) {
+        Object.assign(this, config)
+      }
+      async getMetadata() {
+        return { format: 'markdown', release: { tag_name: 'v1' }, contentMetadata: { ingredients: [{ path: './content' }] } }
+      }
+    }
+    const store = new Map<string, any>()
+    const loader: any = new (withMarkdownObsHelps(Base as any, 'tn'))({
+      cacheAdapter: { get: async (k: string) => store.get(k), set: async (k: string, v: unknown) => void store.set(k, v) },
+      door43Client: { downloadZipball: async () => bytes },
+    })
+    await expect(loader.downloadResource(TN)).rejects.toThrow()
+    expect(store.size).toBe(0)
   })
 })
