@@ -88,6 +88,20 @@ describe('lookupMatches', () => {
     expect(lookupMatches(rank, 'a subtitle only team')[0]).toMatchObject({ id: 'ta:x/a-sub', exact: false })
     expect(lookupMatches(rank, 'a subtitle only team').every((m) => !m.exact)).toBe(true)
   })
+  test('a subtitle never becomes names[0]: an id with no title gets none', () => {
+    const m = { revision: 1, map: { core: { lang: 'x', names: {}, subtitles: { 'ta:x/orphan': 'Orphan question here' } }, parts: new Map() } } as never
+    expect(lookupMatches(m, 'orphan question')).toEqual([])
+  })
+  test('question words are ignored in every language', () => {
+    const q = {
+      revision: 1,
+      map: { core: { lang: 'x', names: { 'ta:a/met-es': ['Metáfora'], 'ta:a/met-fr': ['Métaphore'], 'ta:a/met-en': ['Metaphor'], 'ta:a/met-id': ['Metafora'] } }, parts: new Map() },
+    } as never
+    expect(lookupMatches(q, 'qué es la metáfora').map((x) => x.id)).toContain('ta:a/met-es')
+    expect(lookupMatches(q, "qu'est-ce qu'une métaphore").map((x) => x.id)).toContain('ta:a/met-fr')
+    expect(lookupMatches(q, 'what is a metaphor').map((x) => x.id)).toContain('ta:a/met-en')
+    expect(lookupMatches(q, 'apa itu metafora').map((x) => x.id)).toContain('ta:a/met-id')
+  })
   test('a subtitle on a tw: id is ignored; one equal to the title is not added twice', () => {
     expect(lookupMatches(rank, 'secret question')).toEqual([])
     expect(lookupMatches(rank, 'same')[0]!.names).toEqual(['Same'])

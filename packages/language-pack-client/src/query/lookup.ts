@@ -15,6 +15,11 @@ export type LookupData = { name: string; matches: LookupMatch[] }
 export const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
 
 const STOP = `a an the to of in on at for and or is are do does how what which who i we my our
+can could should would be it this that with about from as by
+es son lo su sus hay sobre entre este esta esto cual cuales quien
+ce est qu ne pas sur dans par avec cette
+e é sao ser sobre com este esta isso qual
+itu ini adalah ada tentang pada
 a de la el los las un una unos unas y o en que del al por para con se mi como qué cómo cuál
 le la les un une des de du et ou en à au aux pour que qui comment
 o os as um uma de do da dos das e ou em no na para que como
@@ -44,7 +49,8 @@ function namesById(m: MapSet): Map<string, { names: string[]; subs: Set<string> 
   }
   const core = m.map?.core as { names?: Record<string, string[]>; subtitles?: Record<string, unknown> } | undefined
   for (const [id, names] of Object.entries(core?.names ?? {})) for (const n of names) add(id, n)
-  for (const [id, sub] of Object.entries(core?.subtitles ?? {})) if (id.startsWith('ta:') && typeof sub === 'string') add(id, sub, true)
+  // A subtitle is only ever a later name: an id with no title in the map names gets none.
+  for (const [id, sub] of Object.entries(core?.subtitles ?? {})) if (id.startsWith('ta:') && typeof sub === 'string' && out.has(id)) add(id, sub, true)
   const topics = m.topics?.core as { names?: Record<string, unknown[][]> } | undefined
   for (const [id, names] of Object.entries(topics?.names ?? {})) for (const n of names) add(id, typeof n[0] === 'string' ? n[0] : undefined)
   const xtopics = m.xtopics?.core as { topics?: Map<string, { title?: string }> } | undefined

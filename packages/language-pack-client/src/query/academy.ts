@@ -6,7 +6,14 @@ import { type Answer, newAnswer, usedUnit } from './envelope'
 import { haveMap, languageTn, usageBooks } from './maps'
 
 export type AcademyArticle = { id: string; title?: string; count: number; partial: boolean }
-export type AcademyData = { book: string; articles: AcademyArticle[] }
+/** `covered` is false when the language has no tN source for the book (none of its own, or one that does not cover it): `articles` is then [] for lack of a source, not because nothing is cited. */
+export type AcademyData = { book: string; covered: boolean; articles: AcademyArticle[] }
+
+/** True when the tN the usage reads covers the book, wholly or in part (a concept with no row still has the coverage cell). */
+export function academyCovered(m: MapSet, book: string): boolean {
+  const c = usageBooks(m, 'ta:')[book]
+  return c !== undefined && c.state !== 'none'
+}
 
 /** The `ta:` ids the maps know: the usage table of the language, the English notes, and the names of the map. */
 function taIds(m: MapSet): Set<string> {
@@ -44,6 +51,7 @@ export async function academyQuery(reader: PackReader, book: string): Promise<An
     out.data = null
     return out
   }
-  out.data = { book, articles: academyOf(m, book) }
+  const covered = academyCovered(m, book)
+  out.data = { book, covered, articles: covered ? academyOf(m, book) : [] }
   return out
 }

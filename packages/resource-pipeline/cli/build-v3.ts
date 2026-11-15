@@ -396,7 +396,7 @@ async function build(o: Options, io: Io): Promise<void> {
   const taConfigs = o.taConfig === undefined ? undefined : readTaConfigs(o.taConfig, taKeys)
   const taTocs = o.taConfig === undefined ? undefined : readTaTocs(o.taConfig, taKeys)
   for (const [key, manuals] of taConfigs ?? []) {
-    if (manuals.size > 0 && !(taTocs?.get(key) && taTocs.get(key)!.size > 0)) io.log(`${key}: config.yaml found but no toc.yaml (fetched before the titles were read): the articles get no names from the toc`)
+    if (manuals.size > 0 && !(taTocs?.get(key) && taTocs.get(key)!.size > 0)) io.log(`no toc.yaml for ${key} (none in the release, or a folder fetched before toc.yaml was read)`)
   }
   if (taConfigs === undefined && taKeys.length > 0) io.log('no --ta-config: the related of the tA articles comes from the links of the texts alone')
   const built = await buildLanguage({

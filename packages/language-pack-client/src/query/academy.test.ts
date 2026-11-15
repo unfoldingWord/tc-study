@@ -87,6 +87,19 @@ describe('academy', () => {
     expect(academyOf(m, 'gen')).toEqual([]) // whole book, no row: zero
     expect(academyOf(m, 'exo')).toEqual([]) // not covered: none
   })
+  test('covered: false with no own tN or outside the tN coverage, true for a covered book with no citations', async () => {
+    const rows = new Map([['ta:a', new Map([['rut', [2, 2]]])]])
+    const coverage = new Map([['x/es-419/tn', { whole: ['gen'], partial: ['rut'] }]])
+    const own = { lang: 'es-419', res: [['x/es-419/tn', 'v1']], coverage, usage: { unit: 'notes', rows }, names: { 'ta:a': ['A'] } }
+    const r = await open({ books: ['tit'] })
+    const ask = async (core: object, book: string) =>
+      (await academyQuery({ ...r, maps: async () => ({ revision: 1, map: { core, parts: new Map() } }) } as never, book)).data!
+    expect(await ask(own, 'rut')).toEqual({ book: 'rut', covered: true, articles: [{ id: 'ta:a', title: 'A', count: 2, partial: true }] })
+    expect(await ask(own, 'gen')).toEqual({ book: 'gen', covered: true, articles: [] })
+    expect(await ask(own, 'exo')).toEqual({ book: 'exo', covered: false, articles: [] })
+    const none = { lang: 'es-419', res: [], coverage: new Map(), usage: undefined, names: { 'ta:a': ['A'] } }
+    expect(await ask(none, 'rut')).toEqual({ book: 'rut', covered: false, articles: [] })
+  })
   test('English: ids and counts come from the xmap notes, and the xmap is marked used', async () => {
     const TN = 'unfoldingWord/en/tn'
     const notes = { unit: 'notes', rows: new Map([['ta:translate/figs-metaphor', new Map([['psa', [140, 120]]])]]) }
@@ -95,7 +108,7 @@ describe('academy', () => {
     const map = { core: { lang: 'en', res: [[TN, 'v1']], coverage: new Map(), usage: undefined, names: {} }, parts: new Map() }
     const r = await open({ books: ['tit'] })
     const a = await academyQuery({ ...r, maps: async () => ({ revision: 1, xmap, map }) } as never, 'psa')
-    expect(a.data).toEqual({ book: 'psa', articles: [{ id: 'ta:translate/figs-metaphor', count: 140, partial: false }] })
+    expect(a.data).toEqual({ book: 'psa', covered: true, articles: [{ id: 'ta:translate/figs-metaphor', count: 140, partial: false }] })
     expect(a.revision.units.xmap).toBeGreaterThan(0)
     // Without the xmap the English counts cannot be read: data null and the unit is listed.
     const b = await academyQuery({ ...r, maps: async () => ({ revision: 1, map }) } as never, 'psa')
