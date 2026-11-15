@@ -27,6 +27,10 @@ const ok = (text: string): Text => ({ content: [{ type: 'text', text }] })
 const fail = (text: string): Text => ({ content: [{ type: 'text', text }], isError: true })
 
 /** A note or an article in plain text: no headings, no links the reader cannot follow. */
+/** One line of `lookup_term`: the id, the names, and the question of an Academy article when it has one. */
+export const lookupLine = (m: { id: string; names: string[]; subtitle?: string }): string =>
+  `${m.id} — ${m.names.join(', ')}${m.subtitle ? ` (asks: ${m.subtitle})` : ''}`
+
 export function clean(md: unknown): string {
   return String(md ?? '')
     .replace(/^#+\s*/gm, '')
@@ -190,7 +194,7 @@ export function createPacksServer(o: PacksServerOptions): McpServer {
       if (!a.name.trim()) throw new Error('Give a word to look for.')
       const rows = (await r.lookup(a.name)).data?.matches ?? []
       if (rows.length === 0) return `Nothing named like "${a.name}" in ${l}. Try another spelling, or the English word.`
-      return rows.map((m) => `${m.id} — ${m.names.join(', ')}${m.subtitle ? ` (asks: ${m.subtitle})` : ''}`).join('\n')
+      return rows.map((m) => lookupLine(m)).join('\n')
     }),
   )
 

@@ -24,7 +24,7 @@ export const fold = (s: string): string =>
 
 const STOP = `a an the to of in on at for and or is are do does how what which who i we my our
 can could should would be it this that with about from as by
-es son lo su sus hay sobre entre este esta esto cual cuales quien
+es lo su sus hay sobre entre este esta esto cual cuales quien
 ce est qu ne pas sur dans par avec cette
 e é sao ser sobre com este esta isso qual
 itu ini adalah ada tentang pada
@@ -93,22 +93,25 @@ function namesById(m: MapSet): Entry[] {
 }
 
 /**
- * The ids whose names contain `name`, at most `limit`: first those with a name equal to it, then those with a name that
- * starts with it or has it as a whole word, then the rest; ids in code-point order within each. Accents, capitals and
- * punctuation do not count (the query and the names are compared as their words). A query with function words ("how",
- * "a", "de") or leftover single letters ("what's" gives "what" and "s") also matches a name that has every other word, in
- * any order, as a word or the start of one (score 2); when those content words are exactly the words of a name, the match is exact (score 0). A query with no word at all (only punctuation) gives no matches. A match found only in a subtitle scores 3 and is never exact; the
- * subtitle is returned in `subtitle`, not in `names`.
+ * The ids whose names contain `name`, at most `limit`, best first; ids in code-point order within a score.
+ * - Accents, capitals and punctuation do not count: the query and the names are compared as their words.
+ * - Score 0 (exact): a name equal to the query.
+ * - Score 0 also: the query's content words (stoplist and one-letter leftovers dropped, only when the query has two or
+ *   more words) are the words of a name, the same words in the same order, with no extra word.
+ * - Score 1: a name that starts with the query or has it as a whole word.
+ * - Score 2: a name that contains the query, or has every content word, in any order, as a word or the start of one.
+ * - Score 3: a match found only in a subtitle; never exact. The subtitle is returned in `subtitle`, not in `names`.
+ * - A query with no word at all (only punctuation) gives no matches.
  */
 export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[] {
   const qw = wordsOf(fold(name))
   const q = qw.join(' ')
   if (q === '') return []
   const keep = qw.length >= 2 ? qw.filter((w) => !stopwords.has(w) && [...w].length > 1) : []
-  const keepKey = [...keep].sort().join(' ')
+  const keepKey = keep.join(' ')
   const hit = (f: string, words: string[]): number => {
     if (f === q) return 0
-    if (keepKey !== '' && [...words].sort().join(' ') === keepKey) return 0
+    if (keepKey !== '' && words.join(' ') === keepKey) return 0
     if (f.startsWith(q) || words.includes(q)) return 1
     if (f.includes(q)) return 2
     if (keep.length > 0 && keep.every((w) => words.some((p) => p.startsWith(w)))) return 2

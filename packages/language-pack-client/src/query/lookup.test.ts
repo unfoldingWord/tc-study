@@ -73,6 +73,31 @@ describe('lookupMatches: folding and content words', () => {
   })
 })
 
+describe('lookupMatches: exact needs the same words in order', () => {
+  const d = (names: Record<string, string[]>) => ({ revision: 1, map: { core: { lang: 'en', names }, parts: new Map() } }) as never
+  test('a different order is not exact but still matches', () => {
+    const [m] = lookupMatches(d({ 'per:spirit': ['Holy Spirit'] }), 'who is the Spirit Holy')
+    expect(m!.id).toBe('per:spirit')
+    expect(m!.exact).toBe(false)
+    expect(lookupMatches(d({ 'per:spirit': ['Holy Spirit'] }), 'who is the Holy Spirit')[0]!.exact).toBe(true)
+  })
+  test('an extra word in the name is not exact', () => {
+    const [m] = lookupMatches(d({ 'ta:m': ['Metáfora compleja'] }), 'qué es la metáfora')
+    expect(m!.exact).toBe(false)
+  })
+  test('repeated words count', () => {
+    const q = d({ 'x:one': ['Holy'], 'x:two': ['Holy Holy'] })
+    const r = lookupMatches(q, 'what is holy holy')
+    expect(r.find((x) => x.id === 'x:two')!.exact).toBe(true)
+    expect(r.find((x) => x.id === 'x:one')?.exact ?? false).toBe(false)
+  })
+  test('"son" is not a stopword: "who is the son" finds "Son"', () => {
+    const [m] = lookupMatches(d({ 'per:son': ['Son'] }), 'who is the son')
+    expect(m!.id).toBe('per:son')
+    expect(m!.exact).toBe(true)
+  })
+})
+
 describe('lookupMatches', () => {
   test('the subtitle of an article is returned apart from the names', () => {
     const [hit] = lookupMatches(taMaps, 'set up a translation team')
