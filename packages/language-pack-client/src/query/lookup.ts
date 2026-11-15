@@ -17,7 +17,7 @@ export const fold = (s: string): string =>
   s
     .normalize('NFD')
     .replace(/(\p{Script=Latin})\p{M}+/gu, '$1')
-    .replace(/[ً-ْٰـ]/g, '')
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
     .normalize('NFC')
     .toLowerCase()
     .trim()
@@ -108,13 +108,14 @@ export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[
   const qw = wordsOf(fold(name))
   const q = qw.join(' ')
   if (q === '') return []
-  let keep = qw.length >= 2 ? qw.filter((w) => !stopwords.has(w) && [...w].length > 1) : []
+  const keep = qw.length >= 2 ? qw.filter((w) => !stopwords.has(w) && [...w].length > 1) : []
   // Every word was a stopword or one letter: the last word is the content ("who is the son" asks for "Son").
-  if (qw.length >= 2 && keep.length === 0) keep = [qw[qw.length - 1]!]
+  // It counts for the exact rule only, not for the loose matches.
+  const exactKey = qw.length >= 2 && keep.length === 0 ? qw[qw.length - 1]! : keep.join(' ')
   const keepKey = keep.join(' ')
   const hit = (f: string, words: string[]): number => {
     if (f === q) return 0
-    if (keepKey !== '' && words.join(' ') === keepKey) return 0
+    if (exactKey !== '' && words.join(' ') === exactKey) return 0
     if (f.startsWith(q) || words.includes(q)) return 1
     if (f.includes(q)) return 2
     if (keep.length > 0 && keep.every((w) => words.some((p) => p.startsWith(w)))) return 2

@@ -73,6 +73,16 @@ describe('lookupMatches: folding and content words', () => {
   })
 })
 
+describe('lookupMatches: the last-word fallback is for the exact rule only', () => {
+  const d = { revision: 1, map: { core: { lang: 'en', names: { 'p:t': ['Theophilus'], 'p:th': ['Thessalonians'], 'p:i': ['Items'], 'p:a': ['Abraham'], 'p:s': ['Son'] } }, parts: new Map() } } as never
+  test('no loose match through it', () => {
+    for (const q of ['is the', 'what is it', 'what is a']) expect(lookupMatches(d, q)).toEqual([])
+  })
+  test('"who is the son" is still exact for Son', () => {
+    expect(lookupMatches(d, 'who is the son')[0]).toMatchObject({ id: 'p:s', exact: true })
+  })
+})
+
 describe('lookupMatches: Arabic marks and subtitles', () => {
   const ar = (names: Record<string, string[]>) => ({ revision: 1, map: { core: { lang: 'ar', names }, parts: new Map() } }) as never
   test('dagger alef U+0670 folds', () => {
