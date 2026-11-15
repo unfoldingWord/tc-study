@@ -916,6 +916,17 @@ describe('buildLanguage: the related of tA', () => {
     expect(groupsOf(hinted.segments)['ta:checking'].inputs).toBe(groupsOf(plain.segments)['ta:checking'].inputs)
   })
 
+  test('a hint that is had but not used still adds the role-hints row', async () => {
+    // Three headed sections in the hint, two in the article: the levels differ, so the hint is not used.
+    const hints = new Map([['ta:translate/z', [{ level: 2, role: 'definition' as const }, { level: 2, role: 'facts' as const }, { level: 3, role: 'facts' as const }]]])
+    const plain = await run(withZ())
+    const hinted = await buildLanguage({ source: withZ(), lang: ES, registry: registry(), about, roleHints: hints, roleHintSegs: new Map([['ta:translate/z', 'aa11']]) })
+    expect(hinted.report.some((l) => l.includes('1 articles had a hint, 0 used it'))).toBe(true)
+    const roles = (b: typeof plain) => (groupsOf(b.segments)['ta:translate'].seg.t as { articles: { id: string; sections: { role: string }[] }[] }).articles.find((x) => x.id === 'ta:translate/z')!.sections.map((x) => x.role)
+    expect(roles(hinted)).toEqual(roles(plain))
+    expect(groupsOf(hinted.segments)['ta:translate'].inputs).not.toBe(groupsOf(plain.segments)['ta:translate'].inputs)
+  })
+
   test('the segment holds related; the inputs of every tA group change with the configs and with the set of tA rows', async () => {
     const plain = groupsOf((await run(taSource())).segments)
     const translate = (plain['ta:translate'].seg.t as { articles: { id: string; related?: string[] }[] }).articles

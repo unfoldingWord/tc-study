@@ -3,9 +3,9 @@ import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { catalogView, hex, keyId, KNOWN, readerOutput, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
+import { catalogView, hex, keyId, KNOWN, readerOutput, readHeader, readSegment, verifyCatalog } from '@bt-synergy/language-pack-v3'
 import { createHash } from 'node:crypto'
-import { main, optionsFromArgs, USAGE } from './build-v3'
+import { main, optionsFromArgs, readRoleHints, USAGE } from './build-v3'
 import type { TopicSource } from './fetch-topic-sources'
 import { testKey } from './testKey'
 
@@ -35,6 +35,11 @@ async function run(args: string[]) {
 }
 
 const sample = (out: string, extra: string[] = []): string[] => ['--list', LIST, '--originals', ORIGINALS, '--parts', PARTS, '--out', out, '--built', BUILT, ...extra]
+
+/** Whether the file is an `art` segment (by its header). */
+function readRoleHintsIsArt(path: string): boolean {
+  return (readHeader(new Uint8Array(readFileSync(path))).header.h as { class?: unknown }).class === 'art'
+}
 
 const read = (path: string): Uint8Array => new Uint8Array(readFileSync(path))
 
@@ -249,6 +254,45 @@ describe('build-v3: arguments and errors', () => {
     expect(plain.out.concat(plain.err).some((l) => l.startsWith('role hints: '))).toBe(false)
     // The art segments that used a hint have the segment of the hints in their inputs: their catalog entries differ.
     expect(Buffer.from(read(join(hintedOut, 'catalog-es-419.seg'))).equals(Buffer.from(read(join(plainOut, 'catalog-es-419.seg'))))).toBe(false)
+  })
+
+  test('--role-hints with a folder that has no segments/: exit 1 with the usage', async () => {
+    const result = await run(sample(temp(), ['--role-hints', temp()]))
+    expect(result.code).toBe(1)
+    expect(result.err.join(' ')).toContain('--role-hints')
+    expect(result.err.join(' ')).toContain('segments')
+  })
+
+  test('--role-hints with a .seg that cannot be read: the error names the file', async () => {
+    const hints = temp()
+    mkdirSync(join(hints, 'segments'))
+    writeFileSync(join(hints, 'segments', 'bad.seg'), new Uint8Array([1, 2, 3, 4]))
+    const result = await run(sample(temp(), ['--books', 'tit', '--role-hints', hints]))
+    expect(result.code).toBe(2)
+    expect(result.err.join(' ')).toContain('Cannot read the role hints')
+    expect(result.err.join(' ')).toContain('bad.seg')
+  })
+
+  test('readRoleHints: an article in two art segments is an error', async () => {
+    const source = temp()
+    expect((await run(sample(source, ['--books', 'tit']))).code).toBe(0)
+    const hints = temp()
+    mkdirSync(join(hints, 'segments'))
+    const arts = readdirSync(join(source, 'segments')).filter((f) => readRoleHintsIsArt(join(source, 'segments', f)))
+    expect(arts.length).toBeGreaterThan(0)
+    cpSync(join(source, 'segments', arts[0]), join(hints, 'segments', 'one.seg'))
+    cpSync(join(source, 'segments', arts[0]), join(hints, 'segments', 'two.seg'))
+    await expect(readRoleHints(hints)).rejects.toThrow('is in two art segments')
+  })
+
+  test('two builds with the same hints give the same files (the inputs rows and the segment ids)', async () => {
+    const source = temp()
+    expect((await run(sample(source, ['--books', 'tit']))).code).toBe(0)
+    const a = temp()
+    const b = temp()
+    expect((await run(sample(a, ['--books', 'tit', '--role-hints', source]))).code).toBe(0)
+    expect((await run(sample(b, ['--books', 'tit', '--role-hints', source]))).code).toBe(0)
+    expect(snapshot(a)).toEqual(snapshot(b))
   })
 
   test('--role-hints that is not a folder with segments/: exit 1 with the usage', async () => {

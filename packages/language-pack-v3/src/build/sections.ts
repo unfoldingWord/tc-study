@@ -69,6 +69,8 @@ export type RegistryEntry = {
   fingerprint: string
   trigrams: number[]
   aliases?: string[]
+  /** Where `role` came from when it did not come from the heading table: absent for a table role (registries built before inheritance read so). */
+  roleFrom?: 'inherited' | 'hint'
 }
 
 /** The sections of each article of a build, by {@link articlePath}. */
@@ -309,7 +311,7 @@ function common(a: number[], b: number[]): number {
 
 // The registry as the build writes it
 
-const ENTRY_FIELDS = ['sid', 'title', 'level', 'role', 'fingerprint', 'trigrams', 'aliases']
+const ENTRY_FIELDS = ['sid', 'title', 'level', 'role', 'fingerprint', 'trigrams', 'aliases', 'roleFrom']
 
 /** An entry with its fields in the fixed order of {@link RegistryEntry}; a field this code does not know goes last, sorted. */
 function canonicalEntry(entry: RegistryEntry): RegistryEntry {
@@ -434,8 +436,10 @@ function assign(
 
   // 2. The same role and the same place among the sections of that role.
   const oldByRole = new Map<Role, number[]>()
-  old.forEach((entry, o) => pushTo(oldByRole, entry.role, o))
-  // Only roles the table gave count: an inherited or hinted role says nothing of where the section sits among its role's sections.
+  // Only roles the table gave count, in the old entries too: an inherited or hinted role says nothing of where the section sits among its role's sections.
+  old.forEach((entry, o) => {
+    if (entry.roleFrom === undefined) pushTo(oldByRole, entry.role, o)
+  })
   const seen = new Map<Role, number>()
   prepared.forEach(({ role, source }, i) => {
     if (source !== 'table') return
@@ -504,7 +508,7 @@ function assign(
 
   const sections: SectionModel[] = []
   const entries: RegistryEntry[] = []
-  prepared.forEach(({ part, role, lang, fingerprint, trigrams }, i) => {
+  prepared.forEach(({ part, role, source, lang, fingerprint, trigrams }, i) => {
     // The old sections this one holds: the one it matched and those it absorbed (ids.md: a merged section keeps the sid
     // of the first). One found by its heading or its role keeps the sid it matched; one found by its text takes the
     // sid of the earliest of them. The sids and aliases of the others become its aliases.
@@ -526,6 +530,7 @@ function assign(
     const entry: RegistryEntry =
       part.title === undefined ? { sid, level: part.level, role, fingerprint, trigrams } : { sid, title: part.title, level: part.level, role, fingerprint, trigrams }
     if (aliases.length > 0) entry.aliases = [...aliases]
+    if (source !== 'table') entry.roleFrom = source
     entries.push(entry)
   })
   return { sections, entries, hintUsed }

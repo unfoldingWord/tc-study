@@ -50,12 +50,13 @@ import {
   hex,
   KNOWN,
   signCatalog,
+  readHeader,
   readSegment,
   type Segment,
   ORIGINALS,
   artView,
-  type RoleHint,
   parseTipnr,
+  type RoleHint,
   type SectionRegistry,
   type TipnrRecord,
   xtopicsView,
@@ -277,15 +278,19 @@ export async function readRoleHints(dir: string): Promise<{ hints: Map<string, R
   const folder = join(dir, 'segments')
   let segments = 0
   for (const name of readdirSync(folder).filter((f) => f.endsWith('.seg')).sort()) {
+    const path = join(folder, name)
     let read
     try {
-      read = await readSegment(new Uint8Array(readFileSync(join(folder, name))), { known: KNOWN.art, expectedClass: 'art' })
+      const bytes = new Uint8Array(readFileSync(path))
+      // The header says the class: only the `art` segments hold roles.
+      if ((readHeader(bytes).header.h as { class?: unknown }).class !== 'art') continue
+      read = await readSegment(bytes, { known: KNOWN.art, expectedClass: 'art' })
     } catch (error) {
-      if (/is expected/.test((error as Error).message)) continue
-      throw new Error(`Cannot read the role hints ${join(folder, name)}: ${(error as Error).message}`)
+      throw new Error(`Cannot read the role hints ${path}: ${(error as Error).message}`)
     }
     segments++
     for (const article of artView(read.seg).articles) {
+      if (hints.has(article.id)) throw new Error(`Cannot read the role hints ${folder}: the article ${article.id} is in two art segments (${segs.get(article.id)} and ${read.id})`)
       hints.set(article.id, article.sections.filter((section) => section.level > 0).map(({ level, role }) => ({ level, role })))
       segs.set(article.id, read.id)
     }

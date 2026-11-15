@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { sha256Hex } from '../codec/sha256'
-import { articlePath, assignSids, normalizeHeading, roleOf, type SectionPart, type SectionRegistry, splitSections, trigramsOf } from './sections'
+import { articlePath, assignSids, canonicalRegistry, normalizeHeading, roleOf, type SectionPart, type SectionRegistry, splitSections, trigramsOf } from './sections'
 
 /** `n` distinct words that start with `prefix`, as one text: every trigram of it is different from those of another prefix. */
 const words = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${i}`).join(' ')
@@ -690,6 +690,34 @@ describe('assignSids: inherited roles and the sids', () => {
     expect(built.sections[0].sid).toBe('examples')
     expect(built.sections[2].sid).toBe('examples-2')
     expect(built.sections[1].sid).not.toBe('examples-2')
+  })
+
+  test('an old entry whose role is inherited does not take part in pass 2: a renamed table section keeps its own sid', () => {
+    const first = roleSid([
+      { level: 3, title: 'Examples from the Bible', md: 'a' },
+      { level: 4, title: 'A brand new subheading', md: 'b' },
+      { level: 3, title: 'Examples of translation strategies applied', md: 'c' },
+    ])
+    expect(first.registry[ART].map((e) => e.roleFrom)).toEqual([undefined, 'inherited', undefined])
+    const [a, sub, b] = sids(first.sections)
+    // B is renamed (pass 1 misses it) and still has a table role of the same kind.
+    const again = roleSid(
+      [
+        { level: 3, title: 'Examples from the Bible', md: 'a' },
+        { level: 4, title: 'A brand new subheading', md: 'b' },
+        { level: 3, title: 'Translation strategies applied', md: 'zzz' },
+      ],
+      first.registry,
+    )
+    expect(again.sections.map((s) => s.role)).toEqual(['examples', 'examples', 'examples'])
+    expect(sids(again.sections)).toEqual([a, sub, b])
+  })
+
+  test('a registry written without roleFrom still loads: its entries read as table roles', () => {
+    const entry = { sid: 'examples', title: 'Examples from the Bible', level: 3, role: 'examples' as const, fingerprint: sha256Hex('a'), trigrams: [] as number[] }
+    const built = roleSid([{ level: 3, title: 'Other examples from the Bible', md: 'a' }], { [ART]: [entry] })
+    expect(sids(built.sections)).toEqual(['examples'])
+    expect(canonicalRegistry({ [ART]: [entry] })[ART][0]).toEqual(entry)
   })
 
   test('level sequences: 2,4,3; a skip from 3 to 5; a level 1 resets', () => {

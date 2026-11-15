@@ -120,6 +120,16 @@ describe('publish-v3', () => {
     expect(existsSync(join(mapWork, 'role-hints'))).toBe(false)
   })
 
+  test('a map language that is not published: the build has no hints and the log says so', async () => {
+    const bucket = temp()
+    expect((await publish(en(bucket))).code).toBe(0)
+    const work = temp()
+    const run = await publish(es(bucket, ES, ['--map-lang', 'pt-br'], work))
+    expect(run.err.join(' ')).toContain('The map language pt-br is not published: built without role hints')
+    expect(existsSync(join(work, 'role-hints'))).toBe(false)
+    expect(run.err.some((l) => l.startsWith('role hints: '))).toBe(false)
+  })
+
   test('es-419 before en is skipped', async () => {
     const bucket = temp()
     mkdirSync(join(bucket, 'v3'), { recursive: true })
