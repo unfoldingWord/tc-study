@@ -35,10 +35,10 @@ const rank = {
         'ta:x/a-sub': ['Unrelated'],
         'ta:x/b-title': ['Team work'],
         'ta:x/z-title': ['The team'],
-        'ta:x/faith': ['Fe y gracia'],
+        'ta:x/faith': ['Fe gracia salvadora'],
         'ta:x/accent': ['Gracia Équipe'],
-        'ta:x/hi': ['का अनुवाद'],
-        'ta:x/ar': ['من ترجمة'],
+        'ta:x/hi': ['अनुवाद टीम'],
+        'ta:x/ar': ['ترجمة فريق'],
         'ta:x/same': ['Same'],
         'tw:x/term': ['Term'],
       },
@@ -67,11 +67,14 @@ describe('lookupMatches', () => {
   test('function words are ignored by the several-word rule, content words of two letters are kept', () => {
     expect(lookupMatches(taMaps, 'how to team').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
     expect(lookupMatches(taMaps, 'a to')).toEqual([])
-    expect(lookupMatches(rank, 'fe y gracia').map((m) => m.id)).toEqual(['ta:x/faith'])
-    expect(lookupMatches(rank, 'y gracia fe').map((m) => m.id)).toEqual(['ta:x/faith'])
+    expect(lookupMatches(rank, 'gracia y fe').map((m) => m.id)).toEqual(['ta:x/faith'])
+    expect(lookupMatches(rank, 'y fe de gracia').map((m) => m.id)).toEqual(['ta:x/faith'])
+    expect(lookupMatches(rank, 'y fe de paz')).toEqual([])
+    expect(lookupMatches(rank, 'का टीम अनुवाद').map((m) => m.id)).toEqual(['ta:x/hi'])
     expect(lookupMatches(rank, 'का अनुवाद').map((m) => m.id)).toEqual(['ta:x/hi'])
-    expect(lookupMatches(rank, 'من ترجمة').map((m) => m.id)).toEqual(['ta:x/ar'])
-    expect(lookupMatches(rank, 'من فريق')).toEqual([])
+    expect(lookupMatches(rank, 'का किताब')).toEqual([])
+    expect(lookupMatches(rank, 'من فريق').map((m) => m.id)).toEqual(['ta:x/ar'])
+    expect(lookupMatches(rank, 'من كتاب')).toEqual([])
   })
   test('accents, capitals, double spaces and punctuation do not matter; a mid-word start does not match', () => {
     expect(lookupMatches(rank, 'EQUIPE   Gracia').map((m) => m.id)).toEqual(['ta:x/accent'])
