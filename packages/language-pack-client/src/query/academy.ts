@@ -1,0 +1,48 @@
+/** `academy`: the tA articles the notes of a book cite, most cited first, from the usage of the `map`. No Node module here. */
+import { BOOKS, type MapSet } from '@bt-synergy/language-pack-v3'
+import { ClientError } from '../errors'
+import type { PackReader } from '../reader'
+import { type Answer, newAnswer, usedUnit } from './envelope'
+import { haveMap, usageBooks } from './maps'
+
+export type AcademyArticle = { id: string; title?: string; count: number; partial: boolean }
+export type AcademyData = { book: string; articles: AcademyArticle[] }
+
+type Named = { names?: Record<string, string[]> } | undefined
+
+/** The `ta:` ids the maps know: the usage table of the language, the English notes, and the names of the map. */
+function taIds(m: MapSet): Set<string> {
+  const ids = new Set<string>()
+  const add = (keys: Iterable<string> | undefined) => {
+    for (const k of keys ?? []) if (k.startsWith('ta:')) ids.add(k)
+  }
+  add(m.map?.core.usage?.rows.keys())
+  add(m.xmap?.core.notes?.rows.keys())
+  add(Object.keys((m.map?.core as Named)?.names ?? {}))
+  return ids
+}
+
+export function academyOf(m: MapSet, book: string): AcademyArticle[] {
+  const names = (m.map?.core as Named)?.names ?? {}
+  const out: AcademyArticle[] = []
+  for (const id of taIds(m)) {
+    const c = usageBooks(m, id)[book]
+    if (c === undefined || (c.state !== 'count' && c.state !== 'partial') || c.count === undefined) continue
+    const title = names[id]?.[0]
+    out.push({ id, ...(title !== undefined ? { title } : {}), count: c.count, partial: c.state === 'partial' })
+  }
+  return out.sort((a, b) => b.count - a.count || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
+
+export async function academyQuery(reader: PackReader, book: string): Promise<Answer<AcademyData | null>> {
+  if (typeof book !== 'string' || !(BOOKS as readonly string[]).includes(book)) throw new ClientError('E_ARG', `not a book: ${JSON.stringify(book)}`)
+  const out = newAnswer<AcademyData | null>(reader, 'academy')
+  const m = await reader.maps()
+  if (m.map !== undefined) usedUnit(out, reader, 'map')
+  if (!haveMap(out, reader, m, 'map')) {
+    out.data = null
+    return out
+  }
+  out.data = { book, articles: academyOf(m, book) }
+  return out
+}

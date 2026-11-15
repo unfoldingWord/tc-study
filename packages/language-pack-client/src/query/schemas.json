@@ -121,5 +121,16 @@
       "required": ["name"],
       "additionalProperties": false
     }
+  },
+  "academy": {
+    "label": { "es": "Academia: los artículos de tA que citan las notas de un libro, del más citado al menos" },
+    "description": "The Academy articles the translation notes of a book cite, with how many notes cite each, most cited first. It reads the language map only.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "book": { "type": "string", "description": "A book code, such as \"rut\"." } },
+      "required": ["book"],
+      "additionalProperties": false
+    }
   }
 }
