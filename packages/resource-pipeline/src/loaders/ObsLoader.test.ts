@@ -112,4 +112,26 @@ describe('ObsLoader reads the zip', () => {
     expect(a).toEqual(b)
     expect(a.title).toContain('Sin Enters the World')
   })
+
+  test('a directory ingredient with fewer than 50 files succeeds, rows only for the files there', async () => {
+    const { loader, store } = setup(files, meta({ contentMetadata: { ingredients: [{ identifier: 'obs', path: './content', isDir: true }] } }))
+    await loader.downloadResource(key)
+    expect([...store.keys()].filter((k) => k.startsWith('obs:')).sort()).toEqual([`obs:${key}:01`, `obs:${key}:02`])
+    expect(loader.lastSkipped.length).toBe(48)
+  })
+
+  test('an explicit id missing from the zip fails naming it, and every failed id is named', async () => {
+    const { loader } = setup({ 'manifest.yaml': 'x' })
+    const err = await loader.downloadResource(key).then(() => '', (e) => String(e.message))
+    expect(err).toContain('2 OBS stories')
+    expect(err).toContain('01: ')
+    expect(err).toContain('02: ')
+    expect(err).toContain('content/02.md')
+  })
+
+  test('a bad zip fails, even for a directory ingredient', async () => {
+    const { loader } = setup(files, meta({ contentMetadata: { ingredients: [{ identifier: 'obs', path: './content', isDir: true }] } }))
+    ;(loader as any).door43Client.downloadZipball = async () => new TextEncoder().encode('<html>502</html>').buffer
+    await expect(loader.downloadResource(key)).rejects.toThrow()
+  })
 })

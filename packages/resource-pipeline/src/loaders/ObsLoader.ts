@@ -78,6 +78,9 @@ function zipRef(metadata: ResourceMetadata): string {
   return metadata.release?.tag_name || (metadata as { default_branch?: string }).default_branch || 'master'
 }
 
+/** A story whose file is not in the zip. */
+class ObsStoryAbsentError extends Error {}
+
 type ObsZip = { ref: string; archive: JSZip; top: string }
 
 export class ObsLoader implements ResourceLoader {
@@ -85,6 +88,8 @@ export class ObsLoader implements ResourceLoader {
   private catalogAdapter: ObsCatalogAdapter
   private door43Client: ObsDoor43Client
   private debug: boolean
+  /** Story ids the last `downloadResource` skipped (directory-derived ids whose file is not in the zip). */
+  lastSkipped: string[] = []
   private zips = new Map<string, Promise<ObsZip>>()
 
   constructor(config: {
@@ -149,7 +154,7 @@ export class ObsLoader implements ResourceLoader {
     const ref = zip.ref
     const entry = zip.archive.files[`${zip.top}/${storyPath.replace(/^\.\//, '')}`]
     if (!entry || entry.dir) {
-      throw new Error(`Story file ${storyPath} is not in the ${owner}/${repoName} zip at ${ref}`)
+      throw new ObsStoryAbsentError(`Story file ${storyPath} is not in the ${owner}/${repoName} zip at ${ref}`)
     }
     const md = await entry.async('string')
     const parsed = parseObsStoryMarkdown(storyNum, md)
@@ -254,7 +259,11 @@ export class ObsLoader implements ResourceLoader {
     }
 
     let loaded = total - remaining.length
+    // Ids listed explicitly (a numeric ingredient identifier) must be in the zip; ids guessed from a directory
+    // ingredient (01..50) are skipped when their file is absent.
+    const explicit = (ingredients as { identifier?: string }[]).some((i) => i.identifier != null && /^\d+$/.test(String(i.identifier)))
     const failures: string[] = []
+    this.lastSkipped = []
     for (const storyId of remaining) {
       try {
         await this.loadContent(resourceKey, storyId)
@@ -267,7 +276,11 @@ export class ObsLoader implements ResourceLoader {
         })
       } catch (err) {
         loaded++
-        failures.push(err instanceof Error ? err.message : String(err))
+        if (!explicit && err instanceof ObsStoryAbsentError) {
+          this.lastSkipped.push(storyId)
+          continue
+        }
+        failures.push(`${storyId}: ${err instanceof Error ? err.message : String(err)}`)
         onProgress?.({
           loaded,
           total,
@@ -280,7 +293,7 @@ export class ObsLoader implements ResourceLoader {
       }
     }
     if (failures.length > 0) {
-      throw new Error(`${failures.length} OBS stories of ${resourceKey} failed: ${failures[0]}`)
+      throw new Error(`${failures.length} OBS stories of ${resourceKey} failed: ${failures.join('; ')}`)
     }
   }
 }
