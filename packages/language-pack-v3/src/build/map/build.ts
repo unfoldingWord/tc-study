@@ -33,6 +33,8 @@ export function buildMap(o: {
   obs: ObsModel | null
   bookNames?: Record<string, [string, string, string]>
   partial?: boolean
+  /** The titles the tA tocs give the articles, by `ta:` id ({@link conceptNames}). */
+  tocTitles?: Map<string, string[]>
 }): MapBuild {
   const books = [...o.books].sort((a, b) => bookNumber(a.model.book) - bookNumber(b.model.book))
   const usage = new Tally('notes')
@@ -50,7 +52,7 @@ export function buildMap(o: {
     part: 'core',
     res: refs.map((ref) => [ref.key, tagOf(ref.stamp)]),
     books: bookNames(books.map((b) => b.model), o.bookNames),
-    names: conceptNames(o.articles),
+    names: conceptNames(o.articles, o.tocTitles),
     coverage: coverageOf(refs.map((ref) => ({ ...ref, books: ref.books.filter((b) => BOOK_CODES.has(b) && built.has(b)) })), o.partial === true),
   }
   const subtitles = subtitlesOf(o.articles)

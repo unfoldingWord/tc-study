@@ -5,7 +5,8 @@
  * - {@link fetchTaConfigs} takes them from the release zip a parts list names for each Translation Academy resource (the release the
  *   parts were built from) and writes them in a folder: `<dir>/<resource key>/<manual>/config.yaml`. The folder of a resource is
  *   made even when its release has no config, so that "none in the release" and "not fetched" differ.
- * - {@link readTaConfigs} reads that folder back for a build.
+ * - It also writes the `toc.yaml` of each manual next to it: its titles name the articles (`build/taToc.ts`).
+ * - {@link readTaConfigs} and {@link readTaTocs} read that folder back for a build.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
@@ -41,18 +42,20 @@ export function taReleases(list: { resources?: ListResource[] }): { key: string;
   return out
 }
 
-/** The `config.yaml` of each manual in a Door43 release zip (one top folder), by manual. */
-export async function configsOfZip(zip: Uint8Array | ArrayBuffer): Promise<Map<string, string>> {
+/** The `config.yaml` and the `toc.yaml` of each manual in a Door43 release zip (one top folder), by manual. */
+export async function configsOfZip(zip: Uint8Array | ArrayBuffer): Promise<{ configs: Map<string, string>; tocs: Map<string, string> }> {
   const archive = await JSZip.loadAsync(zip, { checkCRC32: true })
   const tops = new Set(Object.keys(archive.files).map((name) => name.split('/')[0]))
   if (tops.size !== 1) throw new Error(`A Door43 zip has one top folder; this one has ${tops.size}`)
-  const out = new Map<string, string>()
+  const configs = new Map<string, string>()
+  const tocs = new Map<string, string>()
   for (const [name, entry] of Object.entries(archive.files)) {
     const parts = name.split('/')
-    if (entry.dir || parts.length !== 3 || parts[2] !== 'config.yaml' || !MANUAL.test(parts[1])) continue
-    out.set(parts[1], await entry.async('string'))
+    if (entry.dir || parts.length !== 3 || !MANUAL.test(parts[1])) continue
+    if (parts[2] === 'config.yaml') configs.set(parts[1], await entry.async('string'))
+    else if (parts[2] === 'toc.yaml') tocs.set(parts[1], await entry.async('string'))
   }
-  return out
+  return { configs, tocs }
 }
 
 /**
@@ -72,37 +75,50 @@ export async function fetchTaConfigs(o: { listFile: string; out: string; fetchFn
   for (const { key, tag, zip } of taReleases(list)) {
     const response = await fetchFn(zip)
     if (!response.ok) throw new Error(`${key}: GET ${zip} gave ${response.status}`)
-    const configs = await configsOfZip(await response.arrayBuffer())
+    const { configs, tocs } = await configsOfZip(await response.arrayBuffer())
     const folder = folderOf(partial, key)
     await mkdir(folder, { recursive: true })
     for (const [manual, text] of configs) {
       await mkdir(join(folder, manual), { recursive: true })
       await writeFile(join(folder, manual, 'config.yaml'), text)
     }
+    for (const [manual, text] of tocs) {
+      await mkdir(join(folder, manual), { recursive: true })
+      await writeFile(join(folder, manual, 'toc.yaml'), text)
+    }
     const manuals = [...configs.keys()].sort()
     written.set(key, manuals)
-    o.log?.(`${key} ${tag}: ${manuals.length === 0 ? 'no config.yaml' : manuals.map((m) => `${m}/config.yaml`).join(', ')}`)
+    const tocManuals = [...tocs.keys()].sort()
+    o.log?.(
+      `${key} ${tag}: ${manuals.length === 0 ? 'no config.yaml' : manuals.map((m) => `${m}/config.yaml`).join(', ')}; ${tocManuals.length === 0 ? 'no toc.yaml' : tocManuals.map((m) => `${m}/toc.yaml`).join(', ')}`,
+    )
   }
   await rm(o.out, { recursive: true, force: true })
   await rename(partial, o.out)
   return written
 }
 
-/**
- * The configs `fetchTaConfigs` wrote under `dir`, for the resources `keys`: a resource whose folder is not there is left out (the
- * build reports it); one whose folder is empty has an empty map (its release has none).
- */
-export function readTaConfigs(dir: string, keys: string[]): Map<string, Map<string, string>> {
+/** One file of each manual under `dir` for the resources `keys`: see {@link readTaConfigs}. */
+function readManualFiles(dir: string, keys: string[], name: string): Map<string, Map<string, string>> {
   const out = new Map<string, Map<string, string>>()
   for (const key of keys) {
     const folder = folderOf(dir, key)
     if (!existsSync(folder) || !statSync(folder).isDirectory()) continue
     const manuals = new Map<string, string>()
     for (const manual of readdirSync(folder).sort()) {
-      const file = join(folder, manual, 'config.yaml')
+      const file = join(folder, manual, name)
       if (MANUAL.test(manual) && existsSync(file)) manuals.set(manual, readFileSync(file, 'utf8'))
     }
     out.set(key, manuals)
   }
   return out
 }
+
+/**
+ * The configs `fetchTaConfigs` wrote under `dir`, for the resources `keys`: a resource whose folder is not there is left out (the
+ * build reports it); one whose folder is empty has an empty map (its release has none).
+ */
+export const readTaConfigs = (dir: string, keys: string[]): Map<string, Map<string, string>> => readManualFiles(dir, keys, 'config.yaml')
+
+/** The `toc.yaml` of each manual `fetchTaConfigs` wrote under `dir`, by resource key and manual, as {@link readTaConfigs}. */
+export const readTaTocs = (dir: string, keys: string[]): Map<string, Map<string, string>> => readManualFiles(dir, keys, 'toc.yaml')

@@ -18,7 +18,8 @@
  * - **orig**: the `sot` rows of the book in the originals; the resources are the originals that have the book;
  * - **art**: the `sot` rows of the articles of the group, in the resources of those articles. A tA group also has the `sot` rows of
  *   every tA article and one row `ta-config|{resource}/{manual}/config.yaml#{sha-256 of the text}` per config given: its
- *   `related` comes from all of them (`related.ts`); **lex**: the `sot` rows of the
+ *   `related` comes from all of them (`related.ts`). The `map` core has one row `ta-toc|{resource}/{manual}/toc.yaml#{sha-256 of the text}`
+ *   per `toc.yaml` given: its titles are more names of the articles (`taToc.ts`); **lex**: the `sot` rows of the
  *   lexicon files `content/{n}.json` of the group, in the resources of its entries; **obs**: the `sot` rows of every resource the
  *   segment names in `res`.
  *
@@ -36,6 +37,7 @@ import type { About, ArticleModel, BookModel, CatalogResource, LexEntry, OrigMod
 import { ORIGINALS, type ResourceRef, type Row, type RowSource } from '../source/rows'
 import { articleOfPath, articleResources, artSegment, extractArticles, type Kind } from './art'
 import type { TaConfigs } from './related'
+import { parseTaToc } from './taToc'
 import { extractBook, isBookResource } from './bookHelps'
 import { bookSegment } from './book'
 import { type BuiltSegment, buildCatalog, builtSegment, compareSegments, needsOfBook } from './catalog'
@@ -250,6 +252,8 @@ export async function buildLanguage(o: {
   aligned?: boolean
   withOrig?: boolean
   taConfigs?: TaConfigs
+  /** The text of the `toc.yaml` of each manual of each tA resource: its titles are more names of the articles. */
+  taTocs?: Map<string, Map<string, string>>
 }): Promise<LanguageBuild> {
   const { source, lang } = o
   const report: string[] = []
@@ -360,9 +364,24 @@ export async function buildLanguage(o: {
 
   // The language map: the notes counted by concept, the names of books and concepts, the coverage of every resource
   if (refs.length > 0) {
-    const built = buildMap({ lang, refs, books: mapBooks, articles: [...articles.values()].flat(), obs, bookNames: o.bookNames, partial: o.partial })
+    // The toc titles of each tA article, by id; a link that is not an article of the build is left out.
+    const articleIds = new Set([...articles.values()].flat().map((a) => a.id))
+    const tocTitles = new Map<string, string[]>()
+    const tocRows: RowKey[] = []
+    // Code point order, so the names and the input rows do not depend on the order of the caller's Maps.
+    const byCodePoint = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+    for (const [key, manuals] of [...(o.taTocs ?? [])].sort((a, b) => byCodePoint(a[0], b[0]))) {
+      for (const [manual, text] of [...manuals].sort((a, b) => byCodePoint(a[0], b[0]))) {
+        tocRows.push({ layer: 'ta-toc', key: `${key}/${manual}/toc.yaml#${sha256Hex(text)}` })
+        for (const [link, title] of parseTaToc(text, report, `${key}/${manual}/toc.yaml`)) {
+          const id = `ta:${manual}/${link.toLowerCase()}`
+          if (articleIds.has(id)) tocTitles.set(id, [...(tocTitles.get(id) ?? []), title])
+        }
+      }
+    }
+    const built = buildMap({ lang, refs, books: mapBooks, articles: [...articles.values()].flat(), obs, bookNames: o.bookNames, partial: o.partial, tocTitles })
     const all = refs.map((ref) => ref.key)
-    const coreRows: RowKey[] = [...mapRows.values()].flat()
+    const coreRows: RowKey[] = [...[...mapRows.values()].flat(), ...tocRows]
     for (const list of artRows.values()) coreRows.push(...list)
     if (obs !== null) for (const resource of obs.res.map(([key]) => key)) await addKeys(coreRows, source.rows({ lang, resource, layer: 'sot' }))
     await add(mapSegment(built.core), inputsOf(coreRows, stampsOf(all)), all)

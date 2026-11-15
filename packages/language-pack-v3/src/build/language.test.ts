@@ -909,4 +909,22 @@ describe('buildLanguage: the related of tA', () => {
     }
     expect(groupsOf((await run(more)).segments)['ta:checking'].inputs).not.toBe(plain['ta:checking'].inputs)
   })
+
+  test('the titles of a toc are more names of the articles and change the inputs of the map core', async () => {
+    const mapOf = (b: Awaited<ReturnType<typeof run>>) => b.segments.filter((s) => s.seg.h.class === 'map' && s.seg.h.part === 'core')[0]
+    const plain = mapOf(await run(taSource()))
+    const toc = 'sections:\n  - title: "Heading"\n    sections:\n      - title: "Alt Name"\n        link: A\n      - title: "Gone"\n        link: nope\n'
+    const withToc = mapOf(await buildLanguage({ source: taSource(), lang: ES, registry: registry(), about, taTocs: new Map([[TA, new Map([['translate', toc]])]]) }))
+    const names = (withToc.seg.t as { names: Record<string, string[]> }).names
+    expect(names['ta:translate/a'].slice(1)).toEqual(['Alt Name'])
+    expect(Object.keys(names)).not.toContain('ta:translate/nope')
+    expect(withToc.inputs).not.toBe(plain.inputs)
+    // The order of the caller's Maps does not matter.
+    const toc2 = 'sections:\n  - title: "Other"\n    link: b\n'
+    const fwd = new Map([[TA, new Map([['translate', toc], ['checking', toc2]])]])
+    const rev = new Map([[TA, new Map([['checking', toc2], ['translate', toc]])]])
+    const a = mapOf(await buildLanguage({ source: taSource(), lang: ES, registry: registry(), about, taTocs: fwd }))
+    const b = mapOf(await buildLanguage({ source: taSource(), lang: ES, registry: registry(), about, taTocs: rev }))
+    expect(Buffer.from(a.bytes).equals(Buffer.from(b.bytes))).toBe(true)
+  })
 })

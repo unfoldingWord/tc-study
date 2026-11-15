@@ -18,7 +18,7 @@ map-header = {
 
 map-core-tables = {
   "books": [66*66 book-name],  ; required, v1; in canonical order (ids.md)
-  "names": { * concept-id => [+ tstr] },   ; required, v1; the title first, then other names
+  "names": { * concept-id => [+ tstr] },   ; required, v1; the title first, then other names (tA: the title, then the toc.yaml titles that differ from it)
   ? "subtitles": { * concept-id => tstr }, ; optional, v1; tA: the question each article answers
   "coverage": coverage,        ; required, v1; per resource key: the books it has
   ? "usage": counts,           ; optional, v1; unit "notes": Academy articles used by this language's notes

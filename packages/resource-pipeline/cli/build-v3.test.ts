@@ -255,6 +255,25 @@ describe('build-v3: arguments and errors', () => {
     expect(result.err.join('\n')).toContain(USAGE)
   })
 
+  test('a --ta-config folder with a config.yaml and no toc.yaml logs that no toc was found', async () => {
+    const dir = temp()
+    const list = JSON.parse(readFileSync(LIST, 'utf8'))
+    const key = 'es-419_gl/es-419/ta'
+    list.resources.push({ key, subject: 'Translation Academy', stamp: 'v4#2024-07-17T20_15_35Z' })
+    writeFileSync(join(dir, 'list.json'), JSON.stringify(list))
+    const manual = join(dir, 'ta-config', ...key.split('/'), 'translate')
+    mkdirSync(manual, { recursive: true })
+    writeFileSync(join(manual, 'config.yaml'), 'a:\n')
+    const args = sample(join(dir, 'out'), ['--ta-config', join(dir, 'ta-config')]).map((arg) => (arg === LIST ? join(dir, 'list.json') : arg))
+    const result = await run(args)
+    expect(result.err).toEqual([])
+    expect(result.out).toContain(`no toc.yaml for ${key} (none in the release, or a folder fetched before toc.yaml was read)`)
+    // With a toc.yaml next to the config the line is not printed.
+    writeFileSync(join(manual, 'toc.yaml'), 'projects: []\n')
+    const again = await run(args.map((arg) => (arg === join(dir, 'out') ? join(dir, 'out2') : arg)))
+    expect(again.out.join('\n')).not.toContain('no toc.yaml')
+  })
+
   test('a --parts directory that does not exist: exit 1, the message names it', async () => {
     const missing = join(temp(), 'no-parts')
     const result = await run(sample(temp()).map((arg) => (arg === PARTS ? missing : arg)))

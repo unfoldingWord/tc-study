@@ -76,7 +76,7 @@ All are methods of `PackReader`; each returns an `Answer<T>`:
 
 ```ts
 type Answer<T> = {
-  query: 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context'
+  query: 'passage' | 'concept' | 'article' | 'renderings' | 'search' | 'topics' | 'books' | 'context' | 'lookup' | 'academy'
   data: T | null                                   // null when the unit that answers is not installed
   cites: { res; release; id?; ref?; section? }[]   // where each datum comes from
   revision: { lang?; common?; units: Record<unit, number> } // a book of revision 1 under a map of revision 2 says both
@@ -94,6 +94,7 @@ type Answer<T> = {
 | `topics({ category?, book? })` | people, places, events, stories, sections | the topics of the `xtopics` module (`installed: false` when it is not on the device) |
 | `books({ article } or { concept })` | which books use it | one cell per book: `state`, `count`, `verses`, `installed`, `bytes` |
 | `renderings({ strong } or { book, word })` | a Strong's number or a word | how the language renders it, with counts and references |
+| `academy(book)` | `'rut'` | the tA articles the notes of the book cite: `book`, `covered` (false when the language has no tN that covers the book: then `articles` is `[]` for lack of a source, not because nothing is cited), `articles` (`id`, `title`, `count`, `partial`, most cited first); `data: null` when the `map` is not installed |
 | `search(text, filters?)` | full text | hits over the installed books, from the client's index or one built in memory |
 
 `none` means the source does not cover the book; it is not zero. The JSON Schema of each `data` is `schemas` (exported from the package, `src/query/schemas.json`). For a `ta:` article, `books` and `context` read the usage table of the language's `map`, judged by the language's own `tn` source (the coverage key whose last segment is `tn`, not `unfoldingWord/en/tn`); a language whose map has none gets `none` in every cell. A `tw:` article reads the English word links (`unfoldingWord/en/twl`) of the `xmap`. The answer names the `map` or `xmap` unit in `revision.units`. When the map a query needs is not on the device or its bytes are bad (`xmap` for `tw:` and Strong's numbers, `map` for `ta:`, `xtopics` for topics), the data says `installed: false` and the unit is in `notInstalled`: nobody looked, which is not `none`. `renderings` resolves the Strong's number by the lookup rule of the `strong` table (`G5485` is `G54850` when the table has that one) and `data.strong` is the resolved key. A passage's `coverage` is `zero` for a source that covers the whole book but has no row in the range. `search` returns hits of the books active in this reader only.
