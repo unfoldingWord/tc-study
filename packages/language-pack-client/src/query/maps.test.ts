@@ -82,6 +82,14 @@ describe('books', () => {
     const r = await open({ books: ['tit'] })
     expect((await r.books({ article: 'tw:kt/apostle' })).data!.books.tit!.state).toBe('count')
   })
+  test('an article or a tW concept with obs not installed lists obs in notInstalled', async () => {
+    const r = await open({ books: ['tit'] })
+    for (const q of [{ article: 'ta:translate/figs-metaphor' }, { concept: 'tw:kt/god' }]) {
+      const a = await r.books(q)
+      expect(a.data!.obs).toMatchObject({ state: 'none', installed: false })
+      expect(a.notInstalled.find((n) => n.unit === 'obs')).toEqual({ unit: 'obs', bytes: r.size('obs') })
+    }
+  })
   test('a concept that is a topic flags installed per book', async () => {
     const r = await open({ books: ['tit'] })
     const a = await r.books({ concept: 'per:abraham' })
@@ -117,7 +125,7 @@ describe('concept', () => {
     expect(miss!.bytes).toBeGreaterThan(0)
     expect(a.revision.units.xmap).toBeGreaterThan(0)
   })
-  test('with the book installed nothing is missing', async () => {
+  test('only obs is missing', async () => {
     const r = await open({ books: ['tit'] })
     // The obs unit is not installed here: it is the only thing missing.
     expect((await r.concept(METAPHOR)).notInstalled.map((n) => n.unit)).toEqual(['obs'])

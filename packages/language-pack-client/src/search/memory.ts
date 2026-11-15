@@ -2,7 +2,7 @@
  * ranked differently: here by word count over the square root of the piece length, there by SQLite's bm25. With
  * more matches than the limit, the two can keep different hits. */
 import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
-import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfObs,type SearchFilters, type SearchIndex } from './types'
+import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
 
 const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 

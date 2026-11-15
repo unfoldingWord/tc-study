@@ -3,7 +3,7 @@
  * no SQLite binding. The text of the user is never FTS5 syntax: each word is a quoted phrase of its own (all must match).
  */
 import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
-import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfObs,type SearchFilters, type SearchIndex } from './types'
+import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
 
 export interface SqlDriver {
   exec(sql: string): Promise<void>

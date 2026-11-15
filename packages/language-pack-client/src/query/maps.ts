@@ -182,7 +182,10 @@ export async function booksQuery(reader: PackReader, q: { article: string } | { 
   out.data = { books }
   if (id.startsWith('ta:') || id.startsWith('tw:')) {
     if (!reader.installed('obs')) {
-      if (reader.listed('obs')) out.data.obs = { state: 'none', installed: false, bytes: reader.size('obs') }
+      if (reader.listed('obs')) {
+        out.data.obs = { state: 'none', installed: false, bytes: reader.size('obs') }
+        missingUnit(out, { unit: 'obs', bytes: reader.size('obs') })
+      }
     } else {
       const model = await reader.obs()
       if (model !== undefined) {

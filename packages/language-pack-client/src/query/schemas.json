@@ -91,7 +91,7 @@
   },
   "books": {
     "label": { "es": "Libros: dónde se usa un artículo o concepto, y si el libro está instalado" },
-    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed. A tW or tA article also has an obs cell: the Open Bible Stories frames linked (tW) or notes (tA), none when the language has no such table, installed false when the obs unit is not installed.",
+    "description": "For each book, how often an article or concept is used there (or that the source does not cover it) and whether the book is installed. A tW or tA article also has an obs cell: the Open Bible Stories frames linked (tW) or notes (tA), none when the language has no such table, state none with installed false when the obs unit is not installed (not looked at, the unit is not installed; it is then listed in notInstalled).",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
