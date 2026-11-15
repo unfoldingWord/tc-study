@@ -16,7 +16,7 @@ export const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu,
 
 /**
  * Every name the maps know for each id, the language's first: the names of the language map (titles of the articles in this
- * language), the language's names of topics, the common title of a topic, and the last part of an article id as words
+ * language), the language's names of topics, the common title of a topic, the subtitle of an Academy article (its question), and the last part of an article id as words
  * (`tw:kt/grace` is "grace", `ta:translate/figs-metaphor` is "figs metaphor").
  */
 function namesById(m: MapSet): Map<string, string[]> {
@@ -29,6 +29,8 @@ function namesById(m: MapSet): Map<string, string[]> {
   }
   const core = m.map?.core as { names?: Record<string, string[]> } | undefined
   for (const [id, names] of Object.entries(core?.names ?? {})) for (const n of names) add(id, n)
+  const subtitles = (m.map?.core as { subtitles?: Record<string, string> } | undefined)?.subtitles
+  for (const [id, sub] of Object.entries(subtitles ?? {})) if (id.startsWith('ta:')) add(id, sub)
   const topics = m.topics?.core as { names?: Record<string, unknown[][]> } | undefined
   for (const [id, names] of Object.entries(topics?.names ?? {})) for (const n of names) add(id, typeof n[0] === 'string' ? n[0] : undefined)
   const xtopics = m.xtopics?.core as { topics?: Map<string, { title?: string }> } | undefined
@@ -45,6 +47,8 @@ function namesById(m: MapSet): Map<string, string[]> {
 export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[] {
   const q = fold(name)
   if (q === '') return []
+  const words = q.split(/\s+/)
+  const long = words.length >= 2 ? words.filter((w) => w.length > 2) : []
   const scored: { id: string; names: string[]; score: number }[] = []
   for (const [id, names] of namesById(m)) {
     let score = 3
@@ -53,6 +57,10 @@ export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[
       if (f === q) score = 0
       else if (f.startsWith(q) || f.split(/\s+/).includes(q)) score = Math.min(score, 1)
       else if (f.includes(q)) score = Math.min(score, 2)
+      else if (long.length > 0) {
+        const parts = f.split(/[^\p{L}\p{N}]+/u)
+        if (long.every((w) => parts.some((p) => p.startsWith(w)))) score = Math.min(score, 2)
+      }
     }
     if (score < 3) scored.push({ id, names, score })
   }

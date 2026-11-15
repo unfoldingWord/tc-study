@@ -14,7 +14,34 @@ const maps = {
   xmap: { core: { concepts: new Map([['tw:kt/grace', 0], ['tw:other/graceful', 0], ['ta:translate/figs-metaphor', 0]]) }, parts: new Map() },
 } as never
 
+const taMaps = {
+  revision: 1,
+  map: {
+    core: {
+      lang: 'en',
+      names: { 'ta:manage/translate-team': ['Setting Up A Translation Team'] },
+      subtitles: { 'ta:manage/translate-team': 'How can I set up a translation team?' },
+    },
+    parts: new Map(),
+  },
+} as never
+
 describe('lookupMatches', () => {
+  test('the subtitle of an article is a name, after the title', () => {
+    const [hit] = lookupMatches(taMaps, 'set up a translation team')
+    expect(hit!.id).toBe('ta:manage/translate-team')
+    expect(hit!.names).toEqual(['Setting Up A Translation Team', 'How can I set up a translation team?'])
+    expect(hit!.exact).toBe(false)
+  })
+  test('several words match in any order, as whole words or word starts', () => {
+    expect(lookupMatches(taMaps, 'team translation').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
+    expect(lookupMatches(taMaps, 'transl tea').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
+    expect(lookupMatches(taMaps, 'team horse')).toEqual([])
+  })
+  test('words of one or two letters are ignored by the several-word rule', () => {
+    expect(lookupMatches(taMaps, 'how to team').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
+    expect(lookupMatches(taMaps, 'a to')).toEqual([])
+  })
   test('a name in the language, with or without accents and capitals, finds its id first', () => {
     const [first] = lookupMatches(maps, 'metafora')
     expect(first).toEqual({ id: 'ta:translate/figs-metaphor', names: ['Metáfora', 'figs metaphor'], exact: true })
