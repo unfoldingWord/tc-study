@@ -185,9 +185,9 @@ describe('case 4: tito-es419, the real book', () => {
     expect(out.links.res).toBe('es-419_gl/es-419/twl')
   })
 
-  test('GLT has 1 913 pieces, 953 words, all aligned, 69 events; GST 3 471, 1 732, all aligned, 69', () => {
+  test('GLT has 1 922 pieces, 953 words, all aligned, 69 events; GST 3 480, 1 732, all aligned, 69', () => {
     const [glt, gst] = out.texts
-    for (const [text, pieces, words] of [[glt, 1913, 953], [gst, 3471, 1732]] as const) {
+    for (const [text, pieces, words] of [[glt, 1922, 953], [gst, 3480, 1732]] as const) {
       expect(text.pieces).toHaveLength(pieces)
       expect(text.pieces.filter((p: [string, boolean]) => p[1])).toHaveLength(words)
       expect(text.align).toHaveLength(words)

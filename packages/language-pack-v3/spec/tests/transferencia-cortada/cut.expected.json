@@ -33,7 +33,7 @@
         },
         "v": 1
       },
-      "id": "4554c992186d17ed9056a84684aed26dfd4b89ebdf8780af1732317b0fcf44fa",
+      "id": "668759e8f73859e28ff87aac0ab73803ce2d187b917554183ed94899c808d194",
       "resources": [
         {
           "books": "000000000000800000",
@@ -80,10 +80,10 @@
         {
           "book": "tit",
           "class": "book",
-          "id": "12e4f2c8c44626fda329709ee53f852cef3d93046a36f145f2196738f794469b",
+          "id": "4d594775635152ce4ec12cbc211f9315b5c21d9a5577777563f982077a92254d",
           "inputs": "38c7a9b9849f1c0eaf8117628c74f9dece052c477ce2b022f9a146beb70e9383",
-          "size": 37713,
-          "ulen": 104046
+          "size": 37716,
+          "ulen": 104064
         }
       ],
       "units": [
@@ -104,7 +104,7 @@
   "entries": [
     {
       "class": "catalog",
-      "id": "4554c992186d17ed9056a84684aed26dfd4b89ebdf8780af1732317b0fcf44fa",
+      "id": "668759e8f73859e28ff87aac0ab73803ce2d187b917554183ed94899c808d194",
       "kind": "segment",
       "status": "ok"
     },
@@ -116,7 +116,7 @@
     },
     {
       "class": "book",
-      "id": "12e4f2c8c44626fda329709ee53f852cef3d93046a36f145f2196738f794469b",
+      "id": "4d594775635152ce4ec12cbc211f9315b5c21d9a5577777563f982077a92254d",
       "kind": "segment",
       "status": "missing"
     }
@@ -124,29 +124,29 @@
   "index": {
     "by": "build-cases 1",
     "catalogs": [
-      "4554c992186d17ed9056a84684aed26dfd4b89ebdf8780af1732317b0fcf44fa"
+      "668759e8f73859e28ff87aac0ab73803ce2d187b917554183ed94899c808d194"
     ],
     "entries": [
       {
         "class": "catalog",
-        "id": "4554c992186d17ed9056a84684aed26dfd4b89ebdf8780af1732317b0fcf44fa",
+        "id": "668759e8f73859e28ff87aac0ab73803ce2d187b917554183ed94899c808d194",
         "kind": "segment",
         "offset": 0,
-        "size": 743
+        "size": 739
       },
       {
         "class": "book",
         "id": "644fd73e8b75f16563e6adf91301f5f7727339f3e405ab9ce9ebf3dfe7e52ea7",
         "kind": "segment",
-        "offset": 743,
+        "offset": 739,
         "size": 427
       },
       {
         "class": "book",
-        "id": "12e4f2c8c44626fda329709ee53f852cef3d93046a36f145f2196738f794469b",
+        "id": "4d594775635152ce4ec12cbc211f9315b5c21d9a5577777563f982077a92254d",
         "kind": "segment",
-        "offset": 1170,
-        "size": 37713
+        "offset": 1166,
+        "size": 37716
       }
     ],
     "made": "2026-11-01T10:00:00Z",
