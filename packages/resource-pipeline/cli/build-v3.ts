@@ -60,7 +60,7 @@ import {
 } from '@bt-synergy/language-pack-v3'
 import { partsSource } from '@bt-synergy/language-pack-v3/node/partsSource'
 import { readSigningKey, type SigningKey } from '../src/language/signKey'
-import { readTaConfigs } from '../src/language/taConfig'
+import { readTaConfigs, readTaTocs } from '../src/language/taConfig'
 import { pins, sourcesProblem, type TopicSource } from './fetch-topic-sources'
 
 export class UsageError extends Error {}
@@ -394,6 +394,7 @@ async function build(o: Options, io: Io): Promise<void> {
   // Without --ta-config the related of the tA articles comes from the links alone (a log line says so).
   const taKeys = (await source.resources(lang)).filter((ref) => ref.kind === 'Translation Academy').map((ref) => ref.key)
   const taConfigs = o.taConfig === undefined ? undefined : readTaConfigs(o.taConfig, taKeys)
+  const taTocs = o.taConfig === undefined ? undefined : readTaTocs(o.taConfig, taKeys)
   if (taConfigs === undefined && taKeys.length > 0) io.log('no --ta-config: the related of the tA articles comes from the links of the texts alone')
   const built = await buildLanguage({
     source,
@@ -406,6 +407,7 @@ async function build(o: Options, io: Io): Promise<void> {
     topics,
     aligned: o.aligned,
     taConfigs,
+    taTocs,
   })
 
   // Signing changes the header of a catalog and nothing its id is the hash of: the ids, and so every `requires` and every segment, stay.

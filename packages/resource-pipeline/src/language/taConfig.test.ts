@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import JSZip from 'jszip'
 import { main } from '../../cli/fetch-ta-config'
-import { configsOfZip, fetchTaConfigs, readTaConfigs, taReleases } from './taConfig'
+import { configsOfZip, fetchTaConfigs, readTaConfigs, readTaTocs, taReleases } from './taConfig'
 
 const TA = 'es-419_gl/es-419/ta'
 const ZIP = 'https://git.door43.org/es-419_gl/es-419_ta/archive/v4.zip'
@@ -51,7 +51,7 @@ describe('taReleases', () => {
 describe('configsOfZip', () => {
   test('keeps the config.yaml of each manual and nothing else', async () => {
     const zip = await zipOf({ 'translate/config.yaml': 'a:\n', 'checking/config.yaml': 'b:\n', 'translate/toc.yaml': 'x', 'translate/a/config.yaml': 'no', 'manifest.yaml': 'm' })
-    const configs = await configsOfZip(zip)
+    const { configs, tocs } = await configsOfZip(zip)
     expect([...configs.entries()].sort()).toEqual([
       ['checking', 'b:\n'],
       ['translate', 'a:\n'],
@@ -64,7 +64,7 @@ describe('fetchTaConfigs and readTaConfigs', () => {
     const dir = tempDir()
     const listFile = join(dir, 'list.json')
     writeFileSync(listFile, JSON.stringify(list([taResource()])))
-    const zip = await zipOf({ 'translate/config.yaml': 'figs-metaphor:\n  dependencies:\n    - figs-simile\n', 'intro/config.yaml': 'ta-intro:\n' })
+    const zip = await zipOf({ 'translate/config.yaml': 'figs-metaphor:\n  dependencies:\n    - figs-simile\n', 'intro/config.yaml': 'ta-intro:\n', 'translate/toc.yaml': 'title: "T"\n' })
     const asked: string[] = []
     const out = join(dir, 'ta-config')
     const written = await fetchTaConfigs({ listFile, out, fetchFn: (async (url: string) => (asked.push(url), new Response(zip))) as unknown as typeof fetch })
@@ -75,6 +75,9 @@ describe('fetchTaConfigs and readTaConfigs', () => {
     const read = readTaConfigs(out, [TA, 'unfoldingWord/en/ta'])
     expect([...read.keys()]).toEqual([TA])
     expect([...read.get(TA)!.keys()]).toEqual(['intro', 'translate'])
+    const tocs = readTaTocs(out, [TA, 'unfoldingWord/en/ta'])
+    expect([...tocs.keys()]).toEqual([TA])
+    expect([...tocs.get(TA)!]).toEqual([['translate', 'title: "T"\n']])
   })
 
   test('a release with no config gives an empty folder, read as an empty map', async () => {

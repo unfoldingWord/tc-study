@@ -49,15 +49,29 @@ export function bookNames(books: BookModel[], list?: Record<string, [string, str
   })
 }
 
-/** The names of each concept: a tW title split at commas, a tA title whole; keys sorted by code point. */
-export function conceptNames(articles: ArticleModel[]): Record<string, string[]> {
+/** The fold of a name for comparing two: case and spaces. */
+const fold = (s: string): string => s.toLowerCase().replace(/\s+/g, '')
+
+/**
+ * The names of each concept: a tW title split at commas; a tA title whole, then each title the manual's toc gives it
+ * (`tocTitles`, by id, in toc order) that differs from it after folding case and spaces, with no repeats. Keys sorted by code point.
+ */
+export function conceptNames(articles: ArticleModel[], tocTitles?: Map<string, string[]>): Record<string, string[]> {
   const out: Record<string, string[]> = {}
   for (const a of [...articles].sort((x, y) => compareCodePoints(x.id, y.id))) {
     if (a.id.startsWith('tw:')) {
       const parts = a.title.split(',').map((s) => s.trim()).filter((s) => s !== '')
       if (parts.length > 0) out[a.id] = parts
     } else if (a.id.startsWith('ta:')) {
-      if (a.title.trim() !== '') out[a.id] = [a.title]
+      if (a.title.trim() === '') continue
+      const names = [a.title]
+      const seen = new Set([fold(a.title)])
+      for (const title of tocTitles?.get(a.id) ?? []) {
+        if (title.trim() === '' || seen.has(fold(title))) continue
+        seen.add(fold(title))
+        names.push(title)
+      }
+      out[a.id] = names
     }
   }
   return out

@@ -69,6 +69,21 @@ describe('bookNames', () => {
 
 const art = (id: string, title: string, subtitle?: string): ArticleModel => ({ id, res: 'r', title, ...(subtitle ? { subtitle } : {}), sections: [] })
 
+describe('conceptNames with toc titles', () => {
+  test('the title first, then the toc titles that differ after folding case and spaces, without repeats', () => {
+    const arts = [art('ta:translate/figs-simetaphor', 'Simple Metaphor'), art('ta:translate/other', 'Other'), art('tw:kt/god', 'Dios')]
+    const toc = new Map([
+      ['ta:translate/figs-simetaphor', ['simple  metaphor', 'Biblical Imagery — Simple Metaphors', 'Biblical Imagery — Simple Metaphors', 'Another']],
+      ['tw:kt/god', ['Ignored']],
+    ])
+    expect(conceptNames(arts, toc)).toEqual({
+      'ta:translate/figs-simetaphor': ['Simple Metaphor', 'Biblical Imagery — Simple Metaphors', 'Another'],
+      'ta:translate/other': ['Other'],
+      'tw:kt/god': ['Dios'],
+    })
+  })
+})
+
 describe('conceptNames and subtitlesOf', () => {
   test('tW titles split at commas; tA keep the title', () => {
     const arts = [art('tw:kt/grace', ' gracia , amable,, '), art('tw:kt/god', 'Dios'), art('ta:translate/figs-metaphor', 'Metáfora, x', 'Sub')]
