@@ -332,6 +332,11 @@ export function makeReader(o: ReaderInput): PackReader {
       const id = activeIds.get(unit)![0]
       if (model !== undefined && id !== undefined) await index.addBook(o.lang, model, id)
     }
+    if (reader.installed('obs')) {
+      const model = await reader.obs()
+      const id = activeIds.get('obs')?.[0]
+      if (model !== undefined && id !== undefined) await index.addObs(o.lang, model, id)
+    }
     return index
   }
   const lang = o.revisions?.lang ?? langCat?.revision
@@ -384,7 +389,7 @@ export function makeReader(o: ReaderInput): PackReader {
         })
         index = await run
       }
-      return searchQuery(reader, index, [...listedUnits].filter((u) => u.startsWith('book:')), text, filters)
+      return searchQuery(reader, index, [...listedUnits].filter((u) => u.startsWith('book:') || u === 'obs'), text, filters)
     },
     academy: (book) => academyQuery(reader, book),
     stories: (ref) => storiesQuery(reader, ref),

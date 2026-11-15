@@ -1,7 +1,7 @@
 /** The search index contract and the rows of a book that both indexes keep. No Node module here. */
-import type { BookModel, Event, Piece } from '@bt-synergy/language-pack-v3'
+import type { BookModel, Event, ObsModel, Piece } from '@bt-synergy/language-pack-v3'
 
-export type SearchKind = 'text' | 'note' | 'question' | 'link'
+export type SearchKind = 'text' | 'note' | 'question' | 'link' | 'title'
 
 export type SearchFilters = { books?: string[]; kinds?: SearchKind[]; limit?: number }
 
@@ -19,6 +19,8 @@ export type Hit = { kind: string; book: string; ref: string; res: string; id?: s
 export interface SearchIndex {
   init(): Promise<void>
   addBook(lang: string, book: BookModel, segmentId: string): Promise<void>
+  /** The rows of the `obs` unit, with `book: 'obs'` (`rowsOfObs`). */
+  addObs(lang: string, obs: ObsModel, segmentId: string): Promise<void>
   removeSegment(segmentId: string): Promise<void>
   has(segmentId: string): Promise<boolean>
   search(lang: string, text: string, f?: SearchFilters): Promise<Hit[]>
@@ -72,6 +74,23 @@ export function rowsOf(book: BookModel): PieceRow[] {
       rid: r.id,
       body: [str(r.cols.origWords), str(r.cols.tags), str(r.cols.articlePath), r.concept ?? ''].filter((s) => s !== '').join(' '),
     })
+  return rows.filter((r) => r.body !== '')
+}
+
+const pad = (n: number): string => String(n).padStart(2, '0')
+const frameRef = (frame: number): string => `${pad(Math.floor(frame / 100))}:${pad(frame % 100)}`
+
+/** The rows of Open Bible Stories: a title (`NN:0`, none when the title is empty), each frame, each note (quote and note), each question (question and response). */
+export function rowsOfObs(obs: ObsModel): PieceRow[] {
+  const rows: PieceRow[] = []
+  for (const s of obs.stories) {
+    rows.push({ kind: 'title', ref: `${pad(s.n)}:0`, res: s.res, rid: '', body: s.title.trim() })
+    for (const f of s.frames) rows.push({ kind: 'text', ref: `${pad(s.n)}:${pad(f.n)}`, res: s.res, rid: '', body: f.text })
+  }
+  for (const r of obs.notes?.rows ?? [])
+    rows.push({ kind: 'note', ref: frameRef(r.frame), res: obs.notes!.res, rid: r.id, body: `${str(r.cols.quote)} ${str(r.cols.note)}`.trim() })
+  for (const r of obs.questions?.rows ?? [])
+    rows.push({ kind: 'question', ref: frameRef(r.frame), res: obs.questions!.res, rid: r.id, body: `${str(r.cols.question)}\n${str(r.cols.response)}`.trim() })
   return rows.filter((r) => r.body !== '')
 }
 

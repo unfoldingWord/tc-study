@@ -2,8 +2,8 @@
  * Full-text search over an FTS5 table, through a driver the host provides (bun:sqlite, wa-sqlite, expo-sqlite...). This file knows
  * no SQLite binding. The text of the user is never FTS5 syntax: each word is a quoted phrase of its own (all must match).
  */
-import type { BookModel } from '@bt-synergy/language-pack-v3'
-import { DEFAULT_LIMIT, type Hit, queryWords, rowsOf, type SearchFilters, type SearchIndex } from './types'
+import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
+import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfObs,type SearchFilters, type SearchIndex } from './types'
 
 export interface SqlDriver {
   exec(sql: string): Promise<void>
@@ -13,6 +13,25 @@ export interface SqlDriver {
 }
 
 export function sqlIndex(driver: SqlDriver): SearchIndex {
+  async function store(lang: string, bookName: string, rows: PieceRow[], segmentId: string): Promise<void> {
+    await driver.transaction(async () => {
+      await driver.run('DELETE FROM pieces WHERE seg = ?', [segmentId])
+      await driver.run('DELETE FROM indexed WHERE seg = ?', [segmentId])
+      for (const r of rows) {
+        await driver.run('INSERT INTO pieces (body, kind, lang, book, ref, res, rid, seg) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [
+          r.body,
+          r.kind,
+          lang,
+          bookName,
+          r.ref,
+          r.res,
+          r.rid,
+          segmentId,
+        ])
+      }
+      await driver.run('INSERT INTO indexed (seg, lang, book) VALUES (?, ?, ?)', [segmentId, lang, bookName])
+    })
+  }
   return {
     async init() {
       await driver.exec(
@@ -21,24 +40,10 @@ export function sqlIndex(driver: SqlDriver): SearchIndex {
       )
     },
     async addBook(lang: string, book: BookModel, segmentId: string) {
-      const rows = rowsOf(book)
-      await driver.transaction(async () => {
-        await driver.run('DELETE FROM pieces WHERE seg = ?', [segmentId])
-        await driver.run('DELETE FROM indexed WHERE seg = ?', [segmentId])
-        for (const r of rows) {
-          await driver.run('INSERT INTO pieces (body, kind, lang, book, ref, res, rid, seg) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [
-            r.body,
-            r.kind,
-            lang,
-            book.book,
-            r.ref,
-            r.res,
-            r.rid,
-            segmentId,
-          ])
-        }
-        await driver.run('INSERT INTO indexed (seg, lang, book) VALUES (?, ?, ?)', [segmentId, lang, book.book])
-      })
+      await store(lang, book.book, rowsOf(book), segmentId)
+    },
+    async addObs(lang: string, obs: ObsModel, segmentId: string) {
+      await store(lang, 'obs', rowsOfObs(obs), segmentId)
     },
     async removeSegment(segmentId) {
       await driver.transaction(async () => {
