@@ -58,6 +58,7 @@ import {
   parseTipnr,
   type RoleHint,
   type SectionRegistry,
+  unitBytes,
   type TipnrRecord,
   xtopicsView,
   type XtopicsCore,
@@ -503,6 +504,14 @@ async function build(o: Options, io: Io): Promise<void> {
 
   for (const segment of all) io.log(lineOf(segment))
   for (const line of [mapSizes('xmap', common.segments, 'xmap'), mapSizes(`map ${lang}`, built.segments, 'map')]) if (line !== undefined) io.log(line)
+  // What a device downloads for each unit (the compressed segments): one line each and units.json, by unit id.
+  const units: Record<string, number> = {}
+  for (const catalog of [common.catalog, built.catalog]) {
+    if (catalog !== undefined) Object.assign(units, unitBytes(catalogView(catalog.seg)))
+  }
+  const unitIds = Object.keys(units).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  await writeFile(join(o.out, 'units.json'), `${JSON.stringify(Object.fromEntries(unitIds.map((id) => [id, units[id]])), null, 2)}\n`)
+  for (const id of unitIds) io.log(`unit ${id} ${(units[id] / 1024).toFixed(1)} KB`)
   const bytes = all.reduce((sum, segment) => sum + segment.bytes.length, 0)
   io.log(`${all.length} segments, ${(bytes / 1024).toFixed(1)} KB, written in ${o.out} (${built.report.length} lines in report.txt)`)
 }
