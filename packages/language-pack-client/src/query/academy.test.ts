@@ -78,6 +78,34 @@ describe('academy', () => {
       expect(academyOf(m, 'gen')).toEqual([])
     }
   })
+  test('revision.units lists only the maps read: xmap for English, not for another language', async () => {
+    const TN = 'unfoldingWord/en/tn'
+    const r = await open({ books: ['tit'] })
+    const notes = { unit: 'notes', rows: new Map([['ta:x/a', new Map([['tit', [2, 1]]])]]) }
+    const xmap = { core: { coverage: new Map([[TN, { whole: ['tit'], partial: [] }]]), notes, links: undefined, strong: { unit: 'occurrences', rows: new Map() } }, parts: new Map() }
+    const en = { core: { lang: 'en', res: [[TN, 'v1']], coverage: new Map(), usage: undefined, names: {} }, parts: new Map() }
+    const es = { core: { lang: 'es-419', res: [['x/es-419/tn', 'v1']], coverage: new Map([['x/es-419/tn', { whole: ['tit'], partial: [] }]]), usage: { unit: 'notes', rows: new Map([['ta:x/a', new Map([['tit', [3, 1]]])]]) }, names: {} }, parts: new Map() }
+    const a = await academyQuery({ ...r, maps: async () => ({ revision: 1, xmap, map: en }) } as never, 'tit')
+    expect(a.revision.units.xmap).toBeGreaterThan(0)
+    expect(a.data!.articles).toEqual([{ id: 'ta:x/a', count: 2, partial: false }])
+    const b = await academyQuery({ ...r, maps: async () => ({ revision: 1, xmap, map: es }) } as never, 'tit')
+    expect(b.revision.units.xmap).toBeUndefined()
+    expect(b.revision.units.map).toBeGreaterThan(0)
+    expect(b.data!.articles).toEqual([{ id: 'ta:x/a', count: 3, partial: false }])
+  })
+  test('English with many ids: counts come from the xmap notes and agree with usageBooks', () => {
+    const TN = 'unfoldingWord/en/tn'
+    const rows = new Map<string, Map<string, [number, number]>>()
+    for (let i = 0; i < 400; i++) rows.set(`ta:x/a${i}`, new Map([['tit', [i % 5, 1]]]))
+    const m = {
+      revision: 1,
+      xmap: { core: { coverage: new Map([[TN, { whole: ['tit'], partial: [] }]]), notes: { unit: 'notes', rows }, links: undefined, strong: { unit: 'occurrences', rows: new Map() } }, parts: new Map() },
+      map: { core: { lang: 'en', res: [[TN, 'v1']], coverage: new Map(), usage: undefined, names: {} }, parts: new Map() },
+    } as never
+    const list = academyOf(m, 'tit')
+    expect(list.length).toBe(320)
+    for (const x of list) expect(usageBooks(m, x.id).tit).toMatchObject({ count: x.count })
+  })
   test('without the map: data null and the unit missing', async () => {
     const r = await open({ books: ['tit'] })
     const a = await academyQuery({ ...r, maps: async () => ({ revision: 1 }) } as never, 'tit')

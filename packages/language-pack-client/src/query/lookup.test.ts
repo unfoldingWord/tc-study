@@ -4,7 +4,7 @@ import { httpSource } from '../source/http'
 import { memoryStore } from '../store/memory'
 import { type FakeServer, startFakeServer } from '../../test/fakeServer'
 import { buildSample, type Sample } from '../../test/sample'
-import { lookupMatches } from './lookup'
+import { lookupMatches, lookupStats } from './lookup'
 
 const maps = {
   revision: 1,
@@ -178,5 +178,29 @@ describe('reader.lookup', () => {
     expect(a.query).toBe('lookup')
     expect(a.data!.matches.map((m) => m.id)).toContain('ta:translate/figs-abstractnouns')
     await expect(r.lookup('  ')).rejects.toMatchObject({ code: 'E_ARG' })
+  })
+  test('the second lookup of a reader reuses the built entries, and results are copies', async () => {
+    server = startFakeServer(sample, {})
+    const client = createClient({ store: memoryStore(), source: httpSource({ base: server.url }), trust })
+    await client.install('es-419', { books: [] })
+    const r = await client.open('es-419')
+    const a = await r.lookup('abstractnouns')
+    const before = lookupStats.builds
+    const b = await r.lookup('abstractnouns')
+    expect(lookupStats.builds).toBe(before)
+    expect(b.data!.matches).toEqual(a.data!.matches)
+    // Mutating a result does not touch later lookups.
+    a.data!.matches[0]!.names.push('corrupt')
+    a.data!.matches[0]!.names[0] = 'changed'
+    const c = await r.lookup('abstractnouns')
+    expect(c.data!.matches).toEqual(b.data!.matches)
+    expect(lookupStats.builds).toBe(before)
+  })
+  test('a query of only punctuation is E_ARG', async () => {
+    server = startFakeServer(sample, {})
+    const client = createClient({ store: memoryStore(), source: httpSource({ base: server.url }), trust })
+    await client.install('es-419', { books: [] })
+    const r = await client.open('es-419')
+    await expect(r.lookup('???')).rejects.toMatchObject({ code: 'E_ARG' })
   })
 })

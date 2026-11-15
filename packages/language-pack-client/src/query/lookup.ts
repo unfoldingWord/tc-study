@@ -33,7 +33,11 @@ const wordsOf = (s: string): string[] => s.split(WORD).filter((w) => w !== '')
 const stopwords = new Set(wordsOf(fold(STOP)))
 
 type Entry = { id: string; names: string[]; subtitle?: string; forms: { f: string; words: string[]; sub: boolean }[] }
-const cache = new WeakMap<object, Entry[]>()
+type Cores = [unknown, unknown, unknown, unknown]
+const cache = new WeakMap<object, { cores: Cores; list: Entry[] }>()
+const NONE = {}
+/** How many times the entries were built (for tests: a second lookup on the same maps must not build again). */
+export const lookupStats = { builds: 0 }
 
 /**
  * Every name the maps know for each id, the language's first: the names of the language map (titles of the articles in
@@ -42,8 +46,12 @@ const cache = new WeakMap<object, Entry[]>()
  * question) is kept apart: it matches, but is not a name. The result is cached per map object, with the folded names.
  */
 function namesById(m: MapSet): Entry[] {
-  const hit = cache.get(m)
-  if (hit !== undefined) return hit
+  // `reader.maps()` makes a new MapSet each call; only the cores inside are stable, so they are the key.
+  const cores: Cores = [m.map?.core, m.topics?.core, m.xtopics?.core, m.xmap?.core]
+  const key = (cores.find((c) => c !== undefined) ?? NONE) as object
+  const hit = cache.get(key)
+  if (hit !== undefined && hit.cores.every((c, i) => c === cores[i])) return hit.list
+  lookupStats.builds++
   const out = new Map<string, { names: string[]; subtitle?: string }>()
   const add = (id: string, name: string | undefined): void => {
     if (name === undefined || name.trim() === '') return
@@ -74,7 +82,7 @@ function namesById(m: MapSet): Entry[] {
     if (subtitle !== undefined) forms.push(form(subtitle, true))
     list.push({ id, names, ...(subtitle !== undefined ? { subtitle } : {}), forms })
   }
-  cache.set(m, list)
+  cache.set(key, { cores, list })
   return list
 }
 
@@ -108,7 +116,7 @@ export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[
     if (score < 4) scored.push({ e, score })
   }
   scored.sort((a, b) => a.score - b.score || (a.e.id < b.e.id ? -1 : a.e.id > b.e.id ? 1 : 0))
-  return scored.slice(0, limit).map(({ e, score }) => ({ id: e.id, names: e.names, ...(e.subtitle !== undefined ? { subtitle: e.subtitle } : {}), exact: score === 0 }))
+  return scored.slice(0, limit).map(({ e, score }) => ({ id: e.id, names: [...e.names], ...(e.subtitle !== undefined ? { subtitle: e.subtitle } : {}), exact: score === 0 }))
 }
 
 export async function lookupQuery(reader: PackReader, name: string, limit?: number): Promise<Answer<LookupData>> {
