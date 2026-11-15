@@ -14,23 +14,38 @@ export type LookupData = { name: string; matches: LookupMatch[] }
 
 /** Lowercase, without accents: "Metáfora" and "metafora" are the same word. */
 export const fold = (s: string): string =>
-  s.normalize('NFD').replace(/(\p{Script=Latin})\p{M}+/gu, '$1').normalize('NFC').toLowerCase().trim()
+  s
+    .normalize('NFD')
+    .replace(/(\p{Script=Latin})\p{M}+/gu, '$1')
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+    .normalize('NFC')
+    .toLowerCase()
+    .trim()
 
-const STOP = `a an the to of in on at for and or is are do does how what which who i we my our
-can could should would be it this that with about from as by
-es son lo su sus hay sobre entre este esta esto cual cuales quien
-ce est qu ne pas sur dans par avec cette
-e é sao ser sobre com este esta isso qual
-itu ini adalah ada tentang pada
-a de la el los las un una unos unas y o en que del al por para con se mi como qué cómo cuál
-le la les un une des de du et ou en à au aux pour que qui comment
-o os as um uma de do da dos das e ou em no na para que como
-di ke dari dan yang untuk dengan bagaimana apa
-في من إلى على و عن ما كيف
-का की के में है और से को कैसे क्या`
+/** Stopwords by the primary subtag of the pack's language; every language also uses the English list. */
+const STOP_BY_LANG: Record<string, string> = {
+  en: `a an the to of in on at for and or is are do does how what which who i we my our can could should would be it this that with about from as by`,
+  es: `es son lo su sus hay sobre entre este esta esto cual cuales quien quienes a de la el los las un una unos unas y o en que del al por para con se mi como qué cómo cuál`,
+  fr: `ce est qu ne pas sur dans par avec cette le la les un une des de du et ou en à au aux pour que qui comment`,
+  pt: `e é sao ser sobre com este esta isso qual o os as um uma de do da dos das e ou em no na para que como`,
+  id: `itu ini adalah ada tentang pada di ke dari dan yang untuk dengan bagaimana apa`,
+  ar: `في من إلى على و عن ما كيف`,
+  hi: `का की के में है और से को कैसे क्या`,
+}
 const WORD = /[^\p{L}\p{N}\p{M}]+/u
 const wordsOf = (s: string): string[] => s.split(WORD).filter((w) => w !== '')
-const stopwords = new Set(wordsOf(fold(STOP)))
+const stopSets = new Map<string, Set<string>>()
+/** The English stopwords plus those of the pack's language (`es-419` is `es`); a language with no list uses English only. */
+function stopwordsFor(lang: unknown): Set<string> {
+  const fam = typeof lang === 'string' ? lang.split(/[-_]/)[0]!.toLowerCase() : ''
+  const key = Object.prototype.hasOwnProperty.call(STOP_BY_LANG, fam) ? fam : 'en'
+  let set = stopSets.get(key)
+  if (set === undefined) {
+    set = new Set(wordsOf(fold(key === 'en' ? STOP_BY_LANG.en! : `${STOP_BY_LANG.en} ${STOP_BY_LANG[key]}`)))
+    stopSets.set(key, set)
+  }
+  return set
+}
 
 type Entry = { id: string; names: string[]; subtitle?: string; forms: { f: string; words: string[]; sub: boolean }[] }
 type Cores = [unknown, unknown, unknown, unknown]
@@ -87,20 +102,31 @@ function namesById(m: MapSet): Entry[] {
 }
 
 /**
- * The ids whose names contain `name`, at most `limit`: first those with a name equal to it, then those with a name that
- * starts with it or has it as a whole word, then the rest; ids in code-point order within each. Accents, capitals and
- * punctuation do not count (the query and the names are compared as their words). A query with function words ("how",
- * "a", "de") or leftover single letters ("what's" gives "what" and "s") also matches a name that has every other word, in
- * any order, as a word or the start of one (score 2). A match found only in a subtitle scores 3 and is never exact; the
- * subtitle is returned in `subtitle`, not in `names`.
+ * The ids whose names contain `name`, at most `limit`, best first; ids in code-point order within a score.
+ * - Accents, capitals and punctuation do not count: the query and the names are compared as their words.
+ * - Score 0 (exact): a name equal to the query.
+ * - Score 0 also: the query's content words (stoplist and one-letter leftovers dropped, only when the query has two or
+ *   more words) are the words of a name, the same words in the same order, with no extra word.
+ * - Score 1: a name that starts with the query or has it as a whole word.
+ * - Score 2: a name that contains the query, or has every content word, in any order, as a word or the start of one.
+ * - Score 3: a match found only in a subtitle; never exact. The subtitle is returned in `subtitle`, not in `names`.
+ * - The stoplist is the English one plus the one of the pack's language (`map` core `lang`): "son" is a stopword in Spanish only.
+ * - A query of two or more words with no content word keeps its last word as the only content word.
+ * - A query with no word at all (only punctuation) gives no matches.
  */
 export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[] {
   const qw = wordsOf(fold(name))
   const q = qw.join(' ')
   if (q === '') return []
+  const stopwords = stopwordsFor((m.map?.core as { lang?: unknown } | undefined)?.lang)
   const keep = qw.length >= 2 ? qw.filter((w) => !stopwords.has(w) && [...w].length > 1) : []
+  // Every word was a stopword or one letter: the last word is the content ("who is the son" asks for "Son").
+  // It counts for the exact rule only, not for the loose matches.
+  const exactKey = qw.length >= 2 && keep.length === 0 ? qw[qw.length - 1]! : keep.join(' ')
+  const keepKey = keep.join(' ')
   const hit = (f: string, words: string[]): number => {
     if (f === q) return 0
+    if (exactKey !== '' && words.join(' ') === exactKey) return 0
     if (f.startsWith(q) || words.includes(q)) return 1
     if (f.includes(q)) return 2
     if (keep.length > 0 && keep.every((w) => words.some((p) => p.startsWith(w)))) return 2
@@ -120,7 +146,7 @@ export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[
 }
 
 export async function lookupQuery(reader: PackReader, name: string, limit?: number): Promise<Answer<LookupData>> {
-  if (typeof name !== 'string' || wordsOf(fold(name)).length === 0) throw new ClientError('E_ARG', 'lookup needs a word')
+  if (typeof name !== 'string' || name.trim() === '') throw new ClientError('E_ARG', 'lookup needs a word')
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) throw new ClientError('E_ARG', 'lookup limit must be a positive integer')
   const out = newAnswer<LookupData>(reader, 'lookup')
   const m = await reader.maps()

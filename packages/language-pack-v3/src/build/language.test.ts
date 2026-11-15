@@ -183,7 +183,7 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
     expect(first.report.length).toBeGreaterThan(0)
     for (const line of first.report) expect(line).toMatch(/^(book [0-9a-z]{3}|art( (tw|ta):[^:\s]+)?|lex( [GH][0-9]+)?|obs): \S/)
     expect(first.report.some((line) => line.startsWith('book tit: es-419_gl/es-419/tn '))).toBe(true)
-    expect(first.report.some((line) => line.startsWith('art tw:kt: tw:kt/believe '))).toBe(true)
+    // The art sample has no heading left unplaced (the subheadings of a definition take its role), so no art line is required.
     // A line about a whole lexicon file or resource has no group.
     expect(first.report.some((line) => line.startsWith(`lex: ${UGL}: `))).toBe(true)
   })
@@ -881,6 +881,51 @@ describe('buildLanguage: the related of tA', () => {
   }
   const run = (source: RowSource, taConfigs?: Map<string, Map<string, string>>) => buildLanguage({ source, lang: ES, registry: registry(), about, taConfigs })
   const groupsOf = (segments: BuiltSegment[]) => Object.fromEntries(byClass(segments, 'art').map((s) => [s.seg.h.group, s]))
+
+  const withZ = (): RowSource => {
+    const base = taSource()
+    return {
+      resources: (lang) => base.resources(lang),
+      async *rows(f: RowFilter) {
+        yield* base.rows(f)
+        if ((f.resource === undefined || f.resource === TA) && (f.layer === undefined || f.layer === 'sot')) {
+          yield { layer: 'sot', key: `${TA}/translate/z`, value: '# Z\n\n## ¿Qué?\n\nx\n\n## Algo raro\n\ny' }
+        }
+      },
+    }
+  }
+
+  test('an unplaced heading is in the report with the scope of its group', async () => {
+    const source = withZ()
+    const built = await run(source)
+    expect(built.report).toContain(`art ta:translate: ta:translate/z (${TA}): the heading "Algo raro" is not placed (role unknown, sid s1)`)
+  })
+
+  test('roles from the map language: the report counts them and the inputs carry the segment', async () => {
+    const hints = new Map([['ta:translate/z', [{ level: 2, role: 'definition' as const }]]])
+    const plain = await run(withZ())
+    const hinted = await buildLanguage({ source: withZ(), lang: ES, registry: registry(), about, roleHints: hints, roleHintSegs: new Map([['ta:translate/z', 'aa11']]) })
+    const other = await buildLanguage({ source: withZ(), lang: ES, registry: registry(), about, roleHints: hints, roleHintSegs: new Map([['ta:translate/z', 'bb22']]) })
+    expect(hinted.report).toContain('art ta:translate: ta:translate/: role hints: 1 articles had a hint, 1 used it')
+    const roles = (b: typeof plain) => (groupsOf(b.segments)['ta:translate'].seg.t as { articles: { id: string; sections: { role: string }[] }[] }).articles.find((x) => x.id === 'ta:translate/z')!.sections.map((x) => x.role)
+    expect(roles(plain)).toEqual(['intro', 'unknown'])
+    expect(roles(hinted)).toEqual(['intro', 'definition'])
+    expect(groupsOf(hinted.segments)['ta:translate'].inputs).not.toBe(groupsOf(plain.segments)['ta:translate'].inputs)
+    expect(groupsOf(hinted.segments)['ta:translate'].inputs).not.toBe(groupsOf(other.segments)['ta:translate'].inputs)
+    // A group none of whose articles used a hint keeps its inputs.
+    expect(groupsOf(hinted.segments)['ta:checking'].inputs).toBe(groupsOf(plain.segments)['ta:checking'].inputs)
+  })
+
+  test('a hint that is had but not used still adds the role-hints row', async () => {
+    // Three headed sections in the hint, two in the article: the levels differ, so the hint is not used.
+    const hints = new Map([['ta:translate/z', [{ level: 2, role: 'definition' as const }, { level: 2, role: 'facts' as const }, { level: 3, role: 'facts' as const }]]])
+    const plain = await run(withZ())
+    const hinted = await buildLanguage({ source: withZ(), lang: ES, registry: registry(), about, roleHints: hints, roleHintSegs: new Map([['ta:translate/z', 'aa11']]) })
+    expect(hinted.report.some((l) => l.includes('1 articles had a hint, 0 used it'))).toBe(true)
+    const roles = (b: typeof plain) => (groupsOf(b.segments)['ta:translate'].seg.t as { articles: { id: string; sections: { role: string }[] }[] }).articles.find((x) => x.id === 'ta:translate/z')!.sections.map((x) => x.role)
+    expect(roles(hinted)).toEqual(roles(plain))
+    expect(groupsOf(hinted.segments)['ta:translate'].inputs).not.toBe(groupsOf(plain.segments)['ta:translate'].inputs)
+  })
 
   test('the segment holds related; the inputs of every tA group change with the configs and with the set of tA rows', async () => {
     const plain = groupsOf((await run(taSource())).segments)

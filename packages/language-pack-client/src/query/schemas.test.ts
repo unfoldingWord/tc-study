@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { ROLES } from '@bt-synergy/language-pack-v3'
 import { schemas as exported } from '../index'
 import { SEARCH_FILTER_KEYS } from '../search/types'
 import schemas from './schemas.json'
@@ -25,5 +26,10 @@ describe('schemas.json', () => {
   test('the search schema has the arguments of reader.search(text, filters)', () => {
     const props = Object.keys((schemas as unknown as Record<string, Entry>).search!.input.properties).sort()
     expect(props).toEqual(['text', ...Object.keys(SEARCH_FILTER_KEYS)].sort())
+  })
+  test('the article input pins roles to ROLES and forbids section with roles', () => {
+    const input = (schemas as any).article.input
+    expect(input.properties.roles.items.enum).toEqual([...ROLES])
+    expect(input.not.required).toEqual(['section', 'roles'])
   })
 })

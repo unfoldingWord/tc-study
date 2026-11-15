@@ -29,8 +29,15 @@
       "type": "object",
       "properties": {
         "id": { "type": "string", "description": "An article id such as \"tw:kt/grace\"." },
-        "section": { "type": "string", "description": "A section id, or \"all\" for every section." }
+        "section": { "type": "string", "description": "A section id, or \"all\" for every section." },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "enum": ["intro", "definition", "facts", "translation-suggestions", "examples", "strategies", "description", "reason", "bible-references", "word-data", "unknown"] },
+          "description": "Only the sections whose role is in the list, in article order; the rest go to `more`. Not with `section`."
+        }
       },
+      "not": { "required": ["section", "roles"] },
       "required": ["id"],
       "additionalProperties": false
     }
@@ -110,7 +117,7 @@
   },
   "lookup": {
     "label": { "es": "Buscar por nombre: las claves de los términos, artículos, personas y lugares que se llaman así" },
-    "description": "The ids of key terms, Academy articles, people, places and events whose name contains a word, in this language or in English, exact names first. It reads the maps only.",
+    "description": "The ids of key terms, Academy articles, people, places and events whose name contains a word, in this language or in English, exact names first. A query with no words (only punctuation) returns no matches. It reads the maps only.",
     "input": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",

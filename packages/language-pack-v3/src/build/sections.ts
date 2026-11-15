@@ -69,6 +69,8 @@ export type RegistryEntry = {
   fingerprint: string
   trigrams: number[]
   aliases?: string[]
+  /** Where `role` came from when it did not come from the heading table: absent for a table role (registries built before inheritance read so). */
+  roleFrom?: 'inherited' | 'hint'
 }
 
 /** The sections of each article of a build, by {@link articlePath}. */
@@ -309,7 +311,7 @@ function common(a: number[], b: number[]): number {
 
 // The registry as the build writes it
 
-const ENTRY_FIELDS = ['sid', 'title', 'level', 'role', 'fingerprint', 'trigrams', 'aliases']
+const ENTRY_FIELDS = ['sid', 'title', 'level', 'role', 'fingerprint', 'trigrams', 'aliases', 'roleFrom']
 
 /** An entry with its fields in the fixed order of {@link RegistryEntry}; a field this code does not know goes last, sorted. */
 function canonicalEntry(entry: RegistryEntry): RegistryEntry {
@@ -334,7 +336,9 @@ export function canonicalRegistry(registry: SectionRegistry): SectionRegistry {
 
 // Assigning
 
-type Prepared = { part: SectionPart; role: Role; lang: string; key: string | null; fingerprint: string; trigrams: number[] }
+/** Where a role came from: the heading table, the parent section ({@link inheritRoles}) or the map language's article (a hint). */
+type RoleSource = 'table' | 'inherited' | 'hint'
+type Prepared = { part: SectionPart; role: Role; source: RoleSource; lang: string; key: string | null; fingerprint: string; trigrams: number[] }
 
 /** What pass 1 compares: the normalized heading, or one fixed key for the text before the first heading. `null` for a heading with no text. */
 function headingKey(level: number, title: string | undefined): string | null {
@@ -352,7 +356,47 @@ function prepare(part: SectionPart, articleLang: string): Prepared {
     // A heading from another language's table says the section is written in that language.
     if (placed.lang !== null && family(placed.lang) !== family(articleLang)) lang = placed.lang
   }
-  return { part, role, lang, key: headingKey(part.level, part.title), fingerprint: sha256Hex(part.md), trigrams: trigramsOf(part.md) }
+  return { part, role, source: 'table', lang, key: headingKey(part.level, part.title), fingerprint: sha256Hex(part.md), trigrams: trigramsOf(part.md) }
+}
+
+/**
+ * A section with no known role (`unknown`) takes the role of its parent, the nearest earlier section with a lower level,
+ * when that role is not `unknown` or `intro`. The parent's role counts after its own inheritance, so it passes through levels.
+ */
+function inheritRoles(prepared: Prepared[]): void {
+  const stack: Prepared[] = []
+  for (const p of prepared) {
+    while (stack.length > 0 && stack[stack.length - 1].part.level >= p.part.level) stack.pop()
+    const parent = stack[stack.length - 1]
+    if (p.role === 'unknown' && parent !== undefined && parent.role !== 'unknown' && parent.role !== 'intro') {
+      p.role = parent.role
+      p.source = 'inherited'
+    }
+    stack.push(p)
+  }
+}
+
+/** The headed sections of an article in the map language, in order, with their final roles: what {@link applyHints} aligns to. */
+export type RoleHint = { level: number; role: Role }[]
+
+/**
+ * When the headed sections (level > 0) of an article have the same number and the same sequence of levels as its hint (the
+ * article with the same id in the map language), each of them whose role is `unknown` takes the role of the hint at the same
+ * position; a role the table knows is kept, and when one of them differs from the hint at its position the whole hint is
+ * rejected (the articles are in another order). Returns whether the shape matched (the hint was used). Runs before {@link inheritRoles}.
+ */
+function applyHints(prepared: Prepared[], hint: RoleHint): boolean {
+  const headed = prepared.filter((p) => p.part.level > 0)
+  if (headed.length !== hint.length || headed.some((p, i) => p.part.level !== hint[i].level)) return false
+  // A section the table places must agree with the hint at its position, else the orders differ and no hint is trusted.
+  if (headed.some((p, i) => p.role !== 'unknown' && p.role !== hint[i].role)) return false
+  headed.forEach((p, i) => {
+    if (p.role === 'unknown' && hint[i].role !== 'unknown' && hint[i].role !== 'intro') {
+      p.role = hint[i].role
+      p.source = 'hint'
+    }
+  })
+  return true
 }
 
 function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
@@ -362,8 +406,15 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 }
 
 /** The sections of one article against the entries the registry has for it. Nothing here touches the registry itself. */
-function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[]): { sections: SectionModel[]; entries: RegistryEntry[] } {
+function assign(
+  articleLang: string,
+  parts: SectionPart[],
+  old: RegistryEntry[],
+  hint?: RoleHint,
+): { sections: SectionModel[]; entries: RegistryEntry[]; hintUsed: boolean } {
   const prepared = parts.map((part) => prepare(part, articleLang))
+  const hintUsed = hint !== undefined && applyHints(prepared, hint)
+  inheritRoles(prepared)
   const n = prepared.length
   const match: number[] = new Array(n).fill(-1)
   const used: boolean[] = new Array(old.length).fill(false)
@@ -388,9 +439,13 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
 
   // 2. The same role and the same place among the sections of that role.
   const oldByRole = new Map<Role, number[]>()
-  old.forEach((entry, o) => pushTo(oldByRole, entry.role, o))
+  // Only roles the table gave count, in the old entries too: an inherited or hinted role says nothing of where the section sits among its role's sections.
+  old.forEach((entry, o) => {
+    if (entry.roleFrom === undefined) pushTo(oldByRole, entry.role, o)
+  })
   const seen = new Map<Role, number>()
-  prepared.forEach(({ role }, i) => {
+  prepared.forEach(({ role, source }, i) => {
+    if (source !== 'table') return
     const place = seen.get(role) ?? 0
     seen.set(role, place + 1)
     if (match[i] !== -1 || role === 'unknown') return
@@ -456,7 +511,7 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
 
   const sections: SectionModel[] = []
   const entries: RegistryEntry[] = []
-  prepared.forEach(({ part, role, lang, fingerprint, trigrams }, i) => {
+  prepared.forEach(({ part, role, source, lang, fingerprint, trigrams }, i) => {
     // The old sections this one holds: the one it matched and those it absorbed (ids.md: a merged section keeps the sid
     // of the first). One found by its heading or its role keeps the sid it matched; one found by its text takes the
     // sid of the earliest of them. The sids and aliases of the others become its aliases.
@@ -478,9 +533,10 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
     const entry: RegistryEntry =
       part.title === undefined ? { sid, level: part.level, role, fingerprint, trigrams } : { sid, title: part.title, level: part.level, role, fingerprint, trigrams }
     if (aliases.length > 0) entry.aliases = [...aliases]
+    if (source !== 'table') entry.roleFrom = source
     entries.push(entry)
   })
-  return { sections, entries }
+  return { sections, entries, hintUsed }
 }
 
 /**
@@ -509,6 +565,7 @@ export function assignArticle(
   articleLang: string,
   parts: SectionPart[],
   old: RegistryEntry[] | undefined,
-): { sections: SectionModel[]; entries: RegistryEntry[] } {
-  return assign(articleLang, parts, old ?? [])
+  hint?: RoleHint,
+): { sections: SectionModel[]; entries: RegistryEntry[]; hintUsed: boolean } {
+  return assign(articleLang, parts, old ?? [], hint)
 }

@@ -202,6 +202,36 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
       await writeFile(join(commonDir, 'segments', `${id}.seg`), bytes)
     }
   }
+  // The `art` segments of the published map-language catalog, for --role-hints: a language other than the map language takes the roles of its
+  // sections from the articles of the map language (the same id). Without a published map-language catalog, the build has no hints.
+  const hintsDir = resolve(o.work, 'role-hints')
+  let hints = false
+  const downloadHints = async (): Promise<void> => {
+    await rm(hintsDir, { recursive: true, force: true })
+    const mapPublished = (await readPublishedV3(store, o.mapLang)).lang
+    if (mapPublished === undefined) {
+      io.log(`The map language ${o.mapLang} is not published: built without role hints`)
+      return
+    }
+    await mkdir(join(hintsDir, 'segments'), { recursive: true })
+    const { seg } = await readSegment(mapPublished.bytes, { known: KNOWN.catalog, expectedClass: 'catalog' })
+    let n = 0
+    for (const entry of catalogView(seg).segments) {
+      if (entry.class !== 'art') continue
+      const id = hex(entry.id)
+      const bytes = await store.getBytes(V3_KEYS.seg(id))
+      if (bytes === null) {
+        // Hints are a help, not a requirement: a catalog that names a segment the bucket lacks must not stop the build.
+        await rm(hintsDir, { recursive: true, force: true })
+        io.log(`The published ${o.mapLang} catalog names the segment ${id}, which the bucket does not have: built without role hints`)
+        return
+      }
+      await writeFile(join(hintsDir, 'segments', `${id}.seg`), bytes)
+      n++
+    }
+    hints = true
+    io.log(`role hints: ${n} art segments of the published ${o.mapLang} catalog`)
+  }
   // The registry of the language as published: each build starts from it (a second build must not start from the first one's).
   const resetRegistry = async (): Promise<void> => {
     await rm(registryDir, { recursive: true, force: true })
@@ -222,6 +252,7 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
       ...(o.topics === undefined ? [] : ['--topics', o.topics]),
       ...(o.taConfig === undefined ? [] : ['--ta-config', o.taConfig]),
       ...(o.books === undefined ? [] : ['--books', o.books]),
+      ...(hints ? ['--role-hints', hintsDir] : []),
       ...(o.aligned ? ['--aligned'] : []),
       ...(o.signKey === undefined ? [] : ['--sign-key', o.signKey]),
     ]
@@ -234,6 +265,7 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
   if (published.common !== undefined) await downloadCommon()
   let publishCommon = false
   if (!isMap) {
+    await downloadHints()
     await build(true)
   } else {
     await build(false)

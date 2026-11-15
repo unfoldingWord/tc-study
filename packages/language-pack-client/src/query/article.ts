@@ -1,5 +1,6 @@
 /** `article`, and `context`: a passage with the default sections of the articles its notes and links name. No Node module here. */
-import type { ArticleModel, Role, SectionModel } from '@bt-synergy/language-pack-v3'
+import { type ArticleModel, type Role, ROLES, type SectionModel } from '@bt-synergy/language-pack-v3'
+import { ClientError } from '../errors'
 import type { PackReader } from '../reader'
 import { type Answer, absorb, missingUnit, newAnswer, releaseOf, usedUnit } from './envelope'
 import { haveMap, usageBooks, usageUnit } from './maps'
@@ -30,15 +31,34 @@ async function titled(reader: PackReader, ids: string[], models: ArticleModel[])
   return out
 }
 
-function defaults(id: string, sections: SectionModel[]): SectionModel[] {
-  const by = (...roles: Role[]) => sections.filter((s) => roles.includes(s.role))
+/**
+ * The sections an article gives when none is asked for, small on purpose: sections that inherit a role from a heading are not
+ * extra defaults.
+ * - tW: the first `definition` at the article's top heading level (the smallest level above 0), else the first at any level, else `intro`, else the first section.
+ * - tA: the first `description` and the first `reason`, each at that level or else at any level, in reading order; the first section only when neither exists.
+ * @internal exported for tests
+ */
+export function defaultSections(id: string, sections: SectionModel[]): SectionModel[] {
+  const top = Math.min(...sections.filter((s) => s.level > 0).map((s) => s.level))
+  // The first section of a role at the top level, else at any level: a deeper one is better than the first section.
+  const first = (role: Role) => sections.find((s) => s.role === role && s.level === top) ?? sections.find((s) => s.role === role)
   let pick: SectionModel[] = []
-  if (id.startsWith('tw:')) pick = by('definition').length > 0 ? by('definition').slice(0, 1) : by('intro').slice(0, 1)
-  else if (id.startsWith('ta:')) pick = by('description', 'reason')
+  if (id.startsWith('tw:')) {
+    const one = first('definition') ?? sections.find((s) => s.role === 'intro')
+    if (one !== undefined) pick = [one]
+  } else if (id.startsWith('ta:')) {
+    const wanted = [first('description'), first('reason')]
+    pick = sections.filter((s) => wanted.includes(s))
+  }
   return pick.length > 0 ? pick : sections.slice(0, 1)
 }
 
-export async function articleQuery(reader: PackReader, id: string, section?: string | 'all'): Promise<Answer<ArticleData>> {
+export async function articleQuery(reader: PackReader, id: string, section?: string | 'all' | { roles: Role[] }): Promise<Answer<ArticleData>> {
+  if (typeof section === 'object' && section !== null) {
+    const roles: unknown = section.roles
+    if (!Array.isArray(roles) || roles.length === 0 || !roles.every((r) => (ROLES as readonly unknown[]).includes(r)))
+      throw new ClientError('E_ARG', `article roles must be a non-empty list of: ${ROLES.join(', ')}`)
+  }
   const out = newAnswer<ArticleData>(reader, 'article')
   const unit = reader.unitOf('art', id) ?? `art:${id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : id}`
   const models: ArticleModel[] | undefined = reader.installed(unit) ? await reader.articles(unit.slice('art:'.length)) : undefined
@@ -50,11 +70,13 @@ export async function articleQuery(reader: PackReader, id: string, section?: str
   const art = models.find((a) => a.id === id) ?? models.find((a) => a.aliases?.includes(id))
   if (art === undefined) return out
   const chosen =
-    section === undefined
-      ? defaults(art.id, art.sections)
+    section === undefined || section === null
+      ? defaultSections(art.id, art.sections)
       : section === 'all'
         ? art.sections
-        : art.sections.filter((s) => s.sid === section || s.aliases?.includes(section))
+        : typeof section === 'object'
+          ? art.sections.filter((s) => section.roles.includes(s.role))
+          : art.sections.filter((s) => s.sid === section || s.aliases?.includes(section))
   const shown = new Set(chosen)
   const header = (await reader.segments(unit))?.[0]?.h.res
   const release = releaseOf(header, art.res)

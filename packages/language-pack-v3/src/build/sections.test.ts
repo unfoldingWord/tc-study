@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { sha256Hex } from '../codec/sha256'
-import { articlePath, assignSids, normalizeHeading, roleOf, type SectionPart, type SectionRegistry, splitSections, trigramsOf } from './sections'
+import { articlePath, assignArticle, assignSids, canonicalRegistry, normalizeHeading, roleOf, type SectionPart, type SectionRegistry, splitSections, trigramsOf } from './sections'
 
 /** `n` distinct words that start with `prefix`, as one text: every trigram of it is different from those of another prefix. */
 const words = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${i}`).join(' ')
@@ -435,7 +435,7 @@ describe('assignSids: recognizing a section', () => {
   })
 
   test('a deleted section\'s entry disappears from the new registry, and its sid is not reused in that build', () => {
-    const one = assignSids(ART, ES, [{ level: 2, title: 'Definición', md: body('d') }, { level: 3, title: 'Raro', md: body('r') }], {})
+    const one = assignSids(ART, ES, [{ level: 2, title: 'Definición', md: body('d') }, { level: 2, title: 'Raro', md: body('r') }], {})
     expect(one.registry[ART].map((e) => e.sid)).toEqual(['definition', 's1'])
     const two = assignSids(ART, ES, [{ level: 2, title: 'Definición', md: body('d') }], one.registry)
     expect(two.registry[ART].map((e) => e.sid)).toEqual(['definition'])
@@ -495,7 +495,7 @@ describe('assignSids: the registry', () => {
     { level: 0, md: words('i', 8) },
     { level: 2, title: 'Definición', md: words('d', 20) },
     { level: 2, title: n === 1 ? 'Ejemplos de la Biblia' : 'Ejemplos de las historias bíblicas', md: words('e', 20) },
-    { level: 3, title: 'Un apartado raro', md: words('r', 15) },
+    { level: 2, title: 'Un apartado raro', md: words('r', 15) },
   ]
 
   test('an entry has the sid, heading, level, role, the fingerprint (sha256 of the text) and the trigrams', () => {
@@ -623,5 +623,173 @@ describe('the registry is canonical', () => {
     const one = assignSids(ART, ES, [{ level: 0, md: a }, { level: 2, title: 'Uno', md: b }], {})
     const two = assignSids(ART, ES, [{ level: 0, md: `${a}\n\n${b}` }], one.registry)
     expect(Object.keys(two.registry[ART][0])).toEqual(['sid', 'level', 'role', 'fingerprint', 'trigrams', 'aliases'])
+  })
+})
+
+describe('assignSids: a subheading with no known role takes its parent role', () => {
+  const roles = (parts: SectionPart[]) => assignSids(ART, 'en', parts, {}).sections.map((s) => s.role)
+  const SUB = 'A quotation with two layers'
+
+  test('a level 4 under a strategies heading is strategies', () => {
+    expect(roles([
+      { level: 3, title: 'Translation Strategies', md: 'a' },
+      { level: 4, title: SUB, md: 'b' },
+    ])).toEqual(['strategies', 'strategies'])
+  })
+
+  test('a level 3 unknown after a level 3 strategies is a sibling and stays unknown', () => {
+    expect(roles([
+      { level: 3, title: 'Translation Strategies', md: 'a' },
+      { level: 3, title: SUB, md: 'b' },
+    ])).toEqual(['strategies', 'unknown'])
+  })
+
+  test('the role passes through deeper levels', () => {
+    expect(roles([
+      { level: 3, title: 'Translation Strategies', md: 'a' },
+      { level: 4, title: SUB, md: 'b' },
+      { level: 5, title: 'Another one', md: 'c' },
+    ])).toEqual(['strategies', 'strategies', 'strategies'])
+  })
+
+  test('an unknown under an unknown, or under the intro, stays unknown', () => {
+    expect(roles([
+      { level: 0, md: 'i' },
+      { level: 2, title: SUB, md: 'b' },
+      { level: 3, title: 'Another one', md: 'c' },
+    ])).toEqual(['intro', 'unknown', 'unknown'])
+  })
+
+  test('the sids of an article already in the registry do not change', () => {
+    const parts: SectionPart[] = [
+      { level: 3, title: 'Translation Strategies', md: words('s', 20) },
+      { level: 4, title: SUB, md: words('q', 20) },
+    ]
+    const before = assignSids(ART, 'en', parts, {})
+    const old: SectionRegistry = { [ART]: before.registry[ART].map((e, i) => (i === 1 ? { ...e, role: 'unknown' as const } : e)) }
+    const again = assignSids(ART, 'en', parts, old)
+    expect(sids(again.sections)).toEqual(sids(before.sections))
+  })
+})
+
+describe('assignSids: inherited roles and the sids', () => {
+  const roleSid = (parts: SectionPart[], registry: SectionRegistry = {}) => assignSids(ART, 'en', parts, registry)
+
+  test('an inherited role does not take the sid of the sibling of that role (pass 2)', () => {
+    const entry = (sid: string, title: string, role: 'examples' | 'unknown', level = 3) => ({ sid, title, level, role, fingerprint: sha256Hex(sid), trigrams: [] as number[] })
+    const old: SectionRegistry = { [ART]: [entry('examples', 'Examples from the Bible', 'examples'), entry('examples-2', 'Translation strategies applied', 'examples'), entry('s1', 'Old unknown', 'unknown', 4)] }
+    const built = roleSid(
+      [
+        { level: 3, title: 'Examples from the Bible', md: 'a' },
+        { level: 4, title: 'A brand new subheading', md: 'b' },
+        { level: 3, title: 'Examples of translation strategies applied', md: 'c' },
+      ],
+      old,
+    )
+    expect(built.sections.map((s) => s.role)).toEqual(['examples', 'examples', 'examples'])
+    expect(built.sections[0].sid).toBe('examples')
+    expect(built.sections[2].sid).toBe('examples-2')
+    expect(built.sections[1].sid).not.toBe('examples-2')
+  })
+
+  test('an old entry whose role is inherited does not take part in pass 2: a renamed table section keeps its own sid', () => {
+    const first = roleSid([
+      { level: 3, title: 'Examples from the Bible', md: 'a' },
+      { level: 4, title: 'A brand new subheading', md: 'b' },
+      { level: 3, title: 'Examples of translation strategies applied', md: 'c' },
+    ])
+    expect(first.registry[ART].map((e) => e.roleFrom)).toEqual([undefined, 'inherited', undefined])
+    const [a, sub, b] = sids(first.sections)
+    // B is renamed (pass 1 misses it) and still has a table role of the same kind.
+    const again = roleSid(
+      [
+        { level: 3, title: 'Examples from the Bible', md: 'a' },
+        { level: 4, title: 'A brand new subheading', md: 'b' },
+        { level: 3, title: 'Translation strategies applied', md: 'zzz' },
+      ],
+      first.registry,
+    )
+    expect(again.sections.map((s) => s.role)).toEqual(['examples', 'examples', 'examples'])
+    expect(sids(again.sections)).toEqual([a, sub, b])
+  })
+
+  describe('a registry built before roleFrom: a subheading is `unknown` with sid s1 and no roleFrom', () => {
+    const parts = (sub: string): SectionPart[] => [
+      { level: 3, title: 'Translation Strategies', md: words('s', 20) },
+      { level: 4, title: sub, md: words('q', 20) },
+    ]
+    const oldStyle = (): SectionRegistry => {
+      const built = assignSids(ART, 'en', parts('A quotation with two layers'), {})
+      return {
+        [ART]: built.registry[ART].map((e, i) => {
+          if (i !== 1) return e
+          const { roleFrom: _drop, ...rest } = e
+          return { ...rest, role: 'unknown' as const, sid: 's1' }
+        }),
+      }
+    }
+
+    test('a rebuild keeps s1 although the role becomes inherited', () => {
+      const old = oldStyle()
+      expect(old[ART][1].roleFrom).toBeUndefined()
+      const again = assignSids(ART, 'en', parts('A quotation with two layers'), old)
+      expect(again.sections[1].role).toBe('strategies')
+      expect(sids(again.sections)[1]).toBe('s1')
+      expect(again.registry[ART][1].roleFrom).toBe('inherited')
+    })
+
+    test('the same with a renamed heading', () => {
+      const again = assignSids(ART, 'en', parts('A different name for it'), oldStyle())
+      expect(again.sections[1].role).toBe('strategies')
+      expect(sids(again.sections)[1]).toBe('s1')
+    })
+  })
+
+  describe('roleFrom hint', () => {
+    const H = (level: number, role: string) => ({ level, role }) as { level: number; role: never }
+    test('is written for hinted sections, and such an old entry stays out of pass 2 when its heading is renamed', () => {
+      const first = assignArticle('en', [{ level: 2, title: 'Definition', md: words('d', 20) }, { level: 2, title: 'Titulo 1', md: words('f', 20) }], undefined, [H(2, 'definition'), H(2, 'facts')])
+      expect(first.hintUsed).toBe(true)
+      expect(first.entries.map((e) => e.roleFrom)).toEqual([undefined, 'hint'])
+      const old = first.entries.map((e, i) => (i === 1 ? { ...e, sid: 'h7', trigrams: [] as number[] } : e))
+      // "Hechos" is a table heading for facts; the old hinted entry (another title) must not give it h7.
+      const again = assignArticle('en', [{ level: 2, title: 'Definition', md: words('d', 20) }, { level: 2, title: 'Hechos', md: words('z', 20) }], old)
+      expect(again.sections.map((s) => s.role)).toEqual(['definition', 'facts'])
+      expect(again.sections[1].sid).not.toBe('h7')
+    })
+  })
+
+  test('a registry written without roleFrom still loads: its entries read as table roles', () => {
+    const entry = { sid: 'examples', title: 'Examples from the Bible', level: 3, role: 'examples' as const, fingerprint: sha256Hex('a'), trigrams: [] as number[] }
+    const built = roleSid([{ level: 3, title: 'Other examples from the Bible', md: 'a' }], { [ART]: [entry] })
+    expect(sids(built.sections)).toEqual(['examples'])
+    expect(canonicalRegistry({ [ART]: [entry] })[ART][0]).toEqual(entry)
+  })
+
+  test('level sequences: 2,4,3; a skip from 3 to 5; a level 1 resets', () => {
+    const roles = (levels: number[], first = 'Definition') =>
+      roleSid(levels.map((level, i) => ({ level, title: i === 0 ? first : `Other ${i}`, md: 'x' }))).sections.map((s) => s.role)
+    expect(roles([2, 4, 3])).toEqual(['definition', 'definition', 'definition'])
+    expect(roles([3, 5], 'Facts')).toEqual(['facts', 'facts'])
+    expect(roles([2, 1, 2])).toEqual(['definition', 'unknown', 'unknown'])
+  })
+
+  test('a level 3 unknown under a known level 2 in a fresh build gets a role-based sid', () => {
+    const built = roleSid([
+      { level: 2, title: 'Definition', md: 'a' },
+      { level: 3, title: 'Something else', md: 'b' },
+    ])
+    expect(sids(built.sections)).toEqual(['definition', 'definition-2'])
+  })
+
+  test('an article already in the registry keeps its sids when the heading is renamed (passes 2 and 3 run)', () => {
+    const parts: SectionPart[] = [
+      { level: 3, title: 'Translation Strategies', md: words('s', 20) },
+      { level: 4, title: 'Sub one', md: words('q', 20) },
+      { level: 4, title: 'Sub two', md: words('r', 20) },
+    ]
+    const before = roleSid(parts)
+    const renamed = parts.map((p, i) => (i === 0 ? p : { ...p, title: `${p.title} renamed` }))
+    expect(sids(roleSid(renamed, before.registry).sections)).toEqual(sids(before.sections))
   })
 })

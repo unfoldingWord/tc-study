@@ -102,6 +102,50 @@ describe('publish-v3', () => {
     expect(run.err.join(' ')).toContain('--ta-config')
   })
 
+  test('a language other than the map language downloads the art segments of the published map language as role hints', async () => {
+    const bucket = temp()
+    expect((await publish(en(bucket))).code).toBe(0)
+    expect((await publish(es(bucket))).code).toBe(0)
+    // The English sample has no articles, so es-419 is the map language here: the build of `en` is a language other than the map language.
+    const work = temp()
+    const again = await publish(en(bucket, EN, ['--map-lang', 'es-419'], work))
+    expect(again.code).toBe(0)
+    const artIds = (await catalog(bucket, 'es-419')).model.segments.filter((e) => e.class === 'art').map((e) => hex(e.id)).sort()
+    expect(artIds.length).toBeGreaterThan(0)
+    expect(readdirSync(join(work, 'role-hints', 'segments')).sort()).toEqual(artIds.map((id) => `${id}.seg`))
+    expect(again.err.some((l) => l.startsWith('role hints: '))).toBe(true)
+    // The map language itself builds without hints.
+    const mapWork = temp()
+    await publish(es(bucket, ES, ['--map-lang', 'es-419'], mapWork))
+    expect(existsSync(join(mapWork, 'role-hints'))).toBe(false)
+  })
+
+  test('a map language that is not published: the build has no hints and the log says so', async () => {
+    const bucket = temp()
+    expect((await publish(en(bucket))).code).toBe(0)
+    const work = temp()
+    const run = await publish(es(bucket, ES, ['--map-lang', 'pt-br'], work))
+    expect(run.err.join(' ')).toContain('The map language pt-br is not published: built without role hints')
+    expect(existsSync(join(work, 'role-hints'))).toBe(false)
+    expect(run.err.some((l) => l.startsWith('role hints: '))).toBe(false)
+  })
+
+  test('a map-language catalog that names a segment the bucket lacks: the build has no hints, logs it and goes on', async () => {
+    const bucket = temp()
+    expect((await publish(en(bucket))).code).toBe(0)
+    expect((await publish(es(bucket))).code).toBe(0)
+    const artId = (await catalog(bucket, 'es-419')).model.segments.filter((e) => e.class === 'art').map((e) => hex(e.id))[0]!
+    const file = readdirSync(join(bucket, 'v3'), { recursive: true }).map(String).find((f) => f.endsWith(`${artId}.seg`))
+    expect(file).toBeDefined()
+    rmSync(join(bucket, 'v3', file!))
+    const work = temp()
+    const run = await publish(en(bucket, EN, ['--map-lang', 'es-419'], work))
+    expect(run.code).toBe(0)
+    expect(run.err.join(' ')).toContain(`names the segment ${artId}, which the bucket does not have: built without role hints`)
+    expect(existsSync(join(work, 'role-hints'))).toBe(false)
+    expect(run.err.some((l) => l.startsWith('role hints: '))).toBe(false)
+  })
+
   test('es-419 before en is skipped', async () => {
     const bucket = temp()
     mkdirSync(join(bucket, 'v3'), { recursive: true })

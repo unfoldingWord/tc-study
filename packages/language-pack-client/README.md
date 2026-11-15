@@ -88,7 +88,7 @@ type Answer<T> = {
 | Query | Asks | Data |
 |---|---|---|
 | `passage(ref)` | `'tit 1:1'`, `'tit 1:1-3'` | texts, notes, questions and links in range; coverage of the language's resources for the book |
-| `article(id, section?)` | `'tw:kt/faith'` | sections (the definition by default, or one by id, or `'all'`), `more` (the rest), `otherLang` for a section kept in another language; for tA, `related`: each tied article's id and its title (none when its group is not installed) |
+| `article(id, section?)` (`section` may also be `{ roles: Role[] }`: only the sections of those roles, the rest in `more`; an empty or unknown role is `E_ARG`) | `'tw:kt/faith'` | sections (the definition by default, or one by id, or `'all'`), `more` (the rest), `otherLang` for a section kept in another language; for tA, `related`: each tied article's id and its title (none when its group is not installed) |
 | `context(ref)` | a passage | the passage plus, for each concept its notes and links name, the article (when installed) and the books that use it |
 | `concept(id)` | `'tw:kt/grace'`, `'per:abraham'` | the concept, names, relations; books where it is used that are not installed go to `notInstalled` |
 | `topics({ category?, book? })` | people, places, events, stories, sections | the topics of the `xtopics` module (`installed: false` when it is not on the device) |
@@ -96,6 +96,10 @@ type Answer<T> = {
 | `renderings({ strong } or { book, word })` | a Strong's number or a word | how the language renders it, with counts and references |
 | `academy(book)` | `'rut'` | the tA articles the notes of the book cite: `book`, `covered` (false when the language has no tN that covers the book: then `articles` is `[]` for lack of a source, not because nothing is cited), `articles` (`id`, `title`, `count`, `partial`, most cited first); `data: null` when the `map` is not installed |
 | `search(text, filters?)` | full text | hits over the installed books, from the client's index or one built in memory |
+
+A `lookup` query with no words (only punctuation) returns `matches: []`; empty or non-string text is `E_ARG`.
+
+`reader.article(id, { roles: ['strategies'] })` returns only the sections of those roles; in the JSON input, `section` and `roles` are separate fields (not both).
 
 `none` means the source does not cover the book; it is not zero. The JSON Schema of each `data` is `schemas` (exported from the package, `src/query/schemas.json`). For a `ta:` article, `books` and `context` read the usage table of the language's `map`, judged by the language's own `tn` source (the coverage key whose last segment is `tn`, not `unfoldingWord/en/tn`); a language whose map has none gets `none` in every cell. A `tw:` article reads the English word links (`unfoldingWord/en/twl`) of the `xmap`. The answer names the `map` or `xmap` unit in `revision.units`. When the map a query needs is not on the device or its bytes are bad (`xmap` for `tw:` and Strong's numbers, `map` for `ta:`, `xtopics` for topics), the data says `installed: false` and the unit is in `notInstalled`: nobody looked, which is not `none`. `renderings` resolves the Strong's number by the lookup rule of the `strong` table (`G5485` is `G54850` when the table has that one) and `data.strong` is the resolved key. A passage's `coverage` is `zero` for a source that covers the whole book but has no row in the range. `search` returns hits of the books active in this reader only.
 
