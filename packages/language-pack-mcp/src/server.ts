@@ -190,7 +190,7 @@ export function createPacksServer(o: PacksServerOptions): McpServer {
       if (!a.name.trim()) throw new Error('Give a word to look for.')
       const rows = (await r.lookup(a.name)).data?.matches ?? []
       if (rows.length === 0) return `Nothing named like "${a.name}" in ${l}. Try another spelling, or the English word.`
-      return rows.map((m) => `${m.id} — ${m.names.join(', ')}`).join('\n')
+      return rows.map((m) => `${m.id} — ${m.names.join(', ')}${m.subtitle ? ` (asks: ${m.subtitle})` : ''}`).join('\n')
     }),
   )
 

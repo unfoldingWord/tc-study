@@ -223,6 +223,9 @@ describe('article by roles', () => {
     await expect(r.article('ta:translate/m', { roles: [] })).rejects.toMatchObject({ code: 'E_ARG' })
     await expect(r.article('ta:translate/m', { roles: ['nope' as never] })).rejects.toMatchObject({ code: 'E_ARG' })
     await expect(r.article('ta:translate/m', { roles: 'strategies' as never })).rejects.toMatchObject({ code: 'E_ARG' })
+    await expect(r.article('ta:translate/m', {} as never)).rejects.toMatchObject({ code: 'E_ARG' })
+    await expect(r.article('ta:translate/m', { roles: undefined } as never)).rejects.toMatchObject({ code: 'E_ARG' })
+    await expect(r.article('ta:translate/m', { roles: ['strategies', 'nope'] as never })).rejects.toMatchObject({ code: 'E_ARG' })
   })
   test('the old forms are unchanged', async () => {
     const r = await reader()

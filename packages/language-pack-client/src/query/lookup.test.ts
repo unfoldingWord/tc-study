@@ -52,6 +52,27 @@ const rank = {
   },
 } as never
 
+describe('lookupMatches: folding and content words', () => {
+  test('Arabic diacritics fold; Devanagari marks stay', () => {
+    const d = { revision: 1, map: { core: { lang: 'x', names: { 'ta:x/ar': ['الاستعارة'], 'ta:x/hi': ['काम'], 'ta:x/hi2': ['कम'] } }, parts: new Map() } } as never
+    const [a] = lookupMatches(d, 'اَلِاسْتِعَارَة')
+    expect(a!.id).toBe('ta:x/ar')
+    expect(a!.exact).toBe(true)
+    expect(lookupMatches(d, 'ـالاستعارة').map((x) => x.id)).toEqual(['ta:x/ar'])
+    expect(lookupMatches(d, 'काम').map((x) => x.id)).toEqual(['ta:x/hi'])
+  })
+  test('content words equal to a name are exact, before a longer name', () => {
+    const d = (lang: string, a: string, b: string) =>
+      ({ revision: 1, map: { core: { lang, names: { 'ta:translate/figs-metaphor': [a], 'ta:translate/figs-metaphor-complex': [b] } }, parts: new Map() } }) as never
+    const es = lookupMatches(d('es', 'Metáfora', 'Metáfora compleja'), 'qué es la metáfora')
+    expect(es.map((x) => x.id)).toEqual(['ta:translate/figs-metaphor', 'ta:translate/figs-metaphor-complex'])
+    expect(es[0]!.exact).toBe(true)
+    const en = lookupMatches(d('en', 'Metaphor', 'Complex Metaphor'), 'what is a metaphor')
+    expect(en[0]!.id).toBe('ta:translate/figs-metaphor')
+    expect(en[0]!.exact).toBe(true)
+  })
+})
+
 describe('lookupMatches', () => {
   test('the subtitle of an article is returned apart from the names', () => {
     const [hit] = lookupMatches(taMaps, 'set up a translation team')
@@ -198,11 +219,14 @@ describe('reader.lookup', () => {
     expect(a.data!.matches[0]!.names).not.toBe(c.data!.matches[0]!.names)
     expect(lookupStats.builds).toBe(before)
   })
-  test('a query of only punctuation is E_ARG', async () => {
+  test('a query of only punctuation gives no matches; non-strings and blank text are E_ARG', async () => {
     server = startFakeServer(sample, {})
     const client = createClient({ store: memoryStore(), source: httpSource({ base: server.url }), trust })
     await client.install('es-419', { books: [] })
     const r = await client.open('es-419')
-    await expect(r.lookup('???')).rejects.toMatchObject({ code: 'E_ARG' })
+    expect((await r.lookup('???')).data!.matches).toEqual([])
+    await expect(r.lookup('')).rejects.toMatchObject({ code: 'E_ARG' })
+    await expect(r.lookup('   ')).rejects.toMatchObject({ code: 'E_ARG' })
+    await expect(r.lookup(5 as never)).rejects.toMatchObject({ code: 'E_ARG' })
   })
 })
