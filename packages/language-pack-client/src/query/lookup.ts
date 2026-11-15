@@ -14,23 +14,37 @@ export type LookupData = { name: string; matches: LookupMatch[] }
 /** Lowercase, without accents: "Metáfora" and "metafora" are the same word. */
 export const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim()
 
+const STOP = `a an the to of in on at for and or is are do does how what which who i we my our
+a de la el los las un una unos unas y o en que del al por para con se mi como qué cómo cuál
+le la les un une des de du et ou en à au aux pour que qui comment
+o os as um uma de do da dos das e ou em no na para que como
+di ke dari dan yang untuk dengan bagaimana apa
+في من إلى على و عن ما كيف
+का की के में है और से को कैसे क्या`
+const WORD = /[^\p{L}\p{N}]+/u
+const wordsOf = (s: string): string[] => s.split(WORD).filter((w) => w !== '')
+const stopwords = new Set(wordsOf(fold(STOP)))
+
 /**
- * Every name the maps know for each id, the language's first: the names of the language map (titles of the articles in this
- * language), the language's names of topics, the common title of a topic, the subtitle of an Academy article (its question), and the last part of an article id as words
- * (`tw:kt/grace` is "grace", `ta:translate/figs-metaphor` is "figs metaphor").
+ * Every name the maps know for each id, the language's first: the names of the language map (titles of the articles in
+ * this language), the subtitle of an Academy article (its question), the language's names of topics, the common title of
+ * a topic, and the last part of an article id as words (`tw:kt/grace` is "grace", `ta:translate/figs-metaphor` is
+ * "figs metaphor"). `subs` holds the names that are subtitles: they rank below the other names.
  */
-function namesById(m: MapSet): Map<string, string[]> {
-  const out = new Map<string, string[]>()
-  const add = (id: string, name: string | undefined): void => {
+function namesById(m: MapSet): Map<string, { names: string[]; subs: Set<string> }> {
+  const out = new Map<string, { names: string[]; subs: Set<string> }>()
+  const add = (id: string, name: string | undefined, sub = false): void => {
     if (name === undefined || name.trim() === '') return
-    const list = out.get(id) ?? []
-    if (!list.includes(name)) list.push(name)
-    out.set(id, list)
+    const e = out.get(id) ?? { names: [], subs: new Set<string>() }
+    if (!e.names.includes(name)) {
+      e.names.push(name)
+      if (sub) e.subs.add(name)
+    }
+    out.set(id, e)
   }
-  const core = m.map?.core as { names?: Record<string, string[]> } | undefined
+  const core = m.map?.core as { names?: Record<string, string[]>; subtitles?: Record<string, unknown> } | undefined
   for (const [id, names] of Object.entries(core?.names ?? {})) for (const n of names) add(id, n)
-  const subtitles = (m.map?.core as { subtitles?: Record<string, string> } | undefined)?.subtitles
-  for (const [id, sub] of Object.entries(subtitles ?? {})) if (id.startsWith('ta:')) add(id, sub)
+  for (const [id, sub] of Object.entries(core?.subtitles ?? {})) if (id.startsWith('ta:') && typeof sub === 'string') add(id, sub, true)
   const topics = m.topics?.core as { names?: Record<string, unknown[][]> } | undefined
   for (const [id, names] of Object.entries(topics?.names ?? {})) for (const n of names) add(id, typeof n[0] === 'string' ? n[0] : undefined)
   const xtopics = m.xtopics?.core as { topics?: Map<string, { title?: string }> } | undefined
@@ -41,28 +55,35 @@ function namesById(m: MapSet): Map<string, string[]> {
 }
 
 /**
- * The ids whose names contain `name`, at most `limit`: first those with a name equal to it, then those with a name that starts
- * with it or has it as a whole word, then the rest; ids in code-point order within each. Accents and capitals do not count.
+ * The ids whose names contain `name`, at most `limit`: first those with a name equal to it, then those with a name that
+ * starts with it or has it as a whole word, then the rest; ids in code-point order within each. Accents and capitals do
+ * not count. A query of two or more words also matches a name that has every word, in any order, as a word or the start
+ * of one (score 2), ignoring function words ("how", "a", "de"; "fe y gracia" looks for "fe" and "gracia"). A match found
+ * only in a subtitle scores 3 and is never exact.
  */
 export function lookupMatches(m: MapSet, name: string, limit = 15): LookupMatch[] {
   const q = fold(name)
   if (q === '') return []
-  const words = q.split(/\s+/)
-  const long = words.length >= 2 ? words.filter((w) => w.length > 2) : []
-  const scored: { id: string; names: string[]; score: number }[] = []
-  for (const [id, names] of namesById(m)) {
-    let score = 3
-    for (const n of names) {
-      const f = fold(n)
-      if (f === q) score = 0
-      else if (f.startsWith(q) || f.split(/\s+/).includes(q)) score = Math.min(score, 1)
-      else if (f.includes(q)) score = Math.min(score, 2)
-      else if (long.length > 0) {
-        const parts = f.split(/[^\p{L}\p{N}]+/u)
-        if (long.every((w) => parts.some((p) => p.startsWith(w)))) score = Math.min(score, 2)
-      }
+  const qw = wordsOf(q)
+  const keep = qw.length >= 2 ? qw.filter((w) => !stopwords.has(w)) : []
+  const hit = (f: string): number => {
+    if (f === q) return 0
+    if (f.startsWith(q) || f.split(/\s+/).includes(q)) return 1
+    if (f.includes(q)) return 2
+    if (keep.length > 0) {
+      const parts = wordsOf(f)
+      if (keep.every((w) => parts.some((p) => p.startsWith(w)))) return 2
     }
-    if (score < 3) scored.push({ id, names, score })
+    return 4
+  }
+  const scored: { id: string; names: string[]; score: number }[] = []
+  for (const [id, { names, subs }] of namesById(m)) {
+    let score = 4
+    for (const n of names) {
+      const h = hit(fold(n))
+      score = Math.min(score, subs.has(n) && h < 4 ? 3 : h)
+    }
+    if (score < 4) scored.push({ id, names, score })
   }
   scored.sort((a, b) => a.score - b.score || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
   return scored.slice(0, limit).map(({ id, names, score }) => ({ id, names, exact: score === 0 }))

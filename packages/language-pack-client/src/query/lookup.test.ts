@@ -26,6 +26,32 @@ const taMaps = {
   },
 } as never
 
+const rank = {
+  revision: 1,
+  map: {
+    core: {
+      lang: 'x',
+      names: {
+        'ta:x/a-sub': ['Unrelated'],
+        'ta:x/b-title': ['Team work'],
+        'ta:x/z-title': ['The team'],
+        'ta:x/faith': ['Fe y gracia'],
+        'ta:x/accent': ['Gracia Équipe'],
+        'ta:x/hi': ['का अनुवाद'],
+        'ta:x/ar': ['من ترجمة'],
+        'ta:x/same': ['Same'],
+        'tw:x/term': ['Term'],
+      },
+      subtitles: {
+        'ta:x/a-sub': 'A subtitle only team',
+        'ta:x/same': 'Same',
+        'tw:x/term': 'Secret question',
+      },
+    },
+    parts: new Map(),
+  },
+} as never
+
 describe('lookupMatches', () => {
   test('the subtitle of an article is a name, after the title', () => {
     const [hit] = lookupMatches(taMaps, 'set up a translation team')
@@ -38,9 +64,30 @@ describe('lookupMatches', () => {
     expect(lookupMatches(taMaps, 'transl tea').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
     expect(lookupMatches(taMaps, 'team horse')).toEqual([])
   })
-  test('words of one or two letters are ignored by the several-word rule', () => {
+  test('function words are ignored by the several-word rule, content words of two letters are kept', () => {
     expect(lookupMatches(taMaps, 'how to team').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
     expect(lookupMatches(taMaps, 'a to')).toEqual([])
+    expect(lookupMatches(rank, 'fe y gracia').map((m) => m.id)).toEqual(['ta:x/faith'])
+    expect(lookupMatches(rank, 'y gracia fe').map((m) => m.id)).toEqual(['ta:x/faith'])
+    expect(lookupMatches(rank, 'का अनुवाद').map((m) => m.id)).toEqual(['ta:x/hi'])
+    expect(lookupMatches(rank, 'من ترجمة').map((m) => m.id)).toEqual(['ta:x/ar'])
+    expect(lookupMatches(rank, 'من فريق')).toEqual([])
+  })
+  test('accents, capitals, double spaces and punctuation do not matter; a mid-word start does not match', () => {
+    expect(lookupMatches(rank, 'EQUIPE   Gracia').map((m) => m.id)).toEqual(['ta:x/accent'])
+    expect(lookupMatches(taMaps, 'set up a translation team?').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
+    expect(lookupMatches(taMaps, 'translation, team').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
+    expect(lookupMatches(taMaps, 'ranslation setting')).toEqual([])
+  })
+  test('an exact title ranks first; a subtitle-only hit ranks below title hits and is never exact', () => {
+    expect(lookupMatches(rank, 'Team work')[0]).toMatchObject({ id: 'ta:x/b-title', exact: true })
+    expect(lookupMatches(rank, 'team', 2).map((m) => m.id)).toEqual(['ta:x/b-title', 'ta:x/z-title'])
+    expect(lookupMatches(rank, 'a subtitle only team')[0]).toMatchObject({ id: 'ta:x/a-sub', exact: false })
+    expect(lookupMatches(rank, 'a subtitle only team').every((m) => !m.exact)).toBe(true)
+  })
+  test('a subtitle on a tw: id is ignored; one equal to the title is not added twice', () => {
+    expect(lookupMatches(rank, 'secret question')).toEqual([])
+    expect(lookupMatches(rank, 'same')[0]!.names).toEqual(['Same'])
   })
   test('a name in the language, with or without accents and capitals, finds its id first', () => {
     const [first] = lookupMatches(maps, 'metafora')
