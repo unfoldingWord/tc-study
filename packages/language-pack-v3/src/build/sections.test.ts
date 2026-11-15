@@ -435,7 +435,7 @@ describe('assignSids: recognizing a section', () => {
   })
 
   test('a deleted section\'s entry disappears from the new registry, and its sid is not reused in that build', () => {
-    const one = assignSids(ART, ES, [{ level: 2, title: 'Definición', md: body('d') }, { level: 3, title: 'Raro', md: body('r') }], {})
+    const one = assignSids(ART, ES, [{ level: 2, title: 'Definición', md: body('d') }, { level: 2, title: 'Raro', md: body('r') }], {})
     expect(one.registry[ART].map((e) => e.sid)).toEqual(['definition', 's1'])
     const two = assignSids(ART, ES, [{ level: 2, title: 'Definición', md: body('d') }], one.registry)
     expect(two.registry[ART].map((e) => e.sid)).toEqual(['definition'])
@@ -495,7 +495,7 @@ describe('assignSids: the registry', () => {
     { level: 0, md: words('i', 8) },
     { level: 2, title: 'Definición', md: words('d', 20) },
     { level: 2, title: n === 1 ? 'Ejemplos de la Biblia' : 'Ejemplos de las historias bíblicas', md: words('e', 20) },
-    { level: 3, title: 'Un apartado raro', md: words('r', 15) },
+    { level: 2, title: 'Un apartado raro', md: words('r', 15) },
   ]
 
   test('an entry has the sid, heading, level, role, the fingerprint (sha256 of the text) and the trigrams', () => {
@@ -623,5 +623,51 @@ describe('the registry is canonical', () => {
     const one = assignSids(ART, ES, [{ level: 0, md: a }, { level: 2, title: 'Uno', md: b }], {})
     const two = assignSids(ART, ES, [{ level: 0, md: `${a}\n\n${b}` }], one.registry)
     expect(Object.keys(two.registry[ART][0])).toEqual(['sid', 'level', 'role', 'fingerprint', 'trigrams', 'aliases'])
+  })
+})
+
+describe('assignSids: a subheading with no known role takes its parent role', () => {
+  const roles = (parts: SectionPart[]) => assignSids(ART, 'en', parts, {}).sections.map((s) => s.role)
+  const SUB = 'A quotation with two layers'
+
+  test('a level 4 under a strategies heading is strategies', () => {
+    expect(roles([
+      { level: 3, title: 'Translation Strategies', md: 'a' },
+      { level: 4, title: SUB, md: 'b' },
+    ])).toEqual(['strategies', 'strategies'])
+  })
+
+  test('a level 3 unknown after a level 3 strategies is a sibling and stays unknown', () => {
+    expect(roles([
+      { level: 3, title: 'Translation Strategies', md: 'a' },
+      { level: 3, title: SUB, md: 'b' },
+    ])).toEqual(['strategies', 'unknown'])
+  })
+
+  test('the role passes through deeper levels', () => {
+    expect(roles([
+      { level: 3, title: 'Translation Strategies', md: 'a' },
+      { level: 4, title: SUB, md: 'b' },
+      { level: 5, title: 'Another one', md: 'c' },
+    ])).toEqual(['strategies', 'strategies', 'strategies'])
+  })
+
+  test('an unknown under an unknown, or under the intro, stays unknown', () => {
+    expect(roles([
+      { level: 0, md: 'i' },
+      { level: 2, title: SUB, md: 'b' },
+      { level: 3, title: 'Another one', md: 'c' },
+    ])).toEqual(['intro', 'unknown', 'unknown'])
+  })
+
+  test('the sids of an article already in the registry do not change', () => {
+    const parts: SectionPart[] = [
+      { level: 3, title: 'Translation Strategies', md: words('s', 20) },
+      { level: 4, title: SUB, md: words('q', 20) },
+    ]
+    const before = assignSids(ART, 'en', parts, {})
+    const old: SectionRegistry = { [ART]: before.registry[ART].map((e, i) => (i === 1 ? { ...e, role: 'unknown' as const } : e)) }
+    const again = assignSids(ART, 'en', parts, old)
+    expect(sids(again.sections)).toEqual(sids(before.sections))
   })
 })

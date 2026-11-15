@@ -183,7 +183,7 @@ describe('buildLanguage: es-419 Titus and the common parts', () => {
     expect(first.report.length).toBeGreaterThan(0)
     for (const line of first.report) expect(line).toMatch(/^(book [0-9a-z]{3}|art( (tw|ta):[^:\s]+)?|lex( [GH][0-9]+)?|obs): \S/)
     expect(first.report.some((line) => line.startsWith('book tit: es-419_gl/es-419/tn '))).toBe(true)
-    expect(first.report.some((line) => line.startsWith('art tw:kt: tw:kt/believe '))).toBe(true)
+    // The art sample has no heading left unplaced (the subheadings of a definition take its role), so no art line is required.
     // A line about a whole lexicon file or resource has no group.
     expect(first.report.some((line) => line.startsWith(`lex: ${UGL}: `))).toBe(true)
   })

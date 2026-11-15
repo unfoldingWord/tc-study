@@ -355,6 +355,20 @@ function prepare(part: SectionPart, articleLang: string): Prepared {
   return { part, role, lang, key: headingKey(part.level, part.title), fingerprint: sha256Hex(part.md), trigrams: trigramsOf(part.md) }
 }
 
+/**
+ * A section with no known role (`unknown`) takes the role of its parent, the nearest earlier section with a lower level,
+ * when that role is not `unknown` or `intro`. The parent's role counts after its own inheritance, so it passes through levels.
+ */
+function inheritRoles(prepared: Prepared[]): void {
+  const stack: Prepared[] = []
+  for (const p of prepared) {
+    while (stack.length > 0 && stack[stack.length - 1].part.level >= p.part.level) stack.pop()
+    const parent = stack[stack.length - 1]
+    if (p.role === 'unknown' && parent !== undefined && parent.role !== 'unknown' && parent.role !== 'intro') p.role = parent.role
+    stack.push(p)
+  }
+}
+
 function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   const list = map.get(key)
   if (list === undefined) map.set(key, [value])
@@ -364,6 +378,7 @@ function pushTo<K, V>(map: Map<K, V[]>, key: K, value: V): void {
 /** The sections of one article against the entries the registry has for it. Nothing here touches the registry itself. */
 function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[]): { sections: SectionModel[]; entries: RegistryEntry[] } {
   const prepared = parts.map((part) => prepare(part, articleLang))
+  inheritRoles(prepared)
   const n = prepared.length
   const match: number[] = new Array(n).fill(-1)
   const used: boolean[] = new Array(old.length).fill(false)

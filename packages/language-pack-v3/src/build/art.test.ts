@@ -108,15 +108,15 @@ describe('the es-419 tW of the sample', () => {
     expect(grace.sections[3].md).toBe('*   Números de Strong: H2580, H2587, H2589, H2603, H8467, G2143, G5485, G5543')
   })
 
-  test('the numbered sub-headings of a definition are sections of level 3 that no rule places, and the report lists them', () => {
+  test('the numbered sub-headings of a definition are sections of level 3 that take the role of the definition', () => {
     const believe = groups.get('tw:kt')!.find((a) => a.id === 'tw:kt/believe')!
-    expect(believe.sections.filter((s) => s.role === 'unknown').map((s) => [s.sid, s.level, s.title])).toEqual([
-      ['s1', 3, '1\\. Creer'],
-      ['s2', 3, '2\\. Creer en'],
-      ['s3', 3, '3\\. Creyente'],
-      ['s4', 3, '4\\. Incredulidad'],
+    expect(believe.sections.filter((s) => s.level === 3).map((s) => [s.sid, s.role, s.title])).toEqual([
+      ['definition-2', 'definition', '1\\. Creer'],
+      ['definition-3', 'definition', '2\\. Creer en'],
+      ['definition-4', 'definition', '3\\. Creyente'],
+      ['definition-5', 'definition', '4\\. Incredulidad'],
     ])
-    expect(issues).toContain('tw:kt/believe (es-419_gl/es-419/tw): the heading "1\\\\. Creer" is not placed (role unknown, sid s1)')
+    expect(issues.some((line) => line.startsWith('tw:kt/believe '))).toBe(false)
     expect(issues.every((line) => line.includes('is not placed'))).toBe(true)
   })
 
