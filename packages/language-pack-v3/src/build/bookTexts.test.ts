@@ -493,6 +493,20 @@ describe('the blanks that the USJ loses after a milestone and at the end of a li
     expect(joined(para(verseNode('1'), zs('α'), wd('Blessed'), ze, '{', zs('α'), wd('are'), ze, '} ', zs('β'), wd('the'), ze))).toBe('Blessed {are} the')
   })
 
+  test('an opening mark after a milestone keeps its blank: "called ‘woman,’", "name “man{kind}”", "means “living,”"', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('called'), ze, '‘', zs('β'), wd('woman'), ze, ',’'))).toBe('called ‘woman,’')
+    expect(joined(para(verseNode('1'), zs('α'), wd('name'), ze, '“', zs('β'), wd('man'), ze, '{', zs('γ'), wd('kind'), ze, '}”'))).toBe('name “man {kind}”')
+    expect(joined(para(verseNode('1'), zs('α'), wd('means'), ze, '“', zs('β'), wd('living'), ze, ',”'))).toBe('means “living,”')
+    expect(joined(para(verseNode('1'), zs('α'), wd('Casluhim'), ze, '(', zs('β'), wd('whom'), ze, ')'))).toBe('Casluhim (whom)')
+    expect(joined(para(verseNode('1'), zs('α'), wd('end'), ze, '.', ' ', zs('β'), wd('x'), ze, '[', zs('γ'), wd('y'), ze, ']'))).toBe('end. x [y]')
+  })
+
+  test('an opening mark that follows a blank, or no word, gets nothing; a closing mark after a word gets nothing', () => {
+    expect(joined(para(verseNode('1'), zs('α'), wd('a'), ze, ' ‘', zs('β'), wd('b'), ze))).toBe('a ‘b')
+    expect(joined(para(verseNode('1'), '“', zs('α'), wd('a'), ze, '”'))).toBe('“a”')
+    expect(joined(para(verseNode('1'), zs('α'), wd('bird'), '{', zs('β'), wd('s'), ze, '}'))).toBe('bird{s}')
+  })
+
   test('nothing is added where the USFM has none: a comma or a closing quote after a word', () => {
     expect(joined(para(verseNode('1'), zs('α'), wd('end'), ze, ',', zs('β'), wd('next'), ze, '”', '.'))).toBe('end, next”.')
     expect(joined(para(verseNode('1'), '“', zs('α'), wd('end'), ze, '”'))).toBe('“end”')

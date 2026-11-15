@@ -1,7 +1,8 @@
 /**
  * Whole-sample check of the blanks of the bridge texts: builds every ULT/UST (or GLT/GST) text of a phase 0 sample and counts
- * the pieces that still show a lost blank (`LOST_SPACE`, the pattern that the MCP scripture adapter falls back on), and compares
- * the text without blanks with the text of the rows (the builder only adds blanks).
+ * the pieces that still show a lost blank (`LOST_SPACE`, the pattern that the MCP scripture adapter falls back on), counts the opening marks that touch the piece before
+ * them (`OPENING_JOIN`), and compares the text without any blank with the text of the rows: the builder only adds blanks, and
+ * this comparison ignores blanks, so it cannot see a blank that is missing or extra; the two counts above do.
  *
  *   bun scripts/check-whitespace.ts <sample folder> <language> <resource>...
  *   bun scripts/check-whitespace.ts C:/.../fase0-paquetes/muestra en unfoldingWord/en/ult unfoldingWord/en/ust
@@ -15,6 +16,8 @@ import { partsSource } from '../src/node/partsSource'
 import type { Row } from '../src/source/rows'
 
 const LOST_SPACE = /[\p{L}\p{N}]\{|\}[\p{L}\p{N}]|[.,;:!?][\p{L}{]/u
+/** A letter, a digit, `.,;:!?` or a closing mark directly followed by an opening mark: "called‘woman", "name“man". */
+const OPENING_JOIN = /[\p{L}\p{N}.,;:!?)\]”’»][“‘(\[«„‚]/u
 
 const [folder, lang, ...resources] = process.argv.slice(2)
 if (folder === undefined || lang === undefined || resources.length === 0) {
@@ -35,7 +38,7 @@ const list = JSON.parse(await Bun.file(`${folder}/${lang}/list.json`).text()) as
 for (const part of list.parts) if (resources.includes(part.resource) && part.book !== undefined) books.add(part.book)
 
 let skipped = 0
-const totals = new Map<string, { texts: number; pieces: number; lost: number; changed: number; suffixes: number; examples: string[] }>()
+const totals = new Map<string, { texts: number; pieces: number; lost: number; opening: number; changed: number; suffixes: number; examples: string[] }>()
 for (const book of [...books].sort()) {
   let index: OrigIndex
   try {
@@ -55,7 +58,7 @@ for (const book of [...books].sort()) {
     }
     if (!rows.some((row) => row.key.startsWith(`scripture-usj:${resource}:${book}:`))) continue
     const text = extractText(rows, book, resource, index)
-    const total = totals.get(resource) ?? { texts: 0, pieces: 0, lost: 0, changed: 0, suffixes: 0, examples: [] }
+    const total = totals.get(resource) ?? { texts: 0, pieces: 0, lost: 0, opening: 0, changed: 0, suffixes: 0, examples: [] }
     total.texts++
     total.pieces += text.pieces.length
     const joined = text.pieces.map(([t]) => t).join('')
@@ -65,6 +68,8 @@ for (const book of [...books].sort()) {
     text.pieces.forEach(([t], i) => {
       if (noteAt.has(i)) return
       const around = (text.pieces[i - 1]?.[0].slice(-1) ?? '') + t
+      // Only the join of two pieces counts: an opening mark inside one piece is the text of the USFM.
+      if (i > 0 && OPENING_JOIN.test(text.pieces[i - 1][0].slice(-1) + t.slice(0, 1))) total.opening++
       if (LOST_SPACE.test(around)) {
         total.lost++
         // A suffix in braces right after a word, "bird{s}", has no blank in the USFM either: told apart for the count.
@@ -84,6 +89,6 @@ for (const book of [...books].sort()) {
 }
 console.log(`${skipped} texts left out because their part is not in the folder`)
 for (const [resource, t] of totals) {
-  console.log(`${resource}: ${t.texts} texts, ${t.pieces} pieces, LOST_SPACE ${t.lost} (of them ${t.suffixes} are a suffix in braces right after a word, "bird{s}", with no blank in the USFM either), texts that differ from the rows apart from blanks ${t.changed}`)
+  console.log(`${resource}: ${t.texts} texts, ${t.pieces} pieces, LOST_SPACE ${t.lost} (of them ${t.suffixes} are a suffix in braces right after a word, "bird{s}", with no blank in the USFM either), opening-mark joins (OPENING_JOIN) ${t.opening}, texts whose letters and marks differ from the rows (blanks of every kind are ignored, so this does not see a missing or extra blank) ${t.changed}`)
   for (const example of t.examples) console.log(`  ${example}`)
 }

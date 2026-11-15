@@ -27,7 +27,15 @@ const LOST_BEFORE_BRACE = /[\p{L}\p{N}]$/u
 const BLANK_START = /^[\s,.;:!?)\]}”’»]/u
 const BLANK_END = /\s$/u
 /** Does a blank go between the text `a` and the text `b` that follow each other with a milestone between them? */
-const lostBlank = (a: string, b: string): boolean => (b.startsWith('{') ? LOST_BEFORE_BRACE.test(a) : LOST_BEFORE.test(a) && LOST_AFTER.test(b))
+const lostBlank = (a: string, b: string): boolean =>
+  b.startsWith('{')
+    ? LOST_BEFORE_BRACE.test(a)
+    : OPENING_START.test(b)
+      ? LOST_BEFORE.test(a) || CLOSING_END.test(a)
+      : LOST_BEFORE.test(a) && LOST_AFTER.test(b)
+/** An opening mark, and a closing one: "called ‘woman,’" lost the blank before the `‘` too. */
+const OPENING_START = /^[“‘(\[«„‚]/u
+const CLOSING_END = /[)\]”’»]$/u
 /** The second number of a verse label that is a bridge: `"13-14"` is 14. */
 const BRIDGE_END = /^[0-9]+-([0-9]+)/
 
