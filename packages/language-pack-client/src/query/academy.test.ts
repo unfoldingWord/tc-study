@@ -49,6 +49,35 @@ describe('academy', () => {
     const m = await r.maps()
     for (const x of list) expect(usageBooks(m, x.id).tit).toMatchObject({ count: x.count })
   })
+  test('over a map with many ids the counts equal usageBooks and nothing else is listed', () => {
+    const rows = new Map<string, Map<string, [number, number]>>()
+    for (let i = 0; i < 500; i++) rows.set(`ta:x/a${String(i).padStart(3, '0')}`, new Map([['tit', [i % 7, 1]], ['gen', [3, 1]]]))
+    const mk = (partial: boolean) =>
+      ({
+        revision: 1,
+        map: {
+          core: {
+            lang: 'es',
+            names: { 'ta:x/a001': ['Uno'] },
+            res: new Map([['x/es/tn', {}]]),
+            coverage: new Map([['x/es/tn', { whole: partial ? [] : ['tit'], partial: partial ? ['tit'] : [] }]]),
+            usage: { unit: 'notes', rows },
+          },
+          parts: new Map(),
+        },
+      }) as never
+    for (const partial of [false, true]) {
+      const m = mk(partial)
+      const list = academyOf(m, 'tit')
+      expect(list.length).toBe(500 - Math.ceil(500 / 7))
+      for (const x of list) {
+        expect(usageBooks(m, x.id).tit).toMatchObject({ count: x.count })
+        expect(x.partial).toBe(partial)
+      }
+      expect(list.find((x) => x.id === 'ta:x/a001')!.title).toBe('Uno')
+      expect(academyOf(m, 'gen')).toEqual([])
+    }
+  })
   test('without the map: data null and the unit missing', async () => {
     const r = await open({ books: ['tit'] })
     const a = await academyQuery({ ...r, maps: async () => ({ revision: 1 }) } as never, 'tit')

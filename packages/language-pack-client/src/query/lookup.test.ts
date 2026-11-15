@@ -53,11 +53,40 @@ const rank = {
 } as never
 
 describe('lookupMatches', () => {
-  test('the subtitle of an article is a name, after the title', () => {
+  test('the subtitle of an article is returned apart from the names', () => {
     const [hit] = lookupMatches(taMaps, 'set up a translation team')
     expect(hit!.id).toBe('ta:manage/translate-team')
-    expect(hit!.names).toEqual(['Setting Up A Translation Team', 'How can I set up a translation team?'])
+    expect(hit!.names).toEqual(['Setting Up A Translation Team'])
+    expect(hit!.subtitle).toBe('How can I set up a translation team?')
     expect(hit!.exact).toBe(false)
+  })
+  test('punctuation in the query does not stop a match', () => {
+    const p = {
+      revision: 1,
+      map: {
+        core: {
+          lang: 'x',
+          names: { 'ta:translate/figs-metaphor': ['Metaphor'], 'ta:manage/translate-team': ['Translation team'], 'ta:x/team-fr': ['Équipe de traduction'], 'ta:x/wit': ['What Is Translation?'] },
+        },
+        parts: new Map(),
+      },
+    } as never
+    expect(lookupMatches(p, 'metaphor?')[0]).toMatchObject({ id: 'ta:translate/figs-metaphor', exact: true })
+    expect(lookupMatches(p, "what's a metaphor").map((x) => x.id)).toEqual(['ta:translate/figs-metaphor'])
+    expect(lookupMatches(p, "it's a metaphor").map((x) => x.id)).toEqual(['ta:translate/figs-metaphor'])
+    expect(lookupMatches(p, "l'équipe de traduction").map((x) => x.id)).toEqual(['ta:x/team-fr'])
+    expect(lookupMatches(p, 'translation team')[0]!.id).toBe('ta:manage/translate-team')
+    expect(lookupMatches(p, 'what is translation')[0]).toMatchObject({ id: 'ta:x/wit', exact: true })
+  })
+  test('accents go only from Latin letters: Devanagari vowel signs stay', () => {
+    const d = { revision: 1, map: { core: { lang: 'x', names: { 'ta:x/work': ['काम'], 'ta:x/less': ['कम'], 'ta:x/met': ['Metáfora'] } }, parts: new Map() } } as never
+    expect(lookupMatches(d, 'metafora')[0]!.id).toBe('ta:x/met')
+    expect(lookupMatches(d, 'काम').map((x) => x.id)).toEqual(['ta:x/work'])
+    expect(lookupMatches(d, 'कम').map((x) => x.id)).toEqual(['ta:x/less'])
+  })
+  test('the names of a map are built once', () => {
+    const first = lookupMatches(maps, 'grace')
+    expect(lookupMatches(maps, 'grace')).toEqual(first)
   })
   test('several words match in any order, as whole words or word starts', () => {
     expect(lookupMatches(taMaps, 'team translation').map((m) => m.id)).toEqual(['ta:manage/translate-team'])
