@@ -134,4 +134,22 @@ describe('ObsLoader reads the zip', () => {
     ;(loader as any).door43Client.downloadZipball = async () => new TextEncoder().encode('<html>502</html>').buffer
     await expect(loader.downloadResource(key)).rejects.toThrow()
   })
+
+  test('a changed release downloads that release zip', async () => {
+    const m: any = meta()
+    const { loader, calls } = setup(files, m)
+    await loader.loadContent(key, '01')
+    m.release = { tag_name: 'v10' }
+    const two = await loader.loadContent(key, '02')
+    expect(calls).toEqual(['unfoldingWord/en_obs@v9', 'unfoldingWord/en_obs@v10'])
+    expect(two.frames[0].resolvedSrc).toContain('https://cdn.door43.org')
+    const one = setup(files, meta({ release: { tag_name: 'v10' }, contentMetadata: { ingredients: [{ identifier: '01', path: './content/01.md' }] } }))
+    expect((await one.loader.loadContent(key, '01')).frames[1].resolvedSrc).toContain('/raw/tag/v10/')
+  })
+
+  test('ingredient paths are normalised before the zip lookup', async () => {
+    const { loader } = setup(files, meta({ contentMetadata: { ingredients: [{ identifier: '01', path: './content/./x/../01.md' }] } }))
+    const story = await loader.loadContent(key, '01')
+    expect(story.frames[1].resolvedSrc).toBe('https://git.door43.org/unfoldingWord/en_obs/raw/tag/v9/content/img/obs-en-01-02.jpg')
+  })
 })

@@ -78,6 +78,17 @@ function zipRef(metadata: ResourceMetadata): string {
   return metadata.release?.tag_name || (metadata as { default_branch?: string }).default_branch || 'master'
 }
 
+/** A repo-relative path as the zip names it: no `.` segments, `a/..` collapsed, no leading `./` or `/`. */
+function repoPath(path: string): string {
+  const out: string[] = []
+  for (const seg of path.split('/')) {
+    if (seg === '' || seg === '.') continue
+    if (seg === '..') out.pop()
+    else out.push(seg)
+  }
+  return out.join('/')
+}
+
 /** A story whose file is not in the zip. */
 class ObsStoryAbsentError extends Error {}
 
@@ -138,7 +149,8 @@ export class ObsLoader implements ResourceLoader {
     }
 
     const metadata = await this.getMetadata(resourceKey)
-    const storyPath = getStoryPath(metadata, padded)
+    const rawPath = getStoryPath(metadata, padded)
+    const storyPath = rawPath ? repoPath(rawPath) : null
     if (!storyPath) {
       throw new Error(`Story "${padded}" not found in OBS ingredients for ${resourceKey}`)
     }
@@ -152,7 +164,7 @@ export class ObsLoader implements ResourceLoader {
 
     const zip = await this.zipOf(resourceKey, metadata)
     const ref = zip.ref
-    const entry = zip.archive.files[`${zip.top}/${storyPath.replace(/^\.\//, '')}`]
+    const entry = zip.archive.files[`${zip.top}/${storyPath}`]
     if (!entry || entry.dir) {
       throw new ObsStoryAbsentError(`Story file ${storyPath} is not in the ${owner}/${repoName} zip at ${ref}`)
     }
@@ -195,7 +207,8 @@ export class ObsLoader implements ResourceLoader {
 
   /** The release zip, downloaded once per resource and kept (the promise is memoised, a failure is not). */
   private zipOf(resourceKey: string, metadata: ResourceMetadata): Promise<ObsZip> {
-    let pending = this.zips.get(resourceKey)
+    const memoKey = `${resourceKey}@${zipRef(metadata)}`
+    let pending = this.zips.get(memoKey)
     if (!pending) {
       const [owner, language, resourceId] = resourceKey.split('/')
       const repoName = `${language}_${resourceId}`
@@ -212,8 +225,8 @@ export class ObsLoader implements ResourceLoader {
         }
         return { ref, archive, top }
       })()
-      this.zips.set(resourceKey, pending)
-      pending.catch(() => this.zips.delete(resourceKey))
+      this.zips.set(memoKey, pending)
+      pending.catch(() => this.zips.delete(memoKey))
     }
     return pending
   }
