@@ -55,6 +55,11 @@ on:
         required: false
         type: boolean
         default: false
+      obs:
+        description: Build Open Bible Stories (off until a measured staging run)
+        required: false
+        type: boolean
+        default: false
       v3:
         description: With parts, also build and publish format 3 (staging only in this phase), after the 2.0 parts
         required: false
@@ -94,6 +99,7 @@ jobs:
       FORCE: ${{ inputs.force }}
       PARTS: ${{ inputs.parts }}
       COMPARE: ${{ inputs.compare }}
+      OBS: ${{ inputs.obs }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       # The language reaches a shell, a bucket key and a log: only a plain code passes. The value is never printed.
@@ -232,6 +238,7 @@ jobs:
           if [ "$MODE" = no-upload ]; then args+=(--no-upload); fi
           # Parts in both modes. A parts publish is measured too: its time and memory are what carrying units saves.
           if [ "$PARTS" = true ]; then args+=(--parts); fi
+          if [ "$OBS" = true ]; then args+=(--obs); fi
           if [ "$MODE" = no-upload ] || [ "$PARTS" = true ]; then
             command -v /usr/bin/time > /dev/null || { sudo apt-get update -q && sudo apt-get install -y time; }
             runner=(/usr/bin/time -v -o "$RUNNER_TEMP/packs-out/time.txt")
