@@ -116,8 +116,8 @@ type Found = { id: string; group: string; kind: Kind; ref: ResourceRef; publishe
  * - `taConfigs` is the text of the `config.yaml` of each manual of each tA resource ({@link relatedArticles}). Undefined:
  *   `related` comes from the links of the texts alone.
  * - `roleHints` maps an article id to the headed sections of the same article in the map language ({@link RoleHint}): an article
- *   with the same sequence of levels takes its `unknown` roles from it (`sections.ts`). `hinted` lists, by group, the ids of the
- *   articles that used a hint; the report has one line per group: how many articles had a hint and how many used it.
+ *   with the same sequence of levels takes its `unknown` roles from it (`sections.ts`). The report has one line per group:
+ *   how many articles had a hint and how many used it.
  * - The result maps each group (`tw:kt`, `tw:names`, `tw:other`, `ta:translate`, `ta:checking`, `ta:process`, `ta:intro`,
  *   sorted) to its articles, ordered by id. Both orders are by code point.
  */
@@ -128,7 +128,7 @@ export async function extractArticles(
   issues: string[] = [],
   taConfigs?: TaConfigs,
   roleHints?: Map<string, RoleHint>,
-): Promise<{ groups: Map<string, ArticleModel[]>; registry: SectionRegistry; hinted: Map<string, string[]> }> {
+): Promise<{ groups: Map<string, ArticleModel[]>; registry: SectionRegistry }> {
   const resources = (await source.resources(lang))
     .filter((ref) => ref.kind === TW_SUBJECT || ref.kind === TA_SUBJECT)
     .sort((a, b) => compareCodePoints(a.key, b.key))
@@ -169,7 +169,6 @@ export async function extractArticles(
   const ordered = [...found.values()].sort((a, b) => compareCodePoints(a.group, b.group) || compareCodePoints(a.id, b.id))
   const groups = new Map<string, ArticleModel[]>()
   const next: SectionRegistry = { ...registry }
-  const hinted = new Map<string, string[]>()
   const counts = new Map<string, [number, number]>()
   for (const article of ordered) {
     const { id, ref } = article
@@ -189,11 +188,6 @@ export async function extractArticles(
       count[0]++
       if (hintUsed) count[1]++
       counts.set(article.group, count)
-    }
-    if (hintUsed) {
-      const list = hinted.get(article.group)
-      if (list === undefined) hinted.set(article.group, [id])
-      else list.push(id)
     }
     next[path] = entries
     for (const section of sections) {
@@ -219,7 +213,7 @@ export async function extractArticles(
   for (const [group, [had, used]] of [...counts].sort(([a], [b]) => compareCodePoints(a, b))) {
     issues.push(`${group}/: role hints: ${had} articles had a hint, ${used} used it`)
   }
-  return { groups, registry: canonicalRegistry(next), hinted }
+  return { groups, registry: canonicalRegistry(next) }
 }
 
 /**

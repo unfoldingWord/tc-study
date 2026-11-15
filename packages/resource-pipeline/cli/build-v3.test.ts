@@ -254,6 +254,22 @@ describe('build-v3: arguments and errors', () => {
     expect(plain.out.concat(plain.err).some((l) => l.startsWith('role hints: '))).toBe(false)
     // The art segments that used a hint have the segment of the hints in their inputs: their catalog entries differ.
     expect(Buffer.from(read(join(hintedOut, 'catalog-es-419.seg'))).equals(Buffer.from(read(join(plainOut, 'catalog-es-419.seg'))))).toBe(false)
+    // The roles themselves, read from the built art segments: the hints are this language's own build, so each section of
+    // the hinted build has the role its hint had (the bytes differ only by the inputs), and the build has real roles.
+    const rolesOf = async (dir: string): Promise<Map<string, string>> => {
+      const roles = new Map<string, string>()
+      for (const name of readdirSync(join(dir, 'segments'))) {
+        const output = (await readerOutput(read(join(dir, 'segments', name)))) as { h?: { class?: string }; articles?: { id: string; sections: { sid: string; role: string }[] }[] }
+        if (output.h?.class !== 'art') continue
+        for (const a of output.articles ?? []) for (const sec of a.sections) roles.set(`${a.id}#${sec.sid}`, sec.role)
+      }
+      return roles
+    }
+    const fromHints = await rolesOf(hintsOut)
+    const hintedRoles = await rolesOf(hintedOut)
+    expect(hintedRoles.size).toBeGreaterThan(0)
+    expect([...hintedRoles]).toEqual([...fromHints])
+    expect([...hintedRoles.values()].some((role) => role === 'definition')).toBe(true)
   })
 
   test('--role-hints with a folder that has no segments/: exit 1 with the usage', async () => {

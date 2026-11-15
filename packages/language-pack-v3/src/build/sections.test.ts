@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { sha256Hex } from '../codec/sha256'
-import { articlePath, assignSids, canonicalRegistry, normalizeHeading, roleOf, type SectionPart, type SectionRegistry, splitSections, trigramsOf } from './sections'
+import { articlePath, assignArticle, assignSids, canonicalRegistry, normalizeHeading, roleOf, type SectionPart, type SectionRegistry, splitSections, trigramsOf } from './sections'
 
 /** `n` distinct words that start with `prefix`, as one text: every trigram of it is different from those of another prefix. */
 const words = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${i}`).join(' ')
@@ -711,6 +711,52 @@ describe('assignSids: inherited roles and the sids', () => {
     )
     expect(again.sections.map((s) => s.role)).toEqual(['examples', 'examples', 'examples'])
     expect(sids(again.sections)).toEqual([a, sub, b])
+  })
+
+  describe('a registry built before roleFrom: a subheading is `unknown` with sid s1 and no roleFrom', () => {
+    const parts = (sub: string): SectionPart[] => [
+      { level: 3, title: 'Translation Strategies', md: words('s', 20) },
+      { level: 4, title: sub, md: words('q', 20) },
+    ]
+    const oldStyle = (): SectionRegistry => {
+      const built = assignSids(ART, 'en', parts('A quotation with two layers'), {})
+      return {
+        [ART]: built.registry[ART].map((e, i) => {
+          if (i !== 1) return e
+          const { roleFrom: _drop, ...rest } = e
+          return { ...rest, role: 'unknown' as const, sid: 's1' }
+        }),
+      }
+    }
+
+    test('a rebuild keeps s1 although the role becomes inherited', () => {
+      const old = oldStyle()
+      expect(old[ART][1].roleFrom).toBeUndefined()
+      const again = assignSids(ART, 'en', parts('A quotation with two layers'), old)
+      expect(again.sections[1].role).toBe('strategies')
+      expect(sids(again.sections)[1]).toBe('s1')
+      expect(again.registry[ART][1].roleFrom).toBe('inherited')
+    })
+
+    test('the same with a renamed heading', () => {
+      const again = assignSids(ART, 'en', parts('A different name for it'), oldStyle())
+      expect(again.sections[1].role).toBe('strategies')
+      expect(sids(again.sections)[1]).toBe('s1')
+    })
+  })
+
+  describe('roleFrom hint', () => {
+    const H = (level: number, role: string) => ({ level, role }) as { level: number; role: never }
+    test('is written for hinted sections, and such an old entry stays out of pass 2 when its heading is renamed', () => {
+      const first = assignArticle('en', [{ level: 2, title: 'Definition', md: words('d', 20) }, { level: 2, title: 'Titulo 1', md: words('f', 20) }], undefined, [H(2, 'definition'), H(2, 'facts')])
+      expect(first.hintUsed).toBe(true)
+      expect(first.entries.map((e) => e.roleFrom)).toEqual([undefined, 'hint'])
+      const old = first.entries.map((e, i) => (i === 1 ? { ...e, sid: 'h7', trigrams: [] as number[] } : e))
+      // "Hechos" is a table heading for facts; the old hinted entry (another title) must not give it h7.
+      const again = assignArticle('en', [{ level: 2, title: 'Definition', md: words('d', 20) }, { level: 2, title: 'Hechos', md: words('z', 20) }], old)
+      expect(again.sections.map((s) => s.role)).toEqual(['definition', 'facts'])
+      expect(again.sections[1].sid).not.toBe('h7')
+    })
   })
 
   test('a registry written without roleFrom still loads: its entries read as table roles', () => {
