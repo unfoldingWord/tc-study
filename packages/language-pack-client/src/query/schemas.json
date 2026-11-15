@@ -139,5 +139,27 @@
       "required": ["book"],
       "additionalProperties": false
     }
+  },
+  "stories": {
+    "label": { "es": "Historias: las historias bíblicas (OBS) de un pasaje, o todas" },
+    "description": "The Open Bible Stories whose ranges meet a passage or a whole chapter, or all of them in order.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "ref": { "type": "string", "description": "A book code and a chapter or a range, such as \"gen 1\" or \"gen 1:1-2:3\". Absent: every story." } },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "story": {
+    "label": { "es": "Historia: una historia bíblica (OBS) con sus cuadros, notas, preguntas y enlaces" },
+    "description": "One Open Bible Story with its frames and, per frame, the notes, questions and word links, when the stories are installed.",
+    "input": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": { "n": { "type": "integer", "minimum": 1, "maximum": 50, "description": "The number of the story, 1 to 50." } },
+      "required": ["n"],
+      "additionalProperties": false
+    }
   }
 }
