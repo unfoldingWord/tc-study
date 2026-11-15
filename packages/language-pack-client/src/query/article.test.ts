@@ -9,6 +9,7 @@ import { memoryStore } from '../store/memory'
 import type { VerifiedCatalog } from '../verify'
 import { type FakeServer, startFakeServer } from '../../test/fakeServer'
 import { buildSample, type Sample } from '../../test/sample'
+import { defaultSections } from './article'
 
 let sample: Sample
 let trust: { trustedKeys: Record<string, Uint8Array> }
@@ -233,5 +234,27 @@ describe('article by roles', () => {
     expect(sids((await r.article('ta:translate/m', null as never)).data!.sections)).toEqual(['d'])
     expect(sids((await r.article('ta:translate/m', 'all')).data!.sections)).toHaveLength(5)
     expect(sids((await r.article('ta:translate/m', 's2')).data!.sections)).toEqual(['s2'])
+  })
+})
+
+describe('defaultSections', () => {
+  const S = (sid: string, level: number, role: string) => ({ sid, level, role, lang: 'en', md: sid }) as never
+  const sids = (id: string, secs: never[]) => defaultSections(id, secs).map((s) => (s as { sid: string }).sid)
+  test('tA: the first description and the first reason at the top level, not the subheadings that inherit them', () => {
+    const secs = [S('intro', 0, 'intro'), S('description', 2, 'description'), S('description-2', 3, 'description'), S('examples', 2, 'examples'), S('reason', 2, 'reason'), S('reason-2', 3, 'reason'), S('description-3', 2, 'description')]
+    expect(sids('ta:translate/x', secs)).toEqual(['description', 'reason'])
+  })
+  test('tA: the top level is the smallest above 0, whatever it is', () => {
+    const secs = [S('a', 3, 'description'), S('b', 4, 'description'), S('c', 3, 'reason')]
+    expect(sids('ta:translate/x', secs)).toEqual(['a', 'c'])
+  })
+  test('tA: a description only at a deeper level, or no role at all, gives the first section', () => {
+    expect(sids('ta:translate/x', [S('a', 2, 'unknown'), S('b', 3, 'description')])).toEqual(['a'])
+    expect(sids('ta:translate/x', [S('a', 2, 'unknown'), S('b', 2, 'unknown')])).toEqual(['a'])
+  })
+  test('tW: the first definition at the top level, else the intro, else the first section', () => {
+    expect(sids('tw:kt/x', [S('intro', 0, 'intro'), S('definition', 2, 'definition'), S('definition-2', 3, 'definition')])).toEqual(['definition'])
+    expect(sids('tw:kt/x', [S('intro', 0, 'intro'), S('facts', 2, 'facts')])).toEqual(['intro'])
+    expect(sids('tw:kt/x', [S('s1', 2, 'unknown'), S('facts', 2, 'facts')])).toEqual(['s1'])
   })
 })

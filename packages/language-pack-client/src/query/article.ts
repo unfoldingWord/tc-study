@@ -31,11 +31,24 @@ async function titled(reader: PackReader, ids: string[], models: ArticleModel[])
   return out
 }
 
-function defaults(id: string, sections: SectionModel[]): SectionModel[] {
-  const by = (...roles: Role[]) => sections.filter((s) => roles.includes(s.role))
+/**
+ * The sections an article gives when none is asked for, small on purpose: sections that inherit a role from a heading are not
+ * extra defaults.
+ * - tW: the first `definition` at the article's top heading level (the smallest level above 0), else `intro`, else the first section.
+ * - tA: the first `description` and the first `reason` at that level, in reading order, else the first section.
+ * @internal exported for tests
+ */
+export function defaultSections(id: string, sections: SectionModel[]): SectionModel[] {
+  const top = Math.min(...sections.filter((s) => s.level > 0).map((s) => s.level))
+  const first = (role: Role) => sections.find((s) => s.role === role && s.level === top)
   let pick: SectionModel[] = []
-  if (id.startsWith('tw:')) pick = by('definition').length > 0 ? by('definition').slice(0, 1) : by('intro').slice(0, 1)
-  else if (id.startsWith('ta:')) pick = by('description', 'reason')
+  if (id.startsWith('tw:')) {
+    const one = first('definition') ?? sections.find((s) => s.role === 'intro')
+    if (one !== undefined) pick = [one]
+  } else if (id.startsWith('ta:')) {
+    const wanted = [first('description'), first('reason')]
+    pick = sections.filter((s) => wanted.includes(s))
+  }
   return pick.length > 0 ? pick : sections.slice(0, 1)
 }
 
@@ -57,7 +70,7 @@ export async function articleQuery(reader: PackReader, id: string, section?: str
   if (art === undefined) return out
   const chosen =
     section === undefined || section === null
-      ? defaults(art.id, art.sections)
+      ? defaultSections(art.id, art.sections)
       : section === 'all'
         ? art.sections
         : typeof section === 'object'

@@ -24,6 +24,17 @@ describe('assignSids: role hints', () => {
     }
   })
 
+  test('a table role that disagrees with the hint rejects the hint for the whole article', () => {
+    const out = run(parts([2, 2, 3], ['Ejemplos de la Biblia']), [H(2, 'description'), H(2, 'facts'), H(3, 'strategies')])
+    expect(out.hintUsed).toBe(false)
+    expect(out.sections.map((s) => s.role)).toEqual(['examples', 'unknown', 'unknown'])
+  })
+
+  test('a table role that agrees with the hint keeps the hint', () => {
+    const out = run(parts([2, 2, 3], ['Hechos']), [H(2, 'facts'), H(2, 'facts'), H(3, 'strategies')])
+    expect(out.hintUsed).toBe(true)
+  })
+
   test('the text before the first heading does not count in the shape', () => {
     const out = run([{ level: 0, md: 'intro' }, ...parts([2, 2, 3])])
     expect(out.hintUsed).toBe(true)
@@ -31,8 +42,8 @@ describe('assignSids: role hints', () => {
   })
 
   test('a role the table knows is kept', () => {
-    const out = run(parts([2, 2, 3], ['Hechos']))
-    expect(out.sections.map((s) => s.role)).toEqual(['facts', 'facts', 'strategies'])
+    const out = run(parts([2, 2, 3], ['Hechos']), [H(2, 'facts'), H(2, 'unknown'), H(3, 'strategies')])
+    expect(out.sections.map((s) => s.role)).toEqual(['facts', 'unknown', 'strategies'])
   })
 
   test('inheritance runs after the hints for what is left', () => {

@@ -382,11 +382,14 @@ export type RoleHint = { level: number; role: Role }[]
 /**
  * When the headed sections (level > 0) of an article have the same number and the same sequence of levels as its hint (the
  * article with the same id in the map language), each of them whose role is `unknown` takes the role of the hint at the same
- * position; a role the table knows is kept. Returns whether the shape matched (the hint was used). Runs before {@link inheritRoles}.
+ * position; a role the table knows is kept, and when one of them differs from the hint at its position the whole hint is
+ * rejected (the articles are in another order). Returns whether the shape matched (the hint was used). Runs before {@link inheritRoles}.
  */
 function applyHints(prepared: Prepared[], hint: RoleHint): boolean {
   const headed = prepared.filter((p) => p.part.level > 0)
   if (headed.length !== hint.length || headed.some((p, i) => p.part.level !== hint[i].level)) return false
+  // A section the table places must agree with the hint at its position, else the orders differ and no hint is trusted.
+  if (headed.some((p, i) => p.role !== 'unknown' && p.role !== hint[i].role)) return false
   headed.forEach((p, i) => {
     if (p.role === 'unknown' && hint[i].role !== 'unknown' && hint[i].role !== 'intro') {
       p.role = hint[i].role

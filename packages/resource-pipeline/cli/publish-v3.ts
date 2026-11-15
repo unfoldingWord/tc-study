@@ -220,7 +220,12 @@ async function run(o: Options, env: Env, io: Io): Promise<Result> {
       if (entry.class !== 'art') continue
       const id = hex(entry.id)
       const bytes = await store.getBytes(V3_KEYS.seg(id))
-      if (bytes === null) throw new Error(`The published ${o.mapLang} catalog names the segment ${id}, which the bucket does not have`)
+      if (bytes === null) {
+        // Hints are a help, not a requirement: a catalog that names a segment the bucket lacks must not stop the build.
+        await rm(hintsDir, { recursive: true, force: true })
+        io.log(`The published ${o.mapLang} catalog names the segment ${id}, which the bucket does not have: built without role hints`)
+        return
+      }
       await writeFile(join(hintsDir, 'segments', `${id}.seg`), bytes)
       n++
     }

@@ -130,6 +130,22 @@ describe('publish-v3', () => {
     expect(run.err.some((l) => l.startsWith('role hints: '))).toBe(false)
   })
 
+  test('a map-language catalog that names a segment the bucket lacks: the build has no hints, logs it and goes on', async () => {
+    const bucket = temp()
+    expect((await publish(en(bucket))).code).toBe(0)
+    expect((await publish(es(bucket))).code).toBe(0)
+    const artId = (await catalog(bucket, 'es-419')).model.segments.filter((e) => e.class === 'art').map((e) => hex(e.id))[0]!
+    const file = readdirSync(join(bucket, 'v3'), { recursive: true }).map(String).find((f) => f.endsWith(`${artId}.seg`))
+    expect(file).toBeDefined()
+    rmSync(join(bucket, 'v3', file!))
+    const work = temp()
+    const run = await publish(en(bucket, EN, ['--map-lang', 'es-419'], work))
+    expect(run.code).toBe(0)
+    expect(run.err.join(' ')).toContain(`names the segment ${artId}, which the bucket does not have: built without role hints`)
+    expect(existsSync(join(work, 'role-hints'))).toBe(false)
+    expect(run.err.some((l) => l.startsWith('role hints: '))).toBe(false)
+  })
+
   test('es-419 before en is skipped', async () => {
     const bucket = temp()
     mkdirSync(join(bucket, 'v3'), { recursive: true })
