@@ -36,7 +36,7 @@ type Entry = { id: string; names: string[]; subtitle?: string; forms: { f: strin
 type Cores = [unknown, unknown, unknown, unknown]
 const cache = new WeakMap<object, { cores: Cores; list: Entry[] }>()
 const NONE = {}
-/** How many times the entries were built (for tests: a second lookup on the same maps must not build again). */
+/** @internal How many times the entries were built (for tests: a second lookup on the same maps must not build again). */
 export const lookupStats = { builds: 0 }
 
 /**

@@ -190,10 +190,12 @@ describe('reader.lookup', () => {
     expect(lookupStats.builds).toBe(before)
     expect(b.data!.matches).toEqual(a.data!.matches)
     // Mutating a result does not touch later lookups.
+    const snap = structuredClone(a.data!.matches)
     a.data!.matches[0]!.names.push('corrupt')
     a.data!.matches[0]!.names[0] = 'changed'
     const c = await r.lookup('abstractnouns')
-    expect(c.data!.matches).toEqual(b.data!.matches)
+    expect(c.data!.matches).toEqual(snap)
+    expect(a.data!.matches[0]!.names).not.toBe(c.data!.matches[0]!.names)
     expect(lookupStats.builds).toBe(before)
   })
   test('a query of only punctuation is E_ARG', async () => {
