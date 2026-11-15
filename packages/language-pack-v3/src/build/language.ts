@@ -368,8 +368,10 @@ export async function buildLanguage(o: {
     const articleIds = new Set([...articles.values()].flat().map((a) => a.id))
     const tocTitles = new Map<string, string[]>()
     const tocRows: RowKey[] = []
-    for (const [key, manuals] of o.taTocs ?? []) {
-      for (const [manual, text] of manuals) {
+    // Code point order, so the names and the input rows do not depend on the order of the caller's Maps.
+    const byCodePoint = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
+    for (const [key, manuals] of [...(o.taTocs ?? [])].sort((a, b) => byCodePoint(a[0], b[0]))) {
+      for (const [manual, text] of [...manuals].sort((a, b) => byCodePoint(a[0], b[0]))) {
         tocRows.push({ layer: 'ta-toc', key: `${key}/${manual}/toc.yaml#${sha256Hex(text)}` })
         for (const [link, title] of parseTaToc(text, report, `${key}/${manual}/toc.yaml`)) {
           const id = `ta:${manual}/${link.toLowerCase()}`

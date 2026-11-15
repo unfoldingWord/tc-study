@@ -29,6 +29,17 @@ describe('parseTaToc', () => {
     ])
   })
 
+  test('a title with a colon is kept whole, quoted or not', () => {
+    expect(parseTaToc('- title: "Step 1: Getting Started"\n  link: a\n- title: Step 2: More\n  link: b\n')).toEqual([
+      ['a', 'Step 1: Getting Started'],
+      ['b', 'Step 2: More'],
+    ])
+  })
+
+  test('a link written before its title is dropped (the title then names nothing)', () => {
+    expect(parseTaToc('- link: a\n  title: "T"\n')).toEqual([])
+  })
+
   test('empty text and a heading alone give nothing', () => {
     expect(parseTaToc('')).toEqual([])
     expect(parseTaToc('title: "X"\nsections:\n  - title: "H"\n')).toEqual([])

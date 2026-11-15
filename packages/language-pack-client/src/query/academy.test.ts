@@ -101,5 +101,6 @@ describe('academy', () => {
     const b = await academyQuery({ ...r, maps: async () => ({ revision: 1, map }) } as never, 'psa')
     expect(b.data).toBeNull()
     expect(b.notInstalled.find((n) => n.unit === 'xmap')).toMatchObject({ bytes: r.size('xmap') })
+    expect(r.size('xmap')).toBeGreaterThan(0)
   })
 })

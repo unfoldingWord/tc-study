@@ -88,7 +88,10 @@ export async function fetchTaConfigs(o: { listFile: string; out: string; fetchFn
     }
     const manuals = [...configs.keys()].sort()
     written.set(key, manuals)
-    o.log?.(`${key} ${tag}: ${manuals.length === 0 ? 'no config.yaml' : manuals.map((m) => `${m}/config.yaml`).join(', ')}`)
+    const tocManuals = [...tocs.keys()].sort()
+    o.log?.(
+      `${key} ${tag}: ${manuals.length === 0 ? 'no config.yaml' : manuals.map((m) => `${m}/config.yaml`).join(', ')}; ${tocManuals.length === 0 ? 'no toc.yaml' : tocManuals.map((m) => `${m}/toc.yaml`).join(', ')}`,
+    )
   }
   await rm(o.out, { recursive: true, force: true })
   await rename(partial, o.out)

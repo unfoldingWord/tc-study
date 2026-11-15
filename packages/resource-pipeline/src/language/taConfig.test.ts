@@ -49,13 +49,14 @@ describe('taReleases', () => {
 })
 
 describe('configsOfZip', () => {
-  test('keeps the config.yaml of each manual and nothing else', async () => {
+  test('keeps the config.yaml and the toc.yaml of each manual, one folder down', async () => {
     const zip = await zipOf({ 'translate/config.yaml': 'a:\n', 'checking/config.yaml': 'b:\n', 'translate/toc.yaml': 'x', 'translate/a/config.yaml': 'no', 'manifest.yaml': 'm' })
     const { configs, tocs } = await configsOfZip(zip)
     expect([...configs.entries()].sort()).toEqual([
       ['checking', 'b:\n'],
       ['translate', 'a:\n'],
     ])
+    expect([...tocs.entries()]).toEqual([['translate', 'x']])
   })
 })
 
@@ -129,6 +130,6 @@ describe('fetch-ta-config', () => {
     const zip = await zipOf({ 'translate/config.yaml': 'a:\n' })
     const ok = io()
     expect(await main(['--list', listFile, '--out', join(dir, 'o')], ok.io, (async () => new Response(zip)) as unknown as typeof fetch)).toBe(0)
-    expect(ok.lines).toEqual([`${TA} v4: translate/config.yaml`, `1 tA resource(s) written under ${join(dir, 'o')}`])
+    expect(ok.lines).toEqual([`${TA} v4: translate/config.yaml; no toc.yaml`, `1 tA resource(s) written under ${join(dir, 'o')}`])
   })
 })
