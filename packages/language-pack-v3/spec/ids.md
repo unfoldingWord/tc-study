@@ -160,6 +160,12 @@ once and kept between builds, even when the heading is corrected, translated or 
 - **The role is apart from the sid.** Correcting a role does not change the sid.
 - A heading the builder cannot place gets the role `unknown`, and the builder's report lists it. The section stays
   readable and citable.
+- **An unplaced subheading takes a role from where it sits.** A heading no table places, when it sits under a section
+  (the nearest earlier one with a lower level) whose role is known (not `unknown` or `intro`), takes that role. A
+  translated article takes the roles of its `unknown` sections from the article with the same id in the map language
+  when both have the same number of headed sections with the same sequence of levels (a role the table knows is kept);
+  inheritance then runs for what is left. The role is stored apart from the sid, and an inherited or hinted role does not
+  move sids: pass 2 above (same role, same place) counts only the roles the heading table gave.
 
 ## Links inside text
 

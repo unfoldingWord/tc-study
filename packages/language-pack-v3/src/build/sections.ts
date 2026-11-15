@@ -334,7 +334,9 @@ export function canonicalRegistry(registry: SectionRegistry): SectionRegistry {
 
 // Assigning
 
-type Prepared = { part: SectionPart; role: Role; lang: string; key: string | null; fingerprint: string; trigrams: number[] }
+/** Where a role came from: the heading table, the parent section ({@link inheritRoles}) or the map language's article (a hint). */
+type RoleSource = 'table' | 'inherited' | 'hint'
+type Prepared = { part: SectionPart; role: Role; source: RoleSource; lang: string; key: string | null; fingerprint: string; trigrams: number[] }
 
 /** What pass 1 compares: the normalized heading, or one fixed key for the text before the first heading. `null` for a heading with no text. */
 function headingKey(level: number, title: string | undefined): string | null {
@@ -352,7 +354,7 @@ function prepare(part: SectionPart, articleLang: string): Prepared {
     // A heading from another language's table says the section is written in that language.
     if (placed.lang !== null && family(placed.lang) !== family(articleLang)) lang = placed.lang
   }
-  return { part, role, lang, key: headingKey(part.level, part.title), fingerprint: sha256Hex(part.md), trigrams: trigramsOf(part.md) }
+  return { part, role, source: 'table', lang, key: headingKey(part.level, part.title), fingerprint: sha256Hex(part.md), trigrams: trigramsOf(part.md) }
 }
 
 /**
@@ -364,7 +366,10 @@ function inheritRoles(prepared: Prepared[]): void {
   for (const p of prepared) {
     while (stack.length > 0 && stack[stack.length - 1].part.level >= p.part.level) stack.pop()
     const parent = stack[stack.length - 1]
-    if (p.role === 'unknown' && parent !== undefined && parent.role !== 'unknown' && parent.role !== 'intro') p.role = parent.role
+    if (p.role === 'unknown' && parent !== undefined && parent.role !== 'unknown' && parent.role !== 'intro') {
+      p.role = parent.role
+      p.source = 'inherited'
+    }
     stack.push(p)
   }
 }
@@ -404,8 +409,10 @@ function assign(articleLang: string, parts: SectionPart[], old: RegistryEntry[])
   // 2. The same role and the same place among the sections of that role.
   const oldByRole = new Map<Role, number[]>()
   old.forEach((entry, o) => pushTo(oldByRole, entry.role, o))
+  // Only roles the table gave count: an inherited or hinted role says nothing of where the section sits among its role's sections.
   const seen = new Map<Role, number>()
-  prepared.forEach(({ role }, i) => {
+  prepared.forEach(({ role, source }, i) => {
+    if (source !== 'table') return
     const place = seen.get(role) ?? 0
     seen.set(role, place + 1)
     if (match[i] !== -1 || role === 'unknown') return

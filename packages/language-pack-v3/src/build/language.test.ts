@@ -882,6 +882,21 @@ describe('buildLanguage: the related of tA', () => {
   const run = (source: RowSource, taConfigs?: Map<string, Map<string, string>>) => buildLanguage({ source, lang: ES, registry: registry(), about, taConfigs })
   const groupsOf = (segments: BuiltSegment[]) => Object.fromEntries(byClass(segments, 'art').map((s) => [s.seg.h.group, s]))
 
+  test('an unplaced heading is in the report with the scope of its group', async () => {
+    const base = taSource()
+    const source: RowSource = {
+      resources: (lang) => base.resources(lang),
+      async *rows(f: RowFilter) {
+        yield* base.rows(f)
+        if ((f.resource === undefined || f.resource === TA) && (f.layer === undefined || f.layer === 'sot')) {
+          yield { layer: 'sot', key: `${TA}/translate/z`, value: '# Z\n\n## ¿Qué?\n\nx\n\n## Algo raro\n\ny' }
+        }
+      },
+    }
+    const built = await run(source)
+    expect(built.report).toContain(`art ta:translate: ta:translate/z (${TA}): the heading "Algo raro" is not placed (role unknown, sid s1)`)
+  })
+
   test('the segment holds related; the inputs of every tA group change with the configs and with the set of tA rows', async () => {
     const plain = groupsOf((await run(taSource())).segments)
     const translate = (plain['ta:translate'].seg.t as { articles: { id: string; related?: string[] }[] }).articles
