@@ -3,7 +3,7 @@
  * no SQLite binding. The text of the user is never FTS5 syntax: each word is a quoted phrase of its own (all must match).
  */
 import type { ArticleModel, BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
-import { stemForms } from './stem'
+import { stemForms, stemmerFor } from './stem'
 import { DEFAULT_LIMIT, type Hit, INDEX_VERSION, type PieceRow, queryWords, rowsOf, rowsOfArticles, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
 
 export interface SqlDriver {
@@ -16,8 +16,17 @@ export interface SqlDriver {
 const TOKEN = /[\p{L}\p{N}]+/gu
 
 /** All the stem forms of each token of the body, separated by spaces. */
-const stemsOf = (lang: string, body: string): string =>
-  [...body.matchAll(TOKEN)].map((m) => stemForms(lang, m[0]).join(' ')).join(' ')
+const stemsOf = (lang: string, body: string, memo: Map<string, string>): string => {
+  if (stemmerFor(lang) === undefined) return '' // no stemmer: the stems column stays empty and the match leaves out the stems terms
+  return [...body.matchAll(TOKEN)]
+    .map((m) => {
+      const k = `${lang}|${m[0]}`
+      let s = memo.get(k)
+      if (s === undefined) memo.set(k, (s = stemForms(lang, m[0]).join(' ')))
+      return s
+    })
+    .join(' ')
+}
 
 const foldWord = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
 
@@ -49,25 +58,27 @@ const quote = (w: string): string => `"${w.replace(/"/g, '""')}"`
 /** One group per query word: the word in the body, or (for a single token) one of its stems. */
 function group(lang: string, w: string): string {
   const toks = [...w.matchAll(TOKEN)].map((m) => m[0])
-  if (toks.length !== 1) return `(body : ${quote(w)})`
+  if (toks.length !== 1 || stemmerFor(lang) === undefined) return `(body : ${quote(w)})`
   return `(${['body : ' + quote(w), ...stemForms(lang, toks[0]!).map((f) => 'stems : ' + quote(f))].join(' OR ')})`
 }
 
 export function sqlIndex(driver: SqlDriver): SearchIndex {
+  const stemMemo = new Map<string, string>()
   async function store(lang: string, bookName: string, rows: PieceRow[], segmentId: string): Promise<void> {
     await driver.transaction(async () => {
       await driver.run('DELETE FROM pieces WHERE seg = ?', [segmentId])
       await driver.run('DELETE FROM indexed WHERE seg = ?', [segmentId])
       for (const r of rows) {
-        await driver.run('INSERT INTO pieces (body, stems, kind, lang, book, ref, res, rid, seg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [
+        await driver.run('INSERT INTO pieces (body, stems, kind, lang, book, ref, res, rid, role, seg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [
           r.body,
-          stemsOf(lang, r.body),
+          stemsOf(lang, r.body, stemMemo),
           r.kind,
           lang,
           bookName,
           r.ref,
           r.res,
           r.rid,
+          r.role ?? '',
           segmentId,
         ])
       }
@@ -80,7 +91,7 @@ export function sqlIndex(driver: SqlDriver): SearchIndex {
       const v = await driver.all<{ v: string }>("SELECT v FROM meta WHERE k = 'version'", [])
       if (v[0]?.v !== String(INDEX_VERSION)) await driver.exec('DROP TABLE IF EXISTS pieces; DROP TABLE IF EXISTS indexed; DROP TABLE IF EXISTS meta; CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT);')
       await driver.exec(
-        `CREATE VIRTUAL TABLE IF NOT EXISTS pieces USING fts5(body, stems, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, seg UNINDEXED, tokenize = 'unicode61 remove_diacritics 2');
+        `CREATE VIRTUAL TABLE IF NOT EXISTS pieces USING fts5(body, stems, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, role UNINDEXED, seg UNINDEXED, tokenize = 'unicode61 remove_diacritics 2');
          CREATE TABLE IF NOT EXISTS indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT);`,
       )
       await driver.run("INSERT OR REPLACE INTO meta (k, v) VALUES ('version', ?)", [String(INDEX_VERSION)])
@@ -120,9 +131,9 @@ export function sqlIndex(driver: SqlDriver): SearchIndex {
         params.push(...f.kinds)
       }
       params.push(f.limit ?? DEFAULT_LIMIT)
-      type Row = { kind: string; book: string; ref: string; res: string; rid: string; body: string; rank: number }
+      type Row = { kind: string; book: string; ref: string; res: string; rid: string; role: string; body: string; rank: number }
       const rows = await driver.all<Row>(
-        `SELECT kind, book, ref, res, rid, body, bm25(pieces) AS rank FROM pieces WHERE ${where} ORDER BY rank LIMIT ?`,
+        `SELECT kind, book, ref, res, rid, role, body, bm25(pieces) AS rank FROM pieces WHERE ${where} ORDER BY rank LIMIT ?`,
         params,
       )
       return rows.map(
@@ -132,6 +143,7 @@ export function sqlIndex(driver: SqlDriver): SearchIndex {
           ref: r.ref,
           res: r.res,
           ...(r.rid !== '' ? { id: r.rid } : {}),
+          ...(r.kind === 'section' && r.role !== '' ? { role: r.role } : {}),
           snippet: snippetOf(lang, r.body, words),
           score: -r.rank,
         }),

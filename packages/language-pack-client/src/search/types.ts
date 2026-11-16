@@ -11,13 +11,15 @@ export const SEARCH_FILTER_KEYS: Record<keyof SearchFilters, true> = { books: tr
 export const DEFAULT_LIMIT = 20
 
 /** Version of the index layout. A stored index with another version is dropped and rebuilt by `init()`. */
-export const INDEX_VERSION = 2
+export const INDEX_VERSION = 3
 
 /**
  * `ref` is the reference as the resource has it (`1:1`), `res` the resource key, `id` the row id of a note, question or link.
+ * `role` is the role of the section for a `section` hit (`definition`, `intro`...), so a caller can link to it; other hits have none. A section hit
+ * has `book: ''`, so a `books` filter leaves it out.
  * `snippet` is a piece of the body with the matched words between « and ». `score` is higher for a better match.
  */
-export type Hit = { kind: string; book: string; ref: string; res: string; id?: string; snippet: string; score: number }
+export type Hit = { kind: string; book: string; ref: string; res: string; id?: string; role?: string; snippet: string; score: number }
 
 export interface SearchIndex {
   init(): Promise<void>
@@ -30,7 +32,7 @@ export interface SearchIndex {
   search(lang: string, text: string, f?: SearchFilters): Promise<Hit[]>
 }
 
-export type PieceRow = { kind: SearchKind; ref: string; res: string; rid: string; body: string }
+export type PieceRow = { kind: SearchKind; ref: string; res: string; rid: string; body: string; role?: string }
 
 const NUMBER = /^(\d+)/
 
@@ -104,7 +106,7 @@ export function rowsOfArticles(articles: ArticleModel[]): PieceRow[] {
   for (const a of articles)
     for (const s of a.sections) {
       if (s.md.trim() === '') continue
-      rows.push({ kind: 'section', ref: '', res: a.res, rid: `${a.id}#${s.sid}`, body: [a.title, s.title ?? '', s.md].filter((x) => x !== '').join('\n') })
+      rows.push({ kind: 'section', ref: '', res: a.res, rid: `${a.id}#${s.sid}`, role: s.role, body: [a.title, s.title ?? '', s.md].filter((x) => x !== '').join('\n') })
     }
   return rows
 }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
-import { memoryIndex } from './memory'
+import { memoryIndex, tokenizer } from './memory'
 
 const book = (name: string, text: string): BookModel => ({
   lang: 'xx',
@@ -104,8 +104,22 @@ describe('memoryIndex stems', () => {
     const hits = await ix.search('es-419', 'gracia', { kinds: ['section'] })
     expect(hits.map((h) => h.id).sort()).toEqual(['tw:kt/grace#definicion', 'tw:kt/grace#sugerencias'])
     expect(hits[0]).toMatchObject({ kind: 'section', book: '', ref: '', res: 'r/tw' })
+    expect(hits.map((h) => h.role).sort()).toEqual(['definition', 'translation'])
     expect(await ix.search('es-419', 'inmerecido', { kinds: ['note'] })).toEqual([])
     await ix.removeSegment('a1')
     expect(await ix.search('es-419', 'gracia')).toEqual([])
+  })
+})
+
+describe('memoryIndex interning', () => {
+  test('two tokens with the same word in the same language share the same stem array; another language does not', () => {
+    const tok = tokenizer()
+    const a = tok('Las gracias de Dios', 'es-419')
+    const b = tok('la gracia y gracias', 'es-419')
+    const c = tok('gracias', 'en')
+    const x = a.find((t) => t.t === 'gracias')!
+    const y = b.find((t) => t.t === 'gracias')!
+    expect(x.s).toBe(y.s)
+    expect(c[0]!.s).not.toBe(x.s)
   })
 })

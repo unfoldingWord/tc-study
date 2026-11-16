@@ -1,6 +1,8 @@
-/** The index in memory: the fallback of a reader (and the one of a Worker) when the host gives no SQL driver. Same matches as `sqlIndex`,
- * ranked differently: here by word count over the square root of the piece length, there by SQLite's bm25. With
- * more matches than the limit, the two can keep different hits. */
+/** The index in memory: the fallback of a reader (and the one of a Worker) when the host gives no SQL driver. It does not have the same
+ * matches as `sqlIndex` for a query word of several tokens (here each token is compared by form or stem, there the words are a phrase of
+ * the body), and it ranks differently: here by word count over the square root of the piece length, there by SQLite's bm25. With
+ * more matches than the limit, the two can keep different hits. Token forms are interned per index (one {t, s} per language and word),
+ * so a book does not hold one stem array per occurrence. */
 import type { ArticleModel, BookModel, ObsModel } from '@bt-synergy/language-pack-v3'
 import { stemForms } from './stem'
 import { DEFAULT_LIMIT, type Hit, type PieceRow, queryWords, rowsOf, rowsOfArticles, rowsOfObs, type SearchFilters, type SearchIndex } from './types'
@@ -9,13 +11,16 @@ const fold = (s: string): string => s.normalize('NFD').replace(/\p{M}/gu, '').to
 
 /** `t` is the folded word, `s` its stem forms in the language of the row (or of the query). */
 type Tok = { t: string; s: string[]; start: number; end: number }
-function tokens(s: string, lang: string): Tok[] {
-  return [...s.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => ({
-    t: fold(m[0]),
-    s: stemForms(lang, m[0]),
-    start: m.index!,
-    end: m.index! + m[0].length,
-  }))
+/** A tokenizer with its own table of forms: two tokens of the same language and word share the same `s` array. */
+export function tokenizer(): (s: string, lang: string) => Tok[] {
+  const forms = new Map<string, { t: string; s: string[] }>()
+  return (s, lang) =>
+    [...s.matchAll(/[\p{L}\p{N}]+/gu)].map((m) => {
+      const k = `${lang}|${m[0]}`
+      let f = forms.get(k)
+      if (f === undefined) forms.set(k, (f = { t: fold(m[0]), s: stemForms(lang, m[0]) }))
+      return { t: f.t, s: f.s, start: m.index!, end: m.index! + m[0].length }
+    })
 }
 
 const sameWord = (a: Tok, b: Tok): boolean => a.t === b.t || a.s.some((x) => b.s.includes(x))
@@ -31,6 +36,7 @@ function phraseAt(toks: Tok[], phrase: Tok[]): number[] {
 
 export function memoryIndex(): SearchIndex {
   let rows: Row[] = []
+  const tokens = tokenizer()
   const segs = new Set<string>()
   return {
     async init() {},
@@ -91,6 +97,7 @@ export function memoryIndex(): SearchIndex {
           ref: r.ref,
           res: r.res,
           ...(r.rid !== '' ? { id: r.rid } : {}),
+          ...(r.kind === 'section' && r.role !== undefined ? { role: r.role } : {}),
           snippet: `${lo > 0 ? '…' : ''}${snippet}${hi < r.toks.length - 1 ? '…' : ''}`,
           score: count / Math.sqrt(r.toks.length),
         })

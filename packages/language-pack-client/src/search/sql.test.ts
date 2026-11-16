@@ -357,6 +357,39 @@ describe('sqlIndex stems', () => {
     await ix.init()
     expect(await ix.has('s1')).toBe(true)
   })
+  test('a version 2 database (no role column) is rebuilt by init', async () => {
+    const db = new Database(':memory:')
+    db.exec(`CREATE TABLE meta (k TEXT PRIMARY KEY, v TEXT); INSERT INTO meta VALUES ('version', '2');
+      CREATE VIRTUAL TABLE pieces USING fts5(body, stems, kind UNINDEXED, lang UNINDEXED, book UNINDEXED, ref UNINDEXED, res UNINDEXED, rid UNINDEXED, seg UNINDEXED);
+      CREATE TABLE indexed (seg TEXT PRIMARY KEY, lang TEXT, book TEXT); INSERT INTO indexed VALUES ('s1', 'es', 'rut');`)
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    expect(await ix.has('s1')).toBe(false)
+    await ix.addBook('es', mk('es', 'Las gracias de Dios'), 's1')
+    expect((await ix.search('es', 'gracia')).length).toBe(1)
+  })
+  test('section hits carry their role; other hits have none', async () => {
+    const ix = sqlIndex(bunDriver())
+    await ix.init()
+    await ix.addArticles(
+      'es-419',
+      [{ id: 'tw:kt/grace', res: 'r/tw', title: 'Gracia', sections: [{ sid: 'definicion', level: 2, role: 'definition', title: 'Definición', lang: 'es-419', md: 'El favor inmerecido.' }] }] as never,
+      'a1',
+    )
+    await ix.addBook('es-419', mk('es-419', 'Las gracias de Dios'), 's1')
+    const hits = await ix.search('es-419', 'gracia')
+    expect(hits.find((h) => h.kind === 'section')).toMatchObject({ id: 'tw:kt/grace#definicion', role: 'definition' })
+    expect(hits.find((h) => h.kind === 'text')!.role).toBeUndefined()
+  })
+  test('a language with no stemmer writes empty stems and matches the exact word only', async () => {
+    const db = new Database(':memory:')
+    const ix = sqlIndex(bunDriver(db))
+    await ix.init()
+    await ix.addBook('fr', mk('fr', 'les graces et les gracias'), 's3')
+    expect(db.query('SELECT stems FROM pieces').all()).toEqual([{ stems: '' }])
+    expect((await ix.search('fr', 'gracias')).length).toBe(1)
+    expect(await ix.search('fr', 'gracia')).toEqual([])
+  })
   test('user text with quotes is never FTS5 syntax', async () => {
     const ix = sqlIndex(bunDriver())
     await ix.init()
