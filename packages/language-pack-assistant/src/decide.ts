@@ -13,10 +13,11 @@ import { MAX_OPTIONS, outcomeFor, readQuestion, ruleOutcome, type Outcome, type 
 
 /**
  * The classifier's answer is taken alone when its best probability leads the second by at least this much; below it, the two best
- * become a choice. Frozen from the tune sets (`eval/tune.ts`, 2026-11-12): calls correct es 77/100, pt 50/100, en 58/60 at every
- * margin from 0 to 0.9; correct among accepted is flat from 0.2 to 0.6 (es 62/75, pt 40/86, en 47/48), 0 to 0.1 accepts one wrong
- * es call more, 0.7 and above moves one wrong es call to a choice. The classifier decides few tune questions (es 9, pt 7, en 2), so
- * the plateau is kept at C0's value.
+ * become a choice. Frozen from the tune sets (`eval/tune.ts`, 2026-11-12: calls correct flat from margin 0 to 0.9, correct among
+ * accepted flat from 0.2 to 0.6), counted per R28 (accepted = a call by a rule or the classifier; the search fallback is not
+ * accepted) on the refreshed staging packs of 2026-11-15 (`eval/run.ts`): calls correct es 76/100, pt 49/100, en 55/60; accepted
+ * es 80 (61 correct), pt 62 (38), en 47 (45); counting the fallback, pt 88 (39) and en 48 (45). The classifier alone decides few
+ * tune questions (pt 3, en 1), so the plateau is kept at C0's value.
  */
 export const DEFAULT_MARGIN = 0.3
 

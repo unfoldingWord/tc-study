@@ -27,7 +27,11 @@ function folderBytes(dir: string): number {
   let n = 0
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name)
-    n += e.isDirectory() ? folderBytes(p) : statSync(p).size
+    try {
+      n += e.isDirectory() ? folderBytes(p) : statSync(p).size
+    } catch {
+      // a file that went away while counting (the folder may be shared with other tools) is not counted
+    }
   }
   return n
 }

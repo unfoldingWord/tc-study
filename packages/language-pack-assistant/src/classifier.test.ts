@@ -33,7 +33,7 @@ describe('classifier', () => {
   })
   test('the generated files load, a file for queries/2 does not', () => {
     for (const lang of ['en', 'es', 'pt']) {
-      const raw = readFileSync(join(import.meta.dir, '..', 'complements', `${lang}.classifier.json`), 'utf8')
+      const raw = readFileSync(join(import.meta.dir, '..', 'complements', `${lang}.classifier.json`), 'utf8').split(String.fromCharCode(13)).join('')
       expect(loadComplement(bytes(raw)).ok).toBe(true)
       expect(raw).toBe(render(lang))
       expect(examplesOf(lang).length).toBeGreaterThan(80)
