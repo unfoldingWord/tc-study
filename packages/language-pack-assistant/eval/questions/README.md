@@ -1,6 +1,6 @@
 # Question sets of the language-pack assistant
 
-Files: `*-tune.jsonl` (tuning sets, 60 questions each) and `*-test.jsonl` (held-out test sets, 150 questions each).
+Files: `*-tune.jsonl` (tuning sets, 100 questions in es and pt, 60 in en) and `*-test.jsonl` (held-out test sets, 150 questions each).
 
 ## Who wrote them, and when
 

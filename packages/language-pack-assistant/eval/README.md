@@ -21,7 +21,7 @@ es and pt are asked of the `es-419` reader (pt has no pack of its own yet; its t
 
 ## Question sets
 
-`questions/*-tune.jsonl` (60 questions) are for tuning; `questions/*-test.jsonl` (150) are held out and frozen (see
+`questions/*-tune.jsonl` (100 questions in es and pt, 60 in en) are for tuning; `questions/*-test.jsonl` (150) are held out and frozen (see
 `questions/README.md`). A change to a test set needs a commit of its own, `eval: refreeze <lang> test set`. The tune sets have no
 expected pieces, so `top3` is measured on the test sets only.
 
